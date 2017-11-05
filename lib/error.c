@@ -16,7 +16,9 @@
 
 #include "got_error.h"
 
-#define nitems(a) (sizeof(a) / sizeof((a)[0]))
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
 
 const struct got_error *
 got_error(int code)
