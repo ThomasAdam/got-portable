@@ -19,7 +19,6 @@
 #include <sha1.h>
 
 #include "got_error.h"
-#include "got_path.h"
 #include "got_refs.h"
 #include "got_repository.h"
 
@@ -36,8 +35,7 @@ repo_open_test(const char *repo_path)
 	const char *abspath;
 	int ret;
 
-	abspath = got_path_normalize(repo_path);
-	err = got_repo_open(&repo, abspath);
+	err = got_repo_open(&repo, repo_path);
 	ret = (err == NULL && repo != NULL);
 	got_repo_close(repo);
 	return ret;
@@ -49,11 +47,9 @@ repo_get_head_ref(const char *repo_path)
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_reference *head_ref;
-	const char *abspath;
 	int ret;
 
-	abspath = got_path_normalize(repo_path);
-	err = got_repo_open(&repo, abspath);
+	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
 	err = got_repo_get_reference(&head_ref, repo, GOT_REF_HEAD);

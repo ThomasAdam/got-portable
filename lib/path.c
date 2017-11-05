@@ -60,16 +60,3 @@ got_path_normalize(const char *path)
 
 	return resolved;
 }
-
-int
-got_path_is_normalized(const char *path)
-{
-	char *normpath;
-	int ret;
-
-	normpath = got_path_normalize(path);
-	ret = (strcmp(normpath, path) == 0);
-	free(normpath);
-
-	return ret;
-}

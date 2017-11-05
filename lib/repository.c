@@ -98,26 +98,38 @@ is_git_repo(struct got_repository *repo)
 }
 
 const struct got_error *
-got_repo_open(struct got_repository **ret, const char *abspath)
+got_repo_open(struct got_repository **ret, const char *path)
 {
-	struct got_repository *repo;
+	struct got_repository *repo = NULL;
+	const struct got_error *err = NULL;
+	char *abspath = got_path_get_absolute(path);
 
-	if (!got_path_is_absolute(abspath))
-		return got_error(GOT_ERR_NOT_ABSPATH);
-
-	repo = calloc(1, sizeof(*repo));
-	if (repo == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-
-	repo->path = got_path_normalize(abspath);
-	if (repo->path == NULL)
+	if (abspath == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
-	if (!is_git_repo(repo))
-		return got_error(GOT_ERR_NOT_GIT_REPO);
+	repo = calloc(1, sizeof(*repo));
+	if (repo == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+
+	repo->path = got_path_normalize(abspath);
+	if (repo->path == NULL) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	if (!is_git_repo(repo)) {
+		err = got_error(GOT_ERR_NOT_GIT_REPO);
+		goto done;
+	}
 		
 	*ret = repo;
-	return NULL;
+done:
+	if (err)
+		free(repo);
+	free(abspath);
+	return err;
 }
 
 void
