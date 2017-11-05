@@ -35,6 +35,7 @@ repo_resolve_head_ref(const char *repo_path)
 	struct got_repository *repo;
 	struct got_reference *head_ref;
 	struct got_object_id *id;
+	char buf[SHA1_DIGEST_STRING_LENGTH];
 	int ret;
 
 	err = got_repo_open(&repo, repo_path);
@@ -46,6 +47,7 @@ repo_resolve_head_ref(const char *repo_path)
 	err = got_ref_resolve(&id, repo, head_ref);
 	if (err != NULL || head_ref == NULL)
 		return 0;
+	printf("HEAD is at %s\n", got_object_id_str(id, buf, sizeof(buf)));
 	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);

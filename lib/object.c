@@ -14,8 +14,28 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_object_id {
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
-};
+#include <stdio.h>
+#include <sha1.h>
 
-const char * got_object_id_str(struct got_object_id *, char *, size_t);
+#include "got_object.h"
+
+const char *
+got_object_id_str(struct got_object_id *id, char *buf, size_t size)
+{
+	char *p = buf;
+	char hex[3];
+	int i;
+
+	if (size < SHA1_DIGEST_STRING_LENGTH)
+		return NULL;
+
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		snprintf(hex, sizeof(hex), "%.2x", id->sha1[i]);
+		p[0] = hex[0];
+		p[1] = hex[1];
+		p += 2;
+	}
+	p[0] = '\0';
+
+	return buf;
+}
