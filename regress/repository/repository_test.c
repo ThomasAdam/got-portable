@@ -29,39 +29,6 @@
 #define GOT_REPO_PATH "../../../"
 
 static int
-repo_open_test(const char *repo_path)
-{
-	const struct got_error *err;
-	struct got_repository *repo;
-	const char *abspath;
-	int ret;
-
-	err = got_repo_open(&repo, repo_path);
-	ret = (err == NULL && repo != NULL);
-	got_repo_close(repo);
-	return ret;
-}
-
-static int
-repo_get_head_ref(const char *repo_path)
-{
-	const struct got_error *err;
-	struct got_repository *repo;
-	struct got_reference *head_ref;
-	int ret;
-
-	err = got_repo_open(&repo, repo_path);
-	if (err != NULL || repo == NULL)
-		return 0;
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
-	if (err != NULL || head_ref == NULL)
-		return 0;
-	got_ref_close(head_ref);
-	got_repo_close(repo);
-	return 1;
-}
-
-static int
 repo_resolve_head_ref(const char *repo_path)
 {
 	const struct got_error *err;
@@ -100,8 +67,6 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
-	RUN_TEST(repo_open_test(repo_path), "repo_open");
-	RUN_TEST(repo_get_head_ref(repo_path), "get_head_ref");
 	RUN_TEST(repo_resolve_head_ref(repo_path), "resolve_head_ref");
 
 	return failure ? 1 : 0;
