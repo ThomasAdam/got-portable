@@ -41,6 +41,7 @@ struct got_reference {
 #define GOT_REF_HEAD		"HEAD"
 #define GOT_REF_ORIG_HEAD	"ORIG_HEAD"
 #define GOT_REF_MERGE_HEAD	"MERGE_HEAD"
+#define GOT_REF_FETCH_HEAD	"FETCH_HEAD"
 
 const struct got_error *
 got_ref_open(struct got_reference **, const char *, const char *);

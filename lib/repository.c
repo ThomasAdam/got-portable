@@ -29,9 +29,12 @@
 #define GOT_GIT_DIR	".git"
 
 /* Mandatory files and directories inside the git directory. */
-#define GOT_OBJECTS_DIR	"objects"
-#define GOT_REFS_DIR	"refs"
-#define GOT_HEAD_FILE	"HEAD"
+#define GOT_OBJECTS_DIR		"objects"
+#define GOT_REFS_DIR		"refs"
+#define GOT_HEAD_FILE		"HEAD"
+
+#define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
+#define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
 
 static char *
 get_path_git_dir(struct got_repository *repo)
@@ -138,7 +141,10 @@ got_repo_get_reference(struct got_reference **ref,
 	char *path_refs;
 
 	/* Some refs live in the .git directory. */
-	if (strcmp(refname, GOT_REF_HEAD) == 0)
+	if (strcmp(refname, GOT_REF_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_ORIG_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0)
 		path_refs = get_path_git_dir(repo);
 	else
 		path_refs = get_path_refs(repo);
