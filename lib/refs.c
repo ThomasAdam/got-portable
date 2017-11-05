@@ -22,8 +22,9 @@
 #include <util.h>
 
 #include "got_error.h"
-#include "got_path.h"
 #include "got_refs.h"
+
+#include "path.h"
 
 static const struct got_error *
 parse_symref(struct got_reference **ref, const char *name, const char *line)

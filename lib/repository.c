@@ -21,10 +21,11 @@
 #include <sha1.h>
 #include <string.h>
 
-#include "got_path.h"
 #include "got_error.h"
 #include "got_refs.h"
 #include "got_repository.h"
+
+#include "path.h"
 
 #define GOT_GIT_DIR	".git"
 
