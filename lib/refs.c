@@ -59,6 +59,7 @@ parse_sha1_digest(uint8_t *digest, const char *line)
 	uint8_t b;
 	int i, n;
 
+	memset(digest, 0, SHA1_DIGEST_LENGTH);
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
 		n = sscanf(line, "%hhx", &b);
 		if (n == 1)
