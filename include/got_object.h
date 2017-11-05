@@ -14,6 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_object {
+struct got_object_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 };

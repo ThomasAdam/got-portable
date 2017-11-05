@@ -43,8 +43,12 @@ struct got_reference {
 #define GOT_REF_MERGE_HEAD	"MERGE_HEAD"
 #define GOT_REF_FETCH_HEAD	"FETCH_HEAD"
 
-const struct got_error *
-got_ref_open(struct got_reference **, const char *, const char *);
+struct got_repository;
+struct got_object_id;
 
+const struct got_error * got_ref_open(struct got_reference **,
+    struct got_repository *, const char *);
 void got_ref_close(struct got_reference *);
-
+struct got_reference *got_ref_dup(struct got_reference *);
+const struct got_error *got_ref_resolve(struct got_object_id **,
+    struct got_repository *, struct got_reference *);

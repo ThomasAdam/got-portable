@@ -37,8 +37,8 @@
 #define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
 #define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
 
-static char *
-get_path_git_dir(struct got_repository *repo)
+char *
+got_repo_get_path_git_dir(struct got_repository *repo)
 {
 	char *path_git;
 	
@@ -60,14 +60,14 @@ get_path_git_child(struct got_repository *repo, const char *basename)
 	return path_child;
 }
 
-static char *
-get_path_objects(struct got_repository *repo)
+char *
+got_repo_get_path_objects(struct got_repository *repo)
 {
 	return get_path_git_child(repo, GOT_OBJECTS_DIR);
 }
 
-static char *
-get_path_refs(struct got_repository *repo)
+char *
+got_repo_get_path_refs(struct got_repository *repo)
 {
 	return get_path_git_child(repo, GOT_REFS_DIR);
 }
@@ -81,9 +81,9 @@ get_path_head(struct got_repository *repo)
 static int
 is_git_repo(struct got_repository *repo)
 {
-	char *path_git = get_path_git_dir(repo);
-	char *path_objects = get_path_objects(repo);
-	char *path_refs = get_path_refs(repo);
+	char *path_git = got_repo_get_path_git_dir(repo);
+	char *path_objects = got_repo_get_path_objects(repo);
+	char *path_refs = got_repo_get_path_refs(repo);
 	char *path_head = get_path_head(repo);
 	int ret;
 
@@ -144,25 +144,4 @@ const char *
 got_repo_get_path(struct got_repository *repo)
 {
 	return repo->path;
-}
-
-const struct got_error *
-got_repo_get_reference(struct got_reference **ref,
-    struct got_repository *repo, const char *refname)
-{
-	const struct got_error *err = NULL;
-	char *path_refs;
-
-	/* Some refs live in the .git directory. */
-	if (strcmp(refname, GOT_REF_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_ORIG_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0)
-		path_refs = get_path_git_dir(repo);
-	else
-		path_refs = get_path_refs(repo);
-
-	err = got_ref_open(ref, path_refs, refname);
-	free(path_refs);
-	return err;
 }

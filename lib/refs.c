@@ -20,11 +20,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <util.h>
+#include <limits.h>
+#include <errno.h>
 
 #include "got_error.h"
+#include "got_object.h"
+#include "got_repository.h"
 #include "got_refs.h"
 
 #include "path.h"
+
 
 static const struct got_error *
 parse_symref(struct got_reference **ref, const char *name, const char *line)
@@ -54,18 +59,39 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 }
 
 static int
+parse_xdigit(uint8_t *val, const char *hex)
+{
+	char *ep;
+	long lval;
+
+	errno = 0;
+	lval = strtol(hex, &ep, 16);
+	if (hex[0] == '\0' || *ep != '\0')
+		return 0;
+	if (errno == ERANGE && (lval == LONG_MAX || lval == LONG_MIN))
+		return 0;
+
+	*val = (uint8_t)lval;
+	return 1;
+}
+
+static int
 parse_sha1_digest(uint8_t *digest, const char *line)
 {
-	uint8_t b;
-	int i, n;
+	uint8_t b = 0;
+	char hex[3] = {'\0', '\0', '\0'};
+	int i, j;
 
-	memset(digest, 0, SHA1_DIGEST_LENGTH);
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		n = sscanf(line, "%hhx", &b);
-		if (n == 1)
-			digest[i] = b;
-		else
+		if (line[0] == '\0' || line[1] == '\0')
 			return 0;
+		for (j = 0; j < 2; j++) {
+			hex[j] = *line;
+			line++;
+		}
+		if (!parse_xdigit(&b, hex))
+			return 0;
+		digest[i] = b;
 	}
 
 	return 1;
@@ -121,14 +147,37 @@ done:
 	return err;
 }
 
+static char *
+get_refs_dir_path(struct got_repository *repo, const char *refname)
+{
+	/* Some refs live in the .git directory. */
+	if (strcmp(refname, GOT_REF_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_ORIG_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0)
+		return got_repo_get_path_git_dir(repo);
+
+	/* Is the ref name relative to the .git directory? */
+	if (strncmp(refname, "refs/", 5) == 0)
+		return got_repo_get_path_git_dir(repo);
+
+	return got_repo_get_path_refs(repo);
+}
+
 const struct got_error *
-got_ref_open(struct got_reference **ref, const char *path_refs,
+got_ref_open(struct got_reference **ref, struct got_repository *repo,
    const char *refname)
 {
 	const struct got_error *err = NULL;
 	char *path_ref = NULL;
 	char *normpath = NULL;
 	const char *parent_dir;
+	char *path_refs = get_refs_dir_path(repo, refname);
+
+	if (path_refs == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
 	
 	/* XXX For now, this assumes that refs exist in the filesystem. */
 
@@ -143,10 +192,11 @@ got_ref_open(struct got_reference **ref, const char *path_refs,
 		goto done;
 	}
 
-	err = parse_ref_file(ref, refname, normpath ? normpath : path_refs);
+	err = parse_ref_file(ref, refname, normpath);
 done:
 	free(normpath);
 	free(path_ref);
+	free(path_refs);
 	return err;
 }
 
@@ -158,4 +208,82 @@ got_ref_close(struct got_reference *ref)
 	else
 		free(ref->ref.ref.name);
 	free(ref);
+}
+
+struct got_reference *
+got_ref_dup(struct got_reference *ref)
+{
+	struct got_reference *ret = calloc(1, sizeof(*ret));
+	char *name = NULL;
+	char *symref = NULL;
+
+	if (ret == NULL)
+		return NULL;
+
+	ret->flags = ref->flags;
+	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
+		ret->ref.symref.name = strdup(ref->ref.symref.name);
+		if (ret->ref.symref.name == NULL) {
+			free(ret);
+			return NULL;
+		}
+		ret->ref.symref.ref = strdup(ref->ref.symref.ref);
+		if (ret->ref.symref.ref == NULL) {
+			free(ret->ref.symref.name);
+			free(ret);
+			return NULL;
+		}
+	} else {
+		ref->ref.ref.name = strdup(ref->ref.ref.name);
+		if (ref->ref.ref.name == NULL) {
+			free(ret);
+			return NULL;
+		}
+		memcpy(ret->ref.ref.sha1, ref->ref.ref.sha1,
+		    SHA1_DIGEST_LENGTH);
+	}
+
+	return ret;
+}
+
+static const struct got_error *
+resolve_symbolic_ref(struct got_reference **resolved,
+    struct got_repository *repo, struct got_reference *ref)
+{
+	struct got_reference *nextref;
+	const struct got_error *err;
+
+	err = got_ref_open(&nextref, repo, ref->ref.symref.ref);
+	if (err)
+		return err;
+
+	if (nextref->flags & GOT_REF_IS_SYMBOLIC)
+		err = resolve_symbolic_ref(resolved, repo, nextref);
+	else
+		*resolved = got_ref_dup(nextref);
+
+	got_ref_close(nextref);
+	return err;
+}
+
+const struct got_error *
+got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
+    struct got_reference *ref)
+{
+	const struct got_error *err;
+
+	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
+		struct got_reference *resolved = NULL;
+		err = resolve_symbolic_ref(&resolved, repo, ref);
+		if (err == NULL)
+			err = got_ref_resolve(id, repo, resolved);
+		free(resolved);
+		return err;
+	}
+
+	*id = calloc(1, sizeof(**id));
+	if (*id == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+	memcpy((*id)->sha1, ref->ref.ref.sha1, SHA1_DIGEST_LENGTH);
+	return NULL;
 }

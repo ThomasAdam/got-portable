@@ -19,6 +19,7 @@
 #include <sha1.h>
 
 #include "got_error.h"
+#include "got_object.h"
 #include "got_refs.h"
 #include "got_repository.h"
 
@@ -52,9 +53,33 @@ repo_get_head_ref(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_repo_get_reference(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
 	if (err != NULL || head_ref == NULL)
 		return 0;
+	got_ref_close(head_ref);
+	got_repo_close(repo);
+	return 1;
+}
+
+static int
+repo_resolve_head_ref(const char *repo_path)
+{
+	const struct got_error *err;
+	struct got_repository *repo;
+	struct got_reference *head_ref;
+	struct got_object_id *id;
+	int ret;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		return 0;
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (err != NULL || head_ref == NULL)
+		return 0;
+	err = got_ref_resolve(&id, repo, head_ref);
+	if (err != NULL || head_ref == NULL)
+		return 0;
+	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);
 	return 1;
@@ -77,6 +102,7 @@ main(int argc, const char *argv[])
 
 	RUN_TEST(repo_open_test(repo_path), "repo_open");
 	RUN_TEST(repo_get_head_ref(repo_path), "get_head_ref");
+	RUN_TEST(repo_resolve_head_ref(repo_path), "resolve_head_ref");
 
 	return failure ? 1 : 0;
 }
