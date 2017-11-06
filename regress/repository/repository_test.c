@@ -72,6 +72,7 @@ repo_read_object_header(const char *repo_path)
 		printf("author: %s\n", commit->author);
 		printf("committer: %s\n", commit->committer);
 		printf("log: %s\n", commit->logmsg);
+		got_object_commit_close(commit);
 	}
 	got_object_close(obj);
 	free(id);
