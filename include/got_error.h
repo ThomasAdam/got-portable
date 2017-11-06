@@ -26,6 +26,8 @@
 #define GOT_ERR_DECOMPRESSION	0x0008
 #define GOT_ERR_NO_SPACE	0x0009
 #define GOT_ERR_BAD_OBJ_HDR	0x0010
+#define GOT_ERR_OBJ_TYPE	0x0011
+#define GOT_ERR_BAD_OBJ_DATA	0x0012
 
 static const struct got_error {
 	int code;
@@ -42,6 +44,8 @@ static const struct got_error {
 	{ GOT_ERR_DECOMPRESSION,"decompression failed" },
 	{ GOT_ERR_NO_SPACE,	"buffer too small" },
 	{ GOT_ERR_BAD_OBJ_HDR,	"bad object header" },
+	{ GOT_ERR_OBJ_TYPE,	"wrong type of object" },
+	{ GOT_ERR_BAD_OBJ_DATA,	"bad object data" },
 };
 
 const struct got_error * got_error(int code);

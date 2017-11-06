@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sha1.h>
@@ -53,6 +55,24 @@ repo_read_object_header(const char *repo_path)
 	if (err != NULL || obj == NULL)
 		return 0;
 	printf("object type=%d size=%lu\n", obj->type, obj->size);
+	if (obj->type == GOT_OBJ_TYPE_COMMIT) {
+		struct got_commit_object *commit;
+		struct got_parent_id *pid;
+
+		err = got_object_commit_open(&commit, repo, obj);
+		if (err != NULL || commit == NULL)
+			return 0;
+		printf("tree: %s\n",
+		    got_object_id_str(&commit->tree_id, buf, sizeof(buf)));
+		printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
+		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+			printf("%s\n",
+			    got_object_id_str(&pid->id, buf, sizeof(buf)));
+		}
+		printf("author: %s\n", commit->author);
+		printf("committer: %s\n", commit->committer);
+		printf("log: %s\n", commit->logmsg);
+	}
 	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);

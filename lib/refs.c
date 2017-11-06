@@ -15,18 +15,19 @@
  */
 
 #include <sys/types.h>
+#include <sys/queue.h>
+
 #include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <util.h>
-#include <limits.h>
-#include <errno.h>
 
 #include "got_error.h"
 #include "got_object.h"
 #include "got_repository.h"
 #include "got_refs.h"
+#include "got_sha1.h"
 
 #include "path.h"
 
@@ -58,45 +59,6 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 	return NULL;
 }
 
-static int
-parse_xdigit(uint8_t *val, const char *hex)
-{
-	char *ep;
-	long lval;
-
-	errno = 0;
-	lval = strtol(hex, &ep, 16);
-	if (hex[0] == '\0' || *ep != '\0')
-		return 0;
-	if (errno == ERANGE && (lval == LONG_MAX || lval == LONG_MIN))
-		return 0;
-
-	*val = (uint8_t)lval;
-	return 1;
-}
-
-static int
-parse_sha1_digest(uint8_t *digest, const char *line)
-{
-	uint8_t b = 0;
-	char hex[3] = {'\0', '\0', '\0'};
-	int i, j;
-
-	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		if (line[0] == '\0' || line[1] == '\0')
-			return 0;
-		for (j = 0; j < 2; j++) {
-			hex[j] = *line;
-			line++;
-		}
-		if (!parse_xdigit(&b, hex))
-			return 0;
-		digest[i] = b;
-	}
-
-	return 1;
-}
-
 static const struct got_error *
 parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 {
@@ -112,7 +74,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 	if (ref_name == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	if (!parse_sha1_digest(digest, line))
+	if (!got_parse_sha1_digest(digest, line))
 		return got_error(GOT_ERR_NOT_REF);
 
 	*ref = calloc(1, sizeof(**ref));

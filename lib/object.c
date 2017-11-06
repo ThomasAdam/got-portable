@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +27,7 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_repository.h"
+#include "got_sha1.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -37,6 +40,11 @@
 #define GOT_OBJ_TAG_COMMIT	"commit"
 #define GOT_OBJ_TAG_TREE	"tree"
 #define GOT_OBJ_TAG_BLOB	"blob"
+
+#define GOT_COMMIT_TAG_TREE		"tree "
+#define GOT_COMMIT_TAG_PARENT		"parent "
+#define GOT_COMMIT_TAG_AUTHOR		"author "
+#define GOT_COMMIT_TAG_COMMITTER	"committer "
 
 const char *
 got_object_id_str(struct got_object_id *id, char *buf, size_t size)
@@ -148,7 +156,7 @@ inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
 }
 
 static const struct got_error *
-parse_obj_header(struct got_object **obj, char *buf, size_t len)
+parse_object_header(struct got_object **obj, char *buf, size_t len)
 {
 	const char *obj_tags[] = {
 		GOT_OBJ_TAG_COMMIT,
@@ -161,12 +169,14 @@ parse_obj_header(struct got_object **obj, char *buf, size_t len)
 		GOT_OBJ_TYPE_BLOB,
 	};
 	int type = 0;
-	size_t size = 0;
+	size_t size = 0, hdrlen = 0;
 	int i;
 	char *p = strchr(buf, '\0');
 
 	if (p == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
+
+	hdrlen = strlen(buf) + 1 /* '\0' */;
 
 	for (i = 0; i < nitems(obj_tags); i++) {
 		const char *tag = obj_tags[i];
@@ -190,6 +200,7 @@ parse_obj_header(struct got_object **obj, char *buf, size_t len)
 
 	*obj = calloc(1, sizeof(**obj));
 	(*obj)->type = type;
+	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
 	return NULL;
 }
@@ -201,7 +212,6 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	const struct got_error *err;
 	FILE *f;
 	struct got_zstream_buf zb;
-	char *p;
 	size_t outlen;
 	int i, ret;
 
@@ -219,10 +229,31 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	err = parse_obj_header(obj, zb.outbuf, outlen);
+	err = parse_object_header(obj, zb.outbuf, outlen);
 done:
 	inflate_end(&zb);
 	fclose(f);
+	return err;
+}
+
+static const struct got_error *
+object_path(char **path, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	char *path_objects = got_repo_get_path_objects(repo);
+
+	if (path_objects == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	got_object_id_str(id, hex, sizeof(hex));
+
+	if (asprintf(path, "%s/%.2x/%s", path_objects,
+	    id->sha1[0], hex + 2) == -1)
+		err = got_error(GOT_ERR_NO_MEM);
+
+	free(path_objects);
 	return err;
 }
 
@@ -231,28 +262,17 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
-	char *path_objects = got_repo_get_path_objects(repo);
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	char *path = NULL;
 
-	if (path_objects == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-
-	got_object_id_str(id, hex, sizeof(hex));
-
-	if (asprintf(&path, "%s/%.2x/%s",
-	    path_objects, id->sha1[0], hex + 2) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
+	err = object_path(&path, id, repo);
+	if (err)
+		return err;
 
 	err = read_object_header(obj, repo, path);
 	if (err == NULL)
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
-
 done:
 	free(path);
-	free(path_objects);
 	return err;
 }
 
@@ -260,4 +280,215 @@ void
 got_object_close(struct got_object *obj)
 {
 	free(obj);
+}
+
+static int
+commit_object_valid(struct got_commit_object *commit)
+{
+	int i;
+	int n;
+
+	if (commit == NULL)
+		return 0;
+
+	n = 0;
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		if (commit->tree_id.sha1[i] == 0)
+			n++;
+	}
+	if (n == SHA1_DIGEST_LENGTH)
+		return 0;
+
+	return 1;
+}
+
+static const struct got_error *
+parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
+{
+	const struct got_error *err = NULL;
+	char *s = buf;
+	size_t tlen;
+	ssize_t remain = (ssize_t)len;
+ 
+	*commit = calloc(1, sizeof(**commit));
+	if (*commit == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	SIMPLEQ_INIT(&(*commit)->parent_ids);
+
+	tlen = strlen(GOT_COMMIT_TAG_TREE);
+	if (strncmp(s, GOT_COMMIT_TAG_TREE, tlen) == 0) {
+		remain -= tlen;
+		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		if (!got_parse_sha1_digest((*commit)->tree_id.sha1, s)) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		remain -= SHA1_DIGEST_STRING_LENGTH;
+		s += SHA1_DIGEST_STRING_LENGTH;
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_PARENT);
+	while (strncmp(s, GOT_COMMIT_TAG_PARENT, tlen) == 0) {
+		struct got_parent_id *pid;
+
+		remain -= tlen;
+		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}	
+
+		pid = calloc(1, sizeof(*pid));
+		if (pid == NULL) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		s += tlen;
+		if (!got_parse_sha1_digest(pid->id.sha1, s)) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
+		(*commit)->nparents++;
+
+		s += SHA1_DIGEST_STRING_LENGTH;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_AUTHOR);
+	if (strncmp(s, GOT_COMMIT_TAG_AUTHOR, tlen) == 0) {
+		char *p;
+
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		(*commit)->author = strdup(s);
+		if ((*commit)->author == NULL) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		s += strlen((*commit)->author) + 1;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_COMMITTER);
+	if (strncmp(s, GOT_COMMIT_TAG_COMMITTER, tlen) == 0) {
+		char *p;
+
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		(*commit)->committer = strdup(s);
+		if ((*commit)->committer == NULL) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		s += strlen((*commit)->committer) + 1;
+	}
+
+	(*commit)->logmsg = strdup(s);
+done:
+	if (err)
+		got_object_commit_close(*commit);
+	return err;
+}
+
+static const struct got_error *
+read_commit_object(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object *obj, const char *path)
+{
+	const struct got_error *err = NULL;
+	FILE *f;
+	struct got_zstream_buf zb;
+	size_t len;
+	char *p;
+	int i, ret;
+
+	f = fopen(path, "rb");
+	if (f == NULL)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	err = inflate_init(&zb, 8192);
+	if (err) {
+		fclose(f);
+		return err;
+	}
+
+	do {
+		err = inflate_read(&zb, f, &len);
+		if (err || len == 0)
+			break;
+	} while (len < obj->hdrlen + obj->size);
+
+	if (len < obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	/* Skip object header. */
+	len -= obj->hdrlen;
+	err = parse_commit_object(commit, zb.outbuf + obj->hdrlen, len);
+done:
+	inflate_end(&zb);
+	fclose(f);
+	return err;
+}
+
+const struct got_error *
+got_object_commit_open(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object *obj)
+{
+	const struct got_error *err = NULL;
+	char *path = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	err = object_path(&path, &obj->id, repo);
+	if (err)
+		return err;
+
+	err = read_commit_object(commit, repo, obj, path);
+	free(path);
+	return err;
+}
+
+void
+got_object_commit_close(struct got_commit_object *commit)
+{
+	struct got_parent_id *pid;
+
+	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
+		pid = SIMPLEQ_FIRST(&commit->parent_ids);
+		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
+		free(pid);
+	}
+
+	free(commit->author);
+	free(commit->committer);
+	free(commit->logmsg);
+	free(commit);
 }
