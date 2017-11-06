@@ -21,6 +21,11 @@
 #define GOT_ERR_NOT_ABSPATH	0x0003
 #define GOT_ERR_BAD_PATH	0x0004
 #define GOT_ERR_NOT_REF		0x0005
+#define GOT_ERR_IO		0x0006
+#define GOT_ERR_EOF		0x0007
+#define GOT_ERR_DECOMPRESSION	0x0008
+#define GOT_ERR_NO_SPACE	0x0009
+#define GOT_ERR_BAD_OBJ_HDR	0x0010
 
 static const struct got_error {
 	int code;
@@ -32,6 +37,11 @@ static const struct got_error {
 	{ GOT_ERR_NOT_ABSPATH,	"absolute path expected" },
 	{ GOT_ERR_BAD_PATH,	"bad path" },
 	{ GOT_ERR_NOT_REF,	"no such reference found" },
+	{ GOT_ERR_IO,		"input/output error" },
+	{ GOT_ERR_EOF,		"unexpected end of file" },
+	{ GOT_ERR_DECOMPRESSION,"decompression failed" },
+	{ GOT_ERR_NO_SPACE,	"buffer too small" },
+	{ GOT_ERR_BAD_OBJ_HDR,	"bad object header" },
 };
 
 const struct got_error * got_error(int code);

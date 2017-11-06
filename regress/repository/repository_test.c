@@ -29,12 +29,13 @@
 #define GOT_REPO_PATH "../../../"
 
 static int
-repo_resolve_head_ref(const char *repo_path)
+repo_read_object_header(const char *repo_path)
 {
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_reference *head_ref;
 	struct got_object_id *id;
+	struct got_object *obj;
 	char buf[SHA1_DIGEST_STRING_LENGTH];
 	int ret;
 
@@ -48,6 +49,11 @@ repo_resolve_head_ref(const char *repo_path)
 	if (err != NULL || head_ref == NULL)
 		return 0;
 	printf("HEAD is at %s\n", got_object_id_str(id, buf, sizeof(buf)));
+	err = got_object_open(&obj, repo, id);
+	if (err != NULL || obj == NULL)
+		return 0;
+	printf("object type=%d size=%lu\n", obj->type, obj->size);
+	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);
@@ -69,7 +75,7 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
-	RUN_TEST(repo_resolve_head_ref(repo_path), "resolve_head_ref");
+	RUN_TEST(repo_read_object_header(repo_path), "read_object_header");
 
 	return failure ? 1 : 0;
 }
