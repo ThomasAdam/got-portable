@@ -170,15 +170,16 @@ parse_obj_header(struct got_object **obj, char *buf, size_t len)
 
 	for (i = 0; i < nitems(obj_tags); i++) {
 		const char *tag = obj_tags[i];
+		size_t tlen = strlen(tag);
 		const char *errstr;
 
-		if (strncmp(buf, tag, strlen(tag)) != 0)
+		if (strncmp(buf, tag, tlen) != 0)
 			continue;
 
 		type = obj_types[i];
-		if (len <= strlen(tag))
+		if (len <= tlen)
 			return got_error(GOT_ERR_BAD_OBJ_HDR);
-		size = strtonum(buf + strlen(tag), 0, LONG_MAX, &errstr);
+		size = strtonum(buf + tlen, 0, LONG_MAX, &errstr);
 		if (errstr != NULL)
 			return got_error(GOT_ERR_BAD_OBJ_HDR);
 		break;
