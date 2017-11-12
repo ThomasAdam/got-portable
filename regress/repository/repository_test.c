@@ -30,6 +30,29 @@
 
 #define GOT_REPO_PATH "../../../"
 
+static const struct got_error *
+print_commit_object(struct got_object *, struct got_repository *);
+
+static const struct got_error *
+print_parent_commits(struct got_commit_object *commit,
+    struct got_repository *repo)
+{
+	struct got_parent_id *pid;
+	const struct got_error *err;
+	struct got_object *obj;
+
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		err = got_object_open(&obj, repo, &pid->id);
+		if (err != NULL)
+			return err;
+		if (obj->type != GOT_OBJ_TYPE_COMMIT)
+			return got_error(GOT_ERR_OBJ_TYPE);
+		print_commit_object(obj, repo);
+		got_object_close(obj);
+	}
+
+	return NULL;
+}
 
 static const struct got_error *
 print_commit_object(struct got_object *obj, struct got_repository *repo)
@@ -53,13 +76,15 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	printf("author: %s\n", commit->author);
 	printf("committer: %s\n", commit->committer);
 	printf("log: %s\n", commit->logmsg);
+
+	err = print_parent_commits(commit, repo);
 	got_object_commit_close(commit);
 
-	return NULL;
+	return err;
 }
 
 static int
-repo_read_head_commit(const char *repo_path)
+repo_read_log(const char *repo_path)
 {
 	const struct got_error *err;
 	struct got_repository *repo;
@@ -107,7 +132,7 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
-	RUN_TEST(repo_read_head_commit(repo_path), "read_head_commit");
+	RUN_TEST(repo_read_log(repo_path), "read_log");
 
 	return failure ? 1 : 0;
 }
