@@ -139,9 +139,3 @@ got_repo_close(struct got_repository *repo)
 	free(repo->path);
 	free(repo);
 }
-
-const char *
-got_repo_get_path(struct got_repository *repo)
-{
-	return repo->path;
-}
