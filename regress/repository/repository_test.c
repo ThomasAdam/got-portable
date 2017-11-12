@@ -59,7 +59,7 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 }
 
 static int
-repo_read_object_header(const char *repo_path)
+repo_read_head_commit(const char *repo_path)
 {
 	const struct got_error *err;
 	struct got_repository *repo;
@@ -107,7 +107,7 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
-	RUN_TEST(repo_read_object_header(repo_path), "read_object_header");
+	RUN_TEST(repo_read_head_commit(repo_path), "read_head_commit");
 
 	return failure ? 1 : 0;
 }
