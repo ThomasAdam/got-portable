@@ -51,11 +51,6 @@ struct got_object {
 	size_t hdrlen;
 	size_t size;
 	struct got_object_id id;
-	union {
-		struct got_blob_object blob;
-		struct got_tree_object tree;
-		struct got_commit_object commit;
-	} obj;
 };
 
 struct got_repository;
