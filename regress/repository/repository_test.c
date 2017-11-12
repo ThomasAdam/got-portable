@@ -30,6 +30,34 @@
 
 #define GOT_REPO_PATH "../../../"
 
+
+static const struct got_error *
+print_commit_object(struct got_object *obj, struct got_repository *repo)
+{
+	struct got_commit_object *commit;
+	struct got_parent_id *pid;
+	char buf[SHA1_DIGEST_STRING_LENGTH];
+	const struct got_error *err;
+
+	err = got_object_commit_open(&commit, repo, obj);
+	if (err != NULL)
+		return err;
+
+	printf("tree: %s\n",
+	    got_object_id_str(&commit->tree_id, buf, sizeof(buf)));
+	printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		printf("%s\n",
+		    got_object_id_str(&pid->id, buf, sizeof(buf)));
+	}
+	printf("author: %s\n", commit->author);
+	printf("committer: %s\n", commit->committer);
+	printf("log: %s\n", commit->logmsg);
+	got_object_commit_close(commit);
+
+	return NULL;
+}
+
 static int
 repo_read_object_header(const char *repo_path)
 {
@@ -55,25 +83,8 @@ repo_read_object_header(const char *repo_path)
 	if (err != NULL || obj == NULL)
 		return 0;
 	printf("object type=%d size=%lu\n", obj->type, obj->size);
-	if (obj->type == GOT_OBJ_TYPE_COMMIT) {
-		struct got_commit_object *commit;
-		struct got_parent_id *pid;
-
-		err = got_object_commit_open(&commit, repo, obj);
-		if (err != NULL || commit == NULL)
-			return 0;
-		printf("tree: %s\n",
-		    got_object_id_str(&commit->tree_id, buf, sizeof(buf)));
-		printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
-		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-			printf("%s\n",
-			    got_object_id_str(&pid->id, buf, sizeof(buf)));
-		}
-		printf("author: %s\n", commit->author);
-		printf("committer: %s\n", commit->committer);
-		printf("log: %s\n", commit->logmsg);
-		got_object_commit_close(commit);
-	}
+	if (obj->type == GOT_OBJ_TYPE_COMMIT)
+		print_commit_object(obj, repo);
 	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
