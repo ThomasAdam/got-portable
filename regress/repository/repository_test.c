@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/stat.h>
 #include <sys/queue.h>
 
 #include <stdio.h>
@@ -55,12 +56,27 @@ print_parent_commits(struct got_commit_object *commit,
 }
 
 static const struct got_error *
+print_tree_object(struct got_object *obj, struct got_repository *repo)
+{
+	struct got_tree_object *tree;
+	const struct got_error *err;
+
+	err = got_object_tree_open(&tree, repo, obj);
+	if (err != NULL)
+		return err;
+
+	got_object_tree_close(tree);
+	return NULL;
+}
+
+static const struct got_error *
 print_commit_object(struct got_object *obj, struct got_repository *repo)
 {
 	struct got_commit_object *commit;
 	struct got_parent_id *pid;
 	char buf[SHA1_DIGEST_STRING_LENGTH];
 	const struct got_error *err;
+	struct got_object* treeobj;
 
 	err = got_object_commit_open(&commit, repo, obj);
 	if (err != NULL)
@@ -76,6 +92,13 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	printf("author: %s\n", commit->author);
 	printf("committer: %s\n", commit->committer);
 	printf("log: %s\n", commit->logmsg);
+
+	err = got_object_open(&treeobj, repo, &commit->tree_id);
+	if (err != NULL)
+		return err;
+	if (treeobj->type == GOT_OBJ_TYPE_TREE)
+		print_tree_object(treeobj, repo);
+	got_object_close(treeobj);
 
 	err = print_parent_commits(commit, repo);
 	got_object_commit_close(commit);

@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/stat.h>
 #include <sys/queue.h>
 
 #include <stdio.h>
@@ -416,6 +417,137 @@ done:
 	return err;
 }
 
+static void
+tree_entry_close(struct got_tree_entry *te)
+{
+	free(te->name);
+	free(te);
+}
+
+static const char *
+mode_trailer(mode_t mode)
+{
+	if (S_ISDIR(mode))
+		return "/";
+
+	return "";
+}
+
+static const struct got_error *
+parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
+    size_t maxlen)
+{
+	char *p = buf, *space;
+	const struct got_error *err = NULL;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+
+	*te = calloc(1, sizeof(**te));
+	if (*te == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	*elen = strlen(buf) + 1;
+	if (*elen > maxlen) {
+		free(*te);
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	}
+
+	space = strchr(buf, ' ');
+	if (space == NULL) {
+		free(*te);
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	}
+	while (*p != ' ') {
+		if (*p < '0' && *p > '7') {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		(*te)->mode <<= 3;
+		(*te)->mode |= *p - '0';
+		p++;
+	}
+
+	(*te)->name = strdup(space + 1);
+	if (*elen > maxlen || maxlen - *elen < SHA1_DIGEST_LENGTH) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+	buf += strlen(buf) + 1;
+	memcpy((*te)->id.sha1, buf, SHA1_DIGEST_LENGTH);
+	*elen += SHA1_DIGEST_LENGTH;
+
+	printf("%s %s%s\n", got_object_id_str(&(*te)->id, hex, sizeof(hex)),
+	    (*te)->name, mode_trailer((*te)->mode));
+done:
+	if (err)
+		tree_entry_close(*te);
+	return err;
+}
+
+static const struct got_error *
+open_tree_recursive(struct got_object_id *id, struct got_repository *repo)
+{
+	struct got_object *obj;
+	struct got_tree_object *tree;
+	const struct got_error *err;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (obj->type != GOT_OBJ_TYPE_TREE)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	err = got_object_tree_open(&tree, repo, obj);
+	if (err) {
+		got_object_close(obj);
+		return err;
+	}
+
+	got_object_tree_close(tree);
+	got_object_close(obj);
+	return NULL;
+}
+
+static const struct got_error *
+parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
+    char *buf, size_t len)
+{
+	size_t remain = len;
+	int nentries;
+
+	*tree = calloc(1, sizeof(**tree));
+	if (*tree == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	SIMPLEQ_INIT(&(*tree)->entries);
+
+	while (remain > 0) {
+		struct got_tree_entry *te;
+		size_t elen;
+
+		parse_tree_entry(&te, &elen, buf, remain);
+		(*tree)->nentries++;
+		SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
+		if (S_ISDIR(te->mode)) {
+			const struct got_error *err;
+			err = open_tree_recursive(&te->id, repo);
+			if (err) {
+				got_object_tree_close(*tree);
+				return err;
+			}
+		}
+		buf += elen;
+		remain -= elen;
+	}
+	printf("\n");
+
+	if (remain != 0) {
+		got_object_tree_close(*tree);
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	}
+
+	return NULL;
+}
+
 static const struct got_error *
 read_commit_object(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, const char *path)
@@ -491,4 +623,69 @@ got_object_commit_close(struct got_commit_object *commit)
 	free(commit->committer);
 	free(commit->logmsg);
 	free(commit);
+}
+
+static const struct got_error *
+read_tree_object(struct got_tree_object **tree,
+    struct got_repository *repo, struct got_object *obj, const char *path)
+{
+	const struct got_error *err = NULL;
+	FILE *f;
+	struct got_zstream_buf zb;
+	size_t len;
+	char *p;
+	int i, ret;
+
+	f = fopen(path, "rb");
+	if (f == NULL)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	err = inflate_init(&zb, 8192);
+	if (err) {
+		fclose(f);
+		return err;
+	}
+
+	do {
+		err = inflate_read(&zb, f, &len);
+		if (err || len == 0)
+			break;
+	} while (len < obj->hdrlen + obj->size);
+
+	if (len < obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	/* Skip object header. */
+	len -= obj->hdrlen;
+	err = parse_tree_object(tree, repo, zb.outbuf + obj->hdrlen, len);
+done:
+	inflate_end(&zb);
+	fclose(f);
+	return err;
+}
+
+const struct got_error *
+got_object_tree_open(struct got_tree_object **tree,
+    struct got_repository *repo, struct got_object *obj)
+{
+	const struct got_error *err = NULL;
+	char *path = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_TREE)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	err = object_path(&path, &obj->id, repo);
+	if (err)
+		return err;
+
+	err = read_tree_object(tree, repo, obj, path);
+	free(path);
+	return err;
+}
+
+void
+got_object_tree_close(struct got_tree_object *tree)
+{
 }

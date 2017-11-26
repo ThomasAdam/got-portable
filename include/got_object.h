@@ -22,8 +22,16 @@ struct got_blob_object {
 	char *dummy;
 };
 
+struct got_tree_entry {
+	SIMPLEQ_ENTRY(got_tree_entry) entry;
+	mode_t mode;
+	char *name;
+	struct got_object_id id;
+};
+
 struct got_tree_object {
-	char *dummy;
+	int nentries;
+	SIMPLEQ_HEAD(, got_tree_entry) entries;
 };
 
 struct got_parent_id {
@@ -62,4 +70,6 @@ void got_object_close(struct got_object *);
 const struct got_error *got_object_commit_open(struct got_commit_object **,
     struct got_repository *, struct got_object *);
 void got_object_commit_close(struct got_commit_object *);
-
+const struct got_error *got_object_tree_open(struct got_tree_object **,
+    struct got_repository *, struct got_object *);
+void got_object_tree_close(struct got_tree_object *);
