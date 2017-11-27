@@ -68,16 +68,6 @@ got_object_id_str(struct got_object_id *id, char *buf, size_t size)
 	return buf;
 }
 
-struct got_zstream_buf {
-	z_stream z;
-	char *inbuf;
-	size_t inlen;
-	char *outbuf;
-	size_t outlen;
-	int flags;
-#define GOT_ZSTREAM_F_HAVE_MORE 0x01
-};
-
 static void
 inflate_end(struct got_zstream_buf *zb)
 {
@@ -662,3 +652,57 @@ got_object_tree_close(struct got_tree_object *tree)
 
 	free(tree);
 }
+
+const struct got_error *
+got_object_blob_open(struct got_blob_object **blob,
+    struct got_repository *repo, struct got_object *obj, size_t blocksize)
+{
+	const struct got_error *err = NULL;
+	char *path;
+
+	if (obj->type != GOT_OBJ_TYPE_BLOB)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	err = object_path(&path, &obj->id, repo);
+	if (err)
+		return err;
+
+	*blob = calloc(1, sizeof(**blob));
+	if (*blob == NULL) {
+		free(path);
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
+	(*blob)->f = fopen(path, "rb");
+	if ((*blob)->f == NULL) {
+		free(*blob);
+		free(path);
+		return got_error(GOT_ERR_BAD_PATH);
+	}
+
+	err = inflate_init(&(*blob)->zb, blocksize);
+	if (err != NULL) {
+		fclose((*blob)->f);
+		free(*blob);
+		free(path);
+		return err;
+	}
+
+	free(path);
+	return err;
+}
+
+void
+got_object_blob_close(struct got_blob_object *blob)
+{
+	inflate_end(&blob->zb);
+	fclose(blob->f);
+	free(blob);
+}
+
+const struct got_error *
+got_object_blob_read_block(struct got_blob_object *blob, size_t *outlenp)
+{
+	return inflate_read(&blob->zb, blob->f, outlenp);
+}
+

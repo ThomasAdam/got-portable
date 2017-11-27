@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <util.h>
+#include <zlib.h>
 
 #include "got_error.h"
 #include "got_object.h"

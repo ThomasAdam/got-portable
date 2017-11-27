@@ -14,12 +14,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_zstream_buf {
+	z_stream z;
+	char *inbuf;
+	size_t inlen;
+	char *outbuf;
+	size_t outlen;
+	int flags;
+#define GOT_ZSTREAM_F_HAVE_MORE 0x01
+};
+
 struct got_object_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 };
 
 struct got_blob_object {
-	char *dummy;
+	FILE *f;
+	struct got_zstream_buf zb;
 };
 
 struct got_tree_entry {
@@ -73,3 +84,8 @@ void got_object_commit_close(struct got_commit_object *);
 const struct got_error *got_object_tree_open(struct got_tree_object **,
     struct got_repository *, struct got_object *);
 void got_object_tree_close(struct got_tree_object *);
+const struct got_error *got_object_blob_open(struct got_blob_object **,
+    struct got_repository *, struct got_object *, size_t);
+void got_object_blob_close(struct got_blob_object *);
+const struct got_error *got_object_blob_read_block(struct got_blob_object *,
+    size_t *);

@@ -20,11 +20,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sha1.h>
+#include <zlib.h>
 
 #include "got_error.h"
 #include "got_object.h"
 #include "got_refs.h"
 #include "got_repository.h"
+#include "got_sha1.h"
 
 #define RUN_TEST(expr, name) \
 	if (!(expr)) { printf("test %s failed", (name)); failure = 1; }
@@ -184,6 +186,51 @@ repo_read_log(const char *repo_path)
 	return 1;
 }
 
+static int
+repo_read_blob(const char *repo_path)
+{
+	const char *blob_sha1 = "141f5fdc96126c1f4195558560a3c915e3d9b4c3";
+	const struct got_error *err;
+	struct got_repository *repo;
+	struct got_object_id id;
+	struct got_object *obj;
+	struct got_blob_object *blob;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	int i;
+	size_t len;
+
+	if (!got_parse_sha1_digest(id.sha1, blob_sha1))
+		return 0;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		return 0;
+	err = got_object_open(&obj, repo, &id);
+	if (err != NULL || obj == NULL)
+		return 0;
+	if (obj->type != GOT_OBJ_TYPE_BLOB)
+		return 0;
+
+	err = got_object_blob_open(&blob, repo, obj, 64);
+	if (err != NULL)
+		return 0;
+
+	putchar('\n');
+	do {
+		err = got_object_blob_read_block(blob, &len);
+		if (err)
+			break;
+		for (i = 0; i < len; i++)
+			putchar(blob->zb.outbuf[i]);
+	} while (len != 0);
+	putchar('\n');
+
+	got_object_blob_close(blob);
+	got_object_close(obj);
+	got_repo_close(repo);
+	return (err == NULL);
+}
+
 int
 main(int argc, const char *argv[])
 {
@@ -200,6 +247,7 @@ main(int argc, const char *argv[])
 	}
 
 	RUN_TEST(repo_read_log(repo_path), "read_log");
+	RUN_TEST(repo_read_blob(repo_path), "read_blob");
 
 	return failure ? 1 : 0;
 }
