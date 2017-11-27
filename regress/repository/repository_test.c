@@ -56,17 +56,60 @@ print_parent_commits(struct got_commit_object *commit,
 }
 
 static const struct got_error *
-print_tree_object(struct got_object *obj, struct got_repository *repo)
+print_tree_object(struct got_object *obj, char *parent,
+    struct got_repository *repo)
 {
 	struct got_tree_object *tree;
+	struct got_tree_entry *te;
 	const struct got_error *err;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	err = got_object_tree_open(&tree, repo, obj);
 	if (err != NULL)
 		return err;
 
+	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+		struct got_object *treeobj;
+		char *next_parent;
+
+		if (!S_ISDIR(te->mode)) {
+			printf("%s %s/%s\n",
+			    got_object_id_str(&te->id, hex, sizeof(hex)),
+			    parent, te->name);
+			continue;
+		}
+		printf("%s %s/%s\n",
+		    got_object_id_str(&te->id, hex, sizeof(hex)),
+		    parent, te->name);
+
+		err = got_object_open(&treeobj, repo, &te->id);
+		if (err != NULL)
+			break;
+
+		if (treeobj->type != GOT_OBJ_TYPE_TREE) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			got_object_close(treeobj);
+			break;
+		}
+
+		if (asprintf(&next_parent, "%s/%s", parent, te->name) == -1) {
+			err = got_error(GOT_ERR_NO_MEM);
+			got_object_close(treeobj);
+			break;
+		}
+
+		err = print_tree_object(treeobj, next_parent, repo);
+		free(next_parent);
+		if (err) {
+			got_object_close(treeobj);
+			break;
+		}
+
+		got_object_close(treeobj);
+	}
+
 	got_object_tree_close(tree);
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -96,8 +139,10 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	err = got_object_open(&treeobj, repo, &commit->tree_id);
 	if (err != NULL)
 		return err;
-	if (treeobj->type == GOT_OBJ_TYPE_TREE)
-		print_tree_object(treeobj, repo);
+	if (treeobj->type == GOT_OBJ_TYPE_TREE) {
+		print_tree_object(treeobj, "", repo);
+		printf("\n");
+	}
 	got_object_close(treeobj);
 
 	err = print_parent_commits(commit, repo);

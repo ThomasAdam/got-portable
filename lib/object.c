@@ -474,37 +474,10 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	buf += strlen(buf) + 1;
 	memcpy((*te)->id.sha1, buf, SHA1_DIGEST_LENGTH);
 	*elen += SHA1_DIGEST_LENGTH;
-
-	printf("%s %s%s\n", got_object_id_str(&(*te)->id, hex, sizeof(hex)),
-	    (*te)->name, mode_trailer((*te)->mode));
 done:
 	if (err)
 		tree_entry_close(*te);
 	return err;
-}
-
-static const struct got_error *
-open_tree_recursive(struct got_object_id *id, struct got_repository *repo)
-{
-	struct got_object *obj;
-	struct got_tree_object *tree;
-	const struct got_error *err;
-
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (obj->type != GOT_OBJ_TYPE_TREE)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	err = got_object_tree_open(&tree, repo, obj);
-	if (err) {
-		got_object_close(obj);
-		return err;
-	}
-
-	got_object_tree_close(tree);
-	got_object_close(obj);
-	return NULL;
 }
 
 static const struct got_error *
@@ -527,18 +500,9 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 		parse_tree_entry(&te, &elen, buf, remain);
 		(*tree)->nentries++;
 		SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
-		if (S_ISDIR(te->mode)) {
-			const struct got_error *err;
-			err = open_tree_recursive(&te->id, repo);
-			if (err) {
-				got_object_tree_close(*tree);
-				return err;
-			}
-		}
 		buf += elen;
 		remain -= elen;
 	}
-	printf("\n");
 
 	if (remain != 0) {
 		got_object_tree_close(*tree);
@@ -688,4 +652,13 @@ got_object_tree_open(struct got_tree_object **tree,
 void
 got_object_tree_close(struct got_tree_object *tree)
 {
+	struct got_tree_entry *te;
+
+	while (!SIMPLEQ_EMPTY(&tree->entries)) {
+		te = SIMPLEQ_FIRST(&tree->entries);
+		SIMPLEQ_REMOVE_HEAD(&tree->entries, entry);
+		tree_entry_close(te);
+	}
+
+	free(tree);
 }
