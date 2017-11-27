@@ -175,7 +175,6 @@ repo_read_log(const char *repo_path)
 	err = got_object_open(&obj, repo, id);
 	if (err != NULL || obj == NULL)
 		return 0;
-	printf("object type=%d size=%lu\n", obj->type, obj->size);
 	if (obj->type == GOT_OBJ_TYPE_COMMIT)
 		print_commit_object(obj, repo);
 	got_object_close(obj);
