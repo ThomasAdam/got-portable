@@ -47,7 +47,7 @@
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
-const char *
+char *
 got_object_id_str(struct got_object_id *id, char *buf, size_t size)
 {
 	char *p = buf;
@@ -692,6 +692,7 @@ got_object_blob_open(struct got_blob_object **blob,
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
+	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 
 	free(path);
 	return err;

@@ -61,6 +61,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	FILE *f1, *f2;
 	char *n1, *n2;
 	size_t len, hdrlen;
+	char hex1[SHA1_DIGEST_STRING_LENGTH];
+	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	int res;
 
 	err = open_tempfile(&f1, &n1);
@@ -102,6 +104,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	memset(&args, 0, sizeof(args));
 
 	args.diff_format = D_UNIFIED;
+	args.label[0] = got_object_id_str(&blob1->id, hex1, sizeof(hex1));
+	args.label[1] = got_object_id_str(&blob2->id, hex2, sizeof(hex2));
 	err = got_diffreg(&res, n1, n2, 0, &args, &ds);
 done:
 	unlink(n1);

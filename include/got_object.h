@@ -32,6 +32,7 @@ struct got_blob_object {
 	FILE *f;
 	struct got_zstream_buf zb;
 	size_t hdrlen;
+	struct got_object_id id;
 };
 
 struct got_tree_entry {
@@ -75,7 +76,7 @@ struct got_object {
 
 struct got_repository;
 
-const char * got_object_id_str(struct got_object_id *, char *, size_t);
+char * got_object_id_str(struct got_object_id *, char *, size_t);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
 void got_object_close(struct got_object *);

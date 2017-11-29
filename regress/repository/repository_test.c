@@ -27,6 +27,7 @@
 #include "got_refs.h"
 #include "got_repository.h"
 #include "got_sha1.h"
+#include "got_diff.h"
 
 #define RUN_TEST(expr, name) \
 	if (!(expr)) { printf("test %s failed", (name)); failure = 1; }
@@ -277,7 +278,7 @@ repo_diff_blob(const char *repo_path)
 		return 0;
 
 	putchar('\n');
-	got_diff_blob(blob1, blob2, repo);
+	got_diff_blob(blob1, blob2, stdout);
 	putchar('\n');
 
 	got_object_blob_close(blob1);
