@@ -88,7 +88,7 @@
 #include "got_diff.h"
 
 #include "diff.h"
-#include "xmalloc.h"
+#include "xmalloc.h" /* XXX should return GOT_ERR_NO_MEM instead of exiting */
 
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
