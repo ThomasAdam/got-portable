@@ -53,7 +53,7 @@ open_tempfile(FILE **sfp, char **sfn)
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    FILE *outfile)
+    const char *label1, const char *label2 ,FILE *outfile)
 {
 	struct got_diff_state ds;
 	struct got_diff_args args;
@@ -104,8 +104,11 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	memset(&args, 0, sizeof(args));
 
 	args.diff_format = D_UNIFIED;
-	args.label[0] = got_object_id_str(&blob1->id, hex1, sizeof(hex1));
-	args.label[1] = got_object_id_str(&blob2->id, hex2, sizeof(hex2));
+	args.label[0] = label1 ?
+	    label1 : got_object_id_str(&blob1->id, hex1, sizeof(hex1));
+	args.label[1] = label2 ?
+	    label2 : got_object_id_str(&blob2->id, hex2, sizeof(hex2));
+
 	err = got_diffreg(&res, n1, n2, 0, &args, &ds);
 done:
 	unlink(n1);

@@ -112,7 +112,8 @@ struct got_diff_state {
 struct got_diff_args {
 	int	 Tflag;
 	int	 diff_format, diff_context, status;
-	char	*ifdefname, *diffargs, *label[2], *ignore_pats;
+	char	*ifdefname, *diffargs, *ignore_pats;
+	const char *label[2];
 };
 
 char	*splice(char *, char *);

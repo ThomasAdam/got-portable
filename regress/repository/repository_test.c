@@ -278,7 +278,7 @@ repo_diff_blob(const char *repo_path)
 		return 0;
 
 	putchar('\n');
-	got_diff_blob(blob1, blob2, stdout);
+	got_diff_blob(blob1, blob2, NULL, NULL, stdout);
 	putchar('\n');
 
 	got_object_blob_close(blob1);

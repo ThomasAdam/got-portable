@@ -15,4 +15,4 @@
  */
 
 const struct got_error *got_diff_blob(struct got_blob_object *,
-    struct got_blob_object *, FILE *);
+    struct got_blob_object *, const char *, const char *, FILE *);
