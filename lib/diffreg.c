@@ -233,12 +233,12 @@ struct diff_state {
 	struct context_vec *context_vec_end;
 	struct context_vec *context_vec_ptr;
 	struct line *file[2];
+#define FUNCTION_CONTEXT_SIZE	55
+	char lastbuf[FUNCTION_CONTEXT_SIZE];
+	int lastline;
+	int lastmatchline;
 } ds;
 
-#define FUNCTION_CONTEXT_SIZE	55
-static char lastbuf[FUNCTION_CONTEXT_SIZE];
-static int lastline;
-static int lastmatchline;
 
 struct diff_args {
 	int	 Tflag;
@@ -327,8 +327,8 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 	f1 = f2 = NULL;
 	*rval = D_SAME;
 	ds.anychange = 0;
-	lastline = 0;
-	lastmatchline = 0;
+	ds.lastline = 0;
+	ds.lastmatchline = 0;
 	ds.context_vec_ptr = ds.context_vec_start - 1;
 	if (flags & D_IGNORECASE)
 		ds.chrtran = cup2low;
@@ -1305,10 +1305,10 @@ match_function(const long *f, int pos, FILE *fp)
 {
 	unsigned char buf[FUNCTION_CONTEXT_SIZE];
 	size_t nc;
-	int last = lastline;
+	int last = ds.lastline;
 	char *state = NULL;
 
-	lastline = pos;
+	ds.lastline = pos;
 	while (pos > last) {
 		fseek(fp, f[pos - 1], SEEK_SET);
 		nc = f[pos] - f[pos - 1];
@@ -1329,18 +1329,18 @@ match_function(const long *f, int pos, FILE *fp)
 					if (!state)
 						state = " (public)";
 				} else {
-					strlcpy(lastbuf, buf, sizeof lastbuf);
+					strlcpy(ds.lastbuf, buf, sizeof ds.lastbuf);
 					if (state)
-						strlcat(lastbuf, state,
-						    sizeof lastbuf);
-					lastmatchline = pos;
-					return lastbuf;
+						strlcat(ds.lastbuf, state,
+						    sizeof ds.lastbuf);
+					ds.lastmatchline = pos;
+					return ds.lastbuf;
 				}
 			}
 		}
 		pos--;
 	}
-	return lastmatchline > 0 ? lastbuf : NULL;
+	return ds.lastmatchline > 0 ? ds.lastbuf : NULL;
 }
 
 /* dump accumulated "context" diff changes */
