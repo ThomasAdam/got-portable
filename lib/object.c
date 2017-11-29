@@ -663,6 +663,9 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (obj->type != GOT_OBJ_TYPE_BLOB)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
+	if (blocksize < obj->hdrlen)
+		return got_error(GOT_ERR_NO_SPACE);
+
 	err = object_path(&path, &obj->id, repo);
 	if (err)
 		return err;
@@ -687,6 +690,8 @@ got_object_blob_open(struct got_blob_object **blob,
 		free(path);
 		return err;
 	}
+
+	(*blob)->hdrlen = obj->hdrlen;
 
 	free(path);
 	return err;

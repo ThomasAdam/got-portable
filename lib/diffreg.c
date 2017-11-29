@@ -66,6 +66,7 @@
 
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/queue.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -79,6 +80,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sha1.h>
+#include <zlib.h>
+
+#include "got_error.h"
+#include "got_object.h"
+#include "got_diff.h"
 
 #include "diff.h"
 #include "xmalloc.h"
@@ -230,6 +237,11 @@ static char lastbuf[FUNCTION_CONTEXT_SIZE];
 static int lastline;
 static int lastmatchline;
 
+int	 Nflag, Pflag, rflag, sflag, Tflag;
+int	 diff_format, diff_context, status;
+char	*start, *ifdefname, *diffargs, *label[2], *ignore_pats;
+struct stat stb1, stb2;
+
 
 /*
  * chrtran points to one of 2 translation tables: cup2low if folding upper to
@@ -289,14 +301,27 @@ u_char cup2low[256] = {
 	0xfd, 0xfe, 0xff
 };
 
-int
-diffreg(char *file1, char *file2, int flags)
+const struct got_error *
+got_diffreg(int *rval, char *file1, char *file2, int flags)
 {
+	const struct got_error *err = NULL;
 	FILE *f1, *f2;
-	int i, rval;
+	int i;
+
+	diff_format = D_UNIFIED;
+
+	if (strcmp(file1, "-") == 0)
+		fstat(STDIN_FILENO, &stb1);
+	else if (stat(file1, &stb1) != 0)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	if (strcmp(file2, "-") == 0)
+		fstat(STDIN_FILENO, &stb2);
+	else if (stat(file2, &stb2) != 0)
+		return got_error(GOT_ERR_BAD_PATH);
 
 	f1 = f2 = NULL;
-	rval = D_SAME;
+	*rval = D_SAME;
 	anychange = 0;
 	lastline = 0;
 	lastmatchline = 0;
@@ -305,8 +330,10 @@ diffreg(char *file1, char *file2, int flags)
 		chrtran = cup2low;
 	else
 		chrtran = clow2low;
-	if (S_ISDIR(stb1.st_mode) != S_ISDIR(stb2.st_mode))
-		return (S_ISDIR(stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
+	if (S_ISDIR(stb1.st_mode) != S_ISDIR(stb2.st_mode)) {
+		*rval = (S_ISDIR(stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
+		return NULL;
+	}
 	if (strcmp(file1, "-") == 0 && strcmp(file2, "-") == 0)
 		goto closem;
 
@@ -316,7 +343,6 @@ diffreg(char *file1, char *file2, int flags)
 		if (!S_ISREG(stb1.st_mode)) {
 			if ((f1 = opentemp(file1)) == NULL ||
 			    fstat(fileno(f1), &stb1) < 0) {
-				warn("%s", file1);
 				status |= 2;
 				goto closem;
 			}
@@ -326,7 +352,6 @@ diffreg(char *file1, char *file2, int flags)
 			f1 = fopen(file1, "r");
 	}
 	if (f1 == NULL) {
-		warn("%s", file1);
 		status |= 2;
 		goto closem;
 	}
@@ -337,7 +362,6 @@ diffreg(char *file1, char *file2, int flags)
 		if (!S_ISREG(stb2.st_mode)) {
 			if ((f2 = opentemp(file2)) == NULL ||
 			    fstat(fileno(f2), &stb2) < 0) {
-				warn("%s", file2);
 				status |= 2;
 				goto closem;
 			}
@@ -347,7 +371,6 @@ diffreg(char *file1, char *file2, int flags)
 			f2 = fopen(file2, "r");
 	}
 	if (f2 == NULL) {
-		warn("%s", file2);
 		status |= 2;
 		goto closem;
 	}
@@ -365,7 +388,7 @@ diffreg(char *file1, char *file2, int flags)
 
 	if ((flags & D_FORCEASCII) == 0 &&
 	    (!asciifile(f1) || !asciifile(f2))) {
-		rval = D_BINARY;
+		*rval = D_BINARY;
 		status |= 1;
 		goto closem;
 	}
@@ -378,41 +401,71 @@ diffreg(char *file1, char *file2, int flags)
 
 	member = (int *)file[1];
 	equiv(sfile[0], slen[0], sfile[1], slen[1], member);
-	member = xreallocarray(member, slen[1] + 2, sizeof(*member));
+	member = reallocarray(member, slen[1] + 2, sizeof(*member));
+	if (member == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 
 	class = (int *)file[0];
 	unsort(sfile[0], slen[0], class);
-	class = xreallocarray(class, slen[0] + 2, sizeof(*class));
+	class = reallocarray(class, slen[0] + 2, sizeof(*class));
+	if (class == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 
-	klist = xcalloc(slen[0] + 2, sizeof(*klist));
+	klist = calloc(slen[0] + 2, sizeof(*klist));
+	if (klist == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 	clen = 0;
 	clistlen = 100;
-	clist = xcalloc(clistlen, sizeof(*clist));
+	clist = calloc(clistlen, sizeof(*clist));
+	if (clist == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 	i = stone(class, slen[0], member, klist, flags);
 	free(member);
 	free(class);
 
-	J = xreallocarray(J, len[0] + 2, sizeof(*J));
+	J = reallocarray(J, len[0] + 2, sizeof(*J));
+	if (J == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 	unravel(klist[i]);
 	free(clist);
+	clist = NULL;
 	free(klist);
+	klist = NULL;
 
-	ixold = xreallocarray(ixold, len[0] + 2, sizeof(*ixold));
-	ixnew = xreallocarray(ixnew, len[1] + 2, sizeof(*ixnew));
+	ixold = reallocarray(ixold, len[0] + 2, sizeof(*ixold));
+	if (ixold == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
+	ixnew = reallocarray(ixnew, len[1] + 2, sizeof(*ixnew));
+	if (ixnew == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 	check(f1, f2, flags);
 	output(file1, f1, file2, f2, flags);
 closem:
 	if (anychange) {
 		status |= 1;
-		if (rval == D_SAME)
-			rval = D_DIFFER;
+		if (*rval == D_SAME)
+			*rval = D_DIFFER;
 	}
 	if (f1 != NULL)
 		fclose(f1);
 	if (f2 != NULL)
 		fclose(f2);
 
-	return (rval);
+	return (err);
 }
 
 /*
@@ -941,11 +994,7 @@ preadline(int fd, size_t rlen, off_t off)
 static int
 ignoreline(char *line)
 {
-	int ret;
-
-	ret = regexec(&ignore_re, line, 0, NULL, 0);
-	free(line);
-	return (ret == 0);	/* if it matched, it should be ignored. */
+	return 0; /* do not ignore any lines */
 }
 
 /*

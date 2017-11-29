@@ -231,6 +231,63 @@ repo_read_blob(const char *repo_path)
 	return (err == NULL);
 }
 
+static int
+repo_diff_blob(const char *repo_path)
+{
+	const char *blob1_sha1 = "141f5fdc96126c1f4195558560a3c915e3d9b4c3";
+	const char *blob2_sha1 = "de7eb21b21c7823a753261aadf7cba35c9580fbf";
+	const struct got_error *err;
+	struct got_repository *repo;
+	struct got_object_id id1;
+	struct got_object_id id2;
+	struct got_object *obj1;
+	struct got_object *obj2;
+	struct got_blob_object *blob1;
+	struct got_blob_object *blob2;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	int i;
+	size_t len;
+
+	if (!got_parse_sha1_digest(id1.sha1, blob1_sha1))
+		return 0;
+	if (!got_parse_sha1_digest(id2.sha1, blob2_sha1))
+		return 0;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		return 0;
+
+	err = got_object_open(&obj1, repo, &id1);
+	if (err != NULL || obj1 == NULL)
+		return 0;
+	if (obj1->type != GOT_OBJ_TYPE_BLOB)
+		return 0;
+	err = got_object_open(&obj2, repo, &id2);
+	if (err != NULL || obj2 == NULL)
+		return 0;
+	if (obj2->type != GOT_OBJ_TYPE_BLOB)
+		return 0;
+
+	err = got_object_blob_open(&blob1, repo, obj1, 512);
+	if (err != NULL)
+		return 0;
+
+	err = got_object_blob_open(&blob2, repo, obj2, 512);
+	if (err != NULL)
+		return 0;
+
+	putchar('\n');
+	got_diff_blob(blob1, blob2, repo);
+	putchar('\n');
+
+	got_object_blob_close(blob1);
+	got_object_blob_close(blob2);
+	got_object_close(obj1);
+	got_object_close(obj2);
+	got_repo_close(repo);
+	return (err == NULL);
+}
+
 int
 main(int argc, const char *argv[])
 {
@@ -248,6 +305,7 @@ main(int argc, const char *argv[])
 
 	RUN_TEST(repo_read_log(repo_path), "read_log");
 	RUN_TEST(repo_read_blob(repo_path), "read_blob");
+	RUN_TEST(repo_diff_blob(repo_path), "diff_blob");
 
 	return failure ? 1 : 0;
 }

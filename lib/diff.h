@@ -89,7 +89,7 @@ extern struct	excludes *excludes_list;
 extern regex_t	ignore_re;
 
 char	*splice(char *, char *);
-int	diffreg(char *, char *, int);
+const struct got_error *got_diffreg(int *, char *, char *, int);
 int	easprintf(char **, const char *, ...);
 void	*emalloc(size_t);
 void	*erealloc(void *, size_t);

@@ -28,6 +28,7 @@
 #define GOT_ERR_BAD_OBJ_HDR	0x0010
 #define GOT_ERR_OBJ_TYPE	0x0011
 #define GOT_ERR_BAD_OBJ_DATA	0x0012
+#define GOT_ERR_FILE_OPEN	0x0013
 
 static const struct got_error {
 	int code;
@@ -46,6 +47,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_OBJ_HDR,	"bad object header" },
 	{ GOT_ERR_OBJ_TYPE,	"wrong type of object" },
 	{ GOT_ERR_BAD_OBJ_DATA,	"bad object data" },
+	{ GOT_ERR_FILE_OPEN,	"could not open file" },
 };
 
 const struct got_error * got_error(int code);

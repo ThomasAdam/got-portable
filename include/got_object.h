@@ -31,6 +31,7 @@ struct got_object_id {
 struct got_blob_object {
 	FILE *f;
 	struct got_zstream_buf zb;
+	size_t hdrlen;
 };
 
 struct got_tree_entry {
