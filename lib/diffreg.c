@@ -169,7 +169,7 @@ struct cand {
 struct line {
 	int	serial;
 	int	value;
-} *file[2];
+};
 
 /*
  * The following struct is used to record change information when
@@ -232,6 +232,7 @@ struct diff_state {
 	struct context_vec *context_vec_start;
 	struct context_vec *context_vec_end;
 	struct context_vec *context_vec_ptr;
+	struct line *file[2];
 } ds;
 
 #define FUNCTION_CONTEXT_SIZE	55
@@ -402,7 +403,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 	sort(ds.sfile[0], ds.slen[0]);
 	sort(ds.sfile[1], ds.slen[1]);
 
-	ds.member = (int *)file[1];
+	ds.member = (int *)ds.file[1];
 	equiv(ds.sfile[0], ds.slen[0], ds.sfile[1], ds.slen[1], ds.member);
 	ds.member = reallocarray(ds.member, ds.slen[1] + 2, sizeof(*ds.member));
 	if (ds.member == NULL) {
@@ -410,7 +411,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 		goto closem;
 	}
 
-	ds.class = (int *)file[0];
+	ds.class = (int *)ds.file[0];
 	unsort(ds.sfile[0], ds.slen[0], ds.class);
 	ds.class = reallocarray(ds.class, ds.slen[0] + 2, sizeof(*ds.class));
 	if (ds.class == NULL) {
@@ -569,7 +570,7 @@ prepare(int i, FILE *fd, off_t filesize, int flags)
 		p[++j].value = h;
 	}
 	ds.len[i] = j;
-	file[i] = p;
+	ds.file[i] = p;
 }
 
 static void
@@ -578,15 +579,15 @@ prune(void)
 	int i, j;
 
 	for (ds.pref = 0; ds.pref < ds.len[0] && ds.pref < ds.len[1] &&
-	    file[0][ds.pref + 1].value == file[1][ds.pref + 1].value;
+	    ds.file[0][ds.pref + 1].value == ds.file[1][ds.pref + 1].value;
 	    ds.pref++)
 		;
 	for (ds.suff = 0; ds.suff < ds.len[0] - ds.pref && ds.suff < ds.len[1] - ds.pref &&
-	    file[0][ds.len[0] - ds.suff].value == file[1][ds.len[1] - ds.suff].value;
+	    ds.file[0][ds.len[0] - ds.suff].value == ds.file[1][ds.len[1] - ds.suff].value;
 	    ds.suff++)
 		;
 	for (j = 0; j < 2; j++) {
-		ds.sfile[j] = file[j] + ds.pref;
+		ds.sfile[j] = ds.file[j] + ds.pref;
 		ds.slen[j] = ds.len[j] - ds.pref - ds.suff;
 		for (i = 0; i <= ds.slen[j]; i++)
 			ds.sfile[j][i].serial = i;
