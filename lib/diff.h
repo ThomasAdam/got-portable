@@ -81,13 +81,6 @@ struct excludes {
 	struct excludes *next;
 };
 
-extern int	Nflag, Pflag, rflag, sflag, Tflag;
-extern int	diff_format, diff_context, status;
-extern char	*start, *ifdefname, *diffargs, *label[2], *ignore_pats;
-extern struct	stat stb1, stb2;
-extern struct	excludes *excludes_list;
-extern regex_t	ignore_re;
-
 char	*splice(char *, char *);
 const struct got_error *got_diffreg(int *, char *, char *, int);
 int	easprintf(char **, const char *, ...);

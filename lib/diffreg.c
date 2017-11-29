@@ -237,11 +237,12 @@ static char lastbuf[FUNCTION_CONTEXT_SIZE];
 static int lastline;
 static int lastmatchline;
 
-int	 Nflag, Pflag, rflag, sflag, Tflag;
-int	 diff_format, diff_context, status;
-char	*start, *ifdefname, *diffargs, *label[2], *ignore_pats;
-struct stat stb1, stb2;
-
+struct diff_args {
+	int	 Tflag;
+	int	 diff_format, diff_context, status;
+	char	*ifdefname, *diffargs, *label[2], *ignore_pats;
+	struct stat stb1, stb2;
+} diff_args;
 
 /*
  * chrtran points to one of 2 translation tables: cup2low if folding upper to
@@ -308,16 +309,16 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 	FILE *f1, *f2;
 	int i;
 
-	diff_format = D_UNIFIED;
+	diff_args.diff_format = D_UNIFIED;
 
 	if (strcmp(file1, "-") == 0)
-		fstat(STDIN_FILENO, &stb1);
-	else if (stat(file1, &stb1) != 0)
+		fstat(STDIN_FILENO, &diff_args.stb1);
+	else if (stat(file1, &diff_args.stb1) != 0)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	if (strcmp(file2, "-") == 0)
-		fstat(STDIN_FILENO, &stb2);
-	else if (stat(file2, &stb2) != 0)
+		fstat(STDIN_FILENO, &diff_args.stb2);
+	else if (stat(file2, &diff_args.stb2) != 0)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	f1 = f2 = NULL;
@@ -330,8 +331,8 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 		chrtran = cup2low;
 	else
 		chrtran = clow2low;
-	if (S_ISDIR(stb1.st_mode) != S_ISDIR(stb2.st_mode)) {
-		*rval = (S_ISDIR(stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
+	if (S_ISDIR(diff_args.stb1.st_mode) != S_ISDIR(diff_args.stb2.st_mode)) {
+		*rval = (S_ISDIR(diff_args.stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
 	}
 	if (strcmp(file1, "-") == 0 && strcmp(file2, "-") == 0)
@@ -340,10 +341,10 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 	if (flags & D_EMPTY1)
 		f1 = fopen(_PATH_DEVNULL, "r");
 	else {
-		if (!S_ISREG(stb1.st_mode)) {
+		if (!S_ISREG(diff_args.stb1.st_mode)) {
 			if ((f1 = opentemp(file1)) == NULL ||
-			    fstat(fileno(f1), &stb1) < 0) {
-				status |= 2;
+			    fstat(fileno(f1), &diff_args.stb1) < 0) {
+				diff_args.status |= 2;
 				goto closem;
 			}
 		} else if (strcmp(file1, "-") == 0)
@@ -352,17 +353,17 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 			f1 = fopen(file1, "r");
 	}
 	if (f1 == NULL) {
-		status |= 2;
+		diff_args.status |= 2;
 		goto closem;
 	}
 
 	if (flags & D_EMPTY2)
 		f2 = fopen(_PATH_DEVNULL, "r");
 	else {
-		if (!S_ISREG(stb2.st_mode)) {
+		if (!S_ISREG(diff_args.stb2.st_mode)) {
 			if ((f2 = opentemp(file2)) == NULL ||
-			    fstat(fileno(f2), &stb2) < 0) {
-				status |= 2;
+			    fstat(fileno(f2), &diff_args.stb2) < 0) {
+				diff_args.status |= 2;
 				goto closem;
 			}
 		} else if (strcmp(file2, "-") == 0)
@@ -371,7 +372,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 			f2 = fopen(file2, "r");
 	}
 	if (f2 == NULL) {
-		status |= 2;
+		diff_args.status |= 2;
 		goto closem;
 	}
 
@@ -382,18 +383,18 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 		break;
 	default:
 		/* error */
-		status |= 2;
+		diff_args.status |= 2;
 		goto closem;
 	}
 
 	if ((flags & D_FORCEASCII) == 0 &&
 	    (!asciifile(f1) || !asciifile(f2))) {
 		*rval = D_BINARY;
-		status |= 1;
+		diff_args.status |= 1;
 		goto closem;
 	}
-	prepare(0, f1, stb1.st_size, flags);
-	prepare(1, f2, stb2.st_size, flags);
+	prepare(0, f1, diff_args.stb1.st_size, flags);
+	prepare(1, f2, diff_args.stb2.st_size, flags);
 
 	prune();
 	sort(sfile[0], slen[0]);
@@ -456,7 +457,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 	output(file1, f1, file2, f2, flags);
 closem:
 	if (anychange) {
-		status |= 1;
+		diff_args.status |= 1;
 		if (*rval == D_SAME)
 			*rval = D_DIFFER;
 	}
@@ -479,8 +480,8 @@ files_differ(FILE *f1, FILE *f2, int flags)
 	char buf1[BUFSIZ], buf2[BUFSIZ];
 	size_t i, j;
 
-	if ((flags & (D_EMPTY1|D_EMPTY2)) || stb1.st_size != stb2.st_size ||
-	    (stb1.st_mode & S_IFMT) != (stb2.st_mode & S_IFMT))
+	if ((flags & (D_EMPTY1|D_EMPTY2)) || diff_args.stb1.st_size != diff_args.stb2.st_size ||
+	    (diff_args.stb1.st_mode & S_IFMT) != (diff_args.stb2.st_mode & S_IFMT))
 		return (1);
 	for (;;) {
 		i = fread(buf1, 1, sizeof(buf1), f1);
@@ -913,7 +914,7 @@ output(char *file1, FILE *f1, char *file2, FILE *f2, int flags)
 	m = len[0];
 	J[0] = 0;
 	J[m + 1] = len[1] + 1;
-	if (diff_format != D_EDIT) {
+	if (diff_args.diff_format != D_EDIT) {
 		for (i0 = 1; i0 <= m; i0 = i1 + 1) {
 			while (i0 <= m && J[i0] == J[i0 - 1] + 1)
 				i0++;
@@ -940,7 +941,7 @@ output(char *file1, FILE *f1, char *file2, FILE *f2, int flags)
 	}
 	if (m == 0)
 		change(file1, f1, file2, f2, 1, 0, 1, len[1], &flags);
-	if (diff_format == D_IFDEF) {
+	if (diff_args.diff_format == D_IFDEF) {
 		for (;;) {
 #define	c i0
 			if ((c = getc(f1)) == EOF)
@@ -950,9 +951,9 @@ output(char *file1, FILE *f1, char *file2, FILE *f2, int flags)
 #undef c
 	}
 	if (anychange != 0) {
-		if (diff_format == D_CONTEXT)
+		if (diff_args.diff_format == D_CONTEXT)
 			dump_context_vec(f1, f2, flags);
-		else if (diff_format == D_UNIFIED)
+		else if (diff_args.diff_format == D_UNIFIED)
 			dump_unified_vec(f1, f2, flags);
 	}
 }
@@ -1012,9 +1013,9 @@ change(char *file1, FILE *f1, char *file2, FILE *f2, int a, int b, int c, int d,
 	int i;
 
 restart:
-	if (diff_format != D_IFDEF && a > b && c > d)
+	if (diff_args.diff_format != D_IFDEF && a > b && c > d)
 		return;
-	if (ignore_pats != NULL) {
+	if (diff_args.ignore_pats != NULL) {
 		char *line;
 		/*
 		 * All lines in the change, insert, or delete must
@@ -1041,10 +1042,10 @@ restart:
 	}
 proceed:
 	if (*pflags & D_HEADER) {
-		diff_output("%s %s %s\n", diffargs, file1, file2);
+		diff_output("%s %s %s\n", diff_args.diffargs, file1, file2);
 		*pflags &= ~D_HEADER;
 	}
-	if (diff_format == D_CONTEXT || diff_format == D_UNIFIED) {
+	if (diff_args.diff_format == D_CONTEXT || diff_args.diff_format == D_UNIFIED) {
 		/*
 		 * Allocate change records as needed.
 		 */
@@ -1062,13 +1063,13 @@ proceed:
 			 */
 			print_header(file1, file2);
 			anychange = 1;
-		} else if (a > context_vec_ptr->b + (2 * diff_context) + 1 &&
-		    c > context_vec_ptr->d + (2 * diff_context) + 1) {
+		} else if (a > context_vec_ptr->b + (2 * diff_args.diff_context) + 1 &&
+		    c > context_vec_ptr->d + (2 * diff_args.diff_context) + 1) {
 			/*
 			 * If this change is more than 'diff_context' lines from the
 			 * previous change, dump the record and reset it.
 			 */
-			if (diff_format == D_CONTEXT)
+			if (diff_args.diff_format == D_CONTEXT)
 				dump_context_vec(f1, f2, *pflags);
 			else
 				dump_unified_vec(f1, f2, *pflags);
@@ -1082,14 +1083,14 @@ proceed:
 	}
 	if (anychange == 0)
 		anychange = 1;
-	switch (diff_format) {
+	switch (diff_args.diff_format) {
 	case D_BRIEF:
 		return;
 	case D_NORMAL:
 	case D_EDIT:
 		range(a, b, ",");
 		diff_output("%c", a > b ? 'a' : c > d ? 'd' : 'c');
-		if (diff_format == D_NORMAL)
+		if (diff_args.diff_format == D_NORMAL)
 			range(c, d, ",");
 		diff_output("\n");
 		break;
@@ -1109,13 +1110,13 @@ proceed:
 		}
 		break;
 	}
-	if (diff_format == D_NORMAL || diff_format == D_IFDEF) {
+	if (diff_args.diff_format == D_NORMAL || diff_args.diff_format == D_IFDEF) {
 		fetch(ixold, a, b, f1, '<', 1, *pflags);
-		if (a <= b && c <= d && diff_format == D_NORMAL)
+		if (a <= b && c <= d && diff_args.diff_format == D_NORMAL)
 			diff_output("---\n");
 	}
-	i = fetch(ixnew, c, d, f2, diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
-	if (i != 0 && diff_format == D_EDIT) {
+	i = fetch(ixnew, c, d, f2, diff_args.diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
+	if (i != 0 && diff_args.diff_format == D_EDIT) {
 		/*
 		 * A non-zero return value for D_EDIT indicates that the
 		 * last line printed was a bare dot (".") that has been
@@ -1130,10 +1131,10 @@ proceed:
 		c += i;
 		goto restart;
 	}
-	if ((diff_format == D_EDIT || diff_format == D_REVERSE) && c <= d)
+	if ((diff_args.diff_format == D_EDIT || diff_args.diff_format == D_REVERSE) && c <= d)
 		diff_output(".\n");
 	if (inifdef) {
-		diff_output("#endif /* %s */\n", ifdefname);
+		diff_output("#endif /* %s */\n", diff_args.ifdefname);
 		inifdef = 0;
 	}
 }
@@ -1147,7 +1148,7 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 	 * When doing #ifdef's, copy down to current line
 	 * if this is the first file, so that stuff makes it to output.
 	 */
-	if (diff_format == D_IFDEF && oldfile) {
+	if (diff_args.diff_format == D_IFDEF && oldfile) {
 		long curpos = ftell(lb);
 		/* print through if append (a>b), else to (nb: 0 vs 1 orig) */
 		nc = f[a > b ? b : a - 1] - curpos;
@@ -1156,34 +1157,34 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 	}
 	if (a > b)
 		return (0);
-	if (diff_format == D_IFDEF) {
+	if (diff_args.diff_format == D_IFDEF) {
 		if (inifdef) {
 			diff_output("#else /* %s%s */\n",
-			    oldfile == 1 ? "!" : "", ifdefname);
+			    oldfile == 1 ? "!" : "", diff_args.ifdefname);
 		} else {
 			if (oldfile)
-				diff_output("#ifndef %s\n", ifdefname);
+				diff_output("#ifndef %s\n", diff_args.ifdefname);
 			else
-				diff_output("#ifdef %s\n", ifdefname);
+				diff_output("#ifdef %s\n", diff_args.ifdefname);
 		}
 		inifdef = 1 + oldfile;
 	}
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
 		nc = f[i] - f[i - 1];
-		if (diff_format != D_IFDEF && ch != '\0') {
+		if (diff_args.diff_format != D_IFDEF && ch != '\0') {
 			diff_output("%c", ch);
-			if (Tflag && (diff_format == D_NORMAL || diff_format == D_CONTEXT
-			    || diff_format == D_UNIFIED))
+			if (diff_args.Tflag && (diff_args.diff_format == D_NORMAL || diff_args.diff_format == D_CONTEXT
+			    || diff_args.diff_format == D_UNIFIED))
 				diff_output("\t");
-			else if (diff_format != D_UNIFIED)
+			else if (diff_args.diff_format != D_UNIFIED)
 				diff_output(" ");
 		}
 		col = 0;
 		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
 			if ((c = getc(lb)) == EOF) {
-				if (diff_format == D_EDIT || diff_format == D_REVERSE ||
-				    diff_format == D_NREVERSE)
+				if (diff_args.diff_format == D_EDIT || diff_args.diff_format == D_REVERSE ||
+				    diff_args.diff_format == D_NREVERSE)
 					warnx("No newline at end of file");
 				else
 					diff_output("\n\\ No newline at end of "
@@ -1195,7 +1196,7 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 					diff_output(" ");
 				} while (++col & 7);
 			} else {
-				if (diff_format == D_EDIT && j == 1 && c == '\n'
+				if (diff_args.diff_format == D_EDIT && j == 1 && c == '\n'
 				    && lastc == '.') {
 					/*
 					 * Don't print a bare "." line
@@ -1352,10 +1353,10 @@ dump_context_vec(FILE *f1, FILE *f2, int flags)
 		return;
 
 	b = d = 0;		/* gcc */
-	lowa = MAXIMUM(1, cvp->a - diff_context);
-	upb = MINIMUM(len[0], context_vec_ptr->b + diff_context);
-	lowc = MAXIMUM(1, cvp->c - diff_context);
-	upd = MINIMUM(len[1], context_vec_ptr->d + diff_context);
+	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
+	upb = MINIMUM(len[0], context_vec_ptr->b + diff_args.diff_context);
+	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
+	upd = MINIMUM(len[1], context_vec_ptr->d + diff_args.diff_context);
 
 	diff_output("***************");
 	if ((flags & D_PROTOTYPE)) {
@@ -1455,10 +1456,10 @@ dump_unified_vec(FILE *f1, FILE *f2, int flags)
 		return;
 
 	b = d = 0;		/* gcc */
-	lowa = MAXIMUM(1, cvp->a - diff_context);
-	upb = MINIMUM(len[0], context_vec_ptr->b + diff_context);
-	lowc = MAXIMUM(1, cvp->c - diff_context);
-	upd = MINIMUM(len[1], context_vec_ptr->d + diff_context);
+	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
+	upb = MINIMUM(len[0], context_vec_ptr->b + diff_args.diff_context);
+	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
+	upd = MINIMUM(len[1], context_vec_ptr->d + diff_args.diff_context);
 
 	diff_output("@@ -");
 	uni_range(lowa, upb);
@@ -1518,16 +1519,16 @@ dump_unified_vec(FILE *f1, FILE *f2, int flags)
 static void
 print_header(const char *file1, const char *file2)
 {
-	if (label[0] != NULL)
-		diff_output("%s %s\n", diff_format == D_CONTEXT ? "***" : "---",
-		    label[0]);
+	if (diff_args.label[0] != NULL)
+		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "***" : "---",
+		    diff_args.label[0]);
 	else
-		diff_output("%s %s\t%s", diff_format == D_CONTEXT ? "***" : "---",
-		    file1, ctime(&stb1.st_mtime));
-	if (label[1] != NULL)
-		diff_output("%s %s\n", diff_format == D_CONTEXT ? "---" : "+++",
-		    label[1]);
+		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "***" : "---",
+		    file1, ctime(&diff_args.stb1.st_mtime));
+	if (diff_args.label[1] != NULL)
+		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
+		    diff_args.label[1]);
 	else
-		diff_output("%s %s\t%s", diff_format == D_CONTEXT ? "---" : "+++",
-		    file2, ctime(&stb2.st_mtime));
+		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
+		    file2, ctime(&diff_args.stb2.st_mtime));
 }
