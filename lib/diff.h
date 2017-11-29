@@ -107,11 +107,17 @@ struct got_diff_state {
 	int lastline;
 	int lastmatchline;
 	struct stat stb1, stb2;
-} ds;
+};
+
+struct got_diff_args {
+	int	 Tflag;
+	int	 diff_format, diff_context, status;
+	char	*ifdefname, *diffargs, *label[2], *ignore_pats;
+};
 
 char	*splice(char *, char *);
 const struct got_error *got_diffreg(int *, char *,
-    char *, int, struct got_diff_state *);
+    char *, int, struct got_diff_args *, struct got_diff_state *);
 int	easprintf(char **, const char *, ...);
 void	*emalloc(size_t);
 void	*erealloc(void *, size_t);

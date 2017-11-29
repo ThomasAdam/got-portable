@@ -185,23 +185,23 @@ struct context_vec {
 
 #define	diff_output	printf
 static FILE	*opentemp(const char *);
-static void	 output(struct got_diff_state *, char *, FILE *, char *, FILE *, int);
+static void	 output(struct got_diff_state *, struct got_diff_args *, char *, FILE *, char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 range(int, int, char *);
 static void	 uni_range(int, int);
-static void	 dump_context_vec(struct got_diff_state *, FILE *, FILE *, int);
-static void	 dump_unified_vec(struct got_diff_state *, FILE *, FILE *, int);
+static void	 dump_context_vec(struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
+static void	 dump_unified_vec(struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static void	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
 static void	 prune(struct got_diff_state *);
 static void	 equiv(struct line *, int, struct line *, int, int *);
 static void	 unravel(struct got_diff_state *, int);
 static void	 unsort(struct line *, int, int *);
-static void	 change(struct got_diff_state *, char *, FILE *, char *, FILE *, int, int, int, int, int *);
+static void	 change(struct got_diff_state *, struct got_diff_args *, char *, FILE *, char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
-static void	 print_header(struct got_diff_state *, const char *, const char *);
+static void	 print_header(struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 ignoreline(char *);
 static int	 asciifile(FILE *);
-static int	 fetch(struct got_diff_state *, long *, int, int, FILE *, int, int, int);
+static int	 fetch(struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int, int);
 static int	 newcand(struct got_diff_state *, int, int, int);
 static int	 search(struct got_diff_state *, int *, int, int);
 static int	 skipline(FILE *);
@@ -211,12 +211,6 @@ static int	 readhash(struct got_diff_state *, FILE *, int);
 static int	 files_differ(struct got_diff_state *, FILE *, FILE *, int);
 static char	*match_function(struct got_diff_state *, const long *, int, FILE *);
 static char	*preadline(int, size_t, off_t);
-
-struct diff_args {
-	int	 Tflag;
-	int	 diff_format, diff_context, status;
-	char	*ifdefname, *diffargs, *label[2], *ignore_pats;
-} diff_args;
 
 /*
  * chrtran points to one of 2 translation tables: cup2low if folding upper to
@@ -278,13 +272,11 @@ u_char cup2low[256] = {
 
 const struct got_error *
 got_diffreg(int *rval, char *file1, char *file2, int flags,
-    struct got_diff_state *ds)
+    struct got_diff_args *args, struct got_diff_state *ds)
 {
 	const struct got_error *err = NULL;
 	FILE *f1, *f2;
 	int i;
-
-	diff_args.diff_format = D_UNIFIED;
 
 	if (strcmp(file1, "-") == 0)
 		fstat(STDIN_FILENO, &ds->stb1);
@@ -319,7 +311,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		if (!S_ISREG(ds->stb1.st_mode)) {
 			if ((f1 = opentemp(file1)) == NULL ||
 			    fstat(fileno(f1), &ds->stb1) < 0) {
-				diff_args.status |= 2;
+				args->status |= 2;
 				goto closem;
 			}
 		} else if (strcmp(file1, "-") == 0)
@@ -328,7 +320,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 			f1 = fopen(file1, "r");
 	}
 	if (f1 == NULL) {
-		diff_args.status |= 2;
+		args->status |= 2;
 		goto closem;
 	}
 
@@ -338,7 +330,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		if (!S_ISREG(ds->stb2.st_mode)) {
 			if ((f2 = opentemp(file2)) == NULL ||
 			    fstat(fileno(f2), &ds->stb2) < 0) {
-				diff_args.status |= 2;
+				args->status |= 2;
 				goto closem;
 			}
 		} else if (strcmp(file2, "-") == 0)
@@ -347,7 +339,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 			f2 = fopen(file2, "r");
 	}
 	if (f2 == NULL) {
-		diff_args.status |= 2;
+		args->status |= 2;
 		goto closem;
 	}
 
@@ -358,14 +350,14 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		break;
 	default:
 		/* error */
-		diff_args.status |= 2;
+		args->status |= 2;
 		goto closem;
 	}
 
 	if ((flags & D_FORCEASCII) == 0 &&
 	    (!asciifile(f1) || !asciifile(f2))) {
 		*rval = D_BINARY;
-		diff_args.status |= 1;
+		args->status |= 1;
 		goto closem;
 	}
 	prepare(ds, 0, f1, ds->stb1.st_size, flags);
@@ -429,10 +421,10 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		goto closem;
 	}
 	check(ds, f1, f2, flags);
-	output(ds, file1, f1, file2, f2, flags);
+	output(ds, args, file1, f1, file2, f2, flags);
 closem:
 	if (ds->anychange) {
-		diff_args.status |= 1;
+		args->status |= 1;
 		if (*rval == D_SAME)
 			*rval = D_DIFFER;
 	}
@@ -880,8 +872,8 @@ skipline(FILE *f)
 }
 
 static void
-output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
-    int flags)
+output(struct got_diff_state *ds, struct got_diff_args *args,
+    char *file1, FILE *f1, char *file2, FILE *f2, int flags)
 {
 	int m, i0, i1, j0, j1;
 
@@ -890,7 +882,7 @@ output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
 	m = ds->len[0];
 	ds->J[0] = 0;
 	ds->J[m + 1] = ds->len[1] + 1;
-	if (diff_args.diff_format != D_EDIT) {
+	if (args->diff_format != D_EDIT) {
 		for (i0 = 1; i0 <= m; i0 = i1 + 1) {
 			while (i0 <= m && ds->J[i0] == ds->J[i0 - 1] + 1)
 				i0++;
@@ -900,7 +892,7 @@ output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
 				i1++;
 			j1 = ds->J[i1 + 1] - 1;
 			ds->J[i1] = j1;
-			change(ds, file1, f1, file2, f2, i0, i1, j0, j1, &flags);
+			change(ds, args, file1, f1, file2, f2, i0, i1, j0, j1, &flags);
 		}
 	} else {
 		for (i0 = m; i0 >= 1; i0 = i1 - 1) {
@@ -912,12 +904,12 @@ output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
 				i1--;
 			j1 = ds->J[i1 - 1] + 1;
 			ds->J[i1] = j1;
-			change(ds, file1, f1, file2, f2, i1, i0, j1, j0, &flags);
+			change(ds, args, file1, f1, file2, f2, i1, i0, j1, j0, &flags);
 		}
 	}
 	if (m == 0)
-		change(ds, file1, f1, file2, f2, 1, 0, 1, ds->len[1], &flags);
-	if (diff_args.diff_format == D_IFDEF) {
+		change(ds, args, file1, f1, file2, f2, 1, 0, 1, ds->len[1], &flags);
+	if (args->diff_format == D_IFDEF) {
 		for (;;) {
 #define	c i0
 			if ((c = getc(f1)) == EOF)
@@ -927,10 +919,10 @@ output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
 #undef c
 	}
 	if (ds->anychange != 0) {
-		if (diff_args.diff_format == D_CONTEXT)
-			dump_context_vec(ds, f1, f2, flags);
-		else if (diff_args.diff_format == D_UNIFIED)
-			dump_unified_vec(ds, f1, f2, flags);
+		if (args->diff_format == D_CONTEXT)
+			dump_context_vec(ds, args, f1, f2, flags);
+		else if (args->diff_format == D_UNIFIED)
+			dump_unified_vec(ds, args, f1, f2, flags);
 	}
 }
 
@@ -982,16 +974,17 @@ ignoreline(char *line)
  * lines missing from the to file.
  */
 static void
-change(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
+change(struct got_diff_state *ds, struct got_diff_args *args,
+    char *file1, FILE *f1, char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
 	static size_t max_context = 64;
 	int i;
 
 restart:
-	if (diff_args.diff_format != D_IFDEF && a > b && c > d)
+	if (args->diff_format != D_IFDEF && a > b && c > d)
 		return;
-	if (diff_args.ignore_pats != NULL) {
+	if (args->ignore_pats != NULL) {
 		char *line;
 		/*
 		 * All lines in the change, insert, or delete must
@@ -1018,10 +1011,10 @@ restart:
 	}
 proceed:
 	if (*pflags & D_HEADER) {
-		diff_output("%s %s %s\n", diff_args.diffargs, file1, file2);
+		diff_output("%s %s %s\n", args->diffargs, file1, file2);
 		*pflags &= ~D_HEADER;
 	}
-	if (diff_args.diff_format == D_CONTEXT || diff_args.diff_format == D_UNIFIED) {
+	if (args->diff_format == D_CONTEXT || args->diff_format == D_UNIFIED) {
 		/*
 		 * Allocate change records as needed.
 		 */
@@ -1037,18 +1030,18 @@ proceed:
 			/*
 			 * Print the context/unidiff header first time through.
 			 */
-			print_header(ds, file1, file2);
+			print_header(ds, args, file1, file2);
 			ds->anychange = 1;
-		} else if (a > ds->context_vec_ptr->b + (2 * diff_args.diff_context) + 1 &&
-		    c > ds->context_vec_ptr->d + (2 * diff_args.diff_context) + 1) {
+		} else if (a > ds->context_vec_ptr->b + (2 * args->diff_context) + 1 &&
+		    c > ds->context_vec_ptr->d + (2 * args->diff_context) + 1) {
 			/*
 			 * If this change is more than 'diff_context' lines from the
 			 * previous change, dump the record and reset it.
 			 */
-			if (diff_args.diff_format == D_CONTEXT)
-				dump_context_vec(ds, f1, f2, *pflags);
+			if (args->diff_format == D_CONTEXT)
+				dump_context_vec(ds, args, f1, f2, *pflags);
 			else
-				dump_unified_vec(ds, f1, f2, *pflags);
+				dump_unified_vec(ds, args, f1, f2, *pflags);
 		}
 		ds->context_vec_ptr++;
 		ds->context_vec_ptr->a = a;
@@ -1059,14 +1052,14 @@ proceed:
 	}
 	if (ds->anychange == 0)
 		ds->anychange = 1;
-	switch (diff_args.diff_format) {
+	switch (args->diff_format) {
 	case D_BRIEF:
 		return;
 	case D_NORMAL:
 	case D_EDIT:
 		range(a, b, ",");
 		diff_output("%c", a > b ? 'a' : c > d ? 'd' : 'c');
-		if (diff_args.diff_format == D_NORMAL)
+		if (args->diff_format == D_NORMAL)
 			range(c, d, ",");
 		diff_output("\n");
 		break;
@@ -1086,13 +1079,13 @@ proceed:
 		}
 		break;
 	}
-	if (diff_args.diff_format == D_NORMAL || diff_args.diff_format == D_IFDEF) {
-		fetch(ds, ds->ixold, a, b, f1, '<', 1, *pflags);
-		if (a <= b && c <= d && diff_args.diff_format == D_NORMAL)
+	if (args->diff_format == D_NORMAL || args->diff_format == D_IFDEF) {
+		fetch(ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
+		if (a <= b && c <= d && args->diff_format == D_NORMAL)
 			diff_output("---\n");
 	}
-	i = fetch(ds, ds->ixnew, c, d, f2, diff_args.diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
-	if (i != 0 && diff_args.diff_format == D_EDIT) {
+	i = fetch(ds, args, ds->ixnew, c, d, f2, args->diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
+	if (i != 0 && args->diff_format == D_EDIT) {
 		/*
 		 * A non-zero return value for D_EDIT indicates that the
 		 * last line printed was a bare dot (".") that has been
@@ -1107,17 +1100,17 @@ proceed:
 		c += i;
 		goto restart;
 	}
-	if ((diff_args.diff_format == D_EDIT || diff_args.diff_format == D_REVERSE) && c <= d)
+	if ((args->diff_format == D_EDIT || args->diff_format == D_REVERSE) && c <= d)
 		diff_output(".\n");
 	if (ds->inifdef) {
-		diff_output("#endif /* %s */\n", diff_args.ifdefname);
+		diff_output("#endif /* %s */\n", args->ifdefname);
 		ds->inifdef = 0;
 	}
 }
 
 static int
-fetch(struct got_diff_state *ds, long *f, int a, int b, FILE *lb, int ch,
-    int oldfile, int flags)
+fetch(struct got_diff_state *ds, struct got_diff_args *args,
+    long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 {
 	int i, j, c, lastc, col, nc;
 
@@ -1125,7 +1118,7 @@ fetch(struct got_diff_state *ds, long *f, int a, int b, FILE *lb, int ch,
 	 * When doing #ifdef's, copy down to current line
 	 * if this is the first file, so that stuff makes it to output.
 	 */
-	if (diff_args.diff_format == D_IFDEF && oldfile) {
+	if (args->diff_format == D_IFDEF && oldfile) {
 		long curpos = ftell(lb);
 		/* print through if append (a>b), else to (nb: 0 vs 1 orig) */
 		nc = f[a > b ? b : a - 1] - curpos;
@@ -1134,34 +1127,34 @@ fetch(struct got_diff_state *ds, long *f, int a, int b, FILE *lb, int ch,
 	}
 	if (a > b)
 		return (0);
-	if (diff_args.diff_format == D_IFDEF) {
+	if (args->diff_format == D_IFDEF) {
 		if (ds->inifdef) {
 			diff_output("#else /* %s%s */\n",
-			    oldfile == 1 ? "!" : "", diff_args.ifdefname);
+			    oldfile == 1 ? "!" : "", args->ifdefname);
 		} else {
 			if (oldfile)
-				diff_output("#ifndef %s\n", diff_args.ifdefname);
+				diff_output("#ifndef %s\n", args->ifdefname);
 			else
-				diff_output("#ifdef %s\n", diff_args.ifdefname);
+				diff_output("#ifdef %s\n", args->ifdefname);
 		}
 		ds->inifdef = 1 + oldfile;
 	}
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
 		nc = f[i] - f[i - 1];
-		if (diff_args.diff_format != D_IFDEF && ch != '\0') {
+		if (args->diff_format != D_IFDEF && ch != '\0') {
 			diff_output("%c", ch);
-			if (diff_args.Tflag && (diff_args.diff_format == D_NORMAL || diff_args.diff_format == D_CONTEXT
-			    || diff_args.diff_format == D_UNIFIED))
+			if (args->Tflag && (args->diff_format == D_NORMAL || args->diff_format == D_CONTEXT
+			    || args->diff_format == D_UNIFIED))
 				diff_output("\t");
-			else if (diff_args.diff_format != D_UNIFIED)
+			else if (args->diff_format != D_UNIFIED)
 				diff_output(" ");
 		}
 		col = 0;
 		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
 			if ((c = getc(lb)) == EOF) {
-				if (diff_args.diff_format == D_EDIT || diff_args.diff_format == D_REVERSE ||
-				    diff_args.diff_format == D_NREVERSE)
+				if (args->diff_format == D_EDIT || args->diff_format == D_REVERSE ||
+				    args->diff_format == D_NREVERSE)
 					warnx("No newline at end of file");
 				else
 					diff_output("\n\\ No newline at end of "
@@ -1173,7 +1166,7 @@ fetch(struct got_diff_state *ds, long *f, int a, int b, FILE *lb, int ch,
 					diff_output(" ");
 				} while (++col & 7);
 			} else {
-				if (diff_args.diff_format == D_EDIT && j == 1 && c == '\n'
+				if (args->diff_format == D_EDIT && j == 1 && c == '\n'
 				    && lastc == '.') {
 					/*
 					 * Don't print a bare "." line
@@ -1319,7 +1312,8 @@ match_function(struct got_diff_state *ds, const long *f, int pos, FILE *fp)
 
 /* dump accumulated "context" diff changes */
 static void
-dump_context_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
+dump_context_vec(struct got_diff_state *ds, struct got_diff_args *args,
+    FILE *f1, FILE *f2, int flags)
 {
 	struct context_vec *cvp = ds->context_vec_start;
 	int lowa, upb, lowc, upd, do_output;
@@ -1330,10 +1324,10 @@ dump_context_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 		return;
 
 	b = d = 0;		/* gcc */
-	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
-	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + diff_args.diff_context);
-	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
-	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + diff_args.diff_context);
+	lowa = MAXIMUM(1, cvp->a - args->diff_context);
+	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + args->diff_context);
+	lowc = MAXIMUM(1, cvp->c - args->diff_context);
+	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + args->diff_context);
 
 	diff_output("***************");
 	if ((flags & D_PROTOTYPE)) {
@@ -1370,16 +1364,16 @@ dump_context_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 				ch = (a <= b) ? 'd' : 'a';
 
 			if (ch == 'a')
-				fetch(ds, ds->ixold, lowa, b, f1, ' ', 0, flags);
+				fetch(ds, args, ds->ixold, lowa, b, f1, ' ', 0, flags);
 			else {
-				fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-				fetch(ds, ds->ixold, a, b, f1,
+				fetch(ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+				fetch(ds, args, ds->ixold, a, b, f1,
 				    ch == 'c' ? '!' : '-', 0, flags);
 			}
 			lowa = b + 1;
 			cvp++;
 		}
-		fetch(ds, ds->ixold, b + 1, upb, f1, ' ', 0, flags);
+		fetch(ds, args, ds->ixold, b + 1, upb, f1, ' ', 0, flags);
 	}
 	/* output changes to the "new" file */
 	diff_output("--- ");
@@ -1406,23 +1400,24 @@ dump_context_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 				ch = (a <= b) ? 'd' : 'a';
 
 			if (ch == 'd')
-				fetch(ds, ds->ixnew, lowc, d, f2, ' ', 0, flags);
+				fetch(ds, args, ds->ixnew, lowc, d, f2, ' ', 0, flags);
 			else {
-				fetch(ds, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
-				fetch(ds, ds->ixnew, c, d, f2,
+				fetch(ds, args, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
+				fetch(ds, args, ds->ixnew, c, d, f2,
 				    ch == 'c' ? '!' : '+', 0, flags);
 			}
 			lowc = d + 1;
 			cvp++;
 		}
-		fetch(ds, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
+		fetch(ds, args, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
 	}
 	ds->context_vec_ptr = ds->context_vec_start - 1;
 }
 
 /* dump accumulated "unified" diff changes */
 static void
-dump_unified_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
+dump_unified_vec(struct got_diff_state *ds, struct got_diff_args *args,
+    FILE *f1, FILE *f2, int flags)
 {
 	struct context_vec *cvp = ds->context_vec_start;
 	int lowa, upb, lowc, upd;
@@ -1433,10 +1428,10 @@ dump_unified_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 		return;
 
 	b = d = 0;		/* gcc */
-	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
-	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + diff_args.diff_context);
-	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
-	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + diff_args.diff_context);
+	lowa = MAXIMUM(1, cvp->a - args->diff_context);
+	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + args->diff_context);
+	lowc = MAXIMUM(1, cvp->c - args->diff_context);
+	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + args->diff_context);
 
 	diff_output("@@ -");
 	uni_range(lowa, upb);
@@ -1472,40 +1467,41 @@ dump_unified_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 
 		switch (ch) {
 		case 'c':
-			fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(ds, ds->ixold, a, b, f1, '-', 0, flags);
-			fetch(ds, ds->ixnew, c, d, f2, '+', 0, flags);
+			fetch(ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+			fetch(ds, args, ds->ixold, a, b, f1, '-', 0, flags);
+			fetch(ds, args, ds->ixnew, c, d, f2, '+', 0, flags);
 			break;
 		case 'd':
-			fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(ds, ds->ixold, a, b, f1, '-', 0, flags);
+			fetch(ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+			fetch(ds, args, ds->ixold, a, b, f1, '-', 0, flags);
 			break;
 		case 'a':
-			fetch(ds, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
-			fetch(ds, ds->ixnew, c, d, f2, '+', 0, flags);
+			fetch(ds, args, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
+			fetch(ds, args, ds->ixnew, c, d, f2, '+', 0, flags);
 			break;
 		}
 		lowa = b + 1;
 		lowc = d + 1;
 	}
-	fetch(ds, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
+	fetch(ds, args, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
 
 	ds->context_vec_ptr = ds->context_vec_start - 1;
 }
 
 static void
-print_header(struct got_diff_state *ds, const char *file1, const char *file2)
+print_header(struct got_diff_state *ds, struct got_diff_args *args,
+    const char *file1, const char *file2)
 {
-	if (diff_args.label[0] != NULL)
-		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "***" : "---",
-		    diff_args.label[0]);
+	if (args->label[0] != NULL)
+		diff_output("%s %s\n", args->diff_format == D_CONTEXT ? "***" : "---",
+		    args->label[0]);
 	else
-		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "***" : "---",
+		diff_output("%s %s\t%s", args->diff_format == D_CONTEXT ? "***" : "---",
 		    file1, ctime(&ds->stb1.st_mtime));
-	if (diff_args.label[1] != NULL)
-		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
-		    diff_args.label[1]);
+	if (args->label[1] != NULL)
+		diff_output("%s %s\n", args->diff_format == D_CONTEXT ? "---" : "+++",
+		    args->label[1]);
 	else
-		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
+		diff_output("%s %s\t%s", args->diff_format == D_CONTEXT ? "---" : "+++",
 		    file2, ctime(&ds->stb2.st_mtime));
 }

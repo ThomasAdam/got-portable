@@ -56,6 +56,7 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
     FILE *outfile)
 {
 	struct got_diff_state ds;
+	struct got_diff_args args;
 	const struct got_error *err = NULL;
 	FILE *f1, *f2;
 	char *n1, *n2;
@@ -98,7 +99,10 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	fflush(f2);
 
 	memset(&ds, 0, sizeof(ds));
-	err = got_diffreg(&res, n1, n2, 0, &ds);
+	memset(&args, 0, sizeof(args));
+
+	args.diff_format = D_UNIFIED;
+	err = got_diffreg(&res, n1, n2, 0, &args, &ds);
 done:
 	unlink(n1);
 	unlink(n2);
