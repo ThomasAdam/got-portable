@@ -14,5 +14,5 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-const struct got_error *
-got_diff_blob(struct got_blob_object *, struct got_blob_object *, FILE *);
+const struct got_error *got_diff_blob(struct got_blob_object *,
+    struct got_blob_object *, FILE *);

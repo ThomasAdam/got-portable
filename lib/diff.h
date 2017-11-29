@@ -81,8 +81,36 @@ struct excludes {
 	struct excludes *next;
 };
 
+struct got_diff_state {
+	int  *J;			/* will be overlaid on class */
+	int  *class;		/* will be overlaid on file[0] */
+	int  *klist;		/* will be overlaid on file[0] after class */
+	int  *member;		/* will be overlaid on file[1] */
+	int   clen;
+	int   inifdef;		/* whether or not we are in a #ifdef block */
+	int   len[2];
+	int   pref, suff;	/* length of prefix and suffix */
+	int   slen[2];
+	int   anychange;
+	long *ixnew;		/* will be overlaid on file[1] */
+	long *ixold;		/* will be overlaid on klist */
+	struct cand *clist;	/* merely a free storage pot for candidates */
+	int   clistlen;		/* the length of clist */
+	struct line *sfile[2];	/* shortened by pruning common prefix/suffix */
+	u_char *chrtran;		/* translation table for case-folding */
+	struct context_vec *context_vec_start;
+	struct context_vec *context_vec_end;
+	struct context_vec *context_vec_ptr;
+	struct line *file[2];
+#define FUNCTION_CONTEXT_SIZE	55
+	char lastbuf[FUNCTION_CONTEXT_SIZE];
+	int lastline;
+	int lastmatchline;
+} ds;
+
 char	*splice(char *, char *);
-const struct got_error *got_diffreg(int *, char *, char *, int);
+const struct got_error *got_diffreg(int *, char *,
+    char *, int, struct got_diff_state *);
 int	easprintf(char **, const char *, ...);
 void	*emalloc(size_t);
 void	*erealloc(void *, size_t);

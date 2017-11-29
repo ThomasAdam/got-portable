@@ -185,60 +185,32 @@ struct context_vec {
 
 #define	diff_output	printf
 static FILE	*opentemp(const char *);
-static void	 output(char *, FILE *, char *, FILE *, int);
-static void	 check(FILE *, FILE *, int);
+static void	 output(struct got_diff_state *, char *, FILE *, char *, FILE *, int);
+static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 range(int, int, char *);
 static void	 uni_range(int, int);
-static void	 dump_context_vec(FILE *, FILE *, int);
-static void	 dump_unified_vec(FILE *, FILE *, int);
-static void	 prepare(int, FILE *, off_t, int);
-static void	 prune(void);
+static void	 dump_context_vec(struct got_diff_state *, FILE *, FILE *, int);
+static void	 dump_unified_vec(struct got_diff_state *, FILE *, FILE *, int);
+static void	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
+static void	 prune(struct got_diff_state *);
 static void	 equiv(struct line *, int, struct line *, int, int *);
-static void	 unravel(int);
+static void	 unravel(struct got_diff_state *, int);
 static void	 unsort(struct line *, int, int *);
-static void	 change(char *, FILE *, char *, FILE *, int, int, int, int, int *);
+static void	 change(struct got_diff_state *, char *, FILE *, char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
 static void	 print_header(const char *, const char *);
 static int	 ignoreline(char *);
 static int	 asciifile(FILE *);
-static int	 fetch(long *, int, int, FILE *, int, int, int);
-static int	 newcand(int, int, int);
-static int	 search(int *, int, int);
+static int	 fetch(struct got_diff_state *, long *, int, int, FILE *, int, int, int);
+static int	 newcand(struct got_diff_state *, int, int, int);
+static int	 search(struct got_diff_state *, int *, int, int);
 static int	 skipline(FILE *);
 static int	 isqrt(int);
-static int	 stone(int *, int, int *, int *, int);
-static int	 readhash(FILE *, int);
+static int	 stone(struct got_diff_state *, int *, int, int *, int *, int);
+static int	 readhash(struct got_diff_state *, FILE *, int);
 static int	 files_differ(FILE *, FILE *, int);
-static char	*match_function(const long *, int, FILE *);
+static char	*match_function(struct got_diff_state *, const long *, int, FILE *);
 static char	*preadline(int, size_t, off_t);
-
-struct diff_state {
-	int  *J;			/* will be overlaid on class */
-	int  *class;		/* will be overlaid on file[0] */
-	int  *klist;		/* will be overlaid on file[0] after class */
-	int  *member;		/* will be overlaid on file[1] */
-	int   clen;
-	int   inifdef;		/* whether or not we are in a #ifdef block */
-	int   len[2];
-	int   pref, suff;	/* length of prefix and suffix */
-	int   slen[2];
-	int   anychange;
-	long *ixnew;		/* will be overlaid on file[1] */
-	long *ixold;		/* will be overlaid on klist */
-	struct cand *clist;	/* merely a free storage pot for candidates */
-	int   clistlen;		/* the length of clist */
-	struct line *sfile[2];	/* shortened by pruning common prefix/suffix */
-	u_char *chrtran;		/* translation table for case-folding */
-	struct context_vec *context_vec_start;
-	struct context_vec *context_vec_end;
-	struct context_vec *context_vec_ptr;
-	struct line *file[2];
-#define FUNCTION_CONTEXT_SIZE	55
-	char lastbuf[FUNCTION_CONTEXT_SIZE];
-	int lastline;
-	int lastmatchline;
-} ds;
-
 
 struct diff_args {
 	int	 Tflag;
@@ -306,7 +278,8 @@ u_char cup2low[256] = {
 };
 
 const struct got_error *
-got_diffreg(int *rval, char *file1, char *file2, int flags)
+got_diffreg(int *rval, char *file1, char *file2, int flags,
+    struct got_diff_state *ds)
 {
 	const struct got_error *err = NULL;
 	FILE *f1, *f2;
@@ -326,14 +299,14 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 
 	f1 = f2 = NULL;
 	*rval = D_SAME;
-	ds.anychange = 0;
-	ds.lastline = 0;
-	ds.lastmatchline = 0;
-	ds.context_vec_ptr = ds.context_vec_start - 1;
+	ds->anychange = 0;
+	ds->lastline = 0;
+	ds->lastmatchline = 0;
+	ds->context_vec_ptr = ds->context_vec_start - 1;
 	if (flags & D_IGNORECASE)
-		ds.chrtran = cup2low;
+		ds->chrtran = cup2low;
 	else
-		ds.chrtran = clow2low;
+		ds->chrtran = clow2low;
 	if (S_ISDIR(diff_args.stb1.st_mode) != S_ISDIR(diff_args.stb2.st_mode)) {
 		*rval = (S_ISDIR(diff_args.stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
@@ -396,70 +369,70 @@ got_diffreg(int *rval, char *file1, char *file2, int flags)
 		diff_args.status |= 1;
 		goto closem;
 	}
-	prepare(0, f1, diff_args.stb1.st_size, flags);
-	prepare(1, f2, diff_args.stb2.st_size, flags);
+	prepare(ds, 0, f1, diff_args.stb1.st_size, flags);
+	prepare(ds, 1, f2, diff_args.stb2.st_size, flags);
 
-	prune();
-	sort(ds.sfile[0], ds.slen[0]);
-	sort(ds.sfile[1], ds.slen[1]);
+	prune(ds);
+	sort(ds->sfile[0], ds->slen[0]);
+	sort(ds->sfile[1], ds->slen[1]);
 
-	ds.member = (int *)ds.file[1];
-	equiv(ds.sfile[0], ds.slen[0], ds.sfile[1], ds.slen[1], ds.member);
-	ds.member = reallocarray(ds.member, ds.slen[1] + 2, sizeof(*ds.member));
-	if (ds.member == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto closem;
-	}
-
-	ds.class = (int *)ds.file[0];
-	unsort(ds.sfile[0], ds.slen[0], ds.class);
-	ds.class = reallocarray(ds.class, ds.slen[0] + 2, sizeof(*ds.class));
-	if (ds.class == NULL) {
+	ds->member = (int *)ds->file[1];
+	equiv(ds->sfile[0], ds->slen[0], ds->sfile[1], ds->slen[1], ds->member);
+	ds->member = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
+	if (ds->member == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto closem;
 	}
 
-	ds.klist = calloc(ds.slen[0] + 2, sizeof(*ds.klist));
-	if (ds.klist == NULL) {
+	ds->class = (int *)ds->file[0];
+	unsort(ds->sfile[0], ds->slen[0], ds->class);
+	ds->class = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
+	if (ds->class == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto closem;
 	}
-	ds.clen = 0;
-	ds.clistlen = 100;
-	ds.clist = calloc(ds.clistlen, sizeof(*ds.clist));
-	if (ds.clist == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto closem;
-	}
-	i = stone(ds.class, ds.slen[0], ds.member, ds.klist, flags);
-	free(ds.member);
-	free(ds.class);
 
-	ds.J = reallocarray(ds.J, ds.len[0] + 2, sizeof(*ds.J));
-	if (ds.J == NULL) {
+	ds->klist = calloc(ds->slen[0] + 2, sizeof(*ds->klist));
+	if (ds->klist == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto closem;
 	}
-	unravel(ds.klist[i]);
-	free(ds.clist);
-	ds.clist = NULL;
-	free(ds.klist);
-	ds.klist = NULL;
+	ds->clen = 0;
+	ds->clistlen = 100;
+	ds->clist = calloc(ds->clistlen, sizeof(*ds->clist));
+	if (ds->clist == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
+	i = stone(ds, ds->class, ds->slen[0], ds->member, ds->klist, flags);
+	free(ds->member);
+	free(ds->class);
 
-	ds.ixold = reallocarray(ds.ixold, ds.len[0] + 2, sizeof(*ds.ixold));
-	if (ds.ixold == NULL) {
+	ds->J = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
+	if (ds->J == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto closem;
 	}
-	ds.ixnew = reallocarray(ds.ixnew, ds.len[1] + 2, sizeof(*ds.ixnew));
-	if (ds.ixnew == NULL) {
+	unravel(ds, ds->klist[i]);
+	free(ds->clist);
+	ds->clist = NULL;
+	free(ds->klist);
+	ds->klist = NULL;
+
+	ds->ixold = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
+	if (ds->ixold == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto closem;
 	}
-	check(f1, f2, flags);
-	output(file1, f1, file2, f2, flags);
+	ds->ixnew = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
+	if (ds->ixnew == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
+	check(ds, f1, f2, flags);
+	output(ds, file1, f1, file2, f2, flags);
 closem:
-	if (ds.anychange) {
+	if (ds->anychange) {
 		diff_args.status |= 1;
 		if (*rval == D_SAME)
 			*rval = D_DIFFER;
@@ -549,7 +522,7 @@ splice(char *dir, char *file)
 }
 
 static void
-prepare(int i, FILE *fd, off_t filesize, int flags)
+prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 {
 	struct line *p;
 	int j, h;
@@ -562,35 +535,35 @@ prepare(int i, FILE *fd, off_t filesize, int flags)
 		sz = 100;
 
 	p = xcalloc(sz + 3, sizeof(*p));
-	for (j = 0; (h = readhash(fd, flags));) {
+	for (j = 0; (h = readhash(ds, fd, flags));) {
 		if (j == sz) {
 			sz = sz * 3 / 2;
 			p = xreallocarray(p, sz + 3, sizeof(*p));
 		}
 		p[++j].value = h;
 	}
-	ds.len[i] = j;
-	ds.file[i] = p;
+	ds->len[i] = j;
+	ds->file[i] = p;
 }
 
 static void
-prune(void)
+prune(struct got_diff_state *ds)
 {
 	int i, j;
 
-	for (ds.pref = 0; ds.pref < ds.len[0] && ds.pref < ds.len[1] &&
-	    ds.file[0][ds.pref + 1].value == ds.file[1][ds.pref + 1].value;
-	    ds.pref++)
+	for (ds->pref = 0; ds->pref < ds->len[0] && ds->pref < ds->len[1] &&
+	    ds->file[0][ds->pref + 1].value == ds->file[1][ds->pref + 1].value;
+	    ds->pref++)
 		;
-	for (ds.suff = 0; ds.suff < ds.len[0] - ds.pref && ds.suff < ds.len[1] - ds.pref &&
-	    ds.file[0][ds.len[0] - ds.suff].value == ds.file[1][ds.len[1] - ds.suff].value;
-	    ds.suff++)
+	for (ds->suff = 0; ds->suff < ds->len[0] - ds->pref && ds->suff < ds->len[1] - ds->pref &&
+	    ds->file[0][ds->len[0] - ds->suff].value == ds->file[1][ds->len[1] - ds->suff].value;
+	    ds->suff++)
 		;
 	for (j = 0; j < 2; j++) {
-		ds.sfile[j] = ds.file[j] + ds.pref;
-		ds.slen[j] = ds.len[j] - ds.pref - ds.suff;
-		for (i = 0; i <= ds.slen[j]; i++)
-			ds.sfile[j][i].serial = i;
+		ds->sfile[j] = ds->file[j] + ds->pref;
+		ds->slen[j] = ds->len[j] - ds->pref - ds->suff;
+		for (i = 0; i <= ds->slen[j]; i++)
+			ds->sfile[j][i].serial = i;
 	}
 }
 
@@ -642,7 +615,7 @@ isqrt(int n)
 }
 
 static int
-stone(int *a, int n, int *b, int *c, int flags)
+stone(struct got_diff_state *ds, int *a, int n, int *b, int *c, int flags)
 {
 	int i, k, y, j, l;
 	int oldc, tc, oldl, sq;
@@ -656,7 +629,7 @@ stone(int *a, int n, int *b, int *c, int flags)
 	}
 
 	k = 0;
-	c[0] = newcand(0, 0, 0);
+	c[0] = newcand(ds, 0, 0, 0);
 	for (i = 1; i <= n; i++) {
 		j = a[i];
 		if (j == 0)
@@ -666,21 +639,21 @@ stone(int *a, int n, int *b, int *c, int flags)
 		oldc = c[0];
 		numtries = 0;
 		do {
-			if (y <= ds.clist[oldc].y)
+			if (y <= ds->clist[oldc].y)
 				continue;
-			l = search(c, k, y);
+			l = search(ds, c, k, y);
 			if (l != oldl + 1)
 				oldc = c[l - 1];
 			if (l <= k) {
-				if (ds.clist[c[l]].y <= y)
+				if (ds->clist[c[l]].y <= y)
 					continue;
 				tc = c[l];
-				c[l] = newcand(i, y, oldc);
+				c[l] = newcand(ds, i, y, oldc);
 				oldc = tc;
 				oldl = l;
 				numtries++;
 			} else {
-				c[l] = newcand(i, y, oldc);
+				c[l] = newcand(ds, i, y, oldc);
 				k++;
 				break;
 			}
@@ -690,27 +663,27 @@ stone(int *a, int n, int *b, int *c, int flags)
 }
 
 static int
-newcand(int x, int y, int pred)
+newcand(struct got_diff_state *ds, int x, int y, int pred)
 {
 	struct cand *q;
 
-	if (ds.clen == ds.clistlen) {
-		ds.clistlen = ds.clistlen * 11 / 10;
-		ds.clist = xreallocarray(ds.clist, ds.clistlen, sizeof(*ds.clist));
+	if (ds->clen == ds->clistlen) {
+		ds->clistlen = ds->clistlen * 11 / 10;
+		ds->clist = xreallocarray(ds->clist, ds->clistlen, sizeof(*ds->clist));
 	}
-	q = ds.clist + ds.clen;
+	q = ds->clist + ds->clen;
 	q->x = x;
 	q->y = y;
 	q->pred = pred;
-	return (ds.clen++);
+	return (ds->clen++);
 }
 
 static int
-search(int *c, int k, int y)
+search(struct got_diff_state *ds, int *c, int k, int y)
 {
 	int i, j, l, t;
 
-	if (ds.clist[c[k]].y < y)	/* quick look for typical case */
+	if (ds->clist[c[k]].y < y)	/* quick look for typical case */
 		return (k + 1);
 	i = 0;
 	j = k + 1;
@@ -718,7 +691,7 @@ search(int *c, int k, int y)
 		l = (i + j) / 2;
 		if (l <= i)
 			break;
-		t = ds.clist[c[l]].y;
+		t = ds->clist[c[l]].y;
 		if (t > y)
 			j = l;
 		else if (t < y)
@@ -730,16 +703,16 @@ search(int *c, int k, int y)
 }
 
 static void
-unravel(int p)
+unravel(struct got_diff_state *ds, int p)
 {
 	struct cand *q;
 	int i;
 
-	for (i = 0; i <= ds.len[0]; i++)
-		ds.J[i] = i <= ds.pref ? i :
-		    i > ds.len[0] - ds.suff ? i + ds.len[1] - ds.len[0] : 0;
-	for (q = ds.clist + p; q->y != 0; q = ds.clist + q->pred)
-		ds.J[q->x + ds.pref] = q->y + ds.pref;
+	for (i = 0; i <= ds->len[0]; i++)
+		ds->J[i] = i <= ds->pref ? i :
+		    i > ds->len[0] - ds->suff ? i + ds->len[1] - ds->len[0] : 0;
+	for (q = ds->clist + p; q->y != 0; q = ds->clist + q->pred)
+		ds->J[q->x + ds->pref] = q->y + ds->pref;
 }
 
 /*
@@ -749,7 +722,7 @@ unravel(int p)
  *  2.  collect random access indexes to the two files
  */
 static void
-check(FILE *f1, FILE *f2, int flags)
+check(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 {
 	int i, j, jackpot, c, d;
 	long ctold, ctnew;
@@ -757,16 +730,16 @@ check(FILE *f1, FILE *f2, int flags)
 	rewind(f1);
 	rewind(f2);
 	j = 1;
-	ds.ixold[0] = ds.ixnew[0] = 0;
+	ds->ixold[0] = ds->ixnew[0] = 0;
 	jackpot = 0;
 	ctold = ctnew = 0;
-	for (i = 1; i <= ds.len[0]; i++) {
-		if (ds.J[i] == 0) {
-			ds.ixold[i] = ctold += skipline(f1);
+	for (i = 1; i <= ds->len[0]; i++) {
+		if (ds->J[i] == 0) {
+			ds->ixold[i] = ctold += skipline(f1);
 			continue;
 		}
-		while (j < ds.J[i]) {
-			ds.ixnew[j] = ctnew += skipline(f2);
+		while (j < ds->J[i]) {
+			ds->ixnew[j] = ctnew += skipline(f2);
 			j++;
 		}
 		if (flags & (D_FOLDBLANKS|D_IGNOREBLANKS|D_IGNORECASE)) {
@@ -810,9 +783,9 @@ check(FILE *f1, FILE *f2, int flags)
 						ctnew++;
 					}
 				}
-				if (ds.chrtran[c] != ds.chrtran[d]) {
+				if (ds->chrtran[c] != ds->chrtran[d]) {
 					jackpot++;
-					ds.J[i] = 0;
+					ds->J[i] = 0;
 					if (c != '\n' && c != EOF)
 						ctold += skipline(f1);
 					if (d != '\n' && c != EOF)
@@ -828,7 +801,7 @@ check(FILE *f1, FILE *f2, int flags)
 				ctnew++;
 				if ((c = getc(f1)) != (d = getc(f2))) {
 					/* jackpot++; */
-					ds.J[i] = 0;
+					ds->J[i] = 0;
 					if (c != '\n' && c != EOF)
 						ctold += skipline(f1);
 					if (d != '\n' && c != EOF)
@@ -839,12 +812,12 @@ check(FILE *f1, FILE *f2, int flags)
 					break;
 			}
 		}
-		ds.ixold[i] = ctold;
-		ds.ixnew[j] = ctnew;
+		ds->ixold[i] = ctold;
+		ds->ixnew[j] = ctnew;
 		j++;
 	}
-	for (; j <= ds.len[1]; j++)
-		ds.ixnew[j] = ctnew += skipline(f2);
+	for (; j <= ds->len[1]; j++)
+		ds->ixnew[j] = ctnew += skipline(f2);
 	/*
 	 * if (jackpot)
 	 *	fprintf(stderr, "jackpot\n");
@@ -908,42 +881,43 @@ skipline(FILE *f)
 }
 
 static void
-output(char *file1, FILE *f1, char *file2, FILE *f2, int flags)
+output(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
+    int flags)
 {
 	int m, i0, i1, j0, j1;
 
 	rewind(f1);
 	rewind(f2);
-	m = ds.len[0];
-	ds.J[0] = 0;
-	ds.J[m + 1] = ds.len[1] + 1;
+	m = ds->len[0];
+	ds->J[0] = 0;
+	ds->J[m + 1] = ds->len[1] + 1;
 	if (diff_args.diff_format != D_EDIT) {
 		for (i0 = 1; i0 <= m; i0 = i1 + 1) {
-			while (i0 <= m && ds.J[i0] == ds.J[i0 - 1] + 1)
+			while (i0 <= m && ds->J[i0] == ds->J[i0 - 1] + 1)
 				i0++;
-			j0 = ds.J[i0 - 1] + 1;
+			j0 = ds->J[i0 - 1] + 1;
 			i1 = i0 - 1;
-			while (i1 < m && ds.J[i1 + 1] == 0)
+			while (i1 < m && ds->J[i1 + 1] == 0)
 				i1++;
-			j1 = ds.J[i1 + 1] - 1;
-			ds.J[i1] = j1;
-			change(file1, f1, file2, f2, i0, i1, j0, j1, &flags);
+			j1 = ds->J[i1 + 1] - 1;
+			ds->J[i1] = j1;
+			change(ds, file1, f1, file2, f2, i0, i1, j0, j1, &flags);
 		}
 	} else {
 		for (i0 = m; i0 >= 1; i0 = i1 - 1) {
-			while (i0 >= 1 && ds.J[i0] == ds.J[i0 + 1] - 1 && ds.J[i0] != 0)
+			while (i0 >= 1 && ds->J[i0] == ds->J[i0 + 1] - 1 && ds->J[i0] != 0)
 				i0--;
-			j0 = ds.J[i0 + 1] - 1;
+			j0 = ds->J[i0 + 1] - 1;
 			i1 = i0 + 1;
-			while (i1 > 1 && ds.J[i1 - 1] == 0)
+			while (i1 > 1 && ds->J[i1 - 1] == 0)
 				i1--;
-			j1 = ds.J[i1 - 1] + 1;
-			ds.J[i1] = j1;
-			change(file1, f1, file2, f2, i1, i0, j1, j0, &flags);
+			j1 = ds->J[i1 - 1] + 1;
+			ds->J[i1] = j1;
+			change(ds, file1, f1, file2, f2, i1, i0, j1, j0, &flags);
 		}
 	}
 	if (m == 0)
-		change(file1, f1, file2, f2, 1, 0, 1, ds.len[1], &flags);
+		change(ds, file1, f1, file2, f2, 1, 0, 1, ds->len[1], &flags);
 	if (diff_args.diff_format == D_IFDEF) {
 		for (;;) {
 #define	c i0
@@ -953,11 +927,11 @@ output(char *file1, FILE *f1, char *file2, FILE *f2, int flags)
 		}
 #undef c
 	}
-	if (ds.anychange != 0) {
+	if (ds->anychange != 0) {
 		if (diff_args.diff_format == D_CONTEXT)
-			dump_context_vec(f1, f2, flags);
+			dump_context_vec(ds, f1, f2, flags);
 		else if (diff_args.diff_format == D_UNIFIED)
-			dump_unified_vec(f1, f2, flags);
+			dump_unified_vec(ds, f1, f2, flags);
 	}
 }
 
@@ -1009,8 +983,8 @@ ignoreline(char *line)
  * lines missing from the to file.
  */
 static void
-change(char *file1, FILE *f1, char *file2, FILE *f2, int a, int b, int c, int d,
-    int *pflags)
+change(struct got_diff_state *ds, char *file1, FILE *f1, char *file2, FILE *f2,
+    int a, int b, int c, int d, int *pflags)
 {
 	static size_t max_context = 64;
 	int i;
@@ -1028,7 +1002,7 @@ restart:
 		if (a <= b) {		/* Changes and deletes. */
 			for (i = a; i <= b; i++) {
 				line = preadline(fileno(f1),
-				    ds.ixold[i] - ds.ixold[i - 1], ds.ixold[i - 1]);
+				    ds->ixold[i] - ds->ixold[i - 1], ds->ixold[i - 1]);
 				if (!ignoreline(line))
 					goto proceed;
 			}
@@ -1036,7 +1010,7 @@ restart:
 		if (a > b || c <= d) {	/* Changes and inserts. */
 			for (i = c; i <= d; i++) {
 				line = preadline(fileno(f2),
-				    ds.ixnew[i] - ds.ixnew[i - 1], ds.ixnew[i - 1]);
+				    ds->ixnew[i] - ds->ixnew[i - 1], ds->ixnew[i - 1]);
 				if (!ignoreline(line))
 					goto proceed;
 			}
@@ -1052,40 +1026,40 @@ proceed:
 		/*
 		 * Allocate change records as needed.
 		 */
-		if (ds.context_vec_ptr == ds.context_vec_end - 1) {
-			ptrdiff_t offset = ds.context_vec_ptr - ds.context_vec_start;
+		if (ds->context_vec_ptr == ds->context_vec_end - 1) {
+			ptrdiff_t offset = ds->context_vec_ptr - ds->context_vec_start;
 			max_context <<= 1;
-			ds.context_vec_start = xreallocarray(ds.context_vec_start,
-			    max_context, sizeof(*ds.context_vec_start));
-			ds.context_vec_end = ds.context_vec_start + max_context;
-			ds.context_vec_ptr = ds.context_vec_start + offset;
+			ds->context_vec_start = xreallocarray(ds->context_vec_start,
+			    max_context, sizeof(*ds->context_vec_start));
+			ds->context_vec_end = ds->context_vec_start + max_context;
+			ds->context_vec_ptr = ds->context_vec_start + offset;
 		}
-		if (ds.anychange == 0) {
+		if (ds->anychange == 0) {
 			/*
 			 * Print the context/unidiff header first time through.
 			 */
 			print_header(file1, file2);
-			ds.anychange = 1;
-		} else if (a > ds.context_vec_ptr->b + (2 * diff_args.diff_context) + 1 &&
-		    c > ds.context_vec_ptr->d + (2 * diff_args.diff_context) + 1) {
+			ds->anychange = 1;
+		} else if (a > ds->context_vec_ptr->b + (2 * diff_args.diff_context) + 1 &&
+		    c > ds->context_vec_ptr->d + (2 * diff_args.diff_context) + 1) {
 			/*
 			 * If this change is more than 'diff_context' lines from the
 			 * previous change, dump the record and reset it.
 			 */
 			if (diff_args.diff_format == D_CONTEXT)
-				dump_context_vec(f1, f2, *pflags);
+				dump_context_vec(ds, f1, f2, *pflags);
 			else
-				dump_unified_vec(f1, f2, *pflags);
+				dump_unified_vec(ds, f1, f2, *pflags);
 		}
-		ds.context_vec_ptr++;
-		ds.context_vec_ptr->a = a;
-		ds.context_vec_ptr->b = b;
-		ds.context_vec_ptr->c = c;
-		ds.context_vec_ptr->d = d;
+		ds->context_vec_ptr++;
+		ds->context_vec_ptr->a = a;
+		ds->context_vec_ptr->b = b;
+		ds->context_vec_ptr->c = c;
+		ds->context_vec_ptr->d = d;
 		return;
 	}
-	if (ds.anychange == 0)
-		ds.anychange = 1;
+	if (ds->anychange == 0)
+		ds->anychange = 1;
 	switch (diff_args.diff_format) {
 	case D_BRIEF:
 		return;
@@ -1114,11 +1088,11 @@ proceed:
 		break;
 	}
 	if (diff_args.diff_format == D_NORMAL || diff_args.diff_format == D_IFDEF) {
-		fetch(ds.ixold, a, b, f1, '<', 1, *pflags);
+		fetch(ds, ds->ixold, a, b, f1, '<', 1, *pflags);
 		if (a <= b && c <= d && diff_args.diff_format == D_NORMAL)
 			diff_output("---\n");
 	}
-	i = fetch(ds.ixnew, c, d, f2, diff_args.diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
+	i = fetch(ds, ds->ixnew, c, d, f2, diff_args.diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
 	if (i != 0 && diff_args.diff_format == D_EDIT) {
 		/*
 		 * A non-zero return value for D_EDIT indicates that the
@@ -1136,14 +1110,15 @@ proceed:
 	}
 	if ((diff_args.diff_format == D_EDIT || diff_args.diff_format == D_REVERSE) && c <= d)
 		diff_output(".\n");
-	if (ds.inifdef) {
+	if (ds->inifdef) {
 		diff_output("#endif /* %s */\n", diff_args.ifdefname);
-		ds.inifdef = 0;
+		ds->inifdef = 0;
 	}
 }
 
 static int
-fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
+fetch(struct got_diff_state *ds, long *f, int a, int b, FILE *lb, int ch,
+    int oldfile, int flags)
 {
 	int i, j, c, lastc, col, nc;
 
@@ -1161,7 +1136,7 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 	if (a > b)
 		return (0);
 	if (diff_args.diff_format == D_IFDEF) {
-		if (ds.inifdef) {
+		if (ds->inifdef) {
 			diff_output("#else /* %s%s */\n",
 			    oldfile == 1 ? "!" : "", diff_args.ifdefname);
 		} else {
@@ -1170,7 +1145,7 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
 			else
 				diff_output("#ifdef %s\n", diff_args.ifdefname);
 		}
-		ds.inifdef = 1 + oldfile;
+		ds->inifdef = 1 + oldfile;
 	}
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
@@ -1223,7 +1198,7 @@ fetch(long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
  * Hash function taken from Robert Sedgewick, Algorithms in C, 3d ed., p 578.
  */
 static int
-readhash(FILE *f, int flags)
+readhash(struct got_diff_state *ds, FILE *f, int flags)
 {
 	int i, t, space;
 	int sum;
@@ -1238,7 +1213,7 @@ readhash(FILE *f, int flags)
 						return (0);
 					break;
 				}
-				sum = sum * 127 + ds.chrtran[t];
+				sum = sum * 127 + ds->chrtran[t];
 			}
 		else
 			for (i = 0; (t = getc(f)) != '\n'; i++) {
@@ -1264,7 +1239,7 @@ readhash(FILE *f, int flags)
 					i++;
 					space = 0;
 				}
-				sum = sum * 127 + ds.chrtran[t];
+				sum = sum * 127 + ds->chrtran[t];
 				i++;
 				continue;
 			case EOF:
@@ -1301,14 +1276,14 @@ asciifile(FILE *f)
 #define begins_with(s, pre) (strncmp(s, pre, sizeof(pre)-1) == 0)
 
 static char *
-match_function(const long *f, int pos, FILE *fp)
+match_function(struct got_diff_state *ds, const long *f, int pos, FILE *fp)
 {
 	unsigned char buf[FUNCTION_CONTEXT_SIZE];
 	size_t nc;
-	int last = ds.lastline;
+	int last = ds->lastline;
 	char *state = NULL;
 
-	ds.lastline = pos;
+	ds->lastline = pos;
 	while (pos > last) {
 		fseek(fp, f[pos - 1], SEEK_SET);
 		nc = f[pos] - f[pos - 1];
@@ -1329,41 +1304,41 @@ match_function(const long *f, int pos, FILE *fp)
 					if (!state)
 						state = " (public)";
 				} else {
-					strlcpy(ds.lastbuf, buf, sizeof ds.lastbuf);
+					strlcpy(ds->lastbuf, buf, sizeof ds->lastbuf);
 					if (state)
-						strlcat(ds.lastbuf, state,
-						    sizeof ds.lastbuf);
-					ds.lastmatchline = pos;
-					return ds.lastbuf;
+						strlcat(ds->lastbuf, state,
+						    sizeof ds->lastbuf);
+					ds->lastmatchline = pos;
+					return ds->lastbuf;
 				}
 			}
 		}
 		pos--;
 	}
-	return ds.lastmatchline > 0 ? ds.lastbuf : NULL;
+	return ds->lastmatchline > 0 ? ds->lastbuf : NULL;
 }
 
 /* dump accumulated "context" diff changes */
 static void
-dump_context_vec(FILE *f1, FILE *f2, int flags)
+dump_context_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 {
-	struct context_vec *cvp = ds.context_vec_start;
+	struct context_vec *cvp = ds->context_vec_start;
 	int lowa, upb, lowc, upd, do_output;
 	int a, b, c, d;
 	char ch, *f;
 
-	if (ds.context_vec_start > ds.context_vec_ptr)
+	if (ds->context_vec_start > ds->context_vec_ptr)
 		return;
 
 	b = d = 0;		/* gcc */
 	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
-	upb = MINIMUM(ds.len[0], ds.context_vec_ptr->b + diff_args.diff_context);
+	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + diff_args.diff_context);
 	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
-	upd = MINIMUM(ds.len[1], ds.context_vec_ptr->d + diff_args.diff_context);
+	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + diff_args.diff_context);
 
 	diff_output("***************");
 	if ((flags & D_PROTOTYPE)) {
-		f = match_function(ds.ixold, lowa-1, f1);
+		f = match_function(ds, ds->ixold, lowa-1, f1);
 		if (f != NULL)
 			diff_output(" %s", f);
 	}
@@ -1377,14 +1352,14 @@ dump_context_vec(FILE *f1, FILE *f2, int flags)
 	 * the "old" lines as context in the "new" list).
 	 */
 	do_output = 0;
-	for (; cvp <= ds.context_vec_ptr; cvp++)
+	for (; cvp <= ds->context_vec_ptr; cvp++)
 		if (cvp->a <= cvp->b) {
-			cvp = ds.context_vec_start;
+			cvp = ds->context_vec_start;
 			do_output++;
 			break;
 		}
 	if (do_output) {
-		while (cvp <= ds.context_vec_ptr) {
+		while (cvp <= ds->context_vec_ptr) {
 			a = cvp->a;
 			b = cvp->b;
 			c = cvp->c;
@@ -1396,16 +1371,16 @@ dump_context_vec(FILE *f1, FILE *f2, int flags)
 				ch = (a <= b) ? 'd' : 'a';
 
 			if (ch == 'a')
-				fetch(ds.ixold, lowa, b, f1, ' ', 0, flags);
+				fetch(ds, ds->ixold, lowa, b, f1, ' ', 0, flags);
 			else {
-				fetch(ds.ixold, lowa, a - 1, f1, ' ', 0, flags);
-				fetch(ds.ixold, a, b, f1,
+				fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+				fetch(ds, ds->ixold, a, b, f1,
 				    ch == 'c' ? '!' : '-', 0, flags);
 			}
 			lowa = b + 1;
 			cvp++;
 		}
-		fetch(ds.ixold, b + 1, upb, f1, ' ', 0, flags);
+		fetch(ds, ds->ixold, b + 1, upb, f1, ' ', 0, flags);
 	}
 	/* output changes to the "new" file */
 	diff_output("--- ");
@@ -1413,14 +1388,14 @@ dump_context_vec(FILE *f1, FILE *f2, int flags)
 	diff_output(" ----\n");
 
 	do_output = 0;
-	for (cvp = ds.context_vec_start; cvp <= ds.context_vec_ptr; cvp++)
+	for (cvp = ds->context_vec_start; cvp <= ds->context_vec_ptr; cvp++)
 		if (cvp->c <= cvp->d) {
-			cvp = ds.context_vec_start;
+			cvp = ds->context_vec_start;
 			do_output++;
 			break;
 		}
 	if (do_output) {
-		while (cvp <= ds.context_vec_ptr) {
+		while (cvp <= ds->context_vec_ptr) {
 			a = cvp->a;
 			b = cvp->b;
 			c = cvp->c;
@@ -1432,37 +1407,37 @@ dump_context_vec(FILE *f1, FILE *f2, int flags)
 				ch = (a <= b) ? 'd' : 'a';
 
 			if (ch == 'd')
-				fetch(ds.ixnew, lowc, d, f2, ' ', 0, flags);
+				fetch(ds, ds->ixnew, lowc, d, f2, ' ', 0, flags);
 			else {
-				fetch(ds.ixnew, lowc, c - 1, f2, ' ', 0, flags);
-				fetch(ds.ixnew, c, d, f2,
+				fetch(ds, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
+				fetch(ds, ds->ixnew, c, d, f2,
 				    ch == 'c' ? '!' : '+', 0, flags);
 			}
 			lowc = d + 1;
 			cvp++;
 		}
-		fetch(ds.ixnew, d + 1, upd, f2, ' ', 0, flags);
+		fetch(ds, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
 	}
-	ds.context_vec_ptr = ds.context_vec_start - 1;
+	ds->context_vec_ptr = ds->context_vec_start - 1;
 }
 
 /* dump accumulated "unified" diff changes */
 static void
-dump_unified_vec(FILE *f1, FILE *f2, int flags)
+dump_unified_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 {
-	struct context_vec *cvp = ds.context_vec_start;
+	struct context_vec *cvp = ds->context_vec_start;
 	int lowa, upb, lowc, upd;
 	int a, b, c, d;
 	char ch, *f;
 
-	if (ds.context_vec_start > ds.context_vec_ptr)
+	if (ds->context_vec_start > ds->context_vec_ptr)
 		return;
 
 	b = d = 0;		/* gcc */
 	lowa = MAXIMUM(1, cvp->a - diff_args.diff_context);
-	upb = MINIMUM(ds.len[0], ds.context_vec_ptr->b + diff_args.diff_context);
+	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + diff_args.diff_context);
 	lowc = MAXIMUM(1, cvp->c - diff_args.diff_context);
-	upd = MINIMUM(ds.len[1], ds.context_vec_ptr->d + diff_args.diff_context);
+	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + diff_args.diff_context);
 
 	diff_output("@@ -");
 	uni_range(lowa, upb);
@@ -1470,7 +1445,7 @@ dump_unified_vec(FILE *f1, FILE *f2, int flags)
 	uni_range(lowc, upd);
 	diff_output(" @@");
 	if ((flags & D_PROTOTYPE)) {
-		f = match_function(ds.ixold, lowa-1, f1);
+		f = match_function(ds, ds->ixold, lowa-1, f1);
 		if (f != NULL)
 			diff_output(" %s", f);
 	}
@@ -1480,7 +1455,7 @@ dump_unified_vec(FILE *f1, FILE *f2, int flags)
 	 * Output changes in "unified" diff format--the old and new lines
 	 * are printed together.
 	 */
-	for (; cvp <= ds.context_vec_ptr; cvp++) {
+	for (; cvp <= ds->context_vec_ptr; cvp++) {
 		a = cvp->a;
 		b = cvp->b;
 		c = cvp->c;
@@ -1498,25 +1473,25 @@ dump_unified_vec(FILE *f1, FILE *f2, int flags)
 
 		switch (ch) {
 		case 'c':
-			fetch(ds.ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(ds.ixold, a, b, f1, '-', 0, flags);
-			fetch(ds.ixnew, c, d, f2, '+', 0, flags);
+			fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+			fetch(ds, ds->ixold, a, b, f1, '-', 0, flags);
+			fetch(ds, ds->ixnew, c, d, f2, '+', 0, flags);
 			break;
 		case 'd':
-			fetch(ds.ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(ds.ixold, a, b, f1, '-', 0, flags);
+			fetch(ds, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
+			fetch(ds, ds->ixold, a, b, f1, '-', 0, flags);
 			break;
 		case 'a':
-			fetch(ds.ixnew, lowc, c - 1, f2, ' ', 0, flags);
-			fetch(ds.ixnew, c, d, f2, '+', 0, flags);
+			fetch(ds, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
+			fetch(ds, ds->ixnew, c, d, f2, '+', 0, flags);
 			break;
 		}
 		lowa = b + 1;
 		lowc = d + 1;
 	}
-	fetch(ds.ixnew, d + 1, upd, f2, ' ', 0, flags);
+	fetch(ds, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
 
-	ds.context_vec_ptr = ds.context_vec_start - 1;
+	ds->context_vec_ptr = ds->context_vec_start - 1;
 }
 
 static void

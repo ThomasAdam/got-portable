@@ -34,7 +34,7 @@ open_tempfile(FILE **sfp, char **sfn)
 	static const int sfnlen = 20;
 	int fd;
 
-	*sfn = calloc(sizeof(char), sfnlen);
+	*sfn = calloc(sfnlen, sizeof(char));
 	if (*sfn == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 	strlcpy(*sfn, "/tmp/got.XXXXXXXXXX", sfnlen);
@@ -54,6 +54,7 @@ const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
     FILE *outfile)
 {
+	struct got_diff_state ds;
 	const struct got_error *err = NULL;
 	FILE *f1, *f2;
 	char *n1, *n2;
@@ -95,7 +96,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	fflush(f1);
 	fflush(f2);
 
-	err = got_diffreg(&res, n1, n2, 0);
+	memset(&ds, 0, sizeof(ds));
+	err = got_diffreg(&res, n1, n2, 0, &ds);
 done:
 	unlink(n1);
 	unlink(n2);
