@@ -270,6 +270,7 @@ u_char cup2low[256] = {
 	0xfd, 0xfe, 0xff
 };
 
+/* XXX should expect 'FILE *' instead of 'char *' */
 const struct got_error *
 got_diffreg(int *rval, char *file1, char *file2, int flags,
     struct got_diff_args *args, struct got_diff_state *ds)
