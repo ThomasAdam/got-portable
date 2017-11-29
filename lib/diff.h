@@ -106,6 +106,7 @@ struct got_diff_state {
 	char lastbuf[FUNCTION_CONTEXT_SIZE];
 	int lastline;
 	int lastmatchline;
+	struct stat stb1, stb2;
 } ds;
 
 char	*splice(char *, char *);

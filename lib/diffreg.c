@@ -198,7 +198,7 @@ static void	 unravel(struct got_diff_state *, int);
 static void	 unsort(struct line *, int, int *);
 static void	 change(struct got_diff_state *, char *, FILE *, char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
-static void	 print_header(const char *, const char *);
+static void	 print_header(struct got_diff_state *, const char *, const char *);
 static int	 ignoreline(char *);
 static int	 asciifile(FILE *);
 static int	 fetch(struct got_diff_state *, long *, int, int, FILE *, int, int, int);
@@ -208,7 +208,7 @@ static int	 skipline(FILE *);
 static int	 isqrt(int);
 static int	 stone(struct got_diff_state *, int *, int, int *, int *, int);
 static int	 readhash(struct got_diff_state *, FILE *, int);
-static int	 files_differ(FILE *, FILE *, int);
+static int	 files_differ(struct got_diff_state *, FILE *, FILE *, int);
 static char	*match_function(struct got_diff_state *, const long *, int, FILE *);
 static char	*preadline(int, size_t, off_t);
 
@@ -216,7 +216,6 @@ struct diff_args {
 	int	 Tflag;
 	int	 diff_format, diff_context, status;
 	char	*ifdefname, *diffargs, *label[2], *ignore_pats;
-	struct stat stb1, stb2;
 } diff_args;
 
 /*
@@ -288,13 +287,13 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 	diff_args.diff_format = D_UNIFIED;
 
 	if (strcmp(file1, "-") == 0)
-		fstat(STDIN_FILENO, &diff_args.stb1);
-	else if (stat(file1, &diff_args.stb1) != 0)
+		fstat(STDIN_FILENO, &ds->stb1);
+	else if (stat(file1, &ds->stb1) != 0)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	if (strcmp(file2, "-") == 0)
-		fstat(STDIN_FILENO, &diff_args.stb2);
-	else if (stat(file2, &diff_args.stb2) != 0)
+		fstat(STDIN_FILENO, &ds->stb2);
+	else if (stat(file2, &ds->stb2) != 0)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	f1 = f2 = NULL;
@@ -307,8 +306,8 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		ds->chrtran = cup2low;
 	else
 		ds->chrtran = clow2low;
-	if (S_ISDIR(diff_args.stb1.st_mode) != S_ISDIR(diff_args.stb2.st_mode)) {
-		*rval = (S_ISDIR(diff_args.stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
+	if (S_ISDIR(ds->stb1.st_mode) != S_ISDIR(ds->stb2.st_mode)) {
+		*rval = (S_ISDIR(ds->stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
 	}
 	if (strcmp(file1, "-") == 0 && strcmp(file2, "-") == 0)
@@ -317,9 +316,9 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 	if (flags & D_EMPTY1)
 		f1 = fopen(_PATH_DEVNULL, "r");
 	else {
-		if (!S_ISREG(diff_args.stb1.st_mode)) {
+		if (!S_ISREG(ds->stb1.st_mode)) {
 			if ((f1 = opentemp(file1)) == NULL ||
-			    fstat(fileno(f1), &diff_args.stb1) < 0) {
+			    fstat(fileno(f1), &ds->stb1) < 0) {
 				diff_args.status |= 2;
 				goto closem;
 			}
@@ -336,9 +335,9 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 	if (flags & D_EMPTY2)
 		f2 = fopen(_PATH_DEVNULL, "r");
 	else {
-		if (!S_ISREG(diff_args.stb2.st_mode)) {
+		if (!S_ISREG(ds->stb2.st_mode)) {
 			if ((f2 = opentemp(file2)) == NULL ||
-			    fstat(fileno(f2), &diff_args.stb2) < 0) {
+			    fstat(fileno(f2), &ds->stb2) < 0) {
 				diff_args.status |= 2;
 				goto closem;
 			}
@@ -352,7 +351,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		goto closem;
 	}
 
-	switch (files_differ(f1, f2, flags)) {
+	switch (files_differ(ds, f1, f2, flags)) {
 	case 0:
 		goto closem;
 	case 1:
@@ -369,8 +368,8 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		diff_args.status |= 1;
 		goto closem;
 	}
-	prepare(ds, 0, f1, diff_args.stb1.st_size, flags);
-	prepare(ds, 1, f2, diff_args.stb2.st_size, flags);
+	prepare(ds, 0, f1, ds->stb1.st_size, flags);
+	prepare(ds, 1, f2, ds->stb2.st_size, flags);
 
 	prune(ds);
 	sort(ds->sfile[0], ds->slen[0]);
@@ -451,13 +450,13 @@ closem:
  * XXX - could use code from cmp(1) [faster]
  */
 static int
-files_differ(FILE *f1, FILE *f2, int flags)
+files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 {
 	char buf1[BUFSIZ], buf2[BUFSIZ];
 	size_t i, j;
 
-	if ((flags & (D_EMPTY1|D_EMPTY2)) || diff_args.stb1.st_size != diff_args.stb2.st_size ||
-	    (diff_args.stb1.st_mode & S_IFMT) != (diff_args.stb2.st_mode & S_IFMT))
+	if ((flags & (D_EMPTY1|D_EMPTY2)) || ds->stb1.st_size != ds->stb2.st_size ||
+	    (ds->stb1.st_mode & S_IFMT) != (ds->stb2.st_mode & S_IFMT))
 		return (1);
 	for (;;) {
 		i = fread(buf1, 1, sizeof(buf1), f1);
@@ -1038,7 +1037,7 @@ proceed:
 			/*
 			 * Print the context/unidiff header first time through.
 			 */
-			print_header(file1, file2);
+			print_header(ds, file1, file2);
 			ds->anychange = 1;
 		} else if (a > ds->context_vec_ptr->b + (2 * diff_args.diff_context) + 1 &&
 		    c > ds->context_vec_ptr->d + (2 * diff_args.diff_context) + 1) {
@@ -1495,18 +1494,18 @@ dump_unified_vec(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 }
 
 static void
-print_header(const char *file1, const char *file2)
+print_header(struct got_diff_state *ds, const char *file1, const char *file2)
 {
 	if (diff_args.label[0] != NULL)
 		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "***" : "---",
 		    diff_args.label[0]);
 	else
 		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "***" : "---",
-		    file1, ctime(&diff_args.stb1.st_mtime));
+		    file1, ctime(&ds->stb1.st_mtime));
 	if (diff_args.label[1] != NULL)
 		diff_output("%s %s\n", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
 		    diff_args.label[1]);
 	else
 		diff_output("%s %s\t%s", diff_args.diff_format == D_CONTEXT ? "---" : "+++",
-		    file2, ctime(&diff_args.stb2.st_mtime));
+		    file2, ctime(&ds->stb2.st_mtime));
 }
