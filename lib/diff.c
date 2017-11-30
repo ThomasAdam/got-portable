@@ -27,6 +27,7 @@
 #include "got_repository.h"
 #include "got_object.h"
 #include "got_error.h"
+#include "got_diff.h"
 
 #include "diff.h"
 
@@ -241,9 +242,53 @@ diff_added_tree(struct got_object_id *id)
 }
 
 static const struct got_error *
-diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2)
+diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
+    struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err = NULL;
+	struct got_object *treeobj1 = NULL;
+	struct got_object *treeobj2 = NULL;
+	struct got_tree_object *tree1 = NULL;
+	struct got_tree_object *tree2 = NULL;
+
+	err = got_object_open(&treeobj1, repo, id1);
+	if (err)
+		goto done;
+
+	if (treeobj1->type != GOT_OBJ_TYPE_TREE) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_open(&treeobj2, repo, id2);
+	if (err)
+		goto done;
+
+	if (treeobj2->type != GOT_OBJ_TYPE_TREE) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_tree_open(&tree1, repo, treeobj1);
+	if (err)
+		goto done;
+
+	err = got_object_tree_open(&tree2, repo, treeobj2);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(tree1, tree2, repo);
+
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	if (treeobj1)
+		got_object_close(treeobj1);
+	if (treeobj2)
+		got_object_close(treeobj2);
+	return err;
 }
 
 static const struct got_error *
@@ -276,7 +321,7 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
 
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
-			return diff_modified_tree(&te1->id, &te2->id);
+			return diff_modified_tree(&te1->id, &te2->id, repo);
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
 			return diff_modified_blob(&te1->id, &te2->id, repo);
@@ -308,14 +353,13 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_tree_entry *te1;
-	struct got_tree_entry *te2;
+	struct got_tree_entry *te1 = NULL;
+	struct got_tree_entry *te2 = NULL;
 
-	if (tree1->nentries == 0 && tree2->nentries == 0)
-		return NULL;
-
-	te1 = SIMPLEQ_FIRST(&tree1->entries);
-	te2 = SIMPLEQ_FIRST(&tree2->entries);
+	if (tree1)
+		te1 = SIMPLEQ_FIRST(&tree1->entries);
+	if (tree2)
+		te2 = SIMPLEQ_FIRST(&tree2->entries);
 
 	do {
 		if (te1) {
