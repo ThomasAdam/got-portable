@@ -161,9 +161,53 @@ diff_added_blob(struct got_object_id *id, struct got_repository *repo)
 }
 
 static const struct got_error *
-diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2)
+diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
+    struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err;
+	struct got_object *obj1 = NULL;
+	struct got_object *obj2 = NULL;
+	struct got_blob_object *blob1 = NULL;
+	struct got_blob_object *blob2 = NULL;
+
+	err = got_object_open(&obj1, repo, id1);
+	if (err)
+		return got_error(GOT_ERR_BAD_OBJ_HDR);
+	if (obj1->type != GOT_OBJ_TYPE_BLOB) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_open(&obj2, repo, id2);
+	if (err) {
+		err= got_error(GOT_ERR_BAD_OBJ_HDR);
+		goto done;
+	}
+	if (obj2->type != GOT_OBJ_TYPE_BLOB) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	err = got_object_blob_open(&blob1, repo, obj1, 512);
+	if (err != NULL) {
+		err = got_error(GOT_ERR_FILE_OPEN);
+		goto done;
+	}
+
+	err = got_object_blob_open(&blob2, repo, obj2, 512);
+	if (err != NULL) {
+		err = got_error(GOT_ERR_FILE_OPEN);
+		goto done;
+	}
+
+	err = got_diff_blob(blob1, blob2, NULL, NULL, stdout);
+
+done:
+	got_object_close(obj1);
+	got_object_close(obj2);
+	got_object_blob_close(blob1);
+	got_object_blob_close(blob2);
+	return err;
 }
 
 static const struct got_error *
@@ -197,7 +241,8 @@ diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2)
 }
 
 static const struct got_error *
-diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
+diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_tree_entry *te2;
@@ -216,7 +261,7 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
 			return diff_modified_tree(&te1->id, &te2->id);
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
-			return diff_modified_blob(&te1->id, &te2->id);
+			return diff_modified_blob(&te1->id, &te2->id, repo);
 	}
 
 	return diff_kind_mismatch(&te1->id, &te2->id);
@@ -256,7 +301,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 
 	do {
 		if (te1) {
-			err = diff_entry_old_new(te1, tree2);
+			err = diff_entry_old_new(te1, tree2, repo);
 			if (err)
 				break;
 		}
