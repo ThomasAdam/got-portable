@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <sha1.h>
 #include <zlib.h>
 
@@ -29,27 +30,23 @@
 
 #include "diff.h"
 
-static const struct got_error *
-open_tempfile(FILE **sfp, char **sfn)
+static FILE *
+opentemp(void)
 {
-	static const int sfnlen = 20;
+	char name[PATH_MAX];
 	int fd;
 
-	*sfn = calloc(sfnlen, sizeof(char));
-	if (*sfn == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-	strlcpy(*sfn, "/tmp/got.XXXXXXXXXX", sfnlen);
-	if ((fd = mkstemp(*sfn)) == -1 ||
-	    ((*sfp) = fdopen(fd, "w+")) == NULL) {
-		if (fd != -1) {
-			unlink(*sfn);
-			close(fd);
-		}
-		free(*sfn);
-		return got_error(GOT_ERR_FILE_OPEN);
-	}
-	return NULL;
+	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
+		return NULL;
+
+	fd = mkstemp(name);
+	if (fd < 0)
+		return NULL;
+
+	unlink(name);
+	return (fdopen(fd, "w+"));
 }
+
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
@@ -59,23 +56,20 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	struct got_diff_args args;
 	const struct got_error *err = NULL;
 	FILE *f1, *f2;
-	char *n1, *n2;
-	size_t len, hdrlen;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
+	size_t len, hdrlen;
 	int res;
 
-	err = open_tempfile(&f1, &n1);
-	if (err != NULL)
-		return err;
+	f1 = opentemp();
+	if (f1 == NULL)
+		return got_error(GOT_ERR_FILE_OPEN);
 
-	err = open_tempfile(&f2, &n2);
-	if (err != NULL) {
+	f2 = opentemp();
+	if (f2 == NULL) {
 		fclose(f1);
-		free(n1);
-		return err;
+		return got_error(GOT_ERR_FILE_OPEN);
 	}
-
 
 	hdrlen = blob1->hdrlen;
 	do {
@@ -99,24 +93,30 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 
 	fflush(f1);
 	fflush(f2);
+	/* rewind(f1); */
+	/* rewind(f2);*/
 
 	memset(&ds, 0, sizeof(ds));
-	memset(&args, 0, sizeof(args));
+	/* XXX should stat buffers be passed in args instead of ds? */
+	ds.stb1.st_mode = S_IFREG;
+	ds.stb1.st_size = blob1->zb.z.total_out;
+	ds.stb1.st_mtime = 0; /* XXX */
 
+	ds.stb2.st_mode = S_IFREG;
+	ds.stb2.st_size = blob2->zb.z.total_out;
+	ds.stb2.st_mtime = 0; /* XXX */
+
+	memset(&args, 0, sizeof(args));
 	args.diff_format = D_UNIFIED;
 	args.label[0] = label1 ?
 	    label1 : got_object_id_str(&blob1->id, hex1, sizeof(hex1));
 	args.label[1] = label2 ?
 	    label2 : got_object_id_str(&blob2->id, hex2, sizeof(hex2));
 
-	err = got_diffreg(&res, n1, n2, 0, &args, &ds);
+	err = got_diffreg(&res, f1, f2, 0, &args, &ds);
 done:
-	unlink(n1);
-	unlink(n2);
 	fclose(f1);
 	fclose(f2);
-	free(n1);
-	free(n2);
 	return err;
 }
 

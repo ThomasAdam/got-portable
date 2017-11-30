@@ -184,8 +184,7 @@ struct context_vec {
 };
 
 #define	diff_output	printf
-static FILE	*opentemp(const char *);
-static void	 output(struct got_diff_state *, struct got_diff_args *, char *, FILE *, char *, FILE *, int);
+static void	 output(struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 range(int, int, char *);
 static void	 uni_range(int, int);
@@ -196,7 +195,7 @@ static void	 prune(struct got_diff_state *);
 static void	 equiv(struct line *, int, struct line *, int, int *);
 static void	 unravel(struct got_diff_state *, int);
 static void	 unsort(struct line *, int, int *);
-static void	 change(struct got_diff_state *, struct got_diff_args *, char *, FILE *, char *, FILE *, int, int, int, int, int *);
+static void	 change(struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
 static void	 print_header(struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 ignoreline(char *);
@@ -270,26 +269,13 @@ u_char cup2low[256] = {
 	0xfd, 0xfe, 0xff
 };
 
-/* XXX should expect 'FILE *' instead of 'char *' */
 const struct got_error *
-got_diffreg(int *rval, char *file1, char *file2, int flags,
+got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
     struct got_diff_args *args, struct got_diff_state *ds)
 {
 	const struct got_error *err = NULL;
-	FILE *f1, *f2;
 	int i;
 
-	if (strcmp(file1, "-") == 0)
-		fstat(STDIN_FILENO, &ds->stb1);
-	else if (stat(file1, &ds->stb1) != 0)
-		return got_error(GOT_ERR_BAD_PATH);
-
-	if (strcmp(file2, "-") == 0)
-		fstat(STDIN_FILENO, &ds->stb2);
-	else if (stat(file2, &ds->stb2) != 0)
-		return got_error(GOT_ERR_BAD_PATH);
-
-	f1 = f2 = NULL;
 	*rval = D_SAME;
 	ds->anychange = 0;
 	ds->lastline = 0;
@@ -303,43 +289,16 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		*rval = (S_ISDIR(ds->stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
 	}
-	if (strcmp(file1, "-") == 0 && strcmp(file2, "-") == 0)
-		goto closem;
-
 	if (flags & D_EMPTY1)
 		f1 = fopen(_PATH_DEVNULL, "r");
-	else {
-		if (!S_ISREG(ds->stb1.st_mode)) {
-			if ((f1 = opentemp(file1)) == NULL ||
-			    fstat(fileno(f1), &ds->stb1) < 0) {
-				args->status |= 2;
-				goto closem;
-			}
-		} else if (strcmp(file1, "-") == 0)
-			f1 = stdin;
-		else
-			f1 = fopen(file1, "r");
-	}
-	if (f1 == NULL) {
+	else if (f1 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
 
 	if (flags & D_EMPTY2)
 		f2 = fopen(_PATH_DEVNULL, "r");
-	else {
-		if (!S_ISREG(ds->stb2.st_mode)) {
-			if ((f2 = opentemp(file2)) == NULL ||
-			    fstat(fileno(f2), &ds->stb2) < 0) {
-				args->status |= 2;
-				goto closem;
-			}
-		} else if (strcmp(file2, "-") == 0)
-			f2 = stdin;
-		else
-			f2 = fopen(file2, "r");
-	}
-	if (f2 == NULL) {
+	else if (f2 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
@@ -422,7 +381,7 @@ got_diffreg(int *rval, char *file1, char *file2, int flags,
 		goto closem;
 	}
 	check(ds, f1, f2, flags);
-	output(ds, args, file1, f1, file2, f2, flags);
+	output(ds, args, args->label[0], f1, args->label[1], f2, flags);
 closem:
 	if (ds->anychange) {
 		args->status |= 1;
@@ -463,37 +422,6 @@ files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 		if (memcmp(buf1, buf2, i) != 0)
 			return (1);
 	}
-}
-
-static FILE *
-opentemp(const char *file)
-{
-	char buf[BUFSIZ], tempfile[PATH_MAX];
-	ssize_t nread;
-	int ifd, ofd;
-
-	if (strcmp(file, "-") == 0)
-		ifd = STDIN_FILENO;
-	else if ((ifd = open(file, O_RDONLY, 0644)) < 0)
-		return (NULL);
-
-	(void)strlcpy(tempfile, _PATH_TMP "/diff.XXXXXXXX", sizeof(tempfile));
-
-	if ((ofd = mkstemp(tempfile)) < 0) {
-		close(ifd);
-		return (NULL);
-	}
-	unlink(tempfile);
-	while ((nread = read(ifd, buf, BUFSIZ)) > 0) {
-		if (write(ofd, buf, nread) != nread) {
-			close(ifd);
-			close(ofd);
-			return (NULL);
-		}
-	}
-	close(ifd);
-	lseek(ofd, (off_t)0, SEEK_SET);
-	return (fdopen(ofd, "r"));
 }
 
 char *
@@ -874,7 +802,7 @@ skipline(FILE *f)
 
 static void
 output(struct got_diff_state *ds, struct got_diff_args *args,
-    char *file1, FILE *f1, char *file2, FILE *f2, int flags)
+    const char *file1, FILE *f1, const char *file2, FILE *f2, int flags)
 {
 	int m, i0, i1, j0, j1;
 
@@ -976,7 +904,7 @@ ignoreline(char *line)
  */
 static void
 change(struct got_diff_state *ds, struct got_diff_args *args,
-    char *file1, FILE *f1, char *file2, FILE *f2,
+    const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
 	static size_t max_context = 64;
