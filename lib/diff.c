@@ -53,7 +53,7 @@ open_tempfile(FILE **sfp, char **sfn)
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    const char *label1, const char *label2 ,FILE *outfile)
+    const char *label1, const char *label2, FILE *outfile)
 {
 	struct got_diff_state ds;
 	struct got_diff_args args;
@@ -117,5 +117,141 @@ done:
 	fclose(f2);
 	free(n1);
 	free(n2);
+	return err;
+}
+
+static const struct got_error *
+match_entry_by_name(struct got_tree_entry **te, struct got_tree_entry *te1,
+    struct got_tree_object *tree2)
+{
+	*te = NULL;
+	return NULL;
+}
+
+static int
+same_id(struct got_object_id *id1, struct got_object_id *id2)
+{
+	return (memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH) == 0);
+}
+
+static const struct got_error *
+diff_added_blob(struct got_object_id *id)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_deleted_blob(struct got_object_id *id)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_added_tree(struct got_object_id *id)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_deleted_tree(struct got_object_id *id)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2)
+{
+	return NULL;
+}
+
+static const struct got_error *
+diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
+{
+	const struct got_error *err;
+	struct got_tree_entry *te2;
+
+	err = match_entry_by_name(&te2, te1, tree2);
+	if (err)
+		return err;
+	if (te2 == NULL) {
+		if (S_ISDIR(te1->mode))
+			return diff_deleted_tree(&te1->id);
+		return diff_deleted_blob(&te1->id);
+	}
+
+	if (S_ISDIR(te1->mode) == S_ISDIR(te2->mode)) {
+		if (!same_id(&te1->id, &te2->id))
+			return diff_modified_tree(&te1->id, &te2->id);
+	} else if (S_ISREG(te1->mode) == S_ISREG(te2->mode)) {
+		if (!same_id(&te1->id, &te2->id))
+			return diff_modified_blob(&te1->id, &te2->id);
+	} else
+		return diff_kind_mismatch(&te1->id, &te2->id);
+
+	return NULL;
+}
+
+static const struct got_error *
+diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1)
+{
+	const struct got_error *err;
+	struct got_tree_entry *te1;
+
+	err = match_entry_by_name(&te1, te2, tree1);
+	if (err)
+		return err;
+	if (te1 != NULL) /* handled by diff_entry_old_new() */
+		return NULL;
+
+	if (S_ISDIR(te2->mode))
+		return diff_added_tree(&te2->id);
+	return diff_added_blob(&te2->id);
+}
+
+const struct got_error *
+got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_entry *te1;
+	struct got_tree_entry *te2;
+
+	if (tree1->nentries == 0 && tree2->nentries == 0)
+		return NULL;
+
+	te1 = SIMPLEQ_FIRST(&tree1->entries);
+	te2 = SIMPLEQ_FIRST(&tree2->entries);
+
+	do {
+		if (te1) {
+			err = diff_entry_old_new(te1, tree2);
+			if (err)
+				break;
+		}
+
+		if (te2) {
+			err = diff_entry_new_old(te2, tree1);
+			if (err)
+				break;
+		}
+
+		if (te1)
+			te1 = SIMPLEQ_NEXT(te1, entry);
+		if (te2)
+			te2 = SIMPLEQ_NEXT(te2, entry);
+	} while (te1 || te2);
+
 	return err;
 }

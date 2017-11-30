@@ -16,3 +16,5 @@
 
 const struct got_error *got_diff_blob(struct got_blob_object *,
     struct got_blob_object *, const char *, const char *, FILE *);
+const struct got_error *got_diff_tree(struct got_tree_object *,
+    struct got_tree_object *, struct got_repository *);
