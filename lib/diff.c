@@ -65,6 +65,7 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	FILE *f1 = NULL, *f2 = NULL;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
+	char *idstr1 = NULL, *idstr2 = NULL;
 	size_t len, hdrlen;
 	int res, flags = 0;
 
@@ -84,9 +85,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	} else
 		flags |= D_EMPTY2;
 
-	if (blob1 == NULL) {
-		f1 = NULL;
-	} else {
+	if (blob1) {
+		idstr1 = got_object_id_str(&blob1->id, hex1, sizeof(hex1));
 		hdrlen = blob1->hdrlen;
 		do {
 			err = got_object_blob_read_block(blob1, &len);
@@ -96,44 +96,51 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 			fwrite(blob1->zb.outbuf + hdrlen, len - hdrlen, 1, f1);
 			hdrlen = 0;
 		} while (len != 0);
-	}
+	} else
+		idstr1 = "/dev/null";
 
-	hdrlen = blob2->hdrlen;
-	do {
-		err = got_object_blob_read_block(blob2, &len);
-		if (err)
-			goto done;
-		/* Skip blob object header first time around. */
-		fwrite(blob2->zb.outbuf + hdrlen, len - hdrlen, 1, f2);
-		hdrlen = 0;
-	} while (len != 0);
+	if (blob2) {
+		idstr2 = got_object_id_str(&blob2->id, hex2, sizeof(hex2));
+		hdrlen = blob2->hdrlen;
+		do {
+			err = got_object_blob_read_block(blob2, &len);
+			if (err)
+				goto done;
+			/* Skip blob object header first time around. */
+			fwrite(blob2->zb.outbuf + hdrlen, len - hdrlen, 1, f2);
+			hdrlen = 0;
+		} while (len != 0);
+	} else
+		idstr2 = "/dev/null";
 
-	fflush(f1);
-	fflush(f2);
-	/* rewind(f1); */
-	/* rewind(f2);*/
+	if (f1)
+		fflush(f1);
+	if (f2)
+		fflush(f2);
 
 	memset(&ds, 0, sizeof(ds));
 	/* XXX should stat buffers be passed in args instead of ds? */
 	ds.stb1.st_mode = S_IFREG;
-	ds.stb1.st_size = blob1->zb.z.total_out;
+	if (blob1)
+		ds.stb1.st_size = blob1->zb.z.total_out;
 	ds.stb1.st_mtime = 0; /* XXX */
 
 	ds.stb2.st_mode = S_IFREG;
-	ds.stb2.st_size = blob2->zb.z.total_out;
+	if (blob2)
+		ds.stb2.st_size = blob2->zb.z.total_out;
 	ds.stb2.st_mtime = 0; /* XXX */
 
 	memset(&args, 0, sizeof(args));
 	args.diff_format = D_UNIFIED;
-	args.label[0] = label1 ?
-	    label1 : got_object_id_str(&blob1->id, hex1, sizeof(hex1));
-	args.label[1] = label2 ?
-	    label2 : got_object_id_str(&blob2->id, hex2, sizeof(hex2));
+	args.label[0] = label1 ? label1 : idstr1;
+	args.label[1] = label2 ? label2 : idstr2;
 
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile);
 done:
-	fclose(f1);
-	fclose(f2);
+	if (f1)
+		fclose(f1);
+	if (f2)
+		fclose(f2);
 	return err;
 }
 

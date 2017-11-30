@@ -289,6 +289,63 @@ repo_diff_blob(const char *repo_path)
 	return (err == NULL);
 }
 
+static int
+repo_diff_tree(const char *repo_path)
+{
+	const char *blob1_sha1 = "1efc41caf761a0a1f119d0c5121eedcb2e7a88c3";
+	const char *blob2_sha1 = "cb4ba67a335b2b7ecac88867063596bd9e1ab485";
+	const struct got_error *err;
+	struct got_repository *repo;
+	struct got_object_id id1;
+	struct got_object_id id2;
+	struct got_object *obj1;
+	struct got_object *obj2;
+	struct got_tree_object *tree1;
+	struct got_tree_object *tree2;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	int i;
+	size_t len;
+
+	if (!got_parse_sha1_digest(id1.sha1, blob1_sha1))
+		return 0;
+	if (!got_parse_sha1_digest(id2.sha1, blob2_sha1))
+		return 0;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		return 0;
+
+	err = got_object_open(&obj1, repo, &id1);
+	if (err != NULL || obj1 == NULL)
+		return 0;
+	if (obj1->type != GOT_OBJ_TYPE_TREE)
+		return 0;
+	err = got_object_open(&obj2, repo, &id2);
+	if (err != NULL || obj2 == NULL)
+		return 0;
+	if (obj2->type != GOT_OBJ_TYPE_TREE)
+		return 0;
+
+	err = got_object_tree_open(&tree1, repo, obj1);
+	if (err != NULL)
+		return 0;
+
+	err = got_object_tree_open(&tree2, repo, obj2);
+	if (err != NULL)
+		return 0;
+
+	putchar('\n');
+	got_diff_tree(tree1, tree2, repo);
+	putchar('\n');
+
+	got_object_tree_close(tree1);
+	got_object_tree_close(tree2);
+	got_object_close(obj1);
+	got_object_close(obj2);
+	got_repo_close(repo);
+	return (err == NULL);
+}
+
 int
 main(int argc, const char *argv[])
 {
@@ -307,6 +364,7 @@ main(int argc, const char *argv[])
 	RUN_TEST(repo_read_log(repo_path), "read_log");
 	RUN_TEST(repo_read_blob(repo_path), "read_blob");
 	RUN_TEST(repo_diff_blob(repo_path), "diff_blob");
+	RUN_TEST(repo_diff_tree(repo_path), "diff_tree");
 
 	return failure ? 1 : 0;
 }
