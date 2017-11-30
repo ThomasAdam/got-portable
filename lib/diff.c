@@ -218,9 +218,20 @@ done:
 }
 
 static const struct got_error *
-diff_deleted_blob(struct got_object_id *id)
+diff_deleted_blob(struct got_object_id *id, struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err;
+	struct got_blob_object  *blob;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	err = got_object_blob_open(&blob, repo, obj, 512);
+	if (err != NULL)
+		return err;
+
+	return got_diff_blob(blob, NULL, NULL, NULL, stdout);
 }
 
 static const struct got_error *
@@ -260,7 +271,7 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
 			return diff_deleted_tree(&te1->id);
-		return diff_deleted_blob(&te1->id);
+		return diff_deleted_blob(&te1->id, repo);
 	}
 
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
