@@ -160,7 +160,7 @@ diff_added_blob(struct got_object_id *id, struct got_repository *repo)
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	err = got_object_blob_open(&blob, repo, obj, 512);
+	err = got_object_blob_open(&blob, repo, obj, 8192);
 	if (err != NULL)
 		return err;
 
@@ -195,13 +195,13 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 		goto done;
 	}
 
-	err = got_object_blob_open(&blob1, repo, obj1, 512);
+	err = got_object_blob_open(&blob1, repo, obj1, 8192);
 	if (err != NULL) {
 		err = got_error(GOT_ERR_FILE_OPEN);
 		goto done;
 	}
 
-	err = got_object_blob_open(&blob2, repo, obj2, 512);
+	err = got_object_blob_open(&blob2, repo, obj2, 8192);
 	if (err != NULL) {
 		err = got_error(GOT_ERR_FILE_OPEN);
 		goto done;
@@ -227,7 +227,7 @@ diff_deleted_blob(struct got_object_id *id, struct got_repository *repo)
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	err = got_object_blob_open(&blob, repo, obj, 512);
+	err = got_object_blob_open(&blob, repo, obj, 8192);
 	if (err != NULL)
 		return err;
 
