@@ -35,6 +35,7 @@ opentemp(void)
 {
 	char name[PATH_MAX];
 	int fd;
+	FILE *f;
 
 	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
 		return NULL;
@@ -44,7 +45,13 @@ opentemp(void)
 		return NULL;
 
 	unlink(name);
-	return (fdopen(fd, "w+"));
+	f = fdopen(fd, "w+");
+	if (f == NULL) {
+		close(fd);
+		return NULL;
+	}
+
+	return f;
 }
 
 const struct got_error *
