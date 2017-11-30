@@ -54,31 +54,41 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	struct got_diff_state ds;
 	struct got_diff_args args;
 	const struct got_error *err = NULL;
-	FILE *f1, *f2;
+	FILE *f1 = NULL, *f2 = NULL;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	size_t len, hdrlen;
-	int res;
+	int res, flags = 0;
 
-	f1 = opentemp();
-	if (f1 == NULL)
-		return got_error(GOT_ERR_FILE_OPEN);
+	if (blob1) {
+		f1 = opentemp();
+		if (f1 == NULL)
+			return got_error(GOT_ERR_FILE_OPEN);
+	} else
+		flags |= D_EMPTY1;
 
-	f2 = opentemp();
-	if (f2 == NULL) {
-		fclose(f1);
-		return got_error(GOT_ERR_FILE_OPEN);
+	if (blob2) {
+		f2 = opentemp();
+		if (f2 == NULL) {
+			fclose(f1);
+			return got_error(GOT_ERR_FILE_OPEN);
+		}
+	} else
+		flags |= D_EMPTY2;
+
+	if (blob1 == NULL) {
+		f1 = NULL;
+	} else {
+		hdrlen = blob1->hdrlen;
+		do {
+			err = got_object_blob_read_block(blob1, &len);
+			if (err)
+				goto done;
+			/* Skip blob object header first time around. */
+			fwrite(blob1->zb.outbuf + hdrlen, len - hdrlen, 1, f1);
+			hdrlen = 0;
+		} while (len != 0);
 	}
-
-	hdrlen = blob1->hdrlen;
-	do {
-		err = got_object_blob_read_block(blob1, &len);
-		if (err)
-			goto done;
-		/* Skip blob object header first time around. */
-		fwrite(blob1->zb.outbuf + hdrlen, len - hdrlen, 1, f1);
-		hdrlen = 0;
-	} while (len != 0);
 
 	hdrlen = blob2->hdrlen;
 	do {
@@ -112,7 +122,7 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	args.label[1] = label2 ?
 	    label2 : got_object_id_str(&blob2->id, hex2, sizeof(hex2));
 
-	err = got_diffreg(&res, f1, f2, 0, &args, &ds);
+	err = got_diffreg(&res, f1, f2, flags, &args, &ds);
 done:
 	fclose(f1);
 	fclose(f2);
@@ -134,9 +144,20 @@ same_id(struct got_object_id *id1, struct got_object_id *id2)
 }
 
 static const struct got_error *
-diff_added_blob(struct got_object_id *id)
+diff_added_blob(struct got_object_id *id, struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err;
+	struct got_blob_object  *blob;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	err = got_object_blob_open(&blob, repo, obj, 512);
+	if (err != NULL)
+		return err;
+
+	return got_diff_blob(NULL, blob, NULL, NULL, stdout);
 }
 
 static const struct got_error *
@@ -202,7 +223,8 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
 }
 
 static const struct got_error *
-diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1)
+diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_tree_entry *te1;
@@ -215,7 +237,7 @@ diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1)
 
 	if (S_ISDIR(te2->mode))
 		return diff_added_tree(&te2->id);
-	return diff_added_blob(&te2->id);
+	return diff_added_blob(&te2->id, repo);
 }
 
 const struct got_error *
@@ -240,7 +262,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		}
 
 		if (te2) {
-			err = diff_entry_new_old(te2, tree1);
+			err = diff_entry_new_old(te2, tree1, repo);
 			if (err)
 				break;
 		}
