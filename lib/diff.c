@@ -236,9 +236,33 @@ diff_deleted_blob(struct got_object_id *id, struct got_repository *repo)
 }
 
 static const struct got_error *
-diff_added_tree(struct got_object_id *id)
+diff_added_tree(struct got_object_id *id, struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err = NULL;
+	struct got_object *treeobj = NULL;
+	struct got_tree_object *tree = NULL;
+
+	err = got_object_open(&treeobj, repo, id);
+	if (err)
+		goto done;
+
+	if (treeobj->type != GOT_OBJ_TYPE_TREE) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_tree_open(&tree, repo, treeobj);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(NULL, tree, repo);
+
+done:
+	if (tree)
+		got_object_tree_close(tree);
+	if (treeobj)
+		got_object_close(treeobj);
+	return err;
 }
 
 static const struct got_error *
@@ -344,7 +368,7 @@ diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1,
 		return NULL;
 
 	if (S_ISDIR(te2->mode))
-		return diff_added_tree(&te2->id);
+		return diff_added_tree(&te2->id, repo);
 	return diff_added_blob(&te2->id, repo);
 }
 
