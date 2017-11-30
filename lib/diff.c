@@ -197,10 +197,9 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
 			return diff_modified_blob(&te1->id, &te2->id);
-	} else
-		return diff_kind_mismatch(&te1->id, &te2->id);
+	}
 
-	return NULL;
+	return diff_kind_mismatch(&te1->id, &te2->id);
 }
 
 static const struct got_error *
