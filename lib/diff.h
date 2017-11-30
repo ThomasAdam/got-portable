@@ -118,7 +118,7 @@ struct got_diff_args {
 
 char	*splice(char *, char *);
 const struct got_error *got_diffreg(int *, FILE *,
-    FILE *, int, struct got_diff_args *, struct got_diff_state *);
+    FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *);
 int	easprintf(char **, const char *, ...);
 void	*emalloc(size_t);
 void	*erealloc(void *, size_t);

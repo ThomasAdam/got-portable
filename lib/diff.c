@@ -122,7 +122,7 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	args.label[1] = label2 ?
 	    label2 : got_object_id_str(&blob2->id, hex2, sizeof(hex2));
 
-	err = got_diffreg(&res, f1, f2, flags, &args, &ds);
+	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile);
 done:
 	fclose(f1);
 	fclose(f2);
