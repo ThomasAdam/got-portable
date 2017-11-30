@@ -348,6 +348,7 @@ done:
 static const struct got_error *
 diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2)
 {
+	/* XXX TODO */
 	return NULL;
 }
 
