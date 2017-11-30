@@ -191,10 +191,10 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2)
 		return diff_deleted_blob(&te1->id);
 	}
 
-	if (S_ISDIR(te1->mode) == S_ISDIR(te2->mode)) {
+	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
 			return diff_modified_tree(&te1->id, &te2->id);
-	} else if (S_ISREG(te1->mode) == S_ISREG(te2->mode)) {
+	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
 			return diff_modified_blob(&te1->id, &te2->id);
 	} else
