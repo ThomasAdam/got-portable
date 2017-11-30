@@ -47,7 +47,6 @@ opentemp(void)
 	return (fdopen(fd, "w+"));
 }
 
-
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
     const char *label1, const char *label2, FILE *outfile)
