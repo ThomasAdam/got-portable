@@ -292,8 +292,8 @@ repo_diff_blob(const char *repo_path)
 static int
 repo_diff_tree(const char *repo_path)
 {
-	const char *blob1_sha1 = "1efc41caf761a0a1f119d0c5121eedcb2e7a88c3";
-	const char *blob2_sha1 = "cb4ba67a335b2b7ecac88867063596bd9e1ab485";
+	const char *tree1_sha1 = "1efc41caf761a0a1f119d0c5121eedcb2e7a88c3";
+	const char *tree2_sha1 = "cb4ba67a335b2b7ecac88867063596bd9e1ab485";
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_object_id id1;
@@ -306,9 +306,9 @@ repo_diff_tree(const char *repo_path)
 	int i;
 	size_t len;
 
-	if (!got_parse_sha1_digest(id1.sha1, blob1_sha1))
+	if (!got_parse_sha1_digest(id1.sha1, tree1_sha1))
 		return 0;
-	if (!got_parse_sha1_digest(id2.sha1, blob2_sha1))
+	if (!got_parse_sha1_digest(id2.sha1, tree2_sha1))
 		return 0;
 
 	err = got_repo_open(&repo, repo_path);
