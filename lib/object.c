@@ -235,6 +235,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 				err = got_error(GOT_ERR_NO_MEM);
 				goto done;
 			}
+			buf += totlen;
 		}
 		memcpy(buf, zb.outbuf, outlen);
 		totlen += outlen;
