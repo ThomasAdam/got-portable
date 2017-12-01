@@ -229,8 +229,13 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 		err = inflate_read(&zb, f, &outlen);
 		if (err)
 			goto done;
-		if (strchr(zb.outbuf, '\0') == NULL)
+		if (strchr(zb.outbuf, '\0') == NULL) {
 			buf = recallocarray(buf, 1 + i, 2 + i, zbsize);
+			if (buf == NULL) {
+				err = got_error(GOT_ERR_NO_MEM);
+				goto done;
+			}
+		}
 		memcpy(buf, zb.outbuf, outlen);
 		totlen += outlen;
 		i++;
