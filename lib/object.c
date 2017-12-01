@@ -414,15 +414,6 @@ tree_entry_close(struct got_tree_entry *te)
 	free(te);
 }
 
-static const char *
-mode_trailer(mode_t mode)
-{
-	if (S_ISDIR(mode))
-		return "/";
-
-	return "";
-}
-
 static const struct got_error *
 parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
     size_t maxlen)
