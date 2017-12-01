@@ -204,17 +204,16 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	FILE *f;
 	struct got_zstream_buf zb;
 	char *buf;
-	size_t totalsz;
+	size_t len;
 	const size_t zbsize = 64;
-	size_t outlen;
+	size_t outlen, totlen;
 	int i, ret;
 
 	f = fopen(path, "rb");
 	if (f == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
-	totalsz = zbsize;
-	buf = calloc(totalsz, sizeof(char));
+	buf = calloc(zbsize, sizeof(char));
 	if (buf == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
@@ -225,19 +224,19 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	}
 
 	i = 0;
+	totlen = 0;
 	do {
 		err = inflate_read(&zb, f, &outlen);
 		if (err)
 			goto done;
-		if (strchr(zb.outbuf, '\0') == NULL) {
+		if (strchr(zb.outbuf, '\0') == NULL)
 			buf = recallocarray(buf, 1 + i, 2 + i, zbsize);
-			totalsz += zbsize;
-		}
-		memcpy(buf, zb.outbuf, zbsize);
+		memcpy(buf, zb.outbuf, outlen);
+		totlen += outlen;
 		i++;
 	} while (strchr(zb.outbuf, '\0') == NULL);
 
-	err = parse_object_header(obj, buf, totalsz);
+	err = parse_object_header(obj, buf, totlen);
 done:
 	inflate_end(&zb);
 	fclose(f);
