@@ -144,11 +144,15 @@ done:
 	return err;
 }
 
-static const struct got_error *
-match_entry_by_name(struct got_tree_entry **te, struct got_tree_entry *te1,
-    struct got_tree_object *tree2)
+struct got_tree_entry *
+match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
 {
-	*te = NULL;
+	struct got_tree_entry *te2;
+
+	SIMPLEQ_FOREACH(te2, &tree2->entries, entry) {
+		if (strcmp(te1->name, te2->name) == 0)
+			return te2;
+	}
 	return NULL;
 }
 
@@ -218,10 +222,14 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	err = got_diff_blob(blob1, blob2, NULL, NULL, stdout);
 
 done:
-	got_object_close(obj1);
-	got_object_close(obj2);
-	got_object_blob_close(blob1);
-	got_object_blob_close(blob2);
+	if (obj1)
+		got_object_close(obj1);
+	if (obj2)
+		got_object_close(obj2);
+	if (blob1)
+		got_object_blob_close(blob1);
+	if (blob2)
+		got_object_blob_close(blob2);
 	return err;
 }
 
@@ -365,10 +373,9 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
 {
 	const struct got_error *err;
 	struct got_tree_entry *te2;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
 
-	err = match_entry_by_name(&te2, te1, tree2);
-	if (err)
-		return err;
+	te2 = match_entry_by_name(te1, tree2);
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
 			return diff_deleted_tree(&te1->id, repo);
@@ -381,6 +388,7 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
 		if (!same_id(&te1->id, &te2->id))
 			return diff_modified_blob(&te1->id, &te2->id, repo);
+
 	}
 
 	return diff_kind_mismatch(&te1->id, &te2->id);
@@ -393,9 +401,7 @@ diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1,
 	const struct got_error *err;
 	struct got_tree_entry *te1;
 
-	err = match_entry_by_name(&te1, te2, tree1);
-	if (err)
-		return err;
+	te1 = match_entry_by_name(te2, tree1);
 	if (te1 != NULL) /* handled by diff_entry_old_new() */
 		return NULL;
 

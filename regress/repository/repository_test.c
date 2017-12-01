@@ -293,7 +293,7 @@ static int
 repo_diff_tree(const char *repo_path)
 {
 	const char *tree1_sha1 = "1efc41caf761a0a1f119d0c5121eedcb2e7a88c3";
-	const char *tree2_sha1 = "cb4ba67a335b2b7ecac88867063596bd9e1ab485";
+	const char *tree2_sha1 = "4aa8f2933839ff8a8fb3f905a4c232d22c6ff5f3";
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_object_id id1;

@@ -918,7 +918,7 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
-	static size_t max_context = 64;
+	size_t max_context = 64;
 	int i;
 
 restart:

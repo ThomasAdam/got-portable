@@ -120,27 +120,27 @@ inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
 	z->next_out = zb->outbuf;
 	z->avail_out = zb->outlen;
 
-	if (z->avail_in == 0 && (zb->flags & GOT_ZSTREAM_F_HAVE_MORE) == 0) {
-		int i;
-		n = fread(zb->inbuf, 1, zb->inlen, f);
-		if (n == 0) {
-			if (ferror(f))
-				return got_error(GOT_ERR_IO);
-			*outlenp = 0;
-			return NULL;
+	do {
+		if (z->avail_in == 0) {
+			int i;
+			n = fread(zb->inbuf, 1, zb->inlen, f);
+			if (n == 0) {
+				if (ferror(f))
+					return got_error(GOT_ERR_IO);
+				*outlenp = 0;
+				return NULL;
+			}
+			z->next_in = zb->inbuf;
+			z->avail_in = n;
 		}
-		z->next_in = zb->inbuf;
-		z->avail_in = n;
-	}
+		ret = inflate(z, Z_SYNC_FLUSH);
+	} while (ret == Z_OK && z->avail_out > 0);
 
-	ret = inflate(z, Z_SYNC_FLUSH);
-	if (ret == Z_OK) {
-		if (z->avail_out == 0)
-			zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
-		else
-			zb->flags &= ~GOT_ZSTREAM_F_HAVE_MORE;
-	} else if (ret != Z_STREAM_END)
-		return got_error(GOT_ERR_DECOMPRESSION);
+	if (ret != Z_OK) {
+		if (ret != Z_STREAM_END)
+			return got_error(GOT_ERR_DECOMPRESSION);
+		zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
+	}
 
 	*outlenp = z->total_out - last_total_out;
 	return NULL;
@@ -203,6 +203,9 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	const struct got_error *err;
 	FILE *f;
 	struct got_zstream_buf zb;
+	char *buf;
+	size_t totalsz;
+	const size_t zbsize = 64;
 	size_t outlen;
 	int i, ret;
 
@@ -210,17 +213,31 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	if (f == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
-	err = inflate_init(&zb, 64);
+	totalsz = zbsize;
+	buf = calloc(totalsz, sizeof(char));
+	if (buf == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	err = inflate_init(&zb, zbsize);
 	if (err) {
 		fclose(f);
 		return err;
 	}
 
-	err = inflate_read(&zb, f, &outlen);
-	if (err)
-		goto done;
+	i = 0;
+	do {
+		err = inflate_read(&zb, f, &outlen);
+		if (err)
+			goto done;
+		if (strchr(zb.outbuf, '\0') == NULL) {
+			buf = recallocarray(buf, 1 + i, 2 + i, zbsize);
+			totalsz += zbsize;
+		}
+		memcpy(buf, zb.outbuf, zbsize);
+		i++;
+	} while (strchr(zb.outbuf, '\0') == NULL);
 
-	err = parse_object_header(obj, zb.outbuf, outlen);
+	err = parse_object_header(obj, buf, totalsz);
 done:
 	inflate_end(&zb);
 	fclose(f);
