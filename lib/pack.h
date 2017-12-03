@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
  *
