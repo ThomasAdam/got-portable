@@ -65,13 +65,13 @@ struct got_commit_object {
 
 struct got_object {
 	int type;
-#define GOT_OBJ_TYPE_COMMIT 	1
-#define GOT_OBJ_TYPE_TREE	2
-#define GOT_OBJ_TYPE_BLOB	3
-#define GOT_OBJ_TYPE_TAG	4
+#define GOT_OBJ_TYPE_COMMIT		1
+#define GOT_OBJ_TYPE_TREE		2
+#define GOT_OBJ_TYPE_BLOB		3
+#define GOT_OBJ_TYPE_TAG		4
 /* 5 is reserved */
-#define GOT_OBJ_OFFSET_DELTA	6
-#define GOT_OBJ_REF_DELTA	7
+#define GOT_OBJ_TYPE_OFFSET_DELTA	6
+#define GOT_OBJ_TYPE_REF_DELTA		7
 
 	size_t hdrlen;
 	size_t size;
