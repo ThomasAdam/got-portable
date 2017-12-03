@@ -62,7 +62,7 @@ struct got_packidx_v2_hdr {
 
 struct got_packfile_hdr {
 	uint32_t	signature;
-#define GOT_PACKFILE_SIGNATURE	0x4041434b	/* 'P' 'A' 'C' 'K' */
+#define GOT_PACKFILE_SIGNATURE	0x5041434b	/* 'P' 'A' 'C' 'K' */
 	uint32_t	version;	/* big endian */
 #define GOT_PACKFILE_VERSION 2
 	uint32_t	nobjects;	/* big endian */
