@@ -197,7 +197,6 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 	    nobj * sizeof(*p->large_offsets));
 
 checksum:
-
 	n = fread(&p->trailer, sizeof(p->trailer), 1, f);
 	if (n != 1) {
 		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
