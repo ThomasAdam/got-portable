@@ -75,6 +75,10 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 	FILE *f;
 	const struct got_error *err = NULL;
 	size_t n, nobj, packfile_size;
+	SHA1_CTX ctx;
+	uint8_t sha1[SHA1_DIGEST_LENGTH];
+
+	SHA1Init(&ctx);
 
 	f = fopen(path, "rb");
 	if (f == NULL)
@@ -101,6 +105,8 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		goto done;
 	}
 
+	SHA1Update(&ctx, (uint8_t *)&p->magic, sizeof(p->magic));
+
 	n = fread(&p->version, sizeof(p->version), 1, f);
 	if (n != 1) {
 		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
@@ -112,6 +118,8 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		goto done;
 	}
 
+	SHA1Update(&ctx, (uint8_t *)&p->version, sizeof(p->version));
+
 	n = fread(&p->fanout_table, sizeof(p->fanout_table), 1, f);
 	if (n != 1) {
 		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
@@ -121,6 +129,8 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 	err = verify_fanout_table(p->fanout_table);
 	if (err)
 		goto done;
+
+	SHA1Update(&ctx, (uint8_t *)p->fanout_table, sizeof(p->fanout_table));
 
 	nobj = betoh32(p->fanout_table[0xff]);
 
@@ -136,6 +146,9 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		goto done;
 	}
 
+	SHA1Update(&ctx, (uint8_t *)p->sorted_ids,
+	    nobj * sizeof(*p->sorted_ids));
+
 	p->offsets = calloc(nobj, sizeof(*p->offsets));
 	if (p->offsets == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
@@ -148,6 +161,8 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		goto done;
 	}
 
+	SHA1Update(&ctx, (uint8_t *)p->offsets, nobj * sizeof(*p->offsets));
+
 	p->crc32 = calloc(nobj, sizeof(*p->crc32));
 	if (p->crc32 == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
@@ -159,6 +174,8 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
+
+	SHA1Update(&ctx, (uint8_t *)p->crc32, nobj * sizeof(*p->crc32));
 
 	/* Large file offsets are contained only in files > 2GB. */
 	if (packfile_size <= 0x80000000)
@@ -176,6 +193,9 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 		goto done;
 	}
 
+	SHA1Update(&ctx, (uint8_t*)p->large_offsets,
+	    nobj * sizeof(*p->large_offsets));
+
 checksum:
 
 	n = fread(&p->trailer, sizeof(p->trailer), 1, f);
@@ -184,8 +204,10 @@ checksum:
 		goto done;
 	}
 
-	/* TODO verify checksum */
-
+	SHA1Update(&ctx, p->trailer.pack_file_sha1, SHA1_DIGEST_LENGTH);
+	SHA1Final(sha1, &ctx);
+	if (memcmp(p->trailer.pack_idx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
+		err = got_error(GOT_ERR_PACKIDX_CSUM);
 done:
 	fclose(f);
 	if (err)

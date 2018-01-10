@@ -30,6 +30,7 @@
 #define GOT_ERR_BAD_OBJ_DATA	0x0012
 #define GOT_ERR_FILE_OPEN	0x0013
 #define GOT_ERR_BAD_PACKIDX	0x0014
+#define GOT_ERR_PACKIDX_CSUM	0x0015
 
 static const struct got_error {
 	int code;
@@ -50,6 +51,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_OBJ_DATA,	"bad object data" },
 	{ GOT_ERR_FILE_OPEN,	"could not open file" },
 	{ GOT_ERR_BAD_PACKIDX,	"bad pack index file" },
+	{ GOT_ERR_PACKIDX_CSUM, "pack index file checksum error" },
 };
 
 const struct got_error * got_error(int code);
