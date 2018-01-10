@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,7 +20,7 @@ struct got_pack_obj_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 } __attribute__((__packed__));
 
-struct got_pack_idx_trailer {
+struct got_packidx_trailer {
 	u_int8_t	pack_file_sha1[SHA1_DIGEST_LENGTH];
 	u_int8_t	pack_idx_sha1[SHA1_DIGEST_LENGTH];
 } __attribute__((__packed__));
@@ -41,7 +41,7 @@ struct got_packidx_v2_hdr {
 	 * total number of objects in the pack file. All pointer variables
 	 * below point to tables with a corresponding number of entries.
 	 */
-	uint32_t	fanout_table[0xff];	/* values are big endian */
+	uint32_t	fanout_table[0xff + 1];	/* values are big endian */
 
 	/* Sorted SHA1 checksums for each object in the pack file. */
 	struct got_pack_obj_id *sorted_ids;
@@ -57,7 +57,7 @@ struct got_packidx_v2_hdr {
 	/* Large offsets table is empty for pack files < 2 GB. */
 	uint64_t	*large_offsets;		/* values are big endian */
 
-	struct got_pack_idx_trailer trailer;
+	struct got_packidx_trailer trailer;
 };
 
 struct got_packfile_hdr {
@@ -114,8 +114,12 @@ struct got_packfile_object_data_offset_delta {
 
 struct got_packfile_obj_data {
 	union {
-		struct got_packfile_object_data;
-		struct got_packfile_object_data_ref_delta;
-		struct got_packfile_object_data_offset_delta;
+		struct got_packfile_object_data data;
+		struct got_packfile_object_data_ref_delta ref_delta;
+		struct got_packfile_object_data_offset_delta offset_delta;
 	} __attribute__((__packed__));
 } __attribute__((__packed__));
+
+const struct got_error *got_packidx_open(struct got_packidx_v2_hdr **,
+    const char *);
+void got_packidx_close(struct got_packidx_v2_hdr *);

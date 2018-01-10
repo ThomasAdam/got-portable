@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #define GOT_ERR_OBJ_TYPE	0x0011
 #define GOT_ERR_BAD_OBJ_DATA	0x0012
 #define GOT_ERR_FILE_OPEN	0x0013
+#define GOT_ERR_BAD_PACKIDX	0x0014
 
 static const struct got_error {
 	int code;
@@ -48,6 +49,7 @@ static const struct got_error {
 	{ GOT_ERR_OBJ_TYPE,	"wrong type of object" },
 	{ GOT_ERR_BAD_OBJ_DATA,	"bad object data" },
 	{ GOT_ERR_FILE_OPEN,	"could not open file" },
+	{ GOT_ERR_BAD_PACKIDX,	"bad pack index file" },
 };
 
 const struct got_error * got_error(int code);
