@@ -161,7 +161,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 	}
 
 	/* Large file offsets are contained only in files > 2GB. */
-	if (packfile_size < 0x80000000)
+	if (packfile_size <= 0x80000000)
 		goto checksum;
 
 	p->large_offsets = calloc(nobj, sizeof(*p->large_offsets));
