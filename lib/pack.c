@@ -39,7 +39,7 @@ verify_fanout_table(uint32_t *fanout_table)
 	return NULL;
 }
 
-const struct got_error *
+static const struct got_error *
 get_packfile_size(size_t *size, const char *path_idx)
 {
 	struct stat sb;
