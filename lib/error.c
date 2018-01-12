@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "got_error.h"
 
 #ifndef nitems
@@ -30,5 +34,15 @@ got_error(int code)
 			return &got_errors[i];
 	}
 
-	return &got_errors[GOT_ERR_UNKNOWN];
+	abort();
+}
+
+const struct got_error *
+got_error_from_errno()
+{
+	static struct got_error err;
+
+	err.code = GOT_ERR_ERRNO;
+	err.msg = strerror(errno);
+	return &err;
 }

@@ -284,7 +284,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	f = fopen(path, "rb");
 	if (f == NULL) {
 		if (errno != ENOENT) {
-			err = got_error(GOT_ERR_BAD_PATH);
+			err = got_error_from_errno();
 			goto done;
 		}
 		err = got_packfile_extract_object(&f, id, repo);

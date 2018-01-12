@@ -346,7 +346,7 @@ dump_packed_object(FILE **f, FILE *packfile, off_t offset)
 	}
 
 	if (fseeko(packfile, offset, SEEK_SET) != 0) {
-		err = got_error(errno == EIO ? GOT_ERR_IO : GOT_ERR_BAD_PATH);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -450,7 +450,7 @@ extract_object(FILE **f, const char *path_packdir,
 
 	packfile = fopen(path_packfile, "rb");
 	if (packfile == NULL) {
-		err = got_error(errno == EIO ? GOT_ERR_IO : GOT_ERR_BAD_PATH);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -465,8 +465,8 @@ extract_object(FILE **f, const char *path_packdir,
 
 done:
 	free(path_packfile);
-	if (packfile && fclose(packfile) == -1 && errno == EIO && err == 0)
-		err = got_error(GOT_ERR_IO);
+	if (packfile && fclose(packfile) == -1 && err == 0)
+		err = got_error_from_errno();
 	return err;
 }
 
@@ -486,7 +486,7 @@ got_packfile_extract_object(FILE **f, struct got_object_id *id,
 
 	packdir = opendir(path_packdir);
 	if (packdir == NULL) {
-		err = got_error(errno == EIO ? GOT_ERR_IO : GOT_ERR_BAD_PATH);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -517,7 +517,7 @@ got_packfile_extract_object(FILE **f, struct got_object_id *id,
 
 done:
 	free(path_packdir);
-	if (packdir && closedir(packdir) != 0 && errno == EIO && err == 0)
-		err = got_error(GOT_ERR_IO);
+	if (packdir && closedir(packdir) != 0 && err == 0)
+		err = got_error_from_errno();
 	return err;
 }
