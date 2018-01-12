@@ -83,8 +83,7 @@ get_packfile_size(size_t *size, const char *path_idx)
 
 	if (stat(path_pack, &sb) != 0) {
 		free(path_pack);
-		return got_error(GOT_ERR_IO);
-
+		return got_error_from_errno();
 	}
 
 	free(path_pack);
@@ -120,7 +119,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(&p->magic, sizeof(p->magic), 1, f);
 	if (n != 1) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -133,7 +132,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(&p->version, sizeof(p->version), 1, f);
 	if (n != 1) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -146,7 +145,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(&p->fanout_table, sizeof(p->fanout_table), 1, f);
 	if (n != 1) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -166,7 +165,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(p->sorted_ids, sizeof(*p->sorted_ids), nobj, f);
 	if (n != nobj) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -181,7 +180,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(p->crc32, sizeof(*p->crc32), nobj, f);
 	if (n != nobj) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -195,7 +194,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(p->offsets, sizeof(*p->offsets), nobj, f);
 	if (n != nobj) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -213,7 +212,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	n = fread(p->large_offsets, sizeof(*p->large_offsets), nobj, f);
 	if (n != nobj) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -223,7 +222,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 checksum:
 	n = fread(&p->trailer, sizeof(p->trailer), 1, f);
 	if (n != 1) {
-		err = got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKIDX);
+		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
@@ -317,7 +316,7 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 
 	n = fread(&hdr, sizeof(hdr), 1, f);
 	if (n != 1)
-		return got_error(ferror(f) ? GOT_ERR_IO : GOT_ERR_BAD_PACKFILE);
+		return got_ferror(f, GOT_ERR_BAD_PACKIDX);
 
 	if (betoh32(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
 	    betoh32(hdr.version) != GOT_PACKFILE_VERSION ||
@@ -360,10 +359,10 @@ dump_packed_object(FILE **f, FILE *packfile, off_t offset)
 
 		n = fread(&sizeN, sizeof(sizeN), 1, packfile);
 		if (n != 1) {
-			err = got_error(ferror(packfile) ?
-			    GOT_ERR_IO : GOT_ERR_BAD_PACKFILE);
+			err = got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
+
 		if (i == 0) {
 			type = (sizeN & GOT_PACK_OBJ_SIZE0_TYPE_MASK) >>
 			    GOT_PACK_OBJ_SIZE0_TYPE_MASK_SHIFT;
@@ -397,15 +396,13 @@ dump_packed_object(FILE **f, FILE *packfile, off_t offset)
 
 		n = fread(data, len, 1, packfile);
 		if (n != 1) {
-			err = got_error(ferror(packfile) ?
-			    GOT_ERR_IO : GOT_ERR_BAD_PACKFILE);
+			err = got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
 
 		n = fwrite(data, len, 1, *f);
 		if (n != 1) {
-			err = got_error(ferror(*f) ?
-			    GOT_ERR_IO : GOT_ERR_BAD_PACKFILE);
+			err = got_ferror(*f, GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
 

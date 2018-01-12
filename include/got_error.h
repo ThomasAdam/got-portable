@@ -60,3 +60,4 @@ static const struct got_error {
 
 const struct got_error * got_error(int code);
 const struct got_error *got_error_from_errno();
+const struct got_error *got_ferror(FILE *, int);

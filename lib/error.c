@@ -15,6 +15,7 @@
  */
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,4 +47,12 @@ got_error_from_errno()
 	err.code = GOT_ERR_ERRNO;
 	strerror_r(errno, msg, sizeof(msg));
 	return &err;
+}
+
+const struct got_error *
+got_ferror(FILE *f, int code)
+{
+	if (ferror(f))
+		return got_error_from_errno();
+	return got_error(code);
 }
