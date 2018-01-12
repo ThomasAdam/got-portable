@@ -33,8 +33,10 @@
 #define GOT_REFS_DIR		"refs"
 #define GOT_HEAD_FILE		"HEAD"
 
+/* Other files and directories inside the git directory. */
 #define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
 #define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
+#define GOT_OBJECTS_PACK_DIR	"objects/pack"
 
 char *
 got_repo_get_path_git_dir(struct got_repository *repo)
@@ -63,6 +65,12 @@ char *
 got_repo_get_path_objects(struct got_repository *repo)
 {
 	return get_path_git_child(repo, GOT_OBJECTS_DIR);
+}
+
+char *
+got_repo_get_path_objects_pack(struct got_repository *repo)
+{
+	return get_path_git_child(repo, GOT_OBJECTS_PACK_DIR);
 }
 
 char *

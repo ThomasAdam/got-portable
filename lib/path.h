@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,3 +30,7 @@ char *got_path_get_absolute(const char *);
  * The result is allocated with malloc(3).
  */
 char *got_path_normalize(const char *);
+
+/* Open a new temporary file for writing.
+ * The file is not visible in the filesystem. */
+FILE *got_opentemp(void);

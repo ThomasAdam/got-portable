@@ -30,30 +30,7 @@
 #include "got_diff.h"
 
 #include "diff.h"
-
-static FILE *
-opentemp(void)
-{
-	char name[PATH_MAX];
-	int fd;
-	FILE *f;
-
-	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
-		return NULL;
-
-	fd = mkstemp(name);
-	if (fd < 0)
-		return NULL;
-
-	unlink(name);
-	f = fdopen(fd, "w+");
-	if (f == NULL) {
-		close(fd);
-		return NULL;
-	}
-
-	return f;
-}
+#include "path.h"
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
@@ -70,14 +47,14 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	int res, flags = 0;
 
 	if (blob1) {
-		f1 = opentemp();
+		f1 = got_opentemp();
 		if (f1 == NULL)
 			return got_error(GOT_ERR_FILE_OPEN);
 	} else
 		flags |= D_EMPTY1;
 
 	if (blob2) {
-		f2 = opentemp();
+		f2 = got_opentemp();
 		if (f2 == NULL) {
 			fclose(f1);
 			return got_error(GOT_ERR_FILE_OPEN);
@@ -154,12 +131,6 @@ match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
 			return te2;
 	}
 	return NULL;
-}
-
-static int
-same_id(struct got_object_id *id1, struct got_object_id *id2)
-{
-	return (memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH) == 0);
 }
 
 static const struct got_error *
@@ -383,12 +354,11 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
 	}
 
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
-		if (!same_id(&te1->id, &te2->id))
+		if (got_object_id_cmp(&te1->id, &te2->id) != 0)
 			return diff_modified_tree(&te1->id, &te2->id, repo);
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
-		if (!same_id(&te1->id, &te2->id))
+		if (got_object_id_cmp(&te1->id, &te2->id) != 0)
 			return diff_modified_blob(&te1->id, &te2->id, repo);
-
 	}
 
 	return diff_kind_mismatch(&te1->id, &te2->id);

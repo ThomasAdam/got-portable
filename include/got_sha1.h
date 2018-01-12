@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,3 +15,4 @@
  */
 
 int got_parse_sha1_digest(uint8_t *, const char *);
+char *got_sha1_digest_to_str(const uint8_t *, char *, size_t);

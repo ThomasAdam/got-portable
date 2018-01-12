@@ -30,7 +30,7 @@
 #include "got_diff.h"
 
 #define RUN_TEST(expr, name) \
-	if (!(expr)) { printf("test %s failed", (name)); failure = 1; }
+	if (!(expr)) { printf("test %s failed\n", (name)); failure = 1; }
 
 #define GOT_REPO_PATH "../../../"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -80,7 +80,9 @@ struct got_object {
 
 struct got_repository;
 
-char * got_object_id_str(struct got_object_id *, char *, size_t);
+char *got_object_id_str(struct got_object_id *, char *, size_t);
+int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
+const char *got_object_get_type_tag(int);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
 void got_object_close(struct got_object *);

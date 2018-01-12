@@ -16,13 +16,9 @@
 
 /* See Documentation/technical/pack-format.txt in Git. */
 
-struct got_pack_obj_id {
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
-} __attribute__((__packed__));
-
 struct got_packidx_trailer {
-	u_int8_t	pack_file_sha1[SHA1_DIGEST_LENGTH];
-	u_int8_t	pack_idx_sha1[SHA1_DIGEST_LENGTH];
+	u_int8_t	packfile_sha1[SHA1_DIGEST_LENGTH];
+	u_int8_t	packidx_sha1[SHA1_DIGEST_LENGTH];
 } __attribute__((__packed__));
 
 /* Ignore pack index version 1 which is no longer written by Git. */
@@ -44,15 +40,15 @@ struct got_packidx_v2_hdr {
 	uint32_t	fanout_table[0xff + 1];	/* values are big endian */
 
 	/* Sorted SHA1 checksums for each object in the pack file. */
-	struct got_pack_obj_id *sorted_ids;
+	struct got_object_id *sorted_ids;
+
+	/* CRC32 of the packed representation of each object. */
+	uint32_t	*crc32;
 
 	/* Offset into the pack file for each object. */
 	uint32_t	*offsets;		/* values are big endian */
 #define GOT_PACKIDX_OFFSET_VAL_MASK		0x7fffffff
 #define GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX	0x80000000
-
-	/* CRC32 of the packed representation of each object. */
-	uint32_t	*crc32;
 
 	/* Large offsets table is empty for pack files < 2 GB. */
 	uint64_t	*large_offsets;		/* values are big endian */
@@ -80,8 +76,9 @@ struct got_packfile_obj_hdr {
 	uint8_t *size;		/* variable length */
 #define GOT_PACK_OBJ_SIZE_MORE		0x80
 #define GOT_PACK_OBJ_SIZE0_TYPE_MASK	0x70 /* See struct got_object->type */
+#define GOT_PACK_OBJ_SIZE0_TYPE_MASK_SHIFT	4
 #define GOT_PACK_OBJ_SIZE0_VAL_MASK	0x0f
-#define GOT_PACK_OBJ_SIZEN_VAL_MASK	0x7f
+#define GOT_PACK_OBJ_SIZE_VAL_MASK	0x7f
 };
 
 /* If object is not a DELTA type. */
@@ -91,7 +88,7 @@ struct got_packfile_object_data {
 
 /* If object is of type	GOT_OBJ_TYPE_REF_DELTA. */
 struct got_packfile_object_data_ref_delta {
-	struct got_pack_obj_id id;
+	struct got_object_id id;
 	uint8_t *delta_data;		/* compressed */
 };
 
@@ -123,3 +120,6 @@ struct got_packfile_obj_data {
 const struct got_error *got_packidx_open(struct got_packidx_v2_hdr **,
     const char *);
 void got_packidx_close(struct got_packidx_v2_hdr *);
+
+const struct got_error *got_packfile_extract_object(FILE **,
+    struct got_object_id *, struct got_repository *);

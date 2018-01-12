@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,7 @@
 #include "got_object.h"
 #include "got_repository.h"
 #include "got_sha1.h"
+#include "pack.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -50,22 +52,28 @@
 char *
 got_object_id_str(struct got_object_id *id, char *buf, size_t size)
 {
-	char *p = buf;
-	char hex[3];
-	int i;
+	return got_sha1_digest_to_str(id->sha1, buf, size);
+}
 
-	if (size < SHA1_DIGEST_STRING_LENGTH)
-		return NULL;
+int
+got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
+{
+	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
+}
 
-	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		snprintf(hex, sizeof(hex), "%.2x", id->sha1[i]);
-		p[0] = hex[0];
-		p[1] = hex[1];
-		p += 2;
+const char *
+got_object_get_type_tag(int type)
+{
+	switch (type) {
+	case GOT_OBJ_TYPE_COMMIT:
+		return GOT_OBJ_TAG_COMMIT;
+	case GOT_OBJ_TYPE_TREE:
+		return GOT_OBJ_TAG_TREE;
+	case GOT_OBJ_TYPE_BLOB:
+		return GOT_OBJ_TAG_BLOB;
 	}
-	p[0] = '\0';
 
-	return buf;
+	return NULL;
 }
 
 static void
@@ -198,10 +206,9 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 
 static const struct got_error *
 read_object_header(struct got_object **obj, struct got_repository *repo,
-    const char *path)
+    FILE *f)
 {
 	const struct got_error *err;
-	FILE *f;
 	struct got_zstream_buf zb;
 	char *buf;
 	size_t len;
@@ -209,19 +216,13 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	size_t outlen, totlen;
 	int i, ret;
 
-	f = fopen(path, "rb");
-	if (f == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
-
 	buf = calloc(zbsize, sizeof(char));
 	if (buf == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
 	err = inflate_init(&zb, zbsize);
-	if (err) {
-		fclose(f);
+	if (err)
 		return err;
-	}
 
 	i = 0;
 	totlen = 0;
@@ -244,7 +245,6 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	err = parse_object_header(obj, buf, totlen);
 done:
 	inflate_end(&zb);
-	fclose(f);
 	return err;
 }
 
@@ -274,17 +274,35 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
-	char *path = NULL;
+	char *path;
+	FILE *f = NULL;
 
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 
-	err = read_object_header(obj, repo, path);
+	f = fopen(path, "rb");
+	if (f == NULL) {
+		if (errno != ENOENT) {
+			err = got_error(GOT_ERR_BAD_PATH);
+			goto done;
+		}
+		err = got_packfile_extract_object(&f, id, repo);
+		if (err)
+			goto done;
+		if (f == NULL) {
+			err = got_error(GOT_ERR_NO_OBJ);
+			goto done;
+		}
+	}
+
+	err = read_object_header(obj, repo, f);
 	if (err == NULL)
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 done:
 	free(path);
+	if (f != NULL)
+		fclose(f);
 	return err;
 }
 
@@ -723,4 +741,3 @@ got_object_blob_read_block(struct got_blob_object *blob, size_t *outlenp)
 {
 	return inflate_read(&blob->zb, blob->f, outlenp);
 }
-

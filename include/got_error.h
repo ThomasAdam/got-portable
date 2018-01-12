@@ -15,22 +15,24 @@
  */
 
 /* Error codes */
-#define GOT_ERR_UNKNOWN		0x0000
-#define GOT_ERR_NO_MEM		0x0001
-#define GOT_ERR_NOT_GIT_REPO	0x0002
-#define GOT_ERR_NOT_ABSPATH	0x0003
-#define GOT_ERR_BAD_PATH	0x0004
-#define GOT_ERR_NOT_REF		0x0005
-#define GOT_ERR_IO		0x0006
-#define GOT_ERR_EOF		0x0007
-#define GOT_ERR_DECOMPRESSION	0x0008
-#define GOT_ERR_NO_SPACE	0x0009
-#define GOT_ERR_BAD_OBJ_HDR	0x0010
-#define GOT_ERR_OBJ_TYPE	0x0011
-#define GOT_ERR_BAD_OBJ_DATA	0x0012
-#define GOT_ERR_FILE_OPEN	0x0013
-#define GOT_ERR_BAD_PACKIDX	0x0014
-#define GOT_ERR_PACKIDX_CSUM	0x0015
+#define GOT_ERR_UNKNOWN		0
+#define GOT_ERR_NO_MEM		1
+#define GOT_ERR_NOT_GIT_REPO	2
+#define GOT_ERR_NOT_ABSPATH	3
+#define GOT_ERR_BAD_PATH	4
+#define GOT_ERR_NOT_REF		5
+#define GOT_ERR_IO		6
+#define GOT_ERR_EOF		7
+#define GOT_ERR_DECOMPRESSION	8
+#define GOT_ERR_NO_SPACE	9
+#define GOT_ERR_BAD_OBJ_HDR	10
+#define GOT_ERR_OBJ_TYPE	11
+#define GOT_ERR_BAD_OBJ_DATA	12
+#define GOT_ERR_FILE_OPEN	13
+#define GOT_ERR_BAD_PACKIDX	14
+#define GOT_ERR_PACKIDX_CSUM	15
+#define GOT_ERR_BAD_PACKFILE	16
+#define GOT_ERR_NO_OBJ		17
 
 static const struct got_error {
 	int code;
@@ -52,6 +54,8 @@ static const struct got_error {
 	{ GOT_ERR_FILE_OPEN,	"could not open file" },
 	{ GOT_ERR_BAD_PACKIDX,	"bad pack index file" },
 	{ GOT_ERR_PACKIDX_CSUM, "pack index file checksum error" },
+	{ GOT_ERR_BAD_PACKFILE,	"bad pack file" },
+	{ GOT_ERR_NO_OBJ,	"object not found" },
 };
 
 const struct got_error * got_error(int code);

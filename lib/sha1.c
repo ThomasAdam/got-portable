@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sha1.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 
@@ -57,4 +58,25 @@ got_parse_sha1_digest(uint8_t *digest, const char *line)
 	}
 
 	return 1;
+}
+
+char *
+got_sha1_digest_to_str(const uint8_t *digest, char *buf, size_t size)
+{
+	char *p = buf;
+	char hex[3];
+	int i;
+
+	if (size < SHA1_DIGEST_STRING_LENGTH)
+		return NULL;
+
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		snprintf(hex, sizeof(hex), "%.2x", digest[i]);
+		p[0] = hex[0];
+		p[1] = hex[1];
+		p += 2;
+	}
+	p[0] = '\0';
+
+	return buf;
 }

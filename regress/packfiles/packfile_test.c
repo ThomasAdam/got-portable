@@ -15,6 +15,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/queue.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,10 +23,11 @@
 #include <zlib.h>
 
 #include "got_error.h"
+#include "got_object.h"
 #include "pack.h"
 
 #define RUN_TEST(expr, name) \
-	if (!(expr)) { printf("test %s failed", (name)); failure = 1; }
+	if (!(expr)) { printf("test %s failed\n", (name)); failure = 1; }
 
 #define GOT_REPO_PATH "../../../"
 
