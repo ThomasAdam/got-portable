@@ -73,7 +73,7 @@ got_opentemp(void)
 	if (fd < 0)
 		return NULL;
 
-	/* unlink(name); */
+	unlink(name);
 	f = fdopen(fd, "w+");
 	if (f == NULL) {
 		close(fd);
