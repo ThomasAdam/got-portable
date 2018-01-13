@@ -416,6 +416,7 @@ done:
 		fclose(*f);
 	return err;
 }
+
 static const struct got_error *
 extract_object(FILE **f, const char *path_packdir,
     struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
