@@ -294,10 +294,11 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 	while (i < totobj) {
 		struct got_object_id *oid = &packidx->sorted_ids[i++];
 		uint32_t offset;
+		int cmp = got_object_id_cmp(id, oid);
 
-		if (got_object_id_cmp(id, oid) < 0)
+		if (cmp < 0)
 			continue;
-		if (got_object_id_cmp(id, oid) > 0)
+		if (cmp > 0)
 			break;
 
 		return i;
