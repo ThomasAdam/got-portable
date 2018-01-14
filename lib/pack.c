@@ -328,16 +328,77 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 }
 
 static const struct got_error *
+dump_plain_object(FILE *infile, uint8_t type, uint64_t size, FILE *outfile)
+{
+	const char *type_tag = got_object_get_type_tag(type);
+	size_t n;
+
+	if (type_tag == NULL)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	fprintf(outfile, "%s %llu", type_tag, size);
+	fputc('\0', outfile);
+
+	while (size > 0) {
+		uint8_t data[2048];
+		size_t len = MIN(size, sizeof(data));
+
+		n = fread(data, len, 1, infile);
+		if (n != 1)
+			return got_ferror(infile, GOT_ERR_BAD_PACKIDX);
+
+		n = fwrite(data, len, 1, outfile);
+		if (n != 1)
+			return got_ferror(outfile, GOT_ERR_BAD_PACKIDX);
+
+		size -= len;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+decode_type_and_size(uint8_t *type, uint64_t *size, FILE *packfile)
+{
+	uint8_t t = 0;
+	uint64_t s = 0;
+	uint8_t sizeN;
+	size_t n;
+	int i = 0;
+
+	do {
+		/* We do not support size values which don't fit in 64 bit. */
+		if (i > 9)
+			return got_error(GOT_ERR_NO_SPACE);
+
+		n = fread(&sizeN, sizeof(sizeN), 1, packfile);
+		if (n != 1)
+			return got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
+
+		if (i == 0) {
+			t = (sizeN & GOT_PACK_OBJ_SIZE0_TYPE_MASK) >>
+			    GOT_PACK_OBJ_SIZE0_TYPE_MASK_SHIFT;
+			s = (sizeN & GOT_PACK_OBJ_SIZE0_VAL_MASK);
+		} else {
+			size_t shift = 4 + 7 * (i - 1);
+			s |= ((sizeN & GOT_PACK_OBJ_SIZE_VAL_MASK) << shift);
+		}
+		i++;
+	} while (sizeN & GOT_PACK_OBJ_SIZE_MORE);
+
+	*type = t;
+	*size = s;
+	return NULL;
+}
+
+static const struct got_error *
 dump_packed_object(FILE **f, FILE *packfile, off_t offset)
 {
 	const struct got_error *err = NULL;
 	const char *template = "/tmp/got.XXXXXXXXXX";
-	uint64_t size = 0;
-	uint8_t type = 0;
-	uint8_t sizeN;
-	int i;
-	size_t n;
-	const char *type_tag;
+	uint8_t type;
+	uint64_t size;
+	FILE *outfile = NULL;
 
 	*f = got_opentemp();
 	if (*f == NULL) {
@@ -350,67 +411,24 @@ dump_packed_object(FILE **f, FILE *packfile, off_t offset)
 		goto done;
 	}
 
-	i = 0;
-	do {
-		/* We do not support size values which don't fit in 64 bit. */
-		if (i > 9) {
-			err = got_error(GOT_ERR_NO_SPACE);
-			goto done;
-		}
+	err = decode_type_and_size(&type, &size, packfile);
+	if (err)
+		goto done;
 
-		n = fread(&sizeN, sizeof(sizeN), 1, packfile);
-		if (n != 1) {
-			err = got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
-			goto done;
-		}
-
-		if (i == 0) {
-			type = (sizeN & GOT_PACK_OBJ_SIZE0_TYPE_MASK) >>
-			    GOT_PACK_OBJ_SIZE0_TYPE_MASK_SHIFT;
-			size = (sizeN & GOT_PACK_OBJ_SIZE0_VAL_MASK);
-		} else {
-			size_t shift = 4 + 7 * (i - 1);
-			size |= ((sizeN & GOT_PACK_OBJ_SIZE_VAL_MASK) << shift);
-		}
-		i++;
-	} while (sizeN & GOT_PACK_OBJ_SIZE_MORE);
-
-	if (type == GOT_OBJ_TYPE_OFFSET_DELTA)
-		printf("object type OFFSET_DELTA not yet implemented\n");
-	else if (type == GOT_OBJ_TYPE_REF_DELTA)
-		printf("object type REF_DELTA not yet implemented\n");
-	else if (type == GOT_OBJ_TYPE_TAG)
-		printf("object type TAG not yet implemented\n");
-
-	type_tag = got_object_get_type_tag(type);
-	if (type_tag == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_HDR);
+	switch (type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_BLOB:
+		err = dump_plain_object(packfile, type, size, *f);
+		break;
+	case GOT_OBJ_TYPE_REF_DELTA:
+	case GOT_OBJ_TYPE_TAG:
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	default:
+		err = got_error(GOT_ERR_NOT_IMPL);
 		goto done;
 	}
 
-	fprintf(*f, "%s %llu", type_tag, size);
-	fputc('\0', *f);
-
-	while (size > 0) {
-		uint8_t data[2048];
-		size_t len = MIN(size, sizeof(data));
-
-		n = fread(data, len, 1, packfile);
-		if (n != 1) {
-			err = got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
-			goto done;
-		}
-
-		n = fwrite(data, len, 1, *f);
-		if (n != 1) {
-			err = got_ferror(*f, GOT_ERR_BAD_PACKIDX);
-			goto done;
-		}
-
-		size -= len;
-	}
-
-	printf("object type is %d\n", type);
 	rewind(*f);
 done:
 	if (err && *f)
