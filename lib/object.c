@@ -249,8 +249,7 @@ done:
 }
 
 static const struct got_error *
-object_path(char **path, struct got_object_id *id,
-    struct got_repository *repo)
+object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
@@ -269,39 +268,52 @@ object_path(char **path, struct got_object_id *id,
 	return err;
 }
 
-const struct got_error *
-got_object_open(struct got_object **obj, struct got_repository *repo,
-    struct got_object_id *id)
+static const struct got_error *
+open_object(FILE **f, struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
-	FILE *f = NULL;
 
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 
-	f = fopen(path, "rb");
-	if (f == NULL) {
+	*f = fopen(path, "rb");
+	if (*f == NULL) {
 		if (errno != ENOENT) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = got_packfile_extract_object(&f, id, repo);
+		err = got_packfile_extract_object(f, id, repo);
 		if (err)
 			goto done;
-		if (f == NULL) {
+		if (*f == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			goto done;
 		}
 	}
+done:
+	free(path);
+	if (err && *f != NULL)
+		fclose(*f);
+	return err;
+}
+
+const struct got_error *
+got_object_open(struct got_object **obj, struct got_repository *repo,
+    struct got_object_id *id)
+{
+	const struct got_error *err;
+	FILE *f;
+
+	err = open_object(&f, id, repo);
+	if (err)
+		return err;
 
 	err = read_object_header(obj, repo, f);
 	if (err == NULL)
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
-done:
-	free(path);
-	if (f != NULL)
+	else
 		fclose(f);
 	return err;
 }
@@ -534,24 +546,17 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 
 static const struct got_error *
 read_commit_object(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object *obj, const char *path)
+    struct got_repository *repo, struct got_object *obj, FILE *f)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 	struct got_zstream_buf zb;
 	size_t len;
 	char *p;
 	int i, ret;
 
-	f = fopen(path, "rb");
-	if (f == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
-
 	err = inflate_init(&zb, 8192);
-	if (err) {
-		fclose(f);
+	if (err)
 		return err;
-	}
 
 	do {
 		err = inflate_read(&zb, f, &len);
@@ -569,7 +574,6 @@ read_commit_object(struct got_commit_object **commit,
 	err = parse_commit_object(commit, zb.outbuf + obj->hdrlen, len);
 done:
 	inflate_end(&zb);
-	fclose(f);
 	return err;
 }
 
@@ -578,17 +582,17 @@ got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
 {
 	const struct got_error *err = NULL;
-	char *path = NULL;
+	FILE *f;
 
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = object_path(&path, &obj->id, repo);
+	err = open_object(&f, &obj->id, repo);
 	if (err)
 		return err;
 
-	err = read_commit_object(commit, repo, obj, path);
-	free(path);
+	err = read_commit_object(commit, repo, obj, f);
+	fclose(f);
 	return err;
 }
 
@@ -611,24 +615,17 @@ got_object_commit_close(struct got_commit_object *commit)
 
 static const struct got_error *
 read_tree_object(struct got_tree_object **tree,
-    struct got_repository *repo, struct got_object *obj, const char *path)
+    struct got_repository *repo, struct got_object *obj, FILE *f)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 	struct got_zstream_buf zb;
 	size_t len;
 	char *p;
 	int i, ret;
 
-	f = fopen(path, "rb");
-	if (f == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
-
 	err = inflate_init(&zb, 8192);
-	if (err) {
-		fclose(f);
+	if (err)
 		return err;
-	}
 
 	do {
 		err = inflate_read(&zb, f, &len);
@@ -646,7 +643,6 @@ read_tree_object(struct got_tree_object **tree,
 	err = parse_tree_object(tree, repo, zb.outbuf + obj->hdrlen, len);
 done:
 	inflate_end(&zb);
-	fclose(f);
 	return err;
 }
 
@@ -655,17 +651,17 @@ got_object_tree_open(struct got_tree_object **tree,
     struct got_repository *repo, struct got_object *obj)
 {
 	const struct got_error *err = NULL;
-	char *path = NULL;
+	FILE *f;
 
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = object_path(&path, &obj->id, repo);
+	err = open_object(&f, &obj->id, repo);
 	if (err)
 		return err;
 
-	err = read_tree_object(tree, repo, obj, path);
-	free(path);
+	err = read_tree_object(tree, repo, obj, f);
+	fclose(f);
 	return err;
 }
 
@@ -688,7 +684,6 @@ got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
 {
 	const struct got_error *err = NULL;
-	char *path;
 
 	if (obj->type != GOT_OBJ_TYPE_BLOB)
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -696,35 +691,26 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (blocksize < obj->hdrlen)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	err = object_path(&path, &obj->id, repo);
-	if (err)
-		return err;
-
 	*blob = calloc(1, sizeof(**blob));
-	if (*blob == NULL) {
-		free(path);
+	if (*blob == NULL)
 		return got_error(GOT_ERR_NO_MEM);
-	}
 
-	(*blob)->f = fopen(path, "rb");
-	if ((*blob)->f == NULL) {
+	err = open_object(&((*blob)->f), &obj->id, repo);
+	if (err) {
 		free(*blob);
-		free(path);
-		return got_error(GOT_ERR_BAD_PATH);
+		return err;
 	}
 
 	err = inflate_init(&(*blob)->zb, blocksize);
 	if (err != NULL) {
 		fclose((*blob)->f);
 		free(*blob);
-		free(path);
 		return err;
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
 	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 
-	free(path);
 	return err;
 }
 
