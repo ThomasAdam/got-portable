@@ -5,6 +5,7 @@ SRCS = path.c repository.c error.c refs.c object.c sha1.c diff.c \
 	diffreg.c xmalloc.c pack.c repository_test.c
 
 CPPFLAGS = -I${.CURDIR}/../../include
+CFLAGS = -Werror
 LDADD = -lutil -lz
 DEBUG = -O0 -g
 
