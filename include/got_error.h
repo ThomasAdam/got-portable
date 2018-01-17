@@ -34,6 +34,7 @@
 #define GOT_ERR_BAD_PACKFILE	16
 #define GOT_ERR_NO_OBJ		17
 #define GOT_ERR_NOT_IMPL	18
+#define GOT_ERR_OBJ_NOT_PACKED	19
 
 static const struct got_error {
 	int code;
@@ -58,6 +59,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_PACKFILE,	"bad pack file" },
 	{ GOT_ERR_NO_OBJ,	"object not found" },
 	{ GOT_ERR_NOT_IMPL,	"feature not implemented" },
+	{ GOT_ERR_OBJ_NOT_PACKED,"object is not packed" },
 };
 
 const struct got_error * got_error(int code);

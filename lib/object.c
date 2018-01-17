@@ -274,9 +274,8 @@ open_object(FILE **f, struct got_object *obj, struct got_repository *repo)
 	const struct got_error *err = NULL;
 	char *path;
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		return got_error(GOT_ERR_NOT_IMPL);
-	}
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		return got_packfile_extract_object(f, obj, repo);
 
 	err = object_path(&path, &obj->id, repo);
 	if (err)

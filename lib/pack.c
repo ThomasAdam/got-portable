@@ -327,7 +327,7 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 }
 
 static const struct got_error *
-decode_type_and_size(uint8_t *type, uint64_t *size, FILE *packfile)
+decode_type_and_size(uint8_t *type, uint64_t *size, size_t *len, FILE *packfile)
 {
 	uint8_t t = 0;
 	uint64_t s = 0;
@@ -357,6 +357,7 @@ decode_type_and_size(uint8_t *type, uint64_t *size, FILE *packfile)
 
 	*type = t;
 	*size = s;
+	*len = i * sizeof(sizeN);
 	return NULL;
 }
 
@@ -374,6 +375,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	FILE *packfile;
 	uint8_t type;
 	uint64_t size;
+	size_t tslen;
 
 	*obj = NULL;
 	if (idx == -1) /* object not found in pack index */
@@ -407,7 +409,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		goto done;
 	}
 
-	err = decode_type_and_size(&type, &size, packfile);
+	err = decode_type_and_size(&type, &size, &tslen, packfile);
 	if (err)
 		goto done;
 
@@ -431,7 +433,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		(*obj)->hdrlen = 0;
 		(*obj)->size = size;
 		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
-		(*obj)->pack_offset = offset;
+		(*obj)->pack_offset = offset + tslen;
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 	case GOT_OBJ_TYPE_TAG:
@@ -498,5 +500,77 @@ done:
 	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == 0)
 		err = got_error_from_errno();
+	return err;
+}
+
+static const struct got_error *
+dump_plain_object(FILE *infile, uint8_t type, size_t size, FILE *outfile)
+{
+	size_t n;
+
+	while (size > 0) {
+		uint8_t data[2048];
+		size_t len = MIN(size, sizeof(data));
+
+		n = fread(data, len, 1, infile);
+		if (n != 1)
+			return got_ferror(infile, GOT_ERR_BAD_PACKIDX);
+
+		n = fwrite(data, len, 1, outfile);
+		if (n != 1)
+			return got_ferror(outfile, GOT_ERR_BAD_PACKIDX);
+
+		size -= len;
+	}
+
+	rewind(outfile);
+	return NULL;
+}
+
+const struct got_error *
+got_packfile_extract_object(FILE **f, struct got_object *obj,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	FILE *packfile = NULL;
+
+	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
+		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	*f = got_opentemp();
+	if (*f == NULL) {
+		err = got_error(GOT_ERR_FILE_OPEN);
+		goto done;
+	}
+
+	packfile = fopen(obj->path_packfile, "rb");
+	if (packfile == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (fseeko(packfile, obj->pack_offset, SEEK_SET) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	switch (obj->type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_BLOB:
+		err = dump_plain_object(packfile, obj->type, obj->size, *f);
+		break;
+	case GOT_OBJ_TYPE_REF_DELTA:
+	case GOT_OBJ_TYPE_TAG:
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	default:
+		err = got_error(GOT_ERR_NOT_IMPL);
+		goto done;
+	}
+done:
+	if (packfile)
+		fclose(packfile);
+	if (err && *f)
+		fclose(*f);
 	return err;
 }
