@@ -73,9 +73,15 @@ struct got_object {
 #define GOT_OBJ_TYPE_OFFSET_DELTA	6
 #define GOT_OBJ_TYPE_REF_DELTA		7
 
+	int flags;
+#define GOT_OBJ_FLAG_PACKED		0x01
+
 	size_t hdrlen;
 	size_t size;
 	struct got_object_id id;
+
+	char *path_packfile;
+	off_t pack_offset;
 };
 
 struct got_repository;

@@ -134,7 +134,7 @@ inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
 			n = fread(zb->inbuf, 1, zb->inlen, f);
 			if (n == 0) {
 				if (ferror(f))
-					return got_error(GOT_ERR_IO);
+					return got_ferror(f, GOT_ERR_IO);
 				*outlenp = 0;
 				return NULL;
 			}
@@ -268,34 +268,26 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 	return err;
 }
 
-static const struct got_error *
-open_object(FILE **f, struct got_object_id *id, struct got_repository *repo)
+const struct got_error *
+open_object(FILE **f, struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
 
-	err = object_path(&path, id, repo);
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		return got_error(GOT_ERR_NOT_IMPL);
+	}
+
+	err = object_path(&path, &obj->id, repo);
 	if (err)
 		return err;
-
 	*f = fopen(path, "rb");
 	if (*f == NULL) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		err = got_packfile_extract_object(f, id, repo);
-		if (err)
-			goto done;
-		if (*f == NULL) {
-			err = got_error(GOT_ERR_NO_OBJ);
-			goto done;
-		}
+		err = got_error_from_errno();
+		goto done;
 	}
 done:
 	free(path);
-	if (err && *f != NULL)
-		fclose(*f);
 	return err;
 }
 
@@ -303,24 +295,43 @@ const struct got_error *
 got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
+	char *path;
 	FILE *f;
 
-	err = open_object(&f, id, repo);
+	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 
-	err = read_object_header(obj, repo, f);
-	if (err == NULL)
+	f = fopen(path, "rb");
+	if (f == NULL) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = got_packfile_open_object(obj, id, repo);
+		if (err)
+			goto done;
+		if (*obj == NULL)
+			err = got_error(GOT_ERR_NO_OBJ);
+	} else {
+		err = read_object_header(obj, repo, f);
+		if (err)
+			goto done;
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
-	else
+	}
+done:
+	free(path);
+	if (err && f)
 		fclose(f);
 	return err;
+
 }
 
 void
 got_object_close(struct got_object *obj)
 {
+	free(obj->path_packfile);
 	free(obj);
 }
 
@@ -587,7 +598,7 @@ got_object_commit_open(struct got_commit_object **commit,
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = open_object(&f, &obj->id, repo);
+	err = open_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -656,7 +667,7 @@ got_object_tree_open(struct got_tree_object **tree,
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = open_object(&f, &obj->id, repo);
+	err = open_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -695,7 +706,7 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	err = open_object(&((*blob)->f), &obj->id, repo);
+	err = open_object(&((*blob)->f), obj, repo);
 	if (err) {
 		free(*blob);
 		return err;

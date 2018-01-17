@@ -292,16 +292,15 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 		i = betoh32(packidx->fanout_table[id0 - 1]);
 
 	while (i < totobj) {
-		struct got_object_id *oid = &packidx->sorted_ids[i++];
+		struct got_object_id *oid = &packidx->sorted_ids[i];
 		uint32_t offset;
 		int cmp = got_object_id_cmp(id, oid);
 
-		if (cmp < 0)
-			continue;
-		if (cmp > 0)
+		if (cmp == 0)
+			return i;
+		else if (cmp > 0)
 			break;
-
-		return i;
+		i++;
 	}
 
 	return -1;
@@ -325,36 +324,6 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 
 	return err;
-}
-
-static const struct got_error *
-dump_plain_object(FILE *infile, uint8_t type, uint64_t size, FILE *outfile)
-{
-	const char *type_tag = got_object_get_type_tag(type);
-	size_t n;
-
-	if (type_tag == NULL)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	fprintf(outfile, "%s %llu", type_tag, size);
-	fputc('\0', outfile);
-
-	while (size > 0) {
-		uint8_t data[2048];
-		size_t len = MIN(size, sizeof(data));
-
-		n = fread(data, len, 1, infile);
-		if (n != 1)
-			return got_ferror(infile, GOT_ERR_BAD_PACKIDX);
-
-		n = fwrite(data, len, 1, outfile);
-		if (n != 1)
-			return got_ferror(outfile, GOT_ERR_BAD_PACKIDX);
-
-		size -= len;
-	}
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -392,63 +361,21 @@ decode_type_and_size(uint8_t *type, uint64_t *size, FILE *packfile)
 }
 
 static const struct got_error *
-dump_packed_object(FILE **f, FILE *packfile, off_t offset)
-{
-	const struct got_error *err = NULL;
-	const char *template = "/tmp/got.XXXXXXXXXX";
-	uint8_t type;
-	uint64_t size;
-	FILE *outfile = NULL;
-
-	*f = got_opentemp();
-	if (*f == NULL) {
-		err = got_error(GOT_ERR_FILE_OPEN);
-		goto done;
-	}
-
-	if (fseeko(packfile, offset, SEEK_SET) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	err = decode_type_and_size(&type, &size, packfile);
-	if (err)
-		goto done;
-
-	switch (type) {
-	case GOT_OBJ_TYPE_COMMIT:
-	case GOT_OBJ_TYPE_TREE:
-	case GOT_OBJ_TYPE_BLOB:
-		err = dump_plain_object(packfile, type, size, *f);
-		break;
-	case GOT_OBJ_TYPE_REF_DELTA:
-	case GOT_OBJ_TYPE_TAG:
-	case GOT_OBJ_TYPE_OFFSET_DELTA:
-	default:
-		err = got_error(GOT_ERR_NOT_IMPL);
-		goto done;
-	}
-
-	rewind(*f);
-done:
-	if (err && *f)
-		fclose(*f);
-	return err;
-}
-
-static const struct got_error *
-extract_object(FILE **f, const char *path_packdir,
-    struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
+open_packed_object(struct got_object **obj, struct got_repository *repo,
+    const char *path_packdir, struct got_packidx_v2_hdr *packidx,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	int idx = get_object_idx(packidx, id);
 	off_t offset;
-	char *path_packfile;
-	FILE *packfile;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	char *sha1str;
+	char *path_packfile;
+	FILE *packfile;
+	uint8_t type;
+	uint64_t size;
 
-	*f = NULL;
+	*obj = NULL;
 	if (idx == -1) /* object not found in pack index */
 		return NULL;
 
@@ -475,20 +402,55 @@ extract_object(FILE **f, const char *path_packdir,
 	if (err)
 		goto done;
 
-	printf("Dumping object at offset %llu\n", offset);
-	err = dump_packed_object(f, packfile, offset);
+	if (fseeko(packfile, offset, SEEK_SET) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = decode_type_and_size(&type, &size, packfile);
 	if (err)
 		goto done;
 
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+
+	switch (type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_BLOB:
+		(*obj)->path_packfile = strdup(path_packfile);
+		if ((*obj)->path_packfile == NULL) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		(*obj)->type = type;
+		(*obj)->flags = GOT_OBJ_FLAG_PACKED;
+		(*obj)->hdrlen = 0;
+		(*obj)->size = size;
+		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+		(*obj)->pack_offset = offset;
+		break;
+	case GOT_OBJ_TYPE_REF_DELTA:
+	case GOT_OBJ_TYPE_TAG:
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	default:
+		err = got_error(GOT_ERR_NOT_IMPL);
+		goto done;
+	}
 done:
 	free(path_packfile);
+	if (err)
+		free(*obj);
 	if (packfile && fclose(packfile) == -1 && err == 0)
 		err = got_error_from_errno();
 	return err;
 }
 
 const struct got_error *
-got_packfile_extract_object(FILE **f, struct got_object_id *id,
+got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -525,10 +487,10 @@ got_packfile_extract_object(FILE **f, struct got_object_id *id,
 		if (err)
 			goto done;
 
-		err = extract_object(f, path_packdir, packidx, id);
+		err = open_packed_object(obj, repo, path_packdir, packidx, id);
 		if (err)
 			goto done;
-		if (*f != NULL)
+		if (*obj != NULL)
 			break;
 	}
 

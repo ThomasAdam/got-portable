@@ -121,5 +121,5 @@ const struct got_error *got_packidx_open(struct got_packidx_v2_hdr **,
     const char *);
 void got_packidx_close(struct got_packidx_v2_hdr *);
 
-const struct got_error *got_packfile_extract_object(FILE **,
+const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_object_id *, struct got_repository *);
