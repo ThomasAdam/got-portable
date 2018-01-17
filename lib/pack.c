@@ -490,6 +490,7 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 			goto done;
 
 		err = open_packed_object(obj, repo, path_packdir, packidx, id);
+		got_packidx_close(packidx);
 		if (err)
 			goto done;
 		if (*obj != NULL)
