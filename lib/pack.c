@@ -35,6 +35,7 @@
 #include "got_sha1.h"
 #include "pack.h"
 #include "path.h"
+#include "delta.h"
 
 #define GOT_PACK_PREFIX		"pack-"
 #define GOT_PACKFILE_SUFFIX	".pack"
@@ -515,17 +516,46 @@ dump_plain_object(FILE *infile, uint8_t type, size_t size, FILE *outfile)
 
 		n = fread(data, len, 1, infile);
 		if (n != 1)
-			return got_ferror(infile, GOT_ERR_BAD_PACKIDX);
+			return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
 
 		n = fwrite(data, len, 1, outfile);
 		if (n != 1)
-			return got_ferror(outfile, GOT_ERR_BAD_PACKIDX);
+			return got_ferror(outfile, GOT_ERR_IO);
 
 		size -= len;
 	}
 
 	rewind(outfile);
 	return NULL;
+}
+
+static const struct got_error *
+dump_ref_delta_object(struct got_repository *repo, FILE *infile, uint8_t type,
+    size_t size, FILE *outfile)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id base_id;
+	struct got_object *base_obj;
+	int n;
+
+	if (size < sizeof(base_id))
+		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
+
+	n = fread(&base_id, sizeof(base_id), 1, infile);
+	if (n != 1)
+		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
+
+	size -= sizeof(base_id);
+	if (size <= 0)
+		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
+
+	err = got_object_open(&base_obj, repo, &base_id);
+	if (err)
+		return err;
+
+	err = got_delta_apply(repo, infile, size, base_obj, outfile);
+	got_object_close(base_obj);
+	return err;
 }
 
 const struct got_error *
@@ -562,6 +592,9 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 		err = dump_plain_object(packfile, obj->type, obj->size, *f);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
+		err = dump_ref_delta_object(repo, packfile, obj->type,
+		    obj->size, *f);
+		break;
 	case GOT_OBJ_TYPE_TAG:
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	default:
