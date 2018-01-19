@@ -80,15 +80,20 @@ struct got_object {
 	size_t size;
 	struct got_object_id id;
 
-	char *path_packfile;
-	off_t pack_offset;
+	char *path_packfile;	/* if packed */
+	off_t pack_offset;	/* if packed */
+
+	/* If type is OFFSET_DELTA: */
+	int base_type;
+	uint64_t base_size;
+	off_t base_obj_offset;
 };
 
 struct got_repository;
 
 char *got_object_id_str(struct got_object_id *, char *, size_t);
 int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
-const char *got_object_get_type_tag(int);
+int got_object_get_type(struct got_object *);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
 void got_object_close(struct got_object *);

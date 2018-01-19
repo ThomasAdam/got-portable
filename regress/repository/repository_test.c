@@ -49,7 +49,7 @@ print_parent_commits(struct got_commit_object *commit,
 		err = got_object_open(&obj, repo, &pid->id);
 		if (err != NULL)
 			return err;
-		if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
 			return got_error(GOT_ERR_OBJ_TYPE);
 		print_commit_object(obj, repo);
 		got_object_close(obj);
@@ -89,7 +89,7 @@ print_tree_object(struct got_object *obj, char *parent,
 		if (err != NULL)
 			break;
 
-		if (treeobj->type != GOT_OBJ_TYPE_TREE) {
+		if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
 			err = got_error(GOT_ERR_OBJ_TYPE);
 			got_object_close(treeobj);
 			break;
@@ -142,7 +142,7 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	err = got_object_open(&treeobj, repo, &commit->tree_id);
 	if (err != NULL)
 		return err;
-	if (treeobj->type == GOT_OBJ_TYPE_TREE) {
+	if (got_object_get_type(treeobj) == GOT_OBJ_TYPE_TREE) {
 		print_tree_object(treeobj, "", repo);
 		printf("\n");
 	}
@@ -178,7 +178,7 @@ repo_read_log(const char *repo_path)
 	err = got_object_open(&obj, repo, id);
 	if (err != NULL || obj == NULL)
 		return 0;
-	if (obj->type == GOT_OBJ_TYPE_COMMIT)
+	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
 		print_commit_object(obj, repo);
 	got_object_close(obj);
 	free(id);
@@ -209,7 +209,7 @@ repo_read_blob(const char *repo_path)
 	err = got_object_open(&obj, repo, &id);
 	if (err != NULL || obj == NULL)
 		return 0;
-	if (obj->type != GOT_OBJ_TYPE_BLOB)
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB)
 		return 0;
 
 	err = got_object_blob_open(&blob, repo, obj, 64);

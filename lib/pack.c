@@ -388,6 +388,98 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 }
 
 static const struct got_error *
+decode_negative_offset(int64_t *offset, size_t *len, FILE *packfile)
+{
+	int64_t o = 0;
+	uint8_t offN;
+	size_t n;
+	int i = 0;
+
+	do {
+		/* We do not support offset values which don't fit in 64 bit. */
+		if (i > 8)
+			return got_error(GOT_ERR_NO_SPACE);
+
+		n = fread(&offN, sizeof(offN), 1, packfile);
+		if (n != 1)
+			return got_ferror(packfile, GOT_ERR_BAD_PACKIDX);
+
+		if (i == 0)
+			o = (offN & GOT_PACK_OBJ_DELTA_OFF_VAL_MASK);
+		else {
+			int j;
+			int64_t v = 128;
+			o <<= 7;
+			o |= (offN & GOT_PACK_OBJ_DELTA_OFF_VAL_MASK);
+			o += v;
+			for (j = 0; j < i; j++) {
+				v <<= 7;
+				o += v;
+			}
+		}
+		i++;
+	} while (offN & GOT_PACK_OBJ_DELTA_OFF_MORE);
+
+	*offset = o;
+	*len = i * sizeof(offN);
+	return NULL;
+}
+
+static const struct got_error *
+open_offset_delta_object(struct got_object **obj, struct got_repository *repo,
+    const char *path_packfile, FILE *packfile, struct got_object_id *id,
+    off_t offset, size_t size)
+{
+	const struct got_error *err = NULL;
+	int64_t negoffset;
+	size_t negofflen;
+	off_t base_obj_offset;
+	struct got_object *base_obj;
+	struct got_object_id base_id;
+	uint8_t base_type;
+	uint64_t base_size;
+	size_t base_tslen;
+
+	err = decode_negative_offset(&negoffset, &negofflen, packfile);
+	if (err)
+		return err;
+
+	/* Compute the base object's offset (must be in the same pack file). */
+	base_obj_offset = (offset - negoffset);
+	if (base_obj_offset <= 0)
+		return got_error(GOT_ERR_BAD_PACKFILE);
+
+	if (fseeko(packfile, base_obj_offset, SEEK_SET) != 0)
+		return got_error_from_errno();
+
+	err = decode_type_and_size(&base_type, &base_size, &base_tslen,
+	    packfile);
+	if (err)
+		return err;
+
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	(*obj)->path_packfile = strdup(path_packfile);
+	if ((*obj)->path_packfile == NULL) {
+		free(*obj);
+		return got_error(GOT_ERR_NO_MEM);
+	}
+	(*obj)->type = GOT_OBJ_TYPE_OFFSET_DELTA;
+	(*obj)->flags = GOT_OBJ_FLAG_PACKED;
+	(*obj)->hdrlen = 0;
+	(*obj)->size = size;
+	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	(*obj)->pack_offset = offset;
+	(*obj)->base_type = base_type;
+	(*obj)->base_size = base_size;
+	(*obj)->base_obj_offset = base_obj_offset;
+
+	return NULL;
+}
+
+static const struct got_error *
 open_packed_object(struct got_object **obj, struct got_repository *repo,
     const char *path_packdir, struct got_packidx_v2_hdr *packidx,
     struct got_object_id *id)
@@ -447,9 +539,14 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		    offset + tslen, size);
 		break;
 
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		err = open_offset_delta_object(obj, repo, path_packfile,
+		    packfile, id, offset + tslen, size);
+		break;
+
 	case GOT_OBJ_TYPE_REF_DELTA:
 	case GOT_OBJ_TYPE_TAG:
-	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		break;
 	default:
 		err = got_error(GOT_ERR_NOT_IMPL);
 		goto done;
@@ -547,7 +644,7 @@ dump_ref_delta_object(struct got_repository *repo, FILE *infile, uint8_t type,
 	const struct got_error *err = NULL;
 	struct got_object_id base_id;
 	struct got_object *base_obj;
-	int n;
+	size_t n;
 
 	if (size < sizeof(base_id))
 		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);

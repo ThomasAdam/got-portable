@@ -232,7 +232,7 @@ diff_added_tree(struct got_object_id *id, struct got_repository *repo)
 	if (err)
 		goto done;
 
-	if (treeobj->type != GOT_OBJ_TYPE_TREE) {
+	if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -312,7 +312,7 @@ diff_deleted_tree(struct got_object_id *id, struct got_repository *repo)
 	if (err)
 		goto done;
 
-	if (treeobj->type != GOT_OBJ_TYPE_TREE) {
+	if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}

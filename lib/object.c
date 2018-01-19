@@ -61,19 +61,21 @@ got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
 	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
 }
 
-const char *
-got_object_get_type_tag(int type)
+int
+got_object_get_type(struct got_object *obj)
 {
-	switch (type) {
+	switch (obj->type) {
 	case GOT_OBJ_TYPE_COMMIT:
-		return GOT_OBJ_TAG_COMMIT;
 	case GOT_OBJ_TYPE_TREE:
-		return GOT_OBJ_TAG_TREE;
 	case GOT_OBJ_TYPE_BLOB:
-		return GOT_OBJ_TAG_BLOB;
+	case GOT_OBJ_TYPE_TAG:
+		return obj->type;
+	case GOT_OBJ_TYPE_REF_DELTA:
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		return obj->base_type;
 	}
 
-	return NULL;
+	abort();
 }
 
 static void

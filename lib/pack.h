@@ -107,6 +107,9 @@ struct got_packfile_object_data_offset_delta {
 	 * 2^14 + ... + 2^(7 * (n-1)) is added to the result.
 	 */
 	uint8_t *offset;	/* variable length */
+#define GOT_PACK_OBJ_DELTA_OFF_MORE		0x80
+#define GOT_PACK_OBJ_DELTA_OFF_VAL_MASK		0x7f
+	uint8_t *delta_data;		/* compressed */
 };
 
 struct got_packfile_obj_data {
