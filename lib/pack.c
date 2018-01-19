@@ -363,7 +363,7 @@ decode_type_and_size(uint8_t *type, uint64_t *size, size_t *len, FILE *packfile)
 }
 
 static const struct got_error *
-open_packed_plain_object(struct got_object **obj, const char *path_packfile,
+open_plain_object(struct got_object **obj, const char *path_packfile,
     struct got_object_id *id, uint8_t type, off_t offset, size_t size)
 {
 	*obj = calloc(1, sizeof(**obj));
@@ -443,7 +443,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
-		err = open_packed_plain_object(obj, path_packfile, id, type,
+		err = open_plain_object(obj, path_packfile, id, type,
 		    offset + tslen, size);
 		break;
 
