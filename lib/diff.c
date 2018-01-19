@@ -163,7 +163,7 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	err = got_object_open(&obj1, repo, id1);
 	if (err)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
-	if (obj1->type != GOT_OBJ_TYPE_BLOB) {
+	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -173,7 +173,7 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 		err= got_error(GOT_ERR_BAD_OBJ_HDR);
 		goto done;
 	}
-	if (obj2->type != GOT_OBJ_TYPE_BLOB) {
+	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
@@ -265,7 +265,7 @@ diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 
-	if (treeobj1->type != GOT_OBJ_TYPE_TREE) {
+	if (got_object_get_type(treeobj1) != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -274,7 +274,7 @@ diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 
-	if (treeobj2->type != GOT_OBJ_TYPE_TREE) {
+	if (got_object_get_type(treeobj2) != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}

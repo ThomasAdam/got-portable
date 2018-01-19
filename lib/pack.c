@@ -36,6 +36,7 @@
 #include "pack.h"
 #include "path.h"
 #include "delta.h"
+#include "object.h"
 
 #define GOT_PACK_PREFIX		"pack-"
 #define GOT_PACKFILE_SUFFIX	".pack"

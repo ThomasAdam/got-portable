@@ -63,8 +63,7 @@ struct got_commit_object {
 	char *logmsg;
 };
 
-struct got_object {
-	int type;
+struct got_object;
 #define GOT_OBJ_TYPE_COMMIT		1
 #define GOT_OBJ_TYPE_TREE		2
 #define GOT_OBJ_TYPE_BLOB		3
@@ -72,22 +71,6 @@ struct got_object {
 /* 5 is reserved */
 #define GOT_OBJ_TYPE_OFFSET_DELTA	6
 #define GOT_OBJ_TYPE_REF_DELTA		7
-
-	int flags;
-#define GOT_OBJ_FLAG_PACKED		0x01
-
-	size_t hdrlen;
-	size_t size;
-	struct got_object_id id;
-
-	char *path_packfile;	/* if packed */
-	off_t pack_offset;	/* if packed */
-
-	/* If type is OFFSET_DELTA: */
-	int base_type;
-	uint64_t base_size;
-	off_t base_obj_offset;
-};
 
 struct got_repository;
 

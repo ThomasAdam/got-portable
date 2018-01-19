@@ -31,6 +31,7 @@
 #include "got_repository.h"
 #include "got_sha1.h"
 #include "pack.h"
+#include "object.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

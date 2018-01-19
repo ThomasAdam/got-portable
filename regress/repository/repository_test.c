@@ -261,12 +261,12 @@ repo_diff_blob(const char *repo_path)
 	err = got_object_open(&obj1, repo, &id1);
 	if (err != NULL || obj1 == NULL)
 		return 0;
-	if (obj1->type != GOT_OBJ_TYPE_BLOB)
+	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB)
 		return 0;
 	err = got_object_open(&obj2, repo, &id2);
 	if (err != NULL || obj2 == NULL)
 		return 0;
-	if (obj2->type != GOT_OBJ_TYPE_BLOB)
+	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB)
 		return 0;
 
 	err = got_object_blob_open(&blob1, repo, obj1, 512);
@@ -318,12 +318,12 @@ repo_diff_tree(const char *repo_path)
 	err = got_object_open(&obj1, repo, &id1);
 	if (err != NULL || obj1 == NULL)
 		return 0;
-	if (obj1->type != GOT_OBJ_TYPE_TREE)
+	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_TREE)
 		return 0;
 	err = got_object_open(&obj2, repo, &id2);
 	if (err != NULL || obj2 == NULL)
 		return 0;
-	if (obj2->type != GOT_OBJ_TYPE_TREE)
+	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_TREE)
 		return 0;
 
 	err = got_object_tree_open(&tree1, repo, obj1);
