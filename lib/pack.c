@@ -458,6 +458,23 @@ open_offset_delta_object(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		return err;
 
+	/*
+	 * XXX We currently only support plain objects as a delta base,
+	 * i.e. deltas cannot be chained. Is this a problem?
+	 * If so, we would have to resolve a plain object base type here.
+	 */
+	switch (base_type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_BLOB:
+	case GOT_OBJ_TYPE_TAG:
+		break;
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	case GOT_OBJ_TYPE_REF_DELTA:
+	default:
+		return got_error(GOT_ERR_NOT_IMPL);
+	}
+
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
 		return got_error(GOT_ERR_NO_MEM);
