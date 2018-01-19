@@ -363,6 +363,31 @@ decode_type_and_size(uint8_t *type, uint64_t *size, size_t *len, FILE *packfile)
 }
 
 static const struct got_error *
+open_packed_plain_object(struct got_object **obj, const char *path_packfile,
+    struct got_object_id *id, uint8_t type, off_t offset, size_t size)
+{
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	(*obj)->path_packfile = strdup(path_packfile);
+	if ((*obj)->path_packfile == NULL) {
+		free(*obj);
+		*obj = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
+	(*obj)->type = type;
+	(*obj)->flags = GOT_OBJ_FLAG_PACKED;
+	(*obj)->hdrlen = 0;
+	(*obj)->size = size;
+	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	(*obj)->pack_offset = offset;
+
+	return NULL;
+}
+
+static const struct got_error *
 open_packed_object(struct got_object **obj, struct got_repository *repo,
     const char *path_packdir, struct got_packidx_v2_hdr *packidx,
     struct got_object_id *id)
@@ -414,28 +439,14 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	*obj = calloc(1, sizeof(**obj));
-	if (*obj == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
-
 	switch (type) {
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
-		(*obj)->path_packfile = strdup(path_packfile);
-		if ((*obj)->path_packfile == NULL) {
-			err = got_error(GOT_ERR_NO_MEM);
-			goto done;
-		}
-		(*obj)->type = type;
-		(*obj)->flags = GOT_OBJ_FLAG_PACKED;
-		(*obj)->hdrlen = 0;
-		(*obj)->size = size;
-		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
-		(*obj)->pack_offset = offset + tslen;
+		err = open_packed_plain_object(obj, path_packfile, id, type,
+		    offset + tslen, size);
 		break;
+
 	case GOT_OBJ_TYPE_REF_DELTA:
 	case GOT_OBJ_TYPE_TAG:
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
