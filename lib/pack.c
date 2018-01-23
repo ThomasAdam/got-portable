@@ -747,6 +747,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
+	case GOT_OBJ_TYPE_TAG:
 		err = open_plain_object(obj, path_packfile, id, type,
 		    offset + tslen, size);
 		break;
@@ -757,7 +758,6 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		    packfile, id, offset, tslen, type, size);
 		break;
 
-	case GOT_OBJ_TYPE_TAG:
 	default:
 		err = got_error(GOT_ERR_NOT_IMPL);
 		goto done;
