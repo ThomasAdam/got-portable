@@ -19,7 +19,7 @@ struct got_delta_base {
 	char *path_packfile;
 	off_t offset;
 	int type;
-	size_t size;
+	size_t delta_size;
 };
 
 struct got_delta_chain {
