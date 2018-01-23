@@ -28,51 +28,51 @@
 
 #include "delta.h"
 
-struct got_delta_base *
-got_delta_base_open(const char *path_packfile, int type, off_t offset,
+struct got_delta *
+got_delta_open(const char *path_packfile, int type, off_t offset,
     size_t size)
 {
-	struct got_delta_base *base;
+	struct got_delta *delta;
 
-	base = calloc(1, sizeof(*base));
-	if (base == NULL)
+	delta = calloc(1, sizeof(*delta));
+	if (delta == NULL)
 		return NULL;
 
-	base->path_packfile = strdup(path_packfile);
-	if (base->path_packfile == NULL) {
-		free(base);
+	delta->path_packfile = strdup(path_packfile);
+	if (delta->path_packfile == NULL) {
+		free(delta);
 		return NULL;
 	}
-	base->type = type;
-	base->offset = offset;
-	base->size = size;
-	return base;
+	delta->type = type;
+	delta->offset = offset;
+	delta->size = size;
+	return delta;
 }
 
 void
-got_delta_base_close(struct got_delta_base *base)
+got_delta_close(struct got_delta *delta)
 {
-	free(base->path_packfile);
-	free(base);
+	free(delta->path_packfile);
+	free(delta);
 
 }
 
 const struct got_error *
 got_delta_chain_get_base_type(int *type, struct got_delta_chain *deltas)
 {
-	struct got_delta_base *base;
+	struct got_delta *delta;
 	int n = 0;
 
-	/* Find the last base in the chain. It should be a plain object. */
-	SIMPLEQ_FOREACH(base, &deltas->entries, entry) {
+	/* Find the last delta in the chain. It should be a plain object. */
+	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		n++;
-		if (base->type == GOT_OBJ_TYPE_COMMIT ||
-		    base->type == GOT_OBJ_TYPE_TREE ||
-		    base->type == GOT_OBJ_TYPE_BLOB ||
-		    base->type == GOT_OBJ_TYPE_TAG) {
+		if (delta->type == GOT_OBJ_TYPE_COMMIT ||
+		    delta->type == GOT_OBJ_TYPE_TREE ||
+		    delta->type == GOT_OBJ_TYPE_BLOB ||
+		    delta->type == GOT_OBJ_TYPE_TAG) {
 			if (n != deltas->nentries)
 				return got_error(GOT_ERR_BAD_DELTA_CHAIN);
-			*type = base->type;
+			*type = delta->type;
 			return NULL;
 		}
 	}

@@ -336,11 +336,11 @@ void
 got_object_close(struct got_object *obj)
 {
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
-		struct got_delta_base *base;
+		struct got_delta *delta;
 		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
-			base = SIMPLEQ_FIRST(&obj->deltas.entries);
+			delta = SIMPLEQ_FIRST(&obj->deltas.entries);
 			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
-			got_delta_base_close(base);
+			got_delta_close(delta);
 		}
 	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED)
