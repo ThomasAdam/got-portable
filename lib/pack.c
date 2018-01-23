@@ -329,7 +329,7 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 }
 
 static const struct got_error *
-decode_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
+parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
     FILE *packfile)
 {
 	uint8_t t = 0;
@@ -390,7 +390,7 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 }
 
 static const struct got_error *
-decode_negative_offset(int64_t *offset, size_t *len, FILE *packfile)
+parse_negative_offset(int64_t *offset, size_t *len, FILE *packfile)
 {
 	int64_t o = 0;
 	uint8_t offN;
@@ -428,7 +428,7 @@ parse_offset_delta(off_t *base_offset, FILE *packfile, off_t offset)
 	int64_t negoffset;
 	size_t negofflen;
 
-	err = decode_negative_offset(&negoffset, &negofflen, packfile);
+	err = parse_negative_offset(&negoffset, &negofflen, packfile);
 	if (err)
 		return err;
 
@@ -461,7 +461,7 @@ resolve_offset_delta(struct got_delta_chain *deltas, FILE *packfile,
 	if (fseeko(packfile, base_offset, SEEK_SET) != 0)
 		return got_error_from_errno();
 
-	err = decode_object_type_and_size(&base_type, &base_size, &base_tslen,
+	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
 	    packfile);
 	if (err)
 		return err;
@@ -604,7 +604,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		goto done;
 	}
 
-	err = decode_object_type_and_size(&type, &size, &tslen, packfile);
+	err = parse_object_type_and_size(&type, &size, &tslen, packfile);
 	if (err)
 		goto done;
 
