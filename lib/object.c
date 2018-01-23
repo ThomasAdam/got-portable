@@ -273,8 +273,8 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 	return err;
 }
 
-const struct got_error *
-open_object(FILE **f, struct got_object *obj, struct got_repository *repo)
+static const struct got_error *
+fopen_object(FILE **f, struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -611,7 +611,7 @@ got_object_commit_open(struct got_commit_object **commit,
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = open_object(&f, obj, repo);
+	err = fopen_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -680,7 +680,7 @@ got_object_tree_open(struct got_tree_object **tree,
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = open_object(&f, obj, repo);
+	err = fopen_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -719,7 +719,7 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	err = open_object(&((*blob)->f), obj, repo);
+	err = fopen_object(&((*blob)->f), obj, repo);
 	if (err) {
 		free(*blob);
 		return err;
