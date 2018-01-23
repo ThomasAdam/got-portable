@@ -439,6 +439,25 @@ parse_offset_delta(off_t *base_offset, FILE *packfile, off_t offset)
 	return NULL;
 }
 
+static const struct got_error *resolve_delta_chain(struct got_delta_chain *,
+    FILE *, const char *, off_t, size_t);
+
+static const struct got_error *
+resolve_offset_delta(struct got_delta_chain *deltas, FILE *packfile,
+    const char *path_packfile, off_t offset, size_t delta_size)
+{
+	const struct got_error *err;
+	off_t next_offset;
+
+	err = parse_offset_delta(&next_offset, packfile, offset);
+	if (err)
+		return err;
+
+	/* Next offset must be in the same packfile. */
+	return resolve_delta_chain(deltas, packfile, path_packfile,
+	    next_offset, delta_size);
+}
+
 static const struct got_error *
 resolve_delta_chain(struct got_delta_chain *deltas, FILE *packfile,
     const char *path_packfile, off_t offset, size_t delta_size)
@@ -471,16 +490,10 @@ resolve_delta_chain(struct got_delta_chain *deltas, FILE *packfile,
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		break;
-	case GOT_OBJ_TYPE_OFFSET_DELTA: {
-		off_t next_offset;
-		err = parse_offset_delta(&next_offset, packfile, offset);
-		if (err)
-			return err;
-		/* Next offset must be in the same packfile. */
-		err = resolve_delta_chain(deltas, packfile, path_packfile,
-		    next_offset, base_size);
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		err = resolve_offset_delta(deltas, packfile, path_packfile,
+		    offset, base_size);
 		break;
-	}
 	case GOT_OBJ_TYPE_REF_DELTA:
 	default:
 		return got_error(GOT_ERR_NOT_IMPL);
