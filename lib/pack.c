@@ -408,15 +408,9 @@ decode_negative_offset(int64_t *offset, size_t *len, FILE *packfile)
 		if (i == 0)
 			o = (offN & GOT_PACK_OBJ_DELTA_OFF_VAL_MASK);
 		else {
-			int j;
-			int64_t v = 128;
+			o++;
 			o <<= 7;
-			o |= (offN & GOT_PACK_OBJ_DELTA_OFF_VAL_MASK);
-			o += v;
-			for (j = 0; j < i; j++) {
-				v <<= 7;
-				o += v;
-			}
+			o += (offN & GOT_PACK_OBJ_DELTA_OFF_VAL_MASK);
 		}
 		i++;
 	} while (offN & GOT_PACK_OBJ_DELTA_OFF_MORE);
@@ -429,7 +423,7 @@ decode_negative_offset(int64_t *offset, size_t *len, FILE *packfile)
 static const struct got_error *
 open_offset_delta_object(struct got_object **obj, struct got_repository *repo,
     const char *path_packfile, FILE *packfile, struct got_object_id *id,
-    off_t offset, size_t size)
+    off_t offset, size_t tslen, size_t size)
 {
 	const struct got_error *err = NULL;
 	int64_t negoffset;
@@ -489,7 +483,7 @@ open_offset_delta_object(struct got_object **obj, struct got_repository *repo,
 	(*obj)->hdrlen = 0;
 	(*obj)->size = size;
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
-	(*obj)->pack_offset = offset;
+	(*obj)->pack_offset = offset + tslen;
 	(*obj)->base_type = base_type;
 	(*obj)->base_size = base_size;
 	(*obj)->base_obj_offset = base_obj_offset;
@@ -559,7 +553,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		err = open_offset_delta_object(obj, repo, path_packfile,
-		    packfile, id, offset + tslen, size);
+		    packfile, id, offset, tslen, size);
 		break;
 
 	case GOT_OBJ_TYPE_REF_DELTA:
