@@ -822,14 +822,14 @@ dump_plain_object(FILE *infile, uint8_t type, size_t size, FILE *outfile)
 }
 
 static const struct got_error *
-dump_delta_object(struct got_object *obj, FILE *outfile)
+dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	FILE *base_file, *accum_file;
 	int n = 0;
 
-	if (SIMPLEQ_EMPTY(&obj->deltas.entries))
+	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
 	base_file = got_opentemp();
@@ -844,7 +844,7 @@ dump_delta_object(struct got_object *obj, FILE *outfile)
 	}
 
 	/* Deltas are ordered in ascending order. */
-	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		FILE *delta_file = fopen(delta->path_packfile, "rb");
 		if (delta_file == NULL) {
 			err = got_error_from_errno();
@@ -859,12 +859,12 @@ dump_delta_object(struct got_object *obj, FILE *outfile)
 
 		err = got_delta_apply(delta, base_file, delta_file,
 		    /* Final delta application writes to the output file. */
-		    ++n < obj->deltas.nentries ? accum_file : outfile);
+		    ++n < deltas->nentries ? accum_file : outfile);
 		fclose(delta_file);
 		if (err)
 			goto done;
 
-		if (n < obj->deltas.nentries) {
+		if (n < deltas->nentries) {
 			/* Accumulated delta becomes the new base. */
 			FILE *tmp = accum_file;
 			accum_file = base_file;
@@ -911,7 +911,7 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 
 		err = dump_plain_object(packfile, obj->type, obj->size, *f);
 	} else
-		err = dump_delta_object(obj, *f);
+		err = dump_delta_chain(&obj->deltas, *f);
 done:
 	if (packfile)
 		fclose(packfile);
