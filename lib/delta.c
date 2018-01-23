@@ -30,7 +30,7 @@
 
 struct got_delta_base *
 got_delta_base_open(const char *path_packfile, int type, off_t offset,
-    size_t delta_size)
+    size_t size)
 {
 	struct got_delta_base *base;
 
@@ -45,7 +45,7 @@ got_delta_base_open(const char *path_packfile, int type, off_t offset,
 	}
 	base->type = type;
 	base->offset = offset;
-	base->delta_size = delta_size;
+	base->size = size;
 	return base;
 }
 
