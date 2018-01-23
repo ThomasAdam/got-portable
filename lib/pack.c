@@ -308,6 +308,88 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 	return -1;
 }
 
+static const struct got_error *
+search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	char *path_packdir;
+	DIR *packdir;
+	struct dirent *dent;
+	char *path_packidx;
+
+	path_packdir = got_repo_get_path_objects_pack(repo);
+	if (path_packdir == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	packdir = opendir(path_packdir);
+	if (packdir == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	while ((dent = readdir(packdir)) != NULL) {
+		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+			continue;
+
+		if (asprintf(&path_packidx, "%s/%s", path_packdir,
+		    dent->d_name) == -1) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+
+		err = got_packidx_open(packidx, path_packidx);
+		free(path_packidx);
+		if (err)
+			goto done;
+
+		*idx = get_object_idx(*packidx, id);
+		if (*idx != -1) {
+			err = NULL; /* found the object */
+			goto done;
+		}
+
+		got_packidx_close(*packidx);
+		*packidx = NULL;
+	}
+
+	err = got_error(GOT_ERR_NO_OBJ);
+done:
+	free(path_packdir);
+	if (closedir(packdir) != 0 && err == 0)
+		err = got_error_from_errno();
+	return err;
+}
+
+const struct got_error *
+get_packfile_path(char **path_packfile, struct got_repository *repo,
+    struct got_packidx_v2_hdr *packidx)
+{
+	char *path_packdir;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	char *sha1str;
+	char *path_packidx;
+
+	*path_packfile = NULL;
+
+	path_packdir = got_repo_get_path_objects_pack(repo);
+	if (path_packdir == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	sha1str = got_sha1_digest_to_str(packidx->trailer.packfile_sha1,
+	    hex, sizeof(hex));
+	if (sha1str == NULL)
+		return got_error(GOT_ERR_PACKIDX_CSUM);
+
+	if (asprintf(path_packfile, "%s/%s%s%s", path_packdir,
+	    GOT_PACK_PREFIX, sha1str, GOT_PACKFILE_SUFFIX) == -1) {
+		*path_packfile = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
+	return NULL;
+}
+
 const struct got_error *
 read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 {
@@ -441,11 +523,12 @@ parse_offset_delta(off_t *base_offset, FILE *packfile, off_t offset)
 }
 
 static const struct got_error *resolve_delta_chain(struct got_delta_chain *,
-    FILE *, const char *, int, off_t, size_t);
+    struct got_repository *repo, FILE *, const char *, int, off_t, size_t);
 
 static const struct got_error *
-resolve_offset_delta(struct got_delta_chain *deltas, FILE *packfile,
-    const char *path_packfile, off_t delta_offset)
+resolve_offset_delta(struct got_delta_chain *deltas,
+    struct got_repository *repo, FILE *packfile, const char *path_packfile,
+    off_t delta_offset)
 {
 	const struct got_error *err;
 	off_t base_offset;
@@ -466,14 +549,74 @@ resolve_offset_delta(struct got_delta_chain *deltas, FILE *packfile,
 	if (err)
 		return err;
 
-	return resolve_delta_chain(deltas, packfile, path_packfile,
+	return resolve_delta_chain(deltas, repo, packfile, path_packfile,
 	    base_type, base_offset + base_tslen, base_size);
 }
 
 static const struct got_error *
-resolve_delta_chain(struct got_delta_chain *deltas, FILE *packfile,
-    const char *path_packfile, int delta_type, off_t delta_offset,
-    size_t delta_size)
+resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
+    FILE *packfile, const char *path_packfile, off_t delta_offset)
+{
+	const struct got_error *err;
+	struct got_object_id id;
+	struct got_packidx_v2_hdr *packidx;
+	int idx;
+	off_t base_offset;
+	uint8_t base_type;
+	uint64_t base_size;
+	size_t base_tslen;
+	size_t n;
+	FILE *base_packfile;
+	char *path_base_packfile;
+
+	n = fread(&id, sizeof(id), 1, packfile);
+	if (n != 1)
+		return got_ferror(packfile, GOT_ERR_IO);
+
+	err = search_packidx(&packidx, &idx, repo, &id);
+	if (err)
+		return err;
+
+	base_offset = get_object_offset(packidx, idx);
+	if (base_offset == (uint64_t)-1) {
+		got_packidx_close(packidx);
+		return got_error(GOT_ERR_BAD_PACKIDX);
+	}
+
+	err = get_packfile_path(&path_base_packfile, repo, packidx);
+	got_packidx_close(packidx);
+	if (err)
+		return err;
+
+	base_packfile = fopen(path_base_packfile, "rb");
+	if (base_packfile == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (fseeko(base_packfile, base_offset, SEEK_SET) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
+	    base_packfile);
+	if (err)
+		goto done;
+
+	err = resolve_delta_chain(deltas, repo, base_packfile,
+	    path_base_packfile, base_type, base_offset + base_tslen, base_size);
+done:
+	free(path_base_packfile);
+	if (base_packfile && fclose(base_packfile) == -1 && err == 0)
+		err = got_error_from_errno();
+	return err;
+}
+
+static const struct got_error *
+resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
+    FILE *packfile, const char *path_packfile, int delta_type,
+    off_t delta_offset, size_t delta_size)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -494,10 +637,13 @@ resolve_delta_chain(struct got_delta_chain *deltas, FILE *packfile,
 		/* Plain types are the final delta base. Recursion ends. */
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		err = resolve_offset_delta(deltas, packfile, path_packfile,
-		    delta_offset);
+		err = resolve_offset_delta(deltas, repo, packfile,
+		    path_packfile, delta_offset);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
+		err = resolve_ref_delta(deltas, repo, packfile, path_packfile,
+		    delta_offset);
+		break;
 	default:
 		return got_error(GOT_ERR_NOT_IMPL);
 	}
@@ -538,8 +684,8 @@ open_offset_delta_object(struct got_object **obj,
 	SIMPLEQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 
-	err = resolve_delta_chain(&(*obj)->deltas, packfile, path_packfile,
-	    GOT_OBJ_TYPE_OFFSET_DELTA, offset, delta_size);
+	err = resolve_delta_chain(&(*obj)->deltas, repo, packfile,
+	    path_packfile, GOT_OBJ_TYPE_OFFSET_DELTA, offset, delta_size);
 	if (err)
 		goto done;
 
@@ -558,14 +704,10 @@ done:
 
 static const struct got_error *
 open_packed_object(struct got_object **obj, struct got_repository *repo,
-    const char *path_packdir, struct got_packidx_v2_hdr *packidx,
-    struct got_object_id *id)
+    struct got_packidx_v2_hdr *packidx, int idx, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
-	int idx = get_object_idx(packidx, id);
 	off_t offset;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
-	char *sha1str;
 	char *path_packfile;
 	FILE *packfile;
 	uint8_t type;
@@ -573,21 +715,14 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	size_t tslen;
 
 	*obj = NULL;
-	if (idx == -1) /* object not found in pack index */
-		return NULL;
 
 	offset = get_object_offset(packidx, idx);
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
-	sha1str = got_sha1_digest_to_str(packidx->trailer.packfile_sha1,
-	    hex, sizeof(hex));
-	if (sha1str == NULL)
-		return got_error(GOT_ERR_PACKIDX_CSUM);
-
-	if (asprintf(&path_packfile, "%s/%s%s%s", path_packdir,
-	    GOT_PACK_PREFIX, sha1str, GOT_PACKFILE_SUFFIX) == -1)
-		return got_error(GOT_ERR_NO_MEM);
+	err = get_packfile_path(&path_packfile, repo, packidx);
+	if (err)
+		return err;
 
 	packfile = fopen(path_packfile, "rb");
 	if (packfile == NULL) {
@@ -639,51 +774,15 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	DIR *packdir = NULL;
-	struct dirent *dent;
-	char *path_packdir = got_repo_get_path_objects_pack(repo);
+	struct got_packidx_v2_hdr *packidx = NULL;
+	int idx;
 
-	if (path_packdir == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
+	err = search_packidx(&packidx, &idx, repo, id);
+	if (err)
+		return err;
 
-	packdir = opendir(path_packdir);
-	if (packdir == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	while ((dent = readdir(packdir)) != NULL) {
-		struct got_packidx_v2_hdr *packidx;
-		char *path_packidx, *path_object;
-
-		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
-			continue;
-
-		if (asprintf(&path_packidx, "%s/%s", path_packdir,
-		    dent->d_name) == -1) {
-			err = got_error(GOT_ERR_NO_MEM);
-			goto done;
-		}
-
-		err = got_packidx_open(&packidx, path_packidx);
-		free(path_packidx);
-		if (err)
-			goto done;
-
-		err = open_packed_object(obj, repo, path_packdir, packidx, id);
-		got_packidx_close(packidx);
-		if (err)
-			goto done;
-		if (*obj != NULL)
-			break;
-	}
-
-done:
-	free(path_packdir);
-	if (packdir && closedir(packdir) != 0 && err == 0)
-		err = got_error_from_errno();
+	err = open_packed_object(obj, repo, packidx, idx, id);
+	got_packidx_close(packidx);
 	return err;
 }
 
