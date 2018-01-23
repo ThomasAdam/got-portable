@@ -18,6 +18,7 @@ struct got_object {
 	int type;
 	int flags;
 #define GOT_OBJ_FLAG_PACKED		0x01
+#define GOT_OBJ_FLAG_DELTIFIED		0x02
 
 	size_t hdrlen;
 	size_t size;
@@ -25,10 +26,5 @@ struct got_object {
 
 	char *path_packfile;	/* if packed */
 	off_t pack_offset;	/* if packed */
-
-	/* If type is OFFSET_DELTA: */
-	int base_type;
-	uint64_t base_size;
-	off_t base_obj_offset;
+	struct got_delta_chain deltas; /* if deltified */
 };
-

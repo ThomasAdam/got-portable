@@ -14,6 +14,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_delta_base {
+	SIMPLEQ_ENTRY(got_delta_base) entry;
+	char *path_packfile;
+	off_t offset;
+	int type;
+	size_t size;
+};
+
+struct got_delta_chain {
+	int nentries;
+	SIMPLEQ_HEAD(, got_delta_base) entries;
+};
+
+struct got_delta_base *got_delta_base_open(const char *, int, off_t, size_t);
+void got_delta_base_close(struct got_delta_base *);
+const struct got_error *got_delta_chain_get_base_type(int *,
+    struct got_delta_chain *) ;
 const struct got_error *
 got_delta_apply(struct got_repository *, FILE *, size_t, struct got_object *,
     FILE *);

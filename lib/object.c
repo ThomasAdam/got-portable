@@ -31,6 +31,7 @@
 #include "got_repository.h"
 #include "got_sha1.h"
 #include "pack.h"
+#include "delta.h"
 #include "object.h"
 
 #ifndef MIN
@@ -71,12 +72,13 @@ got_object_get_type(struct got_object *obj)
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		return obj->type;
-	case GOT_OBJ_TYPE_REF_DELTA:
-	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		return obj->base_type;
+	default:
+		abort();
+		break;
 	}
 
-	abort();
+	/* not reached */
+	return 0;
 }
 
 static void
@@ -333,7 +335,16 @@ done:
 void
 got_object_close(struct got_object *obj)
 {
-	free(obj->path_packfile);
+	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		struct got_delta_base *base;
+		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
+			base = SIMPLEQ_FIRST(&obj->deltas.entries);
+			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
+			got_delta_base_close(base);
+		}
+	}
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		free(obj->path_packfile);
 	free(obj);
 }
 
