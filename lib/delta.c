@@ -61,28 +61,22 @@ const struct got_error *
 got_delta_chain_get_base_type(int *type, struct got_delta_chain *deltas)
 {
 	struct got_delta *delta;
-	int n = 0;
 
-	/* Find the last delta in the chain. It should be a plain object. */
-	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
-		n++;
-		if (delta->type == GOT_OBJ_TYPE_COMMIT ||
-		    delta->type == GOT_OBJ_TYPE_TREE ||
-		    delta->type == GOT_OBJ_TYPE_BLOB ||
-		    delta->type == GOT_OBJ_TYPE_TAG) {
-			if (n != deltas->nentries)
-				return got_error(GOT_ERR_BAD_DELTA_CHAIN);
-			*type = delta->type;
-			return NULL;
-		}
+	/* The first delta in the chain should represent the base object. */
+	delta = SIMPLEQ_FIRST(&deltas->entries);
+	if (delta->type == GOT_OBJ_TYPE_COMMIT ||
+	    delta->type == GOT_OBJ_TYPE_TREE ||
+	    delta->type == GOT_OBJ_TYPE_BLOB ||
+	    delta->type == GOT_OBJ_TYPE_TAG) {
+		*type = delta->type;
+		return NULL;
 	}
 
 	return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 }
 
-const struct got_error *
-got_delta_apply(struct got_repository *repo, FILE *infile, size_t size,
-    struct got_object *base_obj, FILE *outfile)
+const struct got_error *got_delta_apply(struct got_delta *delta,
+    FILE *base_file, FILE *delta_file, FILE *outfile)
 {
 	return got_error(GOT_ERR_NOT_IMPL);
 }

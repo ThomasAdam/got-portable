@@ -647,7 +647,7 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 	if (delta == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 	deltas->nentries++;
-	SIMPLEQ_INSERT_TAIL(&deltas->entries, delta, entry);
+	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
 	/* In case of error below, delta is freed in got_object_close(). */
 
 	switch (delta_type) {
@@ -822,31 +822,62 @@ dump_plain_object(FILE *infile, uint8_t type, size_t size, FILE *outfile)
 }
 
 static const struct got_error *
-dump_ref_delta_object(struct got_repository *repo, FILE *infile, uint8_t type,
-    size_t size, FILE *outfile)
+dump_delta_object(struct got_object *obj, FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id base_id;
-	struct got_object *base_obj;
-	size_t n;
+	struct got_delta *delta;
+	FILE *base_file, *accum_file;
+	int n = 0;
 
-	if (size < sizeof(base_id))
-		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
+	if (SIMPLEQ_EMPTY(&obj->deltas.entries))
+		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
-	n = fread(&base_id, sizeof(base_id), 1, infile);
-	if (n != 1)
-		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
+	base_file = got_opentemp();
+	if (base_file == NULL)
+		return got_error_from_errno();
 
-	size -= sizeof(base_id);
-	if (size <= 0)
-		return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
-
-	err = got_object_open(&base_obj, repo, &base_id);
-	if (err)
+	accum_file = got_opentemp();
+	if (accum_file == NULL) {
+		err = got_error_from_errno();
+		fclose(base_file);
 		return err;
+	}
 
-	err = got_delta_apply(repo, infile, size, base_obj, outfile);
-	got_object_close(base_obj);
+	/* Deltas are ordered in ascending order. */
+	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+		FILE *delta_file = fopen(delta->path_packfile, "rb");
+		if (delta_file == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (fseeko(delta_file, delta->offset, SEEK_SET) != 0) {
+			fclose(delta_file);
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		err = got_delta_apply(delta, base_file, delta_file,
+		    /* Final delta application writes to the output file. */
+		    ++n < obj->deltas.nentries ? accum_file : outfile);
+		fclose(delta_file);
+		if (err)
+			goto done;
+
+		if (n < obj->deltas.nentries) {
+			/* Accumulated delta becomes the new base. */
+			FILE *tmp = accum_file;
+			accum_file = base_file;
+			base_file = tmp;
+			rewind(base_file);
+			rewind(accum_file);
+		}
+	}
+
+done:
+	fclose(base_file);
+	fclose(accum_file);
+	rewind(outfile);
 	return err;
 }
 
@@ -866,33 +897,21 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 		goto done;
 	}
 
-	packfile = fopen(obj->path_packfile, "rb");
-	if (packfile == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
+		packfile = fopen(obj->path_packfile, "rb");
+		if (packfile == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
 
-	if (fseeko(packfile, obj->pack_offset, SEEK_SET) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
+		if (fseeko(packfile, obj->pack_offset, SEEK_SET) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
 
-	switch (obj->type) {
-	case GOT_OBJ_TYPE_COMMIT:
-	case GOT_OBJ_TYPE_TREE:
-	case GOT_OBJ_TYPE_BLOB:
-	case GOT_OBJ_TYPE_TAG:
 		err = dump_plain_object(packfile, obj->type, obj->size, *f);
-		break;
-	case GOT_OBJ_TYPE_REF_DELTA:
-		err = dump_ref_delta_object(repo, packfile, obj->type,
-		    obj->size, *f);
-		break;
-	case GOT_OBJ_TYPE_OFFSET_DELTA:
-	default:
-		err = got_error(GOT_ERR_NOT_IMPL);
-		goto done;
-	}
+	} else
+		err = dump_delta_object(obj, *f);
 done:
 	if (packfile)
 		fclose(packfile);
