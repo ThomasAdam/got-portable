@@ -361,7 +361,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 get_packfile_path(char **path_packfile, struct got_repository *repo,
     struct got_packidx_v2_hdr *packidx)
 {
@@ -407,6 +407,33 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 	    betoh32(hdr.nobjects) != totobj)
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 
+	return err;
+}
+
+static const struct got_error *
+open_packfile(FILE **packfile, char **path_packfile,
+    struct got_repository *repo, struct got_packidx_v2_hdr *packidx)
+{
+	const struct got_error *err;
+
+	*packfile = NULL;
+
+	err = get_packfile_path(path_packfile, repo, packidx);
+	if (err)
+		return err;
+
+	*packfile = fopen(*path_packfile, "rb");
+	if (*packfile == NULL) {
+		err = got_error_from_errno();
+		free(*path_packfile);
+		return err;
+	}
+
+	err = read_packfile_hdr(*packfile, packidx);
+	if (err) {
+		fclose(*packfile);
+		*packfile = NULL;
+	}
 	return err;
 }
 
@@ -583,16 +610,10 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		return got_error(GOT_ERR_BAD_PACKIDX);
 	}
 
-	err = get_packfile_path(&path_base_packfile, repo, packidx);
+	err = open_packfile(&base_packfile, &path_base_packfile, repo, packidx);
 	got_packidx_close(packidx);
 	if (err)
 		return err;
-
-	base_packfile = fopen(path_base_packfile, "rb");
-	if (base_packfile == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
 
 	if (fseeko(base_packfile, base_offset, SEEK_SET) != 0) {
 		err = got_error_from_errno();
@@ -720,19 +741,9 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
-	err = get_packfile_path(&path_packfile, repo, packidx);
+	err = open_packfile(&packfile, &path_packfile, repo, packidx);
 	if (err)
 		return err;
-
-	packfile = fopen(path_packfile, "rb");
-	if (packfile == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	err = read_packfile_hdr(packfile, packidx);
-	if (err)
-		goto done;
 
 	if (fseeko(packfile, offset, SEEK_SET) != 0) {
 		err = got_error_from_errno();
