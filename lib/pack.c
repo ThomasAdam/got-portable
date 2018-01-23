@@ -652,10 +652,10 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 }
 
 static const struct got_error *
-open_offset_delta_object(struct got_object **obj,
-    struct got_repository *repo, struct got_packidx_v2_hdr *packidx,
-    const char *path_packfile, FILE *packfile, struct got_object_id *id,
-    off_t offset, size_t tslen, size_t delta_size)
+open_delta_object(struct got_object **obj, struct got_repository *repo,
+    struct got_packidx_v2_hdr *packidx, const char *path_packfile,
+    FILE *packfile, struct got_object_id *id, off_t offset, size_t tslen,
+    int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id base_id;
@@ -685,7 +685,7 @@ open_offset_delta_object(struct got_object **obj,
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 
 	err = resolve_delta_chain(&(*obj)->deltas, repo, packfile,
-	    path_packfile, GOT_OBJ_TYPE_OFFSET_DELTA, offset, delta_size);
+	    path_packfile, delta_type, offset, delta_size);
 	if (err)
 		goto done;
 
@@ -752,11 +752,11 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		break;
 
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		err = open_offset_delta_object(obj, repo, packidx,
-		    path_packfile, packfile, id, offset, tslen, size);
+	case GOT_OBJ_TYPE_REF_DELTA:
+		err = open_delta_object(obj, repo, packidx, path_packfile,
+		    packfile, id, offset, tslen, type, size);
 		break;
 
-	case GOT_OBJ_TYPE_REF_DELTA:
 	case GOT_OBJ_TYPE_TAG:
 	default:
 		err = got_error(GOT_ERR_NOT_IMPL);
