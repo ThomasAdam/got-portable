@@ -870,13 +870,13 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
+	case GOT_OBJ_TYPE_TAG:
 		err = dump_plain_object(packfile, obj->type, obj->size, *f);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 		err = dump_ref_delta_object(repo, packfile, obj->type,
 		    obj->size, *f);
 		break;
-	case GOT_OBJ_TYPE_TAG:
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	default:
 		err = got_error(GOT_ERR_NOT_IMPL);
