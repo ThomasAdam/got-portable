@@ -53,6 +53,8 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 	}
 
 	*ref = calloc(1, sizeof(**ref));
+	if (*ref == NULL)
+		return got_error(GOT_ERR_NO_MEM);
 	(*ref)->flags |= GOT_REF_IS_SYMBOLIC;
 	symref = &((*ref)->ref.symref);
 	symref->name = symref_name;
@@ -79,6 +81,8 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 		return got_error(GOT_ERR_NOT_REF);
 
 	*ref = calloc(1, sizeof(**ref));
+	if (*ref == NULL)
+		return got_error(GOT_ERR_NO_MEM);
 	(*ref)->ref.ref.name = ref_name;
 	memcpy(&(*ref)->ref.ref.sha1, digest, SHA1_DIGEST_LENGTH);
 	return NULL;
@@ -172,10 +176,11 @@ got_ref_close(struct got_reference *ref)
 struct got_reference *
 got_ref_dup(struct got_reference *ref)
 {
-	struct got_reference *ret = calloc(1, sizeof(*ret));
+	struct got_reference *ret;
 	char *name = NULL;
 	char *symref = NULL;
 
+	ret = calloc(1, sizeof(*ret));
 	if (ret == NULL)
 		return NULL;
 

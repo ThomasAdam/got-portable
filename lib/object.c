@@ -203,6 +203,8 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
 	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL)
+		return got_error(GOT_ERR_NO_MEM);
 	(*obj)->type = type;
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
