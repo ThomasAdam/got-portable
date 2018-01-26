@@ -89,7 +89,6 @@
 #include "got_diff.h"
 
 #include "diff.h"
-#include "xmalloc.h" /* XXX should return GOT_ERR_NO_MEM instead of exiting */
 
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
@@ -185,24 +184,24 @@ struct context_vec {
 };
 
 static void	 diff_output(FILE *, const char *, ...);
-static void	 output(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
+static int	 output(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 range(FILE *, int, int, char *);
 static void	 uni_range(FILE *, int, int);
 static void	 dump_context_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static void	 dump_unified_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
-static void	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
+static int	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
 static void	 prune(struct got_diff_state *);
 static void	 equiv(struct line *, int, struct line *, int, int *);
 static void	 unravel(struct got_diff_state *, int);
-static void	 unsort(struct line *, int, int *);
-static void	 change(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
+static int	 unsort(struct line *, int, int *);
+static int	 change(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
 static void	 print_header(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 ignoreline(char *);
 static int	 asciifile(FILE *);
 static int	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int, int);
-static int	 newcand(struct got_diff_state *, int, int, int);
+static int	 newcand(struct got_diff_state *, int, int, int, int *);
 static int	 search(struct got_diff_state *, int *, int, int);
 static int	 skipline(FILE *);
 static int	 isqrt(int);
@@ -331,8 +330,14 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		args->status |= 1;
 		goto closem;
 	}
-	prepare(ds, 0, f1, ds->stb1.st_size, flags);
-	prepare(ds, 1, f2, ds->stb2.st_size, flags);
+	if (prepare(ds, 0, f1, ds->stb1.st_size, flags)) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
+	if (prepare(ds, 1, f2, ds->stb2.st_size, flags)) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 
 	prune(ds);
 	sort(ds->sfile[0], ds->slen[0]);
@@ -347,7 +352,10 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	}
 
 	ds->class = (int *)ds->file[0];
-	unsort(ds->sfile[0], ds->slen[0], ds->class);
+	if (unsort(ds->sfile[0], ds->slen[0], ds->class)) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 	ds->class = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
 	if (ds->class == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
@@ -369,6 +377,10 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	i = stone(ds, ds->class, ds->slen[0], ds->member, ds->klist, flags);
 	free(ds->member);
 	free(ds->class);
+	if (i < 0) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto closem;
+	}
 
 	ds->J = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
 	if (ds->J == NULL) {
@@ -392,7 +404,9 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		goto closem;
 	}
 	check(ds, f1, f2, flags);
-	output(outfile, ds, args, args->label[0], f1, args->label[1], f2, flags);
+	if (output(outfile, ds, args, args->label[0], f1, args->label[1], f2,
+	    flags))
+		err = got_error(GOT_ERR_NO_MEM);
 closem:
 	if (ds->anychange) {
 		args->status |= 1;
@@ -435,24 +449,7 @@ files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 	}
 }
 
-char *
-splice(char *dir, char *file)
-{
-	char *tail, *buf;
-	size_t dirlen;
-
-	dirlen = strlen(dir);
-	while (dirlen != 0 && dir[dirlen - 1] == '/')
-	    dirlen--;
-	if ((tail = strrchr(file, '/')) == NULL)
-		tail = file;
-	else
-		tail++;
-	xasprintf(&buf, "%.*s/%s", (int)dirlen, dir, tail);
-	return (buf);
-}
-
-static void
+static int
 prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 {
 	struct line *p;
@@ -465,16 +462,22 @@ prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 	if (sz < 100)
 		sz = 100;
 
-	p = xcalloc(sz + 3, sizeof(*p));
+	p = calloc(sz + 3, sizeof(*p));
+	if (p == NULL)
+		return (-1);
 	for (j = 0; (h = readhash(ds, fd, flags));) {
 		if (j == sz) {
 			sz = sz * 3 / 2;
-			p = xreallocarray(p, sz + 3, sizeof(*p));
+			p = reallocarray(p, sz + 3, sizeof(*p));
+			if (p == NULL)
+				return (-1);
 		}
 		p[++j].value = h;
 	}
 	ds->len[i] = j;
 	ds->file[i] = p;
+
+	return (0);
 }
 
 static void
@@ -551,6 +554,7 @@ stone(struct got_diff_state *ds, int *a, int n, int *b, int *c, int flags)
 	int i, k, y, j, l;
 	int oldc, tc, oldl, sq;
 	u_int numtries, bound;
+	int error;
 
 	if (flags & D_MINIMAL)
 		bound = UINT_MAX;
@@ -560,7 +564,9 @@ stone(struct got_diff_state *ds, int *a, int n, int *b, int *c, int flags)
 	}
 
 	k = 0;
-	c[0] = newcand(ds, 0, 0, 0);
+	c[0] = newcand(ds, 0, 0, 0, &error);
+	if (error)
+		return -1;
 	for (i = 1; i <= n; i++) {
 		j = a[i];
 		if (j == 0)
@@ -579,12 +585,16 @@ stone(struct got_diff_state *ds, int *a, int n, int *b, int *c, int flags)
 				if (ds->clist[c[l]].y <= y)
 					continue;
 				tc = c[l];
-				c[l] = newcand(ds, i, y, oldc);
+				c[l] = newcand(ds, i, y, oldc, &error);
+				if (error)
+					return -1;
 				oldc = tc;
 				oldl = l;
 				numtries++;
 			} else {
-				c[l] = newcand(ds, i, y, oldc);
+				c[l] = newcand(ds, i, y, oldc, &error);
+				if (error)
+					return -1;
 				k++;
 				break;
 			}
@@ -594,18 +604,24 @@ stone(struct got_diff_state *ds, int *a, int n, int *b, int *c, int flags)
 }
 
 static int
-newcand(struct got_diff_state *ds, int x, int y, int pred)
+newcand(struct got_diff_state *ds, int x, int y, int pred, int *errorp)
 {
 	struct cand *q;
 
 	if (ds->clen == ds->clistlen) {
 		ds->clistlen = ds->clistlen * 11 / 10;
-		ds->clist = xreallocarray(ds->clist, ds->clistlen, sizeof(*ds->clist));
+		ds->clist = reallocarray(ds->clist, ds->clistlen,
+		    sizeof(*ds->clist));
+		if (ds->clist == NULL) {
+			*errorp = -1;
+			return 0;
+		}
 	}
 	q = ds->clist + ds->clen;
 	q->x = x;
 	q->y = y;
 	q->pred = pred;
+	*errorp = 0;
 	return (ds->clen++);
 }
 
@@ -788,17 +804,21 @@ sort(struct line *a, int n)
 	}
 }
 
-static void
+static int
 unsort(struct line *f, int l, int *b)
 {
 	int *a, i;
 
-	a = xcalloc(l + 1, sizeof(*a));
+	a = calloc(l + 1, sizeof(*a));
+	if (a == NULL)
+		return (-1);
 	for (i = 1; i <= l; i++)
 		a[f[i].serial] = f[i].value;
 	for (i = 1; i <= l; i++)
 		b[i] = a[i];
 	free(a);
+
+	return (0);
 }
 
 static int
@@ -811,11 +831,12 @@ skipline(FILE *f)
 	return (i);
 }
 
-static void
+static int
 output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2, int flags)
 {
 	int m, i0, i1, j0, j1;
+	int error = 0;
 
 	rewind(f1);
 	rewind(f2);
@@ -832,7 +853,10 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 				i1++;
 			j1 = ds->J[i1 + 1] - 1;
 			ds->J[i1] = j1;
-			change(outfile, ds, args, file1, f1, file2, f2, i0, i1, j0, j1, &flags);
+			error = change(outfile, ds, args, file1, f1, file2, f2,
+			    i0, i1, j0, j1, &flags);
+			if (error)
+				return (error);
 		}
 	} else {
 		for (i0 = m; i0 >= 1; i0 = i1 - 1) {
@@ -844,16 +868,23 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 				i1--;
 			j1 = ds->J[i1 - 1] + 1;
 			ds->J[i1] = j1;
-			change(outfile, ds, args, file1, f1, file2, f2, i1, i0, j1, j0, &flags);
+			change(outfile, ds, args, file1, f1, file2, f2, i1, i0,
+			    j1, j0, &flags);
+			if (error)
+				return (error);
 		}
 	}
-	if (m == 0)
-		change(outfile, ds, args, file1, f1, file2, f2, 1, 0, 1, ds->len[1], &flags);
+	if (m == 0) {
+		error = change(outfile, ds, args, file1, f1, file2, f2, 1, 0,
+		    1, ds->len[1], &flags);
+		if (error)
+			return (error);
+	}
 	if (args->diff_format == D_IFDEF) {
 		for (;;) {
 #define	c i0
 			if ((c = getc(f1)) == EOF)
-				return;
+				return (0);
 			diff_output(outfile, "%c", c);
 		}
 #undef c
@@ -864,6 +895,8 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		else if (args->diff_format == D_UNIFIED)
 			dump_unified_vec(outfile, ds, args, f1, f2, flags);
 	}
+
+	return (0);
 }
 
 static void
@@ -891,9 +924,13 @@ preadline(int fd, size_t rlen, off_t off)
 	char *line;
 	ssize_t nr;
 
-	line = xmalloc(rlen + 1);
-	if ((nr = pread(fd, line, rlen, off)) < 0)
-		err(2, "preadline");
+	line = malloc(rlen + 1);
+	if (line == NULL)
+		return NULL;
+	if ((nr = pread(fd, line, rlen, off)) < 0) {
+		free(line);
+		return NULL;
+	}
 	if (nr > 0 && line[nr-1] == '\n')
 		nr--;
 	line[nr] = '\0';
@@ -913,7 +950,7 @@ ignoreline(char *line)
  * lines appended (beginning at b).  If c is greater than d then there are
  * lines missing from the to file.
  */
-static void
+static int
 change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
@@ -923,7 +960,7 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 
 restart:
 	if (args->diff_format != D_IFDEF && a > b && c > d)
-		return;
+		return (0);
 	if (args->ignore_pats != NULL) {
 		char *line;
 		/*
@@ -934,7 +971,10 @@ restart:
 		if (a <= b) {		/* Changes and deletes. */
 			for (i = a; i <= b; i++) {
 				line = preadline(fileno(f1),
-				    ds->ixold[i] - ds->ixold[i - 1], ds->ixold[i - 1]);
+				    ds->ixold[i] - ds->ixold[i - 1],
+				    ds->ixold[i - 1]);
+				if (line == NULL)
+					return (-1);
 				if (!ignoreline(line))
 					goto proceed;
 			}
@@ -942,12 +982,15 @@ restart:
 		if (a > b || c <= d) {	/* Changes and inserts. */
 			for (i = c; i <= d; i++) {
 				line = preadline(fileno(f2),
-				    ds->ixnew[i] - ds->ixnew[i - 1], ds->ixnew[i - 1]);
+				    ds->ixnew[i] - ds->ixnew[i - 1],
+				    ds->ixnew[i - 1]);
+				if (line == NULL)
+					return (-1);
 				if (!ignoreline(line))
 					goto proceed;
 			}
 		}
-		return;
+		return (0);
 	}
 proceed:
 	if (*pflags & D_HEADER) {
@@ -961,8 +1004,11 @@ proceed:
 		if (ds->context_vec_ptr == ds->context_vec_end - 1) {
 			ptrdiff_t offset = ds->context_vec_ptr - ds->context_vec_start;
 			max_context <<= 1;
-			ds->context_vec_start = xreallocarray(ds->context_vec_start,
-			    max_context, sizeof(*ds->context_vec_start));
+			ds->context_vec_start =
+			    reallocarray(ds->context_vec_start, max_context,
+				sizeof(*ds->context_vec_start));
+			if (ds->context_vec_start == NULL)
+				return (-1);
 			ds->context_vec_end = ds->context_vec_start + max_context;
 			ds->context_vec_ptr = ds->context_vec_start + offset;
 		}
@@ -988,13 +1034,13 @@ proceed:
 		ds->context_vec_ptr->b = b;
 		ds->context_vec_ptr->c = c;
 		ds->context_vec_ptr->d = d;
-		return;
+		return (0);
 	}
 	if (ds->anychange == 0)
 		ds->anychange = 1;
 	switch (args->diff_format) {
 	case D_BRIEF:
-		return;
+		return (0);
 	case D_NORMAL:
 	case D_EDIT:
 		range(outfile, a, b, ",");
@@ -1046,6 +1092,8 @@ proceed:
 		diff_output(outfile, "#endif /* %s */\n", args->ifdefname);
 		ds->inifdef = 0;
 	}
+
+	return (0);
 }
 
 static int
