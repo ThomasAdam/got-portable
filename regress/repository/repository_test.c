@@ -29,9 +29,6 @@
 #include "got_sha1.h"
 #include "got_diff.h"
 
-#define RUN_TEST(expr, name) \
-	if (!(expr)) { printf("test %s failed\n", (name)); failure = 1; }
-
 #define GOT_REPO_PATH "../../../"
 
 static const struct got_error *
@@ -346,10 +343,15 @@ repo_diff_tree(const char *repo_path)
 	return (err == NULL);
 }
 
+#define RUN_TEST(expr, name) \
+	{ test_ok = (expr);  \
+	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
+	failure = (failure || !test_ok); }
+
 int
 main(int argc, const char *argv[])
 {
-	int failure = 0;
+	int test_ok = 0, failure = 0;
 	const char *repo_path;
 
 	if (argc == 1)

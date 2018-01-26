@@ -23,18 +23,21 @@
 
 #include "delta.h"
 
-#define RUN_TEST(expr, name) \
-	if (!(expr)) { printf("test %s failed\n", (name)); failure = 1; }
-
 static int
 delta_combine()
 {
 	return 1;
 }
 
+#define RUN_TEST(expr, name) \
+	{ test_ok = (expr);  \
+	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
+	failure = (failure || !test_ok); }
+
 int
 main(int argc, const char *argv[])
 {
+	int test_ok;
 	int failure = 0;
 
 	if (argc != 1) {
