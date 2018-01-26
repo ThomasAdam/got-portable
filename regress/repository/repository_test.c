@@ -39,7 +39,7 @@ print_parent_commits(struct got_commit_object *commit,
     struct got_repository *repo)
 {
 	struct got_parent_id *pid;
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	struct got_object *obj;
 
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
@@ -48,11 +48,11 @@ print_parent_commits(struct got_commit_object *commit,
 			return err;
 		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
 			return got_error(GOT_ERR_OBJ_TYPE);
-		print_commit_object(obj, repo);
+		err = print_commit_object(obj, repo);
 		got_object_close(obj);
 	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -175,8 +175,12 @@ repo_read_log(const char *repo_path)
 	err = got_object_open(&obj, repo, id);
 	if (err != NULL || obj == NULL)
 		return 0;
-	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
-		print_commit_object(obj, repo);
+	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT) {
+		err = print_commit_object(obj, repo);
+		if (err)
+			return 0;
+	} else
+		return 0;
 	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
