@@ -34,7 +34,7 @@
 
 #define GOT_REPO_PATH "../../../"
 
-int verbose = 0;
+static int verbose;
 
 void
 test_printf(char *fmt, ...)
