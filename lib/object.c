@@ -33,6 +33,7 @@
 #include "pack.h"
 #include "delta.h"
 #include "object.h"
+#include "zb.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -79,84 +80,6 @@ got_object_get_type(struct got_object *obj)
 
 	/* not reached */
 	return 0;
-}
-
-static void
-inflate_end(struct got_zstream_buf *zb)
-{
-	free(zb->inbuf);
-	free(zb->outbuf);
-	inflateEnd(&zb->z);
-}
-
-static const struct got_error *
-inflate_init(struct got_zstream_buf *zb, size_t bufsize)
-{
-	const struct got_error *err = NULL;
-
-	memset(zb, 0, sizeof(*zb));
-
-	zb->z.zalloc = Z_NULL;
-	zb->z.zfree = Z_NULL;
-	if (inflateInit(&zb->z) != Z_OK) {
-		err = got_error(GOT_ERR_IO);
-		goto done;
-	}
-
-	zb->inlen = zb->outlen = bufsize;
-
-	zb->inbuf = calloc(1, zb->inlen);
-	if (zb->inbuf == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
-
-	zb->outbuf = calloc(1, zb->outlen);
-	if (zb->outbuf == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
-
-done:
-	if (err)
-		inflate_end(zb);
-	return err;
-}
-
-static const struct got_error *
-inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
-{
-	size_t last_total_out = zb->z.total_out;
-	z_stream *z = &zb->z;
-	int n, ret;
-
-	z->next_out = zb->outbuf;
-	z->avail_out = zb->outlen;
-
-	do {
-		if (z->avail_in == 0) {
-			int i;
-			n = fread(zb->inbuf, 1, zb->inlen, f);
-			if (n == 0) {
-				if (ferror(f))
-					return got_ferror(f, GOT_ERR_IO);
-				*outlenp = 0;
-				return NULL;
-			}
-			z->next_in = zb->inbuf;
-			z->avail_in = n;
-		}
-		ret = inflate(z, Z_SYNC_FLUSH);
-	} while (ret == Z_OK && z->avail_out > 0);
-
-	if (ret != Z_OK) {
-		if (ret != Z_STREAM_END)
-			return got_error(GOT_ERR_DECOMPRESSION);
-		zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
-	}
-
-	*outlenp = z->total_out - last_total_out;
-	return NULL;
 }
 
 static const struct got_error *
@@ -227,14 +150,14 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	if (buf == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	err = inflate_init(&zb, zbsize);
+	err = got_inflate_init(&zb, zbsize);
 	if (err)
 		return err;
 
 	i = 0;
 	totlen = 0;
 	do {
-		err = inflate_read(&zb, f, &outlen);
+		err = got_inflate_read(&zb, f, &outlen);
 		if (err)
 			goto done;
 		if (strchr(zb.outbuf, '\0') == NULL) {
@@ -251,7 +174,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 
 	err = parse_object_header(obj, buf, totlen);
 done:
-	inflate_end(&zb);
+	got_inflate_end(&zb);
 	return err;
 }
 
@@ -580,12 +503,12 @@ read_commit_object(struct got_commit_object **commit,
 	char *p;
 	int i, ret;
 
-	err = inflate_init(&zb, 8192);
+	err = got_inflate_init(&zb, 8192);
 	if (err)
 		return err;
 
 	do {
-		err = inflate_read(&zb, f, &len);
+		err = got_inflate_read(&zb, f, &len);
 		if (err || len == 0)
 			break;
 	} while (len < obj->hdrlen + obj->size);
@@ -599,7 +522,7 @@ read_commit_object(struct got_commit_object **commit,
 	len -= obj->hdrlen;
 	err = parse_commit_object(commit, zb.outbuf + obj->hdrlen, len);
 done:
-	inflate_end(&zb);
+	got_inflate_end(&zb);
 	return err;
 }
 
@@ -649,12 +572,12 @@ read_tree_object(struct got_tree_object **tree,
 	char *p;
 	int i, ret;
 
-	err = inflate_init(&zb, 8192);
+	err = got_inflate_init(&zb, 8192);
 	if (err)
 		return err;
 
 	do {
-		err = inflate_read(&zb, f, &len);
+		err = got_inflate_read(&zb, f, &len);
 		if (err || len == 0)
 			break;
 	} while (len < obj->hdrlen + obj->size);
@@ -668,7 +591,7 @@ read_tree_object(struct got_tree_object **tree,
 	len -= obj->hdrlen;
 	err = parse_tree_object(tree, repo, zb.outbuf + obj->hdrlen, len);
 done:
-	inflate_end(&zb);
+	got_inflate_end(&zb);
 	return err;
 }
 
@@ -727,7 +650,7 @@ got_object_blob_open(struct got_blob_object **blob,
 		return err;
 	}
 
-	err = inflate_init(&(*blob)->zb, blocksize);
+	err = got_inflate_init(&(*blob)->zb, blocksize);
 	if (err != NULL) {
 		fclose((*blob)->f);
 		free(*blob);
@@ -743,7 +666,7 @@ got_object_blob_open(struct got_blob_object **blob,
 void
 got_object_blob_close(struct got_blob_object *blob)
 {
-	inflate_end(&blob->zb);
+	got_inflate_end(&blob->zb);
 	fclose(blob->f);
 	free(blob);
 }
@@ -751,5 +674,5 @@ got_object_blob_close(struct got_blob_object *blob)
 const struct got_error *
 got_object_blob_read_block(struct got_blob_object *blob, size_t *outlenp)
 {
-	return inflate_read(&blob->zb, blob->f, outlenp);
+	return got_inflate_read(&blob->zb, blob->f, outlenp);
 }

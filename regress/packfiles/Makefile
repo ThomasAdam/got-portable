@@ -2,7 +2,7 @@
 
 PROG = packfile_test
 SRCS = error.c pack.c repository.c object.c path.c sha1.c \
-	delta.c packfile_test.c
+	delta.c zb.c packfile_test.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
