@@ -356,7 +356,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 	err = got_error(GOT_ERR_NO_OBJ);
 done:
 	free(path_packdir);
-	if (closedir(packdir) != 0 && err == 0)
+	if (packdir && closedir(packdir) != 0 && err == 0)
 		err = got_error_from_errno();
 	return err;
 }
