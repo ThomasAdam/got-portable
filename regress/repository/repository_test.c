@@ -17,8 +17,10 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sha1.h>
 #include <zlib.h>
 
@@ -28,8 +30,24 @@
 #include "got_repository.h"
 #include "got_sha1.h"
 #include "got_diff.h"
+#include "unistd.h"
 
 #define GOT_REPO_PATH "../../../"
+
+int verbose = 0;
+
+void
+test_printf(char *fmt, ...)
+{
+	va_list ap;
+
+	if (!verbose)
+		return;
+
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	va_end(ap);
+}
 
 static const struct got_error *
 print_commit_object(struct got_object *, struct got_repository *);
@@ -73,12 +91,12 @@ print_tree_object(struct got_object *obj, char *parent,
 		char *next_parent;
 
 		if (!S_ISDIR(te->mode)) {
-			printf("%s %s/%s\n",
+			test_printf("%s %s/%s\n",
 			    got_object_id_str(&te->id, hex, sizeof(hex)),
 			    parent, te->name);
 			continue;
 		}
-		printf("%s %s/%s\n",
+		test_printf("%s %s/%s\n",
 		    got_object_id_str(&te->id, hex, sizeof(hex)),
 		    parent, te->name);
 
@@ -125,23 +143,23 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	if (err != NULL)
 		return err;
 
-	printf("tree: %s\n",
+	test_printf("tree: %s\n",
 	    got_object_id_str(&commit->tree_id, buf, sizeof(buf)));
-	printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
+	test_printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		printf("%s\n",
+		test_printf("%s\n",
 		    got_object_id_str(&pid->id, buf, sizeof(buf)));
 	}
-	printf("author: %s\n", commit->author);
-	printf("committer: %s\n", commit->committer);
-	printf("log: %s\n", commit->logmsg);
+	test_printf("author: %s\n", commit->author);
+	test_printf("committer: %s\n", commit->committer);
+	test_printf("log: %s\n", commit->logmsg);
 
 	err = got_object_open(&treeobj, repo, &commit->tree_id);
 	if (err != NULL)
 		return err;
 	if (got_object_get_type(treeobj) == GOT_OBJ_TYPE_TREE) {
 		print_tree_object(treeobj, "", repo);
-		printf("\n");
+		test_printf("\n");
 	}
 	got_object_close(treeobj);
 
@@ -171,7 +189,7 @@ repo_read_log(const char *repo_path)
 	err = got_ref_resolve(&id, repo, head_ref);
 	if (err != NULL || head_ref == NULL)
 		return 0;
-	printf("HEAD is at %s\n", got_object_id_str(id, buf, sizeof(buf)));
+	test_printf("HEAD is at %s\n", got_object_id_str(id, buf, sizeof(buf)));
 	err = got_object_open(&obj, repo, id);
 	if (err != NULL || obj == NULL)
 		return 0;
@@ -217,15 +235,15 @@ repo_read_blob(const char *repo_path)
 	if (err != NULL)
 		return 0;
 
-	putchar('\n');
+	test_printf("\n");
 	do {
 		err = got_object_blob_read_block(blob, &len);
 		if (err)
 			break;
 		for (i = 0; i < len; i++)
-			putchar(blob->zb.outbuf[i]);
+			test_printf("%c", blob->zb.outbuf[i]);
 	} while (len != 0);
-	putchar('\n');
+	test_printf("\n");
 
 	got_object_blob_close(blob);
 	got_object_close(obj);
@@ -278,9 +296,9 @@ repo_diff_blob(const char *repo_path)
 	if (err != NULL)
 		return 0;
 
-	putchar('\n');
+	test_printf("\n");
 	got_diff_blob(blob1, blob2, NULL, NULL, stdout);
-	putchar('\n');
+	test_printf("\n");
 
 	got_object_blob_close(blob1);
 	got_object_blob_close(blob2);
@@ -335,9 +353,9 @@ repo_diff_tree(const char *repo_path)
 	if (err != NULL)
 		return 0;
 
-	putchar('\n');
+	test_printf("\n");
 	got_diff_tree(tree1, tree2, repo);
-	putchar('\n');
+	test_printf("\n");
 
 	got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
@@ -352,18 +370,40 @@ repo_diff_tree(const char *repo_path)
 	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
+
+void
+usage(void)
+{
+	fprintf(stderr, "usage: repository_test [-v] [REPO_PATH]\n");
+}
+
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
+	int ch;
+	int vflag = 0;
 
-	if (argc == 1)
+	while ((ch = getopt(argc, argv, "v")) != -1) {
+		switch (ch) {
+		case 'v':
+			verbose = 1;
+			break;
+		default:
+			usage();
+			return 1;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0)
 		repo_path = GOT_REPO_PATH;
-	else if (argc == 2)
+	else if (argc == 1)
 		repo_path = argv[1];
 	else {
-		fprintf(stderr, "usage: repository_test [REPO_PATH]\n");
+		usage();
 		return 1;
 	}
 
