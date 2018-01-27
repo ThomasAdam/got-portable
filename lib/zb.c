@@ -73,6 +73,7 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
 	z->next_out = zb->outbuf;
 	z->avail_out = zb->outlen;
 
+	*outlenp = 0;
 	if (inlenp)
 		*inlenp = 0;
 	do {
@@ -81,8 +82,7 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
 			if (n == 0) {
 				if (ferror(f))
 					return got_ferror(f, GOT_ERR_IO);
-				*outlenp = 0;
-				return NULL;
+				break; /* EOF */
 			}
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
