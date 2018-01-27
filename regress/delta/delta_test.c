@@ -18,15 +18,116 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <zlib.h>
 
 #include "got_error.h"
 
 #include "delta.h"
+#include "path.h"
+
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
+
+struct delta_test {
+	const char *base;
+	const char *delta;
+	size_t delta_len;
+	const char *expected;
+} delta_tests[] = {
+	/* base len 0, target len 4, append 4 'x' */
+	{ "", "\x00\x04\x04xxxx", 7, "xxxx" },
+	/* copy 4 bytes at offset 0 from base, append 4 'x' */
+	{ "aabbccdd", "\x08\x08\x90\x04\x04xxxx", 9, "aabbxxxx" },
+	/* copy 4 bytes at offset 4 from base, append 4 'x' */
+	{ "aabbccdd", "\x08\x08\x91\x04\x04\x04xxxx", 10, "ccddxxxx" },
+};
+
+static const struct got_error *
+compress_to_file(FILE **outfile, const char *input, size_t inlen)
+{
+	const struct got_error *err = NULL;
+	z_stream z;
+	char buf[2048];
+	char *inbuf;
+	int ret;
+	size_t n;
+
+	memset(&z, 0, sizeof(z));
+	z.zalloc = Z_NULL;
+	z.zfree = Z_NULL;
+
+	if (deflateInit(&z, 8) != Z_OK)
+		return got_error(GOT_ERR_IO);
+
+	*outfile = got_opentemp();
+	if (*outfile == NULL)
+		return got_error_from_errno();
+
+	z.next_in = (Bytef *)input;
+	z.avail_in = inlen;
+	z.next_out = buf;
+	z.avail_out = sizeof(buf);
+	/* Our output buffer is large enough so one round should be enough. */
+	ret = deflate(&z, Z_FINISH);
+	if (ret != Z_STREAM_END || z.avail_out == 0) {
+		err = got_error(GOT_ERR_COMPRESSION);
+		goto done;
+	}
+
+	deflateEnd(&z);
+
+	n = fwrite(buf, 1, z.avail_out, *outfile);
+	if (n != z.avail_out)
+		err = got_ferror(*outfile, GOT_ERR_IO);
+done:
+	if (err) {
+		fclose(*outfile);
+		*outfile = NULL;
+	} else
+		rewind(*outfile);
+	return err;
+}
 
 static int
 delta_combine()
 {
-	return 1;
+	const struct got_error *err = NULL;
+	int i;
+	FILE *result_file;
+
+	result_file = got_opentemp();
+	if (result_file == NULL)
+		return 1;
+
+	for (i = 0; i < nitems(delta_tests); i++) {
+		struct delta_test *dt = &delta_tests[i];
+		FILE *base_file;
+		char buf[1024];
+		size_t n, len, result_len;
+
+		len = strlen(dt->base);
+		err = compress_to_file(&base_file, dt->base, len);
+		if (err)
+			break;
+
+		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
+		    result_file);
+		fclose(base_file);
+		if (err)
+			break;
+		result_len = strlen(dt->expected);
+		n = fread(buf, result_len, 1, result_file);
+		if (n != 1 || strncmp(buf, dt->expected, result_len) != 0) {
+			err = got_ferror(result_file, GOT_ERR_BAD_DELTA);
+			break;
+		}
+		rewind(result_file);
+	}
+
+	fclose(result_file);
+	return (err == NULL);
 }
 
 #define RUN_TEST(expr, name) \

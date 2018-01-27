@@ -157,7 +157,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	i = 0;
 	totlen = 0;
 	do {
-		err = got_inflate_read(&zb, f, &outlen);
+		err = got_inflate_read(&zb, f, NULL, &outlen);
 		if (err)
 			goto done;
 		if (strchr(zb.outbuf, '\0') == NULL) {
@@ -508,7 +508,7 @@ read_commit_object(struct got_commit_object **commit,
 		return err;
 
 	do {
-		err = got_inflate_read(&zb, f, &len);
+		err = got_inflate_read(&zb, f, NULL, &len);
 		if (err || len == 0)
 			break;
 	} while (len < obj->hdrlen + obj->size);
@@ -577,7 +577,7 @@ read_tree_object(struct got_tree_object **tree,
 		return err;
 
 	do {
-		err = got_inflate_read(&zb, f, &len);
+		err = got_inflate_read(&zb, f, NULL, &len);
 		if (err || len == 0)
 			break;
 	} while (len < obj->hdrlen + obj->size);
@@ -674,5 +674,5 @@ got_object_blob_close(struct got_blob_object *blob)
 const struct got_error *
 got_object_blob_read_block(struct got_blob_object *blob, size_t *outlenp)
 {
-	return got_inflate_read(&blob->zb, blob->f, outlenp);
+	return got_inflate_read(&blob->zb, blob->f, NULL, outlenp);
 }

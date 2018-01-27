@@ -37,6 +37,7 @@
 #include "path.h"
 #include "delta.h"
 #include "object.h"
+#include "zb.h"
 
 #define GOT_PACK_PREFIX		"pack-"
 #define GOT_PACKFILE_SUFFIX	".pack"
@@ -845,7 +846,11 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
-		FILE *delta_file = fopen(delta->path_packfile, "rb");
+		uint8_t *delta_buf = NULL;
+		size_t delta_len = 0;
+		FILE *delta_file;
+
+		delta_file = fopen(delta->path_packfile, "rb");
 		if (delta_file == NULL) {
 			err = got_error_from_errno();
 			goto done;
@@ -857,10 +862,18 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			goto done;
 		}
 
-		err = got_delta_apply(delta, base_file, delta_file,
+		/* Delta streams should always fit in memory. */
+		err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file,
+		    delta->size);
+		if (err)
+			return err;
+
+		fclose(delta_file);
+
+		err = got_delta_apply(base_file, delta_buf, delta_len,
 		    /* Final delta application writes to the output file. */
 		    ++n < deltas->nentries ? accum_file : outfile);
-		fclose(delta_file);
+		free(delta_buf);
 		if (err)
 			goto done;
 

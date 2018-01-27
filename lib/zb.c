@@ -25,6 +25,7 @@
 #include "got_error.h"
 #include "got_object.h"
 
+#include "path.h"
 #include "zb.h"
 
 const struct got_error *
@@ -62,19 +63,21 @@ done:
 }
 
 const struct got_error *
-got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
+got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
+    size_t *outlenp)
 {
 	size_t last_total_out = zb->z.total_out;
 	z_stream *z = &zb->z;
-	int n, ret;
+	int ret;
 
 	z->next_out = zb->outbuf;
 	z->avail_out = zb->outlen;
 
+	if (inlenp)
+		*inlenp = 0;
 	do {
 		if (z->avail_in == 0) {
-			int i;
-			n = fread(zb->inbuf, 1, zb->inlen, f);
+			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
 			if (n == 0) {
 				if (ferror(f))
 					return got_ferror(f, GOT_ERR_IO);
@@ -83,6 +86,8 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
 			}
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
+			if (inlenp)
+				*inlenp += n;
 		}
 		ret = inflate(z, Z_SYNC_FLUSH);
 	} while (ret == Z_OK && z->avail_out > 0);
@@ -103,4 +108,91 @@ got_inflate_end(struct got_zstream_buf *zb)
 	free(zb->inbuf);
 	free(zb->outbuf);
 	inflateEnd(&zb->z);
+}
+
+const struct got_error *
+got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f, size_t insize)
+{
+	const struct got_error *err;
+	size_t inbytes, consumed, avail;
+	struct got_zstream_buf zb;
+	void *newbuf;
+
+	err = got_inflate_init(&zb, 8192);
+	if (err)
+		return err;
+
+	*outbuf = NULL;
+	*outlen = 0;
+	inbytes = 0;
+
+	do {
+		err = got_inflate_read(&zb, f, &consumed, &avail);
+		if (err)
+			return err;
+		inbytes += consumed;
+		if (avail == 0) {
+			if (inbytes < insize)
+				err = got_error(GOT_ERR_BAD_DELTA);
+			break;
+		}
+		newbuf = reallocarray(*outbuf, 1, *outlen + avail);
+		if (newbuf == NULL) {
+			free(*outbuf);
+			*outbuf = NULL;
+			*outlen = 0;
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		memcpy(newbuf + *outlen, zb.outbuf, avail);
+		*outbuf = newbuf;
+		*outlen += avail;
+	} while (inbytes < insize);
+
+done:
+	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_inflate_to_tempfile(FILE **outfile, size_t *outlen, FILE *f)
+{
+	const struct got_error *err;
+	size_t avail;
+	struct got_zstream_buf zb;
+	void *newbuf;
+
+	*outfile = got_opentemp();
+	if (*outfile == NULL)
+		return got_error_from_errno();
+
+	err = got_inflate_init(&zb, 8192);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+
+	do {
+		err = got_inflate_read(&zb, f, NULL, &avail);
+		if (err)
+			return err;
+		if (avail > 0) {
+			size_t n;
+			n = fwrite(zb.outbuf, avail, 1, *outfile);
+			if (n != 1) {
+				err = got_ferror(*outfile, GOT_ERR_IO);
+				goto done;
+			}
+			*outlen += avail;
+		}
+	} while (avail > 0);
+
+done:
+	if (err) {
+		fclose(*outfile);
+		*outfile = NULL;
+	} else
+		rewind(*outfile);
+	got_inflate_end(&zb);
+	return err;
 }
