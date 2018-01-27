@@ -465,6 +465,7 @@ static const struct got_error *
 parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
     char *buf, size_t len)
 {
+	const struct got_error *err;
 	size_t remain = len;
 	int nentries;
 
@@ -478,7 +479,9 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 		struct got_tree_entry *te;
 		size_t elen;
 
-		parse_tree_entry(&te, &elen, buf, remain);
+		err = parse_tree_entry(&te, &elen, buf, remain);
+		if (err)
+			return err;
 		(*tree)->nentries++;
 		SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
 		buf += elen;
