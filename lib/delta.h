@@ -55,12 +55,12 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
 #define GOT_DELTA_SIZE_MORE	0x80
 
 /*
- * A delta stream contains copy opcodes and verbatim data.
+ * The rest of the delta stream contains copy instructions.
  *
- * A copy opcode instructs the delta combiner to copy N bytes starting at
- * offset X from the delta base to the output. Copy opcodes begin with a
- * byte which has its MSB set. The remaining bits of this byte describe how
- * many offset and length value bytes follow.
+ * A base copy instruction tells the delta combiner to copy N bytes starting
+ * at offset X from the delta base to the output. Base copy instructions begin
+ * with a byte which has its MSB set. The remaining bits of this byte describe
+ * how many offset and length value bytes follow.
  * The offset X is encoded in 1 to 4 bytes, and the length N is encoded in
  * 1 to 3 bytes. For both values, the first byte contributes the least
  * significant part and the last byte which is present contributes the
@@ -68,13 +68,14 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
  * If the offset value is omitted, an offset of zero is implied.
  * If the length value is omitted, a default length of 65536 bytes is implied.
  *
- * Verbatim data is copied from the delta stream to the output.
- * Verbatim data is preceded by one byte which does not have the MSB set
- * and which specifies the length of the verbatim data which follows (i.e.
+ * An inline copy instruction tells the delta combiner to copy data from
+ * the delta stream to the output.
+ * Such instructions begin with one byte which does not have the MSB set
+ * and which specifies the length of the inline data which follows (i.e.
  * at most 127 bytes). A length value of zero is invalid.
  */
 
-#define GOT_DELTA_COPY_OPCODE	0x80
+#define GOT_DELTA_BASE_COPY	0x80
 
 #define GOT_DELTA_COPY_OFF1	0x01	/* byte 1 of offset is present */
 #define GOT_DELTA_COPY_OFF2	0x02	/* byte 2 of offset is present */

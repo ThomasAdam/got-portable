@@ -252,7 +252,7 @@ got_delta_apply(FILE *base_compressed, const uint8_t *delta_buf,
 	/* Decode and execute copy instructions from the delta stream. */
 	err = next_delta_byte(&p, &remain);
 	while (err == NULL) {
-		if (*p & GOT_DELTA_COPY_OPCODE) {
+		if (*p & GOT_DELTA_BASE_COPY) {
 			off_t offset = 0;
 			size_t len = 0;
 			err = parse_opcode(&offset, &len, &p, &remain);
