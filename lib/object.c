@@ -510,11 +510,9 @@ read_commit_object(struct got_commit_object **commit,
 	if (err)
 		return err;
 
-	do {
-		err = got_inflate_read(&zb, f, NULL, &len);
-		if (err || len == 0)
-			break;
-	} while (len < obj->hdrlen + obj->size);
+	err = got_inflate_read(&zb, f, NULL, &len);
+	if (err)
+		return err;
 
 	if (len < obj->hdrlen + obj->size) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -579,11 +577,9 @@ read_tree_object(struct got_tree_object **tree,
 	if (err)
 		return err;
 
-	do {
-		err = got_inflate_read(&zb, f, NULL, &len);
-		if (err || len == 0)
-			break;
-	} while (len < obj->hdrlen + obj->size);
+	err = got_inflate_read(&zb, f, NULL, &len);
+	if (err)
+		return err;
 
 	if (len < obj->hdrlen + obj->size) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
