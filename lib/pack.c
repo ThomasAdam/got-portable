@@ -799,30 +799,6 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 }
 
 static const struct got_error *
-dump_plain_object(FILE *infile, uint8_t type, size_t size, FILE *outfile)
-{
-	size_t n;
-
-	while (size > 0) {
-		uint8_t data[2048];
-		size_t len = MIN(size, sizeof(data));
-
-		n = fread(data, len, 1, infile);
-		if (n != 1)
-			return got_ferror(infile, GOT_ERR_BAD_PACKFILE);
-
-		n = fwrite(data, len, 1, outfile);
-		if (n != 1)
-			return got_ferror(outfile, GOT_ERR_IO);
-
-		size -= len;
-	}
-
-	rewind(outfile);
-	return NULL;
-}
-
-static const struct got_error *
 dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 {
 	const struct got_error *err = NULL;
@@ -922,7 +898,7 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 			goto done;
 		}
 
-		err = dump_plain_object(packfile, obj->type, obj->size, *f);
+		err = got_inflate_to_file(&obj->size, packfile, *f);
 	} else
 		err = dump_delta_chain(&obj->deltas, *f);
 done:

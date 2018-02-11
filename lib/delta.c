@@ -27,6 +27,7 @@
 #include "got_object.h"
 
 #include "delta.h"
+#include "path.h"
 #include "zb.h"
 
 #ifndef MIN
@@ -260,8 +261,13 @@ got_delta_apply(FILE *base_compressed, const uint8_t *delta_buf,
 				break;
 			if (base_file == NULL) {
 				size_t inflated_size;
-				err = got_inflate_to_tempfile(&base_file,
-				    &inflated_size, base_compressed);
+				base_file = got_opentemp();
+				if (base_file == NULL) {
+					err = got_error_from_errno();
+					break;
+				}
+				err = got_inflate_to_file(&inflated_size,
+				    base_compressed, base_file);
 				if (err)
 					break;
 				if (inflated_size != base_size) {

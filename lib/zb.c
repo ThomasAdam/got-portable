@@ -155,16 +155,12 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_tempfile(FILE **outfile, size_t *outlen, FILE *f)
+got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 {
 	const struct got_error *err;
 	size_t avail;
 	struct got_zstream_buf zb;
 	void *newbuf;
-
-	*outfile = got_opentemp();
-	if (*outfile == NULL)
-		return got_error_from_errno();
 
 	err = got_inflate_init(&zb, 8192);
 	if (err)
@@ -173,14 +169,14 @@ got_inflate_to_tempfile(FILE **outfile, size_t *outlen, FILE *f)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, f, NULL, &avail);
+		err = got_inflate_read(&zb, infile, NULL, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {
 			size_t n;
-			n = fwrite(zb.outbuf, avail, 1, *outfile);
+			n = fwrite(zb.outbuf, avail, 1, outfile);
 			if (n != 1) {
-				err = got_ferror(*outfile, GOT_ERR_IO);
+				err = got_ferror(outfile, GOT_ERR_IO);
 				goto done;
 			}
 			*outlen += avail;
@@ -188,11 +184,8 @@ got_inflate_to_tempfile(FILE **outfile, size_t *outlen, FILE *f)
 	} while (avail > 0);
 
 done:
-	if (err) {
-		fclose(*outfile);
-		*outfile = NULL;
-	} else
-		rewind(*outfile);
+	if (err == NULL)
+		rewind(outfile);
 	got_inflate_end(&zb);
 	return err;
 }
