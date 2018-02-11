@@ -35,8 +35,8 @@
 #endif
 
 struct got_delta *
-got_delta_open(const char *path_packfile, int type, off_t offset,
-    size_t size)
+got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
+    int type, size_t size)
 {
 	struct got_delta *delta;
 
@@ -51,6 +51,7 @@ got_delta_open(const char *path_packfile, int type, off_t offset,
 	}
 	delta->type = type;
 	delta->offset = offset;
+	delta->tslen = tslen;
 	delta->size = size;
 	return delta;
 }
@@ -224,11 +225,10 @@ copy_from_delta(const uint8_t **p, size_t *remain, size_t len, FILE *outfile)
 }
 
 const struct got_error *
-got_delta_apply(FILE *base_compressed, const uint8_t *delta_buf,
+got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
     size_t delta_len, FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	FILE *base_file = NULL;
 	uint64_t base_size, result_size;
 	size_t remain, outsize = 0;
 	const uint8_t *p;
@@ -259,22 +259,6 @@ got_delta_apply(FILE *base_compressed, const uint8_t *delta_buf,
 			err = parse_opcode(&offset, &len, &p, &remain);
 			if (err)
 				break;
-			if (base_file == NULL) {
-				size_t inflated_size;
-				base_file = got_opentemp();
-				if (base_file == NULL) {
-					err = got_error_from_errno();
-					break;
-				}
-				err = got_inflate_to_file(&inflated_size,
-				    base_compressed, base_file);
-				if (err)
-					break;
-				if (inflated_size != base_size) {
-					err = got_error(GOT_ERR_BAD_DELTA);
-					break;
-				}
-			}
 			err = copy_from_base(base_file, offset, len, outfile);
 			if (err == NULL)
 				outsize += len;
@@ -304,8 +288,6 @@ got_delta_apply(FILE *base_compressed, const uint8_t *delta_buf,
 	if (outsize != result_size)
 		err = got_error(GOT_ERR_BAD_DELTA);
 
-	if (base_file)
-		fclose(base_file);
 	if (err == NULL)
 		rewind(outfile);
 	return err;

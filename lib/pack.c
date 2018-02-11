@@ -548,8 +548,9 @@ parse_offset_delta(off_t *base_offset, FILE *packfile, off_t offset)
 	return NULL;
 }
 
-static const struct got_error *resolve_delta_chain(struct got_delta_chain *,
-    struct got_repository *repo, FILE *, const char *, int, off_t, size_t);
+static const struct got_error *
+resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
+    FILE *, const char *, off_t, size_t, int, size_t);
 
 static const struct got_error *
 resolve_offset_delta(struct got_delta_chain *deltas,
@@ -576,7 +577,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 		return err;
 
 	return resolve_delta_chain(deltas, repo, packfile, path_packfile,
-	    base_type, base_offset + base_tslen, base_size);
+	    base_offset, base_tslen, base_type, base_size);
 }
 
 static const struct got_error *
@@ -625,7 +626,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		goto done;
 
 	err = resolve_delta_chain(deltas, repo, base_packfile,
-	    path_base_packfile, base_type, base_offset + base_tslen, base_size);
+	    path_base_packfile, base_offset, base_tslen, base_type,
+	    base_size);
 done:
 	free(path_base_packfile);
 	if (base_packfile && fclose(base_packfile) == -1 && err == 0)
@@ -635,14 +637,14 @@ done:
 
 static const struct got_error *
 resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
-    FILE *packfile, const char *path_packfile, int delta_type,
-    off_t delta_offset, size_t delta_size)
+    FILE *packfile, const char *path_packfile, off_t delta_offset, size_t tslen,
+    int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 
-	delta = got_delta_open(path_packfile, delta_type, delta_offset,
-	    delta_size);
+	delta = got_delta_open(path_packfile, delta_offset, tslen,
+	    delta_type, delta_size);
 	if (delta == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 	deltas->nentries++;
@@ -705,7 +707,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 
 	err = resolve_delta_chain(&(*obj)->deltas, repo, packfile,
-	    path_packfile, delta_type, offset, delta_size);
+	    path_packfile, offset, tslen, delta_type, delta_size);
 	if (err)
 		goto done;
 
@@ -830,7 +832,8 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			goto done;
 		}
 
-		if (fseeko(delta_file, delta->offset, SEEK_SET) != 0) {
+		if (fseeko(delta_file, delta->offset + delta->tslen,
+		    SEEK_SET) != 0) {
 			fclose(delta_file);
 			err = got_error_from_errno();
 			goto done;
@@ -854,6 +857,13 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			n++;
 			rewind(base_file);
 			continue;
+		}
+
+		if (delta->type == GOT_OBJ_TYPE_REF_DELTA &&
+		    fseeko(delta_file, SHA1_DIGEST_LENGTH, SEEK_CUR) != 0) {
+			fclose(delta_file);
+			err = got_error_from_errno();
+			goto done;
 		}
 
 		/* Delta streams should always fit in memory. */

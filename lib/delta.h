@@ -18,6 +18,7 @@ struct got_delta {
 	SIMPLEQ_ENTRY(got_delta) entry;
 	char *path_packfile;
 	off_t offset;
+	size_t tslen;
 	int type;
 	size_t size;
 };
@@ -27,7 +28,7 @@ struct got_delta_chain {
 	SIMPLEQ_HEAD(, got_delta) entries;
 };
 
-struct got_delta *got_delta_open(const char *, int, off_t, size_t);
+struct got_delta *got_delta_open(const char *, off_t, size_t, int, size_t);
 void got_delta_close(struct got_delta *);
 const struct got_error *got_delta_chain_get_base_type(int *,
     struct got_delta_chain *);
