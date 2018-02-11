@@ -836,12 +836,31 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			goto done;
 		}
 
+		if (n == 0) {
+			/* Plain object types are the delta base. */
+			if (delta->type != GOT_OBJ_TYPE_COMMIT &&
+			    delta->type != GOT_OBJ_TYPE_TREE &&
+			    delta->type != GOT_OBJ_TYPE_BLOB &&
+			    delta->type != GOT_OBJ_TYPE_TAG) {
+				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
+				goto done;
+			}
+
+			err = got_inflate_to_file(&delta_len, delta_file,
+			    base_file);
+			fclose(delta_file);
+			if (err)
+				goto done;
+			n++;
+			rewind(base_file);
+			continue;
+		}
+
 		/* Delta streams should always fit in memory. */
 		err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file);
-		if (err)
-			return err;
-
 		fclose(delta_file);
+		if (err)
+			goto done;
 
 		err = got_delta_apply(base_file, delta_buf, delta_len,
 		    /* Final delta application writes to the output file. */
