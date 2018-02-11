@@ -178,7 +178,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 			}
 			*outlen += avail;
 		}
-	} while (avail > 0);
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
 
 done:
 	if (err == NULL)
