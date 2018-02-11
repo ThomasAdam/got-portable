@@ -44,52 +44,6 @@ struct delta_test {
 	{ "aabbccdd", "\x08\x08\x91\x04\x04\x04xxxx", 10, "ccddxxxx" },
 };
 
-static const struct got_error *
-compress_to_file(FILE **outfile, const char *input, size_t inlen)
-{
-	const struct got_error *err = NULL;
-	z_stream z;
-	char buf[2048];
-	char *inbuf;
-	int ret;
-	size_t n;
-
-	memset(&z, 0, sizeof(z));
-	z.zalloc = Z_NULL;
-	z.zfree = Z_NULL;
-
-	if (deflateInit(&z, 8) != Z_OK)
-		return got_error(GOT_ERR_IO);
-
-	*outfile = got_opentemp();
-	if (*outfile == NULL)
-		return got_error_from_errno();
-
-	z.next_in = (Bytef *)input;
-	z.avail_in = inlen;
-	z.next_out = buf;
-	z.avail_out = sizeof(buf);
-	/* Our output buffer is large enough so one round should be enough. */
-	ret = deflate(&z, Z_FINISH);
-	if (ret != Z_STREAM_END || z.avail_out == 0) {
-		err = got_error(GOT_ERR_COMPRESSION);
-		goto done;
-	}
-
-	deflateEnd(&z);
-
-	n = fwrite(buf, 1, z.avail_out, *outfile);
-	if (n != z.avail_out)
-		err = got_ferror(*outfile, GOT_ERR_IO);
-done:
-	if (err) {
-		fclose(*outfile);
-		*outfile = NULL;
-	} else
-		rewind(*outfile);
-	return err;
-}
-
 static int
 delta_combine()
 {
@@ -108,9 +62,18 @@ delta_combine()
 		size_t n, len, result_len;
 
 		len = strlen(dt->base);
-		err = compress_to_file(&base_file, dt->base, len);
-		if (err)
+		base_file = got_opentemp();
+		if (base_file == NULL) {
+			err = got_error_from_errno();
 			break;
+		}
+
+		n = fwrite(dt->base, 1, len, base_file);
+		if (n != len) {
+			err = got_ferror(base_file, GOT_ERR_IO);
+			break;
+		}
+		rewind(base_file);
 
 		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
 		    result_file);
