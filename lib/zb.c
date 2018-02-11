@@ -63,8 +63,7 @@ done:
 }
 
 const struct got_error *
-got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
-    size_t *outlenp)
+got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *outlenp)
 {
 	size_t last_total_out = zb->z.total_out;
 	z_stream *z = &zb->z;
@@ -74,8 +73,6 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
 	z->avail_out = zb->outlen;
 
 	*outlenp = 0;
-	if (inlenp)
-		*inlenp = 0;
 	do {
 		if (z->avail_in == 0) {
 			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
@@ -86,8 +83,6 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
 			}
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
-			if (inlenp)
-				*inlenp += n;
 		}
 		ret = inflate(z, Z_SYNC_FLUSH);
 	} while (ret == Z_OK && z->avail_out > 0);
@@ -128,7 +123,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, f, NULL, &avail);
+		err = got_inflate_read(&zb, f, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {
@@ -166,7 +161,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, infile, NULL, &avail);
+		err = got_inflate_read(&zb, infile, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {
