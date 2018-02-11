@@ -126,13 +126,13 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f, size_t insize)
 	*outlen = 0;
 	inbytes = 0;
 
-	do {
+	while (1) {
 		err = got_inflate_read(&zb, f, &consumed, &avail);
 		if (err)
 			return err;
 		inbytes += consumed;
 		if (avail == 0) {
-			if (inbytes < insize)
+			if (insize && inbytes < insize)
 				err = got_error(GOT_ERR_BAD_DELTA);
 			break;
 		}
@@ -147,7 +147,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f, size_t insize)
 		memcpy(newbuf + *outlen, zb.outbuf, avail);
 		*outbuf = newbuf;
 		*outlen += avail;
-	} while (inbytes < insize);
+	};
 
 done:
 	got_inflate_end(&zb);
