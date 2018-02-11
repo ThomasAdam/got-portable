@@ -839,8 +839,7 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 		}
 
 		/* Delta streams should always fit in memory. */
-		err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file,
-		    delta->size);
+		err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file);
 		if (err)
 			return err;
 

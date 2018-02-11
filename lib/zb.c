@@ -92,10 +92,12 @@ got_inflate_read(struct got_zstream_buf *zb, FILE *f, size_t *inlenp,
 		ret = inflate(z, Z_SYNC_FLUSH);
 	} while (ret == Z_OK && z->avail_out > 0);
 
-	if (ret != Z_OK) {
+	if (ret == Z_OK) {
+		zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
+	} else {
 		if (ret != Z_STREAM_END)
 			return got_error(GOT_ERR_DECOMPRESSION);
-		zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
+		zb->flags &= ~GOT_ZSTREAM_F_HAVE_MORE;
 	}
 
 	*outlenp = z->total_out - last_total_out;
@@ -111,10 +113,10 @@ got_inflate_end(struct got_zstream_buf *zb)
 }
 
 const struct got_error *
-got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f, size_t insize)
+got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 {
 	const struct got_error *err;
-	size_t inbytes, consumed, avail;
+	size_t consumed, avail;
 	struct got_zstream_buf zb;
 	void *newbuf;
 
@@ -124,30 +126,25 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f, size_t insize)
 
 	*outbuf = NULL;
 	*outlen = 0;
-	inbytes = 0;
 
-	while (1) {
+	do {
 		err = got_inflate_read(&zb, f, &consumed, &avail);
 		if (err)
 			return err;
-		inbytes += consumed;
-		if (avail == 0) {
-			if (insize && inbytes < insize)
-				err = got_error(GOT_ERR_BAD_DELTA);
-			break;
+		if (avail > 0) {
+			newbuf = reallocarray(*outbuf, 1, *outlen + avail);
+			if (newbuf == NULL) {
+				free(*outbuf);
+				*outbuf = NULL;
+				*outlen = 0;
+				err = got_error(GOT_ERR_NO_MEM);
+				goto done;
+			}
+			memcpy(newbuf + *outlen, zb.outbuf, avail);
+			*outbuf = newbuf;
+			*outlen += avail;
 		}
-		newbuf = reallocarray(*outbuf, 1, *outlen + avail);
-		if (newbuf == NULL) {
-			free(*outbuf);
-			*outbuf = NULL;
-			*outlen = 0;
-			err = got_error(GOT_ERR_NO_MEM);
-			goto done;
-		}
-		memcpy(newbuf + *outlen, zb.outbuf, avail);
-		*outbuf = newbuf;
-		*outlen += avail;
-	};
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
 
 done:
 	got_inflate_end(&zb);
