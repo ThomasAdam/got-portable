@@ -553,17 +553,45 @@ resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
     FILE *, const char *, off_t, size_t, int, size_t);
 
 static const struct got_error *
+add_delta(struct got_delta_chain *deltas, const char *path_packfile,
+    off_t delta_offset, size_t tslen, int delta_type, size_t delta_size,
+    size_t delta_data_offset)
+{
+	struct got_delta *delta;
+
+	delta = got_delta_open(path_packfile, delta_offset, tslen,
+	    delta_type, delta_size, delta_data_offset);
+	if (delta == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+	/* delta is freed in got_object_close() */
+	deltas->nentries++;
+	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
+	return NULL;
+}
+
+static const struct got_error *
 resolve_offset_delta(struct got_delta_chain *deltas,
     struct got_repository *repo, FILE *packfile, const char *path_packfile,
-    off_t delta_offset)
+    off_t delta_offset,size_t tslen, int delta_type, size_t delta_size)
+
 {
 	const struct got_error *err;
 	off_t base_offset;
 	uint8_t base_type;
 	uint64_t base_size;
 	size_t base_tslen;
+	off_t delta_data_offset;
 
 	err = parse_offset_delta(&base_offset, packfile, delta_offset);
+	if (err)
+		return err;
+
+	delta_data_offset = ftello(packfile);
+	if (delta_data_offset == -1)
+		return got_error_from_errno();
+
+	err = add_delta(deltas, path_packfile, delta_offset, tslen,
+	    delta_type, delta_size, delta_data_offset);
 	if (err)
 		return err;
 
@@ -582,7 +610,8 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 
 static const struct got_error *
 resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
-    FILE *packfile, const char *path_packfile, off_t delta_offset)
+    FILE *packfile, const char *path_packfile, off_t delta_offset,
+    size_t tslen, int delta_type, size_t delta_size)
 {
 	const struct got_error *err;
 	struct got_object_id id;
@@ -595,10 +624,20 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	size_t n;
 	FILE *base_packfile;
 	char *path_base_packfile;
+	off_t delta_data_offset;
 
 	n = fread(&id, sizeof(id), 1, packfile);
 	if (n != 1)
 		return got_ferror(packfile, GOT_ERR_IO);
+
+	delta_data_offset = ftello(packfile);
+	if (delta_data_offset == -1)
+		return got_error_from_errno();
+
+	err = add_delta(deltas, path_packfile, delta_offset, tslen,
+	    delta_type, delta_size, delta_data_offset);
+	if (err)
+		return err;
 
 	err = search_packidx(&packidx, &idx, repo, &id);
 	if (err)
@@ -641,15 +680,6 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
     int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
-	struct got_delta *delta;
-
-	delta = got_delta_open(path_packfile, delta_offset, tslen,
-	    delta_type, delta_size);
-	if (delta == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-	deltas->nentries++;
-	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
-	/* In case of error below, delta is freed in got_object_close(). */
 
 	switch (delta_type) {
 	case GOT_OBJ_TYPE_COMMIT:
@@ -657,14 +687,18 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		/* Plain types are the final delta base. Recursion ends. */
+		err = add_delta(deltas, path_packfile, delta_offset, tslen,
+		    delta_type, delta_size, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		err = resolve_offset_delta(deltas, repo, packfile,
-		    path_packfile, delta_offset);
+		    path_packfile, delta_offset, tslen, delta_type,
+		    delta_size);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
-		err = resolve_ref_delta(deltas, repo, packfile, path_packfile,
-		    delta_offset);
+		err = resolve_ref_delta(deltas, repo, packfile,
+		    path_packfile, delta_offset, tslen, delta_type,
+		    delta_size);
 		break;
 	default:
 		return got_error(GOT_ERR_NOT_IMPL);
@@ -832,12 +866,6 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			goto done;
 		}
 
-		if (fseeko(delta_file, delta->offset + delta->tslen,
-		    SEEK_SET) != 0) {
-			fclose(delta_file);
-			err = got_error_from_errno();
-			goto done;
-		}
 
 		if (n == 0) {
 			/* Plain object types are the delta base. */
@@ -849,6 +877,12 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 				goto done;
 			}
 
+			if (fseeko(delta_file, delta->offset + delta->tslen,
+			    SEEK_SET) != 0) {
+				fclose(delta_file);
+				err = got_error_from_errno();
+				goto done;
+			}
 			err = got_inflate_to_file(&delta_len, delta_file,
 			    base_file);
 			fclose(delta_file);
@@ -859,8 +893,7 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			continue;
 		}
 
-		if (delta->type == GOT_OBJ_TYPE_REF_DELTA &&
-		    fseeko(delta_file, SHA1_DIGEST_LENGTH, SEEK_CUR) != 0) {
+		if (fseeko(delta_file, delta->data_offset, SEEK_CUR) != 0) {
 			fclose(delta_file);
 			err = got_error_from_errno();
 			goto done;

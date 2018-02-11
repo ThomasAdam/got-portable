@@ -36,7 +36,7 @@
 
 struct got_delta *
 got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
-    int type, size_t size)
+    int type, size_t size, off_t data_offset)
 {
 	struct got_delta *delta;
 
@@ -53,6 +53,7 @@ got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
 	delta->offset = offset;
 	delta->tslen = tslen;
 	delta->size = size;
+	delta->data_offset = data_offset;
 	return delta;
 }
 
