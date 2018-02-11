@@ -252,7 +252,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 
 	/* Decode and execute copy instructions from the delta stream. */
 	err = next_delta_byte(&p, &remain);
-	while (err == NULL) {
+	while (err == NULL && remain > 0) {
 		if (*p & GOT_DELTA_BASE_COPY) {
 			off_t offset = 0;
 			size_t len = 0;
@@ -260,8 +260,13 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			if (err)
 				break;
 			err = copy_from_base(base_file, offset, len, outfile);
-			if (err == NULL)
+			if (err == NULL) {
 				outsize += len;
+				if (remain > 0) {
+					p++;
+					remain--;
+				}
+			}
 		} else {
 			size_t len = (size_t)*p;
 			if (len == 0) {
@@ -270,18 +275,10 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			}
 			err = next_delta_byte(&p, &remain);
 			if (err)
-				return err;
+				break;
 			err = copy_from_delta(&p, &remain, len, outfile);
 			if (err == NULL)
 				outsize += len;
-		}
-
-		if (err == NULL) {
-			if (remain == 0)
-				break;
-			/* Fetch the next instruction. */
-			p++;
-			remain--;
 		}
 	}
 
