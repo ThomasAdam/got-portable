@@ -66,11 +66,11 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 		idstr1 = got_object_id_str(&blob1->id, hex1, sizeof(hex1));
 		hdrlen = blob1->hdrlen;
 		do {
-			err = got_object_blob_read_block(blob1, &len);
+			err = got_object_blob_read_block(&len, blob1);
 			if (err)
 				goto done;
 			/* Skip blob object header first time around. */
-			fwrite(blob1->zb.outbuf + hdrlen, len - hdrlen, 1, f1);
+			fwrite(blob1->read_buf + hdrlen, len - hdrlen, 1, f1);
 			hdrlen = 0;
 		} while (len != 0);
 	} else
@@ -80,11 +80,11 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 		idstr2 = got_object_id_str(&blob2->id, hex2, sizeof(hex2));
 		hdrlen = blob2->hdrlen;
 		do {
-			err = got_object_blob_read_block(blob2, &len);
+			err = got_object_blob_read_block(&len, blob2);
 			if (err)
 				goto done;
 			/* Skip blob object header first time around. */
-			fwrite(blob2->zb.outbuf + hdrlen, len - hdrlen, 1, f2);
+			fwrite(blob2->read_buf + hdrlen, len - hdrlen, 1, f2);
 			hdrlen = 0;
 		} while (len != 0);
 	} else

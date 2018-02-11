@@ -237,11 +237,11 @@ repo_read_blob(const char *repo_path)
 
 	test_printf("\n");
 	do {
-		err = got_object_blob_read_block(blob, &len);
+		err = got_object_blob_read_block(&len, blob);
 		if (err)
 			break;
 		for (i = 0; i < len; i++)
-			test_printf("%c", blob->zb.outbuf[i]);
+			test_printf("%c", blob->read_buf[i]);
 	} while (len != 0);
 	test_printf("\n");
 

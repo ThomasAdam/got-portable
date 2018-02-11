@@ -199,13 +199,10 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 }
 
 static const struct got_error *
-fopen_object(FILE **f, struct got_object *obj, struct got_repository *repo)
+open_loose_object(FILE **f, struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
-
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		return got_packfile_extract_object(f, obj, repo);
 
 	err = object_path(&path, &obj->id, repo);
 	if (err)
@@ -349,6 +346,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
 		(*commit)->nparents++;
 
+		remain -= SHA1_DIGEST_STRING_LENGTH;
 		s += SHA1_DIGEST_STRING_LENGTH;
 	}
 
@@ -374,6 +372,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			goto done;
 		}
 		s += strlen((*commit)->author) + 1;
+		remain -= strlen((*commit)->author) + 1;
 	}
 
 	tlen = strlen(GOT_COMMIT_TAG_COMMITTER);
@@ -398,9 +397,14 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			goto done;
 		}
 		s += strlen((*commit)->committer) + 1;
+		remain -= strlen((*commit)->committer) + 1;
 	}
 
-	(*commit)->logmsg = strdup(s);
+	(*commit)->logmsg = strndup(s, remain);
+	if ((*commit)->logmsg == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
 done:
 	if (err)
 		got_object_commit_close(*commit);
@@ -497,20 +501,67 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 }
 
 static const struct got_error *
+read_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
+{
+	const struct got_error *err = NULL;
+	static const size_t blocksize = 512;
+	size_t n, total, remain;
+	uint8_t *buf;
+
+	*outbuf = NULL;
+	*outlen = 0;
+
+	buf = calloc(1, blocksize);
+	if (buf == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	remain = blocksize;
+	total = 0;
+	while (1) {
+		if (remain == 0) {
+			uint8_t *newbuf;
+			newbuf = reallocarray(buf, 1, total + blocksize);
+			if (newbuf == NULL) {
+				err = got_error(GOT_ERR_NO_MEM);
+				goto done;
+			}
+			buf = newbuf;
+			remain += blocksize;
+		}
+		n = fread(buf, 1, remain, f);
+		if (n == 0) {
+			if (ferror(f)) {
+				err = got_ferror(f, GOT_ERR_IO);
+				goto done;
+			}
+			break; /* EOF */
+		}
+		remain -= n;
+		total += n;
+	};
+
+done:
+	if (err == NULL) {
+		*outbuf = buf;
+		*outlen = total;
+	} else
+		free(buf);
+	return err;
+}
+
+static const struct got_error *
 read_commit_object(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, FILE *f)
 {
 	const struct got_error *err = NULL;
-	struct got_zstream_buf zb;
 	size_t len;
-	char *p;
+	uint8_t *p;
 	int i, ret;
 
-	err = got_inflate_init(&zb, 8192);
-	if (err)
-		return err;
-
-	err = got_inflate_read(&zb, f, &len);
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		err = read_to_mem(&p, &len, f);
+	else
+		err = got_inflate_to_mem(&p, &len, f);
 	if (err)
 		return err;
 
@@ -521,9 +572,9 @@ read_commit_object(struct got_commit_object **commit,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = parse_commit_object(commit, zb.outbuf + obj->hdrlen, len);
+	err = parse_commit_object(commit, p + obj->hdrlen, len);
+	free(p);
 done:
-	got_inflate_end(&zb);
 	return err;
 }
 
@@ -537,7 +588,10 @@ got_object_commit_open(struct got_commit_object **commit,
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = fopen_object(&f, obj, repo);
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		err = got_packfile_extract_object(&f, obj, repo);
+	else
+		err = open_loose_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -568,16 +622,14 @@ read_tree_object(struct got_tree_object **tree,
     struct got_repository *repo, struct got_object *obj, FILE *f)
 {
 	const struct got_error *err = NULL;
-	struct got_zstream_buf zb;
 	size_t len;
-	char *p;
+	uint8_t *p;
 	int i, ret;
 
-	err = got_inflate_init(&zb, 8192);
-	if (err)
-		return err;
-
-	err = got_inflate_read(&zb, f, &len);
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		err = read_to_mem(&p, &len, f);
+	else
+		err = got_inflate_to_mem(&p, &len, f);
 	if (err)
 		return err;
 
@@ -588,9 +640,9 @@ read_tree_object(struct got_tree_object **tree,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = parse_tree_object(tree, repo, zb.outbuf + obj->hdrlen, len);
+	err = parse_tree_object(tree, repo, p + obj->hdrlen, len);
+	free(p);
 done:
-	got_inflate_end(&zb);
 	return err;
 }
 
@@ -604,7 +656,10 @@ got_object_tree_open(struct got_tree_object **tree,
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	err = fopen_object(&f, obj, repo);
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		err = got_packfile_extract_object(&f, obj, repo);
+	else
+		err = open_loose_object(&f, obj, repo);
 	if (err)
 		return err;
 
@@ -643,20 +698,33 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	err = fopen_object(&((*blob)->f), obj, repo);
-	if (err) {
-		free(*blob);
-		return err;
-	}
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		(*blob)->read_buf = calloc(1, blocksize);
+		if ((*blob)->read_buf == NULL)
+			return got_error(GOT_ERR_NO_MEM);
+		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
+		if (err)
+			return err;
+	} else {
+		err = open_loose_object(&((*blob)->f), obj, repo);
+		if (err) {
+			free(*blob);
+			return err;
+		}
 
-	err = got_inflate_init(&(*blob)->zb, blocksize);
-	if (err != NULL) {
-		fclose((*blob)->f);
-		free(*blob);
-		return err;
+		err = got_inflate_init(&(*blob)->zb, blocksize);
+		if (err != NULL) {
+			fclose((*blob)->f);
+			free(*blob);
+			return err;
+		}
+
+		(*blob)->read_buf = (*blob)->zb.outbuf;
+		(*blob)->flags |= GOT_BLOB_F_COMPRESSED;
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
+	(*blob)->blocksize = blocksize;
 	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 
 	return err;
@@ -665,13 +733,25 @@ got_object_blob_open(struct got_blob_object **blob,
 void
 got_object_blob_close(struct got_blob_object *blob)
 {
-	got_inflate_end(&blob->zb);
+	if (blob->flags & GOT_BLOB_F_COMPRESSED)
+		got_inflate_end(&blob->zb);
+	else
+		free(blob->read_buf);
 	fclose(blob->f);
 	free(blob);
 }
 
 const struct got_error *
-got_object_blob_read_block(struct got_blob_object *blob, size_t *outlenp)
+got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 {
-	return got_inflate_read(&blob->zb, blob->f, outlenp);
+	size_t n;
+
+	if (blob->flags & GOT_BLOB_F_COMPRESSED)
+		return got_inflate_read(&blob->zb, blob->f, outlenp);
+
+	n = fread(blob->read_buf, 1, blob->blocksize, blob->f);
+	if (n == 0 && ferror(blob->f))
+		return got_ferror(blob->f, GOT_ERR_IO);
+	*outlenp = n;
+	return NULL;
 }
