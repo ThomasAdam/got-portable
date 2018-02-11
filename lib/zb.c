@@ -116,7 +116,7 @@ const struct got_error *
 got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 {
 	const struct got_error *err;
-	size_t consumed, avail;
+	size_t avail;
 	struct got_zstream_buf zb;
 	void *newbuf;
 
@@ -128,7 +128,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, f, &consumed, &avail);
+		err = got_inflate_read(&zb, f, NULL, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {
