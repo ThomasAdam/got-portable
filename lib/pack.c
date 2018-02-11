@@ -301,8 +301,6 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 
 		if (cmp == 0)
 			return i;
-		else if (cmp > 0)
-			break;
 		i++;
 	}
 

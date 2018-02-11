@@ -207,6 +207,37 @@ repo_read_log(const char *repo_path)
 }
 
 static int
+repo_read_tree(const char *repo_path)
+{
+	const char *tree_sha1 = "6cc96e0e093fb30630ba7f199d0a008b24c6a690";
+	const struct got_error *err;
+	struct got_repository *repo;
+	struct got_object_id id;
+	struct got_object *obj;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	int i;
+	size_t len;
+
+	if (!got_parse_sha1_digest(id.sha1, tree_sha1))
+		return 0;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		return 0;
+	err = got_object_open(&obj, repo, &id);
+	if (err != NULL || obj == NULL)
+		return 0;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE)
+		return 0;
+
+	print_tree_object(obj, "", repo);
+	test_printf("\n");
+
+	got_object_close(obj);
+	got_repo_close(repo);
+	return (err == NULL);
+}
+static int
 repo_read_blob(const char *repo_path)
 {
 	const char *blob_sha1 = "141f5fdc96126c1f4195558560a3c915e3d9b4c3";
@@ -407,6 +438,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+	RUN_TEST(repo_read_tree(repo_path), "read_tree");
 	RUN_TEST(repo_read_log(repo_path), "read_log");
 	RUN_TEST(repo_read_blob(repo_path), "read_blob");
 	RUN_TEST(repo_diff_blob(repo_path), "diff_blob");
