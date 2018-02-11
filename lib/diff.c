@@ -69,6 +69,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 			err = got_object_blob_read_block(&len, blob1);
 			if (err)
 				goto done;
+			if (len == 0)
+				break;
 			/* Skip blob object header first time around. */
 			fwrite(blob1->read_buf + hdrlen, len - hdrlen, 1, f1);
 			hdrlen = 0;
@@ -83,6 +85,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 			err = got_object_blob_read_block(&len, blob2);
 			if (err)
 				goto done;
+			if (len == 0)
+				break;
 			/* Skip blob object header first time around. */
 			fwrite(blob2->read_buf + hdrlen, len - hdrlen, 1, f2);
 			hdrlen = 0;
@@ -90,10 +94,14 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	} else
 		idstr2 = "/dev/null";
 
-	if (f1)
+	if (f1) {
 		fflush(f1);
-	if (f2)
+		rewind(f1);
+	}
+	if (f2) {
 		fflush(f2);
+		rewind(f2);
+	}
 
 	memset(&ds, 0, sizeof(ds));
 	/* XXX should stat buffers be passed in args instead of ds? */
