@@ -298,6 +298,7 @@ repo_diff_blob(const char *repo_path)
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
+	FILE *outfile;
 
 	if (!got_parse_sha1_digest(id1.sha1, blob1_sha1))
 		return 0;
@@ -328,7 +329,13 @@ repo_diff_blob(const char *repo_path)
 		return 0;
 
 	test_printf("\n");
-	got_diff_blob(blob1, blob2, NULL, NULL, stdout);
+	if (!verbose) {
+		outfile = fopen("/dev/null", "w+");
+		if (outfile == NULL)
+			return 0;
+	} else
+		outfile = stdout;
+	got_diff_blob(blob1, blob2, NULL, NULL, outfile);
 	test_printf("\n");
 
 	got_object_blob_close(blob1);
@@ -355,6 +362,7 @@ repo_diff_tree(const char *repo_path)
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
+	FILE *outfile;
 
 	if (!got_parse_sha1_digest(id1.sha1, tree1_sha1))
 		return 0;
@@ -384,8 +392,14 @@ repo_diff_tree(const char *repo_path)
 	if (err != NULL)
 		return 0;
 
+	if (!verbose) {
+		outfile = fopen("/dev/null", "w+");
+		if (outfile == NULL)
+			return 0;
+	} else
+		outfile = stdout;
 	test_printf("\n");
-	got_diff_tree(tree1, tree2, repo, stdout);
+	got_diff_tree(tree1, tree2, repo, outfile);
 	test_printf("\n");
 
 	got_object_tree_close(tree1);
