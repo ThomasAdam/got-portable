@@ -268,11 +268,12 @@ repo_read_blob(const char *repo_path)
 
 	test_printf("\n");
 	do {
+		const uint8_t *buf = got_object_blob_get_read_buf(blob);
 		err = got_object_blob_read_block(&len, blob);
 		if (err)
 			break;
 		for (i = 0; i < len; i++)
-			test_printf("%c", blob->read_buf[i]);
+			test_printf("%c", buf[i]);
 	} while (len != 0);
 	test_printf("\n");
 

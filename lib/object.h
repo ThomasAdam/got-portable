@@ -28,3 +28,14 @@ struct got_object {
 	off_t pack_offset;	/* if packed */
 	struct got_delta_chain deltas; /* if deltified */
 };
+
+struct got_blob_object {
+	FILE *f;
+	struct got_zstream_buf zb;
+	size_t hdrlen;
+	size_t blocksize;
+	uint8_t *read_buf;
+	int flags;
+#define GOT_BLOB_F_COMPRESSED	0x01
+	struct got_object_id id;
+};

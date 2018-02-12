@@ -28,16 +28,7 @@ struct got_object_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 };
 
-struct got_blob_object {
-	FILE *f;
-	struct got_zstream_buf zb;
-	size_t hdrlen;
-	size_t blocksize;
-	uint8_t *read_buf;
-	int flags;
-#define GOT_BLOB_F_COMPRESSED	0x01
-	struct got_object_id id;
-};
+struct got_blob_object;
 
 struct got_tree_entry {
 	SIMPLEQ_ENTRY(got_tree_entry) entry;
@@ -93,5 +84,8 @@ void got_object_tree_close(struct got_tree_object *);
 const struct got_error *got_object_blob_open(struct got_blob_object **,
     struct got_repository *, struct got_object *, size_t);
 void got_object_blob_close(struct got_blob_object *);
+char *got_object_blob_id_str(struct got_blob_object*, char *, size_t);
+size_t got_object_blob_get_hdrlen(struct got_blob_object *);
+const uint8_t *got_object_blob_get_read_buf(struct got_blob_object *);
 const struct got_error *got_object_blob_read_block(size_t *,
     struct got_blob_object *);

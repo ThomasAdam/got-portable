@@ -741,6 +741,24 @@ got_object_blob_close(struct got_blob_object *blob)
 	free(blob);
 }
 
+char *
+got_object_blob_id_str(struct got_blob_object *blob, char *buf, size_t size)
+{
+	return got_sha1_digest_to_str(blob->id.sha1, buf, size);
+}
+
+size_t
+got_object_blob_get_hdrlen(struct got_blob_object *blob)
+{
+	return blob->hdrlen;
+}
+
+const uint8_t *
+got_object_blob_get_read_buf(struct got_blob_object *blob)
+{
+	return blob->read_buf;
+}
+
 const struct got_error *
 got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 {
