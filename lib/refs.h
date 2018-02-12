@@ -14,21 +14,25 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* A symbolic reference. */
+struct got_symref {
+	char *name;
+	char *ref;
+};
+
+/* A non-symbolic reference (there is no better designation). */
+struct got_ref {
+	char *name;
+	u_int8_t sha1[SHA1_DIGEST_LENGTH];
+};
+
 /* A reference which points to an arbitrary object. */
-struct got_reference;
+struct got_reference {
+	unsigned int flags;
+#define GOT_REF_IS_SYMBOLIC	0x01
 
-/* Well-known reference names. */
-#define GOT_REF_HEAD		"HEAD"
-#define GOT_REF_ORIG_HEAD	"ORIG_HEAD"
-#define GOT_REF_MERGE_HEAD	"MERGE_HEAD"
-#define GOT_REF_FETCH_HEAD	"FETCH_HEAD"
-
-struct got_repository;
-struct got_object_id;
-
-const struct got_error * got_ref_open(struct got_reference **,
-    struct got_repository *, const char *);
-void got_ref_close(struct got_reference *);
-struct got_reference *got_ref_dup(struct got_reference *);
-const struct got_error *got_ref_resolve(struct got_object_id **,
-    struct got_repository *, struct got_reference *);
+	union {
+		struct got_ref ref;
+		struct got_symref symref;
+	} ref;
+};

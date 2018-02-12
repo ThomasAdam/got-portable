@@ -34,6 +34,7 @@
 #include "delta.h"
 #include "zb.h"
 #include "object.h"
+#include "refs.h"
 
 static const struct got_error *
 parse_symref(struct got_reference **ref, const char *name, const char *line)
