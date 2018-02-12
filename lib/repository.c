@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,10 @@
 #include "got_repository.h"
 
 #include "path.h"
+
+struct got_repository {
+	char *path;
+};
 
 #define GOT_GIT_DIR	".git"
 

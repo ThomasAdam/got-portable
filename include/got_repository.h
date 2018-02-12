@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,9 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_repository {
-	char *path;
-};
+struct got_repository;
 
 /* Open and close git repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *);
