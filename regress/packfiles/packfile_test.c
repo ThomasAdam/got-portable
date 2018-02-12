@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sha1.h>
-#include <zlib.h>
 
 #include "got_error.h"
 #include "got_object.h"

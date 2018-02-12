@@ -21,8 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
-#include <zlib.h>
 #include <unistd.h>
 
 #include "got_error.h"
@@ -224,7 +222,6 @@ repo_read_tree(const char *repo_path)
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_object *obj;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 
@@ -252,7 +249,6 @@ repo_read_blob(const char *repo_path)
 	struct got_repository *repo;
 	struct got_object *obj;
 	struct got_blob_object *blob;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 
@@ -297,7 +293,6 @@ repo_diff_blob(const char *repo_path)
 	struct got_object *obj2;
 	struct got_blob_object *blob1;
 	struct got_blob_object *blob2;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 	FILE *outfile;
@@ -354,7 +349,6 @@ repo_diff_tree(const char *repo_path)
 	struct got_object *obj2;
 	struct got_tree_object *tree1;
 	struct got_tree_object *tree2;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 	FILE *outfile;
