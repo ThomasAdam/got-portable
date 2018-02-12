@@ -32,8 +32,8 @@
 #include "got_sha1.h"
 #include "pack.h"
 #include "delta.h"
-#include "object.h"
 #include "zb.h"
+#include "object.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

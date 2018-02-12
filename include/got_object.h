@@ -14,16 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_zstream_buf {
-	z_stream z;
-	char *inbuf;
-	size_t inlen;
-	char *outbuf;
-	size_t outlen;
-	int flags;
-#define GOT_ZSTREAM_F_HAVE_MORE 0x01
-};
-
 struct got_object_id {
 	u_int8_t sha1[SHA1_DIGEST_LENGTH];
 };

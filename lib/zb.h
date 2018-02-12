@@ -14,6 +14,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_zstream_buf {
+	z_stream z;
+	char *inbuf;
+	size_t inlen;
+	char *outbuf;
+	size_t outlen;
+	int flags;
+#define GOT_ZSTREAM_F_HAVE_MORE 0x01
+};
+
 const struct got_error *got_inflate_init(struct got_zstream_buf *, size_t);
 const struct got_error *got_inflate_read(struct got_zstream_buf *, FILE *,
     size_t *);
