@@ -52,10 +52,22 @@
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
-char *
-got_object_id_str(struct got_object_id *id, char *buf, size_t size)
+const struct got_error *
+got_object_id_str(char **outbuf, struct got_object_id *id)
 {
-	return got_sha1_digest_to_str(id->sha1, buf, size);
+	static const size_t len = SHA1_DIGEST_STRING_LENGTH;
+
+	*outbuf = calloc(1, len);
+	if (*outbuf == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	if (got_sha1_digest_to_str(id->sha1, *outbuf, len) == NULL) {
+		free(*outbuf);
+		*outbuf = NULL;
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	}
+
+	return NULL;
 }
 
 int
@@ -182,18 +194,21 @@ static const struct got_error *
 object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
+	char *hex;
 	char *path_objects = got_repo_get_path_objects(repo);
 
 	if (path_objects == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	got_object_id_str(id, hex, sizeof(hex));
+	err = got_object_id_str(&hex, id);
+	if (err)
+		return err;
 
 	if (asprintf(path, "%s/%.2x/%s", path_objects,
 	    id->sha1[0], hex + 2) == -1)
 		err = got_error(GOT_ERR_NO_MEM);
 
+	free(hex);
 	free(path_objects);
 	return err;
 }
@@ -349,7 +364,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		if (remain < SHA1_DIGEST_STRING_LENGTH) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
-		}	
+		}
 
 		pid = calloc(1, sizeof(*pid));
 		if (pid == NULL) {

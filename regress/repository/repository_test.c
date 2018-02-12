@@ -80,7 +80,6 @@ print_tree_object(struct got_object *obj, char *parent,
 	struct got_tree_object *tree;
 	struct got_tree_entry *te;
 	const struct got_error *err;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	err = got_object_tree_open(&tree, repo, obj);
 	if (err != NULL)
@@ -89,16 +88,18 @@ print_tree_object(struct got_object *obj, char *parent,
 	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
 		struct got_object *treeobj;
 		char *next_parent;
+		char *hex;
+
+		err = got_object_id_str(&hex, te->id);
+		if (err)
+			break;
 
 		if (!S_ISDIR(te->mode)) {
-			test_printf("%s %s/%s\n",
-			    got_object_id_str(te->id, hex, sizeof(hex)),
-			    parent, te->name);
+			test_printf("%s %s/%s\n", hex, parent, te->name);
 			continue;
 		}
-		test_printf("%s %s/%s\n",
-		    got_object_id_str(te->id, hex, sizeof(hex)),
-		    parent, te->name);
+		test_printf("%s %s/%s\n", hex, parent, te->name);
+		free(hex);
 
 		err = got_object_open(&treeobj, repo, te->id);
 		if (err != NULL)
@@ -135,20 +136,26 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 {
 	struct got_commit_object *commit;
 	struct got_parent_id *pid;
-	char buf[SHA1_DIGEST_STRING_LENGTH];
+	char *buf;
 	const struct got_error *err;
 	struct got_object* treeobj;
 
 	err = got_object_commit_open(&commit, repo, obj);
-	if (err != NULL)
+	if (err)
 		return err;
 
-	test_printf("tree: %s\n",
-	    got_object_id_str(commit->tree_id, buf, sizeof(buf)));
+	err = got_object_id_str(&buf, commit->tree_id);
+	if (err)
+		return err;
+	test_printf("tree: %s\n", buf);
+	free(buf);
 	test_printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		test_printf("%s\n",
-		    got_object_id_str(pid->id, buf, sizeof(buf)));
+		err = got_object_id_str(&buf, pid->id);
+		if (err)
+			return err;
+		test_printf("%s\n", buf);
+		free(buf);
 	}
 	test_printf("author: %s\n", commit->author);
 	test_printf("committer: %s\n", commit->committer);
@@ -177,7 +184,7 @@ repo_read_log(const char *repo_path)
 	struct got_reference *head_ref;
 	struct got_object_id *id;
 	struct got_object *obj;
-	char buf[SHA1_DIGEST_STRING_LENGTH];
+	char *buf;
 	int ret;
 
 	err = got_repo_open(&repo, repo_path);
@@ -189,7 +196,11 @@ repo_read_log(const char *repo_path)
 	err = got_ref_resolve(&id, repo, head_ref);
 	if (err != NULL || head_ref == NULL)
 		return 0;
-	test_printf("HEAD is at %s\n", got_object_id_str(id, buf, sizeof(buf)));
+	err = got_object_id_str(&buf, id);
+	if (err != NULL)
+		return 0;
+	test_printf("HEAD is at %s\n", buf);
+	free(buf);
 	err = got_object_open(&obj, repo, id);
 	if (err != NULL || obj == NULL)
 		return 0;

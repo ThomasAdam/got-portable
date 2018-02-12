@@ -57,7 +57,7 @@ struct got_object;
 
 struct got_repository;
 
-char *got_object_id_str(struct got_object_id *, char *, size_t);
+const struct got_error *got_object_id_str(char **, struct got_object_id *);
 int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
 int got_object_get_type(struct got_object *);
 const struct got_error *got_object_open(struct got_object **,
