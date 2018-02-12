@@ -23,7 +23,8 @@
 
 #include "got_error.h"
 #include "got_object.h"
-#include "pack.h"
+
+#include "got_pack_priv.h"
 
 #define GOT_REPO_PATH "../../../"
 

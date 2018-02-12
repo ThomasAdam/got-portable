@@ -22,8 +22,8 @@
 
 #include "got_error.h"
 
-#include "delta.h"
-#include "path.h"
+#include "got_delta_priv.h"
+#include "got_path_priv.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

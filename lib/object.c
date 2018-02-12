@@ -29,11 +29,12 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_repository.h"
-#include "got_sha1.h"
-#include "delta.h"
-#include "pack.h"
-#include "zb.h"
-#include "object.h"
+
+#include "got_sha1_priv.h"
+#include "got_delta_priv.h"
+#include "got_pack_priv.h"
+#include "got_zb_priv.h"
+#include "got_object_priv.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

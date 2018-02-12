@@ -24,7 +24,7 @@
 #include "got_refs.h"
 #include "got_repository.h"
 
-#include "path.h"
+#include "got_path_priv.h"
 
 struct got_repository {
 	char *path;

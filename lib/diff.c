@@ -29,8 +29,8 @@
 #include "got_error.h"
 #include "got_diff.h"
 
-#include "diff.h"
-#include "path.h"
+#include "got_diff_priv.h"
+#include "got_path_priv.h"
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
