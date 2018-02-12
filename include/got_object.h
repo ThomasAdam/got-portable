@@ -58,11 +58,12 @@ struct got_object;
 struct got_repository;
 
 char *got_object_id_str(struct got_object_id *, char *, size_t);
-const struct got_error *got_parse_object_id(struct got_object_id **, const char *);
 int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
 int got_object_get_type(struct got_object *);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
+const struct got_error *got_object_open_by_id_str(struct got_object **,
+    struct got_repository *, const char *); 
 void got_object_close(struct got_object *);
 const struct got_error *got_object_commit_open(struct got_commit_object **,
     struct got_repository *, struct got_object *);

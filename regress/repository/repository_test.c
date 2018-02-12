@@ -212,21 +212,15 @@ repo_read_tree(const char *repo_path)
 	const char *tree_sha1 = "6cc96e0e093fb30630ba7f199d0a008b24c6a690";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object_id *id;
 	struct got_object *obj;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 
-	err = got_parse_object_id(&id, tree_sha1);
-	if (err != NULL)
-		return 0;
-
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_object_open(&obj, repo, id);
-	free(id);
+	err = got_object_open_by_id_str(&obj, repo, tree_sha1);
 	if (err != NULL || obj == NULL)
 		return 0;
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE)
@@ -245,22 +239,16 @@ repo_read_blob(const char *repo_path)
 	const char *blob_sha1 = "141f5fdc96126c1f4195558560a3c915e3d9b4c3";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object_id *id;
 	struct got_object *obj;
 	struct got_blob_object *blob;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	int i;
 	size_t len;
 
-	err = got_parse_object_id(&id, blob_sha1);
-	if (err != NULL)
-		return 0;
-
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_object_open(&obj, repo, id);
-	free(id);
+	err = got_object_open_by_id_str(&obj, repo, blob_sha1);
 	if (err != NULL || obj == NULL)
 		return 0;
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB)
@@ -294,8 +282,6 @@ repo_diff_blob(const char *repo_path)
 	const char *blob2_sha1 = "de7eb21b21c7823a753261aadf7cba35c9580fbf";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object_id *id1;
-	struct got_object_id *id2;
 	struct got_object *obj1;
 	struct got_object *obj2;
 	struct got_blob_object *blob1;
@@ -305,26 +291,16 @@ repo_diff_blob(const char *repo_path)
 	size_t len;
 	FILE *outfile;
 
-	err = got_parse_object_id(&id1, blob1_sha1);
-	if (err != NULL)
-		return 0;
-
-	err = got_parse_object_id(&id2, blob2_sha1);
-	if (err != NULL)
-		return 0;
-
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
 
-	err = got_object_open(&obj1, repo, id1);
-	free(id1);
+	err = got_object_open_by_id_str(&obj1, repo, blob1_sha1);
 	if (err != NULL || obj1 == NULL)
 		return 0;
 	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB)
 		return 0;
-	err = got_object_open(&obj2, repo, id2);
-	free(id2);
+	err = got_object_open_by_id_str(&obj2, repo, blob2_sha1);
 	if (err != NULL || obj2 == NULL)
 		return 0;
 	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB)
@@ -363,8 +339,6 @@ repo_diff_tree(const char *repo_path)
 	const char *tree2_sha1 = "4aa8f2933839ff8a8fb3f905a4c232d22c6ff5f3";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object_id *id1;
-	struct got_object_id *id2;
 	struct got_object *obj1;
 	struct got_object *obj2;
 	struct got_tree_object *tree1;
@@ -374,26 +348,16 @@ repo_diff_tree(const char *repo_path)
 	size_t len;
 	FILE *outfile;
 
-	err = got_parse_object_id(&id1, tree1_sha1);
-	if (err != NULL)
-		return 0;
-
-	err = got_parse_object_id(&id2, tree2_sha1);
-	if (err != NULL)
-		return 0;
-
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
 
-	err = got_object_open(&obj1, repo, id1);
-	free(id1);
+	err = got_object_open_by_id_str(&obj1, repo, tree1_sha1);
 	if (err != NULL || obj1 == NULL)
 		return 0;
 	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_TREE)
 		return 0;
-	err = got_object_open(&obj2, repo, id2);
-	free(id2);
+	err = got_object_open_by_id_str(&obj2, repo, tree2_sha1);
 	if (err != NULL || obj2 == NULL)
 		return 0;
 	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_TREE)

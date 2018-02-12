@@ -58,21 +58,6 @@ got_object_id_str(struct got_object_id *id, char *buf, size_t size)
 	return got_sha1_digest_to_str(id->sha1, buf, size);
 }
 
-const struct got_error *
-got_parse_object_id(struct got_object_id **id, const char *buf)
-{
-	*id = calloc(1, sizeof(**id));
-	if (*id == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-	if (!got_parse_sha1_digest((*id)->sha1, buf)) {
-		free(*id);
-		*id = NULL;
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
-	}
-	return NULL;
-}
-
-
 int
 got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
 {
@@ -267,6 +252,18 @@ done:
 		fclose(f);
 	return err;
 
+}
+
+const struct got_error *
+got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
+    const char *id_str)
+{
+	struct got_object_id id;
+
+	if (!got_parse_sha1_digest(id.sha1, id_str))
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	return got_object_open(obj, repo, &id);
 }
 
 void
