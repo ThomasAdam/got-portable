@@ -27,7 +27,6 @@
 #include "got_object.h"
 #include "got_refs.h"
 #include "got_repository.h"
-#include "got_sha1.h"
 #include "got_diff.h"
 
 #define GOT_REPO_PATH "../../../"
