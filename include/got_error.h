@@ -38,6 +38,7 @@
 #define GOT_ERR_BAD_DELTA_CHAIN	20
 #define GOT_ERR_BAD_DELTA	21
 #define GOT_ERR_COMPRESSION	22
+#define GOT_ERR_BAD_OBJ_ID_STR	23
 
 static const struct got_error {
 	int code;
@@ -64,8 +65,9 @@ static const struct got_error {
 	{ GOT_ERR_NOT_IMPL,	"feature not implemented" },
 	{ GOT_ERR_OBJ_NOT_PACKED,"object is not packed" },
 	{ GOT_ERR_BAD_DELTA_CHAIN,"bad delta chain" },
-	{ GOT_ERR_BAD_DELTA	,"bad delta" },
-	{ GOT_ERR_COMPRESSION,"compression failed" },
+	{ GOT_ERR_BAD_DELTA,	"bad delta" },
+	{ GOT_ERR_COMPRESSION,	"compression failed" },
+	{ GOT_ERR_BAD_OBJ_ID_STR,"bad object id string" },
 };
 
 const struct got_error * got_error(int code);

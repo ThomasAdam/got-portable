@@ -88,7 +88,7 @@ struct got_packfile_object_data {
 
 /* If object is of type	GOT_OBJ_TYPE_REF_DELTA. */
 struct got_packfile_object_data_ref_delta {
-	struct got_object_id id;
+	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	uint8_t *delta_data;		/* compressed */
 };
 

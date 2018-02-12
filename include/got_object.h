@@ -14,9 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_object_id {
-	u_int8_t sha1[SHA1_DIGEST_LENGTH];
-};
+struct got_object_id;
 
 struct got_blob_object;
 
@@ -24,7 +22,7 @@ struct got_tree_entry {
 	SIMPLEQ_ENTRY(got_tree_entry) entry;
 	mode_t mode;
 	char *name;
-	struct got_object_id id;
+	struct got_object_id *id;
 };
 
 struct got_tree_object {
@@ -34,13 +32,13 @@ struct got_tree_object {
 
 struct got_parent_id {
 	SIMPLEQ_ENTRY(got_parent_id) entry;
-	struct got_object_id id;
+	struct got_object_id *id;
 };
 
 SIMPLEQ_HEAD(got_parent_id_list, got_parent_id);
 
 struct got_commit_object {
-	struct got_object_id tree_id;
+	struct got_object_id *tree_id;
 	unsigned int nparents;
 	SIMPLEQ_HEAD(, got_parent_id) parent_ids;
 	char *author;
@@ -60,6 +58,7 @@ struct got_object;
 struct got_repository;
 
 char *got_object_id_str(struct got_object_id *, char *, size_t);
+const struct got_error *got_parse_object_id(struct got_object_id **, const char *);
 int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
 int got_object_get_type(struct got_object *);
 const struct got_error *got_object_open(struct got_object **,

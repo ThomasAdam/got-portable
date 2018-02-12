@@ -30,8 +30,8 @@
 #include "got_object.h"
 #include "got_repository.h"
 #include "got_sha1.h"
-#include "pack.h"
 #include "delta.h"
+#include "pack.h"
 #include "zb.h"
 #include "object.h"
 
@@ -57,6 +57,21 @@ got_object_id_str(struct got_object_id *id, char *buf, size_t size)
 {
 	return got_sha1_digest_to_str(id->sha1, buf, size);
 }
+
+const struct got_error *
+got_parse_object_id(struct got_object_id **id, const char *buf)
+{
+	*id = calloc(1, sizeof(**id));
+	if (*id == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+	if (!got_parse_sha1_digest((*id)->sha1, buf)) {
+		free(*id);
+		*id = NULL;
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	}
+	return NULL;
+}
+
 
 int
 got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
@@ -281,7 +296,7 @@ commit_object_valid(struct got_commit_object *commit)
 
 	n = 0;
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		if (commit->tree_id.sha1[i] == 0)
+		if (commit->tree_id->sha1[i] == 0)
 			n++;
 	}
 	if (n == SHA1_DIGEST_LENGTH)
@@ -301,6 +316,12 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 	*commit = calloc(1, sizeof(**commit));
 	if (*commit == NULL)
 		return got_error(GOT_ERR_NO_MEM);
+	(*commit)->tree_id = calloc(1, sizeof(*(*commit)->tree_id));
+	if ((*commit)->tree_id == NULL) {
+		free(*commit);
+		*commit = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
 
 	SIMPLEQ_INIT(&(*commit)->parent_ids);
 
@@ -312,7 +333,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			goto done;
 		}
 		s += tlen;
-		if (!got_parse_sha1_digest((*commit)->tree_id.sha1, s)) {
+		if (!got_parse_sha1_digest((*commit)->tree_id->sha1, s)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
@@ -338,9 +359,17 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			err = got_error(GOT_ERR_NO_MEM);
 			goto done;
 		}
+		pid->id = calloc(1, sizeof(*pid->id));
+		if (pid->id == NULL) {
+			free(pid);
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
 		s += tlen;
-		if (!got_parse_sha1_digest(pid->id.sha1, s)) {
+		if (!got_parse_sha1_digest(pid->id->sha1, s)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			free(pid->id);
+			free(pid);
 			goto done;
 		}
 		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
@@ -406,14 +435,17 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		goto done;
 	}
 done:
-	if (err)
+	if (err) {
 		got_object_commit_close(*commit);
+		*commit = NULL;
+	}
 	return err;
 }
 
 static void
 tree_entry_close(struct got_tree_entry *te)
 {
+	free(te->id);
 	free(te->name);
 	free(te);
 }
@@ -430,15 +462,24 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	if (*te == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
+	(*te)->id = calloc(1, sizeof(*(*te)->id));
+	if ((*te)->id == NULL) {
+		free(*te);
+		*te = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
 	*elen = strlen(buf) + 1;
 	if (*elen > maxlen) {
 		free(*te);
+		*te = NULL;
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	}
 
 	space = strchr(buf, ' ');
 	if (space == NULL) {
 		free(*te);
+		*te = NULL;
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	}
 	while (*p != ' ') {
@@ -457,11 +498,13 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 		goto done;
 	}
 	buf += strlen(buf) + 1;
-	memcpy((*te)->id.sha1, buf, SHA1_DIGEST_LENGTH);
+	memcpy((*te)->id->sha1, buf, SHA1_DIGEST_LENGTH);
 	*elen += SHA1_DIGEST_LENGTH;
 done:
-	if (err)
+	if (err) {
 		tree_entry_close(*te);
+		*te = NULL;
+	}
 	return err;
 }
 
@@ -608,9 +651,11 @@ got_object_commit_close(struct got_commit_object *commit)
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
 		pid = SIMPLEQ_FIRST(&commit->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
+		free(pid->id);
 		free(pid);
 	}
 
+	free(commit->tree_id);
 	free(commit->author);
 	free(commit->committer);
 	free(commit->logmsg);
