@@ -46,7 +46,7 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
 /*
  * A delta stream begins with two size fields. The first specifies the
  * size of the delta base, and the second describes the expected size of
- * the data which results from combining the delta base and the delta.
+ * the data which results from applying the delta to the delta base.
  *
  * Each size field uses a variable length encoding:
  * size0...sizeN form a 7+7+7+...+7 bit integer, where size0 is the
@@ -60,10 +60,10 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
 /*
  * The rest of the delta stream contains copy instructions.
  *
- * A base copy instruction tells the delta combiner to copy N bytes starting
- * at offset X from the delta base to the output. Base copy instructions begin
- * with a byte which has its MSB set. The remaining bits of this byte describe
- * how many offset and length value bytes follow.
+ * A base copy instruction copies N bytes starting at offset X from the delta
+ * base to the output. Base copy instructions begin with a byte which has its
+ * MSB set. The remaining bits of this byte describe how many offset and
+ * length value bytes follow.
  * The offset X is encoded in 1 to 4 bytes, and the length N is encoded in
  * 1 to 3 bytes. For both values, the first byte contributes the least
  * significant part and the last byte which is present contributes the
@@ -71,8 +71,7 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
  * If the offset value is omitted, an offset of zero is implied.
  * If the length value is omitted, a default length of 65536 bytes is implied.
  *
- * An inline copy instruction tells the delta combiner to copy data from
- * the delta stream to the output.
+ * An inline copy instruction copies data from the delta stream to the output.
  * Such instructions begin with one byte which does not have the MSB set
  * and which specifies the length of the inline data which follows (i.e.
  * at most 127 bytes). A length value of zero is invalid.

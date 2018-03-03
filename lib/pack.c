@@ -727,7 +727,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 
 	(*obj)->flags = 0;
 	(*obj)->hdrlen = 0;
-	(*obj)->size = 0; /* Not yet known because deltas aren't combined. */
+	(*obj)->size = 0; /* Not known because deltas aren't applied yet. */
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset + tslen;
 
