@@ -46,9 +46,9 @@ packfile_read_idx(const char *repo_path)
 	if (err) {
 		printf("got_packidx_open: %s\n", err->msg);
 		ret = 0;
-	}
+	} else
+		got_packidx_close(packidx);
 
-	got_packidx_close(packidx);
 	free(fullpath);
 	return ret;
 }
