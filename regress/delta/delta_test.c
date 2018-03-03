@@ -44,7 +44,7 @@ struct delta_test {
 };
 
 static int
-delta_combine()
+delta_apply()
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -108,7 +108,7 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
-	RUN_TEST(delta_combine(), "delta_combine");
+	RUN_TEST(delta_apply(), "delta_apply");
 
 	return failure ? 1 : 0;
 }
