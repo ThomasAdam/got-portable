@@ -584,7 +584,7 @@ read_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			buf = newbuf;
 			remain += blocksize;
 		}
-		n = fread(buf, 1, remain, f);
+		n = fread(buf + total, 1, remain, f);
 		if (n == 0) {
 			if (ferror(f)) {
 				err = got_ferror(f, GOT_ERR_IO);
