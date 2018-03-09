@@ -51,6 +51,12 @@
 #define GOT_OBJECTS_PACK_DIR	"objects/pack"
 
 char *
+got_repo_get_path(struct got_repository *repo)
+{
+	return strdup(repo->path);
+}
+
+char *
 got_repo_get_path_git_dir(struct got_repository *repo)
 {
 	char *path_git;

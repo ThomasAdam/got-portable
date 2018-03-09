@@ -32,3 +32,4 @@ void got_ref_close(struct got_reference *);
 struct got_reference *got_ref_dup(struct got_reference *);
 const struct got_error *got_ref_resolve(struct got_object_id **,
     struct got_repository *, struct got_reference *);
+char *got_ref_to_str(struct got_reference *);

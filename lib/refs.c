@@ -276,3 +276,21 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 	memcpy((*id)->sha1, ref->ref.ref.sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
 }
+
+char *
+got_ref_to_str(struct got_reference *ref)
+{
+	char *str;
+	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
+		if (asprintf(&str, "ref: %s", ref->ref.symref.ref) == -1)
+			return NULL;
+	} else {
+		str = calloc(1, SHA1_DIGEST_STRING_LENGTH);
+		if (str == NULL)
+			return NULL;
+		str = got_sha1_digest_to_str(ref->ref.ref.sha1, str,
+		    SHA1_DIGEST_STRING_LENGTH);
+	}
+
+	return str;
+}

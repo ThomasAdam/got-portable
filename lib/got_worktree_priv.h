@@ -14,20 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_repository;
+struct got_worktree {
+	char *path_worktree_root;
+	char *path_repo;
+};
 
-/* Open and close git repositories. */
-const struct got_error *got_repo_open(struct got_repository**, const char *);
-void got_repo_close(struct got_repository*);
-
-char *got_repo_get_path(struct got_repository *);
-char *got_repo_get_path_git_dir(struct got_repository *);
-char *got_repo_get_path_objects(struct got_repository *);
-char *got_repo_get_path_objects_pack(struct got_repository *);
-char *got_repo_get_path_refs(struct got_repository *);
-
-struct got_reference;
-
-/* Get a reference, by name, from a repository. */
-const struct got_error *got_repo_get_reference(struct got_reference **,
-    struct got_repository *, const char *);
+#define GOT_WORKTREE_GOT_DIR	".got"
+#define GOT_WORKTREE_FILE_INDEX	"fileindex"
+#define GOT_WORKTREE_REPOSITORY	"repository"
