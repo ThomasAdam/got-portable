@@ -17,29 +17,26 @@
 /* 
  * Meta data about a tracked on-disk file.
  *
- * Note that some fields are truncated results from stat(2). These are only
- * used in order to detect modifications made to on-disk files, they are
- * never written back to the filesystem.
+ * Note that some fields are results from stat(2). These are only used in
+ * order to detect modifications made to on-disk files, they are never
+ * applied back to the filesystem.
  */
 struct got_index_entry {
-	uint32_t ctime_sec;
-	uint32_t ctime_nsec;
-	uint32_t mtime_sec;
-	uint32_t mtime_nsec;
-	uint32_t dev;
-	uint32_t ino;
+	struct timespec ctime;
+	struct timespec mtime;
 	uint32_t mode;
 #define GOT_INDEX_ENTRY_MODE_OBJ_TYPE	0x0000000f
 #define GOT_INDEX_ENTRY_MODE_PERMS	0x0000ff10
 	uint32_t uid;
 	uint32_t gid;
 	uint32_t size;
+
 	uint8_t obj_sha1[SHA1_DIGEST_LENGTH];
-	uint16_t flags;
-#define GOT_INDEX_ENTRY_F_NAME_LEN	0x0fff
-#define GOT_INDEX_ENTRY_F_STAGE		0x3000
-#define GOT_INDEX_ENTRY_F_EXTENDED	0x4000
-#define GOT_INDEX_ENTRY_F_ASSUME_VALID	0x8000
+	uint32_t flags;
+#define GOT_INDEX_ENTRY_F_NAME_LEN	0x00000fff
+#define GOT_INDEX_ENTRY_F_STAGE		0x00003000
+#define GOT_INDEX_ENTRY_F_EXTENDED	0x00004000
+#define GOT_INDEX_ENTRY_F_ASSUME_VALID	0x00008000
 
 	/* This is a unix-style path relative to top level directory. */
 	const char *path;
