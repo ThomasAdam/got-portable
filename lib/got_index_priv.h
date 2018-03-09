@@ -14,39 +14,56 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* 
- * Meta data about a tracked on-disk file.
- *
- * Note that some fields are results from stat(2). These are only used in
+/*
+ * State information for a tracked file in a work tree.
+ * When written to disk, multi-byte fields are written in big-endian.
+ * Some fields are based on results from stat(2). These are only used in
  * order to detect modifications made to on-disk files, they are never
  * applied back to the filesystem.
  */
 struct got_index_entry {
-	struct timespec ctime;
-	struct timespec mtime;
-	uint32_t mode;
-#define GOT_INDEX_ENTRY_MODE_OBJ_TYPE	0x0000000f
-#define GOT_INDEX_ENTRY_MODE_PERMS	0x0000ff10
+	uint64_t ctime_sec;
+	uint64_t ctime_nsec;
+	uint64_t mtime_sec;
+	uint64_t mtime_nsec;
 	uint32_t uid;
 	uint32_t gid;
+	/*
+	 * On-disk size is truncated to the lower 32 bits.
+	 * The value is only used to check for modifications anyway.
+	 */
 	uint32_t size;
+	uint16_t mode;
+#define GOT_INDEX_ENTRY_MODE_OBJ_TYPE	0x000f
+#define GOT_INDEX_ENTRY_MODE_PERMS	0xff10
 
-	uint8_t obj_sha1[SHA1_DIGEST_LENGTH];
+	/* SHA1 of corresponding blob in repository. */
+	uint8_t blob_sha1[SHA1_DIGEST_LENGTH];
+
 	uint32_t flags;
-#define GOT_INDEX_ENTRY_F_NAME_LEN	0x00000fff
+#define GOT_INDEX_ENTRY_F_PATH_LEN	0x00000fff
 #define GOT_INDEX_ENTRY_F_STAGE		0x00003000
 #define GOT_INDEX_ENTRY_F_EXTENDED	0x00004000
 #define GOT_INDEX_ENTRY_F_ASSUME_VALID	0x00008000
 
-	/* This is a unix-style path relative to top level directory. */
+	/*
+	 * UNIX-style path, relative to work tree root.
+	 * Variable length and NUL-padded to a multiple of 8.
+	 */
 	const char *path;
 };
 
-struct got_index {
-	uint32_t signature;
-	uint32_t version;
-	uint32_t nentries;
-	struct got_index_entry *entries;
-	/* extensions go here */
-	uint8_t sha1[SHA1_DIGEST_LENGTH];
+/* "Stages" of a file which is afflicted by a 3-way merge conflict. */
+#define GOT_INDEX_ENTRY_STAGE_MERGED	0
+#define GOT_INDEX_ENTRY_STAGE_ANCESTOR	1
+#define GOT_INDEX_ENTRY_STAGE_OURS	2
+#define GOT_INDEX_ENTRY_STAGE_THEIRS	3
+
+/* On-disk index file header structure. */
+struct got_index_hdr {
+	uint32_t signature;	/* big-endian on disk */
+	uint32_t version;	/* big-endian on disk */
+	uint32_t nentries;	/* big-endian on disk */
+	struct got_index_entry *entries; /* big-endian on disk */
+	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above data */
 };
