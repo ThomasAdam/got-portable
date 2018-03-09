@@ -46,6 +46,7 @@ got_error_from_errno()
 
 	err.code = GOT_ERR_ERRNO;
 	strerror_r(errno, msg, sizeof(msg));
+	err.msg = msg;
 	return &err;
 }
 
