@@ -17,12 +17,14 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/limits.h>
+#include <sys/stat.h>
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -31,6 +33,7 @@
 #include "got_worktree.h"
 
 #include "got_worktree_priv.h"
+#include "got_path_priv.h"
 
 #define GOT_REPO_PATH "../../../"
 
@@ -59,6 +62,7 @@ check_meta_file_exists(const char *worktree_path, const char *name)
 	    name) == -1)
 		return 0;
 	f = fopen(path, "r");
+	free(path);
 	if (f == NULL)
 		return 0;
 	fclose(f);
@@ -105,6 +109,91 @@ done:
 	return ok;
 }
 
+static int
+obstruct_meta_file(char **path, const char *worktree_path, const char *name)
+{
+	FILE *f;
+	char *s = "This file should not be here\n";
+
+	if (asprintf(path, "%s/%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR,
+	    name) == -1)
+		return 0;
+	f = fopen(*path, "w+");
+	if (f == NULL) {
+		free(*path);
+		return 0;
+	}
+	if (fwrite(s, 1, strlen(s), f) != strlen(s)) {
+		free(*path);
+		return 0;
+	}
+	fclose(f);
+	return 1;
+}
+
+static int
+worktree_init_exists(const char *repo_path)
+{
+	const struct got_error *err;
+	struct got_repository *repo = NULL;
+	struct got_reference *head_ref = NULL;
+	char worktree_path[PATH_MAX];
+	char *gotpath;
+	char *path;
+	int ok = 0;
+	FILE *f;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		goto done;
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (err != NULL || head_ref == NULL)
+		goto done;
+
+	strlcpy(worktree_path, "worktree-XXXXXX", sizeof(worktree_path));
+	if (mkdtemp(worktree_path) == NULL)
+		goto done;
+
+	if (asprintf(&gotpath, "%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR)
+	    == -1)
+		goto done;
+	if (mkdir(gotpath, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST)
+		goto done;
+
+	/* Create files which got_worktree_init() will try to create as well. */
+
+	if (!obstruct_meta_file(&path, worktree_path, GOT_REF_HEAD))
+		goto done;
+	err = got_worktree_init(worktree_path, head_ref, repo);
+	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
+		ok++;
+	unlink(path);
+	free(path);
+
+	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FILE_INDEX))
+		goto done;
+	err = got_worktree_init(worktree_path, head_ref, repo);
+	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
+		ok++;
+	unlink(path);
+	free(path);
+
+	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_REPOSITORY))
+		goto done;
+	err = got_worktree_init(worktree_path, head_ref, repo);
+	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
+		ok++;
+	unlink(path);
+	free(path);
+
+done:
+	if (head_ref)
+		got_ref_close(head_ref);
+	if (repo)
+		got_repo_close(repo);
+	return (ok == 3);
+}
+
 #define RUN_TEST(expr, name) \
 	{ test_ok = (expr);  \
 	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
@@ -148,6 +237,7 @@ main(int argc, char *argv[])
 	}
 
 	RUN_TEST(worktree_init(repo_path), "init");
+	RUN_TEST(worktree_init_exists(repo_path), "init exists");
 
 	return failure ? 1 : 0;
 }
