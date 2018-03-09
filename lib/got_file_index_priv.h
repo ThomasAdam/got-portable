@@ -22,6 +22,7 @@
  * applied back to the filesystem.
  */
 struct got_file_index_entry {
+	TAILQ_ENTRY(, got_file_index_entry) entry;
 	uint64_t ctime_sec;
 	uint64_t ctime_nsec;
 	uint64_t mtime_sec;
@@ -64,6 +65,6 @@ struct got_file_index_hdr {
 	uint32_t signature;	/* big-endian on disk */
 	uint32_t version;	/* big-endian on disk */
 	uint32_t nentries;	/* big-endian on disk */
-	struct got_file_index_entry *entries; /* big-endian on disk */
+	TAILQ_HEAD(, got_file_index_entry) entries;
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
