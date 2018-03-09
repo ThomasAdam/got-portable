@@ -407,7 +407,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 		if (*idx != -1) {
 			*packidx = dup_packidx(repo->packidx_cache[i]);
 			if (*packidx == NULL)
-				*idx = -1;
+				return got_error(GOT_ERR_NO_MEM);
 			return NULL;
 		}
 	}
