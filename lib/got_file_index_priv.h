@@ -64,6 +64,6 @@ struct got_file_index_hdr {
 	uint32_t signature;	/* big-endian on disk */
 	uint32_t version;	/* big-endian on disk */
 	uint32_t nentries;	/* big-endian on disk */
-	struct got_index_entry *entries; /* big-endian on disk */
+	struct got_file_index_entry *entries; /* big-endian on disk */
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above data */
 };
