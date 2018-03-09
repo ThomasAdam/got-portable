@@ -429,7 +429,7 @@ main(int argc, char *argv[])
 	if (argc == 0)
 		repo_path = GOT_REPO_PATH;
 	else if (argc == 1)
-		repo_path = argv[1];
+		repo_path = argv[0];
 	else {
 		usage();
 		return 1;
