@@ -49,7 +49,7 @@ struct got_file_index_entry {
 
 	/*
 	 * UNIX-style path, relative to work tree root.
-	 * Variable length and NUL-padded to a multiple of 8.
+	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
 	const char *path;
 };
