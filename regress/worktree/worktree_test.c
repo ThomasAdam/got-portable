@@ -53,6 +53,41 @@ test_printf(char *fmt, ...)
 }
 
 static int
+remove_got_dir(const char *worktree_path)
+{
+	char *path;
+
+	if (asprintf(&path, "%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR) == -1)
+		return 0;
+	rmdir(path);
+	free(path);
+	return 1;
+}
+
+static int
+remove_meta_file(const char *worktree_path, const char *name)
+{
+	char *path;
+
+	if (asprintf(&path, "%s/%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR,
+	    name) == -1)
+		return 0;
+	unlink(path);
+	free(path);
+	return 1;
+}
+
+static void
+remove_workdir(const char *worktree_path)
+{
+	remove_meta_file(worktree_path, GOT_REF_HEAD);
+	remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX);
+	remove_meta_file(worktree_path, GOT_WORKTREE_REPOSITORY);
+	remove_got_dir(worktree_path);
+	rmdir(worktree_path);
+}
+
+static int
 check_meta_file_exists(const char *worktree_path, const char *name)
 {
 	FILE *f;
@@ -101,6 +136,7 @@ worktree_init(const char *repo_path)
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_REPOSITORY))
 		goto done;
 	ok = 1;
+	remove_workdir(worktree_path);
 done:
 	if (head_ref)
 		got_ref_close(head_ref);
@@ -138,7 +174,7 @@ worktree_init_exists(const char *repo_path)
 	struct got_repository *repo = NULL;
 	struct got_reference *head_ref = NULL;
 	char worktree_path[PATH_MAX];
-	char *gotpath;
+	char *gotpath = NULL;
 	char *path;
 	int ok = 0;
 	FILE *f;
@@ -152,6 +188,8 @@ worktree_init_exists(const char *repo_path)
 
 	strlcpy(worktree_path, "worktree-XXXXXX", sizeof(worktree_path));
 	if (mkdtemp(worktree_path) == NULL)
+		goto done;
+	if (mkdir(worktree_path, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST)
 		goto done;
 
 	if (asprintf(&gotpath, "%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR)
@@ -191,6 +229,9 @@ done:
 		got_ref_close(head_ref);
 	if (repo)
 		got_repo_close(repo);
+	free(gotpath);
+	if (ok == 3)
+		remove_workdir(worktree_path);
 	return (ok == 3);
 }
 
