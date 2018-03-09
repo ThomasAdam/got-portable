@@ -53,7 +53,7 @@ struct got_file_index_entry {
 	const char *path;
 };
 
-/* "Stages" of a file which is afflicted by a 3-way merge conflict. */
+/* "Stages" of a file afflicted by a 3-way merge conflict. */
 #define GOT_INDEX_ENTRY_STAGE_MERGED	0
 #define GOT_INDEX_ENTRY_STAGE_ANCESTOR	1
 #define GOT_INDEX_ENTRY_STAGE_OURS	2
