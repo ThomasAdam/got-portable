@@ -35,8 +35,6 @@ struct got_parent_id {
 	struct got_object_id *id;
 };
 
-SIMPLEQ_HEAD(got_parent_id_list, got_parent_id);
-
 struct got_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;
