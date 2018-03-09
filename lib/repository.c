@@ -114,8 +114,12 @@ got_repo_open(struct got_repository **ret, const char *path)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath = got_path_get_absolute(path);
+	char *abspath;
 
+	if (got_path_is_absolute(path))
+		abspath = strdup(path);
+	else
+		abspath = got_path_get_absolute(path);
 	if (abspath == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
