@@ -21,7 +21,7 @@
  * order to detect modifications made to on-disk files, they are never
  * applied back to the filesystem.
  */
-struct got_index_entry {
+struct got_file_index_entry {
 	uint64_t ctime_sec;
 	uint64_t ctime_nsec;
 	uint64_t mtime_sec;
@@ -59,8 +59,8 @@ struct got_index_entry {
 #define GOT_INDEX_ENTRY_STAGE_OURS	2
 #define GOT_INDEX_ENTRY_STAGE_THEIRS	3
 
-/* On-disk index file header structure. */
-struct got_index_hdr {
+/* On-disk file index header structure. */
+struct got_file_index_hdr {
 	uint32_t signature;	/* big-endian on disk */
 	uint32_t version;	/* big-endian on disk */
 	uint32_t nentries;	/* big-endian on disk */
