@@ -14,21 +14,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sha1.h>
 #include <string.h>
+#include <zlib.h>
 
 #include "got_error.h"
 #include "got_refs.h"
 #include "got_repository.h"
 
 #include "got_path_priv.h"
+#include "got_repository_priv.h"
+#include "got_zb_priv.h"
+#include "got_delta_priv.h"
+#include "got_object_priv.h"
+#include "got_pack_priv.h"
 
-struct got_repository {
-	char *path;
-};
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
 
 #define GOT_GIT_DIR	".git"
 
@@ -151,6 +159,13 @@ done:
 void
 got_repo_close(struct got_repository *repo)
 {
+	int i;
+
+	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+		if (repo->packidx_cache[i] == NULL)
+			break;
+		got_packidx_close(repo->packidx_cache[i]);
+	}
 	free(repo->path);
 	free(repo);
 }

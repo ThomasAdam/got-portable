@@ -39,6 +39,11 @@
 #include "got_delta_priv.h"
 #include "got_zb_priv.h"
 #include "got_object_priv.h"
+#include "got_repository_priv.h"
+
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
 
 #define GOT_PACK_PREFIX		"pack-"
 #define GOT_PACKFILE_SUFFIX	".pack"
@@ -308,6 +313,81 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 	return -1;
 }
 
+static struct got_packidx_v2_hdr *
+dup_packidx(struct got_packidx_v2_hdr *packidx)
+{
+	struct got_packidx_v2_hdr *p;
+	size_t nobj;
+
+	p = calloc(1, sizeof(*p));
+	if (p == NULL)
+		return NULL;
+
+	memcpy(p, packidx, sizeof(*p));
+	p->sorted_ids = NULL;
+	p->crc32 = NULL;
+	p->offsets = NULL;
+	p->large_offsets = NULL;
+
+	nobj = betoh32(p->fanout_table[0xff]);
+
+	p->sorted_ids = calloc(nobj, sizeof(*p->sorted_ids));
+	if (p->sorted_ids == NULL)
+		goto err;
+	memcpy(p->sorted_ids, packidx->sorted_ids, nobj * sizeof(*p->sorted_ids));
+
+	p->crc32 = calloc(nobj, sizeof(*p->crc32));
+	if (p->crc32 == NULL)
+		goto err;
+	memcpy(p->crc32, packidx->crc32, nobj * sizeof(*p->crc32));
+
+	p->offsets = calloc(nobj, sizeof(*p->offsets));
+	if (p->offsets == NULL)
+		goto err;
+	memcpy(p->offsets, packidx->offsets, nobj * sizeof(*p->offsets));
+
+	if (p->large_offsets) {
+		p->large_offsets = calloc(nobj, sizeof(*p->large_offsets));
+		if (p->large_offsets == NULL)
+			goto err;
+		memcpy(p->large_offsets, packidx->large_offsets,
+		    nobj * sizeof(*p->large_offsets));
+	}
+
+	return p;
+
+err:
+	free(p->large_offsets);
+	free(p->offsets);
+	free(p->crc32);
+	free(p->sorted_ids);
+	free(p);
+	return NULL;
+}
+
+static void
+cache_packidx(struct got_packidx_v2_hdr *packidx,
+    struct got_repository *repo)
+{
+	struct got_packidx_v2_hdr *p;
+	int i;
+
+	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+		if (repo->packidx_cache[i] == NULL)
+			break;
+	}
+
+	if (i == nitems(repo->packidx_cache)) {
+		got_packidx_close(repo->packidx_cache[i - 1]);
+		memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
+		    sizeof(repo->packidx_cache) -
+		    sizeof(repo->packidx_cache[0]));
+		i = 0;
+	}
+
+	repo->packidx_cache[i] = dup_packidx(packidx);
+}
+
 static const struct got_error *
 search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
     struct got_repository *repo, struct got_object_id *id)
@@ -317,6 +397,21 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 	DIR *packdir;
 	struct dirent *dent;
 	char *path_packidx;
+	int i;
+
+	/* Search pack index cache. */
+	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+		if (repo->packidx_cache[i] == NULL)
+			break;
+		*idx = get_object_idx(repo->packidx_cache[i], id);
+		if (*idx != -1) {
+			*packidx = dup_packidx(repo->packidx_cache[i]);
+			if (*packidx == NULL)
+				*idx = -1;
+			return NULL;
+		}
+	}
+	/* No luck. Search the filesystem. */
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
@@ -346,6 +441,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 		*idx = get_object_idx(*packidx, id);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
+			cache_packidx(*packidx, repo);
 			goto done;
 		}
 
