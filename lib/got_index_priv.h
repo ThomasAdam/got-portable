@@ -40,19 +40,9 @@ struct got_index_entry {
 #define GOT_INDEX_ENTRY_F_STAGE		0x3000
 #define GOT_INDEX_ENTRY_F_EXTENDED	0x4000
 #define GOT_INDEX_ENTRY_F_ASSUME_VALID	0x8000
-	uint16_t ext_flags; /*  if F_EXTENDED set in version 3 or later */
-#define GOT_INDEX_ENTRY_EXT_F_UNUSED		0x1fff
-#define GOT_INDEX_ENTRY_EXT_F_INTEND_TO_ADD	0x2000
-#define GOT_INDEX_ENTRY_EXT_F_SKIP_WORKTREE	0x4000
-#define GOT_INDEX_ENTRY_EXT_F_RESERVED		0x8000
 
-	/* 
-	 * This is a unix-style path relative to top level directory.
-	 * In version 4 it is prefix-compressed relative to previous entry.
-	 */
+	/* This is a unix-style path relative to top level directory. */
 	const char *path;
-
-	/* In versions < 4, path is NUL-padded to a multple of eight bytes. */
 };
 
 struct got_index {
