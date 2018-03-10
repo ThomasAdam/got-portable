@@ -144,7 +144,8 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	}
 
 	/* Store path to repository. */ 
-	if (asprintf(&repopath, "%s/%s", gotpath, GOT_WORKTREE_REPOSITORY) == -1) {
+	if (asprintf(&repopath, "%s/%s", gotpath, GOT_WORKTREE_REPOSITORY)
+	    == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
