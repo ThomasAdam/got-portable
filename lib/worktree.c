@@ -144,7 +144,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
-	/* Stamp repository with format file. */
+	/* Stamp work tree with format file. */
 	if (asprintf(&formatstr, "%d", GOT_WORKTREE_FORMAT_VERSION) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
