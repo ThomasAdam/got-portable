@@ -366,8 +366,7 @@ err:
 }
 
 static void
-cache_packidx(struct got_packidx_v2_hdr *packidx,
-    struct got_repository *repo)
+cache_packidx(struct got_packidx_v2_hdr *packidx, struct got_repository *repo)
 {
 	struct got_packidx_v2_hdr *p;
 	int i;
