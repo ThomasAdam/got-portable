@@ -83,6 +83,7 @@ remove_workdir(const char *worktree_path)
 	remove_meta_file(worktree_path, GOT_REF_HEAD);
 	remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX);
 	remove_meta_file(worktree_path, GOT_WORKTREE_REPOSITORY);
+	remove_meta_file(worktree_path, GOT_WORKTREE_FORMAT);
 	remove_got_dir(worktree_path);
 	rmdir(worktree_path);
 }
@@ -134,6 +135,8 @@ worktree_init(const char *repo_path)
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FILE_INDEX))
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_REPOSITORY))
+		goto done;
+	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FORMAT))
 		goto done;
 	ok = 1;
 	remove_workdir(worktree_path);
@@ -224,15 +227,23 @@ worktree_init_exists(const char *repo_path)
 	unlink(path);
 	free(path);
 
+	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FORMAT))
+		goto done;
+	err = got_worktree_init(worktree_path, head_ref, repo);
+	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
+		ok++;
+	unlink(path);
+	free(path);
+
 done:
 	if (head_ref)
 		got_ref_close(head_ref);
 	if (repo)
 		got_repo_close(repo);
 	free(gotpath);
-	if (ok == 3)
+	if (ok == 4)
 		remove_workdir(worktree_path);
-	return (ok == 3);
+	return (ok == 4);
 }
 
 #define RUN_TEST(expr, name) \

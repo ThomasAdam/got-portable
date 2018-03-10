@@ -42,8 +42,10 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	char *indexpath = NULL;
 	char *headpath = NULL;
 	char *repopath = NULL;
+	char *formatpath = NULL;
 	char *refstr = NULL;
 	char *path_repos = NULL;
+	char *formatstr = NULL;
 	char buf[4];
 	ssize_t n;
 	int fd;
@@ -143,7 +145,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 
-	/* Store path to repository. */ 
+	/* Store path to repository. */
 	if (asprintf(&repopath, "%s/%s", gotpath, GOT_WORKTREE_REPOSITORY)
 	    == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
@@ -184,6 +186,40 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 
+	/* Stamp repository with format file. */
+	if (asprintf(&formatpath, "%s/%s", gotpath, GOT_WORKTREE_FORMAT)
+	    == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+	if (asprintf(&formatstr, "%d", GOT_WORKTREE_FORMAT_VERSION) == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+	fd = open(formatpath, O_RDWR | O_CREAT | O_EXCL | O_EXLOCK | O_NOFOLLOW,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	n = read(fd, buf, sizeof(buf));
+	if (n != 0) {
+		err = (n == -1 ? got_error_from_errno() :
+		    got_error(GOT_ERR_WORKTREE_EXISTS));
+		close(fd);
+		goto done;
+	}
+	n = dprintf(fd, "%s\n", formatstr);
+	if (n != strlen(formatstr) + 1) {
+		err = got_error_from_errno();
+		close(fd);
+		goto done;
+	}
+	if (close(fd) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
 done:
 	free(abspath);
 	free(normpath);
@@ -191,6 +227,8 @@ done:
 	free(indexpath);
 	free(headpath);
 	free(repopath);
+	free(formatpath);
+	free(formatstr);
 	free(refstr);
 	free(path_repos);
 	return err;
