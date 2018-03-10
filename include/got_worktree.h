@@ -24,5 +24,7 @@ char *got_worktree_get_repo_path(struct got_worktree *);
 struct got_reference *got_worktree_get_head(struct got_worktree *);
 const struct got_error *got_worktree_set_head(struct got_worktree *,
     struct got_reference *, struct got_repository *);
+const struct got_error *got_worktree_update_fileindex(struct got_worktree *,
+    struct got_repository *);
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     struct got_repository *);
