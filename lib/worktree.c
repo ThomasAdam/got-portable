@@ -133,8 +133,6 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
     const char *prefix, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *abspath = NULL;
-	char *normpath = NULL;
 	char *gotpath = NULL;
 	char *refstr = NULL;
 	char *path_repos = NULL;
@@ -143,29 +141,14 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (!got_path_is_absolute(prefix))
 		return got_error(GOT_ERR_BAD_PATH);
 
-	if (got_path_is_absolute(path)) {
-		abspath = strdup(path);
-		if (abspath == NULL)
-			return got_error(GOT_ERR_NO_MEM);
-	} else {
-		abspath = got_path_get_absolute(path);
-		if (abspath == NULL)
-			return got_error(GOT_ERR_BAD_PATH);
-	}
-
 	/* Create top-level directory (may already exist). */
-	normpath = got_path_normalize(abspath);
-	if (normpath == NULL) {
-		err = got_error(GOT_ERR_BAD_PATH);
-		goto done;
-	}
-	if (mkdir(normpath, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
+	if (mkdir(path, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
 	/* Create .got directory (may already exist). */
-	if (asprintf(&gotpath, "%s/%s", normpath, GOT_WORKTREE_GOT_DIR) == -1) {
+	if (asprintf(&gotpath, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
@@ -214,8 +197,6 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 done:
-	free(abspath);
-	free(normpath);
 	free(gotpath);
 	free(formatstr);
 	free(refstr);
