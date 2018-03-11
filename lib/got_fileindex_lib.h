@@ -56,6 +56,8 @@ struct got_fileindex_entry {
 	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
 	char *path;
+
+	/* More data could be here if F_EXTENDED is set; To be determined... */
 };
 
 /* "Stages" of a file afflicted by a 3-way merge conflict. */
@@ -64,13 +66,18 @@ struct got_fileindex_entry {
 #define GOT_INDEX_ENTRY_STAGE_OURS	2
 #define GOT_INDEX_ENTRY_STAGE_THEIRS	3
 
+struct got_fileindex {
+	uint32_t nentries;
+	TAILQ_HEAD(, got_fileindex_entry) entries;
+};
+
 /* On-disk file index header structure. */
 struct got_fileindex_hdr {
-	uint32_t signature;	/* big-endian on disk */
-	uint32_t version;	/* big-endian on disk */
+	uint32_t signature;	/* big-endian */
+	uint32_t version;	/* big-endian */
 #define GOT_FILE_INDEX_VERSION	1
-	uint32_t nentries;	/* big-endian on disk */
-	TAILQ_HEAD(, got_fileindex_entry) entries;
+	uint32_t nentries;	/* big-endian */
+	/* list of concatenated fileindex entries */
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
 
