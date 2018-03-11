@@ -37,7 +37,7 @@
 #include "got_pack_priv.h"
 #include "got_path_priv.h"
 #include "got_delta_priv.h"
-#include "got_zb_priv.h"
+#include "got_zbuf_priv.h"
 #include "got_object_priv.h"
 #include "got_repository_priv.h"
 

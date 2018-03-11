@@ -33,7 +33,7 @@
 #include "got_sha1_priv.h"
 #include "got_delta_priv.h"
 #include "got_pack_priv.h"
-#include "got_zb_priv.h"
+#include "got_zbuf_priv.h"
 #include "got_object_priv.h"
 
 #ifndef MIN
