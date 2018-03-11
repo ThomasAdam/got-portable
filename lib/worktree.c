@@ -33,7 +33,7 @@
 #include "got_path_priv.h"
 
 static const struct got_error *
-create_meta_file(const char *gotpath, const char *name, const char *content)
+create_meta_file(const char *path_got, const char *name, const char *content)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -41,7 +41,7 @@ create_meta_file(const char *gotpath, const char *name, const char *content)
 	char buf[4];
 	ssize_t n;
 
-	if (asprintf(&path, "%s/%s", gotpath, name) == -1) {
+	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		path = NULL;
 		goto done;
@@ -78,7 +78,7 @@ done:
 }
 
 static const struct got_error *
-read_meta_file(char **content, const char *gotpath, const char *name)
+read_meta_file(char **content, const char *path_got, const char *name)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -88,7 +88,7 @@ read_meta_file(char **content, const char *gotpath, const char *name)
 
 	*content = NULL;
 
-	if (asprintf(&path, "%s/%s", gotpath, name) == -1) {
+	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		path = NULL;
 		goto done;
@@ -139,7 +139,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
     const char *prefix, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *gotpath = NULL;
+	char *path_got = NULL;
 	char *refstr = NULL;
 	char *path_repos = NULL;
 	char *formatstr = NULL;
@@ -154,27 +154,27 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	}
 
 	/* Create .got directory (may already exist). */
-	if (asprintf(&gotpath, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
+	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	if (mkdir(gotpath, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
+	if (mkdir(path_got, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
 	/* Create an empty lock file. */
-	err = create_meta_file(gotpath, GOT_WORKTREE_LOCK, NULL);
+	err = create_meta_file(path_got, GOT_WORKTREE_LOCK, NULL);
 	if (err)
 		goto done;
 
 	/* Create an empty file index. */
-	err = create_meta_file(gotpath, GOT_WORKTREE_FILE_INDEX, NULL);
+	err = create_meta_file(path_got, GOT_WORKTREE_FILE_INDEX, NULL);
 	if (err)
 		goto done;
 
 	/* Set base commit to empty. */
-	err = create_meta_file(gotpath, GOT_WORKTREE_BASE_COMMIT, NULL);
+	err = create_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT, NULL);
 	if (err)
 		goto done;
 
@@ -184,7 +184,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = create_meta_file(gotpath, GOT_WORKTREE_HEAD, refstr);
+	err = create_meta_file(path_got, GOT_WORKTREE_HEAD, refstr);
 	if (err)
 		goto done;
 
@@ -194,12 +194,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = create_meta_file(gotpath, GOT_WORKTREE_REPOSITORY, path_repos);
+	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY, path_repos);
 	if (err)
 		goto done;
 
 	/* Store in-repository path prefix. */
-	err = create_meta_file(gotpath, GOT_WORKTREE_PATH_PREFIX, prefix);
+	err = create_meta_file(path_got, GOT_WORKTREE_PATH_PREFIX, prefix);
 	if (err)
 		goto done;
 
@@ -208,12 +208,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = create_meta_file(gotpath, GOT_WORKTREE_FORMAT, formatstr);
+	err = create_meta_file(path_got, GOT_WORKTREE_FORMAT, formatstr);
 	if (err)
 		goto done;
 
 done:
-	free(gotpath);
+	free(path_got);
 	free(formatstr);
 	free(refstr);
 	free(path_repos);
@@ -224,7 +224,7 @@ const struct got_error *
 got_worktree_open(struct got_worktree **worktree, const char *path)
 {
 	const struct got_error *err = NULL;
-	char *gotpath;
+	char *path_got;
 	char *refstr = NULL;
 	char *path_repos = NULL;
 	char *formatstr = NULL;
@@ -234,13 +234,13 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 
 	*worktree = NULL;
 
-	if (asprintf(&gotpath, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
+	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
-		gotpath = NULL;
+		path_got = NULL;
 		goto done;
 	}
 
-	if (asprintf(&path_lock, "%s/%s", gotpath, GOT_WORKTREE_LOCK) == -1) {
+	if (asprintf(&path_lock, "%s/%s", path_got, GOT_WORKTREE_LOCK) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		path_lock = NULL;
 		goto done;
@@ -253,7 +253,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	err = read_meta_file(&formatstr, gotpath, GOT_WORKTREE_FORMAT);
+	err = read_meta_file(&formatstr, path_got, GOT_WORKTREE_FORMAT);
 	if (err)
 		goto done;
 
@@ -279,16 +279,16 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = read_meta_file(&(*worktree)->path_repo, gotpath,
+	err = read_meta_file(&(*worktree)->path_repo, path_got,
 	    GOT_WORKTREE_REPOSITORY);
 	if (err)
 		goto done;
-	err = read_meta_file(&(*worktree)->path_prefix, gotpath,
+	err = read_meta_file(&(*worktree)->path_prefix, path_got,
 	    GOT_WORKTREE_PATH_PREFIX);
 		goto done;
 
 done:
-	free(gotpath);
+	free(path_got);
 	free(path_lock);
 	if (err) {
 		if (fd != -1)
