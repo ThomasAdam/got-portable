@@ -17,11 +17,13 @@
 struct got_worktree {
 	char *path_worktree_root;
 	char *path_repo;
+	char *path_prefix;
 };
 
-#define GOT_WORKTREE_GOT_DIR	".got"
-#define GOT_WORKTREE_FILE_INDEX	"fileindex"
-#define GOT_WORKTREE_REPOSITORY	"repository"
-#define GOT_WORKTREE_FORMAT	"format"
+#define GOT_WORKTREE_GOT_DIR		".got"
+#define GOT_WORKTREE_FILE_INDEX		"fileindex"
+#define GOT_WORKTREE_REPOSITORY		"repository"
+#define GOT_WORKTREE_PATH_PREFIX	"path-prefix"
+#define GOT_WORKTREE_FORMAT		"format"
 
 #define GOT_WORKTREE_FORMAT_VERSION	1

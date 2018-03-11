@@ -78,7 +78,7 @@ done:
 
 const struct got_error *
 got_worktree_init(const char *path, struct got_reference *head_ref,
-    struct got_repository *repo)
+    const char *prefix, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *abspath = NULL;
@@ -87,6 +87,9 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	char *refstr = NULL;
 	char *path_repos = NULL;
 	char *formatstr = NULL;
+
+	if (!got_path_is_absolute(prefix))
+		return got_error(GOT_ERR_BAD_PATH);
 
 	if (got_path_is_absolute(path)) {
 		abspath = strdup(path);
@@ -141,6 +144,11 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 	err = create_meta_file(gotpath, GOT_WORKTREE_REPOSITORY, path_repos);
+	if (err)
+		goto done;
+
+	/* Store in-repository path prefix. */
+	err = create_meta_file(gotpath, GOT_WORKTREE_PATH_PREFIX, prefix);
 	if (err)
 		goto done;
 
