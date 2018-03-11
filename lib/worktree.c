@@ -195,7 +195,7 @@ got_worktree_get_head(struct got_worktree *worktree)
 }
 
 const struct got_error *
-got_worktree_set_head(struct got_worktree *worktree, struct got_reference *head,
+got_worktree_change_head(struct got_worktree *worktree, struct got_reference *head,
     struct got_repository *repo)
 {
 	return NULL;
