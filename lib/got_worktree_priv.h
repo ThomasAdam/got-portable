@@ -18,6 +18,12 @@ struct got_worktree {
 	char *path_worktree_root;
 	char *path_repo;
 	char *path_prefix;
+
+	/*
+	 * This file descriptor exclusively locks GOT_WORKTREE_FILE_INDEX.
+	 * This ensures that only one process opens the work tree at a time.
+	 */
+	int fd_fileindex;
 };
 
 #define GOT_WORKTREE_GOT_DIR		".got"

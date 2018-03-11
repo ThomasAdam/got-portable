@@ -15,6 +15,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/limits.h>
 
 #include <string.h>
 #include <stdio.h>
@@ -207,12 +208,95 @@ done:
 const struct got_error *
 got_worktree_open(struct got_worktree **worktree, const char *path)
 {
-	return NULL;
+	const struct got_error *err = NULL;
+	char *gotpath;
+	char *refstr = NULL;
+	char *path_repos = NULL;
+	char *formatstr = NULL;
+	char *path_fileindex = NULL;
+	int version, fd = -1;
+	const char *errstr;
+
+	*worktree = NULL;
+
+	if (asprintf(&gotpath, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		gotpath = NULL;
+		goto done;
+	}
+
+	if (asprintf(&path_fileindex, "%s/%s", gotpath,
+	    GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		path_fileindex = NULL;
+		goto done;
+	}
+
+	fd = open(path_fileindex, O_RDWR | O_EXCL | O_EXLOCK | O_NOFOLLOW,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error(GOT_ERR_WORKTREE_BUSY);
+		goto done;
+	}
+
+	err = read_meta_file(&formatstr, gotpath, GOT_WORKTREE_FORMAT);
+	if (err)
+		goto done;
+
+	version = strtonum(formatstr, 1, INT_MAX, &errstr);
+	if (errstr) {
+		err = got_error(GOT_ERR_WORKTREE_META);
+		goto done;
+	}
+	if (version != GOT_WORKTREE_FORMAT_VERSION) {
+		err = got_error(GOT_ERR_WORKTREE_VERS);
+		goto done;
+	}
+
+	*worktree = calloc(1, sizeof(**worktree));
+	if (*worktree == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+	(*worktree)->fd_fileindex = -1;
+
+	(*worktree)->path_worktree_root = strdup(path);
+	if ((*worktree)->path_worktree_root == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+	err = read_meta_file(&(*worktree)->path_repo, gotpath,
+	    GOT_WORKTREE_REPOSITORY);
+	if (err)
+		goto done;
+	err = read_meta_file(&(*worktree)->path_prefix, gotpath,
+	    GOT_WORKTREE_PATH_PREFIX);
+		goto done;
+
+done:
+	free(gotpath);
+	free(path_fileindex);
+	if (err) {
+		if (fd != -1)
+			close(fd);
+		if (*worktree != NULL)
+			got_worktree_close(*worktree);
+		*worktree = NULL;
+	} else
+		(*worktree)->fd_fileindex = fd;
+
+	return err;
 }
 
 void
 got_worktree_close(struct got_worktree *worktree)
 {
+	free(worktree->path_worktree_root);
+	free(worktree->path_repo);
+	free(worktree->path_prefix);
+	if (worktree->fd_fileindex != -1)
+		close(worktree->fd_fileindex);
+	free(worktree);
 }
 
 char *
