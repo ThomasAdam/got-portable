@@ -143,7 +143,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	const struct got_error *err = NULL;
 	char *path_got = NULL;
 	char *refstr = NULL;
-	char *path_repos = NULL;
+	char *repo_path = NULL;
 	char *formatstr = NULL;
 
 	if (!got_path_is_absolute(prefix))
@@ -192,12 +192,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Store path to repository. */
-	path_repos = got_repo_get_path(repo);
-	if (path_repos == NULL) {
+	repo_path = got_repo_get_path(repo);
+	if (repo_path == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY, path_repos);
+	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY, repo_path);
 	if (err)
 		goto done;
 
@@ -219,7 +219,7 @@ done:
 	free(path_got);
 	free(formatstr);
 	free(refstr);
-	free(path_repos);
+	free(repo_path);
 	return err;
 }
 
@@ -229,7 +229,6 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	const struct got_error *err = NULL;
 	char *path_got;
 	char *refstr = NULL;
-	char *path_repos = NULL;
 	char *formatstr = NULL;
 	char *path_lock = NULL;
 	int version, fd = -1;
@@ -277,12 +276,12 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	}
 	(*worktree)->lockfd = -1;
 
-	(*worktree)->path_worktree_root = strdup(path);
-	if ((*worktree)->path_worktree_root == NULL) {
+	(*worktree)->worktree_root = strdup(path);
+	if ((*worktree)->worktree_root == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = read_meta_file(&(*worktree)->path_repo, path_got,
+	err = read_meta_file(&(*worktree)->repo_path, path_got,
 	    GOT_WORKTREE_REPOSITORY);
 	if (err)
 		goto done;
@@ -319,8 +318,8 @@ done:
 void
 got_worktree_close(struct got_worktree *worktree)
 {
-	free(worktree->path_worktree_root);
-	free(worktree->path_repo);
+	free(worktree->worktree_root);
+	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit);
 	free(worktree->head_ref);
@@ -332,7 +331,7 @@ got_worktree_close(struct got_worktree *worktree)
 char *
 got_worktree_get_repo_path(struct got_worktree *worktree)
 {
-	return strdup(worktree->path_repo);
+	return strdup(worktree->repo_path);
 }
 
 struct got_reference *

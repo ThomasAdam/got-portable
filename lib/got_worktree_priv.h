@@ -15,8 +15,8 @@
  */
 
 struct got_worktree {
-	char *path_worktree_root;
-	char *path_repo;
+	char *worktree_root;
+	char *repo_path;
 	char *path_prefix;
 	char *base_commit;
 	char *head_ref;
