@@ -170,6 +170,7 @@ obstruct_meta_file(char **path, const char *worktree_path, const char *name)
 {
 	FILE *f;
 	char *s = "This file should not be here\n";
+	int ret = 1;
 
 	if (asprintf(path, "%s/%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR,
 	    name) == -1)
@@ -181,10 +182,10 @@ obstruct_meta_file(char **path, const char *worktree_path, const char *name)
 	}
 	if (fwrite(s, 1, strlen(s), f) != strlen(s)) {
 		free(*path);
-		return 0;
+		ret = 0;
 	}
 	fclose(f);
-	return 1;
+	return ret;
 }
 
 static int
