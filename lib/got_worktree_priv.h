@@ -20,8 +20,16 @@ struct got_worktree {
 	char *path_prefix;
 
 	/*
-	 * This file descriptor exclusively locks GOT_WORKTREE_FILE_INDEX.
-	 * This ensures that only one process opens the work tree at a time.
+	 * File descriptor for the file index, open while a work tree is open.
+	 * This is used to read the file index and to write out a new file
+	 * index, and also for locking the entire work tree.
+	 * When a work tree is opened, a shared lock on the file index is
+	 * acquired with flock(2). This shared lock is held until the work
+	 * tree is closed, i.e. throughout the lifetime of any operation
+	 * which uses a work tree.
+	 * Before any modifications are made to the on-disk state of meta data,
+	 * tracked files, or directory tree structure, this shared lock must
+	 * be upgraded to an exclusive lock.
 	 */
 	int fd_fileindex;
 };
