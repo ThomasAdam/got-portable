@@ -73,3 +73,7 @@ struct got_fileindex_hdr {
 	TAILQ_HEAD(, got_fileindex_entry) entries;
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
+
+const struct got_error *got_fileindex_entry_open(struct got_fileindex_entry **,
+    const char *, uint8_t *);
+void got_fileindex_entry_close(struct got_fileindex_entry *);
