@@ -296,6 +296,11 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
+	err = read_meta_file(&(*worktree)->head_ref, path_got,
+	    GOT_WORKTREE_HEAD);
+	if (err)
+		goto done;
+
 done:
 	free(path_got);
 	free(path_lock);
@@ -318,6 +323,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->path_repo);
 	free(worktree->path_prefix);
 	free(worktree->base_commit);
+	free(worktree->head_ref);
 	if (worktree->lockfd != -1)
 		close(worktree->lockfd);
 	free(worktree);

@@ -19,6 +19,7 @@ struct got_worktree {
 	char *path_repo;
 	char *path_prefix;
 	char *base_commit;
+	char *head_ref;
 
 	/*
 	 * File descriptor for the lock file, open while a work tree is open.
