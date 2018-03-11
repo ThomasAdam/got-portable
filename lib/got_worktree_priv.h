@@ -20,24 +20,23 @@ struct got_worktree {
 	char *path_prefix;
 
 	/*
-	 * File descriptor for the file index, open while a work tree is open.
-	 * This is used to read the file index and to write out a new file
-	 * index, and also for locking the entire work tree.
-	 * When a work tree is opened, a shared lock on the file index is
+	 * File descriptor for the lock file, open while a work tree is open.
+	 * When a work tree is opened, a shared lock on the lock file is
 	 * acquired with flock(2). This shared lock is held until the work
 	 * tree is closed, i.e. throughout the lifetime of any operation
 	 * which uses a work tree.
-	 * Before any modifications are made to the on-disk state of meta data,
-	 * tracked files, or directory tree structure, this shared lock must
-	 * be upgraded to an exclusive lock.
+	 * Before any modifications are made to the on-disk state of work
+	 * tree meta data, tracked files, or directory tree structure, this
+	 * shared lock must be upgraded to an exclusive lock.
 	 */
-	int fd_fileindex;
+	int lockfd;
 };
 
 #define GOT_WORKTREE_GOT_DIR		".got"
 #define GOT_WORKTREE_FILE_INDEX		"fileindex"
 #define GOT_WORKTREE_REPOSITORY		"repository"
 #define GOT_WORKTREE_PATH_PREFIX	"path-prefix"
+#define GOT_WORKTREE_LOCK		"lock"
 #define GOT_WORKTREE_FORMAT		"format"
 
 #define GOT_WORKTREE_FORMAT_VERSION	1

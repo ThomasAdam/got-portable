@@ -163,6 +163,11 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 
+	/* Create an empty lock file. */
+	err = create_meta_file(gotpath, GOT_WORKTREE_LOCK, NULL);
+	if (err)
+		goto done;
+
 	/* Create an empty file index. */
 	err = create_meta_file(gotpath, GOT_WORKTREE_FILE_INDEX, NULL);
 	if (err)
@@ -218,7 +223,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	char *refstr = NULL;
 	char *path_repos = NULL;
 	char *formatstr = NULL;
-	char *path_fileindex = NULL;
+	char *path_lock = NULL;
 	int version, fd = -1;
 	const char *errstr;
 
@@ -230,19 +235,14 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	if (asprintf(&path_fileindex, "%s/%s", gotpath,
-	    GOT_WORKTREE_FILE_INDEX) == -1) {
+	if (asprintf(&path_lock, "%s/%s", gotpath, GOT_WORKTREE_LOCK) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
-		path_fileindex = NULL;
+		path_lock = NULL;
 		goto done;
 	}
 
-	fd = open(path_fileindex, O_RDWR | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	fd = open(path_lock, O_RDWR | O_EXLOCK | O_NONBLOCK);
 	if (fd == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (flock(fd, LOCK_SH | LOCK_NB) == -1) {
 		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
 		    : got_error_from_errno());
 		goto done;
@@ -267,7 +267,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	(*worktree)->fd_fileindex = -1;
+	(*worktree)->lockfd = -1;
 
 	(*worktree)->path_worktree_root = strdup(path);
 	if ((*worktree)->path_worktree_root == NULL) {
@@ -284,7 +284,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 
 done:
 	free(gotpath);
-	free(path_fileindex);
+	free(path_lock);
 	if (err) {
 		if (fd != -1)
 			close(fd);
@@ -292,7 +292,7 @@ done:
 			got_worktree_close(*worktree);
 		*worktree = NULL;
 	} else
-		(*worktree)->fd_fileindex = fd;
+		(*worktree)->lockfd = fd;
 
 	return err;
 }
@@ -303,8 +303,8 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->path_worktree_root);
 	free(worktree->path_repo);
 	free(worktree->path_prefix);
-	if (worktree->fd_fileindex != -1)
-		close(worktree->fd_fileindex);
+	if (worktree->lockfd != -1)
+		close(worktree->lockfd);
 	free(worktree);
 }
 
