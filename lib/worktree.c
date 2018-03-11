@@ -94,8 +94,12 @@ read_meta_file(char **content, const char *gotpath, const char *name)
 		goto done;
 	}
 
-	fd = open(path, O_RDONLY | O_EXLOCK | O_NONBLOCK | O_NOFOLLOW);
+	fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (flock(fd, LOCK_SH | LOCK_NB) == -1) {
 		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
 		    : got_error_from_errno());
 		goto done;
@@ -233,9 +237,12 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	fd = open(path_fileindex, O_RDWR | O_EXLOCK | O_NONBLOCK | O_NOFOLLOW,
-	    GOT_DEFAULT_FILE_MODE);
+	fd = open(path_fileindex, O_RDWR | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (flock(fd, LOCK_SH | LOCK_NB) == -1) {
 		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
 		    : got_error_from_errno());
 		goto done;
