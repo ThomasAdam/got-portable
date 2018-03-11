@@ -276,8 +276,8 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	}
 	(*worktree)->lockfd = -1;
 
-	(*worktree)->worktree_root = strdup(path);
-	if ((*worktree)->worktree_root == NULL) {
+	(*worktree)->root_path = strdup(path);
+	if ((*worktree)->root_path == NULL) {
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
@@ -318,7 +318,7 @@ done:
 void
 got_worktree_close(struct got_worktree *worktree)
 {
-	free(worktree->worktree_root);
+	free(worktree->root_path);
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit);
