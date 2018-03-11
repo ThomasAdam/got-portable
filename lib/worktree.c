@@ -288,6 +288,12 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	err = read_meta_file(&(*worktree)->path_prefix, path_got,
 	    GOT_WORKTREE_PATH_PREFIX);
+	if (err)
+		goto done;
+
+	err = read_meta_file(&(*worktree)->base_commit, path_got,
+	    GOT_WORKTREE_BASE_COMMIT);
+	if (err)
 		goto done;
 
 done:
