@@ -31,6 +31,7 @@
 
 #include "got_worktree_priv.h"
 #include "got_path_priv.h"
+#include "got_sha1_priv.h"
 
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)
@@ -174,8 +175,9 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
-	/* Set base commit to empty. */
-	err = create_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT, NULL);
+	/* Save an invalid base commit hash. */
+	err = create_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT,
+		GOT_WORKTREE_INVALID_COMMIT_ID);
 	if (err)
 		goto done;
 
