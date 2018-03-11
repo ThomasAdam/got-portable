@@ -25,6 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <util.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -100,6 +101,26 @@ remove_worktree(const char *worktree_path)
 }
 
 static int
+read_meta_file(char **content, const char *path)
+{
+	FILE *f;
+	size_t n;
+	size_t len;
+	const char delim[3] = {'\0', '\0', '\0'};
+	int ret = 0;
+
+	f = fopen(path, "r");
+	if (f == NULL)
+		return errno;
+
+	*content = fparseln(f, &len, NULL, delim, 0);
+	if (*content == NULL)
+		ret = errno;
+	fclose(f);
+	return ret;
+}
+
+static int
 check_meta_file_exists(const char *worktree_path, const char *name)
 {
 	struct stat sb;
@@ -111,6 +132,13 @@ check_meta_file_exists(const char *worktree_path, const char *name)
 		return 0;
 	if (stat(path, &sb) == 0)
 		ret = 1;
+	if (verbose) {
+		char *content;
+		if (read_meta_file(&content, path) == 0) {
+			test_printf("%s:\t%s\n", name, content);
+			free(content);
+		}
+	}
 	free(path);
 	return ret;
 }
