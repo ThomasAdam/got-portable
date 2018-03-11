@@ -77,17 +77,26 @@ remove_meta_file(const char *worktree_path, const char *name)
 	return 1;
 }
 
-static void
+static int
 remove_worktree(const char *worktree_path)
 {
-	remove_meta_file(worktree_path, GOT_REF_HEAD);
-	remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX);
-	remove_meta_file(worktree_path, GOT_WORKTREE_REPOSITORY);
-	remove_meta_file(worktree_path, GOT_WORKTREE_PATH_PREFIX);
-	remove_meta_file(worktree_path, GOT_WORKTREE_LOCK);
-	remove_meta_file(worktree_path, GOT_WORKTREE_FORMAT);
-	remove_got_dir(worktree_path);
-	rmdir(worktree_path);
+	if (!remove_meta_file(worktree_path, GOT_REF_HEAD))
+		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX))
+		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_REPOSITORY))
+		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_PATH_PREFIX))
+		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_LOCK))
+		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_FORMAT))
+		return 0;
+	if (!remove_got_dir(worktree_path))
+		return 0;
+	if (rmdir(worktree_path) == -1)
+		return 0;
+	return 1;
 }
 
 static int
@@ -144,8 +153,10 @@ worktree_init(const char *repo_path)
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FORMAT))
 		goto done;
+
+	if (!remove_worktree(worktree_path))
+		goto done;
 	ok = 1;
-	remove_worktree(worktree_path);
 done:
 	if (head_ref)
 		got_ref_close(head_ref);
