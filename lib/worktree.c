@@ -317,6 +317,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->path_worktree_root);
 	free(worktree->path_repo);
 	free(worktree->path_prefix);
+	free(worktree->base_commit);
 	if (worktree->lockfd != -1)
 		close(worktree->lockfd);
 	free(worktree);
