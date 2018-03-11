@@ -114,7 +114,8 @@ read_meta_file(char **content, const char *path_got, const char *name)
 
 	n = read(fd, *content, sb.st_size);
 	if (n != sb.st_size) {
-		err = got_error_from_errno();
+		err = (n == -1 ? got_error_from_errno() :
+		    got_error(GOT_ERR_WORKTREE_META));
 		goto done;
 	}
 	if ((*content)[sb.st_size - 1] != '\n') {
