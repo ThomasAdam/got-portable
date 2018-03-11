@@ -173,7 +173,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
-	/* Create an empty base commit file. */
+	/* Set base commit to empty. */
 	err = create_meta_file(gotpath, GOT_WORKTREE_BASE_COMMIT, NULL);
 	if (err)
 		goto done;
@@ -184,7 +184,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
 	}
-	err = create_meta_file(gotpath, GOT_REF_HEAD, refstr);
+	err = create_meta_file(gotpath, GOT_WORKTREE_HEAD, refstr);
 	if (err)
 		goto done;
 
