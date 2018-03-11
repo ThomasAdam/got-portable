@@ -2,7 +2,7 @@
 
 PROG = worktree_test
 SRCS = worktree.c repository.c object.c path.c error.c refs.c sha1.c pack.c \
-	delta.c zb.c worktree_test.c
+	delta.c zbuf.c worktree_test.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
