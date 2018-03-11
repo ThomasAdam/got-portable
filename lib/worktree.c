@@ -173,6 +173,11 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
+	/* Create an empty base commit file. */
+	err = create_meta_file(gotpath, GOT_WORKTREE_BASE_COMMIT, NULL);
+	if (err)
+		goto done;
+
 	/* Write the HEAD reference. */
 	refstr = got_ref_to_str(head_ref);
 	if (refstr == NULL) {

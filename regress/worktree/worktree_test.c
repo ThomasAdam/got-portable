@@ -89,6 +89,8 @@ remove_worktree(const char *worktree_path)
 		return 0;
 	if (!remove_meta_file(worktree_path, GOT_WORKTREE_PATH_PREFIX))
 		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_BASE_COMMIT))
+		return 0;
 	if (!remove_meta_file(worktree_path, GOT_WORKTREE_LOCK))
 		return 0;
 	if (!remove_meta_file(worktree_path, GOT_WORKTREE_FORMAT))
@@ -171,6 +173,8 @@ worktree_init(const char *repo_path)
 	if (!check_meta_file_exists(worktree_path, GOT_REF_HEAD))
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_LOCK))
+		goto done;
+	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_BASE_COMMIT))
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FILE_INDEX))
 		goto done;
@@ -276,6 +280,9 @@ worktree_init_exists(const char *repo_path)
 	    GOT_WORKTREE_LOCK))
 		goto done;
 	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_BASE_COMMIT))
+		goto done;
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
 	    GOT_WORKTREE_FILE_INDEX))
 		goto done;
 	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
@@ -292,9 +299,9 @@ done:
 	if (repo)
 		got_repo_close(repo);
 	free(gotpath);
-	if (ok == 6)
+	if (ok == 7)
 		remove_worktree(worktree_path);
-	return (ok == 6);
+	return (ok == 7);
 }
 
 #define RUN_TEST(expr, name) \
