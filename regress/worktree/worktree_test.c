@@ -104,13 +104,15 @@ check_meta_file_exists(const char *worktree_path, const char *name)
 {
 	struct stat sb;
 	char *path;
+	int ret = 0;
 
 	if (asprintf(&path, "%s/%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR,
 	    name) == -1)
 		return 0;
-	if (stat(path, &sb) == -1)
-		return 0;
-	return 1;
+	if (stat(path, &sb) == 0)
+		ret = 1;
+	free(path);
+	return ret;
 }
 
 static int
