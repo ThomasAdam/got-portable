@@ -177,11 +177,37 @@ obstruct_meta_file(char **path, const char *worktree_path, const char *name)
 }
 
 static int
+obstruct_meta_file_and_init(int *ok, struct got_repository *repo,
+    const char *worktree_path, char *name)
+{
+	const struct got_error *err;
+	char *path;
+	int ret = 0;
+	struct got_reference *head_ref = NULL;
+
+	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FILE_INDEX))
+		return 0;
+
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (err != NULL || head_ref == NULL)
+		return 0;
+
+	err = got_worktree_init(worktree_path, head_ref, "/", repo);
+	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST) {
+		(*ok)++;
+		ret = 1;
+	}
+	unlink(path);
+	free(path);
+	got_ref_close(head_ref);
+	return ret;
+}
+
+static int
 worktree_init_exists(const char *repo_path)
 {
 	const struct got_error *err;
 	struct got_repository *repo = NULL;
-	struct got_reference *head_ref = NULL;
 	char worktree_path[PATH_MAX];
 	char *gotpath = NULL;
 	char *path;
@@ -191,10 +217,6 @@ worktree_init_exists(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		goto done;
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
-	if (err != NULL || head_ref == NULL)
-		goto done;
-
 	strlcpy(worktree_path, "worktree-XXXXXX", sizeof(worktree_path));
 	if (mkdtemp(worktree_path) == NULL)
 		goto done;
@@ -208,58 +230,26 @@ worktree_init_exists(const char *repo_path)
 		goto done;
 
 	/* Create files which got_worktree_init() will try to create as well. */
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_REF_HEAD))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_REF_HEAD))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_LOCK))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_LOCK))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FILE_INDEX))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_FILE_INDEX))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_REPOSITORY))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_REPOSITORY))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_PATH_PREFIX))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_PATH_PREFIX))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
-
-	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FORMAT))
+	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
+	    GOT_WORKTREE_FORMAT))
 		goto done;
-	err = got_worktree_init(worktree_path, head_ref, "/", repo);
-	if (err != NULL && err->code == GOT_ERR_ERRNO && errno == EEXIST)
-		ok++;
-	unlink(path);
-	free(path);
 
 done:
-	if (head_ref)
-		got_ref_close(head_ref);
 	if (repo)
 		got_repo_close(repo);
 	free(gotpath);
