@@ -21,8 +21,8 @@
  * order to detect modifications made to on-disk files, they are never
  * applied back to the filesystem.
  */
-struct got_file_index_entry {
-	TAILQ_ENTRY(, got_file_index_entry) entry;
+struct got_fileindex_entry {
+	TAILQ_ENTRY(, got_fileindex_entry) entry;
 	uint64_t ctime_sec;
 	uint64_t ctime_nsec;
 	uint64_t mtime_sec;
@@ -61,10 +61,10 @@ struct got_file_index_entry {
 #define GOT_INDEX_ENTRY_STAGE_THEIRS	3
 
 /* On-disk file index header structure. */
-struct got_file_index_hdr {
+struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian on disk */
 	uint32_t version;	/* big-endian on disk */
 	uint32_t nentries;	/* big-endian on disk */
-	TAILQ_HEAD(, got_file_index_entry) entries;
+	TAILQ_HEAD(, got_fileindex_entry) entries;
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
