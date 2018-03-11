@@ -22,7 +22,7 @@
  * applied back to the filesystem.
  */
 struct got_fileindex_entry {
-	TAILQ_ENTRY(, got_fileindex_entry) entry;
+	TAILQ_ENTRY(got_fileindex_entry) entry;
 	uint64_t ctime_sec;
 	uint64_t ctime_nsec;
 	uint64_t mtime_sec;
@@ -34,9 +34,13 @@ struct got_fileindex_entry {
 	 * The value is only used to check for modifications anyway.
 	 */
 	uint32_t size;
+
 	uint16_t mode;
-#define GOT_INDEX_ENTRY_MODE_OBJ_TYPE	0x000f
-#define GOT_INDEX_ENTRY_MODE_PERMS	0xff10
+#define GOT_INDEX_ENTRY_MODE_FILE_TYPE		0x000f
+#define GOT_INDEX_ENTRY_MODE_REGULAR_FILE	1
+#define GOT_INDEX_ENTRY_MODE_SYMLINK		2
+#define GOT_INDEX_ENTRY_MODE_PERMS		0xff10
+#define GOT_INDEX_ENTRY_MODE_PERMS_SHIFT	4
 
 	/* SHA1 of corresponding blob in repository. */
 	uint8_t blob_sha1[SHA1_DIGEST_LENGTH];
@@ -51,7 +55,7 @@ struct got_fileindex_entry {
 	 * UNIX-style path, relative to work tree root.
 	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
-	const char *path;
+	char *path;
 };
 
 /* "Stages" of a file afflicted by a 3-way merge conflict. */
@@ -64,6 +68,7 @@ struct got_fileindex_entry {
 struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian on disk */
 	uint32_t version;	/* big-endian on disk */
+#define GOT_FILE_INDEX_VERSION	1
 	uint32_t nentries;	/* big-endian on disk */
 	TAILQ_HEAD(, got_fileindex_entry) entries;
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
