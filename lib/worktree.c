@@ -76,6 +76,58 @@ done:
 	return err;
 }
 
+static const struct got_error *
+read_meta_file(char **content, const char *gotpath, const char *name)
+{
+	const struct got_error *err = NULL;
+	char *path;
+	int fd = -1;
+	ssize_t n;
+	struct stat sb;
+
+	*content = NULL;
+
+	if (asprintf(&path, "%s/%s", gotpath, name) == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		path = NULL;
+		goto done;
+	}
+
+	fd = open(path, O_RDONLY | O_EXCL | O_EXLOCK | O_NOFOLLOW);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	stat(path, &sb);
+	*content = calloc(1, sb.st_size);
+	if (*content == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+
+	n = read(fd, *content, sb.st_size);
+	if (n != sb.st_size) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if ((*content)[sb.st_size - 1] != '\n') {
+		err = got_error(GOT_ERR_WORKTREE_META);
+		goto done;
+	}
+	(*content)[sb.st_size - 1] = '\0';
+
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno();
+	free(path);
+	if (err) {
+		free(*content);
+		*content = NULL;
+	}
+	return err;
+}
+
 const struct got_error *
 got_worktree_init(const char *path, struct got_reference *head_ref,
     const char *prefix, struct got_repository *repo)

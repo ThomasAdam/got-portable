@@ -40,6 +40,7 @@
 #define GOT_ERR_COMPRESSION	22
 #define GOT_ERR_BAD_OBJ_ID_STR	23
 #define GOT_ERR_WORKTREE_EXISTS	26
+#define GOT_ERR_WORKTREE_META	27
 
 static const struct got_error {
 	int code;
@@ -70,6 +71,7 @@ static const struct got_error {
 	{ GOT_ERR_COMPRESSION,	"compression failed" },
 	{ GOT_ERR_BAD_OBJ_ID_STR,"bad object id string" },
 	{ GOT_ERR_WORKTREE_EXISTS,"worktree already exists" },
+	{ GOT_ERR_WORKTREE_META,"bad worktree meta data" },
 };
 
 const struct got_error * got_error(int code);
