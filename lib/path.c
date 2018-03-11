@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "got_path_priv.h"
+#include "got_path_lib.h"
 
 int
 got_path_is_absolute(const char *path)

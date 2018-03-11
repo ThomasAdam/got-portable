@@ -25,8 +25,8 @@
 #include "got_error.h"
 #include "got_object.h"
 
-#include "got_path_priv.h"
-#include "got_zbuf_priv.h"
+#include "got_path_lib.h"
+#include "got_zbuf_lib.h"
 
 const struct got_error *
 got_inflate_init(struct got_zstream_buf *zb, size_t bufsize)

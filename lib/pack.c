@@ -33,13 +33,13 @@
 #include "got_object.h"
 #include "got_repository.h"
 
-#include "got_sha1_priv.h"
-#include "got_pack_priv.h"
-#include "got_path_priv.h"
-#include "got_delta_priv.h"
-#include "got_zbuf_priv.h"
-#include "got_object_priv.h"
-#include "got_repository_priv.h"
+#include "got_sha1_lib.h"
+#include "got_pack_lib.h"
+#include "got_path_lib.h"
+#include "got_delta_lib.h"
+#include "got_zbuf_lib.h"
+#include "got_object_lib.h"
+#include "got_repository_lib.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

@@ -88,7 +88,7 @@
 #include "got_object.h"
 #include "got_diff.h"
 
-#include "got_diff_priv.h"
+#include "got_diff_lib.h"
 
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))

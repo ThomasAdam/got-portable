@@ -29,9 +29,9 @@
 #include "got_refs.h"
 #include "got_worktree.h"
 
-#include "got_worktree_priv.h"
-#include "got_path_priv.h"
-#include "got_sha1_priv.h"
+#include "got_worktree_lib.h"
+#include "got_path_lib.h"
+#include "got_sha1_lib.h"
 
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)

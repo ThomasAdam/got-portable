@@ -26,9 +26,9 @@
 #include "got_repository.h"
 #include "got_object.h"
 
-#include "got_delta_priv.h"
-#include "got_path_priv.h"
-#include "got_zbuf_priv.h"
+#include "got_delta_lib.h"
+#include "got_path_lib.h"
+#include "got_zbuf_lib.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
