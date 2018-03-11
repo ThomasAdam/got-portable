@@ -47,7 +47,7 @@ create_meta_file(const char *gotpath, const char *name, const char *content)
 		goto done;
 	}
 
-	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_EXLOCK | O_NOFOLLOW,
+	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		err = got_error_from_errno();
@@ -94,9 +94,10 @@ read_meta_file(char **content, const char *gotpath, const char *name)
 		goto done;
 	}
 
-	fd = open(path, O_RDONLY | O_EXCL | O_EXLOCK | O_NOFOLLOW);
+	fd = open(path, O_RDONLY | O_EXLOCK | O_NONBLOCK | O_NOFOLLOW);
 	if (fd == -1) {
-		err = got_error_from_errno();
+		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
+		    : got_error_from_errno());
 		goto done;
 	}
 
@@ -232,10 +233,11 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	fd = open(path_fileindex, O_RDWR | O_EXCL | O_EXLOCK | O_NOFOLLOW,
+	fd = open(path_fileindex, O_RDWR | O_EXLOCK | O_NONBLOCK | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		err = got_error(GOT_ERR_WORKTREE_BUSY);
+		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
+		    : got_error_from_errno());
 		goto done;
 	}
 
