@@ -23,4 +23,4 @@ void got_worktree_close(struct got_worktree *);
 char *got_worktree_get_repo_path(struct got_worktree *);
 char  *got_worktree_get_head_ref_name(struct got_worktree *);
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
-    struct got_repository *);
+    struct got_reference *, struct got_repository *);

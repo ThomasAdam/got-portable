@@ -16,6 +16,7 @@
 
 #include <sys/stat.h>
 #include <sys/limits.h>
+#include <sys/queue.h>
 
 #include <string.h>
 #include <stdio.h>
@@ -23,15 +24,27 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sha1.h>
+#include <zlib.h>
+#include <fnmatch.h>
 
 #include "got_error.h"
 #include "got_repository.h"
 #include "got_refs.h"
+#include "got_object.h"
 #include "got_worktree.h"
 
 #include "got_worktree_lib.h"
 #include "got_path_lib.h"
 #include "got_sha1_lib.h"
+#include "got_fileindex_lib.h"
+#include "got_zbuf_lib.h"
+#include "got_delta_lib.h"
+#include "got_object_lib.h"
+
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
 
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)
@@ -340,9 +353,313 @@ got_worktree_get_head_ref_name(struct got_worktree *worktree)
 	return strdup(worktree->head_ref);
 }
 
+static const struct got_error *
+lock_worktree(struct got_worktree *worktree, int operation)
+{
+	if (flock(worktree->lockfd, operation | LOCK_NB) == -1)
+		return (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
+		    : got_error_from_errno());
+	return NULL;
+}
+
+static const char *
+apply_path_prefix(struct got_worktree *worktree, const char *path)
+{
+	const char *p = path;
+	p += strlen(worktree->path_prefix);
+	if (*p == '/')
+		p++;
+	return p;
+}
+
+static const struct got_error *
+add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
+   const char *path, struct got_blob_object *blob, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *abspath;
+	int fd;
+	size_t len, hdrlen;
+	struct got_fileindex_entry *entry;
+
+	if (asprintf(&abspath, "%s/%s", worktree->root_path,
+	    apply_path_prefix(worktree, path)) == -1)
+		return got_error(GOT_ERR_NO_MEM);
+
+	fd = open(abspath, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		if (errno == EEXIST) {
+			struct stat sb;
+			if (lstat(abspath, &sb) == -1) {
+				err = got_error_from_errno();
+			} else if (!S_ISREG(sb.st_mode)) {
+				/* TODO file is obstructed; do something */
+				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+			}
+		}
+		return err;
+	}
+
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	do {
+		const uint8_t *buf = got_object_blob_get_read_buf(blob);
+		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			break;
+		if (len > 0) {
+			/* Skip blob object header first time around. */
+			ssize_t outlen = write(fd, buf + hdrlen, len - hdrlen);
+			hdrlen = 0;
+			if (outlen == -1) {
+				err = got_error_from_errno();
+				break;
+			} else if (outlen != len) {
+				err = got_error(GOT_ERR_IO);
+				break;
+			}
+		}
+	} while (len != 0);
+
+	fsync(fd);
+
+	err = got_fileindex_entry_open(&entry, abspath, blob->id.sha1);
+	if (err)
+		goto done;
+
+	err = got_fileindex_entry_add(fileindex, entry);
+	if (err)
+		goto done;
+done:
+	close(fd);
+	free(abspath);
+	return err;
+}
+
+static const struct got_error *
+add_dir_on_disk(struct got_worktree *worktree, const char *path)
+{
+	const struct got_error *err = NULL;
+	char *abspath;
+	size_t len;
+
+	if (asprintf(&abspath, "%s/%s", worktree->root_path,
+	    apply_path_prefix(worktree, path)) == -1)
+		return got_error(GOT_ERR_NO_MEM);
+
+	/* XXX queue work rather than editing disk directly? */
+	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
+		struct stat sb;
+
+		if (errno != EEXIST) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (lstat(abspath, &sb) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (!S_ISDIR(sb.st_mode)) {
+			/* TODO directory is obstructed; do something */
+			return got_error(GOT_ERR_FILE_OBSTRUCTED);
+		}
+	}
+
+done:
+	free(abspath);
+	return err;
+}
+
+static const struct got_error *
+tree_checkout(struct got_worktree *, struct got_fileindex *,
+    struct got_tree_object *, const char *, struct got_repository *);
+
+static const struct got_error *
+tree_checkout_entry(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_tree_entry *te,
+    const char *parent, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	struct got_blob_object *blob = NULL;
+	struct got_tree_object *tree = NULL;
+	char *path = NULL;
+	size_t len;
+
+	if (parent[0] == '/' && parent[1] == '\0')
+		parent = "";
+	if (asprintf(&path, "%s/%s", parent, te->name) == -1)
+		return got_error(GOT_ERR_NO_MEM);
+
+	/* Skip this entry if it is outside of our path prefix. */
+	len = MIN(strlen(worktree->path_prefix), strlen(path));
+	if (strncmp(path, worktree->path_prefix, len) != 0) {
+		free(path);
+		return NULL;
+	}
+
+	err = got_object_open(&obj, repo, te->id);
+	if (err)
+		goto done;
+
+	switch (got_object_get_type(obj)) {
+	case GOT_OBJ_TYPE_BLOB:
+		if (strlen(worktree->path_prefix) >= strlen(path))
+			break;
+		err = got_object_blob_open(&blob, repo, obj, 8192);
+		if (err)
+			goto done;
+		err = add_file_on_disk(worktree, fileindex, path, blob, repo);
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		err = got_object_tree_open(&tree, repo, obj);
+		if (err)
+			goto done;
+		if (strlen(worktree->path_prefix) < strlen(path)) {
+			err = add_dir_on_disk(worktree, path);
+			if (err)
+				break;
+		}
+		err = tree_checkout(worktree, fileindex, tree, path, repo);
+		break;
+	default:
+		break;
+	}
+
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (tree)
+		got_object_tree_close(tree);
+	if (obj)
+		got_object_close(obj);
+	free(path);
+	return err;
+}
+
+static const struct got_error *
+tree_checkout(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_tree_object *tree,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_entry *te;
+	size_t len;
+
+	/* Skip this tree if it is outside of our path prefix. */
+	len = MIN(strlen(worktree->path_prefix), strlen(path));
+	if (strncmp(path, worktree->path_prefix, len) != 0)
+		return NULL;
+
+	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+		err = tree_checkout_entry(worktree, fileindex, te, path, repo);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
-    struct got_repository *repo)
+    struct got_reference *head_ref, struct got_repository *repo)
 {
-	return NULL;
+	const struct got_error *err = NULL, *unlockerr;
+	struct got_object_id *commit_id = NULL;
+	struct got_object *obj = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
+	char *fileindex_path = NULL, *new_fileindex_path = NULL;
+	struct got_fileindex *fileindex = NULL;
+	FILE *findex = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	fileindex = got_fileindex_open();
+	if (fileindex == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
+		goto done;
+	}
+
+	err = got_opentemp_named(&new_fileindex_path, &findex, fileindex_path);
+	if (err)
+		goto done;
+
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error(GOT_ERR_NO_MEM);
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	err = got_ref_resolve(&commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	err = got_object_open(&obj, repo, commit_id);
+	if (err)
+		goto done;
+
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_commit_open(&commit, repo, obj);
+	if (err)
+		goto done;
+
+	got_object_close(obj);
+	err = got_object_open(&obj, repo, commit->tree_id);
+	if (err)
+		goto done;
+
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_tree_open(&tree, repo, obj);
+	if (err)
+		goto done;
+
+	err = tree_checkout(worktree, fileindex, tree, "/", repo);
+	if (err)
+		goto done;
+
+	err = got_fileindex_write(fileindex, findex);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	free(new_fileindex_path);
+	new_fileindex_path = NULL;
+
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	if (obj)
+		got_object_close(obj);
+	free(commit_id);
+	if (new_fileindex_path)
+		unlink(new_fileindex_path);
+	if (findex)
+		fclose(findex);
+	free(new_fileindex_path);
+	free(fileindex_path);
+	got_fileindex_close(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
 }

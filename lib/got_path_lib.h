@@ -37,3 +37,11 @@ char *got_path_normalize(const char *);
 /* Open a new temporary file for writing.
  * The file is not visible in the filesystem. */
 FILE *got_opentemp(void);
+
+/* Open a new temporary file for writing.
+ * The file is visible in the filesystem. */
+const struct got_error *got_opentemp_named(char **, FILE **, const char *);
+
+/* Count the number of path segments separated by '/'. */
+const struct got_error *
+got_path_segment_count(int *count, const char *path);

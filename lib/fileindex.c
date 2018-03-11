@@ -75,3 +75,44 @@ got_fileindex_entry_close(struct got_fileindex_entry *entry)
 	free(entry->path);
 	free(entry);
 }
+
+const struct got_error *
+got_fileindex_entry_add(struct got_fileindex *fileindex,
+    struct got_fileindex_entry *entry)
+{
+	/* TODO keep entries sorted by name */
+	TAILQ_INSERT_TAIL(&fileindex->entries, entry, entry);
+	fileindex->nentries++;
+	return NULL;
+}
+
+struct got_fileindex *
+got_fileindex_open(void)
+{
+	struct got_fileindex *fileindex;
+
+	fileindex = calloc(1, sizeof(*fileindex));
+	if (fileindex)
+		TAILQ_INIT(&fileindex->entries);
+	return fileindex;
+}
+
+void
+got_fileindex_close(struct got_fileindex *fileindex)
+{
+	struct got_fileindex_entry *entry;
+
+	while (!TAILQ_EMPTY(&fileindex->entries)) {
+		entry = TAILQ_FIRST(&fileindex->entries);
+		TAILQ_REMOVE(&fileindex->entries, entry, entry);
+		got_fileindex_entry_close(entry);
+		fileindex->nentries--;
+	}
+	free(fileindex);
+}
+
+const struct got_error *
+got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
+{
+	return NULL;
+}

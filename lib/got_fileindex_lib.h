@@ -84,3 +84,8 @@ struct got_fileindex_hdr {
 const struct got_error *got_fileindex_entry_open(struct got_fileindex_entry **,
     const char *, uint8_t *);
 void got_fileindex_entry_close(struct got_fileindex_entry *);
+struct got_fileindex *got_fileindex_open(void);
+void got_fileindex_close(struct got_fileindex *);
+const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
+const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
+    struct got_fileindex_entry *);

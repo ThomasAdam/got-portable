@@ -304,6 +304,74 @@ done:
 	return (ok == 7);
 }
 
+static int
+worktree_checkout(const char *repo_path)
+{
+	const struct got_error *err;
+	struct got_repository *repo = NULL;
+	struct got_reference *head_ref = NULL;
+	struct got_worktree *worktree = NULL;
+	char *makefile_path = NULL, *cfile_path = NULL;
+	char worktree_path[PATH_MAX];
+	int ok = 0;
+	struct stat sb;
+
+	err = got_repo_open(&repo, repo_path);
+	if (err != NULL || repo == NULL)
+		goto done;
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (err != NULL || head_ref == NULL)
+		goto done;
+
+	strlcpy(worktree_path, "worktree-XXXXXX", sizeof(worktree_path));
+	if (mkdtemp(worktree_path) == NULL)
+		goto done;
+
+	err = got_worktree_init(worktree_path, head_ref, "/regress/worktree",
+	    repo);
+	if (err != NULL)
+		goto done;
+
+	err = got_worktree_open(&worktree, worktree_path);
+	if (err != NULL)
+		goto done;
+
+	err = got_worktree_checkout_files(worktree, head_ref, repo);
+	if (err != NULL)
+		goto done;
+
+	test_printf("checked out %s\n", worktree_path);
+
+	/* The work tree should contain a Makefile and worktree_test.c. */
+	if (asprintf(&makefile_path, "%s/Makefile", worktree_path) == -1)
+		goto done;
+	if (stat(makefile_path, &sb) != 0)
+		goto done;
+	else
+		unlink(makefile_path);
+	if (asprintf(&cfile_path, "%s/worktree_test.c", worktree_path) == -1)
+		goto done;
+	if (stat(cfile_path, &sb) != 0)
+		goto done;
+	else
+		unlink(cfile_path);
+
+	if (!remove_worktree(worktree_path))
+		goto done;
+
+	ok = 1;
+done:
+	if (worktree)
+		got_worktree_close(worktree);
+	if (head_ref)
+		got_ref_close(head_ref);
+	if (repo)
+		got_repo_close(repo);
+	free(makefile_path);
+	free(cfile_path);
+	return ok;
+}
+
 #define RUN_TEST(expr, name) \
 	{ test_ok = (expr);  \
 	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
@@ -348,6 +416,7 @@ main(int argc, char *argv[])
 
 	RUN_TEST(worktree_init(repo_path), "init");
 	RUN_TEST(worktree_init_exists(repo_path), "init exists");
+	RUN_TEST(worktree_checkout(repo_path), "checkout");
 
 	return failure ? 1 : 0;
 }

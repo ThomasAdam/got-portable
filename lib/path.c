@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "got_error.h"
+
 #include "got_path_lib.h"
 
 int
@@ -61,6 +63,26 @@ got_path_normalize(const char *path)
 	return resolved;
 }
 
+const struct got_error *
+got_path_segment_count(int *count, const char *path)
+{
+	int n = 0;
+	char *s = strdup(path), *p;
+
+	*count = 0;
+
+	if (s == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	do {
+		p = strsep(&s, "/");
+		if (s && *s != '/')
+			(*count)++;
+	} while (p);
+
+	return NULL;
+}
+
 FILE *
 got_opentemp(void)
 {
@@ -83,4 +105,33 @@ got_opentemp(void)
 	}
 
 	return f;
+}
+
+const struct got_error *
+got_opentemp_named(char **path, FILE **outfile, const char *basepath)
+{
+	const struct got_error *err = NULL;
+	int fd, ret;
+
+	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
+		*path = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
+	fd = mkstemp(*path);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		free(*path);
+		*path = NULL;
+		return err;
+	}
+
+	*outfile = fdopen(fd, "w+");
+	if (*outfile == NULL) {
+		err = got_error_from_errno();
+		free(*path);
+		*path = NULL;
+	}
+
+	return err;
 }
