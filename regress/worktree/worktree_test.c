@@ -102,17 +102,14 @@ remove_worktree(const char *worktree_path)
 static int
 check_meta_file_exists(const char *worktree_path, const char *name)
 {
-	FILE *f;
+	struct stat sb;
 	char *path;
 
 	if (asprintf(&path, "%s/%s/%s", worktree_path, GOT_WORKTREE_GOT_DIR,
 	    name) == -1)
 		return 0;
-	f = fopen(path, "r");
-	free(path);
-	if (f == NULL)
+	if (stat(path, &sb) == -1)
 		return 0;
-	fclose(f);
 	return 1;
 }
 
