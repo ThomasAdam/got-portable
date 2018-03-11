@@ -78,7 +78,7 @@ remove_meta_file(const char *worktree_path, const char *name)
 }
 
 static void
-remove_workdir(const char *worktree_path)
+remove_worktree(const char *worktree_path)
 {
 	remove_meta_file(worktree_path, GOT_REF_HEAD);
 	remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX);
@@ -145,7 +145,7 @@ worktree_init(const char *repo_path)
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FORMAT))
 		goto done;
 	ok = 1;
-	remove_workdir(worktree_path);
+	remove_worktree(worktree_path);
 done:
 	if (head_ref)
 		got_ref_close(head_ref);
@@ -254,7 +254,7 @@ done:
 		got_repo_close(repo);
 	free(gotpath);
 	if (ok == 6)
-		remove_workdir(worktree_path);
+		remove_worktree(worktree_path);
 	return (ok == 6);
 }
 
