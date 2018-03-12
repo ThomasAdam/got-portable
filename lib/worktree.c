@@ -463,12 +463,14 @@ done:
 
 static const struct got_error *
 tree_checkout(struct got_worktree *, struct got_fileindex *,
-    struct got_tree_object *, const char *, struct got_repository *);
+    struct got_tree_object *, const char *, struct got_repository *,
+    got_worktree_checkout_cb progress_cb, void *progress_arg);
 
 static const struct got_error *
 tree_checkout_entry(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_tree_entry *te,
-    const char *parent, struct got_repository *repo)
+    const char *parent, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -493,6 +495,8 @@ tree_checkout_entry(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	(*progress_cb)(progress_arg, path);
+
 	switch (got_object_get_type(obj)) {
 	case GOT_OBJ_TYPE_BLOB:
 		if (strlen(worktree->path_prefix) >= strlen(path))
@@ -511,7 +515,8 @@ tree_checkout_entry(struct got_worktree *worktree,
 			if (err)
 				break;
 		}
-		err = tree_checkout(worktree, fileindex, tree, path, repo);
+		err = tree_checkout(worktree, fileindex, tree, path, repo,
+		    progress_cb, progress_arg);
 		break;
 	default:
 		break;
@@ -531,7 +536,8 @@ done:
 static const struct got_error *
 tree_checkout(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_tree_object *tree,
-    const char *path, struct got_repository *repo)
+    const char *path, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
@@ -543,7 +549,8 @@ tree_checkout(struct got_worktree *worktree,
 		return NULL;
 
 	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
-		err = tree_checkout_entry(worktree, fileindex, te, path, repo);
+		err = tree_checkout_entry(worktree, fileindex, te, path, repo,
+		    progress_cb, progress_arg);
 		if (err)
 			break;
 	}
@@ -553,7 +560,8 @@ tree_checkout(struct got_worktree *worktree,
 
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
-    struct got_reference *head_ref, struct got_repository *repo)
+    struct got_reference *head_ref, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL, *unlockerr;
 	struct got_object_id *commit_id = NULL;
@@ -616,7 +624,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = tree_checkout(worktree, fileindex, tree, "/", repo);
+	err = tree_checkout(worktree, fileindex, tree, "/", repo,
+	    progress_cb, progress_arg);
 	if (err)
 		goto done;
 

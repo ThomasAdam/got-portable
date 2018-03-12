@@ -135,6 +135,17 @@ usage_checkout(void)
 	exit(1);
 }
 
+static void
+checkout_progress(void *arg, const char *path)
+{
+	char *worktree_path = arg;
+
+	while (path[0] == '/')
+		path++;
+
+	printf("A  %s/%s\n", worktree_path, path);
+}
+
 const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
@@ -173,8 +184,6 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	printf("%s %s %s %s\n", getprogname(), argv[0], repo_path, worktree_path);
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
 		goto done;
@@ -190,7 +199,8 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_checkout_files(worktree, head_ref, repo);
+	error = got_worktree_checkout_files(worktree, head_ref, repo,
+	    checkout_progress, worktree_path);
 	if (error != NULL)
 		goto done;
 
