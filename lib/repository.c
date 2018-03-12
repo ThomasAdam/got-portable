@@ -108,6 +108,7 @@ is_git_repo(struct got_repository *repo)
 	char *path_head = get_path_head(repo);
 	int ret = 0;
 	struct stat sb;
+	struct got_reference *head_ref;
 
 	if (lstat(path_git, &sb) == -1)
 		goto done;
@@ -128,6 +129,12 @@ is_git_repo(struct got_repository *repo)
 		goto done;
 	if (!S_ISREG(sb.st_mode))
 		goto done;
+
+	/* Check if the HEAD reference can be opened. */
+	if (got_ref_open(&head_ref, repo, GOT_REF_HEAD) != NULL)
+		goto done;
+	got_ref_close(head_ref);
+
 	ret = 1;
 done:
 	free(path_git);
