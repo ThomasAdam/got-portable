@@ -108,8 +108,8 @@ usage(void)
 {
 	int i;
 
-	fprintf(stderr, "usage: %s [-h] command [arg ...]\n\nAvailable commands:\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s [-h] command [arg ...]\n\n"
+	    "Available commands:\n", getprogname());
 	for (i = 0; i < nitems(got_commands); i++) {
 		struct cmd *cmd = &got_commands[i];
 		fprintf(stderr, "    %s: %s\n", cmd->cmd_name, cmd->cmd_descr);
