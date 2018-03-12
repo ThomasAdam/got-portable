@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <err.h>
+#include <unistd.h>
 
 #include "got_error.h"
 
@@ -107,6 +109,9 @@ main(int argc, const char *argv[])
 		fprintf(stderr, "usage: delta_test [REPO_PATH]\n");
 		return 1;
 	}
+
+	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+		err(1, "pledge");
 
 	RUN_TEST(delta_apply(), "delta_apply");
 

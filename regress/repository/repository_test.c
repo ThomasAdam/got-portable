@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <err.h>
+#include <unistd.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -404,6 +406,9 @@ main(int argc, char *argv[])
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
 	int ch;
+
+	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+		err(1, "pledge");
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
 		switch (ch) {
