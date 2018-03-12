@@ -1,11 +1,21 @@
+.PATH:${.CURDIR}/../lib
 
 PROG=		got
-SRCS=		got.c
+SRCS=		got.c delta.c error.c object.c path.c pack.c refs.c \
+		repository.c sha1.c zbuf.c
 
-CFLAGS+=	-W -Wall -Wstrict-prototypes -Wunused-variable
+CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
+LDADD = -lutil -lz
+DPADD = ${LIBZ} ${LIBUTIL}
+DEBUG = -O0 -g
+CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 
-# libgit2
-CFLAGS+=	-I/usr/local/include
-LDADD+=		-L/usr/local/lib -lgit2
+# For now, default to installing binary in ~/bin
+install:
+	${INSTALL} ${INSTALL_COPY} -o ${USER} -g ${USER} \
+	-m ${BINMODE} ${PROG} ${HOME}/bin/${PROG}
+
+# Don't install man pages yet
+NOMAN = Yes
 
 .include <bsd.prog.mk>

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2017 Martin Pieuchot
+ * Copyright (c) 2017 Martin Pieuchot <mpi@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <err.h>
 #include <errno.h>
 #include <locale.h>
@@ -22,7 +25,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <git2.h>
+#include "got_error.h"
+#include "got_object.h"
+#include "got_refs.h"
+#include "got_repository.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -40,7 +46,9 @@ int		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
 	{ "log",	cmd_log },
+#ifdef notyet
 	{ "status",	cmd_status },
+#endif
 };
 
 int
@@ -52,7 +60,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_ALL, "");
 
-	if (pledge("stdio rpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
@@ -90,50 +98,104 @@ usage(void)
 	exit(1);
 }
 
-int
-cmd_log(int argc __unused, char *argv[] __unused)
+static const struct got_error *
+print_commit_object(struct got_object *, struct got_object_id *,
+    struct got_repository *);
+
+static const struct got_error *
+print_parent_commits(struct got_commit_object *commit,
+    struct got_repository *repo)
 {
-	git_repository *repo = NULL;
-	git_revwalk *walker = NULL;
-	git_commit *commit = NULL;
-	git_oid oid;
+	struct got_parent_id *pid;
+	const struct got_error *err = NULL;
+	struct got_object *obj;
 
-	git_libgit2_init();
-
-	if (git_repository_open_ext(&repo, ".", 0, NULL))
-		errx(1, "git_repository_open: %s", giterr_last()->message);
-
-	if (git_revwalk_new(&walker, repo))
-		errx(1, "git_revwalk_new: %s", giterr_last()->message);
-
-	if (git_revwalk_push_head(walker))
-		errx(1, "git_revwalk_push_head: %s", giterr_last()->message);
-
-	while (git_revwalk_next(&oid, walker) == 0) {
-		char buf[GIT_OID_HEXSZ + 1];
-		const git_signature *sig;
-
-		git_commit_free(commit);
-		if (git_commit_lookup(&commit, repo, &oid))
-			errx(1, "git_commit_lookup: %s", giterr_last()->message);
-
-		printf("-----------------------------------------------\n");
-		git_oid_tostr(buf, sizeof(buf), git_commit_id(commit));
-		printf("commit %s\n", buf);
-
-		if ((sig = git_commit_author(commit)) != NULL) {
-			printf("Author: %s <%s>\n", sig->name, sig->email);
-		}
-		printf("\n%s\n", git_commit_message_raw(commit));
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		err = got_object_open(&obj, repo, pid->id);
+		if (err != NULL)
+			return err;
+		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
+			return got_error(GOT_ERR_OBJ_TYPE);
+		err = print_commit_object(obj, pid->id, repo);
+		got_object_close(obj);
 	}
-	git_commit_free(commit);
 
-	git_repository_free(repo);
-	git_libgit2_shutdown();
+	return err;
+}
 
+static const struct got_error *
+print_commit_object(struct got_object *obj, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	struct got_commit_object *commit;
+	char *buf;
+	const struct got_error *err;
+
+	err = got_object_commit_open(&commit, repo, obj);
+	if (err)
+		return err;
+
+	err = got_object_id_str(&buf, id);
+	if (err)
+		return err;
+
+	printf("-----------------------------------------------\n");
+	printf("commit: %s\n", buf);
+	printf("Author: %s\n", commit->author);
+	printf("\n%s\n", commit->logmsg);
+
+	free(buf);
+
+	err = print_parent_commits(commit, repo);
+	got_object_commit_close(commit);
+	return err;
+}
+
+int
+cmd_log(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo;
+	struct got_reference *head_ref;
+	struct got_object_id *id;
+	struct got_object *obj;
+	char *repo_path;
+
+	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+		err(1, "pledge");
+
+	/* TODO parse argv */
+	repo_path = getcwd(NULL, 0);
+	if (repo_path == NULL)
+		err(1, "getcwd");
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL || repo == NULL)
+		return 1;
+	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (error != NULL || head_ref == NULL)
+		return 1;
+	error = got_ref_resolve(&id, repo, head_ref);
+	if (error != NULL || head_ref == NULL)
+		return 1;
+
+	error = got_object_open(&obj, repo, id);
+	if (error != NULL || obj == NULL)
+		return 1;
+	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT) {
+		error = print_commit_object(obj, id, repo);
+		if (error)
+			return 1;
+	} else
+		return 1;
+	got_object_close(obj);
+	free(id);
+	got_ref_close(head_ref);
+	got_repo_close(repo);
 	return 0;
 }
 
+#ifdef notyet
 int
 cmd_status(int argc __unused, char *argv[] __unused)
 {
@@ -212,3 +274,4 @@ cmd_status(int argc __unused, char *argv[] __unused)
 
 	return 0;
 }
+#endif
