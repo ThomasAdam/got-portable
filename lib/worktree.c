@@ -188,12 +188,6 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
-	/* Save an invalid base commit hash. */
-	err = create_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT,
-		GOT_WORKTREE_INVALID_COMMIT_ID);
-	if (err)
-		goto done;
-
 	/* Write the HEAD reference. */
 	refstr = got_ref_to_str(head_ref);
 	if (refstr == NULL) {
@@ -300,11 +294,6 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 	err = read_meta_file(&(*worktree)->path_prefix, path_got,
 	    GOT_WORKTREE_PATH_PREFIX);
-	if (err)
-		goto done;
-
-	err = read_meta_file(&(*worktree)->base_commit, path_got,
-	    GOT_WORKTREE_BASE_COMMIT);
 	if (err)
 		goto done;
 
