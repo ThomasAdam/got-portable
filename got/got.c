@@ -40,6 +40,7 @@ struct cmd {
 };
 
 __dead void	usage(void);
+__dead void	usage_log(void);
 
 int		cmd_log(int, char *[]);
 int		cmd_status(int, char *[]);
@@ -151,6 +152,13 @@ print_commit_object(struct got_object *obj, struct got_object_id *id,
 	return err;
 }
 
+__dead void
+usage_log(void)
+{
+	fprintf(stderr, "usage: %s log [REPO_PATH]\n", getprogname());
+	exit(1);
+}
+
 int
 cmd_log(int argc, char *argv[])
 {
@@ -159,15 +167,19 @@ cmd_log(int argc, char *argv[])
 	struct got_reference *head_ref;
 	struct got_object_id *id;
 	struct got_object *obj;
-	char *repo_path;
+	char *repo_path = NULL;
 
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 
-	/* TODO parse argv */
-	repo_path = getcwd(NULL, 0);
-	if (repo_path == NULL)
-		err(1, "getcwd");
+	if (argc == 1) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			err(1, "getcwd");
+	} else if (argc == 2)
+		repo_path = argv[1];
+	else
+		usage_log();
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL || repo == NULL)
