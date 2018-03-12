@@ -60,12 +60,7 @@ got_repo_get_path(struct got_repository *repo)
 char *
 got_repo_get_path_git_dir(struct got_repository *repo)
 {
-	char *path_git;
-	
-	if (asprintf(&path_git, "%s/%s", repo->path, GOT_GIT_DIR) == -1)
-		return NULL;
-
-	return path_git;
+	return strdup(repo->path_git_dir);
 }
 
 static char *
@@ -73,7 +68,7 @@ get_path_git_child(struct got_repository *repo, const char *basename)
 {
 	char *path_child;
 	
-	if (asprintf(&path_child, "%s/%s/%s", repo->path, GOT_GIT_DIR,
+	if (asprintf(&path_child, "%s/%s", repo->path_git_dir,
 	    basename) == -1)
 		return NULL;
 
@@ -169,15 +164,28 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 
-	if (!is_git_repo(repo)) {
-		err = got_error(GOT_ERR_NOT_GIT_REPO);
+	repo->path_git_dir = strdup(repo->path);
+	if (repo->path_git_dir == NULL) {
+		err = got_error(GOT_ERR_NO_MEM);
 		goto done;
+	}
+	if (!is_git_repo(repo)) {
+		free(repo->path_git_dir);
+		if (asprintf(&repo->path_git_dir, "%s/%s", repo->path,
+		    GOT_GIT_DIR) == -1) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		if (!is_git_repo(repo)) {
+			err = got_error(GOT_ERR_NOT_GIT_REPO);
+			goto done;
+		}
 	}
 		
 	*ret = repo;
 done:
 	if (err)
-		free(repo);
+		got_repo_close(repo);
 	free(abspath);
 	return err;
 }
@@ -193,5 +201,6 @@ got_repo_close(struct got_repository *repo)
 		got_packidx_close(repo->packidx_cache[i]);
 	}
 	free(repo->path);
+	free(repo->path_git_dir);
 	free(repo);
 }
