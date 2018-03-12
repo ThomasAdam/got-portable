@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/stat.h>
 
 #include <limits.h>
 #include <stdlib.h>
@@ -110,11 +111,30 @@ is_git_repo(struct got_repository *repo)
 	char *path_objects = got_repo_get_path_objects(repo);
 	char *path_refs = got_repo_get_path_refs(repo);
 	char *path_head = get_path_head(repo);
-	int ret;
+	int ret = 0;
+	struct stat sb;
 
-	ret = (path_git != NULL) && (path_objects != NULL) &&
-	    (path_refs != NULL) && (path_head != NULL);
+	if (lstat(path_git, &sb) == -1)
+		goto done;
+	if (!S_ISDIR(sb.st_mode))
+		goto done;
 
+	if (lstat(path_objects, &sb) == -1)
+		goto done;
+	if (!S_ISDIR(sb.st_mode))
+		goto done;
+
+	if (lstat(path_refs, &sb) == -1)
+		goto done;
+	if (!S_ISDIR(sb.st_mode))
+		goto done;
+
+	if (lstat(path_head, &sb) == -1)
+		goto done;
+	if (!S_ISREG(sb.st_mode))
+		goto done;
+	ret = 1;
+done:
 	free(path_git);
 	free(path_objects);
 	free(path_refs);
