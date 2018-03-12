@@ -235,7 +235,6 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 {
 	const struct got_error *err = NULL;
 	char *path_got;
-	char *refstr = NULL;
 	char *formatstr = NULL;
 	char *path_lock = NULL;
 	int version, fd = -1;
@@ -432,7 +431,6 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 {
 	const struct got_error *err = NULL;
 	char *abspath;
-	size_t len;
 
 	if (asprintf(&abspath, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)

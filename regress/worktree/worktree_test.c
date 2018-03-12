@@ -104,7 +104,6 @@ static int
 read_meta_file(char **content, const char *path)
 {
 	FILE *f;
-	size_t n;
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
 	int ret = 0;
@@ -249,9 +248,7 @@ worktree_init_exists(const char *repo_path)
 	struct got_repository *repo = NULL;
 	char worktree_path[PATH_MAX];
 	char *gotpath = NULL;
-	char *path;
 	int ok = 0;
-	FILE *f;
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -383,7 +380,6 @@ main(int argc, char *argv[])
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
 	int ch;
-	int vflag = 0;
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
 		switch (ch) {

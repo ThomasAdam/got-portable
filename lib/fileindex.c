@@ -184,7 +184,7 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *entry,
     FILE *outfile)
 {
 	const struct got_error *err;
-	size_t n, len, pad;
+	size_t n;
 
 	err = write_fileindex_val64(ctx, entry->ctime_sec, outfile);
 	if (err)
