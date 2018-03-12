@@ -159,7 +159,6 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	char *path_ref = NULL;
 	char *normpath = NULL;
-	const char *parent_dir;
 	char *path_refs = get_refs_dir_path(repo, refname);
 
 	if (path_refs == NULL) {
@@ -202,8 +201,6 @@ struct got_reference *
 got_ref_dup(struct got_reference *ref)
 {
 	struct got_reference *ret;
-	char *name = NULL;
-	char *symref = NULL;
 
 	ret = calloc(1, sizeof(*ret));
 	if (ret == NULL)

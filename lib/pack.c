@@ -302,7 +302,6 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 
 	while (i < totobj) {
 		struct got_object_id *oid = &packidx->sorted_ids[i];
-		uint32_t offset;
 		int cmp = got_object_id_cmp(id, oid);
 
 		if (cmp == 0)
@@ -368,7 +367,6 @@ err:
 static void
 cache_packidx(struct got_packidx_v2_hdr *packidx, struct got_repository *repo)
 {
-	struct got_packidx_v2_hdr *p;
 	int i;
 
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
@@ -463,9 +461,6 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 	char *path_packdir;
 	char hex[SHA1_DIGEST_STRING_LENGTH];
 	char *sha1str;
-	char *path_packidx;
-
-	*path_packfile = NULL;
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
@@ -810,11 +805,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
     int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id base_id;
-	uint8_t base_type;
 	int resolved_type;
-	uint64_t base_size;
-	size_t base_tslen;
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)

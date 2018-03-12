@@ -182,7 +182,6 @@ repo_read_log(const char *repo_path)
 	struct got_object_id *id;
 	struct got_object *obj;
 	char *buf;
-	int ret;
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -221,8 +220,6 @@ repo_read_tree(const char *repo_path)
 	const struct got_error *err;
 	struct got_repository *repo;
 	struct got_object *obj;
-	int i;
-	size_t len;
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -292,8 +289,6 @@ repo_diff_blob(const char *repo_path)
 	struct got_object *obj2;
 	struct got_blob_object *blob1;
 	struct got_blob_object *blob2;
-	int i;
-	size_t len;
 	FILE *outfile;
 
 	err = got_repo_open(&repo, repo_path);
@@ -348,8 +343,6 @@ repo_diff_tree(const char *repo_path)
 	struct got_object *obj2;
 	struct got_tree_object *tree1;
 	struct got_tree_object *tree2;
-	int i;
-	size_t len;
 	FILE *outfile;
 
 	err = got_repo_open(&repo, repo_path);
@@ -411,7 +404,6 @@ main(int argc, char *argv[])
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
 	int ch;
-	int vflag = 0;
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
 		switch (ch) {

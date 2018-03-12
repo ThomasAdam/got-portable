@@ -66,7 +66,6 @@ got_path_normalize(const char *path)
 const struct got_error *
 got_path_segment_count(int *count, const char *path)
 {
-	int n = 0;
 	char *s = strdup(path), *p;
 
 	*count = 0;
@@ -111,7 +110,7 @@ const struct got_error *
 got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 {
 	const struct got_error *err = NULL;
-	int fd, ret;
+	int fd;
 
 	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
 		*path = NULL;

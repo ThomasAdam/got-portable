@@ -359,9 +359,7 @@ static const struct got_error *
 diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
     struct got_repository *repo, FILE *outfile)
 {
-	const struct got_error *err;
 	struct got_tree_entry *te2;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	te2 = match_entry_by_name(te1, tree2);
 	if (te2 == NULL) {
@@ -387,7 +385,6 @@ static const struct got_error *
 diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1,
     struct got_repository *repo, FILE *outfile)
 {
-	const struct got_error *err;
 	struct got_tree_entry *te1;
 
 	te1 = match_entry_by_name(te2, tree1);

@@ -7,7 +7,7 @@ SRCS = worktree.c repository.c object.c path.c error.c refs.c sha1.c pack.c \
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
 DEBUG = -O0 -g
-CFLAGS += -Werror
+CFLAGS = -Werror -Wall -Wstrict-prototypes -Wunused-variable
 
 NOMAN = yes
 

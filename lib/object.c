@@ -154,10 +154,9 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	const struct got_error *err;
 	struct got_zstream_buf zb;
 	char *buf;
-	size_t len;
 	const size_t zbsize = 64;
 	size_t outlen, totlen;
-	int i, ret;
+	int i;
 
 	buf = calloc(zbsize, sizeof(char));
 	if (buf == NULL)
@@ -296,26 +295,6 @@ got_object_close(struct got_object *obj)
 	if (obj->flags & GOT_OBJ_FLAG_PACKED)
 		free(obj->path_packfile);
 	free(obj);
-}
-
-static int
-commit_object_valid(struct got_commit_object *commit)
-{
-	int i;
-	int n;
-
-	if (commit == NULL)
-		return 0;
-
-	n = 0;
-	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
-		if (commit->tree_id->sha1[i] == 0)
-			n++;
-	}
-	if (n == SHA1_DIGEST_LENGTH)
-		return 0;
-
-	return 1;
 }
 
 static const struct got_error *
@@ -469,7 +448,6 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 {
 	char *p = buf, *space;
 	const struct got_error *err = NULL;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
 
 	*te = calloc(1, sizeof(**te));
 	if (*te == NULL)
@@ -527,7 +505,6 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 {
 	const struct got_error *err;
 	size_t remain = len;
-	int nentries;
 
 	*tree = calloc(1, sizeof(**tree));
 	if (*tree == NULL)
@@ -612,7 +589,6 @@ read_commit_object(struct got_commit_object **commit,
 	const struct got_error *err = NULL;
 	size_t len;
 	uint8_t *p;
-	int i, ret;
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED)
 		err = read_to_mem(&p, &len, f);
@@ -682,7 +658,6 @@ read_tree_object(struct got_tree_object **tree,
 	const struct got_error *err = NULL;
 	size_t len;
 	uint8_t *p;
-	int i, ret;
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED)
 		err = read_to_mem(&p, &len, f);

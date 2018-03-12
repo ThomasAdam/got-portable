@@ -152,7 +152,6 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	const struct got_error *err;
 	size_t avail;
 	struct got_zstream_buf zb;
-	void *newbuf;
 
 	err = got_inflate_init(&zb, 8192);
 	if (err)
