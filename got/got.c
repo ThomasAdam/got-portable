@@ -37,6 +37,7 @@
 struct cmd {
 	const char	 *cmd_name;
 	int		(*cmd_main)(int, char *[]);
+	void		(*cmd_usage)(void);
 	const char	 *cmd_descr;
 };
 
@@ -47,9 +48,11 @@ int		cmd_log(int, char *[]);
 int		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
-	{ "log",	cmd_log,	"show repository history" },
+	{ "log",	cmd_log,	usage_log,
+	    "show repository history" },
 #ifdef notyet
-	{ "status",	cmd_status,	"show modification status of files" },
+	{ "status",	cmd_status,	usage_status,
+	    "show modification status of files" },
 #endif
 };
 
@@ -59,14 +62,18 @@ main(int argc, char *argv[])
 	struct cmd *cmd;
 	unsigned int i;
 	int ch;
+	int hflag = 0;
 
 	setlocale(LC_ALL, "");
 
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch (ch) {
+		case 'h':
+			hflag = 1;
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -85,6 +92,9 @@ main(int argc, char *argv[])
 		if (strncmp(cmd->cmd_name, argv[0], strlen(argv[0])))
 			continue;
 
+		if (hflag)
+			got_commands[i].cmd_usage();
+
 		return got_commands[i].cmd_main(argc, argv);
 		/* NOTREACHED */
 	}
@@ -98,7 +108,7 @@ usage(void)
 {
 	int i;
 
-	fprintf(stderr, "usage: %s command [arg ...]\n\nAvailable commands:\n",
+	fprintf(stderr, "usage: %s [-h] command [arg ...]\n\nAvailable commands:\n",
 	    getprogname());
 	for (i = 0; i < nitems(got_commands); i++) {
 		struct cmd *cmd = &got_commands[i];
