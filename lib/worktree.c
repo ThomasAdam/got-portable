@@ -158,9 +158,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	char *refstr = NULL;
 	char *repo_path = NULL;
 	char *formatstr = NULL;
+	char *absprefix = NULL;
 
-	if (!got_path_is_absolute(prefix))
-		return got_error(GOT_ERR_BAD_PATH);
+	if (!got_path_is_absolute(prefix)) {
+		if (asprintf(&absprefix, "/%s", prefix) == -1)
+			return got_error(GOT_ERR_NO_MEM);
+	}
 
 	/* Create top-level directory (may already exist). */
 	if (mkdir(path, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
@@ -209,7 +212,8 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Store in-repository path prefix. */
-	err = create_meta_file(path_got, GOT_WORKTREE_PATH_PREFIX, prefix);
+	err = create_meta_file(path_got, GOT_WORKTREE_PATH_PREFIX,
+	    absprefix ? absprefix : prefix);
 	if (err)
 		goto done;
 
@@ -227,6 +231,7 @@ done:
 	free(formatstr);
 	free(refstr);
 	free(repo_path);
+	free(absprefix);
 	return err;
 }
 

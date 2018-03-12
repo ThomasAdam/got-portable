@@ -20,7 +20,7 @@
 .Nm got
 .Nd simple version control system
 .Sh SYNOPSIS
-.Nm 
+.Nm
 .Ar command
 .Op Fl h
 .Op Ar arg ...
@@ -39,9 +39,11 @@ Display usage information.
 .El
 .Pp
 The commands are as follows:
-.Bl -tag -width Ds
-.It Cm status
-Show current status of files.
+.Bl -tag -width checkout
+.It Cm checkout
+Copy files from a repository into a new work tree.
+.\".It Cm status
+.\"Show current status of files.
 .It Cm log
 Display history of the repository.
 .El

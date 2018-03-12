@@ -53,7 +53,7 @@ const struct got_error*		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
-	    "check out a work tree from a repository" },
+	    "check out a new work tree from a repository" },
 	{ "log",	cmd_log,	usage_log,
 	    "show repository history" },
 #ifdef notyet
@@ -130,8 +130,8 @@ usage(void)
 __dead void
 usage_checkout(void)
 {
-	fprintf(stderr, "usage: %s checkout REPO_PATH [WORKTREE_PATH]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s checkout [-p prefix] repository-path "
+	    "[worktree-path]\n", getprogname());
 	exit(1);
 }
 
@@ -155,13 +155,30 @@ cmd_checkout(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *repo_path = NULL;
 	char *worktree_path = NULL;
+	const char *path_prefix = "";
+	int ch;
+
+	optind = 0;
+	while ((ch = getopt(argc, argv, "p:")) != -1) {
+		switch (ch) {
+		case 'p':
+			path_prefix = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
 
 	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
 		err(1, "pledge");
 
-	if (argc == 2) {
+	if (argc == 1) {
 		char *cwd, *base, *dotgit;
-		repo_path = argv[1];
+		repo_path = argv[0];
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
 			err(1, "getcwd");
@@ -176,9 +193,9 @@ cmd_checkout(int argc, char *argv[])
 			return got_error(GOT_ERR_NO_MEM);
 		}
 		free(cwd);
-	} else if (argc == 3) {
-		repo_path = argv[1];
-		worktree_path = strdup(argv[2]);
+	} else if (argc == 2) {
+		repo_path = argv[0];
+		worktree_path = strdup(argv[1]);
 		if (worktree_path == NULL)
 			return got_error(GOT_ERR_NO_MEM);
 	} else
@@ -191,7 +208,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_init(worktree_path, head_ref, "/", repo);
+	error = got_worktree_init(worktree_path, head_ref, path_prefix, repo);
 	if (error != NULL)
 		goto done;
 
@@ -267,7 +284,7 @@ print_commit_object(struct got_object *obj, struct got_object_id *id,
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [REPO_PATH]\n", getprogname());
+	fprintf(stderr, "usage: %s log [repository-path]\n", getprogname());
 	exit(1);
 }
 
