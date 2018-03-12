@@ -37,6 +37,7 @@
 struct cmd {
 	const char	 *cmd_name;
 	int		(*cmd_main)(int, char *[]);
+	const char	 *cmd_descr;
 };
 
 __dead void	usage(void);
@@ -46,9 +47,9 @@ int		cmd_log(int, char *[]);
 int		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
-	{ "log",	cmd_log },
+	{ "log",	cmd_log,	"show repository history" },
 #ifdef notyet
-	{ "status",	cmd_status },
+	{ "status",	cmd_status,	"show modification status of files" },
 #endif
 };
 
@@ -95,7 +96,14 @@ main(int argc, char *argv[])
 __dead void
 usage(void)
 {
-	fprintf(stderr, "usage: %s command [arg ...]\n", getprogname());
+	int i;
+
+	fprintf(stderr, "usage: %s command [arg ...]\n\nAvailable commands:\n",
+	    getprogname());
+	for (i = 0; i < nitems(got_commands); i++) {
+		struct cmd *cmd = &got_commands[i];
+		fprintf(stderr, "    %s: %s\n", cmd->cmd_name, cmd->cmd_descr);
+	}
 	exit(1);
 }
 
