@@ -36,7 +36,7 @@
 
 struct cmd {
 	const char	 *cmd_name;
-	int		(*cmd_main)(int, char *[]);
+	const struct got_error *(*cmd_main)(int, char *[]);
 	void		(*cmd_usage)(void);
 	const char	 *cmd_descr;
 };
@@ -44,8 +44,8 @@ struct cmd {
 __dead void	usage(void);
 __dead void	usage_log(void);
 
-int		cmd_log(int, char *[]);
-int		cmd_status(int, char *[]);
+const struct got_error*		cmd_log(int, char *[]);
+const struct got_error*		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
 	{ "log",	cmd_log,	usage_log,
@@ -87,6 +87,8 @@ main(int argc, char *argv[])
 		usage();
 
 	for (i = 0; i < nitems(got_commands); i++) {
+		const struct got_error *error;
+
 		cmd = &got_commands[i];
 
 		if (strncmp(cmd->cmd_name, argv[0], strlen(argv[0])))
@@ -95,8 +97,13 @@ main(int argc, char *argv[])
 		if (hflag)
 			got_commands[i].cmd_usage();
 
-		return got_commands[i].cmd_main(argc, argv);
-		/* NOTREACHED */
+		error = got_commands[i].cmd_main(argc, argv);
+		if (error) {
+			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
+			return 1;
+		}
+
+		return 0;
 	}
 
 	fprintf(stderr, "%s: unknown command -- %s\n", getprogname(), argv[0]);
@@ -177,7 +184,7 @@ usage_log(void)
 	exit(1);
 }
 
-int
+const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -200,33 +207,33 @@ cmd_log(int argc, char *argv[])
 		usage_log();
 
 	error = got_repo_open(&repo, repo_path);
-	if (error != NULL || repo == NULL)
-		return 1;
+	if (error != NULL)
+		return error;
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
-	if (error != NULL || head_ref == NULL)
-		return 1;
+	if (error != NULL)
+		return error;
 	error = got_ref_resolve(&id, repo, head_ref);
-	if (error != NULL || head_ref == NULL)
-		return 1;
+	if (error != NULL)
+		return error;
 
 	error = got_object_open(&obj, repo, id);
-	if (error != NULL || obj == NULL)
-		return 1;
+	if (error != NULL)
+		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT) {
 		error = print_commit_object(obj, id, repo);
 		if (error)
-			return 1;
+			return error;
 	} else
-		return 1;
+		return got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);
-	return 0;
+	return NULL;
 }
 
 #ifdef notyet
-int
+const struct got_error *
 cmd_status(int argc __unused, char *argv[] __unused)
 {
 	git_repository *repo = NULL;
