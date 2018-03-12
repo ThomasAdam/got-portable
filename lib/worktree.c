@@ -576,17 +576,16 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_opentemp_named(&new_fileindex_path, &findex, fileindex_path);
-	if (err)
-		goto done;
-
-
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
 		err = got_error(GOT_ERR_NO_MEM);
 		fileindex_path = NULL;
 		goto done;
 	}
+
+	err = got_opentemp_named(&new_fileindex_path, &findex, fileindex_path);
+	if (err)
+		goto done;
 
 	err = got_ref_resolve(&commit_id, repo, head_ref);
 	if (err)
