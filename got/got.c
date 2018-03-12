@@ -109,7 +109,7 @@ main(int argc, char *argv[])
 		return 0;
 	}
 
-	fprintf(stderr, "%s: unknown command -- %s\n", getprogname(), argv[0]);
+	fprintf(stderr, "%s: unknown command '%s'\n", getprogname(), argv[0]);
 	return 1;
 }
 
