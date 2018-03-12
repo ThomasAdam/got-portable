@@ -24,11 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "got_error.h"
 #include "got_object.h"
 #include "got_refs.h"
 #include "got_repository.h"
+#include "got_worktree.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -42,12 +44,16 @@ struct cmd {
 };
 
 __dead void	usage(void);
+__dead void	usage_checkout(void);
 __dead void	usage_log(void);
 
+const struct got_error*		cmd_checkout(int, char *[]);
 const struct got_error*		cmd_log(int, char *[]);
 const struct got_error*		cmd_status(int, char *[]);
 
 struct cmd got_commands[] = {
+	{ "checkout",	cmd_checkout,	usage_checkout,
+	    "check out a work tree from a repository" },
 	{ "log",	cmd_log,	usage_log,
 	    "show repository history" },
 #ifdef notyet
@@ -65,9 +71,6 @@ main(int argc, char *argv[])
 	int hflag = 0;
 
 	setlocale(LC_ALL, "");
-
-	if (pledge("stdio rpath wpath cpath", NULL) == -1)
-		err(1, "pledge");
 
 	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch (ch) {
@@ -122,6 +125,80 @@ usage(void)
 		fprintf(stderr, "    %s: %s\n", cmd->cmd_name, cmd->cmd_descr);
 	}
 	exit(1);
+}
+
+__dead void
+usage_checkout(void)
+{
+	fprintf(stderr, "usage: %s checkout REPO_PATH [WORKTREE_PATH]\n",
+	    getprogname());
+	exit(1);
+}
+
+const struct got_error *
+cmd_checkout(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_reference *head_ref = NULL;
+	struct got_worktree *worktree = NULL;
+	char *repo_path = NULL;
+	char *worktree_path = NULL;
+
+	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
+		err(1, "pledge");
+
+	if (argc == 2) {
+		char *cwd, *base, *dotgit;
+		repo_path = argv[1];
+		cwd = getcwd(NULL, 0);
+		if (cwd == NULL)
+			err(1, "getcwd");
+		base = basename(repo_path);
+		if (base == NULL)
+			err(1, "basename");
+		dotgit = strstr(base, ".git");
+		if (dotgit)
+			*dotgit = '\0';
+		if (asprintf(&worktree_path, "%s/%s", cwd, base) == -1) {
+			free(cwd);
+			return got_error(GOT_ERR_NO_MEM);
+		}
+		free(cwd);
+	} else if (argc == 3) {
+		repo_path = argv[1];
+		worktree_path = strdup(argv[2]);
+		if (worktree_path == NULL)
+			return got_error(GOT_ERR_NO_MEM);
+	} else
+		usage_checkout();
+
+	printf("%s %s %s %s\n", getprogname(), argv[0], repo_path, worktree_path);
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL)
+		goto done;
+	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (error != NULL)
+		goto done;
+
+	error = got_worktree_init(worktree_path, head_ref, "/", repo);
+	if (error != NULL)
+		goto done;
+
+	error = got_worktree_open(&worktree, worktree_path);
+	if (error != NULL)
+		goto done;
+
+	error = got_worktree_checkout_files(worktree, head_ref, repo);
+	if (error != NULL)
+		goto done;
+
+	printf("checked out %s\n", worktree_path);
+
+done:
+	free(worktree_path);
+	return error;
 }
 
 static const struct got_error *
