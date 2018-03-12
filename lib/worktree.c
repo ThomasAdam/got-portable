@@ -377,22 +377,22 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
    const char *path, struct got_blob_object *blob, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *abspath;
+	char *ondisk_path;
 	int fd;
 	size_t len, hdrlen;
 	struct got_fileindex_entry *entry;
 
-	if (asprintf(&abspath, "%s/%s", worktree->root_path,
+	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)
 		return got_error(GOT_ERR_NO_MEM);
 
-	fd = open(abspath, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		err = got_error_from_errno();
 		if (errno == EEXIST) {
 			struct stat sb;
-			if (lstat(abspath, &sb) == -1) {
+			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();
 			} else if (!S_ISREG(sb.st_mode)) {
 				/* TODO file is obstructed; do something */
@@ -424,7 +424,8 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	fsync(fd);
 
-	err = got_fileindex_entry_open(&entry, abspath, blob->id.sha1);
+	err = got_fileindex_entry_open(&entry, ondisk_path,
+	    apply_path_prefix(worktree, path), blob->id.sha1);
 	if (err)
 		goto done;
 
@@ -433,7 +434,7 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		goto done;
 done:
 	close(fd);
-	free(abspath);
+	free(ondisk_path);
 	return err;
 }
 

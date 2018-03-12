@@ -74,6 +74,7 @@ struct got_fileindex {
 /* On-disk file index header structure. */
 struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian */
+#define GOT_FILE_INDEX_SIGNATURE	0x676f7449 /* 'g', 'o', 't', 'I' */
 	uint32_t version;	/* big-endian */
 #define GOT_FILE_INDEX_VERSION	1
 	uint32_t nentries;	/* big-endian */
@@ -82,7 +83,7 @@ struct got_fileindex_hdr {
 };
 
 const struct got_error *got_fileindex_entry_open(struct got_fileindex_entry **,
-    const char *, uint8_t *);
+    const char *, const char *, uint8_t *);
 void got_fileindex_entry_close(struct got_fileindex_entry *);
 struct got_fileindex *got_fileindex_open(void);
 void got_fileindex_close(struct got_fileindex *);
