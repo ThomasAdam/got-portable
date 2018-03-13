@@ -18,21 +18,39 @@
 .Os
 .Sh NAME
 .Nm got
-.Nd simple version control system
+.Nd distributed version control system
 .Sh SYNOPSIS
 .Nm
 .Ar command
 .Op Fl h
 .Op Ar arg ...
 .Sh DESCRIPTION
-The
 .Nm
-utility is used to manage
-.Xr git 5
-repositories.
-It prioritizes ease of use and simplicity over flexibility.
+is a distributed version control system which prioritizes ease of use
+and simplicity over flexibility.
 .Pp
-The options are as follows:
+.Nm
+stores the history of files tracked in version control in a repository
+which happens to use the same on-disk format as the so-called
+.Dq bare
+repositories created by the popular Git version control system.
+This repository format is described in
+.Xr got-repository 5 .
+.Pp
+Files managed by
+.Nm
+can be checked out from the repository for modification.
+Checked out files are stored in a
+.Em work tree
+which is placed at an arbitrary directory in the filesystem hierarchy.
+The format of a
+.Nm
+work tree is described in
+.Xr got-worktree 5 .
+.Pp
+.Nm
+provides global and command-specific options.
+Global options must preceed the command name, and are as follows:
 .Bl -tag -width tenletters
 .It Fl h
 Display usage information.
@@ -50,4 +68,5 @@ Display history of the repository.
 .Sh EXIT STATUS
 .Ex -std got
 .Sh SEE ALSO
-.Xr git 5
+.Xr got-repository 5
+.Xr got-worktree 5
