@@ -1,0 +1,99 @@
+.\"
+.\" Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOT-REPOSITORY 5
+.Os
+.Sh NAME
+.Nm got-repository
+.Nd format of
+.Xr got 1
+repositories
+.Sh DESCRIPTION
+.Xr got 1
+stores the history of files tracked in version control in a repository
+which happens to use the same on-disk format as the so-called
+.Dq bare
+repositories created by the popular Git version control system.
+.Pp
+The repository's core data model is a directed acyclic graph which
+contains three types of objects as nodes.
+Each object is identified by the SHA-1 hash calculated over the object's
+header plus the content stored in the object.
+The object header names the type of object in an ASCII string, which is
+followed by a space, followed by the size of data in the object encoded
+as an ASCII number string.
+This header is terminated by a
+.Sy NUL
+character.
+.Pp
+The content of files tracked under version control is stored in objects
+of type
+.Em blob .
+.Pp
+A
+.Em tree
+object points to any number of such blobs, and also to other trees
+in order to form a hierarchy of files and directories.
+.Pp
+A
+.Em commit
+object points to the root element of one tree, and thus records the
+state of this entire tree as a snapshot.
+Commit objects are chained together and thus form a line of history
+of snapshots.
+A given commit can be suceeded by an arbitrary number of subsequent
+commits, such that diverging lines of version control history, known as
+.Em branches ,
+can be represented.
+A commit which preceeds another commit is referred to as that other commit's
+.Em parent commit .
+A commit with multiple parents reunites diverged lines of history and is
+known as a
+.Em merge commit .
+While the data model allows for commits with an arbitrary number of
+parent commits,
+.Xr got 1
+restricts all commits to at most 2 parents in order to discourage chaotic
+branching and merging practices.
+.Pp
+When stored on disk, all objects are compressed with
+.Xr deflate 3 .
+Mulitple objects may be stored together in a
+.Em pack file
+which provides for deltification of object content.
+.Sh FILES
+.Bl -tag -width /etc/rpc -compact
+.It Pa HEAD
+.It Pa ORIG_HEAD
+.It Pa FETCH_HEAD
+.It Pa branches/
+.It Pa config
+.It Pa description
+.It Pa hooks/
+.It Pa index
+.It Pa info
+.It Pa logs/
+.It Pa objects/
+.It Pa packed-refs
+.It Pa refs/
+.El
+.Sh SEE ALSO
+.Xr git 1 ,
+.Xr got 1 ,
+.Xr deflate 3 ,
+.Xr got-worktree 5
+.Sh HISTORY
+The Git repository format was conceived by Linus Torvalds in 2005.
