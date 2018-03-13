@@ -67,6 +67,12 @@ The commands are as follows:
 .Bl -tag -width checkout
 .It Cm checkout
 Copy files from a repository into a new work tree.
+The work tree may be restricted to a subset of the repository's tree
+hierarchy by specifying the
+.Fl p Ar prefix
+option.
+In this case, only files beneath the specified directory prefix will
+be checked out.
 .\".It Cm status
 .\"Show current status of files.
 .It Cm log
