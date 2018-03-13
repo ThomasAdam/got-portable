@@ -920,21 +920,89 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 }
 
 static const struct got_error *
+get_delta_sizes(uint64_t *base_size, uint64_t *result_size,
+    struct got_delta *delta)
+{
+	const struct got_error *err;
+	uint8_t *delta_buf = NULL;
+	size_t delta_len = 0;
+	FILE *delta_file;
+
+	delta_file = fopen(delta->path_packfile, "rb");
+	if (delta_file == NULL)
+		return got_error_from_errno();
+
+	if (fseeko(delta_file, delta->data_offset, SEEK_CUR) != 0) {
+		err = got_error_from_errno();
+		fclose(delta_file);
+		return err;
+	}
+
+	err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file);
+	fclose(delta_file);
+	if (err)
+		return err;
+
+	err = got_delta_get_sizes(base_size, result_size, delta_buf, delta_len);
+	free(delta_buf);
+	return err;
+}
+
+static const struct got_error *
+get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
+{
+	struct got_delta *delta;
+	uint64_t base_size = 0, result_size = 0;
+
+	*max_size = 0;
+	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+		/* Plain object types are the delta base. */
+		if (delta->type != GOT_OBJ_TYPE_COMMIT &&
+		    delta->type != GOT_OBJ_TYPE_TREE &&
+		    delta->type != GOT_OBJ_TYPE_BLOB &&
+		    delta->type != GOT_OBJ_TYPE_TAG) {
+			const struct got_error *err;
+			err = get_delta_sizes(&base_size, &result_size, delta);
+			if (err)
+				return err;
+		} else
+			base_size = delta->size;
+		if (base_size > *max_size)
+			*max_size = base_size;
+		if (result_size > *max_size)
+			*max_size = result_size;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	FILE *base_file, *accum_file;
+	FILE *base_file = NULL, *accum_file = NULL;
+	uint64_t max_size;
 	int n = 0;
 
 	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
-	base_file = got_opentemp();
+	err = get_delta_chain_max_size(&max_size, deltas);
+	if (err)
+		return err;
+
+	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
+		base_file = fmemopen(NULL, max_size, "w+");
+	else
+		base_file = got_opentemp();
 	if (base_file == NULL)
 		return got_error_from_errno();
 
-	accum_file = got_opentemp();
+	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
+		accum_file = fmemopen(NULL, max_size, "w+");
+	else
+		accum_file = got_opentemp();
 	if (accum_file == NULL) {
 		err = got_error_from_errno();
 		fclose(base_file);
@@ -952,7 +1020,6 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			err = got_error_from_errno();
 			goto done;
 		}
-
 
 		if (n == 0) {
 			/* Plain object types are the delta base. */

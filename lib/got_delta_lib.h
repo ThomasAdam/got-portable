@@ -34,6 +34,8 @@ struct got_delta *got_delta_open(const char *, off_t, size_t, int, size_t,
 void got_delta_close(struct got_delta *);
 const struct got_error *got_delta_chain_get_base_type(int *,
     struct got_delta_chain *);
+const struct got_error *got_delta_get_sizes(uint64_t *, uint64_t *,
+    const uint8_t *, size_t);
 const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
     FILE *);
 

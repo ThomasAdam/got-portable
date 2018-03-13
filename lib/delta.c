@@ -225,6 +225,41 @@ copy_from_delta(const uint8_t **p, size_t *remain, size_t len, FILE *outfile)
 	return NULL;
 }
 
+static const struct got_error *
+parse_delta_sizes(uint64_t *base_size, uint64_t *result_size,
+    const uint8_t **p, size_t *remain)
+{
+	const struct got_error *err;
+
+	/* Read the two size fields at the beginning of the stream. */
+	err = parse_size(base_size, p, remain);
+	if (err)
+		return err;
+	err = next_delta_byte(p, remain);
+	if (err)
+		return err;
+	err = parse_size(result_size, p, remain);
+	if (err)
+		return err;
+
+	return NULL;
+}
+
+const struct got_error *
+got_delta_get_sizes(uint64_t *base_size, uint64_t *result_size,
+    const uint8_t *delta_buf, size_t delta_len)
+{
+	size_t remain;
+	const uint8_t *p;
+
+	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
+		return got_error(GOT_ERR_BAD_DELTA);
+
+	p = delta_buf;
+	remain = delta_len;
+	return parse_delta_sizes(base_size, result_size, &p, &remain);
+}
+
 const struct got_error *
 got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
     size_t delta_len, FILE *outfile)
@@ -242,15 +277,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 
 	p = delta_buf;
 	remain = delta_len;
-
-	/* Read the two size fields at the beginning of the stream. */
-	err = parse_size(&base_size, &p, &remain);
-	if (err)
-		return err;
-	err = next_delta_byte(&p, &remain);
-	if (err)
-		return err;
-	err = parse_size(&result_size, &p, &remain);
+	err = parse_delta_sizes(&base_size, &result_size, &p, &remain);
 	if (err)
 		return err;
 
