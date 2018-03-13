@@ -37,9 +37,16 @@ repositories created by the popular Git version control system.
 This repository format is described in
 .Xr got-repository 5 .
 .Pp
+.Nm
+is a
+.Dq distributed
+version control system because every copy of a repository is writeable.
+Modifications made to files can be synchronized between repositories
+automatically at any time.
+.Pp
 Files managed by
 .Nm
-can be checked out from the repository for modification.
+must be checked out from the repository for modification.
 Checked out files are stored in a
 .Em work tree
 which is placed at an arbitrary directory in the filesystem hierarchy.
