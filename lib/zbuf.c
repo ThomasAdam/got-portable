@@ -115,7 +115,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	struct got_zstream_buf zb;
 	void *newbuf;
 
-	err = got_inflate_init(&zb, 8192);
+	err = got_inflate_init(&zb, GOT_ZSTREAM_BUFSIZE);
 	if (err)
 		return err;
 
@@ -153,7 +153,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	size_t avail;
 	struct got_zstream_buf zb;
 
-	err = got_inflate_init(&zb, 8192);
+	err = got_inflate_init(&zb, GOT_ZSTREAM_BUFSIZE);
 	if (err)
 		goto done;
 
