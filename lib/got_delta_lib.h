@@ -38,6 +38,12 @@ const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
     FILE *);
 
 /*
+ * The amount of result data we may keep in RAM while applying deltas.
+ * Data larger than this is written to disk during delta application (slow).
+ */
+#define GOT_DELTA_RESULT_SIZE_CACHED_MAX	(32 * 1024 * 1024) /* bytes */
+
+/*
  * Definitions for delta data streams.
  */
 

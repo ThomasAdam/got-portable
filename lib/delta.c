@@ -233,6 +233,9 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 	uint64_t base_size, result_size;
 	size_t remain, outsize = 0;
 	const uint8_t *p;
+	FILE *memstream = NULL;
+	char *memstream_buf = NULL;
+	size_t memstream_size = 0;
 
 	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
 		return got_error(GOT_ERR_BAD_DELTA);
@@ -251,6 +254,9 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 	if (err)
 		return err;
 
+	if (result_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
+		memstream = open_memstream(&memstream_buf, &memstream_size);
+
 	/* Decode and execute copy instructions from the delta stream. */
 	err = next_delta_byte(&p, &remain);
 	while (err == NULL && remain > 0) {
@@ -260,7 +266,8 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			err = parse_opcode(&offset, &len, &p, &remain);
 			if (err)
 				break;
-			err = copy_from_base(base_file, offset, len, outfile);
+			err = copy_from_base(base_file, offset, len,
+			    memstream ? memstream : outfile);
 			if (err == NULL) {
 				outsize += len;
 				if (remain > 0) {
@@ -277,7 +284,8 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			err = next_delta_byte(&p, &remain);
 			if (err)
 				break;
-			err = copy_from_delta(&p, &remain, len, outfile);
+			err = copy_from_delta(&p, &remain, len,
+			    memstream ? memstream : outfile);
 			if (err == NULL)
 				outsize += len;
 		}
@@ -286,6 +294,16 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 	if (outsize != result_size)
 		err = got_error(GOT_ERR_BAD_DELTA);
 
+	if (memstream != NULL) {
+		fclose(memstream);
+		if (err == NULL) {
+			size_t n;
+			n = fwrite(memstream_buf, 1, memstream_size, outfile);
+			if (n != memstream_size)
+				err = got_ferror(outfile, GOT_ERR_IO);
+		}
+		free(memstream_buf);
+	}
 	if (err == NULL)
 		rewind(outfile);
 	return err;
