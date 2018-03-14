@@ -1127,21 +1127,22 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		uint8_t *delta_buf = NULL;
 		size_t delta_len = 0;
-		FILE *delta_file;
-
-		delta_file = fopen(delta->path_packfile, "rb");
-		if (delta_file == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
 
 		if (n == 0) {
+			FILE *delta_file;
+
 			/* Plain object types are the delta base. */
 			if (delta->type != GOT_OBJ_TYPE_COMMIT &&
 			    delta->type != GOT_OBJ_TYPE_TREE &&
 			    delta->type != GOT_OBJ_TYPE_BLOB &&
 			    delta->type != GOT_OBJ_TYPE_TAG) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
+				goto done;
+			}
+
+			delta_file = fopen(delta->path_packfile, "rb");
+			if (delta_file == NULL) {
+				err = got_error_from_errno();
 				goto done;
 			}
 
@@ -1164,6 +1165,11 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
 		    path_packfile, repo);
 		if (delta_buf == NULL) {
+			FILE *delta_file = fopen(delta->path_packfile, "rb");
+			if (delta_file == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
 			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
 			    != 0) {
 				fclose(delta_file);
@@ -1182,8 +1188,7 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 			    delta_len, path_packfile, repo);
 			if (err)
 				goto done;
-		} else
-			fclose(delta_file);
+		}
 		/* delta_buf is now cached */
 
 		err = got_delta_apply(base_file, delta_buf, delta_len,
