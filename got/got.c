@@ -173,8 +173,10 @@ cmd_checkout(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
 		err(1, "pledge");
+#endif
 
 	if (argc == 1) {
 		char *cwd, *base, *dotgit;
@@ -298,9 +300,10 @@ cmd_log(int argc, char *argv[])
 	struct got_object *obj;
 	char *repo_path = NULL;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
-
+#endif
 	if (argc == 1) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)

@@ -114,7 +114,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	f = fopen(path, "rb");
 	if (f == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_from_errno();
 
 	err = get_packfile_size(&packfile_size, path);
 	if (err)
@@ -985,7 +985,7 @@ clear_delta_cache_entry(struct got_delta_cache_entry *entry)
 	entry->delta_len = 0;
 }
 
-void
+const struct got_error *
 add_delta_cache_entry(struct got_delta_cache *cache, off_t data_offset,
     uint8_t *delta_buf, size_t delta_len)
 {
@@ -1009,13 +1009,14 @@ add_delta_cache_entry(struct got_delta_cache *cache, off_t data_offset,
 	entry = &cache->deltas[i];
 	entry->delta_buf = calloc(1, delta_len);
 	if (entry->delta_buf == NULL)
-		return;
+		return got_error(GOT_ERR_NO_MEM);
 	entry->data_offset = data_offset;
-	memcpy(entry->delta_buf, delta_buf, delta_len);
+	entry->delta_buf = delta_buf;
 	entry->delta_len = delta_len;
+	return NULL;
 }
 
-void
+const struct got_error *
 cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
     const char *path_packfile, struct got_repository *repo)
 {
@@ -1026,11 +1027,9 @@ cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
 		cache = &repo->delta_cache[i];
 		if (cache->path_packfile == NULL)
 			break;
-		if (strcmp(cache->path_packfile, path_packfile) == 0) {
-			add_delta_cache_entry(cache, data_offset, delta_buf,
-			    delta_len);
-			return;
-		}
+		if (strcmp(cache->path_packfile, path_packfile) == 0)
+			return add_delta_cache_entry(cache, data_offset,
+			    delta_buf, delta_len);
 	}
 
 	if (i == nitems(repo->delta_cache)) {
@@ -1052,8 +1051,8 @@ cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
 	cache = &repo->delta_cache[i];
 	cache->path_packfile = strdup(path_packfile);
 	if (cache->path_packfile == NULL)
-		return;
-	add_delta_cache_entry(cache, data_offset, delta_buf, delta_len);
+		return got_error(GOT_ERR_NO_MEM);
+	return add_delta_cache_entry(cache, data_offset, delta_buf, delta_len);
 }
 
 void
@@ -1129,7 +1128,6 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 		uint8_t *delta_buf = NULL;
 		size_t delta_len = 0;
 		FILE *delta_file;
-		int is_cached = 0;
 
 		delta_file = fopen(delta->path_packfile, "rb");
 		if (delta_file == NULL) {
@@ -1165,7 +1163,6 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 
 		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
 		    path_packfile, repo);
-
 		if (delta_buf == NULL) {
 			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
 			    != 0) {
@@ -1181,16 +1178,16 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 			if (err)
 				goto done;
 
-			cache_delta(delta->data_offset, delta_buf, delta_len,
-			    path_packfile, repo);
-		} else
-			is_cached = 1;
+			err = cache_delta(delta->data_offset, delta_buf,
+			    delta_len, path_packfile, repo);
+			if (err)
+				goto done;
+		}
+		/* delta_buf is now cached */
 
 		err = got_delta_apply(base_file, delta_buf, delta_len,
 		    /* Final delta application writes to the output file. */
 		    ++n < deltas->nentries ? accum_file : outfile);
-		if (!is_cached)
-			free(delta_buf);
 		if (err)
 			goto done;
 
