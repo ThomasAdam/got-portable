@@ -976,8 +976,123 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 	return NULL;
 }
 
+void
+clear_delta_cache_entry(struct got_delta_cache_entry *entry)
+{
+	entry->data_offset = 0;
+	free(entry->delta_buf);
+	entry->delta_buf = NULL;
+	entry->delta_len = 0;
+}
+
+void
+add_delta_cache_entry(struct got_delta_cache *cache, off_t data_offset,
+    uint8_t *delta_buf, size_t delta_len)
+{
+	int i;
+	struct got_delta_cache_entry *entry;
+
+	for (i = 0; i < nitems(cache->deltas); i++) {
+		entry = &cache->deltas[i];
+		if (entry->data_offset == 0)
+			break;
+	}
+
+	if (i == nitems(cache->deltas)) {
+		entry = &cache->deltas[i - 1];
+		clear_delta_cache_entry(entry);
+		memmove(&cache->deltas[1], &cache->deltas[0],
+		    sizeof(cache->deltas) - sizeof(cache->deltas[0]));
+		i = 0;
+	}
+
+	entry = &cache->deltas[i];
+	entry->delta_buf = calloc(1, delta_len);
+	if (entry->delta_buf == NULL)
+		return;
+	entry->data_offset = data_offset;
+	memcpy(entry->delta_buf, delta_buf, delta_len);
+	entry->delta_len = delta_len;
+}
+
+void
+cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
+    const char *path_packfile, struct got_repository *repo)
+{
+	struct got_delta_cache *cache;
+	int i;
+
+	for (i = 0; i < nitems(repo->delta_cache); i++) {
+		cache = &repo->delta_cache[i];
+		if (cache->path_packfile == NULL)
+			break;
+		if (strcmp(cache->path_packfile, path_packfile) == 0) {
+			add_delta_cache_entry(cache, data_offset, delta_buf,
+			    delta_len);
+			return;
+		}
+	}
+
+	if (i == nitems(repo->delta_cache)) {
+		int j;
+		cache = &repo->delta_cache[i - 1];
+		free(cache->path_packfile);
+		cache->path_packfile = NULL;
+		for (j = 0; j < nitems(cache->deltas); j++) {
+			struct got_delta_cache_entry *entry = &cache->deltas[j];
+			if (entry->data_offset == 0)
+				break;
+			clear_delta_cache_entry(entry);
+		}
+		memmove(&repo->delta_cache[1], &repo->delta_cache[0],
+		    sizeof(repo->delta_cache) - sizeof(repo->delta_cache[0]));
+		i = 0;
+	}
+
+	cache = &repo->delta_cache[i];
+	cache->path_packfile = strdup(path_packfile);
+	if (cache->path_packfile == NULL)
+		return;
+	add_delta_cache_entry(cache, data_offset, delta_buf, delta_len);
+}
+
+void
+get_cached_delta(uint8_t **delta_buf, size_t *delta_len,
+    off_t data_offset, const char *path_packfile, struct got_repository *repo)
+{
+	struct got_delta_cache *cache;
+	struct got_delta_cache_entry *entry;
+	int i;
+
+	*delta_buf = NULL;
+	*delta_len = 0;
+
+	for (i = 0; i < nitems(repo->delta_cache); i++) {
+		cache = &repo->delta_cache[i];
+		if (cache->path_packfile == NULL)
+			return;
+		if (strcmp(cache->path_packfile, path_packfile) == 0)
+			break;
+	}
+
+	if (i == nitems(repo->delta_cache))
+		return;
+
+	for (i = 0; i < nitems(cache->deltas); i++) {
+		entry = &cache->deltas[i];
+		if (entry->data_offset == 0)
+			break;
+		if (entry->data_offset == data_offset) {
+			*delta_buf = entry->delta_buf;
+			*delta_len = entry->delta_len;
+			break;
+		}
+	}
+}
+
 static const struct got_error *
-dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
+dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
+    const char *path_packfile, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1014,6 +1129,7 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 		uint8_t *delta_buf = NULL;
 		size_t delta_len = 0;
 		FILE *delta_file;
+		int is_cached = 0;
 
 		delta_file = fopen(delta->path_packfile, "rb");
 		if (delta_file == NULL) {
@@ -1047,22 +1163,34 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile)
 			continue;
 		}
 
-		if (fseeko(delta_file, delta->data_offset, SEEK_CUR) != 0) {
-			fclose(delta_file);
-			err = got_error_from_errno();
-			goto done;
-		}
+		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
+		    path_packfile, repo);
 
-		/* Delta streams should always fit in memory. */
-		err = got_inflate_to_mem(&delta_buf, &delta_len, delta_file);
-		fclose(delta_file);
-		if (err)
-			goto done;
+		if (delta_buf == NULL) {
+			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
+			    != 0) {
+				fclose(delta_file);
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			/* Delta streams should always fit in memory. */
+			err = got_inflate_to_mem(&delta_buf, &delta_len,
+			    delta_file);
+			fclose(delta_file);
+			if (err)
+				goto done;
+
+			cache_delta(delta->data_offset, delta_buf, delta_len,
+			    path_packfile, repo);
+		} else
+			is_cached = 1;
 
 		err = got_delta_apply(base_file, delta_buf, delta_len,
 		    /* Final delta application writes to the output file. */
 		    ++n < deltas->nentries ? accum_file : outfile);
-		free(delta_buf);
+		if (!is_cached)
+			free(delta_buf);
 		if (err)
 			goto done;
 
@@ -1113,7 +1241,8 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 
 		err = got_inflate_to_file(&obj->size, packfile, *f);
 	} else
-		err = dump_delta_chain(&obj->deltas, *f);
+		err = dump_delta_chain(&obj->deltas, *f, obj->path_packfile,
+		    repo);
 done:
 	if (packfile)
 		fclose(packfile);

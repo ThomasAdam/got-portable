@@ -14,6 +14,19 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct got_delta_cache_entry {
+	off_t data_offset;
+	uint8_t *delta_buf;
+	size_t delta_len;
+};
+
+#define GOT_DELTA_CACHE_SIZE	1024
+
+struct got_delta_cache {
+	char *path_packfile;
+	struct got_delta_cache_entry deltas[GOT_DELTA_CACHE_SIZE];
+};
+
 #define GOT_PACKIDX_CACHE_SIZE	64
 
 struct got_repository {
@@ -22,5 +35,8 @@ struct got_repository {
 
 	/* The pack index cache speeds up search for packed objects. */
 	struct got_packidx_v2_hdr *packidx_cache[GOT_PACKIDX_CACHE_SIZE];
+
+	/* The delta cache speeds up reconstruction of packed objects. */
+	struct got_delta_cache delta_cache[GOT_PACKIDX_CACHE_SIZE];
 };
 

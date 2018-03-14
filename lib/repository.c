@@ -207,6 +207,27 @@ got_repo_close(struct got_repository *repo)
 			break;
 		got_packidx_close(repo->packidx_cache[i]);
 	}
+
+	for (i = 0; i < nitems(repo->delta_cache); i++) {
+		struct got_delta_cache *cache = &repo->delta_cache[i];
+		int j;
+
+		if (cache->path_packfile == NULL)
+			break;
+		free(cache->path_packfile);
+		cache->path_packfile = NULL;
+
+		for (j = 0; j < nitems(cache->deltas); j++) {
+			struct got_delta_cache_entry *entry = &cache->deltas[j];
+			if (entry->data_offset == 0)
+				break;
+			entry->data_offset = 0;
+			free(entry->delta_buf);
+			entry->delta_buf = NULL;
+			entry->delta_len = 0;
+		}
+	}
+
 	free(repo->path);
 	free(repo->path_git_dir);
 	free(repo);
