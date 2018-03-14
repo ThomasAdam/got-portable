@@ -1182,7 +1182,8 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 			    delta_len, path_packfile, repo);
 			if (err)
 				goto done;
-		}
+		} else
+			fclose(delta_file);
 		/* delta_buf is now cached */
 
 		err = got_delta_apply(base_file, delta_buf, delta_len,
