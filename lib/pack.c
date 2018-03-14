@@ -1007,9 +1007,6 @@ add_delta_cache_entry(struct got_delta_cache *cache, off_t data_offset,
 	}
 
 	entry = &cache->deltas[i];
-	entry->delta_buf = calloc(1, delta_len);
-	if (entry->delta_buf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
 	entry->data_offset = data_offset;
 	entry->delta_buf = delta_buf;
 	entry->delta_len = delta_len;
