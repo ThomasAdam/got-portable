@@ -261,6 +261,66 @@ got_delta_get_sizes(uint64_t *base_size, uint64_t *result_size,
 }
 
 const struct got_error *
+got_delta_apply_in_mem(uint8_t *base_buf, const uint8_t *delta_buf,
+    size_t delta_len, uint8_t *outbuf, size_t *outsize)
+{
+	const struct got_error *err = NULL;
+	uint64_t base_size, result_size;
+	size_t remain;
+	const uint8_t *p;
+
+	*outsize= 0;
+
+	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
+		return got_error(GOT_ERR_BAD_DELTA);
+
+	p = delta_buf;
+	remain = delta_len;
+	err = parse_delta_sizes(&base_size, &result_size, &p, &remain);
+	if (err)
+		return err;
+
+	/* Decode and execute copy instructions from the delta stream. */
+	err = next_delta_byte(&p, &remain);
+	while (err == NULL && remain > 0) {
+		if (*p & GOT_DELTA_BASE_COPY) {
+			off_t offset = 0;
+			size_t len = 0;
+			err = parse_opcode(&offset, &len, &p, &remain);
+			if (err)
+				break;
+			memcpy(outbuf + *outsize, base_buf + offset, len);
+			if (err == NULL) {
+				*outsize += len;
+				if (remain > 0) {
+					p++;
+					remain--;
+				}
+			}
+		} else {
+			size_t len = (size_t)*p;
+			if (len == 0) {
+				err = got_error(GOT_ERR_BAD_DELTA);
+				break;
+			}
+			err = next_delta_byte(&p, &remain);
+			if (err)
+				break;
+			if (remain < len)
+				return got_error(GOT_ERR_BAD_DELTA);
+			memcpy(outbuf + *outsize, p, len);
+			p += len;
+			remain -= len;
+			*outsize += len;
+		}
+	}
+
+	if (*outsize != result_size)
+		err = got_error(GOT_ERR_BAD_DELTA);
+	return err;
+}
+
+const struct got_error *
 got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
     size_t delta_len, FILE *outfile)
 {

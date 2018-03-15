@@ -1093,31 +1093,33 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	FILE *base_file = NULL, *accum_file = NULL;
+	uint8_t *base_buf = NULL, *accum_buf = NULL;
+	size_t accum_size;
 	uint64_t max_size;
 	int n = 0;
 
 	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
+	/* We process small enough files entirely in memory for speed. */
 	err = get_delta_chain_max_size(&max_size, deltas);
 	if (err)
 		return err;
-
-	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
-		base_file = fmemopen(NULL, max_size, "w+");
-	else
+	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+		accum_buf = malloc(max_size);
+		if (accum_buf == NULL)
+			return got_error(GOT_ERR_NO_MEM);
+	} else {
 		base_file = got_opentemp();
-	if (base_file == NULL)
-		return got_error_from_errno();
+		if (base_file == NULL)
+			return got_error_from_errno();
 
-	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
-		accum_file = fmemopen(NULL, max_size, "w+");
-	else
 		accum_file = got_opentemp();
-	if (accum_file == NULL) {
-		err = got_error_from_errno();
-		fclose(base_file);
-		return err;
+		if (accum_file == NULL) {
+			err = got_error_from_errno();
+			fclose(base_file);
+			return err;
+		}
 	}
 
 	/* Deltas are ordered in ascending order. */
@@ -1127,6 +1129,7 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 
 		if (n == 0) {
 			FILE *delta_file;
+			size_t base_len;
 
 			/* Plain object types are the delta base. */
 			if (delta->type != GOT_OBJ_TYPE_COMMIT &&
@@ -1149,13 +1152,28 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 				err = got_error_from_errno();
 				goto done;
 			}
-			err = got_inflate_to_file(&delta_len, delta_file,
-			    base_file);
+			if (base_file)
+				err = got_inflate_to_file(&delta_len,
+				    delta_file, base_file);
+			else {
+				err = got_inflate_to_mem(&base_buf, &base_len,
+				    delta_file);
+				if (base_len < max_size) {
+					uint8_t *p;
+					p = reallocarray(base_buf, 1, max_size);
+					if (p == NULL) {
+						err = got_error(GOT_ERR_NO_MEM);
+						goto done;
+					}
+					base_buf = p;
+				}
+			}
 			fclose(delta_file);
 			if (err)
 				goto done;
 			n++;
-			rewind(base_file);
+			if (base_file)
+				rewind(base_file);
 			continue;
 		}
 
@@ -1188,25 +1206,46 @@ dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
 		}
 		/* delta_buf is now cached */
 
-		err = got_delta_apply(base_file, delta_buf, delta_len,
-		    /* Final delta application writes to the output file. */
-		    ++n < deltas->nentries ? accum_file : outfile);
+		if (base_buf) {
+			err = got_delta_apply_in_mem(base_buf, delta_buf,
+			    delta_len, accum_buf, &accum_size);
+			n++;
+		} else {
+			err = got_delta_apply(base_file, delta_buf, delta_len,
+			    /* Final delta application writes to output file. */
+			    ++n < deltas->nentries ? accum_file : outfile);
+		}
 		if (err)
 			goto done;
 
 		if (n < deltas->nentries) {
 			/* Accumulated delta becomes the new base. */
-			FILE *tmp = accum_file;
-			accum_file = base_file;
-			base_file = tmp;
-			rewind(base_file);
-			rewind(accum_file);
+			if (base_buf) {
+				uint8_t *tmp = accum_buf;
+				accum_buf = base_buf;
+				base_buf = tmp;
+			} else {
+				FILE *tmp = accum_file;
+				accum_file = base_file;
+				base_file = tmp;
+				rewind(base_file);
+				rewind(accum_file);
+			}
 		}
 	}
 
 done:
-	fclose(base_file);
-	fclose(accum_file);
+	free(base_buf);
+	if (accum_buf) {
+		size_t len = fwrite(accum_buf, 1, accum_size, outfile);
+		free(accum_buf);
+		if (len != accum_size)
+			return got_ferror(outfile, GOT_ERR_IO);
+	}
+	if (base_file)
+		fclose(base_file);
+	if (accum_file)
+		fclose(accum_file);
 	rewind(outfile);
 	return err;
 }
