@@ -21,12 +21,14 @@ struct got_zstream_buf {
 	char *outbuf;
 	size_t outlen;
 	int flags;
-#define GOT_ZSTREAM_F_HAVE_MORE 0x01
+#define GOT_ZSTREAM_F_HAVE_MORE		0x01
+#define GOT_ZSTREAM_F_OWN_OUTBUF	0x02
 };
 
-#define GOT_ZSTREAM_BUFSIZE	8192
+#define GOT_ZSTREAM_BUFSIZE		8192
 
-const struct got_error *got_inflate_init(struct got_zstream_buf *, size_t);
+const struct got_error *got_inflate_init(struct got_zstream_buf *, uint8_t *,
+    size_t);
 const struct got_error *got_inflate_read(struct got_zstream_buf *, FILE *,
     size_t *);
 void got_inflate_end(struct got_zstream_buf *);

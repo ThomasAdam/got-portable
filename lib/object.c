@@ -162,7 +162,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	if (buf == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 
-	err = got_inflate_init(&zb, zbsize);
+	err = got_inflate_init(&zb, NULL, zbsize);
 	if (err)
 		return err;
 
@@ -759,7 +759,7 @@ got_object_blob_open(struct got_blob_object **blob,
 			return err;
 		}
 
-		err = got_inflate_init(&(*blob)->zb, blocksize);
+		err = got_inflate_init(&(*blob)->zb, NULL, blocksize);
 		if (err != NULL) {
 			fclose((*blob)->f);
 			free(*blob);

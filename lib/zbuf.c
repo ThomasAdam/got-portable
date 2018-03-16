@@ -29,7 +29,7 @@
 #include "got_zbuf_lib.h"
 
 const struct got_error *
-got_inflate_init(struct got_zstream_buf *zb, size_t bufsize)
+got_inflate_init(struct got_zstream_buf *zb, uint8_t *outbuf, size_t bufsize)
 {
 	const struct got_error *err = NULL;
 
@@ -50,11 +50,15 @@ got_inflate_init(struct got_zstream_buf *zb, size_t bufsize)
 		goto done;
 	}
 
-	zb->outbuf = calloc(1, zb->outlen);
-	if (zb->outbuf == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
-		goto done;
-	}
+	if (outbuf == NULL) {
+		zb->outbuf = calloc(1, zb->outlen);
+		if (zb->outbuf == NULL) {
+			err = got_error(GOT_ERR_NO_MEM);
+			goto done;
+		}
+		zb->flags |= GOT_ZSTREAM_F_OWN_OUTBUF;
+	} else
+		zb->outbuf = outbuf;
 
 done:
 	if (err)
@@ -103,7 +107,8 @@ void
 got_inflate_end(struct got_zstream_buf *zb)
 {
 	free(zb->inbuf);
-	free(zb->outbuf);
+	if (zb->flags & GOT_ZSTREAM_F_OWN_OUTBUF)
+		free(zb->outbuf);
 	inflateEnd(&zb->z);
 }
 
@@ -115,19 +120,23 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	struct got_zstream_buf zb;
 	void *newbuf;
 
-	err = got_inflate_init(&zb, GOT_ZSTREAM_BUFSIZE);
+	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
+	if (*outbuf == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
 	if (err)
 		return err;
 
-	*outbuf = NULL;
 	*outlen = 0;
 
 	do {
 		err = got_inflate_read(&zb, f, &avail);
 		if (err)
 			return err;
-		if (avail > 0) {
-			newbuf = reallocarray(*outbuf, 1, *outlen + avail);
+		*outlen += avail;
+		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
+			newbuf = reallocarray(*outbuf, 1,
+			    *outlen + GOT_ZSTREAM_BUFSIZE);
 			if (newbuf == NULL) {
 				free(*outbuf);
 				*outbuf = NULL;
@@ -135,9 +144,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 				err = got_error(GOT_ERR_NO_MEM);
 				goto done;
 			}
-			memcpy(newbuf + *outlen, zb.outbuf, avail);
 			*outbuf = newbuf;
-			*outlen += avail;
+			zb.outbuf = newbuf + *outlen;
+			zb.outlen = GOT_ZSTREAM_BUFSIZE;
 		}
 	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
 
@@ -153,7 +162,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	size_t avail;
 	struct got_zstream_buf zb;
 
-	err = got_inflate_init(&zb, GOT_ZSTREAM_BUFSIZE);
+	err = got_inflate_init(&zb, NULL, GOT_ZSTREAM_BUFSIZE);
 	if (err)
 		goto done;
 
