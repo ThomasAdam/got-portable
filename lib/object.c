@@ -501,7 +501,7 @@ done:
 
 static const struct got_error *
 parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
-    char *buf, size_t len)
+    uint8_t *buf, size_t len)
 {
 	const struct got_error *err;
 	size_t remain = len;
@@ -684,20 +684,26 @@ got_object_tree_open(struct got_tree_object **tree,
     struct got_repository *repo, struct got_object *obj)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		err = got_packfile_extract_object(&f, obj, repo);
-	else
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		uint8_t *buf;
+		size_t len;
+		err = got_packfile_extract_object_to_mem(&buf, &len, obj, repo);
+		if (err)
+			return err;
+		err = parse_tree_object(tree, repo, buf + obj->hdrlen, len);
+		free(buf);
+	} else {
+		FILE *f;
 		err = open_loose_object(&f, obj, repo);
-	if (err)
-		return err;
-
-	err = read_tree_object(tree, repo, obj, f);
-	fclose(f);
+		if (err)
+			return err;
+		err = read_tree_object(tree, repo, obj, f);
+		fclose(f);
+	}
 	return err;
 }
 

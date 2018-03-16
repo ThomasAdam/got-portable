@@ -128,3 +128,5 @@ const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_object_id *, struct got_repository *);
 const struct got_error *got_packfile_extract_object(FILE **,
     struct got_object *, struct got_repository *);
+const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
+    struct got_object *, struct got_repository *);

@@ -1250,6 +1250,135 @@ done:
 	return err;
 }
 
+static const struct got_error *
+dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
+    struct got_delta_chain *deltas, const char *path_packfile,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_delta *delta;
+	uint8_t *base_buf = NULL, *accum_buf = NULL;
+	size_t accum_size;
+	uint64_t max_size;
+	int n = 0;
+
+	*outbuf = NULL;
+	*outlen = 0;
+
+	if (SIMPLEQ_EMPTY(&deltas->entries))
+		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
+
+	err = get_delta_chain_max_size(&max_size, deltas);
+	if (err)
+		return err;
+	accum_buf = malloc(max_size);
+	if (accum_buf == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	/* Deltas are ordered in ascending order. */
+	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+		uint8_t *delta_buf = NULL;
+		size_t delta_len = 0;
+
+		if (n == 0) {
+			FILE *delta_file;
+			size_t base_len;
+
+			/* Plain object types are the delta base. */
+			if (delta->type != GOT_OBJ_TYPE_COMMIT &&
+			    delta->type != GOT_OBJ_TYPE_TREE &&
+			    delta->type != GOT_OBJ_TYPE_BLOB &&
+			    delta->type != GOT_OBJ_TYPE_TAG) {
+				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
+				goto done;
+			}
+
+			delta_file = fopen(delta->path_packfile, "rb");
+			if (delta_file == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			if (fseeko(delta_file, delta->offset + delta->tslen,
+			    SEEK_SET) != 0) {
+				fclose(delta_file);
+				err = got_error_from_errno();
+				goto done;
+			}
+			err = got_inflate_to_mem(&base_buf, &base_len,
+			    delta_file);
+			if (base_len < max_size) {
+				uint8_t *p;
+				p = reallocarray(base_buf, 1, max_size);
+				if (p == NULL) {
+					err = got_error(GOT_ERR_NO_MEM);
+					goto done;
+				}
+				base_buf = p;
+			}
+			fclose(delta_file);
+			if (err)
+				goto done;
+			n++;
+			continue;
+		}
+
+		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
+		    path_packfile, repo);
+		if (delta_buf == NULL) {
+			FILE *delta_file = fopen(delta->path_packfile, "rb");
+			if (delta_file == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
+			    != 0) {
+				fclose(delta_file);
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			/* Delta streams should always fit in memory. */
+			err = got_inflate_to_mem(&delta_buf, &delta_len,
+			    delta_file);
+			fclose(delta_file);
+			if (err)
+				goto done;
+
+			err = cache_delta(delta->data_offset, delta_buf,
+			    delta_len, path_packfile, repo);
+			if (err)
+				goto done;
+		}
+		/* delta_buf is now cached */
+
+		err = got_delta_apply_in_mem(base_buf, delta_buf,
+		    delta_len, accum_buf, &accum_size);
+		n++;
+		if (err)
+			goto done;
+
+		if (n < deltas->nentries) {
+			/* Accumulated delta becomes the new base. */
+			uint8_t *tmp = accum_buf;
+			accum_buf = base_buf;
+			base_buf = tmp;
+		}
+	}
+
+done:
+	free(base_buf);
+	if (err) {
+		free(accum_buf);
+		*outbuf = NULL;
+		*outlen = 0;
+	} else {
+		*outbuf = accum_buf;
+		*outlen = accum_size;
+	}
+	return err;
+}
+
 const struct got_error *
 got_packfile_extract_object(FILE **f, struct got_object *obj,
     struct got_repository *repo)
@@ -1287,5 +1416,40 @@ done:
 		fclose(packfile);
 	if (err && *f)
 		fclose(*f);
+	return err;
+}
+
+const struct got_error *
+got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
+    struct got_object *obj, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	FILE *packfile = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_TREE)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
+		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
+		packfile = fopen(obj->path_packfile, "rb");
+		if (packfile == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (fseeko(packfile, obj->pack_offset, SEEK_SET) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		err = got_inflate_to_mem(buf, len, packfile);
+	} else
+		err = dump_delta_chain_to_mem(buf, len, &obj->deltas,
+		    obj->path_packfile, repo);
+done:
+	if (packfile)
+		fclose(packfile);
 	return err;
 }
