@@ -989,7 +989,7 @@ get_delta_sizes(uint64_t *base_size, uint64_t *result_size,
 	if (delta_file == NULL)
 		return got_error_from_errno();
 
-	if (fseeko(delta_file, delta->data_offset, SEEK_CUR) != 0) {
+	if (fseeko(delta_file, delta->data_offset, SEEK_SET) != 0) {
 		err = got_error_from_errno();
 		fclose(delta_file);
 		return err;
@@ -1242,7 +1242,7 @@ dump_delta_chain_to_file(struct got_delta_chain *deltas, FILE *outfile,
 				err = got_error_from_errno();
 				goto done;
 			}
-			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
+			if (fseeko(delta_file, delta->data_offset, SEEK_SET)
 			    != 0) {
 				fclose(delta_file);
 				err = got_error_from_errno();
@@ -1388,7 +1388,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				err = got_error_from_errno();
 				goto done;
 			}
-			if (fseeko(delta_file, delta->data_offset, SEEK_CUR)
+			if (fseeko(delta_file, delta->data_offset, SEEK_SET)
 			    != 0) {
 				fclose(delta_file);
 				err = got_error_from_errno();
