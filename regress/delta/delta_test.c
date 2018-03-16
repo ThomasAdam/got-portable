@@ -77,11 +77,15 @@ delta_apply()
 		rewind(base_file);
 
 		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
-		    result_file);
+		    result_file, &len);
 		fclose(base_file);
 		if (err)
 			break;
 		result_len = strlen(dt->expected);
+		if (result_len != len) {
+			err = got_ferror(result_file, GOT_ERR_BAD_DELTA);
+			break;
+		}
 		n = fread(buf, result_len, 1, result_file);
 		if (n != 1 || strncmp(buf, dt->expected, result_len) != 0) {
 			err = got_ferror(result_file, GOT_ERR_BAD_DELTA);

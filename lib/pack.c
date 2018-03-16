@@ -1082,16 +1082,19 @@ get_cached_delta(uint8_t **delta_buf, size_t *delta_len,
 }
 
 static const struct got_error *
-dump_delta_chain_to_file(struct got_delta_chain *deltas, FILE *outfile,
-    FILE *packfile, const char *path_packfile, struct got_repository *repo)
+dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
+    FILE *outfile, FILE *packfile, const char *path_packfile,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
 	FILE *base_file = NULL, *accum_file = NULL;
 	uint8_t *base_buf = NULL, *accum_buf = NULL;
-	size_t accum_size;
+	size_t accum_size = 0;
 	uint64_t max_size;
 	int n = 0;
+
+	*result_size = 0;
 
 	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
@@ -1192,7 +1195,8 @@ dump_delta_chain_to_file(struct got_delta_chain *deltas, FILE *outfile,
 		} else {
 			err = got_delta_apply(base_file, delta_buf, delta_len,
 			    /* Final delta application writes to output file. */
-			    ++n < deltas->nentries ? accum_file : outfile);
+			    ++n < deltas->nentries ? accum_file : outfile,
+			    &accum_size);
 		}
 		if (err)
 			goto done;
@@ -1226,6 +1230,8 @@ done:
 	if (accum_file)
 		fclose(accum_file);
 	rewind(outfile);
+	if (err == NULL)
+		*result_size = accum_size;
 	return err;
 }
 
@@ -1372,8 +1378,8 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 
 		err = got_inflate_to_file(&obj->size, packfile, *f);
 	} else
-		err = dump_delta_chain_to_file(&obj->deltas, *f, packfile,
-		    obj->path_packfile, repo);
+		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, *f,
+		    packfile, obj->path_packfile, repo);
 done:
 	if (packfile)
 		fclose(packfile);

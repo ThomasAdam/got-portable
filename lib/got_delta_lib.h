@@ -38,7 +38,7 @@ const struct got_error *got_delta_get_sizes(uint64_t *, uint64_t *,
 const struct got_error *got_delta_apply_in_mem(uint8_t *, const uint8_t *,
     size_t, uint8_t *, size_t *);
 const struct got_error *got_delta_apply(FILE *, const uint8_t *, size_t,
-    FILE *);
+    FILE *, size_t *);
 
 /*
  * The amount of result data we may keep in RAM while applying deltas.

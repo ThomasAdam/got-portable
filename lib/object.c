@@ -625,8 +625,8 @@ got_object_commit_open(struct got_commit_object **commit,
 		err = got_packfile_extract_object_to_mem(&buf, &len, obj, repo);
 		if (err)
 			return err;
-		len -= obj->hdrlen;
-		err = parse_commit_object(commit, buf + obj->hdrlen, len);
+		obj->size = len;
+		err = parse_commit_object(commit, buf, len);
 		free(buf);
 	} else {
 		FILE *f;
@@ -701,8 +701,8 @@ got_object_tree_open(struct got_tree_object **tree,
 		err = got_packfile_extract_object_to_mem(&buf, &len, obj, repo);
 		if (err)
 			return err;
-		len -= obj->hdrlen;
-		err = parse_tree_object(tree, repo, buf + obj->hdrlen, len);
+		obj->size = len;
+		err = parse_tree_object(tree, repo, buf, len);
 		free(buf);
 	} else {
 		FILE *f;

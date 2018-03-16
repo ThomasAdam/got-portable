@@ -315,15 +315,17 @@ got_delta_apply_in_mem(uint8_t *base_buf, const uint8_t *delta_buf,
 
 const struct got_error *
 got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
-    size_t delta_len, FILE *outfile)
+    size_t delta_len, FILE *outfile, size_t *outsize)
 {
 	const struct got_error *err = NULL;
 	uint64_t base_size, result_size;
-	size_t remain, outsize = 0;
+	size_t remain = 0;
 	const uint8_t *p;
 	FILE *memstream = NULL;
 	char *memstream_buf = NULL;
 	size_t memstream_size = 0;
+
+	*outsize = 0;
 
 	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
 		return got_error(GOT_ERR_BAD_DELTA);
@@ -349,7 +351,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			err = copy_from_base(base_file, offset, len,
 			    memstream ? memstream : outfile);
 			if (err == NULL) {
-				outsize += len;
+				*outsize += len;
 				if (remain > 0) {
 					p++;
 					remain--;
@@ -367,11 +369,11 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 			err = copy_from_delta(&p, &remain, len,
 			    memstream ? memstream : outfile);
 			if (err == NULL)
-				outsize += len;
+				*outsize += len;
 		}
 	}
 
-	if (outsize != result_size)
+	if (*outsize != result_size)
 		err = got_error(GOT_ERR_BAD_DELTA);
 
 	if (memstream != NULL) {
