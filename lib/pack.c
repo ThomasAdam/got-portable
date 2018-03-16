@@ -1087,7 +1087,7 @@ get_cached_delta(uint8_t **delta_buf, size_t *delta_len,
 }
 
 static const struct got_error *
-dump_delta_chain(struct got_delta_chain *deltas, FILE *outfile,
+dump_delta_chain_to_file(struct got_delta_chain *deltas, FILE *outfile,
     const char *path_packfile, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -1409,8 +1409,8 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 
 		err = got_inflate_to_file(&obj->size, packfile, *f);
 	} else
-		err = dump_delta_chain(&obj->deltas, *f, obj->path_packfile,
-		    repo);
+		err = dump_delta_chain_to_file(&obj->deltas, *f,
+		    obj->path_packfile, repo);
 done:
 	if (packfile)
 		fclose(packfile);
