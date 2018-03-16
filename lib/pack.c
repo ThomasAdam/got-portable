@@ -364,25 +364,99 @@ err:
 	return NULL;
 }
 
-static void
-cache_packidx(struct got_packidx_v2_hdr *packidx, struct got_repository *repo)
+static const struct got_error *
+get_packfile_path(char **path_packfile, struct got_repository *repo,
+    struct got_packidx_v2_hdr *packidx)
 {
+	char *path_packdir;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	char *sha1str;
+
+	path_packdir = got_repo_get_path_objects_pack(repo);
+	if (path_packdir == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+
+	sha1str = got_sha1_digest_to_str(packidx->trailer.packfile_sha1,
+	    hex, sizeof(hex));
+	if (sha1str == NULL)
+		return got_error(GOT_ERR_PACKIDX_CSUM);
+
+	if (asprintf(path_packfile, "%s/%s%s%s", path_packdir,
+	    GOT_PACK_PREFIX, sha1str, GOT_PACKFILE_SUFFIX) == -1) {
+		*path_packfile = NULL;
+		return got_error(GOT_ERR_NO_MEM);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
+{
+	const struct got_error *err = NULL;
+	uint32_t totobj = betoh32(packidx->fanout_table[0xff]);
+	struct got_packfile_hdr hdr;
+	size_t n;
+
+	n = fread(&hdr, sizeof(hdr), 1, f);
+	if (n != 1)
+		return got_ferror(f, GOT_ERR_BAD_PACKIDX);
+
+	if (betoh32(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
+	    betoh32(hdr.version) != GOT_PACKFILE_VERSION ||
+	    betoh32(hdr.nobjects) != totobj)
+		err = got_error(GOT_ERR_BAD_PACKFILE);
+
+	return err;
+}
+
+static const struct got_error *
+cache_pack(struct got_packidx_v2_hdr *packidx, struct got_repository *repo)
+{
+	const struct got_error *err;
+	FILE *packfile;
+	char *path_packfile;
 	int i;
 
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
-		if (repo->packidx_cache[i] == NULL)
+	err = get_packfile_path(&path_packfile, repo, packidx);
+	if (err)
+		return err;
+
+	packfile = fopen(path_packfile, "rb");
+	if (packfile == NULL) {
+		err = got_error_from_errno();
+		free(path_packfile);
+		return err;
+	}
+	err = read_packfile_hdr(packfile, packidx);
+	if (err) {
+		fclose(packfile);
+		return err;
+	}
+
+	for (i = 0; i < nitems(repo->pack_cache); i++) {
+		if (repo->pack_cache[i].packidx == NULL)
 			break;
 	}
 
-	if (i == nitems(repo->packidx_cache)) {
-		got_packidx_close(repo->packidx_cache[i - 1]);
-		memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
-		    sizeof(repo->packidx_cache) -
-		    sizeof(repo->packidx_cache[0]));
+	if (i == nitems(repo->pack_cache)) {
+		got_packidx_close(repo->pack_cache[i - 1].packidx);
+		fclose(repo->pack_cache[i - 1].packfile);
+		free(repo->pack_cache[i - 1].path_packfile);
+		memmove(&repo->pack_cache[1], &repo->pack_cache[0],
+		    sizeof(repo->pack_cache) - sizeof(repo->pack_cache[0]));
 		i = 0;
 	}
 
-	repo->packidx_cache[i] = dup_packidx(packidx);
+	repo->pack_cache[i].packidx = dup_packidx(packidx);
+	if (repo->pack_cache[i].packidx != NULL) {
+		repo->pack_cache[i].packfile = packfile;
+		repo->pack_cache[i].path_packfile = path_packfile;
+	} else {
+		fclose(packfile);
+		free(path_packfile);
+	}
+	return NULL;
 }
 
 static const struct got_error *
@@ -396,13 +470,13 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 	char *path_packidx;
 	int i;
 
-	/* Search pack index cache. */
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
-		if (repo->packidx_cache[i] == NULL)
+	/* Search pack cache. */
+	for (i = 0; i < nitems(repo->pack_cache); i++) {
+		if (repo->pack_cache[i].packidx == NULL)
 			break;
-		*idx = get_object_idx(repo->packidx_cache[i], id);
+		*idx = get_object_idx(repo->pack_cache[i].packidx, id);
 		if (*idx != -1) {
-			*packidx = dup_packidx(repo->packidx_cache[i]);
+			*packidx = dup_packidx(repo->pack_cache[i].packidx);
 			if (*packidx == NULL)
 				return got_error(GOT_ERR_NO_MEM);
 			return NULL;
@@ -438,7 +512,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 		*idx = get_object_idx(*packidx, id);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
-			cache_packidx(*packidx, repo);
+			cache_pack(*packidx, repo);
 			goto done;
 		}
 
@@ -455,58 +529,33 @@ done:
 }
 
 static const struct got_error *
-get_packfile_path(char **path_packfile, struct got_repository *repo,
-    struct got_packidx_v2_hdr *packidx)
-{
-	char *path_packdir;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
-	char *sha1str;
-
-	path_packdir = got_repo_get_path_objects_pack(repo);
-	if (path_packdir == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-
-	sha1str = got_sha1_digest_to_str(packidx->trailer.packfile_sha1,
-	    hex, sizeof(hex));
-	if (sha1str == NULL)
-		return got_error(GOT_ERR_PACKIDX_CSUM);
-
-	if (asprintf(path_packfile, "%s/%s%s%s", path_packdir,
-	    GOT_PACK_PREFIX, sha1str, GOT_PACKFILE_SUFFIX) == -1) {
-		*path_packfile = NULL;
-		return got_error(GOT_ERR_NO_MEM);
-	}
-
-	return NULL;
-}
-
-const struct got_error *
-read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
-{
-	const struct got_error *err = NULL;
-	uint32_t totobj = betoh32(packidx->fanout_table[0xff]);
-	struct got_packfile_hdr hdr;
-	size_t n;
-
-	n = fread(&hdr, sizeof(hdr), 1, f);
-	if (n != 1)
-		return got_ferror(f, GOT_ERR_BAD_PACKIDX);
-
-	if (betoh32(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
-	    betoh32(hdr.version) != GOT_PACKFILE_VERSION ||
-	    betoh32(hdr.nobjects) != totobj)
-		err = got_error(GOT_ERR_BAD_PACKFILE);
-
-	return err;
-}
-
-static const struct got_error *
-open_packfile(FILE **packfile, char **path_packfile,
+open_packfile(FILE **packfile, char **path_packfile, int *is_cached,
     struct got_repository *repo, struct got_packidx_v2_hdr *packidx)
 {
 	const struct got_error *err;
+	int i;
 
 	*packfile = NULL;
+	*path_packfile = NULL;
+	*is_cached = 0;
+
+	/* The pack could already be cached after an object search. */
+	for (i = 0; i < nitems(repo->pack_cache); i++) {
+		if (repo->pack_cache[i].packidx == NULL)
+			break;
+
+		/* The pack index trailer acts as a cache key. */
+		if (memcmp(&packidx->trailer,
+		    &repo->pack_cache[i].packidx->trailer,
+		    sizeof(packidx->trailer)) != 0)
+			continue;
+
+		*packfile = repo->pack_cache[i].packfile;
+		*path_packfile = repo->pack_cache[i].path_packfile;
+		*is_cached = 1;
+		return NULL;
+	}
+	/* No luck. Try the filesystem. */
 
 	err = get_packfile_path(path_packfile, repo, packidx);
 	if (err)
@@ -713,8 +762,9 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	uint64_t base_size;
 	size_t base_tslen;
 	size_t n;
-	FILE *base_packfile;
-	char *path_base_packfile;
+	FILE *base_packfile = NULL;
+	char *path_base_packfile = NULL;
+	int pack_cached = 0;
 	off_t delta_data_offset;
 
 	n = fread(&id, sizeof(id), 1, packfile);
@@ -740,7 +790,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		return got_error(GOT_ERR_BAD_PACKIDX);
 	}
 
-	err = open_packfile(&base_packfile, &path_base_packfile, repo, packidx);
+	err = open_packfile(&base_packfile, &path_base_packfile, &pack_cached,
+	    repo, packidx);
 	got_packidx_close(packidx);
 	if (err)
 		return err;
@@ -759,9 +810,11 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	    path_base_packfile, base_offset, base_tslen, base_type,
 	    base_size);
 done:
-	free(path_base_packfile);
-	if (base_packfile && fclose(base_packfile) == -1 && err == 0)
-		err = got_error_from_errno();
+	if (!pack_cached) {
+		free(path_base_packfile);
+		if (base_packfile && fclose(base_packfile) == -1 && err == 0)
+			err = got_error_from_errno();
+	}
 	return err;
 }
 
@@ -851,8 +904,9 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	off_t offset;
-	char *path_packfile;
-	FILE *packfile;
+	char *path_packfile = NULL;
+	FILE *packfile = NULL;
+	int pack_cached = 0;
 	uint8_t type;
 	uint64_t size;
 	size_t tslen;
@@ -863,7 +917,8 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
-	err = open_packfile(&packfile, &path_packfile, repo, packidx);
+	err = open_packfile(&packfile, &path_packfile, &pack_cached,
+	    repo, packidx);
 	if (err)
 		return err;
 
@@ -896,9 +951,11 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		goto done;
 	}
 done:
-	free(path_packfile);
-	if (packfile && fclose(packfile) == -1 && err == 0)
-		err = got_error_from_errno();
+	if (!pack_cached) {
+		free(path_packfile);
+		if (packfile && fclose(packfile) == -1 && err == 0)
+			err = got_error_from_errno();
+	}
 	return err;
 }
 
