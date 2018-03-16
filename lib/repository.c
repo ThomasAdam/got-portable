@@ -202,12 +202,10 @@ got_repo_close(struct got_repository *repo)
 {
 	int i;
 
-	for (i = 0; i < nitems(repo->pack_cache); i++) {
-		if (repo->pack_cache[i].packidx == NULL)
+	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+		if (repo->packidx_cache[i] == NULL)
 			break;
-		got_packidx_close(repo->pack_cache[i].packidx);
-		fclose(repo->pack_cache[i].packfile);
-		free(repo->pack_cache[i].path_packfile);
+		got_packidx_close(repo->packidx_cache[i]);
 	}
 
 	for (i = 0; i < nitems(repo->delta_cache); i++) {
