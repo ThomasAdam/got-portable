@@ -1426,9 +1426,6 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 	const struct got_error *err = NULL;
 	FILE *packfile = NULL;
 
-	if (obj->type != GOT_OBJ_TYPE_TREE)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 

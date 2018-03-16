@@ -615,20 +615,27 @@ got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		err = got_packfile_extract_object(&f, obj, repo);
-	else
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		uint8_t *buf;
+		size_t len;
+		err = got_packfile_extract_object_to_mem(&buf, &len, obj, repo);
+		if (err)
+			return err;
+		len -= obj->hdrlen;
+		err = parse_commit_object(commit, buf + obj->hdrlen, len);
+		free(buf);
+	} else {
+		FILE *f;
 		err = open_loose_object(&f, obj, repo);
-	if (err)
-		return err;
-
-	err = read_commit_object(commit, repo, obj, f);
-	fclose(f);
+		if (err)
+			return err;
+		err = read_commit_object(commit, repo, obj, f);
+		fclose(f);
+	}
 	return err;
 }
 
