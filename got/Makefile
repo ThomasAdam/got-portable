@@ -7,7 +7,13 @@ SRCS=		got.c delta.c error.c fileindex.c object.c path.c pack.c \
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lutil -lz
 DPADD = ${LIBZ} ${LIBUTIL}
+.if defined(PROFILE)
+CC = gcc
+CPPFLAGS += -DPROFILE
+DEBUG = -O0 -pg
+.else
 DEBUG = -O0 -g
+.endif
 CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 
 # For now, default to installing binary in ~/bin
