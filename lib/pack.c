@@ -1009,7 +1009,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	off_t offset;
 	char *path_packfile;
-	FILE *packfile;
+	struct got_pack *pack;
 	uint8_t type;
 	uint64_t size;
 	size_t tslen;
@@ -1024,16 +1024,19 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		return err;
 
-	err = open_packfile(&packfile, path_packfile, repo, packidx);
-	if (err)
-		return err;
+	pack = get_cached_pack(path_packfile, repo);
+	if (pack == NULL) {
+		err = cache_pack(&pack, path_packfile, packidx, repo);
+		if (err)
+			goto done;
+	}
 
-	if (fseeko(packfile, offset, SEEK_SET) != 0) {
+	if (fseeko(pack->packfile, offset, SEEK_SET) != 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	err = parse_object_type_and_size(&type, &size, &tslen, packfile);
+	err = parse_object_type_and_size(&type, &size, &tslen, pack->packfile);
 	if (err)
 		goto done;
 
@@ -1049,7 +1052,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	case GOT_OBJ_TYPE_REF_DELTA:
 		err = open_delta_object(obj, repo, packidx, path_packfile,
-		    packfile, id, offset, tslen, type, size);
+		    pack->packfile, id, offset, tslen, type, size);
 		break;
 
 	default:
@@ -1058,8 +1061,6 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	}
 done:
 	free(path_packfile);
-	if (packfile && fclose(packfile) == -1 && err == 0)
-		err = got_error_from_errno();
 	return err;
 }
 
