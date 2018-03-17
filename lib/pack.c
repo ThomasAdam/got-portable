@@ -1344,12 +1344,6 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	*f = got_opentemp();
-	if (*f == NULL) {
-		err = got_error(GOT_ERR_FILE_OPEN);
-		goto done;
-	}
-
 	pack = get_cached_pack(obj->path_packfile, repo);
 	if (pack == NULL) {
 		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
@@ -1363,10 +1357,33 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 			goto done;
 		}
 
+		if (obj->size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
+			*f = fmemopen(NULL, obj->size, "w+");
+		else
+			*f = got_opentemp();
+		if (*f == NULL) {
+			err = got_error(GOT_ERR_FILE_OPEN);
+			goto done;
+		}
 		err = got_inflate_to_file(&obj->size, pack->packfile, *f);
-	} else
+	} else {
+		uint64_t max_size;
+
+		err = get_delta_chain_max_size(&max_size, &obj->deltas,
+		    pack->packfile);
+		if (err)
+			return err;
+		if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
+			*f = fmemopen(NULL, max_size, "w+");
+		else
+			*f = got_opentemp();
+		if (*f == NULL) {
+			err = got_error(GOT_ERR_FILE_OPEN);
+			goto done;
+		}
 		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, *f,
 		    pack, repo);
+	}
 done:
 	if (err && *f)
 		fclose(*f);
