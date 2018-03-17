@@ -17,7 +17,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
-#include <sys/mman.h>
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -502,56 +501,6 @@ read_packfile_hdr(FILE *f, struct got_packidx_v2_hdr *packidx)
 	return err;
 }
 
-#ifdef notyet
-static const struct got_error *
-map_packfile_segment(struct got_pack_mapping **map, const char *path_packfile,
-    off_t offset, size_t len)
-{
-	const struct got_error *err = NULL;
-
-	if (len < GOT_PACK_MAPPING_MIN_SIZE)
-		len = GOT_PACK_MAPPING_MIN_SIZE;
-
-	if (len > GOT_PACK_MAPPING_MAX_SIZE)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	*map = calloc(1, sizeof(**map));
-	if (*map == NULL)
-		return got_error(GOT_ERR_NO_MEM);
-
-	(*map)->fd = open(path_packfile, O_RDONLY | O_NOFOLLOW);
-	if ((*map)->fd == -1) {
-		err = got_error_from_errno();
-		free((*map));
-		*map = NULL;
-		return err;
-	}
-
-	(*map)->addr = mmap(NULL, len, PROT_READ, MAP_PRIVATE, (*map)->fd, offset);
-	if ((*map)->addr == NULL) {
-		err = got_error_from_errno();
-		close((*map)->fd);
-		free((*map));
-		*map = NULL;
-		return err;
-	}
-
-	(*map)->offset = offset;
-	(*map)->len = len;
-
-	return NULL;
-}
-#endif
-
-static const struct got_error *
-unmap_packfile_segment(struct got_pack_mapping *map)
-{
-	if (munmap(map->addr, map->len) == -1 || close(map->fd) == -1)
-		return got_error_from_errno();
-	free(map);
-	return NULL;
-}
-
 static const struct got_error *
 open_packfile(FILE **packfile, const char *path_packfile,
     struct got_repository *repo, struct got_packidx_v2_hdr *packidx)
@@ -576,29 +525,14 @@ open_packfile(FILE **packfile, const char *path_packfile,
 	return err;
 }
 
-const struct got_error *
+void
 got_pack_close(struct got_pack *pack)
 {
-	const struct got_error *err = NULL;
-
-	while (!TAILQ_EMPTY(&pack->mappings)) {
-		struct got_pack_mapping *map = TAILQ_FIRST(&pack->mappings);
-		err = unmap_packfile_segment(map);
-		if (err)
-			break;
-		TAILQ_REMOVE(&pack->mappings, map, entry);
-		pack->nmappings--;
-	}
-
-	if (err == NULL) {
-		fclose(pack->packfile);
-		pack->packfile = NULL;
-		free(pack->path_packfile);
-		pack->path_packfile = NULL;
-		pack->filesize = 0;
-	}
-
-	return err;
+	fclose(pack->packfile);
+	pack->packfile = NULL;
+	free(pack->path_packfile);
+	pack->path_packfile = NULL;
+	pack->filesize = 0;
 }
 
 static const struct got_error *
@@ -628,8 +562,6 @@ cache_pack(struct got_pack **packp, const char *path_packfile,
 	}
 
 	pack = &repo->packs[i];
-
-	TAILQ_INIT(&pack->mappings);
 
 	pack->path_packfile = strdup(path_packfile);
 	if (pack->path_packfile == NULL) {
