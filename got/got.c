@@ -230,41 +230,11 @@ done:
 }
 
 static const struct got_error *
-print_commit_object(struct got_object *, struct got_object_id *,
-    struct got_repository *);
-
-static const struct got_error *
-print_parent_commits(struct got_commit_object *commit,
+print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo)
 {
-	struct got_parent_id *pid;
 	const struct got_error *err = NULL;
-	struct got_object *obj;
-
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		err = got_object_open(&obj, repo, pid->id);
-		if (err != NULL)
-			return err;
-		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
-			return got_error(GOT_ERR_OBJ_TYPE);
-		err = print_commit_object(obj, pid->id, repo);
-		got_object_close(obj);
-	}
-
-	return err;
-}
-
-static const struct got_error *
-print_commit_object(struct got_object *obj, struct got_object_id *id,
-    struct got_repository *repo)
-{
-	struct got_commit_object *commit;
 	char *buf;
-	const struct got_error *err;
-
-	err = got_object_commit_open(&commit, repo, obj);
-	if (err)
-		return err;
 
 	err = got_object_id_str(&buf, id);
 	if (err)
@@ -276,9 +246,89 @@ print_commit_object(struct got_object *obj, struct got_object_id *id,
 	printf("\n%s\n", commit->logmsg);
 
 	free(buf);
+	return NULL;
+}
 
-	err = print_parent_commits(commit, repo);
-	got_object_commit_close(commit);
+struct commit_queue_entry {
+	TAILQ_ENTRY(commit_queue_entry) entry;
+	struct got_object_id *id;
+	struct got_commit_object *commit;
+};
+
+static const struct got_error *
+print_commits(struct got_object *root_obj, struct got_object_id *root_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_commit_object *root_commit;
+	TAILQ_HEAD(, commit_queue_entry) commits;
+	struct commit_queue_entry *entry;
+
+	TAILQ_INIT(&commits);
+
+	err = got_object_commit_open(&root_commit, repo, root_obj);
+	if (err)
+		return err;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		return got_error(GOT_ERR_NO_MEM);
+	entry->id = got_object_id_dup(root_id);
+	if (entry->id == NULL) {
+		free(entry);
+		return got_error(GOT_ERR_NO_MEM);
+	}
+	entry->commit = root_commit;
+	TAILQ_INSERT_HEAD(&commits, entry, entry);
+
+	while (!TAILQ_EMPTY(&commits)) {
+		struct got_parent_id *pid;
+
+		entry = TAILQ_FIRST(&commits);
+		err = print_commit(entry->commit, entry->id, repo);
+		if (err)
+			break;
+
+		SIMPLEQ_FOREACH(pid, &entry->commit->parent_ids, entry) {
+			struct got_object *obj;
+			struct got_commit_object *pcommit;
+			struct commit_queue_entry *pentry;
+
+			err = got_object_open(&obj, repo, pid->id);
+			if (err)
+				break;
+			if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+				err = got_error(GOT_ERR_OBJ_TYPE);
+				break;
+			}
+
+			err = got_object_commit_open(&pcommit, repo, obj);
+			got_object_close(obj);
+			if (err)
+				break;
+
+			pentry = calloc(1, sizeof(*pentry));
+			if (pentry == NULL) {
+				err = got_error(GOT_ERR_NO_MEM);
+				got_object_commit_close(pcommit);
+				break;
+			}
+			pentry->id = got_object_id_dup(pid->id);
+			if (pentry->id == NULL) {
+				err = got_error(GOT_ERR_NO_MEM);
+				got_object_commit_close(pcommit);
+				break;
+			}
+			pentry->commit = pcommit;
+			TAILQ_INSERT_TAIL(&commits, pentry, entry);
+		}
+
+		TAILQ_REMOVE(&commits, entry, entry);
+		got_object_commit_close(entry->commit);
+		free(entry->id);
+		free(entry);
+	}
+
 	return err;
 }
 
@@ -325,17 +375,15 @@ cmd_log(int argc, char *argv[])
 	error = got_object_open(&obj, repo, id);
 	if (error != NULL)
 		return error;
-	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT) {
-		error = print_commit_object(obj, id, repo);
-		if (error)
-			return error;
-	} else
-		return got_error(GOT_ERR_OBJ_TYPE);
+	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
+		error = print_commits(obj, id, repo);
+	else
+		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);
-	return NULL;
+	return error;
 }
 
 #ifdef notyet

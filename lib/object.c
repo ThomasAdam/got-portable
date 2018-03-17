@@ -77,6 +77,18 @@ got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
 	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
 }
 
+struct got_object_id *
+got_object_id_dup(struct got_object_id *id1)
+{
+	struct got_object_id *id2;
+
+	id2 = malloc(sizeof(*id2));
+	if (id2 == NULL)
+		return NULL;
+	memcpy(id2, id1, sizeof(*id2));
+	return id2;
+}
+
 int
 got_object_get_type(struct got_object *obj)
 {
