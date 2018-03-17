@@ -263,7 +263,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	}
 done:
 	free(path);
-	if (err && f)
+	if (f)
 		fclose(f);
 	return err;
 
