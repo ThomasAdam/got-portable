@@ -95,6 +95,7 @@ print_tree_object(struct got_object *obj, char *parent,
 
 		if (!S_ISDIR(te->mode)) {
 			test_printf("%s %s/%s\n", hex, parent, te->name);
+			free(hex);
 			continue;
 		}
 		test_printf("%s %s/%s\n", hex, parent, te->name);
@@ -239,6 +240,7 @@ repo_read_tree(const char *repo_path)
 	got_repo_close(repo);
 	return (err == NULL);
 }
+
 static int
 repo_read_blob(const char *repo_path)
 {
