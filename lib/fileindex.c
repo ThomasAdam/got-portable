@@ -25,7 +25,7 @@
 
 #include "got_error.h"
 
-#include "got_fileindex_lib.h"
+#include "got_lib_fileindex.h"
 
 const struct got_error *
 got_fileindex_entry_open(struct got_fileindex_entry **entry,

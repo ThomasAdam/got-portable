@@ -28,12 +28,12 @@
 #include "got_refs.h"
 #include "got_repository.h"
 
-#include "got_path_lib.h"
-#include "got_delta_lib.h"
-#include "got_zbuf_lib.h"
-#include "got_object_lib.h"
-#include "got_pack_lib.h"
-#include "got_repository_lib.h"
+#include "got_lib_path.h"
+#include "got_lib_delta.h"
+#include "got_lib_zbuf.h"
+#include "got_lib_object.h"
+#include "got_lib_pack.h"
+#include "got_lib_repository.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

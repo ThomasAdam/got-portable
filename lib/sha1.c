@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include "got_sha1_lib.h"
+#include "got_lib_sha1.h"
 
 static int
 parse_xdigit(uint8_t *val, const char *hex)

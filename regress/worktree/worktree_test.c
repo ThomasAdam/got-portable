@@ -35,8 +35,8 @@
 #include "got_repository.h"
 #include "got_worktree.h"
 
-#include "got_worktree_lib.h"
-#include "got_path_lib.h"
+#include "got_lib_worktree.h"
+#include "got_lib_path.h"
 
 #define GOT_REPO_PATH "../../../"
 

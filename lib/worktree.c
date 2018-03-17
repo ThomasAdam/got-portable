@@ -34,13 +34,13 @@
 #include "got_object.h"
 #include "got_worktree.h"
 
-#include "got_worktree_lib.h"
-#include "got_path_lib.h"
-#include "got_sha1_lib.h"
-#include "got_fileindex_lib.h"
-#include "got_zbuf_lib.h"
-#include "got_delta_lib.h"
-#include "got_object_lib.h"
+#include "got_lib_worktree.h"
+#include "got_lib_path.h"
+#include "got_lib_sha1.h"
+#include "got_lib_fileindex.h"
+#include "got_lib_zbuf.h"
+#include "got_lib_delta.h"
+#include "got_lib_object.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

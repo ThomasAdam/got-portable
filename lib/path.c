@@ -22,7 +22,7 @@
 
 #include "got_error.h"
 
-#include "got_path_lib.h"
+#include "got_lib_path.h"
 
 int
 got_path_is_absolute(const char *path)
