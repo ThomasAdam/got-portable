@@ -18,7 +18,7 @@
 .Os
 .Sh NAME
 .Nm got
-.Nd distributed version control system
+.Nd version control system
 .Sh SYNOPSIS
 .Nm
 .Ar command
@@ -26,23 +26,23 @@
 .Op Ar arg ...
 .Sh DESCRIPTION
 .Nm
-is a distributed version control system which prioritizes ease of use
-and simplicity over flexibility.
+is a version control system which prioritizes ease of use and simplicity
+over flexibility.
 .Pp
 .Nm
-stores the history of files tracked in version control in a repository
-which happens to use the same on-disk format as so-called
+stores the history of tracked files in a repository which happens to use
+the same on-disk format as
 .Dq bare
-repositories created by the popular Git version control system.
+repositories used by the popular Git version control system.
 This repository format is described in
 .Xr got-repository 5 .
 .Pp
 .Nm
 is a
-.Dq distributed
+.Em distributed
 version control system because every copy of a repository is writeable.
 Modifications made to files can be synchronized between repositories
-automatically at any time.
+at any time.
 .Pp
 Files managed by
 .Nm
@@ -50,7 +50,7 @@ must be checked out from the repository for modification.
 Checked out files are stored in a
 .Em work tree
 which can be placed at an arbitrary directory in the filesystem hierarchy.
-The format of a
+The on-disk format of a
 .Nm
 work tree is described in
 .Xr got-worktree 5 .
@@ -80,6 +80,12 @@ Display history of the repository.
 .El
 .Sh EXIT STATUS
 .Ex -std got
+.Sh EXAMPLES
+Check out a work tree of
+.Ox
+kernel sources from a Git repository at /var/repo/openbsd-src to ~/sys:
+.Pp
+.Dl $ got checkout -p sys /var/repo/openbsd-src ~/sys
 .Sh SEE ALSO
 .Xr got-repository 5
 .Xr got-worktree 5
