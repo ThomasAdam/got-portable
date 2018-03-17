@@ -39,13 +39,14 @@ got_fileindex_entry_open(struct got_fileindex_entry **entry,
 
 	*entry = calloc(1, sizeof(**entry));
 	if (*entry == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	(*entry)->path = strdup(relpath);
 	if ((*entry)->path == NULL) {
+		const struct got_error *err = got_error_from_errno();
 		free(*entry);
 		*entry = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 	
 	(*entry)->ctime_sec = sb.st_ctime;

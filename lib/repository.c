@@ -161,7 +161,7 @@ got_repo_open(struct got_repository **ret, const char *path)
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -173,14 +173,14 @@ got_repo_open(struct got_repository **ret, const char *path)
 
 	repo->path_git_dir = strdup(repo->path);
 	if (repo->path_git_dir == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	if (!is_git_repo(repo)) {
 		free(repo->path_git_dir);
 		if (asprintf(&repo->path_git_dir, "%s/%s", repo->path,
 		    GOT_GIT_DIR) == -1) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 		if (!is_git_repo(repo)) {

@@ -60,7 +60,7 @@ got_object_id_str(char **outbuf, struct got_object_id *id)
 
 	*outbuf = calloc(1, len);
 	if (*outbuf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	if (got_sha1_digest_to_str(id->sha1, *outbuf, len) == NULL) {
 		free(*outbuf);
@@ -152,7 +152,7 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	(*obj)->type = type;
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
@@ -172,7 +172,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 
 	buf = calloc(zbsize, sizeof(char));
 	if (buf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	err = got_inflate_init(&zb, NULL, zbsize);
 	if (err)
@@ -187,7 +187,7 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 		if (strchr(zb.outbuf, '\0') == NULL) {
 			buf = recallocarray(buf, 1 + i, 2 + i, zbsize);
 			if (buf == NULL) {
-				err = got_error(GOT_ERR_NO_MEM);
+				err = got_error_from_errno();
 				goto done;
 			}
 		}
@@ -210,7 +210,7 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 	char *path_objects = got_repo_get_path_objects(repo);
 
 	if (path_objects == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	err = got_object_id_str(&hex, id);
 	if (err)
@@ -218,7 +218,7 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 
 	if (asprintf(path, "%s/%.2x/%s", path_objects,
 	    id->sha1[0], hex + 2) == -1)
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 
 	free(hex);
 	free(path_objects);
@@ -319,12 +319,13 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
  
 	*commit = calloc(1, sizeof(**commit));
 	if (*commit == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	(*commit)->tree_id = calloc(1, sizeof(*(*commit)->tree_id));
 	if ((*commit)->tree_id == NULL) {
+		err = got_error_from_errno();
 		free(*commit);
 		*commit = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 
 	SIMPLEQ_INIT(&(*commit)->parent_ids);
@@ -360,13 +361,13 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 
 		pid = calloc(1, sizeof(*pid));
 		if (pid == NULL) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 		pid->id = calloc(1, sizeof(*pid->id));
 		if (pid->id == NULL) {
+			err = got_error_from_errno();
 			free(pid);
-			err = got_error(GOT_ERR_NO_MEM);
 			goto done;
 		}
 		s += tlen;
@@ -401,7 +402,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		*p = '\0';
 		(*commit)->author = strdup(s);
 		if ((*commit)->author == NULL) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 		s += strlen((*commit)->author) + 1;
@@ -426,7 +427,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		*p = '\0';
 		(*commit)->committer = strdup(s);
 		if ((*commit)->committer == NULL) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 		s += strlen((*commit)->committer) + 1;
@@ -435,7 +436,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 
 	(*commit)->logmsg = strndup(s, remain);
 	if ((*commit)->logmsg == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 done:
@@ -463,13 +464,14 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 
 	*te = calloc(1, sizeof(**te));
 	if (*te == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	(*te)->id = calloc(1, sizeof(*(*te)->id));
 	if ((*te)->id == NULL) {
+		err = got_error_from_errno();
 		free(*te);
 		*te = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 
 	*elen = strlen(buf) + 1;
@@ -481,9 +483,10 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 
 	space = strchr(buf, ' ');
 	if (space == NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		free(*te);
 		*te = NULL;
-		return got_error(GOT_ERR_BAD_OBJ_DATA);
+		return err;
 	}
 	while (*p != ' ') {
 		if (*p < '0' && *p > '7') {
@@ -520,7 +523,7 @@ parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
 
 	*tree = calloc(1, sizeof(**tree));
 	if (*tree == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	SIMPLEQ_INIT(&(*tree)->entries);
 
@@ -558,7 +561,7 @@ read_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	buf = calloc(1, blocksize);
 	if (buf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	remain = blocksize;
 	total = 0;
@@ -567,7 +570,7 @@ read_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			uint8_t *newbuf;
 			newbuf = reallocarray(buf, 1, total + blocksize);
 			if (newbuf == NULL) {
-				err = got_error(GOT_ERR_NO_MEM);
+				err = got_error_from_errno();
 				goto done;
 			}
 			buf = newbuf;
@@ -755,14 +758,15 @@ got_object_blob_open(struct got_blob_object **blob,
 
 	*blob = calloc(1, sizeof(**blob));
 	if (*blob == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
 		(*blob)->read_buf = calloc(1, blocksize);
 		if ((*blob)->read_buf == NULL) {
+			err = got_error_from_errno();
 			free(*blob);
 			*blob = NULL;
-			return got_error(GOT_ERR_NO_MEM);
+			return err;
 		}
 		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
 		if (err) {

@@ -70,16 +70,17 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 
 	symref_name = strdup(name);
 	if (symref_name == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	symref_ref = strdup(line);
 	if (symref_ref == NULL) {
+		const struct got_error *err = got_error_from_errno();
 		free(symref_name);
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	(*ref)->flags |= GOT_REF_IS_SYMBOLIC;
 	symref = &((*ref)->ref.symref);
 	symref->name = symref_name;
@@ -100,14 +101,14 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 
 	ref_name = strdup(name);
 	if (ref_name == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	if (!got_parse_sha1_digest(digest, line))
 		return got_error(GOT_ERR_NOT_REF);
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	(*ref)->ref.ref.name = ref_name;
 	memcpy(&(*ref)->ref.ref.sha1, digest, SHA1_DIGEST_LENGTH);
 	return NULL;
@@ -162,14 +163,14 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	char *path_refs = get_refs_dir_path(repo, refname);
 
 	if (path_refs == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	
 	/* XXX For now, this assumes that refs exist in the filesystem. */
 
 	if (asprintf(&path_ref, "%s/%s", path_refs, refname) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -269,7 +270,7 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 
 	*id = calloc(1, sizeof(**id));
 	if (*id == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	memcpy((*id)->sha1, ref->ref.ref.sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
 }

@@ -15,8 +15,8 @@
  */
 
 /* Error codes */
-#define GOT_ERR_ERRNO		0
-#define GOT_ERR_NO_MEM		1
+#define GOT_ERR_OK		0
+#define GOT_ERR_ERRNO		1
 #define GOT_ERR_NOT_GIT_REPO	2
 #define GOT_ERR_NOT_ABSPATH	3
 #define GOT_ERR_BAD_PATH	4
@@ -50,8 +50,8 @@ static const struct got_error {
 	int code;
 	const char *msg;
 } got_errors[] = {
+	{ GOT_ERR_OK,		"no error occured?!?" },
 	{ GOT_ERR_ERRNO,	"see errno" },
-	{ GOT_ERR_NO_MEM,	"out of memory" },
 	{ GOT_ERR_NOT_GIT_REPO, "no git repository found" },
 	{ GOT_ERR_NOT_ABSPATH,	"absolute path expected" },
 	{ GOT_ERR_BAD_PATH,	"bad path" },

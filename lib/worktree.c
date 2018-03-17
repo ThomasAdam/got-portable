@@ -56,7 +56,7 @@ create_meta_file(const char *path_got, const char *name, const char *content)
 	ssize_t n;
 
 	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		path = NULL;
 		goto done;
 	}
@@ -103,7 +103,7 @@ read_meta_file(char **content, const char *path_got, const char *name)
 	*content = NULL;
 
 	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		path = NULL;
 		goto done;
 	}
@@ -122,7 +122,7 @@ read_meta_file(char **content, const char *path_got, const char *name)
 	stat(path, &sb);
 	*content = calloc(1, sb.st_size);
 	if (*content == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -162,7 +162,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 
 	if (!got_path_is_absolute(prefix)) {
 		if (asprintf(&absprefix, "/%s", prefix) == -1)
-			return got_error(GOT_ERR_NO_MEM);
+			return got_error_from_errno();
 	}
 
 	/* Create top-level directory (may already exist). */
@@ -173,7 +173,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 
 	/* Create .got directory (may already exist). */
 	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	if (mkdir(path_got, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
@@ -194,7 +194,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	/* Write the HEAD reference. */
 	refstr = got_ref_to_str(head_ref);
 	if (refstr == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_HEAD, refstr);
@@ -204,7 +204,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	/* Store path to repository. */
 	repo_path = got_repo_get_path(repo);
 	if (repo_path == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY, repo_path);
@@ -219,7 +219,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 
 	/* Stamp work tree with format file. */
 	if (asprintf(&formatstr, "%d", GOT_WORKTREE_FORMAT_VERSION) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_FORMAT, formatstr);
@@ -248,13 +248,13 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	*worktree = NULL;
 
 	if (asprintf(&path_got, "%s/%s", path, GOT_WORKTREE_GOT_DIR) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		path_got = NULL;
 		goto done;
 	}
 
 	if (asprintf(&path_lock, "%s/%s", path_got, GOT_WORKTREE_LOCK) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		path_lock = NULL;
 		goto done;
 	}
@@ -282,14 +282,14 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 
 	*worktree = calloc(1, sizeof(**worktree));
 	if (*worktree == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	(*worktree)->lockfd = -1;
 
 	(*worktree)->root_path = strdup(path);
 	if ((*worktree)->root_path == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	err = read_meta_file(&(*worktree)->repo_path, path_got,
@@ -377,7 +377,7 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -439,7 +439,7 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 
 	if (asprintf(&abspath, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	/* XXX queue work rather than editing disk directly? */
 	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
@@ -487,7 +487,7 @@ tree_checkout_entry(struct got_worktree *worktree,
 	if (parent[0] == '/' && parent[1] == '\0')
 		parent = "";
 	if (asprintf(&path, "%s/%s", parent, te->name) == -1)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	/* Skip this entry if it is outside of our path prefix. */
 	len = MIN(strlen(worktree->path_prefix), strlen(path));
@@ -583,13 +583,13 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 
 	fileindex = got_fileindex_open();
 	if (fileindex == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		fileindex_path = NULL;
 		goto done;
 	}

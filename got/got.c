@@ -190,15 +190,16 @@ cmd_checkout(int argc, char *argv[])
 		if (dotgit)
 			*dotgit = '\0';
 		if (asprintf(&worktree_path, "%s/%s", cwd, base) == -1) {
+			error = got_error_from_errno();
 			free(cwd);
-			return got_error(GOT_ERR_NO_MEM);
+			return error;
 		}
 		free(cwd);
 	} else if (argc == 2) {
 		repo_path = argv[0];
 		worktree_path = strdup(argv[1]);
 		if (worktree_path == NULL)
-			return got_error(GOT_ERR_NO_MEM);
+			return got_error_from_errno();
 	} else
 		usage_checkout();
 
@@ -272,11 +273,12 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 
 	entry = calloc(1, sizeof(*entry));
 	if (entry == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	entry->id = got_object_id_dup(root_id);
 	if (entry->id == NULL) {
+		err = got_error_from_errno();
 		free(entry);
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 	entry->commit = root_commit;
 	TAILQ_INSERT_HEAD(&commits, entry, entry);
@@ -309,13 +311,13 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 
 			pentry = calloc(1, sizeof(*pentry));
 			if (pentry == NULL) {
-				err = got_error(GOT_ERR_NO_MEM);
+				err = got_error_from_errno();
 				got_object_commit_close(pcommit);
 				break;
 			}
 			pentry->id = got_object_id_dup(pid->id);
 			if (pentry->id == NULL) {
-				err = got_error(GOT_ERR_NO_MEM);
+				err = got_error_from_errno();
 				got_object_commit_close(pcommit);
 				break;
 			}

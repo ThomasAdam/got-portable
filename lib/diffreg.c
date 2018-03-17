@@ -331,11 +331,11 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		goto closem;
 	}
 	if (prepare(ds, 0, f1, ds->stb1.st_size, flags)) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	if (prepare(ds, 1, f2, ds->stb2.st_size, flags)) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 
@@ -347,44 +347,46 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	equiv(ds->sfile[0], ds->slen[0], ds->sfile[1], ds->slen[1], ds->member);
 	ds->member = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
 	if (ds->member == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 
 	ds->class = (int *)ds->file[0];
 	if (unsort(ds->sfile[0], ds->slen[0], ds->class)) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	ds->class = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
 	if (ds->class == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 
 	ds->klist = calloc(ds->slen[0] + 2, sizeof(*ds->klist));
 	if (ds->klist == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	ds->clen = 0;
 	ds->clistlen = 100;
 	ds->clist = calloc(ds->clistlen, sizeof(*ds->clist));
 	if (ds->clist == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	i = stone(ds, ds->class, ds->slen[0], ds->member, ds->klist, flags);
-	free(ds->member);
-	free(ds->class);
 	if (i < 0) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
+		free(ds->member);
+		free(ds->class);
 		goto closem;
 	}
+	free(ds->member);
+	free(ds->class);
 
 	ds->J = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
 	if (ds->J == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	unravel(ds, ds->klist[i]);
@@ -395,18 +397,18 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 
 	ds->ixold = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
 	if (ds->ixold == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	ds->ixnew = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
 	if (ds->ixnew == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto closem;
 	}
 	check(ds, f1, f2, flags);
 	if (output(outfile, ds, args, args->label[0], f1, args->label[1], f2,
 	    flags))
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 closem:
 	if (ds->anychange) {
 		args->status |= 1;

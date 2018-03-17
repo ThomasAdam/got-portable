@@ -89,7 +89,7 @@ get_packfile_size(size_t *size, const char *path_idx)
 		return got_error(GOT_ERR_BAD_PATH);
 	*dot = '\0';
 	if (asprintf(&path_pack, "%s.pack", base_path) == -1)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	if (stat(path_pack, &sb) != 0) {
 		free(path_pack);
@@ -123,7 +123,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	p = calloc(1, sizeof(*p));
 	if (p == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -169,7 +169,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	p->sorted_ids = calloc(nobj, sizeof(*p->sorted_ids));
 	if (p->sorted_ids == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -184,7 +184,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	p->crc32 = calloc(nobj, sizeof(*p->crc32));
 	if (p->crc32 == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -198,7 +198,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	p->offsets = calloc(nobj, sizeof(*p->offsets));
 	if (p->offsets == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -216,7 +216,7 @@ got_packidx_open(struct got_packidx_v2_hdr **packidx, const char *path)
 
 	p->large_offsets = calloc(nobj, sizeof(*p->large_offsets));
 	if (p->large_offsets == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -404,8 +404,6 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 		*idx = get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
 			*packidx = repo->packidx_cache[i];
-			if (*packidx == NULL)
-				return got_error(GOT_ERR_NO_MEM);
 			return NULL;
 		}
 	}
@@ -413,7 +411,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	packdir = opendir(path_packdir);
 	if (packdir == NULL) {
@@ -427,7 +425,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 
 		if (asprintf(&path_packidx, "%s/%s", path_packdir,
 		    dent->d_name) == -1) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 
@@ -465,7 +463,7 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	sha1str = got_sha1_digest_to_str(packidx->trailer.packfile_sha1,
 	    hex, sizeof(hex));
@@ -475,7 +473,7 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 	if (asprintf(path_packfile, "%s/%s%s%s", path_packdir,
 	    GOT_PACK_PREFIX, sha1str, GOT_PACKFILE_SUFFIX) == -1) {
 		*path_packfile = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	}
 
 	return NULL;
@@ -565,7 +563,7 @@ cache_pack(struct got_pack **packp, const char *path_packfile,
 
 	pack->path_packfile = strdup(path_packfile);
 	if (pack->path_packfile == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
@@ -643,13 +641,14 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 {
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	(*obj)->path_packfile = strdup(path_packfile);
 	if ((*obj)->path_packfile == NULL) {
+		const struct got_error *err = got_error_from_errno();
 		free(*obj);
 		*obj = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return err;
 	}
 
 	(*obj)->type = type;
@@ -728,7 +727,7 @@ add_delta(struct got_delta_chain *deltas, const char *path_packfile,
 	    delta_type, delta_size, delta_data_offset, delta_buf,
 	    delta_len);
 	if (delta == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	/* delta is freed in got_object_close() */
 	deltas->nentries++;
 	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
@@ -899,7 +898,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	(*obj)->flags = 0;
 	(*obj)->hdrlen = 0;
@@ -909,7 +908,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 
 	(*obj)->path_packfile = strdup(path_packfile);
 	if ((*obj)->path_packfile == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 	(*obj)->flags |= GOT_OBJ_FLAG_PACKED;
@@ -1070,7 +1069,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 		accum_buf = malloc(max_size);
 		if (accum_buf == NULL)
-			return got_error(GOT_ERR_NO_MEM);
+			return got_error_from_errno();
 	} else {
 		base_file = got_opentemp();
 		if (base_file == NULL)
@@ -1113,7 +1112,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 					uint8_t *p;
 					p = reallocarray(base_buf, 1, max_size);
 					if (p == NULL) {
-						err = got_error(GOT_ERR_NO_MEM);
+						err = got_error_from_errno();
 						goto done;
 					}
 					base_buf = p;
@@ -1198,7 +1197,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 		return err;
 	accum_buf = malloc(max_size);
 	if (accum_buf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
@@ -1225,7 +1224,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				uint8_t *p;
 				p = reallocarray(base_buf, 1, max_size);
 				if (p == NULL) {
-					err = got_error(GOT_ERR_NO_MEM);
+					err = got_error_from_errno();
 					goto done;
 				}
 				base_buf = p;

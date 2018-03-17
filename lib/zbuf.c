@@ -46,14 +46,14 @@ got_inflate_init(struct got_zstream_buf *zb, uint8_t *outbuf, size_t bufsize)
 
 	zb->inbuf = calloc(1, zb->inlen);
 	if (zb->inbuf == NULL) {
-		err = got_error(GOT_ERR_NO_MEM);
+		err = got_error_from_errno();
 		goto done;
 	}
 
 	if (outbuf == NULL) {
 		zb->outbuf = calloc(1, zb->outlen);
 		if (zb->outbuf == NULL) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			goto done;
 		}
 		zb->flags |= GOT_ZSTREAM_F_OWN_OUTBUF;
@@ -122,7 +122,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
 	if (err)
 		return err;
@@ -138,10 +138,10 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			newbuf = reallocarray(*outbuf, 1,
 			    *outlen + GOT_ZSTREAM_BUFSIZE);
 			if (newbuf == NULL) {
+				err = got_error_from_errno();
 				free(*outbuf);
 				*outbuf = NULL;
 				*outlen = 0;
-				err = got_error(GOT_ERR_NO_MEM);
 				goto done;
 			}
 			*outbuf = newbuf;

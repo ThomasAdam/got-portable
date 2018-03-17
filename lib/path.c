@@ -71,7 +71,7 @@ got_path_segment_count(int *count, const char *path)
 	*count = 0;
 
 	if (s == NULL)
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 
 	do {
 		p = strsep(&s, "/");
@@ -114,7 +114,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
 		*path = NULL;
-		return got_error(GOT_ERR_NO_MEM);
+		return got_error_from_errno();
 	}
 
 	fd = mkstemp(*path);

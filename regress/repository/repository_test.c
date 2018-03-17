@@ -112,7 +112,7 @@ print_tree_object(struct got_object *obj, char *parent,
 		}
 
 		if (asprintf(&next_parent, "%s/%s", parent, te->name) == -1) {
-			err = got_error(GOT_ERR_NO_MEM);
+			err = got_error_from_errno();
 			got_object_close(treeobj);
 			break;
 		}
