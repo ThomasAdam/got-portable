@@ -23,7 +23,7 @@ struct got_delta_cache_entry {
 #define GOT_DELTA_CACHE_SIZE	1024
 
 struct got_delta_cache {
-	char *path_packfile;
+	int nentries;
 	struct got_delta_cache_entry deltas[GOT_DELTA_CACHE_SIZE];
 };
 

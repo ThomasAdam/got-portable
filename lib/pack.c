@@ -580,7 +580,6 @@ const struct got_error *
 got_pack_close(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
-	struct got_delta_cache *cache = &pack->delta_cache;
 	int i;
 
 	while (!TAILQ_EMPTY(&pack->mappings)) {
@@ -600,17 +599,15 @@ got_pack_close(struct got_pack *pack)
 		pack->filesize = 0;
 	}
 
-	free(cache->path_packfile);
-	cache->path_packfile = NULL;
-	for (i = 0; i < nitems(cache->deltas); i++) {
-		struct got_delta_cache_entry *entry = &cache->deltas[i];
-		if (entry->data_offset == 0)
-			break;
+	for (i = 0; i < pack->delta_cache.nentries; i++) {
+		struct got_delta_cache_entry *entry;
+		entry = &pack->delta_cache.deltas[i];
 		entry->data_offset = 0;
 		free(entry->delta_buf);
 		entry->delta_buf = NULL;
 		entry->delta_len = 0;
 	}
+	pack->delta_cache.nentries = 0;
 
 	return err;
 }
@@ -1149,39 +1146,29 @@ clear_delta_cache_entry(struct got_delta_cache_entry *entry)
 }
 
 const struct got_error *
-add_delta_cache_entry(struct got_delta_cache *cache, off_t data_offset,
-    uint8_t *delta_buf, size_t delta_len)
+cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
+    struct got_pack *pack)
 {
 	int i;
+	struct got_delta_cache *cache = &pack->delta_cache;
 	struct got_delta_cache_entry *entry;
 
-	for (i = 0; i < nitems(cache->deltas); i++) {
-		entry = &cache->deltas[i];
-		if (entry->data_offset == 0)
-			break;
-	}
-
-	if (i == nitems(cache->deltas)) {
-		entry = &cache->deltas[i - 1];
+	if (cache->nentries == nitems(cache->deltas)) {
+		entry = &cache->deltas[cache->nentries - 1];
 		clear_delta_cache_entry(entry);
+		cache->nentries--;
 		memmove(&cache->deltas[1], &cache->deltas[0],
 		    sizeof(cache->deltas) - sizeof(cache->deltas[0]));
 		i = 0;
-	}
+	} else
+		i = cache->nentries;
 
 	entry = &cache->deltas[i];
 	entry->data_offset = data_offset;
 	entry->delta_buf = delta_buf;
 	entry->delta_len = delta_len;
+	cache->nentries++;
 	return NULL;
-}
-
-const struct got_error *
-cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
-    struct got_pack *pack)
-{
-	return add_delta_cache_entry(&pack->delta_cache, data_offset,
-	    delta_buf, delta_len);
 }
 
 void
