@@ -866,8 +866,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	uint64_t base_size;
 	size_t base_tslen;
 	size_t n;
-	FILE *base_packfile;
 	char *path_base_packfile;
+	struct got_pack *base_pack;
 	off_t delta_data_offset;
 
 	n = fread(&id, sizeof(id), 1, packfile);
@@ -897,28 +897,28 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	if (err)
 		return err;
 
-	err = open_packfile(&base_packfile, path_base_packfile, repo, packidx);
-	got_packidx_close(packidx);
-	if (err)
-		return err;
+	base_pack = get_cached_pack(path_base_packfile, repo);
+	if (base_pack == NULL) {
+		err = cache_pack(&base_pack, path_base_packfile, NULL, repo);
+		if (err)
+			goto done;
+	}
 
-	if (fseeko(base_packfile, base_offset, SEEK_SET) != 0) {
+	if (fseeko(base_pack->packfile, base_offset, SEEK_SET) != 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
 	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
-	    base_packfile);
+	    base_pack->packfile);
 	if (err)
 		goto done;
 
-	err = resolve_delta_chain(deltas, repo, base_packfile,
+	err = resolve_delta_chain(deltas, repo, base_pack->packfile,
 	    path_base_packfile, base_offset, base_tslen, base_type,
 	    base_size);
 done:
 	free(path_base_packfile);
-	if (base_packfile && fclose(base_packfile) == -1 && err == 0)
-		err = got_error_from_errno();
 	return err;
 }
 
