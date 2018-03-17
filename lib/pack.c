@@ -1354,9 +1354,12 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 			goto done;
 		}
 
-		if (obj->size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
-			*f = fmemopen(NULL, obj->size, "w+");
-		else
+		if (obj->size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+			size_t size = obj->size;
+			if (size == 0) /* empty file */
+				size = 1;
+			*f = fmemopen(NULL, size, "w+");
+		} else
 			*f = got_opentemp();
 		if (*f == NULL) {
 			err = got_error(GOT_ERR_FILE_OPEN);
