@@ -14,19 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_delta_cache_entry {
-	off_t data_offset;
-	uint8_t *delta_buf;
-	size_t delta_len;
-};
-
-#define GOT_DELTA_CACHE_SIZE	1024
-
-struct got_delta_cache {
-	int nentries;
-	struct got_delta_cache_entry deltas[GOT_DELTA_CACHE_SIZE];
-};
-
 /* A pack file segment mapped with mmap(2). */
 struct got_pack_mapping {
 	TAILQ_ENTRY(got_pack_mapping) entry;
@@ -48,8 +35,6 @@ struct got_pack {
 	int nmappings;
 
 	TAILQ_HEAD(, got_pack_mapping) mappings;
-
-	struct got_delta_cache delta_cache;
 };
 
 const struct got_error *got_pack_close(struct got_pack *);

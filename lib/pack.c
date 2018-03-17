@@ -580,7 +580,6 @@ const struct got_error *
 got_pack_close(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
-	int i;
 
 	while (!TAILQ_EMPTY(&pack->mappings)) {
 		struct got_pack_mapping *map = TAILQ_FIRST(&pack->mappings);
@@ -598,16 +597,6 @@ got_pack_close(struct got_pack *pack)
 		pack->path_packfile = NULL;
 		pack->filesize = 0;
 	}
-
-	for (i = 0; i < pack->delta_cache.nentries; i++) {
-		struct got_delta_cache_entry *entry;
-		entry = &pack->delta_cache.deltas[i];
-		entry->data_offset = 0;
-		free(entry->delta_buf);
-		entry->delta_buf = NULL;
-		entry->delta_len = 0;
-	}
-	pack->delta_cache.nentries = 0;
 
 	return err;
 }
@@ -799,12 +788,13 @@ resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
 static const struct got_error *
 add_delta(struct got_delta_chain *deltas, const char *path_packfile,
     off_t delta_offset, size_t tslen, int delta_type, size_t delta_size,
-    size_t delta_data_offset)
+    size_t delta_data_offset, uint8_t *delta_buf, size_t delta_len)
 {
 	struct got_delta *delta;
 
 	delta = got_delta_open(path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset);
+	    delta_type, delta_size, delta_data_offset, delta_buf,
+	    delta_len);
 	if (delta == NULL)
 		return got_error(GOT_ERR_NO_MEM);
 	/* delta is freed in got_object_close() */
@@ -825,6 +815,8 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	uint64_t base_size;
 	size_t base_tslen;
 	off_t delta_data_offset;
+	uint8_t *delta_buf;
+	size_t delta_len;
 
 	err = parse_offset_delta(&base_offset, packfile, delta_offset);
 	if (err)
@@ -834,8 +826,12 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	if (delta_data_offset == -1)
 		return got_error_from_errno();
 
+	err = got_inflate_to_mem(&delta_buf, &delta_len, packfile);
+	if (err)
+		return err;
+
 	err = add_delta(deltas, path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset);
+	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
 		return err;
 
@@ -869,6 +865,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	char *path_base_packfile;
 	struct got_pack *base_pack;
 	off_t delta_data_offset;
+	uint8_t *delta_buf;
+	size_t delta_len;
 
 	n = fread(&id, sizeof(id), 1, packfile);
 	if (n != 1)
@@ -878,8 +876,12 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	if (delta_data_offset == -1)
 		return got_error_from_errno();
 
+	err = got_inflate_to_mem(&delta_buf, &delta_len, packfile);
+	if (err)
+		return err;
+
 	err = add_delta(deltas, path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset);
+	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
 		return err;
 
@@ -936,7 +938,7 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 	case GOT_OBJ_TYPE_TAG:
 		/* Plain types are the final delta base. Recursion ends. */
 		err = add_delta(deltas, path_packfile, delta_offset, tslen,
-		    delta_type, delta_size, 0);
+		    delta_type, delta_size, 0, NULL, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		err = resolve_offset_delta(deltas, repo, packfile,
@@ -1086,28 +1088,6 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 }
 
 static const struct got_error *
-get_delta_sizes(uint64_t *base_size, uint64_t *result_size,
-    struct got_delta *delta, FILE *packfile)
-{
-	const struct got_error *err;
-	uint8_t *delta_buf = NULL;
-	size_t delta_len = 0;
-
-	if (fseeko(packfile, delta->data_offset, SEEK_SET) != 0) {
-		err = got_error_from_errno();
-		return err;
-	}
-
-	err = got_inflate_to_mem(&delta_buf, &delta_len, packfile);
-	if (err)
-		return err;
-
-	err = got_delta_get_sizes(base_size, result_size, delta_buf, delta_len);
-	free(delta_buf);
-	return err;
-}
-
-static const struct got_error *
 get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
     FILE *packfile)
 {
@@ -1122,8 +1102,8 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
 		    delta->type != GOT_OBJ_TYPE_BLOB &&
 		    delta->type != GOT_OBJ_TYPE_TAG) {
 			const struct got_error *err;
-			err = get_delta_sizes(&base_size, &result_size, delta,
-			    packfile);
+			err = got_delta_get_sizes(&base_size, &result_size,
+			    delta->delta_buf, delta->delta_len);
 			if (err)
 				return err;
 		} else
@@ -1135,63 +1115,6 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
 	}
 
 	return NULL;
-}
-
-void
-clear_delta_cache_entry(struct got_delta_cache_entry *entry)
-{
-	entry->data_offset = 0;
-	free(entry->delta_buf);
-	entry->delta_buf = NULL;
-	entry->delta_len = 0;
-}
-
-const struct got_error *
-cache_delta(off_t data_offset, uint8_t *delta_buf, size_t delta_len,
-    struct got_pack *pack)
-{
-	int i;
-	struct got_delta_cache *cache = &pack->delta_cache;
-	struct got_delta_cache_entry *entry;
-
-	if (cache->nentries == nitems(cache->deltas)) {
-		entry = &cache->deltas[cache->nentries - 1];
-		clear_delta_cache_entry(entry);
-		cache->nentries--;
-		memmove(&cache->deltas[1], &cache->deltas[0],
-		    sizeof(cache->deltas) - sizeof(cache->deltas[0]));
-		i = 0;
-	} else
-		i = cache->nentries;
-
-	entry = &cache->deltas[i];
-	entry->data_offset = data_offset;
-	entry->delta_buf = delta_buf;
-	entry->delta_len = delta_len;
-	cache->nentries++;
-	return NULL;
-}
-
-void
-get_cached_delta(uint8_t **delta_buf, size_t *delta_len, off_t data_offset,
-    struct got_pack *pack)
-{
-	struct got_delta_cache_entry *entry;
-	int i;
-
-	*delta_buf = NULL;
-	*delta_len = 0;
-
-	for (i = 0; i < nitems(pack->delta_cache.deltas); i++) {
-		entry = &pack->delta_cache.deltas[i];
-		if (entry->data_offset == 0)
-			break;
-		if (entry->data_offset == data_offset) {
-			*delta_buf = entry->delta_buf;
-			*delta_len = entry->delta_len;
-			break;
-		}
-	}
 }
 
 static const struct got_error *
@@ -1234,9 +1157,6 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
-		uint8_t *delta_buf = NULL;
-		size_t delta_len = 0;
-
 		if (n == 0) {
 			size_t base_len;
 
@@ -1278,34 +1198,13 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			continue;
 		}
 
-		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
-		    pack);
-		if (delta_buf == NULL) {
-			if (fseeko(pack->packfile, delta->data_offset, SEEK_SET)
-			    != 0) {
-				err = got_error_from_errno();
-				goto done;
-			}
-
-			/* Delta streams should always fit in memory. */
-			err = got_inflate_to_mem(&delta_buf, &delta_len,
-			    pack->packfile);
-			if (err)
-				goto done;
-
-			err = cache_delta(delta->data_offset, delta_buf,
-			    delta_len, pack);
-			if (err)
-				goto done;
-		}
-		/* delta_buf is now cached */
-
 		if (base_buf) {
-			err = got_delta_apply_in_mem(base_buf, delta_buf,
-			    delta_len, accum_buf, &accum_size);
+			err = got_delta_apply_in_mem(base_buf, delta->delta_buf,
+			    delta->delta_len, accum_buf, &accum_size);
 			n++;
 		} else {
-			err = got_delta_apply(base_file, delta_buf, delta_len,
+			err = got_delta_apply(base_file, delta->delta_buf,
+			    delta->delta_len,
 			    /* Final delta application writes to output file. */
 			    ++n < deltas->nentries ? accum_file : outfile,
 			    &accum_size);
@@ -1374,9 +1273,6 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
-		uint8_t *delta_buf = NULL;
-		size_t delta_len = 0;
-
 		if (n == 0) {
 			size_t base_len;
 
@@ -1411,30 +1307,8 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			continue;
 		}
 
-		get_cached_delta(&delta_buf, &delta_len, delta->data_offset,
-		    pack);
-		if (delta_buf == NULL) {
-			if (fseeko(pack->packfile, delta->data_offset, SEEK_SET)
-			    != 0) {
-				err = got_error_from_errno();
-				goto done;
-			}
-
-			/* Delta streams should always fit in memory. */
-			err = got_inflate_to_mem(&delta_buf, &delta_len,
-			    pack->packfile);
-			if (err)
-				goto done;
-
-			err = cache_delta(delta->data_offset, delta_buf,
-			    delta_len, pack);
-			if (err)
-				goto done;
-		}
-		/* delta_buf is now cached */
-
-		err = got_delta_apply_in_mem(base_buf, delta_buf,
-		    delta_len, accum_buf, &accum_size);
+		err = got_delta_apply_in_mem(base_buf, delta->delta_buf,
+		    delta->delta_len, accum_buf, &accum_size);
 		n++;
 		if (err)
 			goto done;
