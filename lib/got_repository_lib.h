@@ -28,6 +28,7 @@ struct got_delta_cache {
 };
 
 #define GOT_PACKIDX_CACHE_SIZE	64
+#define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
 struct got_repository {
 	char *path;
@@ -36,7 +37,9 @@ struct got_repository {
 	/* The pack index cache speeds up search for packed objects. */
 	struct got_packidx_v2_hdr *packidx_cache[GOT_PACKIDX_CACHE_SIZE];
 
-	/* The delta cache speeds up reconstruction of packed objects. */
-	struct got_delta_cache delta_cache[GOT_PACKIDX_CACHE_SIZE];
-};
+	/* Open file handles, memory maps, and cached deltas for pack files. */
+	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
+	/* XXX TODO move into packs[] */
+	struct got_delta_cache delta_cache[GOT_DELTA_CACHE_SIZE];
+};

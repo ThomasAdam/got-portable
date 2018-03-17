@@ -29,11 +29,11 @@
 #include "got_repository.h"
 
 #include "got_path_lib.h"
-#include "got_repository_lib.h"
-#include "got_zbuf_lib.h"
 #include "got_delta_lib.h"
+#include "got_zbuf_lib.h"
 #include "got_object_lib.h"
 #include "got_pack_lib.h"
+#include "got_repository_lib.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -206,6 +206,12 @@ got_repo_close(struct got_repository *repo)
 		if (repo->packidx_cache[i] == NULL)
 			break;
 		got_packidx_close(repo->packidx_cache[i]);
+	}
+
+	for (i = 0; i < nitems(repo->packs); i++) {
+		if (repo->packs[i].path_packfile == NULL)
+			break;
+		got_pack_close(&repo->packs[i]);
 	}
 
 	for (i = 0; i < nitems(repo->delta_cache); i++) {

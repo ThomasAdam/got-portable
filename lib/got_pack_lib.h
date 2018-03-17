@@ -14,6 +14,30 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* A pack file segment mapped with mmap(2). */
+struct got_pack_mapping {
+	TAILQ_ENTRY(got_pack_mapping) entry;
+	int fd;
+	uint8_t *addr;
+	off_t offset;
+	size_t len;
+};
+
+#define GOT_PACK_MAX_OPEN_MAPPINGS	512
+#define GOT_PACK_MAPPING_MIN_SIZE	8192
+#define GOT_PACK_MAPPING_MAX_SIZE	(2048 * GOT_PACK_MAPPING_MIN_SIZE)
+
+/* An open pack file. */
+struct got_pack {
+	char *path_packfile;
+	FILE *packfile;
+	size_t filesize;
+	int nmappings;
+	TAILQ_HEAD(, got_pack_mapping) mappings;
+};
+
+const struct got_error *got_pack_close(struct got_pack *);
+
 /* See Documentation/technical/pack-format.txt in Git. */
 
 struct got_packidx_trailer {
