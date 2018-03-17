@@ -756,6 +756,7 @@ got_object_blob_open(struct got_blob_object **blob,
 		err = open_loose_object(&((*blob)->f), obj, repo);
 		if (err) {
 			free(*blob);
+			*blob = NULL;
 			return err;
 		}
 

@@ -1381,8 +1381,10 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 		    pack, repo);
 	}
 done:
-	if (err && *f)
+	if (err && *f) {
 		fclose(*f);
+		*f = NULL;
+	}
 	return err;
 }
 
