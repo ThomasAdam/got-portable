@@ -1088,8 +1088,7 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 }
 
 static const struct got_error *
-get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
-    FILE *packfile)
+get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 {
 	struct got_delta *delta;
 	uint64_t base_size = 0, result_size = 0;
@@ -1135,7 +1134,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
 	/* We process small enough files entirely in memory for speed. */
-	err = get_delta_chain_max_size(&max_size, deltas, pack->packfile);
+	err = get_delta_chain_max_size(&max_size, deltas);
 	if (err)
 		return err;
 	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
@@ -1264,7 +1263,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
-	err = get_delta_chain_max_size(&max_size, deltas, pack->packfile);
+	err = get_delta_chain_max_size(&max_size, deltas);
 	if (err)
 		return err;
 	accum_buf = malloc(max_size);
@@ -1369,8 +1368,7 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	} else {
 		uint64_t max_size;
 
-		err = get_delta_chain_max_size(&max_size, &obj->deltas,
-		    pack->packfile);
+		err = get_delta_chain_max_size(&max_size, &obj->deltas);
 		if (err)
 			return err;
 		if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
