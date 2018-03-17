@@ -14,19 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_delta_cache_entry {
-	off_t data_offset;
-	uint8_t *delta_buf;
-	size_t delta_len;
-};
-
-#define GOT_DELTA_CACHE_SIZE	1024
-
-struct got_delta_cache {
-	char *path_packfile;
-	struct got_delta_cache_entry deltas[GOT_DELTA_CACHE_SIZE];
-};
-
 #define GOT_PACKIDX_CACHE_SIZE	64
 #define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
@@ -39,7 +26,4 @@ struct got_repository {
 
 	/* Open file handles, memory maps, and cached deltas for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
-
-	/* XXX TODO move into packs[] */
-	struct got_delta_cache delta_cache[GOT_DELTA_CACHE_SIZE];
 };
