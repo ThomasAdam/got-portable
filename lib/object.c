@@ -747,11 +747,18 @@ got_object_blob_open(struct got_blob_object **blob,
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
 		(*blob)->read_buf = calloc(1, blocksize);
-		if ((*blob)->read_buf == NULL)
+		if ((*blob)->read_buf == NULL) {
+			free(*blob);
+			*blob = NULL;
 			return got_error(GOT_ERR_NO_MEM);
+		}
 		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
-		if (err)
+		if (err) {
+			free((*blob)->read_buf);
+			free(*blob);
+			*blob = NULL;
 			return err;
+		}
 	} else {
 		err = open_loose_object(&((*blob)->f), obj, repo);
 		if (err) {
@@ -764,6 +771,7 @@ got_object_blob_open(struct got_blob_object **blob,
 		if (err != NULL) {
 			fclose((*blob)->f);
 			free(*blob);
+			*blob = NULL;
 			return err;
 		}
 
