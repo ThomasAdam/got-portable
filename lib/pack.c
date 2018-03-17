@@ -404,7 +404,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 			break;
 		*idx = get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
-			*packidx = dup_packidx(repo->packidx_cache[i]);
+			*packidx = repo->packidx_cache[i];
 			if (*packidx == NULL)
 				return got_error(GOT_ERR_NO_MEM);
 			return NULL;
@@ -891,7 +891,6 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 
 	base_offset = get_object_offset(packidx, idx);
 	if (base_offset == (uint64_t)-1) {
-		got_packidx_close(packidx);
 		return got_error(GOT_ERR_BAD_PACKIDX);
 	}
 
@@ -1083,7 +1082,6 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 		return err;
 
 	err = cache_pack(NULL, (*obj)->path_packfile, packidx, repo);
-	got_packidx_close(packidx);
 	return err;
 }
 
