@@ -392,7 +392,8 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [repository-path]\n", getprogname());
+	fprintf(stderr, "usage: %s log [-p] [repository-path]\n",
+	    getprogname());
 	exit(1);
 }
 
