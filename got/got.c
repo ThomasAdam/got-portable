@@ -85,6 +85,7 @@ main(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
+	optind = 0;
 
 	if (argc <= 0)
 		usage();
@@ -158,7 +159,6 @@ cmd_checkout(int argc, char *argv[])
 	const char *path_prefix = "";
 	int ch;
 
-	optind = 0;
 	while ((ch = getopt(argc, argv, "p:")) != -1) {
 		switch (ch) {
 		case 'p':
