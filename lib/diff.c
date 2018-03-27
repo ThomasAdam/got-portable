@@ -360,9 +360,10 @@ static const struct got_error *
 diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_object *tree2,
     struct got_repository *repo, FILE *outfile)
 {
-	struct got_tree_entry *te2;
+	struct got_tree_entry *te2 = NULL;
 
-	te2 = match_entry_by_name(te1, tree2);
+	if (tree2)
+		te2 = match_entry_by_name(te1, tree2);
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
 			return diff_deleted_tree(te1->id, repo, outfile);
@@ -386,11 +387,11 @@ static const struct got_error *
 diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_object *tree1,
     struct got_repository *repo, FILE *outfile)
 {
-	struct got_tree_entry *te1;
-
-	te1 = match_entry_by_name(te2, tree1);
-	if (te1 != NULL) /* handled by diff_entry_old_new() */
-		return NULL;
+	if (tree1) {
+		struct got_tree_entry *te1 = match_entry_by_name(te2, tree1);
+		if (te1 != NULL) /* handled by diff_entry_old_new() */
+			return NULL;
+	}
 
 	if (S_ISDIR(te2->mode))
 		return diff_added_tree(te2->id, repo, outfile);
