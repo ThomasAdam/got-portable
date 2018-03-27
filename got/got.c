@@ -31,6 +31,7 @@
 #include "got_refs.h"
 #include "got_repository.h"
 #include "got_worktree.h"
+#include "got_diff.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -231,8 +232,56 @@ done:
 }
 
 static const struct got_error *
-print_commit(struct got_commit_object *commit, struct got_object_id *id,
+print_patch(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2;
+	struct got_object *obj;
+	struct got_parent_id *pid;
+
+	err = got_object_open(&obj, repo, commit->tree_id);
+	if (err)
+		return err;
+
+	err = got_object_tree_open(&tree2, repo, obj);
+	got_object_close(obj);
+	if (err)
+		return err;
+
+	pid = SIMPLEQ_FIRST(&commit->parent_ids);
+	if (pid != NULL) {
+		struct got_commit_object *pcommit;
+
+		err = got_object_open(&obj, repo, pid->id);
+		if (err)
+			return err;
+
+		err = got_object_commit_open(&pcommit, repo, obj);
+		got_object_close(obj);
+		if (err)
+			return err;
+
+		err = got_object_open(&obj, repo, pcommit->tree_id);
+		got_object_commit_close(pcommit);
+		if (err)
+			return err;
+		err = got_object_tree_open(&tree1, repo, obj);
+		got_object_close(obj);
+		if (err)
+			return err;
+	}
+
+	err = got_diff_tree(tree1, tree2, repo, stdout);
+	if (tree1)
+		got_object_tree_close(tree1);
+	got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
+print_commit(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo, int show_patch)
 {
 	const struct got_error *err = NULL;
 	char *buf;
@@ -246,8 +295,11 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("Author: %s\n", commit->author);
 	printf("\n%s\n", commit->logmsg);
 
+	if (show_patch)
+		err = print_patch(commit, id, repo);
+
 	free(buf);
-	return NULL;
+	return err;
 }
 
 struct commit_queue_entry {
@@ -258,7 +310,7 @@ struct commit_queue_entry {
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo)
+    struct got_repository *repo, int show_patch)
 {
 	const struct got_error *err;
 	struct got_commit_object *root_commit;
@@ -287,7 +339,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		struct got_parent_id *pid;
 
 		entry = TAILQ_FIRST(&commits);
-		err = print_commit(entry->commit, entry->id, repo);
+		err = print_commit(entry->commit, entry->id, repo, show_patch);
 		if (err)
 			break;
 
@@ -350,16 +402,33 @@ cmd_log(int argc, char *argv[])
 	struct got_object_id *id;
 	struct got_object *obj;
 	char *repo_path = NULL;
+	int ch;
+	int show_patch = 0;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc == 1) {
+
+	while ((ch = getopt(argc, argv, "p")) != -1) {
+		switch (ch) {
+		case 'p':
+			show_patch = 1;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
 			err(1, "getcwd");
-	} else if (argc == 2)
+	} else if (argc == 1)
 		repo_path = argv[1];
 	else
 		usage_log();
@@ -378,7 +447,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
-		error = print_commits(obj, id, repo);
+		error = print_commits(obj, id, repo, show_patch);
 	else
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);

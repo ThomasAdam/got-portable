@@ -1,8 +1,8 @@
 .PATH:${.CURDIR}/../lib
 
 PROG=		got
-SRCS=		got.c delta.c error.c fileindex.c object.c path.c pack.c \
-		refs.c repository.c sha1.c worktree.c zbuf.c
+SRCS=		got.c delta.c diff.c diffreg.c error.c fileindex.c object.c \
+		path.c pack.c refs.c repository.c sha1.c worktree.c zbuf.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lutil -lz
