@@ -295,8 +295,11 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("Author: %s\n", commit->author);
 	printf("\n%s\n", commit->logmsg);
 
-	if (show_patch)
+	if (show_patch) {
 		err = print_patch(commit, id, repo);
+		if (err == 0)
+			printf("\n");
+	}
 
 	free(buf);
 	return err;
