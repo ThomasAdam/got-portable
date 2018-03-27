@@ -433,7 +433,7 @@ cmd_log(int argc, char *argv[])
 		if (repo_path == NULL)
 			err(1, "getcwd");
 	} else if (argc == 1)
-		repo_path = argv[1];
+		repo_path = argv[0];
 	else
 		usage_log();
 
