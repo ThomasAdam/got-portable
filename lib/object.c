@@ -89,6 +89,12 @@ got_object_id_dup(struct got_object_id *id1)
 	return id2;
 }
 
+struct got_object_id *
+got_object_get_id(struct got_object *obj)
+{
+	return got_object_id_dup(&obj->id);
+}
+
 int
 got_object_get_type(struct got_object *obj)
 {

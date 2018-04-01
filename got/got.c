@@ -400,7 +400,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-p] [repository-path]\n",
+	fprintf(stderr, "usage: %s log [-p] [repository-path] [commit]\n",
 	    getprogname());
 	exit(1);
 }
@@ -410,10 +410,10 @@ cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo;
-	struct got_reference *head_ref;
-	struct got_object_id *id;
+	struct got_object_id *id = NULL;
 	struct got_object *obj;
 	char *repo_path = NULL;
+	char *commit_id_str = NULL;
 	int ch;
 	int show_patch = 0;
 
@@ -440,22 +440,36 @@ cmd_log(int argc, char *argv[])
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
 			err(1, "getcwd");
-	} else if (argc == 1)
+	} else if (argc == 1) {
 		repo_path = argv[0];
-	else
+	} else if (argc == 2) {
+		repo_path = argv[0];
+		commit_id_str = argv[1];
+	} else
 		usage_log();
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
 		return error;
-	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
-	if (error != NULL)
-		return error;
-	error = got_ref_resolve(&id, repo, head_ref);
-	if (error != NULL)
-		return error;
 
-	error = got_object_open(&obj, repo, id);
+	if (commit_id_str == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			return error;
+		error = got_ref_resolve(&id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			return error;
+		error = got_object_open(&obj, repo, id);
+	} else {
+		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		if (error == NULL) {
+			id = got_object_get_id(obj);
+			if (id == NULL)
+				error = got_error_from_errno();
+		}
+	}
 	if (error != NULL)
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
@@ -464,7 +478,6 @@ cmd_log(int argc, char *argv[])
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
 	free(id);
-	got_ref_close(head_ref);
 	got_repo_close(repo);
 	return error;
 }
