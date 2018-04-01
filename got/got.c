@@ -496,14 +496,6 @@ cmd_log(int argc, char *argv[])
 	return error;
 }
 
-__dead void
-usage_diff(void)
-{
-	fprintf(stderr, "usage: %s diff repository-path object1 object2\n",
-	    getprogname());
-	exit(1);
-}
-
 static const struct got_error *
 diff_blobs(struct got_object *obj1, struct got_object *obj2,
     struct got_repository *repo)
@@ -586,6 +578,14 @@ done:
 
 }
 
+__dead void
+usage_diff(void)
+{
+	fprintf(stderr, "usage: %s diff [repository-path] object1 object2\n",
+	    getprogname());
+	exit(1);
+}
+
 const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
@@ -615,6 +615,12 @@ cmd_diff(int argc, char *argv[])
 
 	if (argc == 0) {
 		usage_diff(); /* TODO show local worktree changes */
+	} else if (argc == 2) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			err(1, "getcwd");
+		obj_id_str1 = argv[0];
+		obj_id_str2 = argv[1];
 	} else if (argc == 3) {
 		repo_path = argv[0];
 		obj_id_str1 = argv[1];

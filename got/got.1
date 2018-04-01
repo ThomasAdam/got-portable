@@ -93,6 +93,12 @@ commits.
 If the
 .Ar repository path
 is omitted, use the current working directory.
+.It Cm diff [ Ar repository-path ] Ar object1 Ar object2
+Display the differences between two objects in the repository.
+Both objects must be of the same type (blobs, trees, or commits).
+If the
+.Ar repository path
+is omitted, use the current working directory.
 .El
 .Sh EXIT STATUS
 .Ex -std got
