@@ -885,7 +885,7 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 		    delta_size);
 		break;
 	default:
-		return got_error(GOT_ERR_NOT_IMPL);
+		return got_error(GOT_ERR_OBJ_TYPE);
 	}
 
 	return err;
@@ -992,7 +992,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 		break;
 
 	default:
-		err = got_error(GOT_ERR_NOT_IMPL);
+		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 done:
