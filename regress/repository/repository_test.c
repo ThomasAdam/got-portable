@@ -19,6 +19,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <util.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -30,6 +31,12 @@
 #include "got_refs.h"
 #include "got_repository.h"
 #include "got_diff.h"
+
+#include "got_lib_path.h"
+
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
 
 #define GOT_REPO_PATH "../../../"
 
@@ -294,6 +301,26 @@ repo_diff_blob(const char *repo_path)
 	struct got_blob_object *blob1;
 	struct got_blob_object *blob2;
 	FILE *outfile;
+	int i;
+	char *line;
+	size_t len;
+	const char delim[3] = {'\0', '\0', '\0'};
+	const char *expected_output[] = {
+		"--- 141f5fdc96126c1f4195558560a3c915e3d9b4c3",
+		"+++ de7eb21b21c7823a753261aadf7cba35c9580fbf",
+		"@@ -1,10 +1,10 @@",
+		" .PATH:${.CURDIR}/../../lib",
+		" ",
+		" PROG = repository_test",
+		"-SRCS = path.c repository.c error.c refs.c repository_test.c",
+		"+SRCS = path.c repository.c error.c refs.c object.c sha1.c repository_test.c",
+		" ",
+		" CPPFLAGS = -I${.CURDIR}/../../include",
+		"-LDADD = -lutil",
+		"+LDADD = -lutil -lz",
+		" ",
+		" NOMAN = yes"
+	};
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -319,14 +346,29 @@ repo_diff_blob(const char *repo_path)
 		return 0;
 
 	test_printf("\n");
-	if (!verbose) {
-		outfile = fopen("/dev/null", "w+");
-		if (outfile == NULL)
-			return 0;
-	} else
-		outfile = stdout;
+	outfile = got_opentemp();
+	if (outfile == NULL)
+		return 0;
 	got_diff_blob(blob1, blob2, NULL, NULL, outfile);
+	rewind(outfile);
+	i = 0;
+	while ((line = fparseln(outfile, &len, NULL, delim, 0)) != NULL) {
+		test_printf(line);
+		test_printf("\n");
+		if (i < nitems(expected_output) &&
+		    strcmp(line, expected_output[i]) != 0) {
+			test_printf("diff output mismatch; expected: '%s'\n",
+			    expected_output[i]);
+		}
+		i++;
+	}
+	fclose(outfile);
 	test_printf("\n");
+	if (i != nitems(expected_output) + 1) {
+		test_printf("number of lines expected: %d; actual: %d\n",
+		    nitems(expected_output), i - 1);
+		return 0;
+	}
 
 	got_object_blob_close(blob1);
 	got_object_blob_close(blob2);
