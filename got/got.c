@@ -473,7 +473,7 @@ cmd_log(int argc, char *argv[])
 	if (argc == 0) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
-			err(1, "getcwd");
+			return got_error_from_errno();
 	} else if (argc == 1) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
@@ -638,7 +638,7 @@ cmd_diff(int argc, char *argv[])
 	} else if (argc == 2) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
-			err(1, "getcwd");
+			return got_error_from_errno();
 		obj_id_str1 = argv[0];
 		obj_id_str2 = argv[1];
 	} else if (argc == 3) {
