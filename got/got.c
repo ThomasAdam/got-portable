@@ -206,7 +206,7 @@ cmd_checkout(int argc, char *argv[])
 		free(cwd);
 	} else if (argc == 2) {
 		repo_path = argv[0];
-		worktree_path = strdup(argv[1]);
+		worktree_path = realpath(argv[1], NULL);
 		if (worktree_path == NULL)
 			return got_error_from_errno();
 	} else

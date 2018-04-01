@@ -482,6 +482,7 @@ tree_checkout_entry(struct got_worktree *worktree,
 	struct got_blob_object *blob = NULL;
 	struct got_tree_object *tree = NULL;
 	char *path = NULL;
+	char *progress_path = NULL;
 	size_t len;
 
 	if (parent[0] == '/' && parent[1] == '\0')
@@ -500,7 +501,10 @@ tree_checkout_entry(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	(*progress_cb)(progress_arg, path);
+	progress_path = path;
+	if (strncmp(progress_path, worktree->path_prefix, len) == 0)
+		progress_path += len;
+	(*progress_cb)(progress_arg, progress_path);
 
 	switch (got_object_get_type(obj)) {
 	case GOT_OBJ_TYPE_BLOB:
