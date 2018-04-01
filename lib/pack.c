@@ -301,8 +301,6 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id, str
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = betoh32(packidx->fanout_table[0xff]);
 	int i = 0;
-	char hex[SHA1_DIGEST_STRING_LENGTH];
-	char *sha1str = got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
 
 	if (id0 > 0)
 		i = betoh32(packidx->fanout_table[id0 - 1]);
@@ -311,20 +309,8 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id, str
 		struct got_object_id *oid = &packidx->sorted_ids[i];
 		int cmp = got_object_id_cmp(id, oid);
 
-		if (cmp == 0) {
-			char *path_packfile = NULL;
-			const struct got_error *err;
-			err = get_packfile_path(&path_packfile, repo, packidx);
-			if (err) {
-				printf("get_packfile_path: %s\n", err->msg);
-			} else {
-				if (strcmp(sha1str, "b3197d9ea53a42fc1632369008b8f3a085dcd205") == 0) {
-					printf("Found %s in %s\n", sha1str, path_packfile);
-				}
-			}
-			free(path_packfile);
+		if (cmp == 0)
 			return i;
-		}
 		i++;
 	}
 
