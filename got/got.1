@@ -94,6 +94,9 @@ is specified with the
 .Fl c
 option, start traversing history at this commit.
 The
+.Ar commit
+argument is a SHA1 hash which corresponds to the commit object.
+The
 .Fl l
 option limits the output to a number of
 .Ar N
@@ -103,6 +106,9 @@ If the
 is omitted, use the current working directory.
 .It Cm diff [ Ar repository-path ] Ar object1 Ar object2
 Display the differences between two objects in the repository.
+Each
+.Ar object
+argument is a SHA1 hash which corresponds to the object.
 Both objects must be of the same type (blobs, trees, or commits).
 If the
 .Ar repository path
