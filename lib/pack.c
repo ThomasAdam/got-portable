@@ -1279,41 +1279,21 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 			goto done;
 	}
 
+	*f = got_opentemp();
+	if (*f == NULL) {
+		err = got_error(GOT_ERR_FILE_OPEN);
+		goto done;
+	}
+
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
 		if (fseeko(pack->packfile, obj->pack_offset, SEEK_SET) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
-
-		if (obj->size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
-			size_t size = obj->size;
-			if (size == 0) /* empty file */
-				size = 1;
-			*f = fmemopen(NULL, size, "w+");
-		} else
-			*f = got_opentemp();
-		if (*f == NULL) {
-			err = got_error(GOT_ERR_FILE_OPEN);
-			goto done;
-		}
 		err = got_inflate_to_file(&obj->size, pack->packfile, *f);
-	} else {
-		uint64_t max_size;
-
-		err = get_delta_chain_max_size(&max_size, &obj->deltas);
-		if (err)
-			return err;
-		if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX)
-			*f = fmemopen(NULL, max_size, "w+");
-		else
-			*f = got_opentemp();
-		if (*f == NULL) {
-			err = got_error(GOT_ERR_FILE_OPEN);
-			goto done;
-		}
+	} else
 		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, *f,
 		    pack, repo);
-	}
 done:
 	if (err && *f) {
 		fclose(*f);
