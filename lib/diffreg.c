@@ -299,16 +299,21 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		*rval = (S_ISDIR(ds->stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
 	}
-	if (flags & D_EMPTY1)
+	if (flags & D_EMPTY1) {
 		f1 = fopen(_PATH_DEVNULL, "r");
+		if (f1 == NULL)
+			return got_error_from_errno();
+	}
 	else if (f1 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
 
-	if (flags & D_EMPTY2)
+	if (flags & D_EMPTY2) {
 		f2 = fopen(_PATH_DEVNULL, "r");
-	else if (f2 == NULL) {
+		if (f2 == NULL)
+			return got_error_from_errno();
+	} else if (f2 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
