@@ -27,7 +27,7 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_repository.h"
-#include "got_refs.h"
+#include "got_reference.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_path.h"

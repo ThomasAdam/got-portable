@@ -25,7 +25,7 @@
 #include <zlib.h>
 
 #include "got_error.h"
-#include "got_refs.h"
+#include "got_reference.h"
 #include "got_repository.h"
 
 #include "got_lib_path.h"
