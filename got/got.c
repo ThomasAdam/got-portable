@@ -404,7 +404,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-p] [repository-path] [commit]\n",
+	fprintf(stderr, "usage: %s log [-p] [-c commit] [repository-path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -417,7 +417,7 @@ cmd_log(int argc, char *argv[])
 	struct got_object_id *id = NULL;
 	struct got_object *obj;
 	char *repo_path = NULL;
-	char *commit_id_str = NULL;
+	char *start_commit = NULL;
 	int ch;
 	int show_patch = 0;
 
@@ -426,10 +426,13 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "p")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
+			break;
+		case 'c':
+			start_commit = optarg;
 			break;
 		default:
 			usage();
@@ -446,9 +449,6 @@ cmd_log(int argc, char *argv[])
 			err(1, "getcwd");
 	} else if (argc == 1) {
 		repo_path = argv[0];
-	} else if (argc == 2) {
-		repo_path = argv[0];
-		commit_id_str = argv[1];
 	} else
 		usage_log();
 
@@ -456,7 +456,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 
-	if (commit_id_str == NULL) {
+	if (start_commit == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
 		if (error != NULL)
@@ -467,7 +467,7 @@ cmd_log(int argc, char *argv[])
 			return error;
 		error = got_object_open(&obj, repo, id);
 	} else {
-		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		error = got_object_open_by_id_str(&obj, repo, start_commit);
 		if (error == NULL) {
 			id = got_object_get_id(obj);
 			if (id == NULL)
