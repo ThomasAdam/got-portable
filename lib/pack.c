@@ -291,12 +291,18 @@ get_object_offset(struct got_packidx_v2_hdr *packidx, int idx)
 	return (off_t)(offset & GOT_PACKIDX_OFFSET_VAL_MASK);
 }
 
+static const struct got_error *
+get_packfile_path(char **path_packfile, struct got_repository *repo,
+    struct got_packidx_v2_hdr *packidx);
+
 static int
-get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
+get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id, struct got_repository *repo)
 {
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = betoh32(packidx->fanout_table[0xff]);
 	int i = 0;
+	char hex[SHA1_DIGEST_STRING_LENGTH];
+	char *sha1str = got_sha1_digest_to_str(id->sha1, hex, sizeof(hex));
 
 	if (id0 > 0)
 		i = betoh32(packidx->fanout_table[id0 - 1]);
@@ -305,8 +311,20 @@ get_object_idx(struct got_packidx_v2_hdr *packidx, struct got_object_id *id)
 		struct got_object_id *oid = &packidx->sorted_ids[i];
 		int cmp = got_object_id_cmp(id, oid);
 
-		if (cmp == 0)
+		if (cmp == 0) {
+			char *path_packfile = NULL;
+			const struct got_error *err;
+			err = get_packfile_path(&path_packfile, repo, packidx);
+			if (err) {
+				printf("get_packfile_path: %s\n", err->msg);
+			} else {
+				if (strcmp(sha1str, "b3197d9ea53a42fc1632369008b8f3a085dcd205") == 0) {
+					printf("Found %s in %s\n", sha1str, path_packfile);
+				}
+			}
+			free(path_packfile);
 			return i;
+		}
 		i++;
 	}
 
@@ -401,7 +419,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
-		*idx = get_object_idx(repo->packidx_cache[i], id);
+		*idx = get_object_idx(repo->packidx_cache[i], id, repo);
 		if (*idx != -1) {
 			*packidx = repo->packidx_cache[i];
 			return NULL;
@@ -434,7 +452,7 @@ search_packidx(struct got_packidx_v2_hdr **packidx, int *idx,
 		if (err)
 			goto done;
 
-		*idx = get_object_idx(*packidx, id);
+		*idx = get_object_idx(*packidx, id, repo);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
 			cache_packidx(*packidx, repo);
@@ -1047,7 +1065,7 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 
 static const struct got_error *
 dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
-    FILE *outfile, struct got_pack *pack, struct got_repository *repo)
+    FILE *outfile, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1086,6 +1104,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		if (n == 0) {
+			struct got_pack *pack;
 			size_t base_len;
 
 			/* Plain object types are the delta base. */
@@ -1093,6 +1112,12 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			    delta->type != GOT_OBJ_TYPE_TREE &&
 			    delta->type != GOT_OBJ_TYPE_BLOB &&
 			    delta->type != GOT_OBJ_TYPE_TAG) {
+				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
+				goto done;
+			}
+
+			pack = get_cached_pack(delta->path_packfile, repo);
+			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
 			}
@@ -1176,8 +1201,7 @@ done:
 
 static const struct got_error *
 dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
-    struct got_delta_chain *deltas, struct got_pack *pack,
-    struct got_repository *repo)
+    struct got_delta_chain *deltas, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1202,6 +1226,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		if (n == 0) {
+			struct got_pack *pack;
 			size_t base_len;
 
 			/* Plain object types are the delta base. */
@@ -1209,6 +1234,12 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			    delta->type != GOT_OBJ_TYPE_TREE &&
 			    delta->type != GOT_OBJ_TYPE_BLOB &&
 			    delta->type != GOT_OBJ_TYPE_TAG) {
+				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
+				goto done;
+			}
+
+			pack = get_cached_pack(delta->path_packfile, repo);
+			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
 			}
@@ -1267,17 +1298,9 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_pack *pack;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
-
-	pack = get_cached_pack(obj->path_packfile, repo);
-	if (pack == NULL) {
-		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
-		if (err)
-			goto done;
-	}
 
 	*f = got_opentemp();
 	if (*f == NULL) {
@@ -1286,14 +1309,24 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	}
 
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
+		struct got_pack *pack;
+
+		pack = get_cached_pack(obj->path_packfile, repo);
+		if (pack == NULL) {
+			err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+			if (err)
+				goto done;
+		}
+
 		if (fseeko(pack->packfile, obj->pack_offset, SEEK_SET) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
+
 		err = got_inflate_to_file(&obj->size, pack->packfile, *f);
 	} else
 		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, *f,
-		    pack, repo);
+		    repo);
 done:
 	if (err && *f) {
 		fclose(*f);
@@ -1307,20 +1340,20 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
     struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	FILE *packfile = NULL;
-	struct got_pack *pack;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	pack = get_cached_pack(obj->path_packfile, repo);
-	if (pack == NULL) {
-		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
-		if (err)
-			goto done;
-	}
-
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
+		struct got_pack *pack;
+
+		pack = get_cached_pack(obj->path_packfile, repo);
+		if (pack == NULL) {
+			err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+			if (err)
+				goto done;
+		}
+
 		if (fseeko(pack->packfile, obj->pack_offset, SEEK_SET) != 0) {
 			err = got_error_from_errno();
 			goto done;
@@ -1328,10 +1361,7 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 
 		err = got_inflate_to_mem(buf, len, pack->packfile);
 	} else
-		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, pack,
-		    repo);
+		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, repo);
 done:
-	if (packfile)
-		fclose(packfile);
 	return err;
 }

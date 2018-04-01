@@ -16,6 +16,7 @@
 
 struct got_delta {
 	SIMPLEQ_ENTRY(got_delta) entry;
+	char *path_packfile;
 	off_t offset;
 	size_t tslen;
 	int type;
