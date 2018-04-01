@@ -75,16 +75,21 @@ In this case, only files beneath the specified directory prefix will
 be checked out.
 .\".It Cm status
 .\"Show current status of files.
-.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Ar repository-path ]
+.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Ar repository-path ]
 Display history of the repository.
 If the
 .Fl p
-flag is given, display the patch of modifications made in each commit.
+option is given, display the patch of modifications made in each commit.
 If a
 .Ar commit
 is specified with the
 .Fl c
 option, start traversing history at this commit.
+The
+.Fl l
+option limits the output to a number of
+.Ar N
+commits.
 If the
 .Ar repository path
 is omitted, use the current working directory.

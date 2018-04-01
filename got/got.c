@@ -16,6 +16,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/limits.h>
 
 #include <err.h>
 #include <errno.h>
@@ -317,7 +318,7 @@ struct commit_queue_entry {
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int show_patch)
+    struct got_repository *repo, int show_patch, int limit)
 {
 	const struct got_error *err;
 	struct got_commit_object *root_commit;
@@ -357,6 +358,9 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 			}
 			break;
 		}
+
+		if (limit && --limit == 0)
+			break;
 
 		SIMPLEQ_FOREACH(pid, &entry->commit->parent_ids, entry) {
 			struct got_object *obj;
@@ -404,8 +408,8 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-p] [-c commit] [repository-path]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s log [-p] [-c commit] [ -l N ] "
+	    "[repository-path]\n", getprogname());
 	exit(1);
 }
 
@@ -419,20 +423,26 @@ cmd_log(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
-	int show_patch = 0;
+	int show_patch = 0, limit = 0;
+	const char *errstr;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:l:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
 			break;
 		case 'c':
 			start_commit = optarg;
+			break;
+		case 'l':
+			limit = strtonum(optarg, 1, INT_MAX, &errstr);
+			if (errstr != NULL)
+				err(1, "-l option %s", errstr);
 			break;
 		default:
 			usage();
@@ -477,7 +487,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
-		error = print_commits(obj, id, repo, show_patch);
+		error = print_commits(obj, id, repo, show_patch, limit);
 	else
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
