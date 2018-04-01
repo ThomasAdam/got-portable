@@ -315,6 +315,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("-----------------------------------------------\n");
 	printf("commit: %s\n", buf);
 	printf("Author: %s\n", commit->author);
+	if (strcmp(commit->author, commit->committer) != 0)
+		printf("Committer: %s\n", commit->committer);
 	printf("\n%s\n", commit->logmsg);
 
 	if (show_patch) {
