@@ -301,8 +301,10 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	}
 	if (flags & D_EMPTY1) {
 		f1 = fopen(_PATH_DEVNULL, "r");
-		if (f1 == NULL)
-			return got_error_from_errno();
+		if (f1 == NULL) {
+			err = got_error_from_errno();
+			goto closem;
+		}
 	}
 	else if (f1 == NULL) {
 		args->status |= 2;
@@ -311,8 +313,10 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 
 	if (flags & D_EMPTY2) {
 		f2 = fopen(_PATH_DEVNULL, "r");
-		if (f2 == NULL)
-			return got_error_from_errno();
+		if (f2 == NULL) {
+			err = got_error_from_errno();
+			goto closem;
+		}
 	} else if (f2 == NULL) {
 		args->status |= 2;
 		goto closem;
