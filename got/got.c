@@ -189,7 +189,10 @@ cmd_checkout(int argc, char *argv[])
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
 			err(1, "getcwd");
-		base = basename(repo_path);
+		if (path_prefix[0])
+			base = basename(path_prefix);
+		else
+			base = basename(repo_path);
 		if (base == NULL)
 			err(1, "basename");
 		dotgit = strstr(base, ".git");

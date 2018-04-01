@@ -65,14 +65,22 @@ Display usage information.
 .Pp
 The commands are as follows:
 .Bl -tag -width checkout
-.It Cm checkout
+.It Cm checkout [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
 Copy files from a repository into a new work tree.
 The work tree may be restricted to a subset of the repository's tree
 hierarchy by specifying the
-.Fl p Ar prefix
+.Fl p Ar path-prefix
 option.
-In this case, only files beneath the specified directory prefix will
+In this case, only files beneath the specified prefix will
 be checked out.
+If the
+.Ar work tree path
+is not specified, either use the base name of the
+.Ar repository path ,
+or if a
+.Ar path prefix
+was specified use the base name of the
+.Ar path prefix .
 .\".It Cm status
 .\"Show current status of files.
 .It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Ar repository-path ]
