@@ -185,34 +185,47 @@ cmd_checkout(int argc, char *argv[])
 #endif
 	if (argc == 1) {
 		char *cwd, *base, *dotgit;
-		repo_path = argv[0];
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
 		cwd = getcwd(NULL, 0);
-		if (cwd == NULL)
-			err(1, "getcwd");
+		if (cwd == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 		if (path_prefix[0])
 			base = basename(path_prefix);
 		else
 			base = basename(repo_path);
-		if (base == NULL)
-			err(1, "basename");
+		if (base == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 		dotgit = strstr(base, ".git");
 		if (dotgit)
 			*dotgit = '\0';
 		if (asprintf(&worktree_path, "%s/%s", cwd, base) == -1) {
 			error = got_error_from_errno();
 			free(cwd);
-			return error;
+			goto done;
 		}
 		free(cwd);
 	} else if (argc == 2) {
-		repo_path = argv[0];
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 		worktree_path = realpath(argv[1], NULL);
-		if (worktree_path == NULL)
-			return got_error_from_errno();
+		if (worktree_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 	} else
 		usage_checkout();
 
 	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
 	if (error != NULL)
 		goto done;
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
@@ -235,6 +248,7 @@ cmd_checkout(int argc, char *argv[])
 	printf("checked out %s\n", worktree_path);
 
 done:
+	free(repo_path);
 	free(worktree_path);
 	return error;
 }
@@ -461,11 +475,14 @@ cmd_log(int argc, char *argv[])
 		if (repo_path == NULL)
 			err(1, "getcwd");
 	} else if (argc == 1) {
-		repo_path = argv[0];
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
 	} else
 		usage_log();
 
 	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
 	if (error != NULL)
 		return error;
 
@@ -625,13 +642,16 @@ cmd_diff(int argc, char *argv[])
 		obj_id_str1 = argv[0];
 		obj_id_str2 = argv[1];
 	} else if (argc == 3) {
-		repo_path = argv[0];
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
 		obj_id_str1 = argv[1];
 		obj_id_str2 = argv[2];
 	} else
 		usage_diff();
 
 	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
 	if (error != NULL)
 		goto done;
 
