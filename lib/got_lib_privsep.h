@@ -20,7 +20,10 @@
  * Data is communicated between processes via imsg_read(3)/imsg_compose(3).
  * This behaviour is transparent to users of the library.
  *
- * File descriptor passing is used in cases where sizes exceed MAX_IMSGSIZE.
+ * We generally transmit data in imsg buffers, split across several messages
+ * if necessary. File descriptor passing is used in cases where this is
+ * impractical, such as when accessing pack files or when transferring
+ * large blobs.
  *
  * We currently do not exec(2) after a fork(2).
  * To achieve fork+exec, relevant parts of our library functionality could
@@ -30,6 +33,10 @@
 enum got_imsg_type {
 	/* An error occured while processing a request. */
 	GOT_IMSG_ERROR,
+
+	/* Messages for transmitting deltas and associated delta streams. */
+	GOT_IMSG_DELTA,
+	GOT_IMSG_DELTA_STREAM,
 
 	/*
 	 * Messages concerned with read access to objects in a repository.
@@ -41,7 +48,6 @@ enum got_imsg_type {
 	 */
 	GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REQUEST,
 	GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REPLY,
-	GOT_IMSG_DELTA,
 	GOT_IMSG_READ_LOOSE_BLOB_OBJECT_REQUEST,
 	GOT_IMSG_READ_LOOSE_BLOB_OBJECT_REPLY,
 	GOT_IMSG_READ_LOOSE_TREE_OBJECT_REQUEST,
@@ -59,6 +65,30 @@ enum got_imsg_type {
 /* Structure for GOT_IMSG_ERROR. */
 struct got_imsg_error {
 	int code; /* an error code from got_error.h */
+};
+
+/* Structure for GOT_IMSG_DELTA data. */
+struct got_imsg_delta {
+	/* These fields are the same as in struct got_delta. */
+	off_t offset;
+	size_t tslen;
+	int type;
+	size_t size;
+	off_t data_offset;
+	size_t delta_len;
+
+	/*
+	 * Followed by DELTA_STREAM messages until delta_len bytes
+	 * of delta stream data have been transmitted.
+	 */
+};
+
+/* Structure for GOT_IMSG_DELTA_STREAM data. */
+struct got_imsg_delta_stream {
+	/*
+	 * Empty since the following is implied:
+	 * Read delta stream data from imsg buffer.
+	 */
 };
 
 /* Structure for GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REQUEST data. */
@@ -79,22 +109,6 @@ struct got_imsg_read_loose_object_header_reply {
 	struct got_object_id id;
 
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
-};
-
-/* Structure for GOT_IMSG_DELTA data. */
-struct got_imsg_delta {
-	/* These fields are the same as in struct got_delta. */
-	off_t offset;
-	size_t tslen;
-	int type;
-	size_t size;
-	off_t data_offset;
-	size_t delta_len;
-
-	/*
-	 * Followed by raw delta data: If imsg fd == -1 then read
-	 * delta data from imsg buffer, else read from fd.
-	 */
 };
 
 /* TODO: Implement the above, and then add more message data types here. */
