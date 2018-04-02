@@ -23,7 +23,7 @@
  * File descriptor passing is used in cases where sizes exceed MAX_IMSGSIZE.
  *
  * We currently do not exec(2) after a fork(2).
- * To achieve fork+exec, releveant parts of our library functionality could
+ * To achieve fork+exec, relevant parts of our library functionality could
  * be made accessible via separate executables in a libexec directory.
  */
 
