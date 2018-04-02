@@ -186,7 +186,6 @@ struct context_vec {
 static void	 diff_output(FILE *, const char *, ...);
 static int	 output(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
-static void	 range(FILE *, int, int, char *);
 static void	 uni_range(FILE *, int, int);
 static void	 dump_unified_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static int	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
@@ -898,14 +897,6 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 }
 
 static void
-range(FILE *outfile, int a, int b, char *separator)
-{
-	diff_output(outfile, "%d", a > b ? b : a);
-	if (a < b)
-		diff_output(outfile, "%s%d", separator, b);
-}
-
-static void
 uni_range(FILE *outfile, int a, int b)
 {
 	if (a < b)
@@ -981,30 +972,11 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 	}
 	if (ds->anychange == 0)
 		ds->anychange = 1;
-	switch (args->diff_format) {
-	case D_BRIEF:
+	if (args->diff_format == D_BRIEF)
 		return (0);
-	case D_REVERSE:
-		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
-		range(outfile, a, b, " ");
-		diff_output(outfile, "\n");
-		break;
-	case D_NREVERSE:
-		if (a > b)
-			diff_output(outfile, "a%d %d\n", b, d - c + 1);
-		else {
-			diff_output(outfile, "d%d %d\n", a, b - a + 1);
-			if (!(c > d))
-				/* add changed lines */
-				diff_output(outfile, "a%d %d\n", b, d - c + 1);
-		}
-		break;
-	}
 	if (args->diff_format == D_IFDEF)
 		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
 	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, '\0', 0, *pflags);
-	if (args->diff_format == D_REVERSE && c <= d)
-		diff_output(outfile, ".\n");
 	if (ds->inifdef) {
 		diff_output(outfile, "#endif /* %s */\n", args->ifdefname);
 		ds->inifdef = 0;
@@ -1057,12 +1029,8 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		col = 0;
 		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
 			if ((c = getc(lb)) == EOF) {
-				if (args->diff_format == D_REVERSE ||
-				    args->diff_format == D_NREVERSE)
-					warnx("No newline at end of file");
-				else
-					diff_output(outfile, "\n\\ No newline at end of "
-					    "file\n");
+				diff_output(outfile, "\n\\ No newline at end of "
+				    "file\n");
 				return (0);
 			}
 			if (c == '\t' && (flags & D_EXPANDTABS)) {
