@@ -49,20 +49,16 @@ enum got_imsg_type {
 	GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST,
 	GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY,
 	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST_OUTPUT,
-	GOT_IMSG_LOOSE_BLOB_OBJECT_REPLY,
 	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
-	GOT_IMSG_LOOSE_TREE_OBJECT_REPLY,
-	GOT_IMSG_TREE_ENTRY,
 	GOT_IMSG_LOOSE_COMMIT_OBJECT_REQUEST,
-	GOT_IMSG_LOOSE_COMMIT_OBJECT_REPLY,
 	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST_OUTPUT,
-	GOT_IMSG_PACKED_BLOB_OBJECT_REPLY,
 	GOT_IMSG_PACKED_TREE_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_TREE_OBJECT_REPLY,
 	GOT_IMSG_PACKED_COMMIT_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_COMMIT_OBJECT_REPLY
+	GOT_IMSG_BLOB_OBJECT_REQUEST_OUTPUT,
+	GOT_IMSG_BLOB_OBJECT_REPLY,
+	GOT_IMSG_TREE_OBJECT_REPLY,
+	GOT_IMSG_TREE_ENTRY,
+	GOT_IMSG_COMMIT_OBJECT_REPLY
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -128,11 +124,13 @@ struct got_imsg_loose_blob_object_request {
 	/*
 	 * The following is implied: If imsg fd == -1 then read raw
 	 * blob data from imsg buffer, else read from fd.
+	 *
+	 * This message is followed by an OBJECT_REQUEST_OUTPUT message.
 	 */
 };
 
-/* Structure for GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST_OUTPUT data. */
-struct got_imsg_loose_blob_object_request_output {
+/* Structure for GOT_IMSG_BLOB_OBJECT_REQUEST_OUTPUT data. */
+struct got_imsg_blob_object_request_output {
 	/*
 	 * Empty since the following is implied: If imsg fd == -1 then
 	 * respond with blob data in imsg buffer, else write to fd.
@@ -156,7 +154,7 @@ struct got_imsg_tree_entry {
 	/* Followed by entry's name in remaining data of imsg buffer. */
 } __attribute__((__packed__));
 
-/* Structure for transmitting struct got_tree_object data in an imsg. */
+/* Structure for GOT_IMSG_TREE_OBJECT_REPLY data. */
 struct got_imsg_tree_object {
 	int nentries; /* This many TREE_ENTRY messages follow. */
 };
