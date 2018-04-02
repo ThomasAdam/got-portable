@@ -1002,12 +1002,9 @@ restart:
 	switch (args->diff_format) {
 	case D_BRIEF:
 		return (0);
-	case D_NORMAL:
 	case D_EDIT:
 		range(outfile, a, b, ",");
 		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
-		if (args->diff_format == D_NORMAL)
-			range(outfile, c, d, ",");
 		diff_output(outfile, "\n");
 		break;
 	case D_REVERSE:
@@ -1026,12 +1023,9 @@ restart:
 		}
 		break;
 	}
-	if (args->diff_format == D_NORMAL || args->diff_format == D_IFDEF) {
+	if (args->diff_format == D_IFDEF)
 		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
-		if (a <= b && c <= d && args->diff_format == D_NORMAL)
-			diff_output(outfile, "---\n");
-	}
-	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, args->diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
+	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, '\0', 0, *pflags);
 	if (i != 0 && args->diff_format == D_EDIT) {
 		/*
 		 * A non-zero return value for D_EDIT indicates that the
@@ -1093,8 +1087,7 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		nc = f[i] - f[i - 1];
 		if (args->diff_format != D_IFDEF && ch != '\0') {
 			diff_output(outfile, "%c", ch);
-			if (args->Tflag && (args->diff_format == D_NORMAL ||
-			    args->diff_format == D_UNIFIED))
+			if (args->Tflag && args->diff_format == D_UNIFIED)
 				diff_output(outfile, "\t");
 			else if (args->diff_format != D_UNIFIED)
 				diff_output(outfile, " ");
