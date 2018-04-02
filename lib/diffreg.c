@@ -359,8 +359,6 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	p = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
 	if (p == NULL) {
 		err = got_error_from_errno();
-		free(ds->member);
-		ds->member = NULL;
 		goto closem;
 	}
 	ds->member = p;
@@ -373,8 +371,6 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	p = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
 	if (p == NULL) {
 		err = got_error_from_errno();
-		free(ds->class);
-		ds->class = NULL;
 		goto closem;
 	}
 	ds->class = p;
@@ -394,12 +390,8 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	i = stone(ds, ds->class, ds->slen[0], ds->member, ds->klist, flags);
 	if (i < 0) {
 		err = got_error_from_errno();
-		free(ds->member);
-		free(ds->class);
 		goto closem;
 	}
-	free(ds->member);
-	free(ds->class);
 
 	p = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
 	if (p == NULL) {
@@ -436,6 +428,8 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	    flags))
 		err = got_error_from_errno();
 closem:
+	free(ds->member);
+	free(ds->class);
 	if (ds->anychange) {
 		args->status |= 1;
 		if (*rval == D_SAME)
