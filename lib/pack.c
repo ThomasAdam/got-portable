@@ -353,7 +353,8 @@ dup_packidx(struct got_packidx_v2_hdr *packidx)
 	p->sorted_ids = calloc(nobj, sizeof(*p->sorted_ids));
 	if (p->sorted_ids == NULL)
 		goto err;
-	memcpy(p->sorted_ids, packidx->sorted_ids, nobj * sizeof(*p->sorted_ids));
+	memcpy(p->sorted_ids, packidx->sorted_ids,
+	    nobj * sizeof(*p->sorted_ids));
 
 	p->crc32 = calloc(nobj, sizeof(*p->crc32));
 	if (p->crc32 == NULL)

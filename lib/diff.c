@@ -75,7 +75,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 				break;
 			size1 += len;
 			/* Skip blob object header first time around. */
-			fwrite(got_object_blob_get_read_buf(blob1) + hdrlen, len - hdrlen, 1, f1);
+			fwrite(got_object_blob_get_read_buf(blob1) + hdrlen,
+			    len - hdrlen, 1, f1);
 			hdrlen = 0;
 		} while (len != 0);
 	} else
@@ -93,7 +94,8 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 				break;
 			size2 += len;
 			/* Skip blob object header first time around. */
-			fwrite(got_object_blob_get_read_buf(blob2) + hdrlen, len - hdrlen, 1, f2);
+			fwrite(got_object_blob_get_read_buf(blob2) + hdrlen,
+			    len - hdrlen, 1, f2);
 			hdrlen = 0;
 		} while (len != 0);
 	} else
