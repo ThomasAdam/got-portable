@@ -17,7 +17,7 @@
 /*
  * All code runs under the same UID but sensitive code paths are
  * run in a separate process with tighter pledge(2) promises.
- * Data is communicated between processes via imsg_read(3)/imsg_compose(3).
+ * Data is communicated between processes via imsg_flush(3) and imsg_read(3).
  * This behaviour is transparent to users of the library.
  *
  * We generally transmit data in imsg buffers, split across several messages
