@@ -862,36 +862,19 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 	m = ds->len[0];
 	ds->J[0] = 0;
 	ds->J[m + 1] = ds->len[1] + 1;
-	if (args->diff_format != D_EDIT) {
-		for (i0 = 1; i0 <= m; i0 = i1 + 1) {
-			while (i0 <= m && ds->J[i0] == ds->J[i0 - 1] + 1)
-				i0++;
-			j0 = ds->J[i0 - 1] + 1;
-			i1 = i0 - 1;
-			while (i1 < m && ds->J[i1 + 1] == 0)
-				i1++;
-			j1 = ds->J[i1 + 1] - 1;
-			ds->J[i1] = j1;
-			error = change(outfile, ds, args, file1, f1, file2, f2,
-			    i0, i1, j0, j1, &flags);
-			if (error)
-				return (error);
-		}
-	} else {
-		for (i0 = m; i0 >= 1; i0 = i1 - 1) {
-			while (i0 >= 1 && ds->J[i0] == ds->J[i0 + 1] - 1 && ds->J[i0] != 0)
-				i0--;
-			j0 = ds->J[i0 + 1] - 1;
-			i1 = i0 + 1;
-			while (i1 > 1 && ds->J[i1 - 1] == 0)
-				i1--;
-			j1 = ds->J[i1 - 1] + 1;
-			ds->J[i1] = j1;
-			change(outfile, ds, args, file1, f1, file2, f2, i1, i0,
-			    j1, j0, &flags);
-			if (error)
-				return (error);
-		}
+	for (i0 = 1; i0 <= m; i0 = i1 + 1) {
+		while (i0 <= m && ds->J[i0] == ds->J[i0 - 1] + 1)
+			i0++;
+		j0 = ds->J[i0 - 1] + 1;
+		i1 = i0 - 1;
+		while (i1 < m && ds->J[i1 + 1] == 0)
+			i1++;
+		j1 = ds->J[i1 + 1] - 1;
+		ds->J[i1] = j1;
+		error = change(outfile, ds, args, file1, f1, file2, f2,
+		    i0, i1, j0, j1, &flags);
+		if (error)
+			return (error);
 	}
 	if (m == 0) {
 		error = change(outfile, ds, args, file1, f1, file2, f2, 1, 0,
@@ -947,7 +930,6 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 {
 	int i;
 
-restart:
 	if (args->diff_format != D_IFDEF && a > b && c > d)
 		return (0);
 
@@ -1002,11 +984,6 @@ restart:
 	switch (args->diff_format) {
 	case D_BRIEF:
 		return (0);
-	case D_EDIT:
-		range(outfile, a, b, ",");
-		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
-		diff_output(outfile, "\n");
-		break;
 	case D_REVERSE:
 		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
 		range(outfile, a, b, " ");
@@ -1026,22 +1003,7 @@ restart:
 	if (args->diff_format == D_IFDEF)
 		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
 	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, '\0', 0, *pflags);
-	if (i != 0 && args->diff_format == D_EDIT) {
-		/*
-		 * A non-zero return value for D_EDIT indicates that the
-		 * last line printed was a bare dot (".") that has been
-		 * escaped as ".." to prevent ed(1) from misinterpreting
-		 * it.  We have to add a substitute command to change this
-		 * back and restart where we left off.
-		 */
-		diff_output(outfile, ".\n");
-		diff_output(outfile, "%ds/.//\n", a + i - 1);
-		b = a + i - 1;
-		a = b + 1;
-		c += i;
-		goto restart;
-	}
-	if ((args->diff_format == D_EDIT || args->diff_format == D_REVERSE) && c <= d)
+	if (args->diff_format == D_REVERSE && c <= d)
 		diff_output(outfile, ".\n");
 	if (ds->inifdef) {
 		diff_output(outfile, "#endif /* %s */\n", args->ifdefname);
@@ -1095,7 +1057,7 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		col = 0;
 		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
 			if ((c = getc(lb)) == EOF) {
-				if (args->diff_format == D_EDIT || args->diff_format == D_REVERSE ||
+				if (args->diff_format == D_REVERSE ||
 				    args->diff_format == D_NREVERSE)
 					warnx("No newline at end of file");
 				else
@@ -1108,18 +1070,6 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 					diff_output(outfile, " ");
 				} while (++col & 7);
 			} else {
-				if (args->diff_format == D_EDIT && j == 1 && c == '\n'
-				    && lastc == '.') {
-					/*
-					 * Don't print a bare "." line
-					 * since that will confuse ed(1).
-					 * Print ".." instead and return,
-					 * giving the caller an offset
-					 * from which to restart.
-					 */
-					diff_output(outfile, ".\n");
-					return (i - a + 1);
-				}
 				diff_output(outfile, "%c", c);
 				col++;
 			}
