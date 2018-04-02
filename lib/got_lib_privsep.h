@@ -28,6 +28,9 @@
  */
 
 enum got_imsg_type {
+	/* An error occured while processing a request. */
+	GOT_IMSG_ERROR,
+
 	/*
 	 * Messages concerned with read access to objects in a repository.
 	 * Object and pack files are opened by the main process, where
@@ -51,6 +54,11 @@ enum got_imsg_type {
 	GOT_IMSG_READ_PACKED_TREE_OBJECT_REPLY,
 	GOT_IMSG_READ_PACKED_COMMIT_OBJECT_REQUEST,
 	GOT_IMSG_READ_PACKED_COMMIT_OBJECT_REPLY
+};
+
+/* Structure for GOT_IMSG_ERROR. */
+struct got_imsg_error {
+	int code; /* an error code from got_error.h */
 };
 
 /* Structure for GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REQUEST data. */
