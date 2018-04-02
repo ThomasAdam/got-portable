@@ -291,6 +291,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	ds->lastline = 0;
 	ds->lastmatchline = 0;
 	ds->context_vec_ptr = ds->context_vec_start - 1;
+	ds->max_context = 64;
 	if (flags & D_IGNORECASE)
 		ds->chrtran = cup2low;
 	else
@@ -966,7 +967,6 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
-	static size_t max_context = 64;
 	int i;
 
 restart:
@@ -1013,14 +1013,16 @@ proceed:
 		 * Allocate change records as needed.
 		 */
 		if (ds->context_vec_ptr == ds->context_vec_end - 1) {
-			ptrdiff_t offset = ds->context_vec_ptr - ds->context_vec_start;
-			max_context <<= 1;
+			ptrdiff_t offset;
+			offset = ds->context_vec_ptr - ds->context_vec_start;
+			ds->max_context <<= 1;
 			ds->context_vec_start =
-			    reallocarray(ds->context_vec_start, max_context,
+			    reallocarray(ds->context_vec_start, ds->max_context,
 				sizeof(*ds->context_vec_start));
 			if (ds->context_vec_start == NULL)
 				return (-1);
-			ds->context_vec_end = ds->context_vec_start + max_context;
+			ds->context_vec_end = ds->context_vec_start +
+			    ds->max_context;
 			ds->context_vec_ptr = ds->context_vec_start + offset;
 		}
 		if (ds->anychange == 0) {

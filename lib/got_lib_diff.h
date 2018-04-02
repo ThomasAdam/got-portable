@@ -107,6 +107,7 @@ struct got_diff_state {
 	int lastline;
 	int lastmatchline;
 	struct stat stb1, stb2;
+	size_t max_context;
 };
 
 struct got_diff_args {
