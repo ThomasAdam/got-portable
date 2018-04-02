@@ -364,8 +364,12 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 
 	while (!TAILQ_EMPTY(&commits)) {
 		struct got_parent_id *pid;
+		struct got_object *obj;
+		struct got_commit_object *pcommit;
+		struct commit_queue_entry *pentry;
 
 		entry = TAILQ_FIRST(&commits);
+
 		err = print_commit(entry->commit, entry->id, repo, show_patch);
 		if (err)
 			break;
@@ -373,39 +377,38 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		if (limit && --limit == 0)
 			break;
 
-		SIMPLEQ_FOREACH(pid, &entry->commit->parent_ids, entry) {
-			struct got_object *obj;
-			struct got_commit_object *pcommit;
-			struct commit_queue_entry *pentry;
+		if (entry->commit->nparents == 0)
+			break;
 
-			err = got_object_open(&obj, repo, pid->id);
-			if (err)
-				break;
-			if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-				err = got_error(GOT_ERR_OBJ_TYPE);
-				break;
-			}
-
-			err = got_object_commit_open(&pcommit, repo, obj);
-			got_object_close(obj);
-			if (err)
-				break;
-
-			pentry = calloc(1, sizeof(*pentry));
-			if (pentry == NULL) {
-				err = got_error_from_errno();
-				got_object_commit_close(pcommit);
-				break;
-			}
-			pentry->id = got_object_id_dup(pid->id);
-			if (pentry->id == NULL) {
-				err = got_error_from_errno();
-				got_object_commit_close(pcommit);
-				break;
-			}
-			pentry->commit = pcommit;
-			TAILQ_INSERT_TAIL(&commits, pentry, entry);
+		/* Follow the first parent (TODO: handle merge commits). */
+		pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
+		err = got_object_open(&obj, repo, pid->id);
+		if (err)
+			break;
+		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			break;
 		}
+
+		err = got_object_commit_open(&pcommit, repo, obj);
+		got_object_close(obj);
+		if (err)
+			break;
+
+		pentry = calloc(1, sizeof(*pentry));
+		if (pentry == NULL) {
+			err = got_error_from_errno();
+			got_object_commit_close(pcommit);
+			break;
+		}
+		pentry->id = got_object_id_dup(pid->id);
+		if (pentry->id == NULL) {
+			err = got_error_from_errno();
+			got_object_commit_close(pcommit);
+			break;
+		}
+		pentry->commit = pcommit;
+		TAILQ_INSERT_TAIL(&commits, pentry, entry);
 
 		TAILQ_REMOVE(&commits, entry, entry);
 		got_object_commit_close(entry->commit);
