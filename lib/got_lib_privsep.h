@@ -49,12 +49,15 @@ enum got_imsg_type {
 	GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST,
 	GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY,
 	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
+	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST_OUTPUT,
 	GOT_IMSG_LOOSE_BLOB_OBJECT_REPLY,
 	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
 	GOT_IMSG_LOOSE_TREE_OBJECT_REPLY,
+	GOT_IMSG_TREE_ENTRY,
 	GOT_IMSG_LOOSE_COMMIT_OBJECT_REQUEST,
 	GOT_IMSG_LOOSE_COMMIT_OBJECT_REPLY,
 	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST,
+	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST_OUTPUT,
 	GOT_IMSG_PACKED_BLOB_OBJECT_REPLY,
 	GOT_IMSG_PACKED_TREE_OBJECT_REQUEST,
 	GOT_IMSG_PACKED_TREE_OBJECT_REPLY,
@@ -78,8 +81,10 @@ struct got_imsg_delta {
 	size_t delta_len;
 
 	/*
-	 * Followed by DELTA_STREAM messages until delta_len bytes
-	 * of delta stream data have been transmitted.
+	 * Followed by delta stream in remaining bytes of imsg buffer.
+	 * If delta_len exceeds imsg buffer length, followed by one or
+	 * more DELTA_STREAM messages until delta_len bytes of delta
+	 * stream have been transmitted.
 	 */
 };
 
@@ -87,7 +92,7 @@ struct got_imsg_delta {
 struct got_imsg_delta_stream {
 	/*
 	 * Empty since the following is implied:
-	 * Read delta stream data from imsg buffer.
+	 * Read additional delta stream data from imsg buffer.
 	 */
 };
 
@@ -114,6 +119,46 @@ struct got_imsg_object {
 /* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
 struct got_imsg_loose_object_header_reply {
 	struct got_imsg_object iobj;
+};
+
+/* Structure for GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST data. */
+struct got_imsg_loose_blob_object_request {
+	struct got_imsg_object iobj;
+
+	/*
+	 * The following is implied: If imsg fd == -1 then read raw
+	 * blob data from imsg buffer, else read from fd.
+	 */
+};
+
+/* Structure for GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST_OUTPUT data. */
+struct got_imsg_loose_blob_object_request_output {
+	/*
+	 * Empty since the following is implied: If imsg fd == -1 then
+	 * respond with blob data in imsg buffer, else write to fd.
+	 */
+};
+
+/* Structure for GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST data. */
+struct got_imsg_loose_tree_object_request {
+	struct got_imsg_object iobj;
+
+	/*
+	 * The following is implied: If imsg fd == -1 then read raw tree
+	 * data from imsg buffer, else read from fd.
+	 */
+};
+
+/* Structure for GOT_IMSG_TREE_ENTRY. */
+struct got_imsg_tree_entry {
+	struct got_object_id id;
+	mode_t mode;
+	/* Followed by entry's name in remaining data of imsg buffer. */
+};
+
+/* Structure for transmitting struct got_tree_object data in an imsg. */
+struct got_imsg_tree_object {
+	int nentries; /* This many TREE_ENTRY messages follow. */
 };
 
 /* TODO: Implement the above, and then add more message data types here. */
