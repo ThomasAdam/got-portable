@@ -80,6 +80,21 @@ static const struct got_error {
 	{ GOT_ERR_WORKTREE_BUSY,"worktree already locked" },
 };
 
-const struct got_error * got_error(int code);
+/*
+ * Get an error object from the above list, for a given error code.
+ * The error message is fixed.
+ */
+const struct got_error *got_error(int);
+
+/*
+ * Get a statically allocated error object with code GOT_ERR_ERRNO
+ * and an error message obtained from strerror(3).
+ */
 const struct got_error *got_error_from_errno(void);
+
+/*
+ * If ferror(3) indicates an error status for the FILE, obtain an error
+ * from got_error_from_errno(). Else, obtain the error via got_error()
+ * with the error code provided in the second argument.
+ */
 const struct got_error *got_ferror(FILE *, int);

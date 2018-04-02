@@ -16,13 +16,49 @@
 
 struct got_worktree;
 
+/*
+ * Attempt to initialize a new work tree on disk.
+ * The first argument is the path to a directory where the work tree
+ * will be created. The path itself must not yet exist, but the dirname(3)
+ * of the path must already exist.
+ * The reference provided will be used as the new worktree's HEAD.
+ * The third argument speficies the work tree's path prefix.
+ */
 const struct got_error *got_worktree_init(const char *, struct got_reference *,
     const char *, struct got_repository *);
+
+/*
+ * Attempt to open a worktree at the specified path.
+ * The caller must dispose of it with got_worktree_close().
+ */
 const struct got_error *got_worktree_open(struct got_worktree **, const char *);
+
+/* Dispose of an open work tree. */
 void got_worktree_close(struct got_worktree *);
+
+/*
+ * Get the path to the repository associated with a worktree.
+ * The caller must dispose of it with free(3).
+ */
 char *got_worktree_get_repo_path(struct got_worktree *);
+
+/*
+ * Get the name of a work tree's HEAD reference.
+ * The caller must dispose of it with free(3).
+ */
 char  *got_worktree_get_head_ref_name(struct got_worktree *);
+
+/* A callback function which is invoked when a path is checked out. */
 typedef void (*got_worktree_checkout_cb)(void *, const char *);
+
+/*
+ * Attempt to check out files into a work tree from its associated repository
+ * and path prefix, and update the work tree's file index accordingly.
+ * File content is obtained from blobs within the work tree's path prefix
+ * inside the tree resolved via the provided reference.
+ * The checkout progress callback will be invoked with the provided
+ * void * argument, and the path of each checked out file.
+ */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     struct got_reference *, struct got_repository *,
-    got_worktree_checkout_cb progress_cb, void *progress_arg);
+    got_worktree_checkout_cb progress, void *);

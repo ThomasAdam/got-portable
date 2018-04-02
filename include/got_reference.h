@@ -26,10 +26,25 @@ struct got_reference;
 struct got_repository;
 struct got_object_id;
 
+/*
+ * Attempt to open the reference with the provided name in a repository.
+ * The caller must dispose of it with got_ref_close().
+ */
 const struct got_error * got_ref_open(struct got_reference **,
     struct got_repository *, const char *);
+
+/* Dispose of a reference. */
 void got_ref_close(struct got_reference *);
+
+/*
+ * Create a duplicate copy of a reference.
+ * The caller must dispose of this copy with got_ref_close().
+ */
 struct got_reference *got_ref_dup(struct got_reference *);
+
+/* Attempt to resolve a reference to an object ID. */
 const struct got_error *got_ref_resolve(struct got_object_id **,
     struct got_repository *, struct got_reference *);
+
+/* Return a string representation of a reference. */
 char *got_ref_to_str(struct got_reference *);

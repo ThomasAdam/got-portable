@@ -16,10 +16,14 @@
 
 struct got_repository;
 
-/* Open and close git repositories. */
+/* Open and close repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *);
 void got_repo_close(struct got_repository*);
 
+/*
+ * Obtain paths to various directories within a repository.
+ * The caller must dispose of a path with free(3).
+ */
 char *got_repo_get_path(struct got_repository *);
 char *got_repo_get_path_git_dir(struct got_repository *);
 char *got_repo_get_path_objects(struct got_repository *);
@@ -28,6 +32,9 @@ char *got_repo_get_path_refs(struct got_repository *);
 
 struct got_reference;
 
-/* Get a reference, by name, from a repository. */
+/*
+ * Obtain a reference, by name, from a repository.
+ * The caller must dispose of it with got_ref_close().
+ */
 const struct got_error *got_repo_get_reference(struct got_reference **,
     struct got_repository *, const char *);

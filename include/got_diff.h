@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * Compute the differences between two blobs and write unified diff text
+ * to the provided output FILE. Two const char * diff header labels may
+ * be provided which will be used to identify each blob in the diff output.
+ * If a label is NULL, use the blob's SHA1 checksum instead.
+ */
 const struct got_error *got_diff_blob(struct got_blob_object *,
     struct got_blob_object *, const char *, const char *, FILE *);
+
+/*
+ * Compute the differences between two trees and write unified diff text
+ * to the provided output FILE.
+ */
 const struct got_error *got_diff_tree(struct got_tree_object *,
     struct got_tree_object *, struct got_repository *, FILE *);

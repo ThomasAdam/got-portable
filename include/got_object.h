@@ -44,6 +44,7 @@ struct got_commit_object {
 	char *logmsg;
 };
 
+/* A generic object. Used as a handle which holds an ID and an object type. */
 struct got_object;
 #define GOT_OBJ_TYPE_COMMIT		1
 #define GOT_OBJ_TYPE_TREE		2
@@ -55,27 +56,115 @@ struct got_object;
 
 struct got_repository;
 
+/*
+ * Obtain a string representation of an object ID. The output depends on
+ * the hash function used by the repository format (currently SHA1).
+ */
 const struct got_error *got_object_id_str(char **, struct got_object_id *);
+
+/*
+ * Compare two object IDs. Return value behaves like memcmp(3).
+ */
 int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
+
+/*
+ * Created a newly allocated copy of an object ID.
+ * The caller should dispose of it with free(3).
+ */
 struct got_object_id *got_object_id_dup(struct got_object_id *);
+
+/*
+ * Get a newly allocated copy of an object's ID.
+ * The caller should dispose of it with free(3).
+ */
 struct got_object_id *got_object_get_id(struct got_object *);
+
+/*
+ * Obtain the type of an object.
+ * Returns one of the GOT_OBJ_TYPE_x values (see above).
+ */
 int got_object_get_type(struct got_object *);
+
+/*
+ * Attempt to open the object in a repository with the provided ID.
+ * Caller must dispose of it with got_object_close().
+ */
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
+
+/*
+ * Attempt to map the provided ID string to an object ID and then
+ * attempt to open the object in a repository with this ID.
+ * The form of an ID string depends on the hash function used by the
+ * repository format (currently SHA1).
+ * Caller must dispose of the object with got_object_close().
+ */
 const struct got_error *got_object_open_by_id_str(struct got_object **,
-    struct got_repository *, const char *); 
+    struct got_repository *, const char *);
+
+/* Dispose of an object. */
 void got_object_close(struct got_object *);
+
+/*
+ * Attempt to open a commit object in a repository.
+ * The provided object must be of type GOT_OBJ_TYPE_COMMIT.
+ * The caller must dispose of the commit with got_object_commit_close().
+ */
 const struct got_error *got_object_commit_open(struct got_commit_object **,
     struct got_repository *, struct got_object *);
+
+/* Dispose of a commit object. */
 void got_object_commit_close(struct got_commit_object *);
+
+/*
+ * Attempt to open a tree object in a repository.
+ * The provided object must be of type GOT_OBJ_TYPE_TREE.
+ * The caller must dispose of the tree with got_object_tree_close().
+ */
 const struct got_error *got_object_tree_open(struct got_tree_object **,
     struct got_repository *, struct got_object *);
+
+/* Dispose of a tree object. */
 void got_object_tree_close(struct got_tree_object *);
+
+/*
+ * Attempt to open a blob object in a repository.
+ * The provided object must be of type GOT_OBJ_TYPE_BLOB.
+ * The size_t argument specifies the block size of an associated read buffer.
+ * The caller must dispose of the blob with got_object_blob_close().
+ */
 const struct got_error *got_object_blob_open(struct got_blob_object **,
     struct got_repository *, struct got_object *, size_t);
+
+/* Dispose of a blob object. */
 void got_object_blob_close(struct got_blob_object *);
+
+/*
+ * Write the string representation of the object ID of a blob to a buffer.
+ * The size_t argument speficies the size of the buffer. In the current
+ * implementation, it must be at least SHA1_DIGEST_STRING_LENGTH bytes.
+ * XXX This is a bad API, use got_object_id_str() instead.
+ */
 char *got_object_blob_id_str(struct got_blob_object*, char *, size_t);
+
+/*
+ * Get the length of header data at the beginning of the blob's read buffer.
+ * Note that header data is only present upon the first invocation of
+ * got_object_blob_read_block() after the blob is opened.
+ */
 size_t got_object_blob_get_hdrlen(struct got_blob_object *);
+
+/*
+ * Get a pointer to the blob's read buffer.
+ * The read buffer is filled by got_object_blob_read_block().
+ */
 const uint8_t *got_object_blob_get_read_buf(struct got_blob_object *);
+
+/*
+ * Read the next chunk of data from a blob, up to the blob's read buffer
+ * block size. The size_t output argument indicates how many bytes have
+ * been read into the blob's read buffer. Zero bytes will be reported if
+ * all data in the blob has been read.
+ */
 const struct got_error *got_object_blob_read_block(size_t *,
     struct got_blob_object *);
