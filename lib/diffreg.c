@@ -962,6 +962,7 @@ preadline(int fd, size_t rlen, off_t off)
 static int
 ignoreline(char *line)
 {
+	free(line);
 	return 0; /* do not ignore any lines */
 }
 
@@ -983,6 +984,7 @@ restart:
 	if (args->diff_format != D_IFDEF && a > b && c > d)
 		return (0);
 	if (args->ignore_pats != NULL) {
+		char *line;
 		/*
 		 * All lines in the change, insert, or delete must
 		 * match an ignore pattern for the change to be
@@ -990,30 +992,24 @@ restart:
 		 */
 		if (a <= b) {		/* Changes and deletes. */
 			for (i = a; i <= b; i++) {
-				char *line = preadline(fileno(f1),
+				line = preadline(fileno(f1),
 				    ds->ixold[i] - ds->ixold[i - 1],
 				    ds->ixold[i - 1]);
 				if (line == NULL)
 					return (-1);
-				if (!ignoreline(line)) {
-					free(line);
+				if (!ignoreline(line))
 					goto proceed;
-				}
-				free(line);
 			}
 		}
 		if (a > b || c <= d) {	/* Changes and inserts. */
 			for (i = c; i <= d; i++) {
-				char *line = preadline(fileno(f2),
+				line = preadline(fileno(f2),
 				    ds->ixnew[i] - ds->ixnew[i - 1],
 				    ds->ixnew[i - 1]);
 				if (line == NULL)
 					return (-1);
-				if (!ignoreline(line)) {
-					free(line);
+				if (!ignoreline(line))
 					goto proceed;
-				}
-				free(line);
 			}
 		}
 		return (0);
