@@ -45,6 +45,7 @@
 #define GOT_ERR_WORKTREE_BUSY	29
 #define GOT_ERR_DIR_OBSTRUCTED	30
 #define GOT_ERR_FILE_OBSTRUCTED	31
+#define GOT_ERR_RECURSION	32
 
 static const struct got_error {
 	int code;
@@ -78,6 +79,7 @@ static const struct got_error {
 	{ GOT_ERR_WORKTREE_META,"bad worktree meta data" },
 	{ GOT_ERR_WORKTREE_VERS,"unsupported worktree format version" },
 	{ GOT_ERR_WORKTREE_BUSY,"worktree already locked" },
+	{ GOT_ERR_RECURSION,	"recursion limit reached" },
 };
 
 /*
