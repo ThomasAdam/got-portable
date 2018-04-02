@@ -188,7 +188,6 @@ static int	 output(FILE *, struct got_diff_state *, struct got_diff_args *, cons
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 range(FILE *, int, int, char *);
 static void	 uni_range(FILE *, int, int);
-static void	 dump_context_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static void	 dump_unified_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static int	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
 static void	 prune(struct got_diff_state *);
@@ -909,12 +908,8 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		}
 #undef c
 	}
-	if (ds->anychange != 0) {
-		if (args->diff_format == D_CONTEXT)
-			dump_context_vec(outfile, ds, args, f1, f2, flags);
-		else if (args->diff_format == D_UNIFIED)
-			dump_unified_vec(outfile, ds, args, f1, f2, flags);
-	}
+	if (ds->anychange != 0)
+		dump_unified_vec(outfile, ds, args, f1, f2, flags);
 
 	return (0);
 }
@@ -960,7 +955,7 @@ restart:
 		diff_output(outfile, "%s %s %s\n", args->diffargs, file1, file2);
 		*pflags &= ~D_HEADER;
 	}
-	if (args->diff_format == D_CONTEXT || args->diff_format == D_UNIFIED) {
+	if (args->diff_format == D_UNIFIED) {
 		/*
 		 * Allocate change records as needed.
 		 */
@@ -993,10 +988,7 @@ restart:
 			 * If this change is more than 'diff_context' lines from the
 			 * previous change, dump the record and reset it.
 			 */
-			if (args->diff_format == D_CONTEXT)
-				dump_context_vec(outfile, ds, args, f1, f2, *pflags);
-			else
-				dump_unified_vec(outfile, ds, args, f1, f2, *pflags);
+			dump_unified_vec(outfile, ds, args, f1, f2, *pflags);
 		}
 		ds->context_vec_ptr++;
 		ds->context_vec_ptr->a = a;
@@ -1101,8 +1093,8 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		nc = f[i] - f[i - 1];
 		if (args->diff_format != D_IFDEF && ch != '\0') {
 			diff_output(outfile, "%c", ch);
-			if (args->Tflag && (args->diff_format == D_NORMAL || args->diff_format == D_CONTEXT
-			    || args->diff_format == D_UNIFIED))
+			if (args->Tflag && (args->diff_format == D_NORMAL ||
+			    args->diff_format == D_UNIFIED))
 				diff_output(outfile, "\t");
 			else if (args->diff_format != D_UNIFIED)
 				diff_output(outfile, " ");
@@ -1267,110 +1259,6 @@ match_function(struct got_diff_state *ds, const long *f, int pos, FILE *fp)
 	return ds->lastmatchline > 0 ? ds->lastbuf : NULL;
 }
 
-/* dump accumulated "context" diff changes */
-static void
-dump_context_vec(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
-    FILE *f1, FILE *f2, int flags)
-{
-	struct context_vec *cvp = ds->context_vec_start;
-	int lowa, upb, lowc, upd, do_output;
-	int a, b, c, d;
-	char ch, *f;
-
-	if (ds->context_vec_start > ds->context_vec_ptr)
-		return;
-
-	b = d = 0;		/* gcc */
-	lowa = MAXIMUM(1, cvp->a - args->diff_context);
-	upb = MINIMUM(ds->len[0], ds->context_vec_ptr->b + args->diff_context);
-	lowc = MAXIMUM(1, cvp->c - args->diff_context);
-	upd = MINIMUM(ds->len[1], ds->context_vec_ptr->d + args->diff_context);
-
-	diff_output(outfile, "***************");
-	if ((flags & D_PROTOTYPE)) {
-		f = match_function(ds, ds->ixold, lowa-1, f1);
-		if (f != NULL)
-			diff_output(outfile, " %s", f);
-	}
-	diff_output(outfile, "\n*** ");
-	range(outfile, lowa, upb, ",");
-	diff_output(outfile, " ****\n");
-
-	/*
-	 * Output changes to the "old" file.  The first loop suppresses
-	 * output if there were no changes to the "old" file (we'll see
-	 * the "old" lines as context in the "new" list).
-	 */
-	do_output = 0;
-	for (; cvp <= ds->context_vec_ptr; cvp++)
-		if (cvp->a <= cvp->b) {
-			cvp = ds->context_vec_start;
-			do_output++;
-			break;
-		}
-	if (do_output) {
-		while (cvp <= ds->context_vec_ptr) {
-			a = cvp->a;
-			b = cvp->b;
-			c = cvp->c;
-			d = cvp->d;
-
-			if (a <= b && c <= d)
-				ch = 'c';
-			else
-				ch = (a <= b) ? 'd' : 'a';
-
-			if (ch == 'a')
-				fetch(outfile, ds, args, ds->ixold, lowa, b, f1, ' ', 0, flags);
-			else {
-				fetch(outfile, ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-				fetch(outfile, ds, args, ds->ixold, a, b, f1,
-				    ch == 'c' ? '!' : '-', 0, flags);
-			}
-			lowa = b + 1;
-			cvp++;
-		}
-		fetch(outfile, ds, args, ds->ixold, b + 1, upb, f1, ' ', 0, flags);
-	}
-	/* output changes to the "new" file */
-	diff_output(outfile, "--- ");
-	range(outfile, lowc, upd, ",");
-	diff_output(outfile, " ----\n");
-
-	do_output = 0;
-	for (cvp = ds->context_vec_start; cvp <= ds->context_vec_ptr; cvp++)
-		if (cvp->c <= cvp->d) {
-			cvp = ds->context_vec_start;
-			do_output++;
-			break;
-		}
-	if (do_output) {
-		while (cvp <= ds->context_vec_ptr) {
-			a = cvp->a;
-			b = cvp->b;
-			c = cvp->c;
-			d = cvp->d;
-
-			if (a <= b && c <= d)
-				ch = 'c';
-			else
-				ch = (a <= b) ? 'd' : 'a';
-
-			if (ch == 'd')
-				fetch(outfile, ds, args, ds->ixnew, lowc, d, f2, ' ', 0, flags);
-			else {
-				fetch(outfile, ds, args, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
-				fetch(outfile, ds, args, ds->ixnew, c, d, f2,
-				    ch == 'c' ? '!' : '+', 0, flags);
-			}
-			lowc = d + 1;
-			cvp++;
-		}
-		fetch(outfile, ds, args, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
-	}
-	ds->context_vec_ptr = ds->context_vec_start - 1;
-}
-
 /* dump accumulated "unified" diff changes */
 static void
 dump_unified_vec(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
@@ -1450,15 +1338,13 @@ print_header(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *arg
     const char *file1, const char *file2)
 {
 	if (args->label[0] != NULL)
-		diff_output(outfile, "%s %s\n", args->diff_format == D_CONTEXT ? "***" : "---",
-		    args->label[0]);
+		diff_output(outfile, "--- %s\n", args->label[0]);
 	else
-		diff_output(outfile, "%s %s\t%s", args->diff_format == D_CONTEXT ? "***" : "---",
-		    file1, ctime(&ds->stb1.st_mtime));
+		diff_output(outfile, "--- %s\t%s", file1,
+		    ctime(&ds->stb1.st_mtime));
 	if (args->label[1] != NULL)
-		diff_output(outfile, "%s %s\n", args->diff_format == D_CONTEXT ? "---" : "+++",
-		    args->label[1]);
+		diff_output(outfile, "+++ %s\n", args->label[1]);
 	else
-		diff_output(outfile, "%s %s\t%s", args->diff_format == D_CONTEXT ? "---" : "+++",
-		    file2, ctime(&ds->stb2.st_mtime));
+		diff_output(outfile, "+++ %s\t%s", file2,
+		    ctime(&ds->stb2.st_mtime));
 }

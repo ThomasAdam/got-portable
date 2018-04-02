@@ -40,7 +40,6 @@
 #define	D_NORMAL	0	/* Normal output */
 #define	D_EDIT		-1	/* Editor script out */
 #define	D_REVERSE	1	/* Reverse editor script */
-#define	D_CONTEXT	2	/* Diff with context */
 #define	D_UNIFIED	3	/* Unified context diff */
 #define	D_IFDEF		4	/* Diff with merged #ifdef's */
 #define	D_NREVERSE	5	/* Reverse ed script with numbered
