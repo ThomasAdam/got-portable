@@ -114,7 +114,7 @@ struct got_imsg_object {
 	struct got_object_id id;
 
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
-};
+} __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
 struct got_imsg_loose_object_header_reply {
@@ -154,7 +154,7 @@ struct got_imsg_tree_entry {
 	struct got_object_id id;
 	mode_t mode;
 	/* Followed by entry's name in remaining data of imsg buffer. */
-};
+} __attribute__((__packed__));
 
 /* Structure for transmitting struct got_tree_object data in an imsg. */
 struct got_imsg_tree_object {
