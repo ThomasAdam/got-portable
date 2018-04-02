@@ -396,8 +396,6 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	p = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
 	if (p == NULL) {
 		err = got_error_from_errno();
-		free(ds->J);
-		ds->J = NULL;
 		goto closem;
 	}
 	ds->J = p;
@@ -428,6 +426,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	    flags))
 		err = got_error_from_errno();
 closem:
+	free(ds->J);
 	free(ds->member);
 	free(ds->class);
 	if (ds->anychange) {
