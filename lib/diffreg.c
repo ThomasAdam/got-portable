@@ -284,7 +284,8 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
     struct got_diff_args *args, struct got_diff_state *ds, FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	int i;
+	int i, *p;
+	long *lp;
 
 	*rval = D_SAME;
 	ds->anychange = 0;
@@ -355,22 +356,28 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 
 	ds->member = (int *)ds->file[1];
 	equiv(ds->sfile[0], ds->slen[0], ds->sfile[1], ds->slen[1], ds->member);
-	ds->member = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
-	if (ds->member == NULL) {
+	p = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
+	if (p == NULL) {
 		err = got_error_from_errno();
+		free(ds->member);
+		ds->member = NULL;
 		goto closem;
 	}
+	ds->member = p;
 
 	ds->class = (int *)ds->file[0];
 	if (unsort(ds->sfile[0], ds->slen[0], ds->class)) {
 		err = got_error_from_errno();
 		goto closem;
 	}
-	ds->class = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
-	if (ds->class == NULL) {
+	p = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
+	if (p == NULL) {
 		err = got_error_from_errno();
+		free(ds->class);
+		ds->class = NULL;
 		goto closem;
 	}
+	ds->class = p;
 
 	ds->klist = calloc(ds->slen[0] + 2, sizeof(*ds->klist));
 	if (ds->klist == NULL) {
@@ -394,27 +401,36 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	free(ds->member);
 	free(ds->class);
 
-	ds->J = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
-	if (ds->J == NULL) {
+	p = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
+	if (p == NULL) {
 		err = got_error_from_errno();
+		free(ds->J);
+		ds->J = NULL;
 		goto closem;
 	}
+	ds->J = p;
 	unravel(ds, ds->klist[i]);
 	free(ds->clist);
 	ds->clist = NULL;
 	free(ds->klist);
 	ds->klist = NULL;
 
-	ds->ixold = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
-	if (ds->ixold == NULL) {
+	lp = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
+	if (lp == NULL) {
 		err = got_error_from_errno();
+		free(ds->ixold);
+		ds->ixold = NULL;
 		goto closem;
 	}
-	ds->ixnew = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
-	if (ds->ixnew == NULL) {
+	ds->ixold = lp;
+	lp = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
+	if (lp == NULL) {
 		err = got_error_from_errno();
+		free(ds->ixnew);
+		ds->ixnew = NULL;
 		goto closem;
 	}
+	ds->ixnew = lp;
 	check(ds, f1, f2, flags);
 	if (output(outfile, ds, args, args->label[0], f1, args->label[1], f2,
 	    flags))
@@ -464,7 +480,7 @@ files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 static int
 prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 {
-	struct line *p;
+	struct line *p, *q;
 	int j, h;
 	size_t sz;
 
@@ -480,9 +496,12 @@ prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 	for (j = 0; (h = readhash(ds, fd, flags));) {
 		if (j == sz) {
 			sz = sz * 3 / 2;
-			p = reallocarray(p, sz + 3, sizeof(*p));
-			if (p == NULL)
+			q = reallocarray(p, sz + 3, sizeof(*p));
+			if (q == NULL) {
+				free(p);
 				return (-1);
+			}
+			p = q;
 		}
 		p[++j].value = h;
 	}
@@ -622,12 +641,14 @@ newcand(struct got_diff_state *ds, int x, int y, int pred, int *errorp)
 
 	if (ds->clen == ds->clistlen) {
 		ds->clistlen = ds->clistlen * 11 / 10;
-		ds->clist = reallocarray(ds->clist, ds->clistlen,
-		    sizeof(*ds->clist));
-		if (ds->clist == NULL) {
+		q = reallocarray(ds->clist, ds->clistlen, sizeof(*ds->clist));
+		if (q == NULL) {
 			*errorp = -1;
+			free(ds->clist);
+			ds->clist = NULL;
 			return 0;
 		}
+		ds->clist = q;
 	}
 	q = ds->clist + ds->clen;
 	q->x = x;
@@ -1013,14 +1034,18 @@ proceed:
 		 * Allocate change records as needed.
 		 */
 		if (ds->context_vec_ptr == ds->context_vec_end - 1) {
+			struct context_vec *cvp;
 			ptrdiff_t offset;
 			offset = ds->context_vec_ptr - ds->context_vec_start;
 			ds->max_context <<= 1;
 			ds->context_vec_start =
-			    reallocarray(ds->context_vec_start, ds->max_context,
-				sizeof(*ds->context_vec_start));
-			if (ds->context_vec_start == NULL)
+			cvp = reallocarray(ds->context_vec_start,
+			    ds->max_context, sizeof(*ds->context_vec_start));
+			if (cvp == NULL) {
+				free(ds->context_vec_start);
 				return (-1);
+			}
+			ds->context_vec_start = cvp;
 			ds->context_vec_end = ds->context_vec_start +
 			    ds->max_context;
 			ds->context_vec_ptr = ds->context_vec_start + offset;
