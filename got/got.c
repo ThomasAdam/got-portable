@@ -413,14 +413,12 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		free(entry);
 	}
 
-	if (err) {
-		while (!TAILQ_EMPTY(&commits)) {
-			entry = TAILQ_FIRST(&commits);
-			TAILQ_REMOVE(&commits, entry, entry);
-			got_object_commit_close(entry->commit);
-			free(entry->id);
-			free(entry);
-		}
+	while (!TAILQ_EMPTY(&commits)) {
+		entry = TAILQ_FIRST(&commits);
+		TAILQ_REMOVE(&commits, entry, entry);
+		got_object_commit_close(entry->commit);
+		free(entry->id);
+		free(entry);
 	}
 
 	return err;
