@@ -113,7 +113,7 @@ struct got_diff_state {
 struct got_diff_args {
 	int	 Tflag;
 	int	 diff_format, diff_context, status;
-	char	*ifdefname, *diffargs, *ignore_pats;
+	char	*ifdefname, *diffargs;
 	const char *label[2];
 };
 

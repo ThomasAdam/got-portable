@@ -198,7 +198,6 @@ static int	 unsort(struct line *, int, int *);
 static int	 change(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
 static void	 print_header(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, const char *);
-static int	 ignoreline(char *);
 static int	 asciifile(FILE *);
 static int	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int, int);
 static int	 newcand(struct got_diff_state *, int, int, int, int *);
@@ -209,7 +208,6 @@ static int	 stone(struct got_diff_state *, int *, int, int *, int *, int);
 static int	 readhash(struct got_diff_state *, FILE *, int);
 static int	 files_differ(struct got_diff_state *, FILE *, FILE *, int);
 static char	*match_function(struct got_diff_state *, const long *, int, FILE *);
-static char	*preadline(int, size_t, off_t);
 
 /*
  * chrtran points to one of 2 translation tables: cup2low if folding upper to
@@ -940,32 +938,6 @@ uni_range(FILE *outfile, int a, int b)
 		diff_output(outfile, "%d,0", b);
 }
 
-static char *
-preadline(int fd, size_t rlen, off_t off)
-{
-	char *line;
-	ssize_t nr;
-
-	line = malloc(rlen + 1);
-	if (line == NULL)
-		return NULL;
-	if ((nr = pread(fd, line, rlen, off)) < 0) {
-		free(line);
-		return NULL;
-	}
-	if (nr > 0 && line[nr-1] == '\n')
-		nr--;
-	line[nr] = '\0';
-	return (line);
-}
-
-static int
-ignoreline(char *line)
-{
-	free(line);
-	return 0; /* do not ignore any lines */
-}
-
 /*
  * Indicate that there is a difference between lines a and b of the from file
  * to get to lines c to d of the to file.  If a is greater then b then there
@@ -983,38 +955,7 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 restart:
 	if (args->diff_format != D_IFDEF && a > b && c > d)
 		return (0);
-	if (args->ignore_pats != NULL) {
-		char *line;
-		/*
-		 * All lines in the change, insert, or delete must
-		 * match an ignore pattern for the change to be
-		 * ignored.
-		 */
-		if (a <= b) {		/* Changes and deletes. */
-			for (i = a; i <= b; i++) {
-				line = preadline(fileno(f1),
-				    ds->ixold[i] - ds->ixold[i - 1],
-				    ds->ixold[i - 1]);
-				if (line == NULL)
-					return (-1);
-				if (!ignoreline(line))
-					goto proceed;
-			}
-		}
-		if (a > b || c <= d) {	/* Changes and inserts. */
-			for (i = c; i <= d; i++) {
-				line = preadline(fileno(f2),
-				    ds->ixnew[i] - ds->ixnew[i - 1],
-				    ds->ixnew[i - 1]);
-				if (line == NULL)
-					return (-1);
-				if (!ignoreline(line))
-					goto proceed;
-			}
-		}
-		return (0);
-	}
-proceed:
+
 	if (*pflags & D_HEADER) {
 		diff_output(outfile, "%s %s %s\n", args->diffargs, file1, file2);
 		*pflags &= ~D_HEADER;
