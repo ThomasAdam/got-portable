@@ -46,20 +46,20 @@ enum got_imsg_type {
 	 * separate process which runs under pledge("stdio").
 	 * This sandboxes our own repository parsing code, as well as zlib.
 	 */
-	GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REQUEST,
-	GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REPLY,
-	GOT_IMSG_READ_LOOSE_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_READ_LOOSE_BLOB_OBJECT_REPLY,
-	GOT_IMSG_READ_LOOSE_TREE_OBJECT_REQUEST,
-	GOT_IMSG_READ_LOOSE_TREE_OBJECT_REPLY,
-	GOT_IMSG_READ_LOOSE_COMMIT_OBJECT_REQUEST,
-	GOT_IMSG_READ_LOOSE_COMMIT_OBJECT_REPLY,
-	GOT_IMSG_READ_PACKED_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_READ_PACKED_BLOB_OBJECT_REPLY,
-	GOT_IMSG_READ_PACKED_TREE_OBJECT_REQUEST,
-	GOT_IMSG_READ_PACKED_TREE_OBJECT_REPLY,
-	GOT_IMSG_READ_PACKED_COMMIT_OBJECT_REQUEST,
-	GOT_IMSG_READ_PACKED_COMMIT_OBJECT_REPLY
+	GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST,
+	GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY,
+	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
+	GOT_IMSG_LOOSE_BLOB_OBJECT_REPLY,
+	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
+	GOT_IMSG_LOOSE_TREE_OBJECT_REPLY,
+	GOT_IMSG_LOOSE_COMMIT_OBJECT_REQUEST,
+	GOT_IMSG_LOOSE_COMMIT_OBJECT_REPLY,
+	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST,
+	GOT_IMSG_PACKED_BLOB_OBJECT_REPLY,
+	GOT_IMSG_PACKED_TREE_OBJECT_REQUEST,
+	GOT_IMSG_PACKED_TREE_OBJECT_REPLY,
+	GOT_IMSG_PACKED_COMMIT_OBJECT_REQUEST,
+	GOT_IMSG_PACKED_COMMIT_OBJECT_REPLY
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -91,16 +91,16 @@ struct got_imsg_delta_stream {
 	 */
 };
 
-/* Structure for GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REQUEST data. */
-struct got_imsg_read_loose_object_header_request {
+/* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST data. */
+struct got_imsg_loose_object_header_request {
 	/*
 	 * Empty since the following is implied: If imsg fd == -1 then
 	 * read raw object data from imsg buffer, else read from fd.
 	 */
 };
 
-/* Structure for GOT_IMSG_READ_LOOSE_OBJECT_HEADER_REPLY data. */
-struct got_imsg_read_loose_object_header_reply {
+/* Structure for transmitting struct got_object data in an imsg. */
+struct got_imsg_object {
 	/* These fields are the same as in struct got_object. */
 	int type;
 	int flags;
@@ -109,6 +109,11 @@ struct got_imsg_read_loose_object_header_reply {
 	struct got_object_id id;
 
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
+};
+
+/* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
+struct got_imsg_loose_object_header_reply {
+	struct got_imsg_object iobj;
 };
 
 /* TODO: Implement the above, and then add more message data types here. */
