@@ -59,7 +59,7 @@
 #define D_IGNOREBLANKS	0x200	/* Ignore white space changes */
 
 /*
- * Status values for print_status() and diffreg() return values
+ * Status values for got_diffreg() return values
  */
 #define	D_SAME		0	/* Files are the same */
 #define	D_DIFFER	1	/* Files are different */
@@ -109,12 +109,5 @@ struct got_diff_args {
 	const char *label[2];
 };
 
-char	*splice(char *, char *);
 const struct got_error *got_diffreg(int *, FILE *,
     FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *);
-int	easprintf(char **, const char *, ...);
-void	*emalloc(size_t);
-void	*erealloc(void *, size_t);
-void	diffdir(char *, char *, int);
-void	print_only(const char *, size_t, const char *);
-void	print_status(int, char *, char *, char *);
