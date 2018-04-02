@@ -400,10 +400,6 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	}
 	ds->J = p;
 	unravel(ds, ds->klist[i]);
-	free(ds->clist);
-	ds->clist = NULL;
-	free(ds->klist);
-	ds->klist = NULL;
 
 	lp = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
 	if (lp == NULL) {
@@ -429,6 +425,8 @@ closem:
 	free(ds->J);
 	free(ds->member);
 	free(ds->class);
+	free(ds->clist);
+	free(ds->klist);
 	if (ds->anychange) {
 		args->status |= 1;
 		if (*rval == D_SAME)
