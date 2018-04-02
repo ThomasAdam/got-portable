@@ -37,7 +37,6 @@
 /*
  * Output format options
  */
-#define	D_EDIT		-1	/* Editor script out */
 #define	D_REVERSE	1	/* Reverse editor script */
 #define	D_UNIFIED	3	/* Unified context diff */
 #define	D_IFDEF		4	/* Diff with merged #ifdef's */
