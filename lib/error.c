@@ -42,11 +42,9 @@ const struct got_error *
 got_error_from_errno()
 {
 	static struct got_error err;
-	static char msg[1024];
 
 	err.code = GOT_ERR_ERRNO;
-	strerror_r(errno, msg, sizeof(msg));
-	err.msg = msg;
+	err.msg = strerror(errno);
 	return &err;
 }
 
