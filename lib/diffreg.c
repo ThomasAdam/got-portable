@@ -404,16 +404,12 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	lp = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
 	if (lp == NULL) {
 		err = got_error_from_errno();
-		free(ds->ixold);
-		ds->ixold = NULL;
 		goto closem;
 	}
 	ds->ixold = lp;
 	lp = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
 	if (lp == NULL) {
 		err = got_error_from_errno();
-		free(ds->ixnew);
-		ds->ixnew = NULL;
 		goto closem;
 	}
 	ds->ixnew = lp;
@@ -427,6 +423,8 @@ closem:
 	free(ds->class);
 	free(ds->clist);
 	free(ds->klist);
+	free(ds->ixold);
+	free(ds->ixnew);
 	if (ds->anychange) {
 		args->status |= 1;
 		if (*rval == D_SAME)
