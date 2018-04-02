@@ -79,12 +79,15 @@ get_packfile_size(size_t *size, const char *path)
 	struct stat sb;
 	char *dot;
 
+	*size = 0;
+
 	dot = strrchr(path, '.');
 	if (dot == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	/* Path must point to a pack index or to a pack file. */
 	if (strcmp(dot, ".idx") == 0) {
+		const struct got_error *err = NULL;
 		char *path_pack;
 		char base_path[PATH_MAX];
 
@@ -98,11 +101,11 @@ get_packfile_size(size_t *size, const char *path)
 		if (asprintf(&path_pack, "%s.pack", base_path) == -1)
 			return got_error_from_errno();
 
-		if (stat(path_pack, &sb) != 0) {
-			free(path_pack);
-			return got_error_from_errno();
-		}
+		if (stat(path_pack, &sb) != 0)
+			err = got_error_from_errno();
 		free(path_pack);
+		if (err)
+			return err;
 	} else if (strcmp(dot, ".pack") == 0) {
 		if (stat(path, &sb) != 0)
 			return got_error_from_errno();
