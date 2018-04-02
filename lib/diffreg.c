@@ -881,15 +881,6 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		if (error)
 			return (error);
 	}
-	if (args->diff_format == D_IFDEF) {
-		for (;;) {
-#define	c i0
-			if ((c = getc(f1)) == EOF)
-				return (0);
-			diff_output(outfile, "%c", c);
-		}
-#undef c
-	}
 	if (ds->anychange != 0)
 		dump_unified_vec(outfile, ds, args, f1, f2, flags);
 
@@ -921,7 +912,7 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 {
 	int i;
 
-	if (args->diff_format != D_IFDEF && a > b && c > d)
+	if (a > b && c > d)
 		return (0);
 
 	if (*pflags & D_HEADER) {
@@ -974,14 +965,7 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		ds->anychange = 1;
 	if (args->diff_format == D_BRIEF)
 		return (0);
-	if (args->diff_format == D_IFDEF)
-		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
 	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, '\0', 0, *pflags);
-	if (ds->inifdef) {
-		diff_output(outfile, "#endif /* %s */\n", args->ifdefname);
-		ds->inifdef = 0;
-	}
-
 	return (0);
 }
 
@@ -991,35 +975,12 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 {
 	int i, j, c, lastc, col, nc;
 
-	/*
-	 * When doing #ifdef's, copy down to current line
-	 * if this is the first file, so that stuff makes it to output.
-	 */
-	if (args->diff_format == D_IFDEF && oldfile) {
-		long curpos = ftell(lb);
-		/* print through if append (a>b), else to (nb: 0 vs 1 orig) */
-		nc = f[a > b ? b : a - 1] - curpos;
-		for (i = 0; i < nc; i++)
-			diff_output(outfile, "%c", getc(lb));
-	}
 	if (a > b)
 		return (0);
-	if (args->diff_format == D_IFDEF) {
-		if (ds->inifdef) {
-			diff_output(outfile, "#else /* %s%s */\n",
-			    oldfile == 1 ? "!" : "", args->ifdefname);
-		} else {
-			if (oldfile)
-				diff_output(outfile, "#ifndef %s\n", args->ifdefname);
-			else
-				diff_output(outfile, "#ifdef %s\n", args->ifdefname);
-		}
-		ds->inifdef = 1 + oldfile;
-	}
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
 		nc = f[i] - f[i - 1];
-		if (args->diff_format != D_IFDEF && ch != '\0') {
+		if (ch != '\0') {
 			diff_output(outfile, "%c", ch);
 			if (args->Tflag && args->diff_format == D_UNIFIED)
 				diff_output(outfile, "\t");

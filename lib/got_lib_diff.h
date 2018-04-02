@@ -38,7 +38,6 @@
  * Output format options
  */
 #define	D_UNIFIED	3	/* Unified context diff */
-#define	D_IFDEF		4	/* Diff with merged #ifdef's */
 #define	D_BRIEF		6	/* Say if the files differ */
 
 /*
@@ -81,7 +80,6 @@ struct got_diff_state {
 	int  *klist;		/* will be overlaid on file[0] after class */
 	int  *member;		/* will be overlaid on file[1] */
 	int   clen;
-	int   inifdef;		/* whether or not we are in a #ifdef block */
 	int   len[2];
 	int   pref, suff;	/* length of prefix and suffix */
 	int   slen[2];
@@ -107,7 +105,7 @@ struct got_diff_state {
 struct got_diff_args {
 	int	 Tflag;
 	int	 diff_format, diff_context, status;
-	char	*ifdefname, *diffargs;
+	char	 *diffargs;
 	const char *label[2];
 };
 
