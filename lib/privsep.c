@@ -167,9 +167,10 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 		}
 		memcpy(&ierr, imsg.data, sizeof(ierr));
 		if (ierr.code == GOT_ERR_ERRNO) {
-			static struct got_error err;
-			err.code = GOT_ERR_ERRNO;
-			err.msg = strerror(ierr.errno_code);
+			static struct got_error serr;
+			serr.code = GOT_ERR_ERRNO;
+			serr.msg = strerror(ierr.errno_code);
+			err = &serr;
 		} else
 			err = got_error(ierr.code);
 		break;
