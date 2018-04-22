@@ -52,6 +52,7 @@
 #define GOT_ERR_PRIVSEP_LEN	36
 #define GOT_ERR_PRIVSEP_PIPE	37
 #define GOT_ERR_PRIVSEP_NO_FD	38
+#define GOT_ERR_PRIVSEP_MSG	39
 
 static const struct got_error {
 	int code;
@@ -93,6 +94,7 @@ static const struct got_error {
 				"from unprivileged process" },
 	{ GOT_ERR_PRIVSEP_PIPE,	"unprivileged process closed pipe" },
 	{ GOT_ERR_PRIVSEP_NO_FD,"out of file descriptors for privsep" },
+	{ GOT_ERR_PRIVSEP_MSG,"unexpected message from unprivileged process" },
 };
 
 /*

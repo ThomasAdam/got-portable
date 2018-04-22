@@ -201,6 +201,9 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 			/* TODO: Handle deltas */
 		}
 		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
 	}
 
 	imsg_free(&imsg);
