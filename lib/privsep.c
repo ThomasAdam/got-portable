@@ -103,7 +103,6 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj, int ndeltas)
 	iobj.flags = obj->flags;
 	iobj.hdrlen = obj->hdrlen;
 	iobj.size = obj->size;
-	memcpy(iobj.id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 	iobj.ndeltas = ndeltas;
 
 	if (ndeltas > 0) {
@@ -196,7 +195,6 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 		(*obj)->type = iobj.type;
 		(*obj)->hdrlen = iobj.hdrlen;
 		(*obj)->size = iobj.size;
-		memcpy((*obj)->id.sha1, iobj.id.sha1, SHA1_DIGEST_LENGTH);
 		for (i = 0; i < iobj.ndeltas; i++) {
 			/* TODO: Handle deltas */
 		}

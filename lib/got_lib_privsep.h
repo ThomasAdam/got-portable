@@ -99,10 +99,9 @@ struct got_imsg_object {
 	int flags;
 	size_t hdrlen;
 	size_t size;
-	struct got_object_id id;
 
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
-} __attribute__((__packed__));
+};
 
 /* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
 struct got_imsg_loose_object_header_reply {
