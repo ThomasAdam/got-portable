@@ -252,6 +252,7 @@ read_object_header_privsep(struct got_object **obj, int fd)
 		f = fdopen(fd, "rb");
 		if (f == NULL) {
 			err = got_error_from_errno();
+			close(fd);
 			goto done;
 		}
 
