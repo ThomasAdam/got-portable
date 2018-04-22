@@ -309,7 +309,7 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 }
 
 static const struct got_error *
-open_loose_object(FILE **f, struct got_object *obj, struct got_repository *repo)
+open_loose_object(int *fd, struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -317,8 +317,8 @@ open_loose_object(FILE **f, struct got_object *obj, struct got_repository *repo)
 	err = object_path(&path, &obj->id, repo);
 	if (err)
 		return err;
-	*f = fopen(path, "rb");
-	if (*f == NULL) {
+	*fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	if (*fd == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -728,9 +728,16 @@ got_object_commit_open(struct got_commit_object **commit,
 		free(buf);
 	} else {
 		FILE *f;
-		err = open_loose_object(&f, obj, repo);
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
+		f = fdopen(fd, "rb");
+		if (f == NULL) {
+			err = got_error_from_errno();
+			close(fd);
+			return err;
+		}
 		err = read_commit_object(commit, repo, obj, f);
 		fclose(f);
 	}
@@ -804,11 +811,18 @@ got_object_tree_open(struct got_tree_object **tree,
 		free(buf);
 	} else {
 		FILE *f;
-		err = open_loose_object(&f, obj, repo);
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
+		f = fdopen(fd, "rb");
+		if (f == NULL) {
+			close(fd);
+			return got_error_from_errno();
+		}
 		err = read_tree_object(tree, repo, obj, f);
 		fclose(f);
+		close(fd);
 	}
 	return err;
 }
@@ -859,10 +873,18 @@ got_object_blob_open(struct got_blob_object **blob,
 			return err;
 		}
 	} else {
-		err = open_loose_object(&((*blob)->f), obj, repo);
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
 		if (err) {
 			free(*blob);
 			*blob = NULL;
+			return err;
+		}
+		(*blob)->f = fdopen(fd, "rb");
+		if ((*blob)->f == NULL) {
+			free(*blob);
+			*blob = NULL;
+			close(fd);
 			return err;
 		}
 
