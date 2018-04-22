@@ -71,9 +71,12 @@ print_parent_commits(struct got_commit_object *commit,
 		if (err != NULL)
 			return err;
 		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
-			return got_error(GOT_ERR_OBJ_TYPE);
-		err = print_commit_object(obj, repo);
+			err = got_error(GOT_ERR_OBJ_TYPE);
+		else
+			err = print_commit_object(obj, repo);
 		got_object_close(obj);
+		if (err)
+			break;
 	}
 
 	return err;
@@ -451,7 +454,7 @@ main(int argc, char *argv[])
 	const char *repo_path;
 	int ch;
 
-	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc", NULL) == -1)
 		err(1, "pledge");
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {

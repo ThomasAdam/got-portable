@@ -2,7 +2,7 @@
 
 PROG = repository_test
 SRCS = path.c repository.c error.c reference.c object.c sha1.c diff.c \
-	diffreg.c pack.c delta.c zbuf.c repository_test.c
+	diffreg.c pack.c privsep.c delta.c zbuf.c repository_test.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz

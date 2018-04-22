@@ -46,8 +46,7 @@ enum got_imsg_type {
 	 * separate process which runs under pledge("stdio").
 	 * This sandboxes our own repository parsing code, as well as zlib.
 	 */
-	GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST,
-	GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY,
+	GOT_IMSG_OBJECT,
 	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
 	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
 	GOT_IMSG_LOOSE_COMMIT_OBJECT_REQUEST,
@@ -64,6 +63,7 @@ enum got_imsg_type {
 /* Structure for GOT_IMSG_ERROR. */
 struct got_imsg_error {
 	int code; /* an error code from got_error.h */
+	int errno_code; /* in case code equals GOT_ERR_ERRNO */
 };
 
 /* Structure for GOT_IMSG_DELTA data. */
@@ -92,15 +92,7 @@ struct got_imsg_delta_stream {
 	 */
 };
 
-/* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REQUEST data. */
-struct got_imsg_loose_object_header_request {
-	/*
-	 * Empty since the following is implied: If imsg fd == -1 then
-	 * read raw object data from imsg buffer, else read from fd.
-	 */
-};
-
-/* Structure for transmitting struct got_object data in an imsg. */
+/* Structure for GOT_IMSG_OBJECT data. */
 struct got_imsg_object {
 	/* These fields are the same as in struct got_object. */
 	int type;
@@ -158,5 +150,11 @@ struct got_imsg_tree_entry {
 struct got_imsg_tree_object {
 	int nentries; /* This many TREE_ENTRY messages follow. */
 };
+
+void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
+const struct got_error *got_privsep_send_obj(struct imsgbuf *,
+    struct got_object *, int);
+const struct got_error *got_privsep_recv_obj(struct got_object **,
+    struct imsgbuf *);
 
 /* TODO: Implement the above, and then add more message data types here. */

@@ -389,7 +389,7 @@ main(int argc, char *argv[])
 	const char *repo_path;
 	int ch;
 
-	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
 		err(1, "pledge");
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {

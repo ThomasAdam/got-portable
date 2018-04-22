@@ -180,7 +180,7 @@ cmd_checkout(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 1) {
@@ -449,7 +449,7 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc", NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -623,7 +623,7 @@ cmd_diff(int argc, char *argv[])
 	int ch;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc", NULL) == -1)
 		err(1, "pledge");
 #endif
 

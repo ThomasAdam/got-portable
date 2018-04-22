@@ -14,17 +14,24 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <sha1.h>
 #include <zlib.h>
 #include <ctype.h>
 #include <limits.h>
+#include <imsg.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -33,8 +40,10 @@
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
 #include "got_lib_pack.h"
+#include "got_lib_path.h"
 #include "got_lib_zbuf.h"
 #include "got_lib_object.h"
+#include "got_lib_privsep.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -166,8 +175,7 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 }
 
 static const struct got_error *
-read_object_header(struct got_object **obj, struct got_repository *repo,
-    FILE *f)
+read_object_header(struct got_object **obj, FILE *f)
 {
 	const struct got_error *err;
 	struct got_zstream_buf zb;
@@ -205,6 +213,72 @@ read_object_header(struct got_object **obj, struct got_repository *repo,
 	err = parse_object_header(obj, buf, totlen);
 done:
 	got_inflate_end(&zb);
+	return err;
+}
+
+static const struct got_error *
+read_object_header_privsep(struct got_object **obj, int fd)
+{
+	struct imsgbuf parent_ibuf;
+	int imsg_fds[2];
+	const struct got_error *err = NULL;
+	pid_t pid;
+	int child_status;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		struct got_object *child_obj = NULL;
+		struct imsgbuf child_ibuf;
+		FILE *f = NULL;
+		int status = 0;
+
+		setproctitle("got: read object header");
+		close(imsg_fds[0]);
+		imsg_init(&child_ibuf, imsg_fds[1]);
+		if (err)
+			goto done;
+
+		/* revoke access to most system calls */
+		if (pledge("stdio", NULL) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		f = fdopen(fd, "rb");
+		if (f == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		err = read_object_header(&child_obj, f);
+		if (err)
+			goto done;
+
+		err = got_privsep_send_obj(&child_ibuf, child_obj, 0);
+done:
+		if (child_obj)
+			got_object_close(child_obj);
+		if (err) {
+			got_privsep_send_error(&child_ibuf, err);
+			status = 1;
+		}
+		if (f)
+			fclose(f);
+		imsg_clear(&child_ibuf);
+		_exit(status);
+	}
+
+	close(imsg_fds[1]);
+	imsg_init(&parent_ibuf, imsg_fds[0]);
+	err = got_privsep_recv_obj(obj, &parent_ibuf);
+	imsg_clear(&parent_ibuf);
+	waitpid(pid, &child_status, 0);
+	close(imsg_fds[0]);
 	return err;
 }
 
@@ -258,14 +332,14 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	char *path;
-	FILE *f;
+	int fd;
 
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 
-	f = fopen(path, "rb");
-	if (f == NULL) {
+	fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
 		if (errno != ENOENT) {
 			err = got_error_from_errno();
 			goto done;
@@ -276,15 +350,15 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		if (*obj == NULL)
 			err = got_error(GOT_ERR_NO_OBJ);
 	} else {
-		err = read_object_header(obj, repo, f);
+		err = read_object_header_privsep(obj, fd);
 		if (err)
 			goto done;
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 	}
 done:
 	free(path);
-	if (f)
-		fclose(f);
+	if (fd != -1)
+		close(fd);
 	return err;
 
 }

@@ -46,6 +46,12 @@
 #define GOT_ERR_DIR_OBSTRUCTED	30
 #define GOT_ERR_FILE_OBSTRUCTED	31
 #define GOT_ERR_RECURSION	32
+#define GOT_ERR_TIMEOUT		33
+#define GOT_ERR_INTERRUPT	34
+#define GOT_ERR_PRIVSEP_READ	35
+#define GOT_ERR_PRIVSEP_LEN	36
+#define GOT_ERR_PRIVSEP_PIPE	37
+#define GOT_ERR_PRIVSEP_NO_FD	38
 
 static const struct got_error {
 	int code;
@@ -80,6 +86,13 @@ static const struct got_error {
 	{ GOT_ERR_WORKTREE_VERS,"unsupported worktree format version" },
 	{ GOT_ERR_WORKTREE_BUSY,"worktree already locked" },
 	{ GOT_ERR_RECURSION,	"recursion limit reached" },
+	{ GOT_ERR_TIMEOUT,	"operation timed out" },
+	{ GOT_ERR_INTERRUPT,	"operation interrupted" },
+	{ GOT_ERR_PRIVSEP_READ,	"no data received from unprivileged process" },
+	{ GOT_ERR_PRIVSEP_LEN,	"unexpected amount of data received "
+				"from unprivileged process" },
+	{ GOT_ERR_PRIVSEP_PIPE,	"unprivileged process closed pipe" },
+	{ GOT_ERR_PRIVSEP_NO_FD,"out of file descriptors for privsep" },
 };
 
 /*

@@ -56,8 +56,6 @@
 				SHA1_DIGEST_STRING_LENGTH - 1 + \
 				strlen(GOT_PACKIDX_SUFFIX))
 
-#define GOT_DELTA_CHAIN_RECURSION_MAX	100
-
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
