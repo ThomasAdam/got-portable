@@ -270,6 +270,7 @@ done:
 		if (f)
 			fclose(f);
 		imsg_clear(&child_ibuf);
+		close(imsg_fds[1]);
 		_exit(status);
 	}
 
