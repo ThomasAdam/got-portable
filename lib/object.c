@@ -215,6 +215,8 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 	char *hex;
 	char *path_objects = got_repo_get_path_objects(repo);
 
+	*path = NULL;
+
 	if (path_objects == NULL)
 		return got_error_from_errno();
 
