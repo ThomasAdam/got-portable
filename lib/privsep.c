@@ -64,6 +64,35 @@ poll_fd(int fd, int events, int timeout)
 }
 
 static const struct got_error *
+recv_one_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
+{
+	const struct got_error *err;
+	ssize_t n, m;
+
+	err = poll_fd(ibuf->fd, POLLIN, INFTIM);
+	if (err)
+		return err;
+
+	n = imsg_read(ibuf);
+	if (n == -1) {
+		if (errno == EAGAIN) /* Could be a file-descriptor leak. */
+			return got_error(GOT_ERR_PRIVSEP_NO_FD);
+		return got_error(GOT_ERR_PRIVSEP_READ);
+	}
+	if (n == 0)
+		return got_error(GOT_ERR_PRIVSEP_PIPE);
+
+	m = imsg_get(ibuf, imsg);
+	if (m == 0)
+		return got_error(GOT_ERR_PRIVSEP_READ);
+
+	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	return NULL;
+}
+
+static const struct got_error *
 recv_imsg_error(struct imsg *imsg, size_t datalen)
 {
 	struct got_imsg_error ierr;
@@ -148,7 +177,6 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	struct got_imsg_object iobj;
-	ssize_t n, m;
 	size_t datalen;
 	int i;
 	const size_t min_datalen =
@@ -156,25 +184,9 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 
 	*obj = NULL;
 
-	err = poll_fd(ibuf->fd, POLLIN, INFTIM);
+	err = recv_one_imsg(&imsg, ibuf, min_datalen);
 	if (err)
 		return err;
-
-	n = imsg_read(ibuf);
-	if (n == -1) {
-		if (errno == EAGAIN) /* Could be a file-descriptor leak. */
-			return got_error(GOT_ERR_PRIVSEP_NO_FD);
-		return got_error(GOT_ERR_PRIVSEP_READ);
-	}
-	if (n == 0)
-		return got_error(GOT_ERR_PRIVSEP_PIPE);
-
-	m = imsg_get(ibuf, &imsg);
-	if (m == 0)
-		return got_error(GOT_ERR_PRIVSEP_READ);
-
-	if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen)
-		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
