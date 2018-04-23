@@ -98,7 +98,7 @@ struct got_imsg_object {
 
 /* Structure for GOT_IMSG_COMMIT data. */
 struct got_imsg_commit_object {
-	uint8_t tree_id[SHA1_DIGEST_STRING_LENGTH];
+	uint8_t tree_id[SHA1_DIGEST_LENGTH];
 	size_t author_len;
 	size_t committer_len;
 	size_t logmsg_len;
@@ -106,7 +106,7 @@ struct got_imsg_commit_object {
 
 	/* Followed by author_len + committer_len + logmsg_len data bytes */
 
-	/* Followed by 'nparents' SHA1_DIGEST_STRING_LENGTH length strings */
+	/* Followed by 'nparents' SHA1_DIGEST_LENGTH length strings */
 
 	/* XXX should use more messages to support very large log messages */
 } __attribute__((__packed__));

@@ -244,9 +244,7 @@ got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *comm
 	size_t len, total;
 	struct got_parent_id *pid;
 
-	if (got_sha1_digest_to_str(commit->tree_id->sha1, icommit.tree_id,
-	    sizeof(icommit.tree_id)) == NULL)
-			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
 	icommit.committer_len = strlen(commit->committer);
 	icommit.logmsg_len = strlen(commit->logmsg);
@@ -254,7 +252,7 @@ got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *comm
 
 	total = sizeof(icommit) + icommit.author_len +
 	    icommit.committer_len + icommit.logmsg_len +
-	    icommit.nparents * (SHA1_DIGEST_STRING_LENGTH);
+	    icommit.nparents * SHA1_DIGEST_LENGTH;
 	/* XXX TODO support very large log messages properly */
 	if (total > MAX_IMSGSIZE)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -273,14 +271,8 @@ got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *comm
 	memcpy(buf + len, commit->logmsg, icommit.logmsg_len);
 	len += icommit.logmsg_len;
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		char id_str[SHA1_DIGEST_STRING_LENGTH];
-		if (got_sha1_digest_to_str(pid->id->sha1, id_str,
-		    sizeof(id_str)) == NULL) {
-			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
-			goto done;
-		}
-		memcpy(buf + len, id_str, SHA1_DIGEST_STRING_LENGTH);
-		len += SHA1_DIGEST_STRING_LENGTH;
+		memcpy(buf + len, pid->id, SHA1_DIGEST_LENGTH);
+		len += SHA1_DIGEST_LENGTH;
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT, 0, 0, -1, buf, len) == -1) {
@@ -338,7 +330,7 @@ got_privsep_recv_commit_obj(struct got_commit_object **commit,
 		memcpy(&icommit, data, sizeof(icommit));
 		if (datalen != sizeof(icommit) + icommit.author_len +
 		    icommit.committer_len + icommit.logmsg_len +
-		    icommit.nparents * (SHA1_DIGEST_STRING_LENGTH)) {
+		    icommit.nparents * SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
@@ -354,11 +346,8 @@ got_privsep_recv_commit_obj(struct got_commit_object **commit,
 			break;
 		}
 
-		if (!got_parse_sha1_digest((*commit)->tree_id->sha1,
-		    icommit.tree_id)) {
-			err = got_error(GOT_ERR_BAD_OBJ_DATA);
-			break;
-		}
+		memcpy((*commit)->tree_id->sha1, icommit.tree_id,
+		    SHA1_DIGEST_LENGTH);
 
 		if (icommit.author_len == 0) {
 			(*commit)->author = strdup("");
@@ -416,13 +405,24 @@ got_privsep_recv_commit_obj(struct got_commit_object **commit,
 		len += icommit.logmsg_len;
 
 		for (i = 0; i < icommit.nparents; i++) {
-			char id_str[SHA1_DIGEST_STRING_LENGTH];
-			memcpy(id_str, data + len +
-			    i * SHA1_DIGEST_STRING_LENGTH, sizeof(id_str));
-			id_str[SHA1_DIGEST_STRING_LENGTH - 1] = '\0';
-			err = got_object_commit_add_parent(*commit, id_str);
-			if (err)
+			struct got_parent_id *pid;
+
+			pid = calloc(1, sizeof(*pid));
+			if (pid == NULL) {
+				err = got_error_from_errno();
 				break;
+			}
+			pid->id = calloc(1, sizeof(*pid->id));
+			if (pid->id == NULL) {
+				err = got_error_from_errno();
+				free(pid);
+				break;
+			}
+
+			memcpy(pid->id, data + len + i * SHA1_DIGEST_LENGTH,
+			    sizeof(*pid->id));
+			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
+			(*commit)->nparents++;
 		}
 		break;
 	default:
