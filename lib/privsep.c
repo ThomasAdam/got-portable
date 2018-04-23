@@ -128,17 +128,22 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 	if (ret != -1) {
 		fprintf(stderr, "%s: error %d \"%s\": imsg_compose: %s\n",
 		    getprogname(), err->code, err->msg, strerror(errno));
+		return;
 	}
 
 	poll_err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
-	if (poll_err)
+	if (poll_err) {
 		fprintf(stderr, "%s: error %d \"%s\": poll: %s\n",
 		    getprogname(), err->code, err->msg, poll_err->msg);
+		return;
+	}
 
 	ret = imsg_flush(ibuf);
-	if (ret == -1)
+	if (ret == -1) {
 		fprintf(stderr, "%s: error %d \"%s\": imsg_flush: %s\n",
 		    getprogname(), err->code, err->msg, strerror(errno));
+		return;
+	}
 }
 
 const struct got_error *
