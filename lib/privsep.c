@@ -509,7 +509,7 @@ got_privsep_recv_tree_obj(struct got_tree_object **tree, struct imsgbuf *ibuf)
 get_more:
 	err = read_imsg(ibuf);
 	if (err)
-		return err;
+		goto done;
 
 	while (1) {
 		struct imsg imsg;
@@ -598,9 +598,10 @@ get_more:
 
 		imsg_free(&imsg);
 	}
-
+done:
 	if (*tree && (*tree)->nentries != nentries) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		if (err == NULL)
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
 		got_object_tree_close(*tree);
 		*tree = NULL;
 	}
