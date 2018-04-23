@@ -220,14 +220,14 @@ static void
 read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
 {
 	const struct got_error *err = NULL;
-	struct got_object *child_obj = NULL;
-	struct imsgbuf child_ibuf;
+	struct got_object *obj = NULL;
+	struct imsgbuf ibuf;
 	FILE *f = NULL;
 	int status = 0;
 
 	setproctitle("got: read object header");
 	close(imsg_fds[0]);
-	imsg_init(&child_ibuf, imsg_fds[1]);
+	imsg_init(&ibuf, imsg_fds[1]);
 
 	/* revoke access to most system calls */
 	if (pledge("stdio", NULL) == -1) {
@@ -242,21 +242,21 @@ read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
 		goto done;
 	}
 
-	err = read_object_header(&child_obj, f);
+	err = read_object_header(&obj, f);
 	if (err)
 		goto done;
 
-	err = got_privsep_send_obj(&child_ibuf, child_obj, 0);
+	err = got_privsep_send_obj(&ibuf, obj, 0);
 done:
-	if (child_obj)
-		got_object_close(child_obj);
+	if (obj)
+		got_object_close(obj);
 	if (err) {
-		got_privsep_send_error(&child_ibuf, err);
+		got_privsep_send_error(&ibuf, err);
 		status = 1;
 	}
 	if (f)
 		fclose(f);
-	imsg_clear(&child_ibuf);
+	imsg_clear(&ibuf);
 	close(imsg_fds[1]);
 	_exit(status);
 }
