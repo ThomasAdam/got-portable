@@ -27,6 +27,7 @@
 #include "got_error.h"
 #include "got_reference.h"
 #include "got_repository.h"
+#include "got_worktree.h"
 
 #include "got_lib_path.h"
 #include "got_lib_delta.h"
@@ -34,6 +35,7 @@
 #include "got_lib_object.h"
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"
+#include "got_lib_worktree.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -182,6 +184,28 @@ got_repo_open(struct got_repository **ret, const char *path)
 		    GOT_GIT_DIR) == -1) {
 			err = got_error_from_errno();
 			goto done;
+		}
+		if (!is_git_repo(repo)) {
+			struct got_worktree *worktree;
+			if (got_worktree_open(&worktree, repo->path) == NULL) {
+				free(repo->path_git_dir);
+				repo->path_git_dir =
+				    strdup(worktree->repo_path);
+				if (repo->path_git_dir == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				if (!is_git_repo(repo)) {
+					free(repo->path_git_dir);
+					if (asprintf(&repo->path_git_dir,
+					    "%s/%s", worktree->repo_path,
+					    GOT_GIT_DIR) == -1) {
+						err = got_error_from_errno();
+						goto done;
+					}
+				}
+				got_worktree_close(worktree);
+			}
 		}
 		if (!is_git_repo(repo)) {
 			err = got_error(GOT_ERR_NOT_GIT_REPO);
