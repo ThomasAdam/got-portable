@@ -48,17 +48,9 @@ enum got_imsg_type {
 	 */
 	GOT_IMSG_OBJECT,
 	GOT_IMSG_COMMIT,
-	GOT_IMSG_OBJ_ID,
-	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_TREE_OBJECT_REQUEST,
-	GOT_IMSG_PACKED_COMMIT_OBJECT_REQUEST,
-	GOT_IMSG_BLOB_OBJECT_REQUEST_OUTPUT,
-	GOT_IMSG_BLOB_OBJECT_REPLY,
-	GOT_IMSG_TREE_OBJECT_REPLY,
+	GOT_IMSG_TREE,
 	GOT_IMSG_TREE_ENTRY,
-	GOT_IMSG_COMMIT_OBJECT_REPLY
+	GOT_IMSG_BLOB,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -104,6 +96,7 @@ struct got_imsg_object {
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
 };
 
+/* Structure for GOT_IMSG_COMMIT data. */
 struct got_imsg_commit_object {
 	uint8_t tree_id[SHA1_DIGEST_STRING_LENGTH];
 	size_t author_len;
@@ -118,40 +111,6 @@ struct got_imsg_commit_object {
 	/* XXX should use more messages to support very large log messages */
 } __attribute__((__packed__));
 
-/* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
-struct got_imsg_loose_object_header_reply {
-	struct got_imsg_object iobj;
-};
-
-/* Structure for GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST data. */
-struct got_imsg_loose_blob_object_request {
-	struct got_imsg_object iobj;
-
-	/*
-	 * The following is implied: If imsg fd == -1 then read raw
-	 * blob data from imsg buffer, else read from fd.
-	 *
-	 * This message is followed by an OBJECT_REQUEST_OUTPUT message.
-	 */
-};
-
-/* Structure for GOT_IMSG_BLOB_OBJECT_REQUEST_OUTPUT data. */
-struct got_imsg_blob_object_request_output {
-	/*
-	 * Empty since the following is implied: If imsg fd == -1 then
-	 * respond with blob data in imsg buffer, else write to fd.
-	 */
-};
-
-/* Structure for GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST data. */
-struct got_imsg_loose_tree_object_request {
-	struct got_imsg_object iobj;
-
-	/*
-	 * The following is implied: If imsg fd == -1 then read raw tree
-	 * data from imsg buffer, else read from fd.
-	 */
-};
 
 /* Structure for GOT_IMSG_TREE_ENTRY. */
 struct got_imsg_tree_entry {
