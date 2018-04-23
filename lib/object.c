@@ -216,6 +216,51 @@ done:
 	return err;
 }
 
+static void
+read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
+{
+	const struct got_error *err = NULL;
+	struct got_object *child_obj = NULL;
+	struct imsgbuf child_ibuf;
+	FILE *f = NULL;
+	int status = 0;
+
+	setproctitle("got: read object header");
+	close(imsg_fds[0]);
+	imsg_init(&child_ibuf, imsg_fds[1]);
+
+	/* revoke access to most system calls */
+	if (pledge("stdio", NULL) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	f = fdopen(obj_fd, "rb");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		close(obj_fd);
+		goto done;
+	}
+
+	err = read_object_header(&child_obj, f);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_obj(&child_ibuf, child_obj, 0);
+done:
+	if (child_obj)
+		got_object_close(child_obj);
+	if (err) {
+		got_privsep_send_error(&child_ibuf, err);
+		status = 1;
+	}
+	if (f)
+		fclose(f);
+	imsg_clear(&child_ibuf);
+	close(imsg_fds[1]);
+	_exit(status);
+}
+
 static const struct got_error *
 read_object_header_privsep(struct got_object **obj, int fd)
 {
@@ -232,47 +277,8 @@ read_object_header_privsep(struct got_object **obj, int fd)
 	if (pid == -1)
 		return got_error_from_errno();
 	else if (pid == 0) {
-		struct got_object *child_obj = NULL;
-		struct imsgbuf child_ibuf;
-		FILE *f = NULL;
-		int status = 0;
-
-		setproctitle("got: read object header");
-		close(imsg_fds[0]);
-		imsg_init(&child_ibuf, imsg_fds[1]);
-		if (err)
-			goto done;
-
-		/* revoke access to most system calls */
-		if (pledge("stdio", NULL) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
-
-		f = fdopen(fd, "rb");
-		if (f == NULL) {
-			err = got_error_from_errno();
-			close(fd);
-			goto done;
-		}
-
-		err = read_object_header(&child_obj, f);
-		if (err)
-			goto done;
-
-		err = got_privsep_send_obj(&child_ibuf, child_obj, 0);
-done:
-		if (child_obj)
-			got_object_close(child_obj);
-		if (err) {
-			got_privsep_send_error(&child_ibuf, err);
-			status = 1;
-		}
-		if (f)
-			fclose(f);
-		imsg_clear(&child_ibuf);
-		close(imsg_fds[1]);
-		_exit(status);
+		read_object_header_privsep_child(fd, imsg_fds);
+		/* not reached */
 	}
 
 	close(imsg_fds[1]);
