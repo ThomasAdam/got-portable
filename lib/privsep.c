@@ -63,6 +63,25 @@ poll_fd(int fd, int events, int timeout)
 	return got_error(GOT_ERR_INTERRUPT);
 }
 
+static const struct got_error *
+recv_imsg_error(struct imsg *imsg, size_t datalen)
+{
+	struct got_imsg_error ierr;
+
+	if (datalen != sizeof(ierr))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&ierr, imsg->data, sizeof(ierr));
+	if (ierr.code == GOT_ERR_ERRNO) {
+		static struct got_error serr;
+		serr.code = GOT_ERR_ERRNO;
+		serr.msg = strerror(ierr.errno_code);
+		return &serr;
+	}
+
+	return got_error(ierr.code);
+}
+
 /* Attempt to send an error in an imsg. Complain on stderr as a last resort. */
 void
 got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
@@ -127,12 +146,13 @@ const struct got_error *
 got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_error ierr;
 	struct imsg imsg;
 	struct got_imsg_object iobj;
 	ssize_t n, m;
 	size_t datalen;
 	int i;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error), sizeof(struct got_imsg_object));
 
 	*obj = NULL;
 
@@ -153,25 +173,14 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 	if (m == 0)
 		return got_error(GOT_ERR_PRIVSEP_READ);
 
-	if (imsg.hdr.len < IMSG_HEADER_SIZE + MIN(sizeof(ierr), sizeof(obj)))
+	if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_ERROR:
-		if (datalen != sizeof(ierr)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		memcpy(&ierr, imsg.data, sizeof(ierr));
-		if (ierr.code == GOT_ERR_ERRNO) {
-			static struct got_error serr;
-			serr.code = GOT_ERR_ERRNO;
-			serr.msg = strerror(ierr.errno_code);
-			err = &serr;
-		} else
-			err = got_error(ierr.code);
+		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_OBJECT:
 		if (datalen != sizeof(iobj)) {
