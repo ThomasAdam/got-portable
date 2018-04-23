@@ -801,7 +801,7 @@ read_commit_object_privsep(struct got_commit_object **commit,
 		return got_error_from_errno();
 	else if (pid == 0) {
 		read_commit_object_privsep_child(obj, fd, imsg_fds);
-		/* no reached */
+		/* not reached */
 	}
 
 	close(imsg_fds[1]);
