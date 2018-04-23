@@ -399,6 +399,56 @@ got_object_close(struct got_object *obj)
 	free(obj);
 }
 
+struct got_commit_object *
+got_object_commit_alloc_partial(void)
+{
+	struct got_commit_object *commit;
+
+	commit = calloc(1, sizeof(*commit));
+	if (commit == NULL)
+		return NULL;
+	commit->tree_id = calloc(1, sizeof(*commit->tree_id));
+	if (commit->tree_id == NULL) {
+		free(commit);
+		return NULL;
+	}
+
+	SIMPLEQ_INIT(&commit->parent_ids);
+
+	return commit;
+}
+
+const struct got_error *
+got_object_commit_add_parent(struct got_commit_object *commit,
+    const char *id_str)
+{
+	const struct got_error *err = NULL;
+	struct got_parent_id *pid;
+
+	pid = calloc(1, sizeof(*pid));
+	if (pid == NULL)
+		return got_error_from_errno();
+
+	pid->id = calloc(1, sizeof(*pid->id));
+	if (pid->id == NULL) {
+		err = got_error_from_errno();
+		free(pid);
+		return err;
+	}
+
+	if (!got_parse_sha1_digest(pid->id->sha1, id_str)) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		free(pid->id);
+		free(pid);
+		return err;
+	}
+
+	SIMPLEQ_INSERT_TAIL(&commit->parent_ids, pid, entry);
+	commit->nparents++;
+
+	return NULL;
+}
+
 static const struct got_error *
 parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 {
@@ -407,18 +457,9 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 	size_t tlen;
 	ssize_t remain = (ssize_t)len;
  
-	*commit = calloc(1, sizeof(**commit));
+	*commit = got_object_commit_alloc_partial();
 	if (*commit == NULL)
 		return got_error_from_errno();
-	(*commit)->tree_id = calloc(1, sizeof(*(*commit)->tree_id));
-	if ((*commit)->tree_id == NULL) {
-		err = got_error_from_errno();
-		free(*commit);
-		*commit = NULL;
-		return err;
-	}
-
-	SIMPLEQ_INIT(&(*commit)->parent_ids);
 
 	tlen = strlen(GOT_COMMIT_TAG_TREE);
 	if (strncmp(s, GOT_COMMIT_TAG_TREE, tlen) == 0) {
@@ -441,34 +482,15 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 
 	tlen = strlen(GOT_COMMIT_TAG_PARENT);
 	while (strncmp(s, GOT_COMMIT_TAG_PARENT, tlen) == 0) {
-		struct got_parent_id *pid;
-
 		remain -= tlen;
 		if (remain < SHA1_DIGEST_STRING_LENGTH) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-
-		pid = calloc(1, sizeof(*pid));
-		if (pid == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		pid->id = calloc(1, sizeof(*pid->id));
-		if (pid->id == NULL) {
-			err = got_error_from_errno();
-			free(pid);
-			goto done;
-		}
 		s += tlen;
-		if (!got_parse_sha1_digest(pid->id->sha1, s)) {
-			err = got_error(GOT_ERR_BAD_OBJ_DATA);
-			free(pid->id);
-			free(pid);
+		err = got_object_commit_add_parent(*commit, s);
+		if (err)
 			goto done;
-		}
-		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
-		(*commit)->nparents++;
 
 		remain -= SHA1_DIGEST_STRING_LENGTH;
 		s += SHA1_DIGEST_STRING_LENGTH;
@@ -688,8 +710,8 @@ done:
 }
 
 static const struct got_error *
-read_commit_object(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object *obj, FILE *f)
+read_commit_object(struct got_commit_object **commit, struct got_object *obj,
+    FILE *f)
 {
 	const struct got_error *err = NULL;
 	size_t len;
@@ -715,6 +737,82 @@ done:
 	return err;
 }
 
+static void
+read_commit_object_privsep_child(struct got_object *obj, int obj_fd,
+    int imsg_fds[2])
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	struct imsgbuf ibuf;
+	FILE *f = NULL;
+	int status = 0;
+
+	setproctitle("got: read commit object");
+	close(imsg_fds[0]);
+	imsg_init(&ibuf, imsg_fds[1]);
+
+	/* revoke access to most system calls */
+	if (pledge("stdio", NULL) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	f = fdopen(obj_fd, "rb");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		close(obj_fd);
+		goto done;
+	}
+
+	err = read_commit_object(&commit, obj, f);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_commit_obj(&ibuf, commit);
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	if (err) {
+		got_privsep_send_error(&ibuf, err);
+		status = 1;
+	}
+	if (f)
+		fclose(f);
+	imsg_clear(&ibuf);
+	close(imsg_fds[1]);
+	_exit(status);
+}
+
+static const struct got_error *
+read_commit_object_privsep(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object *obj, int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf parent_ibuf;
+	int imsg_fds[2];
+	pid_t pid;
+	int child_status;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		read_commit_object_privsep_child(obj, fd, imsg_fds);
+		/* no reached */
+	}
+
+	close(imsg_fds[1]);
+	imsg_init(&parent_ibuf, imsg_fds[0]);
+	err = got_privsep_recv_commit_obj(commit, &parent_ibuf);
+	imsg_clear(&parent_ibuf);
+	waitpid(pid, &child_status, 0);
+	close(imsg_fds[0]);
+	return err;
+}
+
 const struct got_error *
 got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
@@ -734,19 +832,12 @@ got_object_commit_open(struct got_commit_object **commit,
 		err = parse_commit_object(commit, buf, len);
 		free(buf);
 	} else {
-		FILE *f;
 		int fd;
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
-		f = fdopen(fd, "rb");
-		if (f == NULL) {
-			err = got_error_from_errno();
-			close(fd);
-			return err;
-		}
-		err = read_commit_object(commit, repo, obj, f);
-		fclose(f);
+		err = read_commit_object_privsep(commit, repo, obj, fd);
+		close(fd);
 	}
 	return err;
 }

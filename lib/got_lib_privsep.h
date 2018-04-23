@@ -47,9 +47,10 @@ enum got_imsg_type {
 	 * This sandboxes our own repository parsing code, as well as zlib.
 	 */
 	GOT_IMSG_OBJECT,
+	GOT_IMSG_COMMIT,
+	GOT_IMSG_OBJ_ID,
 	GOT_IMSG_LOOSE_BLOB_OBJECT_REQUEST,
 	GOT_IMSG_LOOSE_TREE_OBJECT_REQUEST,
-	GOT_IMSG_LOOSE_COMMIT_OBJECT_REQUEST,
 	GOT_IMSG_PACKED_BLOB_OBJECT_REQUEST,
 	GOT_IMSG_PACKED_TREE_OBJECT_REQUEST,
 	GOT_IMSG_PACKED_COMMIT_OBJECT_REQUEST,
@@ -103,6 +104,20 @@ struct got_imsg_object {
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
 };
 
+struct got_imsg_commit_object {
+	uint8_t tree_id[SHA1_DIGEST_STRING_LENGTH];
+	size_t author_len;
+	size_t committer_len;
+	size_t logmsg_len;
+	int nparents;
+
+	/* Followed by author_len + committer_len + logmsg_len data bytes */
+
+	/* Followed by 'nparents' SHA1_DIGEST_STRING_LENGTH length strings */
+
+	/* XXX should use more messages to support very large log messages */
+} __attribute__((__packed__));
+
 /* Structure for GOT_IMSG_LOOSE_OBJECT_HEADER_REPLY data. */
 struct got_imsg_loose_object_header_reply {
 	struct got_imsg_object iobj;
@@ -154,6 +169,10 @@ void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *, int);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_commit_obj(struct imsgbuf *,
+    struct got_commit_object *);
+const struct got_error *got_privsep_recv_commit_obj(struct got_commit_object **,
     struct imsgbuf *);
 
 /* TODO: Implement the above, and then add more message data types here. */

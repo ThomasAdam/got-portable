@@ -234,3 +234,203 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 
 	return err;
 }
+
+const struct got_error *
+got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *commit)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_commit_object icommit;
+	uint8_t *buf;
+	size_t len, total;
+	struct got_parent_id *pid;
+
+	if (got_sha1_digest_to_str(commit->tree_id->sha1, icommit.tree_id,
+	    sizeof(icommit.tree_id)) == NULL)
+			return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	icommit.author_len = strlen(commit->author);
+	icommit.committer_len = strlen(commit->committer);
+	icommit.logmsg_len = strlen(commit->logmsg);
+	icommit.nparents = commit->nparents;
+
+	total = sizeof(icommit) + icommit.author_len +
+	    icommit.committer_len + icommit.logmsg_len +
+	    icommit.nparents * (SHA1_DIGEST_STRING_LENGTH);
+	/* XXX TODO support very large log messages properly */
+	if (total > MAX_IMSGSIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	buf = malloc(total);
+	if (buf == NULL)
+		return got_error_from_errno();
+
+	len = 0;
+	memcpy(buf + len, &icommit, sizeof(icommit));
+	len += sizeof(icommit);
+	memcpy(buf + len, commit->author, icommit.author_len);
+	len += icommit.author_len;
+	memcpy(buf + len, commit->committer, icommit.committer_len);
+	len += icommit.committer_len;
+	memcpy(buf + len, commit->logmsg, icommit.logmsg_len);
+	len += icommit.logmsg_len;
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		char id_str[SHA1_DIGEST_STRING_LENGTH];
+		if (got_sha1_digest_to_str(pid->id->sha1, id_str,
+		    sizeof(id_str)) == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+			goto done;
+		}
+		memcpy(buf + len, id_str, SHA1_DIGEST_STRING_LENGTH);
+		len += SHA1_DIGEST_STRING_LENGTH;
+	}
+
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT, 0, 0, -1, buf, len) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
+	if (err)
+		goto done;
+
+	if (imsg_flush(ibuf) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+done:
+	free(buf);
+	return err;
+}
+const struct got_error *
+got_privsep_recv_commit_obj(struct got_commit_object **commit,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_commit_object icommit;
+	size_t len, datalen;
+	int i;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error),
+	    sizeof(struct got_imsg_commit_object));
+	uint8_t *data;
+
+	*commit = NULL;
+
+	err = recv_one_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+
+	data = imsg.data;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	len = 0;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_COMMIT:
+		if (datalen < sizeof(icommit)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+
+		memcpy(&icommit, data, sizeof(icommit));
+		if (datalen != sizeof(icommit) + icommit.author_len +
+		    icommit.committer_len + icommit.logmsg_len +
+		    icommit.nparents * (SHA1_DIGEST_STRING_LENGTH)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		if (icommit.nparents < 0) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		len += sizeof(icommit);
+
+		*commit = got_object_commit_alloc_partial();
+		if (*commit == NULL) {
+			err = got_error_from_errno();
+			break;
+		}
+
+		if (!got_parse_sha1_digest((*commit)->tree_id->sha1,
+		    icommit.tree_id)) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			break;
+		}
+
+		if (icommit.author_len == 0) {
+			(*commit)->author = strdup("");
+			if ((*commit)->author == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*commit)->author = malloc(icommit.author_len + 1);
+			if ((*commit)->author == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*commit)->author, data + len,
+			    icommit.author_len);
+			(*commit)->author[icommit.author_len] = '\0';
+		}
+		len += icommit.author_len;
+
+		if (icommit.committer_len == 0) {
+			(*commit)->committer = strdup("");
+			if ((*commit)->committer == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*commit)->committer =
+			    malloc(icommit.committer_len + 1);
+			if ((*commit)->committer == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*commit)->committer, data + len,
+			    icommit.committer_len);
+			(*commit)->committer[icommit.committer_len] = '\0';
+		}
+		len += icommit.committer_len;
+
+		if (icommit.logmsg_len == 0) {
+			(*commit)->logmsg = strdup("");
+			if ((*commit)->logmsg == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*commit)->logmsg = malloc(icommit.logmsg_len + 1);
+			if ((*commit)->logmsg == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*commit)->logmsg, data + len,
+			    icommit.logmsg_len);
+			(*commit)->logmsg[icommit.logmsg_len] = '\0';
+		}
+		len += icommit.logmsg_len;
+
+		for (i = 0; i < icommit.nparents; i++) {
+			char id_str[SHA1_DIGEST_STRING_LENGTH];
+			memcpy(id_str, data + len +
+			    i * SHA1_DIGEST_STRING_LENGTH, sizeof(id_str));
+			id_str[SHA1_DIGEST_STRING_LENGTH - 1] = '\0';
+			err = got_object_commit_add_parent(*commit, id_str);
+			if (err)
+				break;
+		}
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}

@@ -43,3 +43,5 @@ struct got_blob_object {
 #define GOT_BLOB_F_COMPRESSED	0x01
 	struct got_object_id id;
 };
+
+struct got_commit_object *got_object_commit_alloc_partial(void);
