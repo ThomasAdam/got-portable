@@ -514,7 +514,6 @@ get_more:
 	while (1) {
 		struct imsg imsg;
 		size_t n;
-		uint8_t *data;
 		size_t datalen;
 		struct got_imsg_tree_entry ite;
 		struct got_tree_entry *te = NULL;
@@ -529,7 +528,6 @@ get_more:
 		if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen)
 			return got_error(GOT_ERR_PRIVSEP_LEN);
 
-		data = imsg.data;
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 		switch (imsg.hdr.type) {
@@ -573,6 +571,7 @@ get_more:
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
+
 			te = got_alloc_tree_entry_partial();
 			if (te == NULL) {
 				err = got_error_from_errno();
@@ -584,7 +583,7 @@ get_more:
 				err = got_error_from_errno();
 				break;
 			}
-			memcpy(te->name, imsg.data, datalen);
+			memcpy(te->name, imsg.data + sizeof(ite), datalen);
 			te->name[datalen] = '\0';
 
 			memcpy(te->id->sha1, ite.id, SHA1_DIGEST_LENGTH);
