@@ -64,10 +64,10 @@ poll_fd(int fd, int events, int timeout)
 }
 
 static const struct got_error *
-recv_one_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
+read_imsg(struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
-	ssize_t n, m;
+	size_t n;
 
 	err = poll_fd(ibuf->fd, POLLIN, INFTIM);
 	if (err)
@@ -82,8 +82,21 @@ recv_one_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 	if (n == 0)
 		return got_error(GOT_ERR_PRIVSEP_PIPE);
 
-	m = imsg_get(ibuf, imsg);
-	if (m == 0)
+	return NULL;
+}
+
+static const struct got_error *
+recv_one_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
+{
+	const struct got_error *err;
+	ssize_t n;
+
+	err = read_imsg(ibuf);
+	if (err)
+		return err;
+
+	n = imsg_get(ibuf, imsg);
+	if (n == 0)
 		return got_error(GOT_ERR_PRIVSEP_READ);
 
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
@@ -146,10 +159,24 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 	}
 }
 
+static const struct got_error *
+flush_imsg(struct imsgbuf *ibuf)
+{
+	const struct got_error *err;
+
+	err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
+	if (err)
+		return err;
+
+	if (imsg_flush(ibuf) == -1)
+		return got_error_from_errno();
+
+	return NULL;
+}
+
 const struct got_error *
 got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj, int ndeltas)
 {
-	const struct got_error *err = NULL;
 	struct got_imsg_object iobj;
 
 	iobj.type = obj->type;
@@ -166,14 +193,7 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj, int ndeltas)
 	    == -1)
 		return got_error_from_errno();
 
-	err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
-	if (err)
-		return err;
-
-	if (imsg_flush(ibuf) == -1)
-		return got_error_from_errno();
-
-	return NULL;
+	return flush_imsg(ibuf);
 }
 
 const struct got_error *
@@ -280,15 +300,7 @@ got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *comm
 		goto done;
 	}
 
-	err = poll_fd(ibuf->fd, POLLOUT, INFTIM);
-	if (err)
-		goto done;
-
-	if (imsg_flush(ibuf) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
+	err = flush_imsg(ibuf);
 done:
 	free(buf);
 	return err;
@@ -431,6 +443,168 @@ got_privsep_recv_commit_obj(struct got_commit_object **commit,
 	}
 
 	imsg_free(&imsg);
+
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_tree_obj(struct imsgbuf *ibuf, struct got_tree_object *tree)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_tree_object itree;
+	struct got_tree_entry *te;
+
+	itree.nentries = tree->nentries;
+	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
+	    == -1)
+		return got_error_from_errno();
+
+	err = flush_imsg(ibuf);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+		struct got_imsg_tree_entry ite;
+		uint8_t *buf = NULL;
+		size_t len = sizeof(ite) + strlen(te->name);
+
+		if (len > MAX_IMSGSIZE)
+			return got_error(GOT_ERR_NO_SPACE);
+
+		buf = malloc(len);
+		if (buf == NULL)
+			return got_error_from_errno();
+
+		memcpy(ite.id, te->id->sha1, sizeof(ite.id));
+		ite.mode = te->mode;
+		memcpy(buf, &ite, sizeof(ite));
+		memcpy(buf + sizeof(ite), te->name, strlen(te->name));
+
+		if (imsg_compose(ibuf, GOT_IMSG_TREE_ENTRY, 0, 0, -1,
+		    buf, len) == -1)
+			err = got_error_from_errno();
+		free(buf);
+		if (err)
+			return err;
+
+		err = flush_imsg(ibuf);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+const struct got_error *
+got_privsep_recv_tree_obj(struct got_tree_object **tree, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error),
+	    sizeof(struct got_imsg_tree_object));
+	struct got_imsg_tree_object itree = { 0 };
+	int nentries = 0;
+
+	*tree = NULL;
+get_more:
+	err = read_imsg(ibuf);
+	if (err)
+		return err;
+
+	while (1) {
+		struct imsg imsg;
+		size_t n;
+		uint8_t *data;
+		size_t datalen;
+		struct got_imsg_tree_entry ite;
+		struct got_tree_entry *te = NULL;
+
+		n = imsg_get(ibuf, &imsg);
+		if (n == 0) {
+			if (*tree && (*tree)->nentries != nentries)
+				goto get_more;
+			break;
+		}
+
+		if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen)
+			return got_error(GOT_ERR_PRIVSEP_LEN);
+
+		data = imsg.data;
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+		switch (imsg.hdr.type) {
+		case GOT_IMSG_ERROR:
+			err = recv_imsg_error(&imsg, datalen);
+			break;
+		case GOT_IMSG_TREE:
+			/* This message should only appear once. */
+			if (*tree != NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			if (datalen != sizeof(itree)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			memcpy(&itree, imsg.data, sizeof(itree));
+			*tree = calloc(1, sizeof(**tree));
+			if (*tree == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			(*tree)->nentries = itree.nentries;
+			SIMPLEQ_INIT(&(*tree)->entries);
+			break;
+		case GOT_IMSG_TREE_ENTRY:
+			/* This message should be preceeded by GOT_IMSG_TREE. */
+			if (*tree == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			if (datalen < sizeof(ite) || datalen > MAX_IMSGSIZE) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+
+			/* Remaining data contains the entry's name. */
+			datalen -= sizeof(ite);
+			memcpy(&ite, imsg.data, sizeof(ite));
+			if (datalen == 0 || datalen > MAX_IMSGSIZE) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			te = got_alloc_tree_entry_partial();
+			if (te == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			te->name = malloc(datalen + 1);
+			if (te->name == NULL) {
+				free(te);
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy(te->name, imsg.data, datalen);
+			te->name[datalen] = '\0';
+
+			memcpy(te->id->sha1, ite.id, SHA1_DIGEST_LENGTH);
+			te->mode = ite.mode;
+			SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
+			nentries++;
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
+		imsg_free(&imsg);
+	}
+
+	if (*tree && (*tree)->nentries != nentries) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		got_object_tree_close(*tree);
+		*tree = NULL;
+	}
 
 	return err;
 }

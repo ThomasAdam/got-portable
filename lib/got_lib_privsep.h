@@ -114,7 +114,7 @@ struct got_imsg_commit_object {
 
 /* Structure for GOT_IMSG_TREE_ENTRY. */
 struct got_imsg_tree_entry {
-	struct got_object_id id;
+	char id[SHA1_DIGEST_LENGTH];
 	mode_t mode;
 	/* Followed by entry's name in remaining data of imsg buffer. */
 } __attribute__((__packed__));
@@ -133,5 +133,9 @@ const struct got_error *got_privsep_send_commit_obj(struct imsgbuf *,
     struct got_commit_object *);
 const struct got_error *got_privsep_recv_commit_obj(struct got_commit_object **,
     struct imsgbuf *);
+const struct got_error *got_privsep_recv_tree_obj(struct got_tree_object **,
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_tree_obj(struct imsgbuf *,
+    struct got_tree_object *);
 
 /* TODO: Implement the above, and then add more message data types here. */

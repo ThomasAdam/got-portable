@@ -567,6 +567,23 @@ tree_entry_close(struct got_tree_entry *te)
 	free(te);
 }
 
+struct got_tree_entry *
+got_alloc_tree_entry_partial(void)
+{
+	struct got_tree_entry *te;
+
+	te = calloc(1, sizeof(*te));
+	if (te == NULL)
+		return NULL;
+
+	te->id = calloc(1, sizeof(*te->id));
+	if (te->id == NULL) {
+		free(te);
+		te = NULL;
+	}
+	return te;
+}
+
 static const struct got_error *
 parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
     size_t maxlen)
@@ -574,17 +591,9 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	char *p = buf, *space;
 	const struct got_error *err = NULL;
 
-	*te = calloc(1, sizeof(**te));
+	*te = got_alloc_tree_entry_partial();
 	if (*te == NULL)
 		return got_error_from_errno();
-
-	(*te)->id = calloc(1, sizeof(*(*te)->id));
-	if ((*te)->id == NULL) {
-		err = got_error_from_errno();
-		free(*te);
-		*te = NULL;
-		return err;
-	}
 
 	*elen = strlen(buf) + 1;
 	if (*elen > maxlen) {
@@ -627,8 +636,7 @@ done:
 }
 
 static const struct got_error *
-parse_tree_object(struct got_tree_object **tree, struct got_repository *repo,
-    uint8_t *buf, size_t len)
+parse_tree_object(struct got_tree_object **tree, uint8_t *buf, size_t len)
 {
 	const struct got_error *err;
 	size_t remain = len;
@@ -862,8 +870,7 @@ got_object_commit_close(struct got_commit_object *commit)
 }
 
 static const struct got_error *
-read_tree_object(struct got_tree_object **tree,
-    struct got_repository *repo, struct got_object *obj, FILE *f)
+read_tree_object(struct got_tree_object **tree, struct got_object *obj, FILE *f)
 {
 	const struct got_error *err = NULL;
 	size_t len;
@@ -883,9 +890,85 @@ read_tree_object(struct got_tree_object **tree,
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = parse_tree_object(tree, repo, p + obj->hdrlen, len);
+	err = parse_tree_object(tree, p + obj->hdrlen, len);
 	free(p);
 done:
+	return err;
+}
+
+static void
+read_tree_object_privsep_child(struct got_object *obj, int obj_fd,
+    int imsg_fds[2])
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree = NULL;
+	struct imsgbuf ibuf;
+	FILE *f = NULL;
+	int status = 0;
+
+	setproctitle("got: read tree object");
+	close(imsg_fds[0]);
+	imsg_init(&ibuf, imsg_fds[1]);
+
+	/* revoke access to most system calls */
+	if (pledge("stdio", NULL) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	f = fdopen(obj_fd, "rb");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		close(obj_fd);
+		goto done;
+	}
+
+	err = read_tree_object(&tree, obj, f);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_tree_obj(&ibuf, tree);
+done:
+	if (tree)
+		got_object_tree_close(tree);
+	if (err) {
+		got_privsep_send_error(&ibuf, err);
+		status = 1;
+	}
+	if (f)
+		fclose(f);
+	imsg_clear(&ibuf);
+	close(imsg_fds[1]);
+	_exit(status);
+}
+
+static const struct got_error *
+read_tree_object_privsep(struct got_tree_object **tree, struct got_object *obj,
+    int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf parent_ibuf;
+	int imsg_fds[2];
+	pid_t pid;
+	int child_status;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		read_tree_object_privsep_child(obj, fd, imsg_fds);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	imsg_init(&parent_ibuf, imsg_fds[0]);
+	err = got_privsep_recv_tree_obj(tree, &parent_ibuf);
+	imsg_clear(&parent_ibuf);
+	waitpid(pid, &child_status, 0);
+	close(imsg_fds[0]);
 	return err;
 }
 
@@ -905,21 +988,14 @@ got_object_tree_open(struct got_tree_object **tree,
 		if (err)
 			return err;
 		obj->size = len;
-		err = parse_tree_object(tree, repo, buf, len);
+		err = parse_tree_object(tree, buf, len);
 		free(buf);
 	} else {
-		FILE *f;
 		int fd;
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
-		f = fdopen(fd, "rb");
-		if (f == NULL) {
-			close(fd);
-			return got_error_from_errno();
-		}
-		err = read_tree_object(tree, repo, obj, f);
-		fclose(f);
+		err = read_tree_object_privsep(tree, obj, fd);
 		close(fd);
 	}
 	return err;

@@ -45,3 +45,4 @@ struct got_blob_object {
 };
 
 struct got_commit_object *got_object_commit_alloc_partial(void);
+struct got_tree_entry *got_alloc_tree_entry_partial(void);
