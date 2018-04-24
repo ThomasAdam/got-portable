@@ -82,21 +82,30 @@ got_path_segment_count(int *count, const char *path)
 	return NULL;
 }
 
-FILE *
-got_opentemp(void)
+int
+got_opentempfd(void)
 {
 	char name[PATH_MAX];
 	int fd;
-	FILE *f;
 
 	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
-		return NULL;
+		return -1;
 
 	fd = mkstemp(name);
+	unlink(name);
+	return fd;
+}
+
+FILE *
+got_opentemp(void)
+{
+	int fd;
+	FILE *f;
+
+	fd = got_opentempfd();
 	if (fd < 0)
 		return NULL;
 
-	unlink(name);
 	f = fdopen(fd, "w+");
 	if (f == NULL) {
 		close(fd);

@@ -34,6 +34,10 @@ char *got_path_get_absolute(const char *);
  */
 char *got_path_normalize(const char *);
 
+/* Open a file descriptor to a new temporary file for writing.
+ * The file is not visible in the filesystem. */
+int got_opentempfd(void);
+
 /* Open a new temporary file for writing.
  * The file is not visible in the filesystem. */
 FILE *got_opentemp(void);
