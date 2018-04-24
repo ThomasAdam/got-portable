@@ -531,7 +531,7 @@ diff_blobs(struct got_object *obj1, struct got_object *obj2,
 	err = got_object_blob_open(&blob1, repo, obj1, 8192);
 	if (err)
 		goto done;
-	err = got_object_blob_open(&blob2, repo, obj2, 81992);
+	err = got_object_blob_open(&blob2, repo, obj2, 8192);
 	if (err)
 		goto done;
 
