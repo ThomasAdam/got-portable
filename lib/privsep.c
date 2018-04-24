@@ -609,20 +609,26 @@ done:
 }
 
 const struct got_error *
-got_privsep_send_blob(struct imsgbuf *ibuf)
+got_privsep_send_blob(struct imsgbuf *ibuf, size_t size)
 {
+	struct got_imsg_blob iblob;
+
+	iblob.size = size;
 	/* Data has already been written to file descriptor. */
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, NULL, 0) == -1)
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, &iblob, sizeof(iblob))
+	    == -1)
 		return got_error_from_errno();
 
 	return flush_imsg(ibuf);
 }
 
 const struct got_error *
-got_privsep_recv_blob(struct imsgbuf *ibuf)
+got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
+	struct got_imsg_blob iblob;
 	size_t datalen;
 
 	err = recv_one_imsg(&imsg, ibuf, 0);
@@ -636,8 +642,10 @@ got_privsep_recv_blob(struct imsgbuf *ibuf)
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_BLOB:
-		if (datalen != 0)
+		if (datalen != sizeof(iblob))
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
+		memcpy(&iblob, imsg.data, sizeof(iblob));
+		*size = iblob.size;
 		/* Data has been written to file descriptor. */
 		break;
 	default:

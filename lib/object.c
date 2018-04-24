@@ -1016,11 +1016,9 @@ got_object_tree_close(struct got_tree_object *tree)
 }
 
 static const struct got_error *
-read_blob_object(int outfd, int infd)
+read_blob_object(size_t *size, int outfd, int infd)
 {
-	size_t size;
-
-	return got_inflate_to_fd(&size, infd, outfd);
+	return got_inflate_to_fd(size, infd, outfd);
 }
 
 static const struct got_error *
@@ -1029,6 +1027,7 @@ read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 	int status = 0;
+	size_t size;
 
 	setproctitle("got: read blob object");
 	close(imsg_fds[0]);
@@ -1040,12 +1039,12 @@ read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
 		goto done;
 	}
 
-	err = read_blob_object(outfd, infd);
+	err = read_blob_object(&size, outfd, infd);
 	close(infd);
 	if (err)
 		goto done;
 
-	err = got_privsep_send_blob(&ibuf);
+	err = got_privsep_send_blob(&ibuf, size);
 done:
 	if (err) {
 		got_privsep_send_error(&ibuf, err);
@@ -1058,7 +1057,7 @@ done:
 }
 
 static const struct got_error *
-read_blob_object_privsep(int outfd, int infd)
+read_blob_object_privsep(size_t *size, int outfd, int infd)
 {
 	struct imsgbuf parent_ibuf;
 	int imsg_fds[2];
@@ -1079,7 +1078,7 @@ read_blob_object_privsep(int outfd, int infd)
 
 	close(imsg_fds[1]);
 	imsg_init(&parent_ibuf, imsg_fds[0]);
-	err = got_privsep_recv_blob(&parent_ibuf);
+	err = got_privsep_recv_blob(size, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
 	waitpid(pid, &child_status, 0);
 	close(imsg_fds[0]);
@@ -1115,6 +1114,8 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 	} else {
 		int infd, outfd;
+		size_t size;
+		struct stat sb;
 
 		err = open_loose_object(&infd, obj, repo);
 		if (err)
@@ -1128,10 +1129,28 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 		}
 
-		err = read_blob_object_privsep(outfd, infd);
+		err = read_blob_object_privsep(&size, outfd, infd);
 		close(infd);
 		if (err)
 			goto done;
+
+		if (size != obj->hdrlen + obj->size) {
+			err = got_error(GOT_ERR_BAD_OBJ_HDR);
+			close(outfd);
+			goto done;
+		}
+
+		if (fstat(outfd, &sb) == -1) {
+			err = got_error_from_errno();
+			close(outfd);
+			goto done;
+		}
+
+		if (sb.st_size != size) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			close(outfd);
+			goto done;
+		}
 
 		(*blob)->f = fdopen(outfd, "rb");
 		if ((*blob)->f == NULL) {

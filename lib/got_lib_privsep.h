@@ -123,6 +123,11 @@ struct got_imsg_tree_object {
 	int nentries; /* This many TREE_ENTRY messages follow. */
 };
 
+/* Structure for GOT_IMSG_BLOB. */
+struct got_imsg_blob {
+	size_t size;
+};
+
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *, int);
@@ -136,7 +141,7 @@ const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
-const struct got_error *got_privsep_send_blob(struct imsgbuf *);
-const struct got_error *got_privsep_recv_blob(struct imsgbuf *);
+const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
+const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
 
 /* TODO: Implement the above, and then add more message data types here. */
