@@ -129,13 +129,13 @@ const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *, int);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
     struct imsgbuf *);
-const struct got_error *got_privsep_send_commit_obj(struct imsgbuf *,
+const struct got_error *got_privsep_send_commit(struct imsgbuf *,
     struct got_commit_object *);
-const struct got_error *got_privsep_recv_commit_obj(struct got_commit_object **,
+const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
     struct imsgbuf *);
-const struct got_error *got_privsep_recv_tree_obj(struct got_tree_object **,
+const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
-const struct got_error *got_privsep_send_tree_obj(struct imsgbuf *,
+const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
 
 /* TODO: Implement the above, and then add more message data types here. */

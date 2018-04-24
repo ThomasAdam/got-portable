@@ -256,7 +256,7 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_commit_obj(struct imsgbuf *ibuf, struct got_commit_object *commit)
+got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_commit_object icommit;
@@ -306,8 +306,7 @@ done:
 	return err;
 }
 const struct got_error *
-got_privsep_recv_commit_obj(struct got_commit_object **commit,
-    struct imsgbuf *ibuf)
+got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -448,7 +447,7 @@ got_privsep_recv_commit_obj(struct got_commit_object **commit,
 }
 
 const struct got_error *
-got_privsep_send_tree_obj(struct imsgbuf *ibuf, struct got_tree_object *tree)
+got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_tree_object itree;
@@ -496,7 +495,7 @@ got_privsep_send_tree_obj(struct imsgbuf *ibuf, struct got_tree_object *tree)
 }
 
 const struct got_error *
-got_privsep_recv_tree_obj(struct got_tree_object **tree, struct imsgbuf *ibuf)
+got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	const size_t min_datalen =

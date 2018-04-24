@@ -776,7 +776,7 @@ read_commit_object_privsep_child(struct got_object *obj, int obj_fd,
 	if (err)
 		goto done;
 
-	err = got_privsep_send_commit_obj(&ibuf, commit);
+	err = got_privsep_send_commit(&ibuf, commit);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -814,7 +814,7 @@ read_commit_object_privsep(struct got_commit_object **commit,
 
 	close(imsg_fds[1]);
 	imsg_init(&parent_ibuf, imsg_fds[0]);
-	err = got_privsep_recv_commit_obj(commit, &parent_ibuf);
+	err = got_privsep_recv_commit(commit, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
 	waitpid(pid, &child_status, 0);
 	close(imsg_fds[0]);
@@ -927,7 +927,7 @@ read_tree_object_privsep_child(struct got_object *obj, int obj_fd,
 	if (err)
 		goto done;
 
-	err = got_privsep_send_tree_obj(&ibuf, tree);
+	err = got_privsep_send_tree(&ibuf, tree);
 done:
 	if (tree)
 		got_object_tree_close(tree);
@@ -965,7 +965,7 @@ read_tree_object_privsep(struct got_tree_object **tree, struct got_object *obj,
 
 	close(imsg_fds[1]);
 	imsg_init(&parent_ibuf, imsg_fds[0]);
-	err = got_privsep_recv_tree_obj(tree, &parent_ibuf);
+	err = got_privsep_recv_tree(tree, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
 	waitpid(pid, &child_status, 0);
 	close(imsg_fds[0]);
