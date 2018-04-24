@@ -1015,6 +1015,34 @@ got_object_tree_close(struct got_tree_object *tree)
 	free(tree);
 }
 
+static const struct got_error *
+open_loose_blob(FILE **outfile, int fd)
+{
+	const struct got_error *err = NULL;
+	FILE *infile = NULL;
+	size_t size;
+
+	infile = fdopen(fd, "rb");
+	if (infile == NULL) {
+		err = got_error_from_errno();
+		/* fd will be closed by caller */
+		goto done;
+	}
+
+	*outfile = got_opentemp();
+	if (*outfile == NULL) {
+		err = got_error_from_errno();
+		fclose(infile);
+		goto done;
+	}
+
+	err = got_inflate_to_file(&size, infile, *outfile);
+done:
+	if (infile)
+		fclose(infile);
+	return err;
+}
+
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
@@ -1042,31 +1070,14 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 	} else {
 		int fd;
-		FILE *f = NULL;
-		size_t size;
 
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			goto done;
 
-		f = fdopen(fd, "rb");
-		if (f == NULL) {
-			err = got_error_from_errno();
-			close(fd);
-			goto done;
-		}
-
-		(*blob)->f = got_opentemp();
-		if ((*blob)->f == NULL) {
-			err = got_error_from_errno();
-			close(fd);
-			fclose(f);
-			goto done;
-		}
-
-		err = got_inflate_to_file(&size, f, (*blob)->f);
-		fclose(f);
-		if (err != NULL)
+		err = open_loose_blob(&(*blob)->f, fd);
+		close(fd);
+		if (err)
 			goto done;
 	}
 
