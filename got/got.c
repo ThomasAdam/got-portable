@@ -244,7 +244,8 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	printf("checked out %s\n", worktree_path);
+	printf("Checked out %s\n", worktree_path);
+	printf("Now shut up and hack\n");
 
 done:
 	free(repo_path);
@@ -312,10 +313,10 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		return err;
 
 	printf("-----------------------------------------------\n");
-	printf("commit: %s\n", buf);
-	printf("Author: %s\n", commit->author);
+	printf("commit %s\n", buf);
+	printf("author: %s\n", commit->author);
 	if (strcmp(commit->author, commit->committer) != 0)
-		printf("Committer: %s\n", commit->committer);
+		printf("committer: %s\n", commit->committer);
 	printf("\n%s\n", commit->logmsg);
 
 	if (show_patch) {
