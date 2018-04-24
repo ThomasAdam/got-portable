@@ -1031,14 +1031,14 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error_from_errno();
 
+	(*blob)->read_buf = calloc(1, blocksize);
+	if ((*blob)->read_buf == NULL) {
+		err = got_error_from_errno();
+		free(*blob);
+		*blob = NULL;
+		return err;
+	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		(*blob)->read_buf = calloc(1, blocksize);
-		if ((*blob)->read_buf == NULL) {
-			err = got_error_from_errno();
-			free(*blob);
-			*blob = NULL;
-			return err;
-		}
 		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
 		if (err) {
 			free((*blob)->read_buf);
@@ -1048,30 +1048,43 @@ got_object_blob_open(struct got_blob_object **blob,
 		}
 	} else {
 		int fd;
+		FILE *f = NULL;
+		size_t size;
 		err = open_loose_object(&fd, obj, repo);
 		if (err) {
+			free((*blob)->read_buf);
 			free(*blob);
 			*blob = NULL;
 			return err;
 		}
-		(*blob)->f = fdopen(fd, "rb");
+		f = fdopen(fd, "rb");
+		if (f == NULL) {
+			free((*blob)->read_buf);
+			free(*blob);
+			*blob = NULL;
+			return err;
+		}
+
+		(*blob)->f = got_opentemp();
 		if ((*blob)->f == NULL) {
+			err = got_error_from_errno();
+			free((*blob)->read_buf);
 			free(*blob);
 			*blob = NULL;
 			close(fd);
+			fclose(f);
 			return err;
 		}
 
-		err = got_inflate_init(&(*blob)->zb, NULL, blocksize);
+		err = got_inflate_to_file(&size, f, (*blob)->f);
 		if (err != NULL) {
 			fclose((*blob)->f);
+			free((*blob)->read_buf);
 			free(*blob);
 			*blob = NULL;
+			fclose(f);
 			return err;
 		}
-
-		(*blob)->read_buf = (*blob)->zb.outbuf;
-		(*blob)->flags |= GOT_BLOB_F_COMPRESSED;
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
@@ -1084,10 +1097,7 @@ got_object_blob_open(struct got_blob_object **blob,
 void
 got_object_blob_close(struct got_blob_object *blob)
 {
-	if (blob->flags & GOT_BLOB_F_COMPRESSED)
-		got_inflate_end(&blob->zb);
-	else
-		free(blob->read_buf);
+	free(blob->read_buf);
 	fclose(blob->f);
 	free(blob);
 }
@@ -1114,9 +1124,6 @@ const struct got_error *
 got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 {
 	size_t n;
-
-	if (blob->flags & GOT_BLOB_F_COMPRESSED)
-		return got_inflate_read(&blob->zb, blob->f, outlenp);
 
 	n = fread(blob->read_buf, 1, blob->blocksize, blob->f);
 	if (n == 0 && ferror(blob->f))
