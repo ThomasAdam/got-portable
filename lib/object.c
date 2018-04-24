@@ -1135,7 +1135,7 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 
 		if (size != obj->hdrlen + obj->size) {
-			err = got_error(GOT_ERR_BAD_OBJ_HDR);
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			close(outfd);
 			goto done;
 		}
