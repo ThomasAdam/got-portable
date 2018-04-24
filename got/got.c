@@ -225,7 +225,6 @@ cmd_checkout(int argc, char *argv[])
 		usage_checkout();
 
 	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
 	if (error != NULL)
 		goto done;
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
