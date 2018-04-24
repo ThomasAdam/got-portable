@@ -607,3 +607,45 @@ done:
 
 	return err;
 }
+
+const struct got_error *
+got_privsep_send_blob(struct imsgbuf *ibuf)
+{
+	/* Data has already been written to file descriptor. */
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_blob(struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+
+	err = recv_one_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_BLOB:
+		if (datalen != 0)
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+		/* Data has been written to file descriptor. */
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}

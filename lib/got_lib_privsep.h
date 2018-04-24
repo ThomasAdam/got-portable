@@ -21,9 +21,8 @@
  * This behaviour is transparent to users of the library.
  *
  * We generally transmit data in imsg buffers, split across several messages
- * if necessary. File descriptor passing is used in cases where this is
- * impractical, such as when accessing pack files or when transferring
- * large blobs.
+ * if necessary. File descriptors are used in cases where this is impractical,
+ * such as when accessing pack files or when transferring large blobs.
  *
  * We currently do not exec(2) after a fork(2).
  * To achieve fork+exec, relevant parts of our library functionality could
@@ -137,5 +136,7 @@ const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
+const struct got_error *got_privsep_send_blob(struct imsgbuf *);
+const struct got_error *got_privsep_recv_blob(struct imsgbuf *);
 
 /* TODO: Implement the above, and then add more message data types here. */

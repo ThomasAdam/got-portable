@@ -1023,6 +1023,71 @@ read_blob_object(int outfd, int infd)
 	return got_inflate_to_fd(&size, infd, outfd);
 }
 
+static const struct got_error *
+read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf ibuf;
+	int status = 0;
+
+	setproctitle("got: read blob object");
+	close(imsg_fds[0]);
+	imsg_init(&ibuf, imsg_fds[1]);
+
+	/* revoke access to most system calls */
+	if (pledge("stdio", NULL) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = read_blob_object(outfd, infd);
+	close(infd);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_blob(&ibuf);
+done:
+	if (err) {
+		got_privsep_send_error(&ibuf, err);
+		status = 1;
+	}
+	close(outfd);
+	imsg_clear(&ibuf);
+	close(imsg_fds[1]);
+	_exit(status);
+}
+
+static const struct got_error *
+read_blob_object_privsep(int outfd, int infd)
+{
+	struct imsgbuf parent_ibuf;
+	int imsg_fds[2];
+	const struct got_error *err = NULL;
+	pid_t pid;
+	int child_status;
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		read_blob_object_privsep_child(outfd, infd, imsg_fds);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	imsg_init(&parent_ibuf, imsg_fds[0]);
+	err = got_privsep_recv_blob(&parent_ibuf);
+	imsg_clear(&parent_ibuf);
+	waitpid(pid, &child_status, 0);
+	close(imsg_fds[0]);
+	if (lseek(outfd, SEEK_SET, 0) == -1)
+		err = got_error_from_errno();
+	return err;
+}
+
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
@@ -1063,7 +1128,7 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 		}
 
-		err = read_blob_object(outfd, infd);
+		err = read_blob_object_privsep(outfd, infd);
 		close(infd);
 		if (err)
 			goto done;
