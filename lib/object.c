@@ -1034,63 +1034,54 @@ got_object_blob_open(struct got_blob_object **blob,
 	(*blob)->read_buf = calloc(1, blocksize);
 	if ((*blob)->read_buf == NULL) {
 		err = got_error_from_errno();
-		free(*blob);
-		*blob = NULL;
-		return err;
+		goto done;
 	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
 		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
-		if (err) {
-			free((*blob)->read_buf);
-			free(*blob);
-			*blob = NULL;
-			return err;
-		}
+		if (err)
+			goto done;
 	} else {
 		int fd;
 		FILE *f = NULL;
 		size_t size;
+
 		err = open_loose_object(&fd, obj, repo);
-		if (err) {
-			free((*blob)->read_buf);
-			free(*blob);
-			*blob = NULL;
-			return err;
-		}
+		if (err)
+			goto done;
+
 		f = fdopen(fd, "rb");
 		if (f == NULL) {
-			free((*blob)->read_buf);
-			free(*blob);
-			*blob = NULL;
-			return err;
+			err = got_error_from_errno();
+			close(fd);
+			goto done;
 		}
 
 		(*blob)->f = got_opentemp();
 		if ((*blob)->f == NULL) {
 			err = got_error_from_errno();
-			free((*blob)->read_buf);
-			free(*blob);
-			*blob = NULL;
 			close(fd);
 			fclose(f);
-			return err;
+			goto done;
 		}
 
 		err = got_inflate_to_file(&size, f, (*blob)->f);
-		if (err != NULL) {
-			fclose((*blob)->f);
-			free((*blob)->read_buf);
-			free(*blob);
-			*blob = NULL;
-			fclose(f);
-			return err;
-		}
+		fclose(f);
+		if (err != NULL)
+			goto done;
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
 	(*blob)->blocksize = blocksize;
 	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 
+done:
+	if (err && *blob) {
+		if ((*blob)->f)
+			fclose((*blob)->f);
+		free((*blob)->read_buf);
+		free(*blob);
+		*blob = NULL;
+	}
 	return err;
 }
 
