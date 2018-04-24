@@ -185,17 +185,15 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 
 	err = got_object_open(&obj1, repo, id1);
 	if (err)
-		return got_error(GOT_ERR_BAD_OBJ_HDR);
+		return err;
 	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
 	err = got_object_open(&obj2, repo, id2);
-	if (err) {
-		err= got_error(GOT_ERR_BAD_OBJ_HDR);
+	if (err)
 		goto done;
-	}
 	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
