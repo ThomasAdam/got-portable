@@ -225,7 +225,7 @@ read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
 	FILE *f = NULL;
 	int status = 0;
 
-	setproctitle("got: read object header");
+	setproctitle("read object header");
 	close(imsg_fds[0]);
 	imsg_init(&ibuf, imsg_fds[1]);
 
@@ -755,7 +755,7 @@ read_commit_object_privsep_child(struct got_object *obj, int obj_fd,
 	FILE *f = NULL;
 	int status = 0;
 
-	setproctitle("got: read commit object");
+	setproctitle("read commit object");
 	close(imsg_fds[0]);
 	imsg_init(&ibuf, imsg_fds[1]);
 
@@ -906,7 +906,7 @@ read_tree_object_privsep_child(struct got_object *obj, int obj_fd,
 	FILE *f = NULL;
 	int status = 0;
 
-	setproctitle("got: read tree object");
+	setproctitle("read tree object");
 	close(imsg_fds[0]);
 	imsg_init(&ibuf, imsg_fds[1]);
 
@@ -1029,7 +1029,7 @@ read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
 	int status = 0;
 	size_t size;
 
-	setproctitle("got: read blob object");
+	setproctitle("read blob object");
 	close(imsg_fds[0]);
 	imsg_init(&ibuf, imsg_fds[1]);
 
