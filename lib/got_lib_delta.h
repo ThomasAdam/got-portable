@@ -31,7 +31,7 @@ struct got_delta_chain {
 	SIMPLEQ_HEAD(, got_delta) entries;
 };
 
-#define GOT_DELTA_CHAIN_RECURSION_MAX	100
+#define GOT_DELTA_CHAIN_RECURSION_MAX	500
 
 struct got_delta *got_delta_open(const char *, off_t, size_t, int, size_t,
     off_t, uint8_t *, size_t);
