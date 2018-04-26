@@ -262,13 +262,28 @@ done:
 }
 
 static const struct got_error *
+wait_for_child(pid_t pid)
+{
+	int child_status;
+
+	waitpid(pid, &child_status, 0);
+
+	if (!WIFEXITED(child_status))
+		return got_error(GOT_ERR_PRIVSEP_DIED);
+
+	if (WEXITSTATUS(child_status) != 0)
+		return got_error(GOT_ERR_PRIVSEP_EXIT);
+
+	return NULL;
+}
+
+static const struct got_error *
 read_object_header_privsep(struct got_object **obj, int fd)
 {
 	struct imsgbuf parent_ibuf;
 	int imsg_fds[2];
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *err_child = NULL;
 	pid_t pid;
-	int child_status;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -285,9 +300,9 @@ read_object_header_privsep(struct got_object **obj, int fd)
 	imsg_init(&parent_ibuf, imsg_fds[0]);
 	err = got_privsep_recv_obj(obj, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
-	waitpid(pid, &child_status, 0);
+	err_child = wait_for_child(pid);
 	close(imsg_fds[0]);
-	return err;
+	return err ? err : err_child;
 }
 
 static const struct got_error *
@@ -795,11 +810,10 @@ static const struct got_error *
 read_commit_object_privsep(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, int fd)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *err_child = NULL;
 	struct imsgbuf parent_ibuf;
 	int imsg_fds[2];
 	pid_t pid;
-	int child_status;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -816,9 +830,9 @@ read_commit_object_privsep(struct got_commit_object **commit,
 	imsg_init(&parent_ibuf, imsg_fds[0]);
 	err = got_privsep_recv_commit(commit, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
-	waitpid(pid, &child_status, 0);
+	err_child = wait_for_child(pid);
 	close(imsg_fds[0]);
-	return err;
+	return err ? err : err_child;
 }
 
 const struct got_error *
@@ -946,11 +960,10 @@ static const struct got_error *
 read_tree_object_privsep(struct got_tree_object **tree, struct got_object *obj,
     int fd)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *err_child = NULL;
 	struct imsgbuf parent_ibuf;
 	int imsg_fds[2];
 	pid_t pid;
-	int child_status;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -967,9 +980,9 @@ read_tree_object_privsep(struct got_tree_object **tree, struct got_object *obj,
 	imsg_init(&parent_ibuf, imsg_fds[0]);
 	err = got_privsep_recv_tree(tree, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
-	waitpid(pid, &child_status, 0);
+	err_child = wait_for_child(pid);
 	close(imsg_fds[0]);
-	return err;
+	return err ? err : err_child;
 }
 
 const struct got_error *
@@ -1062,9 +1075,8 @@ read_blob_object_privsep(size_t *size, int outfd, int infd)
 {
 	struct imsgbuf parent_ibuf;
 	int imsg_fds[2];
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *err_child = NULL;
 	pid_t pid;
-	int child_status;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -1081,11 +1093,11 @@ read_blob_object_privsep(size_t *size, int outfd, int infd)
 	imsg_init(&parent_ibuf, imsg_fds[0]);
 	err = got_privsep_recv_blob(size, &parent_ibuf);
 	imsg_clear(&parent_ibuf);
-	waitpid(pid, &child_status, 0);
+	err_child = wait_for_child(pid);
 	close(imsg_fds[0]);
 	if (lseek(outfd, SEEK_SET, 0) == -1)
 		err = got_error_from_errno();
-	return err;
+	return err ? err : err_child;
 }
 
 const struct got_error *
