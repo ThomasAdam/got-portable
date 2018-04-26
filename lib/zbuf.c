@@ -197,7 +197,50 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_fd(size_t *outlen, int infd, int outfd)
+got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
+{
+	const struct got_error *err;
+	size_t avail;
+	struct got_zstream_buf zb;
+	void *newbuf;
+
+	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
+	if (*outbuf == NULL)
+		return got_error_from_errno();
+	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
+	if (err)
+		return err;
+
+	*outlen = 0;
+
+	do {
+		err = got_inflate_read_fd(&zb, infd, &avail);
+		if (err)
+			return err;
+		*outlen += avail;
+		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
+			newbuf = reallocarray(*outbuf, 1,
+			    *outlen + GOT_ZSTREAM_BUFSIZE);
+			if (newbuf == NULL) {
+				err = got_error_from_errno();
+				free(*outbuf);
+				*outbuf = NULL;
+				*outlen = 0;
+				goto done;
+			}
+			*outbuf = newbuf;
+			zb.outbuf = newbuf + *outlen;
+			zb.outlen = GOT_ZSTREAM_BUFSIZE;
+		}
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
+
+done:
+	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 {
 	const struct got_error *err = NULL;
 	size_t avail;
@@ -210,7 +253,7 @@ got_inflate_to_fd(size_t *outlen, int infd, int outfd)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read_fd(&zb, infd, &avail);
+		err = got_inflate_read(&zb, infile, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {
@@ -248,6 +291,41 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 
 	do {
 		err = got_inflate_read(&zb, infile, &avail);
+		if (err)
+			return err;
+		if (avail > 0) {
+			size_t n;
+			n = fwrite(zb.outbuf, avail, 1, outfile);
+			if (n != 1) {
+				err = got_ferror(outfile, GOT_ERR_IO);
+				goto done;
+			}
+			*outlen += avail;
+		}
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
+
+done:
+	if (err == NULL)
+		rewind(outfile);
+	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
+{
+	const struct got_error *err;
+	size_t avail;
+	struct got_zstream_buf zb;
+
+	err = got_inflate_init(&zb, NULL, GOT_ZSTREAM_BUFSIZE);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+
+	do {
+		err = got_inflate_read_fd(&zb, infd, &avail);
 		if (err)
 			return err;
 		if (avail > 0) {

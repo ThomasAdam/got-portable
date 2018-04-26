@@ -17,7 +17,7 @@
 /* An open pack file. */
 struct got_pack {
 	char *path_packfile;
-	FILE *packfile;
+	int fd;
 	size_t filesize;
 };
 

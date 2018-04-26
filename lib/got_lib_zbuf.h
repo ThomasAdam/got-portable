@@ -35,5 +35,7 @@ const struct got_error *got_inflate_read_fd(struct got_zstream_buf *, int,
     size_t *);
 void got_inflate_end(struct got_zstream_buf *);
 const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, FILE *);
+const struct got_error *got_inflate_to_mem_fd(uint8_t **, size_t *, int);
 const struct got_error *got_inflate_to_file(size_t *, FILE *, FILE *);
-const struct got_error *got_inflate_to_fd(size_t *, int, int);
+const struct got_error *got_inflate_to_file_fd(size_t *, int, FILE *);
+const struct got_error *got_inflate_to_fd(size_t *, FILE *, int);

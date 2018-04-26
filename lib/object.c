@@ -1016,18 +1016,13 @@ got_object_tree_close(struct got_tree_object *tree)
 }
 
 static const struct got_error *
-read_blob_object(size_t *size, int outfd, int infd)
-{
-	return got_inflate_to_fd(size, infd, outfd);
-}
-
-static const struct got_error *
 read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 	int status = 0;
 	size_t size;
+	FILE *infile = NULL;
 
 	setproctitle("read blob object");
 	close(imsg_fds[0]);
@@ -1039,8 +1034,14 @@ read_blob_object_privsep_child(int outfd, int infd, int imsg_fds[2])
 		goto done;
 	}
 
-	err = read_blob_object(&size, outfd, infd);
-	close(infd);
+	infile = fdopen(infd, "rb");
+	if (infile == NULL) {
+		err = got_error_from_errno();
+		close(infd);
+		goto done;
+	}
+	err = got_inflate_to_fd(&size, infile, outfd);
+	fclose(infile);
 	if (err)
 		goto done;
 
