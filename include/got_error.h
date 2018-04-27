@@ -55,6 +55,7 @@
 #define GOT_ERR_PRIVSEP_MSG	39
 #define GOT_ERR_PRIVSEP_DIED	40
 #define GOT_ERR_PRIVSEP_EXIT	41
+#define GOT_ERR_PACK_OFFSET	42
 
 static const struct got_error {
 	int code;
@@ -99,6 +100,7 @@ static const struct got_error {
 	{ GOT_ERR_PRIVSEP_MSG,"unexpected message from unprivileged process" },
 	{ GOT_ERR_PRIVSEP_DIED,"unprivileged process died unexpectedly" },
 	{ GOT_ERR_PRIVSEP_EXIT,"bad exit code from unprivileged process" },
+	{ GOT_ERR_PACK_OFFSET,"bad offset in pack file" },
 };
 
 /*
