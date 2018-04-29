@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <curses.h>
 #include <panel.h>
 #include <locale.h>
@@ -21,8 +23,13 @@
 #include <getopt.h>
 #include <string.h>
 #include <err.h>
+#include <unistd.h>
 
 #include "got_error.h"
+#include "got_object.h"
+#include "got_reference.h"
+#include "got_repository.h"
+#include "got_diff.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -61,27 +68,303 @@ struct tog_cmd tog_commands[] = {
 };
 
 /* globals */
-enum tog_view_id tog_view_id;
 WINDOW *tog_main_win;
 PANEL *tog_main_panel;
+static struct tog_log_view {
+	WINDOW *window;
+	PANEL *panel;
+} tog_log_view;
 
 __dead void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [repository-path]\n",
+	endwin();
+	fprintf(stderr, "usage: %s log [-c commit] [repository-path]\n",
 	    getprogname());
 	exit(1);
+}
+
+static const struct got_error *
+draw_commit(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *logmsg0 = NULL, *logmsg = NULL;
+	char *newline;
+	char *line = NULL;
+	char *id_str;
+	size_t len;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+	logmsg0 = strdup(commit->logmsg);
+	if (logmsg0 == NULL)
+		return got_error_from_errno();
+	logmsg = logmsg0;
+	while (*logmsg == '\n')
+		logmsg++;
+	newline = strchr(logmsg, '\n');
+	if (newline != NULL)
+		*newline = '\0';
+
+	if (asprintf(&line, "%.8s %.35s %s", id_str, commit->author,
+	    logmsg) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	waddstr(tog_log_view.window, line);
+	len = strlen(line);
+	while (len < COLS - 1) {
+		waddch(tog_log_view.window, ' ');
+		len++;
+	}
+	waddch(tog_log_view.window, '\n');
+done:
+	free(logmsg0);
+	free(line);
+	return err;
+}
+struct commit_queue_entry {
+	TAILQ_ENTRY(commit_queue_entry) entry;
+	struct got_object_id *id;
+	struct got_commit_object *commit;
+};
+
+static const struct got_error *
+draw_commits(struct got_object *root_obj, struct got_object_id *root_id,
+    struct got_repository *repo, int selected)
+{
+	const struct got_error *err;
+	struct got_commit_object *root_commit;
+	TAILQ_HEAD(, commit_queue_entry) commits;
+	struct commit_queue_entry *entry;
+	int ncommits = 0;
+
+	TAILQ_INIT(&commits);
+
+	err = got_object_commit_open(&root_commit, repo, root_obj);
+	if (err)
+		return err;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		return got_error_from_errno();
+	entry->id = got_object_id_dup(root_id);
+	if (entry->id == NULL) {
+		err = got_error_from_errno();
+		free(entry);
+		return err;
+	}
+	entry->commit = root_commit;
+	TAILQ_INSERT_HEAD(&commits, entry, entry);
+
+	wclear(tog_log_view.window);
+
+	while (!TAILQ_EMPTY(&commits) && ncommits < LINES) {
+		struct got_parent_id *pid;
+		struct got_object *obj;
+		struct got_commit_object *pcommit;
+		struct commit_queue_entry *pentry;
+
+		entry = TAILQ_FIRST(&commits);
+
+		if (ncommits == selected)
+			wstandout(tog_log_view.window);
+		err = draw_commit(entry->commit, entry->id, repo);
+		if (ncommits == selected)
+			wstandend(tog_log_view.window);
+		if (err)
+			break;
+		ncommits++;
+
+		if (entry->commit->nparents == 0)
+			break;
+
+		/* Follow the first parent (TODO: handle merge commits). */
+		pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
+		err = got_object_open(&obj, repo, pid->id);
+		if (err)
+			break;
+		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			break;
+		}
+
+		err = got_object_commit_open(&pcommit, repo, obj);
+		got_object_close(obj);
+		if (err)
+			break;
+
+		pentry = calloc(1, sizeof(*pentry));
+		if (pentry == NULL) {
+			err = got_error_from_errno();
+			got_object_commit_close(pcommit);
+			break;
+		}
+		pentry->id = got_object_id_dup(pid->id);
+		if (pentry->id == NULL) {
+			err = got_error_from_errno();
+			got_object_commit_close(pcommit);
+			break;
+		}
+		pentry->commit = pcommit;
+		TAILQ_INSERT_TAIL(&commits, pentry, entry);
+
+		TAILQ_REMOVE(&commits, entry, entry);
+		got_object_commit_close(entry->commit);
+		free(entry->id);
+		free(entry);
+	}
+
+	while (!TAILQ_EMPTY(&commits)) {
+		entry = TAILQ_FIRST(&commits);
+		TAILQ_REMOVE(&commits, entry, entry);
+		got_object_commit_close(entry->commit);
+		free(entry->id);
+		free(entry);
+	}
+
+	update_panels();
+	doupdate();
+	return err;
+}
+
+
+static const struct got_error *
+show_log_view(struct got_object_id *start_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj;
+	int ch, done = 0, selected = 0;
+	struct got_object_id *id = start_id;
+
+	if (tog_log_view.window == NULL) {
+		tog_log_view.window = newwin(0, 0, 0, 0);
+		if (tog_log_view.window == NULL)
+			return got_error_from_errno();
+	}
+	if (tog_log_view.panel == NULL) {
+		tog_log_view.panel = new_panel(tog_log_view.window);
+		if (tog_log_view.panel == NULL)
+			return got_error_from_errno();
+	}
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	do {
+		err = draw_commits(obj, id, repo, selected);
+		if (err)
+			return err;
+
+		nodelay(stdscr, FALSE);
+		ch = wgetch(tog_log_view.window);
+		switch (ch) {
+			case 'q':
+				done = 1;
+				break;
+			case 'k':
+			case KEY_UP:
+				if (selected > 0)
+					selected--;
+				break;
+			case 'j':
+			case KEY_DOWN:
+				if (selected < LINES - 1)
+					selected++;
+				break;
+			default:
+				break;
+		}
+		nodelay(stdscr, TRUE);
+	} while (!done);
+done:
+	got_object_close(obj);
+	return err;
 }
 
 const struct got_error *
 cmd_log(int argc, char *argv[])
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *error;
+	struct got_repository *repo;
+	struct got_object_id *id = NULL;
+	char *repo_path = NULL;
+	char *start_commit = NULL;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
+		switch (ch) {
+		case 'c':
+			start_commit = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+	} else if (argc == 1) {
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+	} else
+		usage_log();
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error != NULL)
+		return error;
+
+	if (start_commit == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			return error;
+		error = got_ref_resolve(&id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			return error;
+	} else {
+		struct got_object *obj;
+		error = got_object_open_by_id_str(&obj, repo, start_commit);
+		if (error == NULL) {
+			id = got_object_get_id(obj);
+			if (id == NULL)
+				error = got_error_from_errno();
+		}
+	}
+	if (error != NULL)
+		return error;
+	error = show_log_view(id, repo);
+	free(id);
+	got_repo_close(repo);
+	return error;
 }
 
 __dead void
 usage_diff(void)
 {
+	endwin();
 	fprintf(stderr, "usage: %s diff [repository-path] object1 object2\n",
 	    getprogname());
 	exit(1);
@@ -96,6 +379,7 @@ cmd_diff(int argc, char *argv[])
 __dead void
 usage_blame(void)
 {
+	endwin();
 	fprintf(stderr, "usage: %s blame [repository-path] blob-object\n",
 	    getprogname());
 	exit(1);
@@ -188,7 +472,7 @@ main(int argc, char *argv[])
 
 	error = init_curses();
 	if (error) {
-		fprintf(stderr, "Cannot initialize ncurses: %s\n", error->msg);
+		fprintf(stderr, "cannot initialize ncurses: %s\n", error->msg);
 		return 1;
 	}
 
