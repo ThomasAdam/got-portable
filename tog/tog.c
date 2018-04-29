@@ -244,6 +244,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		tog_log_view.window = newwin(0, 0, 0, 0);
 		if (tog_log_view.window == NULL)
 			return got_error_from_errno();
+		keypad(tog_log_view.window, TRUE);
 	}
 	if (tog_log_view.panel == NULL) {
 		tog_log_view.panel = new_panel(tog_log_view.window);
