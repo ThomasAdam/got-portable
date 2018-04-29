@@ -90,26 +90,43 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id,
 {
 	const struct got_error *err = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
-	char *newline;
+	char *author0 = NULL, *author = NULL;
+	char *newline, *smallerthan;
 	char *line = NULL;
-	char *id_str;
+	char *id_str = NULL;
 	size_t len;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 	logmsg0 = strdup(commit->logmsg);
-	if (logmsg0 == NULL)
-		return got_error_from_errno();
+	if (logmsg0 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	logmsg = logmsg0;
 	while (*logmsg == '\n')
 		logmsg++;
 	newline = strchr(logmsg, '\n');
-	if (newline != NULL)
+	if (newline)
 		*newline = '\0';
 
-	if (asprintf(&line, "%.8s %.35s %s", id_str, commit->author,
-	    logmsg) == -1) {
+	author0 = strdup(commit->author);
+	if (author0 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	author = author0;
+	smallerthan = strchr(author, '<');
+	if (smallerthan)
+		*smallerthan = '\0';
+	else {
+		char *at = strchr(author, '@');
+		if (at)
+			*at = '\0';
+	}
+
+	if (asprintf(&line, "%.8s %.20s %s", id_str, author, logmsg) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -123,7 +140,9 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id,
 	waddch(tog_log_view.window, '\n');
 done:
 	free(logmsg0);
+	free(author0);
 	free(line);
+	free(id_str);
 	return err;
 }
 struct commit_queue_entry {
