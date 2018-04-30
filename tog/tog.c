@@ -342,7 +342,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			if (err)
 				goto done;
 		}
-
+redraw:
 		err = draw_commits(&commits, selected);
 		if (err)
 			goto done;
@@ -363,6 +363,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				if (selected < LINES - 1)
 					selected++;
 				break;
+			case KEY_RESIZE:
+				goto redraw;
 			default:
 				break;
 		}
