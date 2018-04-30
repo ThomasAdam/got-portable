@@ -31,6 +31,10 @@
 #include "got_repository.h"
 #include "got_diff.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
@@ -93,11 +97,16 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	char *newline, *smallerthan;
 	char *line = NULL;
 	char *id_str = NULL;
-	size_t len;
+	const size_t id_display_len = 8;
+	const size_t author_display_len = 16;
+	size_t id_len, author_len, logmsg_len, avail;
+	int i, col;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
+	id_len = strlen(id_str);
+
 	logmsg0 = strdup(commit->logmsg);
 	if (logmsg0 == NULL) {
 		err = got_error_from_errno();
@@ -109,6 +118,7 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	newline = strchr(logmsg, '\n');
 	if (newline)
 		*newline = '\0';
+	logmsg_len = strlen(logmsg);
 
 	author0 = strdup(commit->author);
 	if (author0 == NULL) {
@@ -124,18 +134,51 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		if (at)
 			*at = '\0';
 	}
+	author_len = strlen(author);
 
-	if (asprintf(&line, "%.8s %.20s %s", id_str, author, logmsg) == -1) {
+	avail = COLS - 1;
+	line = calloc(avail + 1, sizeof(*line));
+	if (line == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	waddstr(tog_log_view.window, line);
-	len = strlen(line);
-	while (len < COLS - 1) {
-		waddch(tog_log_view.window, ' ');
-		len++;
+	col = 0;
+	for (i = 0; i < MIN(id_display_len, id_len); i++) {
+		if (col >= avail)
+			goto draw;
+		line[col++] = id_str[i];
 	}
+	while (i < id_display_len) {
+		if (col >= avail)
+			goto draw;
+		line[col++] = ' ';
+		i++;
+	}
+	if (col >= avail)
+		goto draw;
+	line[col++] = ' ';
+	for (i = 0; i < MIN(author_display_len, author_len); i++) {
+		if (col >= avail)
+			goto draw;
+		line[col++] = author[i];
+	}
+	while (i < author_display_len) {
+		if (col >= avail)
+			goto draw;
+		line[col++] = ' ';
+		i++;
+	}
+	if (col >= avail)
+		goto draw;
+	line[col++] = ' ';
+
+	while (col < avail && *logmsg)
+		line[col++] = *logmsg++;
+	while (col < avail)
+		line[col++] = ' ';
+draw:
+	waddstr(tog_log_view.window, line);
 	waddch(tog_log_view.window, '\n');
 done:
 	free(logmsg0);
