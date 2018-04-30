@@ -85,8 +85,7 @@ usage_log(void)
 }
 
 static const struct got_error *
-draw_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo)
+draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
@@ -150,18 +149,16 @@ struct commit_queue_entry {
 	struct got_object_id *id;
 	struct got_commit_object *commit;
 };
+TAILQ_HEAD(commit_queue, commit_queue_entry);
 
 static const struct got_error *
-draw_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int selected)
+fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
+    struct got_object_id *root_id, struct got_repository *repo, int limit)
 {
 	const struct got_error *err;
 	struct got_commit_object *root_commit;
-	TAILQ_HEAD(, commit_queue_entry) commits;
 	struct commit_queue_entry *entry;
 	int ncommits = 0;
-
-	TAILQ_INIT(&commits);
 
 	err = got_object_commit_open(&root_commit, repo, root_obj);
 	if (err)
@@ -177,29 +174,15 @@ draw_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		return err;
 	}
 	entry->commit = root_commit;
-	TAILQ_INSERT_HEAD(&commits, entry, entry);
+	TAILQ_INSERT_HEAD(commits, entry, entry);
 
-	wclear(tog_log_view.window);
-
-	while (!TAILQ_EMPTY(&commits) && ncommits < LINES) {
+	while (entry->commit->nparents > 0 && ncommits < limit) {
 		struct got_parent_id *pid;
 		struct got_object *obj;
 		struct got_commit_object *pcommit;
 		struct commit_queue_entry *pentry;
 
-		entry = TAILQ_FIRST(&commits);
-
-		if (ncommits == selected)
-			wstandout(tog_log_view.window);
-		err = draw_commit(entry->commit, entry->id, repo);
-		if (ncommits == selected)
-			wstandend(tog_log_view.window);
-		if (err)
-			break;
-		ncommits++;
-
-		if (entry->commit->nparents == 0)
-			break;
+		entry = TAILQ_LAST(commits, commit_queue);
 
 		/* Follow the first parent (TODO: handle merge commits). */
 		pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
@@ -229,35 +212,61 @@ draw_commits(struct got_object *root_obj, struct got_object_id *root_id,
 			break;
 		}
 		pentry->commit = pcommit;
-		TAILQ_INSERT_TAIL(&commits, pentry, entry);
+		TAILQ_INSERT_TAIL(commits, pentry, entry);
+		ncommits++;
+	}
 
-		TAILQ_REMOVE(&commits, entry, entry);
+	return err;
+}
+
+static void
+free_commits(struct commit_queue *commits)
+{
+	struct commit_queue_entry *entry;
+
+	while (!TAILQ_EMPTY(commits)) {
+		entry = TAILQ_FIRST(commits);
+		TAILQ_REMOVE(commits, entry, entry);
 		got_object_commit_close(entry->commit);
 		free(entry->id);
 		free(entry);
 	}
+}
 
-	while (!TAILQ_EMPTY(&commits)) {
-		entry = TAILQ_FIRST(&commits);
-		TAILQ_REMOVE(&commits, entry, entry);
-		got_object_commit_close(entry->commit);
-		free(entry->id);
-		free(entry);
+static const struct got_error *
+draw_commits(struct commit_queue *commits, int selected)
+{
+	const struct got_error *err = NULL;
+	struct commit_queue_entry *entry;
+	int ncommits = 0;
+
+	wclear(tog_log_view.window);
+
+	TAILQ_FOREACH(entry, commits, entry) {
+		if (ncommits == selected)
+			wstandout(tog_log_view.window);
+		err = draw_commit(entry->commit, entry->id);
+		if (ncommits == selected)
+			wstandend(tog_log_view.window);
+		if (err)
+			break;
+		ncommits++;
 	}
 
 	update_panels();
 	doupdate();
+
 	return err;
 }
-
 
 static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj;
-	int ch, done = 0, selected = 0;
+	int ch, done = 0, selected = 0, refetch_commits = 1;
 	struct got_object_id *id = start_id;
+	struct commit_queue commits;
 
 	if (tog_log_view.window == NULL) {
 		tog_log_view.window = newwin(0, 0, 0, 0);
@@ -279,8 +288,17 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		goto done;
 	}
 
+	TAILQ_INIT(&commits);
 	do {
-		err = draw_commits(obj, id, repo, selected);
+		if (refetch_commits) {
+			free_commits(&commits);
+			err = fetch_commits(&commits, obj, id, repo, LINES);
+			if (err)
+				return err;
+			refetch_commits = 0;
+		}
+
+		err = draw_commits(&commits, selected);
 		if (err)
 			return err;
 
@@ -306,6 +324,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		nodelay(stdscr, TRUE);
 	} while (!done);
 done:
+	free_commits(&commits);
 	got_object_close(obj);
 	return err;
 }
