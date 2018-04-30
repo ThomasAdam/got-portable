@@ -42,11 +42,11 @@ enum tog_view_id {
 };
 
 struct tog_cmd {
-	const char *cmd_name;
+	const char *name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void (*cmd_usage)(void);
 	enum tog_view_id view;
-	const char *cmd_descr;
+	const char *descr;
 };
 
 __dead void	usage(void);
@@ -436,13 +436,34 @@ usage(void)
 {
 	int i;
 
-	fprintf(stderr, "usage: %s [-h] command [arg ...]\n\n"
+	fprintf(stderr, "usage: %s [-h] [command] [arg ...]\n\n"
 	    "Available commands:\n", getprogname());
 	for (i = 0; i < nitems(tog_commands); i++) {
 		struct tog_cmd *cmd = &tog_commands[i];
-		fprintf(stderr, "    %s: %s\n", cmd->cmd_name, cmd->cmd_descr);
+		fprintf(stderr, "    %s: %s\n", cmd->name, cmd->descr);
 	}
 	exit(1);
+}
+
+static char **
+make_argv(const char *arg0, const char *arg1)
+{
+	char **argv;
+	int argc = (arg1 == NULL ? 1 : 2);
+
+	argv = calloc(argc, sizeof(char *));
+	if (argv == NULL)
+		err(1, "calloc");
+	argv[0] = strdup(arg0);
+	if (argv[0] == NULL)
+		err(1, "calloc");
+	if (arg1) {
+		argv[1] = strdup(arg1);
+		if (argv[1] == NULL)
+			err(1, "calloc");
+	}
+
+	return argv;
 }
 
 int
@@ -451,6 +472,7 @@ main(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct tog_cmd *cmd = NULL;
 	int ch, hflag = 0;
+	char **cmd_argv = NULL;
 
 	setlocale(LC_ALL, "");
 
@@ -468,14 +490,19 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	optind = 0;
+	optreset = 1;
 
-	if (argc == 0)
+	if (argc == 0) {
+		/* Build an argument vector which runs a default command. */
 		cmd = &tog_commands[0];
-	else {
+		cmd_argv = make_argv(cmd->name, NULL);
+		argc = 1;
+	} else {
 		int i;
 
+		/* Did the user specific a command? */
 		for (i = 0; i < nitems(tog_commands); i++) {
-			if (strncmp(tog_commands[i].cmd_name, argv[0],
+			if (strncmp(tog_commands[i].name, argv[0],
 			    strlen(argv[0])) == 0) {
 				cmd = &tog_commands[i];
 				if (hflag)
@@ -484,9 +511,25 @@ main(int argc, char *argv[])
 			}
 		}
 		if (cmd == NULL) {
-			fprintf(stderr, "%s: unknown command '%s'\n",
-			    getprogname(), argv[0]);
-			return 1;
+			/* Did the user specify a repository? */
+			char *repo_path = realpath(argv[0], NULL);
+			if (repo_path) {
+				struct got_repository *repo;
+				error = got_repo_open(&repo, repo_path);
+				if (error == NULL)
+					got_repo_close(repo);
+			} else
+				error = got_error(GOT_ERR_NOT_GIT_REPO);
+			if (error) {
+				free(repo_path);
+				fprintf(stderr, "%s: unknown command '%s'\n",
+				    getprogname(), argv[0]);
+				return 1;
+			}
+			cmd = &tog_commands[0];
+			cmd_argv = make_argv(cmd->name, repo_path);
+			argc = 2;
+			free(repo_path);
 		}
 	}
 
@@ -496,11 +539,12 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	error = cmd->cmd_main(argc, argv);
+	error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
 	if (error)
 		goto done;
 done:
 	endwin();
+	free(cmd_argv);
 	if (error)
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 	return 0;
