@@ -16,6 +16,7 @@
 
 #include <sys/queue.h>
 
+#include <errno.h>
 #include <curses.h>
 #include <panel.h>
 #include <locale.h>
@@ -337,12 +338,10 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			free_commits(&commits);
 			err = fetch_commits(&commits, obj, id, repo, LINES);
 			refetch_commits = 0;
-			got_object_close(obj);
-			obj = NULL;
 			if (err)
 				goto done;
 		}
-redraw:
+
 		err = draw_commits(&commits, selected);
 		if (err)
 			goto done;
@@ -350,6 +349,12 @@ redraw:
 		nodelay(stdscr, FALSE);
 		ch = wgetch(tog_log_view.window);
 		switch (ch) {
+			case ERR:
+				if (errno) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				break;
 			case 'q':
 				done = 1;
 				break;
@@ -364,7 +369,10 @@ redraw:
 					selected++;
 				break;
 			case KEY_RESIZE:
-				goto redraw;
+				refetch_commits = 1;
+				if (selected > LINES)
+					selected = LINES - 1;
+				break;
 			default:
 				break;
 		}
