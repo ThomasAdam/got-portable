@@ -263,7 +263,7 @@ static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj;
+	struct got_object *obj = NULL;
 	int ch, done = 0, selected = 0, refetch_commits = 1;
 	struct got_object_id *id = start_id;
 	struct commit_queue commits;
@@ -293,14 +293,16 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		if (refetch_commits) {
 			free_commits(&commits);
 			err = fetch_commits(&commits, obj, id, repo, LINES);
-			if (err)
-				return err;
 			refetch_commits = 0;
+			got_object_close(obj);
+			obj = NULL;
+			if (err)
+				goto done;
 		}
 
 		err = draw_commits(&commits, selected);
 		if (err)
-			return err;
+			goto done;
 
 		nodelay(stdscr, FALSE);
 		ch = wgetch(tog_log_view.window);
@@ -325,7 +327,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 	} while (!done);
 done:
 	free_commits(&commits);
-	got_object_close(obj);
+	if (obj)
+		got_object_close(obj);
 	return err;
 }
 
