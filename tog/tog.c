@@ -519,11 +519,12 @@ main(int argc, char *argv[])
 				if (error == NULL)
 					got_repo_close(repo);
 			} else
-				error = got_error(GOT_ERR_NOT_GIT_REPO);
+				error = got_error_from_errno();
 			if (error) {
-				free(repo_path);
-				fprintf(stderr, "%s: unknown command '%s'\n",
+				fprintf(stderr, "%s: '%s' is neither a known "
+				    "command nor a path to a repository\n",
 				    getprogname(), argv[0]);
+				free(repo_path);
 				return 1;
 			}
 			cmd = &tog_commands[0];
