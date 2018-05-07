@@ -240,6 +240,59 @@ free_commits(struct commit_queue *commits)
 		pop_commit(commits);
 }
 
+
+static const struct got_error *
+fetch_next_commit(struct commit_queue_entry **pentryp,
+    struct commit_queue *commits, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object *obj = NULL;
+	struct got_commit_object *pcommit;
+	struct commit_queue_entry *entry, *pentry;
+	struct got_parent_id *pid;
+
+	if (pentryp)
+		*pentryp = NULL;
+	entry = TAILQ_LAST(commits, commit_queue);
+
+	/* Follow the first parent (TODO: handle merge commits). */
+	pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
+	if (pid == NULL)
+		return NULL;
+	err = got_object_open(&obj, repo, pid->id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		got_object_close(obj);
+		return err;
+	}
+
+	err = got_object_commit_open(&pcommit, repo, obj);
+	got_object_close(obj);
+	if (err)
+		return err;
+
+	pentry = calloc(1, sizeof(*pentry));
+	if (pentry == NULL) {
+		err = got_error_from_errno();
+		got_object_commit_close(pcommit);
+		return err;
+	}
+	pentry->id = got_object_id_dup(pid->id);
+	if (pentry->id == NULL) {
+		err = got_error_from_errno();
+		got_object_commit_close(pcommit);
+		return err;;
+	}
+	pentry->commit = pcommit;
+	TAILQ_INSERT_TAIL(commits, pentry, entry);
+	if (pentryp)
+		*pentryp = pentry;
+
+	return NULL;
+}
+
 static const struct got_error *
 fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
     struct got_object_id *root_id, struct got_repository *repo, int limit)
@@ -258,42 +311,9 @@ fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
 		return err;
 
 	while (entry->commit->nparents > 0 && ncommits < limit) {
-		struct got_parent_id *pid;
-		struct got_object *obj;
-		struct got_commit_object *pcommit;
-		struct commit_queue_entry *pentry;
-
-		entry = TAILQ_LAST(commits, commit_queue);
-
-		/* Follow the first parent (TODO: handle merge commits). */
-		pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
-		err = got_object_open(&obj, repo, pid->id);
+		err = fetch_next_commit(&entry, commits, repo);
 		if (err)
 			break;
-		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-			err = got_error(GOT_ERR_OBJ_TYPE);
-			break;
-		}
-
-		err = got_object_commit_open(&pcommit, repo, obj);
-		got_object_close(obj);
-		if (err)
-			break;
-
-		pentry = calloc(1, sizeof(*pentry));
-		if (pentry == NULL) {
-			err = got_error_from_errno();
-			got_object_commit_close(pcommit);
-			break;
-		}
-		pentry->id = got_object_id_dup(pid->id);
-		if (pentry->id == NULL) {
-			err = got_error_from_errno();
-			got_object_commit_close(pcommit);
-			break;
-		}
-		pentry->commit = pcommit;
-		TAILQ_INSERT_TAIL(commits, pentry, entry);
 		ncommits++;
 	}
 
@@ -331,9 +351,14 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
+	struct got_object_id *id;
 	int ch, done = 0, selected = 0, refetch_commits = 1;
-	struct got_object_id *id = start_id;
 	struct commit_queue commits;
+	struct commit_queue_entry *entry = NULL;
+
+	id = got_object_id_dup(start_id);
+	if (id == NULL)
+		return got_error_from_errno();
 
 	if (tog_log_view.window == NULL) {
 		tog_log_view.window = newwin(0, 0, 0, 0);
@@ -347,7 +372,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			return got_error_from_errno();
 	}
 
-	err = got_object_open(&obj, repo, id);
+	err = got_object_open(&obj, repo, start_id);
 	if (err)
 		return err;
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
@@ -390,6 +415,36 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_DOWN:
 				if (selected < LINES - 1)
 					selected++;
+				if (selected < LINES - 1)
+					break;
+
+				/* scroll down if there are more parents */
+				entry = TAILQ_LAST(&commits, commit_queue);
+				if (entry->commit->nparents == 0)
+					break;
+				got_object_close(obj);
+				pop_commit(&commits);
+				if (TAILQ_EMPTY(&commits)) {
+					refetch_commits = 1;
+					break;
+				}
+				entry = TAILQ_FIRST(&commits);
+				id = got_object_id_dup(entry->id);
+				if (id == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				err = got_object_open(&obj, repo, id);
+				if (err)
+					return err;
+				if (got_object_get_type(obj) !=
+				    GOT_OBJ_TYPE_COMMIT) {
+					err = got_error(GOT_ERR_OBJ_TYPE);
+					goto done;
+				}
+				err = fetch_next_commit(NULL, &commits, repo);
+				if (err)
+					goto done;
 				break;
 			case KEY_RESIZE:
 				refetch_commits = 1;
