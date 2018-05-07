@@ -196,6 +196,51 @@ struct commit_queue_entry {
 TAILQ_HEAD(commit_queue, commit_queue_entry);
 
 static const struct got_error *
+push_commit(struct commit_queue_entry **entryp, struct commit_queue *commits,
+    struct got_commit_object *commit, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	struct commit_queue_entry *entry;
+
+	*entryp = NULL;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		return got_error_from_errno();
+
+	entry->id = got_object_id_dup(id);
+	if (entry->id == NULL) {
+		err = got_error_from_errno();
+		free(entry);
+		return err;
+	}
+
+	entry->commit = commit;
+	TAILQ_INSERT_HEAD(commits, entry, entry);
+	*entryp = entry;
+	return NULL;
+}
+
+static void
+pop_commit(struct commit_queue *commits)
+{
+	struct commit_queue_entry *entry;
+
+	entry = TAILQ_FIRST(commits);
+	TAILQ_REMOVE(commits, entry, entry);
+	got_object_commit_close(entry->commit);
+	free(entry->id);
+	free(entry);
+}
+
+static void
+free_commits(struct commit_queue *commits)
+{
+	while (!TAILQ_EMPTY(commits))
+		pop_commit(commits);
+}
+
+static const struct got_error *
 fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
     struct got_object_id *root_id, struct got_repository *repo, int limit)
 {
@@ -208,17 +253,9 @@ fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
 	if (err)
 		return err;
 
-	entry = calloc(1, sizeof(*entry));
-	if (entry == NULL)
-		return got_error_from_errno();
-	entry->id = got_object_id_dup(root_id);
-	if (entry->id == NULL) {
-		err = got_error_from_errno();
-		free(entry);
+	err = push_commit(&entry, commits, root_commit, root_id);
+	if (err)
 		return err;
-	}
-	entry->commit = root_commit;
-	TAILQ_INSERT_HEAD(commits, entry, entry);
 
 	while (entry->commit->nparents > 0 && ncommits < limit) {
 		struct got_parent_id *pid;
@@ -261,20 +298,6 @@ fetch_commits(struct commit_queue *commits, struct got_object *root_obj,
 	}
 
 	return err;
-}
-
-static void
-free_commits(struct commit_queue *commits)
-{
-	struct commit_queue_entry *entry;
-
-	while (!TAILQ_EMPTY(commits)) {
-		entry = TAILQ_FIRST(commits);
-		TAILQ_REMOVE(commits, entry, entry);
-		got_object_commit_close(entry->commit);
-		free(entry->id);
-		free(entry);
-	}
 }
 
 static const struct got_error *
