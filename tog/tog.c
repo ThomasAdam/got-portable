@@ -422,7 +422,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				entry = TAILQ_LAST(&commits, commit_queue);
 				if (entry->commit->nparents == 0)
 					break;
-				got_object_close(obj);
 				pop_commit(&commits);
 				if (TAILQ_EMPTY(&commits)) {
 					refetch_commits = 1;
@@ -434,6 +433,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					err = got_error_from_errno();
 					goto done;
 				}
+				got_object_close(obj);
 				err = got_object_open(&obj, repo, id);
 				if (err)
 					return err;
