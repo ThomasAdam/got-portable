@@ -435,8 +435,10 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				}
 				got_object_close(obj);
 				err = got_object_open(&obj, repo, id);
-				if (err)
-					return err;
+				if (err) {
+					obj = NULL;
+					goto done;
+				}
 				if (got_object_get_type(obj) !=
 				    GOT_OBJ_TYPE_COMMIT) {
 					err = got_error(GOT_ERR_OBJ_TYPE);
