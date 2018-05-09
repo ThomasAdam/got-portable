@@ -347,6 +347,28 @@ draw_commits(struct commit_queue *commits, int selected)
 }
 
 static const struct got_error *
+get_head_commit_id(struct got_object_id **head_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *head_ref;
+
+	*head_id = NULL;
+
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	if (err)
+		return err;
+
+	err = got_ref_resolve(head_id, repo, head_ref);
+	got_ref_close(head_ref);
+	if (err) {
+		*head_id = NULL;
+		return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -511,12 +533,7 @@ cmd_log(int argc, char *argv[])
 		return error;
 
 	if (start_commit == NULL) {
-		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
-		if (error != NULL)
-			return error;
-		error = got_ref_resolve(&id, repo, head_ref);
-		got_ref_close(head_ref);
+		error = get_head_commit_id(&id, repo);
 		if (error != NULL)
 			return error;
 	} else {
