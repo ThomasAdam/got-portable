@@ -384,7 +384,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 	do {
 		if (refetch_commits) {
 			free_commits(&commits);
-			err = fetch_commits(&commits, obj, id, repo, LINES);
+			err = fetch_commits(&commits, obj, id, repo, LINES - 1);
 			refetch_commits = 0;
 			if (err)
 				goto done;
