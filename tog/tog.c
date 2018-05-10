@@ -548,6 +548,9 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					break;
 				first_displayed_entry =
 				    TAILQ_NEXT(first_displayed_entry, entry);
+				if (TAILQ_LAST(&commits, commit_queue) !=
+				    last_displayed_entry)
+					break;
 				err = fetch_parent_commit(&entry,
 				    last_displayed_entry, repo);
 				if (err)
