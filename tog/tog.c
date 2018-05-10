@@ -526,7 +526,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_UP:
 				if (selected > 0)
 					selected--;
-				if (selected != 0)
+				if (selected > 0)
 					break;
 				/* scroll down if there are more children */
 				entry = TAILQ_FIRST(&commits);
