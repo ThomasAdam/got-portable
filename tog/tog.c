@@ -617,6 +617,9 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				break;
 			case 'j':
 			case KEY_DOWN:
+				nparents = num_parents(first_displayed_entry);
+				if (selected >= nparents - 1)
+					break;
 				if (selected < LINES - 1)
 					selected++;
 				if (selected < LINES - 1)
