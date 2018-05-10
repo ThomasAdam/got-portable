@@ -597,6 +597,11 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					break;
 				scroll_up(&first_displayed_entry, 1, &commits);
 				break;
+			case KEY_PPAGE:
+				scroll_up(&first_displayed_entry, LINES,
+				    &commits);
+				selected = 0;
+				break;
 			case 'j':
 			case KEY_DOWN:
 				if (selected < LINES - 1)
