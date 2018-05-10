@@ -640,9 +640,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					selected = nparents - 1;
 					break;
 				}
-				err = scroll_down(&first_displayed_entry,
-				    MIN(nparents, LINES), last_displayed_entry,
-				    &commits, repo);
+				err = scroll_down(&first_displayed_entry, LINES,
+				    last_displayed_entry, &commits, repo);
 				if (err)
 					goto done;
 				nparents = num_parents(first_displayed_entry);
