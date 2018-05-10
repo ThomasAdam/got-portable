@@ -473,6 +473,27 @@ draw_commits(struct commit_queue_entry **last,
 	return err;
 }
 
+static void
+scroll_up(struct commit_queue_entry **first_displayed_entry, int n,
+    struct commit_queue *commits)
+{
+	struct commit_queue_entry *entry;
+	int nscrolled = 0;
+
+	entry = TAILQ_FIRST(commits);
+	if (*first_displayed_entry == entry)
+		return;
+
+	entry = *first_displayed_entry;
+	while (entry && nscrolled < n) {
+		entry = TAILQ_PREV(entry, commit_queue, entry);
+		if (entry) {
+			*first_displayed_entry = entry;
+			nscrolled++;
+		}
+	}
+}
+
 static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
@@ -528,13 +549,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					selected--;
 				if (selected > 0)
 					break;
-				/* scroll down if there are more children */
-				entry = TAILQ_FIRST(&commits);
-				if (first_displayed_entry == entry)
-					break;
-				first_displayed_entry =
-				    TAILQ_PREV(first_displayed_entry,
-				        commit_queue, entry);
+				scroll_up(&first_displayed_entry, 1, &commits);
 				break;
 			case 'j':
 			case KEY_DOWN:
