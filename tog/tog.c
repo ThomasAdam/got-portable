@@ -441,8 +441,8 @@ fetch_commits(struct commit_queue_entry **start_entry,
 }
 
 static const struct got_error *
-draw_commits(struct commit_queue_entry **last,
-    struct commit_queue_entry *first, int selected, int limit)
+draw_commits(struct commit_queue_entry **last, struct commit_queue_entry *first,
+    int selected, int limit)
 {
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
@@ -541,12 +541,25 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int n,
 	return NULL;
 }
 
+static int
+num_parents(struct commit_queue_entry *entry)
+{
+	int nparents = 0;
+
+	while (entry) {
+		entry = TAILQ_NEXT(entry, entry);
+		nparents++;
+	}
+
+	return nparents;
+}
+
 static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id;
-	int ch, done = 0, selected = 0;
+	int ch, done = 0, selected = 0, nparents;
 	struct commit_queue commits;
 	struct commit_queue_entry *first_displayed_entry = NULL;
 	struct commit_queue_entry *last_displayed_entry = NULL;
@@ -612,6 +625,16 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				    last_displayed_entry, &commits, repo);
 				if (err)
 					goto done;
+				break;
+			case KEY_NPAGE:
+				nparents = num_parents(first_displayed_entry);
+				err = scroll_down(&first_displayed_entry,
+				    MIN(nparents, LINES), last_displayed_entry,
+				    &commits, repo);
+				if (err)
+					goto done;
+				nparents = num_parents(first_displayed_entry);
+				selected = MIN(nparents, LINES) - 1;
 				break;
 			case KEY_RESIZE:
 				if (selected > LINES)
