@@ -480,7 +480,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 	struct got_object_id *id;
 	int ch, done = 0, selected = 0;
 	struct commit_queue commits;
-	struct commit_queue_entry *pentry = NULL;
+	struct commit_queue_entry *entry = NULL;
 	struct commit_queue_entry *first_displayed_entry = NULL;
 	struct commit_queue_entry *last_displayed_entry = NULL;
 
@@ -526,6 +526,15 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_UP:
 				if (selected > 0)
 					selected--;
+				if (selected != 0)
+					break;
+				/* scroll down if there are more children */
+				entry = TAILQ_FIRST(&commits);
+				if (first_displayed_entry == entry)
+					break;
+				first_displayed_entry =
+				    TAILQ_PREV(first_displayed_entry,
+				        commit_queue, entry);
 				break;
 			case 'j':
 			case KEY_DOWN:
@@ -539,12 +548,12 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					break;
 				first_displayed_entry =
 				    TAILQ_NEXT(first_displayed_entry, entry);
-				err = fetch_parent_commit(&pentry,
+				err = fetch_parent_commit(&entry,
 				    last_displayed_entry, repo);
 				if (err)
 					break;
-				if (pentry)
-					TAILQ_INSERT_TAIL(&commits, pentry,
+				if (entry)
+					TAILQ_INSERT_TAIL(&commits, entry,
 					    entry);
 				break;
 			case KEY_RESIZE:
