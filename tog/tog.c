@@ -675,6 +675,7 @@ init_curses(void)
 	nonl();
 	intrflush(stdscr, FALSE);
 	keypad(stdscr, TRUE);
+	curs_set(0);
 
 	tog_main_win = newwin(0, 0, 0, 0);
 	if (tog_main_win == NULL)
