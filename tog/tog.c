@@ -495,13 +495,59 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int n,
 }
 
 static const struct got_error *
+scroll_down(struct commit_queue_entry **first_displayed_entry, int n,
+    struct commit_queue_entry *last_displayed_entry,
+    struct commit_queue *commits, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct commit_queue_entry *entry;
+	int nscrolled = 0;
+
+	if (last_displayed_entry->commit->nparents == 0)
+		return NULL;
+
+	entry = *first_displayed_entry;
+	do {
+		struct commit_queue_entry *pentry;
+
+		pentry = TAILQ_NEXT(entry, entry);
+		if (pentry == NULL) {
+			err = fetch_parent_commit(&pentry, entry, repo);
+			if (err)
+				break;
+			if (pentry == NULL) {
+				*first_displayed_entry = entry;
+				return NULL;
+			}
+			TAILQ_INSERT_TAIL(commits, pentry, entry);
+			last_displayed_entry = pentry;
+		}
+
+		*first_displayed_entry = pentry;
+		entry = pentry;
+
+		if (TAILQ_LAST(commits, commit_queue) == last_displayed_entry) {
+			err = fetch_parent_commit(&pentry, last_displayed_entry,
+			    repo);
+			if (err)
+				break;
+			if (pentry) {
+				TAILQ_INSERT_TAIL(commits, pentry, entry);
+				last_displayed_entry = pentry;
+			}
+		}
+	} while (++nscrolled < n);
+
+	return NULL;
+}
+
+static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id;
 	int ch, done = 0, selected = 0;
 	struct commit_queue commits;
-	struct commit_queue_entry *entry = NULL;
 	struct commit_queue_entry *first_displayed_entry = NULL;
 	struct commit_queue_entry *last_displayed_entry = NULL;
 
@@ -557,22 +603,10 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					selected++;
 				if (selected < LINES - 1)
 					break;
-
-				/* scroll down if there are more parents */
-				if (last_displayed_entry->commit->nparents == 0)
-					break;
-				first_displayed_entry =
-				    TAILQ_NEXT(first_displayed_entry, entry);
-				if (TAILQ_LAST(&commits, commit_queue) !=
-				    last_displayed_entry)
-					break;
-				err = fetch_parent_commit(&entry,
-				    last_displayed_entry, repo);
+				err = scroll_down(&first_displayed_entry, 1,
+				    last_displayed_entry, &commits, repo);
 				if (err)
-					break;
-				if (entry)
-					TAILQ_INSERT_TAIL(&commits, entry,
-					    entry);
+					goto done;
 				break;
 			case KEY_RESIZE:
 				if (selected > LINES)
