@@ -36,6 +36,7 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_repository.h"
+#include "got_opentemp.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"

@@ -14,26 +14,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* Utilities for dealing with filesystem paths. */
+/* Utilities for opening temporary files. */
 
-#define GOT_DEFAULT_FILE_MODE	(S_IRUSR|S_IWUSR | S_IRGRP | S_IROTH)
-#define GOT_DEFAULT_DIR_MODE	(S_IRWXU | S_IRGRP|S_IXGRP | S_IROTH|S_IXOTH)
+/* Open a file descriptor to a new temporary file for writing.
+ * The file is not visible in the filesystem. */
+int got_opentempfd(void);
 
-/* Determine whether a path is an absolute path. */
-int got_path_is_absolute(const char *);
+/* Open a new temporary file for writing.
+ * The file is not visible in the filesystem. */
+FILE *got_opentemp(void);
 
-/*
- * Return an absolute version of a relative path.
- * The result is allocated with malloc(3).
- */
-char *got_path_get_absolute(const char *);
-
-/* 
- * Normalize a path for internal processing.
- * The result is allocated with malloc(3).
- */
-char *got_path_normalize(const char *);
-
-/* Count the number of path segments separated by '/'. */
-const struct got_error *
-got_path_segment_count(int *count, const char *path);
+/* Open a new temporary file for writing.
+ * The file is visible in the filesystem. */
+const struct got_error *got_opentemp_named(char **, FILE **, const char *);

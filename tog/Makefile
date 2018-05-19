@@ -2,8 +2,8 @@
 
 PROG=		tog
 SRCS=		tog.c delta.c diff.c diffreg.c error.c fileindex.c object.c \
-		path.c pack.c privsep.c reference.c repository.c sha1.c \
-		worktree.c zbuf.c
+		opentemp.c path.c pack.c privsep.c reference.c repository.c \
+		sha1.c worktree.c zbuf.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lpanel -lcurses -lutil -lz

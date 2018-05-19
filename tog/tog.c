@@ -34,6 +34,7 @@
 #include "got_reference.h"
 #include "got_repository.h"
 #include "got_diff.h"
+#include "got_opentemp.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -86,39 +87,6 @@ static struct tog_diff_view {
 	WINDOW *window;
 	PANEL *panel;
 } tog_diff_view;
-
-int
-tog_opentempfd(void)
-{
-	char name[PATH_MAX];
-	int fd;
-
-	if (strlcpy(name, "/tmp/tog.XXXXXXXX", sizeof(name)) >= sizeof(name))
-		return -1;
-
-	fd = mkstemp(name);
-	unlink(name);
-	return fd;
-}
-
-FILE *
-tog_opentemp(void)
-{
-	int fd;
-	FILE *f;
-
-	fd = tog_opentempfd();
-	if (fd < 0)
-		return NULL;
-
-	f = fdopen(fd, "w+");
-	if (f == NULL) {
-		close(fd);
-		return NULL;
-	}
-
-	return f;
-}
 
 __dead void
 usage_log(void)
@@ -832,7 +800,7 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 	if (got_object_get_type(obj1) != got_object_get_type(obj2))
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	f = tog_opentemp();
+	f = got_opentemp();
 	if (f == NULL)
 		return got_error_from_errno();
 

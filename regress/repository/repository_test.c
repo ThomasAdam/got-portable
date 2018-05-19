@@ -31,6 +31,7 @@
 #include "got_reference.h"
 #include "got_repository.h"
 #include "got_diff.h"
+#include "got_opentemp.h"
 
 #include "got_lib_path.h"
 

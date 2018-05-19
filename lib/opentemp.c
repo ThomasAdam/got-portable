@@ -17,67 +17,70 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
+#include <stdio.h>
 
+#include "got_opentemp.h"
 #include "got_error.h"
 
-#include "got_lib_path.h"
-
 int
-got_path_is_absolute(const char *path)
+got_opentempfd(void)
 {
-	return path[0] == '/';
+	char name[PATH_MAX];
+	int fd;
+
+	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
+		return -1;
+
+	fd = mkstemp(name);
+	unlink(name);
+	return fd;
 }
 
-char *
-got_path_get_absolute(const char *relpath) 
+FILE *
+got_opentemp(void)
 {
-	char cwd[PATH_MAX];
-	char *abspath;
+	int fd;
+	FILE *f;
 
-	if (getcwd(cwd, sizeof(cwd)) == NULL)
+	fd = got_opentempfd();
+	if (fd < 0)
 		return NULL;
 
-	if (asprintf(&abspath, "%s/%s/", cwd, relpath) == -1)
+	f = fdopen(fd, "w+");
+	if (f == NULL) {
+		close(fd);
 		return NULL;
-
-	return abspath;
-}
-
-char *
-got_path_normalize(const char *path)
-{
-	char *resolved;
-
-	resolved = realpath(path, NULL);
-	if (resolved == NULL)
-		return NULL;
-	
-	if (!got_path_is_absolute(resolved)) {
-		char *abspath = got_path_get_absolute(resolved);
-		free(resolved);
-		resolved = abspath;
 	}
 
-	return resolved;
+	return f;
 }
 
 const struct got_error *
-got_path_segment_count(int *count, const char *path)
+got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 {
-	char *s = strdup(path), *p;
+	const struct got_error *err = NULL;
+	int fd;
 
-	*count = 0;
-
-	if (s == NULL)
+	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
+		*path = NULL;
 		return got_error_from_errno();
+	}
 
-	do {
-		p = strsep(&s, "/");
-		if (s && *s != '/')
-			(*count)++;
-	} while (p);
+	fd = mkstemp(*path);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		free(*path);
+		*path = NULL;
+		return err;
+	}
 
-	return NULL;
+	*outfile = fdopen(fd, "w+");
+	if (*outfile == NULL) {
+		err = got_error_from_errno();
+		free(*path);
+		*path = NULL;
+	}
+
+	return err;
 }

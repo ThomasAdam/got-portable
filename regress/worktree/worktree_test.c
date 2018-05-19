@@ -34,6 +34,7 @@
 #include "got_reference.h"
 #include "got_repository.h"
 #include "got_worktree.h"
+#include "got_opentemp.h"
 
 #include "got_lib_worktree.h"
 #include "got_lib_path.h"
