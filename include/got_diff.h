@@ -29,3 +29,24 @@ const struct got_error *got_diff_blob(struct got_blob_object *,
  */
 const struct got_error *got_diff_tree(struct got_tree_object *,
     struct got_tree_object *, struct got_repository *, FILE *);
+
+/*
+ * Diff two objects, assuming both objects are blobs.
+ * Write unified diff text to the provided output FILE.
+ */
+const struct got_error *got_diff_objects_as_blobs(struct got_object *,
+    struct got_object *, struct got_repository *, FILE *);
+
+/*
+ * Diff two objects, assuming both objects are trees.
+ * Write unified diff text to the provided output FILE.
+ */
+const struct got_error *got_diff_objects_as_trees(struct got_object *,
+    struct got_object *, struct got_repository *, FILE *);
+
+/*
+ * Diff two objects, assuming both objects are commits.
+ * Write unified diff text to the provided output FILE.
+ */
+const struct got_error *got_diff_objects_as_commits(struct got_object *,
+    struct got_object *, struct got_repository *, FILE *);

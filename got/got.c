@@ -521,88 +521,6 @@ cmd_log(int argc, char *argv[])
 	return error;
 }
 
-static const struct got_error *
-diff_blobs(struct got_object *obj1, struct got_object *obj2,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
-
-	err = got_object_blob_open(&blob1, repo, obj1, 8192);
-	if (err)
-		goto done;
-	err = got_object_blob_open(&blob2, repo, obj2, 8192);
-	if (err)
-		goto done;
-
-	err = got_diff_blob(blob1, blob2, NULL, NULL, stdout);
-done:
-	if (blob1)
-		got_object_blob_close(blob1);
-	if (blob2)
-		got_object_blob_close(blob2);
-	return err;
-}
-
-static const struct got_error *
-diff_trees(struct got_object *obj1, struct got_object *obj2,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
-
-	err = got_object_tree_open(&tree1, repo, obj1);
-	if (err)
-		goto done;
-	err = got_object_tree_open(&tree2, repo, obj2);
-	if (err)
-		goto done;
-
-	err = got_diff_tree(tree1, tree2, repo, stdout);
-done:
-	if (tree1)
-		got_object_tree_close(tree1);
-	if (tree2)
-		got_object_tree_close(tree2);
-	return err;
-}
-
-static const struct got_error *
-diff_commits(struct got_object *obj1, struct got_object *obj2,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
-	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
-
-	err = got_object_commit_open(&commit1, repo, obj1);
-	if (err)
-		goto done;
-	err = got_object_commit_open(&commit2, repo, obj2);
-	if (err)
-		goto done;
-
-	err = got_object_open(&tree_obj1, repo, commit1->tree_id);
-	if (err)
-		goto done;
-	err = got_object_open(&tree_obj2, repo, commit2->tree_id);
-	if (err)
-		goto done;
-
-	err = diff_trees(tree_obj1, tree_obj2, repo);
-done:
-	if (tree_obj1)
-		got_object_close(tree_obj1);
-	if (tree_obj2)
-		got_object_close(tree_obj2);
-	if (commit1)
-		got_object_commit_close(commit1);
-	if (commit2)
-		got_object_commit_close(commit2);
-	return err;
-
-}
-
 __dead void
 usage_diff(void)
 {
@@ -685,13 +603,13 @@ cmd_diff(int argc, char *argv[])
 
 	switch (got_object_get_type(obj1)) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = diff_blobs(obj1, obj2, repo);
+		error = got_diff_objects_as_blobs(obj1, obj2, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = diff_trees(obj1, obj2, repo);
+		error = got_diff_objects_as_trees(obj1, obj2, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = diff_commits(obj1, obj2, repo);
+		error = got_diff_objects_as_commits(obj1, obj2, repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
