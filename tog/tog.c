@@ -21,10 +21,13 @@
 #include <panel.h>
 #include <locale.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <getopt.h>
 #include <string.h>
 #include <err.h>
 #include <unistd.h>
+#include <util.h>
+#include <limits.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -79,6 +82,43 @@ static struct tog_log_view {
 	WINDOW *window;
 	PANEL *panel;
 } tog_log_view;
+static struct tog_diff_view {
+	WINDOW *window;
+	PANEL *panel;
+} tog_diff_view;
+
+int
+tog_opentempfd(void)
+{
+	char name[PATH_MAX];
+	int fd;
+
+	if (strlcpy(name, "/tmp/tog.XXXXXXXX", sizeof(name)) >= sizeof(name))
+		return -1;
+
+	fd = mkstemp(name);
+	unlink(name);
+	return fd;
+}
+
+FILE *
+tog_opentemp(void)
+{
+	int fd;
+	FILE *f;
+
+	fd = tog_opentempfd();
+	if (fd < 0)
+		return NULL;
+
+	f = fdopen(fd, "w+");
+	if (f == NULL) {
+		close(fd);
+		return NULL;
+	}
+
+	return f;
+}
 
 __dead void
 usage_log(void)
@@ -188,6 +228,7 @@ done:
 	free(id_str);
 	return err;
 }
+
 struct commit_queue_entry {
 	TAILQ_ENTRY(commit_queue_entry) entry;
 	struct got_object_id *id;
@@ -737,10 +778,269 @@ usage_diff(void)
 	exit(1);
 }
 
+static const struct got_error *
+diff_blobs(FILE *outfile, struct got_object *obj1, struct got_object *obj2,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
+
+	err = got_object_blob_open(&blob1, repo, obj1, 8192);
+	if (err)
+		goto done;
+	err = got_object_blob_open(&blob2, repo, obj2, 8192);
+	if (err)
+		goto done;
+
+	err = got_diff_blob(blob1, blob2, NULL, NULL, outfile);
+done:
+	if (blob1)
+		got_object_blob_close(blob1);
+	if (blob2)
+		got_object_blob_close(blob2);
+	return err;
+}
+
+static const struct got_error *
+diff_trees(FILE *outfile, struct got_object *obj1, struct got_object *obj2,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+
+	err = got_object_tree_open(&tree1, repo, obj1);
+	if (err)
+		goto done;
+	err = got_object_tree_open(&tree2, repo, obj2);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(tree1, tree2, repo, outfile);
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
+diff_commits(FILE *outfile, struct got_object *obj1, struct got_object *obj2,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
+	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
+
+	err = got_object_commit_open(&commit1, repo, obj1);
+	if (err)
+		goto done;
+	err = got_object_commit_open(&commit2, repo, obj2);
+	if (err)
+		goto done;
+
+	err = got_object_open(&tree_obj1, repo, commit1->tree_id);
+	if (err)
+		goto done;
+	err = got_object_open(&tree_obj2, repo, commit2->tree_id);
+	if (err)
+		goto done;
+
+	err = diff_trees(outfile, tree_obj1, tree_obj2, repo);
+done:
+	if (tree_obj1)
+		got_object_close(tree_obj1);
+	if (tree_obj2)
+		got_object_close(tree_obj2);
+	if (commit1)
+		got_object_commit_close(commit1);
+	if (commit2)
+		got_object_commit_close(commit2);
+	return err;
+
+}
+
+const struct got_error *
+draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
+    int *eof, int max_lines)
+{
+	int nlines = 0, nprinted = 0;
+
+	rewind(f);
+	wclear(tog_diff_view.window);
+
+	*eof = 0;
+	while (nprinted < max_lines) {
+		char *line;
+		size_t lineno;
+		size_t linelen;
+		const char delim[3] = { '\0', '\0', '\0'};
+
+		line = fparseln(f, &linelen, &lineno, delim, 0);
+		if (line == NULL) {
+			*eof = 1;
+			break;
+		}
+		if (++nlines < *first_displayed_line) {
+			free(line);
+			continue;
+		}
+
+		if (linelen > COLS - 1)
+			line[COLS - 1] = '\0';
+		waddstr(tog_diff_view.window, line);
+		waddch(tog_diff_view.window, '\n');
+		if (++nprinted == 1)
+			*first_displayed_line = nlines;
+		free(line);
+	}
+	*last_displayed_line = nlines;
+
+	update_panels();
+	doupdate();
+
+	return NULL;
+}
+
+const struct got_error *
+show_diff_view(struct got_object *obj1, struct got_object *obj2,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	FILE *f;
+	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int eof;
+
+	if (got_object_get_type(obj1) != got_object_get_type(obj2))
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	f = tog_opentemp();
+	if (f == NULL)
+		return got_error_from_errno();
+
+	switch (got_object_get_type(obj1)) {
+	case GOT_OBJ_TYPE_BLOB:
+		err = diff_blobs(f, obj1, obj2, repo);
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		err = diff_trees(f, obj1, obj2, repo);
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		err = diff_commits(f, obj1, obj2, repo);
+		break;
+	default:
+		return got_error(GOT_ERR_OBJ_TYPE);
+	}
+
+	fflush(f);
+
+	if (tog_diff_view.window == NULL) {
+		tog_diff_view.window = newwin(0, 0, 0, 0);
+		if (tog_diff_view.window == NULL)
+			return got_error_from_errno();
+		keypad(tog_diff_view.window, TRUE);
+	}
+	if (tog_diff_view.panel == NULL) {
+		tog_diff_view.panel = new_panel(tog_diff_view.window);
+		if (tog_diff_view.panel == NULL)
+			return got_error_from_errno();
+	} else
+		show_panel(tog_diff_view.panel);
+
+	while (!done) {
+		err = draw_diff(f, &first_displayed_line, &last_displayed_line,
+		    &eof, LINES);
+		if (err)
+			break;
+		nodelay(stdscr, FALSE);
+		ch = wgetch(tog_diff_view.window);
+		switch (ch) {
+			case 'q':
+				done = 1;
+				break;
+			case 'k':
+			case KEY_UP:
+				if (first_displayed_line > 1)
+					first_displayed_line--;
+				break;
+			case 'j':
+			case KEY_DOWN:
+				if (!eof)
+					first_displayed_line++;
+				break;
+			default:
+				break;
+		}
+		nodelay(stdscr, TRUE);
+	}
+	fclose(f);
+	return err;
+}
+
 const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_object *obj1 = NULL, *obj2 = NULL;
+	char *repo_path = NULL;
+	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		usage_diff(); /* TODO show local worktree changes */
+	} else if (argc == 2) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		obj_id_str1 = argv[0];
+		obj_id_str2 = argv[1];
+	} else if (argc == 3) {
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		obj_id_str1 = argv[1];
+		obj_id_str2 = argv[2];
+	} else
+		usage_diff();
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error)
+		goto done;
+
+	error = got_object_open_by_id_str(&obj1, repo, obj_id_str1);
+	if (error)
+		goto done;
+
+	error = got_object_open_by_id_str(&obj2, repo, obj_id_str2);
+	if (error)
+		goto done;
+
+	error = show_diff_view(obj1, obj2, repo);
+done:
+	got_repo_close(repo);
+	if (obj1)
+		got_object_close(obj1);
+	if (obj2)
+		got_object_close(obj2);
+	return error;
 }
 
 __dead void
