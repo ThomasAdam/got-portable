@@ -476,7 +476,7 @@ draw_commits(struct commit_queue_entry **last, struct commit_queue_entry **selec
 }
 
 static void
-scroll_up(struct commit_queue_entry **first_displayed_entry, int n,
+scroll_up(struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue *commits)
 {
 	struct commit_queue_entry *entry;
@@ -487,7 +487,7 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int n,
 		return;
 
 	entry = *first_displayed_entry;
-	while (entry && nscrolled < n) {
+	while (entry && nscrolled < maxscroll) {
 		entry = TAILQ_PREV(entry, commit_queue, entry);
 		if (entry) {
 			*first_displayed_entry = entry;
@@ -497,7 +497,7 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int n,
 }
 
 static const struct got_error *
-scroll_down(struct commit_queue_entry **first_displayed_entry, int n,
+scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue_entry *last_displayed_entry,
     struct commit_queue *commits, struct got_repository *repo)
 {
@@ -538,7 +538,7 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int n,
 				last_displayed_entry = pentry;
 			}
 		}
-	} while (++nscrolled < n);
+	} while (++nscrolled < maxscroll);
 
 	return NULL;
 }
