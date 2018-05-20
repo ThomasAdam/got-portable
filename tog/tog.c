@@ -878,7 +878,8 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 				break;
 			case KEY_PPAGE:
 				i = 0;
-				while (i++ < LINES - 1 && first_displayed_line > 1)
+				while (i++ < LINES - 1 &&
+				    first_displayed_line > 1)
 					first_displayed_line--;
 				break;
 			case 'j':
