@@ -77,14 +77,10 @@ struct tog_cmd tog_commands[] = {
 };
 
 /* globals */
-static struct tog_log_view {
+static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_log_view;
-static struct tog_diff_view {
-	WINDOW *window;
-	PANEL *panel;
-} tog_diff_view;
+} tog_log_view, tog_diff_view;
 
 __dead void
 usage_log(void)
