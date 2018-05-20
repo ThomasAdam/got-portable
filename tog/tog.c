@@ -230,7 +230,6 @@ free_commits(struct commit_queue *commits)
 		pop_commit(commits);
 }
 
-
 static const struct got_error *
 fetch_parent_commit(struct commit_queue_entry **pentry,
     struct commit_queue_entry *entry, struct got_repository *repo)
