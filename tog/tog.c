@@ -876,11 +876,14 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 				break;
 			case 'k':
 			case KEY_UP:
+			case KEY_BACKSPACE:
 				if (first_displayed_line > 1)
 					first_displayed_line--;
 				break;
 			case 'j':
 			case KEY_DOWN:
+			case KEY_ENTER:
+			case '\r':
 				if (!eof)
 					first_displayed_line++;
 				break;
