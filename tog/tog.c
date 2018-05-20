@@ -515,12 +515,8 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 		pentry = TAILQ_NEXT(entry, entry);
 		if (pentry == NULL) {
 			err = fetch_parent_commit(&pentry, entry, repo);
-			if (err)
+			if (err || pentry == NULL)
 				break;
-			if (pentry == NULL) {
-				*first_displayed_entry = entry;
-				return NULL;
-			}
 			TAILQ_INSERT_TAIL(commits, pentry, entry);
 			last_displayed_entry = pentry;
 		}
@@ -536,7 +532,8 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 			if (pentry) {
 				TAILQ_INSERT_TAIL(commits, pentry, entry);
 				last_displayed_entry = pentry;
-			}
+			} else
+				break;
 		}
 	} while (++nscrolled < maxscroll);
 
