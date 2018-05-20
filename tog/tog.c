@@ -182,7 +182,7 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	int col, limit;
 	static const size_t id_display_cols = 8;
 	static const size_t author_display_cols = 16;
-	const int avail = COLS - 1;
+	const int avail = COLS;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
@@ -196,12 +196,12 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		waddnstr(tog_log_view.window, id_str, limit);
 	}
 	col = limit + 1;
-	while (col < avail && col < id_display_cols + 2) {
+	while (col <= avail && col < id_display_cols + 2) {
 		waddch(tog_log_view.window, ' ');
 		col++;
 	}
-	if (col >= avail)
-		goto endline;
+	if (col > avail)
+		goto done;
 
 	author0 = strdup(commit->author);
 	if (author0 == NULL) {
@@ -223,13 +223,13 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		goto done;
 	waddwstr(tog_log_view.window, wauthor);
 	col += author_width;
-	while (col < avail && author_width < author_display_cols + 1) {
+	while (col <= avail && author_width < author_display_cols + 1) {
 		waddch(tog_log_view.window, ' ');
 		col++;
 		author_width++;
 	}
-	if (col >= avail)
-		goto endline;
+	if (col > avail)
+		goto done;
 
 	logmsg0 = strdup(commit->logmsg);
 	if (logmsg0 == NULL) {
@@ -252,8 +252,6 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		waddch(tog_log_view.window, ' ');
 		col++;
 	}
-endline:
-	waddch(tog_log_view.window, '\n');
 done:
 	free(logmsg0);
 	free(wlogmsg);
