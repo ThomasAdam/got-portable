@@ -905,6 +905,7 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 					first_displayed_line++;
 				break;
 			case KEY_NPAGE:
+			case ' ':
 				i = 0;
 				while (!eof && i++ < LINES - 1) {
 					char *line = parse_next_line(f, NULL);
