@@ -77,8 +77,6 @@ struct tog_cmd tog_commands[] = {
 };
 
 /* globals */
-WINDOW *tog_main_win;
-PANEL *tog_main_panel;
 static struct tog_log_view {
 	WINDOW *window;
 	PANEL *panel;
@@ -944,7 +942,7 @@ cmd_blame(int argc, char *argv[])
 	return got_error(GOT_ERR_NOT_IMPL);
 }
 
-static const struct got_error *
+static void
 init_curses(void)
 {
 	initscr();
@@ -954,15 +952,6 @@ init_curses(void)
 	intrflush(stdscr, FALSE);
 	keypad(stdscr, TRUE);
 	curs_set(0);
-
-	tog_main_win = newwin(0, 0, 0, 0);
-	if (tog_main_win == NULL)
-		return got_error_from_errno();
-	tog_main_panel = new_panel(tog_main_win);
-	if (tog_main_panel == NULL)
-		return got_error_from_errno();
-
-	return NULL;
 }
 
 __dead void
@@ -1068,11 +1057,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	error = init_curses();
-	if (error) {
-		fprintf(stderr, "cannot initialize ncurses: %s\n", error->msg);
-		return 1;
-	}
+	init_curses();
 
 	error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
 	if (error)
