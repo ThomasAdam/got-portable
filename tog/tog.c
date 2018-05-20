@@ -532,8 +532,7 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 			if (pentry) {
 				TAILQ_INSERT_TAIL(commits, pentry, entry);
 				last_displayed_entry = pentry;
-			} else
-				break;
+			}
 		}
 	} while (++nscrolled < maxscroll);
 
