@@ -645,14 +645,14 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_DOWN:
 				nparents = num_parents(first_displayed_entry);
 				if (selected < LINES - 1 &&
-				    selected < nparents - 1)
+				    selected < nparents - 1) {
 					selected++;
-				else {
-					err = scroll_down(&first_displayed_entry, 1,
-					    last_displayed_entry, &commits, repo);
-					if (err)
-						goto done;
+					break;
 				}
+				err = scroll_down(&first_displayed_entry, 1,
+				    last_displayed_entry, &commits, repo);
+				if (err)
+					goto done;
 				break;
 			case KEY_NPAGE:
 				err = scroll_down(&first_displayed_entry, LINES,
