@@ -51,16 +51,16 @@ struct tog_cmd {
 	const char *descr;
 };
 
-__dead void	usage(void);
-__dead void	usage_log(void);
-__dead void	usage_diff(void);
-__dead void	usage_blame(void);
+__dead static void	usage(void);
+__dead static void	usage_log(void);
+__dead static void	usage_diff(void);
+__dead static void	usage_blame(void);
 
-const struct got_error*	cmd_log(int, char *[]);
-const struct got_error*	cmd_diff(int, char *[]);
-const struct got_error*	cmd_blame(int, char *[]);
+static const struct got_error*	cmd_log(int, char *[]);
+static const struct got_error*	cmd_diff(int, char *[]);
+static const struct got_error*	cmd_blame(int, char *[]);
 
-struct tog_cmd tog_commands[] = {
+static struct tog_cmd tog_commands[] = {
 	{ "log",	cmd_log,	usage_log,
 	    "show repository history" },
 	{ "diff",	cmd_diff,	usage_diff,
@@ -74,7 +74,7 @@ static struct tog_view {
 	PANEL *panel;
 } tog_log_view, tog_diff_view;
 
-__dead void
+__dead static void
 usage_log(void)
 {
 	endwin();
@@ -657,7 +657,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -723,7 +723,7 @@ cmd_log(int argc, char *argv[])
 	return error;
 }
 
-__dead void
+__dead static void
 usage_diff(void)
 {
 	endwin();
@@ -732,7 +732,7 @@ usage_diff(void)
 	exit(1);
 }
 
-const struct got_error *
+static const struct got_error *
 draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
     int *eof, int max_lines)
 {
@@ -774,7 +774,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 	return NULL;
 }
 
-const struct got_error *
+static const struct got_error *
 show_diff_view(struct got_object *obj1, struct got_object *obj2,
     struct got_repository *repo)
 {
@@ -849,7 +849,7 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -915,7 +915,7 @@ done:
 	return error;
 }
 
-__dead void
+__dead static void
 usage_blame(void)
 {
 	endwin();
@@ -924,7 +924,7 @@ usage_blame(void)
 	exit(1);
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_blame(int argc, char *argv[])
 {
 	return got_error(GOT_ERR_NOT_IMPL);
@@ -942,7 +942,7 @@ init_curses(void)
 	curs_set(0);
 }
 
-__dead void
+__dead static void
 usage(void)
 {
 	int i;

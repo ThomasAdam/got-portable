@@ -45,17 +45,19 @@ struct cmd {
 	const char	 *cmd_descr;
 };
 
-__dead void	usage(void);
-__dead void	usage_checkout(void);
-__dead void	usage_log(void);
-__dead void	usage_diff(void);
+__dead static void	usage(void);
+__dead static void	usage_checkout(void);
+__dead static void	usage_log(void);
+__dead static void	usage_diff(void);
 
-const struct got_error*		cmd_checkout(int, char *[]);
-const struct got_error*		cmd_log(int, char *[]);
-const struct got_error*		cmd_diff(int, char *[]);
-const struct got_error*		cmd_status(int, char *[]);
+static const struct got_error*		cmd_checkout(int, char *[]);
+static const struct got_error*		cmd_log(int, char *[]);
+static const struct got_error*		cmd_diff(int, char *[]);
+#ifdef notyet
+static const struct got_error*		cmd_status(int, char *[]);
+#endif
 
-struct cmd got_commands[] = {
+static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
 	    "check out a new work tree from a repository" },
 	{ "log",	cmd_log,	usage_log,
@@ -120,7 +122,7 @@ main(int argc, char *argv[])
 	return 1;
 }
 
-__dead void
+__dead static void
 usage(void)
 {
 	int i;
@@ -134,7 +136,7 @@ usage(void)
 	exit(1);
 }
 
-__dead void
+__dead static void
 usage_checkout(void)
 {
 	fprintf(stderr, "usage: %s checkout [-p prefix] repository-path "
@@ -153,7 +155,7 @@ checkout_progress(void *arg, const char *path)
 	printf("A  %s/%s\n", worktree_path, path);
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -427,7 +429,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 	return err;
 }
 
-__dead void
+__dead static void
 usage_log(void)
 {
 	fprintf(stderr, "usage: %s log [-p] [-c commit] [ -l N ] "
@@ -435,7 +437,7 @@ usage_log(void)
 	exit(1);
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -521,7 +523,7 @@ cmd_log(int argc, char *argv[])
 	return error;
 }
 
-__dead void
+__dead static void
 usage_diff(void)
 {
 	fprintf(stderr, "usage: %s diff [repository-path] object1 object2\n",
@@ -529,7 +531,7 @@ usage_diff(void)
 	exit(1);
 }
 
-const struct got_error *
+static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -630,7 +632,7 @@ done:
 }
 
 #ifdef notyet
-const struct got_error *
+static const struct got_error *
 cmd_status(int argc __unused, char *argv[] __unused)
 {
 	git_repository *repo = NULL;
