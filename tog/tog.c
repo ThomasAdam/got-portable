@@ -74,6 +74,12 @@ static struct tog_view {
 	PANEL *panel;
 } tog_log_view, tog_diff_view;
 
+static const struct got_error *
+show_diff_view(struct got_object *, struct got_object *,
+    struct got_repository *);
+static const struct got_error *
+show_log_view(struct got_object_id *, struct got_repository *);
+
 __dead static void
 usage_log(void)
 {
@@ -436,8 +442,8 @@ fetch_commits(struct commit_queue_entry **start_entry,
 }
 
 static const struct got_error *
-draw_commits(struct commit_queue_entry **last, struct commit_queue_entry *first,
-    int selected, int limit)
+draw_commits(struct commit_queue_entry **last, struct commit_queue_entry **selected,
+    struct commit_queue_entry *first, int selected_idx, int limit)
 {
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
@@ -450,10 +456,12 @@ draw_commits(struct commit_queue_entry **last, struct commit_queue_entry *first,
 	while (entry) {
 		if (ncommits == limit)
 			break;
-		if (ncommits == selected)
+		if (ncommits == selected_idx) {
 			wstandout(tog_log_view.window);
+			*selected = entry;
+		}
 		err = draw_commit(entry->commit, entry->id);
-		if (ncommits == selected)
+		if (ncommits == selected_idx)
 			wstandend(tog_log_view.window);
 		if (err)
 			break;
@@ -550,6 +558,32 @@ num_parents(struct commit_queue_entry *entry)
 }
 
 static const struct got_error *
+show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object *obj1 = NULL, *obj2 = NULL;
+
+	err = got_object_open(&obj2, repo, entry->id);
+	if (err)
+		return err;
+
+	entry = TAILQ_NEXT(entry, entry);
+	if (entry) {
+		err = got_object_open(&obj1, repo, entry->id);
+		if (err)
+			goto done;
+	}
+
+	err = show_diff_view(obj1, obj2, repo);
+done:
+	if (obj1)
+		got_object_close(obj1);
+	if (obj2)
+		got_object_close(obj2);
+	return err;
+}
+
+static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -558,6 +592,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 	struct commit_queue commits;
 	struct commit_queue_entry *first_displayed_entry = NULL;
 	struct commit_queue_entry *last_displayed_entry = NULL;
+	struct commit_queue_entry *selected_entry = NULL;
 
 	id = got_object_id_dup(start_id);
 	if (id == NULL)
@@ -573,15 +608,16 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		tog_log_view.panel = new_panel(tog_log_view.window);
 		if (tog_log_view.panel == NULL)
 			return got_error_from_errno();
-	}
+	} else
+		show_panel(tog_log_view.panel);
 
 	TAILQ_INIT(&commits);
 	err = fetch_commits(&first_displayed_entry, id, &commits, LINES, repo);
 	if (err)
 		goto done;
 	while (!done) {
-		err = draw_commits(&last_displayed_entry, first_displayed_entry,
-		    selected, LINES);
+		err = draw_commits(&last_displayed_entry, &selected_entry,
+		    first_displayed_entry, selected, LINES);
 		if (err)
 			goto done;
 
@@ -646,6 +682,13 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_RESIZE:
 				if (selected > LINES)
 					selected = LINES - 1;
+				break;
+			case KEY_ENTER:
+			case '\r':
+				err = show_commit(selected_entry, repo);
+				if (err)
+					break;
+				show_panel(tog_log_view.panel);
 				break;
 			default:
 				break;
@@ -783,14 +826,15 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
 	int eof;
 
-	if (got_object_get_type(obj1) != got_object_get_type(obj2))
+	if (obj1 != NULL && obj2 != NULL &&
+	    got_object_get_type(obj1) != got_object_get_type(obj2))
 		return got_error(GOT_ERR_OBJ_TYPE);
 
 	f = got_opentemp();
 	if (f == NULL)
 		return got_error_from_errno();
 
-	switch (got_object_get_type(obj1)) {
+	switch (got_object_get_type(obj1 ? obj1 : obj2)) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(obj1, obj2, repo, f);
 		break;
