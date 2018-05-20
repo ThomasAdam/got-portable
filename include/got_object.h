@@ -80,6 +80,12 @@ struct got_object_id *got_object_id_dup(struct got_object_id *);
 struct got_object_id *got_object_get_id(struct got_object *);
 
 /*
+ * Get a newly allocated copy of an object's ID string.
+ * The caller should dispose of it with free(3).
+ */
+const struct got_error *got_object_get_id_str(char **, struct got_object *);
+
+/*
  * Obtain the type of an object.
  * Returns one of the GOT_OBJ_TYPE_x values (see above).
  */

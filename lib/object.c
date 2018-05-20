@@ -105,6 +105,12 @@ got_object_get_id(struct got_object *obj)
 	return got_object_id_dup(&obj->id);
 }
 
+const struct got_error *
+got_object_get_id_str(char **outbuf, struct got_object *obj)
+{
+	return got_object_id_str(outbuf, &obj->id);
+}
+
 int
 got_object_get_type(struct got_object *obj)
 {

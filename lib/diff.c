@@ -519,12 +519,23 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 			goto done;
 	}
 	if (obj2) {
+		char *id_str;
+
 		err = got_object_commit_open(&commit2, repo, obj2);
 		if (err)
 			goto done;
 		err = got_object_open(&tree_obj2, repo, commit2->tree_id);
 		if (err)
 			goto done;
+		err = got_object_get_id_str(&id_str, obj2);
+		if (err)
+			goto done;
+		fprintf(outfile, "commit: %s\n", id_str);
+		free(id_str);
+		fprintf(outfile, "author: %s\n", commit2->author);
+		if (strcmp(commit2->author, commit2->committer) != 0)
+			fprintf(outfile, "committer: %s\n", commit2->committer);
+		fprintf(outfile, "\n%s\n", commit2->logmsg);
 	}
 	err = got_diff_objects_as_trees(tree_obj1, tree_obj2, repo, outfile);
 done:
