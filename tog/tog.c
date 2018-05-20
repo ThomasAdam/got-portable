@@ -83,6 +83,8 @@ show_diff_view(struct got_object *, struct got_object *,
 static const struct got_error *
 show_log_view(struct got_object_id *, struct got_repository *);
 
+static const struct got_error *format_line(wchar_t **, int *, char *, int);
+
 __dead static void
 usage_log(void)
 {
@@ -98,31 +100,35 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	const struct got_error *err = NULL;
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author0 = NULL, *author = NULL;
+	wchar_t *wlogmsg = NULL, *wauthor = NULL;
+	int author_width, logmsg_width;
 	char *newline, *smallerthan;
 	char *line = NULL;
 	char *id_str = NULL;
-	const size_t id_display_len = 8;
-	const size_t author_display_len = 16;
-	size_t id_len, author_len, logmsg_len, avail;
-	int i, col;
+	size_t id_len;
+	int col, limit;
+	static const size_t id_display_cols = 8;
+	static const size_t author_display_cols = 16;
+	const int avail = COLS - 1;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 	id_len = strlen(id_str);
-
-	logmsg0 = strdup(commit->logmsg);
-	if (logmsg0 == NULL) {
-		err = got_error_from_errno();
-		goto done;
+	if (avail < id_display_cols) {
+		limit = MIN(id_len, avail);
+		waddnstr(tog_log_view.window, id_str, limit);
+	} else {
+		limit = MIN(id_display_cols, id_len);
+		waddnstr(tog_log_view.window, id_str, limit);
 	}
-	logmsg = logmsg0;
-	while (*logmsg == '\n')
-		logmsg++;
-	newline = strchr(logmsg, '\n');
-	if (newline)
-		*newline = '\0';
-	logmsg_len = strlen(logmsg);
+	col = limit + 1;
+	while (col < avail && col < id_display_cols + 2) {
+		waddch(tog_log_view.window, ' ');
+		col++;
+	}
+	if (col >= avail)
+		goto endline;
 
 	author0 = strdup(commit->author);
 	if (author0 == NULL) {
@@ -138,55 +144,48 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		if (at)
 			*at = '\0';
 	}
-	author_len = strlen(author);
+	limit = MIN(avail, author_display_cols);
+	err = format_line(&wauthor, &author_width, author, limit);
+	if (err)
+		goto done;
+	waddwstr(tog_log_view.window, wauthor);
+	col += author_width;
+	while (col < avail && author_width < author_display_cols + 1) {
+		waddch(tog_log_view.window, ' ');
+		col++;
+		author_width++;
+	}
+	if (col >= avail)
+		goto endline;
 
-	avail = COLS - 1;
-	line = calloc(avail + 1, sizeof(*line));
-	if (line == NULL) {
+	logmsg0 = strdup(commit->logmsg);
+	if (logmsg0 == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-
-	col = 0;
-	for (i = 0; i < MIN(id_display_len, id_len); i++) {
-		if (col >= avail)
-			goto draw;
-		line[col++] = id_str[i];
+	logmsg = logmsg0;
+	while (*logmsg == '\n')
+		logmsg++;
+	newline = strchr(logmsg, '\n');
+	if (newline)
+		*newline = '\0';
+	limit = avail - col;
+	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit);
+	if (err)
+		goto done;
+	waddwstr(tog_log_view.window, wlogmsg);
+	col += logmsg_width;
+	while (col <= avail) {
+		waddch(tog_log_view.window, ' ');
+		col++;
 	}
-	while (i < id_display_len) {
-		if (col >= avail)
-			goto draw;
-		line[col++] = ' ';
-		i++;
-	}
-	if (col >= avail)
-		goto draw;
-	line[col++] = ' ';
-	for (i = 0; i < MIN(author_display_len, author_len); i++) {
-		if (col >= avail)
-			goto draw;
-		line[col++] = author[i];
-	}
-	while (i < author_display_len) {
-		if (col >= avail)
-			goto draw;
-		line[col++] = ' ';
-		i++;
-	}
-	if (col >= avail)
-		goto draw;
-	line[col++] = ' ';
-
-	while (col < avail && *logmsg)
-		line[col++] = *logmsg++;
-	while (col < avail)
-		line[col++] = ' ';
-draw:
-	waddstr(tog_log_view.window, line);
+endline:
 	waddch(tog_log_view.window, '\n');
 done:
 	free(logmsg0);
+	free(wlogmsg);
 	free(author0);
+	free(wauthor);
 	free(line);
 	free(id_str);
 	return err;
@@ -776,9 +775,34 @@ parse_next_line(FILE *f, size_t *len)
 	return line;
 }
 
-/* Format a line for display, ensuring that it won't overflow COLS columns. */
 static const struct got_error *
-format_line(wchar_t **wlinep, char *line)
+mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
+{
+	const struct got_error *err = NULL;
+
+	*ws = NULL;
+	*wlen = mbstowcs(NULL, s, 0);
+	if (*wlen == (size_t)-1)
+		return got_error_from_errno();
+
+	*ws = calloc(*wlen + 1, sizeof(*ws));
+	if (*ws == NULL)
+		return got_error_from_errno();
+
+	if (mbstowcs(*ws, s, *wlen) != *wlen)
+		err = got_error_from_errno();
+
+	if (err) {
+		free(*ws);
+		*ws = NULL;
+		*wlen = 0;
+	}
+	return err;
+}
+
+/* Format a line for display, ensuring that it won't overflow a width limit. */
+static const struct got_error *
+format_line(wchar_t **wlinep, int *widthp, char *line, int wlimit)
 {
 	const struct got_error *err = NULL;
 	int cols = 0;
@@ -788,21 +812,12 @@ format_line(wchar_t **wlinep, char *line)
 
 	*wlinep = NULL;
 
-	wlen = mbstowcs(NULL, line, 0);
-	if (wlen == (size_t)-1)
-		return got_error_from_errno();
-
-	wline = calloc(wlen + 1, sizeof(wchar_t));
-	if (wline == NULL)
-		return got_error_from_errno();
-
-	if (mbstowcs(wline, line, wlen) != wlen) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	err = mbs2ws(&wline, &wlen, line);
+	if (err)
+		return err;
 
 	i = 0;
-	while (i < wlen && cols <= COLS) {
+	while (i < wlen && cols <= wlimit) {
 		int width = wcwidth(wline[i]);
 		switch (width) {
 		case 0:
@@ -819,8 +834,11 @@ format_line(wchar_t **wlinep, char *line)
 			err = got_error_from_errno();
 			goto done;
 		}
-		if (cols <= COLS)
+		if (cols <= COLS) {
 			i++;
+			if (widthp)
+				*widthp = cols;
+		}
 	}
 	wline[i] = L'\0';
 done:
@@ -856,7 +874,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 			continue;
 		}
 
-		err = format_line(&wline, line);
+		err = format_line(&wline, NULL, line, COLS);
 		if (err) {
 			free(line);
 			return err;
