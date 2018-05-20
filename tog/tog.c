@@ -76,7 +76,6 @@ struct tog_cmd tog_commands[] = {
 	    "show line-by-line file history" },
 };
 
-/* globals */
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
