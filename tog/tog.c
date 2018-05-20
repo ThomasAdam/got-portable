@@ -502,41 +502,30 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue *commits, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct commit_queue_entry *entry;
+	struct commit_queue_entry *pentry;
 	int nscrolled = 0;
 
 	if (last_displayed_entry->commit->nparents == 0)
 		return NULL;
 
-	entry = *first_displayed_entry;
 	do {
-		struct commit_queue_entry *pentry;
-
-		pentry = TAILQ_NEXT(entry, entry);
+		pentry = TAILQ_NEXT(last_displayed_entry, entry);
 		if (pentry == NULL) {
-			err = fetch_parent_commit(&pentry, entry, repo);
+			err = fetch_parent_commit(&pentry,
+			    last_displayed_entry, repo);
 			if (err || pentry == NULL)
 				break;
 			TAILQ_INSERT_TAIL(commits, pentry, entry);
-			last_displayed_entry = pentry;
 		}
+		last_displayed_entry = pentry;
 
+		pentry = TAILQ_NEXT(*first_displayed_entry, entry);
+		if (pentry == NULL)
+			break;
 		*first_displayed_entry = pentry;
-		entry = pentry;
-
-		if (TAILQ_LAST(commits, commit_queue) == last_displayed_entry) {
-			err = fetch_parent_commit(&pentry, last_displayed_entry,
-			    repo);
-			if (err)
-				break;
-			if (pentry) {
-				TAILQ_INSERT_TAIL(commits, pentry, entry);
-				last_displayed_entry = pentry;
-			}
-		}
 	} while (++nscrolled < maxscroll);
 
-	return NULL;
+	return err;
 }
 
 static int
@@ -666,19 +655,17 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 				}
 				break;
 			case KEY_NPAGE:
-				nparents = num_parents(first_displayed_entry);
-				if (nparents < LINES - 1 &&
-				    selected < nparents - 1) {
-					selected = nparents - 1;
-					break;
-				}
 				err = scroll_down(&first_displayed_entry, LINES,
 				    last_displayed_entry, &commits, repo);
 				if (err)
 					goto done;
+				if (last_displayed_entry->commit->nparents > 0)
+					break;
+				/* can't scroll any further; move cursor down */
 				nparents = num_parents(first_displayed_entry);
-				if (selected > nparents)
-					selected = nparents - 1;
+				if (selected < LINES - 1 ||
+				    selected < nparents - 1)
+					selected = MIN(LINES - 1, nparents - 1);
 				break;
 			case KEY_RESIZE:
 				if (selected > LINES)
