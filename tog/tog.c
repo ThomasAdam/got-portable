@@ -44,17 +44,10 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
-enum tog_view_id {
-	TOG_VIEW_LOG,
-	TOG_VIEW_DIFF,
-	TOG_VIEW_BLAME,
-};
-
 struct tog_cmd {
 	const char *name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void (*cmd_usage)(void);
-	enum tog_view_id view;
 	const char *descr;
 };
 
@@ -68,11 +61,11 @@ const struct got_error*	cmd_diff(int, char *[]);
 const struct got_error*	cmd_blame(int, char *[]);
 
 struct tog_cmd tog_commands[] = {
-	{ "log",	cmd_log,	usage_log,	TOG_VIEW_LOG,
+	{ "log",	cmd_log,	usage_log,
 	    "show repository history" },
-	{ "diff",	cmd_diff,	usage_diff,	TOG_VIEW_DIFF,
+	{ "diff",	cmd_diff,	usage_diff,
 	    "compare files and directories" },
-	{ "blame",	cmd_blame,	usage_blame,	TOG_VIEW_BLAME,
+	{ "blame",	cmd_blame,	usage_blame,
 	    "show line-by-line file history" },
 };
 
