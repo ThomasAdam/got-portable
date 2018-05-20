@@ -623,6 +623,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 
 		nodelay(stdscr, FALSE);
 		ch = wgetch(tog_log_view.window);
+		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case ERR:
 				if (errno) {
@@ -693,7 +694,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			default:
 				break;
 		}
-		nodelay(stdscr, TRUE);
 	}
 done:
 	free_commits(&commits);
@@ -870,6 +870,7 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 			break;
 		nodelay(stdscr, FALSE);
 		ch = wgetch(tog_diff_view.window);
+		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case 'q':
 				done = 1;
@@ -890,7 +891,6 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 			default:
 				break;
 		}
-		nodelay(stdscr, TRUE);
 	}
 	fclose(f);
 	return err;
