@@ -83,8 +83,6 @@ show_diff_view(struct got_object *, struct got_object *,
 static const struct got_error *
 show_log_view(struct got_object_id *, struct got_repository *);
 
-static const struct got_error *format_line(wchar_t **, int *, char *, int);
-
 __dead static void
 usage_log(void)
 {
@@ -92,6 +90,81 @@ usage_log(void)
 	fprintf(stderr, "usage: %s log [-c commit] [repository-path]\n",
 	    getprogname());
 	exit(1);
+}
+
+/* Create newly allocated wide-character string equivalent to a byte string. */
+static const struct got_error *
+mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
+{
+	const struct got_error *err = NULL;
+
+	*ws = NULL;
+	*wlen = mbstowcs(NULL, s, 0);
+	if (*wlen == (size_t)-1)
+		return got_error_from_errno();
+
+	*ws = calloc(*wlen + 1, sizeof(*ws));
+	if (*ws == NULL)
+		return got_error_from_errno();
+
+	if (mbstowcs(*ws, s, *wlen) != *wlen)
+		err = got_error_from_errno();
+
+	if (err) {
+		free(*ws);
+		*ws = NULL;
+		*wlen = 0;
+	}
+	return err;
+}
+
+/* Format a line for display, ensuring that it won't overflow a width limit. */
+static const struct got_error *
+format_line(wchar_t **wlinep, int *widthp, char *line, int wlimit)
+{
+	const struct got_error *err = NULL;
+	int cols = 0;
+	wchar_t *wline = NULL;
+	size_t wlen;
+	int i;
+
+	*wlinep = NULL;
+
+	err = mbs2ws(&wline, &wlen, line);
+	if (err)
+		return err;
+
+	i = 0;
+	while (i < wlen && cols <= wlimit) {
+		int width = wcwidth(wline[i]);
+		switch (width) {
+		case 0:
+			break;
+		case 1:
+		case 2:
+			cols += width;
+			break;
+		case -1:
+			if (wline[i] == L'\t')
+				cols += TABSIZE;
+			break;
+		default:
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (cols <= COLS) {
+			i++;
+			if (widthp)
+				*widthp = cols;
+		}
+	}
+	wline[i] = L'\0';
+done:
+	if (err)
+		free(wline);
+	else
+		*wlinep = wline;
+	return err;
 }
 
 static const struct got_error *
@@ -773,80 +846,6 @@ parse_next_line(FILE *f, size_t *len)
 	if (len)
 		*len = linelen;
 	return line;
-}
-
-static const struct got_error *
-mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
-{
-	const struct got_error *err = NULL;
-
-	*ws = NULL;
-	*wlen = mbstowcs(NULL, s, 0);
-	if (*wlen == (size_t)-1)
-		return got_error_from_errno();
-
-	*ws = calloc(*wlen + 1, sizeof(*ws));
-	if (*ws == NULL)
-		return got_error_from_errno();
-
-	if (mbstowcs(*ws, s, *wlen) != *wlen)
-		err = got_error_from_errno();
-
-	if (err) {
-		free(*ws);
-		*ws = NULL;
-		*wlen = 0;
-	}
-	return err;
-}
-
-/* Format a line for display, ensuring that it won't overflow a width limit. */
-static const struct got_error *
-format_line(wchar_t **wlinep, int *widthp, char *line, int wlimit)
-{
-	const struct got_error *err = NULL;
-	int cols = 0;
-	wchar_t *wline = NULL;
-	size_t wlen;
-	int i;
-
-	*wlinep = NULL;
-
-	err = mbs2ws(&wline, &wlen, line);
-	if (err)
-		return err;
-
-	i = 0;
-	while (i < wlen && cols <= wlimit) {
-		int width = wcwidth(wline[i]);
-		switch (width) {
-		case 0:
-			break;
-		case 1:
-		case 2:
-			cols += width;
-			break;
-		case -1:
-			if (wline[i] == L'\t')
-				cols += TABSIZE;
-			break;
-		default:
-			err = got_error_from_errno();
-			goto done;
-		}
-		if (cols <= COLS) {
-			i++;
-			if (widthp)
-				*widthp = cols;
-		}
-	}
-	wline[i] = L'\0';
-done:
-	if (err)
-		free(wline);
-	else
-		*wlinep = wline;
-	return err;
 }
 
 static const struct got_error *
