@@ -857,6 +857,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 	char *line;
 	size_t len;
 	wchar_t *wline;
+	int width;
 
 	rewind(f);
 	werase(tog_diff_view.window);
@@ -873,13 +874,14 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 			continue;
 		}
 
-		err = format_line(&wline, NULL, line, COLS);
+		err = format_line(&wline, &width, line, COLS);
 		if (err) {
 			free(line);
 			return err;
 		}
 		waddwstr(tog_diff_view.window, wline);
-		waddch(tog_diff_view.window, '\n');
+		if (width < COLS)
+			waddch(tog_diff_view.window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
 		free(line);
