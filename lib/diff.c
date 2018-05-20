@@ -448,6 +448,9 @@ got_diff_objects_as_blobs(struct got_object *obj1, struct got_object *obj2,
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
 
+	if (obj1 == NULL && obj2 == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
+
 	if (obj1) {
 		err = got_object_blob_open(&blob1, repo, obj1, 8192);
 		if (err)
@@ -473,6 +476,9 @@ got_diff_objects_as_trees(struct got_object *obj1, struct got_object *obj2,
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+
+	if (obj1 == NULL && obj2 == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
 
 	if (obj1) {
 		err = got_object_tree_open(&tree1, repo, obj1);
@@ -500,6 +506,9 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	const struct got_error *err;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
+
+	if (obj1 == NULL && obj2 == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
 
 	if (obj1) {
 		err = got_object_commit_open(&commit1, repo, obj1);
