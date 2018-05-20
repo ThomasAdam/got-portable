@@ -17,7 +17,9 @@
 #include <sys/queue.h>
 
 #include <errno.h>
+#define _XOPEN_SOURCE_EXTENDED
 #include <curses.h>
+#undef _XOPEN_SOURCE_EXTENDED
 #include <panel.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -28,6 +30,7 @@
 #include <unistd.h>
 #include <util.h>
 #include <limits.h>
+#include <wchar.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -773,13 +776,70 @@ parse_next_line(FILE *f, size_t *len)
 	return line;
 }
 
+/* Format a line for display, ensuring that it won't overflow COLS columns. */
+static const struct got_error *
+format_line(wchar_t **wlinep, char *line)
+{
+	const struct got_error *err = NULL;
+	int cols = 0;
+	wchar_t *wline = NULL;
+	size_t wlen;
+	int i;
+
+	*wlinep = NULL;
+
+	wlen = mbstowcs(NULL, line, 0);
+	if (wlen == (size_t)-1)
+		return got_error_from_errno();
+
+	wline = calloc(wlen + 1, sizeof(wchar_t));
+	if (wline == NULL)
+		return got_error_from_errno();
+
+	if (mbstowcs(wline, line, wlen) != wlen) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	i = 0;
+	while (i < wlen && cols <= COLS) {
+		int width = wcwidth(wline[i]);
+		switch (width) {
+		case 0:
+			break;
+		case 1:
+		case 2:
+			cols += width;
+			break;
+		case -1:
+			if (wline[i] == L'\t')
+				cols += TABSIZE;
+			break;
+		default:
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (cols <= COLS)
+			i++;
+	}
+	wline[i] = L'\0';
+done:
+	if (err)
+		free(wline);
+	else
+		*wlinep = wline;
+	return err;
+}
+
 static const struct got_error *
 draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
     int *eof, int max_lines)
 {
+	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
 	char *line;
 	size_t len;
+	wchar_t *wline;
 
 	rewind(f);
 	werase(tog_diff_view.window);
@@ -796,9 +856,12 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 			continue;
 		}
 
-		if (len > COLS - 1)
-			line[COLS - 1] = '\0';
-		waddstr(tog_diff_view.window, line);
+		err = format_line(&wline, line);
+		if (err) {
+			free(line);
+			return err;
+		}
+		waddwstr(tog_diff_view.window, wline);
 		waddch(tog_diff_view.window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
