@@ -775,23 +775,34 @@ usage_diff(void)
 	exit(1);
 }
 
+static char *
+parse_next_line(FILE *f, size_t *len)
+{
+	char *line;
+	size_t linelen;
+	size_t lineno;
+	const char delim[3] = { '\0', '\0', '\0'};
+
+	line = fparseln(f, &linelen, &lineno, delim, 0);
+	if (len)
+		*len = linelen;
+	return line;
+}
+
 static const struct got_error *
 draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
     int *eof, int max_lines)
 {
 	int nlines = 0, nprinted = 0;
+	char *line;
+	size_t len;
 
 	rewind(f);
 	wclear(tog_diff_view.window);
 
 	*eof = 0;
 	while (nprinted < max_lines) {
-		char *line;
-		size_t lineno;
-		size_t linelen;
-		const char delim[3] = { '\0', '\0', '\0'};
-
-		line = fparseln(f, &linelen, &lineno, delim, 0);
+		line = parse_next_line(f, &len);
 		if (line == NULL) {
 			*eof = 1;
 			break;
@@ -801,7 +812,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 			continue;
 		}
 
-		if (linelen > COLS - 1)
+		if (len > COLS - 1)
 			line[COLS - 1] = '\0';
 		waddstr(tog_diff_view.window, line);
 		waddch(tog_diff_view.window, '\n');
@@ -824,7 +835,7 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 	const struct got_error *err;
 	FILE *f;
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
-	int eof;
+	int eof, i;
 
 	if (obj1 != NULL && obj2 != NULL &&
 	    got_object_get_type(obj1) != got_object_get_type(obj2))
@@ -881,12 +892,26 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 				if (first_displayed_line > 1)
 					first_displayed_line--;
 				break;
+			case KEY_PPAGE:
+				i = 0;
+				while (i++ < LINES - 1 && first_displayed_line > 1)
+					first_displayed_line--;
+				break;
 			case 'j':
 			case KEY_DOWN:
 			case KEY_ENTER:
 			case '\r':
 				if (!eof)
 					first_displayed_line++;
+				break;
+			case KEY_NPAGE:
+				i = 0;
+				while (!eof && i++ < LINES - 1) {
+					char *line = parse_next_line(f, NULL);
+					first_displayed_line++;
+					if (line == NULL)
+						break;
+				}
 				break;
 			default:
 				break;
