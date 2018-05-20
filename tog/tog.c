@@ -556,15 +556,21 @@ static const struct got_error *
 show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 {
 	const struct got_error *err;
+	struct commit_queue_entry *pentry;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 
 	err = got_object_open(&obj2, repo, entry->id);
 	if (err)
 		return err;
 
-	entry = TAILQ_NEXT(entry, entry);
-	if (entry) {
-		err = got_object_open(&obj1, repo, entry->id);
+	pentry = TAILQ_NEXT(entry, entry);
+	if (pentry == NULL) {
+		err = fetch_parent_commit(&pentry, entry, repo);
+		if (err)
+			return err;
+	}
+	if (pentry) {
+		err = got_object_open(&obj1, repo, pentry->id);
 		if (err)
 			goto done;
 	}
