@@ -505,9 +505,6 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 	struct commit_queue_entry *pentry;
 	int nscrolled = 0;
 
-	if (last_displayed_entry->commit->nparents == 0)
-		return NULL;
-
 	do {
 		pentry = TAILQ_NEXT(last_displayed_entry, entry);
 		if (pentry == NULL) {
