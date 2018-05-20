@@ -448,7 +448,7 @@ draw_commits(struct commit_queue_entry **last, struct commit_queue_entry **selec
 	struct commit_queue_entry *entry;
 	int ncommits = 0;
 
-	wclear(tog_log_view.window);
+	werase(tog_log_view.window);
 
 	entry = first;
 	*last = first;
@@ -782,7 +782,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 	size_t len;
 
 	rewind(f);
-	wclear(tog_diff_view.window);
+	werase(tog_diff_view.window);
 
 	*eof = 0;
 	while (nprinted < max_lines) {
