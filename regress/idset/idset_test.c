@@ -105,7 +105,7 @@ idset_add_remove_iter(void)
 		goto done;
 	err = got_object_idset_add(set, &id2, NULL);
 	if (err == NULL)
-		abort();
+		return 0;
 	if (err->code != GOT_ERR_OBJ_EXISTS)
 		goto done;
 	err = NULL;
