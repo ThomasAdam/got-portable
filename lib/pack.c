@@ -87,7 +87,7 @@ get_packfile_size(size_t *size, const char *path)
 		return got_error(GOT_ERR_BAD_PATH);
 
 	/* Path must point to a pack index or to a pack file. */
-	if (strcmp(dot, ".idx") == 0) {
+	if (strcmp(dot, GOT_PACKIDX_SUFFIX) == 0) {
 		const struct got_error *err = NULL;
 		char *path_pack;
 		char base_path[PATH_MAX];
@@ -507,7 +507,7 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 
 	/* Copy up to and excluding ".idx". */
 	if (strlcpy(*path_packfile, packidx->path_packidx,
-	    size - strlen(".idx") - 1) >= size)
+	    size - strlen(GOT_PACKIDX_SUFFIX) - 1) >= size)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
