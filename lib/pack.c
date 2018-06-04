@@ -593,9 +593,10 @@ cache_pack(struct got_pack **packp, const char *path_packfile,
 	err = get_packfile_size(&pack->filesize, path_packfile);
 done:
 	if (err) {
-		if (pack)
+		if (pack) {
 			free(pack->path_packfile);
-		free(pack);
+			memset(pack, 0, sizeof(*pack));
+		}
 	} else if (packp)
 		*packp = pack;
 	return err;
