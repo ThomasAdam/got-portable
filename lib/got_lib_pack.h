@@ -65,6 +65,12 @@ struct got_packidx_v2_hdr {
 	struct got_packidx_trailer trailer;
 };
 
+/* An open pack index file. */
+struct got_packidx {
+	char *path_packidx; /* actual on-disk path */
+	struct got_packidx_v2_hdr hdr;
+};
+
 struct got_packfile_hdr {
 	uint32_t	signature;
 #define GOT_PACKFILE_SIGNATURE	0x5041434b	/* 'P' 'A' 'C' 'K' */
@@ -129,9 +135,9 @@ struct got_packfile_obj_data {
 	} __attribute__((__packed__));
 } __attribute__((__packed__));
 
-const struct got_error *got_packidx_open(struct got_packidx_v2_hdr **,
+const struct got_error *got_packidx_open(struct got_packidx **,
     const char *);
-void got_packidx_close(struct got_packidx_v2_hdr *);
+void got_packidx_close(struct got_packidx *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_object_id *, struct got_repository *);
