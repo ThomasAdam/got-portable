@@ -186,7 +186,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 	if (err)
 		goto done;
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.fanout_table, sizeof(p->hdr.fanout_table));
+	SHA1Update(&ctx, (uint8_t *)p->hdr.fanout_table,
+	    sizeof(p->hdr.fanout_table));
 
 	nobj = betoh32(p->hdr.fanout_table[0xff]);
 
@@ -231,7 +232,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.offsets, nobj * sizeof(*p->hdr.offsets));
+	SHA1Update(&ctx, (uint8_t *)p->hdr.offsets,
+	    nobj * sizeof(*p->hdr.offsets));
 
 	/* Large file offsets are contained only in files > 2GB. */
 	if (packfile_size <= 0x80000000)
@@ -384,7 +386,8 @@ dup_packidx(struct got_packidx *packidx)
 	    nobj * sizeof(*p->hdr.offsets));
 
 	if (p->hdr.large_offsets) {
-		p->hdr.large_offsets = calloc(nobj, sizeof(*p->hdr.large_offsets));
+		p->hdr.large_offsets = calloc(nobj,
+		    sizeof(*p->hdr.large_offsets));
 		if (p->hdr.large_offsets == NULL)
 			goto err;
 		memcpy(p->hdr.large_offsets, packidx->hdr.large_offsets,
@@ -507,7 +510,8 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 		return got_error_from_errno();
 
 	/* Copy up to and excluding ".idx". */
-	strncpy(*path_packfile, packidx->path_packidx, size - strlen(".idx") - 2);
+	strncpy(*path_packfile, packidx->path_packidx,
+	    size - strlen(".idx") - 2);
 
 	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -1173,8 +1177,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 				err = got_inflate_to_file_fd(&base_len,
 				    pack->fd, base_file);
 			else {
-				err = got_inflate_to_mem_fd(&base_buf, &base_len,
-				    pack->fd);
+				err = got_inflate_to_mem_fd(&base_buf,
+				    &base_len, pack->fd);
 				if (base_len < max_size) {
 					uint8_t *p;
 					p = reallocarray(base_buf, 1, max_size);
