@@ -121,6 +121,7 @@ const struct got_error *
 got_packidx_open(struct got_packidx **packidx, const char *path)
 {
 	struct got_packidx *p;
+	struct got_packidx_v2_hdr *h;
 	FILE *f;
 	const struct got_error *err = NULL;
 	size_t n, nobj, packfile_size;
@@ -150,120 +151,119 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 		return err;
 	}
 
-	n = fread(&p->hdr.magic, sizeof(p->hdr.magic), 1, f);
+	h = &p->hdr;
+	n = fread(&h->magic, sizeof(h->magic), 1, f);
 	if (n != 1) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	if (betoh32(p->hdr.magic) != GOT_PACKIDX_V2_MAGIC) {
+	if (betoh32(h->magic) != GOT_PACKIDX_V2_MAGIC) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)&p->hdr.magic, sizeof(p->hdr.magic));
+	SHA1Update(&ctx, (uint8_t *)&h->magic, sizeof(h->magic));
 
-	n = fread(&p->hdr.version, sizeof(p->hdr.version), 1, f);
+	n = fread(&h->version, sizeof(h->version), 1, f);
 	if (n != 1) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	if (betoh32(p->hdr.version) != GOT_PACKIDX_VERSION) {
+	if (betoh32(h->version) != GOT_PACKIDX_VERSION) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)&p->hdr.version, sizeof(p->hdr.version));
+	SHA1Update(&ctx, (uint8_t *)&h->version, sizeof(h->version));
 
-	n = fread(&p->hdr.fanout_table, sizeof(p->hdr.fanout_table), 1, f);
+	n = fread(&h->fanout_table, sizeof(h->fanout_table), 1, f);
 	if (n != 1) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	err = verify_fanout_table(p->hdr.fanout_table);
+	err = verify_fanout_table(h->fanout_table);
 	if (err)
 		goto done;
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.fanout_table,
-	    sizeof(p->hdr.fanout_table));
+	SHA1Update(&ctx, (uint8_t *)h->fanout_table, sizeof(h->fanout_table));
 
-	nobj = betoh32(p->hdr.fanout_table[0xff]);
+	nobj = betoh32(h->fanout_table[0xff]);
 
-	p->hdr.sorted_ids = calloc(nobj, sizeof(*p->hdr.sorted_ids));
-	if (p->hdr.sorted_ids == NULL) {
+	h->sorted_ids = calloc(nobj, sizeof(*h->sorted_ids));
+	if (h->sorted_ids == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	n = fread(p->hdr.sorted_ids, sizeof(*p->hdr.sorted_ids), nobj, f);
+	n = fread(h->sorted_ids, sizeof(*h->sorted_ids), nobj, f);
 	if (n != nobj) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.sorted_ids,
-	    nobj * sizeof(*p->hdr.sorted_ids));
+	SHA1Update(&ctx, (uint8_t *)h->sorted_ids,
+	    nobj * sizeof(*h->sorted_ids));
 
-	p->hdr.crc32 = calloc(nobj, sizeof(*p->hdr.crc32));
-	if (p->hdr.crc32 == NULL) {
+	h->crc32 = calloc(nobj, sizeof(*h->crc32));
+	if (h->crc32 == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	n = fread(p->hdr.crc32, sizeof(*p->hdr.crc32), nobj, f);
+	n = fread(h->crc32, sizeof(*h->crc32), nobj, f);
 	if (n != nobj) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.crc32, nobj * sizeof(*p->hdr.crc32));
+	SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
 
-	p->hdr.offsets = calloc(nobj, sizeof(*p->hdr.offsets));
-	if (p->hdr.offsets == NULL) {
+	h->offsets = calloc(nobj, sizeof(*h->offsets));
+	if (h->offsets == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	n = fread(p->hdr.offsets, sizeof(*p->hdr.offsets), nobj, f);
+	n = fread(h->offsets, sizeof(*h->offsets), nobj, f);
 	if (n != nobj) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t *)p->hdr.offsets,
-	    nobj * sizeof(*p->hdr.offsets));
+	SHA1Update(&ctx, (uint8_t *)h->offsets, nobj * sizeof(*h->offsets));
 
 	/* Large file offsets are contained only in files > 2GB. */
 	if (packfile_size <= 0x80000000)
 		goto checksum;
 
-	p->hdr.large_offsets = calloc(nobj, sizeof(*p->hdr.large_offsets));
-	if (p->hdr.large_offsets == NULL) {
+	h->large_offsets = calloc(nobj, sizeof(*h->large_offsets));
+	if (h->large_offsets == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	n = fread(p->hdr.large_offsets, sizeof(*p->hdr.large_offsets), nobj, f);
+	n = fread(h->large_offsets, sizeof(*h->large_offsets), nobj, f);
 	if (n != nobj) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, (uint8_t*)p->hdr.large_offsets,
-	    nobj * sizeof(*p->hdr.large_offsets));
+	SHA1Update(&ctx, (uint8_t*)h->large_offsets,
+	    nobj * sizeof(*h->large_offsets));
 
 checksum:
-	n = fread(&p->hdr.trailer, sizeof(p->hdr.trailer), 1, f);
+	n = fread(&h->trailer, sizeof(h->trailer), 1, f);
 	if (n != 1) {
 		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 
-	SHA1Update(&ctx, p->hdr.trailer.packfile_sha1, SHA1_DIGEST_LENGTH);
+	SHA1Update(&ctx, h->trailer.packfile_sha1, SHA1_DIGEST_LENGTH);
 	SHA1Final(sha1, &ctx);
-	if (memcmp(p->hdr.trailer.packidx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
+	if (memcmp(h->trailer.packidx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
 		err = got_error(GOT_ERR_PACKIDX_CSUM);
 done:
 	fclose(f);
