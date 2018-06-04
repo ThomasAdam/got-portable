@@ -149,15 +149,15 @@ idset_add_remove_iter(void)
 	if (err)
 		goto done;
 
-	if (got_object_idset_get_data(set, &id1) != (void *)data1) {
+	if (got_object_idset_get(set, &id1) != (void *)data1) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
-	if (got_object_idset_get_data(set, &id2) != (void *)data2) {
+	if (got_object_idset_get(set, &id2) != (void *)data2) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
-	if (got_object_idset_get_data(set, &id3) != (void *)data3) {
+	if (got_object_idset_get(set, &id3) != (void *)data3) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
@@ -177,7 +177,7 @@ idset_add_remove_iter(void)
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
-	if (got_object_idset_get_data(set, &id2) != NULL) {
+	if (got_object_idset_get(set, &id2) != NULL) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}

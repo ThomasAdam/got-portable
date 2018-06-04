@@ -146,8 +146,7 @@ got_object_idset_add(void **existing_data,
 }
 
 void *
-got_object_idset_get_data(struct got_object_idset *set,
-    struct got_object_id *id)
+got_object_idset_get(struct got_object_idset *set, struct got_object_id *id)
 {
 	struct got_object_idset_element *entry;
 	uint8_t i = id->sha1[0];
