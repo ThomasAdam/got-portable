@@ -56,6 +56,8 @@
 #define GOT_ERR_PRIVSEP_DIED	40
 #define GOT_ERR_PRIVSEP_EXIT	41
 #define GOT_ERR_PACK_OFFSET	42
+#define GOT_ERR_OBJ_EXISTS	43
+#define GOT_ERR_BAD_OBJ_ID	44
 
 static const struct got_error {
 	int code;
@@ -97,10 +99,12 @@ static const struct got_error {
 				"from unprivileged process" },
 	{ GOT_ERR_PRIVSEP_PIPE,	"unprivileged process closed pipe" },
 	{ GOT_ERR_PRIVSEP_NO_FD,"out of file descriptors for privsep" },
-	{ GOT_ERR_PRIVSEP_MSG,"unexpected message from unprivileged process" },
-	{ GOT_ERR_PRIVSEP_DIED,"unprivileged process died unexpectedly" },
-	{ GOT_ERR_PRIVSEP_EXIT,"bad exit code from unprivileged process" },
-	{ GOT_ERR_PACK_OFFSET,"bad offset in pack file" },
+	{ GOT_ERR_PRIVSEP_MSG,	"unexpected message from unprivileged process" },
+	{ GOT_ERR_PRIVSEP_DIED,	"unprivileged process died unexpectedly" },
+	{ GOT_ERR_PRIVSEP_EXIT,	"bad exit code from unprivileged process" },
+	{ GOT_ERR_PACK_OFFSET,	"bad offset in pack file" },
+	{ GOT_ERR_OBJ_EXISTS,	"object already exists" },
+	{ GOT_ERR_BAD_OBJ_ID,	"bad object id" },
 };
 
 /*
