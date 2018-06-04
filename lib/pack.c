@@ -318,10 +318,6 @@ get_object_offset(struct got_packidx *packidx, int idx)
 	return (off_t)(offset & GOT_PACKIDX_OFFSET_VAL_MASK);
 }
 
-static const struct got_error *
-get_packfile_path(char **path_packfile, struct got_repository *repo,
-    struct got_packidx *packidx);
-
 static int
 get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
     struct got_repository *repo)
