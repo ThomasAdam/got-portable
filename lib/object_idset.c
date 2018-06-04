@@ -21,6 +21,7 @@
 #include <sha1.h>
 #include <stdio.h>
 #include <zlib.h>
+#include <limits.h>
 
 #include "got_object.h"
 #include "got_error.h"
@@ -47,6 +48,8 @@ struct got_object_idset {
 	 * which of these lists an object ID is stored in.
 	 */
 	TAILQ_HEAD(, got_object_idset_element) entries[0xff + 1];
+	unsigned int nelem;
+#define GOT_OBJECT_IDSET_MAX_ELEM UINT_MAX
 };
 
 struct got_object_idset *
@@ -89,6 +92,9 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 	struct got_object_idset_element *new, *entry;
 	uint8_t i = id->sha1[0];
 
+	if (set->nelem >= GOT_OBJECT_IDSET_MAX_ELEM)
+		return got_error(GOT_ERR_NO_SPACE);
+
 	new = calloc(1, sizeof(*new));
 	if (new == NULL)
 		return got_error_from_errno();
@@ -98,6 +104,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 
 	if (TAILQ_EMPTY(&set->entries[i])) {
 		TAILQ_INSERT_HEAD(&set->entries[i], new, entry);
+		set->nelem++;
 		return NULL;
 	}
 
@@ -114,15 +121,18 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 			return got_error(GOT_ERR_OBJ_EXISTS);
 		} else if (cmp < 0) {
 			TAILQ_INSERT_BEFORE(entry, new, entry);
+			set->nelem++;
 			return NULL;
 		}
 
 		next = TAILQ_NEXT(entry, entry);
 		if (next == NULL) {
 			TAILQ_INSERT_AFTER(&set->entries[i], entry, new, entry);
+			set->nelem++;
 			return NULL;
 		} else if (got_object_id_cmp(&new->id, &next->id) > 0) {
 			TAILQ_INSERT_BEFORE(next, new, entry);
+			set->nelem++;
 			return NULL;
 		}
 	}
@@ -152,9 +162,13 @@ got_object_idset_remove(struct got_object_idset *set,
 	struct got_object_idset_element *entry, *tmp;
 	uint8_t i = id->sha1[0];
 
+	if (set->nelem == 0)
+		return got_error(GOT_ERR_NO_OBJ);
+
 	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
 		if (got_object_id_cmp(&entry->id, id) == 0) {
 			TAILQ_REMOVE(&set->entries[i], entry, entry);
+			set->nelem--;
 			return NULL;
 		}
 	}
@@ -187,4 +201,10 @@ void got_object_idset_for_each(struct got_object_idset *set,
 		TAILQ_FOREACH(entry, &set->entries[i], entry)
 			cb(&entry->id, entry->data);
 	}
+}
+
+unsigned int
+got_object_idset_num_elements(struct got_object_idset *set)
+{
+	return set->nelem;
 }

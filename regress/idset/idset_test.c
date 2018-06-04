@@ -77,6 +77,10 @@ idset_add_remove_iter(void)
 		err = got_error_from_errno();
 		goto done;
 	}
+	if (got_object_idset_num_elements(set) != 0) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 
 	if (!got_parse_sha1_digest(id1.sha1, id_str1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
@@ -94,6 +98,10 @@ idset_add_remove_iter(void)
 	err = got_object_idset_add(set, &id1, (void *)data1);
 	if (err)
 		goto done;
+	if (got_object_idset_num_elements(set) != 1) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 
 	if (!got_object_idset_contains(set, &id1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -104,8 +112,10 @@ idset_add_remove_iter(void)
 	if (err)
 		goto done;
 	err = got_object_idset_add(set, &id2, NULL);
-	if (err == NULL)
-		return 0;
+	if (err == NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 	if (err->code != GOT_ERR_OBJ_EXISTS)
 		goto done;
 	err = NULL;
@@ -115,6 +125,10 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 	if (!got_object_idset_contains(set, &id2)) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+	if (got_object_idset_num_elements(set) != 2) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
@@ -135,10 +149,18 @@ idset_add_remove_iter(void)
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
+	if (got_object_idset_num_elements(set) != 3) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 
 	err = got_object_idset_remove(set, &id2);
 	if (err)
 		goto done;
+	if (got_object_idset_num_elements(set) != 2) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 	if (got_object_idset_contains(set, &id2)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
@@ -149,8 +171,8 @@ idset_add_remove_iter(void)
 	}
 
 	got_object_idset_for_each(set, idset_cb);
-	got_object_idset_free(set);
 done:
+	got_object_idset_free(set);
 	return (err == NULL);
 }
 
