@@ -107,7 +107,7 @@ get_packfile_size(size_t *size, const char *path)
 		free(path_pack);
 		if (err)
 			return err;
-	} else if (strcmp(dot, ".pack") == 0) {
+	} else if (strcmp(dot, GOT_PACKFILE_SUFFIX) == 0) {
 		if (stat(path, &sb) != 0)
 			return got_error_from_errno();
 	} else
