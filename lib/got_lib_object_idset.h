@@ -19,8 +19,8 @@ struct got_object_idset;
 struct got_object_idset *got_object_idset_alloc(void);
 void got_object_idset_free(struct got_object_idset *);
 
-const struct got_error *got_object_idset_add(struct got_object_idset *,
-    struct got_object_id *, void *);
+const struct got_error *got_object_idset_add(void **,
+    struct got_object_idset *, struct got_object_id *, void *);
 void *got_object_idset_get_data(struct got_object_idset *,
     struct got_object_id *);
 const struct got_error *got_object_idset_remove(struct got_object_idset *,

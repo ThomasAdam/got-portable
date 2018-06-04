@@ -71,6 +71,7 @@ idset_add_remove_iter(void)
 {
 	const struct got_error *err = NULL;
 	struct got_object_idset *set;
+	void *existing_data;
 
 	set = got_object_idset_alloc();
 	if (set == NULL) {
@@ -95,9 +96,13 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(set, &id1, (void *)data1);
+	err = got_object_idset_add(&existing_data, set, &id1, (void *)data1);
 	if (err)
 		goto done;
+	if (existing_data != NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
 	if (got_object_idset_num_elements(set) != 1) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
@@ -108,14 +113,21 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(set, &id2, (void *)data2);
+	err = got_object_idset_add(&existing_data, set, &id2, (void *)data2);
 	if (err)
 		goto done;
-	err = got_object_idset_add(set, &id2, NULL);
-	if (err == NULL) {
+	if (existing_data != NULL) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
+	err = got_object_idset_add(&existing_data, set, &id2, NULL);
+	if (existing_data == NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+	if (err->code != GOT_ERR_OBJ_EXISTS)
+		goto done;
+	err = got_object_idset_add(NULL, set, &id2, NULL);
 	if (err->code != GOT_ERR_OBJ_EXISTS)
 		goto done;
 	err = NULL;
@@ -133,7 +145,7 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(set, &id3, (void *)data3);
+	err = got_object_idset_add(NULL, set, &id3, (void *)data3);
 	if (err)
 		goto done;
 

@@ -86,11 +86,14 @@ got_object_idset_free(struct got_object_idset *set)
 }
 
 const struct got_error *
-got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
-    void *data)
+got_object_idset_add(void **existing_data,
+    struct got_object_idset *set, struct got_object_id *id, void *data)
 {
 	struct got_object_idset_element *new, *entry;
 	uint8_t i = id->sha1[0];
+
+	if (existing_data)
+		*existing_data = NULL;
 
 	if (set->nelem >= GOT_OBJECT_IDSET_MAX_ELEM)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -118,6 +121,8 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 
 		if (cmp == 0) {
 			free(new);
+			if (existing_data)
+				*existing_data = entry->data;
 			return got_error(GOT_ERR_OBJ_EXISTS);
 		} else if (cmp < 0) {
 			TAILQ_INSERT_BEFORE(entry, new, entry);
