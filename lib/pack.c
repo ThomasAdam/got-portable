@@ -506,8 +506,9 @@ get_packfile_path(char **path_packfile, struct got_repository *repo,
 		return got_error_from_errno();
 
 	/* Copy up to and excluding ".idx". */
-	strncpy(*path_packfile, packidx->path_packidx,
-	    size - strlen(".idx") - 2);
+	if (strlcpy(*path_packfile, packidx->path_packidx,
+	    size - strlen(".idx") - 1) >= size)
+		return got_error(GOT_ERR_NO_SPACE);
 
 	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
 		return got_error(GOT_ERR_NO_SPACE);
