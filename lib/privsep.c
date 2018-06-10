@@ -266,7 +266,9 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 
 	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
+	icommit.author_time = commit->author_time;
 	icommit.committer_len = strlen(commit->committer);
+	icommit.committer_time = commit->committer_time;
 	icommit.logmsg_len = strlen(commit->logmsg);
 	icommit.nparents = commit->nparents;
 
@@ -366,6 +368,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 				err = got_error_from_errno();
 				break;
 			}
+			(*commit)->author_time = 0;
 		} else {
 			(*commit)->author = malloc(icommit.author_len + 1);
 			if ((*commit)->author == NULL) {
@@ -375,6 +378,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			memcpy((*commit)->author, data + len,
 			    icommit.author_len);
 			(*commit)->author[icommit.author_len] = '\0';
+			(*commit)->author_time = icommit.author_time;
 		}
 		len += icommit.author_len;
 
@@ -384,6 +388,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 				err = got_error_from_errno();
 				break;
 			}
+			(*commit)->committer_time = 0;
 		} else {
 			(*commit)->committer =
 			    malloc(icommit.committer_len + 1);
@@ -394,6 +399,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			memcpy((*commit)->committer, data + len,
 			    icommit.committer_len);
 			(*commit)->committer[icommit.committer_len] = '\0';
+			(*commit)->committer_time = icommit.committer_time;
 		}
 		len += icommit.committer_len;
 

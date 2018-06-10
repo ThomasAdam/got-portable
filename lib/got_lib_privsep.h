@@ -99,7 +99,9 @@ struct got_imsg_object {
 struct got_imsg_commit_object {
 	uint8_t tree_id[SHA1_DIGEST_LENGTH];
 	size_t author_len;
+	time_t author_time;
 	size_t committer_len;
+	time_t committer_time;
 	size_t logmsg_len;
 	int nparents;
 
