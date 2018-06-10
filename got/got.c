@@ -309,18 +309,29 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, int show_patch)
 {
 	const struct got_error *err = NULL;
-	char *buf;
+	char *id_str, *logmsg, *line;
 
-	err = got_object_id_str(&buf, id);
+	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
 	printf("-----------------------------------------------\n");
-	printf("commit %s\n", buf);
+	printf("commit %s\n", id_str);
+	free(id_str);
 	printf("author: %s\n", commit->author);
 	if (strcmp(commit->author, commit->committer) != 0)
 		printf("committer: %s\n", commit->committer);
-	printf("\n%s\n", commit->logmsg);
+
+	logmsg = strdup(commit->logmsg);
+	if (logmsg == NULL)
+		return got_error_from_errno();
+
+	do {
+		line = strsep(&logmsg, "\n");
+		if (line)
+			printf(" %s\n", line);
+	} while (line);
+	free(logmsg);
 
 	if (show_patch) {
 		err = print_patch(commit, id, repo);
@@ -328,7 +339,6 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			printf("\n");
 	}
 
-	free(buf);
 	return err;
 }
 
