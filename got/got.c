@@ -17,6 +17,7 @@
 
 #include <sys/queue.h>
 #include <sys/limits.h>
+#include <sys/types.h>
 
 #include <err.h>
 #include <errno.h>
@@ -26,6 +27,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <time.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -318,9 +320,10 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
-	printf("author: %s\n", commit->author);
+	printf("author: %s  %s", commit->author, ctime(&commit->author_time));
 	if (strcmp(commit->author, commit->committer) != 0)
-		printf("committer: %s\n", commit->committer);
+		printf("committer: %s  %s\n", commit->committer,
+		    ctime(&commit->committer_time));
 	if (commit->nparents > 1) {
 		struct got_parent_id *pid;
 		int n = 1;
