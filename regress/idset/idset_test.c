@@ -56,7 +56,7 @@ static const char *data1 = "data1", *data2 = "data2", *data3 = "data3";
 static int iter_count;
 
 static void
-idset_cb(struct got_object_id *id, void *data) {
+idset_cb(struct got_object_id *id, void *data, void *arg) {
 	if (iter_count == 0 &&
 	    (got_object_id_cmp(id, &id1) != 0 || data != (void *)data1))
 		abort();
@@ -182,7 +182,7 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	got_object_idset_for_each(set, idset_cb);
+	got_object_idset_for_each(set, idset_cb, NULL);
 done:
 	got_object_idset_free(set);
 	return (err == NULL);

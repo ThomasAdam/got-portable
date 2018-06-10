@@ -196,14 +196,14 @@ got_object_idset_contains(struct got_object_idset *set,
 }
 
 void got_object_idset_for_each(struct got_object_idset *set,
-    void (*cb)(struct got_object_id *, void *))
+    void (*cb)(struct got_object_id *, void *, void *), void *arg)
 {
 	struct got_object_idset_element *entry;
 	int i;
 
 	for (i = 0; i < nitems(set->entries); i++) {
 		TAILQ_FOREACH(entry, &set->entries[i], entry)
-			cb(&entry->id, entry->data);
+			cb(&entry->id, entry->data, arg);
 	}
 }
 
