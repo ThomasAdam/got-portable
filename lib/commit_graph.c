@@ -212,7 +212,7 @@ add_iteration_candidate(struct got_commit_graph *graph,
 		err = compare_commits(&cmp, node->commit, n->commit);
 		if (err)
 			return err;
-		if (cmp <= 0)
+		if (cmp < 0)
 			continue;
 		TAILQ_INSERT_BEFORE(n, node, entry);
 		break;
