@@ -199,7 +199,7 @@ static const struct got_error *
 add_iteration_candidate(struct got_commit_graph *graph,
     struct got_commit_graph_node *node)
 {
-	struct got_commit_graph_node *n;
+	struct got_commit_graph_node *n, *next;
 	
 	if (TAILQ_EMPTY(&graph->iter_candidates)) {
 		TAILQ_INSERT_TAIL(&graph->iter_candidates, node, entry);
@@ -212,10 +212,24 @@ add_iteration_candidate(struct got_commit_graph *graph,
 		err = compare_commits(&cmp, node->commit, n->commit);
 		if (err)
 			return err;
-		if (cmp < 0)
-			continue;
-		TAILQ_INSERT_BEFORE(n, node, entry);
-		break;
+		if (cmp < 0) {
+			next = TAILQ_NEXT(n, entry);
+			if (next == NULL) {
+				TAILQ_INSERT_AFTER(&graph->iter_candidates, n,
+				    node, entry);
+				break;
+			}
+			err = compare_commits(&cmp, node->commit, next->commit);
+			if (err)
+				return err;
+			if (cmp >= 0) {
+				TAILQ_INSERT_BEFORE(next, node, entry);
+				break;
+			}
+		} else {
+			TAILQ_INSERT_BEFORE(n, node, entry);
+			break;
+		}
 	}
 
 	return NULL;
