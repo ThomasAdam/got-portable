@@ -306,7 +306,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, int show_patch)
+    struct got_repository *repo, int show_patch, int verbose)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *logmsg, *line;
@@ -321,6 +321,16 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("author: %s\n", commit->author);
 	if (strcmp(commit->author, commit->committer) != 0)
 		printf("committer: %s\n", commit->committer);
+	if (verbose) {
+		struct got_parent_id *pid;
+		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+			err = got_object_id_str(&id_str, pid->id);
+			if (err)
+				return err;
+			printf("parent commit: %s\n", id_str);
+			free(id_str);
+		}
+	}
 
 	logmsg = strdup(commit->logmsg);
 	if (logmsg == NULL)
@@ -344,7 +354,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int show_patch, int limit)
+    struct got_repository *repo, int show_patch, int limit, int verbose)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -373,7 +383,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		}
 		if (commit == NULL)
 			break;
-		err = print_commit(commit, id, repo, show_patch);
+		err = print_commit(commit, id, repo, show_patch, verbose);
 		if (err || (limit && --limit == 0))
 			break;
 	} while (ncommits > 0);
@@ -400,7 +410,7 @@ cmd_log(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
-	int show_patch = 0, limit = 0;
+	int show_patch = 0, limit = 0, verbose = 0;
 	const char *errstr;
 
 #ifndef PROFILE
@@ -408,7 +418,7 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:l:")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:l:v")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -420,6 +430,9 @@ cmd_log(int argc, char *argv[])
 			limit = strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr != NULL)
 				err(1, "-l option %s", errstr);
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		default:
 			usage();
@@ -467,7 +480,8 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
-		error = print_commits(obj, id, repo, show_patch, limit);
+		error = print_commits(obj, id, repo, show_patch, limit,
+		    verbose);
 	else
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
