@@ -321,13 +321,14 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("author: %s\n", commit->author);
 	if (strcmp(commit->author, commit->committer) != 0)
 		printf("committer: %s\n", commit->committer);
-	if (verbose) {
+	if (commit->nparents > 1) {
 		struct got_parent_id *pid;
+		int n = 1;
 		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
 			err = got_object_id_str(&id_str, pid->id);
 			if (err)
 				return err;
-			printf("parent commit: %s\n", id_str);
+			printf("parent %d: %s\n", n++, id_str);
 			free(id_str);
 		}
 	}
