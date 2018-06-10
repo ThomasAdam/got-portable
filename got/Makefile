@@ -1,9 +1,10 @@
 .PATH:${.CURDIR}/../lib
 
 PROG=		got
-SRCS=		got.c delta.c diff.c diffreg.c error.c fileindex.c object.c \
-		opentemp.c path.c pack.c privsep.c reference.c repository.c \
-		sha1.c worktree.c zbuf.c
+SRCS=		got.c commit_graph.c delta.c diff.c diffreg.c error.c \
+		fileindex.c object.c object_idset.c opentemp.c path.c \
+		pack.c privsep.c reference.c repository.c sha1.c \
+		worktree.c zbuf.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lutil -lz

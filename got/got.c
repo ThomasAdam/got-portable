@@ -33,6 +33,7 @@
 #include "got_repository.h"
 #include "got_worktree.h"
 #include "got_diff.h"
+#include "got_commit_graph.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -331,101 +332,43 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	return err;
 }
 
-struct commit_queue_entry {
-	TAILQ_ENTRY(commit_queue_entry) entry;
-	struct got_object_id *id;
-	struct got_commit_object *commit;
-};
-
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
     struct got_repository *repo, int show_patch, int limit)
 {
 	const struct got_error *err;
-	struct got_commit_object *root_commit;
-	TAILQ_HEAD(, commit_queue_entry) commits;
-	struct commit_queue_entry *entry;
+	struct got_commit_graph *graph;
+	int ncommits;
 
-	TAILQ_INIT(&commits);
-
-	err = got_object_commit_open(&root_commit, repo, root_obj);
+	err = got_commit_graph_open(&graph, root_id, repo);
 	if (err)
 		return err;
-
-	entry = calloc(1, sizeof(*entry));
-	if (entry == NULL)
-		return got_error_from_errno();
-	entry->id = got_object_id_dup(root_id);
-	if (entry->id == NULL) {
-		err = got_error_from_errno();
-		free(entry);
+	err = got_commit_graph_iter_start(graph, root_id);
+	if (err)
 		return err;
-	}
-	entry->commit = root_commit;
-	TAILQ_INSERT_HEAD(&commits, entry, entry);
+	do {
+		struct got_commit_object *commit;
+		struct got_object_id *id;
 
-	while (!TAILQ_EMPTY(&commits)) {
-		struct got_parent_id *pid;
-		struct got_object *obj;
-		struct got_commit_object *pcommit;
-		struct commit_queue_entry *pentry;
-
-		entry = TAILQ_FIRST(&commits);
-
-		err = print_commit(entry->commit, entry->id, repo, show_patch);
-		if (err)
-			break;
-
-		if (limit && --limit == 0)
-			break;
-
-		if (entry->commit->nparents == 0)
-			break;
-
-		/* Follow the first parent (TODO: handle merge commits). */
-		pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
-		err = got_object_open(&obj, repo, pid->id);
-		if (err)
-			break;
-		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-			err = got_error(GOT_ERR_OBJ_TYPE);
-			break;
+		err = got_commit_graph_iter_next(&commit, &id, graph);
+		if (err) {
+			if (err->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			err = got_commit_graph_fetch_commits(&ncommits,
+			    graph, 1, repo);
+			if (err)
+				break;
+			else
+				continue;
 		}
-
-		err = got_object_commit_open(&pcommit, repo, obj);
-		got_object_close(obj);
-		if (err)
+		if (commit == NULL)
 			break;
-
-		pentry = calloc(1, sizeof(*pentry));
-		if (pentry == NULL) {
-			err = got_error_from_errno();
-			got_object_commit_close(pcommit);
+		err = print_commit(commit, id, repo, show_patch);
+		if (err || (limit && --limit == 0))
 			break;
-		}
-		pentry->id = got_object_id_dup(pid->id);
-		if (pentry->id == NULL) {
-			err = got_error_from_errno();
-			got_object_commit_close(pcommit);
-			break;
-		}
-		pentry->commit = pcommit;
-		TAILQ_INSERT_TAIL(&commits, pentry, entry);
+	} while (ncommits > 0);
 
-		TAILQ_REMOVE(&commits, entry, entry);
-		got_object_commit_close(entry->commit);
-		free(entry->id);
-		free(entry);
-	}
-
-	while (!TAILQ_EMPTY(&commits)) {
-		entry = TAILQ_FIRST(&commits);
-		TAILQ_REMOVE(&commits, entry, entry);
-		got_object_commit_close(entry->commit);
-		free(entry->id);
-		free(entry);
-	}
-
+	got_commit_graph_close(graph);
 	return err;
 }
 
