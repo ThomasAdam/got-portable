@@ -134,32 +134,21 @@ is_root_node(struct got_commit_graph_node *node)
 	return node->commit->nparents == 0;
 }
 
-static const struct got_error *
-compare_commits(int *cmp, struct got_commit_object *c1,
-    struct got_commit_object *c2)
+static int
+compare_commits(struct got_commit_object *c1, struct got_commit_object *c2)
 {
-	const struct got_error *err;
-	int64_t t1, t2;
+	time_t t1, t2;
 
-	err = got_object_commit_get_committer_time(&t1, c1);
-	if (err)
-		return err;
-	err = got_object_commit_get_committer_time(&t2, c2);
-
-	if (err)
-		return err;
-
+	t1 = c1->committer_time;
+	t2 = c2->committer_time;
 	if (t1 == t2)	
-		*cmp = 0;
+		return 0;
 	else if (t1 < t2)
-		*cmp = -1;
-	else
-		*cmp = 1;
-
-	return NULL;
+		return -1;
+	return 1;
 }
 
-static const struct got_error *
+static void
 add_iteration_candidate(struct got_commit_graph *graph,
     struct got_commit_graph_node *node)
 {
@@ -167,15 +156,11 @@ add_iteration_candidate(struct got_commit_graph *graph,
 	
 	if (TAILQ_EMPTY(&graph->iter_candidates)) {
 		TAILQ_INSERT_TAIL(&graph->iter_candidates, node, entry);
-		return NULL;
+		return;
 	}
 
 	TAILQ_FOREACH(n, &graph->iter_candidates, entry) {
-		const struct got_error *err;
-		int cmp;
-		err = compare_commits(&cmp, node->commit, n->commit);
-		if (err)
-			return err;
+		int cmp = compare_commits(node->commit, n->commit);
 		if (cmp < 0) {
 			next = TAILQ_NEXT(n, entry);
 			if (next == NULL) {
@@ -183,9 +168,7 @@ add_iteration_candidate(struct got_commit_graph *graph,
 				    node, entry);
 				break;
 			}
-			err = compare_commits(&cmp, node->commit, next->commit);
-			if (err)
-				return err;
+			cmp = compare_commits(node->commit, next->commit);
 			if (cmp >= 0) {
 				TAILQ_INSERT_BEFORE(next, node, entry);
 				break;
@@ -195,8 +178,6 @@ add_iteration_candidate(struct got_commit_graph *graph,
 			break;
 		}
 	}
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -222,10 +203,7 @@ add_node(struct got_commit_graph_node **new_node,
 	if (err == NULL) {
 		struct got_parent_id *pid;
 
-		err = add_iteration_candidate(graph, node);
-		if (err)
-			return err;
-
+		add_iteration_candidate(graph, node);
 		err = got_object_idset_remove(graph->open_branches, commit_id);
 		if (err && err->code != GOT_ERR_NO_OBJ)
 			return err;
@@ -476,12 +454,8 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	/* Put all known parents of this commit on the candidate list. */
 	SIMPLEQ_FOREACH(pid, &start_node->commit->parent_ids, entry) {
 		node = got_object_idset_get(graph->node_ids, pid->id);
-		if (node) {
-			const struct got_error *err;
-			err = add_iteration_candidate(graph, node);
-			if (err)
-				return err;
-		}
+		if (node)
+			add_iteration_candidate(graph, node);
 	}
 
 	return NULL;

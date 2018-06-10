@@ -472,6 +472,34 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 }
 
 static const struct got_error *
+parse_commit_time(time_t *time, char *committer)
+{
+	const char *errstr;
+	char *space;
+
+	*time = 0;
+
+	/* Strip off trailing timezone indicator. */
+	space = strrchr(committer, ' ');
+	if (space == NULL)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	*space = '\0';
+
+	/* Timestamp is separated from committer name + email by space. */
+	space = strrchr(committer, ' ');
+	if (space == NULL)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
+	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
+	if (errstr)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
+	/* Strip off parsed time information, leaving just author and email. */
+	*space = '\0';
+	return NULL;
+}
+
+static const struct got_error *
 parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 {
 	const struct got_error *err = NULL;
@@ -521,6 +549,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 	tlen = strlen(GOT_COMMIT_TAG_AUTHOR);
 	if (strncmp(s, GOT_COMMIT_TAG_AUTHOR, tlen) == 0) {
 		char *p;
+		size_t slen;
 
 		remain -= tlen;
 		if (remain <= 0) {
@@ -534,18 +563,23 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			goto done;
 		}
 		*p = '\0';
+		slen = strlen(s);
+		err = parse_commit_time(&(*commit)->author_time, s);
+		if (err)
+			goto done;
 		(*commit)->author = strdup(s);
 		if ((*commit)->author == NULL) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		s += strlen((*commit)->author) + 1;
-		remain -= strlen((*commit)->author) + 1;
+		s += slen + 1;
+		remain -= slen + 1;
 	}
 
 	tlen = strlen(GOT_COMMIT_TAG_COMMITTER);
 	if (strncmp(s, GOT_COMMIT_TAG_COMMITTER, tlen) == 0) {
 		char *p;
+		size_t slen;
 
 		remain -= tlen;
 		if (remain <= 0) {
@@ -559,13 +593,17 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 			goto done;
 		}
 		*p = '\0';
+		slen = strlen(s);
+		err = parse_commit_time(&(*commit)->committer_time, s);
+		if (err)
+			goto done;
 		(*commit)->committer = strdup(s);
 		if ((*commit)->committer == NULL) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		s += strlen((*commit)->committer) + 1;
-		remain -= strlen((*commit)->committer) + 1;
+		s += slen + 1;
+		remain -= slen + 1;
 	}
 
 	(*commit)->logmsg = strndup(s, remain);
@@ -579,57 +617,6 @@ done:
 		*commit = NULL;
 	}
 	return err;
-}
-
-static const struct got_error *
-parse_commit_time(time_t *time, const char *author_str)
-{
-	const struct got_error *err = NULL;
-	const char *errstr;
-	char *committer, *space;
-
-	*time = 0;
-
-	committer = strdup(author_str);
-	if (committer == NULL)
-		return got_error_from_errno();
-
-	/* Strip off trailing timezone indicator. */
-	space = strrchr(committer, ' ');
-	if (space == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-	*space = '\0';
-
-	/* Timestamp is separated from committer name + email by space. */
-	space = strrchr(committer, ' ');
-	if (space == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-
-	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
-	if (errstr)
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-
-done:
-	free(committer);
-	return err;
-}
-
-const struct got_error *
-got_object_commit_get_committer_time(time_t *time,
-    struct got_commit_object *commit)
-{
-	return parse_commit_time(time, commit->committer);
-}
-
-const struct got_error *
-got_object_commit_get_author_time(time_t *time,
-    struct got_commit_object *commit)
-{
-	return parse_commit_time(time, commit->committer);
 }
 
 static void
