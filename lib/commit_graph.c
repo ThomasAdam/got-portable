@@ -135,53 +135,17 @@ is_root_node(struct got_commit_graph_node *node)
 }
 
 static const struct got_error *
-parse_commit_time(int64_t *time, struct got_commit_object *commit)
-{
-	const struct got_error *err = NULL;
-	const char *errstr;
-	char *committer, *space;
-
-	*time = 0;
-
-	committer = strdup(commit->committer);
-	if (committer == NULL)
-		return got_error_from_errno();
-
-	/* Strip off trailing timezone indicator. */
-	space = strrchr(committer, ' ');
-	if (space == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-	*space = '\0';
-
-	/* Timestamp is separated from committer name + email by space. */
-	space = strrchr(committer, ' ');
-	if (space == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-
-	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
-	if (errstr)
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-
-done:
-	free(committer);
-	return err;
-}
-
-static const struct got_error *
 compare_commits(int *cmp, struct got_commit_object *c1,
     struct got_commit_object *c2)
 {
 	const struct got_error *err;
 	int64_t t1, t2;
 
-	err = parse_commit_time(&t1, c1);
+	err = got_object_commit_get_committer_time(&t1, c1);
 	if (err)
 		return err;
-	err = parse_commit_time(&t2, c2);
+	err = got_object_commit_get_committer_time(&t2, c2);
+
 	if (err)
 		return err;
 

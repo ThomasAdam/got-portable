@@ -581,6 +581,57 @@ done:
 	return err;
 }
 
+static const struct got_error *
+parse_commit_time(time_t *time, const char *author_str)
+{
+	const struct got_error *err = NULL;
+	const char *errstr;
+	char *committer, *space;
+
+	*time = 0;
+
+	committer = strdup(author_str);
+	if (committer == NULL)
+		return got_error_from_errno();
+
+	/* Strip off trailing timezone indicator. */
+	space = strrchr(committer, ' ');
+	if (space == NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+	*space = '\0';
+
+	/* Timestamp is separated from committer name + email by space. */
+	space = strrchr(committer, ' ');
+	if (space == NULL) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
+	if (errstr)
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+
+done:
+	free(committer);
+	return err;
+}
+
+const struct got_error *
+got_object_commit_get_committer_time(time_t *time,
+    struct got_commit_object *commit)
+{
+	return parse_commit_time(time, commit->committer);
+}
+
+const struct got_error *
+got_object_commit_get_author_time(time_t *time,
+    struct got_commit_object *commit)
+{
+	return parse_commit_time(time, commit->committer);
+}
+
 static void
 tree_entry_close(struct got_tree_entry *te)
 {

@@ -122,6 +122,14 @@ const struct got_error *got_object_commit_open(struct got_commit_object **,
 /* Dispose of a commit object. */
 void got_object_commit_close(struct got_commit_object *);
 
+/* Get the commit's committer timestamp (in UTC). */
+const struct got_error *got_object_commit_get_committer_time(time_t *,
+    struct got_commit_object *);
+
+/* Get the commit's author timestamp (in UTC). */
+const struct got_error *got_object_commit_get_committer_time(time_t *,
+    struct got_commit_object *);
+
 /*
  * Attempt to open a tree object in a repository.
  * The provided object must be of type GOT_OBJ_TYPE_TREE.
