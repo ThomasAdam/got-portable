@@ -311,15 +311,15 @@ fetch_parent_commit(struct commit_queue_entry **pentry,
 	struct got_object *obj = NULL;
 	struct got_commit_object *commit;
 	struct got_object_id *id;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	*pentry = NULL;
 
 	/* Follow the first parent (TODO: handle merge commits). */
-	pid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
-	if (pid == NULL)
+	qid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
+	if (qid == NULL)
 		return NULL;
-	err = got_object_open(&obj, repo, pid->id);
+	err = got_object_open(&obj, repo, qid->id);
 	if (err)
 		return err;
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
@@ -333,7 +333,7 @@ fetch_parent_commit(struct commit_queue_entry **pentry,
 	if (err)
 		return err;
 
-	id = got_object_id_dup(pid->id);
+	id = got_object_id_dup(qid->id);
 	if (id == NULL) {
 		err = got_error_from_errno();
 		got_object_commit_close(commit);

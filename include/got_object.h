@@ -30,17 +30,17 @@ struct got_tree_object {
 	SIMPLEQ_HEAD(, got_tree_entry) entries;
 };
 
-struct got_parent_id {
-	SIMPLEQ_ENTRY(got_parent_id) entry;
+struct got_object_qid {
+	SIMPLEQ_ENTRY(got_object_qid) entry;
 	struct got_object_id *id;
 };
 
-SIMPLEQ_HEAD(got_object_id_list, got_parent_id);
+SIMPLEQ_HEAD(got_object_id_queue, got_object_qid);
 
 struct got_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;
-	struct got_object_id_list parent_ids;
+	struct got_object_id_queue parent_ids;
 	char *author;
 	time_t author_time;	/* local time */
 	char *author_tzoff;	/* timezone offset description */

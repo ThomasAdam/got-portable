@@ -45,9 +45,9 @@ struct got_commit_graph_node {
 	 * and child (younger) commits.
 	 */
 	int nparents;
-	struct got_object_id_list parent_ids;
+	struct got_object_id_queue parent_ids;
 	int nchildren;
-	struct got_object_id_list child_ids;
+	struct got_object_id_queue child_ids;
 
 	time_t commit_timestamp;
 
@@ -168,22 +168,22 @@ add_iteration_candidate(struct got_commit_graph *graph,
 }
 
 static const struct got_error *
-add_vertex(struct got_object_id_list *id_list, struct got_object_id *id)
+add_vertex(struct got_object_id_queue *ids, struct got_object_id *id)
 {
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
-	pid = calloc(1, sizeof(*pid));
-	if (pid == NULL)
+	qid = calloc(1, sizeof(*qid));
+	if (qid == NULL)
 		return got_error_from_errno();
 
-	pid->id = got_object_id_dup(id);
-	if (pid->id == NULL) {
+	qid->id = got_object_id_dup(id);
+	if (qid->id == NULL) {
 		const struct got_error *err = got_error_from_errno();
-		free(pid);
+		free(qid);
 		return err;
 	}
 
-	SIMPLEQ_INSERT_TAIL(id_list, pid, entry);
+	SIMPLEQ_INSERT_TAIL(ids, qid, entry);
 	return NULL;
 }
 
@@ -194,7 +194,7 @@ add_node(struct got_commit_graph_node **new_node,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node, *existing_node;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	*new_node = NULL;
 
@@ -205,8 +205,8 @@ add_node(struct got_commit_graph_node **new_node,
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	SIMPLEQ_INIT(&node->parent_ids);
 	SIMPLEQ_INIT(&node->child_ids);
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		err = add_vertex(&node->parent_ids, pid->id);
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		err = add_vertex(&node->parent_ids, qid->id);
 		if (err)
 			return err;
 		node->nparents++;
@@ -216,17 +216,17 @@ add_node(struct got_commit_graph_node **new_node,
 	err = got_object_idset_add((void **)(&existing_node),
 	    graph->node_ids, &node->id, node);
 	if (err == NULL) {
-		struct got_parent_id *pid;
+		struct got_object_qid *qid;
 
 		add_iteration_candidate(graph, node);
 		err = got_object_idset_remove(graph->open_branches, commit_id);
 		if (err && err->code != GOT_ERR_NO_OBJ)
 			return err;
-		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-			if (got_object_idset_get(graph->node_ids, pid->id))
+		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+			if (got_object_idset_get(graph->node_ids, qid->id))
 				continue; /* parent already traversed */
 			err = got_object_idset_add(NULL, graph->open_branches,
-			    pid->id, node);
+			    qid->id, node);
 			if (err && err->code != GOT_ERR_OBJ_EXISTS)
 				return err;
 		}
@@ -241,7 +241,7 @@ add_node(struct got_commit_graph_node **new_node,
 	}
 
 	if (child_commit_id) {
-		struct got_parent_id *cid;
+		struct got_object_qid *cid;
 
 		/* Prevent linking to self. */
 		if (got_object_id_cmp(commit_id, child_commit_id) == 0)
@@ -425,7 +425,7 @@ free_graph_node(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_commit_graph_node *node = data;
 	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
-		struct got_parent_id *child = SIMPLEQ_FIRST(&node->child_ids);
+		struct got_object_qid *child = SIMPLEQ_FIRST(&node->child_ids);
 		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
 		free(child);
 	}
@@ -446,7 +446,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
     struct got_object_id *id)
 {
 	struct got_commit_graph_node *start_node, *node;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	start_node = got_object_idset_get(graph->node_ids, id);
 	if (start_node == NULL)
@@ -460,8 +460,8 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	}
 
 	/* Put all known parents of this commit on the candidate list. */
-	SIMPLEQ_FOREACH(pid, &start_node->parent_ids, entry) {
-		node = got_object_idset_get(graph->node_ids, pid->id);
+	SIMPLEQ_FOREACH(qid, &start_node->parent_ids, entry) {
+		node = got_object_idset_get(graph->node_ids, qid->id);
 		if (node)
 			add_iteration_candidate(graph, node);
 	}

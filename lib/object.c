@@ -445,27 +445,27 @@ got_object_commit_add_parent(struct got_commit_object *commit,
     const char *id_str)
 {
 	const struct got_error *err = NULL;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
-	pid = calloc(1, sizeof(*pid));
-	if (pid == NULL)
+	qid = calloc(1, sizeof(*qid));
+	if (qid == NULL)
 		return got_error_from_errno();
 
-	pid->id = calloc(1, sizeof(*pid->id));
-	if (pid->id == NULL) {
+	qid->id = calloc(1, sizeof(*qid->id));
+	if (qid->id == NULL) {
 		err = got_error_from_errno();
-		free(pid);
+		free(qid);
 		return err;
 	}
 
-	if (!got_parse_sha1_digest(pid->id->sha1, id_str)) {
+	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		free(pid->id);
-		free(pid);
+		free(qid->id);
+		free(qid);
 		return err;
 	}
 
-	SIMPLEQ_INSERT_TAIL(&commit->parent_ids, pid, entry);
+	SIMPLEQ_INSERT_TAIL(&commit->parent_ids, qid, entry);
 	commit->nparents++;
 
 	return NULL;
@@ -917,13 +917,13 @@ got_object_commit_open(struct got_commit_object **commit,
 void
 got_object_commit_close(struct got_commit_object *commit)
 {
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
-		pid = SIMPLEQ_FIRST(&commit->parent_ids);
+		qid = SIMPLEQ_FIRST(&commit->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
-		free(pid->id);
-		free(pid);
+		free(qid->id);
+		free(qid);
 	}
 
 	free(commit->tree_id);

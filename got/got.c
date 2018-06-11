@@ -265,7 +265,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2;
 	struct got_object *obj;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	err = got_object_open(&obj, repo, commit->tree_id);
 	if (err)
@@ -276,11 +276,11 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	if (err)
 		return err;
 
-	pid = SIMPLEQ_FIRST(&commit->parent_ids);
-	if (pid != NULL) {
+	qid = SIMPLEQ_FIRST(&commit->parent_ids);
+	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 
-		err = got_object_open(&obj, repo, pid->id);
+		err = got_object_open(&obj, repo, qid->id);
 		if (err)
 			return err;
 
@@ -342,10 +342,10 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		    datestr, commit->committer_tzoff);
 	}
 	if (commit->nparents > 1) {
-		struct got_parent_id *pid;
+		struct got_object_qid *qid;
 		int n = 1;
-		SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-			err = got_object_id_str(&id_str, pid->id);
+		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+			err = got_object_id_str(&id_str, qid->id);
 			if (err)
 				return err;
 			printf("parent %d: %s\n", n++, id_str);

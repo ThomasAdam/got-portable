@@ -63,12 +63,12 @@ static const struct got_error *
 print_parent_commits(struct got_commit_object *commit,
     struct got_repository *repo)
 {
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 	const struct got_error *err = NULL;
 	struct got_object *obj;
 
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		err = got_object_open(&obj, repo, pid->id);
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		err = got_object_open(&obj, repo, qid->id);
 		if (err != NULL)
 			return err;
 		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
@@ -146,7 +146,7 @@ static const struct got_error *
 print_commit_object(struct got_object *obj, struct got_repository *repo)
 {
 	struct got_commit_object *commit;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 	char *buf;
 	const struct got_error *err;
 	struct got_object* treeobj;
@@ -161,8 +161,8 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	test_printf("tree: %s\n", buf);
 	free(buf);
 	test_printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		err = got_object_id_str(&buf, pid->id);
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		err = got_object_id_str(&buf, qid->id);
 		if (err)
 			return err;
 		test_printf("%s\n", buf);

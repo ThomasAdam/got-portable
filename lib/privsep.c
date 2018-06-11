@@ -262,7 +262,7 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	struct got_imsg_commit_object icommit;
 	uint8_t *buf;
 	size_t len, total;
-	struct got_parent_id *pid;
+	struct got_object_qid *qid;
 
 	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
@@ -299,8 +299,8 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	len += icommit.committer_tzoff_len;
 	memcpy(buf + len, commit->logmsg, icommit.logmsg_len);
 	len += icommit.logmsg_len;
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		memcpy(buf + len, pid->id, SHA1_DIGEST_LENGTH);
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		memcpy(buf + len, qid->id, SHA1_DIGEST_LENGTH);
 		len += SHA1_DIGEST_LENGTH;
 	}
 
@@ -470,23 +470,23 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		len += icommit.logmsg_len;
 
 		for (i = 0; i < icommit.nparents; i++) {
-			struct got_parent_id *pid;
+			struct got_object_qid *qid;
 
-			pid = calloc(1, sizeof(*pid));
-			if (pid == NULL) {
+			qid = calloc(1, sizeof(*qid));
+			if (qid == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
-			pid->id = calloc(1, sizeof(*pid->id));
-			if (pid->id == NULL) {
+			qid->id = calloc(1, sizeof(*qid->id));
+			if (qid->id == NULL) {
 				err = got_error_from_errno();
-				free(pid);
+				free(qid);
 				break;
 			}
 
-			memcpy(pid->id, data + len + i * SHA1_DIGEST_LENGTH,
-			    sizeof(*pid->id));
-			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, pid, entry);
+			memcpy(qid->id, data + len + i * SHA1_DIGEST_LENGTH,
+			    sizeof(*qid->id));
+			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
 			(*commit)->nparents++;
 		}
 		break;
