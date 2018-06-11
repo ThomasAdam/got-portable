@@ -493,12 +493,3 @@ got_commit_graph_iter_next(struct got_commit_object **commit,
 	graph->iter_node = node;
 	return NULL;
 }
-
-const struct got_commit_object *
-got_commit_graph_get_commit(struct got_commit_graph *graph,
-    struct got_object_id *id)
-{
-	struct got_commit_graph_node *node;
-	node = got_object_idset_get(graph->node_ids, id);
-	return node ? node->commit : NULL;
-}

@@ -27,6 +27,3 @@ const struct got_error *got_commit_graph_iter_start(
     struct got_commit_graph *, struct got_object_id *);
 const struct got_error *got_commit_graph_iter_next(struct got_commit_object **,
     struct got_object_id **, struct got_commit_graph *);
-
-const struct got_commit_object *got_commit_graph_get_commit(
-    struct got_commit_graph *, struct got_object_id *);
