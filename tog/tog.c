@@ -39,6 +39,7 @@
 #include "got_diff.h"
 #include "got_opentemp.h"
 #include "got_commit_graph.h"
+#include "got_utf8.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -97,20 +98,33 @@ usage_log(void)
 static const struct got_error *
 mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
 {
+	char *vis = NULL;
 	const struct got_error *err = NULL;
 
 	*ws = NULL;
 	*wlen = mbstowcs(NULL, s, 0);
-	if (*wlen == (size_t)-1)
-		return got_error_from_errno();
+	if (*wlen == (size_t)-1) {
+		int vislen;
+		if (errno != EILSEQ)
+			return got_error_from_errno();
+
+		/* byte string invalid in current encoding; try to "fix" it */
+		err = got_mbsavis(&vis, &vislen, s);
+		if (err)
+			return err;
+		*wlen = mbstowcs(NULL, vis, 0);
+		if (*wlen == (size_t)-1)
+			return got_error_from_errno(); /* give up */
+	}
 
 	*ws = calloc(*wlen + 1, sizeof(*ws));
 	if (*ws == NULL)
 		return got_error_from_errno();
 
-	if (mbstowcs(*ws, s, *wlen) != *wlen)
+	if (mbstowcs(*ws, vis ? vis : s, *wlen) != *wlen)
 		err = got_error_from_errno();
 
+	free(vis);
 	if (err) {
 		free(*ws);
 		*ws = NULL;
