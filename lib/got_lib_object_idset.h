@@ -28,4 +28,4 @@ int got_object_idset_contains(struct got_object_idset *,
     struct got_object_id *);
 void got_object_idset_for_each(struct got_object_idset *,
     void (*cb)(struct got_object_id *, void *, void *), void *);
-unsigned int got_object_idset_num_elements(struct got_object_idset *);
+int got_object_idset_num_elements(struct got_object_idset *);

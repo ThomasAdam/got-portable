@@ -48,8 +48,8 @@ struct got_object_idset {
 	 * which of these lists an object ID is stored in.
 	 */
 	TAILQ_HEAD(, got_object_idset_element) entries[0xff + 1];
-	unsigned int nelem;
-#define GOT_OBJECT_IDSET_MAX_ELEM UINT_MAX
+	int nelem;
+#define GOT_OBJECT_IDSET_MAX_ELEM INT_MAX
 };
 
 struct got_object_idset *
@@ -207,7 +207,7 @@ void got_object_idset_for_each(struct got_object_idset *set,
 	}
 }
 
-unsigned int
+int
 got_object_idset_num_elements(struct got_object_idset *set)
 {
 	return set->nelem;
