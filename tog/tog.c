@@ -308,7 +308,6 @@ fetch_parent_commit(struct commit_queue_entry **pentry,
     struct commit_queue_entry *entry, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj = NULL;
 	struct got_commit_object *commit;
 	struct got_object_id *id;
 	struct got_object_qid *qid;
@@ -319,17 +318,8 @@ fetch_parent_commit(struct commit_queue_entry **pentry,
 	qid = SIMPLEQ_FIRST(&entry->commit->parent_ids);
 	if (qid == NULL)
 		return NULL;
-	err = got_object_open(&obj, repo, qid->id);
-	if (err)
-		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		got_object_close(obj);
-		return err;
-	}
 
-	err = got_object_commit_open(&commit, repo, obj);
-	got_object_close(obj);
+	err = got_object_open_as_commit(&commit, repo, qid->id);
 	if (err)
 		return err;
 
@@ -377,20 +367,17 @@ prepend_commits(int *ncommits, struct commit_queue *commits,
     int limit, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object *first_obj = NULL, *last_obj = NULL;
+	struct got_object *last_obj = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	struct commit_queue_entry *entry, *old_head_entry;
 
 	*ncommits = 0;
 
-	err = got_object_open(&first_obj, repo, first_id);
+	err = got_object_open_as_commit(&commit, repo, first_id);
 	if (err)
 		goto done;
-	if (got_object_get_type(first_obj) != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
+
 	err = got_object_open(&last_obj, repo, last_id);
 	if (err)
 		goto done;
@@ -398,10 +385,6 @@ prepend_commits(int *ncommits, struct commit_queue *commits,
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
-
-	err = got_object_commit_open(&commit, repo, first_obj);
-	if (err)
-		goto done;
 
 	id = got_object_id_dup(first_id);
 	if (id == NULL) {
@@ -457,8 +440,6 @@ prepend_commits(int *ncommits, struct commit_queue *commits,
 	}
 
 done:
-	if (first_obj)
-		got_object_close(first_obj);
 	if (last_obj)
 		got_object_close(last_obj);
 	return err;
