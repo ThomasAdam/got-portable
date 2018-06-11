@@ -267,13 +267,16 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
 	icommit.author_time = commit->author_time;
+	icommit.author_tzoff_len = strlen(commit->author_tzoff);
 	icommit.committer_len = strlen(commit->committer);
 	icommit.committer_time = commit->committer_time;
+	icommit.committer_tzoff_len = strlen(commit->committer_tzoff);
 	icommit.logmsg_len = strlen(commit->logmsg);
 	icommit.nparents = commit->nparents;
 
 	total = sizeof(icommit) + icommit.author_len +
-	    icommit.committer_len + icommit.logmsg_len +
+	    icommit.author_tzoff_len + icommit.committer_len +
+	    icommit.committer_tzoff_len + icommit.logmsg_len +
 	    icommit.nparents * SHA1_DIGEST_LENGTH;
 	/* XXX TODO support very large log messages properly */
 	if (total > MAX_IMSGSIZE)
@@ -288,8 +291,12 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	len += sizeof(icommit);
 	memcpy(buf + len, commit->author, icommit.author_len);
 	len += icommit.author_len;
+	memcpy(buf + len, commit->author_tzoff, icommit.author_tzoff_len);
+	len += icommit.author_tzoff_len;
 	memcpy(buf + len, commit->committer, icommit.committer_len);
 	len += icommit.committer_len;
+	memcpy(buf + len, commit->committer_tzoff, icommit.committer_tzoff_len);
+	len += icommit.committer_tzoff_len;
 	memcpy(buf + len, commit->logmsg, icommit.logmsg_len);
 	len += icommit.logmsg_len;
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
@@ -342,7 +349,8 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 		memcpy(&icommit, data, sizeof(icommit));
 		if (datalen != sizeof(icommit) + icommit.author_len +
-		    icommit.committer_len + icommit.logmsg_len +
+		    icommit.author_tzoff_len + icommit.committer_len +
+		    icommit.committer_tzoff_len + icommit.logmsg_len +
 		    icommit.nparents * SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
@@ -378,9 +386,29 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			memcpy((*commit)->author, data + len,
 			    icommit.author_len);
 			(*commit)->author[icommit.author_len] = '\0';
-			(*commit)->author_time = icommit.author_time;
 		}
 		len += icommit.author_len;
+
+		(*commit)->author_time = icommit.author_time;
+		if (icommit.author_tzoff_len == 0) {
+			(*commit)->author_tzoff = strdup("");
+			if ((*commit)->author_tzoff == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*commit)->author_tzoff =
+			    malloc(icommit.author_tzoff_len + 1);
+			if ((*commit)->author_tzoff == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*commit)->author_tzoff, data + len,
+			    icommit.author_tzoff_len);
+			(*commit)->author_tzoff[icommit.author_tzoff_len] =
+			    '\0';
+		}
+		len += icommit.author_tzoff_len;
 
 		if (icommit.committer_len == 0) {
 			(*commit)->committer = strdup("");
@@ -399,9 +427,29 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			memcpy((*commit)->committer, data + len,
 			    icommit.committer_len);
 			(*commit)->committer[icommit.committer_len] = '\0';
-			(*commit)->committer_time = icommit.committer_time;
 		}
 		len += icommit.committer_len;
+
+		(*commit)->committer_time = icommit.committer_time;
+		if (icommit.committer_tzoff_len == 0) {
+			(*commit)->committer_tzoff = strdup("");
+			if ((*commit)->committer_tzoff == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*commit)->committer_tzoff =
+			    malloc(icommit.committer_tzoff_len + 1);
+			if ((*commit)->committer_tzoff == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*commit)->committer_tzoff, data + len,
+			    icommit.committer_tzoff_len);
+			(*commit)->committer_tzoff[icommit.committer_tzoff_len]
+			    = '\0';
+		}
+		len += icommit.committer_tzoff_len;
 
 		if (icommit.logmsg_len == 0) {
 			(*commit)->logmsg = strdup("");

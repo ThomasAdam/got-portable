@@ -306,12 +306,23 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	return err;
 }
 
+char *
+get_datestr(time_t *time, char *datebuf)
+{
+	char *p, *s = ctime_r(time, datebuf);
+	p = strchr(s, '\n');
+	if (p)
+		*p = '\0';
+	return s;
+}
+
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, int show_patch, int verbose)
 {
 	const struct got_error *err = NULL;
-	char *id_str, *logmsg, *line;
+	char *id_str, *datestr, *logmsg, *line;
+	char datebuf[26];
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
@@ -320,10 +331,14 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
-	printf("author: %s  %s", commit->author, ctime(&commit->author_time));
-	if (strcmp(commit->author, commit->committer) != 0)
-		printf("committer: %s  %s\n", commit->committer,
-		    ctime(&commit->committer_time));
+	datestr = get_datestr(&commit->author_time, datebuf);
+	printf("author: %s  %s %s\n", commit->author, datestr,
+	    commit->author_tzoff);
+	if (strcmp(commit->author, commit->committer) != 0) {
+		datestr = get_datestr(&commit->committer_time, datebuf);
+		printf("committer: %s  %s %s\n", commit->committer,
+		    datestr, commit->committer_tzoff);
+	}
 	if (commit->nparents > 1) {
 		struct got_parent_id *pid;
 		int n = 1;

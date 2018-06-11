@@ -40,9 +40,11 @@ struct got_commit_object {
 	unsigned int nparents;
 	SIMPLEQ_HEAD(, got_parent_id) parent_ids;
 	char *author;
-	time_t author_time;	/* UTC */
+	time_t author_time;	/* local time */
+	char *author_tzoff;	/* timezone offset description */
 	char *committer;
-	time_t committer_time;	/* UTC */
+	time_t committer_time;	/* local time */
+	char *committer_tzoff;	/* timezone offset description */
 	char *logmsg;
 };
 
