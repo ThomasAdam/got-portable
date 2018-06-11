@@ -312,9 +312,10 @@ gather_branches(struct got_object_id *id, void *data, void *arg)
 	a->nbranches++;
 }
 
-const struct got_error *
-fetch_commits_from_open_branches(int *ncommits,
-    struct got_commit_graph *graph, struct got_repository *repo)
+static const struct got_error *
+fetch_commits_from_open_branches(int *ncommits, int *wanted_id_added,
+    struct got_commit_graph *graph, struct got_repository *repo,
+    struct got_object_id *wanted_id)
 {
 	const struct got_error *err;
 	struct got_commit_graph_branch *branches;
@@ -322,6 +323,8 @@ fetch_commits_from_open_branches(int *ncommits,
 	int i;
 
 	*ncommits = 0;
+	if (wanted_id_added)
+		*wanted_id_added = 0;
 
 	arg.nbranches = got_object_idset_num_elements(graph->open_branches);
 	if (arg.nbranches == 0)
@@ -360,6 +363,8 @@ fetch_commits_from_open_branches(int *ncommits,
 		}
 		if (new_node)
 			(*ncommits)++;
+		if (wanted_id && got_object_id_cmp(commit_id, wanted_id) == 0)
+			*wanted_id_added = 1;
 	}
 
 	free(branches);
@@ -371,20 +376,42 @@ got_commit_graph_fetch_commits(int *nfetched, struct got_commit_graph *graph,
     int limit, struct got_repository *repo)
 {
 	const struct got_error *err;
-	int total = 0, ncommits;
+	int ncommits;
 
 	*nfetched = 0;
 
-	while (total < limit) {
-		err = fetch_commits_from_open_branches(&ncommits, graph, repo);
+	while (*nfetched < limit) {
+		err = fetch_commits_from_open_branches(&ncommits, NULL,
+		    graph, repo, NULL);
 		if (err)
 			return err;
 		if (ncommits == 0)
 			break;
-		total += ncommits;
+		*nfetched += ncommits;
 	}
 
-	*nfetched = total;
+	return NULL;
+}
+
+const struct got_error *
+got_commit_graph_fetch_commits_up_to(int *nfetched,
+    struct got_commit_graph *graph, struct got_object_id *wanted_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	int ncommits, wanted_id_added = 0;
+
+	*nfetched = 0;
+	while (!wanted_id_added) {
+		err = fetch_commits_from_open_branches(&ncommits,
+		    &wanted_id_added, graph, repo, wanted_id);
+		if (err)
+			return err;
+		if (ncommits == 0)
+			return NULL;
+		*nfetched += ncommits;
+	}
+
 	return NULL;
 }
 
