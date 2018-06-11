@@ -113,17 +113,21 @@ mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
 		if (err)
 			return err;
 		*wlen = mbstowcs(NULL, vis, 0);
-		if (*wlen == (size_t)-1)
-			return got_error_from_errno(); /* give up */
+		if (*wlen == (size_t)-1) {
+			err = got_error_from_errno(); /* give up */
+			goto done;
+		}
 	}
 
 	*ws = calloc(*wlen + 1, sizeof(*ws));
-	if (*ws == NULL)
-		return got_error_from_errno();
+	if (*ws == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (mbstowcs(*ws, vis ? vis : s, *wlen) != *wlen)
 		err = got_error_from_errno();
-
+done:
 	free(vis);
 	if (err) {
 		free(*ws);
