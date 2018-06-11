@@ -171,8 +171,7 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 
 	/*
 	 * If a child node is known, begin looping over the list there
-	 * instead of beginning from the list head. Parent commits are
-	 * traversed before their children.
+	 * instead of beginning from the list head.
 	 */
 	n = child_node ? child_node : TAILQ_FIRST(&graph->iter_list);
 
