@@ -59,6 +59,7 @@
 #define GOT_ERR_OBJ_EXISTS	43
 #define GOT_ERR_BAD_OBJ_ID	44
 #define GOT_ERR_ITER_NEED_MORE	45
+#define GOT_ERR_ITER_COMPLETED	46
 
 static const struct got_error {
 	int code;
@@ -107,6 +108,7 @@ static const struct got_error {
 	{ GOT_ERR_OBJ_EXISTS,	"object already exists" },
 	{ GOT_ERR_BAD_OBJ_ID,	"bad object id" },
 	{ GOT_ERR_ITER_NEED_MORE,"more items needed to continue iteration" },
+	{ GOT_ERR_ITER_COMPLETED,"iteration completed" },
 };
 
 /*
