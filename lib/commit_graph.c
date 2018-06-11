@@ -402,6 +402,10 @@ got_commit_graph_fetch_commits_up_to(int *nfetched,
 	int ncommits, wanted_id_added = 0;
 
 	*nfetched = 0;
+
+	if (got_object_idset_get(graph->node_ids, wanted_id) != NULL)
+		return NULL;
+
 	while (!wanted_id_added) {
 		err = fetch_commits_from_open_branches(&ncommits,
 		    &wanted_id_added, graph, repo, wanted_id);
@@ -492,11 +496,4 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	TAILQ_REMOVE(&graph->iter_candidates, node, entry);
 	graph->iter_node = node;
 	return NULL;
-}
-
-int
-got_commit_graph_contains_object(struct got_commit_graph *graph,
-    struct got_object_id *id)
-{
-	return (got_object_idset_get(graph->node_ids, id) != NULL);
 }
