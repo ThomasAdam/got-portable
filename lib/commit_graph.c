@@ -466,3 +466,10 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	graph->iter_node = node;
 	return NULL;
 }
+
+int
+got_commit_graph_contains_object(struct got_commit_graph *graph,
+    struct got_object_id *id)
+{
+	return (got_object_idset_get(graph->node_ids, id) != NULL);
+}
