@@ -263,28 +263,6 @@ add_node(struct got_commit_graph_node **new_node,
 	return err;
 }
 
-static const struct got_error *
-open_commit(struct got_commit_object **commit, struct got_object_id *id,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_object *obj;
-
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = got_object_commit_open(commit, repo, obj);
-done:
-	got_object_close(obj);
-	return err;
-}
-
-
 const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
     struct got_object_id *commit_id, struct got_repository *repo)
@@ -294,7 +272,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 
 	*graph = NULL;
 
-	err = open_commit(&commit, commit_id, repo);
+	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
 		return err;
 
@@ -368,7 +346,7 @@ fetch_commits_from_open_branches(int *ncommits,
 		commit_id = &branches[i].parent_id;
 		child_node = branches[i].node;
 
-		err = open_commit(&commit, commit_id, repo);
+		err = got_object_open_as_commit(&commit, repo, commit_id);
 		if (err)
 			break;
 

@@ -441,6 +441,27 @@ got_object_commit_alloc_partial(void)
 }
 
 const struct got_error *
+got_object_open_as_commit(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_commit_open(commit, repo, obj);
+done:
+	got_object_close(obj);
+	return err;
+}
+
+const struct got_error *
 got_object_commit_add_parent(struct got_commit_object *commit,
     const char *id_str)
 {

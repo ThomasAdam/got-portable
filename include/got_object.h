@@ -180,5 +180,10 @@ const uint8_t *got_object_blob_get_read_buf(struct got_blob_object *);
  */
 const struct got_error *got_object_blob_read_block(size_t *,
     struct got_blob_object *);
+
+const struct got_error *
+got_object_open_as_commit(struct got_commit_object **,
+    struct got_repository *, struct got_object_id *);
+
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);
