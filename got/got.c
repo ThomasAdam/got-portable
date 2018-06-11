@@ -388,10 +388,11 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 	if (err)
 		return err;
 	do {
+		struct got_object *obj;
 		struct got_commit_object *commit;
 		struct got_object_id *id;
 
-		err = got_commit_graph_iter_next(&commit, &id, graph);
+		err = got_commit_graph_iter_next(&id, graph);
 		if (err) {
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
@@ -402,9 +403,19 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 			else
 				continue;
 		}
-		if (commit == NULL)
+		if (id == NULL)
 			break;
+		err = got_object_open(&obj, repo, id);
+		if (err)
+			return err;
+
+		err = got_object_commit_open(&commit, repo, obj);
+		got_object_close(obj);
+		if (err)
+			return err;
+
 		err = print_commit(commit, id, repo, show_patch, verbose);
+		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;
 	} while (ncommits > 0);

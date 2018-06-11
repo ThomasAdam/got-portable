@@ -35,10 +35,12 @@ struct got_parent_id {
 	struct got_object_id *id;
 };
 
+SIMPLEQ_HEAD(got_object_id_list, got_parent_id);
+
 struct got_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;
-	SIMPLEQ_HEAD(, got_parent_id) parent_ids;
+	struct got_object_id_list parent_ids;
 	char *author;
 	time_t author_time;	/* local time */
 	char *author_tzoff;	/* timezone offset description */

@@ -25,5 +25,5 @@ got_commit_graph_fetch_commits(int *, struct got_commit_graph *, int,
     struct got_repository *);
 const struct got_error *got_commit_graph_iter_start(
     struct got_commit_graph *, struct got_object_id *);
-const struct got_error *got_commit_graph_iter_next(struct got_commit_object **,
-    struct got_object_id **, struct got_commit_graph *);
+const struct got_error *got_commit_graph_iter_next(struct got_object_id **,
+    struct got_commit_graph *);

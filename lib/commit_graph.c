@@ -44,9 +44,12 @@ struct got_commit_graph_node {
 	 * Adjacencies of a graph node are either parent (older) commits,
 	 * and child (younger) commits.
 	 */
-	struct got_commit_object *commit; /* contains list of parents */
+	int nparents;
+	struct got_object_id_list parent_ids;
 	int nchildren;
-	SIMPLEQ_HEAD(, got_parent_id) child_ids;
+	struct got_object_id_list child_ids;
+
+	time_t commit_timestamp;
 
 	/* Used during graph iteration. */
 	TAILQ_ENTRY(got_commit_graph_node) entry;
@@ -118,7 +121,7 @@ is_head_node(struct got_commit_graph_node *node)
 static int
 is_merge_point(struct got_commit_graph_node *node)
 {
-	return node->commit->nparents > 1;
+	return node->nparents > 1;
 }
 
 int
@@ -131,21 +134,7 @@ is_branch_point(struct got_commit_graph_node *node)
 static int
 is_root_node(struct got_commit_graph_node *node)
 {
-	return node->commit->nparents == 0;
-}
-
-static int
-compare_commits(struct got_commit_object *c1, struct got_commit_object *c2)
-{
-	time_t t1, t2;
-
-	t1 = c1->committer_time;
-	t2 = c2->committer_time;
-	if (t1 == t2)	
-		return 0;
-	else if (t1 < t2)
-		return -1;
-	return 1;
+	return node->nparents == 0;
 }
 
 static void
@@ -160,16 +149,14 @@ add_iteration_candidate(struct got_commit_graph *graph,
 	}
 
 	TAILQ_FOREACH(n, &graph->iter_candidates, entry) {
-		int cmp = compare_commits(node->commit, n->commit);
-		if (cmp < 0) {
+		if (node->commit_timestamp < n->commit_timestamp) {
 			next = TAILQ_NEXT(n, entry);
 			if (next == NULL) {
 				TAILQ_INSERT_AFTER(&graph->iter_candidates, n,
 				    node, entry);
 				break;
 			}
-			cmp = compare_commits(node->commit, next->commit);
-			if (cmp >= 0) {
+			if (node->commit_timestamp >= next->commit_timestamp) {
 				TAILQ_INSERT_BEFORE(next, node, entry);
 				break;
 			}
@@ -181,12 +168,33 @@ add_iteration_candidate(struct got_commit_graph *graph,
 }
 
 static const struct got_error *
+add_vertex(struct got_object_id_list *id_list, struct got_object_id *id)
+{
+	struct got_parent_id *pid;
+
+	pid = calloc(1, sizeof(*pid));
+	if (pid == NULL)
+		return got_error_from_errno();
+
+	pid->id = got_object_id_dup(id);
+	if (pid->id == NULL) {
+		const struct got_error *err = got_error_from_errno();
+		free(pid);
+		return err;
+	}
+
+	SIMPLEQ_INSERT_TAIL(id_list, pid, entry);
+	return NULL;
+}
+
+static const struct got_error *
 add_node(struct got_commit_graph_node **new_node,
     struct got_commit_graph *graph, struct got_object_id *commit_id,
     struct got_commit_object *commit, struct got_object_id *child_commit_id)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node, *existing_node;
+	struct got_parent_id *pid;
 
 	*new_node = NULL;
 
@@ -195,8 +203,15 @@ add_node(struct got_commit_graph_node **new_node,
 		return got_error_from_errno();
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
-	node->commit = commit;
+	SIMPLEQ_INIT(&node->parent_ids);
 	SIMPLEQ_INIT(&node->child_ids);
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		err = add_vertex(&node->parent_ids, pid->id);
+		if (err)
+			return err;
+		node->nparents++;
+	}
+	node->commit_timestamp = commit->committer_time; /* XXX not UTC! */
 
 	err = got_object_idset_add((void **)(&existing_node),
 	    graph->node_ids, &node->id, node);
@@ -226,7 +241,7 @@ add_node(struct got_commit_graph_node **new_node,
 	}
 
 	if (child_commit_id) {
-		struct got_parent_id *child, *cid;
+		struct got_parent_id *cid;
 
 		/* Prevent linking to self. */
 		if (got_object_id_cmp(commit_id, child_commit_id) == 0)
@@ -238,17 +253,11 @@ add_node(struct got_commit_graph_node **new_node,
 				return got_error(GOT_ERR_BAD_OBJ_ID);
 		}
 
-		child = calloc(1, sizeof(*child));
-		if (child == NULL)
-			return got_error_from_errno();
-		child->id = got_object_id_dup(child_commit_id);
-		if (child->id == NULL) {
-			err = got_error_from_errno();
-			free(child);
+		err = add_vertex(&node->child_ids, child_commit_id);
+		if (err)
 			return err;
-		}
-		SIMPLEQ_INSERT_TAIL(&node->child_ids, child, entry);
 		node->nchildren++;
+
 	}
 
 	return err;
@@ -285,6 +294,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	}
 
 	err = add_node(&(*graph)->head_node, *graph, commit_id, commit, NULL);
+	got_object_commit_close(commit);
 	if (err) {
 		got_commit_graph_close(*graph);
 		*graph = NULL;
@@ -374,6 +384,7 @@ fetch_commits_from_open_branches(int *ncommits,
 
 		err = add_node(&new_node, graph, commit_id, commit,
 		    &child_node->id);
+		got_object_commit_close(commit);
 		if (err) {
 			if (err->code != GOT_ERR_OBJ_EXISTS)
 				break;
@@ -381,8 +392,6 @@ fetch_commits_from_open_branches(int *ncommits,
 		}
 		if (new_node)
 			(*ncommits)++;
-		else
-			got_object_commit_close(commit);
 	}
 
 	free(branches);
@@ -415,7 +424,6 @@ static void
 free_graph_node(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_commit_graph_node *node = data;
-	got_object_commit_close(node->commit);
 	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
 		struct got_parent_id *child = SIMPLEQ_FIRST(&node->child_ids);
 		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
@@ -452,7 +460,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	}
 
 	/* Put all known parents of this commit on the candidate list. */
-	SIMPLEQ_FOREACH(pid, &start_node->commit->parent_ids, entry) {
+	SIMPLEQ_FOREACH(pid, &start_node->parent_ids, entry) {
 		node = got_object_idset_get(graph->node_ids, pid->id);
 		if (node)
 			add_iteration_candidate(graph, node);
@@ -462,14 +470,13 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 }
 
 const struct got_error *
-got_commit_graph_iter_next(struct got_commit_object **commit,
-    struct got_object_id **id, struct got_commit_graph *graph)
+got_commit_graph_iter_next(struct got_object_id **id,
+    struct got_commit_graph *graph)
 {
 	struct got_commit_graph_node *node;
 
 	if (graph->iter_node == NULL) {
 		/* We are done interating, or iteration was not started. */
-		*commit = NULL;
 		*id = NULL;
 		return NULL;
 	}
@@ -477,7 +484,6 @@ got_commit_graph_iter_next(struct got_commit_object **commit,
 	if (TAILQ_EMPTY(&graph->iter_candidates)) {
 		if (is_root_node(graph->iter_node) &&
 		    got_object_idset_num_elements(graph->open_branches) == 0) {
-			*commit = graph->iter_node->commit;
 			*id = &graph->iter_node->id;
 			/* We are done interating. */
 			graph->iter_node = NULL;
@@ -486,7 +492,6 @@ got_commit_graph_iter_next(struct got_commit_object **commit,
 		return got_error(GOT_ERR_ITER_NEED_MORE);
 	}
 
-	*commit = graph->iter_node->commit;
 	*id = &graph->iter_node->id;
 	node = TAILQ_FIRST(&graph->iter_candidates);
 	TAILQ_REMOVE(&graph->iter_candidates, node, entry);
