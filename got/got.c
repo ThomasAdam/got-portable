@@ -334,7 +334,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	datestr = get_datestr(&commit->author_time, datebuf);
 	printf("author: %s  %s %s\n", commit->author, datestr,
 	    commit->author_tzoff);
-	if (strcmp(commit->author, commit->committer) != 0) {
+	if (strcmp(commit->author, commit->committer) != 0 ||
+	    commit->author_time != commit->committer_time ||
+	    strcmp(commit->author_tzoff, commit->committer_tzoff) != 0) {
 		datestr = get_datestr(&commit->committer_time, datebuf);
 		printf("committer: %s  %s %s\n", commit->committer,
 		    datestr, commit->committer_tzoff);
