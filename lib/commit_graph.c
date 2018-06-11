@@ -82,7 +82,7 @@ struct got_commit_graph {
 	/* The next commit to return when the API user asks for one. */
 	struct got_commit_graph_node *iter_node;
 
-	TAILQ_HEAD(, got_commit_graph_node) iter_candidates;
+	TAILQ_HEAD(, got_commit_graph_node) iter_list;
 };
 
 static struct got_commit_graph *
@@ -107,7 +107,7 @@ alloc_graph(void)
 		return NULL;
 	}
 
-	TAILQ_INIT(&graph->iter_candidates);
+	TAILQ_INIT(&graph->iter_list);
 	return graph;
 }
 
@@ -143,16 +143,16 @@ add_iteration_candidate(struct got_commit_graph *graph,
 {
 	struct got_commit_graph_node *n, *next;
 	
-	if (TAILQ_EMPTY(&graph->iter_candidates)) {
-		TAILQ_INSERT_TAIL(&graph->iter_candidates, node, entry);
+	if (TAILQ_EMPTY(&graph->iter_list)) {
+		TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
 		return;
 	}
 
-	TAILQ_FOREACH(n, &graph->iter_candidates, entry) {
+	TAILQ_FOREACH(n, &graph->iter_list, entry) {
 		if (node->commit_timestamp < n->commit_timestamp) {
 			next = TAILQ_NEXT(n, entry);
 			if (next == NULL) {
-				TAILQ_INSERT_AFTER(&graph->iter_candidates, n,
+				TAILQ_INSERT_AFTER(&graph->iter_list, n,
 				    node, entry);
 				break;
 			}
@@ -231,6 +231,11 @@ add_node(struct got_commit_graph_node **new_node,
 				return err;
 		}
 		*new_node = node;
+		{
+			char *id_str;
+			if (got_object_id_str(&id_str, &node->id) == NULL)
+				fprintf(stderr, "added node %s\n", id_str);
+		}
 	} else if (err->code == GOT_ERR_OBJ_EXISTS) {
 		err = NULL;
 		free(node);
@@ -453,9 +458,9 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 
 	graph->iter_node = start_node;
 
-	while (!TAILQ_EMPTY(&graph->iter_candidates)) {
-		node = TAILQ_FIRST(&graph->iter_candidates);
-		TAILQ_REMOVE(&graph->iter_candidates, node, entry);
+	while (!TAILQ_EMPTY(&graph->iter_list)) {
+		node = TAILQ_FIRST(&graph->iter_list);
+		TAILQ_REMOVE(&graph->iter_list, node, entry);
 	}
 
 	/* Put all known parents of this commit on the candidate list. */
@@ -480,7 +485,7 @@ got_commit_graph_iter_next(struct got_object_id **id,
 		return NULL;
 	}
 
-	if (TAILQ_EMPTY(&graph->iter_candidates)) {
+	if (TAILQ_EMPTY(&graph->iter_list)) {
 		if (is_root_node(graph->iter_node) &&
 		    got_object_idset_num_elements(graph->open_branches) == 0) {
 			*id = &graph->iter_node->id;
@@ -492,8 +497,8 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	}
 
 	*id = &graph->iter_node->id;
-	node = TAILQ_FIRST(&graph->iter_candidates);
-	TAILQ_REMOVE(&graph->iter_candidates, node, entry);
+	node = TAILQ_FIRST(&graph->iter_list);
+	TAILQ_REMOVE(&graph->iter_list, node, entry);
 	graph->iter_node = node;
 	return NULL;
 }
