@@ -263,47 +263,6 @@ add_node(struct got_commit_graph_node **new_node,
 	return err;
 }
 
-const struct got_error *
-got_commit_graph_open(struct got_commit_graph **graph,
-    struct got_object_id *commit_id, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_object *obj;
-	struct got_commit_object *commit;
-
-	*graph = NULL;
-
-	err = got_object_open(&obj, repo, commit_id);
-	if (err)
-		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		got_object_close(obj);
-		return err;
-	}
-
-	err = got_object_commit_open(&commit, repo, obj);
-	got_object_close(obj);
-	if (err)
-		return err;
-
-	*graph = alloc_graph();
-	if (*graph == NULL) {
-		got_object_commit_close(commit);
-		return got_error_from_errno();
-	}
-
-	err = add_node(&(*graph)->head_node, *graph, commit_id, commit, NULL);
-	got_object_commit_close(commit);
-	if (err) {
-		got_commit_graph_close(*graph);
-		*graph = NULL;
-		return err;
-	}
-	
-	return NULL;
-}
-
 static const struct got_error *
 open_commit(struct got_commit_object **commit, struct got_object_id *id,
     struct got_repository *repo)
@@ -323,6 +282,37 @@ open_commit(struct got_commit_object **commit, struct got_object_id *id,
 done:
 	got_object_close(obj);
 	return err;
+}
+
+
+const struct got_error *
+got_commit_graph_open(struct got_commit_graph **graph,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit;
+
+	*graph = NULL;
+
+	err = open_commit(&commit, commit_id, repo);
+	if (err)
+		return err;
+
+	*graph = alloc_graph();
+	if (*graph == NULL) {
+		got_object_commit_close(commit);
+		return got_error_from_errno();
+	}
+
+	err = add_node(&(*graph)->head_node, *graph, commit_id, commit, NULL);
+	got_object_commit_close(commit);
+	if (err) {
+		got_commit_graph_close(*graph);
+		*graph = NULL;
+		return err;
+	}
+	
+	return NULL;
 }
 
 struct got_commit_graph_branch {
