@@ -928,7 +928,9 @@ got_object_commit_close(struct got_commit_object *commit)
 
 	free(commit->tree_id);
 	free(commit->author);
+	free(commit->author_tzoff);
 	free(commit->committer);
+	free(commit->committer_tzoff);
 	free(commit->logmsg);
 	free(commit);
 }
