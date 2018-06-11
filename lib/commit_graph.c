@@ -183,6 +183,7 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 	do {
 		if (node->commit_timestamp == n->commit_timestamp) {
 			TAILQ_INSERT_AFTER(&graph->iter_list, n, node, entry);
+			break;
 		} else if (node->commit_timestamp < n->commit_timestamp) {
 			next = TAILQ_NEXT(n, entry);
 			if (next == NULL) {
