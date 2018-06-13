@@ -588,7 +588,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 
 	TAILQ_INIT(&commits);
 
-	err = got_commit_graph_open(&graph, head_id, repo);
+	err = got_commit_graph_open(&graph, head_id, 0, repo);
 	if (err)
 		goto done;
 
