@@ -35,6 +35,10 @@
 #include "got_lib_zbuf.h"
 #include "got_lib_object.h"
 
+#define GOT_REF_HEADS	"heads"
+#define GOT_REF_TAGS	"tags"
+#define GOT_REF_REMOTES	"remotes"
+
 /* A symbolic reference. */
 struct got_symref {
 	char *name;
@@ -153,26 +157,16 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 	return got_repo_get_path_refs(repo);
 }
 
-const struct got_error *
-got_ref_open(struct got_reference **ref, struct got_repository *repo,
-   const char *refname)
+static const struct got_error *
+open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
+    const char *refname)
 {
 	const struct got_error *err = NULL;
-	char *path_ref = NULL;
-	char *normpath = NULL;
-	char *path_refs = get_refs_dir_path(repo, refname);
+	char *path_ref;
+	char *normpath;
 
-	if (path_refs == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	
-	/* XXX For now, this assumes that refs exist in the filesystem. */
-
-	if (asprintf(&path_ref, "%s/%s", path_refs, refname) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (asprintf(&path_ref, "%s/%s/%s", path_refs, subdir, refname) == -1)
+		return got_error_from_errno();
 
 	normpath = got_path_normalize(path_ref);
 	if (normpath == NULL) {
@@ -182,8 +176,33 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 
 	err = parse_ref_file(ref, refname, normpath);
 done:
-	free(normpath);
 	free(path_ref);
+	free(normpath);
+	return err;
+}
+
+const struct got_error *
+got_ref_open(struct got_reference **ref, struct got_repository *repo,
+   const char *refname)
+{
+	const struct got_error *err = NULL;
+	char *path_refs = get_refs_dir_path(repo, refname);
+
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	
+	/* XXX For now, this assumes that refs exist in the filesystem. */
+
+	err = open_ref(ref, path_refs, GOT_REF_HEADS, refname);
+	if (err != NULL)
+		err = open_ref(ref, path_refs, GOT_REF_TAGS, refname);
+	if (err != NULL)
+		err = open_ref(ref, path_refs, GOT_REF_REMOTES, refname);
+	if (err != NULL)
+		err = open_ref(ref, path_refs, "", refname);
+done:
 	free(path_refs);
 	return err;
 }

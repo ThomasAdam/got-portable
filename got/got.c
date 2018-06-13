@@ -438,7 +438,7 @@ cmd_log(int argc, char *argv[])
 	const struct got_error *error;
 	struct got_repository *repo;
 	struct got_object_id *id = NULL;
-	struct got_object *obj;
+	struct got_object *obj = NULL;
 	char *repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
@@ -502,8 +502,22 @@ cmd_log(int argc, char *argv[])
 			return error;
 		error = got_object_open(&obj, repo, id);
 	} else {
-		error = got_object_open_by_id_str(&obj, repo, start_commit);
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, start_commit);
 		if (error == NULL) {
+			error = got_ref_resolve(&id, repo, ref);
+			got_ref_close(ref);
+			if (error != NULL)
+				return error;
+			error = got_object_open(&obj, repo, id);
+			if (error != NULL)
+				return error;
+		}
+		if (obj == NULL) {
+			error = got_object_open_by_id_str(&obj, repo,
+			    start_commit);
+			if (error != NULL)
+				return error;
 			id = got_object_get_id(obj);
 			if (id == NULL)
 				error = got_error_from_errno();
