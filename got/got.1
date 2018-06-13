@@ -64,16 +64,12 @@ Global options must preceed the command name, and are as follows:
 Display usage information.
 .El
 .Pp
-The commands are as follows:
+The commands for
+.Nm
+are as follows:
 .Bl -tag -width checkout
 .It Cm checkout [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
 Copy files from a repository into a new work tree.
-The work tree may be restricted to a subset of the repository's tree
-hierarchy by specifying the
-.Fl p Ar path-prefix
-option.
-In this case, only files beneath the specified prefix will
-be checked out.
 If the
 .Ar work tree path
 is not specified, either use the base name of the
@@ -82,37 +78,45 @@ or if a
 .Ar path prefix
 was specified use the base name of the
 .Ar path prefix .
+.Pp
+The options for
+.Cm got checkout
+are as follows:
+.Bl -tag -width Ds
+.It Fl p Ar path-prefix
+Restrict the work tree to a subset of the repository's tree hierarchy.
+Only files beneath the specified
+.Ar path-prefix
+will be checked out.
+.El
 .\".It Cm status
 .\"Show current status of files.
-.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Fl v ] [Fl f ] [ Ar repository-path ]
-Display history of the repository.
-If the
-.Fl p
-option is given, display the patch of modifications made in each commit.
-If a
-.Ar commit
-is specified with the
-.Fl c
-option, start traversing history at this commit.
-The
-.Ar commit
-argument is a SHA1 hash which corresponds to the commit object.
-The
-.Fl l
-option limits the output to a number of
-.Ar N
-commits.
-The
-.Fl v
-option enables verbose output.
-The
-.Fl f
-option restricts history traversal to the first parent of each commit.
-This shows the linear history of the current branch only, omitting any
-commits merged from other branches.
+.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Fl v ] [ Fl f ] [ Ar repository-path ]
+Display history of a repository.
 If the
 .Ar repository path
-is omitted, use the current working directory.
+is omitted, assume the repository is located in the current working directory.
+.Pp
+The options for
+.Cm got log
+are as follows:
+.Bl -tag -width Ds
+.It Fl p
+Display the patch of modifications made in each commit.
+.It Fl c Ar commit
+Start traversing history at the specified
+.Ar commit .
+The expected argument is the SHA1 hash which corresponds to the commit object.
+.It Fl l Ar N
+Limit history traversal to a given number of commits.
+.It Fl v
+Show verbose output.
+.It Fl f
+Restrict history traversal to the first parent of each commit.
+This shows the linear history of the current branch only.
+Merge commits which affected the current branch will be shown but
+individual commits which originated on other branches will be omitted.
+.El
 .It Cm diff [ Ar repository-path ] Ar object1 Ar object2
 Display the differences between two objects in the repository.
 Each
