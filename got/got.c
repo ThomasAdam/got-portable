@@ -318,7 +318,7 @@ get_datestr(time_t *time, char *datebuf)
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, int show_patch, int verbose)
+    struct got_repository *repo, int show_patch)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg, *line;
@@ -375,7 +375,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int show_patch, int limit, int verbose,
+    struct got_repository *repo, int show_patch, int limit,
     int first_parent_traversal)
 {
 	const struct got_error *err;
@@ -414,7 +414,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			return err;
-		err = print_commit(commit, id, repo, show_patch, verbose);
+		err = print_commit(commit, id, repo, show_patch);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;
@@ -442,7 +442,7 @@ cmd_log(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
-	int show_patch = 0, limit = 0, verbose = 0, first_parent_traversal = 0;
+	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
 
 #ifndef PROFILE
@@ -450,7 +450,7 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:l:vf")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:l:f")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -462,9 +462,6 @@ cmd_log(int argc, char *argv[])
 			limit = strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr != NULL)
 				err(1, "-l option %s", errstr);
-			break;
-		case 'v':
-			verbose = 1;
 			break;
 		case 'f':
 			first_parent_traversal = 1;
@@ -516,7 +513,7 @@ cmd_log(int argc, char *argv[])
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
 		error = print_commits(obj, id, repo, show_patch, limit,
-		    verbose, first_parent_traversal);
+		    first_parent_traversal);
 	else
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
