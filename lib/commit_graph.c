@@ -64,6 +64,9 @@ struct got_commit_graph {
 	/* The commit at which traversal began (youngest commit in node_ids). */
 	struct got_commit_graph_node *head_node;
 
+	int flags;
+#define GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL		0x01
+
 	/*
 	 * A set of object IDs of known parent commits which we have not yet
 	 * traversed. Each commit ID in this set represents a branch in commit
@@ -220,6 +223,41 @@ add_vertex(struct got_object_id_queue *ids, struct got_object_id *id)
 }
 
 static const struct got_error *
+advance_open_branches(struct got_commit_graph *graph,
+    struct got_commit_graph_node *node,
+    struct got_object_id *commit_id, struct got_commit_object *commit)
+{
+	const struct got_error *err;
+	struct got_object_qid *qid;
+
+	err = got_object_idset_remove(graph->open_branches, commit_id);
+	if (err && err->code != GOT_ERR_NO_OBJ)
+		return err;
+
+	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
+		qid = SIMPLEQ_FIRST(&commit->parent_ids);
+		if (qid == NULL)
+			return NULL;
+		err = got_object_idset_add(NULL, graph->open_branches, qid->id,
+		    node);
+		if (err && err->code != GOT_ERR_OBJ_EXISTS)
+			return err;
+		return NULL;
+	}
+
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		if (got_object_idset_get(graph->node_ids, qid->id))
+			continue; /* parent already traversed */
+		err = got_object_idset_add(NULL, graph->open_branches,
+		    qid->id, node);
+		if (err && err->code != GOT_ERR_OBJ_EXISTS)
+			return err;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 add_node(struct got_commit_graph_node **new_node,
     struct got_commit_graph *graph, struct got_object_id *commit_id,
     struct got_commit_object *commit, struct got_commit_graph_node *child_node)
@@ -248,20 +286,8 @@ add_node(struct got_commit_graph_node **new_node,
 	err = got_object_idset_add((void **)(&existing_node),
 	    graph->node_ids, &node->id, node);
 	if (err == NULL) {
-		struct got_object_qid *qid;
-
 		add_node_to_iter_list(graph, node, child_node);
-		err = got_object_idset_remove(graph->open_branches, commit_id);
-		if (err && err->code != GOT_ERR_NO_OBJ)
-			return err;
-		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-			if (got_object_idset_get(graph->node_ids, qid->id))
-				continue; /* parent already traversed */
-			err = got_object_idset_add(NULL, graph->open_branches,
-			    qid->id, node);
-			if (err && err->code != GOT_ERR_OBJ_EXISTS)
-				return err;
-		}
+		err = advance_open_branches(graph, node, commit_id, commit);
 		*new_node = node;
 	} else if (err->code == GOT_ERR_OBJ_EXISTS) {
 		err = NULL;
@@ -296,7 +322,8 @@ add_node(struct got_commit_graph_node **new_node,
 
 const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
-    struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_object_id *commit_id, int first_parent_traversal,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit;
@@ -312,6 +339,9 @@ got_commit_graph_open(struct got_commit_graph **graph,
 		got_object_commit_close(commit);
 		return got_error_from_errno();
 	}
+
+	if (first_parent_traversal)
+		(*graph)->flags |= GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL;
 
 	err = add_node(&(*graph)->head_node, *graph, commit_id, commit, NULL);
 	got_object_commit_close(commit);

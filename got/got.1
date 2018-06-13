@@ -84,7 +84,7 @@ was specified use the base name of the
 .Ar path prefix .
 .\".It Cm status
 .\"Show current status of files.
-.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Fl v ] [ Ar repository-path ]
+.It Cm log [ Fl p ] [ Fl c Ar commit ] [ Fl l Ar N ] [ Fl v ] [Fl f ] [ Ar repository-path ]
 Display history of the repository.
 If the
 .Fl p
@@ -105,6 +105,11 @@ commits.
 The
 .Fl v
 option enables verbose output.
+The
+.Fl f
+option restricts history traversal to the first parent of each commit.
+This shows the linear history of the current branch only, omitting any
+commits merged from other branches.
 If the
 .Ar repository path
 is omitted, use the current working directory.

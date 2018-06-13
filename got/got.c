@@ -375,13 +375,15 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int show_patch, int limit, int verbose)
+    struct got_repository *repo, int show_patch, int limit, int verbose,
+    int first_parent_traversal)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
 	int ncommits;
 
-	err = got_commit_graph_open(&graph, root_id, repo);
+	err = got_commit_graph_open(&graph, root_id, first_parent_traversal,
+	    repo);
 	if (err)
 		return err;
 	err = got_commit_graph_iter_start(graph, root_id);
@@ -425,7 +427,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-p] [-c commit] [ -l N ] "
+	fprintf(stderr, "usage: %s log [-pf] [-c commit] [ -l N ] "
 	    "[repository-path]\n", getprogname());
 	exit(1);
 }
@@ -440,7 +442,7 @@ cmd_log(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
-	int show_patch = 0, limit = 0, verbose = 0;
+	int show_patch = 0, limit = 0, verbose = 0, first_parent_traversal = 0;
 	const char *errstr;
 
 #ifndef PROFILE
@@ -448,7 +450,7 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:l:v")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:l:vf")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -463,6 +465,9 @@ cmd_log(int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 'f':
+			first_parent_traversal = 1;
 			break;
 		default:
 			usage();
@@ -511,7 +516,7 @@ cmd_log(int argc, char *argv[])
 		return error;
 	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
 		error = print_commits(obj, id, repo, show_patch, limit,
-		    verbose);
+		    verbose, first_parent_traversal);
 	else
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	got_object_close(obj);
