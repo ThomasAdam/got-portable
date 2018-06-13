@@ -427,7 +427,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-pf] [-c commit] [ -l N ] "
+	fprintf(stderr, "usage: %s log [-c commit] [-f] [ -l N ] [-p] "
 	    "[repository-path]\n", getprogname());
 	exit(1);
 }
