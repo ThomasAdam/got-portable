@@ -21,6 +21,7 @@
 #include <string.h>
 #include <zlib.h>
 #include <sha1.h>
+#include <time.h>
 
 #include "got_error.h"
 #include "got_repository.h"

@@ -23,6 +23,7 @@
 #include <string.h>
 #include <util.h>
 #include <zlib.h>
+#include <time.h>
 
 #include "got_error.h"
 #include "got_object.h"

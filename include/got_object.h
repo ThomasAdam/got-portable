@@ -42,11 +42,9 @@ struct got_commit_object {
 	unsigned int nparents;
 	struct got_object_id_queue parent_ids;
 	char *author;
-	time_t author_time;	/* local time */
-	char *author_tzoff;	/* timezone offset description */
+	struct tm tm_author;	/* UTC */
 	char *committer;
-	time_t committer_time;	/* local time */
-	char *committer_tzoff;	/* timezone offset description */
+	struct tm tm_committer;	/* UTC */
 	char *logmsg;
 };
 

@@ -281,7 +281,9 @@ add_node(struct got_commit_graph_node **new_node,
 			return err;
 		node->nparents++;
 	}
-	node->commit_timestamp = commit->committer_time; /* XXX not UTC! */
+	node->commit_timestamp = mktime(&commit->tm_committer); 
+	if (node->commit_timestamp == -1)
+		return got_error_from_errno();
 
 	err = got_object_idset_add((void **)(&existing_node),
 	    graph->node_ids, &node->id, node);

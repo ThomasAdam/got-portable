@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <zlib.h>
 #include <limits.h>
+#include <time.h>
 
 #include "got_object.h"
 #include "got_error.h"

@@ -31,6 +31,7 @@
 #include <util.h>
 #include <limits.h>
 #include <wchar.h>
+#include <time.h>
 
 #include "got_error.h"
 #include "got_object.h"

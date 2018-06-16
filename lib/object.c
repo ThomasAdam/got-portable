@@ -32,6 +32,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <imsg.h>
+#include <time.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -493,20 +494,52 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 }
 
 static const struct got_error *
-parse_commit_time(time_t *time, char **tzoff, char *committer)
+parse_gmtoff(time_t *gmtoff, const char *tzstr)
 {
+	int sign = 1;
+	const char *p = tzstr;
+	time_t h, m;
+
+	*gmtoff = 0;
+
+	if (*p == '-')
+		sign = -1;
+	else if (*p != '+')
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	p++;
+	if (!isdigit(*p) && !isdigit(*(p + 1)))
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	h = (((*p - '0') * 10) + (*(p + 1) - '0'));
+
+	p += 2;
+	if (!isdigit(*p) && !isdigit(*(p + 1)))
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+	m = ((*p - '0') * 10) + (*(p + 1) - '0');
+
+	*gmtoff = (h * 60 * 60 + m * 60) * sign;
+	return NULL;
+}
+
+static const struct got_error *
+parse_commit_time(struct tm *tm, char *committer)
+{
+	const struct got_error *err = NULL;
 	const char *errstr;
-	char *space;
+	char *space, *tzstr;
+	time_t gmtoff;
+	time_t time;
 
-	*time = 0;
-
-	/* Parse and then strip trailing timezone indicator. */
+	/* Parse and strip off trailing timezone indicator string. */
 	space = strrchr(committer, ' ');
 	if (space == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
-	*tzoff = strdup(space + 1);
-	if (*tzoff == NULL)
+	tzstr = strdup(space + 1);
+	if (tzstr == NULL)
 		return got_error_from_errno();
+	err = parse_gmtoff(&gmtoff, tzstr);
+	free(tzstr);
+	if (err)
+		return err;
 	*space = '\0';
 
 	/* Timestamp is separated from committer name + email by space. */
@@ -514,12 +547,21 @@ parse_commit_time(time_t *time, char **tzoff, char *committer)
 	if (space == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
-	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
+	/* Timestamp parsed here is expressed in comitter's local time. */
+	time = strtonum(space + 1, 0, INT64_MAX, &errstr);
 	if (errstr)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
+	/* Express the time stamp in UTC. */
+	memset(tm, 0, sizeof(*tm));
+	time -= gmtoff;
+	if (localtime_r(&time, tm) == NULL)
+		return got_error_from_errno();
+	tm->tm_gmtoff = gmtoff;
+
 	/* Strip off parsed time information, leaving just author and email. */
 	*space = '\0';
+
 	return NULL;
 }
 
@@ -588,8 +630,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		}
 		*p = '\0';
 		slen = strlen(s);
-		err = parse_commit_time(&(*commit)->author_time,
-		    &(*commit)->author_tzoff, s);
+		err = parse_commit_time(&(*commit)->tm_author, s);
 		if (err)
 			goto done;
 		(*commit)->author = strdup(s);
@@ -619,8 +660,7 @@ parse_commit_object(struct got_commit_object **commit, char *buf, size_t len)
 		}
 		*p = '\0';
 		slen = strlen(s);
-		err = parse_commit_time(&(*commit)->committer_time,
-		    &(*commit)->committer_tzoff, s);
+		err = parse_commit_time(&(*commit)->tm_committer, s);
 		if (err)
 			goto done;
 		(*commit)->committer = strdup(s);
@@ -949,9 +989,7 @@ got_object_commit_close(struct got_commit_object *commit)
 
 	free(commit->tree_id);
 	free(commit->author);
-	free(commit->author_tzoff);
 	free(commit->committer);
-	free(commit->committer_tzoff);
 	free(commit->logmsg);
 	free(commit);
 }

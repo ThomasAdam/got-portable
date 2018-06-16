@@ -323,23 +323,29 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg, *line;
 	char datebuf[26];
+	time_t author_time, committer_time;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
+	author_time = mktime(&commit->tm_author);
+	committer_time = mktime(&commit->tm_committer);
+#if 0
+	/* This would express the date in committer's timezone. */
+	author_time += commit->tm_author.tm_gmtoff;
+	committer_time += commit->tm_committer.tm_gmtoff;
+#endif
+
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
-	datestr = get_datestr(&commit->author_time, datebuf);
-	printf("author: %s  %s %s\n", commit->author, datestr,
-	    commit->author_tzoff);
+	datestr = get_datestr(&author_time, datebuf);
+	printf("author: %s  %s UTC\n", commit->author, datestr);
 	if (strcmp(commit->author, commit->committer) != 0 ||
-	    commit->author_time != commit->committer_time ||
-	    strcmp(commit->author_tzoff, commit->committer_tzoff) != 0) {
-		datestr = get_datestr(&commit->committer_time, datebuf);
-		printf("committer: %s  %s %s\n", commit->committer,
-		    datestr, commit->committer_tzoff);
+	    author_time != committer_time) {
+		datestr = get_datestr(&committer_time, datebuf);
+		printf("committer: %s  %s UTC\n", commit->committer, datestr);
 	}
 	if (commit->nparents > 1) {
 		struct got_object_qid *qid;
