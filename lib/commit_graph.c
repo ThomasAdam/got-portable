@@ -155,6 +155,23 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 		return;
 	}
 
+	/* Ensure that an iteration in progress will see this new commit. */
+	if (graph->iter_node) {
+		n = graph->iter_node;
+		while (n) {
+			next = TAILQ_NEXT(n, entry);
+			if (next &&
+			    node->commit_timestamp >= next->commit_timestamp) {
+				TAILQ_INSERT_BEFORE(next, node, entry);
+				return;
+			}
+			n = next;
+		}
+		TAILQ_INSERT_AFTER(&graph->iter_list, graph->iter_node,
+		    node, entry);
+		return;
+	}
+
 	/*
 	 * If a child node is known, begin looping over the list there
 	 * instead of beginning from the list head.
@@ -164,10 +181,6 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 	/* Insert into list based on committer timestamp. */
 	do {
 		if (node->commit_timestamp == n->commit_timestamp) {
-			/*
-			 * Insert after, rather than before, so that an
-			 * iteration in progress will see this new commit.
-			 */
 			TAILQ_INSERT_AFTER(&graph->iter_list, n, node, entry);
 			break;
 		} else if (node->commit_timestamp < n->commit_timestamp) {
