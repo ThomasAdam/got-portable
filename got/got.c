@@ -306,7 +306,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	return err;
 }
 
-char *
+static char *
 get_datestr(time_t *time, char *datebuf)
 {
 	char *p, *s = ctime_r(time, datebuf);

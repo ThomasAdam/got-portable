@@ -499,6 +499,16 @@ done:
 	return err;
 }
 
+static char *
+get_datestr(time_t *time, char *datebuf)
+{
+	char *p, *s = ctime_r(time, datebuf);
+	p = strchr(s, '\n');
+	if (p)
+		*p = '\0';
+	return s;
+}
+
 const struct got_error *
 got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
     struct got_repository *repo, FILE *outfile)
@@ -507,6 +517,8 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
 	char *id_str;
+	char datebuf[26];
+	time_t time;
 
 	if (obj2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
@@ -535,12 +547,16 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 		goto done;
 	}
 	free(id_str);
-	if (fprintf(outfile, "author: %s\n", commit2->author) < 0) {
+	time = mktime(&commit2->tm_author);
+	if (fprintf(outfile, "author: %s  %s UTC\n", commit2->author,
+	    get_datestr(&time, datebuf)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
+	time = mktime(&commit2->tm_committer);
 	if (strcmp(commit2->author, commit2->committer) != 0 &&
-	    fprintf(outfile, "committer: %s\n", commit2->committer) < 0) {
+	    fprintf(outfile, "committer: %s  %s UTC\n", commit2->committer,
+	    get_datestr(&time, datebuf)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
