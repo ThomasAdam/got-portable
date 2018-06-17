@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2015 Theo de Raadt <deraadt@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -61,4 +62,46 @@ got_path_normalize(const char *path)
 	}
 
 	return resolved;
+}
+
+/* canonpath() from kern_pledge.c */
+int
+got_canonpath(const char *input, char *buf, size_t bufsize)
+{
+	const char *p;
+	char *q;
+
+	/* can't canon relative paths, don't bother */
+	if (!got_path_is_absolute(input)) {
+		if (strlcpy(buf, input, bufsize) >= bufsize)
+			return ENAMETOOLONG;
+		return 0;
+	}
+
+	p = input;
+	q = buf;
+	while (*p && (q - buf < bufsize)) {
+		if (p[0] == '/' && (p[1] == '/' || p[1] == '\0')) {
+			p += 1;
+
+		} else if (p[0] == '/' && p[1] == '.' &&
+		    (p[2] == '/' || p[2] == '\0')) {
+			p += 2;
+
+		} else if (p[0] == '/' && p[1] == '.' && p[2] == '.' &&
+		    (p[3] == '/' || p[3] == '\0')) {
+			p += 3;
+			if (q != buf)	/* "/../" at start of buf */
+				while (*--q != '/')
+					continue;
+
+		} else {
+			*q++ = *p++;
+		}
+	}
+	if ((*p == '\0') && (q - buf < bufsize)) {
+		*q = 0;
+		return 0;
+	} else
+		return ENAMETOOLONG;
 }

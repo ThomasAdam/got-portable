@@ -33,3 +33,10 @@ char *got_path_get_absolute(const char *);
  * The result is allocated with malloc(3).
  */
 char *got_path_normalize(const char *);
+
+/*
+ * Canonicalize absolute paths by removing redundant path separators
+ * and resolving references to parent directories ("/../").
+ * Relative paths are copied from input to buf as-is.
+ */
+int got_canonpath(const char *input, char *buf, size_t bufsize)
