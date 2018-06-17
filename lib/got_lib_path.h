@@ -33,7 +33,3 @@ char *got_path_get_absolute(const char *);
  * The result is allocated with malloc(3).
  */
 char *got_path_normalize(const char *);
-
-/* Count the number of path segments separated by '/'. */
-const struct got_error *
-got_path_segment_count(int *count, const char *path);

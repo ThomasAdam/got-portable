@@ -62,22 +62,3 @@ got_path_normalize(const char *path)
 
 	return resolved;
 }
-
-const struct got_error *
-got_path_segment_count(int *count, const char *path)
-{
-	char *s = strdup(path), *p;
-
-	*count = 0;
-
-	if (s == NULL)
-		return got_error_from_errno();
-
-	do {
-		p = strsep(&s, "/");
-		if (s && *s != '/')
-			(*count)++;
-	} while (p);
-
-	return NULL;
-}
