@@ -182,6 +182,13 @@ const struct got_error *got_object_blob_read_block(size_t *,
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **,
     struct got_repository *, struct got_object_id *);
+const struct got_error *
+got_object_open_as_tree(struct got_tree_object **,
+    struct got_repository *, struct got_object_id *);
+
+const struct got_error *
+got_object_open_by_path(struct got_object **, struct got_repository *,
+    struct got_object_id *, const char *);
 
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);

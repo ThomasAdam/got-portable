@@ -1125,6 +1125,27 @@ got_object_tree_open(struct got_tree_object **tree,
 	return err;
 }
 
+const struct got_error *
+got_object_open_as_tree(struct got_tree_object **tree,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_tree_open(tree, repo, obj);
+done:
+	got_object_close(obj);
+	return err;
+}
+
 void
 got_object_tree_close(struct got_tree_object *tree)
 {
@@ -1335,4 +1356,103 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 		return got_ferror(blob->f, GOT_ERR_IO);
 	*outlenp = n;
 	return NULL;
+}
+
+static struct got_tree_entry *
+find_entry_by_name(struct got_tree_object *tree, const char *name)
+{
+	struct got_tree_entry *te;
+
+	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+		if (strcmp(te->name, name) == 0)
+			return te;
+	}
+	return NULL;
+}
+
+const struct got_error *
+got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
+    struct got_object_id *commit_id, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
+	struct got_tree_entry *entry = NULL;
+	char *seg, *s = NULL;
+
+	*obj = NULL;
+
+	/* We are expecting an absolute in-repository path. */
+	if (path[0] != '/')
+		return got_error(GOT_ERR_NOT_ABSPATH);
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	/* Handle opening of root of commit's tree. */
+	if (path[1] == '\0') {
+		err = got_object_open(obj, repo, commit->tree_id);
+		if (err)
+			goto done;
+		return NULL;
+	}
+
+	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
+	if (err)
+		goto done;
+
+	s = strdup(path);
+	if (s == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_canonpath(path, s, strlen(s) + 1);
+	if (err)
+		goto done;
+
+	s++; /* skip leading '/' */
+	seg = s;
+	while (*s) {
+		struct got_tree_object *next_tree;
+
+		if (*s != '/') {
+			s++;
+			continue;
+		}
+
+		/* end of path segment */
+		*s = '\0';
+
+		entry = find_entry_by_name(tree, seg);
+		if (entry == NULL) {
+			err = got_error(GOT_ERR_NO_OBJ);
+			goto done;
+		}
+
+		seg = s + 1;
+		s++;
+
+		if (*s) {
+			err = got_object_open_as_tree(&next_tree, repo,
+			    entry->id);
+			entry = NULL;
+			if (err)
+				goto done;
+			got_object_tree_close(tree);
+			tree = next_tree;
+		}
+	}
+
+	if (entry)
+		err = got_object_open(obj, repo, entry->id);
+	else
+		err = got_error(GOT_ERR_NO_OBJ);
+done:
+	free(s);
+	if (commit)
+		got_object_commit_close(commit);
+	if (tree)
+		got_object_tree_close(tree);
+	return err;
 }
