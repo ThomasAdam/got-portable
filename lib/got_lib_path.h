@@ -39,4 +39,4 @@ char *got_path_normalize(const char *);
  * and resolving references to parent directories ("/../").
  * Relative paths are copied from input to buf as-is.
  */
-int got_canonpath(const char *input, char *buf, size_t bufsize)
+const struct got_error *got_canonpath(const char *, char *, size_t);

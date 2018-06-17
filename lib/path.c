@@ -64,8 +64,8 @@ got_path_normalize(const char *path)
 	return resolved;
 }
 
-/* canonpath() from kern_pledge.c */
-int
+/* based on canonpath() from kern_pledge.c */
+const struct got_error *
 got_canonpath(const char *input, char *buf, size_t bufsize)
 {
 	const char *p;
@@ -74,8 +74,8 @@ got_canonpath(const char *input, char *buf, size_t bufsize)
 	/* can't canon relative paths, don't bother */
 	if (!got_path_is_absolute(input)) {
 		if (strlcpy(buf, input, bufsize) >= bufsize)
-			return ENAMETOOLONG;
-		return 0;
+			return got_error(GOT_ERR_NO_SPACE);
+		return NULL;
 	}
 
 	p = input;
@@ -101,7 +101,7 @@ got_canonpath(const char *input, char *buf, size_t bufsize)
 	}
 	if ((*p == '\0') && (q - buf < bufsize)) {
 		*q = 0;
-		return 0;
+		return NULL;
 	} else
-		return ENAMETOOLONG;
+		return got_error(GOT_ERR_NO_SPACE);
 }
