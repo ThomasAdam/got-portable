@@ -243,31 +243,28 @@ blame_open(struct got_blame **blamep, const char *path,
 	}
 	while (1) {
 		struct got_object_qid *pid;
-		struct got_commit_object *pcommit;
 
 		pid = SIMPLEQ_FIRST(&commit->parent_ids);
 		if (pid == NULL)
-			break;
-
-		err = got_object_open_as_commit(&pcommit, repo, pid->id);
-		if (err)
 			break;
 
 		err = blame_commit(blame, id, pid->id, path, repo);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED)
 				err = NULL;
-			got_object_commit_close(pcommit);
 			break;
 		}
+
 		free(id);
 		id = got_object_id_dup(pid->id);
-		got_object_commit_close(commit);
-		commit = pcommit;
 		if (id == NULL) {
 			err = got_error_from_errno();
 			goto done;
 		}
+		got_object_commit_close(commit);
+		err = got_object_open_as_commit(&commit, repo, id);
+		if (err)
+			break;
 	}
 
 	/* Annotate remaining non-annotated lines with last commit. */
