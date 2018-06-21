@@ -1405,7 +1405,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
-	struct got_tree_entry *entry = NULL;
+	struct got_tree_entry *te = NULL;
 	char *seg, *s, *s0 = NULL;
 
 	*obj = NULL;
@@ -1454,19 +1454,18 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		/* end of path segment */
 		*s = '\0';
 
-		entry = find_entry_by_name(tree, seg);
-		if (entry == NULL) {
+		te = find_entry_by_name(tree, seg);
+		if (te == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			goto done;
 		}
 
 		seg = s + 1;
 		s++;
-
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree, repo,
-			    entry->id);
-			entry = NULL;
+			    te->id);
+			te = NULL;
 			if (err)
 				goto done;
 			got_object_tree_close(tree);
@@ -1474,8 +1473,8 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		}
 	}
 
-	if (entry)
-		err = got_object_open(obj, repo, entry->id);
+	if (te)
+		err = got_object_open(obj, repo, te->id);
 	else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
