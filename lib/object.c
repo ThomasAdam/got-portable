@@ -1447,7 +1447,8 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 
 		if (*s != '/') {
 			s++;
-			continue;
+			if (*s)
+				continue;
 		}
 
 		/* end of path segment */
