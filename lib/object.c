@@ -1406,7 +1406,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *entry = NULL;
-	char *seg, *s = NULL;
+	char *seg, *s, *s0 = NULL;
 
 	*obj = NULL;
 
@@ -1430,15 +1430,16 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	s = strdup(path);
-	if (s == NULL) {
+	s0 = strdup(path);
+	if (s0 == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = got_canonpath(path, s, strlen(s) + 1);
+	err = got_canonpath(path, s0, strlen(s0) + 1);
 	if (err)
 		goto done;
 
+	s = s0;
 	s++; /* skip leading '/' */
 	seg = s;
 	while (*s) {
@@ -1477,7 +1478,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
-	free(s);
+	free(s0);
 	if (commit)
 		got_object_commit_close(commit);
 	if (tree)
