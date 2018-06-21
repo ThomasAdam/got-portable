@@ -1320,6 +1320,28 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_object_open_as_blob(struct got_blob_object **blob,
+    struct got_repository *repo, struct got_object_id *id,
+    size_t blocksize)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = got_object_blob_open(blob, repo, obj, blocksize);
+done:
+	got_object_close(obj);
+	return err;
+}
+
 void
 got_object_blob_close(struct got_blob_object *blob)
 {

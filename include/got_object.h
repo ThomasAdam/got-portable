@@ -193,6 +193,9 @@ got_object_open_as_commit(struct got_commit_object **,
 const struct got_error *
 got_object_open_as_tree(struct got_tree_object **,
     struct got_repository *, struct got_object_id *);
+const struct got_error *
+got_object_open_as_blob(struct got_blob_object **,
+    struct got_repository *, struct got_object_id *, size_t);
 
 const struct got_error *
 got_object_open_by_path(struct got_object **, struct got_repository *,
