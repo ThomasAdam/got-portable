@@ -36,6 +36,7 @@
 #include "got_worktree.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"
+#include "got_blame.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -52,10 +53,12 @@ __dead static void	usage(void);
 __dead static void	usage_checkout(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
+__dead static void	usage_blame(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_log(int, char *[]);
 static const struct got_error*		cmd_diff(int, char *[]);
+static const struct got_error*		cmd_blame(int, char *[]);
 #ifdef notyet
 static const struct got_error*		cmd_status(int, char *[]);
 #endif
@@ -67,6 +70,8 @@ static struct cmd got_commands[] = {
 	    "show repository history" },
 	{ "diff",	cmd_diff,	usage_diff,
 	    "compare files and directories" },
+	{ "blame",	cmd_blame,	usage_blame,
+	    " show when lines in a file were changed" },
 #ifdef notyet
 	{ "status",	cmd_status,	usage_status,
 	    "show modification status of files" },
@@ -645,6 +650,92 @@ done:
 		free(id1);
 	if (id2)
 		free(id2);
+	if (repo)
+		got_repo_close(repo);
+	return error;
+}
+
+__dead static void
+usage_blame(void)
+{
+	fprintf(stderr, "usage: %s blame [-c commit] [repository-path] path\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_blame(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	char *repo_path = NULL;
+	char *path = NULL;
+	struct got_object_id *commit_id = NULL;
+	char *commit_id_str = NULL;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
+		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		usage_blame();
+	} else if (argc == 1) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		path = argv[0];
+	} else if (argc == 2) {
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		path = argv[1];
+	} else
+		usage_blame();
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error != NULL)
+		goto done;
+
+	if (commit_id_str == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			return error;
+		error = got_ref_resolve(&commit_id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			return error;
+	} else {
+		struct got_object *obj;
+		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		if (error != NULL)
+			return error;
+		commit_id = got_object_get_id(obj);
+		if (commit_id == NULL)
+			error = got_error_from_errno();
+		got_object_close(obj);
+	}
+
+	error = got_blame(path, commit_id, repo, stdout);
+done:
+	free(commit_id);
 	if (repo)
 		got_repo_close(repo);
 	return error;

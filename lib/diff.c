@@ -33,9 +33,10 @@
 #include "got_lib_diff.h"
 #include "got_lib_path.h"
 
-const struct got_error *
-got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    const char *label1, const char *label2, FILE *outfile)
+static const struct got_error *
+diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
+    const char *label1, const char *label2, FILE *outfile,
+    struct got_diff_changes *changes)
 {
 	struct got_diff_state ds;
 	struct got_diff_args args;
@@ -100,13 +101,51 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	args.diff_context = 3;
 	flags |= D_PROTOTYPE;
 
-	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile);
+	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
 done:
 	if (f1)
 		fclose(f1);
 	if (f2)
 		fclose(f2);
 	return err;
+}
+
+const struct got_error *
+got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
+    const char *label1, const char *label2, FILE *outfile)
+{
+	return diff_blobs(blob1, blob2, label1, label2, outfile, NULL);
+}
+
+const struct got_error *
+got_diff_blob_lines_changed(struct got_diff_changes **changes,
+    struct got_blob_object *blob1, struct got_blob_object *blob2)
+{
+	const struct got_error *err = NULL;
+
+	*changes = calloc(1, sizeof(**changes));
+	if (*changes == NULL)
+		return got_error_from_errno();
+	SIMPLEQ_INIT(&(*changes)->entries);
+
+	err = diff_blobs(blob1, blob2, NULL, NULL, NULL, *changes);
+	if (err) {
+		got_diff_free_changes(*changes);
+		*changes = NULL;
+	}
+	return err;
+}
+
+void
+got_diff_free_changes(struct got_diff_changes *changes)
+{
+	struct got_diff_change *change;
+	while (!SIMPLEQ_EMPTY(&changes->entries)) {
+		change = SIMPLEQ_FIRST(&changes->entries);
+		SIMPLEQ_REMOVE_HEAD(&changes->entries, entry);
+		free(change);
+	}
+	free(changes);
 }
 
 struct got_tree_entry *

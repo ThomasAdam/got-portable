@@ -171,29 +171,17 @@ struct line {
 	int	value;
 };
 
-/*
- * The following struct is used to record change information when
- * doing a "context" or "unified" diff.  (see routine "change" to
- * understand the highly mnemonic field names)
- */
-struct context_vec {
-	int	a;		/* start line in old file */
-	int	b;		/* end line in old file */
-	int	c;		/* start line in new file */
-	int	d;		/* end line in new file */
-};
-
 static void	 diff_output(FILE *, const char *, ...);
-static int	 output(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
+static int	 output(FILE *, struct got_diff_changes *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
 static void	 uni_range(FILE *, int, int);
-static void	 dump_unified_vec(FILE *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
+static void	 dump_unified_vec(FILE *, struct got_diff_changes *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static int	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
 static void	 prune(struct got_diff_state *);
 static void	 equiv(struct line *, int, struct line *, int, int *);
 static void	 unravel(struct got_diff_state *, int);
 static int	 unsort(struct line *, int, int *);
-static int	 change(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
+static int	 change(FILE *, struct got_diff_changes *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int, int, int, int, int *);
 static void	 sort(struct line *, int);
 static void	 print_header(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 asciifile(FILE *);
@@ -270,6 +258,9 @@ diff_output(FILE *outfile, const char *fmt, ...)
 {
 	va_list ap;
 
+	if (outfile == NULL)
+		return;
+
 	va_start(ap, fmt);
 	vfprintf(outfile, fmt, ap);
 	va_end(ap);
@@ -277,7 +268,8 @@ diff_output(FILE *outfile, const char *fmt, ...)
 
 const struct got_error *
 got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
-    struct got_diff_args *args, struct got_diff_state *ds, FILE *outfile)
+    struct got_diff_args *args, struct got_diff_state *ds, FILE *outfile,
+    struct got_diff_changes *changes)
 {
 	const struct got_error *err = NULL;
 	int i, *p;
@@ -410,8 +402,8 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	}
 	ds->ixnew = lp;
 	check(ds, f1, f2, flags);
-	if (output(outfile, ds, args, args->label[0], f1, args->label[1], f2,
-	    flags))
+	if (output(outfile, changes, ds, args, args->label[0], f1,
+	    args->label[1], f2, flags))
 		err = got_error_from_errno();
 closem:
 	free(ds->J);
@@ -850,7 +842,8 @@ skipline(FILE *f)
 }
 
 static int
-output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
+output(FILE *outfile, struct got_diff_changes *changes,
+    struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2, int flags)
 {
 	int m, i0, i1, j0, j1;
@@ -870,19 +863,19 @@ output(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 			i1++;
 		j1 = ds->J[i1 + 1] - 1;
 		ds->J[i1] = j1;
-		error = change(outfile, ds, args, file1, f1, file2, f2,
+		error = change(outfile, changes, ds, args, file1, f1, file2, f2,
 		    i0, i1, j0, j1, &flags);
 		if (error)
 			return (error);
 	}
 	if (m == 0) {
-		error = change(outfile, ds, args, file1, f1, file2, f2, 1, 0,
-		    1, ds->len[1], &flags);
+		error = change(outfile, changes, ds, args, file1, f1, file2, f2,
+		    1, 0, 1, ds->len[1], &flags);
 		if (error)
 			return (error);
 	}
 	if (ds->anychange != 0)
-		dump_unified_vec(outfile, ds, args, f1, f2, flags);
+		dump_unified_vec(outfile, changes, ds, args, f1, f2, flags);
 
 	return (0);
 }
@@ -906,7 +899,8 @@ uni_range(FILE *outfile, int a, int b)
  * lines missing from the to file.
  */
 static int
-change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
+change(FILE *outfile, struct got_diff_changes *changes,
+    struct got_diff_state *ds, struct got_diff_args *args,
     const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
@@ -952,7 +946,8 @@ change(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 			 * If this change is more than 'diff_context' lines from the
 			 * previous change, dump the record and reset it.
 			 */
-			dump_unified_vec(outfile, ds, args, f1, f2, *pflags);
+			dump_unified_vec(outfile, changes, ds, args, f1, f2,
+			    *pflags);
 		}
 		ds->context_vec_ptr++;
 		ds->context_vec_ptr->a = a;
@@ -1133,7 +1128,8 @@ match_function(struct got_diff_state *ds, const long *f, int pos, FILE *fp)
 
 /* dump accumulated "unified" diff changes */
 static void
-dump_unified_vec(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
+dump_unified_vec(FILE *outfile, struct got_diff_changes *changes,
+    struct got_diff_state *ds, struct got_diff_args *args,
     FILE *f1, FILE *f2, int flags)
 {
 	struct context_vec *cvp = ds->context_vec_start;
@@ -1167,6 +1163,17 @@ dump_unified_vec(FILE *outfile, struct got_diff_state *ds, struct got_diff_args 
 	 * are printed together.
 	 */
 	for (; cvp <= ds->context_vec_ptr; cvp++) {
+		if (changes) {
+			struct got_diff_change *change;
+			change = calloc(1, sizeof(*change));
+			if (change) {
+				memcpy(&change->cv, cvp, sizeof(change->cv));
+				SIMPLEQ_INSERT_TAIL(&changes->entries, change,
+				    entry);
+				changes->nchanges++;
+			}
+		}
+
 		a = cvp->a;
 		b = cvp->b;
 		c = cvp->c;

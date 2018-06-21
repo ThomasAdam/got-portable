@@ -74,6 +74,28 @@ struct excludes {
 	struct excludes *next;
 };
 
+/*
+ * The following struct is used to record change information when
+ * doing a "context" or "unified" diff.  (see routine "change" to
+ * understand the highly mnemonic field names)
+ */
+struct context_vec {
+	int	a;		/* start line in old file */
+	int	b;		/* end line in old file */
+	int	c;		/* start line in new file */
+	int	d;		/* end line in new file */
+};
+
+struct got_diff_change {
+	SIMPLEQ_ENTRY(got_diff_change) entry;
+	struct context_vec cv;
+};
+
+struct got_diff_changes {
+	size_t nchanges;
+	SIMPLEQ_HEAD(, got_diff_change) entries;
+};
+
 struct got_diff_state {
 	int  *J;			/* will be overlaid on class */
 	int  *class;		/* will be overlaid on file[0] */
@@ -110,4 +132,9 @@ struct got_diff_args {
 };
 
 const struct got_error *got_diffreg(int *, FILE *,
-    FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *);
+    FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *,
+    struct got_diff_changes *);
+
+const struct got_error *got_diff_blob_lines_changed(struct got_diff_changes **,
+    struct got_blob_object *, struct got_blob_object *);
+void got_diff_free_changes(struct got_diff_changes *);
