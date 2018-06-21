@@ -60,6 +60,7 @@
 #define GOT_ERR_BAD_OBJ_ID	44
 #define GOT_ERR_ITER_NEED_MORE	45
 #define GOT_ERR_ITER_COMPLETED	46
+#define GOT_ERR_RANGE		47
 
 static const struct got_error {
 	int code;
@@ -109,6 +110,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_OBJ_ID,	"bad object id" },
 	{ GOT_ERR_ITER_NEED_MORE,"more items needed to continue iteration" },
 	{ GOT_ERR_ITER_COMPLETED,"iteration completed" },
+	{ GOT_ERR_RANGE,	"value out of range" },
 };
 
 /*
