@@ -287,7 +287,6 @@ got_repo_close(struct got_repository *repo)
 		got_object_close(ce->obj);
 		free(ce);
 	}
-	fprintf(stderr, "repo cache size: %d hit: %d miss: %d\n", repo->ncached, repo->cache_hit, repo->cache_miss);
 
 	free(repo->path);
 	free(repo->path_git_dir);
