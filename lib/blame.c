@@ -148,11 +148,6 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 
 	if (changes) {
 		struct got_diff_change *change;
-		char *id_str;
-		err = got_object_id_str(&id_str, id);
-		if (err)
-			goto done;
-
 		SIMPLEQ_FOREACH(change, &changes->entries, entry) {
 			int a = change->cv.a;
 			int b = change->cv.b;
@@ -160,7 +155,6 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 			for (lineno = a; lineno <= b; lineno++)
 				annotate_line(blame, lineno, id);
 		}
-		free(id_str);
 	}
 done:
 	if (obj)
