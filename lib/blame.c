@@ -37,7 +37,7 @@
 
 struct got_blame_line {
 	int annotated;
-	struct got_object_id id; /* one per line */
+	struct got_object_id id;
 };
 
 struct got_blame {
