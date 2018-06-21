@@ -80,21 +80,20 @@ dump_blob_and_count_lines(size_t *nlines, FILE *outfile,
 	return NULL;
 }
 
-static const struct got_error *
+static void
 annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id)
 {
 	struct got_blame_line *line;
 
 	if (lineno < 1 || lineno > blame->nlines)
-		return got_error(GOT_ERR_RANGE);
+		return;
 	
 	line = &blame->lines[lineno - 1];
 	if (line->annotated)
-		return NULL;
+		return;
 
 	memcpy(&line->id, id, sizeof(line->id));
 	line->annotated = 1;
-	return NULL;
 }
 
 static const struct got_error *
@@ -158,11 +157,8 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 			int a = change->cv.a;
 			int b = change->cv.b;
 			int lineno;
-			for (lineno = a; lineno <= b; lineno++) {
-				err = annotate_line(blame, lineno, id);
-				if (err)
-					goto done;
-			}
+			for (lineno = a; lineno <= b; lineno++)
+				annotate_line(blame, lineno, id);
 		}
 		free(id_str);
 	}
@@ -268,11 +264,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	}
 
 	/* Annotate remaining non-annotated lines with last commit. */
-	for (lineno = 1; lineno < blame->nlines; lineno++) {
-		err = annotate_line(blame, lineno, id);
-		if (err)
-			break;
-	}
+	for (lineno = 1; lineno < blame->nlines; lineno++)
+		annotate_line(blame, lineno, id);
 
 done:
 	free(id);
