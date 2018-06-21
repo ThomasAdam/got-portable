@@ -1135,7 +1135,7 @@ got_object_open_as_tree(struct got_tree_object **tree,
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
