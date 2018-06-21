@@ -44,7 +44,6 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	char *idstr1 = NULL, *idstr2 = NULL;
-	size_t len, hdrlen;
 	size_t size1, size2;
 	int res, flags = 0;
 
@@ -67,49 +66,20 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	size1 = 0;
 	if (blob1) {
 		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
-		hdrlen = got_object_blob_get_hdrlen(blob1);
-		do {
-			err = got_object_blob_read_block(&len, blob1);
-			if (err)
-				goto done;
-			if (len == 0)
-				break;
-			size1 += len;
-			/* Skip blob object header first time around. */
-			fwrite(got_object_blob_get_read_buf(blob1) + hdrlen,
-			    len - hdrlen, 1, f1);
-			hdrlen = 0;
-		} while (len != 0);
+		err = got_object_blob_dump_to_file(&size1, f1, blob1);
+		if (err)
+			goto done;
 	} else
 		idstr1 = "/dev/null";
 
 	size2 = 0;
 	if (blob2) {
 		idstr2 = got_object_blob_id_str(blob2, hex2, sizeof(hex2));
-		hdrlen = got_object_blob_get_hdrlen(blob2);
-		do {
-			err = got_object_blob_read_block(&len, blob2);
-			if (err)
-				goto done;
-			if (len == 0)
-				break;
-			size2 += len;
-			/* Skip blob object header first time around. */
-			fwrite(got_object_blob_get_read_buf(blob2) + hdrlen,
-			    len - hdrlen, 1, f2);
-			hdrlen = 0;
-		} while (len != 0);
+		err = got_object_blob_dump_to_file(&size2, f2, blob2);
+		if (err)
+			goto done;
 	} else
 		idstr2 = "/dev/null";
-
-	if (f1) {
-		fflush(f1);
-		rewind(f1);
-	}
-	if (f2) {
-		fflush(f2);
-		rewind(f2);
-	}
 
 	memset(&ds, 0, sizeof(ds));
 	/* XXX should stat buffers be passed in args instead of ds? */

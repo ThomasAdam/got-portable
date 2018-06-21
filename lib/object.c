@@ -1358,6 +1358,34 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 	return NULL;
 }
 
+const struct got_error *
+got_object_blob_dump_to_file(size_t *total_len, FILE *outfile,
+    struct got_blob_object *blob)
+{
+	const struct got_error *err = NULL;
+	size_t len, hdrlen;
+
+	*total_len = 0;
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	do {
+		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			return err;
+		if (len == 0)
+			break;
+		*total_len += len;
+		/* Skip blob object header first time around. */
+		fwrite(got_object_blob_get_read_buf(blob) + hdrlen,
+		    len - hdrlen, 1, outfile);
+		hdrlen = 0;
+	} while (len != 0);
+
+	fflush(outfile);
+	rewind(outfile);
+
+	return NULL;
+}
+
 static struct got_tree_entry *
 find_entry_by_name(struct got_tree_object *tree, const char *name)
 {
