@@ -165,13 +165,18 @@ got_object_idset_remove(struct got_object_idset *set,
     struct got_object_id *id)
 {
 	struct got_object_idset_element *entry, *tmp;
-	uint8_t i = id->sha1[0];
+	uint8_t i;
+
+	if (id)
+		i = id->sha1[0];
+	else
+		i = arc4random_uniform(nitems(set->entries));
 
 	if (set->nelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
 	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
-		if (got_object_id_cmp(&entry->id, id) == 0) {
+		if (id == NULL || got_object_id_cmp(&entry->id, id) == 0) {
 			TAILQ_REMOVE(&set->entries[i], entry, entry);
 			set->nelem--;
 			return NULL;
