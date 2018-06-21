@@ -448,6 +448,8 @@ got_object_open_as_commit(struct got_commit_object **commit,
 	const struct got_error *err;
 	struct got_object *obj;
 
+	*commit = NULL;
+
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
@@ -1132,6 +1134,8 @@ got_object_open_as_tree(struct got_tree_object **tree,
 	const struct got_error *err;
 	struct got_object *obj;
 
+	*tree = NULL;
+
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
@@ -1327,6 +1331,8 @@ got_object_open_as_blob(struct got_blob_object **blob,
 {
 	const struct got_error *err;
 	struct got_object *obj;
+
+	*blob = NULL;
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
