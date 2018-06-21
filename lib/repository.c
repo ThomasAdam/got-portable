@@ -28,6 +28,7 @@
 #include "got_reference.h"
 #include "got_repository.h"
 #include "got_worktree.h"
+#include "got_object.h"
 
 #include "got_lib_path.h"
 #include "got_lib_delta.h"
@@ -147,6 +148,47 @@ done:
 
 }
 
+const struct got_error*
+got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
+    struct got_object *obj)
+{
+	struct got_objcache_entry *ce;
+
+	if (repo->ncached >= GOT_OBJECT_CACHE_SIZE) {
+		ce = SIMPLEQ_FIRST(&repo->objcache);
+		SIMPLEQ_REMOVE_HEAD(&repo->objcache, entry);
+		got_object_close(ce->obj);
+		free(ce);
+		repo->ncached--;
+	}
+
+	ce = calloc(1, sizeof(*ce));
+	if (ce == NULL)
+		return got_error_from_errno();
+	memcpy(&ce->id, id, sizeof(ce->id));
+	ce->obj = obj;
+	obj->refcnt++;
+	SIMPLEQ_INSERT_HEAD(&repo->objcache, ce, entry);
+	repo->ncached++;
+	return NULL;
+}
+
+struct got_object *
+got_repo_get_cached_object(struct got_repository *repo,
+    struct got_object_id *id)
+{
+	struct got_objcache_entry *ce;
+
+	SIMPLEQ_FOREACH(ce, &repo->objcache, entry) {
+		if (got_object_id_cmp(&ce->id, id) != 0)
+			continue;
+		repo->cache_hit++;
+		return ce->obj;
+	}
+	repo->cache_miss++;
+	return NULL;
+}
+
 const struct got_error *
 got_repo_open(struct got_repository **ret, const char *path)
 {
@@ -237,6 +279,15 @@ got_repo_close(struct got_repository *repo)
 			break;
 		got_pack_close(&repo->packs[i]);
 	}
+
+	while (!SIMPLEQ_EMPTY(&repo->objcache)) {
+		struct got_objcache_entry *ce;
+		ce = SIMPLEQ_FIRST(&repo->objcache);
+		SIMPLEQ_REMOVE_HEAD(&repo->objcache, entry);
+		got_object_close(ce->obj);
+		free(ce);
+	}
+	fprintf(stderr, "repo cache size: %d hit: %d miss: %d\n", repo->ncached, repo->cache_hit, repo->cache_miss);
 
 	free(repo->path);
 	free(repo->path_git_dir);

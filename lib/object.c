@@ -46,6 +46,7 @@
 #include "got_lib_zbuf.h"
 #include "got_lib_object.h"
 #include "got_lib_privsep.h"
+#include "got_lib_repository.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -365,6 +366,12 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	char *path;
 	int fd;
 
+	*obj = got_repo_get_cached_object(repo, id);
+	if (*obj != NULL) {
+		(*obj)->refcnt++;
+		return NULL;
+	}
+
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
@@ -385,6 +392,11 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		if (err)
 			goto done;
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	}
+
+	if (err == NULL) {
+		(*obj)->refcnt++;
+		err = got_repo_cache_object(repo, id, *obj);
 	}
 done:
 	free(path);
@@ -409,6 +421,11 @@ got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
 void
 got_object_close(struct got_object *obj)
 {
+	if (obj->refcnt > 0) {
+		obj->refcnt--;
+		return;
+	}
+
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
 		struct got_delta *delta;
 		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
@@ -1508,9 +1525,11 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		}
 	}
 
-	if (te)
+	if (te) {
 		err = got_object_open(obj, repo, te->id);
-	else
+		if (err)
+			goto done;
+	} else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
 	free(s0);

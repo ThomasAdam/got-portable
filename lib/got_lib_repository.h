@@ -17,6 +17,14 @@
 #define GOT_PACKIDX_CACHE_SIZE	64
 #define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
+#define GOT_OBJECT_CACHE_SIZE	8192
+
+struct got_objcache_entry {
+	SIMPLEQ_ENTRY(got_objcache_entry) entry;
+	struct got_object_id id;
+	struct got_object *obj;
+};
+
 struct got_repository {
 	char *path;
 	char *path_git_dir;
@@ -26,4 +34,15 @@ struct got_repository {
 
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
+
+	SIMPLEQ_HEAD(, got_objcache_entry) objcache;
+	int ncached;
+	int cache_hit;
+	int cache_miss;
 };
+
+const struct got_error*
+got_repo_cache_object(struct got_repository *, struct got_object_id *,
+    struct got_object *);
+struct got_object *got_repo_get_cached_object(struct got_repository *,
+    struct got_object_id *);

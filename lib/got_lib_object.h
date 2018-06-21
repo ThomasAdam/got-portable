@@ -31,6 +31,7 @@ struct got_object {
 	char *path_packfile;	/* if packed */
 	off_t pack_offset;	/* if packed */
 	struct got_delta_chain deltas; /* if deltified */
+	int refcnt;		/* > 0 if open and/or cached */
 };
 
 struct got_blob_object {
