@@ -1407,6 +1407,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te = NULL;
 	char *seg, *s, *s0 = NULL;
+	size_t len = strlen(path);
 
 	*obj = NULL;
 
@@ -1435,18 +1436,20 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = got_canonpath(path, s0, strlen(s0) + 1);
+	err = got_canonpath(path, s0, len + 1);
 	if (err)
 		goto done;
 
 	s = s0;
 	s++; /* skip leading '/' */
+	len--;
 	seg = s;
-	while (*s) {
+	while (len > 0) {
 		struct got_tree_object *next_tree;
 
 		if (*s != '/') {
 			s++;
+			len--;
 			if (*s)
 				continue;
 		}
@@ -1460,8 +1463,12 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 			goto done;
 		}
 
+		if (len == 0)
+			break;
+
 		seg = s + 1;
 		s++;
+		len--;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree, repo,
 			    te->id);
