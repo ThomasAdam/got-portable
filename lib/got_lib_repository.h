@@ -20,7 +20,6 @@
 #define GOT_OBJECT_CACHE_SIZE	8192
 
 struct got_objcache_entry {
-	SIMPLEQ_ENTRY(got_objcache_entry) entry;
 	struct got_object_id id;
 	struct got_object *obj;
 };
