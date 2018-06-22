@@ -708,7 +708,7 @@ parse_offset_delta(off_t *base_offset, int fd, off_t offset)
 
 static const struct got_error *
 resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
-    struct got_packidx *, int, size_t, const char *, off_t, size_t, int,
+    struct got_packidx *, struct got_pack *, off_t, size_t, int,
     size_t, unsigned int);
 
 static const struct got_error *
@@ -731,9 +731,9 @@ add_delta(struct got_delta_chain *deltas, const char *path_packfile,
 
 static const struct got_error *
 resolve_offset_delta(struct got_delta_chain *deltas,
-    struct got_repository *repo, struct got_packidx *packidx, int fd,
-    size_t packfile_size, const char *path_packfile, off_t delta_offset,
-    size_t tslen, int delta_type, size_t delta_size, unsigned int recursion)
+    struct got_repository *repo, struct got_packidx *packidx,
+    struct got_pack *pack, off_t delta_offset, size_t tslen,
+    int delta_type, size_t delta_size, unsigned int recursion)
 
 {
 	const struct got_error *err;
@@ -745,42 +745,41 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	uint8_t *delta_buf;
 	size_t delta_len;
 
-	err = parse_offset_delta(&base_offset, fd, delta_offset);
+	err = parse_offset_delta(&base_offset, pack->fd, delta_offset);
 	if (err)
 		return err;
 
-	delta_data_offset = lseek(fd, 0, SEEK_CUR);
+	delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 	if (delta_data_offset == -1)
 		return got_error_from_errno();
 
-	err = got_inflate_to_mem_fd(&delta_buf, &delta_len, fd);
+	err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
 	if (err)
 		return err;
 
-	err = add_delta(deltas, path_packfile, delta_offset, tslen,
+	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
 	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
 		return err;
 
 	/* An offset delta must be in the same packfile. */
-	if (base_offset >= packfile_size)
+	if (base_offset >= pack->filesize)
 		return got_error(GOT_ERR_PACK_OFFSET);
-	if (lseek(fd, base_offset, SEEK_SET) == -1)
+	if (lseek(pack->fd, base_offset, SEEK_SET) == -1)
 		return got_error_from_errno();
 
 	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
-	    fd);
+	    pack->fd);
 	if (err)
 		return err;
 
-	return resolve_delta_chain(deltas, repo, packidx, fd, packfile_size,
-	    path_packfile, base_offset, base_tslen, base_type, base_size,
-	    recursion - 1);
+	return resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
+	    base_tslen, base_type, base_size, recursion - 1);
 }
 
 static const struct got_error *
 resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
-    struct got_packidx *packidx, int fd, const char *path_packfile,
+    struct got_packidx *packidx, struct got_pack *pack,
     off_t delta_offset, size_t tslen, int delta_type, size_t delta_size,
     unsigned int recursion)
 {
@@ -792,27 +791,25 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	uint64_t base_size;
 	size_t base_tslen;
 	ssize_t n;
-	char *path_base_packfile;
-	struct got_pack *base_pack;
 	off_t delta_data_offset;
 	uint8_t *delta_buf;
 	size_t delta_len;
 
-	n = read(fd, &id, sizeof(id));
+	n = read(pack->fd, &id, sizeof(id));
 	if (n < 0)
 		return got_error_from_errno();
 	if (n != sizeof(id))
 		return got_error(GOT_ERR_BAD_PACKFILE);
 
-	delta_data_offset = lseek(fd, 0, SEEK_CUR);
+	delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 	if (delta_data_offset == -1)
 		return got_error_from_errno();
 
-	err = got_inflate_to_mem_fd(&delta_buf, &delta_len, fd);
+	err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
 	if (err)
 		return err;
 
-	err = add_delta(deltas, path_packfile, delta_offset, tslen,
+	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
 	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
 		return err;
@@ -827,44 +824,30 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		return got_error(GOT_ERR_BAD_PACKIDX);
 	}
 
-	err = get_packfile_path(&path_base_packfile, repo, packidx);
-	if (err)
-		return err;
-
-	base_pack = get_cached_pack(path_base_packfile, repo);
-	if (base_pack == NULL) {
-		err = cache_pack(&base_pack, path_base_packfile, NULL, repo);
-		if (err)
-			goto done;
-	}
-
-	if (base_offset >= base_pack->filesize) {
+	if (base_offset >= pack->filesize) {
 		err = got_error(GOT_ERR_PACK_OFFSET);
 		goto done;
 	}
-	if (lseek(base_pack->fd, base_offset, SEEK_SET) == -1) {
+	if (lseek(pack->fd, base_offset, SEEK_SET) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
 	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
-	    base_pack->fd);
+	    pack->fd);
 	if (err)
 		goto done;
 
-	err = resolve_delta_chain(deltas, repo, packidx, base_pack->fd,
-	    base_pack->filesize, path_base_packfile, base_offset,
+	err = resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
 	    base_tslen, base_type, base_size, recursion - 1);
 done:
-	free(path_base_packfile);
 	return err;
 }
 
 static const struct got_error *
 resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
-    struct got_packidx *packidx, int fd, size_t packfile_size,
-    const char *path_packfile, off_t delta_offset, size_t tslen,
-    int delta_type, size_t delta_size, unsigned int recursion)
+    struct got_packidx *packidx, struct got_pack *pack, off_t delta_offset,
+    size_t tslen, int delta_type, size_t delta_size, unsigned int recursion)
 {
 	const struct got_error *err = NULL;
 
@@ -877,18 +860,16 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		/* Plain types are the final delta base. Recursion ends. */
-		err = add_delta(deltas, path_packfile, delta_offset, tslen,
-		    delta_type, delta_size, 0, NULL, 0);
+		err = add_delta(deltas, pack->path_packfile, delta_offset,
+		    tslen, delta_type, delta_size, 0, NULL, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		err = resolve_offset_delta(deltas, repo, packidx, fd,
-		    packfile_size, path_packfile, delta_offset, tslen,
-		    delta_type, delta_size, recursion - 1);
+		err = resolve_offset_delta(deltas, repo, packidx, pack,
+		    delta_offset, tslen, delta_type, delta_size, recursion - 1);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
-		err = resolve_ref_delta(deltas, repo, packidx, fd,
-		    path_packfile, delta_offset, tslen, delta_type,
-		    delta_size, recursion - 1);
+		err = resolve_ref_delta(deltas, repo, packidx, pack,
+		    delta_offset, tslen, delta_type, delta_size, recursion - 1);
 		break;
 	default:
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -899,8 +880,8 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 
 static const struct got_error *
 open_delta_object(struct got_object **obj, struct got_repository *repo,
-    struct got_packidx *packidx, const char *path_packfile, int fd,
-    size_t packfile_size, struct got_object_id *id, off_t offset, size_t tslen,
+    struct got_packidx *packidx, struct got_pack *pack,
+    struct got_object_id *id, off_t offset, size_t tslen,
     int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
@@ -916,7 +897,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset + tslen;
 
-	(*obj)->path_packfile = strdup(path_packfile);
+	(*obj)->path_packfile = strdup(pack->path_packfile);
 	if ((*obj)->path_packfile == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -926,9 +907,8 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 	SIMPLEQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 
-	err = resolve_delta_chain(&(*obj)->deltas, repo, packidx, fd,
-	    packfile_size, path_packfile, offset, tslen, delta_type, delta_size,
-	    GOT_DELTA_CHAIN_RECURSION_MAX);
+	err = resolve_delta_chain(&(*obj)->deltas, repo, packidx, pack, offset,
+	    tslen, delta_type, delta_size, GOT_DELTA_CHAIN_RECURSION_MAX);
 	if (err)
 		goto done;
 
@@ -998,8 +978,8 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	case GOT_OBJ_TYPE_REF_DELTA:
-		err = open_delta_object(obj, repo, packidx, path_packfile,
-		    pack->fd, pack->filesize, id, offset, tslen, type, size);
+		err = open_delta_object(obj, repo, packidx, pack, id, offset,
+		    tslen, type, size);
 		break;
 
 	default:
