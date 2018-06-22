@@ -390,15 +390,53 @@ done:
 	return err;
 }
 
+#if 0
 static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
-#if 0
 	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed\n",
 	    name, got_object_idset_num_elements(cache->set), cache->cache_hit,
 	    cache->cache_miss);
-#endif
 }
+
+void check_refcount(struct got_object_id *id, void *data, void *arg)
+{
+	struct got_object_cache *cache = arg;
+	struct got_object_cache_entry *ce = data;
+	struct got_object *obj;
+	struct got_tree_object *tree;
+	struct got_commit_object *commit;
+	char *id_str;
+
+	if (got_object_id_str(&id_str, id) != NULL)
+		return;
+
+	switch (cache->type) {
+	case GOT_OBJECT_CACHE_TYPE_OBJ:
+		obj = ce->data.obj;
+		if (obj->refcnt == 1)
+			break;
+		fprintf(stderr, "object %s has %d unclaimed references\n",
+		    id_str, obj->refcnt - 1);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TREE:
+		tree = ce->data.tree;
+		if (tree->refcnt == 1)
+			break;
+		fprintf(stderr, "tree %s has %d unclaimed references\n",
+		    id_str, tree->refcnt - 1);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_COMMIT:
+		commit = ce->data.commit;
+		if (commit->refcnt == 1)
+			break;
+		fprintf(stderr, "commit %s has %d unclaimed references\n",
+		    id_str, commit->refcnt);
+		break;
+	}
+	free(id_str);
+}
+#endif
 
 void
 got_repo_close(struct got_repository *repo)
@@ -419,9 +457,19 @@ got_repo_close(struct got_repository *repo)
 
 	free(repo->path);
 	free(repo->path_git_dir);
+
+#if 0
 	print_cache_stats(&repo->objcache, "object");
 	print_cache_stats(&repo->treecache, "tree");
 	print_cache_stats(&repo->commitcache, "commit");
+	got_object_idset_for_each(repo->objcache.set, check_refcount,
+	    &repo->objcache);
+	got_object_idset_for_each(repo->treecache.set, check_refcount,
+	    &repo->treecache);
+	got_object_idset_for_each(repo->commitcache.set, check_refcount,
+	    &repo->commitcache);
+#endif
+
 	if (repo->objcache.set)
 		got_object_idset_free(repo->objcache.set);
 	if (repo->treecache.set)
