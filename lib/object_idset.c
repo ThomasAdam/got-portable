@@ -181,6 +181,34 @@ got_object_idset_remove(struct got_object_idset *set,
 	return got_error(GOT_ERR_NO_OBJ);
 }
 
+const struct got_error *
+got_object_idset_remove_random(void **data, struct got_object_idset *set)
+{
+	struct got_object_idset_element *entry, *tmp;
+	int i, n;
+
+	*data = NULL;
+
+	if (set->nelem == 0)
+		return got_error(GOT_ERR_NO_OBJ);
+
+	n = arc4random_uniform(set->nelem);
+	for (i = 0; i < nitems(set->entries); i++) {
+		TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
+			if (--n == 0) {
+				TAILQ_REMOVE(&set->entries[i], entry, entry);
+				*data = entry->data;
+				free(entry);
+				set->nelem--;
+				return NULL;
+			}
+		}
+
+	}
+
+	return got_error(GOT_ERR_NO_OBJ);
+}
+
 int
 got_object_idset_contains(struct got_object_idset *set,
     struct got_object_id *id)
