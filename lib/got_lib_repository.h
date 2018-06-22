@@ -19,12 +19,21 @@
 
 #define GOT_OBJECT_CACHE_SIZE	8192
 
+enum got_object_chache_type {
+	GOT_OBJECT_CACHE_TYPE_OBJ,
+	GOT_OBJECT_CACHE_TYPE_TREE
+};
+
 struct got_object_cache_entry {
 	struct got_object_id id;
-	struct got_object *obj;
+	union {
+		struct got_object *obj;
+		struct got_tree_object *tree;
+	} data;
 };
 
 struct got_object_cache {
+	enum got_object_chache_type type;
 	struct got_object_idset *set;
 	int ncached;
 	int cache_hit;
@@ -41,11 +50,16 @@ struct got_repository {
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
+	/* Caches for opened objects. */
 	struct got_object_cache objcache;
+	struct got_object_cache treecache;
 };
 
-const struct got_error*
-got_repo_cache_object(struct got_repository *, struct got_object_id *,
-    struct got_object *);
+const struct got_error*got_repo_cache_object(struct got_repository *,
+    struct got_object_id *, struct got_object *);
 struct got_object *got_repo_get_cached_object(struct got_repository *,
+    struct got_object_id *);
+const struct got_error*got_repo_cache_tree(struct got_repository *,
+    struct got_object_id *, struct got_tree_object *);
+struct got_tree_object *got_repo_get_cached_tree(struct got_repository *,
     struct got_object_id *);

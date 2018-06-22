@@ -28,6 +28,8 @@ struct got_tree_entry {
 struct got_tree_object {
 	int nentries;
 	SIMPLEQ_HEAD(, got_tree_entry) entries;
+
+	int refcnt; /* for internal use only */
 };
 
 struct got_object_qid {

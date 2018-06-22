@@ -149,40 +149,65 @@ done:
 
 }
 
-const struct got_error *
-got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
-    struct got_object *obj)
+static const struct got_error *
+cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 {
 	const struct got_error *err = NULL;
 	struct got_object_cache_entry *ce;
 
-	if (repo->objcache.ncached >= GOT_OBJECT_CACHE_SIZE) {
+	if (cache->ncached >= GOT_OBJECT_CACHE_SIZE) {
 		err = got_object_idset_remove_random((void **)&ce,
-		    repo->objcache.set);
+		    cache->set);
 		if (err)
 			return err;
-		got_object_close(ce->obj);
+		switch (cache->type) {
+		case GOT_OBJECT_CACHE_TYPE_OBJ:
+			got_object_close(ce->data.obj);
+			break;
+		case GOT_OBJECT_CACHE_TYPE_TREE:
+			got_object_tree_close(ce->data.tree);
+			break;
+		}
 		free(ce);
-		repo->objcache.ncached--;
+		cache->ncached--;
 	}
 
 	ce = calloc(1, sizeof(*ce));
 	if (ce == NULL)
 		return got_error_from_errno();
 	memcpy(&ce->id, id, sizeof(ce->id));
-	ce->obj = obj;
-	err = got_object_idset_add(NULL, repo->objcache.set, id, ce);
+	switch (cache->type) {
+	case GOT_OBJECT_CACHE_TYPE_OBJ:
+		ce->data.obj = (struct got_object *)item;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TREE:
+		ce->data.tree = (struct got_tree_object *)item;
+		break;
+	}
+	err = got_object_idset_add(NULL, cache->set, id, ce);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_EXISTS) {
 			free(ce);
 			err = NULL;
 		}
-	} else {
-		obj->refcnt++;
-		repo->objcache.ncached++;
-	}
+	} else
+		cache->ncached++;
 
 	return err;
+}
+
+const struct got_error *
+got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
+    struct got_object *obj)
+{
+	const struct got_error *err = NULL;
+
+	err = cache_add(&repo->objcache, id, obj);
+	if (err)
+		return err;
+
+	obj->refcnt++;
+	return NULL;
 }
 
 struct got_object *
@@ -194,11 +219,43 @@ got_repo_get_cached_object(struct got_repository *repo,
 	ce = got_object_idset_get(repo->objcache.set, id);
 	if (ce) {
 		repo->objcache.cache_hit++;
-		return ce->obj;
+		return ce->data.obj;
 	}
+
 	repo->objcache.cache_miss++;
 	return NULL;
 }
+
+const struct got_error *
+got_repo_cache_tree(struct got_repository *repo, struct got_object_id *id,
+    struct got_tree_object *tree)
+{
+	const struct got_error *err = NULL;
+
+	err = cache_add(&repo->treecache, id, tree);
+	if (err)
+		return err;
+
+	tree->refcnt++;
+	return NULL;
+}
+
+struct got_tree_object *
+got_repo_get_cached_tree(struct got_repository *repo,
+    struct got_object_id *id)
+{
+	struct got_object_cache_entry *ce;
+
+	ce = got_object_idset_get(repo->treecache.set, id);
+	if (ce) {
+		repo->treecache.cache_hit++;
+		return ce->data.tree;
+	}
+
+	repo->treecache.cache_miss++;
+	return NULL;
+}
+
 
 const struct got_error *
 got_repo_open(struct got_repository **ret, const char *path)
@@ -225,6 +282,14 @@ got_repo_open(struct got_repository **ret, const char *path)
 		err = got_error_from_errno();
 		goto done;
 	}
+	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
+
+	repo->treecache.set = got_object_idset_alloc();
+	if (repo->treecache.set == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
 
 	repo->path = got_path_normalize(abspath);
 	if (repo->path == NULL) {
@@ -301,5 +366,7 @@ got_repo_close(struct got_repository *repo)
 	free(repo->path_git_dir);
 	if (repo->objcache.set)
 		got_object_idset_free(repo->objcache.set);
+	if (repo->treecache.set)
+		got_object_idset_free(repo->treecache.set);
 	free(repo);
 }

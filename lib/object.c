@@ -1121,6 +1121,12 @@ got_object_tree_open(struct got_tree_object **tree,
 {
 	const struct got_error *err = NULL;
 
+	*tree = got_repo_get_cached_tree(repo, &obj->id);
+	if (*tree != NULL) {
+		(*tree)->refcnt++;
+		return NULL;
+	}
+
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
@@ -1141,6 +1147,12 @@ got_object_tree_open(struct got_tree_object **tree,
 		err = read_tree_object_privsep(tree, obj, fd);
 		close(fd);
 	}
+
+	if (err == NULL) {
+		(*tree)->refcnt++;
+		err = got_repo_cache_tree(repo, &obj->id, *tree);
+	}
+
 	return err;
 }
 
@@ -1171,6 +1183,11 @@ void
 got_object_tree_close(struct got_tree_object *tree)
 {
 	struct got_tree_entry *te;
+
+	if (tree->refcnt > 0) {
+		tree->refcnt--;
+		return;
+	}
 
 	while (!SIMPLEQ_EMPTY(&tree->entries)) {
 		te = SIMPLEQ_FIRST(&tree->entries);
