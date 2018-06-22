@@ -173,6 +173,7 @@ got_object_idset_remove(struct got_object_idset *set,
 	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
 		if (got_object_id_cmp(&entry->id, id) == 0) {
 			TAILQ_REMOVE(&set->entries[i], entry, entry);
+			free(entry);
 			set->nelem--;
 			return NULL;
 		}
