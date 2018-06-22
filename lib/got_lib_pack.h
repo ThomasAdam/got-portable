@@ -30,13 +30,17 @@ struct got_packidx_trailer {
 	u_int8_t	packidx_sha1[SHA1_DIGEST_LENGTH];
 } __attribute__((__packed__));
 
+struct got_packidx_object_id {
+	u_int8_t sha1[SHA1_DIGEST_LENGTH];
+} __attribute__((__packed__));
+
 /* Ignore pack index version 1 which is no longer written by Git. */
 #define GOT_PACKIDX_VERSION 2
 
 struct got_packidx_v2_hdr {
-	uint32_t	magic;		/* big endian */
+	uint32_t	*magic;		/* big endian */
 #define GOT_PACKIDX_V2_MAGIC 0xff744f63	/* "\377t0c" */
-	uint32_t	version;
+	uint32_t	*version;
 
 	/* 
 	 * Each entry N in the fanout table contains the number of objects in
@@ -46,10 +50,11 @@ struct got_packidx_v2_hdr {
 	 * total number of objects in the pack file. All pointer variables
 	 * below point to tables with a corresponding number of entries.
 	 */
-	uint32_t	fanout_table[0xff + 1];	/* values are big endian */
+	uint32_t	*fanout_table;	/* values are big endian */
+#define GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS (0xff + 1)
 
 	/* Sorted SHA1 checksums for each object in the pack file. */
-	struct got_object_id *sorted_ids;
+	struct got_packidx_object_id *sorted_ids;
 
 	/* CRC32 of the packed representation of each object. */
 	uint32_t	*crc32;
@@ -62,13 +67,16 @@ struct got_packidx_v2_hdr {
 	/* Large offsets table is empty for pack files < 2 GB. */
 	uint64_t	*large_offsets;		/* values are big endian */
 
-	struct got_packidx_trailer trailer;
+	struct got_packidx_trailer *trailer;
 };
 
 /* An open pack index file. */
 struct got_packidx {
 	char *path_packidx; /* actual on-disk path */
-	struct got_packidx_v2_hdr hdr;
+	int fd;
+	uint8_t *map;
+	size_t len;
+	struct got_packidx_v2_hdr hdr; /* convenient pointers into map */
 };
 
 struct got_packfile_hdr {
@@ -137,7 +145,7 @@ struct got_packfile_obj_data {
 
 const struct got_error *got_packidx_open(struct got_packidx **,
     const char *);
-void got_packidx_close(struct got_packidx *);
+const struct got_error* got_packidx_close(struct got_packidx *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_object_id *, struct got_repository *);

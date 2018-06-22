@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/mman.h>
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -122,9 +123,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 {
 	struct got_packidx *p;
 	struct got_packidx_v2_hdr *h;
-	FILE *f;
 	const struct got_error *err = NULL;
-	size_t n, nobj, packfile_size;
+	size_t nobj, len_fanout, len_ids, offset, remain;
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 
@@ -132,141 +132,140 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 
 	SHA1Init(&ctx);
 
-	f = fopen(path, "rb");
-	if (f == NULL)
-		return got_error_from_errno();
-
-	err = get_packfile_size(&packfile_size, path);
-	if (err)
-		return err;
-
 	p = calloc(1, sizeof(*p));
 	if (p == NULL)
 		return got_error_from_errno();
-	p->path_packidx = strdup(path);
-	if (p->path_packidx == NULL) {
-		err = got_error_from_errno();
-		free(p->path_packidx);
+
+	p->fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	if (p->fd == -1)
+		return got_error_from_errno();
+
+	err = get_packfile_size(&p->len, path);
+	if (err) {
+		close(p->fd);
+		free(p);
+		return err;
+	}
+	if (p->len < sizeof(p->hdr)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		close(p->fd);
 		free(p);
 		return err;
 	}
 
+	p->path_packidx = strdup(path);
+	if (p->path_packidx == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
+	if (p->map == MAP_FAILED) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	h = &p->hdr;
-	n = fread(&h->magic, sizeof(h->magic), 1, f);
-	if (n != 1) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
-		goto done;
-	}
+	offset = 0;
+	remain = p->len;
 
-	if (betoh32(h->magic) != GOT_PACKIDX_V2_MAGIC) {
+	if (remain < sizeof(*h->magic)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-
-	SHA1Update(&ctx, (uint8_t *)&h->magic, sizeof(h->magic));
-
-	n = fread(&h->version, sizeof(h->version), 1, f);
-	if (n != 1) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
-		goto done;
-	}
-
-	if (betoh32(h->version) != GOT_PACKIDX_VERSION) {
+	h->magic = (uint32_t *)(p->map + offset);
+	if (betoh32(*h->magic) != GOT_PACKIDX_V2_MAGIC) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
+	offset += sizeof(*h->magic);
+	remain -= sizeof(*h->magic);
 
-	SHA1Update(&ctx, (uint8_t *)&h->version, sizeof(h->version));
+	SHA1Update(&ctx, (uint8_t *)h->magic, sizeof(*h->magic));
 
-	n = fread(&h->fanout_table, sizeof(h->fanout_table), 1, f);
-	if (n != 1) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
+	if (remain < sizeof(*h->version)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
+	h->version = (uint32_t *)(p->map + offset);
+	if (betoh32(*h->version) != GOT_PACKIDX_VERSION) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		goto done;
+	}
+	offset += sizeof(*h->version);
+	remain -= sizeof(*h->version);
 
+	SHA1Update(&ctx, (uint8_t *)h->version, sizeof(*h->version));
+
+	len_fanout =
+	    sizeof(*h->fanout_table) * GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS;
+	if (remain < len_fanout) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		goto done;
+	}
+	h->fanout_table = (uint32_t *)(p->map + offset);
 	err = verify_fanout_table(h->fanout_table);
 	if (err)
 		goto done;
-
-	SHA1Update(&ctx, (uint8_t *)h->fanout_table, sizeof(h->fanout_table));
+	SHA1Update(&ctx, (uint8_t *)h->fanout_table, len_fanout);
+	offset += len_fanout;
+	remain -= len_fanout;
 
 	nobj = betoh32(h->fanout_table[0xff]);
-
-	h->sorted_ids = calloc(nobj, sizeof(*h->sorted_ids));
-	if (h->sorted_ids == NULL) {
-		err = got_error_from_errno();
+	len_ids = nobj * sizeof(*h->sorted_ids);
+	if (len_ids <= nobj || len_ids > remain) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
+	h->sorted_ids =
+	    (struct got_packidx_object_id *)((uint8_t*)(p->map + offset));
+	SHA1Update(&ctx, (uint8_t *)h->sorted_ids, len_ids);
+	offset += len_ids;
+	remain -= len_ids;
 
-	n = fread(h->sorted_ids, sizeof(*h->sorted_ids), nobj, f);
-	if (n != nobj) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
+	if (remain < nobj * sizeof(*h->crc32)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-
-	SHA1Update(&ctx, (uint8_t *)h->sorted_ids,
-	    nobj * sizeof(*h->sorted_ids));
-
-	h->crc32 = calloc(nobj, sizeof(*h->crc32));
-	if (h->crc32 == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	n = fread(h->crc32, sizeof(*h->crc32), nobj, f);
-	if (n != nobj) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
-		goto done;
-	}
-
+	h->crc32 = (uint32_t *)((uint8_t*)(p->map + offset));
 	SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
+	remain -= nobj * sizeof(*h->crc32);
+	offset += nobj * sizeof(*h->crc32);
 
-	h->offsets = calloc(nobj, sizeof(*h->offsets));
-	if (h->offsets == NULL) {
-		err = got_error_from_errno();
+	if (remain < nobj * sizeof(*h->offsets)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-
-	n = fread(h->offsets, sizeof(*h->offsets), nobj, f);
-	if (n != nobj) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
-		goto done;
-	}
-
+	h->offsets = (uint32_t *)((uint8_t*)(p->map + offset));
 	SHA1Update(&ctx, (uint8_t *)h->offsets, nobj * sizeof(*h->offsets));
+	remain -= nobj * sizeof(*h->offsets);
+	offset += nobj * sizeof(*h->offsets);
 
 	/* Large file offsets are contained only in files > 2GB. */
-	if (packfile_size <= 0x80000000)
+	if (p->len <= 0x80000000)
 		goto checksum;
 
-	h->large_offsets = calloc(nobj, sizeof(*h->large_offsets));
-	if (h->large_offsets == NULL) {
-		err = got_error_from_errno();
+	if (remain < nobj * sizeof(*h->large_offsets)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-
-	n = fread(h->large_offsets, sizeof(*h->large_offsets), nobj, f);
-	if (n != nobj) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
-		goto done;
-	}
-
+	h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
 	SHA1Update(&ctx, (uint8_t*)h->large_offsets,
 	    nobj * sizeof(*h->large_offsets));
+	remain -= nobj * sizeof(*h->large_offsets);
+	offset += nobj * sizeof(*h->large_offsets);
 
 checksum:
-	n = fread(&h->trailer, sizeof(h->trailer), 1, f);
-	if (n != 1) {
-		err = got_ferror(f, GOT_ERR_BAD_PACKIDX);
+	if (remain < sizeof(*h->trailer)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-
-	SHA1Update(&ctx, h->trailer.packfile_sha1, SHA1_DIGEST_LENGTH);
+	h->trailer =
+	    (struct got_packidx_trailer *)((uint8_t*)(p->map + offset));
+	SHA1Update(&ctx, h->trailer->packfile_sha1, SHA1_DIGEST_LENGTH);
 	SHA1Final(sha1, &ctx);
-	if (memcmp(h->trailer.packidx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
+	if (memcmp(h->trailer->packidx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
 		err = got_error(GOT_ERR_PACKIDX_CSUM);
 done:
-	fclose(f);
 	if (err)
 		got_packidx_close(p);
 	else
@@ -274,15 +273,20 @@ done:
 	return err;
 }
 
-void
+const struct got_error *
 got_packidx_close(struct got_packidx *packidx)
 {
-	free(packidx->hdr.sorted_ids);
-	free(packidx->hdr.offsets);
-	free(packidx->hdr.crc32);
-	free(packidx->hdr.large_offsets);
+	const struct got_error *err = NULL;
+
 	free(packidx->path_packidx);
+	if (packidx->map != NULL && packidx->map != MAP_FAILED) {
+		if (munmap(packidx->map, packidx->len) == -1)
+			err = got_error_from_errno();
+	}
+	close(packidx->fd);
 	free(packidx);
+
+	return err;
 }
 
 static int
@@ -330,12 +334,12 @@ get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
 		left = betoh32(packidx->hdr.fanout_table[id0 - 1]);
 
 	while (left <= right) {
-		struct got_object_id *oid;
+		struct got_packidx_object_id *oid;
 		int i, cmp;
 
 		i = ((left + right) / 2);
 		oid = &packidx->hdr.sorted_ids[i];
-		cmp = got_object_id_cmp(id, oid);
+		cmp = memcmp(id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
 		if (cmp == 0)
 			return i;
 		else if (cmp > 0)
@@ -347,9 +351,10 @@ get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
 	return -1;
 }
 
-static void
+static const struct got_error *
 cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
 {
+	const struct got_error *err = NULL;
 	int i;
 
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
@@ -358,7 +363,9 @@ cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
 	}
 
 	if (i == nitems(repo->packidx_cache)) {
-		got_packidx_close(repo->packidx_cache[i - 1]);
+		err = got_packidx_close(repo->packidx_cache[i - 1]);
+		if (err)
+			return err;
 		memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
 		    sizeof(repo->packidx_cache) -
 		    sizeof(repo->packidx_cache[0]));
@@ -366,6 +373,7 @@ cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
 	}
 
 	repo->packidx_cache[i] = packidx;
+	return NULL;
 }
 
 static const struct got_error *
@@ -419,12 +427,14 @@ search_packidx(struct got_packidx **packidx, int *idx,
 		*idx = get_object_idx(*packidx, id, repo);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
-			cache_packidx(*packidx, repo);
+			err = cache_packidx(*packidx, repo);
 			goto done;
 		}
 
-		got_packidx_close(*packidx);
+		err = got_packidx_close(*packidx);
 		*packidx = NULL;
+		if (err)
+			goto done;
 	}
 
 	err = got_error(GOT_ERR_NO_OBJ);
