@@ -154,8 +154,10 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 {
 	const struct got_error *err = NULL;
 	struct got_object_cache_entry *ce;
+	int nelem;
 
-	if (cache->ncached >= GOT_OBJECT_CACHE_SIZE) {
+	nelem = got_object_idset_num_elements(cache->set);
+	if (nelem >= GOT_OBJECT_CACHE_SIZE) {
 		err = got_object_idset_remove_random((void **)&ce,
 		    cache->set);
 		if (err)
@@ -169,7 +171,6 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 			break;
 		}
 		free(ce);
-		cache->ncached--;
 	}
 
 	ce = calloc(1, sizeof(*ce));
@@ -190,8 +191,7 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 			free(ce);
 			err = NULL;
 		}
-	} else
-		cache->ncached++;
+	}
 
 	return err;
 }
