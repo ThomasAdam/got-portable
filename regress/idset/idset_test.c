@@ -167,7 +167,7 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_remove(set, &id2);
+	err = got_object_idset_remove(NULL, set, &id2);
 	if (err)
 		goto done;
 	if (got_object_idset_num_elements(set) != 2) {

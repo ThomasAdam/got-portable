@@ -35,7 +35,7 @@ struct got_repository {
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
-	SIMPLEQ_HEAD(, got_objcache_entry) objcache;
+	struct got_object_idset *objcache;
 	int ncached;
 	int cache_hit;
 	int cache_miss;

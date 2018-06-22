@@ -37,6 +37,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"
 #include "got_lib_worktree.h"
+#include "got_lib_object_idset.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -148,15 +149,18 @@ done:
 
 }
 
-const struct got_error*
+const struct got_error *
 got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
     struct got_object *obj)
 {
+	const struct got_error *err = NULL;
 	struct got_objcache_entry *ce;
 
 	if (repo->ncached >= GOT_OBJECT_CACHE_SIZE) {
-		ce = SIMPLEQ_FIRST(&repo->objcache);
-		SIMPLEQ_REMOVE_HEAD(&repo->objcache, entry);
+		err = got_object_idset_remove_random((void **)&ce,
+		    repo->objcache);
+		if (err)
+			return err;
 		got_object_close(ce->obj);
 		free(ce);
 		repo->ncached--;
@@ -167,10 +171,18 @@ got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
 		return got_error_from_errno();
 	memcpy(&ce->id, id, sizeof(ce->id));
 	ce->obj = obj;
-	obj->refcnt++;
-	SIMPLEQ_INSERT_HEAD(&repo->objcache, ce, entry);
-	repo->ncached++;
-	return NULL;
+	err = got_object_idset_add(NULL, repo->objcache, id, ce);
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS) {
+			free(ce);
+			err = NULL;
+		}
+	} else {
+		obj->refcnt++;
+		repo->ncached++;
+	}
+
+	return err;
 }
 
 struct got_object *
@@ -179,9 +191,8 @@ got_repo_get_cached_object(struct got_repository *repo,
 {
 	struct got_objcache_entry *ce;
 
-	SIMPLEQ_FOREACH(ce, &repo->objcache, entry) {
-		if (got_object_id_cmp(&ce->id, id) != 0)
-			continue;
+	ce = got_object_idset_get(repo->objcache, id);
+	if (ce) {
 		repo->cache_hit++;
 		return ce->obj;
 	}
@@ -205,6 +216,12 @@ got_repo_open(struct got_repository **ret, const char *path)
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	repo->objcache = got_object_idset_alloc();
+	if (repo->objcache == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -280,15 +297,9 @@ got_repo_close(struct got_repository *repo)
 		got_pack_close(&repo->packs[i]);
 	}
 
-	while (!SIMPLEQ_EMPTY(&repo->objcache)) {
-		struct got_objcache_entry *ce;
-		ce = SIMPLEQ_FIRST(&repo->objcache);
-		SIMPLEQ_REMOVE_HEAD(&repo->objcache, entry);
-		got_object_close(ce->obj);
-		free(ce);
-	}
-
 	free(repo->path);
 	free(repo->path_git_dir);
+	if (repo->objcache)
+		got_object_idset_free(repo->objcache);
 	free(repo);
 }
