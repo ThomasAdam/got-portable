@@ -347,67 +347,6 @@ get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
 	return -1;
 }
 
-static struct got_packidx *
-dup_packidx(struct got_packidx *packidx)
-{
-	struct got_packidx *p;
-	size_t nobj;
-
-	p = calloc(1, sizeof(*p));
-	if (p == NULL)
-		return NULL;
-
-	p->path_packidx = strdup(packidx->path_packidx);
-	if (p->path_packidx == NULL) {
-		free(p);
-		return NULL;
-	}
-	memcpy(&p->hdr, &packidx->hdr, sizeof(p->hdr));
-	p->hdr.sorted_ids = NULL;
-	p->hdr.crc32 = NULL;
-	p->hdr.offsets = NULL;
-	p->hdr.large_offsets = NULL;
-
-	nobj = betoh32(p->hdr.fanout_table[0xff]);
-
-	p->hdr.sorted_ids = calloc(nobj, sizeof(*p->hdr.sorted_ids));
-	if (p->hdr.sorted_ids == NULL)
-		goto err;
-	memcpy(p->hdr.sorted_ids, packidx->hdr.sorted_ids,
-	    nobj * sizeof(*p->hdr.sorted_ids));
-
-	p->hdr.crc32 = calloc(nobj, sizeof(*p->hdr.crc32));
-	if (p->hdr.crc32 == NULL)
-		goto err;
-	memcpy(p->hdr.crc32, packidx->hdr.crc32, nobj * sizeof(*p->hdr.crc32));
-
-	p->hdr.offsets = calloc(nobj, sizeof(*p->hdr.offsets));
-	if (p->hdr.offsets == NULL)
-		goto err;
-	memcpy(p->hdr.offsets, packidx->hdr.offsets,
-	    nobj * sizeof(*p->hdr.offsets));
-
-	if (p->hdr.large_offsets) {
-		p->hdr.large_offsets = calloc(nobj,
-		    sizeof(*p->hdr.large_offsets));
-		if (p->hdr.large_offsets == NULL)
-			goto err;
-		memcpy(p->hdr.large_offsets, packidx->hdr.large_offsets,
-		    nobj * sizeof(*p->hdr.large_offsets));
-	}
-
-	return p;
-
-err:
-	free(p->hdr.large_offsets);
-	free(p->hdr.offsets);
-	free(p->hdr.crc32);
-	free(p->hdr.sorted_ids);
-	free(p->path_packidx);
-	free(p);
-	return NULL;
-}
-
 static void
 cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
 {
@@ -426,7 +365,7 @@ cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
 		i = 0;
 	}
 
-	repo->packidx_cache[i] = dup_packidx(packidx);
+	repo->packidx_cache[i] = packidx;
 }
 
 static const struct got_error *
