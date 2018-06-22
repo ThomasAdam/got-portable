@@ -49,7 +49,8 @@ struct got_object_idset {
 	 * which of these lists an object ID is stored in.
 	 */
 	TAILQ_HEAD(, got_object_idset_element) entries[0xff + 1];
-	int nelem;
+	int nelem[0xff + 1];
+	int totelem;
 #define GOT_OBJECT_IDSET_MAX_ELEM INT_MAX
 };
 
@@ -96,7 +97,7 @@ got_object_idset_add(void **existing_data,
 	if (existing_data)
 		*existing_data = NULL;
 
-	if (set->nelem >= GOT_OBJECT_IDSET_MAX_ELEM)
+	if (set->totelem >= GOT_OBJECT_IDSET_MAX_ELEM)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	new = calloc(1, sizeof(*new));
@@ -108,7 +109,8 @@ got_object_idset_add(void **existing_data,
 
 	if (TAILQ_EMPTY(&set->entries[i])) {
 		TAILQ_INSERT_HEAD(&set->entries[i], new, entry);
-		set->nelem++;
+		set->nelem[i]++;
+		set->totelem++;
 		return NULL;
 	}
 
@@ -127,18 +129,21 @@ got_object_idset_add(void **existing_data,
 			return got_error(GOT_ERR_OBJ_EXISTS);
 		} else if (cmp < 0) {
 			TAILQ_INSERT_BEFORE(entry, new, entry);
-			set->nelem++;
+			set->nelem[i]++;
+			set->totelem++;
 			return NULL;
 		}
 
 		next = TAILQ_NEXT(entry, entry);
 		if (next == NULL) {
 			TAILQ_INSERT_AFTER(&set->entries[i], entry, new, entry);
-			set->nelem++;
+			set->nelem[i]++;
+			set->totelem++;
 			return NULL;
 		} else if (got_object_id_cmp(&new->id, &next->id) > 0) {
 			TAILQ_INSERT_BEFORE(next, new, entry);
-			set->nelem++;
+			set->nelem[i]++;
+			set->totelem++;
 			return NULL;
 		}
 	}
@@ -170,7 +175,7 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 	if (data)
 		*data = NULL;
 
-	if (set->nelem == 0)
+	if (set->nelem[i] == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
 	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
@@ -179,7 +184,8 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 			if (data)
 				*data = entry->data;
 			free(entry);
-			set->nelem--;
+			set->nelem[i]--;
+			set->totelem--;
 			return NULL;
 		}
 	}
@@ -191,26 +197,36 @@ const struct got_error *
 got_object_idset_remove_random(void **data, struct got_object_idset *set)
 {
 	struct got_object_idset_element *entry, *tmp;
-	int i, n;
+	int i, n, totelem;
 
 	if (data)
 		*data = NULL;
 
-	if (set->nelem == 0)
+	if (set->totelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	if (set->nelem == 1)
+	/* Pick a random element index across all lists. */
+	if (set->totelem == 1)
 		n = 0;
 	else
-		n = arc4random_uniform(set->nelem);
+		n = arc4random_uniform(set->totelem);
+
+	totelem = 0;
 	for (i = 0; i < nitems(set->entries); i++) {
+		/* Skip lists which don't contain the element we picked. */
+		totelem += set->nelem[i];
+		if (totelem == 0 || n > totelem - 1) {
+			n -= set->nelem[i];
+			continue;
+		}
 		TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
 			if (n == 0) {
 				TAILQ_REMOVE(&set->entries[i], entry, entry);
 				if (data)
 					*data = entry->data;
 				free(entry);
-				set->nelem--;
+				set->nelem[i]--;
+				set->totelem--;
 				return NULL;
 			}
 			n--;
@@ -250,5 +266,5 @@ void got_object_idset_for_each(struct got_object_idset *set,
 int
 got_object_idset_num_elements(struct got_object_idset *set)
 {
-	return set->nelem;
+	return set->totelem;
 }
