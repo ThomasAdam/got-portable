@@ -154,16 +154,16 @@ got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
     struct got_object *obj)
 {
 	const struct got_error *err = NULL;
-	struct got_objcache_entry *ce;
+	struct got_object_cache_entry *ce;
 
-	if (repo->ncached >= GOT_OBJECT_CACHE_SIZE) {
+	if (repo->objcache.ncached >= GOT_OBJECT_CACHE_SIZE) {
 		err = got_object_idset_remove_random((void **)&ce,
-		    repo->objcache);
+		    repo->objcache.set);
 		if (err)
 			return err;
 		got_object_close(ce->obj);
 		free(ce);
-		repo->ncached--;
+		repo->objcache.ncached--;
 	}
 
 	ce = calloc(1, sizeof(*ce));
@@ -171,7 +171,7 @@ got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
 		return got_error_from_errno();
 	memcpy(&ce->id, id, sizeof(ce->id));
 	ce->obj = obj;
-	err = got_object_idset_add(NULL, repo->objcache, id, ce);
+	err = got_object_idset_add(NULL, repo->objcache.set, id, ce);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_EXISTS) {
 			free(ce);
@@ -179,7 +179,7 @@ got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
 		}
 	} else {
 		obj->refcnt++;
-		repo->ncached++;
+		repo->objcache.ncached++;
 	}
 
 	return err;
@@ -189,14 +189,14 @@ struct got_object *
 got_repo_get_cached_object(struct got_repository *repo,
     struct got_object_id *id)
 {
-	struct got_objcache_entry *ce;
+	struct got_object_cache_entry *ce;
 
-	ce = got_object_idset_get(repo->objcache, id);
+	ce = got_object_idset_get(repo->objcache.set, id);
 	if (ce) {
-		repo->cache_hit++;
+		repo->objcache.cache_hit++;
 		return ce->obj;
 	}
-	repo->cache_miss++;
+	repo->objcache.cache_miss++;
 	return NULL;
 }
 
@@ -220,8 +220,8 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 
-	repo->objcache = got_object_idset_alloc();
-	if (repo->objcache == NULL) {
+	repo->objcache.set = got_object_idset_alloc();
+	if (repo->objcache.set == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -299,7 +299,7 @@ got_repo_close(struct got_repository *repo)
 
 	free(repo->path);
 	free(repo->path_git_dir);
-	if (repo->objcache)
-		got_object_idset_free(repo->objcache);
+	if (repo->objcache.set)
+		got_object_idset_free(repo->objcache.set);
 	free(repo);
 }

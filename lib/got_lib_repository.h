@@ -19,9 +19,16 @@
 
 #define GOT_OBJECT_CACHE_SIZE	8192
 
-struct got_objcache_entry {
+struct got_object_cache_entry {
 	struct got_object_id id;
 	struct got_object *obj;
+};
+
+struct got_object_cache {
+	struct got_object_idset *set;
+	int ncached;
+	int cache_hit;
+	int cache_miss;
 };
 
 struct got_repository {
@@ -34,10 +41,7 @@ struct got_repository {
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
-	struct got_object_idset *objcache;
-	int ncached;
-	int cache_hit;
-	int cache_miss;
+	struct got_object_cache objcache;
 };
 
 const struct got_error*
