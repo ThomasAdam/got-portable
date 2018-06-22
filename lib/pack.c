@@ -1125,7 +1125,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 				err = got_error(GOT_ERR_PACK_OFFSET);
 				goto done;
 			}
-			if (lseek(pack->fd, delta_data_offset, SEEK_SET) == -1) {
+			if (lseek(pack->fd, delta_data_offset, SEEK_SET)
+			    == -1) {
 				err = got_error_from_errno();
 				goto done;
 			}
@@ -1252,7 +1253,8 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				err = got_error(GOT_ERR_PACK_OFFSET);
 				goto done;
 			}
-			if (lseek(pack->fd, delta_data_offset, SEEK_SET) == -1) {
+			if (lseek(pack->fd, delta_data_offset, SEEK_SET)
+			    == -1) {
 				err = got_error_from_errno();
 				goto done;
 			}
