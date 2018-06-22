@@ -48,6 +48,8 @@ struct got_commit_object {
 	char *committer;
 	struct tm tm_committer;	/* UTC */
 	char *logmsg;
+
+	int refcnt; /* for internal use only */
 };
 
 /* A generic object. Used as a handle which holds an ID and an object type. */

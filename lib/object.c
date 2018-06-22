@@ -971,6 +971,12 @@ got_object_commit_open(struct got_commit_object **commit,
 {
 	const struct got_error *err = NULL;
 
+	*commit = got_repo_get_cached_commit(repo, &obj->id);
+	if (*commit != NULL) {
+		(*commit)->refcnt++;
+		return NULL;
+	}
+
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
@@ -991,6 +997,12 @@ got_object_commit_open(struct got_commit_object **commit,
 		err = read_commit_object_privsep(commit, repo, obj, fd);
 		close(fd);
 	}
+
+	if (err == NULL) {
+		(*commit)->refcnt++;
+		err = got_repo_cache_commit(repo, &obj->id, *commit);
+	}
+
 	return err;
 }
 
@@ -998,6 +1010,11 @@ void
 got_object_commit_close(struct got_commit_object *commit)
 {
 	struct got_object_qid *qid;
+
+	if (commit->refcnt > 0) {
+		commit->refcnt--;
+		return;
+	}
 
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);

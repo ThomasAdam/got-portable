@@ -169,6 +169,9 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 		case GOT_OBJECT_CACHE_TYPE_TREE:
 			got_object_tree_close(ce->data.tree);
 			break;
+		case GOT_OBJECT_CACHE_TYPE_COMMIT:
+			got_object_commit_close(ce->data.commit);
+			break;
 		}
 		free(ce);
 	}
@@ -183,6 +186,9 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TREE:
 		ce->data.tree = (struct got_tree_object *)item;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_COMMIT:
+		ce->data.commit = (struct got_commit_object *)item;
 		break;
 	}
 	err = got_object_idset_add(NULL, cache->set, id, ce);
@@ -256,6 +262,35 @@ got_repo_get_cached_tree(struct got_repository *repo,
 	return NULL;
 }
 
+const struct got_error *
+got_repo_cache_commit(struct got_repository *repo, struct got_object_id *id,
+    struct got_commit_object *commit)
+{
+	const struct got_error *err = NULL;
+
+	err = cache_add(&repo->commitcache, id, commit);
+	if (err)
+		return err;
+
+	commit->refcnt++;
+	return NULL;
+}
+
+struct got_commit_object *
+got_repo_get_cached_commit(struct got_repository *repo,
+    struct got_object_id *id)
+{
+	struct got_object_cache_entry *ce;
+
+	ce = got_object_idset_get(repo->commitcache.set, id);
+	if (ce) {
+		repo->commitcache.cache_hit++;
+		return ce->data.commit;
+	}
+
+	repo->commitcache.cache_miss++;
+	return NULL;
+}
 
 const struct got_error *
 got_repo_open(struct got_repository **ret, const char *path)
@@ -290,6 +325,13 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
+
+	repo->commitcache.set = got_object_idset_alloc();
+	if (repo->commitcache.set == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	repo->commitcache.type = GOT_OBJECT_CACHE_TYPE_COMMIT;
 
 	repo->path = got_path_normalize(abspath);
 	if (repo->path == NULL) {
@@ -345,6 +387,16 @@ done:
 	return err;
 }
 
+static void
+print_cache_stats(struct got_object_cache *cache, const char *name)
+{
+#if 0
+	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed\n",
+	    name, got_object_idset_num_elements(cache->set), cache->cache_hit,
+	    cache->cache_miss);
+#endif
+}
+
 void
 got_repo_close(struct got_repository *repo)
 {
@@ -364,9 +416,14 @@ got_repo_close(struct got_repository *repo)
 
 	free(repo->path);
 	free(repo->path_git_dir);
+	print_cache_stats(&repo->objcache, "object");
+	print_cache_stats(&repo->treecache, "tree");
+	print_cache_stats(&repo->commitcache, "commit");
 	if (repo->objcache.set)
 		got_object_idset_free(repo->objcache.set);
 	if (repo->treecache.set)
 		got_object_idset_free(repo->treecache.set);
+	if (repo->commitcache.set)
+		got_object_idset_free(repo->commitcache.set);
 	free(repo);
 }

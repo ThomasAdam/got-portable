@@ -21,7 +21,8 @@
 
 enum got_object_chache_type {
 	GOT_OBJECT_CACHE_TYPE_OBJ,
-	GOT_OBJECT_CACHE_TYPE_TREE
+	GOT_OBJECT_CACHE_TYPE_TREE,
+	GOT_OBJECT_CACHE_TYPE_COMMIT,
 };
 
 struct got_object_cache_entry {
@@ -29,6 +30,7 @@ struct got_object_cache_entry {
 	union {
 		struct got_object *obj;
 		struct got_tree_object *tree;
+		struct got_commit_object *commit;
 	} data;
 };
 
@@ -52,6 +54,7 @@ struct got_repository {
 	/* Caches for opened objects. */
 	struct got_object_cache objcache;
 	struct got_object_cache treecache;
+	struct got_object_cache commitcache;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,
@@ -61,4 +64,8 @@ struct got_object *got_repo_get_cached_object(struct got_repository *,
 const struct got_error*got_repo_cache_tree(struct got_repository *,
     struct got_object_id *, struct got_tree_object *);
 struct got_tree_object *got_repo_get_cached_tree(struct got_repository *,
+    struct got_object_id *);
+const struct got_error*got_repo_cache_commit(struct got_repository *,
+    struct got_object_id *, struct got_commit_object *);
+struct got_commit_object *got_repo_get_cached_commit(struct got_repository *,
     struct got_object_id *);
