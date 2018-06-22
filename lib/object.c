@@ -423,7 +423,8 @@ got_object_close(struct got_object *obj)
 {
 	if (obj->refcnt > 0) {
 		obj->refcnt--;
-		return;
+		if (obj->refcnt > 0)
+			return;
 	}
 
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
@@ -1013,7 +1014,8 @@ got_object_commit_close(struct got_commit_object *commit)
 
 	if (commit->refcnt > 0) {
 		commit->refcnt--;
-		return;
+		if (commit->refcnt > 0)
+			return;
 	}
 
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
@@ -1203,7 +1205,8 @@ got_object_tree_close(struct got_tree_object *tree)
 
 	if (tree->refcnt > 0) {
 		tree->refcnt--;
-		return;
+		if (tree->refcnt > 0)
+			return;
 	}
 
 	while (!SIMPLEQ_EMPTY(&tree->entries)) {
