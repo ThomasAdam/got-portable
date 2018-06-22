@@ -157,7 +157,7 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 	int nelem;
 
 	nelem = got_object_idset_num_elements(cache->set);
-	if (nelem >= GOT_OBJECT_CACHE_SIZE) {
+	if (nelem >= cache->size) {
 		err = got_object_idset_remove_random((void **)&ce,
 		    cache->set);
 		if (err)
@@ -318,6 +318,7 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
+	repo->objcache.size = GOT_OBJECT_CACHE_SIZE_OBJ;
 
 	repo->treecache.set = got_object_idset_alloc();
 	if (repo->treecache.set == NULL) {
@@ -325,6 +326,7 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
+	repo->treecache.size = GOT_OBJECT_CACHE_SIZE_TREE;
 
 	repo->commitcache.set = got_object_idset_alloc();
 	if (repo->commitcache.set == NULL) {
@@ -332,6 +334,7 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 	repo->commitcache.type = GOT_OBJECT_CACHE_TYPE_COMMIT;
+	repo->commitcache.size = GOT_OBJECT_CACHE_SIZE_COMMIT;
 
 	repo->path = got_path_normalize(abspath);
 	if (repo->path == NULL) {

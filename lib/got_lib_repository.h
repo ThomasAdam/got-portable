@@ -17,7 +17,9 @@
 #define GOT_PACKIDX_CACHE_SIZE	64
 #define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
-#define GOT_OBJECT_CACHE_SIZE	8192
+#define GOT_OBJECT_CACHE_SIZE_OBJ	8192
+#define GOT_OBJECT_CACHE_SIZE_TREE	4096
+#define GOT_OBJECT_CACHE_SIZE_COMMIT	2048
 
 enum got_object_chache_type {
 	GOT_OBJECT_CACHE_TYPE_OBJ,
@@ -37,6 +39,7 @@ struct got_object_cache_entry {
 struct got_object_cache {
 	enum got_object_chache_type type;
 	struct got_object_idset *set;
+	size_t size;
 	int cache_hit;
 	int cache_miss;
 };
