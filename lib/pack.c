@@ -324,18 +324,24 @@ get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
 {
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
-	int i = 0;
+	int left = 0, right = totobj - 1;
 
 	if (id0 > 0)
-		i = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+		left = betoh32(packidx->hdr.fanout_table[id0 - 1]);
 
-	while (i < totobj) {
-		struct got_object_id *oid = &packidx->hdr.sorted_ids[i];
-		int cmp = got_object_id_cmp(id, oid);
+	while (left <= right) {
+		struct got_object_id *oid;
+		int i, cmp;
 
+		i = ((left + right) / 2);
+		oid = &packidx->hdr.sorted_ids[i];
+		cmp = got_object_id_cmp(id, oid);
 		if (cmp == 0)
 			return i;
-		i++;
+		else if (cmp > 0)
+			left = i + 1;
+		else if (cmp < 0)
+			right = i - 1;
 	}
 
 	return -1;
