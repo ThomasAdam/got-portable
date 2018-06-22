@@ -167,6 +167,9 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 	struct got_object_idset_element *entry, *tmp;
 	uint8_t i = id->sha1[0];
 
+	if (data)
+		*data = NULL;
+
 	if (set->nelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
