@@ -184,7 +184,7 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 }
 
 static const struct got_error *
-read_object_header(struct got_object **obj, FILE *f)
+read_object_header(struct got_object **obj, int fd)
 {
 	const struct got_error *err;
 	struct got_zstream_buf zb;
@@ -204,7 +204,7 @@ read_object_header(struct got_object **obj, FILE *f)
 	i = 0;
 	totlen = 0;
 	do {
-		err = got_inflate_read(&zb, f, &outlen);
+		err = got_inflate_read_fd(&zb, fd, &outlen);
 		if (err)
 			goto done;
 		if (strchr(zb.outbuf, '\0') == NULL) {
@@ -231,7 +231,6 @@ read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
 	struct imsgbuf ibuf;
-	FILE *f = NULL;
 	int status = 0;
 
 	setproctitle("read object header");
@@ -244,14 +243,7 @@ read_object_header_privsep_child(int obj_fd, int imsg_fds[2])
 		goto done;
 	}
 
-	f = fdopen(obj_fd, "rb");
-	if (f == NULL) {
-		err = got_error_from_errno();
-		close(obj_fd);
-		goto done;
-	}
-
-	err = read_object_header(&obj, f);
+	err = read_object_header(&obj, obj_fd);
 	if (err)
 		goto done;
 
@@ -263,8 +255,7 @@ done:
 		got_privsep_send_error(&ibuf, err);
 		status = 1;
 	}
-	if (f)
-		fclose(f);
+	close(obj_fd);
 	imsg_clear(&ibuf);
 	close(imsg_fds[1]);
 	_exit(status);
