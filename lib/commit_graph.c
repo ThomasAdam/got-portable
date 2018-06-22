@@ -230,7 +230,7 @@ advance_open_branches(struct got_commit_graph *graph,
 	const struct got_error *err;
 	struct got_object_qid *qid;
 
-	err = got_object_idset_remove(graph->open_branches, commit_id);
+	err = got_object_idset_remove(NULL, graph->open_branches, commit_id);
 	if (err && err->code != GOT_ERR_NO_OBJ)
 		return err;
 

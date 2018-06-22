@@ -161,7 +161,7 @@ got_object_idset_get(struct got_object_idset *set, struct got_object_id *id)
 }
 
 const struct got_error *
-got_object_idset_remove(struct got_object_idset *set,
+got_object_idset_remove(void **data, struct got_object_idset *set,
     struct got_object_id *id)
 {
 	struct got_object_idset_element *entry, *tmp;
@@ -173,6 +173,8 @@ got_object_idset_remove(struct got_object_idset *set,
 	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
 		if (got_object_id_cmp(&entry->id, id) == 0) {
 			TAILQ_REMOVE(&set->entries[i], entry, entry);
+			if (data)
+				*data = entry->data;
 			free(entry);
 			set->nelem--;
 			return NULL;
