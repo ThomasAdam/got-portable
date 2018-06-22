@@ -199,10 +199,13 @@ got_object_idset_remove_random(void **data, struct got_object_idset *set)
 	if (set->nelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	n = arc4random_uniform(set->nelem);
+	if (set->nelem == 1)
+		n = 0;
+	else
+		n = arc4random_uniform(set->nelem);
 	for (i = 0; i < nitems(set->entries); i++) {
 		TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
-			if (--n == 0) {
+			if (n == 0) {
 				TAILQ_REMOVE(&set->entries[i], entry, entry);
 				if (data)
 					*data = entry->data;
@@ -210,8 +213,8 @@ got_object_idset_remove_random(void **data, struct got_object_idset *set)
 				set->nelem--;
 				return NULL;
 			}
+			n--;
 		}
-
 	}
 
 	return got_error(GOT_ERR_NO_OBJ);
