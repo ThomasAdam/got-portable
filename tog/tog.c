@@ -569,6 +569,21 @@ done:
 }
 
 static const struct got_error *
+browse_commit(struct commit_queue_entry *entry, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree;
+
+	err = got_object_open_as_tree(&tree, repo, entry->commit->tree_id);
+	if (err)
+		return err;
+
+	err = show_tree_view(tree, entry->id, repo);
+	got_object_tree_close(tree);
+	return err;
+}
+
+static const struct got_error *
 show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -706,6 +721,12 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case KEY_ENTER:
 			case '\r':
 				err = show_commit(selected_entry, repo);
+				if (err)
+					goto done;
+				show_panel(tog_log_view.panel);
+				break;
+			case 't':
+				err = browse_commit(selected_entry, repo);
 				if (err)
 					goto done;
 				show_panel(tog_log_view.panel);
