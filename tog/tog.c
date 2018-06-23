@@ -1356,6 +1356,7 @@ static const struct got_error *
 blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
+	const struct got_error *err = NULL;
 	struct tog_parent_tree *pt;
 	char *path;
 	size_t len = 2; /* for leading slash and NUL */
@@ -1370,16 +1371,25 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 	path[0] = '/';
 	pt = TAILQ_LAST(parents, tog_parent_trees);
 	while (pt) {
-		if (strlcat(path, pt->selected_entry->name, len) >= len)
-			return got_error(GOT_ERR_NO_SPACE);
-		if (strlcat(path, "/", len) >= len)
-			return got_error(GOT_ERR_NO_SPACE);
+		if (strlcat(path, pt->selected_entry->name, len) >= len) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+		if (strlcat(path, "/", len) >= len) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
 		pt = TAILQ_PREV(pt, tog_parent_trees, entry);
 	}
-	if (strlcat(path, te->name, len) >= len)
-		return got_error(GOT_ERR_NO_SPACE);
+	if (strlcat(path, te->name, len) >= len) {
+		err = got_error(GOT_ERR_NO_SPACE);
+		goto done;
+	}
 
-	return show_blame_view(path, commit_id, repo);
+	err = show_blame_view(path, commit_id, repo);
+done:
+	free(path);
+	return err;
 }
 
 static const struct got_error *
