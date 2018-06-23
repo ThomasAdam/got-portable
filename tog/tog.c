@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/stat.h>
 
 #include <errno.h>
 #define _XOPEN_SOURCE_EXTENDED
@@ -62,10 +63,12 @@ __dead static void	usage(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
+__dead static void	usage_tree(void);
 
 static const struct got_error*	cmd_log(int, char *[]);
 static const struct got_error*	cmd_diff(int, char *[]);
 static const struct got_error*	cmd_blame(int, char *[]);
+static const struct got_error*	cmd_tree(int, char *[]);
 
 static struct tog_cmd tog_commands[] = {
 	{ "log",	cmd_log,	usage_log,
@@ -74,12 +77,14 @@ static struct tog_cmd tog_commands[] = {
 	    "compare files and directories" },
 	{ "blame",	cmd_blame,	usage_blame,
 	    "show line-by-line file history" },
+	{ "tree",	cmd_tree,	usage_tree,
+	    "browse trees in repository" },
 };
 
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_log_view, tog_diff_view, tog_blame_view;
+} tog_log_view, tog_diff_view, tog_blame_view, tog_tree_view;
 
 static const struct got_error *
 show_diff_view(struct got_object *, struct got_object *,
@@ -88,6 +93,9 @@ static const struct got_error *
 show_log_view(struct got_object_id *, struct got_repository *);
 static const struct got_error *
 show_blame_view(const char *, struct got_object_id *, struct got_repository *);
+static const struct got_error *
+show_tree_view(struct got_tree_object *, struct got_object_id *,
+    struct got_repository *);
 
 __dead static void
 usage_log(void)
@@ -143,7 +151,7 @@ done:
 
 /* Format a line for display, ensuring that it won't overflow a width limit. */
 static const struct got_error *
-format_line(wchar_t **wlinep, int *widthp, char *line, int wlimit)
+format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 {
 	const struct got_error *err = NULL;
 	int cols = 0;
@@ -1179,6 +1187,436 @@ done:
 	return error;
 }
 
+static const struct got_error *
+draw_tree_entries(struct got_tree_entry **first_displayed_entry,
+    struct got_tree_entry **last_displayed_entry,
+    struct got_tree_entry **selected_entry, int *ndisplayed,
+    WINDOW *window, const char *label, const struct got_tree_entries *entries,
+    int selected, int limit, int isroot)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_entry *te;
+	char *line;
+	wchar_t *wline;
+	int width, n;
+
+	*ndisplayed = 0;
+
+	werase(window);
+
+	if (limit == 0)
+		return NULL;
+
+	err = format_line(&wline, &width, label, COLS);
+	if (err)
+		return err;
+	waddwstr(window, wline);
+	if (width < COLS)
+		waddch(window, '\n');
+	if (--limit <= 0)
+		return NULL;
+	waddch(window, '\n');
+	if (--limit <= 0)
+		return NULL;
+
+	te = SIMPLEQ_FIRST(&entries->head);
+	if (*first_displayed_entry == NULL) {
+		assert(!isroot);
+		if (selected == 0) {
+			wstandout(window);
+			*selected_entry = NULL;
+		}
+		waddstr(window, "  ..\n");	/* parent directory */
+		if (selected == 0)
+			wstandend(window);
+		(*ndisplayed)++;
+		if (--limit <= 0)
+			return NULL;
+		n = 1;
+	} else {
+		n = 0;
+		while (te != *first_displayed_entry)
+			te = SIMPLEQ_NEXT(te, entry);
+	}
+
+	while (te) {
+		if (asprintf(&line, "  %s%s",
+		    te->name, S_ISDIR(te->mode) ? "/" : "") == -1)
+			return got_error_from_errno();
+		err = format_line(&wline, &width, line, COLS);
+		if (err) {
+			free(line);
+			break;
+		}
+		if (n == selected) {
+			wstandout(window);
+			*selected_entry = te;
+		}
+		waddwstr(window, wline);
+		if (width < COLS)
+			waddch(window, '\n');
+		if (n == selected)
+			wstandend(window);
+		free(line);
+		n++;
+		(*ndisplayed)++;
+		*last_displayed_entry = te;
+		if (--limit <= 0)
+			break;
+		te = SIMPLEQ_NEXT(te, entry);
+	}
+
+	return err;
+}
+
+static void
+tree_scroll_up(struct got_tree_entry **first_displayed_entry, int maxscroll,
+    const struct got_tree_entries *entries, int isroot)
+{
+	struct got_tree_entry *te, *prev;
+	int i;
+
+	if (*first_displayed_entry == NULL)
+		return;
+
+	te = SIMPLEQ_FIRST(&entries->head);
+	if (*first_displayed_entry == te) {
+		if (!isroot)
+			*first_displayed_entry = NULL;
+		return;
+	}
+
+	/* XXX this is stupid... switch to TAILQ? */
+	for (i = 0; i < maxscroll; i++) {
+		while (te != *first_displayed_entry) {
+			prev = te;
+			te = SIMPLEQ_NEXT(te, entry);
+		}
+		*first_displayed_entry = prev;
+		te = SIMPLEQ_FIRST(&entries->head);
+	}
+	if (!isroot && te == SIMPLEQ_FIRST(&entries->head) && i < maxscroll)
+		*first_displayed_entry = NULL;
+}
+
+static void
+tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
+	struct got_tree_entry *last_displayed_entry,
+	const struct got_tree_entries *entries)
+{
+	struct got_tree_entry *next;
+	int n = 0;
+
+	if (SIMPLEQ_NEXT(last_displayed_entry, entry) == NULL)
+		return;
+
+	if (*first_displayed_entry)
+		next = SIMPLEQ_NEXT(*first_displayed_entry, entry);
+	else
+		next = SIMPLEQ_FIRST(&entries->head);
+	while (next) {
+		*first_displayed_entry = next;
+		if (++n >= maxscroll)
+			break;
+		next = SIMPLEQ_NEXT(next, entry);
+	}
+}
+
+struct tog_parent_tree {
+	SLIST_ENTRY(tog_parent_tree) entry;
+	struct got_tree_object *tree;
+	struct got_tree_entry *first_displayed_entry;
+	struct got_tree_entry *selected_entry;
+	int selected;
+};
+
+SLIST_HEAD(tog_parent_trees, tog_parent_tree);
+
+static const struct got_error *
+blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	struct tog_parent_tree *pt;
+	char *path;
+	size_t len = 2; /* for leading slash and NUL */
+
+	SLIST_FOREACH(pt, parents, entry)
+		len += strlen(pt->selected_entry->name) + 1 /* slash */;
+	len += strlen(te->name);
+	path = calloc(1, len);
+	if (path == NULL)
+		return got_error_from_errno();
+
+	path[0] = '/';
+	SLIST_FOREACH(pt, parents, entry) {
+		if (strlcat(path, pt->selected_entry->name, len) >= len)
+			return got_error(GOT_ERR_NO_SPACE);
+		if (strlcat(path, "/", len) >= len)
+			return got_error(GOT_ERR_NO_SPACE);
+	}
+	if (strlcat(path, te->name, len) >= len)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	return show_blame_view(path, commit_id, repo);
+}
+
+static const struct got_error *
+show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	int ch, done = 0, selected = 0;
+	struct got_tree_object *tree = root;
+	const struct got_tree_entries *entries;
+	struct got_tree_entry *first_displayed_entry = NULL;
+	struct got_tree_entry *last_displayed_entry = NULL;
+	struct got_tree_entry *selected_entry = NULL;
+	char *commit_id_str = NULL, *tree_label = NULL;
+	int nentries, ndisplayed;
+	struct tog_parent_trees parents;
+
+	SLIST_INIT(&parents);
+
+	err = got_object_id_str(&commit_id_str, commit_id);
+	if (err != NULL)
+		goto done;
+
+	if (asprintf(&tree_label, "tree of commit %s", commit_id_str) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (tog_tree_view.window == NULL) {
+		tog_tree_view.window = newwin(0, 0, 0, 0);
+		if (tog_tree_view.window == NULL)
+			return got_error_from_errno();
+		keypad(tog_tree_view.window, TRUE);
+	}
+	if (tog_tree_view.panel == NULL) {
+		tog_tree_view.panel = new_panel(tog_tree_view.window);
+		if (tog_tree_view.panel == NULL)
+			return got_error_from_errno();
+	} else
+		show_panel(tog_tree_view.panel);
+
+	entries = got_object_tree_get_entries(root);
+	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
+	while (!done) {
+		entries = got_object_tree_get_entries(tree);
+		nentries = entries->nentries;
+		if (tree != root)
+			nentries++; /* '..' directory */
+
+		err = draw_tree_entries(&first_displayed_entry,
+		    &last_displayed_entry, &selected_entry, &ndisplayed,
+		    tog_tree_view.window, tree_label, entries, selected,
+		    LINES, tree == root);
+		if (err)
+			break;
+
+		nodelay(stdscr, FALSE);
+		ch = wgetch(tog_tree_view.window);
+		nodelay(stdscr, TRUE);
+		switch (ch) {
+			case 'q':
+				done = 1;
+				break;
+			case 'k':
+			case KEY_UP:
+				if (selected > 0)
+					selected--;
+				if (selected > 0)
+					break;
+				tree_scroll_up(&first_displayed_entry, 1,
+				    entries, tree == root);
+				break;
+			case KEY_PPAGE:
+				if (SIMPLEQ_FIRST(&entries->head) ==
+				    first_displayed_entry) {
+					selected = 0;
+					break;
+				}
+				tree_scroll_up(&first_displayed_entry, LINES,
+				    entries, tree == root);
+				break;
+			case 'j':
+			case KEY_DOWN:
+				if (selected < ndisplayed - 1) {
+					selected++;
+					break;
+				}
+				tree_scroll_down(&first_displayed_entry, 1,
+				    last_displayed_entry, entries);
+				break;
+			case KEY_NPAGE:
+				tree_scroll_down(&first_displayed_entry, LINES,
+				    last_displayed_entry, entries);
+				if (SIMPLEQ_NEXT(last_displayed_entry, entry))
+					break;
+				/* can't scroll any further; move cursor down */
+				if (selected < ndisplayed - 1)
+					selected = ndisplayed - 1;
+				break;
+			case KEY_ENTER:
+			case '\r':
+				if (selected_entry == NULL) {
+					struct tog_parent_tree *parent;
+			case KEY_BACKSPACE:
+					/* user selected '..' */
+					if (tree == root)
+						break;
+					parent = SLIST_FIRST(&parents);
+					SLIST_REMOVE_HEAD(&parents, entry);
+					got_object_tree_close(tree);
+					tree = parent->tree;
+					first_displayed_entry =
+					    parent->first_displayed_entry;
+					selected_entry = parent->selected_entry;
+					selected = parent->selected;
+					free(parent);
+				} else if (S_ISDIR(selected_entry->mode)) {
+					struct tog_parent_tree *parent;
+					struct got_tree_object *child;
+					err = got_object_open_as_tree(
+					    &child, repo, selected_entry->id);
+					if (err)
+						goto done;
+					parent = calloc(1, sizeof(*parent));
+					if (parent == NULL) {
+						err = got_error_from_errno();
+						goto done;
+					}
+					parent->tree = tree;
+					parent->first_displayed_entry =
+					   first_displayed_entry;
+					parent->selected_entry = selected_entry;
+					parent->selected = selected;
+					SLIST_INSERT_HEAD(&parents, parent,
+					    entry);
+					tree = child;
+					selected = 0;
+					first_displayed_entry = NULL;
+				} else if (S_ISREG(selected_entry->mode)) {
+					err = blame_tree_entry(selected_entry,
+					    &parents, commit_id, repo);
+					if (err)
+						goto done;
+				}
+				break;
+			case KEY_RESIZE:
+				if (selected > LINES)
+					selected = ndisplayed - 1;
+				break;
+			default:
+				break;
+		}
+	}
+done:
+	free(tree_label);
+	free(commit_id_str);
+	while (!SLIST_EMPTY(&parents)) {
+		struct tog_parent_tree *parent;
+		parent = SLIST_FIRST(&parents);
+		SLIST_REMOVE_HEAD(&parents, entry);
+		free(parent);
+
+	}
+	if (tree != root)
+		got_object_tree_close(tree);
+	return err;
+}
+
+__dead static void
+usage_tree(void)
+{
+	endwin();
+	fprintf(stderr, "usage: %s tree [-c commit] [repository-path]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_tree(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	char *repo_path = NULL;
+	struct got_object_id *commit_id = NULL;
+	char *commit_id_arg = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
+		switch (ch) {
+		case 'c':
+			commit_id_arg = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+	} else if (argc == 1) {
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+	} else
+		usage_log();
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error != NULL)
+		return error;
+
+	if (commit_id_arg == NULL) {
+		error = get_head_commit_id(&commit_id, repo);
+		if (error != NULL)
+			goto done;
+	} else {
+		struct got_object *obj;
+		error = got_object_open_by_id_str(&obj, repo, commit_id_arg);
+		if (error == NULL) {
+			commit_id = got_object_get_id(obj);
+			if (commit_id == NULL)
+				error = got_error_from_errno();
+		}
+	}
+	if (error != NULL)
+		goto done;
+
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error != NULL)
+		goto done;
+
+	error = got_object_open_as_tree(&tree, repo, commit->tree_id);
+	if (error != NULL)
+		goto done;
+
+	error = show_tree_view(tree, commit_id, repo);
+done:
+	free(commit_id);
+	if (commit)
+		got_object_commit_close(commit);
+	if (tree)
+		got_object_tree_close(tree);
+	if (repo)
+		got_repo_close(repo);
+	return error;
+}
 static void
 init_curses(void)
 {
