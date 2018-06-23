@@ -707,7 +707,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case '\r':
 				err = show_commit(selected_entry, repo);
 				if (err)
-					break;
+					goto done;
 				show_panel(tog_log_view.panel);
 				break;
 			default:
