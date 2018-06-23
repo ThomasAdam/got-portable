@@ -34,6 +34,11 @@ struct got_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+struct got_tree_object {
+	struct got_tree_entries entries;
+	int refcnt;
+};
+
 struct got_blob_object {
 	FILE *f;
 	struct got_zstream_buf zb;

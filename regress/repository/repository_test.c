@@ -88,6 +88,7 @@ print_tree_object(struct got_object *obj, char *parent,
     struct got_repository *repo)
 {
 	struct got_tree_object *tree;
+	const struct got_tree_entries *entries;
 	struct got_tree_entry *te;
 	const struct got_error *err;
 
@@ -95,7 +96,8 @@ print_tree_object(struct got_object *obj, char *parent,
 	if (err != NULL)
 		return err;
 
-	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+	entries = got_object_tree_get_entries(tree);
+	SIMPLEQ_FOREACH(te, &entries->head, entry) {
 		struct got_object *treeobj;
 		char *next_parent;
 		char *hex;

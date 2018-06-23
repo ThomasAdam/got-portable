@@ -550,6 +550,7 @@ tree_checkout(struct got_worktree *worktree,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
+	const struct got_tree_entries *entries;
 	struct got_tree_entry *te;
 	size_t len;
 
@@ -558,7 +559,8 @@ tree_checkout(struct got_worktree *worktree,
 	if (strncmp(path, worktree->path_prefix, len) != 0)
 		return NULL;
 
-	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+	entries = got_object_tree_get_entries(tree);
+	SIMPLEQ_FOREACH(te, &entries->head, entry) {
 		err = tree_checkout_entry(worktree, fileindex, te, path, repo,
 		    progress_cb, progress_arg);
 		if (err)

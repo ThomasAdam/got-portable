@@ -17,6 +17,7 @@
 struct got_object_id;
 
 struct got_blob_object;
+struct got_tree_object;
 
 struct got_tree_entry {
 	SIMPLEQ_ENTRY(got_tree_entry) entry;
@@ -25,11 +26,11 @@ struct got_tree_entry {
 	struct got_object_id *id;
 };
 
-struct got_tree_object {
-	int nentries;
-	SIMPLEQ_HEAD(, got_tree_entry) entries;
+SIMPLEQ_HEAD(got_tree_entries_queue, got_tree_entry);
 
-	int refcnt; /* for internal use only */
+struct got_tree_entries {
+	int nentries;
+	struct got_tree_entries_queue head;
 };
 
 struct got_object_qid {
@@ -140,6 +141,10 @@ const struct got_error *got_object_tree_open(struct got_tree_object **,
 
 /* Dispose of a tree object. */
 void got_object_tree_close(struct got_tree_object *);
+
+/* Get the entries of a tree object. */
+const struct got_tree_entries *got_object_tree_get_entries(
+    struct got_tree_object *);
 
 /*
  * Attempt to open a blob object in a repository.

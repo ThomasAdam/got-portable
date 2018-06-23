@@ -462,7 +462,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 	struct got_imsg_tree_object itree;
 	struct got_tree_entry *te;
 
-	itree.nentries = tree->nentries;
+	itree.nentries = tree->entries.nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
 	    == -1)
 		return got_error_from_errno();
@@ -471,7 +471,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 	if (err)
 		return err;
 
-	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
 		struct got_imsg_tree_entry ite;
 		uint8_t *buf = NULL;
 		size_t len = sizeof(ite) + strlen(te->name);
@@ -528,7 +528,7 @@ get_more:
 
 		n = imsg_get(ibuf, &imsg);
 		if (n == 0) {
-			if (*tree && (*tree)->nentries != nentries)
+			if (*tree && (*tree)->entries.nentries != nentries)
 				goto get_more;
 			break;
 		}
@@ -558,8 +558,8 @@ get_more:
 				err = got_error_from_errno();
 				break;
 			}
-			(*tree)->nentries = itree.nentries;
-			SIMPLEQ_INIT(&(*tree)->entries);
+			(*tree)->entries.nentries = itree.nentries;
+			SIMPLEQ_INIT(&(*tree)->entries.head);
 			break;
 		case GOT_IMSG_TREE_ENTRY:
 			/* This message should be preceeded by GOT_IMSG_TREE. */
@@ -596,7 +596,7 @@ get_more:
 
 			memcpy(te->id->sha1, ite.id, SHA1_DIGEST_LENGTH);
 			te->mode = ite.mode;
-			SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
+			SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
 			nentries++;
 			break;
 		default:
@@ -607,7 +607,7 @@ get_more:
 		imsg_free(&imsg);
 	}
 done:
-	if (*tree && (*tree)->nentries != nentries) {
+	if (*tree && (*tree)->entries.nentries != nentries) {
 		if (err == NULL)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 		got_object_tree_close(*tree);

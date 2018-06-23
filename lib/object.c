@@ -782,7 +782,7 @@ parse_tree_object(struct got_tree_object **tree, uint8_t *buf, size_t len)
 	if (*tree == NULL)
 		return got_error_from_errno();
 
-	SIMPLEQ_INIT(&(*tree)->entries);
+	SIMPLEQ_INIT(&(*tree)->entries.head);
 
 	while (remain > 0) {
 		struct got_tree_entry *te;
@@ -791,8 +791,8 @@ parse_tree_object(struct got_tree_object **tree, uint8_t *buf, size_t len)
 		err = parse_tree_entry(&te, &elen, buf, remain);
 		if (err)
 			return err;
-		(*tree)->nentries++;
-		SIMPLEQ_INSERT_TAIL(&(*tree)->entries, te, entry);
+		(*tree)->entries.nentries++;
+		SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
 		buf += elen;
 		remain -= elen;
 	}
@@ -1200,13 +1200,19 @@ got_object_tree_close(struct got_tree_object *tree)
 			return;
 	}
 
-	while (!SIMPLEQ_EMPTY(&tree->entries)) {
-		te = SIMPLEQ_FIRST(&tree->entries);
-		SIMPLEQ_REMOVE_HEAD(&tree->entries, entry);
+	while (!SIMPLEQ_EMPTY(&tree->entries.head)) {
+		te = SIMPLEQ_FIRST(&tree->entries.head);
+		SIMPLEQ_REMOVE_HEAD(&tree->entries.head, entry);
 		tree_entry_close(te);
 	}
 
 	free(tree);
+}
+
+const struct got_tree_entries *
+got_object_tree_get_entries(struct got_tree_object *tree)
+{
+	return &tree->entries;
 }
 
 static const struct got_error *
@@ -1464,7 +1470,7 @@ find_entry_by_name(struct got_tree_object *tree, const char *name)
 {
 	struct got_tree_entry *te;
 
-	SIMPLEQ_FOREACH(te, &tree->entries, entry) {
+	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
 		if (strcmp(te->name, name) == 0)
 			return te;
 	}

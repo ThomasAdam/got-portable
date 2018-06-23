@@ -152,8 +152,10 @@ struct got_tree_entry *
 match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
 {
 	struct got_tree_entry *te2;
+	const struct got_tree_entries *entries2;
 
-	SIMPLEQ_FOREACH(te2, &tree2->entries, entry) {
+	entries2 = got_object_tree_get_entries(tree2); 
+	SIMPLEQ_FOREACH(te2, &entries2->head, entry) {
 		if (strcmp(te1->name, te2->name) == 0)
 			return te2;
 	}
@@ -423,10 +425,16 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 	struct got_tree_entry *te1 = NULL;
 	struct got_tree_entry *te2 = NULL;
 
-	if (tree1)
-		te1 = SIMPLEQ_FIRST(&tree1->entries);
-	if (tree2)
-		te2 = SIMPLEQ_FIRST(&tree2->entries);
+	if (tree1) {
+		const struct got_tree_entries *entries;
+		entries = got_object_tree_get_entries(tree1);
+		te1 = SIMPLEQ_FIRST(&entries->head);
+	}
+	if (tree2) {
+		const struct got_tree_entries *entries;
+		entries = got_object_tree_get_entries(tree2);
+		te2 = SIMPLEQ_FIRST(&entries->head);
+	}
 
 	do {
 		if (te1) {
