@@ -1149,26 +1149,28 @@ cmd_blame(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path);
 	free(repo_path);
 	if (error != NULL)
-		goto done;
+		return error;
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
 		if (error != NULL)
-			return error;
+			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error != NULL)
-			return error;
+			goto done;
 	} else {
 		struct got_object *obj;
 		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
 		if (error != NULL)
-			return error;
+			goto done;
 		commit_id = got_object_get_id(obj);
-		if (commit_id == NULL)
-			error = got_error_from_errno();
 		got_object_close(obj);
+		if (commit_id == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 	}
 
 	error = show_blame_view(path, commit_id, repo);
