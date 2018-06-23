@@ -41,6 +41,7 @@
 #include "got_opentemp.h"
 #include "got_commit_graph.h"
 #include "got_utf8.h"
+#include "got_blame.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -78,13 +79,15 @@ static struct tog_cmd tog_commands[] = {
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_log_view, tog_diff_view;
+} tog_log_view, tog_diff_view, tog_blame_view;
 
 static const struct got_error *
 show_diff_view(struct got_object *, struct got_object *,
     struct got_repository *);
 static const struct got_error *
 show_log_view(struct got_object_id *, struct got_repository *);
+static const struct got_error *
+show_blame_view(const char *, struct got_object_id *, struct got_repository *);
 
 __dead static void
 usage_log(void)
@@ -801,8 +804,8 @@ parse_next_line(FILE *f, size_t *len)
 }
 
 static const struct got_error *
-draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
-    int *eof, int max_lines)
+draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
+    int *last_displayed_line, int *eof, int max_lines)
 {
 	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
@@ -812,7 +815,7 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 	int width;
 
 	rewind(f);
-	werase(tog_diff_view.window);
+	werase(window);
 
 	*eof = 0;
 	while (nprinted < max_lines) {
@@ -831,9 +834,9 @@ draw_diff(FILE *f, int *first_displayed_line, int *last_displayed_line,
 			free(line);
 			return err;
 		}
-		waddwstr(tog_diff_view.window, wline);
+		waddwstr(window, wline);
 		if (width < COLS)
-			waddch(tog_diff_view.window, '\n');
+			waddch(window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
 		free(line);
@@ -893,8 +896,8 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 		show_panel(tog_diff_view.panel);
 
 	while (!done) {
-		err = draw_diff(f, &first_displayed_line, &last_displayed_line,
-		    &eof, LINES);
+		err = draw_file(tog_diff_view.window, f, &first_displayed_line,
+		    &last_displayed_line, &eof, LINES);
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
@@ -1011,15 +1014,169 @@ __dead static void
 usage_blame(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s blame [repository-path] blob-object\n",
+	fprintf(stderr, "usage: %s blame [-c commit] [repository-path] path\n",
 	    getprogname());
 	exit(1);
 }
 
 static const struct got_error *
+show_blame_view(const char *path, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	FILE *f;
+	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int eof, i;
+
+	f = got_opentemp();
+	if (f == NULL)
+		return got_error_from_errno();
+
+	err = got_blame(path, commit_id, repo, f);
+	if (err)
+		goto done;
+
+	fflush(f);
+
+	if (tog_blame_view.window == NULL) {
+		tog_blame_view.window = newwin(0, 0, 0, 0);
+		if (tog_blame_view.window == NULL)
+			return got_error_from_errno();
+		keypad(tog_blame_view.window, TRUE);
+	}
+	if (tog_blame_view.panel == NULL) {
+		tog_blame_view.panel = new_panel(tog_blame_view.window);
+		if (tog_blame_view.panel == NULL)
+			return got_error_from_errno();
+	} else
+		show_panel(tog_blame_view.panel);
+
+	while (!done) {
+		err = draw_file(tog_blame_view.window, f, &first_displayed_line,
+		    &last_displayed_line, &eof, LINES);
+		if (err)
+			break;
+		nodelay(stdscr, FALSE);
+		ch = wgetch(tog_blame_view.window);
+		nodelay(stdscr, TRUE);
+		switch (ch) {
+			case 'q':
+				done = 1;
+				break;
+			case 'k':
+			case KEY_UP:
+			case KEY_BACKSPACE:
+				if (first_displayed_line > 1)
+					first_displayed_line--;
+				break;
+			case KEY_PPAGE:
+				i = 0;
+				while (i++ < LINES - 1 &&
+				    first_displayed_line > 1)
+					first_displayed_line--;
+				break;
+			case 'j':
+			case KEY_DOWN:
+			case KEY_ENTER:
+			case '\r':
+				if (!eof)
+					first_displayed_line++;
+				break;
+			case KEY_NPAGE:
+			case ' ':
+				i = 0;
+				while (!eof && i++ < LINES - 1) {
+					char *line = parse_next_line(f, NULL);
+					first_displayed_line++;
+					if (line == NULL)
+						break;
+				}
+				break;
+			default:
+				break;
+		}
+	}
+done:
+	fclose(f);
+	return err;
+}
+
+static const struct got_error *
 cmd_blame(int argc, char *argv[])
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	char *repo_path = NULL;
+	char *path = NULL;
+	struct got_object_id *commit_id = NULL;
+	char *commit_id_str = NULL;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
+		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 0) {
+		usage_blame();
+	} else if (argc == 1) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		path = argv[0];
+	} else if (argc == 2) {
+		repo_path = realpath(argv[0], NULL);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+		path = argv[1];
+	} else
+		usage_blame();
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error != NULL)
+		goto done;
+
+	if (commit_id_str == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			return error;
+		error = got_ref_resolve(&commit_id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			return error;
+	} else {
+		struct got_object *obj;
+		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		if (error != NULL)
+			return error;
+		commit_id = got_object_get_id(obj);
+		if (commit_id == NULL)
+			error = got_error_from_errno();
+		got_object_close(obj);
+	}
+
+	error = show_blame_view(path, commit_id, repo);
+done:
+	free(commit_id);
+	if (repo)
+		got_repo_close(repo);
+	return error;
 }
 
 static void
