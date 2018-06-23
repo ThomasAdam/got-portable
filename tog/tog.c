@@ -1221,7 +1221,6 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 
 	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == NULL) {
-		assert(!isroot);
 		if (selected == 0) {
 			wstandout(window);
 			*selected_entry = NULL;
