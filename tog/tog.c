@@ -1158,20 +1158,18 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
-		if (error != NULL)
-			goto done;
 	} else {
 		struct got_object *obj;
 		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
 		if (error != NULL)
 			goto done;
 		commit_id = got_object_get_id(obj);
-		got_object_close(obj);
-		if (commit_id == NULL) {
+		if (commit_id == NULL)
 			error = got_error_from_errno();
-			goto done;
-		}
+		got_object_close(obj);
 	}
+	if (error != NULL)
+		goto done;
 
 	error = show_blame_view(path, commit_id, repo);
 done:
