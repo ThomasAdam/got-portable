@@ -1343,14 +1343,14 @@ tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 }
 
 struct tog_parent_tree {
-	SLIST_ENTRY(tog_parent_tree) entry;
+	TAILQ_ENTRY(tog_parent_tree) entry;
 	struct got_tree_object *tree;
 	struct got_tree_entry *first_displayed_entry;
 	struct got_tree_entry *selected_entry;
 	int selected;
 };
 
-SLIST_HEAD(tog_parent_trees, tog_parent_tree);
+TAILQ_HEAD(tog_parent_trees, tog_parent_tree);
 
 static const struct got_error *
 blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
@@ -1360,7 +1360,7 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 	char *path;
 	size_t len = 2; /* for leading slash and NUL */
 
-	SLIST_FOREACH(pt, parents, entry)
+	TAILQ_FOREACH(pt, parents, entry)
 		len += strlen(pt->selected_entry->name) + 1 /* slash */;
 	len += strlen(te->name);
 	path = calloc(1, len);
@@ -1368,11 +1368,13 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 		return got_error_from_errno();
 
 	path[0] = '/';
-	SLIST_FOREACH(pt, parents, entry) {
+	pt = TAILQ_LAST(parents, tog_parent_trees);
+	while (pt) {
 		if (strlcat(path, pt->selected_entry->name, len) >= len)
 			return got_error(GOT_ERR_NO_SPACE);
 		if (strlcat(path, "/", len) >= len)
 			return got_error(GOT_ERR_NO_SPACE);
+		pt = TAILQ_PREV(pt, tog_parent_trees, entry);
 	}
 	if (strlcat(path, te->name, len) >= len)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -1395,7 +1397,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 	int nentries, ndisplayed;
 	struct tog_parent_trees parents;
 
-	SLIST_INIT(&parents);
+	TAILQ_INIT(&parents);
 
 	err = got_object_id_str(&commit_id_str, commit_id);
 	if (err != NULL)
@@ -1485,8 +1487,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 					/* user selected '..' */
 					if (tree == root)
 						break;
-					parent = SLIST_FIRST(&parents);
-					SLIST_REMOVE_HEAD(&parents, entry);
+					parent = TAILQ_FIRST(&parents);
+					TAILQ_REMOVE(&parents, parent, entry);
 					got_object_tree_close(tree);
 					tree = parent->tree;
 					first_displayed_entry =
@@ -1511,7 +1513,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 					   first_displayed_entry;
 					parent->selected_entry = selected_entry;
 					parent->selected = selected;
-					SLIST_INSERT_HEAD(&parents, parent,
+					TAILQ_INSERT_HEAD(&parents, parent,
 					    entry);
 					tree = child;
 					selected = 0;
@@ -1534,10 +1536,10 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 done:
 	free(tree_label);
 	free(commit_id_str);
-	while (!SLIST_EMPTY(&parents)) {
+	while (!TAILQ_EMPTY(&parents)) {
 		struct tog_parent_tree *parent;
-		parent = SLIST_FIRST(&parents);
-		SLIST_REMOVE_HEAD(&parents, entry);
+		parent = TAILQ_FIRST(&parents);
+		TAILQ_REMOVE(&parents, parent, entry);
 		free(parent);
 
 	}
