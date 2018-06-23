@@ -1499,6 +1499,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 			case KEY_PPAGE:
 				if (SIMPLEQ_FIRST(&entries->head) ==
 				    first_displayed_entry) {
+					if (tree != root)
+						first_displayed_entry = NULL;
 					selected = 0;
 					break;
 				}
