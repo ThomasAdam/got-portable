@@ -1212,12 +1212,11 @@ static const struct got_error *
 draw_tree_entries(struct got_tree_entry **first_displayed_entry,
     struct got_tree_entry **last_displayed_entry,
     struct got_tree_entry **selected_entry, int *ndisplayed,
-    WINDOW *window, const char *label, const struct got_tree_entries *entries,
-    int selected, int limit, int isroot)
+    WINDOW *window, const char *label, const char *parent_path,
+    const struct got_tree_entries *entries, int selected, int limit, int isroot)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
-	char *line;
 	wchar_t *wline;
 	int width, n;
 
@@ -1236,7 +1235,14 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 		waddch(window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	waddch(window, '\n');
+	err = format_line(&wline, &width, parent_path, COLS);
+	if (err)
+		return err;
+	waddwstr(window, wline);
+	if (width < COLS)
+		waddch(window, '\n');
+	if (width < COLS)
+		waddch(window, '\n');
 	if (--limit <= 0)
 		return NULL;
 
@@ -1260,6 +1266,7 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 	}
 
 	while (te) {
+		char *line = NULL;
 		if (asprintf(&line, "  %s%s",
 		    te->name, S_ISDIR(te->mode) ? "/" : "") == -1)
 			return got_error_from_errno();
@@ -1353,41 +1360,61 @@ struct tog_parent_tree {
 TAILQ_HEAD(tog_parent_trees, tog_parent_tree);
 
 static const struct got_error *
-blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_repository *repo)
+tree_entry_path(char **path, struct tog_parent_trees *parents,
+    struct got_tree_entry *te)
 {
 	const struct got_error *err = NULL;
 	struct tog_parent_tree *pt;
-	char *path;
 	size_t len = 2; /* for leading slash and NUL */
 
 	TAILQ_FOREACH(pt, parents, entry)
 		len += strlen(pt->selected_entry->name) + 1 /* slash */;
-	len += strlen(te->name);
-	path = calloc(1, len);
+	if (te)
+		len += strlen(te->name);
+
+	*path = calloc(1, len);
 	if (path == NULL)
 		return got_error_from_errno();
 
-	path[0] = '/';
+	(*path)[0] = '/';
 	pt = TAILQ_LAST(parents, tog_parent_trees);
 	while (pt) {
-		if (strlcat(path, pt->selected_entry->name, len) >= len) {
+		if (strlcat(*path, pt->selected_entry->name, len) >= len) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		if (strlcat(path, "/", len) >= len) {
+		if (strlcat(*path, "/", len) >= len) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
 		pt = TAILQ_PREV(pt, tog_parent_trees, entry);
 	}
-	if (strlcat(path, te->name, len) >= len) {
-		err = got_error(GOT_ERR_NO_SPACE);
-		goto done;
+	if (te) {
+		if (strlcat(*path, te->name, len) >= len) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
 	}
+done:
+	if (err) {
+		free(*path);
+		*path = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path;
+	
+	err = tree_entry_path(&path, parents, te);
+	if (err)
+		return err;
 
 	err = show_blame_view(path, commit_id, repo);
-done:
 	free(path);
 	return err;
 }
@@ -1434,15 +1461,21 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 	entries = got_object_tree_get_entries(root);
 	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
 	while (!done) {
+		char *parent_path;
 		entries = got_object_tree_get_entries(tree);
 		nentries = entries->nentries;
 		if (tree != root)
 			nentries++; /* '..' directory */
 
+		err = tree_entry_path(&parent_path, &parents, NULL);
+		if (err)
+			goto done;
+
 		err = draw_tree_entries(&first_displayed_entry,
 		    &last_displayed_entry, &selected_entry, &ndisplayed,
-		    tog_tree_view.window, tree_label, entries, selected,
-		    LINES, tree == root);
+		    tog_tree_view.window, tree_label, parent_path, entries,
+		    selected, LINES, tree == root);
+		free(parent_path);
 		if (err)
 			break;
 
