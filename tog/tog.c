@@ -1253,6 +1253,8 @@ main(int argc, char *argv[])
 	optreset = 1;
 
 	if (argc == 0) {
+		if (hflag)
+			usage();
 		/* Build an argument vector which runs a default command. */
 		cmd = &tog_commands[0];
 		cmd_argv = make_argv(cmd->name, NULL);
@@ -1281,6 +1283,12 @@ main(int argc, char *argv[])
 			} else
 				error = got_error_from_errno();
 			if (error) {
+				if (hflag) {
+					fprintf(stderr, "%s: '%s' is not a "
+					    "known command\n", getprogname(),
+					    argv[0]);
+					usage();
+				}
 				fprintf(stderr, "%s: '%s' is neither a known "
 				    "command nor a path to a repository\n",
 				    getprogname(), argv[0]);
