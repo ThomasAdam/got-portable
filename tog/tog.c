@@ -1241,8 +1241,9 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 	waddwstr(window, wline);
 	if (width < COLS)
 		waddch(window, '\n');
-	if (width < COLS)
-		waddch(window, '\n');
+	if (--limit <= 0)
+		return NULL;
+	waddch(window, '\n');
 	if (--limit <= 0)
 		return NULL;
 
