@@ -258,7 +258,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	}
 
 	/* Annotate remaining non-annotated lines with last commit. */
-	for (lineno = 1; lineno < blame->nlines; lineno++)
+	for (lineno = 1; lineno <= blame->nlines; lineno++)
 		annotate_line(blame, lineno, id);
 
 done:
