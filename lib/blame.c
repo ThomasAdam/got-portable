@@ -318,7 +318,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 		return err;
 	}
 
-	for (lineno = 1; lineno < blame->nlines; lineno++) {
+	for (lineno = 1; lineno <= blame->nlines; lineno++) {
 		struct got_object_id *id;
 		char *line, *id_str;
 		
