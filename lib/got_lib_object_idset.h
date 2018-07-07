@@ -16,7 +16,13 @@
 
 struct got_object_idset;
 
-struct got_object_idset *got_object_idset_alloc(void);
+enum got_object_idset_iteration_order {
+	GOT_OBJECT_IDSET_ITERATE_BY_OBJECT_ID,
+	GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED,
+};
+
+struct got_object_idset *got_object_idset_alloc(
+    enum got_object_idset_iteration_order);
 void got_object_idset_free(struct got_object_idset *);
 
 const struct got_error *got_object_idset_add(void **,

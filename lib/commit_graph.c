@@ -100,13 +100,15 @@ alloc_graph(void)
 	if (graph == NULL)
 		return NULL;
 
-	graph->node_ids = got_object_idset_alloc();
+	graph->node_ids = got_object_idset_alloc(
+	    GOT_OBJECT_IDSET_ITERATE_BY_OBJECT_ID);
 	if (graph->node_ids == NULL) {
 		free(graph);
 		return NULL;
 	}
 
-	graph->open_branches = got_object_idset_alloc();
+	graph->open_branches = got_object_idset_alloc(
+	     GOT_OBJECT_IDSET_ITERATE_BY_OBJECT_ID);
 	if (graph->open_branches == NULL) {
 		got_object_idset_free(graph->node_ids);
 		free(graph);

@@ -312,7 +312,8 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 
-	repo->objcache.set = got_object_idset_alloc();
+	repo->objcache.set = got_object_idset_alloc(
+	    GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED);
 	if (repo->objcache.set == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -320,7 +321,8 @@ got_repo_open(struct got_repository **ret, const char *path)
 	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
 	repo->objcache.size = GOT_OBJECT_CACHE_SIZE_OBJ;
 
-	repo->treecache.set = got_object_idset_alloc();
+	repo->treecache.set = got_object_idset_alloc(
+	    GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED);
 	if (repo->treecache.set == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -328,7 +330,8 @@ got_repo_open(struct got_repository **ret, const char *path)
 	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
 	repo->treecache.size = GOT_OBJECT_CACHE_SIZE_TREE;
 
-	repo->commitcache.set = got_object_idset_alloc();
+	repo->commitcache.set = got_object_idset_alloc(
+	    GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED);
 	if (repo->commitcache.set == NULL) {
 		err = got_error_from_errno();
 		goto done;
