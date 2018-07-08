@@ -119,7 +119,7 @@ get_packfile_size(size_t *size, const char *path)
 }
 
 const struct got_error *
-got_packidx_open(struct got_packidx **packidx, const char *path)
+got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 {
 	struct got_packidx *p;
 	struct got_packidx_v2_hdr *h;
@@ -180,7 +180,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 	offset += sizeof(*h->magic);
 	remain -= sizeof(*h->magic);
 
-	SHA1Update(&ctx, (uint8_t *)h->magic, sizeof(*h->magic));
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->magic, sizeof(*h->magic));
 
 	if (remain < sizeof(*h->version)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
@@ -194,7 +195,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 	offset += sizeof(*h->version);
 	remain -= sizeof(*h->version);
 
-	SHA1Update(&ctx, (uint8_t *)h->version, sizeof(*h->version));
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->version, sizeof(*h->version));
 
 	len_fanout =
 	    sizeof(*h->fanout_table) * GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS;
@@ -206,7 +208,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 	err = verify_fanout_table(h->fanout_table);
 	if (err)
 		goto done;
-	SHA1Update(&ctx, (uint8_t *)h->fanout_table, len_fanout);
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->fanout_table, len_fanout);
 	offset += len_fanout;
 	remain -= len_fanout;
 
@@ -218,7 +221,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 	}
 	h->sorted_ids =
 	    (struct got_packidx_object_id *)((uint8_t*)(p->map + offset));
-	SHA1Update(&ctx, (uint8_t *)h->sorted_ids, len_ids);
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->sorted_ids, len_ids);
 	offset += len_ids;
 	remain -= len_ids;
 
@@ -227,7 +231,8 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 		goto done;
 	}
 	h->crc32 = (uint32_t *)((uint8_t*)(p->map + offset));
-	SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
 	remain -= nobj * sizeof(*h->crc32);
 	offset += nobj * sizeof(*h->crc32);
 
@@ -236,7 +241,9 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 		goto done;
 	}
 	h->offsets = (uint32_t *)((uint8_t*)(p->map + offset));
-	SHA1Update(&ctx, (uint8_t *)h->offsets, nobj * sizeof(*h->offsets));
+	if (verify)
+		SHA1Update(&ctx, (uint8_t *)h->offsets,
+		    nobj * sizeof(*h->offsets));
 	remain -= nobj * sizeof(*h->offsets);
 	offset += nobj * sizeof(*h->offsets);
 
@@ -249,8 +256,9 @@ got_packidx_open(struct got_packidx **packidx, const char *path)
 		goto done;
 	}
 	h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
-	SHA1Update(&ctx, (uint8_t*)h->large_offsets,
-	    nobj * sizeof(*h->large_offsets));
+	if (verify)
+		SHA1Update(&ctx, (uint8_t*)h->large_offsets,
+		    nobj * sizeof(*h->large_offsets));
 	remain -= nobj * sizeof(*h->large_offsets);
 	offset += nobj * sizeof(*h->large_offsets);
 
@@ -261,10 +269,13 @@ checksum:
 	}
 	h->trailer =
 	    (struct got_packidx_trailer *)((uint8_t*)(p->map + offset));
-	SHA1Update(&ctx, h->trailer->packfile_sha1, SHA1_DIGEST_LENGTH);
-	SHA1Final(sha1, &ctx);
-	if (memcmp(h->trailer->packidx_sha1, sha1, SHA1_DIGEST_LENGTH) != 0)
-		err = got_error(GOT_ERR_PACKIDX_CSUM);
+	if (verify) {
+		SHA1Update(&ctx, h->trailer->packfile_sha1, SHA1_DIGEST_LENGTH);
+		SHA1Final(sha1, &ctx);
+		if (memcmp(h->trailer->packidx_sha1, sha1,
+		    SHA1_DIGEST_LENGTH) != 0)
+			err = got_error(GOT_ERR_PACKIDX_CSUM);
+	}
 done:
 	if (err)
 		got_packidx_close(p);
@@ -419,7 +430,7 @@ search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 		}
 
-		err = got_packidx_open(packidx, path_packidx);
+		err = got_packidx_open(packidx, path_packidx, 0);
 		free(path_packidx);
 		if (err)
 			goto done;

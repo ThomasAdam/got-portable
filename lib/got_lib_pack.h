@@ -144,7 +144,7 @@ struct got_packfile_obj_data {
 } __attribute__((__packed__));
 
 const struct got_error *got_packidx_open(struct got_packidx **,
-    const char *);
+    const char *, int);
 const struct got_error* got_packidx_close(struct got_packidx *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
