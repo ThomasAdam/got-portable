@@ -37,7 +37,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_repository.h"
 #include "got_lib_worktree.h"
-#include "got_lib_object_idset.h"
+#include "got_lib_object_idcache.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -156,10 +156,10 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 	struct got_object_cache_entry *ce;
 	int nelem;
 
-	nelem = got_object_idset_num_elements(cache->set);
+	nelem = got_object_idcache_num_elements(cache->idcache);
 	if (nelem >= cache->size) {
-		err = got_object_idset_remove_random((void **)&ce,
-		    cache->set);
+		err = got_object_idcache_remove_least_used((void **)&ce,
+		    cache->idcache);
 		if (err)
 			return err;
 		switch (cache->type) {
@@ -191,7 +191,7 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 		ce->data.commit = (struct got_commit_object *)item;
 		break;
 	}
-	err = got_object_idset_add(NULL, cache->set, id, ce);
+	err = got_object_idcache_add(cache->idcache, id, ce);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_EXISTS) {
 			free(ce);
@@ -222,7 +222,7 @@ got_repo_get_cached_object(struct got_repository *repo,
 {
 	struct got_object_cache_entry *ce;
 
-	ce = got_object_idset_get(repo->objcache.set, id);
+	ce = got_object_idcache_get(repo->objcache.idcache, id);
 	if (ce) {
 		repo->objcache.cache_hit++;
 		return ce->data.obj;
@@ -252,7 +252,7 @@ got_repo_get_cached_tree(struct got_repository *repo,
 {
 	struct got_object_cache_entry *ce;
 
-	ce = got_object_idset_get(repo->treecache.set, id);
+	ce = got_object_idcache_get(repo->treecache.idcache, id);
 	if (ce) {
 		repo->treecache.cache_hit++;
 		return ce->data.tree;
@@ -282,7 +282,7 @@ got_repo_get_cached_commit(struct got_repository *repo,
 {
 	struct got_object_cache_entry *ce;
 
-	ce = got_object_idset_get(repo->commitcache.set, id);
+	ce = got_object_idcache_get(repo->commitcache.idcache, id);
 	if (ce) {
 		repo->commitcache.cache_hit++;
 		return ce->data.commit;
@@ -312,29 +312,31 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 
-	repo->objcache.set = got_object_idset_alloc();
-	if (repo->objcache.set == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
 	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
 	repo->objcache.size = GOT_OBJECT_CACHE_SIZE_OBJ;
-
-	repo->treecache.set = got_object_idset_alloc();
-	if (repo->treecache.set == NULL) {
+	repo->objcache.idcache = got_object_idcache_alloc(repo->objcache.size);
+	if (repo->objcache.idcache == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
+
 	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
 	repo->treecache.size = GOT_OBJECT_CACHE_SIZE_TREE;
-
-	repo->commitcache.set = got_object_idset_alloc();
-	if (repo->commitcache.set == NULL) {
+	repo->treecache.idcache =
+	    got_object_idcache_alloc(repo->treecache.size);
+	if (repo->treecache.idcache == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
+
 	repo->commitcache.type = GOT_OBJECT_CACHE_TYPE_COMMIT;
 	repo->commitcache.size = GOT_OBJECT_CACHE_SIZE_COMMIT;
+	repo->commitcache.idcache =
+	    got_object_idcache_alloc(repo->commitcache.size);
+	if (repo->commitcache.idcache == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	repo->path = got_path_normalize(abspath);
 	if (repo->path == NULL) {
@@ -395,8 +397,8 @@ static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
 	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed\n",
-	    name, got_object_idset_num_elements(cache->set), cache->cache_hit,
-	    cache->cache_miss);
+	    name, got_object_idcache_num_elements(cache->idcache),
+	    cache->cache_hit, cache->cache_miss);
 }
 
 void check_refcount(struct got_object_id *id, void *data, void *arg)
@@ -462,19 +464,19 @@ got_repo_close(struct got_repository *repo)
 	print_cache_stats(&repo->objcache, "object");
 	print_cache_stats(&repo->treecache, "tree");
 	print_cache_stats(&repo->commitcache, "commit");
-	got_object_idset_for_each(repo->objcache.set, check_refcount,
+	got_object_idcache_for_each(repo->objcache.idcache, check_refcount,
 	    &repo->objcache);
-	got_object_idset_for_each(repo->treecache.set, check_refcount,
+	got_object_idcache_for_each(repo->treecache.idcache, check_refcount,
 	    &repo->treecache);
-	got_object_idset_for_each(repo->commitcache.set, check_refcount,
+	got_object_idcache_for_each(repo->commitcache.idcache, check_refcount,
 	    &repo->commitcache);
 #endif
 
-	if (repo->objcache.set)
-		got_object_idset_free(repo->objcache.set);
-	if (repo->treecache.set)
-		got_object_idset_free(repo->treecache.set);
-	if (repo->commitcache.set)
-		got_object_idset_free(repo->commitcache.set);
+	if (repo->objcache.idcache)
+		got_object_idcache_free(repo->objcache.idcache);
+	if (repo->treecache.idcache)
+		got_object_idcache_free(repo->treecache.idcache);
+	if (repo->commitcache.idcache)
+		got_object_idcache_free(repo->commitcache.idcache);
 	free(repo);
 }
