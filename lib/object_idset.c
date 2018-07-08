@@ -52,11 +52,10 @@ struct got_object_idset {
 	int nelem[0xff + 1];
 	int totelem;
 #define GOT_OBJECT_IDSET_MAX_ELEM INT_MAX
-	enum got_object_idset_iteration_order order;
 };
 
 struct got_object_idset *
-got_object_idset_alloc(enum got_object_idset_iteration_order order)
+got_object_idset_alloc(void)
 {
 	struct got_object_idset *set;
 	int i;
@@ -65,7 +64,6 @@ got_object_idset_alloc(enum got_object_idset_iteration_order order)
 	if (set == NULL)
 		return NULL;
 
-	set->order = order;
 	for (i = 0; i < nitems(set->entries); i++)
 		TAILQ_INIT(&set->entries[i]);
 
@@ -109,8 +107,7 @@ got_object_idset_add(void **existing_data,
 	memcpy(&new->id, id, sizeof(new->id));
 	new->data = data;
 
-	if (TAILQ_EMPTY(&set->entries[i]) ||
-	    set->order == GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED) {
+	if (TAILQ_EMPTY(&set->entries[i])) {
 		TAILQ_INSERT_HEAD(&set->entries[i], new, entry);
 		set->nelem[i]++;
 		set->totelem++;
@@ -157,18 +154,12 @@ got_object_idset_add(void **existing_data,
 void *
 got_object_idset_get(struct got_object_idset *set, struct got_object_id *id)
 {
-	struct got_object_idset_element *entry, *tmp;
+	struct got_object_idset_element *entry;
 	uint8_t i = id->sha1[0];
 
-	TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
-		if (got_object_id_cmp(&entry->id, id) != 0)
-			continue;
-		if (set->order == GOT_OBJECT_IDSET_ITERATE_RECENTLY_USED &&
-		    entry != TAILQ_FIRST(&set->entries[i])) {
-			TAILQ_REMOVE(&set->entries[i], entry, entry);
-			TAILQ_INSERT_HEAD(&set->entries[i], entry, entry);
-		}
-		return entry->data;
+	TAILQ_FOREACH(entry, &set->entries[i], entry) {
+		if (got_object_id_cmp(&entry->id, id) == 0)
+			return entry->data;
 	}
 
 	return NULL;
