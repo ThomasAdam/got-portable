@@ -177,7 +177,7 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 			break;
 		case -1:
 			if (wline[i] == L'\t')
-				cols += TABSIZE;
+				cols += TABSIZE - (cols % TABSIZE);
 			break;
 		default:
 			err = got_error_from_errno();
