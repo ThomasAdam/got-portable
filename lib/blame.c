@@ -269,9 +269,10 @@ done:
 		got_object_blob_close(blob);
 	if (commit)
 		got_object_commit_close(commit);
-	if (err)
-		blame_close(blame);
-	else
+	if (err) {
+		if (blame)
+			blame_close(blame);
+	} else
 		*blamep = blame;
 
 	return err;
