@@ -125,6 +125,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	struct got_packidx_v2_hdr *h;
 	const struct got_error *err = NULL;
 	size_t nobj, len_fanout, len_ids, offset, remain;
+	ssize_t n;
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 
@@ -159,11 +160,12 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		goto done;
 	}
 
+#ifndef GOT_PACK_NO_MMAP
 	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
-	if (p->map == MAP_FAILED) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (p->map == MAP_FAILED)
+		p->map = NULL; /* fall back to read(2) */
+#endif
+
 	h = &p->hdr;
 	offset = 0;
 	remain = p->len;
@@ -172,7 +174,20 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->magic = (uint32_t *)(p->map + offset);
+	if (p->map)
+		h->magic = (uint32_t *)(p->map + offset);
+	else {
+		h->magic = malloc(sizeof(*h->magic));
+		if (h->magic == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->magic, sizeof(*h->magic));
+		if (n != sizeof(*h->magic)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (betoh32(*h->magic) != GOT_PACKIDX_V2_MAGIC) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
@@ -187,7 +202,20 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->version = (uint32_t *)(p->map + offset);
+	if (p->map)
+		h->version = (uint32_t *)(p->map + offset);
+	else {
+		h->version = malloc(sizeof(*h->version));
+		if (h->version == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->version, sizeof(*h->version));
+		if (n != sizeof(*h->version)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (betoh32(*h->version) != GOT_PACKIDX_VERSION) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
@@ -204,7 +232,20 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->fanout_table = (uint32_t *)(p->map + offset);
+	if (p->map)
+		h->fanout_table = (uint32_t *)(p->map + offset);
+	else {
+		h->fanout_table = malloc(len_fanout);
+		if (h->fanout_table == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->fanout_table, len_fanout);
+		if (n != len_fanout) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	err = verify_fanout_table(h->fanout_table);
 	if (err)
 		goto done;
@@ -219,8 +260,21 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->sorted_ids =
-	    (struct got_packidx_object_id *)((uint8_t*)(p->map + offset));
+	if (p->map)
+		h->sorted_ids =
+		    (struct got_packidx_object_id *)((uint8_t*)(p->map + offset));
+	else {
+		h->sorted_ids = malloc(len_ids);
+		if (h->sorted_ids == NULL) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+		n = read(p->fd, h->sorted_ids, len_ids);
+		if (n != len_ids) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (verify)
 		SHA1Update(&ctx, (uint8_t *)h->sorted_ids, len_ids);
 	offset += len_ids;
@@ -230,7 +284,20 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->crc32 = (uint32_t *)((uint8_t*)(p->map + offset));
+	if (p->map)
+		h->crc32 = (uint32_t *)((uint8_t*)(p->map + offset));
+	else {
+		h->crc32 = malloc(nobj * sizeof(*h->crc32));
+		if (h->crc32 == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->crc32, nobj * sizeof(*h->crc32));
+		if (n != nobj * sizeof(*h->crc32)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (verify)
 		SHA1Update(&ctx, (uint8_t *)h->crc32, nobj * sizeof(*h->crc32));
 	remain -= nobj * sizeof(*h->crc32);
@@ -240,7 +307,20 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->offsets = (uint32_t *)((uint8_t*)(p->map + offset));
+	if (p->map)
+		h->offsets = (uint32_t *)((uint8_t*)(p->map + offset));
+	else {
+		h->offsets = malloc(nobj * sizeof(*h->offsets));
+		if (h->offsets == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->offsets, nobj * sizeof(*h->offsets));
+		if (n != nobj * sizeof(*h->offsets)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (verify)
 		SHA1Update(&ctx, (uint8_t *)h->offsets,
 		    nobj * sizeof(*h->offsets));
@@ -255,7 +335,21 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
+	if (p->map)
+		h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
+	else {
+		h->offsets = malloc(nobj * sizeof(*h->large_offsets));
+		if (h->offsets == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->large_offsets,
+		    nobj * sizeof(*h->large_offsets));
+		if (n != nobj * sizeof(*h->large_offsets)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (verify)
 		SHA1Update(&ctx, (uint8_t*)h->large_offsets,
 		    nobj * sizeof(*h->large_offsets));
@@ -267,8 +361,21 @@ checksum:
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
-	h->trailer =
-	    (struct got_packidx_trailer *)((uint8_t*)(p->map + offset));
+	if (p->map)
+		h->trailer =
+		    (struct got_packidx_trailer *)((uint8_t*)(p->map + offset));
+	else {
+		h->trailer = malloc(sizeof(*h->trailer));
+		if (h->trailer == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		n = read(p->fd, h->trailer, sizeof(*h->trailer));
+		if (n != sizeof(*h->trailer)) {
+			err = got_error(GOT_ERR_BAD_PACKIDX);
+			goto done;
+		}
+	}
 	if (verify) {
 		SHA1Update(&ctx, h->trailer->packfile_sha1, SHA1_DIGEST_LENGTH);
 		SHA1Final(sha1, &ctx);
@@ -290,9 +397,18 @@ got_packidx_close(struct got_packidx *packidx)
 	const struct got_error *err = NULL;
 
 	free(packidx->path_packidx);
-	if (packidx->map != NULL && packidx->map != MAP_FAILED) {
+	if (packidx->map) {
 		if (munmap(packidx->map, packidx->len) == -1)
 			err = got_error_from_errno();
+	} else {
+		free(packidx->hdr.magic);
+		free(packidx->hdr.version);
+		free(packidx->hdr.fanout_table);
+		free(packidx->hdr.sorted_ids);
+		free(packidx->hdr.crc32);
+		free(packidx->hdr.offsets);
+		free(packidx->hdr.large_offsets);
+		free(packidx->hdr.trailer);
 	}
 	close(packidx->fd);
 	free(packidx);
