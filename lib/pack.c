@@ -586,10 +586,8 @@ cache_pack(struct got_pack **packp, const char *path_packfile,
 
 	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
 	    pack->fd, 0);
-	if (pack->map == MAP_FAILED) {
-		err = got_error_from_errno();
-		pack->map = NULL;
-	}
+	if (pack->map == MAP_FAILED)
+		pack->map = NULL; /* fall back to read(2) */
 done:
 	if (err) {
 		if (pack) {
