@@ -31,7 +31,7 @@
 #include "got_commit_graph.h"
 
 #include "got_lib_delta.h"
-#include "got_lib_zbuf.h"
+#include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
 

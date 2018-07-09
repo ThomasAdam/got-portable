@@ -4,7 +4,7 @@ PROG=		got
 SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffreg.c error.c \
 		fileindex.c object.c object_idcache.c object_idset.c opentemp.c \
 		path.c pack.c privsep.c reference.c repository.c sha1.c \
-		worktree.c zbuf.c
+		worktree.c inflate.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lutil -lz

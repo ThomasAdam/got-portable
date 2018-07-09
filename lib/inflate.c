@@ -27,7 +27,7 @@
 #include "got_object.h"
 
 #include "got_lib_path.h"
-#include "got_lib_zbuf.h"
+#include "got_lib_inflate.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

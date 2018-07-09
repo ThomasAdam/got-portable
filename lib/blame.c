@@ -30,7 +30,7 @@
 #include "got_blame.h"
 #include "got_opentemp.h"
 
-#include "got_lib_zbuf.h"
+#include "got_lib_inflate.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_diff.h"

@@ -33,7 +33,7 @@
 #include "got_lib_sha1.h"
 #include "got_lib_path.h"
 #include "got_lib_delta.h"
-#include "got_lib_zbuf.h"
+#include "got_lib_inflate.h"
 #include "got_lib_object.h"
 
 #define GOT_REF_HEADS	"heads"
