@@ -38,7 +38,7 @@ got_inflate_init(struct got_zstream_buf *zb, uint8_t *outbuf, size_t bufsize)
 {
 	const struct got_error *err = NULL;
 
-	memset(zb, 0, sizeof(*zb));
+	memset(&zb->z, 0, sizeof(zb->z));
 
 	zb->z.zalloc = Z_NULL;
 	zb->z.zfree = Z_NULL;
@@ -55,6 +55,7 @@ got_inflate_init(struct got_zstream_buf *zb, uint8_t *outbuf, size_t bufsize)
 		goto done;
 	}
 
+	zb->flags = 0;
 	if (outbuf == NULL) {
 		zb->outbuf = calloc(1, zb->outlen);
 		if (zb->outbuf == NULL) {
