@@ -18,10 +18,11 @@
 struct got_pack {
 	char *path_packfile;
 	int fd;
+	uint8_t *map;
 	size_t filesize;
 };
 
-void got_pack_close(struct got_pack *);
+const struct got_error *got_pack_close(struct got_pack *);
 
 /* See Documentation/technical/pack-format.txt in Git. */
 

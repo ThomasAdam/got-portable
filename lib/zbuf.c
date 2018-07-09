@@ -29,6 +29,10 @@
 #include "got_lib_path.h"
 #include "got_lib_zbuf.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 const struct got_error *
 got_inflate_init(struct got_zstream_buf *zb, uint8_t *outbuf, size_t bufsize)
 {
@@ -145,6 +149,48 @@ got_inflate_read_fd(struct got_zstream_buf *zb, int fd, size_t *outlenp)
 	return NULL;
 }
 
+const struct got_error *
+got_inflate_read_mmap(struct got_zstream_buf *zb, uint8_t *map, size_t offset,
+    size_t len, size_t *outlenp, size_t *consumed)
+{
+	size_t last_total_out = zb->z.total_out;
+	z_stream *z = &zb->z;
+	int ret = Z_ERRNO;
+
+	z->next_out = zb->outbuf;
+	z->avail_out = zb->outlen;
+
+	*outlenp = 0;
+	*consumed = 0;
+
+	do {
+		if (z->avail_in == 0) {
+			if (len == 0) {
+				/* EOF */
+				ret = Z_STREAM_END;
+				break;
+			}
+			z->next_in = map + offset;
+			z->avail_in = MIN(zb->inlen, len);
+			*consumed += z->avail_in;
+			offset += z->avail_in;
+			len -= z->avail_in;
+		}
+		ret = inflate(z, Z_SYNC_FLUSH);
+	} while (ret == Z_OK && z->avail_out > 0);
+
+	if (ret == Z_OK) {
+		zb->flags |= GOT_ZSTREAM_F_HAVE_MORE;
+	} else {
+		if (ret != Z_STREAM_END)
+			return got_error(GOT_ERR_DECOMPRESSION);
+		zb->flags &= ~GOT_ZSTREAM_F_HAVE_MORE;
+	}
+
+	*outlenp = z->total_out - last_total_out;
+	return NULL;
+}
+
 void
 got_inflate_end(struct got_zstream_buf *zb)
 {
@@ -219,6 +265,56 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 		if (err)
 			return err;
 		*outlen += avail;
+		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
+			newbuf = reallocarray(*outbuf, 1,
+			    *outlen + GOT_ZSTREAM_BUFSIZE);
+			if (newbuf == NULL) {
+				err = got_error_from_errno();
+				free(*outbuf);
+				*outbuf = NULL;
+				*outlen = 0;
+				goto done;
+			}
+			*outbuf = newbuf;
+			zb.outbuf = newbuf + *outlen;
+			zb.outlen = GOT_ZSTREAM_BUFSIZE;
+		}
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
+
+done:
+	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
+    size_t offset, size_t len)
+{
+	const struct got_error *err;
+	size_t avail;
+	struct got_zstream_buf zb;
+	void *newbuf;
+	size_t consumed;
+
+	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
+	if (*outbuf == NULL)
+		return got_error_from_errno();
+	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
+	if (err)
+		return err;
+
+	*outlen = 0;
+
+	do {
+		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
+		    &consumed);
+		if (err)
+			return err;
+		offset += consumed;
+		len -= consumed;
+		*outlen += avail;
+		if (len == 0)
+			break;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
 			newbuf = reallocarray(*outbuf, 1,
 			    *outlen + GOT_ZSTREAM_BUFSIZE);
@@ -329,6 +425,46 @@ got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
 		err = got_inflate_read_fd(&zb, infd, &avail);
 		if (err)
 			return err;
+		if (avail > 0) {
+			size_t n;
+			n = fwrite(zb.outbuf, avail, 1, outfile);
+			if (n != 1) {
+				err = got_ferror(outfile, GOT_ERR_IO);
+				goto done;
+			}
+			*outlen += avail;
+		}
+	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
+
+done:
+	if (err == NULL)
+		rewind(outfile);
+	got_inflate_end(&zb);
+	return err;
+}
+
+const struct got_error *
+got_inflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
+    size_t len, FILE *outfile)
+{
+	const struct got_error *err;
+	size_t avail;
+	struct got_zstream_buf zb;
+	size_t consumed;
+
+	err = got_inflate_init(&zb, NULL, GOT_ZSTREAM_BUFSIZE);
+	if (err)
+		goto done;
+
+	*outlen = 0;
+
+	do {
+		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
+		    &consumed);
+		if (err)
+			return err;
+		offset += consumed;
+		len -= consumed;
 		if (avail > 0) {
 			size_t n;
 			n = fwrite(zb.outbuf, avail, 1, outfile);
