@@ -1085,6 +1085,7 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 	wchar_t *wline;
 	int width, wlimit;
 	struct tog_blame_line *blame_line;
+	struct got_object_id *prev_id = NULL;
 
 	rewind(f);
 	werase(window);
@@ -1124,7 +1125,10 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 			wstandout(window);
 
 		blame_line = &lines[lineno - 1];
-		if (blame_line->annotated) {
+		if (blame_line->annotated && prev_id &&
+		    got_object_id_cmp(prev_id, blame_line->id) == 0)
+			waddstr(window, "         ");
+		else if (blame_line->annotated) {
 			char *id_str;
 			err = got_object_id_str(&id_str, blame_line->id);
 			if (err) {
@@ -1133,8 +1137,11 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 			}
 			wprintw(window, "%.8s ", id_str);
 			free(id_str);
-		} else
-			waddstr(window, "         ");
+			prev_id = blame_line->id;
+		} else {
+			waddstr(window, "........ ");
+			prev_id = NULL;
+		}
 
 		waddwstr(window, wline);
 		while (width < wlimit) {
