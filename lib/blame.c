@@ -133,7 +133,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 			}
 		}
 	} else if (cb)
-		err = cb(arg, blame->nlines, -1, NULL);
+		err = cb(arg, blame->nlines, -1, id);
 done:
 	if (obj)
 		got_object_close(obj);

@@ -30,8 +30,8 @@ const struct got_error *got_blame(const char *, struct got_object_id *,
  * which last changed this line.
  *
  * The callback is invoked for each commit as history is traversed.
- * If no changes to the file were made in a commit, line number -1 and
- * commit ID NULL will be reported.
+ * If no changes to the file were made in a commit, line number -1 will
+ * be reported.
  *
  * If the callback returns GOT_ERR_ITER_COMPLETED, the blame operation
  * will be aborted and this function returns NULL.
