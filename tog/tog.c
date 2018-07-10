@@ -1182,7 +1182,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct got_object *obj = NULL;
 	struct got_blob_object *blob = NULL;
 	FILE *f = NULL;
-	size_t filesize, nlines;
+	size_t filesize, nlines = 0;
 	struct tog_blame_line *lines = NULL;
 	pthread_t thread = NULL;
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1315,15 +1315,17 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		}
 	}
 done:
-	if (blob)
-		got_object_blob_close(blob);
-	if (f)
-		fclose(f);
-	free(lines);
 	if (thread) {
 		if (pthread_join(thread, (void **)&err) != 0)
 			err = got_error_from_errno();
 	}
+	if (blob)
+		got_object_blob_close(blob);
+	if (f)
+		fclose(f);
+	for (i = 0; i < nlines; i++)
+		free(lines[i].id);
+	free(lines);
 	return err;
 }
 
