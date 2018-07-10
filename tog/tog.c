@@ -1264,6 +1264,10 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct tog_blame_cb_args blame_cb_args;
 	struct tog_blame_thread_args blame_thread_args;
+	struct got_object_id *selected_id;
+	struct got_commit_object *selected_commit = NULL;
+	struct got_object *obj1 = NULL, *obj2 = NULL;
+	struct got_object_qid *pid;
 
 	err = got_object_open_by_path(&obj, repo, commit_id, path);
 	if (err)
@@ -1385,6 +1389,29 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				break;
 			case KEY_ENTER:
 			case '\r':
+				if (!lines[first_displayed_line - 1 +
+				    selected_line - 1].annotated)
+					break;
+				selected_id = lines[first_displayed_line - 1 +
+				    selected_line - 1].id;
+				if (selected_id == NULL)
+					break;
+				err = got_object_open(&obj2, repo, selected_id);
+				if (err)
+					goto done;
+				err = got_object_commit_open(&selected_commit,
+				    repo, obj2);
+				if (err)
+					goto done;
+				pid =
+				    SIMPLEQ_FIRST(&selected_commit->parent_ids);
+				err = got_object_open(&obj1, repo, pid->id);
+				if (err)
+					goto done;
+				err = show_diff_view(obj1, obj2, repo);
+				show_panel(tog_blame_view.panel);
+				if (err)
+					goto done;
 				break;
 			case KEY_NPAGE:
 			case ' ':
@@ -1416,6 +1443,12 @@ done:
 	}
 	if (blob)
 		got_object_blob_close(blob);
+	if (obj1)
+		got_object_close(obj1);
+	if (obj2)
+		got_object_close(obj2);
+	if (selected_commit)
+		got_object_commit_close(selected_commit);
 	if (f)
 		fclose(f);
 	for (i = 0; i < nlines; i++)
