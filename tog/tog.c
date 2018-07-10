@@ -33,6 +33,7 @@
 #include <limits.h>
 #include <wchar.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -1048,24 +1049,173 @@ usage_blame(void)
 	exit(1);
 }
 
+struct tog_blame_line {
+	int annotated;
+	struct got_object_id *id;
+};
+
+static const struct got_error *
+draw_blame(WINDOW *window, FILE *f, struct tog_blame_line *lines, int nlines,
+    int *first_displayed_line, int *last_displayed_line, int *eof,
+    int max_lines)
+{
+	const struct got_error *err;
+	int lineno = 0, nprinted = 0;
+	char *line;
+	size_t len;
+	wchar_t *wline;
+	int width;
+	struct tog_blame_line *blame_line;
+
+	rewind(f);
+	werase(window);
+
+	*eof = 0;
+	while (nprinted < max_lines) {
+		line = parse_next_line(f, &len);
+		if (line == NULL) {
+			*eof = 1;
+			break;
+		}
+		if (++lineno < *first_displayed_line) {
+			free(line);
+			continue;
+		}
+
+		err = format_line(&wline, &width, line, COLS - 9);
+		if (err) {
+			free(line);
+			return err;
+		}
+
+		blame_line = &lines[lineno - 1];
+		if (blame_line->annotated) {
+			char *id_str;
+			err = got_object_id_str(&id_str, blame_line->id);
+			if (err) {
+				free(line);
+				return err;
+			}
+			wprintw(window, "%.8s ", id_str);
+			free(id_str);
+		} else
+			waddstr(window, "         ");
+
+		waddwstr(window, wline);
+		if (width < COLS - 9)
+			waddch(window, '\n');
+		if (++nprinted == 1)
+			*first_displayed_line = lineno;
+		free(line);
+	}
+	*last_displayed_line = lineno;
+
+	update_panels();
+	doupdate();
+
+	return NULL;
+}
+
+struct tog_blame_cb_args {
+	pthread_mutex_t *mutex;
+	struct tog_blame_line *lines; /* one per line */
+	int nlines;
+
+	FILE *f;
+	WINDOW *window;
+	int *first_displayed_line;
+	int *last_displayed_line;
+};
+
+static const struct got_error *
+blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	struct tog_blame_cb_args *a = arg;
+	struct tog_blame_line *line;
+	int eof;
+
+	if (nlines != a->nlines || lineno < 1 || lineno > a->nlines)
+		return got_error(GOT_ERR_RANGE);
+
+	if (pthread_mutex_lock(a->mutex) != 0)
+		return got_error_from_errno();
+
+	line = &a->lines[lineno - 1];
+	line->id = got_object_id_dup(id);
+	if (line->id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	line->annotated = 1;
+
+	err = draw_blame(a->window, a->f, a->lines, a->nlines,
+	    a->first_displayed_line, a->last_displayed_line, &eof, LINES);
+done:
+	if (pthread_mutex_unlock(a->mutex) != 0)
+		return got_error_from_errno();
+	return err;
+}
+
+struct tog_blame_thread_args {
+	const char *path;
+	struct got_object_id *commit_id;
+	struct got_repository *repo;
+	void *blame_cb_args;
+};
+
+static void *
+blame_thread(void *arg)
+{
+	struct tog_blame_thread_args *a = arg;
+	return (void *)got_blame_incremental(a->path, a->commit_id, a->repo,
+	    blame_cb, a->blame_cb_args);
+}
+
 static const struct got_error *
 show_blame_view(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	FILE *f;
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
 	int eof, i;
+	struct got_object *obj = NULL;
+	struct got_blob_object *blob = NULL;
+	FILE *f = NULL;
+	size_t filesize, nlines;
+	struct tog_blame_line *lines = NULL;
+	pthread_t thread = NULL;
+	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	struct tog_blame_cb_args blame_cb_args;
+	struct tog_blame_thread_args blame_thread_args;
 
+	err = got_object_open_by_path(&obj, repo, commit_id, path);
+	if (err)
+		goto done;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		got_object_close(obj);
+		goto done;
+	}
+
+	err = got_object_blob_open(&blob, repo, obj, 8192);
+	got_object_close(obj);
+	if (err)
+		goto done;
 	f = got_opentemp();
-	if (f == NULL)
-		return got_error_from_errno();
-
-	err = got_blame(path, commit_id, repo, f);
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_object_blob_dump_to_file(&filesize, &nlines, f, blob);
 	if (err)
 		goto done;
 
-	fflush(f);
+	lines = calloc(nlines, sizeof(*lines));
+	if (lines == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (tog_blame_view.window == NULL) {
 		tog_blame_view.window = newwin(0, 0, 0, 0);
@@ -1080,14 +1230,49 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	} else
 		show_panel(tog_blame_view.panel);
 
+	if (pthread_mutex_init(&mutex, NULL) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	blame_cb_args.lines = lines;
+	blame_cb_args.nlines = nlines;
+	blame_cb_args.mutex = &mutex;
+	blame_cb_args.f = f;
+	blame_cb_args.window = tog_blame_view.window;
+	blame_cb_args.first_displayed_line = &first_displayed_line;
+	blame_cb_args.last_displayed_line = &last_displayed_line;
+
+	blame_thread_args.path = path;
+	blame_thread_args.commit_id = commit_id;
+	blame_thread_args.repo = repo;
+	blame_thread_args.blame_cb_args = &blame_cb_args;
+
+	if (pthread_create(&thread, NULL, blame_thread,
+	    &blame_thread_args) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
 	while (!done) {
-		err = draw_file(tog_blame_view.window, f, &first_displayed_line,
-		    &last_displayed_line, &eof, LINES);
+		if (pthread_mutex_lock(&mutex) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = draw_blame(tog_blame_view.window, f, lines, nlines,
+		    &first_displayed_line, &last_displayed_line, &eof, LINES);
+		if (pthread_mutex_unlock(&mutex) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
 		ch = wgetch(tog_blame_view.window);
 		nodelay(stdscr, TRUE);
+		if (pthread_mutex_lock(&mutex) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
 		switch (ch) {
 			case 'q':
 				done = 1;
@@ -1124,9 +1309,21 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			default:
 				break;
 		}
+		if (pthread_mutex_unlock(&mutex) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
 	}
 done:
-	fclose(f);
+	if (blob)
+		got_object_blob_close(blob);
+	if (f)
+		fclose(f);
+	free(lines);
+	if (thread) {
+		if (pthread_join(thread, (void **)&err) != 0)
+			err = got_error_from_errno();
+	}
 	return err;
 }
 

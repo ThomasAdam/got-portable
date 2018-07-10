@@ -67,7 +67,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	size1 = 0;
 	if (blob1) {
 		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
-		err = got_object_blob_dump_to_file(&size1, f1, blob1);
+		err = got_object_blob_dump_to_file(&size1, NULL, f1, blob1);
 		if (err)
 			goto done;
 	} else
@@ -76,7 +76,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	size2 = 0;
 	if (blob2) {
 		idstr2 = got_object_blob_id_str(blob2, hex2, sizeof(hex2));
-		err = got_object_blob_dump_to_file(&size2, f2, blob2);
+		err = got_object_blob_dump_to_file(&size2, NULL, f2, blob2);
 		if (err)
 			goto done;
 	} else

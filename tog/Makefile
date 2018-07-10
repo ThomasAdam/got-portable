@@ -7,7 +7,7 @@ SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffreg.c error.c \
 		sha1.c worktree.c utf8.c inflate.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
-LDADD = -lpanel -lncursesw -lutil -lz
+LDADD = -lpanel -lncursesw -lutil -lz -lpthread
 DPADD = ${LIBZ} ${LIBUTIL}
 .if defined(PROFILE)
 CC = gcc

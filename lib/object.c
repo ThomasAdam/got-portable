@@ -1438,13 +1438,19 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 }
 
 const struct got_error *
-got_object_blob_dump_to_file(size_t *total_len, FILE *outfile,
-    struct got_blob_object *blob)
+got_object_blob_dump_to_file(size_t *total_len, size_t *nlines,
+    FILE *outfile, struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
 	size_t len, hdrlen;
+	const uint8_t *buf;
+	int i;
 
-	*total_len = 0;
+	if (total_len)
+		*total_len = 0;
+	if (nlines)
+		*nlines = 0;
+
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
 		err = got_object_blob_read_block(&len, blob);
@@ -1452,10 +1458,17 @@ got_object_blob_dump_to_file(size_t *total_len, FILE *outfile,
 			return err;
 		if (len == 0)
 			break;
-		*total_len += len;
+		if (total_len)
+			*total_len += len;
+		buf = got_object_blob_get_read_buf(blob);
+		if (nlines) {
+			for (i = 0; i < len; i++) {
+				if (buf[i] == '\n')
+					(*nlines)++;
+			}
+		}
 		/* Skip blob object header first time around. */
-		fwrite(got_object_blob_get_read_buf(blob) + hdrlen,
-		    len - hdrlen, 1, outfile);
+		fwrite(buf + hdrlen, len - hdrlen, 1, outfile);
 		hdrlen = 0;
 	} while (len != 0);
 

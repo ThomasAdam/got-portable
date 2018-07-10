@@ -47,58 +47,32 @@ struct got_blame {
 };
 
 static const struct got_error *
-dump_blob_and_count_lines(size_t *nlines, FILE *outfile,
-    struct got_blob_object *blob)
+annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *arg)
 {
 	const struct got_error *err = NULL;
-	size_t len, hdrlen;
-	const uint8_t *buf;
-	int i;
-
-	hdrlen = got_object_blob_get_hdrlen(blob);
-	*nlines = 0;
-	do {
-		err = got_object_blob_read_block(&len, blob);
-		if (err)
-			return err;
-		if (len == 0)
-			break;
-		buf = got_object_blob_get_read_buf(blob);
-		for (i = 0; i < len; i++) {
-			if (buf[i] == '\n')
-				(*nlines)++;
-		}
-		/* Skip blob object header first time around. */
-		fwrite(buf + hdrlen, len - hdrlen, 1, outfile);
-		hdrlen = 0;
-	} while (len != 0);
-
-
-	fflush(outfile);
-	rewind(outfile);
-
-	return NULL;
-}
-
-static void
-annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id)
-{
 	struct got_blame_line *line;
 
 	if (lineno < 1 || lineno > blame->nlines)
-		return;
+		return got_error(GOT_ERR_RANGE);
 	
 	line = &blame->lines[lineno - 1];
 	if (line->annotated)
-		return;
+		return NULL;
 
 	memcpy(&line->id, id, sizeof(line->id));
 	line->annotated = 1;
+	if (cb)
+		err = cb(arg, blame->nlines, lineno, id);
+	return err;
 }
 
 static const struct got_error *
 blame_commit(struct got_blame *blame, struct got_object_id *id,
-    struct got_object_id *pid, const char *path, struct got_repository *repo)
+    struct got_object_id *pid, const char *path, struct got_repository *repo,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL, *pobj = NULL;
@@ -152,8 +126,11 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 			int a = change->cv.a;
 			int b = change->cv.b;
 			int lineno;
-			for (lineno = a; lineno <= b; lineno++)
-				annotate_line(blame, lineno, id);
+			for (lineno = a; lineno <= b; lineno++) {
+				err = annotate_line(blame, lineno, id, cb, arg);
+				if (err)
+					goto done;
+			}
 		}
 	}
 done:
@@ -179,7 +156,9 @@ blame_close(struct got_blame *blame)
 
 static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
-    struct got_object_id *start_commit_id, struct got_repository *repo)
+    struct got_object_id *start_commit_id, struct got_repository *repo,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -212,7 +191,8 @@ blame_open(struct got_blame **blamep, const char *path,
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = dump_blob_and_count_lines(&blame->nlines, blame->f, blob);
+	err = got_object_blob_dump_to_file(NULL, &blame->nlines, blame->f,
+	    blob);
 	if (err)
 		goto done;
 
@@ -238,7 +218,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		if (pid == NULL)
 			break;
 
-		err = blame_commit(blame, id, pid->id, path, repo);
+		err = blame_commit(blame, id, pid->id, path, repo, cb, arg);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED)
 				err = NULL;
@@ -254,12 +234,15 @@ blame_open(struct got_blame **blamep, const char *path,
 		got_object_commit_close(commit);
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
-			break;
+			goto done;
 	}
 
 	/* Annotate remaining non-annotated lines with last commit. */
-	for (lineno = 1; lineno <= blame->nlines; lineno++)
-		annotate_line(blame, lineno, id);
+	for (lineno = 1; lineno <= blame->nlines; lineno++) {
+		err = annotate_line(blame, lineno, id, cb, arg);
+		if (err)
+			goto done;
+	}
 
 done:
 	free(id);
@@ -313,7 +296,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
 		return got_error_from_errno();
 
-	err = blame_open(&blame, abspath, start_commit_id, repo);
+	err = blame_open(&blame, abspath, start_commit_id, repo, NULL, NULL);
 	if (err) {
 		free(abspath);
 		return err;
@@ -344,5 +327,24 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 
 	blame_close(blame);
 	free(abspath);
+	return err;
+}
+
+const struct got_error *
+got_blame_incremental(const char *path, struct got_object_id *commit_id,
+    struct got_repository *repo,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *arg)
+{
+	const struct got_error *err = NULL;
+	struct got_blame *blame;
+	char *abspath;
+
+	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
+		return got_error_from_errno();
+
+	err = blame_open(&blame, abspath, commit_id, repo, cb, arg);
+	free(abspath);
+	blame_close(blame);
 	return err;
 }

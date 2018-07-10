@@ -190,11 +190,13 @@ const struct got_error *got_object_blob_read_block(size_t *,
 
 /*
  * Read the entire content of a blob and write it to the specified file.
- * Flush and rewind the file as well, and indicate the amount of bytes
- * written in the size_t output argument.
+ * Flush and rewind the file as well. Indicate the amount of bytes
+ * written in the first size_t output argument, and the number of lines
+ * in the file in the second size_t output argument (NULL can be passed
+ * for either output argument).
  */
-const struct got_error *got_object_blob_dump_to_file(size_t *, FILE *,
-    struct got_blob_object *);
+const struct got_error *got_object_blob_dump_to_file(size_t *, size_t *,
+    FILE *, struct got_blob_object *);
 
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **,

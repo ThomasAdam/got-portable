@@ -14,5 +14,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * Write an annotated version of a file at a given in-repository path,
+ * as found in the commit specified by ID, to the specified output file.
+ */
 const struct got_error *got_blame(const char *, struct got_object_id *,
     struct got_repository *, FILE *);
+
+/*
+ * Like got_blame() but instead of generating an output file invoke
+ * a callback whenever an annotation has been computed for a line.
+ *
+ * The callback receives the provided void * argument, the total number
+ * of lines of the annotated file, a line number, and the ID of the commit
+ * which last changed this line.
+ */
+const struct got_error *got_blame_incremental(const char *,
+    struct got_object_id *, struct got_repository *,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *);
