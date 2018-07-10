@@ -161,36 +161,39 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 	int i;
 
 	*wlinep = NULL;
+	*widthp = 0;
 
 	err = mbs2ws(&wline, &wlen, line);
 	if (err)
 		return err;
 
 	i = 0;
-	while (i < wlen && cols <= wlimit) {
+	while (i < wlen && cols < wlimit) {
 		int width = wcwidth(wline[i]);
 		switch (width) {
 		case 0:
+			i++;
 			break;
 		case 1:
 		case 2:
-			cols += width;
+			if (cols + width <= wlimit) {
+				cols += width;
+				i++;
+			}
 			break;
 		case -1:
 			if (wline[i] == L'\t')
-				cols += TABSIZE - (cols % TABSIZE);
+				cols += TABSIZE - ((cols + 1) % TABSIZE);
+			i++;
 			break;
 		default:
 			err = got_error_from_errno();
 			goto done;
 		}
-		if (cols <= COLS) {
-			i++;
-			if (widthp)
-				*widthp = cols;
-		}
 	}
 	wline[i] = L'\0';
+	if (widthp)
+		*widthp = cols;
 done:
 	if (err)
 		free(wline);
@@ -1072,7 +1075,7 @@ struct tog_blame_line {
 static const struct got_error *
 draw_blame(WINDOW *window, FILE *f, const char *path,
     struct tog_blame_line *lines, int nlines, int blame_complete,
-    int *first_displayed_line, int *last_displayed_line,
+    int selected_line, int *first_displayed_line, int *last_displayed_line,
     int *eof, int max_lines)
 {
 	const struct got_error *err;
@@ -1080,7 +1083,7 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 	char *line;
 	size_t len;
 	wchar_t *wline;
-	int width;
+	int width, wlimit;
 	struct tog_blame_line *blame_line;
 
 	rewind(f);
@@ -1110,11 +1113,15 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 			continue;
 		}
 
-		err = format_line(&wline, &width, line, COLS - 9);
+		wlimit = COLS < 9 ? 0 : COLS - 9;
+		err = format_line(&wline, &width, line, wlimit);
 		if (err) {
 			free(line);
 			return err;
 		}
+
+		if (nprinted == selected_line - 1)
+			wstandout(window);
 
 		blame_line = &lines[lineno - 1];
 		if (blame_line->annotated) {
@@ -1130,8 +1137,12 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 			waddstr(window, "         ");
 
 		waddwstr(window, wline);
-		if (width < COLS - 9)
-			waddch(window, '\n');
+		while (width < wlimit) {
+			waddch(window, ' '); /* width == wlimit - 1 ? '\n' : ' '); */
+			width++;
+		}
+		if (nprinted == selected_line - 1)
+			wstandend(window);
 		if (++nprinted == 1)
 			*first_displayed_line = lineno;
 		free(line);
@@ -1154,6 +1165,7 @@ struct tog_blame_cb_args {
 	WINDOW *window;
 	int *first_displayed_line;
 	int *last_displayed_line;
+	int *selected_line;
 	int *quit;
 };
 
@@ -1192,7 +1204,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	line->annotated = 1;
 
 	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 0,
-	    a->first_displayed_line, a->last_displayed_line, &eof, LINES);
+	     *a->selected_line, a->first_displayed_line, a->last_displayed_line,
+	    &eof, LINES);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
 		return got_error_from_errno();
@@ -1225,7 +1238,8 @@ blame_thread(void *arg)
 		return (void *)got_error_from_errno();
 
 	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 1,
-	    a->first_displayed_line, a->last_displayed_line, &eof, LINES);
+	    *a->selected_line, a->first_displayed_line, a->last_displayed_line,
+	    &eof, LINES);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
 		err = got_error_from_errno();
@@ -1239,6 +1253,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 {
 	const struct got_error *err = NULL;
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int selected_line = first_displayed_line;
 	int eof, i, blame_complete = 0;
 	struct got_object *obj = NULL;
 	struct got_blob_object *blob = NULL;
@@ -1302,6 +1317,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	blame_cb_args.path = path;
 	blame_cb_args.window = tog_blame_view.window;
 	blame_cb_args.first_displayed_line = &first_displayed_line;
+	blame_cb_args.selected_line = &selected_line;
 	blame_cb_args.last_displayed_line = &last_displayed_line;
 	blame_cb_args.quit = &done;
 
@@ -1323,8 +1339,8 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			goto done;
 		}
 		err = draw_blame(tog_blame_view.window, f, path, lines, nlines,
-		    blame_complete, &first_displayed_line, &last_displayed_line,
-		    &eof, LINES);
+		    blame_complete, selected_line, &first_displayed_line,
+		    &last_displayed_line, &eof, LINES);
 		if (pthread_mutex_unlock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
@@ -1344,32 +1360,44 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				break;
 			case 'k':
 			case KEY_UP:
-			case KEY_BACKSPACE:
-				if (first_displayed_line > 1)
-					first_displayed_line--;
-				break;
-			case KEY_PPAGE:
-				i = 0;
-				while (i++ < LINES - 1 &&
+				if (selected_line > 1)
+					selected_line--;
+				else if (selected_line == 1 &&
 				    first_displayed_line > 1)
 					first_displayed_line--;
 				break;
+			case KEY_PPAGE:
+				if (first_displayed_line == 1) {
+					selected_line = 1;
+					break;
+				}
+				if (first_displayed_line > LINES - 1)
+					first_displayed_line -= (LINES - 1);
+				else
+					first_displayed_line = 1;
+				break;
 			case 'j':
 			case KEY_DOWN:
+				if (selected_line < LINES - 1)
+					selected_line++;
+				else if (last_displayed_line < nlines)
+					first_displayed_line++;
+				break;
 			case KEY_ENTER:
 			case '\r':
-				if (!eof)
-					first_displayed_line++;
 				break;
 			case KEY_NPAGE:
 			case ' ':
-				i = 0;
-				while (!eof && i++ < LINES - 1) {
-					char *line = parse_next_line(f, NULL);
-					first_displayed_line++;
-					if (line == NULL)
-						break;
+				if (last_displayed_line >= nlines &&
+				    selected_line < LINES - 1) {
+					selected_line = LINES - 1;
+					break;
 				}
+				if (last_displayed_line + LINES - 1 <= nlines)
+					first_displayed_line += LINES - 1;
+				else
+					first_displayed_line =
+					    nlines - (LINES - 2);
 				break;
 			default:
 				break;
