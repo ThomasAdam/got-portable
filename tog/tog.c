@@ -213,11 +213,8 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	int author_width, logmsg_width;
 	char *newline, *smallerthan;
 	char *line = NULL;
-	char *id_str = NULL;
-	size_t id_len;
 	int col, limit;
 	static const size_t date_display_cols = 9;
-	static const size_t id_display_cols = 8;
 	static const size_t author_display_cols = 16;
 	const int avail = COLS;
 
@@ -231,25 +228,6 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
 	waddnstr(tog_log_view.window, datebuf, limit);
 	col = limit + 1;
-	if (col > avail)
-		goto done;
-
-	err = got_object_id_str(&id_str, id);
-	if (err)
-		return err;
-	id_len = strlen(id_str);
-	if (avail < date_display_cols + id_display_cols) {
-		limit = MIN(id_len, avail - date_display_cols);
-		waddnstr(tog_log_view.window, id_str, limit);
-	} else {
-		limit = MIN(id_display_cols, id_len);
-		waddnstr(tog_log_view.window, id_str, limit);
-	}
-	col += limit;
-	while (col <= avail && col < date_display_cols + id_display_cols + 2) {
-		waddch(tog_log_view.window, ' ');
-		col++;
-	}
 	if (col > avail)
 		goto done;
 
@@ -308,7 +286,6 @@ done:
 	free(author0);
 	free(wauthor);
 	free(line);
-	free(id_str);
 	return err;
 }
 
