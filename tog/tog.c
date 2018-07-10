@@ -1254,6 +1254,44 @@ blame_thread(void *arg)
 	return (void *)err;
 }
 
+
+static const struct got_error *
+open_blamed_commit_and_parent(struct got_object **pobj, struct got_object **obj,
+    struct tog_blame_line *lines, int first_displayed_line,
+    int selected_line, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct tog_blame_line *line;
+	struct got_commit_object *commit = NULL;
+	struct got_object_qid *pid;
+
+	*pobj = NULL;
+	*obj = NULL;
+
+	line = &lines[first_displayed_line - 1 + selected_line - 1];
+	if (!line->annotated || line->id == NULL)
+		return NULL;
+
+	err = got_object_open(obj, repo, line->id);
+	if (err)
+		goto done;
+
+	err = got_object_commit_open(&commit, repo, *obj);
+	if (err)
+		goto done;
+
+	pid = SIMPLEQ_FIRST(&commit->parent_ids);
+	if (pid) {
+		err = got_object_open(pobj, repo, pid->id);
+		if (err)
+			goto done;
+	}
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
 static const struct got_error *
 show_blame_view(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo)
@@ -1262,7 +1300,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
 	int selected_line = first_displayed_line;
 	int eof, i, blame_complete = 0;
-	struct got_object *obj = NULL;
+	struct got_object *obj = NULL, *pobj = NULL;
 	struct got_blob_object *blob = NULL;
 	FILE *f = NULL;
 	size_t filesize, nlines = 0;
@@ -1271,22 +1309,16 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct tog_blame_cb_args blame_cb_args;
 	struct tog_blame_thread_args blame_thread_args;
-	struct got_object_id *selected_id;
-	struct got_commit_object *commit = NULL;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
-	struct got_object_qid *pid;
 
 	err = got_object_open_by_path(&obj, repo, commit_id, path);
 	if (err)
 		goto done;
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
-		got_object_close(obj);
 		goto done;
 	}
 
 	err = got_object_blob_open(&blob, repo, obj, 8192);
-	got_object_close(obj);
 	if (err)
 		goto done;
 	f = got_opentemp();
@@ -1396,36 +1428,20 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				break;
 			case KEY_ENTER:
 			case '\r':
-				if (!lines[first_displayed_line - 1 +
-				    selected_line - 1].annotated)
-					break;
-				selected_id = lines[first_displayed_line - 1 +
-				    selected_line - 1].id;
-				if (selected_id == NULL)
-					break;
-				err = got_object_open(&obj2, repo, selected_id);
+				err = open_blamed_commit_and_parent(&pobj, &obj,
+				    lines, first_displayed_line, selected_line,
+				    repo);
 				if (err)
 					goto done;
-				err = got_object_commit_open(&commit, repo,
-				    obj2);
-				if (err)
-					goto done;
-				pid = SIMPLEQ_FIRST(&commit->parent_ids);
-				if (pid) {
-					err = got_object_open(&obj1, repo,
-					    pid->id);
-					if (err)
-						goto done;
+				if (pobj == NULL && obj == NULL)
+					break;
+				err = show_diff_view(pobj, obj, repo);
+				if (pobj) {
+					got_object_close(pobj);
+					pobj = NULL;
 				}
-				got_object_commit_close(commit);
-				commit = NULL;
-				err = show_diff_view(obj1, obj2, repo);
-				if (obj1) {
-					got_object_close(obj1);
-					obj1 = NULL;
-				}
-				got_object_close(obj2);
-				obj2 = NULL;
+				got_object_close(obj);
+				obj = NULL;
 				show_panel(tog_blame_view.panel);
 				if (err)
 					goto done;
@@ -1460,12 +1476,10 @@ done:
 	}
 	if (blob)
 		got_object_blob_close(blob);
-	if (obj1)
-		got_object_close(obj1);
-	if (obj2)
-		got_object_close(obj2);
-	if (commit)
-		got_object_commit_close(commit);
+	if (pobj)
+		got_object_close(pobj);
+	if (obj)
+		got_object_close(obj);
 	if (f)
 		fclose(f);
 	for (i = 0; i < nlines; i++)
