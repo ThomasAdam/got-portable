@@ -1125,6 +1125,7 @@ struct tog_blame_cb_args {
 	WINDOW *window;
 	int *first_displayed_line;
 	int *last_displayed_line;
+	int *done;
 };
 
 static const struct got_error *
@@ -1134,6 +1135,9 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	struct tog_blame_cb_args *a = arg;
 	struct tog_blame_line *line;
 	int eof;
+
+	if (*a->done)
+		return got_error(GOT_ERR_ITER_COMPLETED);
 
 	if (nlines != a->nlines || lineno < 1 || lineno > a->nlines)
 		return got_error(GOT_ERR_RANGE);
@@ -1241,6 +1245,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	blame_cb_args.window = tog_blame_view.window;
 	blame_cb_args.first_displayed_line = &first_displayed_line;
 	blame_cb_args.last_displayed_line = &last_displayed_line;
+	blame_cb_args.done = &done;
 
 	blame_thread_args.path = path;
 	blame_thread_args.commit_id = commit_id;
@@ -1318,6 +1323,8 @@ done:
 	if (thread) {
 		if (pthread_join(thread, (void **)&err) != 0)
 			err = got_error_from_errno();
+		if (err && err->code == GOT_ERR_ITER_COMPLETED)
+			err = NULL;
 	}
 	if (blob)
 		got_object_blob_close(blob);
