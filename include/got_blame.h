@@ -28,6 +28,15 @@ const struct got_error *got_blame(const char *, struct got_object_id *,
  * The callback receives the provided void * argument, the total number
  * of lines of the annotated file, a line number, and the ID of the commit
  * which last changed this line.
+ *
+ * The callback is invoked for each commit as history is traversed.
+ * If no changes to the file were made in a commit, line number -1 and
+ * commit ID NULL will be reported.
+ *
+ * If the callback returns GOT_ERR_ITER_COMPLETED, the blame operation
+ * will be aborted and this function returns NULL.
+ * If the callback returns any other error, the blame operation will be
+ * aborted and the callback's error is returned from this function.
  */
 const struct got_error *got_blame_incremental(const char *,
     struct got_object_id *, struct got_repository *,

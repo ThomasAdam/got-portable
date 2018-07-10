@@ -1136,16 +1136,25 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	struct tog_blame_line *line;
 	int eof;
 
-	if (*a->done)
-		return got_error(GOT_ERR_ITER_COMPLETED);
-
-	if (nlines != a->nlines || lineno < 1 || lineno > a->nlines)
+	if (nlines != a->nlines ||
+	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
 		return got_error(GOT_ERR_RANGE);
 
 	if (pthread_mutex_lock(a->mutex) != 0)
 		return got_error_from_errno();
 
+	if (*a->done) {	/* user has quit the blame view */
+		err = got_error(GOT_ERR_ITER_COMPLETED);
+		goto done;
+	}
+
+	if (lineno == -1)
+		goto done; /* no change in this commit */
+
 	line = &a->lines[lineno - 1];
+	if (line->annotated)
+		goto done;
+
 	line->id = got_object_id_dup(id);
 	if (line->id == NULL) {
 		err = got_error_from_errno();
