@@ -1411,15 +1411,20 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				if (err)
 					goto done;
 				pid = SIMPLEQ_FIRST(&commit->parent_ids);
-				err = got_object_open(&obj1, repo, pid->id);
+				if (pid) {
+					err = got_object_open(&obj1, repo,
+					    pid->id);
+					if (err)
+						goto done;
+				}
 				got_object_commit_close(commit);
 				commit = NULL;
-				if (err)
-					goto done;
 				err = show_diff_view(obj1, obj2, repo);
-				got_object_close(obj1);
+				if (obj1) {
+					got_object_close(obj1);
+					obj1 = NULL;
+				}
 				got_object_close(obj2);
-				obj1 = NULL;
 				obj2 = NULL;
 				show_panel(tog_blame_view.panel);
 				if (err)
