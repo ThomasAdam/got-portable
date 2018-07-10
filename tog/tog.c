@@ -445,14 +445,53 @@ draw_commits(struct commit_queue_entry **last, struct commit_queue_entry **selec
 {
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
-	int ncommits = 0;
+	int ncommits;
+	char *id_str, *header;
+	size_t header_len;
+
+	entry = first;
+	*selected = NULL;
+	ncommits = 0;
+	while (entry) {
+		if (++ncommits - 1 == selected_idx) {
+			*selected = entry;
+			break;
+		}
+		entry = TAILQ_NEXT(entry, entry);
+	}
+	if (*selected == NULL)
+		return got_error(GOT_ERR_RANGE);
+
+	err = got_object_id_str(&id_str, (*selected)->id);
+	if (err)
+		return err;
+
+	if (asprintf(&header, "commit: %s", id_str) == -1) {
+		err = got_error_from_errno();
+		free(id_str);
+		return err;
+	}
 
 	werase(tog_log_view.window);
 
+	header_len = strlen(header);
+	if (header_len > COLS) {
+		id_str[COLS + 1] = '\0';
+		header_len = COLS;
+	}
+	wprintw(tog_log_view.window, header);
+	while (header_len < COLS) {
+		waddch(tog_log_view.window, ' ');
+		header_len++;
+	}
+	free(id_str);
+	free(header);
+
 	entry = first;
 	*last = first;
+	ncommits = 0;
 	while (entry) {
-		if (ncommits == limit)
+		if (ncommits == limit - 1)
 			break;
 		if (ncommits == selected_idx) {
 			wstandout(tog_log_view.window);
@@ -646,6 +685,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 		goto done;
 	}
 
+	selected_entry = first_displayed_entry;
 	while (!done) {
 		err = draw_commits(&last_displayed_entry, &selected_entry,
 		    first_displayed_entry, selected, LINES);
@@ -685,7 +725,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 			case 'j':
 			case KEY_DOWN:
 				nparents = num_parents(first_displayed_entry);
-				if (selected < LINES - 1 &&
+				if (selected < LINES - 2 &&
 				    selected < nparents - 1) {
 					selected++;
 					break;
@@ -706,13 +746,13 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo)
 					break;
 				/* can't scroll any further; move cursor down */
 				nparents = num_parents(first_displayed_entry);
-				if (selected < LINES - 1 ||
+				if (selected < LINES - 2 ||
 				    selected < nparents - 1)
-					selected = MIN(LINES - 1, nparents - 1);
+					selected = MIN(LINES - 2, nparents - 1);
 				break;
 			case KEY_RESIZE:
-				if (selected > LINES)
-					selected = LINES - 1;
+				if (selected > LINES - 1)
+					selected = LINES - 2;
 				break;
 			case KEY_ENTER:
 			case '\r':
