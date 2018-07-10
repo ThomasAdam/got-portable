@@ -1056,8 +1056,9 @@ struct tog_blame_line {
 
 static const struct got_error *
 draw_blame(WINDOW *window, FILE *f, const char *path,
-    struct tog_blame_line *lines, int nlines, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines)
+    struct tog_blame_line *lines, int nlines, int blame_complete,
+    int *first_displayed_line, int *last_displayed_line,
+    int *eof, int max_lines)
 {
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
@@ -1070,8 +1071,9 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 	rewind(f);
 	werase(window);
 
-	if (asprintf(&line, "annotation of %s (lines %d-%d of %d)", path,
-	    *first_displayed_line, *last_displayed_line, nlines) == -1)
+	if (asprintf(&line, "[%d-%d/%d] annotation of %s%s",
+	    *first_displayed_line, *last_displayed_line, nlines,
+	    path, blame_complete ? "" : " in progress...") == -1)
 		return got_error_from_errno();
 	err = format_line(&wline, &width, line, COLS);
 	free(line);
@@ -1137,7 +1139,7 @@ struct tog_blame_cb_args {
 	WINDOW *window;
 	int *first_displayed_line;
 	int *last_displayed_line;
-	int *done;
+	int *quit;
 };
 
 static const struct got_error *
@@ -1155,7 +1157,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	if (pthread_mutex_lock(a->mutex) != 0)
 		return got_error_from_errno();
 
-	if (*a->done) {	/* user has quit the blame view */
+	if (*a->quit) {	/* user has quit the blame view */
 		err = got_error(GOT_ERR_ITER_COMPLETED);
 		goto done;
 	}
@@ -1174,7 +1176,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 	line->annotated = 1;
 
-	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines,
+	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 0,
 	    a->first_displayed_line, a->last_displayed_line, &eof, LINES);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
@@ -1187,14 +1189,33 @@ struct tog_blame_thread_args {
 	struct got_object_id *commit_id;
 	struct got_repository *repo;
 	void *blame_cb_args;
+	int *complete;
 };
 
 static void *
 blame_thread(void *arg)
 {
-	struct tog_blame_thread_args *a = arg;
-	return (void *)got_blame_incremental(a->path, a->commit_id, a->repo,
-	    blame_cb, a->blame_cb_args);
+	const struct got_error *err;
+	struct tog_blame_thread_args *ta = arg;
+	struct tog_blame_cb_args *a = ta->blame_cb_args;
+	int eof;
+
+	err = got_blame_incremental(ta->path, ta->commit_id, ta->repo,
+	    blame_cb, ta->blame_cb_args);
+	*ta->complete = 1;
+	if (err)
+		return (void *)err;
+
+	if (pthread_mutex_lock(a->mutex) != 0)
+		return (void *)got_error_from_errno();
+
+	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 1,
+	    a->first_displayed_line, a->last_displayed_line, &eof, LINES);
+
+	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
+		err = got_error_from_errno();
+
+	return (void *)err;
 }
 
 static const struct got_error *
@@ -1203,7 +1224,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 {
 	const struct got_error *err = NULL;
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
-	int eof, i;
+	int eof, i, blame_complete = 0;
 	struct got_object *obj = NULL;
 	struct got_blob_object *blob = NULL;
 	FILE *f = NULL;
@@ -1267,12 +1288,13 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	blame_cb_args.window = tog_blame_view.window;
 	blame_cb_args.first_displayed_line = &first_displayed_line;
 	blame_cb_args.last_displayed_line = &last_displayed_line;
-	blame_cb_args.done = &done;
+	blame_cb_args.quit = &done;
 
 	blame_thread_args.path = path;
 	blame_thread_args.commit_id = commit_id;
 	blame_thread_args.repo = repo;
 	blame_thread_args.blame_cb_args = &blame_cb_args;
+	blame_thread_args.complete = &blame_complete;
 
 	if (pthread_create(&thread, NULL, blame_thread,
 	    &blame_thread_args) != 0) {
@@ -1286,7 +1308,8 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			goto done;
 		}
 		err = draw_blame(tog_blame_view.window, f, path, lines, nlines,
-		    &first_displayed_line, &last_displayed_line, &eof, LINES);
+		    blame_complete, &first_displayed_line, &last_displayed_line,
+		    &eof, LINES);
 		if (pthread_mutex_unlock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
