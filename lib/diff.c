@@ -577,7 +577,7 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (fprintf(outfile, "\n%s\n", commit2->logmsg) < 0) {
+	if (fprintf(outfile, "%s\n", commit2->logmsg) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
