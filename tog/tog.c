@@ -1265,7 +1265,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct tog_blame_cb_args blame_cb_args;
 	struct tog_blame_thread_args blame_thread_args;
 	struct got_object_id *selected_id;
-	struct got_commit_object *selected_commit = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *pid;
 
@@ -1399,16 +1399,21 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				err = got_object_open(&obj2, repo, selected_id);
 				if (err)
 					goto done;
-				err = got_object_commit_open(&selected_commit,
-				    repo, obj2);
+				err = got_object_commit_open(&commit, repo,
+				    obj2);
 				if (err)
 					goto done;
-				pid =
-				    SIMPLEQ_FIRST(&selected_commit->parent_ids);
+				pid = SIMPLEQ_FIRST(&commit->parent_ids);
 				err = got_object_open(&obj1, repo, pid->id);
+				got_object_commit_close(commit);
+				commit = NULL;
 				if (err)
 					goto done;
 				err = show_diff_view(obj1, obj2, repo);
+				got_object_close(obj1);
+				got_object_close(obj2);
+				obj1 = NULL;
+				obj2 = NULL;
 				show_panel(tog_blame_view.panel);
 				if (err)
 					goto done;
@@ -1447,8 +1452,8 @@ done:
 		got_object_close(obj1);
 	if (obj2)
 		got_object_close(obj2);
-	if (selected_commit)
-		got_object_commit_close(selected_commit);
+	if (commit)
+		got_object_commit_close(commit);
 	if (f)
 		fclose(f);
 	for (i = 0; i < nlines; i++)
