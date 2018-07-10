@@ -203,6 +203,7 @@ static const struct got_error *
 draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
+	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author0 = NULL, *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
@@ -212,23 +213,37 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	char *id_str = NULL;
 	size_t id_len;
 	int col, limit;
+	static const size_t date_display_cols = 9;
 	static const size_t id_display_cols = 8;
 	static const size_t author_display_cols = 16;
 	const int avail = COLS;
+
+	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &commit->tm_committer)
+	    >= sizeof(datebuf))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (avail < date_display_cols)
+		limit = MIN(sizeof(datebuf) - 1, avail);
+	else
+		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
+	waddnstr(tog_log_view.window, datebuf, limit);
+	col = limit + 1;
+	if (col > avail)
+		goto done;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 	id_len = strlen(id_str);
-	if (avail < id_display_cols) {
-		limit = MIN(id_len, avail);
+	if (avail < date_display_cols + id_display_cols) {
+		limit = MIN(id_len, avail - date_display_cols);
 		waddnstr(tog_log_view.window, id_str, limit);
 	} else {
 		limit = MIN(id_display_cols, id_len);
 		waddnstr(tog_log_view.window, id_str, limit);
 	}
-	col = limit + 1;
-	while (col <= avail && col < id_display_cols + 2) {
+	col += limit;
+	while (col <= avail && col < date_display_cols + id_display_cols + 2) {
 		waddch(tog_log_view.window, ' ');
 		col++;
 	}
@@ -249,7 +264,7 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		if (at)
 			*at = '\0';
 	}
-	limit = MIN(avail, author_display_cols);
+	limit = avail - col;
 	err = format_line(&wauthor, &author_width, author, limit);
 	if (err)
 		goto done;
