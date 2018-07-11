@@ -105,8 +105,11 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	}
 
 	/* If blob hashes match then don't bother with diffing. */
-	if (got_object_id_cmp(&obj->id, &pobj->id) == 0)
+	if (got_object_id_cmp(&obj->id, &pobj->id) == 0) {
+		if (cb)
+			err = cb(arg, blame->nlines, -1, id);
 		goto done;
+	}
 
 	err = got_object_blob_open(&blob, repo, obj, 8192);
 	if (err)
