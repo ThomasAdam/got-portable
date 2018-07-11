@@ -1326,6 +1326,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct tog_blame_cb_args blame_cb_args;
 	struct tog_blame_thread_args blame_thread_args;
+	struct got_repository *blame_thread_repo = NULL;
 
 	err = got_object_open_by_path(&obj, repo, commit_id, path);
 	if (err)
@@ -1352,6 +1353,10 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		err = got_error_from_errno();
 		goto done;
 	}
+
+	err = got_repo_open(&blame_thread_repo, got_repo_get_path(repo));
+	if (err)
+		goto done;
 
 	if (tog_blame_view.window == NULL) {
 		tog_blame_view.window = newwin(0, 0, 0, 0);
@@ -1383,7 +1388,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 
 	blame_thread_args.path = path;
 	blame_thread_args.commit_id = commit_id;
-	blame_thread_args.repo = repo;
+	blame_thread_args.repo = blame_thread_repo;
 	blame_thread_args.blame_cb_args = &blame_cb_args;
 	blame_thread_args.complete = &blame_complete;
 
@@ -1491,6 +1496,8 @@ done:
 		if (err && err->code == GOT_ERR_ITER_COMPLETED)
 			err = NULL;
 	}
+	if (blame_thread_repo)
+		got_repo_close(blame_thread_repo);
 	if (blob)
 		got_object_blob_close(blob);
 	if (pobj)
