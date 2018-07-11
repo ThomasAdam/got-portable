@@ -988,7 +988,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 
 	if (delta_offset >= pack->filesize)
 		return got_error(GOT_ERR_PACK_OFFSET);
-	delta_data_offset = delta_offset + tslen + sizeof(id);
+	delta_data_offset = delta_offset + tslen;
 	if (delta_data_offset >= pack->filesize)
 		return got_error(GOT_ERR_PACK_OFFSET);
 
@@ -1000,11 +1000,11 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 
 
 	if (pack->map) {
-		size_t mapoff = (size_t)delta_offset;
+		size_t mapoff = (size_t)delta_data_offset;
 		memcpy(&id, pack->map + mapoff, sizeof(id));
 		mapoff += sizeof(id);
 		err = got_inflate_to_mem_mmap(&delta_buf, &delta_len, pack->map,
-		    mapoff, pack->filesize - delta_data_offset);
+		    mapoff, pack->filesize - mapoff);
 		if (err)
 			return err;
 	} else {
