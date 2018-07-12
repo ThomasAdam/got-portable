@@ -1778,7 +1778,7 @@ static const struct got_error *
 draw_tree_entries(struct got_tree_entry **first_displayed_entry,
     struct got_tree_entry **last_displayed_entry,
     struct got_tree_entry **selected_entry, int *ndisplayed,
-    WINDOW *window, const char *label, const char *parent_path,
+    WINDOW *window, const char *label, int show_ids, const char *parent_path,
     const struct got_tree_entries *entries, int selected, int limit, int isroot)
 {
 	const struct got_error *err = NULL;
@@ -1833,10 +1833,19 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 	}
 
 	while (te) {
-		char *line = NULL;
-		if (asprintf(&line, "  %s%s",
-		    te->name, S_ISDIR(te->mode) ? "/" : "") == -1)
+		char *line = NULL, *id_str = NULL;
+
+		if (show_ids) {
+			err = got_object_id_str(&id_str, te->id);
+			if (err)
+				return got_error_from_errno();
+		}
+		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
+		    te->name, S_ISDIR(te->mode) ? "/" : "") == -1) {
+			free(id_str);
 			return got_error_from_errno();
+		}
+		free(id_str);
 		err = format_line(&wline, &width, line, COLS);
 		if (err) {
 			free(line);
@@ -1991,7 +2000,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	int ch, done = 0, selected = 0;
+	int ch, done = 0, selected = 0, show_ids = 0;
 	struct got_tree_object *tree = root;
 	const struct got_tree_entries *entries;
 	struct got_tree_entry *first_displayed_entry = NULL;
@@ -2040,8 +2049,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 
 		err = draw_tree_entries(&first_displayed_entry,
 		    &last_displayed_entry, &selected_entry, &ndisplayed,
-		    tog_tree_view.window, tree_label, parent_path, entries,
-		    selected, LINES, tree == root);
+		    tog_tree_view.window, tree_label, show_ids,
+		     parent_path, entries, selected, LINES, tree == root);
 		free(parent_path);
 		if (err)
 			break;
@@ -2052,6 +2061,9 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		switch (ch) {
 			case 'q':
 				done = 1;
+				break;
+			case 'i':
+				show_ids = !show_ids;
 				break;
 			case 'k':
 			case KEY_UP:
