@@ -1124,8 +1124,8 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 	if (width < COLS)
 		waddch(window, '\n');
 
-	if (asprintf(&line, "[%d-%d/%d] %s%s",
-	    *first_displayed_line, *last_displayed_line, nlines,
+	if (asprintf(&line, "[%d/%d] %s%s",
+	    *first_displayed_line - 1 + selected_line, nlines,
 	    path, blame_complete ? "" : " annotating...") == -1) {
 		free(id_str);
 		return got_error_from_errno();
@@ -1457,14 +1457,14 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					selected_line = 1;
 					break;
 				}
-				if (first_displayed_line > LINES - 1)
-					first_displayed_line -= (LINES - 1);
+				if (first_displayed_line > LINES - 2)
+					first_displayed_line -= (LINES - 2);
 				else
 					first_displayed_line = 1;
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected_line < LINES - 1)
+				if (selected_line < LINES - 2)
 					selected_line++;
 				else if (last_displayed_line < nlines)
 					first_displayed_line++;
@@ -1492,15 +1492,15 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			case KEY_NPAGE:
 			case ' ':
 				if (last_displayed_line >= nlines &&
-				    selected_line < LINES - 1) {
-					selected_line = LINES - 1;
+				    selected_line < LINES - 2) {
+					selected_line = LINES - 2;
 					break;
 				}
-				if (last_displayed_line + LINES - 1 <= nlines)
-					first_displayed_line += LINES - 1;
+				if (last_displayed_line + LINES - 2 <= nlines)
+					first_displayed_line += LINES - 2;
 				else
 					first_displayed_line =
-					    nlines - (LINES - 2);
+					    nlines - (LINES - 3);
 				break;
 			default:
 				break;
