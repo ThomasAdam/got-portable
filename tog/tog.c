@@ -1823,7 +1823,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 	if (err != NULL)
 		goto done;
 
-	if (asprintf(&tree_label, "tree of commit %s", commit_id_str) == -1) {
+	if (asprintf(&tree_label, "commit: %s", commit_id_str) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
