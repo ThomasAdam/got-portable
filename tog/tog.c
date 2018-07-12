@@ -1090,7 +1090,7 @@ struct tog_blame_line {
 };
 
 static const struct got_error *
-draw_blame(WINDOW *window, FILE *f, const char *path,
+draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
     struct tog_blame_line *lines, int nlines, int blame_complete,
     int selected_line, int *first_displayed_line, int *last_displayed_line,
     int *eof, int max_lines)
@@ -1103,14 +1103,34 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 	int width, wlimit;
 	struct tog_blame_line *blame_line;
 	struct got_object_id *prev_id = NULL;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
 
 	rewind(f);
 	werase(window);
 
-	if (asprintf(&line, "[%d-%d/%d] annotation of %s%s",
+	if (asprintf(&line, "commit: %s", id_str) == -1) {
+		err = got_error_from_errno();
+		free(id_str);
+		return err;
+	}
+
+	err = format_line(&wline, &width, line, COLS);
+	free(line);
+	waddwstr(window, wline);
+	if (width < COLS)
+		waddch(window, '\n');
+
+	if (asprintf(&line, "[%d-%d/%d] %s%s",
 	    *first_displayed_line, *last_displayed_line, nlines,
-	    path, blame_complete ? "" : " in progress...") == -1)
+	    path, blame_complete ? "" : " annotating...") == -1) {
+		free(id_str);
 		return got_error_from_errno();
+	}
+	free(id_str);
 	err = format_line(&wline, &width, line, COLS);
 	free(line);
 	if (err)
@@ -1120,7 +1140,7 @@ draw_blame(WINDOW *window, FILE *f, const char *path,
 		waddch(window, '\n');
 
 	*eof = 0;
-	while (nprinted < max_lines - 1) {
+	while (nprinted < max_lines - 2) {
 		line = parse_next_line(f, &len);
 		if (line == NULL) {
 			*eof = 1;
@@ -1184,6 +1204,7 @@ struct tog_blame_cb_args {
 	struct tog_blame_line *lines; /* one per line */
 	int nlines;
 
+	struct got_object_id *commit_id;
 	FILE *f;
 	const char *path;
 	WINDOW *window;
@@ -1227,9 +1248,9 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 	line->annotated = 1;
 
-	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 0,
-	     *a->selected_line, a->first_displayed_line, a->last_displayed_line,
-	    &eof, LINES);
+	err = draw_blame(a->window, a->commit_id, a->f, a->path, a->lines,
+	    a->nlines, 0, *a->selected_line, a->first_displayed_line,
+	    a->last_displayed_line, &eof, LINES);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
 		return got_error_from_errno();
@@ -1238,7 +1259,6 @@ done:
 
 struct tog_blame_thread_args {
 	const char *path;
-	struct got_object_id *commit_id;
 	struct got_repository *repo;
 	void *blame_cb_args;
 	int *complete;
@@ -1252,7 +1272,7 @@ blame_thread(void *arg)
 	struct tog_blame_cb_args *a = ta->blame_cb_args;
 	int eof;
 
-	err = got_blame_incremental(ta->path, ta->commit_id, ta->repo,
+	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->blame_cb_args);
 	*ta->complete = 1;
 	if (err)
@@ -1261,8 +1281,9 @@ blame_thread(void *arg)
 	if (pthread_mutex_lock(a->mutex) != 0)
 		return (void *)got_error_from_errno();
 
-	err = draw_blame(a->window, a->f, a->path, a->lines, a->nlines, 1,
-	    *a->selected_line, a->first_displayed_line, a->last_displayed_line,
+	err = draw_blame(a->window, a->commit_id, a->f, a->path, a->lines,
+	    a->nlines, 1, *a->selected_line, a->first_displayed_line,
+	    a->last_displayed_line,
 	    &eof, LINES);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
@@ -1378,6 +1399,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	blame_cb_args.lines = lines;
 	blame_cb_args.nlines = nlines;
 	blame_cb_args.mutex = &mutex;
+	blame_cb_args.commit_id = commit_id;
 	blame_cb_args.f = f;
 	blame_cb_args.path = path;
 	blame_cb_args.window = tog_blame_view.window;
@@ -1387,7 +1409,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	blame_cb_args.quit = &done;
 
 	blame_thread_args.path = path;
-	blame_thread_args.commit_id = commit_id;
 	blame_thread_args.repo = blame_thread_repo;
 	blame_thread_args.blame_cb_args = &blame_cb_args;
 	blame_thread_args.complete = &blame_complete;
@@ -1403,9 +1424,9 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(tog_blame_view.window, f, path, lines, nlines,
-		    blame_complete, selected_line, &first_displayed_line,
-		    &last_displayed_line, &eof, LINES);
+		err = draw_blame(tog_blame_view.window, commit_id, f, path,
+		    lines, nlines, blame_complete, selected_line,
+		    &first_displayed_line, &last_displayed_line, &eof, LINES);
 		if (pthread_mutex_unlock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
