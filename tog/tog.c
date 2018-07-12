@@ -1126,7 +1126,7 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 
 	if (asprintf(&line, "[%d/%d] %s%s",
 	    *first_displayed_line - 1 + selected_line, nlines,
-	    path, blame_complete ? "" : " annotating...") == -1) {
+	    blame_complete ? "" : "annotating ", path) == -1) {
 		free(id_str);
 		return got_error_from_errno();
 	}
