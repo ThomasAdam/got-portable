@@ -1546,6 +1546,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					first_displayed_line--;
 				break;
 			case KEY_PPAGE:
+			case KEY_BACKSPACE:
 				if (first_displayed_line == 1) {
 					selected_line = 1;
 					break;
