@@ -18,6 +18,7 @@ DEBUG = -O0 -g
 .endif
 CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 #CPLAGS += -DGOT_PACK_NO_MMAP
+#CFLAGS += -DGOT_NO_OBJ_CACHE
 
 # For now, default to installing binary in ~/bin
 GROUP!=id -g -n

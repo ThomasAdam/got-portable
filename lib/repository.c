@@ -149,6 +149,7 @@ done:
 
 }
 
+#ifndef GOT_NO_OBJ_CACHE
 static const struct got_error *
 cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 {
@@ -191,6 +192,7 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 		ce->data.commit = (struct got_commit_object *)item;
 		break;
 	}
+
 	err = got_object_idcache_add(cache->idcache, id, ce);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_EXISTS) {
@@ -198,21 +200,21 @@ cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 			err = NULL;
 		}
 	}
-
 	return err;
 }
+#endif
 
 const struct got_error *
 got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
     struct got_object *obj)
 {
+#ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-
 	err = cache_add(&repo->objcache, id, obj);
 	if (err)
 		return err;
-
 	obj->refcnt++;
+#endif
 	return NULL;
 }
 
@@ -236,13 +238,13 @@ const struct got_error *
 got_repo_cache_tree(struct got_repository *repo, struct got_object_id *id,
     struct got_tree_object *tree)
 {
+#ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-
 	err = cache_add(&repo->treecache, id, tree);
 	if (err)
 		return err;
-
 	tree->refcnt++;
+#endif
 	return NULL;
 }
 
@@ -266,13 +268,14 @@ const struct got_error *
 got_repo_cache_commit(struct got_repository *repo, struct got_object_id *id,
     struct got_commit_object *commit)
 {
+#ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-
 	err = cache_add(&repo->commitcache, id, commit);
 	if (err)
 		return err;
 
 	commit->refcnt++;
+#endif
 	return NULL;
 }
 
