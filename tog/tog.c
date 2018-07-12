@@ -1667,7 +1667,8 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			case ' ':
 				if (last_displayed_line >= blame.nlines &&
 				    selected_line < LINES - 2) {
-					selected_line = LINES - 2;
+					selected_line = MIN(blame.nlines,
+					    LINES - 2);
 					break;
 				}
 				if (last_displayed_line + LINES - 2 <=
