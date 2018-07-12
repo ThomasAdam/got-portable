@@ -1557,7 +1557,9 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected_line < LINES - 2)
+				if (selected_line < LINES - 2 &&
+				    first_displayed_line + selected_line <=
+				    blame.nlines)
 					selected_line++;
 				else if (last_displayed_line < blame.nlines)
 					first_displayed_line++;
