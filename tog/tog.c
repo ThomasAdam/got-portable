@@ -1563,7 +1563,8 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				else if (last_displayed_line < blame.nlines)
 					first_displayed_line++;
 				break;
-			case 'b': {
+			case 'b':
+			case 'p': {
 				struct got_object_id *id;
 				id = get_selected_commit_id(blame.lines,
 				    first_displayed_line, selected_line);
@@ -1576,6 +1577,8 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				if (err)
 					break;
 				if (pobj == NULL && obj == NULL)
+					break;
+				if (ch == 'p' && pobj == NULL)
 					break;
 				done = 1;
 				if (pthread_mutex_unlock(&mutex) != 0) {
@@ -1591,7 +1594,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				}
 				if (thread_err)
 					break;
-				id = got_object_get_id(obj);
+				id = got_object_get_id(ch == 'b' ? obj : pobj);
 				if (id == NULL) {
 					err = got_error_from_errno();
 					break;
