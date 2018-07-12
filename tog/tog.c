@@ -1207,7 +1207,6 @@ struct tog_blame_cb_args {
 	struct got_object_id *commit_id;
 	FILE *f;
 	const char *path;
-	WINDOW *window;
 	int *first_displayed_line;
 	int *last_displayed_line;
 	int *selected_line;
@@ -1248,8 +1247,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 	line->annotated = 1;
 
-	err = draw_blame(a->window, a->commit_id, a->f, a->path, a->lines,
-	    a->nlines, 0, *a->selected_line, a->first_displayed_line,
+	err = draw_blame(tog_blame_view.window, a->commit_id, a->f, a->path,
+	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
 	    a->last_displayed_line, &eof, LINES);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
@@ -1260,7 +1259,7 @@ done:
 struct tog_blame_thread_args {
 	const char *path;
 	struct got_repository *repo;
-	void *blame_cb_args;
+	struct tog_blame_cb_args *cb_args;
 	int *complete;
 };
 
@@ -1269,11 +1268,11 @@ blame_thread(void *arg)
 {
 	const struct got_error *err;
 	struct tog_blame_thread_args *ta = arg;
-	struct tog_blame_cb_args *a = ta->blame_cb_args;
+	struct tog_blame_cb_args *a = ta->cb_args;
 	int eof;
 
 	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->blame_cb_args);
+	    blame_cb, ta->cb_args);
 	*ta->complete = 1;
 	if (err)
 		return (void *)err;
@@ -1281,10 +1280,9 @@ blame_thread(void *arg)
 	if (pthread_mutex_lock(a->mutex) != 0)
 		return (void *)got_error_from_errno();
 
-	err = draw_blame(a->window, a->commit_id, a->f, a->path, a->lines,
-	    a->nlines, 1, *a->selected_line, a->first_displayed_line,
-	    a->last_displayed_line,
-	    &eof, LINES);
+	err = draw_blame(tog_blame_view.window, a->commit_id, a->f, a->path,
+	    a->lines, a->nlines, 1, *a->selected_line, a->first_displayed_line,
+	    a->last_displayed_line, &eof, LINES);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
 		err = got_error_from_errno();
@@ -1292,25 +1290,38 @@ blame_thread(void *arg)
 	return (void *)err;
 }
 
+static struct got_object_id *
+get_selected_commit_id(struct tog_blame_line *lines,
+    int first_displayed_line, int selected_line)
+{
+	struct tog_blame_line *line;
+
+	line = &lines[first_displayed_line - 1 + selected_line - 1];
+	if (!line->annotated)
+		return NULL;
+
+	return line->id;
+}
 
 static const struct got_error *
-open_blamed_commit_and_parent(struct got_object **pobj, struct got_object **obj,
+open_selected_commit(struct got_object **pobj, struct got_object **obj,
     struct tog_blame_line *lines, int first_displayed_line,
     int selected_line, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct tog_blame_line *line;
 	struct got_commit_object *commit = NULL;
+	struct got_object_id *selected_id;
 	struct got_object_qid *pid;
 
 	*pobj = NULL;
 	*obj = NULL;
 
-	line = &lines[first_displayed_line - 1 + selected_line - 1];
-	if (!line->annotated || line->id == NULL)
+	selected_id = get_selected_commit_id(lines,
+	    first_displayed_line, selected_line);
+	if (selected_id == NULL)
 		return NULL;
 
-	err = got_object_open(obj, repo, line->id);
+	err = got_object_open(obj, repo, selected_id);
 	if (err)
 		goto done;
 
@@ -1330,24 +1341,60 @@ done:
 	return err;
 }
 
+struct tog_blame {
+	FILE *f;
+	size_t filesize;
+	struct tog_blame_line *lines;
+	size_t nlines;
+	pthread_t thread;
+	struct tog_blame_thread_args thread_args;
+	struct tog_blame_cb_args cb_args;
+	const char *path;
+	struct got_object_id *commit_id;
+};
+
 static const struct got_error *
-show_blame_view(const char *path, struct got_object_id *commit_id,
+stop_blame(struct tog_blame *blame)
+{
+	const struct got_error *err = NULL;
+	int i;
+
+	if (blame->thread) {
+		if (pthread_join(blame->thread, (void **)&err) != 0)
+			err = got_error_from_errno();
+		if (err && err->code == GOT_ERR_ITER_COMPLETED)
+			err = NULL;
+		blame->thread = NULL;
+	}
+	if (blame->thread_args.repo) {
+		got_repo_close(blame->thread_args.repo);
+		blame->thread_args.repo = NULL;
+	}
+	if (blame->f) {
+		fclose(blame->f);
+		blame->f = NULL;
+	}
+	for (i = 0; i < blame->nlines; i++)
+		free(blame->lines[i].id);
+	free(blame->lines);
+	blame->lines = NULL;
+	free(blame->commit_id);
+	blame->commit_id = NULL;
+
+	return err;
+}
+
+static const struct got_error *
+run_blame(struct tog_blame *blame, pthread_mutex_t *mutex, int *blame_complete,
+    int *first_displayed_line, int *last_displayed_line,
+    int *selected_line, int *done, const char *path,
+    struct got_object_id *commit_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
-	int selected_line = first_displayed_line;
-	int eof, i, blame_complete = 0;
-	struct got_object *obj = NULL, *pobj = NULL;
 	struct got_blob_object *blob = NULL;
-	FILE *f = NULL;
-	size_t filesize, nlines = 0;
-	struct tog_blame_line *lines = NULL;
-	pthread_t thread = NULL;
-	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-	struct tog_blame_cb_args blame_cb_args;
-	struct tog_blame_thread_args blame_thread_args;
-	struct got_repository *blame_thread_repo = NULL;
+	struct got_repository *thread_repo = NULL;
+	struct got_object *obj;
 
 	err = got_object_open_by_path(&obj, repo, commit_id, path);
 	if (err)
@@ -1360,24 +1407,87 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	err = got_object_blob_open(&blob, repo, obj, 8192);
 	if (err)
 		goto done;
-	f = got_opentemp();
-	if (f == NULL) {
+	blame->f = got_opentemp();
+	if (blame->f == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = got_object_blob_dump_to_file(&filesize, &nlines, f, blob);
+	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
+	    blame->f, blob);
 	if (err)
 		goto done;
 
-	lines = calloc(nlines, sizeof(*lines));
-	if (lines == NULL) {
+	blame->lines = calloc(blame->nlines, sizeof(*blame->lines));
+	if (blame->lines == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	err = got_repo_open(&blame_thread_repo, got_repo_get_path(repo));
+	err = got_repo_open(&thread_repo, got_repo_get_path(repo));
 	if (err)
 		goto done;
+
+	blame->cb_args.lines = blame->lines;
+	blame->cb_args.nlines = blame->nlines;
+	blame->cb_args.mutex = mutex;
+	blame->cb_args.commit_id = got_object_id_dup(commit_id);
+	if (blame->cb_args.commit_id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	blame->cb_args.f = blame->f;
+	blame->cb_args.path = path;
+	blame->cb_args.first_displayed_line = first_displayed_line;
+	blame->cb_args.selected_line = selected_line;
+	blame->cb_args.last_displayed_line = last_displayed_line;
+	blame->cb_args.quit = done;
+
+	blame->thread_args.path = path;
+	blame->thread_args.repo = thread_repo;
+	blame->thread_args.cb_args = &blame->cb_args;
+	blame->thread_args.complete = blame_complete;
+	*blame_complete = 0;
+
+	if (pthread_create(&blame->thread, NULL, blame_thread,
+	    &blame->thread_args) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (obj)
+		got_object_close(obj);
+	if (err)
+		stop_blame(blame);
+	return err;
+}
+
+static const struct got_error *
+show_blame_view(const char *path, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *thread_err = NULL;
+	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int selected_line = first_displayed_line;
+	int eof, blame_complete = 0;
+	struct got_object *obj = NULL, *pobj = NULL;
+	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	struct tog_blame blame;
+	int blame_running = 0;
+	struct got_object_id *blamed_commit_id = NULL;
+
+	if (pthread_mutex_init(&mutex, NULL) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	blamed_commit_id = got_object_id_dup(commit_id);
+	if (blamed_commit_id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (tog_blame_view.window == NULL) {
 		tog_blame_view.window = newwin(0, 0, 0, 0);
@@ -1392,41 +1502,22 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	} else
 		show_panel(tog_blame_view.panel);
 
-	if (pthread_mutex_init(&mutex, NULL) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	blame_cb_args.lines = lines;
-	blame_cb_args.nlines = nlines;
-	blame_cb_args.mutex = &mutex;
-	blame_cb_args.commit_id = commit_id;
-	blame_cb_args.f = f;
-	blame_cb_args.path = path;
-	blame_cb_args.window = tog_blame_view.window;
-	blame_cb_args.first_displayed_line = &first_displayed_line;
-	blame_cb_args.selected_line = &selected_line;
-	blame_cb_args.last_displayed_line = &last_displayed_line;
-	blame_cb_args.quit = &done;
-
-	blame_thread_args.path = path;
-	blame_thread_args.repo = blame_thread_repo;
-	blame_thread_args.blame_cb_args = &blame_cb_args;
-	blame_thread_args.complete = &blame_complete;
-
-	if (pthread_create(&thread, NULL, blame_thread,
-	    &blame_thread_args) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	memset(&blame, 0, sizeof(blame));
+	err = run_blame(&blame, &mutex, &blame_complete,
+	    &first_displayed_line, &last_displayed_line,
+	    &selected_line, &done, path, blamed_commit_id, repo);
+	if (err)
+		return err;
 
 	while (!done) {
 		if (pthread_mutex_lock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(tog_blame_view.window, commit_id, f, path,
-		    lines, nlines, blame_complete, selected_line,
-		    &first_displayed_line, &last_displayed_line, &eof, LINES);
+		err = draw_blame(tog_blame_view.window, blamed_commit_id,
+		    blame.f, path, blame.lines, blame.nlines, blame_complete,
+		    selected_line, &first_displayed_line, &last_displayed_line,
+		    &eof, LINES);
 		if (pthread_mutex_unlock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
@@ -1466,16 +1557,59 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			case KEY_DOWN:
 				if (selected_line < LINES - 2)
 					selected_line++;
-				else if (last_displayed_line < nlines)
+				else if (last_displayed_line < blame.nlines)
 					first_displayed_line++;
 				break;
+			case 'b': {
+				struct got_object_id *id;
+				id = get_selected_commit_id(blame.lines,
+				    first_displayed_line, selected_line);
+				if (id == NULL || got_object_id_cmp(id,
+				    blamed_commit_id) == 0)
+					break;
+				err = open_selected_commit(&pobj, &obj,
+				    blame.lines, first_displayed_line,
+				    selected_line, repo);
+				if (err)
+					break;
+				if (pobj == NULL && obj == NULL)
+					break;
+				done = 1;
+				if (pthread_mutex_unlock(&mutex) != 0) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				thread_err = stop_blame(&blame);
+				blame_running = 0;
+				done = 0;
+				if (pthread_mutex_lock(&mutex) != 0) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				if (thread_err)
+					break;
+				free(blamed_commit_id);
+				blamed_commit_id = got_object_get_id(obj);
+				if (blamed_commit_id == NULL) {
+					err = got_error_from_errno();
+					break;
+				}
+				err = run_blame(&blame, &mutex,
+				    &blame_complete, &first_displayed_line,
+				    &last_displayed_line, &selected_line,
+				    &done, path, blamed_commit_id, repo);
+				if (err)
+					break;
+				blame_running = 1;
+				break;
+			}
 			case KEY_ENTER:
 			case '\r':
-				err = open_blamed_commit_and_parent(&pobj, &obj,
-				    lines, first_displayed_line, selected_line,
-				    repo);
+				err = open_selected_commit(&pobj, &obj,
+				    blame.lines, first_displayed_line,
+				    selected_line, repo);
 				if (err)
-					goto done;
+					break;
 				if (pobj == NULL && obj == NULL)
 					break;
 				err = show_diff_view(pobj, obj, repo);
@@ -1487,50 +1621,37 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				obj = NULL;
 				show_panel(tog_blame_view.panel);
 				if (err)
-					goto done;
+					break;
 				break;
 			case KEY_NPAGE:
 			case ' ':
-				if (last_displayed_line >= nlines &&
+				if (last_displayed_line >= blame.nlines &&
 				    selected_line < LINES - 2) {
 					selected_line = LINES - 2;
 					break;
 				}
-				if (last_displayed_line + LINES - 2 <= nlines)
+				if (last_displayed_line + LINES - 2 <=
+				    blame.nlines)
 					first_displayed_line += LINES - 2;
 				else
 					first_displayed_line =
-					    nlines - (LINES - 3);
+					    blame.nlines - (LINES - 3);
 				break;
 			default:
 				break;
 		}
-		if (pthread_mutex_unlock(&mutex) != 0) {
+		if (pthread_mutex_unlock(&mutex) != 0)
 			err = got_error_from_errno();
-			goto done;
-		}
+		if (err || thread_err)
+			break;
 	}
 done:
-	if (thread) {
-		if (pthread_join(thread, (void **)&err) != 0)
-			err = got_error_from_errno();
-		if (err && err->code == GOT_ERR_ITER_COMPLETED)
-			err = NULL;
-	}
-	if (blame_thread_repo)
-		got_repo_close(blame_thread_repo);
-	if (blob)
-		got_object_blob_close(blob);
 	if (pobj)
 		got_object_close(pobj);
-	if (obj)
-		got_object_close(obj);
-	if (f)
-		fclose(f);
-	for (i = 0; i < nlines; i++)
-		free(lines[i].id);
-	free(lines);
-	return err;
+	if (blame_running)
+		thread_err = stop_blame(&blame);
+	free(blamed_commit_id);
+	return thread_err ? thread_err : err;
 }
 
 static const struct got_error *
