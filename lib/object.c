@@ -70,7 +70,7 @@ got_object_id_str(char **outbuf, struct got_object_id *id)
 {
 	static const size_t len = SHA1_DIGEST_STRING_LENGTH;
 
-	*outbuf = calloc(1, len);
+	*outbuf = malloc(len);
 	if (*outbuf == NULL)
 		return got_error_from_errno();
 
@@ -193,7 +193,7 @@ read_object_header(struct got_object **obj, int fd)
 	size_t outlen, totlen;
 	int i;
 
-	buf = calloc(zbsize, sizeof(char));
+	buf = malloc(zbsize);
 	if (buf == NULL)
 		return got_error_from_errno();
 
@@ -208,7 +208,7 @@ read_object_header(struct got_object **obj, int fd)
 		if (err)
 			goto done;
 		if (strchr(zb.outbuf, '\0') == NULL) {
-			buf = recallocarray(buf, 1 + i, 2 + i, zbsize);
+			buf = reallocarray(buf, 2 + i, zbsize);
 			if (buf == NULL) {
 				err = got_error_from_errno();
 				goto done;
@@ -507,11 +507,11 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 
-	qid = calloc(1, sizeof(*qid));
+	qid = malloc(sizeof(*qid));
 	if (qid == NULL)
 		return got_error_from_errno();
 
-	qid->id = calloc(1, sizeof(*qid->id));
+	qid->id = malloc(sizeof(*qid->id));
 	if (qid->id == NULL) {
 		err = got_error_from_errno();
 		free(qid);
@@ -843,7 +843,7 @@ read_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	*outbuf = NULL;
 	*outlen = 0;
 
-	buf = calloc(1, blocksize);
+	buf = malloc(blocksize);
 	if (buf == NULL)
 		return got_error_from_errno();
 
@@ -1330,7 +1330,7 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error_from_errno();
 
-	(*blob)->read_buf = calloc(1, blocksize);
+	(*blob)->read_buf = malloc(blocksize);
 	if ((*blob)->read_buf == NULL) {
 		err = got_error_from_errno();
 		goto done;
