@@ -1,10 +1,10 @@
 .PATH:${.CURDIR}/../lib
 
 PROG=		tog
-SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffreg.c error.c \
-		fileindex.c object.c object_idcache.c object_idset.c \
-		opentemp.c path.c pack.c privsep.c reference.c repository.c \
-		sha1.c worktree.c utf8.c inflate.c
+SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
+		diffreg.c error.c fileindex.c object.c object_idcache.c \
+		object_idset.c opentemp.c path.c pack.c privsep.c \
+		reference.c repository.c sha1.c worktree.c utf8.c inflate.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 LDADD = -lpanel -lncursesw -lutil -lz -lpthread

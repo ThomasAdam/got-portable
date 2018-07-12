@@ -34,17 +34,64 @@
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_diff.h"
+#include "got_lib_diffoffset.h"
 
 struct got_blame_line {
 	int annotated;
 	struct got_object_id id;
 };
 
+struct got_blame_diff_offsets {
+	struct got_diffoffset_chunks *chunks;
+	struct got_object_id *commit_id;
+	SLIST_ENTRY(got_blame_diff_offsets) entry;
+};
+
+SLIST_HEAD(got_blame_diff_offsets_list, got_blame_diff_offsets);
+
 struct got_blame {
 	FILE *f;
 	size_t nlines;
 	struct got_blame_line *lines; /* one per line */
+	int ncommits;
+	struct got_blame_diff_offsets_list diff_offsets_list;
 };
+
+static void
+free_diff_offsets(struct got_blame_diff_offsets *diff_offsets)
+{
+	if (diff_offsets->chunks)
+		got_diffoffset_free(diff_offsets->chunks);
+	free(diff_offsets->commit_id);
+	free(diff_offsets);
+}
+
+static const struct got_error *
+alloc_diff_offsets(struct got_blame_diff_offsets **diff_offsets,
+    struct got_object_id *commit_id)
+{
+	const struct got_error *err = NULL;
+
+	*diff_offsets = calloc(1, sizeof(**diff_offsets));
+	if (*diff_offsets == NULL)
+		return got_error_from_errno();
+
+	(*diff_offsets)->commit_id = got_object_id_dup(commit_id);
+	if ((*diff_offsets)->commit_id == NULL) {
+		err = got_error_from_errno();
+		free_diff_offsets(*diff_offsets);
+		*diff_offsets = NULL;
+		return err;
+	}
+
+	err = got_diffoffset_alloc(&(*diff_offsets)->chunks);
+	if (err) {
+		free_diff_offsets(*diff_offsets);
+		return err;
+	}
+
+	return NULL;
+}
 
 static const struct got_error *
 annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
@@ -66,6 +113,67 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	if (cb)
 		err = cb(arg, blame->nlines, lineno, id);
 	return err;
+}
+
+static int
+get_blamed_line(struct got_blame_diff_offsets_list *diff_offsets_list,
+    int lineno)
+{
+	struct got_blame_diff_offsets *diff_offsets;
+
+	SLIST_FOREACH(diff_offsets, diff_offsets_list, entry)
+		lineno = got_diffoffset_get(diff_offsets->chunks, lineno);
+
+	return lineno;
+}
+
+static const struct got_error *
+blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
+    struct got_object_id *commit_id,
+    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
+    void *arg)
+{
+	const struct got_error *err = NULL;
+	struct got_diff_change *change;
+	struct got_blame_diff_offsets *diff_offsets;
+
+	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
+		int c = change->cv.c;
+		int d = change->cv.d;
+		int new_lineno = c;
+		int new_length = (c < d ? d - c + 1 : (c == d ? 1 : 0));
+		int ln;
+
+		for (ln = new_lineno; ln < new_lineno + new_length; ln++) {
+			err = annotate_line(blame,
+			    get_blamed_line(&blame->diff_offsets_list, ln),
+			    commit_id, cb, arg);
+			if (err)
+				return err;
+		}
+	}
+
+	err = alloc_diff_offsets(&diff_offsets, commit_id);
+	if (err)
+		return err;
+	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
+		int a = change->cv.a;
+		int b = change->cv.b;
+		int c = change->cv.c;
+		int d = change->cv.d;
+		int old_lineno = a;
+		int old_length = (a < b ? b - a + 1 : (a == b ? 1 : 0));
+		int new_lineno = c;
+		int new_length = (c < d ? d - c + 1 : (c == d ? 1 : 0));
+
+		err = got_diffoffset_add(diff_offsets->chunks,
+		    old_lineno, old_length, new_lineno, new_length);
+		if (err)
+			return err;
+	}
+	SLIST_INSERT_HEAD(&blame->diff_offsets_list, diff_offsets, entry);
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -119,22 +227,12 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	err = got_diff_blob_lines_changed(&changes, blob, pblob);
+	err = got_diff_blob_lines_changed(&changes, pblob, blob);
 	if (err)
 		goto done;
 
 	if (changes) {
-		struct got_diff_change *change;
-		SIMPLEQ_FOREACH(change, &changes->entries, entry) {
-			int a = change->cv.a;
-			int b = change->cv.b;
-			int lineno;
-			for (lineno = a; lineno <= b; lineno++) {
-				err = annotate_line(blame, lineno, id, cb, arg);
-				if (err)
-					goto done;
-			}
-		}
+		err = blame_changes(blame, changes, id, cb, arg);
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
@@ -152,9 +250,16 @@ done:
 static void
 blame_close(struct got_blame *blame)
 {
+	struct got_blame_diff_offsets *diff_offsets;
+
 	if (blame->f)
 		fclose(blame->f);
 	free(blame->lines);
+	while (!SLIST_EMPTY(&blame->diff_offsets_list)) {
+		diff_offsets = SLIST_FIRST(&blame->diff_offsets_list);
+		SLIST_REMOVE_HEAD(&blame->diff_offsets_list, entry);
+		free_diff_offsets(diff_offsets);
+	}
 	free(blame);
 }
 
