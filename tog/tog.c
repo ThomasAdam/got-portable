@@ -1595,6 +1595,12 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				if (thread_err)
 					break;
 				id = got_object_get_id(ch == 'b' ? obj : pobj);
+				got_object_close(obj);
+				obj = NULL;
+				if (pobj) {
+					got_object_close(pobj);
+					obj = NULL;
+				}
 				if (id == NULL) {
 					err = got_error_from_errno();
 					break;
