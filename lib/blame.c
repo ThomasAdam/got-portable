@@ -454,7 +454,7 @@ got_blame_incremental(const char *path, struct got_object_id *commit_id,
 
 	err = blame_open(&blame, abspath, commit_id, repo, cb, arg);
 	free(abspath);
-	if (err == NULL)
+	if (blame)
 		blame_close(blame);
 	return err;
 }
