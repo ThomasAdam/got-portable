@@ -40,6 +40,10 @@ struct got_object_qid {
 
 SIMPLEQ_HEAD(got_object_id_queue, got_object_qid);
 
+const struct got_error *got_object_qid_alloc(struct got_object_qid **,
+    struct got_object_id *);
+void got_object_qid_free(struct got_object_qid *);
+
 struct got_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;

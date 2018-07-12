@@ -474,6 +474,33 @@ done:
 }
 
 const struct got_error *
+got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+
+	*qid = calloc(1, sizeof(**qid));
+	if (*qid == NULL)
+		return got_error_from_errno();
+
+	(*qid)->id = got_object_id_dup(id);
+	if ((*qid)->id == NULL) {
+		err = got_error_from_errno();
+		free(*qid);
+		*qid = NULL;
+		return err;
+	}
+
+	return NULL;
+}
+
+void
+got_object_qid_free(struct got_object_qid *qid)
+{
+	free(qid->id);
+	free(qid);
+}
+
+const struct got_error *
 got_object_commit_add_parent(struct got_commit_object *commit,
     const char *id_str)
 {
