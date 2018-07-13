@@ -897,6 +897,7 @@ draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
 		err = format_line(&wline, &width, line, COLS);
 		if (err) {
 			free(line);
+			free(wline);
 			return err;
 		}
 		waddwstr(window, wline);
@@ -905,6 +906,8 @@ draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
 		free(line);
+		free(wline);
+		wline = NULL;
 	}
 	*last_displayed_line = nlines;
 
@@ -1118,7 +1121,10 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 
 	err = format_line(&wline, &width, line, COLS);
 	free(line);
+	line = NULL;
 	waddwstr(window, wline);
+	free(wline);
+	wline = NULL;
 	if (width < COLS)
 		waddch(window, '\n');
 
@@ -1131,9 +1137,12 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 	free(id_str);
 	err = format_line(&wline, &width, line, COLS);
 	free(line);
+	line = NULL;
 	if (err)
 		return err;
 	waddwstr(window, wline);
+	free(wline);
+	wline = NULL;
 	if (width < COLS)
 		waddch(window, '\n');
 
@@ -1168,6 +1177,7 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 			err = got_object_id_str(&id_str, blame_line->id);
 			if (err) {
 				free(line);
+				free(wline);
 				return err;
 			}
 			wprintw(window, "%.8s ", id_str);
@@ -1188,6 +1198,8 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 		if (++nprinted == 1)
 			*first_displayed_line = lineno;
 		free(line);
+		free(wline);
+		wline = NULL;
 	}
 	*last_displayed_line = lineno;
 
@@ -1810,6 +1822,8 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 	if (err)
 		return err;
 	waddwstr(window, wline);
+	free(wline);
+	wline = NULL;
 	if (width < COLS)
 		waddch(window, '\n');
 	if (--limit <= 0)
@@ -1818,6 +1832,8 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 	if (err)
 		return err;
 	waddwstr(window, wline);
+	free(wline);
+	wline = NULL;
 	if (width < COLS)
 		waddch(window, '\n');
 	if (--limit <= 0)
@@ -1874,6 +1890,8 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 		if (n == selected)
 			wstandend(window);
 		free(line);
+		free(wline);
+		wline = NULL;
 		n++;
 		(*ndisplayed)++;
 		*last_displayed_entry = te;
