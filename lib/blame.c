@@ -421,10 +421,13 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 			break;
 
 		err = blame_line(&id, blame, lineno);
-		if (err)
+		if (err) {
+			free(line);
 			break;
+		}
 
 		err = got_object_id_str(&id_str, id);
+		free(id);
 		if (err) {
 			free(line);
 			break;
