@@ -1271,6 +1271,8 @@ blame_thread(void *arg)
 
 	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->cb_args);
+	got_repo_close(ta->repo);
+	ta->repo = NULL;
 	*ta->complete = 1;
 	if (err)
 		return (void *)err;
