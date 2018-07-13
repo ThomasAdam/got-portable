@@ -301,8 +301,11 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 	if (*outbuf == NULL)
 		return got_error_from_errno();
 	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
-	if (err)
+	if (err) {
+		free(*outbuf);
+		*outbuf = NULL;
 		return err;
+	}
 
 	*outlen = 0;
 
