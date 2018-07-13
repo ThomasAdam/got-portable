@@ -427,7 +427,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 		}
 
 		err = got_object_id_str(&id_str, id);
-		free(id);
+		/* Do not free id; It points into blame->lines. */
 		if (err) {
 			free(line);
 			break;
