@@ -645,7 +645,7 @@ got_pack_close(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 
-	if (munmap(pack->map, pack->filesize) == -1)
+	if (pack->map && munmap(pack->map, pack->filesize) == -1)
 		err = got_error_from_errno();
 	close(pack->fd);
 	pack->fd = -1;
