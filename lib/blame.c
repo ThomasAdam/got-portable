@@ -233,6 +233,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 
 	if (changes) {
 		err = blame_changes(blame, changes, id, cb, arg);
+		got_diff_free_changes(changes);
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
