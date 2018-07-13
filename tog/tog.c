@@ -1599,7 +1599,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				obj = NULL;
 				if (pobj) {
 					got_object_close(pobj);
-					obj = NULL;
+					pobj = NULL;
 				}
 				if (id == NULL) {
 					err = got_error_from_errno();
