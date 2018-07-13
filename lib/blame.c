@@ -168,8 +168,10 @@ blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
 
 		err = got_diffoffset_add(diff_offsets->chunks,
 		    old_lineno, old_length, new_lineno, new_length);
-		if (err)
+		if (err) {
+			free_diff_offsets(diff_offsets);
 			return err;
+		}
 	}
 	SLIST_INSERT_HEAD(&blame->diff_offsets_list, diff_offsets, entry);
 
