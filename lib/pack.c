@@ -983,7 +983,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	uint64_t base_size;
 	size_t base_tslen;
 	off_t delta_data_offset;
-	uint8_t *delta_buf;
+	uint8_t *delta_buf = NULL;
 	size_t delta_len;
 
 	if (delta_offset >= pack->filesize)
@@ -1006,7 +1006,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		err = got_inflate_to_mem_mmap(&delta_buf, &delta_len, pack->map,
 		    mapoff, pack->filesize - mapoff);
 		if (err)
-			return err;
+			goto done;
 	} else {
 		ssize_t n = read(pack->fd, &id, sizeof(id));
 		if (n < 0)
@@ -1015,22 +1015,25 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 			return got_error(GOT_ERR_BAD_PACKFILE);
 		err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
 		if (err)
-			return err;
+			goto done;
 	}
 
 	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
 	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
-		return err;
+		goto done;
 
 	/* Delta base must be in the same pack file. */
 	idx = get_object_idx(packidx, &id, repo);
-	if (idx == -1)
-		return got_error(GOT_ERR_BAD_PACKFILE);
+	if (idx == -1) {
+		err = got_error(GOT_ERR_BAD_PACKFILE);
+		goto done;
+	}
 
 	base_offset = get_object_offset(packidx, idx);
 	if (base_offset == (uint64_t)-1) {
-		return got_error(GOT_ERR_BAD_PACKIDX);
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		goto done;
 	}
 
 	if (base_offset >= pack->filesize) {
@@ -1046,6 +1049,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	err = resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
 	    base_tslen, base_type, base_size, recursion - 1);
 done:
+	if (err)
+		free(delta_buf);
 	return err;
 }
 

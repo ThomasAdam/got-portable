@@ -310,7 +310,7 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
 		    &consumed);
 		if (err)
-			return err;
+			goto done;
 		offset += consumed;
 		len -= consumed;
 		*outlen += avail;
