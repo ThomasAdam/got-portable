@@ -496,19 +496,6 @@ draw_commits(struct commit_queue_entry **last,
 	char *id_str, *header;
 	wchar_t *wline;
 
-	entry = first;
-	*selected = NULL;
-	ncommits = 0;
-	while (entry) {
-		if (++ncommits - 1 == selected_idx) {
-			*selected = entry;
-			break;
-		}
-		entry = TAILQ_NEXT(entry, entry);
-	}
-	if (*selected == NULL)
-		return got_error(GOT_ERR_RANGE);
-
 	err = got_object_id_str(&id_str, (*selected)->id);
 	if (err)
 		return err;
@@ -716,8 +703,11 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	 */
 	err = queue_commits(graph, &commits, head_id, LINES, 1, repo,
 	    in_repo_path);
-	if (err && err->code != GOT_ERR_ITER_COMPLETED)
-		goto done;
+	if (err) {
+		if (err->code != GOT_ERR_ITER_COMPLETED)
+			goto done;
+		err = NULL;
+	}
 
 	/*
 	 * Find entry corresponding to the first commit to display.
@@ -775,6 +765,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		switch (ch) {
 			case ERR:
 				if (errno) {
+					if (errno == EINTR)
+						break;
 					err = got_error_from_errno();
 					goto done;
 				}
@@ -834,8 +826,10 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 				break;
 			}
 			case KEY_RESIZE:
-				if (selected > LINES - 1)
+				if (selected > LINES - 2)
 					selected = LINES - 2;
+				if (selected > commits.ncommits - 1)
+					selected = commits.ncommits - 1;
 				break;
 			case KEY_ENTER:
 			case '\r':
