@@ -105,3 +105,31 @@ got_canonpath(const char *input, char *buf, size_t bufsize)
 	} else
 		return got_error(GOT_ERR_NO_SPACE);
 }
+
+const struct got_error *
+got_path_skip_common_ancestor(char **child, const char *parent_abspath,
+    const char *abspath)
+{
+	const struct got_error *err = NULL;
+	size_t len_parent, len, bufsize;
+
+	len_parent = strlen(parent_abspath);
+	len = strlen(abspath);
+	if (len_parent >= len)
+		return got_error(GOT_ERR_BAD_PATH);
+	if (strncmp(parent_abspath, abspath, len_parent) != 0)
+		return got_error(GOT_ERR_BAD_PATH);
+	if (abspath[len_parent] != '/')
+		return got_error(GOT_ERR_BAD_PATH);
+	bufsize = len - len_parent + 1;
+	*child = malloc(bufsize);
+	if (*child == NULL)
+		return got_error_from_errno();
+	if (strlcpy(*child, abspath + len_parent, bufsize) >= bufsize) {
+		err = got_error_from_errno();
+		free(*child);
+		*child = NULL;
+		return err;
+	}
+	return NULL;
+}

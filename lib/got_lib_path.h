@@ -40,3 +40,11 @@ char *got_path_normalize(const char *);
  * Relative paths are copied from input to buf as-is.
  */
 const struct got_error *got_canonpath(const char *, char *, size_t);
+
+/*
+ * Get child part of two absolute paths. The second path must equal the first
+ * path up to some path component, and must be longer than the first path.
+ * The result is allocated with malloc(3).
+ */
+const struct got_error *got_path_skip_common_ancestor(char **, const char *,
+    const char *);

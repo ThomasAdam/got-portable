@@ -38,3 +38,11 @@ struct got_reference;
  */
 const struct got_error *got_repo_get_reference(struct got_reference **,
     struct got_repository *, const char *);
+
+
+/* Indicate whether this is a bare repositiry (contains no git working tree). */
+int got_repo_is_bare(struct got_repository *);
+
+/* Attempt to map an arbitrary path to a path within the repository. */
+const struct got_error *got_repo_map_path(char **, struct got_repository *,
+    const char *);

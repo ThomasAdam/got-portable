@@ -386,12 +386,12 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, int show_patch, int limit,
+    struct got_repository *repo, char *path, int show_patch, int limit,
     int first_parent_traversal)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
-	int ncommits;
+	int ncommits, found_obj = 0;
 
 	err = got_commit_graph_open(&graph, root_id, first_parent_traversal,
 	    repo);
@@ -425,6 +425,48 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			return err;
+		if (path) {
+			struct got_object *obj;
+			struct got_object_qid *pid;
+			int changed = 1;
+
+			err = got_object_open_by_path(&obj, repo, id, path);
+			if (err) {
+				if (err->code == GOT_ERR_NO_OBJ && found_obj) {
+					/*
+					 * Object was added in previous commit.
+					 * History stops here.
+					 */
+					err = NULL;
+				}
+				break;
+			}
+			found_obj = 1;
+
+			pid = SIMPLEQ_FIRST(&commit->parent_ids);
+			if (pid != NULL) {
+				struct got_object *pobj;
+				err = got_object_open_by_path(&pobj, repo,
+				    pid->id, path);
+				if (err) {
+					if (err->code != GOT_ERR_NO_OBJ) {
+						got_object_close(obj);
+						break;
+					}
+					err = NULL;
+					changed = 1;
+				} else {
+					changed = got_object_id_cmp(
+					    got_object_get_id(obj),
+					    got_object_get_id(pobj));
+					got_object_close(pobj);
+				}
+			}
+			if (!changed) {
+				got_object_commit_close(commit);
+				continue;
+			}
+		}
 		err = print_commit(commit, id, repo, show_patch);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
@@ -439,7 +481,7 @@ __dead static void
 usage_log(void)
 {
 	fprintf(stderr, "usage: %s log [-c commit] [-f] [ -l N ] [-p] "
-	    "[repository-path]\n", getprogname());
+	    "[-r repository-path] [path]\n", getprogname());
 	exit(1);
 }
 
@@ -447,10 +489,10 @@ static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
-	struct got_repository *repo;
+	struct got_repository *repo = NULL;
 	struct got_object_id *id = NULL;
 	struct got_object *obj = NULL;
-	char *repo_path = NULL;
+	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
 	char *start_commit = NULL;
 	int ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
@@ -461,7 +503,7 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:l:f")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:l:fr:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -477,6 +519,11 @@ cmd_log(int argc, char *argv[])
 		case 'f':
 			first_parent_traversal = 1;
 			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -486,21 +533,31 @@ cmd_log(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno();
-	} else if (argc == 1) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno();
-	} else
+	if (argc == 0)
+		path = strdup("");
+	else if (argc == 1)
+		path = strdup(argv[0]);
+	else
 		usage_log();
+	if (path == NULL)
+		return got_error_from_errno();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	if (repo_path == NULL) {
+		repo_path = strdup(cwd);
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	}
 
 	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
 	if (error != NULL)
-		return error;
+		goto done;
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
@@ -535,15 +592,31 @@ cmd_log(int argc, char *argv[])
 		}
 	}
 	if (error != NULL)
-		return error;
-	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT)
-		error = print_commits(obj, id, repo, show_patch, limit,
-		    first_parent_traversal);
-	else
+		goto done;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
-	got_object_close(obj);
+		goto done;
+	}
+
+	error = got_repo_map_path(&in_repo_path, repo, path);
+	if (error != NULL)
+		goto done;
+	if (in_repo_path) {
+		free(path);
+		path = in_repo_path;
+	}
+
+	error = print_commits(obj, id, repo, path, show_patch,
+	    limit, first_parent_traversal);
+done:
+	free(path);
+	free(repo_path);
+	free(cwd);
+	if (obj)
+		got_object_close(obj);
 	free(id);
-	got_repo_close(repo);
+	if (repo)
+		got_repo_close(repo);
 	return error;
 }
 

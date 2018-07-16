@@ -69,6 +69,12 @@ got_repo_get_path_git_dir(struct got_repository *repo)
 	return strdup(repo->path_git_dir);
 }
 
+int
+got_repo_is_bare(struct got_repository *repo)
+{
+	return (strcmp(repo->path, repo->path_git_dir) == 0);
+}
+
 static char *
 get_path_git_child(struct got_repository *repo, const char *basename)
 {
@@ -549,4 +555,139 @@ got_repo_close(struct got_repository *repo)
 	if (repo->commitcache.idcache)
 		got_object_idcache_free(repo->commitcache.idcache);
 	free(repo);
+}
+
+const struct got_error *
+got_repo_map_path(char **in_repo_path, struct got_repository *repo,
+    const char *input_path)
+{
+	const struct got_error *err = NULL;
+	char *repo_abspath = NULL, *cwd = NULL;
+	struct stat sb;
+	size_t repolen, cwdlen, len;
+	char *canonpath, *path;
+
+	*in_repo_path = NULL;
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno();
+
+	canonpath = strdup(input_path);
+	if (canonpath == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_canonpath(input_path, canonpath, strlen(canonpath) + 1);
+	if (err)
+		goto done;
+
+	repo_abspath = got_repo_get_path(repo);
+	if (repo_abspath == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* TODO: Call "get in-repository path of work-tree node" API. */
+
+	if (lstat(canonpath, &sb) != 0) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		/*
+		 * Path is not on disk.
+		 * Assume it is already relative to repository root.
+		 */
+		path = strdup(canonpath);
+	} else {
+		int is_repo_child = 0, is_cwd_child = 0;
+
+		path = realpath(canonpath, NULL);
+		if (path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		repolen = strlen(repo_abspath);
+		cwdlen = strlen(cwd);
+		len = strlen(path);
+
+		if (len > repolen && strncmp(path, repo_abspath, repolen) == 0)
+			is_repo_child = 1;
+		if (len > cwdlen && strncmp(path, cwd, cwdlen) == 0)
+			is_cwd_child = 1;
+
+		if (strcmp(path, repo_abspath) == 0) {
+			free(path);
+			path = strdup("");
+			if (path == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+		} else if (is_repo_child && is_cwd_child) {
+			char *child;
+			/* TODO: Is path inside a got worktree? */
+			/* Strip common prefix with repository path. */
+			err = got_path_skip_common_ancestor(&child,
+			    repo_abspath, path);
+			if (err)
+				goto done;
+			free(path);
+			path = child;
+		} else if (is_repo_child) {
+			/* Matched an on-disk path inside repository. */
+			if (got_repo_is_bare(repo)) {
+				/*
+				 * Matched an on-disk path inside repository
+				 * database. Treat as repository-relative.
+				 */
+			} else {
+				char *child;
+				/* Strip common prefix with repository path. */
+				err = got_path_skip_common_ancestor(&child,
+				    repo_abspath, path);
+				if (err)
+					goto done;
+				free(path);
+				path = child;
+			}
+		} else if (is_cwd_child) {
+			char *child;
+			/* TODO: Is path inside a got worktree? */
+			/* Strip common prefix with cwd. */
+			err = got_path_skip_common_ancestor(&child, cwd,
+			    path);
+			if (err)
+				goto done;
+			free(path);
+			path = child;
+		} else {
+			/*
+			 * Matched unrelated on-disk path.
+			 * Treat it as repository-relative.
+			 */
+		}
+	}
+
+	/* Make in-repository path absolute */
+	if (path[0] != '/') {
+		char *abspath;
+		if (asprintf(&abspath, "/%s", path) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		free(path);
+		path = abspath;
+	}
+
+done:
+	free(repo_abspath);
+	free(cwd);
+	free(canonpath);
+	if (err)
+		free(path);
+	else
+		*in_repo_path = path;
+	return err;
 }

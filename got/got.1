@@ -91,11 +91,11 @@ will be checked out.
 .El
 .\".It Cm status
 .\"Show current status of files.
-.It Cm log [ Fl c Ar commit ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Ar repository-path ]
+.It Cm log [ Fl c Ar commit ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
-If the
-.Ar repository path
-is omitted, assume the repository is located in the current working directory.
+If a
+.Ar path
+is specified, show only commits which modified this path.
 .Pp
 The options for
 .Cm got log
@@ -115,6 +115,10 @@ individual commits which originated on other branches will be omitted.
 Limit history traversal to a given number of commits.
 .It Fl p
 Display the patch of modifications made in each commit.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
 .El
 .It Cm diff [ Ar repository-path ] Ar object1 Ar object2
 Display the differences between two objects in the repository.
