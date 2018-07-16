@@ -42,11 +42,11 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width blame
-.It Cm log [ Fl c Ar commit ] [ Ar repository-path ]
+.It Cm log [ Fl c Ar commit ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
-If the
-.Ar repository path
-is omitted, assume the repository is located in the current working directory.
+If a
+.Ar path
+is specified, show only commits which modified this path.
 .Pp
 This command is also executed if no explicit command is specified.
 .Pp
@@ -81,6 +81,10 @@ Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a SHA1 hash which corresponds
 to a commit object.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
 .El
 .It Cm diff [ Ar repository-path ] Ar object1 Ar object2
 Display the differences between two objects in the repository.
