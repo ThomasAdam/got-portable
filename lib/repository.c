@@ -23,6 +23,8 @@
 #include <sha1.h>
 #include <string.h>
 #include <zlib.h>
+#include <errno.h>
+#include <libgen.h>
 
 #include "got_error.h"
 #include "got_reference.h"
@@ -296,11 +298,96 @@ got_repo_get_cached_commit(struct got_repository *repo,
 }
 
 const struct got_error *
-got_repo_open(struct got_repository **ret, const char *path)
+open_repo(struct got_repository *repo, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct got_worktree *worktree = NULL;
+
+	/* bare git repository? */
+	repo->path_git_dir = strdup(path);
+	if (repo->path_git_dir == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (is_git_repo(repo)) {
+		repo->path = strdup(repo->path_git_dir);
+		if (repo->path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		return NULL;
+	}
+
+	/* git repository with working tree? */
+	free(repo->path_git_dir);
+	if (asprintf(&repo->path_git_dir, "%s/%s", path, GOT_GIT_DIR) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (is_git_repo(repo)) {
+		repo->path = strdup(path);
+		if (repo->path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		return NULL;
+	}
+
+	/* got work tree checked out from bare git repository? */
+	free(repo->path_git_dir);
+	repo->path_git_dir = NULL;
+	err = got_worktree_open(&worktree, path);
+	if (err) {
+		if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
+			err = got_error(GOT_ERR_NOT_GIT_REPO);
+		goto done;
+	}
+	repo->path_git_dir = strdup(worktree->repo_path);
+	if (repo->path_git_dir == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* got work tree checked out from git repository with working tree? */
+	if (!is_git_repo(repo)) {
+		free(repo->path_git_dir);
+		if (asprintf(&repo->path_git_dir, "%s/%s", worktree->repo_path,
+		    GOT_GIT_DIR) == -1) {
+			err = got_error_from_errno();
+			repo->path_git_dir = NULL;
+			goto done;
+		}
+		if (!is_git_repo(repo)) {
+			err = got_error(GOT_ERR_NOT_GIT_REPO);
+			goto done;
+		}
+		repo->path = strdup(worktree->repo_path);
+		if (repo->path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else {
+		repo->path = strdup(repo->path_git_dir);
+		if (repo->path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+done:
+	if (worktree)
+		got_worktree_close(worktree);
+	return err;
+}
+
+const struct got_error *
+got_repo_open(struct got_repository **repop, const char *path)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath;
+	char *abspath, *normpath = NULL;
+	int tried_root = 0;
+
+	*repop = NULL;
 
 	if (got_path_is_absolute(path))
 		abspath = strdup(path);
@@ -341,57 +428,37 @@ got_repo_open(struct got_repository **ret, const char *path)
 		goto done;
 	}
 
-	repo->path = got_path_normalize(abspath);
-	if (repo->path == NULL) {
+	normpath = got_path_normalize(abspath);
+	if (normpath == NULL) {
 		err = got_error(GOT_ERR_BAD_PATH);
 		goto done;
 	}
 
-	repo->path_git_dir = strdup(repo->path);
-	if (repo->path_git_dir == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (!is_git_repo(repo)) {
-		free(repo->path_git_dir);
-		if (asprintf(&repo->path_git_dir, "%s/%s", repo->path,
-		    GOT_GIT_DIR) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		if (!is_git_repo(repo)) {
-			struct got_worktree *worktree;
-			if (got_worktree_open(&worktree, repo->path) == NULL) {
-				free(repo->path_git_dir);
-				repo->path_git_dir =
-				    strdup(worktree->repo_path);
-				if (repo->path_git_dir == NULL) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				if (!is_git_repo(repo)) {
-					free(repo->path_git_dir);
-					if (asprintf(&repo->path_git_dir,
-					    "%s/%s", worktree->repo_path,
-					    GOT_GIT_DIR) == -1) {
-						err = got_error_from_errno();
-						goto done;
-					}
-				}
-				got_worktree_close(worktree);
+	path = normpath;
+	do {
+		err = open_repo(repo, path);
+		if (err == NULL)
+			break;
+		if (err->code != GOT_ERR_NOT_GIT_REPO)
+			break;
+		if (path[0] == '/' && path[1] == '\0') {
+			if (tried_root) {
+				err = got_error(GOT_ERR_NOT_GIT_REPO);
+				break;
 			}
+			tried_root = 1;
 		}
-		if (!is_git_repo(repo)) {
-			err = got_error(GOT_ERR_NOT_GIT_REPO);
-			goto done;
-		}
-	}
-		
-	*ret = repo;
+		path = dirname(path);
+		if (path == NULL)
+			err = got_error_from_errno();
+	} while (path);
 done:
 	if (err)
 		got_repo_close(repo);
+	else
+		*repop = repo;
 	free(abspath);
+	free(normpath);
 	return err;
 }
 
