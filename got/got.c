@@ -428,7 +428,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		if (path) {
 			struct got_object *obj;
 			struct got_object_qid *pid;
-			int changed = 1;
+			int changed = 0;
 
 			err = got_object_open_by_path(&obj, repo, id, path);
 			if (err) {
