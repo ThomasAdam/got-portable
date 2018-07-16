@@ -456,9 +456,9 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 					err = NULL;
 					changed = 1;
 				} else {
-					changed = got_object_id_cmp(
+					changed = (got_object_id_cmp(
 					    got_object_get_id(obj),
-					    got_object_get_id(pobj));
+					    got_object_get_id(pobj)) != 0);
 					got_object_close(pobj);
 				}
 			}
