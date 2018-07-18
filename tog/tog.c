@@ -2122,12 +2122,28 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 {
 	const struct got_error *err = NULL;
 	char *path;
-	
+
 	err = tree_entry_path(&path, parents, te);
 	if (err)
 		return err;
 
 	err = show_blame_view(path, commit_id, repo);
+	free(path);
+	return err;
+}
+
+static const struct got_error *
+log_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path;
+
+	err = tree_entry_path(&path, parents, te);
+	if (err)
+		return err;
+
+	err = show_log_view(commit_id, repo, path);
 	free(path);
 	return err;
 }
@@ -2201,6 +2217,14 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 				break;
 			case 'i':
 				show_ids = !show_ids;
+				break;
+			case 'l':
+				if (selected_entry) {
+					err = log_tree_entry(selected_entry,
+					    &parents, commit_id, repo);
+					if (err)
+						goto done;
+				}
 				break;
 			case 'k':
 			case KEY_UP:
