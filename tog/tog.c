@@ -488,7 +488,9 @@ get_head_commit_id(struct got_object_id **head_id, struct got_repository *repo)
 static const struct got_error *
 draw_commits(struct commit_queue_entry **last,
     struct commit_queue_entry **selected, struct commit_queue_entry *first,
-    int selected_idx, int limit, const char *path)
+    struct commit_queue *commits, int selected_idx, int limit,
+    struct got_commit_graph *graph, struct got_repository *repo,
+    const char *path)
 {
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
@@ -545,6 +547,15 @@ draw_commits(struct commit_queue_entry **last,
 			break;
 		ncommits++;
 		*last = entry;
+		if (entry == TAILQ_LAST(&commits->head, commit_queue_head)) {
+			err = queue_commits(graph, commits, entry->id, 1,
+			    0, repo, path);
+			if (err) {
+				if (err->code != GOT_ERR_ITER_COMPLETED)
+					return err;
+				err = NULL;
+			}
+		}
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
@@ -755,7 +766,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	selected_entry = first_displayed_entry;
 	while (!done) {
 		err = draw_commits(&last_displayed_entry, &selected_entry,
-		    first_displayed_entry, selected, LINES, in_repo_path);
+		    first_displayed_entry, &commits, selected, LINES,
+		    graph, repo, in_repo_path);
 		if (err)
 			goto done;
 
