@@ -764,12 +764,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case ERR:
-				if (errno) {
-					if (errno == EINTR)
-						break;
-					err = got_error_from_errno();
-					goto done;
-				}
 				break;
 			case 'q':
 				done = 1;
