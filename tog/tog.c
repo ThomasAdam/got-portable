@@ -669,7 +669,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	struct commit_queue_entry *first_displayed_entry = NULL;
 	struct commit_queue_entry *last_displayed_entry = NULL;
 	struct commit_queue_entry *selected_entry = NULL;
-	struct commit_queue_entry *entry;
 	char *in_repo_path = NULL;
 
 	err = got_repo_map_path(&in_repo_path, repo, path);
@@ -693,12 +692,13 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	if (err)
 		return err;
 
-	TAILQ_INIT(&commits.head);
-	commits.ncommits = 0;
-
+	/* The graph contains all commits. */
 	err = got_commit_graph_open(&graph, head_id, 0, repo);
 	if (err)
 		goto done;
+	/* The commit queue contains a subset of commits filtered by path. */
+	TAILQ_INIT(&commits.head);
+	commits.ncommits = 0;
 
 	/* Populate commit graph with a sufficient number of commits. */
 	err = got_commit_graph_fetch_commits_up_to(&nfetched, graph, start_id,
@@ -712,7 +712,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	 * in order to avoid having to re-fetch commits from disk while
 	 * updating the display.
 	 */
-	err = queue_commits(graph, &commits, head_id, LINES, 1, repo,
+	err = queue_commits(graph, &commits, start_id, LINES, 1, repo,
 	    in_repo_path);
 	if (err) {
 		if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -720,49 +720,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		err = NULL;
 	}
 
-	/*
-	 * Find entry corresponding to the first commit to display.
-	 * if both a path and start commit was specified, the first commit
-	 * shown should be a commit <= start_commit which modified the path.
-	 */
-	if (in_repo_path) {
-		struct got_object_id *id;
-
-		err = got_commit_graph_iter_start(graph, start_id);
-		if (err)
-			return err;
-		do {
-			err = got_commit_graph_iter_next(&id, graph);
-			if (err)
-				goto done;
-			if (id == NULL) {
-				err = got_error(GOT_ERR_NO_OBJ);
-				goto done;
-			}
-			/*
-			 * The graph contains all commits. The commit queue
-			 * contains a subset of commits filtered by path.
-			 */
-			TAILQ_FOREACH(entry, &commits.head, entry) {
-				if (got_object_id_cmp(entry->id, id) == 0) {
-					first_displayed_entry = entry;
-					break;
-				}
-			}
-		} while (first_displayed_entry == NULL);
-	} else {
-		TAILQ_FOREACH(entry, &commits.head, entry) {
-			if (got_object_id_cmp(entry->id, start_id) == 0) {
-				first_displayed_entry = entry;
-				break;
-			}
-		}
-	}
-	if (first_displayed_entry == NULL) {
-		err = got_error(GOT_ERR_NO_OBJ);
-		goto done;
-	}
-
+	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
 	while (!done) {
 		err = draw_commits(&last_displayed_entry, &selected_entry,
