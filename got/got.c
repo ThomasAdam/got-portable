@@ -392,6 +392,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 	const struct got_error *err;
 	struct got_commit_graph *graph;
 	int ncommits, found_obj = 0;
+	int is_root_path = (strcmp(path, "/") != 0);
 
 	err = got_commit_graph_open(&graph, root_id, first_parent_traversal,
 	    repo);
@@ -399,7 +400,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		return err;
 	err = got_commit_graph_iter_start(graph, root_id);
 	if (err)
-		return err;
+		goto done;
 	do {
 		struct got_commit_object *commit;
 		struct got_object_id *id;
@@ -424,20 +425,23 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
-			return err;
-		if (path) {
+			break;
+		if (!is_root_path) {
 			struct got_object *obj;
 			struct got_object_qid *pid;
 			int changed = 0;
 
 			err = got_object_open_by_path(&obj, repo, id, path);
 			if (err) {
+				got_object_commit_close(commit);
 				if (err->code == GOT_ERR_NO_OBJ && found_obj) {
 					/*
-					 * Object was added in previous commit.
-					 * History stops here.
+					 * History of the path stops here
+					 * on the current commit's branch.
+					 * Keep logging on other branches.
 					 */
 					err = NULL;
+					continue;
 				}
 				break;
 			}
@@ -451,6 +455,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 				if (err) {
 					if (err->code != GOT_ERR_NO_OBJ) {
 						got_object_close(obj);
+						got_object_commit_close(commit);
 						break;
 					}
 					err = NULL;
@@ -462,6 +467,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 					got_object_close(pobj);
 				}
 			}
+			got_object_close(obj);
 			if (!changed) {
 				got_object_commit_close(commit);
 				continue;
@@ -472,7 +478,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		if (err || (limit && --limit == 0))
 			break;
 	} while (ncommits > 0);
-
+done:
 	got_commit_graph_close(graph);
 	return err;
 }
