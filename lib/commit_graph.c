@@ -418,11 +418,8 @@ fetch_commits_from_open_branches(int *ncommits, int *wanted_id_added,
 
 		err = add_node(&new_node, graph, commit_id, commit, child_node);
 		got_object_commit_close(commit);
-		if (err) {
-			if (err->code != GOT_ERR_OBJ_EXISTS)
-				break;
-			err = NULL;
-		}
+		if (err)
+			break;
 		if (new_node)
 			(*ncommits)++;
 		if (wanted_id && got_object_id_cmp(commit_id, wanted_id) == 0)
