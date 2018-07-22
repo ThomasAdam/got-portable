@@ -498,6 +498,17 @@ draw_commits(struct commit_queue_entry **last,
 	char *id_str, *header;
 	wchar_t *wline;
 
+	entry = first;
+	ncommits = 0;
+	while (entry) {
+		if (ncommits == selected_idx) {
+			*selected = entry;
+			break;
+		}
+		entry = TAILQ_NEXT(entry, entry);
+		ncommits++;
+	}
+
 	err = got_object_id_str(&id_str, (*selected)->id);
 	if (err)
 		return err;
@@ -536,10 +547,8 @@ draw_commits(struct commit_queue_entry **last,
 	while (entry) {
 		if (ncommits >= limit - 1)
 			break;
-		if (ncommits == selected_idx) {
+		if (ncommits == selected_idx)
 			wstandout(tog_log_view.window);
-			*selected = entry;
-		}
 		err = draw_commit(entry->commit, entry->id);
 		if (ncommits == selected_idx)
 			wstandend(tog_log_view.window);
