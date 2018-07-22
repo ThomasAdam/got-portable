@@ -221,7 +221,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	do {
 		err = got_inflate_read(&zb, f, &avail);
 		if (err)
-			return err;
+			goto done;
 		*outlen += avail;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
 			newbuf = reallocarray(*outbuf, 1,
@@ -257,14 +257,14 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 		return got_error_from_errno();
 	err = got_inflate_init(&zb, *outbuf, GOT_ZSTREAM_BUFSIZE);
 	if (err)
-		return err;
+		goto done;
 
 	*outlen = 0;
 
 	do {
 		err = got_inflate_read_fd(&zb, infd, &avail);
 		if (err)
-			return err;
+			goto done;
 		*outlen += avail;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
 			newbuf = reallocarray(*outbuf, 1,
@@ -356,7 +356,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 	do {
 		err = got_inflate_read(&zb, infile, &avail);
 		if (err)
-			return err;
+			goto done;
 		if (avail > 0) {
 			ssize_t n;
 			n = write(outfd, zb.outbuf, avail);
@@ -393,7 +393,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	do {
 		err = got_inflate_read(&zb, infile, &avail);
 		if (err)
-			return err;
+			goto done;
 		if (avail > 0) {
 			size_t n;
 			n = fwrite(zb.outbuf, avail, 1, outfile);
@@ -428,7 +428,7 @@ got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
 	do {
 		err = got_inflate_read_fd(&zb, infd, &avail);
 		if (err)
-			return err;
+			goto done;
 		if (avail > 0) {
 			size_t n;
 			n = fwrite(zb.outbuf, avail, 1, outfile);
@@ -466,7 +466,7 @@ got_inflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
 		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
 		    &consumed);
 		if (err)
-			return err;
+			goto done;
 		offset += consumed;
 		len -= consumed;
 		if (avail > 0) {
