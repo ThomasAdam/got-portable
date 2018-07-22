@@ -1541,9 +1541,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	/* Handle opening of root of commit's tree. */
 	if (path[1] == '\0') {
 		err = got_object_open(obj, repo, commit->tree_id);
-		if (err)
-			goto done;
-		return NULL;
+		goto done;
 	}
 
 	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
@@ -1599,11 +1597,9 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		}
 	}
 
-	if (te) {
+	if (te)
 		err = got_object_open(obj, repo, te->id);
-		if (err)
-			goto done;
-	} else
+	else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
 	free(s0);
