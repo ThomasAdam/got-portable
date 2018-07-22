@@ -1389,18 +1389,18 @@ blame_thread(void *arg)
 
 	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->cb_args);
-	got_repo_close(ta->repo);
-	ta->repo = NULL;
-	*ta->complete = 1;
-	if (err)
-		return (void *)err;
 
 	if (pthread_mutex_lock(a->mutex) != 0)
 		return (void *)got_error_from_errno();
 
-	err = draw_blame(tog_blame_view.window, a->commit_id, a->f, a->path,
-	    a->lines, a->nlines, 1, *a->selected_line, a->first_displayed_line,
-	    a->last_displayed_line, &eof, LINES);
+	got_repo_close(ta->repo);
+	ta->repo = NULL;
+	*ta->complete = 1;
+	if (!err)
+		err = draw_blame(tog_blame_view.window, a->commit_id, a->f,
+		    a->path, a->lines, a->nlines, 1, *a->selected_line,
+		    a->first_displayed_line, a->last_displayed_line, &eof,
+		    LINES);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
 		err = got_error_from_errno();
@@ -1593,7 +1593,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct got_object *obj = NULL, *pobj = NULL;
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct tog_blame blame;
-	int blame_running = 0;
 	struct got_object_id_queue blamed_commits;
 	struct got_object_qid *blamed_commit = NULL;
 
@@ -1706,7 +1705,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					goto done;
 				}
 				thread_err = stop_blame(&blame);
-				blame_running = 0;
 				done = 0;
 				if (pthread_mutex_lock(&mutex) != 0) {
 					err = got_error_from_errno();
@@ -1737,7 +1735,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				    &done, path, blamed_commit->id, repo);
 				if (err)
 					break;
-				blame_running = 1;
 				break;
 			}
 			case 'B': {
@@ -1751,7 +1748,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					goto done;
 				}
 				thread_err = stop_blame(&blame);
-				blame_running = 0;
 				done = 0;
 				if (pthread_mutex_lock(&mutex) != 0) {
 					err = got_error_from_errno();
@@ -1768,7 +1764,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				    &done, path, blamed_commit->id, repo);
 				if (err)
 					break;
-				blame_running = 1;
 				break;
 			}
 			case KEY_ENTER:
@@ -1817,7 +1812,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 done:
 	if (pobj)
 		got_object_close(pobj);
-	if (blame_running)
+	if (blame.thread)
 		thread_err = stop_blame(&blame);
 	while (!SIMPLEQ_EMPTY(&blamed_commits)) {
 		blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
