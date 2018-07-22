@@ -392,7 +392,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 	const struct got_error *err;
 	struct got_commit_graph *graph;
 	int ncommits, found_obj = 0;
-	int is_root_path = (strcmp(path, "/") != 0);
+	int is_root_path = (strcmp(path, "/") == 0);
 
 	err = got_commit_graph_open(&graph, root_id, first_parent_traversal,
 	    repo);
