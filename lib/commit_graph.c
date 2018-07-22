@@ -307,10 +307,10 @@ add_node(struct got_commit_graph_node **new_node,
 		if (got_object_id_cmp(commit_id, &child_node->id) == 0)
 			return got_error(GOT_ERR_BAD_OBJ_ID);
 
-		/* Prevent double-linking to the same child. */
+		/* Prevent double-linking to the same child (treat as no-op). */
 		SIMPLEQ_FOREACH(cid, &node->child_ids, entry) {
 			if (got_object_id_cmp(cid->id, &child_node->id) == 0)
-				return got_error(GOT_ERR_BAD_OBJ_ID);
+				return NULL;
 		}
 
 		err = add_vertex(&node->child_ids, &child_node->id);
