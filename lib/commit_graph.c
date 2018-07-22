@@ -277,13 +277,17 @@ add_node(struct got_commit_graph_node **new_node,
 	SIMPLEQ_INIT(&node->child_ids);
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 		err = add_vertex(&node->parent_ids, qid->id);
-		if (err)
+		if (err) {
+			free(node);
 			return err;
+		}
 		node->nparents++;
 	}
 	node->commit_timestamp = mktime(&commit->tm_committer); 
-	if (node->commit_timestamp == -1)
+	if (node->commit_timestamp == -1) {
+		free(node);
 		return got_error_from_errno();
+	}
 
 	err = got_object_idset_add((void **)(&existing_node),
 	    graph->node_ids, &node->id, node);
@@ -304,21 +308,29 @@ add_node(struct got_commit_graph_node **new_node,
 		struct got_object_qid *cid;
 
 		/* Prevent linking to self. */
-		if (got_object_id_cmp(commit_id, &child_node->id) == 0)
-			return got_error(GOT_ERR_BAD_OBJ_ID);
+		if (got_object_id_cmp(commit_id, &child_node->id) == 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_ID);
+			goto done;
+		}
 
 		/* Prevent double-linking to the same child (treat as no-op). */
 		SIMPLEQ_FOREACH(cid, &node->child_ids, entry) {
 			if (got_object_id_cmp(cid->id, &child_node->id) == 0)
-				return NULL;
+				goto free_node;
 		}
 
 		err = add_vertex(&node->child_ids, &child_node->id);
 		if (err)
-			return err;
+			goto done;
 		node->nchildren++;
 	}
-
+done:
+	if (err) {
+free_node:
+		if (node != existing_node)
+			free(node);
+		*new_node = NULL;
+	}
 	return err;
 }
 
