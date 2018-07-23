@@ -1391,7 +1391,7 @@ done:
 		size_t len = fwrite(accum_buf, 1, accum_size, outfile);
 		free(accum_buf);
 		if (len != accum_size)
-			return got_ferror(outfile, GOT_ERR_IO);
+			err = got_ferror(outfile, GOT_ERR_IO);
 	}
 	if (base_file)
 		fclose(base_file);
