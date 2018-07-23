@@ -311,7 +311,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, int show_patch)
 {
 	const struct got_error *err = NULL;
-	char *id_str, *datestr, *logmsg, *line;
+	char *id_str, *datestr, *logmsg0, *logmsg, *line;
 	char datebuf[26];
 	time_t author_time, committer_time;
 
@@ -349,16 +349,17 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		}
 	}
 
-	logmsg = strdup(commit->logmsg);
-	if (logmsg == NULL)
+	logmsg0 = strdup(commit->logmsg);
+	if (logmsg0 == NULL)
 		return got_error_from_errno();
 
+	logmsg = logmsg0;
 	do {
 		line = strsep(&logmsg, "\n");
 		if (line)
 			printf(" %s\n", line);
 	} while (line);
-	free(logmsg);
+	free(logmsg0);
 
 	if (show_patch) {
 		err = print_patch(commit, id, repo);
