@@ -1448,7 +1448,6 @@ struct tog_blame {
 	struct tog_blame_thread_args thread_args;
 	struct tog_blame_cb_args cb_args;
 	const char *path;
-	struct got_object_id *commit_id;
 };
 
 static const struct got_error *
@@ -1476,8 +1475,8 @@ stop_blame(struct tog_blame *blame)
 		free(blame->lines[i].id);
 	free(blame->lines);
 	blame->lines = NULL;
-	free(blame->commit_id);
-	blame->commit_id = NULL;
+	free(blame->cb_args.commit_id);
+	blame->cb_args.commit_id = NULL;
 
 	return err;
 }
