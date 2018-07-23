@@ -416,10 +416,23 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 					err = NULL;
 					changed = 1;
 				} else {
-					changed = (got_object_id_cmp(
-					    got_object_get_id(obj),
-					    got_object_get_id(pobj)) != 0);
+					struct got_object_id *id, *pid;
+					id = got_object_get_id(obj);
+					if (id == NULL) {
+						err = got_error_from_errno();
+						break;
+					}
+					pid = got_object_get_id(pobj);
+					if (pid == NULL) {
+						err = got_error_from_errno();
+						free(id);
+						break;
+					}
+					changed =
+					    (got_object_id_cmp(id, pid) != 0);
 					got_object_close(pobj);
+					free(id);
+					free(pid);
 				}
 			}
 			if (!changed) {
