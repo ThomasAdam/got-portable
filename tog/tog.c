@@ -344,6 +344,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 	struct got_object_id *id;
 	struct commit_queue_entry *entry;
 	int nfetched, nqueued = 0, found_obj = 0;
+	int is_root_path = strcmp(path, "/") == 0;
 
 	err = got_commit_graph_iter_start(graph, start_id);
 	if (err)
@@ -387,13 +388,14 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 		if (err)
 			break;
 
-		if (path) {
+		if (!is_root_path) {
 			struct got_object *obj;
 			struct got_object_qid *pid;
 			int changed = 0;
 
 			err = got_object_open_by_path(&obj, repo, id, path);
 			if (err) {
+				got_object_commit_close(commit);
 				if (err->code == GOT_ERR_NO_OBJ &&
 				    (found_obj || !init)) {
 					/* History stops here. */
@@ -411,6 +413,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 				if (err) {
 					if (err->code != GOT_ERR_NO_OBJ) {
 						got_object_close(obj);
+						got_object_commit_close(commit);
 						break;
 					}
 					err = NULL;
@@ -420,12 +423,16 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 					id = got_object_get_id(obj);
 					if (id == NULL) {
 						err = got_error_from_errno();
+						got_object_close(obj);
+						got_object_close(pobj);
 						break;
 					}
 					pid = got_object_get_id(pobj);
 					if (pid == NULL) {
 						err = got_error_from_errno();
 						free(id);
+						got_object_close(obj);
+						got_object_close(pobj);
 						break;
 					}
 					changed =
@@ -435,6 +442,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 					free(pid);
 				}
 			}
+			got_object_close(obj);
 			if (!changed) {
 				got_object_commit_close(commit);
 				continue;
