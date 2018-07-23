@@ -16,7 +16,6 @@
 
 struct got_delta {
 	SIMPLEQ_ENTRY(got_delta) entry;
-	char *path_packfile;
 	off_t offset;
 	size_t tslen;
 	int type;
@@ -33,8 +32,8 @@ struct got_delta_chain {
 
 #define GOT_DELTA_CHAIN_RECURSION_MAX	500
 
-struct got_delta *got_delta_open(const char *, off_t, size_t, int, size_t,
-    off_t, uint8_t *, size_t);
+struct got_delta *got_delta_open(off_t, size_t, int, size_t, off_t,
+    uint8_t *, size_t);
 void got_delta_close(struct got_delta *);
 const struct got_error *got_delta_chain_get_base_type(int *,
     struct got_delta_chain *);

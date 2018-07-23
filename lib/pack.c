@@ -890,14 +890,14 @@ resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
     size_t, unsigned int);
 
 static const struct got_error *
-add_delta(struct got_delta_chain *deltas, const char *path_packfile,
-    off_t delta_offset, size_t tslen, int delta_type, size_t delta_size,
-    size_t delta_data_offset, uint8_t *delta_buf, size_t delta_len)
+add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
+    int delta_type, size_t delta_size, size_t delta_data_offset,
+    uint8_t *delta_buf, size_t delta_len)
 {
 	struct got_delta *delta;
 
-	delta = got_delta_open(path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset, delta_buf,
+	delta = got_delta_open(delta_offset, tslen, delta_type, delta_size,
+	    delta_data_offset, delta_buf,
 	    delta_len);
 	if (delta == NULL)
 		return got_error_from_errno();
@@ -951,8 +951,8 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 			return err;
 	}
 
-	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
+	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
+	    delta_data_offset, delta_buf, delta_len);
 	if (err)
 		goto done;
 
@@ -1024,8 +1024,8 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 			goto done;
 	}
 
-	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
-	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
+	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
+	    delta_data_offset, delta_buf, delta_len);
 	if (err)
 		goto done;
 
@@ -1076,8 +1076,8 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		/* Plain types are the final delta base. Recursion ends. */
-		err = add_delta(deltas, pack->path_packfile, delta_offset,
-		    tslen, delta_type, delta_size, 0, NULL, 0);
+		err = add_delta(deltas, delta_offset, tslen, delta_type,
+		    delta_size, 0, NULL, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		err = resolve_offset_delta(deltas, repo, packidx, pack,
@@ -1249,7 +1249,7 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 
 static const struct got_error *
 dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
-    FILE *outfile, struct got_repository *repo)
+    const char *path_packfile, FILE *outfile, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1301,7 +1301,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 				goto done;
 			}
 
-			pack = get_cached_pack(delta->path_packfile, repo);
+			pack = get_cached_pack(path_packfile, repo);
 			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
@@ -1405,7 +1405,8 @@ done:
 
 static const struct got_error *
 dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
-    struct got_delta_chain *deltas, struct got_repository *repo)
+    struct got_delta_chain *deltas, const char *path_packfile,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1443,7 +1444,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				goto done;
 			}
 
-			pack = get_cached_pack(delta->path_packfile, repo);
+			pack = get_cached_pack(path_packfile, repo);
 			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
@@ -1555,7 +1556,7 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 		}
 	} else
 		err = dump_delta_chain_to_file(&obj->size,
-		    &obj->deltas, *f, repo);
+		    &obj->deltas, obj->path_packfile, *f, repo);
 done:
 	if (err && *f) {
 		fclose(*f);
@@ -1599,7 +1600,8 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 			err = got_inflate_to_mem_fd(buf, len, pack->fd);
 		}
 	} else
-		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, repo);
+		err = dump_delta_chain_to_mem(buf, len, &obj->deltas,
+		    obj->path_packfile, repo);
 done:
 	return err;
 }

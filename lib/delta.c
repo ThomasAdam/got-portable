@@ -36,9 +36,8 @@
 #endif
 
 struct got_delta *
-got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
-    int type, size_t size, off_t data_offset, uint8_t *delta_buf,
-    size_t delta_len)
+got_delta_open(off_t offset, size_t tslen, int type, size_t size,
+    off_t data_offset, uint8_t *delta_buf, size_t delta_len)
 {
 	struct got_delta *delta;
 
@@ -46,11 +45,6 @@ got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
 	if (delta == NULL)
 		return NULL;
 
-	delta->path_packfile = strdup(path_packfile);
-	if (delta->path_packfile == NULL) {
-		free(delta);
-		return NULL;
-	}
 	delta->type = type;
 	delta->offset = offset;
 	delta->tslen = tslen;
@@ -64,7 +58,6 @@ got_delta_open(const char *path_packfile, off_t offset, size_t tslen,
 void
 got_delta_close(struct got_delta *delta)
 {
-	free(delta->path_packfile);
 	free(delta->delta_buf);
 	free(delta);
 }
