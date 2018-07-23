@@ -214,7 +214,7 @@ add_vertex(struct got_object_id_queue *ids, struct got_object_id *id)
 	qid->id = got_object_id_dup(id);
 	if (qid->id == NULL) {
 		const struct got_error *err = got_error_from_errno();
-		free(qid);
+		got_object_qid_free(qid);
 		return err;
 	}
 
@@ -263,12 +263,12 @@ free_node(struct got_commit_graph_node *node)
 	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
 		struct got_object_qid *child = SIMPLEQ_FIRST(&node->child_ids);
 		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
-		free(child);
+		got_object_qid_free(child);
 	}
 	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
 		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
-		free(pid);
+		got_object_qid_free(pid);
 	}
 	free(node);
 }
@@ -280,7 +280,7 @@ add_node(struct got_commit_graph_node **new_node,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node, *existing_node;
-	struct got_object_qid *qid;
+	struct got_object_qid *pid;
 
 	*new_node = NULL;
 
@@ -291,8 +291,8 @@ add_node(struct got_commit_graph_node **new_node,
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	SIMPLEQ_INIT(&node->parent_ids);
 	SIMPLEQ_INIT(&node->child_ids);
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-		err = add_vertex(&node->parent_ids, qid->id);
+	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
+		err = add_vertex(&node->parent_ids, pid->id);
 		if (err) {
 			free_node(node);
 			return err;

@@ -485,7 +485,7 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 	(*qid)->id = got_object_id_dup(id);
 	if ((*qid)->id == NULL) {
 		err = got_error_from_errno();
-		free(*qid);
+		got_object_qid_free(*qid);
 		*qid = NULL;
 		return err;
 	}
@@ -514,7 +514,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	qid->id = malloc(sizeof(*qid->id));
 	if (qid->id == NULL) {
 		err = got_error_from_errno();
-		free(qid);
+		got_object_qid_free(qid);
 		return err;
 	}
 
@@ -1039,8 +1039,7 @@ got_object_commit_close(struct got_commit_object *commit)
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
-		free(qid->id);
-		free(qid);
+		got_object_qid_free(qid);
 	}
 
 	free(commit->tree_id);
