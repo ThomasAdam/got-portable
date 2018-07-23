@@ -191,36 +191,41 @@ read_object_header(struct got_object **obj, int fd)
 	char *buf;
 	const size_t zbsize = 64;
 	size_t outlen, totlen;
-	int i;
+	int nbuf = 1;
 
 	buf = malloc(zbsize);
 	if (buf == NULL)
 		return got_error_from_errno();
 
-	err = got_inflate_init(&zb, NULL, zbsize);
+	err = got_inflate_init(&zb, buf, zbsize);
 	if (err)
 		return err;
 
-	i = 0;
 	totlen = 0;
 	do {
 		err = got_inflate_read_fd(&zb, fd, &outlen);
 		if (err)
 			goto done;
+		if (outlen == 0)
+			break;
+		totlen += outlen;
 		if (strchr(zb.outbuf, '\0') == NULL) {
-			buf = reallocarray(buf, 2 + i, zbsize);
-			if (buf == NULL) {
+			char *newbuf;
+			nbuf++;
+			newbuf = recallocarray(buf, nbuf - 1, nbuf, zbsize);
+			if (newbuf == NULL) {
 				err = got_error_from_errno();
 				goto done;
 			}
+			buf = newbuf;
+			zb.outbuf = newbuf + totlen;
+			zb.outlen = (nbuf * zbsize) - totlen;
 		}
-		memcpy(buf + totlen, zb.outbuf, outlen);
-		totlen += outlen;
-		i++;
 	} while (strchr(zb.outbuf, '\0') == NULL);
 
 	err = parse_object_header(obj, buf, totlen);
 done:
+	free(buf);
 	got_inflate_end(&zb);
 	return err;
 }
