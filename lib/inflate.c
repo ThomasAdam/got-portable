@@ -208,6 +208,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 	size_t avail;
 	struct got_zstream_buf zb;
 	void *newbuf;
+	int nbuf = 1;
 
 	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
 	if (*outbuf == NULL)
@@ -224,8 +225,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			goto done;
 		*outlen += avail;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
-			newbuf = reallocarray(*outbuf, 1,
-			    *outlen + GOT_ZSTREAM_BUFSIZE);
+			nbuf++;
+			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
+			   GOT_ZSTREAM_BUFSIZE);
 			if (newbuf == NULL) {
 				err = got_error_from_errno();
 				free(*outbuf);
@@ -235,7 +237,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
-			zb.outlen = GOT_ZSTREAM_BUFSIZE;
+			zb.outlen = (nbuf * GOT_ZSTREAM_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
 
@@ -251,6 +253,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 	size_t avail;
 	struct got_zstream_buf zb;
 	void *newbuf;
+	int nbuf = 1;
 
 	*outbuf = calloc(1, GOT_ZSTREAM_BUFSIZE);
 	if (*outbuf == NULL)
@@ -267,8 +270,9 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 			goto done;
 		*outlen += avail;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
-			newbuf = reallocarray(*outbuf, 1,
-			    *outlen + GOT_ZSTREAM_BUFSIZE);
+			nbuf++;
+			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
+			    GOT_ZSTREAM_BUFSIZE);
 			if (newbuf == NULL) {
 				err = got_error_from_errno();
 				free(*outbuf);
@@ -278,7 +282,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
-			zb.outlen = GOT_ZSTREAM_BUFSIZE;
+			zb.outlen = (nbuf * GOT_ZSTREAM_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_ZSTREAM_F_HAVE_MORE);
 
