@@ -954,19 +954,25 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	err = add_delta(deltas, pack->path_packfile, delta_offset, tslen,
 	    delta_type, delta_size, delta_data_offset, delta_buf, delta_len);
 	if (err)
-		return err;
+		goto done;
 
 	/* An offset delta must be in the same packfile. */
-	if (base_offset >= pack->filesize)
-		return got_error(GOT_ERR_PACK_OFFSET);
+	if (base_offset >= pack->filesize) {
+		err = got_error(GOT_ERR_PACK_OFFSET);
+		goto done;
+	}
 
 	err = parse_object_type_and_size(&base_type, &base_size, &base_tslen,
 	    pack, base_offset);
 	if (err)
-		return err;
+		goto done;
 
-	return resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
+	err = resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
 	    base_tslen, base_type, base_size, recursion - 1);
+done:
+	if (err)
+		free(delta_buf);
+	return err;
 }
 
 static const struct got_error *
