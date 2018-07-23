@@ -447,10 +447,23 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 					err = NULL;
 					changed = 1;
 				} else {
-					changed = (got_object_id_cmp(
-					    got_object_get_id(obj),
-					    got_object_get_id(pobj)) != 0);
+					struct got_object_id *id, *pid;
+					id = got_object_get_id(obj);
+					if (id == NULL) {
+						err = got_error_from_errno();
+						break;
+					}
+					pid = got_object_get_id(pobj);
+					if (pid == NULL) {
+						free(id);
+						err = got_error_from_errno();
+						break;
+					}
+					changed =
+					    (got_object_id_cmp(id, pid) != 0);
 					got_object_close(pobj);
+					free(id);
+					free(pid);
 				}
 			}
 			got_object_close(obj);
