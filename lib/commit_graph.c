@@ -40,14 +40,11 @@ struct got_commit_graph_node {
 
 	/*
 	 * Each graph node corresponds to a commit object.
-	 * Graph vertices are modelled with two separate adjacency lists:
-	 * Adjacencies of a graph node are either parent (older) commits,
-	 * and child (younger) commits.
+	 * Graph vertices are modelled with an adjacency list.
+	 * Adjacencies of a graph node are parent (older) commits.
 	 */
 	int nparents;
 	struct got_object_id_queue parent_ids;
-	int nchildren;
-	struct got_object_id_queue child_ids;
 
 	time_t commit_timestamp;
 
@@ -260,11 +257,6 @@ advance_open_branches(struct got_commit_graph *graph,
 static void
 free_node(struct got_commit_graph_node *node)
 {
-	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
-		struct got_object_qid *child = SIMPLEQ_FIRST(&node->child_ids);
-		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
-		got_object_qid_free(child);
-	}
 	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
 		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
@@ -279,7 +271,7 @@ add_node(struct got_commit_graph_node **new_node,
     struct got_commit_object *commit, struct got_commit_graph_node *child_node)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_graph_node *node, *existing_node;
+	struct got_commit_graph_node *node;
 	struct got_object_qid *pid;
 
 	*new_node = NULL;
@@ -290,7 +282,6 @@ add_node(struct got_commit_graph_node **new_node,
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	SIMPLEQ_INIT(&node->parent_ids);
-	SIMPLEQ_INIT(&node->child_ids);
 	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
 		err = add_vertex(&node->parent_ids, pid->id);
 		if (err) {
@@ -305,48 +296,21 @@ add_node(struct got_commit_graph_node **new_node,
 		return got_error_from_errno();
 	}
 
-	err = got_object_idset_add((void **)(&existing_node),
-	    graph->node_ids, &node->id, node);
-	if (err == NULL) {
-		add_node_to_iter_list(graph, node, child_node);
-		err = advance_open_branches(graph, node, commit_id, commit);
-		*new_node = node;
-	} else if (err->code == GOT_ERR_OBJ_EXISTS) {
-		err = NULL;
-		free_node(node);
-		node = existing_node;
-	} else {
+	err = got_object_idset_add(NULL, graph->node_ids, &node->id, node);
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS)
+			err = NULL;
 		free_node(node);
 		return err;
 	}
 
-	if (child_node) {
-		struct got_object_qid *cid;
+	add_node_to_iter_list(graph, node, child_node);
+	err = advance_open_branches(graph, node, commit_id, commit);
+	if (err)
+		free_node(node);
+	else
+		*new_node = node;
 
-		/* Prevent linking to self. */
-		if (got_object_id_cmp(commit_id, &child_node->id) == 0) {
-			err = got_error(GOT_ERR_BAD_OBJ_ID);
-			goto done;
-		}
-
-		/* Prevent double-linking to the same child (treat as no-op). */
-		SIMPLEQ_FOREACH(cid, &node->child_ids, entry) {
-			if (got_object_id_cmp(cid->id, &child_node->id) == 0)
-				goto free_node;
-		}
-
-		err = add_vertex(&node->child_ids, &child_node->id);
-		if (err)
-			goto done;
-		node->nchildren++;
-	}
-done:
-	if (err) {
-free_node:
-		if (node != existing_node)
-			free_node(node);
-		*new_node = NULL;
-	}
 	return err;
 }
 
