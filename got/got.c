@@ -451,12 +451,15 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 					id = got_object_get_id(obj);
 					if (id == NULL) {
 						err = got_error_from_errno();
+						got_object_close(obj);
 						break;
 					}
 					pid = got_object_get_id(pobj);
 					if (pid == NULL) {
-						free(id);
 						err = got_error_from_errno();
+						free(id);
+						got_object_close(obj);
+						got_object_close(pobj);
 						break;
 					}
 					changed =
