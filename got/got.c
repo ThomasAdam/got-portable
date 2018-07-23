@@ -269,15 +269,9 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2;
-	struct got_object *obj;
 	struct got_object_qid *qid;
 
-	err = got_object_open(&obj, repo, commit->tree_id);
-	if (err)
-		return err;
-
-	err = got_object_tree_open(&tree2, repo, obj);
-	got_object_close(obj);
+	err = got_object_open_as_tree(&tree2, repo, commit->tree_id);
 	if (err)
 		return err;
 
@@ -285,21 +279,12 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 
-		err = got_object_open(&obj, repo, qid->id);
+		err = got_object_open_as_commit(&pcommit, repo, qid->id);
 		if (err)
 			return err;
 
-		err = got_object_commit_open(&pcommit, repo, obj);
-		got_object_close(obj);
-		if (err)
-			return err;
-
-		err = got_object_open(&obj, repo, pcommit->tree_id);
+		err = got_object_open_as_tree(&tree1, repo, pcommit->tree_id);
 		got_object_commit_close(pcommit);
-		if (err)
-			return err;
-		err = got_object_tree_open(&tree1, repo, obj);
-		got_object_close(obj);
 		if (err)
 			return err;
 	}
