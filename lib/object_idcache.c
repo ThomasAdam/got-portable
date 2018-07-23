@@ -87,6 +87,7 @@ got_object_idcache_add(struct got_object_idcache *cache,
 	if (cache->nelem >= cache->maxelem) {
 		entry = TAILQ_LAST(&cache->entries, got_object_idcache_head);
 		TAILQ_REMOVE(&cache->entries, entry, entry);
+		free(entry);
 		cache->nelem--;
 	}
 
