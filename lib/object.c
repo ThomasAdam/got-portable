@@ -309,7 +309,7 @@ static const struct got_error *
 object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	char *hex;
+	char *hex = NULL;
 	char *path_objects = got_repo_get_path_objects(repo);
 
 	*path = NULL;
@@ -319,12 +319,13 @@ object_path(char **path, struct got_object_id *id, struct got_repository *repo)
 
 	err = got_object_id_str(&hex, id);
 	if (err)
-		return err;
+		goto done;
 
 	if (asprintf(path, "%s/%.2x/%s", path_objects,
 	    id->sha1[0], hex + 2) == -1)
 		err = got_error_from_errno();
 
+done:
 	free(hex);
 	free(path_objects);
 	return err;
