@@ -84,12 +84,8 @@ got_object_idcache_add(struct got_object_idcache *cache,
 {
 	struct got_object_idcache_element *entry;
 
-	if (cache->nelem >= cache->maxelem) {
-		entry = TAILQ_LAST(&cache->entries, got_object_idcache_head);
-		TAILQ_REMOVE(&cache->entries, entry, entry);
-		free(entry);
-		cache->nelem--;
-	}
+	if (cache->nelem >= cache->maxelem)
+		return got_error(GOT_ERR_NO_SPACE);
 
 	entry = calloc(1, sizeof(*entry));
 	if (entry == NULL)
