@@ -499,6 +499,11 @@ free_graph_node(struct got_object_id *id, void *data, void *arg)
 		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
 		free(child);
 	}
+	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
+		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
+		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
+		free(pid);
+	}
 	free(node);
 }
 
