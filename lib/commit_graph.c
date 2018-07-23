@@ -257,6 +257,22 @@ advance_open_branches(struct got_commit_graph *graph,
 	return NULL;
 }
 
+static void
+free_node(struct got_commit_graph_node *node)
+{
+	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
+		struct got_object_qid *child = SIMPLEQ_FIRST(&node->child_ids);
+		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
+		free(child);
+	}
+	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
+		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
+		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
+		free(pid);
+	}
+	free(node);
+}
+
 static const struct got_error *
 add_node(struct got_commit_graph_node **new_node,
     struct got_commit_graph *graph, struct got_object_id *commit_id,
@@ -278,14 +294,14 @@ add_node(struct got_commit_graph_node **new_node,
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 		err = add_vertex(&node->parent_ids, qid->id);
 		if (err) {
-			free(node);
+			free_node(node);
 			return err;
 		}
 		node->nparents++;
 	}
 	node->commit_timestamp = mktime(&commit->tm_committer); 
 	if (node->commit_timestamp == -1) {
-		free(node);
+		free_node(node);
 		return got_error_from_errno();
 	}
 
@@ -297,10 +313,10 @@ add_node(struct got_commit_graph_node **new_node,
 		*new_node = node;
 	} else if (err->code == GOT_ERR_OBJ_EXISTS) {
 		err = NULL;
-		free(node);
+		free_node(node);
 		node = existing_node;
 	} else {
-		free(node);
+		free_node(node);
 		return err;
 	}
 
@@ -328,7 +344,7 @@ done:
 	if (err) {
 free_node:
 		if (node != existing_node)
-			free(node);
+			free_node(node);
 		*new_node = NULL;
 	}
 	return err;
@@ -491,27 +507,17 @@ got_commit_graph_fetch_commits_up_to(int *nfetched,
 }
 
 static void
-free_graph_node(struct got_object_id *id, void *data, void *arg)
+free_node_iter(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_commit_graph_node *node = data;
-	while (!SIMPLEQ_EMPTY(&node->child_ids)) {
-		struct got_object_qid *child = SIMPLEQ_FIRST(&node->child_ids);
-		SIMPLEQ_REMOVE_HEAD(&node->child_ids, entry);
-		free(child);
-	}
-	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
-		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
-		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
-		free(pid);
-	}
-	free(node);
+	free_node(node);
 }
 
 void
 got_commit_graph_close(struct got_commit_graph *graph)
 {
 	got_object_idset_free(graph->open_branches);
-	got_object_idset_for_each(graph->node_ids, free_graph_node, NULL);
+	got_object_idset_for_each(graph->node_ids, free_node_iter, NULL);
 	got_object_idset_free(graph->node_ids);
 	free(graph);
 }
