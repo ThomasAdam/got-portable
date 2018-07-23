@@ -193,49 +193,6 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 	return got_error(GOT_ERR_NO_OBJ);
 }
 
-const struct got_error *
-got_object_idset_remove_random(void **data, struct got_object_idset *set)
-{
-	struct got_object_idset_element *entry, *tmp;
-	int i, n, totelem;
-
-	if (data)
-		*data = NULL;
-
-	if (set->totelem == 0)
-		return got_error(GOT_ERR_NO_OBJ);
-
-	/* Pick a random element index across all lists. */
-	if (set->totelem == 1)
-		n = 0;
-	else
-		n = arc4random_uniform(set->totelem);
-
-	totelem = 0;
-	for (i = 0; i < nitems(set->entries); i++) {
-		/* Skip lists which don't contain the element we picked. */
-		totelem += set->nelem[i];
-		if (totelem == 0 || n > totelem - 1) {
-			n -= set->nelem[i];
-			continue;
-		}
-		TAILQ_FOREACH_SAFE(entry, &set->entries[i], entry, tmp) {
-			if (n == 0) {
-				TAILQ_REMOVE(&set->entries[i], entry, entry);
-				if (data)
-					*data = entry->data;
-				free(entry);
-				set->nelem[i]--;
-				set->totelem--;
-				return NULL;
-			}
-			n--;
-		}
-	}
-
-	return got_error(GOT_ERR_NO_OBJ);
-}
-
 int
 got_object_idset_contains(struct got_object_idset *set,
     struct got_object_id *id)

@@ -24,8 +24,6 @@ const struct got_error *got_object_idset_add(void **,
 void *got_object_idset_get(struct got_object_idset *, struct got_object_id *);
 const struct got_error *got_object_idset_remove(void **,
     struct got_object_idset *, struct got_object_id *);
-const struct got_error *got_object_idset_remove_random(void **,
-    struct got_object_idset *);
 int got_object_idset_contains(struct got_object_idset *,
     struct got_object_id *);
 void got_object_idset_for_each(struct got_object_idset *,
