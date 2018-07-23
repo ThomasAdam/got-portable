@@ -321,7 +321,8 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 			break;
 		if (zb.flags & GOT_ZSTREAM_F_HAVE_MORE) {
 			nbuf++;
-			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf, GOT_ZSTREAM_BUFSIZE);
+			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
+			    GOT_ZSTREAM_BUFSIZE);
 			if (newbuf == NULL) {
 				err = got_error_from_errno();
 				free(*outbuf);
