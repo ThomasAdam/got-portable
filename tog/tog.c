@@ -1868,6 +1868,13 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					first_displayed_line =
 					    blame.nlines - (view->nlines - 3);
 				break;
+			case KEY_RESIZE:
+				view_resize(view);
+				if (selected_line > view->nlines - 2) {
+					selected_line = MIN(blame.nlines,
+					    view->nlines - 2);
+				}
+				break;
 			default:
 				break;
 		}
