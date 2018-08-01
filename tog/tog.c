@@ -85,6 +85,7 @@ static struct tog_cmd tog_commands[] = {
 struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
+	int nlines, ncols, begin_y, begin_x;
 };
 
 static const struct got_error *
@@ -116,6 +117,10 @@ open_view(int nlines, int ncols, int begin_y, int begin_x)
 	if (view == NULL)
 		return NULL;
 
+	view->nlines = nlines;
+	view->ncols = ncols;
+	view->begin_y = begin_y;
+	view->begin_x = begin_x;
 	view->window = newwin(nlines, ncols, begin_y, begin_x);
 	if (view->window == NULL) {
 		close_view(view);
