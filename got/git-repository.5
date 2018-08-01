@@ -14,19 +14,13 @@
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
 .Dd $Mdocdate$
-.Dt GOT-REPOSITORY 5
+.Dt GIT-REPOSITORY 5
 .Os
 .Sh NAME
-.Nm got-repository
-.Nd format of
-.Xr got 1
-repositories
+.Nm git-repository
+.Nd git repository format
 .Sh DESCRIPTION
-.Xr got 1
-stores the history of tracked files in a repository which uses
-the same on-disk format as
-.Dq bare
-repositories used by the Git version control system.
+A git repository stores a series of versioned snapshots of a file hierarchy.
 .Pp
 The repository's core data model is a directed acyclic graph which
 contains three types of objects as nodes.
@@ -39,14 +33,13 @@ This header is terminated by a
 .Sy NUL
 character.
 .Pp
-The content of files tracked under version control is stored in objects
-of type
+The content of tracked files is stored in objects of type
 .Em blob .
 .Pp
 A
 .Em tree
-object points to any number of such blobs, and also to other trees
-in order to form a hierarchy of files and directories.
+object points to any number of such blobs, and also to other trees in
+order to form a hierarchy of files and directories.
 .Pp
 A
 .Em commit
@@ -54,8 +47,8 @@ object points to the root element of one tree, and thus records the
 state of this entire tree as a snapshot.
 Commit objects are chained together and thus form a line of history
 of snapshots.
-A given commit can be suceeded by an arbitrary number of subsequent
-commits, such that diverging lines of version control history, known as
+A given commit can be suceeded by an arbitrary number of subsequent commits,
+such that diverging lines of version control history, known as
 .Em branches ,
 can be represented.
 A commit which preceeds another commit is referred to as that other commit's
@@ -91,9 +84,8 @@ which provides for deltification of object content.
 .It Pa refs/
 .El
 .Sh SEE ALSO
-.Xr git 1 ,
 .Xr got 1 ,
 .Xr deflate 3 ,
 .Xr got-worktree 5
 .Sh HISTORY
-The Git repository format was conceived by Linus Torvalds in 2005.
+The Git repository format was designed by Linus Torvalds in 2005.
