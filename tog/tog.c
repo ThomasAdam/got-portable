@@ -99,8 +99,8 @@ static const struct got_error *
 show_blame_view(struct tog_view *, const char *, struct got_object_id *,
     struct got_repository *);
 static const struct got_error *
-show_tree_view(struct got_tree_object *, struct got_object_id *,
-    struct got_repository *);
+show_tree_view(struct tog_view *, struct got_tree_object *,
+    struct got_object_id *, struct got_repository *);
 
 static void
 close_view(struct tog_view *view)
@@ -754,12 +754,20 @@ browse_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
+	struct tog_view *view;
 
 	err = got_object_open_as_tree(&tree, repo, entry->commit->tree_id);
 	if (err)
 		return err;
 
-	err = show_tree_view(tree, entry->id, repo);
+	view = open_view(0, 0, 0, 0);
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = show_tree_view(view, tree, entry->id, repo);
+	close_view(view);
+done:
 	got_object_tree_close(tree);
 	return err;
 }
@@ -2231,8 +2239,8 @@ log_tree_entry(struct tog_view *view, struct got_tree_entry *te,
 }
 
 static const struct got_error *
-show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
-    struct got_repository *repo)
+show_tree_view(struct tog_view *view, struct got_tree_object *root,
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	int ch, done = 0, selected = 0, show_ids = 0;
@@ -2244,7 +2252,6 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 	char *commit_id_str = NULL, *tree_label = NULL;
 	int nentries, ndisplayed;
 	struct tog_parent_trees parents;
-	struct tog_view *view = NULL;
 
 	TAILQ_INIT(&parents);
 
@@ -2257,11 +2264,6 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		goto done;
 	}
 
-	view = open_view(0, 0, 0, 0);
-	if (view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
 	show_panel(view->panel);
 
 	entries = got_object_tree_get_entries(root);
@@ -2416,8 +2418,6 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		}
 	}
 done:
-	if (view)
-		close_view(view);
 	free(tree_label);
 	free(commit_id_str);
 	while (!TAILQ_EMPTY(&parents)) {
@@ -2452,6 +2452,7 @@ cmd_tree(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	int ch;
+	struct tog_view *view;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
@@ -2512,7 +2513,13 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = show_tree_view(tree, commit_id, repo);
+	view = open_view(0, 0, 0, 0);
+	if (view == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = show_tree_view(view, tree, commit_id, repo);
+	close_view(view);
 done:
 	free(commit_id);
 	if (commit)
