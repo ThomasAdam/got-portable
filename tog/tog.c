@@ -620,7 +620,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	if (err)
 		return err;
 
-	if (path) {
+	if (path && strcmp(path, "/") != 0) {
 		if (asprintf(&header, "commit: %s [%s]", id_str, path) == -1) {
 			err = got_error_from_errno();
 			free(id_str);
