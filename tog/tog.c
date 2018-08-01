@@ -1159,6 +1159,9 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 						break;
 				}
 				break;
+			case KEY_RESIZE:
+				view_resize(view);
+				break;
 			default:
 				break;
 		}
