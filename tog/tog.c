@@ -890,7 +890,9 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 				break;
 			}
 			case KEY_RESIZE:
-				view_resize(view);
+				err = view_resize(view);
+				if (err)
+					goto done;
 				if (selected > view->nlines - 2)
 					selected = view->nlines - 2;
 				if (selected > commits.ncommits - 1)
@@ -1160,12 +1162,15 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 				}
 				break;
 			case KEY_RESIZE:
-				view_resize(view);
+				err = view_resize(view);
+				if (err)
+					goto done;
 				break;
 			default:
 				break;
 		}
 	}
+done:
 	fclose(f);
 	return err;
 }
@@ -1869,7 +1874,9 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					    blame.nlines - (view->nlines - 3);
 				break;
 			case KEY_RESIZE:
-				view_resize(view);
+				err = view_resize(view);
+				if (err)
+					break;
 				if (selected_line > view->nlines - 2) {
 					selected_line = MIN(blame.nlines,
 					    view->nlines - 2);
@@ -2379,7 +2386,9 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 				}
 				break;
 			case KEY_RESIZE:
-				view_resize(view);
+				err = view_resize(view);
+				if (err)
+					goto done;
 				if (selected > view->nlines)
 					selected = ndisplayed - 1;
 				break;
