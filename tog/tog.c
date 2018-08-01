@@ -85,7 +85,7 @@ static struct tog_cmd tog_commands[] = {
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_blame_view, tog_tree_view;
+} tog_tree_view;
 
 static const struct got_error *
 show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
@@ -1344,6 +1344,7 @@ struct tog_blame_cb_args {
 	struct tog_blame_line *lines; /* one per line */
 	int nlines;
 
+	struct tog_view *view;
 	struct got_object_id *commit_id;
 	FILE *f;
 	const char *path;
@@ -1387,7 +1388,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 	line->annotated = 1;
 
-	err = draw_blame(tog_blame_view.window, a->commit_id, a->f, a->path,
+	err = draw_blame(a->view->window, a->commit_id, a->f, a->path,
 	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
 	    a->last_displayed_line, &eof, LINES);
 done:
@@ -1421,7 +1422,7 @@ blame_thread(void *arg)
 	ta->repo = NULL;
 	*ta->complete = 1;
 	if (!err)
-		err = draw_blame(tog_blame_view.window, a->commit_id, a->f,
+		err = draw_blame(a->view->window, a->commit_id, a->f,
 		    a->path, a->lines, a->nlines, 1, *a->selected_line,
 		    a->first_displayed_line, a->last_displayed_line, &eof,
 		    LINES);
@@ -1526,7 +1527,8 @@ stop_blame(struct tog_blame *blame)
 }
 
 static const struct got_error *
-run_blame(struct tog_blame *blame, pthread_mutex_t *mutex, int *blame_complete,
+run_blame(struct tog_blame *blame, pthread_mutex_t *mutex,
+    struct tog_view *view, int *blame_complete,
     int *first_displayed_line, int *last_displayed_line,
     int *selected_line, int *done, const char *path,
     struct got_object_id *commit_id,
@@ -1568,6 +1570,7 @@ run_blame(struct tog_blame *blame, pthread_mutex_t *mutex, int *blame_complete,
 	if (err)
 		goto done;
 
+	blame->cb_args.view = view;
 	blame->cb_args.lines = blame->lines;
 	blame->cb_args.nlines = blame->nlines;
 	blame->cb_args.mutex = mutex;
@@ -1618,7 +1621,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct tog_blame blame;
 	struct got_object_id_queue blamed_commits;
 	struct got_object_qid *blamed_commit = NULL;
-	struct tog_view *diff_view;
+	struct tog_view *view = NULL, *diff_view;
 
 	SIMPLEQ_INIT(&blamed_commits);
 
@@ -1632,21 +1635,15 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		goto done;
 	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
 
-	if (tog_blame_view.window == NULL) {
-		tog_blame_view.window = newwin(0, 0, 0, 0);
-		if (tog_blame_view.window == NULL)
-			return got_error_from_errno();
-		keypad(tog_blame_view.window, TRUE);
+	view = open_view();
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
 	}
-	if (tog_blame_view.panel == NULL) {
-		tog_blame_view.panel = new_panel(tog_blame_view.window);
-		if (tog_blame_view.panel == NULL)
-			return got_error_from_errno();
-	} else
-		show_panel(tog_blame_view.panel);
+	show_panel(view->panel);
 
 	memset(&blame, 0, sizeof(blame));
-	err = run_blame(&blame, &mutex, &blame_complete,
+	err = run_blame(&blame, &mutex, view, &blame_complete,
 	    &first_displayed_line, &last_displayed_line,
 	    &selected_line, &done, path, blamed_commit->id, repo);
 	if (err)
@@ -1657,7 +1654,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(tog_blame_view.window, blamed_commit->id,
+		err = draw_blame(view->window, blamed_commit->id,
 		    blame.f, path, blame.lines, blame.nlines, blame_complete,
 		    selected_line, &first_displayed_line, &last_displayed_line,
 		    &eof, LINES);
@@ -1668,7 +1665,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
-		ch = wgetch(tog_blame_view.window);
+		ch = wgetch(view->window);
 		nodelay(stdscr, TRUE);
 		if (pthread_mutex_lock(&mutex) != 0) {
 			err = got_error_from_errno();
@@ -1753,7 +1750,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					goto done;
 				SIMPLEQ_INSERT_HEAD(&blamed_commits,
 				    blamed_commit, entry);
-				err = run_blame(&blame, &mutex,
+				err = run_blame(&blame, &mutex, view,
 				    &blame_complete, &first_displayed_line,
 				    &last_displayed_line, &selected_line,
 				    &done, path, blamed_commit->id, repo);
@@ -1782,7 +1779,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				SIMPLEQ_REMOVE_HEAD(&blamed_commits, entry);
 				got_object_qid_free(blamed_commit);
 				blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
-				err = run_blame(&blame, &mutex,
+				err = run_blame(&blame, &mutex, view,
 				    &blame_complete, &first_displayed_line,
 				    &last_displayed_line, &selected_line,
 				    &done, path, blamed_commit->id, repo);
@@ -1812,7 +1809,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 				}
 				got_object_close(obj);
 				obj = NULL;
-				show_panel(tog_blame_view.panel);
+				show_panel(view->panel);
 				if (err)
 					break;
 				break;
@@ -1844,6 +1841,8 @@ done:
 		got_object_close(pobj);
 	if (blame.thread)
 		thread_err = stop_blame(&blame);
+	if (view)
+		close_view(view);
 	while (!SIMPLEQ_EMPTY(&blamed_commits)) {
 		blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
 		SIMPLEQ_REMOVE_HEAD(&blamed_commits, entry);
