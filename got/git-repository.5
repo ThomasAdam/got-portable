@@ -54,8 +54,8 @@ Loose objects are stored as individual files beneath the directory
 .Pa objects ,
 spread across 256 sub-directories named after the 256 possible hexadecimal
 values of the first byte of an object identifier.
-The name of the loose object file corresponds to the remaining bytes of the
-object's identifier.
+The name of the loose object file corresponds to the remaining hexadecimal
+byte values of the object's identifier.
 .Pp
 A loose object file begins with a header which specifies the type of object
 as an ASCII string, followed by an ASCII space character, followed by the
