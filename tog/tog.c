@@ -96,7 +96,8 @@ static const struct got_error *
 show_log_view(struct tog_view *, struct got_object_id *,
     struct got_repository *, const char *);
 static const struct got_error *
-show_blame_view(const char *, struct got_object_id *, struct got_repository *);
+show_blame_view(struct tog_view *, const char *, struct got_object_id *,
+    struct got_repository *);
 static const struct got_error *
 show_tree_view(struct got_tree_object *, struct got_object_id *,
     struct got_repository *);
@@ -1651,8 +1652,8 @@ done:
 }
 
 static const struct got_error *
-show_blame_view(const char *path, struct got_object_id *commit_id,
-    struct got_repository *repo)
+show_blame_view(struct tog_view *view, const char *path,
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
 	int ch, done = 0, first_displayed_line = 1, last_displayed_line;
@@ -1663,7 +1664,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct tog_blame blame;
 	struct got_object_id_queue blamed_commits;
 	struct got_object_qid *blamed_commit = NULL;
-	struct tog_view *view = NULL, *diff_view;
+	struct tog_view *diff_view;
 
 	SIMPLEQ_INIT(&blamed_commits);
 
@@ -1677,11 +1678,6 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		goto done;
 	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
 
-	view = open_view(0, 0, 0, 0);
-	if (view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
 	show_panel(view->panel);
 	last_displayed_line = view->nlines;
 
@@ -1895,8 +1891,6 @@ done:
 		got_object_close(pobj);
 	if (blame.thread)
 		thread_err = stop_blame(&blame);
-	if (view)
-		close_view(view);
 	while (!SIMPLEQ_EMPTY(&blamed_commits)) {
 		blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
 		SIMPLEQ_REMOVE_HEAD(&blamed_commits, entry);
@@ -1915,6 +1909,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
+	struct tog_view *view;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
@@ -1975,7 +1970,13 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = show_blame_view(path, commit_id, repo);
+	view = open_view(0, 0, 0, 0);
+	if (view == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = show_blame_view(view, path, commit_id, repo);
+	close_view(view);
 done:
 	free(commit_id);
 	if (repo)
@@ -2196,8 +2197,9 @@ done:
 }
 
 static const struct got_error *
-blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_repository *repo)
+blame_tree_entry(struct tog_view *view, struct got_tree_entry *te,
+    struct tog_parent_trees *parents, struct got_object_id *commit_id,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -2206,7 +2208,7 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 	if (err)
 		return err;
 
-	err = show_blame_view(path, commit_id, repo);
+	err = show_blame_view(view, path, commit_id, repo);
 	free(path);
 	return err;
 }
@@ -2388,8 +2390,16 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 					selected = 0;
 					first_displayed_entry = NULL;
 				} else if (S_ISREG(selected_entry->mode)) {
-					err = blame_tree_entry(selected_entry,
-					    &parents, commit_id, repo);
+					struct tog_view *blame_view;
+					blame_view = open_view(0, 0, 0, 0);
+					if (blame_view == NULL) {
+						err = got_error_from_errno();
+						goto done;
+					}
+					err = blame_tree_entry(blame_view,
+					    selected_entry, &parents,
+					    commit_id, repo);
+					close_view(blame_view);
 					if (err)
 						goto done;
 				}
