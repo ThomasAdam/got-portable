@@ -117,8 +117,8 @@ open_view(int nlines, int ncols, int begin_y, int begin_x)
 	if (view == NULL)
 		return NULL;
 
-	view->nlines = nlines;
-	view->ncols = ncols;
+	view->nlines = nlines ? nlines : LINES - begin_y;
+	view->ncols = ncols ? ncols : COLS - begin_x;
 	view->begin_y = begin_y;
 	view->begin_x = begin_x;
 	view->window = newwin(nlines, ncols, begin_y, begin_x);
