@@ -18,20 +18,11 @@
 .Os
 .Sh NAME
 .Nm git-repository
-.Nd git repository format
+.Nd Git repository format
 .Sh DESCRIPTION
-A git repository stores a series of versioned snapshots of a file hierarchy.
-.Pp
+A Git repository stores a series of versioned snapshots of a file hierarchy.
 The repository's core data model is a directed acyclic graph which
 contains three types of objects as nodes.
-Each object is identified by the SHA-1 hash calculated over the object's
-header plus the content stored in the object.
-The object header names the type of object in an ASCII string, which is
-followed by a space, followed by the size of data in the object encoded
-as an ASCII number string.
-This header is terminated by a
-.Sy NUL
-character.
 .Pp
 The content of tracked files is stored in objects of type
 .Em blob .
@@ -39,14 +30,13 @@ The content of tracked files is stored in objects of type
 A
 .Em tree
 object points to any number of such blobs, and also to other trees in
-order to form a hierarchy of files and directories.
+order to represent a hierarchy of files and directories.
 .Pp
 A
 .Em commit
 object points to the root element of one tree, and thus records the
 state of this entire tree as a snapshot.
-Commit objects are chained together and thus form a line of history
-of snapshots.
+Commit objects are chained together to form a line of history of snapshots.
 A given commit can be suceeded by an arbitrary number of subsequent commits,
 such that diverging lines of version control history, known as
 .Em branches ,
@@ -56,17 +46,34 @@ A commit which preceeds another commit is referred to as that other commit's
 A commit with multiple parents reunites diverged lines of history and is
 known as a
 .Em merge commit .
-While the data model allows for commits with an arbitrary number of
-parent commits,
-.Xr got 1
-restricts all commits to at most 2 parents in order to discourage chaotic
-branching and merging practices.
 .Pp
-When stored on disk, all objects are compressed with
+Each object is identified by a SHA1 hash calculated over the object's
+header and the data stored in the object.
+.Sh OBJECT STORAGE
+Loose objects are stored as individual files beneath the directory
+.Pa objects ,
+spread across 256 sub-directories named after the 256 possible hexadecimal
+values of the first byte of an object identifier.
+The name of the loose object file corresponds to the remaining bytes of the
+object's identifier.
+.Pp
+A loose object file begins with a header which specifies the type of object
+as an ASCII string, followed by an ASCII space character, followed by the
+object data's size encoded as an ASCII number string.
+The header is terminated by a
+.Sy NUL
+character, and the remainder of the file contains object data.
+Loose objects files are compressed with
 .Xr deflate 3 .
-Mulitple objects may be stored together in a
+.Pp
+Multiple objects can be bundled in a
 .Em pack file
-which provides for deltification of object content.
+for better disk space efficiency and increased run-time performance.
+The pack file format adds two additional types of objects:
+offset delta objects and reference delta objects.
+.Pp
+TODO describe pack file format
+.Pp
 .Sh FILES
 .Bl -tag -width /etc/rpc -compact
 .It Pa HEAD
@@ -86,6 +93,9 @@ which provides for deltification of object content.
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr deflate 3 ,
+.Xr SHA1 3 ,
 .Xr got-worktree 5
 .Sh HISTORY
-The Git repository format was designed by Linus Torvalds in 2005.
+The Git repository format was initially designed by Linus Torvalds in 2005
+and has since been extended by various people involved in the development
+of the Git version control system.
