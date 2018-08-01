@@ -85,7 +85,7 @@ static struct tog_cmd tog_commands[] = {
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_log_view, tog_blame_view, tog_tree_view;
+} tog_blame_view, tog_tree_view;
 
 static const struct got_error *
 show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
@@ -236,7 +236,8 @@ done:
 }
 
 static const struct got_error *
-draw_commit(struct got_commit_object *commit, struct got_object_id *id)
+draw_commit(struct tog_view *view, struct got_commit_object *commit,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
@@ -259,7 +260,7 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 		limit = MIN(sizeof(datebuf) - 1, avail);
 	else
 		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
-	waddnstr(tog_log_view.window, datebuf, limit);
+	waddnstr(view->window, datebuf, limit);
 	col = limit + 1;
 	if (col > avail)
 		goto done;
@@ -282,10 +283,10 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	err = format_line(&wauthor, &author_width, author, limit);
 	if (err)
 		goto done;
-	waddwstr(tog_log_view.window, wauthor);
+	waddwstr(view->window, wauthor);
 	col += author_width;
 	while (col <= avail && author_width < author_display_cols + 1) {
-		waddch(tog_log_view.window, ' ');
+		waddch(view->window, ' ');
 		col++;
 		author_width++;
 	}
@@ -307,10 +308,10 @@ draw_commit(struct got_commit_object *commit, struct got_object_id *id)
 	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit);
 	if (err)
 		goto done;
-	waddwstr(tog_log_view.window, wlogmsg);
+	waddwstr(view->window, wlogmsg);
 	col += logmsg_width;
 	while (col <= avail) {
-		waddch(tog_log_view.window, ' ');
+		waddch(view->window, ' ');
 		col++;
 	}
 done:
@@ -540,7 +541,7 @@ get_head_commit_id(struct got_object_id **head_id, struct got_repository *repo)
 }
 
 static const struct got_error *
-draw_commits(struct commit_queue_entry **last,
+draw_commits(struct tog_view *view, struct commit_queue_entry **last,
     struct commit_queue_entry **selected, struct commit_queue_entry *first,
     struct commit_queue *commits, int selected_idx, int limit,
     struct got_commit_graph *graph, struct got_repository *repo,
@@ -586,11 +587,11 @@ draw_commits(struct commit_queue_entry **last,
 	}
 	free(header);
 
-	werase(tog_log_view.window);
+	werase(view->window);
 
-	waddwstr(tog_log_view.window, wline);
+	waddwstr(view->window, wline);
 	if (width < COLS)
-		waddch(tog_log_view.window, '\n');
+		waddch(view->window, '\n');
 	free(wline);
 	if (limit <= 1)
 		return NULL;
@@ -602,10 +603,10 @@ draw_commits(struct commit_queue_entry **last,
 		if (ncommits >= limit - 1)
 			break;
 		if (ncommits == selected_idx)
-			wstandout(tog_log_view.window);
-		err = draw_commit(entry->commit, entry->id);
+			wstandout(view->window);
+		err = draw_commit(view, entry->commit, entry->id);
 		if (ncommits == selected_idx)
-			wstandend(tog_log_view.window);
+			wstandend(view->window);
 		if (err)
 			break;
 		ncommits++;
@@ -741,23 +742,11 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	struct commit_queue_entry *last_displayed_entry = NULL;
 	struct commit_queue_entry *selected_entry = NULL;
 	char *in_repo_path = NULL;
+	struct tog_view *view = NULL;
 
 	err = got_repo_map_path(&in_repo_path, repo, path);
 	if (err != NULL)
 		goto done;
-
-	if (tog_log_view.window == NULL) {
-		tog_log_view.window = newwin(0, 0, 0, 0);
-		if (tog_log_view.window == NULL)
-			return got_error_from_errno();
-		keypad(tog_log_view.window, TRUE);
-	}
-	if (tog_log_view.panel == NULL) {
-		tog_log_view.panel = new_panel(tog_log_view.window);
-		if (tog_log_view.panel == NULL)
-			return got_error_from_errno();
-	} else
-		show_panel(tog_log_view.panel);
 
 	err = get_head_commit_id(&head_id, repo);
 	if (err)
@@ -791,17 +780,25 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		err = NULL;
 	}
 
+	view = open_view();
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	show_panel(view->panel);
+
 	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
 	while (!done) {
-		err = draw_commits(&last_displayed_entry, &selected_entry,
+		err = draw_commits(view, &last_displayed_entry, &selected_entry,
 		    first_displayed_entry, &commits, selected, LINES,
 		    graph, repo, in_repo_path);
 		if (err)
 			goto done;
 
 		nodelay(stdscr, FALSE);
-		ch = wgetch(tog_log_view.window);
+		ch = wgetch(view->window);
 		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case ERR:
@@ -871,19 +868,21 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 				err = show_commit(selected_entry, repo);
 				if (err)
 					goto done;
-				show_panel(tog_log_view.panel);
+				show_panel(view->panel);
 				break;
 			case 't':
 				err = browse_commit(selected_entry, repo);
 				if (err)
 					goto done;
-				show_panel(tog_log_view.panel);
+				show_panel(view->panel);
 				break;
 			default:
 				break;
 		}
 	}
 done:
+	if (view)
+		close_view(view);
 	free(head_id);
 	if (graph)
 		got_commit_graph_close(graph);
