@@ -178,7 +178,8 @@ __dead static void
 usage_log(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s log [-c commit] [-r repository-path] [path]\n",
+	fprintf(stderr,
+	    "usage: %s log [-c commit] [-r repository-path] [path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -295,8 +296,8 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	static const size_t author_display_cols = 16;
 	const int avail = view->ncols;
 
-	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &commit->tm_committer)
-	    >= sizeof(datebuf))
+	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ",
+	    &commit->tm_committer) >= sizeof(datebuf))
 		return got_error(GOT_ERR_NO_SPACE);
 
 	if (avail < date_display_cols)
@@ -886,16 +887,18 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 				}
 				break;
 			case KEY_NPAGE: {
-				struct commit_queue_entry *first = first_displayed_entry;
-				err = scroll_down(&first_displayed_entry, view->nlines,
-				    last_displayed_entry, &commits, graph,
-				    repo, in_repo_path);
+				struct commit_queue_entry *first;
+				first = first_displayed_entry;
+				err = scroll_down(&first_displayed_entry,
+				    view->nlines, last_displayed_entry,
+				    &commits, graph, repo, in_repo_path);
 				if (err) {
 					if (err->code != GOT_ERR_ITER_COMPLETED)
 						goto done;
-					/* can't scroll any further; move cursor down */
-					if (first == first_displayed_entry && selected <
-					    MIN(view->nlines - 2, commits.ncommits - 1)) {
+					if (first == first_displayed_entry &&
+					    selected < MIN(view->nlines - 2,
+					    commits.ncommits - 1)) {
+						/* can't scroll further down */
 						selected = MIN(view->nlines - 2,
 						    commits.ncommits - 1);
 					}
