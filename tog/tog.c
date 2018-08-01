@@ -144,6 +144,13 @@ open_view(int nlines, int ncols, int begin_y, int begin_x,
 	return view;
 }
 
+void
+show_view(struct tog_view *view)
+{
+	show_panel(view->panel);
+	update_panels();
+}
+
 const struct got_error *
 view_resize(struct tog_view *view)
 {
@@ -752,6 +759,7 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 
 	err = show_diff_view(view, obj1, obj2, repo);
 	close_view(view);
+	show_view(parent_view);
 done:
 	if (obj1)
 		got_object_close(obj1);
@@ -779,6 +787,7 @@ browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 	}
 	err = show_tree_view(view, tree, entry->id, repo);
 	close_view(view);
+	show_view(parent_view);
 done:
 	got_object_tree_close(tree);
 	return err;
@@ -834,7 +843,7 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 		err = NULL;
 	}
 
-	show_panel(view->panel);
+	show_view(view);
 
 	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
@@ -921,13 +930,13 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 				err = show_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
-				show_panel(view->panel);
+				show_view(view);
 				break;
 			case 't':
 				err = browse_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
-				show_panel(view->panel);
+				show_view(view);
 				break;
 			default:
 				break;
@@ -1143,7 +1152,7 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	fflush(f);
 
-	show_panel(view->panel);
+	show_view(view);
 
 	while (!done) {
 		err = draw_file(view, f, &first_displayed_line,
@@ -1700,7 +1709,7 @@ show_blame_view(struct tog_view *view, const char *path,
 		goto done;
 	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
 
-	show_panel(view->panel);
+	show_view(view);
 	last_displayed_line = view->nlines;
 
 	memset(&blame, 0, sizeof(blame));
@@ -1865,13 +1874,13 @@ show_blame_view(struct tog_view *view, const char *path,
 				}
 				err = show_diff_view(diff_view, pobj, obj, repo);
 				close_view(diff_view);
+				show_view(view);
 				if (pobj) {
 					got_object_close(pobj);
 					pobj = NULL;
 				}
 				got_object_close(obj);
 				obj = NULL;
-				show_panel(view->panel);
 				if (err)
 					break;
 				break;
@@ -2219,18 +2228,26 @@ done:
 }
 
 static const struct got_error *
-blame_tree_entry(struct tog_view *view, struct got_tree_entry *te,
+blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
     struct tog_parent_trees *parents, struct got_object_id *commit_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
+	struct tog_view *view;
 
 	err = tree_entry_path(&path, parents, te);
 	if (err)
 		return err;
 
-	err = show_blame_view(view, path, commit_id, repo);
+	view = open_view(0, 0, 0, 0, parent_view);
+	if (view) {
+		err = show_blame_view(view, path, commit_id, repo);
+		close_view(view);
+	} else
+		err = got_error_from_errno();
+
+	show_view(parent_view);
 	free(path);
 	return err;
 }
@@ -2278,7 +2295,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 		goto done;
 	}
 
-	show_panel(view->panel);
+	show_view(view);
 
 	entries = got_object_tree_get_entries(root);
 	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
@@ -2323,6 +2340,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 					    selected_entry, &parents,
 					    commit_id, repo);
 					close_view(log_view);
+					show_view(view);
 					if (err)
 						goto done;
 				}
@@ -2406,16 +2424,9 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 					selected = 0;
 					first_displayed_entry = NULL;
 				} else if (S_ISREG(selected_entry->mode)) {
-					struct tog_view *blame_view =
-					    open_view(0, 0, 0, 0, view);
-					if (blame_view == NULL) {
-						err = got_error_from_errno();
-						goto done;
-					}
-					err = blame_tree_entry(blame_view,
+					err = blame_tree_entry(view,
 					    selected_entry, &parents,
 					    commit_id, repo);
-					close_view(blame_view);
 					if (err)
 						goto done;
 				}
