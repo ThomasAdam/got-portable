@@ -85,10 +85,10 @@ static struct tog_cmd tog_commands[] = {
 static struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_log_view, tog_diff_view, tog_blame_view, tog_tree_view;
+} tog_log_view, tog_blame_view, tog_tree_view;
 
 static const struct got_error *
-show_diff_view(struct got_object *, struct got_object *,
+show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
     struct got_repository *);
 static const struct got_error *
 show_log_view(struct got_object_id *, struct got_repository *, const char *);
@@ -97,6 +97,39 @@ show_blame_view(const char *, struct got_object_id *, struct got_repository *);
 static const struct got_error *
 show_tree_view(struct got_tree_object *, struct got_object_id *,
     struct got_repository *);
+
+static void
+close_view(struct tog_view *view)
+{
+	if (view->panel)
+		del_panel(view->panel);
+	if (view->window)
+		delwin(view->window);
+	free(view);
+}
+
+static struct tog_view *
+open_view(void)
+{
+	struct tog_view *view = malloc(sizeof(*view));
+
+	if (view == NULL)
+		return NULL;
+
+	view->window = newwin(0, 0, 0, 0);
+	if (view->window == NULL) {
+		close_view(view);
+		return NULL;
+	}
+	view->panel = new_panel(view->window);
+	if (view->panel == NULL) {
+		close_view(view);
+		return NULL;
+	}
+
+	keypad(view->window, TRUE);
+	return view;
+}
 
 __dead static void
 usage_log(void)
@@ -651,6 +684,7 @@ show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 	const struct got_error *err;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *parent_id;
+	struct tog_view *view;
 
 	err = got_object_open(&obj2, repo, entry->id);
 	if (err)
@@ -663,7 +697,14 @@ show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 			goto done;
 	}
 
-	err = show_diff_view(obj1, obj2, repo);
+	view = open_view();
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = show_diff_view(view, obj1, obj2, repo);
+	close_view(view);
 done:
 	if (obj1)
 		got_object_close(obj1);
@@ -1012,8 +1053,8 @@ draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
 }
 
 static const struct got_error *
-show_diff_view(struct got_object *obj1, struct got_object *obj2,
-    struct got_repository *repo)
+show_diff_view(struct tog_view *view, struct got_object *obj1,
+    struct got_object *obj2, struct got_repository *repo)
 {
 	const struct got_error *err;
 	FILE *f;
@@ -1044,26 +1085,15 @@ show_diff_view(struct got_object *obj1, struct got_object *obj2,
 
 	fflush(f);
 
-	if (tog_diff_view.window == NULL) {
-		tog_diff_view.window = newwin(0, 0, 0, 0);
-		if (tog_diff_view.window == NULL)
-			return got_error_from_errno();
-		keypad(tog_diff_view.window, TRUE);
-	}
-	if (tog_diff_view.panel == NULL) {
-		tog_diff_view.panel = new_panel(tog_diff_view.window);
-		if (tog_diff_view.panel == NULL)
-			return got_error_from_errno();
-	} else
-		show_panel(tog_diff_view.panel);
+	show_panel(view->panel);
 
 	while (!done) {
-		err = draw_file(tog_diff_view.window, f, &first_displayed_line,
+		err = draw_file(view->window, f, &first_displayed_line,
 		    &last_displayed_line, &eof, LINES);
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
-		ch = wgetch(tog_diff_view.window);
+		ch = wgetch(view->window);
 		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case 'q':
@@ -1113,6 +1143,7 @@ cmd_diff(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
 	int ch;
+	struct tog_view *view;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
@@ -1160,7 +1191,13 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = show_diff_view(obj1, obj2, repo);
+	view = open_view();
+	if (view == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = show_diff_view(view, obj1, obj2, repo);
+	close_view(view);
 done:
 	got_repo_close(repo);
 	if (obj1)
@@ -1582,6 +1619,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 	struct tog_blame blame;
 	struct got_object_id_queue blamed_commits;
 	struct got_object_qid *blamed_commit = NULL;
+	struct tog_view *diff_view;
 
 	SIMPLEQ_INIT(&blamed_commits);
 
@@ -1762,7 +1800,13 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					break;
 				if (pobj == NULL && obj == NULL)
 					break;
-				err = show_diff_view(pobj, obj, repo);
+				diff_view = open_view();
+				if (diff_view == NULL) {
+					err = got_error_from_errno();
+					break;
+				}
+				err = show_diff_view(diff_view, pobj, obj, repo);
+				close_view(diff_view);
 				if (pobj) {
 					got_object_close(pobj);
 					pobj = NULL;
