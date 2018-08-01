@@ -93,7 +93,8 @@ static const struct got_error *
 show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
     struct got_repository *);
 static const struct got_error *
-show_log_view(struct got_object_id *, struct got_repository *, const char *);
+show_log_view(struct tog_view *, struct got_object_id *,
+    struct got_repository *, const char *);
 static const struct got_error *
 show_blame_view(const char *, struct got_object_id *, struct got_repository *);
 static const struct got_error *
@@ -763,8 +764,8 @@ browse_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 }
 
 static const struct got_error *
-show_log_view(struct got_object_id *start_id, struct got_repository *repo,
-    const char *path)
+show_log_view(struct tog_view *view, struct got_object_id *start_id,
+    struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *head_id = NULL;
@@ -775,7 +776,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	struct commit_queue_entry *last_displayed_entry = NULL;
 	struct commit_queue_entry *selected_entry = NULL;
 	char *in_repo_path = NULL;
-	struct tog_view *view = NULL;
 
 	err = got_repo_map_path(&in_repo_path, repo, path);
 	if (err != NULL)
@@ -799,13 +799,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	view = open_view(0, 0, 0, 0);
-	if (view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	show_panel(view->panel);
-
 	/*
 	 * Open the initial batch of commits, sorted in commit graph order.
 	 * We keep all commits open throughout the lifetime of the log view
@@ -819,6 +812,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 			goto done;
 		err = NULL;
 	}
+
+	show_panel(view->panel);
 
 	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
@@ -916,8 +911,6 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		}
 	}
 done:
-	if (view)
-		close_view(view);
 	free(head_id);
 	if (graph)
 		got_commit_graph_close(graph);
@@ -935,6 +928,7 @@ cmd_log(int argc, char *argv[])
 	char *path = NULL, *repo_path = NULL, *cwd = NULL;
 	char *start_commit = NULL;
 	int ch;
+	struct tog_view *view;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
@@ -1003,7 +997,13 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = show_log_view(start_id, repo, path);
+	view = open_view(0, 0, 0, 0);
+	if (view == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = show_log_view(view, start_id, repo, path);
+	close_view(view);
 done:
 	free(repo_path);
 	free(cwd);
@@ -2212,8 +2212,9 @@ blame_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 }
 
 static const struct got_error *
-log_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_repository *repo)
+log_tree_entry(struct tog_view *view, struct got_tree_entry *te,
+    struct tog_parent_trees *parents, struct got_object_id *commit_id,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -2222,7 +2223,7 @@ log_tree_entry(struct got_tree_entry *te, struct tog_parent_trees *parents,
 	if (err)
 		return err;
 
-	err = show_log_view(commit_id, repo, path);
+	err = show_log_view(view, commit_id, repo, path);
 	free(path);
 	return err;
 }
@@ -2294,8 +2295,16 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 				break;
 			case 'l':
 				if (selected_entry) {
-					err = log_tree_entry(selected_entry,
-					    &parents, commit_id, repo);
+					struct tog_view *log_view;
+					log_view = open_view(0, 0, 0, 0);
+					if (log_view == NULL) {
+						err = got_error_from_errno();
+						goto done;
+					}
+					err = log_tree_entry(log_view,
+					    selected_entry, &parents,
+					    commit_id, repo);
+					close_view(log_view);
 					if (err)
 						goto done;
 				}
