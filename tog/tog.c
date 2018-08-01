@@ -86,6 +86,7 @@ struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
+	int lines, cols; /* copies of LINES and COLS */
 };
 
 static const struct got_error *
@@ -117,6 +118,8 @@ open_view(int nlines, int ncols, int begin_y, int begin_x)
 	if (view == NULL)
 		return NULL;
 
+	view->lines = LINES;
+	view->cols = COLS;
 	view->nlines = nlines ? nlines : LINES - begin_y;
 	view->ncols = ncols ? ncols : COLS - begin_x;
 	view->begin_y = begin_y;
@@ -134,6 +137,31 @@ open_view(int nlines, int ncols, int begin_y, int begin_x)
 
 	keypad(view->window, TRUE);
 	return view;
+}
+
+const struct got_error *
+view_resize(struct tog_view *view)
+{
+	int nlines, ncols;
+
+	if (view->lines > LINES)
+		nlines = view->nlines - (view->lines - LINES);
+	else
+		nlines = view->nlines + (LINES - view->lines);
+
+	if (view->cols > COLS)
+		ncols = view->ncols - (view->cols - COLS);
+	else
+		ncols = view->ncols + (COLS - view->cols);
+
+	if (wresize(view->window, nlines, ncols) == ERR)
+		return got_error_from_errno();
+
+	view->nlines = nlines;
+	view->ncols = ncols;
+	view->lines = LINES;
+	view->cols = COLS;
+	return NULL;
 }
 
 __dead static void
@@ -255,7 +283,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	int col, limit;
 	static const size_t date_display_cols = 9;
 	static const size_t author_display_cols = 16;
-	const int avail = COLS;
+	const int avail = view->ncols;
 
 	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &commit->tm_committer)
 	    >= sizeof(datebuf))
@@ -585,7 +613,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		return err;
 	}
 	free(id_str);
-	err = format_line(&wline, &width, header, COLS);
+	err = format_line(&wline, &width, header, view->ncols);
 	if (err) {
 		free(header);
 		return err;
@@ -595,7 +623,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	werase(view->window);
 
 	waddwstr(view->window, wline);
-	if (width < COLS)
+	if (width < view->ncols)
 		waddch(view->window, '\n');
 	free(wline);
 	if (limit <= 1)
@@ -771,13 +799,20 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 	if (err)
 		goto done;
 
+	view = open_view(0, 0, 0, 0);
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	show_panel(view->panel);
+
 	/*
 	 * Open the initial batch of commits, sorted in commit graph order.
 	 * We keep all commits open throughout the lifetime of the log view
 	 * in order to avoid having to re-fetch commits from disk while
 	 * updating the display.
 	 */
-	err = queue_commits(graph, &commits, start_id, LINES, 1, repo,
+	err = queue_commits(graph, &commits, start_id, view->nlines, 1, repo,
 	    in_repo_path);
 	if (err) {
 		if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -785,19 +820,11 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		err = NULL;
 	}
 
-	view = open_view(0, 0, 0, 0);
-	if (view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	show_panel(view->panel);
-
 	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
 	while (!done) {
 		err = draw_commits(view, &last_displayed_entry, &selected_entry,
-		    first_displayed_entry, &commits, selected, LINES,
+		    first_displayed_entry, &commits, selected, view->nlines,
 		    graph, repo, in_repo_path);
 		if (err)
 			goto done;
@@ -825,12 +852,12 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 					selected = 0;
 					break;
 				}
-				scroll_up(&first_displayed_entry, LINES,
+				scroll_up(&first_displayed_entry, view->nlines,
 				    &commits);
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected < MIN(LINES - 2,
+				if (selected < MIN(view->nlines - 2,
 				    commits.ncommits - 1)) {
 					selected++;
 					break;
@@ -846,7 +873,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 				break;
 			case KEY_NPAGE: {
 				struct commit_queue_entry *first = first_displayed_entry;
-				err = scroll_down(&first_displayed_entry, LINES,
+				err = scroll_down(&first_displayed_entry, view->nlines,
 				    last_displayed_entry, &commits, graph,
 				    repo, in_repo_path);
 				if (err) {
@@ -854,8 +881,8 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 						goto done;
 					/* can't scroll any further; move cursor down */
 					if (first == first_displayed_entry && selected <
-					    MIN(LINES - 2, commits.ncommits - 1)) {
-						selected = MIN(LINES - 2,
+					    MIN(view->nlines - 2, commits.ncommits - 1)) {
+						selected = MIN(view->nlines - 2,
 						    commits.ncommits - 1);
 					}
 					err = NULL;
@@ -863,8 +890,9 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 				break;
 			}
 			case KEY_RESIZE:
-				if (selected > LINES - 2)
-					selected = LINES - 2;
+				view_resize(view);
+				if (selected > view->nlines - 2)
+					selected = view->nlines - 2;
 				if (selected > commits.ncommits - 1)
 					selected = commits.ncommits - 1;
 				break;
@@ -1008,7 +1036,7 @@ parse_next_line(FILE *f, size_t *len)
 }
 
 static const struct got_error *
-draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
+draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
     int *last_displayed_line, int *eof, int max_lines)
 {
 	const struct got_error *err;
@@ -1019,7 +1047,7 @@ draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
 	int width;
 
 	rewind(f);
-	werase(window);
+	werase(view->window);
 
 	*eof = 0;
 	while (nprinted < max_lines) {
@@ -1033,15 +1061,15 @@ draw_file(WINDOW *window, FILE *f, int *first_displayed_line,
 			continue;
 		}
 
-		err = format_line(&wline, &width, line, COLS);
+		err = format_line(&wline, &width, line, view->ncols);
 		if (err) {
 			free(line);
 			free(wline);
 			return err;
 		}
-		waddwstr(window, wline);
-		if (width < COLS)
-			waddch(window, '\n');
+		waddwstr(view->window, wline);
+		if (width < view->ncols)
+			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
 		free(line);
@@ -1062,7 +1090,8 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 {
 	const struct got_error *err;
 	FILE *f;
-	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int ch, done = 0;
+	int first_displayed_line = 1, last_displayed_line = view->nlines;
 	int eof, i;
 
 	if (obj1 != NULL && obj2 != NULL &&
@@ -1092,8 +1121,8 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 	show_panel(view->panel);
 
 	while (!done) {
-		err = draw_file(view->window, f, &first_displayed_line,
-		    &last_displayed_line, &eof, LINES);
+		err = draw_file(view, f, &first_displayed_line,
+		    &last_displayed_line, &eof, view->nlines);
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
@@ -1111,7 +1140,7 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 			case KEY_PPAGE:
 			case KEY_BACKSPACE:
 				i = 0;
-				while (i++ < LINES - 1 &&
+				while (i++ < view->nlines - 1 &&
 				    first_displayed_line > 1)
 					first_displayed_line--;
 				break;
@@ -1123,7 +1152,7 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 			case KEY_NPAGE:
 			case ' ':
 				i = 0;
-				while (!eof && i++ < LINES - 1) {
+				while (!eof && i++ < view->nlines - 1) {
 					char *line = parse_next_line(f, NULL);
 					first_displayed_line++;
 					if (line == NULL)
@@ -1226,10 +1255,10 @@ struct tog_blame_line {
 };
 
 static const struct got_error *
-draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
-    struct tog_blame_line *lines, int nlines, int blame_complete,
-    int selected_line, int *first_displayed_line, int *last_displayed_line,
-    int *eof, int max_lines)
+draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
+    const char *path, struct tog_blame_line *lines, int nlines,
+    int blame_complete, int selected_line, int *first_displayed_line,
+    int *last_displayed_line, int *eof, int max_lines)
 {
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
@@ -1246,7 +1275,7 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 		return err;
 
 	rewind(f);
-	werase(window);
+	werase(view->window);
 
 	if (asprintf(&line, "commit: %s", id_str) == -1) {
 		err = got_error_from_errno();
@@ -1254,14 +1283,14 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 		return err;
 	}
 
-	err = format_line(&wline, &width, line, COLS);
+	err = format_line(&wline, &width, line, view->ncols);
 	free(line);
 	line = NULL;
-	waddwstr(window, wline);
+	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < COLS)
-		waddch(window, '\n');
+	if (width < view->ncols)
+		waddch(view->window, '\n');
 
 	if (asprintf(&line, "[%d/%d] %s%s",
 	    *first_displayed_line - 1 + selected_line, nlines,
@@ -1270,16 +1299,16 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 		return got_error_from_errno();
 	}
 	free(id_str);
-	err = format_line(&wline, &width, line, COLS);
+	err = format_line(&wline, &width, line, view->ncols);
 	free(line);
 	line = NULL;
 	if (err)
 		return err;
-	waddwstr(window, wline);
+	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < COLS)
-		waddch(window, '\n');
+	if (width < view->ncols)
+		waddch(view->window, '\n');
 
 	*eof = 0;
 	while (nprinted < max_lines - 2) {
@@ -1293,7 +1322,7 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 			continue;
 		}
 
-		wlimit = COLS < 9 ? 0 : COLS - 9;
+		wlimit = view->ncols < 9 ? 0 : view->ncols - 9;
 		err = format_line(&wline, &width, line, wlimit);
 		if (err) {
 			free(line);
@@ -1301,12 +1330,12 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 		}
 
 		if (nprinted == selected_line - 1)
-			wstandout(window);
+			wstandout(view->window);
 
 		blame_line = &lines[lineno - 1];
 		if (blame_line->annotated && prev_id &&
 		    got_object_id_cmp(prev_id, blame_line->id) == 0)
-			waddstr(window, "         ");
+			waddstr(view->window, "         ");
 		else if (blame_line->annotated) {
 			char *id_str;
 			err = got_object_id_str(&id_str, blame_line->id);
@@ -1315,21 +1344,21 @@ draw_blame(WINDOW *window, struct got_object_id *id, FILE *f, const char *path,
 				free(wline);
 				return err;
 			}
-			wprintw(window, "%.8s ", id_str);
+			wprintw(view->window, "%.8s ", id_str);
 			free(id_str);
 			prev_id = blame_line->id;
 		} else {
-			waddstr(window, "........ ");
+			waddstr(view->window, "........ ");
 			prev_id = NULL;
 		}
 
-		waddwstr(window, wline);
+		waddwstr(view->window, wline);
 		while (width < wlimit) {
-			waddch(window, ' '); /* width == wlimit - 1 ? '\n' : ' '); */
+			waddch(view->window, ' ');
 			width++;
 		}
 		if (nprinted == selected_line - 1)
-			wstandend(window);
+			wstandend(view->window);
 		if (++nprinted == 1)
 			*first_displayed_line = lineno;
 		free(line);
@@ -1393,9 +1422,9 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 	line->annotated = 1;
 
-	err = draw_blame(a->view->window, a->commit_id, a->f, a->path,
+	err = draw_blame(a->view, a->commit_id, a->f, a->path,
 	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
-	    a->last_displayed_line, &eof, LINES);
+	    a->last_displayed_line, &eof, a->view->nlines);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
 		return got_error_from_errno();
@@ -1427,10 +1456,10 @@ blame_thread(void *arg)
 	ta->repo = NULL;
 	*ta->complete = 1;
 	if (!err)
-		err = draw_blame(a->view->window, a->commit_id, a->f,
-		    a->path, a->lines, a->nlines, 1, *a->selected_line,
+		err = draw_blame(a->view, a->commit_id, a->f, a->path,
+		    a->lines, a->nlines, 1, *a->selected_line,
 		    a->first_displayed_line, a->last_displayed_line, &eof,
-		    LINES);
+		    a->view->nlines);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
 		err = got_error_from_errno();
@@ -1618,7 +1647,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
-	int ch, done = 0, first_displayed_line = 1, last_displayed_line = LINES;
+	int ch, done = 0, first_displayed_line = 1, last_displayed_line;
 	int selected_line = first_displayed_line;
 	int eof, blame_complete = 0;
 	struct got_object *obj = NULL, *pobj = NULL;
@@ -1646,6 +1675,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		goto done;
 	}
 	show_panel(view->panel);
+	last_displayed_line = view->nlines;
 
 	memset(&blame, 0, sizeof(blame));
 	err = run_blame(&blame, &mutex, view, &blame_complete,
@@ -1659,10 +1689,10 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(view->window, blamed_commit->id,
-		    blame.f, path, blame.lines, blame.nlines, blame_complete,
-		    selected_line, &first_displayed_line, &last_displayed_line,
-		    &eof, LINES);
+		err = draw_blame(view, blamed_commit->id, blame.f, path,
+		    blame.lines, blame.nlines, blame_complete, selected_line,
+		    &first_displayed_line, &last_displayed_line, &eof,
+		    view->nlines);
 		if (pthread_mutex_unlock(&mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
@@ -1694,14 +1724,15 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					selected_line = 1;
 					break;
 				}
-				if (first_displayed_line > LINES - 2)
-					first_displayed_line -= (LINES - 2);
+				if (first_displayed_line > view->nlines - 2)
+					first_displayed_line -=
+					    (view->nlines - 2);
 				else
 					first_displayed_line = 1;
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected_line < LINES - 2 &&
+				if (selected_line < view->nlines - 2 &&
 				    first_displayed_line + selected_line <=
 				    blame.nlines)
 					selected_line++;
@@ -1821,17 +1852,18 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 			case KEY_NPAGE:
 			case ' ':
 				if (last_displayed_line >= blame.nlines &&
-				    selected_line < LINES - 2) {
+				    selected_line < view->nlines - 2) {
 					selected_line = MIN(blame.nlines,
-					    LINES - 2);
+					    view->nlines - 2);
 					break;
 				}
-				if (last_displayed_line + LINES - 2 <=
+				if (last_displayed_line + view->nlines - 2 <=
 				    blame.nlines)
-					first_displayed_line += LINES - 2;
+					first_displayed_line +=
+					    view->nlines - 2;
 				else
 					first_displayed_line =
-					    blame.nlines - (LINES - 3);
+					    blame.nlines - (view->nlines - 3);
 				break;
 			default:
 				break;
@@ -1935,10 +1967,11 @@ done:
 }
 
 static const struct got_error *
-draw_tree_entries(struct got_tree_entry **first_displayed_entry,
+draw_tree_entries(struct tog_view *view,
+    struct got_tree_entry **first_displayed_entry,
     struct got_tree_entry **last_displayed_entry,
     struct got_tree_entry **selected_entry, int *ndisplayed,
-    WINDOW *window, const char *label, int show_ids, const char *parent_path,
+    const char *label, int show_ids, const char *parent_path,
     const struct got_tree_entries *entries, int selected, int limit, int isroot)
 {
 	const struct got_error *err = NULL;
@@ -1948,44 +1981,44 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 
 	*ndisplayed = 0;
 
-	werase(window);
+	werase(view->window);
 
 	if (limit == 0)
 		return NULL;
 
-	err = format_line(&wline, &width, label, COLS);
+	err = format_line(&wline, &width, label, view->ncols);
 	if (err)
 		return err;
-	waddwstr(window, wline);
+	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < COLS)
-		waddch(window, '\n');
+	if (width < view->ncols)
+		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	err = format_line(&wline, &width, parent_path, COLS);
+	err = format_line(&wline, &width, parent_path, view->ncols);
 	if (err)
 		return err;
-	waddwstr(window, wline);
+	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < COLS)
-		waddch(window, '\n');
+	if (width < view->ncols)
+		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	waddch(window, '\n');
+	waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
 
 	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == NULL) {
 		if (selected == 0) {
-			wstandout(window);
+			wstandout(view->window);
 			*selected_entry = NULL;
 		}
-		waddstr(window, "  ..\n");	/* parent directory */
+		waddstr(view->window, "  ..\n");	/* parent directory */
 		if (selected == 0)
-			wstandend(window);
+			wstandend(view->window);
 		(*ndisplayed)++;
 		if (--limit <= 0)
 			return NULL;
@@ -2010,20 +2043,20 @@ draw_tree_entries(struct got_tree_entry **first_displayed_entry,
 			return got_error_from_errno();
 		}
 		free(id_str);
-		err = format_line(&wline, &width, line, COLS);
+		err = format_line(&wline, &width, line, view->ncols);
 		if (err) {
 			free(line);
 			break;
 		}
 		if (n == selected) {
-			wstandout(window);
+			wstandout(view->window);
 			*selected_entry = te;
 		}
-		waddwstr(window, wline);
-		if (width < COLS)
-			waddch(window, '\n');
+		waddwstr(view->window, wline);
+		if (width < view->ncols)
+			waddch(view->window, '\n');
 		if (n == selected)
-			wstandend(window);
+			wstandend(view->window);
 		free(line);
 		free(wline);
 		wline = NULL;
@@ -2224,10 +2257,10 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		if (err)
 			goto done;
 
-		err = draw_tree_entries(&first_displayed_entry,
+		err = draw_tree_entries(view, &first_displayed_entry,
 		    &last_displayed_entry, &selected_entry, &ndisplayed,
-		    view->window, tree_label, show_ids,
-		     parent_path, entries, selected, LINES, tree == root);
+		    tree_label, show_ids, parent_path, entries, selected,
+		    view->nlines, tree == root);
 		free(parent_path);
 		if (err)
 			break;
@@ -2267,8 +2300,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 					selected = 0;
 					break;
 				}
-				tree_scroll_up(&first_displayed_entry, LINES,
-				    entries, tree == root);
+				tree_scroll_up(&first_displayed_entry,
+				    view->nlines, entries, tree == root);
 				break;
 			case 'j':
 			case KEY_DOWN:
@@ -2280,8 +2313,9 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 				    last_displayed_entry, entries);
 				break;
 			case KEY_NPAGE:
-				tree_scroll_down(&first_displayed_entry, LINES,
-				    last_displayed_entry, entries);
+				tree_scroll_down(&first_displayed_entry,
+				    view->nlines, last_displayed_entry,
+				    entries);
 				if (SIMPLEQ_NEXT(last_displayed_entry, entry))
 					break;
 				/* can't scroll any further; move cursor down */
@@ -2335,7 +2369,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 				}
 				break;
 			case KEY_RESIZE:
-				if (selected > LINES)
+				view_resize(view);
+				if (selected > view->nlines)
 					selected = ndisplayed - 1;
 				break;
 			default:
