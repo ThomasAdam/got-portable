@@ -87,6 +87,7 @@ struct tog_view {
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
+	struct tog_view *parent;
 };
 
 static const struct got_error *
@@ -113,13 +114,15 @@ close_view(struct tog_view *view)
 }
 
 static struct tog_view *
-open_view(int nlines, int ncols, int begin_y, int begin_x)
+open_view(int nlines, int ncols, int begin_y, int begin_x,
+    struct tog_view *parent)
 {
 	struct tog_view *view = malloc(sizeof(*view));
 
 	if (view == NULL)
 		return NULL;
 
+	view->parent = parent;
 	view->lines = LINES;
 	view->cols = COLS;
 	view->nlines = nlines ? nlines : LINES - begin_y;
@@ -146,23 +149,28 @@ view_resize(struct tog_view *view)
 {
 	int nlines, ncols;
 
-	if (view->lines > LINES)
-		nlines = view->nlines - (view->lines - LINES);
-	else
-		nlines = view->nlines + (LINES - view->lines);
+	while (view) {
+		if (view->lines > LINES)
+			nlines = view->nlines - (view->lines - LINES);
+		else
+			nlines = view->nlines + (LINES - view->lines);
 
-	if (view->cols > COLS)
-		ncols = view->ncols - (view->cols - COLS);
-	else
-		ncols = view->ncols + (COLS - view->cols);
+		if (view->cols > COLS)
+			ncols = view->ncols - (view->cols - COLS);
+		else
+			ncols = view->ncols + (COLS - view->cols);
 
-	if (wresize(view->window, nlines, ncols) == ERR)
-		return got_error_from_errno();
+		if (wresize(view->window, nlines, ncols) == ERR)
+			return got_error_from_errno();
 
-	view->nlines = nlines;
-	view->ncols = ncols;
-	view->lines = LINES;
-	view->cols = COLS;
+		view->nlines = nlines;
+		view->ncols = ncols;
+		view->lines = LINES;
+		view->cols = COLS;
+
+		view = view->parent;
+	}
+
 	return NULL;
 }
 
@@ -715,7 +723,8 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 }
 
 static const struct got_error *
-show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
+show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
@@ -733,7 +742,7 @@ show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 			goto done;
 	}
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, parent_view);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -750,7 +759,8 @@ done:
 }
 
 static const struct got_error *
-browse_commit(struct commit_queue_entry *entry, struct got_repository *repo)
+browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
@@ -760,7 +770,7 @@ browse_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 	if (err)
 		return err;
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, parent_view);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -904,13 +914,13 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 				break;
 			case KEY_ENTER:
 			case '\r':
-				err = show_commit(selected_entry, repo);
+				err = show_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
 				show_panel(view->panel);
 				break;
 			case 't':
-				err = browse_commit(selected_entry, repo);
+				err = browse_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
 				show_panel(view->panel);
@@ -1006,7 +1016,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, NULL);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -1241,7 +1251,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, NULL);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -1844,7 +1854,7 @@ show_blame_view(struct tog_view *view, const char *path,
 					break;
 				if (pobj == NULL && obj == NULL)
 					break;
-				diff_view = open_view(0, 0, 0, 0);
+				diff_view = open_view(0, 0, 0, 0, view);
 				if (diff_view == NULL) {
 					err = got_error_from_errno();
 					break;
@@ -1978,7 +1988,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, NULL);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -2300,7 +2310,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 			case 'l':
 				if (selected_entry) {
 					struct tog_view *log_view;
-					log_view = open_view(0, 0, 0, 0);
+					log_view = open_view(0, 0, 0, 0, view);
 					if (log_view == NULL) {
 						err = got_error_from_errno();
 						goto done;
@@ -2392,8 +2402,8 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 					selected = 0;
 					first_displayed_entry = NULL;
 				} else if (S_ISREG(selected_entry->mode)) {
-					struct tog_view *blame_view;
-					blame_view = open_view(0, 0, 0, 0);
+					struct tog_view *blame_view =
+					    open_view(0, 0, 0, 0, view);
 					if (blame_view == NULL) {
 						err = got_error_from_errno();
 						goto done;
@@ -2513,7 +2523,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0);
+	view = open_view(0, 0, 0, 0, NULL);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
