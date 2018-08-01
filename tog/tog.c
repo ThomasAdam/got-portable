@@ -109,14 +109,14 @@ close_view(struct tog_view *view)
 }
 
 static struct tog_view *
-open_view(void)
+open_view(int nlines, int ncols, int begin_y, int begin_x)
 {
 	struct tog_view *view = malloc(sizeof(*view));
 
 	if (view == NULL)
 		return NULL;
 
-	view->window = newwin(0, 0, 0, 0);
+	view->window = newwin(nlines, ncols, begin_y, begin_x);
 	if (view->window == NULL) {
 		close_view(view);
 		return NULL;
@@ -698,7 +698,7 @@ show_commit(struct commit_queue_entry *entry, struct got_repository *repo)
 			goto done;
 	}
 
-	view = open_view();
+	view = open_view(0, 0, 0, 0);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -780,7 +780,7 @@ show_log_view(struct got_object_id *start_id, struct got_repository *repo,
 		err = NULL;
 	}
 
-	view = open_view();
+	view = open_view(0, 0, 0, 0);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -1190,7 +1190,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	view = open_view();
+	view = open_view(0, 0, 0, 0);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -1635,7 +1635,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 		goto done;
 	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
 
-	view = open_view();
+	view = open_view(0, 0, 0, 0);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -1796,7 +1796,7 @@ show_blame_view(const char *path, struct got_object_id *commit_id,
 					break;
 				if (pobj == NULL && obj == NULL)
 					break;
-				diff_view = open_view();
+				diff_view = open_view(0, 0, 0, 0);
 				if (diff_view == NULL) {
 					err = got_error_from_errno();
 					break;
@@ -2199,7 +2199,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		goto done;
 	}
 
-	view = open_view();
+	view = open_view(0, 0, 0, 0);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
