@@ -82,10 +82,10 @@ static struct tog_cmd tog_commands[] = {
 	    "browse trees in repository" },
 };
 
-static struct tog_view {
+struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
-} tog_tree_view;
+};
 
 static const struct got_error *
 show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
@@ -2186,6 +2186,7 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 	char *commit_id_str = NULL, *tree_label = NULL;
 	int nentries, ndisplayed;
 	struct tog_parent_trees parents;
+	struct tog_view *view = NULL;
 
 	TAILQ_INIT(&parents);
 
@@ -2198,18 +2199,12 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		goto done;
 	}
 
-	if (tog_tree_view.window == NULL) {
-		tog_tree_view.window = newwin(0, 0, 0, 0);
-		if (tog_tree_view.window == NULL)
-			return got_error_from_errno();
-		keypad(tog_tree_view.window, TRUE);
+	view = open_view();
+	if (view == NULL) {
+		err = got_error_from_errno();
+		goto done;
 	}
-	if (tog_tree_view.panel == NULL) {
-		tog_tree_view.panel = new_panel(tog_tree_view.window);
-		if (tog_tree_view.panel == NULL)
-			return got_error_from_errno();
-	} else
-		show_panel(tog_tree_view.panel);
+	show_panel(view->panel);
 
 	entries = got_object_tree_get_entries(root);
 	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
@@ -2226,14 +2221,14 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 
 		err = draw_tree_entries(&first_displayed_entry,
 		    &last_displayed_entry, &selected_entry, &ndisplayed,
-		    tog_tree_view.window, tree_label, show_ids,
+		    view->window, tree_label, show_ids,
 		     parent_path, entries, selected, LINES, tree == root);
 		free(parent_path);
 		if (err)
 			break;
 
 		nodelay(stdscr, FALSE);
-		ch = wgetch(tog_tree_view.window);
+		ch = wgetch(view->window);
 		nodelay(stdscr, TRUE);
 		switch (ch) {
 			case 'q':
@@ -2343,6 +2338,8 @@ show_tree_view(struct got_tree_object *root, struct got_object_id *commit_id,
 		}
 	}
 done:
+	if (view)
+		close_view(view);
 	free(tree_label);
 	free(commit_id_str);
 	while (!TAILQ_EMPTY(&parents)) {
