@@ -778,9 +778,9 @@ cmd_blame(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 1) {
+	if (argc == 1)
 		path = argv[0];
-	} else
+	else
 		usage_blame();
 
 	cwd = getcwd(NULL, 0);
