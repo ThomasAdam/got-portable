@@ -739,7 +739,7 @@ done:
 __dead static void
 usage_blame(void)
 {
-	fprintf(stderr, "usage: %s blame [-c commit] [repository-path] path\n",
+	fprintf(stderr, "usage: %s blame [-c commit] [-r repository-path] path\n",
 	    getprogname());
 	exit(1);
 }
@@ -749,8 +749,7 @@ cmd_blame(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	char *repo_path = NULL;
-	char *path = NULL;
+	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -760,10 +759,15 @@ cmd_blame(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
 			break;
 		default:
 			usage();
@@ -774,23 +778,29 @@ cmd_blame(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0) {
-		usage_blame();
-	} else if (argc == 1) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno();
+	if (argc == 1) {
 		path = argv[0];
-	} else if (argc == 2) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno();
-		path = argv[1];
 	} else
 		usage_blame();
 
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	if (repo_path == NULL) {
+		repo_path = strdup(cwd);
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	}
+
 	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_map_path(&in_repo_path, repo, path);
 	if (error != NULL)
 		goto done;
 
@@ -798,24 +808,27 @@ cmd_blame(int argc, char *argv[])
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
 		if (error != NULL)
-			return error;
+			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error != NULL)
-			return error;
+			goto done;
 	} else {
 		struct got_object *obj;
 		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
 		if (error != NULL)
-			return error;
+			goto done;
 		commit_id = got_object_get_id(obj);
 		if (commit_id == NULL)
 			error = got_error_from_errno();
 		got_object_close(obj);
 	}
 
-	error = got_blame(path, commit_id, repo, stdout);
+	error = got_blame(in_repo_path, commit_id, repo, stdout);
 done:
+	free(in_repo_path);
+	free(repo_path);
+	free(cwd);
 	free(commit_id);
 	if (repo)
 		got_repo_close(repo);
