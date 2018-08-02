@@ -1284,7 +1284,7 @@ __dead static void
 usage_blame(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s blame [-c commit] [repository-path] path\n",
+	fprintf(stderr, "usage: %s blame [-c commit] [-r repository-path] path\n",
 	    getprogname());
 	exit(1);
 }
@@ -1935,8 +1935,7 @@ cmd_blame(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	char *repo_path = NULL;
-	char *path = NULL;
+	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -1947,10 +1946,15 @@ cmd_blame(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
 			break;
 		default:
 			usage();
@@ -1961,25 +1965,32 @@ cmd_blame(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0) {
-		usage_blame();
-	} else if (argc == 1) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno();
+	if (argc == 1)
 		path = argv[0];
-	} else if (argc == 2) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno();
-		path = argv[1];
-	} else
+	else
 		usage_blame();
 
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	if (repo_path == NULL) {
+		repo_path = strdup(cwd);
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	}
+
+
 	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
 	if (error != NULL)
 		return error;
+
+	error = got_repo_map_path(&in_repo_path, repo, path);
+	if (error != NULL)
+		goto done;
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
@@ -2006,9 +2017,12 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = show_blame_view(view, path, commit_id, repo);
+	error = show_blame_view(view, in_repo_path, commit_id, repo);
 	close_view(view);
 done:
+	free(in_repo_path);
+	free(repo_path);
+	free(cwd);
 	free(commit_id);
 	if (repo)
 		got_repo_close(repo);
