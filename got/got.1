@@ -129,6 +129,22 @@ Both objects must be of the same type (blobs, trees, or commits).
 If the
 .Ar repository path
 is omitted, use the current working directory.
+.It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
+Display line-by-line history of a file at the specified path.
+.Pp
+The options for
+.Cm got blame
+are as follows:
+.Bl -tag -width Ds
+.It Fl c Ar commit
+Start traversing history at the specified
+.Ar commit .
+The expected argument is the name of a branch or a SHA1 hash which corresponds
+to a commit object.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
 .El
 .Sh EXIT STATUS
 .Ex -std got
