@@ -838,8 +838,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	const struct got_error *err = NULL;
 	struct got_object_id *head_id = NULL;
 	int nfetched;
+	struct tog_log_view_state *state = &view->state.log;
 
-	err = got_repo_map_path(&view->state.log.in_repo_path, repo, path);
+	err = got_repo_map_path(&state->in_repo_path, repo, path);
 	if (err != NULL)
 		goto done;
 
@@ -848,16 +849,16 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		return err;
 
 	/* The graph contains all commits. */
-	err = got_commit_graph_open(&view->state.log.graph, head_id, 0, repo);
+	err = got_commit_graph_open(&state->graph, head_id, 0, repo);
 	if (err)
 		goto done;
 	/* The commit queue contains a subset of commits filtered by path. */
-	TAILQ_INIT(&view->state.log.commits.head);
-	view->state.log.commits.ncommits = 0;
+	TAILQ_INIT(&state->commits.head);
+	state->commits.ncommits = 0;
 
 	/* Populate commit graph with a sufficient number of commits. */
 	err = got_commit_graph_fetch_commits_up_to(&nfetched,
-	    view->state.log.graph, start_id, repo);
+	    state->graph, start_id, repo);
 	if (err)
 		goto done;
 
@@ -867,15 +868,15 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	 * in order to avoid having to re-fetch commits from disk while
 	 * updating the display.
 	 */
-	err = queue_commits(view->state.log.graph, &view->state.log.commits, start_id,
-	    view->nlines, 1, repo, view->state.log.in_repo_path);
+	err = queue_commits(state->graph, &state->commits, start_id,
+	    view->nlines, 1, repo, state->in_repo_path);
 	if (err) {
 		if (err->code != GOT_ERR_ITER_COMPLETED)
 			goto done;
 		err = NULL;
 	}
 
-	view->state.log.repo = repo;
+	state->repo = repo;
 done:
 	free(head_id);
 	return err;
@@ -883,10 +884,12 @@ done:
 
 static void close_log_view(struct tog_view *view)
 {
-	if (view->state.log.graph)
-		got_commit_graph_close(view->state.log.graph);
-	free_commits(&view->state.log.commits);
-	free(view->state.log.in_repo_path);
+	struct tog_log_view_state *state = &view->state.log;
+
+	if (state->graph)
+		got_commit_graph_close(state->graph);
+	free_commits(&state->commits);
+	free(state->in_repo_path);
 }
 
 static const struct got_error *
@@ -894,19 +897,18 @@ show_log_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	int ch, done = 0;
+	struct tog_log_view_state *state = &view->state.log;
 
 	view_show(view);
 
-	view->state.log.first_displayed_entry =
-	    TAILQ_FIRST(&view->state.log.commits.head);
-	view->state.log.selected_entry = view->state.log.first_displayed_entry;
+	state->first_displayed_entry =
+	    TAILQ_FIRST(&state->commits.head);
+	state->selected_entry = state->first_displayed_entry;
 	while (!done) {
-		err = draw_commits(view, &view->state.log.last_displayed_entry,
-		    &view->state.log.selected_entry,
-		    view->state.log.first_displayed_entry,
-		    &view->state.log.commits, view->state.log.selected,
-		    view->nlines, view->state.log.graph, view->state.log.repo,
-		    view->state.log.in_repo_path);
+		err = draw_commits(view, &state->last_displayed_entry,
+		    &state->selected_entry, state->first_displayed_entry,
+		    &state->commits, state->selected, view->nlines,
+		    state->graph, state->repo, state->in_repo_path);
 		if (err)
 			goto done;
 
@@ -921,34 +923,33 @@ show_log_view(struct tog_view *view)
 				break;
 			case 'k':
 			case KEY_UP:
-				if (view->state.log.selected > 0)
-					view->state.log.selected--;
-				if (view->state.log.selected > 0)
+				if (state->selected > 0)
+					state->selected--;
+				if (state->selected > 0)
 					break;
-				scroll_up(
-				    &view->state.log.first_displayed_entry,
-				    1, &view->state.log.commits);
+				scroll_up(&state->first_displayed_entry, 1,
+				    &state->commits);
 				break;
 			case KEY_PPAGE:
-				if (TAILQ_FIRST(&view->state.log.commits.head) ==
-				    view->state.log.first_displayed_entry) {
-					view->state.log.selected = 0;
+				if (TAILQ_FIRST(&state->commits.head) ==
+				    state->first_displayed_entry) {
+					state->selected = 0;
 					break;
 				}
-				scroll_up(&view->state.log.first_displayed_entry,
-				    view->nlines, &view->state.log.commits);
+				scroll_up(&state->first_displayed_entry,
+				    view->nlines, &state->commits);
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (view->state.log.selected < MIN(view->nlines - 2,
-				    view->state.log.commits.ncommits - 1)) {
-					view->state.log.selected++;
+				if (state->selected < MIN(view->nlines - 2,
+				    state->commits.ncommits - 1)) {
+					state->selected++;
 					break;
 				}
-				err = scroll_down(&view->state.log.first_displayed_entry, 1,
-				    view->state.log.last_displayed_entry, &view->state.log.commits,
-				    view->state.log.graph,
-				    view->state.log.repo, view->state.log.in_repo_path);
+				err = scroll_down(&state->first_displayed_entry,
+				    1, state->last_displayed_entry,
+				    &state->commits, state->graph, state->repo,
+				    state->in_repo_path);
 				if (err) {
 					if (err->code != GOT_ERR_ITER_COMPLETED)
 						goto done;
@@ -957,42 +958,47 @@ show_log_view(struct tog_view *view)
 				break;
 			case KEY_NPAGE: {
 				struct commit_queue_entry *first;
-				first = view->state.log.first_displayed_entry;
-				err = scroll_down(&view->state.log.first_displayed_entry,
-				    view->nlines, view->state.log.last_displayed_entry,
-				    &view->state.log.commits, view->state.log.graph, view->state.log.repo, view->state.log.in_repo_path);
-				if (err) {
-					if (err->code != GOT_ERR_ITER_COMPLETED)
-						goto done;
-					if (first == view->state.log.first_displayed_entry &&
-					    view->state.log.selected < MIN(view->nlines - 2,
-					    view->state.log.commits.ncommits - 1)) {
-						/* can't scroll further down */
-						view->state.log.selected = MIN(view->nlines - 2,
-						    view->state.log.commits.ncommits - 1);
-					}
-					err = NULL;
+				first = state->first_displayed_entry;
+				err = scroll_down(&state->first_displayed_entry,
+				    view->nlines, state->last_displayed_entry,
+				    &state->commits, state->graph, state->repo,
+				    state->in_repo_path);
+				if (err == NULL)
+					break;
+				if (err->code != GOT_ERR_ITER_COMPLETED)
+					goto done;
+				if (first == state->first_displayed_entry &&
+				    state->selected < MIN(view->nlines - 2,
+				    state->commits.ncommits - 1)) {
+					/* can't scroll further down */
+					state->selected = MIN(view->nlines - 2,
+					    state->commits.ncommits - 1);
 				}
+				err = NULL;
 				break;
 			}
 			case KEY_RESIZE:
 				err = view_resize(view);
 				if (err)
 					goto done;
-				if (view->state.log.selected > view->nlines - 2)
-					view->state.log.selected = view->nlines - 2;
-				if (view->state.log.selected > view->state.log.commits.ncommits - 1)
-					view->state.log.selected = view->state.log.commits.ncommits - 1;
+				if (state->selected > view->nlines - 2)
+					state->selected = view->nlines - 2;
+				if (state->selected >
+				    state->commits.ncommits - 1)
+					state->selected =
+					    state->commits.ncommits - 1;
 				break;
 			case KEY_ENTER:
 			case '\r':
-				err = show_commit(view, view->state.log.selected_entry, view->state.log.repo);
+				err = show_commit(view, state->selected_entry,
+				    state->repo);
 				if (err)
 					goto done;
 				view_show(view);
 				break;
 			case 't':
-				err = browse_commit(view, view->state.log.selected_entry, view->state.log.repo);
+				err = browse_commit(view, state->selected_entry,
+				    state->repo);
 				if (err)
 					goto done;
 				view_show(view);
