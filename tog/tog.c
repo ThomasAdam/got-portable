@@ -100,6 +100,23 @@ struct commit_queue {
 	struct commit_queue_head head;
 };
 
+struct tog_diff_view_state {
+	FILE *f;
+	int first_displayed_line;
+	int last_displayed_line;
+};
+
+struct tog_log_view_state {
+	struct got_commit_graph *graph;
+	struct commit_queue commits;
+	struct commit_queue_entry *first_displayed_entry;
+	struct commit_queue_entry *last_displayed_entry;
+	struct commit_queue_entry *selected_entry;
+	int selected;
+	char *in_repo_path;
+	struct got_repository *repo;
+};
+
 struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
@@ -110,21 +127,8 @@ struct tog_view {
 	/* type-specific state */
 	enum tog_view_type type;
 	union {
-		struct {
-			FILE *f;
-			int first_displayed_line;
-			int last_displayed_line;
-		} diff;
-		struct {
-			struct got_commit_graph *graph;
-			struct commit_queue commits;
-			struct commit_queue_entry *first_displayed_entry;
-			struct commit_queue_entry *last_displayed_entry;
-			struct commit_queue_entry *selected_entry;
-			int selected;
-			char *in_repo_path;
-			struct got_repository *repo;
-		} log;
+		struct tog_diff_view_state diff;
+		struct tog_log_view_state log;
 	} state;
 };
 
