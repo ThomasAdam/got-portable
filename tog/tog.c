@@ -95,12 +95,23 @@ struct tog_view {
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
 	struct tog_view *parent;
+
+	/* type-specific state */
 	enum tog_view_type type;
+	union {
+		struct {
+			FILE *f;
+			int first_displayed_line;
+			int last_displayed_line;
+		} diff;
+	} state;
 };
 
 static const struct got_error *
-show_diff_view(struct tog_view *, struct got_object *, struct got_object *,
+open_diff_view(struct tog_view *, struct got_object *, struct got_object *,
     struct got_repository *);
+static const struct got_error *show_diff_view(struct tog_view *);
+static void close_diff_view(struct tog_view *);
 static const struct got_error *
 show_log_view(struct tog_view *, struct got_object_id *,
     struct got_repository *, const char *);
@@ -766,7 +777,11 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 		goto done;
 	}
 
-	err = show_diff_view(view, obj1, obj2, repo);
+	err = open_diff_view(view, obj1, obj2, repo);
+	if (err)
+		goto done;
+	err = show_diff_view(view);
+	close_diff_view(view);
 	view_close(view);
 	view_show(parent_view);
 done:
@@ -1128,14 +1143,11 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 }
 
 static const struct got_error *
-show_diff_view(struct tog_view *view, struct got_object *obj1,
+open_diff_view(struct tog_view *view, struct got_object *obj1,
     struct got_object *obj2, struct got_repository *repo)
 {
 	const struct got_error *err;
 	FILE *f;
-	int ch, done = 0;
-	int first_displayed_line = 1, last_displayed_line = view->nlines;
-	int eof, i;
 
 	if (obj1 != NULL && obj2 != NULL &&
 	    got_object_get_type(obj1) != got_object_get_type(obj2))
@@ -1161,11 +1173,33 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	fflush(f);
 
+	view->state.diff.f = f;
+	view->state.diff.first_displayed_line = 1;
+	view->state.diff.last_displayed_line = view->nlines;
+
+	return NULL;
+}
+
+static void
+close_diff_view(struct tog_view *view)
+{
+	fclose(view->state.diff.f);
+}
+
+static const struct got_error *
+show_diff_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	int ch, done = 0;
+	int eof, i;
+
 	view_show(view);
 
 	while (!done) {
-		err = draw_file(view, f, &first_displayed_line,
-		    &last_displayed_line, &eof, view->nlines);
+		err = draw_file(view, view->state.diff.f,
+		    &view->state.diff.first_displayed_line,
+		    &view->state.diff.last_displayed_line,
+		    &eof, view->nlines);
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
@@ -1177,27 +1211,28 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 				break;
 			case 'k':
 			case KEY_UP:
-				if (first_displayed_line > 1)
-					first_displayed_line--;
+				if (view->state.diff.first_displayed_line > 1)
+					view->state.diff.first_displayed_line--;
 				break;
 			case KEY_PPAGE:
 			case KEY_BACKSPACE:
 				i = 0;
 				while (i++ < view->nlines - 1 &&
-				    first_displayed_line > 1)
-					first_displayed_line--;
+				    view->state.diff.first_displayed_line > 1)
+					view->state.diff.first_displayed_line--;
 				break;
 			case 'j':
 			case KEY_DOWN:
 				if (!eof)
-					first_displayed_line++;
+					view->state.diff.first_displayed_line++;
 				break;
 			case KEY_NPAGE:
 			case ' ':
 				i = 0;
 				while (!eof && i++ < view->nlines - 1) {
-					char *line = parse_next_line(f, NULL);
-					first_displayed_line++;
+					char *line = parse_next_line(
+					    view->state.diff.f, NULL);
+					view->state.diff.first_displayed_line++;
 					if (line == NULL)
 						break;
 				}
@@ -1212,7 +1247,6 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 		}
 	}
 done:
-	fclose(f);
 	return err;
 }
 
@@ -1278,7 +1312,11 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = show_diff_view(view, obj1, obj2, repo);
+	error = open_diff_view(view, obj1, obj2, repo);
+	if (error)
+		goto done;
+	error = show_diff_view(view);
+	close_diff_view(view);
 	view_close(view);
 done:
 	got_repo_close(repo);
@@ -1882,8 +1920,14 @@ show_blame_view(struct tog_view *view, const char *path,
 					err = got_error_from_errno();
 					break;
 				}
-				err = show_diff_view(diff_view, pobj, obj, repo);
+				err = open_diff_view(diff_view, pobj, obj, repo);
+				if (err)
+					break;
+				err = show_diff_view(diff_view);
+				close_diff_view(diff_view);
 				view_close(diff_view);
+				if (err)
+					break;
 				view_show(view);
 				if (pobj) {
 					got_object_close(pobj);
