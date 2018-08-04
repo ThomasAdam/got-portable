@@ -117,6 +117,19 @@ struct tog_log_view_state {
 	struct got_repository *repo;
 };
 
+struct tog_blame_view_state {
+	int first_displayed_line;
+	int last_displayed_line;
+	int selected_line;
+	int blame_complete;
+	pthread_mutex_t mutex;
+	struct got_object_id_queue blamed_commits;
+	struct got_object_qid *blamed_commit;
+	const char *path;
+	struct got_repository *repo;
+	struct got_object_id *commit_id;
+};
+
 struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
@@ -129,6 +142,7 @@ struct tog_view {
 	union {
 		struct tog_diff_view_state diff;
 		struct tog_log_view_state log;
+		struct tog_blame_view_state blame;
 	} state;
 };
 
@@ -140,8 +154,10 @@ static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *, const char *);
 static const struct got_error * show_log_view(struct tog_view *);
 static void close_log_view(struct tog_view *);
-static const struct got_error *show_blame_view(struct tog_view *, const char *,
+static const struct got_error *open_blame_view(struct tog_view *, const char *,
     struct got_object_id *, struct got_repository *);
+static const struct got_error *show_blame_view(struct tog_view *);
+static void close_blame_view(struct tog_view *);
 static const struct got_error *show_tree_view(struct tog_view *,
     struct got_tree_object *, struct got_object_id *, struct got_repository *);
 
@@ -1767,52 +1783,78 @@ done:
 }
 
 static const struct got_error *
-show_blame_view(struct tog_view *view, const char *path,
+open_blame_view(struct tog_view *view, const char *path,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
-	const struct got_error *err = NULL, *thread_err = NULL;
-	int ch, done = 0, first_displayed_line = 1, last_displayed_line;
-	int selected_line = first_displayed_line;
-	int eof, blame_complete = 0;
-	struct got_object *obj = NULL, *pobj = NULL;
-	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-	struct tog_blame blame;
-	struct got_object_id_queue blamed_commits;
-	struct got_object_qid *blamed_commit = NULL;
-	struct tog_view *diff_view;
+	const struct got_error *err = NULL;
+	struct tog_blame_view_state *state = &view->state.blame;
 
-	SIMPLEQ_INIT(&blamed_commits);
+	SIMPLEQ_INIT(&state->blamed_commits);
 
-	if (pthread_mutex_init(&mutex, NULL) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (pthread_mutex_init(&state->mutex, NULL) != 0)
+		return got_error_from_errno();
 
-	err = got_object_qid_alloc(&blamed_commit, commit_id);
+	err = got_object_qid_alloc(&state->blamed_commit, commit_id);
 	if (err)
-		goto done;
-	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
+		return err;
+
+	SIMPLEQ_INSERT_HEAD(&state->blamed_commits, state->blamed_commit,
+	    entry);
+	state->first_displayed_line = 1;
+	state->last_displayed_line = view->nlines;
+	state->selected_line = 1;
+	state->blame_complete = 0;
+	state->path = path;
+	state->repo = repo;
+	state->commit_id = commit_id;
+
+	return NULL;
+}
+
+static void
+close_blame_view(struct tog_view *view)
+{
+	struct tog_blame_view_state *state = &view->state.blame;
+
+	while (!SIMPLEQ_EMPTY(&state->blamed_commits)) {
+		struct got_object_qid *blamed_commit;
+		blamed_commit = SIMPLEQ_FIRST(&state->blamed_commits);
+		SIMPLEQ_REMOVE_HEAD(&state->blamed_commits, entry);
+		got_object_qid_free(blamed_commit);
+	}
+}
+
+static const struct got_error *
+show_blame_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL, *thread_err = NULL;
+	int ch, done = 0, eof;
+	struct got_object *obj = NULL, *pobj = NULL;
+	struct tog_blame blame;
+	struct tog_view *diff_view;
+	struct tog_blame_view_state *state = &view->state.blame;
 
 	view_show(view);
-	last_displayed_line = view->nlines;
 
 	memset(&blame, 0, sizeof(blame));
-	err = run_blame(&blame, &mutex, view, &blame_complete,
-	    &first_displayed_line, &last_displayed_line,
-	    &selected_line, &done, path, blamed_commit->id, repo);
+	err = run_blame(&blame, &state->mutex, view, &state->blame_complete,
+	    &state->first_displayed_line, &state->last_displayed_line,
+	    &state->selected_line, &done, state->path,
+	    state->blamed_commit->id, state->repo);
 	if (err)
 		return err;
 
 	while (!done) {
-		if (pthread_mutex_lock(&mutex) != 0) {
+		if (pthread_mutex_lock(&state->mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(view, blamed_commit->id, blame.f, path,
-		    blame.lines, blame.nlines, blame_complete, selected_line,
-		    &first_displayed_line, &last_displayed_line, &eof,
-		    view->nlines);
-		if (pthread_mutex_unlock(&mutex) != 0) {
+		err = draw_blame(view, state->blamed_commit->id, blame.f,
+		    state->path, blame.lines, blame.nlines,
+		    state->blame_complete, state->selected_line,
+		    &state->first_displayed_line, &state->last_displayed_line,
+		    &eof, view->nlines);
+		if (pthread_mutex_unlock(&state->mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
@@ -1821,7 +1863,7 @@ show_blame_view(struct tog_view *view, const char *path,
 		nodelay(stdscr, FALSE);
 		ch = wgetch(view->window);
 		nodelay(stdscr, TRUE);
-		if (pthread_mutex_lock(&mutex) != 0) {
+		if (pthread_mutex_lock(&state->mutex) != 0) {
 			err = got_error_from_errno();
 			goto done;
 		}
@@ -1831,44 +1873,47 @@ show_blame_view(struct tog_view *view, const char *path,
 				break;
 			case 'k':
 			case KEY_UP:
-				if (selected_line > 1)
-					selected_line--;
-				else if (selected_line == 1 &&
-				    first_displayed_line > 1)
-					first_displayed_line--;
+				if (state->selected_line > 1)
+					state->selected_line--;
+				else if (state->selected_line == 1 &&
+				    state->first_displayed_line > 1)
+					state->first_displayed_line--;
 				break;
 			case KEY_PPAGE:
 			case KEY_BACKSPACE:
-				if (first_displayed_line == 1) {
-					selected_line = 1;
+				if (state->first_displayed_line == 1) {
+					state->selected_line = 1;
 					break;
 				}
-				if (first_displayed_line > view->nlines - 2)
-					first_displayed_line -=
+				if (state->first_displayed_line >
+				    view->nlines - 2)
+					state->first_displayed_line -=
 					    (view->nlines - 2);
 				else
-					first_displayed_line = 1;
+					state->first_displayed_line = 1;
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected_line < view->nlines - 2 &&
-				    first_displayed_line + selected_line <=
+				if (state->selected_line < view->nlines - 2 &&
+				    state->first_displayed_line +
+				    state->selected_line <= blame.nlines)
+					state->selected_line++;
+				else if (state->last_displayed_line <
 				    blame.nlines)
-					selected_line++;
-				else if (last_displayed_line < blame.nlines)
-					first_displayed_line++;
+					state->first_displayed_line++;
 				break;
 			case 'b':
 			case 'p': {
 				struct got_object_id *id;
 				id = get_selected_commit_id(blame.lines,
-				    first_displayed_line, selected_line);
+				    state->first_displayed_line,
+				    state->selected_line);
 				if (id == NULL || got_object_id_cmp(id,
-				    blamed_commit->id) == 0)
+				    state->blamed_commit->id) == 0)
 					break;
 				err = open_selected_commit(&pobj, &obj,
-				    blame.lines, first_displayed_line,
-				    selected_line, repo);
+				    blame.lines, state->first_displayed_line,
+				    state->selected_line, state->repo);
 				if (err)
 					break;
 				if (pobj == NULL && obj == NULL)
@@ -1876,13 +1921,13 @@ show_blame_view(struct tog_view *view, const char *path,
 				if (ch == 'p' && pobj == NULL)
 					break;
 				done = 1;
-				if (pthread_mutex_unlock(&mutex) != 0) {
+				if (pthread_mutex_unlock(&state->mutex) != 0) {
 					err = got_error_from_errno();
 					goto done;
 				}
 				thread_err = stop_blame(&blame);
 				done = 0;
-				if (pthread_mutex_lock(&mutex) != 0) {
+				if (pthread_mutex_lock(&state->mutex) != 0) {
 					err = got_error_from_errno();
 					goto done;
 				}
@@ -1899,45 +1944,53 @@ show_blame_view(struct tog_view *view, const char *path,
 					err = got_error_from_errno();
 					break;
 				}
-				err = got_object_qid_alloc(&blamed_commit, id);
+				err = got_object_qid_alloc(
+				    &state->blamed_commit, id);
 				free(id);
 				if (err)
 					goto done;
-				SIMPLEQ_INSERT_HEAD(&blamed_commits,
-				    blamed_commit, entry);
-				err = run_blame(&blame, &mutex, view,
-				    &blame_complete, &first_displayed_line,
-				    &last_displayed_line, &selected_line,
-				    &done, path, blamed_commit->id, repo);
+				SIMPLEQ_INSERT_HEAD(&state->blamed_commits,
+				    state->blamed_commit, entry);
+				err = run_blame(&blame, &state->mutex, view,
+				    &state->blame_complete,
+				    &state->first_displayed_line,
+				    &state->last_displayed_line,
+				    &state->selected_line, &done, state->path,
+				    state->blamed_commit->id, state->repo);
 				if (err)
 					break;
 				break;
 			}
 			case 'B': {
 				struct got_object_qid *first;
-				first = SIMPLEQ_FIRST(&blamed_commits);
-				if (!got_object_id_cmp(first->id, commit_id))
+				first = SIMPLEQ_FIRST(&state->blamed_commits);
+				if (!got_object_id_cmp(first->id,
+				    state->commit_id))
 					break;
 				done = 1;
-				if (pthread_mutex_unlock(&mutex) != 0) {
+				if (pthread_mutex_unlock(&state->mutex) != 0) {
 					err = got_error_from_errno();
 					goto done;
 				}
 				thread_err = stop_blame(&blame);
 				done = 0;
-				if (pthread_mutex_lock(&mutex) != 0) {
+				if (pthread_mutex_lock(&state->mutex) != 0) {
 					err = got_error_from_errno();
 					goto done;
 				}
 				if (thread_err)
 					break;
-				SIMPLEQ_REMOVE_HEAD(&blamed_commits, entry);
-				got_object_qid_free(blamed_commit);
-				blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
-				err = run_blame(&blame, &mutex, view,
-				    &blame_complete, &first_displayed_line,
-				    &last_displayed_line, &selected_line,
-				    &done, path, blamed_commit->id, repo);
+				SIMPLEQ_REMOVE_HEAD(&state->blamed_commits,
+				    entry);
+				got_object_qid_free(state->blamed_commit);
+				state->blamed_commit =
+				    SIMPLEQ_FIRST(&state->blamed_commits);
+				err = run_blame(&blame, &state->mutex, view,
+				    &state->blame_complete,
+				    &state->first_displayed_line,
+				    &state->last_displayed_line,
+				    &state->selected_line, &done, state->path,
+				    state->blamed_commit->id, state->repo);
 				if (err)
 					break;
 				break;
@@ -1945,8 +1998,8 @@ show_blame_view(struct tog_view *view, const char *path,
 			case KEY_ENTER:
 			case '\r':
 				err = open_selected_commit(&pobj, &obj,
-				    blame.lines, first_displayed_line,
-				    selected_line, repo);
+				    blame.lines, state->first_displayed_line,
+				    state->selected_line, state->repo);
 				if (err)
 					break;
 				if (pobj == NULL && obj == NULL)
@@ -1957,7 +2010,8 @@ show_blame_view(struct tog_view *view, const char *path,
 					err = got_error_from_errno();
 					break;
 				}
-				err = open_diff_view(diff_view, pobj, obj, repo);
+				err = open_diff_view(diff_view, pobj, obj,
+				    state->repo);
 				if (err)
 					break;
 				err = show_diff_view(diff_view);
@@ -1977,33 +2031,34 @@ show_blame_view(struct tog_view *view, const char *path,
 				break;
 			case KEY_NPAGE:
 			case ' ':
-				if (last_displayed_line >= blame.nlines &&
-				    selected_line < view->nlines - 2) {
-					selected_line = MIN(blame.nlines,
+				if (state->last_displayed_line
+				    >= blame.nlines &&
+				    state->selected_line < view->nlines - 2) {
+					state->selected_line = MIN(blame.nlines,
 					    view->nlines - 2);
 					break;
 				}
-				if (last_displayed_line + view->nlines - 2 <=
-				    blame.nlines)
-					first_displayed_line +=
+				if (state->last_displayed_line +
+				    view->nlines - 2 <= blame.nlines)
+					state->first_displayed_line +=
 					    view->nlines - 2;
 				else
-					first_displayed_line =
+					state->first_displayed_line =
 					    blame.nlines - (view->nlines - 3);
 				break;
 			case KEY_RESIZE:
 				err = view_resize(view);
 				if (err)
 					break;
-				if (selected_line > view->nlines - 2) {
-					selected_line = MIN(blame.nlines,
+				if (state->selected_line > view->nlines - 2) {
+					state->selected_line = MIN(blame.nlines,
 					    view->nlines - 2);
 				}
 				break;
 			default:
 				break;
 		}
-		if (pthread_mutex_unlock(&mutex) != 0)
+		if (pthread_mutex_unlock(&state->mutex) != 0)
 			err = got_error_from_errno();
 		if (err || thread_err)
 			break;
@@ -2013,11 +2068,6 @@ done:
 		got_object_close(pobj);
 	if (blame.thread)
 		thread_err = stop_blame(&blame);
-	while (!SIMPLEQ_EMPTY(&blamed_commits)) {
-		blamed_commit = SIMPLEQ_FIRST(&blamed_commits);
-		SIMPLEQ_REMOVE_HEAD(&blamed_commits, entry);
-		got_object_qid_free(blamed_commit);
-	}
 	return thread_err ? thread_err : err;
 }
 
@@ -2108,7 +2158,11 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = show_blame_view(view, in_repo_path, commit_id, repo);
+	error = open_blame_view(view, in_repo_path, commit_id, repo);
+	if (error)
+		goto done;
+	error = show_blame_view(view);
+	close_blame_view(view);
 	view_close(view);
 done:
 	free(in_repo_path);
@@ -2347,12 +2401,17 @@ blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
 
 	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
 	if (view) {
-		err = show_blame_view(view, path, commit_id, repo);
+		err = open_blame_view(view, path, commit_id, repo);
+		if (err)
+			goto done;
+		err = show_blame_view(view);
+		close_blame_view(view);
 		view_close(view);
 	} else
 		err = got_error_from_errno();
 
 	view_show(parent_view);
+done:
 	free(path);
 	return err;
 }
