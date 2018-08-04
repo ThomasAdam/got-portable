@@ -85,8 +85,14 @@ static struct tog_cmd tog_commands[] = {
 enum tog_view_type {
 	TOG_VIEW_DIFF,
 	TOG_VIEW_LOG,
-	TOG_VIEW_TREE,
-	TOG_VIEW_BLAME
+	TOG_VIEW_BLAME,
+	TOG_VIEW_TREE
+};
+
+struct tog_diff_view_state {
+	FILE *f;
+	int first_displayed_line;
+	int last_displayed_line;
 };
 
 struct commit_queue_entry {
@@ -98,12 +104,6 @@ TAILQ_HEAD(commit_queue_head, commit_queue_entry);
 struct commit_queue {
 	int ncommits;
 	struct commit_queue_head head;
-};
-
-struct tog_diff_view_state {
-	FILE *f;
-	int first_displayed_line;
-	int last_displayed_line;
 };
 
 struct tog_log_view_state {
@@ -130,6 +130,30 @@ struct tog_blame_view_state {
 	struct got_object_id *commit_id;
 };
 
+struct tog_parent_tree {
+	TAILQ_ENTRY(tog_parent_tree) entry;
+	struct got_tree_object *tree;
+	struct got_tree_entry *first_displayed_entry;
+	struct got_tree_entry *selected_entry;
+	int selected;
+};
+
+TAILQ_HEAD(tog_parent_trees, tog_parent_tree);
+
+struct tog_tree_view_state {
+	char *tree_label;
+	struct got_tree_object *root;
+	struct got_tree_object *tree;
+	const struct got_tree_entries *entries;
+	struct got_tree_entry *first_displayed_entry;
+	struct got_tree_entry *last_displayed_entry;
+	struct got_tree_entry *selected_entry;
+	int nentries, ndisplayed, selected, show_ids;
+	struct tog_parent_trees parents;
+	struct got_object_id *commit_id;
+	struct got_repository *repo;
+};
+
 struct tog_view {
 	WINDOW *window;
 	PANEL *panel;
@@ -143,6 +167,7 @@ struct tog_view {
 		struct tog_diff_view_state diff;
 		struct tog_log_view_state log;
 		struct tog_blame_view_state blame;
+		struct tog_tree_view_state tree;
 	} state;
 };
 
@@ -158,8 +183,10 @@ static const struct got_error *open_blame_view(struct tog_view *, const char *,
     struct got_object_id *, struct got_repository *);
 static const struct got_error *show_blame_view(struct tog_view *);
 static void close_blame_view(struct tog_view *);
-static const struct got_error *show_tree_view(struct tog_view *,
+static const struct got_error *open_tree_view(struct tog_view *,
     struct got_tree_object *, struct got_object_id *, struct got_repository *);
+static const struct got_error *show_tree_view(struct tog_view *);
+static void close_tree_view(struct tog_view *);
 
 static void
 view_close(struct tog_view *view)
@@ -175,7 +202,7 @@ static struct tog_view *
 view_open(int nlines, int ncols, int begin_y, int begin_x,
     struct tog_view *parent, enum tog_view_type type)
 {
-	struct tog_view *view = malloc(sizeof(*view));
+	struct tog_view *view = calloc(1, sizeof(*view));
 
 	if (view == NULL)
 		return NULL;
@@ -837,7 +864,11 @@ browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = show_tree_view(view, tree, entry->id, repo);
+	err = open_tree_view(view, tree, entry->id, repo);
+	if (err)
+		goto done;
+	err = show_tree_view(view);
+	close_tree_view(view);
 	view_close(view);
 	view_show(parent_view);
 done:
@@ -2332,16 +2363,6 @@ tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 	}
 }
 
-struct tog_parent_tree {
-	TAILQ_ENTRY(tog_parent_tree) entry;
-	struct got_tree_object *tree;
-	struct got_tree_entry *first_displayed_entry;
-	struct got_tree_entry *selected_entry;
-	int selected;
-};
-
-TAILQ_HEAD(tog_parent_trees, tog_parent_tree);
-
 static const struct got_error *
 tree_entry_path(char **path, struct tog_parent_trees *parents,
     struct got_tree_entry *te)
@@ -2439,50 +2460,79 @@ done:
 }
 
 static const struct got_error *
-show_tree_view(struct tog_view *view, struct got_tree_object *root,
+open_tree_view(struct tog_view *view, struct got_tree_object *root,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	int ch, done = 0, selected = 0, show_ids = 0;
-	struct got_tree_object *tree = root;
-	const struct got_tree_entries *entries;
-	struct got_tree_entry *first_displayed_entry = NULL;
-	struct got_tree_entry *last_displayed_entry = NULL;
-	struct got_tree_entry *selected_entry = NULL;
-	char *commit_id_str = NULL, *tree_label = NULL;
-	int nentries, ndisplayed;
-	struct tog_parent_trees parents;
+	char *commit_id_str = NULL;
+	struct tog_tree_view_state *state = &view->state.tree;
 
-	TAILQ_INIT(&parents);
+	TAILQ_INIT(&state->parents);
 
 	err = got_object_id_str(&commit_id_str, commit_id);
 	if (err != NULL)
 		goto done;
 
-	if (asprintf(&tree_label, "commit: %s", commit_id_str) == -1) {
+	if (asprintf(&state->tree_label, "commit: %s", commit_id_str) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
+	state->root = state->tree = root;
+	state->entries = got_object_tree_get_entries(root);
+	state->first_displayed_entry = SIMPLEQ_FIRST(&state->entries->head);
+	state->commit_id = commit_id;
+	state->repo = repo;
+done:
+	free(commit_id_str);
+	if (err)
+		free(state->tree_label);
+	return err;
+}
+
+static void
+close_tree_view(struct tog_view *view)
+{
+	struct tog_tree_view_state *state = &view->state.tree;
+
+	free(state->tree_label);
+	while (!TAILQ_EMPTY(&state->parents)) {
+		struct tog_parent_tree *parent;
+		parent = TAILQ_FIRST(&state->parents);
+		TAILQ_REMOVE(&state->parents, parent, entry);
+		free(parent);
+
+	}
+	if (state->tree != state->root)
+		got_object_tree_close(state->tree);
+}
+
+static const struct got_error *
+show_tree_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_tree_view_state *state = &view->state.tree;
+	int ch, done = 0;
+	int nentries;
+
 	view_show(view);
 
-	entries = got_object_tree_get_entries(root);
-	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
 	while (!done) {
 		char *parent_path;
-		entries = got_object_tree_get_entries(tree);
-		nentries = entries->nentries;
-		if (tree != root)
+		state->entries = got_object_tree_get_entries(state->tree);
+		nentries = state->entries->nentries;
+		if (state->tree != state->root)
 			nentries++; /* '..' directory */
 
-		err = tree_entry_path(&parent_path, &parents, NULL);
+		err = tree_entry_path(&parent_path, &state->parents, NULL);
 		if (err)
 			goto done;
 
-		err = draw_tree_entries(view, &first_displayed_entry,
-		    &last_displayed_entry, &selected_entry, &ndisplayed,
-		    tree_label, show_ids, parent_path, entries, selected,
-		    view->nlines, tree == root);
+		err = draw_tree_entries(view, &state->first_displayed_entry,
+		    &state->last_displayed_entry, &state->selected_entry,
+		    &state->ndisplayed, state->tree_label, state->show_ids,
+		    parent_path, state->entries, state->selected,
+		    view->nlines, state->tree == state->root);
 		free(parent_path);
 		if (err)
 			break;
@@ -2495,10 +2545,10 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 				done = 1;
 				break;
 			case 'i':
-				show_ids = !show_ids;
+				state->show_ids = !state->show_ids;
 				break;
 			case 'l':
-				if (selected_entry) {
+				if (state->selected_entry) {
 					struct tog_view *log_view;
 					log_view = view_open(0, 0, 0, 0, view,
 					    TOG_VIEW_LOG);
@@ -2507,8 +2557,9 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 						goto done;
 					}
 					err = log_tree_entry(log_view,
-					    selected_entry, &parents,
-					    commit_id, repo);
+					    state->selected_entry,
+					    &state->parents,
+					    state->commit_id, state->repo);
 					view_close(log_view);
 					view_show(view);
 					if (err)
@@ -2517,65 +2568,66 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 				break;
 			case 'k':
 			case KEY_UP:
-				if (selected > 0)
-					selected--;
-				if (selected > 0)
+				if (state->selected > 0)
+					state->selected--;
+				if (state->selected > 0)
 					break;
-				tree_scroll_up(&first_displayed_entry, 1,
-				    entries, tree == root);
+				tree_scroll_up(&state->first_displayed_entry, 1,
+				    state->entries, state->tree == state->root);
 				break;
 			case KEY_PPAGE:
-				if (SIMPLEQ_FIRST(&entries->head) ==
-				    first_displayed_entry) {
-					if (tree != root)
-						first_displayed_entry = NULL;
-					selected = 0;
+				if (SIMPLEQ_FIRST(&state->entries->head) ==
+				    state->first_displayed_entry) {
+					if (state->tree != state->root)
+						state->first_displayed_entry = NULL;
+					state->selected = 0;
 					break;
 				}
-				tree_scroll_up(&first_displayed_entry,
-				    view->nlines, entries, tree == root);
+				tree_scroll_up(&state->first_displayed_entry,
+				    view->nlines, state->entries,
+				    state->tree == state->root);
 				break;
 			case 'j':
 			case KEY_DOWN:
-				if (selected < ndisplayed - 1) {
-					selected++;
+				if (state->selected < state->ndisplayed - 1) {
+					state->selected++;
 					break;
 				}
-				tree_scroll_down(&first_displayed_entry, 1,
-				    last_displayed_entry, entries);
+				tree_scroll_down(&state->first_displayed_entry, 1,
+				    state->last_displayed_entry, state->entries);
 				break;
 			case KEY_NPAGE:
-				tree_scroll_down(&first_displayed_entry,
-				    view->nlines, last_displayed_entry,
-				    entries);
-				if (SIMPLEQ_NEXT(last_displayed_entry, entry))
+				tree_scroll_down(&state->first_displayed_entry,
+				    view->nlines, state->last_displayed_entry,
+				    state->entries);
+				if (SIMPLEQ_NEXT(state->last_displayed_entry, entry))
 					break;
 				/* can't scroll any further; move cursor down */
-				if (selected < ndisplayed - 1)
-					selected = ndisplayed - 1;
+				if (state->selected < state->ndisplayed - 1)
+					state->selected = state->ndisplayed - 1;
 				break;
 			case KEY_ENTER:
 			case '\r':
-				if (selected_entry == NULL) {
+				if (state->selected_entry == NULL) {
 					struct tog_parent_tree *parent;
 			case KEY_BACKSPACE:
 					/* user selected '..' */
-					if (tree == root)
+					if (state->tree == state->root)
 						break;
-					parent = TAILQ_FIRST(&parents);
-					TAILQ_REMOVE(&parents, parent, entry);
-					got_object_tree_close(tree);
-					tree = parent->tree;
-					first_displayed_entry =
+					parent = TAILQ_FIRST(&state->parents);
+					TAILQ_REMOVE(&state->parents, parent, entry);
+					got_object_tree_close(state->tree);
+					state->tree = parent->tree;
+					state->first_displayed_entry =
 					    parent->first_displayed_entry;
-					selected_entry = parent->selected_entry;
-					selected = parent->selected;
+					state->selected_entry = parent->selected_entry;
+					state->selected = parent->selected;
 					free(parent);
-				} else if (S_ISDIR(selected_entry->mode)) {
+				} else if (S_ISDIR(state->selected_entry->mode)) {
 					struct tog_parent_tree *parent;
 					struct got_tree_object *child;
 					err = got_object_open_as_tree(
-					    &child, repo, selected_entry->id);
+					    &child, state->repo, state->selected_entry->id);
 					if (err)
 						goto done;
 					parent = calloc(1, sizeof(*parent));
@@ -2583,20 +2635,20 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 						err = got_error_from_errno();
 						goto done;
 					}
-					parent->tree = tree;
+					parent->tree = state->tree;
 					parent->first_displayed_entry =
-					   first_displayed_entry;
-					parent->selected_entry = selected_entry;
-					parent->selected = selected;
-					TAILQ_INSERT_HEAD(&parents, parent,
+					   state->first_displayed_entry;
+					parent->selected_entry = state->selected_entry;
+					parent->selected = state->selected;
+					TAILQ_INSERT_HEAD(&state->parents, parent,
 					    entry);
-					tree = child;
-					selected = 0;
-					first_displayed_entry = NULL;
-				} else if (S_ISREG(selected_entry->mode)) {
+					state->tree = child;
+					state->selected = 0;
+					state->first_displayed_entry = NULL;
+				} else if (S_ISREG(state->selected_entry->mode)) {
 					err = blame_tree_entry(view,
-					    selected_entry, &parents,
-					    commit_id, repo);
+					    state->selected_entry, &state->parents,
+					    state->commit_id, state->repo);
 					if (err)
 						goto done;
 				}
@@ -2605,25 +2657,14 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 				err = view_resize(view);
 				if (err)
 					goto done;
-				if (selected > view->nlines)
-					selected = ndisplayed - 1;
+				if (state->selected > view->nlines)
+					state->selected = state->ndisplayed - 1;
 				break;
 			default:
 				break;
 		}
 	}
 done:
-	free(tree_label);
-	free(commit_id_str);
-	while (!TAILQ_EMPTY(&parents)) {
-		struct tog_parent_tree *parent;
-		parent = TAILQ_FIRST(&parents);
-		TAILQ_REMOVE(&parents, parent, entry);
-		free(parent);
-
-	}
-	if (tree != root)
-		got_object_tree_close(tree);
 	return err;
 }
 
@@ -2713,7 +2754,11 @@ cmd_tree(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = show_tree_view(view, tree, commit_id, repo);
+	error = open_tree_view(view, tree, commit_id, repo);
+	if (error)
+		goto done;
+	error = show_tree_view(view);
+	close_tree_view(view);
 	view_close(view);
 done:
 	free(commit_id);
