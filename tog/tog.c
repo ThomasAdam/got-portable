@@ -117,6 +117,39 @@ struct tog_log_view_state {
 	struct got_repository *repo;
 };
 
+struct tog_blame_cb_args {
+	pthread_mutex_t *mutex;
+	struct tog_blame_line *lines; /* one per line */
+	int nlines;
+
+	struct tog_view *view;
+	struct got_object_id *commit_id;
+	FILE *f;
+	const char *path;
+	int *first_displayed_line;
+	int *last_displayed_line;
+	int *selected_line;
+	int *quit;
+};
+
+struct tog_blame_thread_args {
+	const char *path;
+	struct got_repository *repo;
+	struct tog_blame_cb_args *cb_args;
+	int *complete;
+};
+
+struct tog_blame {
+	FILE *f;
+	size_t filesize;
+	struct tog_blame_line *lines;
+	size_t nlines;
+	pthread_t thread;
+	struct tog_blame_thread_args thread_args;
+	struct tog_blame_cb_args cb_args;
+	const char *path;
+};
+
 struct tog_blame_view_state {
 	int first_displayed_line;
 	int last_displayed_line;
@@ -128,6 +161,7 @@ struct tog_blame_view_state {
 	const char *path;
 	struct got_repository *repo;
 	struct got_object_id *commit_id;
+	struct tog_blame blame;
 };
 
 struct tog_parent_tree {
@@ -1541,21 +1575,6 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	return NULL;
 }
 
-struct tog_blame_cb_args {
-	pthread_mutex_t *mutex;
-	struct tog_blame_line *lines; /* one per line */
-	int nlines;
-
-	struct tog_view *view;
-	struct got_object_id *commit_id;
-	FILE *f;
-	const char *path;
-	int *first_displayed_line;
-	int *last_displayed_line;
-	int *selected_line;
-	int *quit;
-};
-
 static const struct got_error *
 blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 {
@@ -1598,13 +1617,6 @@ done:
 		return got_error_from_errno();
 	return err;
 }
-
-struct tog_blame_thread_args {
-	const char *path;
-	struct got_repository *repo;
-	struct tog_blame_cb_args *cb_args;
-	int *complete;
-};
 
 static void *
 blame_thread(void *arg)
@@ -1685,17 +1697,6 @@ done:
 		got_object_commit_close(commit);
 	return err;
 }
-
-struct tog_blame {
-	FILE *f;
-	size_t filesize;
-	struct tog_blame_line *lines;
-	size_t nlines;
-	pthread_t thread;
-	struct tog_blame_thread_args thread_args;
-	struct tog_blame_cb_args cb_args;
-	const char *path;
-};
 
 static const struct got_error *
 stop_blame(struct tog_blame *blame)
@@ -1834,6 +1835,7 @@ open_blame_view(struct tog_view *view, const char *path,
 	s->path = path;
 	s->repo = repo;
 	s->commit_id = commit_id;
+	memset(&s->blame, 0, sizeof(s->blame));
 
 	return NULL;
 }
@@ -1857,14 +1859,12 @@ show_blame_view(struct tog_view *view)
 	const struct got_error *err = NULL, *thread_err = NULL;
 	int ch, done = 0, eof;
 	struct got_object *obj = NULL, *pobj = NULL;
-	struct tog_blame blame;
 	struct tog_view *diff_view;
 	struct tog_blame_view_state *s = &view->state.blame;
 
 	view_show(view);
 
-	memset(&blame, 0, sizeof(blame));
-	err = run_blame(&blame, &s->mutex, view, &s->blame_complete,
+	err = run_blame(&s->blame, &s->mutex, view, &s->blame_complete,
 	    &s->first_displayed_line, &s->last_displayed_line,
 	    &s->selected_line, &done, s->path, s->blamed_commit->id, s->repo);
 	if (err)
@@ -1875,8 +1875,8 @@ show_blame_view(struct tog_view *view)
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = draw_blame(view, s->blamed_commit->id, blame.f,
-		    s->path, blame.lines, blame.nlines, s->blame_complete,
+		err = draw_blame(view, s->blamed_commit->id, s->blame.f,
+		    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
 		    s->selected_line, &s->first_displayed_line,
 		    &s->last_displayed_line, &eof, view->nlines);
 		if (pthread_mutex_unlock(&s->mutex) != 0) {
@@ -1920,21 +1920,22 @@ show_blame_view(struct tog_view *view)
 			case KEY_DOWN:
 				if (s->selected_line < view->nlines - 2 &&
 				    s->first_displayed_line +
-				    s->selected_line <= blame.nlines)
+				    s->selected_line <= s->blame.nlines)
 					s->selected_line++;
-				else if (s->last_displayed_line < blame.nlines)
+				else if (s->last_displayed_line <
+				    s->blame.nlines)
 					s->first_displayed_line++;
 				break;
 			case 'b':
 			case 'p': {
 				struct got_object_id *id;
-				id = get_selected_commit_id(blame.lines,
+				id = get_selected_commit_id(s->blame.lines,
 				    s->first_displayed_line, s->selected_line);
 				if (id == NULL || got_object_id_cmp(id,
 				    s->blamed_commit->id) == 0)
 					break;
 				err = open_selected_commit(&pobj, &obj,
-				    blame.lines, s->first_displayed_line,
+				    s->blame.lines, s->first_displayed_line,
 				    s->selected_line, s->repo);
 				if (err)
 					break;
@@ -1947,7 +1948,7 @@ show_blame_view(struct tog_view *view)
 					err = got_error_from_errno();
 					goto done;
 				}
-				thread_err = stop_blame(&blame);
+				thread_err = stop_blame(&s->blame);
 				done = 0;
 				if (pthread_mutex_lock(&s->mutex) != 0) {
 					err = got_error_from_errno();
@@ -1973,7 +1974,7 @@ show_blame_view(struct tog_view *view)
 					goto done;
 				SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
 				    s->blamed_commit, entry);
-				err = run_blame(&blame, &s->mutex, view,
+				err = run_blame(&s->blame, &s->mutex, view,
 				    &s->blame_complete,
 				    &s->first_displayed_line,
 				    &s->last_displayed_line,
@@ -1993,7 +1994,7 @@ show_blame_view(struct tog_view *view)
 					err = got_error_from_errno();
 					goto done;
 				}
-				thread_err = stop_blame(&blame);
+				thread_err = stop_blame(&s->blame);
 				done = 0;
 				if (pthread_mutex_lock(&s->mutex) != 0) {
 					err = got_error_from_errno();
@@ -2005,7 +2006,7 @@ show_blame_view(struct tog_view *view)
 				got_object_qid_free(s->blamed_commit);
 				s->blamed_commit =
 				    SIMPLEQ_FIRST(&s->blamed_commits);
-				err = run_blame(&blame, &s->mutex, view,
+				err = run_blame(&s->blame, &s->mutex, view,
 				    &s->blame_complete,
 				    &s->first_displayed_line,
 				    &s->last_displayed_line,
@@ -2018,7 +2019,7 @@ show_blame_view(struct tog_view *view)
 			case KEY_ENTER:
 			case '\r':
 				err = open_selected_commit(&pobj, &obj,
-				    blame.lines, s->first_displayed_line,
+				    s->blame.lines, s->first_displayed_line,
 				    s->selected_line, s->repo);
 				if (err)
 					break;
@@ -2051,26 +2052,27 @@ show_blame_view(struct tog_view *view)
 				break;
 			case KEY_NPAGE:
 			case ' ':
-				if (s->last_displayed_line >= blame.nlines &&
+				if (s->last_displayed_line >= s->blame.nlines &&
 				    s->selected_line < view->nlines - 2) {
-					s->selected_line = MIN(blame.nlines,
+					s->selected_line = MIN(s->blame.nlines,
 					    view->nlines - 2);
 					break;
 				}
 				if (s->last_displayed_line + view->nlines - 2
-				    <= blame.nlines)
+				    <= s->blame.nlines)
 					s->first_displayed_line +=
 					    view->nlines - 2;
 				else
 					s->first_displayed_line =
-					    blame.nlines - (view->nlines - 3);
+					    s->blame.nlines -
+					    (view->nlines - 3);
 				break;
 			case KEY_RESIZE:
 				err = view_resize(view);
 				if (err)
 					break;
 				if (s->selected_line > view->nlines - 2) {
-					s->selected_line = MIN(blame.nlines,
+					s->selected_line = MIN(s->blame.nlines,
 					    view->nlines - 2);
 				}
 				break;
@@ -2085,8 +2087,8 @@ show_blame_view(struct tog_view *view)
 done:
 	if (pobj)
 		got_object_close(pobj);
-	if (blame.thread)
-		thread_err = stop_blame(&blame);
+	if (s->blame.thread)
+		thread_err = stop_blame(&s->blame);
 	return thread_err ? thread_err : err;
 }
 
