@@ -122,7 +122,7 @@ close_view(struct tog_view *view)
 }
 
 static struct tog_view *
-open_view(int nlines, int ncols, int begin_y, int begin_x,
+view_open(int nlines, int ncols, int begin_y, int begin_x,
     struct tog_view *parent, enum tog_view_type type)
 {
 	struct tog_view *view = malloc(sizeof(*view));
@@ -760,7 +760,7 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 			goto done;
 	}
 
-	view = open_view(0, 0, 0, 0, parent_view, TOG_VIEW_DIFF);
+	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_DIFF);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -789,7 +789,7 @@ browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 	if (err)
 		return err;
 
-	view = open_view(0, 0, 0, 0, parent_view, TOG_VIEW_TREE);
+	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_TREE);
 	if (view == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -1038,7 +1038,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0, NULL, TOG_VIEW_LOG);
+	view = view_open(0, 0, 0, 0, NULL, TOG_VIEW_LOG);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -1273,7 +1273,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	view = open_view(0, 0, 0, 0, NULL, TOG_VIEW_DIFF);
+	view = view_open(0, 0, 0, 0, NULL, TOG_VIEW_DIFF);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -1876,7 +1876,7 @@ show_blame_view(struct tog_view *view, const char *path,
 					break;
 				if (pobj == NULL && obj == NULL)
 					break;
-				diff_view = open_view(0, 0, 0, 0, view,
+				diff_view = view_open(0, 0, 0, 0, view,
 				    TOG_VIEW_DIFF);
 				if (diff_view == NULL) {
 					err = got_error_from_errno();
@@ -2022,7 +2022,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0, NULL, TOG_VIEW_BLAME);
+	view = view_open(0, 0, 0, 0, NULL, TOG_VIEW_BLAME);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
@@ -2264,7 +2264,7 @@ blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
 	if (err)
 		return err;
 
-	view = open_view(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
+	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
 	if (view) {
 		err = show_blame_view(view, path, commit_id, repo);
 		close_view(view);
@@ -2355,7 +2355,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 			case 'l':
 				if (selected_entry) {
 					struct tog_view *log_view;
-					log_view = open_view(0, 0, 0, 0, view,
+					log_view = view_open(0, 0, 0, 0, view,
 					    TOG_VIEW_LOG);
 					if (log_view == NULL) {
 						err = got_error_from_errno();
@@ -2563,7 +2563,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	view = open_view(0, 0, 0, 0, NULL, TOG_VIEW_TREE);
+	view = view_open(0, 0, 0, 0, NULL, TOG_VIEW_TREE);
 	if (view == NULL) {
 		error = got_error_from_errno();
 		goto done;
