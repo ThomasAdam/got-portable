@@ -1232,14 +1232,13 @@ show_diff_view(struct tog_view *view)
 	const struct got_error *err = NULL;
 	int ch, done = 0;
 	int eof, i;
+	struct tog_diff_view_state *state = &view->state.diff;
 
 	view_show(view);
 
 	while (!done) {
-		err = draw_file(view, view->state.diff.f,
-		    &view->state.diff.first_displayed_line,
-		    &view->state.diff.last_displayed_line,
-		    &eof, view->nlines);
+		err = draw_file(view, state->f, &state->first_displayed_line,
+		    &state->last_displayed_line, &eof, view->nlines);
 		if (err)
 			break;
 		nodelay(stdscr, FALSE);
@@ -1251,28 +1250,28 @@ show_diff_view(struct tog_view *view)
 				break;
 			case 'k':
 			case KEY_UP:
-				if (view->state.diff.first_displayed_line > 1)
-					view->state.diff.first_displayed_line--;
+				if (state->first_displayed_line > 1)
+					state->first_displayed_line--;
 				break;
 			case KEY_PPAGE:
 			case KEY_BACKSPACE:
 				i = 0;
 				while (i++ < view->nlines - 1 &&
-				    view->state.diff.first_displayed_line > 1)
-					view->state.diff.first_displayed_line--;
+				    state->first_displayed_line > 1)
+					state->first_displayed_line--;
 				break;
 			case 'j':
 			case KEY_DOWN:
 				if (!eof)
-					view->state.diff.first_displayed_line++;
+					state->first_displayed_line++;
 				break;
 			case KEY_NPAGE:
 			case ' ':
 				i = 0;
 				while (!eof && i++ < view->nlines - 1) {
 					char *line = parse_next_line(
-					    view->state.diff.f, NULL);
-					view->state.diff.first_displayed_line++;
+					    state->f, NULL);
+					state->first_displayed_line++;
 					if (line == NULL)
 						break;
 				}
