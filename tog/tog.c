@@ -140,12 +140,10 @@ static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *, const char *);
 static const struct got_error * show_log_view(struct tog_view *);
 static void close_log_view(struct tog_view *);
-static const struct got_error *
-show_blame_view(struct tog_view *, const char *, struct got_object_id *,
-    struct got_repository *);
-static const struct got_error *
-show_tree_view(struct tog_view *, struct got_tree_object *,
+static const struct got_error *show_blame_view(struct tog_view *, const char *,
     struct got_object_id *, struct got_repository *);
+static const struct got_error *show_tree_view(struct tog_view *,
+    struct got_tree_object *, struct got_object_id *, struct got_repository *);
 
 static void
 view_close(struct tog_view *view)
