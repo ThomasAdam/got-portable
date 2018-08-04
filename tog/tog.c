@@ -112,7 +112,7 @@ show_tree_view(struct tog_view *, struct got_tree_object *,
     struct got_object_id *, struct got_repository *);
 
 static void
-close_view(struct tog_view *view)
+view_close(struct tog_view *view)
 {
 	if (view->panel)
 		del_panel(view->panel);
@@ -140,12 +140,12 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 	view->begin_x = begin_x;
 	view->window = newwin(nlines, ncols, begin_y, begin_x);
 	if (view->window == NULL) {
-		close_view(view);
+		view_close(view);
 		return NULL;
 	}
 	view->panel = new_panel(view->window);
 	if (view->panel == NULL) {
-		close_view(view);
+		view_close(view);
 		return NULL;
 	}
 
@@ -767,7 +767,7 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 	}
 
 	err = show_diff_view(view, obj1, obj2, repo);
-	close_view(view);
+	view_close(view);
 	show_view(parent_view);
 done:
 	if (obj1)
@@ -795,7 +795,7 @@ browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 		goto done;
 	}
 	err = show_tree_view(view, tree, entry->id, repo);
-	close_view(view);
+	view_close(view);
 	show_view(parent_view);
 done:
 	got_object_tree_close(tree);
@@ -1044,7 +1044,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 	error = show_log_view(view, start_id, repo, path);
-	close_view(view);
+	view_close(view);
 done:
 	free(repo_path);
 	free(cwd);
@@ -1279,7 +1279,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 	error = show_diff_view(view, obj1, obj2, repo);
-	close_view(view);
+	view_close(view);
 done:
 	got_repo_close(repo);
 	if (obj1)
@@ -1883,7 +1883,7 @@ show_blame_view(struct tog_view *view, const char *path,
 					break;
 				}
 				err = show_diff_view(diff_view, pobj, obj, repo);
-				close_view(diff_view);
+				view_close(diff_view);
 				show_view(view);
 				if (pobj) {
 					got_object_close(pobj);
@@ -2028,7 +2028,7 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 	error = show_blame_view(view, in_repo_path, commit_id, repo);
-	close_view(view);
+	view_close(view);
 done:
 	free(in_repo_path);
 	free(repo_path);
@@ -2267,7 +2267,7 @@ blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
 	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
 	if (view) {
 		err = show_blame_view(view, path, commit_id, repo);
-		close_view(view);
+		view_close(view);
 	} else
 		err = got_error_from_errno();
 
@@ -2364,7 +2364,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 					err = log_tree_entry(log_view,
 					    selected_entry, &parents,
 					    commit_id, repo);
-					close_view(log_view);
+					view_close(log_view);
 					show_view(view);
 					if (err)
 						goto done;
@@ -2569,7 +2569,7 @@ cmd_tree(int argc, char *argv[])
 		goto done;
 	}
 	error = show_tree_view(view, tree, commit_id, repo);
-	close_view(view);
+	view_close(view);
 done:
 	free(commit_id);
 	if (commit)
