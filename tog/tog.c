@@ -154,7 +154,7 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 }
 
 void
-show_view(struct tog_view *view)
+view_show(struct tog_view *view)
 {
 	show_panel(view->panel);
 	update_panels();
@@ -768,7 +768,7 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 
 	err = show_diff_view(view, obj1, obj2, repo);
 	view_close(view);
-	show_view(parent_view);
+	view_show(parent_view);
 done:
 	if (obj1)
 		got_object_close(obj1);
@@ -796,7 +796,7 @@ browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 	}
 	err = show_tree_view(view, tree, entry->id, repo);
 	view_close(view);
-	show_view(parent_view);
+	view_show(parent_view);
 done:
 	got_object_tree_close(tree);
 	return err;
@@ -852,7 +852,7 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 		err = NULL;
 	}
 
-	show_view(view);
+	view_show(view);
 
 	first_displayed_entry = TAILQ_FIRST(&commits.head);
 	selected_entry = first_displayed_entry;
@@ -939,13 +939,13 @@ show_log_view(struct tog_view *view, struct got_object_id *start_id,
 				err = show_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
-				show_view(view);
+				view_show(view);
 				break;
 			case 't':
 				err = browse_commit(view, selected_entry, repo);
 				if (err)
 					goto done;
-				show_view(view);
+				view_show(view);
 				break;
 			default:
 				break;
@@ -1161,7 +1161,7 @@ show_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	fflush(f);
 
-	show_view(view);
+	view_show(view);
 
 	while (!done) {
 		err = draw_file(view, f, &first_displayed_line,
@@ -1718,7 +1718,7 @@ show_blame_view(struct tog_view *view, const char *path,
 		goto done;
 	SIMPLEQ_INSERT_HEAD(&blamed_commits, blamed_commit, entry);
 
-	show_view(view);
+	view_show(view);
 	last_displayed_line = view->nlines;
 
 	memset(&blame, 0, sizeof(blame));
@@ -1884,7 +1884,7 @@ show_blame_view(struct tog_view *view, const char *path,
 				}
 				err = show_diff_view(diff_view, pobj, obj, repo);
 				view_close(diff_view);
-				show_view(view);
+				view_show(view);
 				if (pobj) {
 					got_object_close(pobj);
 					pobj = NULL;
@@ -2271,7 +2271,7 @@ blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
 	} else
 		err = got_error_from_errno();
 
-	show_view(parent_view);
+	view_show(parent_view);
 	free(path);
 	return err;
 }
@@ -2319,7 +2319,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 		goto done;
 	}
 
-	show_view(view);
+	view_show(view);
 
 	entries = got_object_tree_get_entries(root);
 	first_displayed_entry = SIMPLEQ_FIRST(&entries->head);
@@ -2365,7 +2365,7 @@ show_tree_view(struct tog_view *view, struct got_tree_object *root,
 					    selected_entry, &parents,
 					    commit_id, repo);
 					view_close(log_view);
-					show_view(view);
+					view_show(view);
 					if (err)
 						goto done;
 				}
