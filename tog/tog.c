@@ -343,7 +343,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
     struct tog_view_list_head *views)
 {
 	const struct got_error *err = NULL;
-	struct tog_view *next;
+	struct tog_view *next, *prev;
 	int ch;
 
 	*new = NULL;
@@ -361,6 +361,13 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = next;
 			else
 				*focus = TAILQ_FIRST(views);
+			break;
+		case KEY_BACKSPACE:
+			prev = TAILQ_PREV(view, tog_view_list_head, entry);
+			if (prev)
+				*focus = prev;
+			else
+				*focus = TAILQ_LAST(views, tog_view_list_head);
 			break;
 		case 'q':
 			err = view->input(new, dead, view, ch);
@@ -1438,7 +1445,6 @@ input_diff_view(struct tog_view **new, struct tog_view **dead,
 				s->first_displayed_line--;
 			break;
 		case KEY_PPAGE:
-		case KEY_BACKSPACE:
 			i = 0;
 			while (i++ < view->nlines - 1 &&
 			    s->first_displayed_line > 1)
@@ -2019,7 +2025,6 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->first_displayed_line--;
 			break;
 		case KEY_PPAGE:
-		case KEY_BACKSPACE:
 			if (s->first_displayed_line == 1) {
 				s->selected_line = 1;
 				break;
@@ -2687,7 +2692,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case '\r':
 			if (s->selected_entry == NULL) {
 				struct tog_parent_tree *parent;
-		case KEY_BACKSPACE:
+		case KEY_LEFT:
 				/* user selected '..' */
 				if (s->tree == s->root)
 					break;

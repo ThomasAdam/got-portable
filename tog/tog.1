@@ -62,6 +62,9 @@ Quit the view which is in focus.
 .It Cm Tab
 Switch focus to the next view.
 Cycles through all open views.
+.It Cm Backspace
+Switch focus to the previous view.
+Cycles through all open views.
 .El
 .Pp
 Global options must precede the command name, and are as follows:
@@ -130,7 +133,7 @@ are as follows:
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, Page-down, Space
 Scroll down.
-.It Cm Up-arrow, k, Page-up, Backspace
+.It Cm Up-arrow, k, Page-up
 Scroll up.
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
@@ -142,7 +145,7 @@ are as follows:
 .Bl -tag -width Ds
 .It Cm Down-arrow, j, Page-down, Space
 Move the selection cursor down.
-.It Cm Up-arrow, k, Page-up, Backspace
+.It Cm Up-arrow, k, Page-up
 Move the selection cursor up.
 .It Cm Enter
 Switch to the
@@ -199,7 +202,7 @@ view for the currently selected file.
 Switch to the
 .Cm log
 view for the currently selected tree entry.
-.It Cm Backspace
+.It Cm Left-arrow
 Move back to the parent directory.
 .It Cm i
 Show the object IDs for all objects displayed in the
