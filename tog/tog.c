@@ -410,6 +410,7 @@ view_loop(struct tog_view *view)
 		if (err)
 			break;
 		if (new_view) {
+			/* TODO: de-duplicate! */
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
 			view = new_view;
 		}
