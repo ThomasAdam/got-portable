@@ -338,9 +338,12 @@ view_resize(struct tog_view *view)
 }
 
 static const struct got_error *
-view_input(struct tog_view **new, struct tog_view **dead, struct tog_view *view)
+view_input(struct tog_view **new, struct tog_view **dead,
+    struct tog_view **focus, struct tog_view *view,
+    struct tog_view_list_head *views)
 {
 	const struct got_error *err = NULL;
+	struct tog_view *next;
 	int ch;
 
 	*new = NULL;
@@ -351,6 +354,13 @@ view_input(struct tog_view **new, struct tog_view **dead, struct tog_view *view)
 	nodelay(stdscr, TRUE);
 	switch (ch) {
 		case ERR:
+			break;
+		case '\t':
+			next = TAILQ_NEXT(view, entry);
+			if (next)
+				*focus = next;
+			else
+				*focus = TAILQ_FIRST(views);
 			break;
 		case 'q':
 			err = view->input(new, dead, view, ch);
@@ -384,7 +394,7 @@ view_loop(struct tog_view *view)
 		err = view_show(view);
 		if (err)
 			break;
-		err = view_input(&new_view, &dead_view, view);
+		err = view_input(&new_view, &dead_view, &view, view, &views);
 		if (err)
 			break;
 		if (new_view) {
