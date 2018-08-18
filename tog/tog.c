@@ -339,7 +339,7 @@ view_resize(struct tog_view *view)
 
 static const struct got_error *
 view_input(struct tog_view **new, struct tog_view **dead,
-    struct tog_view **focus, struct tog_view *view,
+    struct tog_view **focus, int *done, struct tog_view *view,
     struct tog_view_list_head *views)
 {
 	const struct got_error *err = NULL;
@@ -366,6 +366,9 @@ view_input(struct tog_view **new, struct tog_view **dead,
 			err = view->input(new, dead, view, ch);
 			*dead = view;
 			break;
+		case 'Q':
+			*done = 1;
+			break;
 		case KEY_RESIZE:
 			err = view_resize(view);
 			if (err)
@@ -386,15 +389,17 @@ view_loop(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
 	struct tog_view *new_view, *dead_view;
+	int done = 0;
 
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
-	while (!TAILQ_EMPTY(&views)) {
+	while (!TAILQ_EMPTY(&views) && !done) {
 		err = view_show(view);
 		if (err)
 			break;
-		err = view_input(&new_view, &dead_view, &view, view, &views);
+		err = view_input(&new_view, &dead_view, &view, &done,
+		    view, &views);
 		if (err)
 			break;
 		if (new_view) {
