@@ -955,6 +955,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		err = NULL;
 	}
 
+	s->first_displayed_entry =
+	    TAILQ_FIRST(&s->commits.head);
+	s->selected_entry = s->first_displayed_entry;
 	s->repo = repo;
 done:
 	free(head_id);
@@ -980,9 +983,6 @@ show_log_view(struct tog_view *view)
 
 	view_show(view);
 
-	s->first_displayed_entry =
-	    TAILQ_FIRST(&s->commits.head);
-	s->selected_entry = s->first_displayed_entry;
 	while (!done) {
 		err = draw_commits(view, &s->last_displayed_entry,
 		    &s->selected_entry, s->first_displayed_entry,
