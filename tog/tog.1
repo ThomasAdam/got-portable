@@ -31,8 +31,40 @@ This repository format is described in
 .Xr git-repository 5 .
 .Pp
 .Nm
-provides global and command-specific options.
-Global options must preceed the command name, and are as follows:
+supports several types of views which display repository data.
+An arbitrary number of views may be opened simultaneously by
+navigating the repository with
+.Nm .
+The supported views are:
+.Bl -tag -width Ds
+.It Cm log view
+Displays commits in the repository's history.
+This view is displayed initially if no
+.Ar command
+is specified.
+.It Cm diff view
+Displays changes made in a particular commit.
+.It Cm blame view
+Displays the line-by-line history of a file.
+.It Cm tree view
+Displays the tree corresponding to a particular commit.
+.El
+.Pp
+.Nm
+provides global and command-specific key bindings and options.
+The global key bindings are:
+.Bl -tag -width Ds
+.It Cm Q
+Quit
+.Nm .
+.It Cm q
+Quit the view which is in focus.
+.It Cm Tab
+Switch focus to the next view.
+Cycles through all open views.
+.El
+.Pp
+Global options must precede the command name, and are as follows:
 .Bl -tag -width tenletters
 .It Fl h
 Display usage information.
@@ -66,10 +98,6 @@ view showing file changes made in the currently selected commit.
 Switch to the
 .Cm tree
 view showing the tree for the currently selected commit.
-.It Cm q
-Quit the
-.Cm log
-view.
 .El
 .Pp
 The options for
@@ -104,10 +132,6 @@ are as follows:
 Scroll down.
 .It Cm Up-arrow, k, Page-up, Backspace
 Scroll up.
-.It Cm q
-Quit the
-.Cm diff
-view.
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.
@@ -137,10 +161,6 @@ parent commit.
 Switch the
 .Cm blame
 view back to the previously blamed commit.
-.It Cm q
-Quit the
-.Cm blame
-view.
 .El
 .Pp
 The options for
