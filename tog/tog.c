@@ -93,6 +93,7 @@ struct tog_diff_view_state {
 	FILE *f;
 	int first_displayed_line;
 	int last_displayed_line;
+	int eof;
 };
 
 struct commit_queue_entry {
@@ -130,6 +131,7 @@ struct tog_blame_cb_args {
 	int *last_displayed_line;
 	int *selected_line;
 	int *quit;
+	int *eof;
 };
 
 struct tog_blame_thread_args {
@@ -155,10 +157,12 @@ struct tog_blame_view_state {
 	int last_displayed_line;
 	int selected_line;
 	int blame_complete;
+	int eof;
+	int done;
 	pthread_mutex_t mutex;
 	struct got_object_id_queue blamed_commits;
 	struct got_object_qid *blamed_commit;
-	const char *path;
+	char *path;
 	struct got_repository *repo;
 	struct got_object_id *commit_id;
 	struct tog_blame blame;
@@ -189,6 +193,7 @@ struct tog_tree_view_state {
 };
 
 struct tog_view {
+	TAILQ_ENTRY(tog_view) entry;
 	WINDOW *window;
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
@@ -203,33 +208,55 @@ struct tog_view {
 		struct tog_blame_view_state blame;
 		struct tog_tree_view_state tree;
 	} state;
+
+	const struct got_error *(*show)(struct tog_view *);
+	const struct got_error *(*input)(struct tog_view **,
+	    struct tog_view **, struct tog_view *, int);
+	const struct got_error *(*close)(struct tog_view *);
 };
+TAILQ_HEAD(tog_view_list_head, tog_view);
 
 static const struct got_error *open_diff_view(struct tog_view *,
     struct got_object *, struct got_object *, struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
-static void close_diff_view(struct tog_view *);
+static const struct got_error *input_diff_view(struct tog_view **,
+    struct tog_view **, struct tog_view *, int);
+static const struct got_error* close_diff_view(struct tog_view *);
+
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *, const char *);
 static const struct got_error * show_log_view(struct tog_view *);
-static void close_log_view(struct tog_view *);
-static const struct got_error *open_blame_view(struct tog_view *, const char *,
+static const struct got_error *input_log_view(struct tog_view **,
+    struct tog_view **, struct tog_view *, int);
+static const struct got_error *close_log_view(struct tog_view *);
+
+static const struct got_error *open_blame_view(struct tog_view *, char *,
     struct got_object_id *, struct got_repository *);
 static const struct got_error *show_blame_view(struct tog_view *);
-static void close_blame_view(struct tog_view *);
+static const struct got_error *input_blame_view(struct tog_view **,
+    struct tog_view **, struct tog_view *, int);
+static const struct got_error *close_blame_view(struct tog_view *);
+
 static const struct got_error *open_tree_view(struct tog_view *,
     struct got_tree_object *, struct got_object_id *, struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
-static void close_tree_view(struct tog_view *);
+static const struct got_error *input_tree_view(struct tog_view **,
+    struct tog_view **, struct tog_view *, int);
+static const struct got_error *close_tree_view(struct tog_view *);
 
-static void
+static const struct got_error *
 view_close(struct tog_view *view)
 {
+	const struct got_error *err = NULL;
+
+	if (view->close)
+		err = view->close(view);
 	if (view->panel)
 		del_panel(view->panel);
 	if (view->window)
 		delwin(view->window);
 	free(view);
+	return err;
 }
 
 static struct tog_view *
@@ -264,11 +291,19 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 	return view;
 }
 
-void
+const struct got_error *
 view_show(struct tog_view *view)
 {
+	const struct got_error *err;
+
+	err = view->show(view);
+	if (err)
+		return err;
 	show_panel(view->panel);
 	update_panels();
+	doupdate();
+
+	return err;
 }
 
 const struct got_error *
@@ -300,6 +335,84 @@ view_resize(struct tog_view *view)
 	}
 
 	return NULL;
+}
+
+static const struct got_error *
+view_input(struct tog_view **new, struct tog_view **dead, struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	int ch;
+
+	*new = NULL;
+	*dead = NULL;
+
+	nodelay(stdscr, FALSE);
+	ch = wgetch(view->window);
+	nodelay(stdscr, TRUE);
+	switch (ch) {
+		case ERR:
+			break;
+		case 'q':
+			err = view->input(new, dead, view, ch);
+			*dead = view;
+			break;
+		case KEY_RESIZE:
+			err = view_resize(view);
+			if (err)
+				return err;
+			err = view->input(new, dead, view, ch);
+			break;
+		default:
+			err = view->input(new, dead, view, ch);
+			break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+view_loop(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_view_list_head views;
+	struct tog_view *new_view, *dead_view;
+
+	TAILQ_INIT(&views);
+	TAILQ_INSERT_HEAD(&views, view, entry);
+
+	while (!TAILQ_EMPTY(&views)) {
+		err = view_show(view);
+		if (err)
+			break;
+		err = view_input(&new_view, &dead_view, view);
+		if (err)
+			break;
+		if (new_view) {
+			TAILQ_INSERT_TAIL(&views, new_view, entry);
+			view = new_view;
+		}
+		if (dead_view) {
+			TAILQ_REMOVE(&views, dead_view, entry);
+			TAILQ_FOREACH(view, &views, entry) {
+				if (view->parent == dead_view)
+					view->parent = NULL;
+			}
+			if (dead_view->parent)
+				view = dead_view->parent;
+			else
+				view = TAILQ_LAST(&views, tog_view_list_head);
+			err = view_close(dead_view);
+			if (err)
+				goto done;
+		}
+	}
+done:
+	while (!TAILQ_EMPTY(&views)) {
+		view = TAILQ_FIRST(&views);
+		TAILQ_REMOVE(&views, view, entry);
+		view_close(view);
+	}
+	return err;
 }
 
 __dead static void
@@ -785,7 +898,6 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	}
 
 	update_panels();
-	doupdate();
 
 	return err;
 }
@@ -841,13 +953,13 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 }
 
 static const struct got_error *
-show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
-    struct got_repository *repo)
+show_commit(struct tog_view **new_view, struct tog_view *parent_view,
+    struct commit_queue_entry *entry, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *parent_id;
-	struct tog_view *view;
+	struct tog_view *diff_view;
 
 	err = got_object_open(&obj2, repo, entry->id);
 	if (err)
@@ -860,19 +972,15 @@ show_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
 			goto done;
 	}
 
-	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_DIFF);
-	if (view == NULL) {
+	diff_view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_DIFF);
+	if (diff_view == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	err = open_diff_view(view, obj1, obj2, repo);
-	if (err)
-		goto done;
-	err = show_diff_view(view);
-	close_diff_view(view);
-	view_close(view);
-	view_show(parent_view);
+	err = open_diff_view(diff_view, obj1, obj2, repo);
+	if (err == NULL)
+		*new_view = diff_view;
 done:
 	if (obj1)
 		got_object_close(obj1);
@@ -882,31 +990,26 @@ done:
 }
 
 static const struct got_error *
-browse_commit(struct tog_view *parent_view, struct commit_queue_entry *entry,
-    struct got_repository *repo)
+browse_commit(struct tog_view **new_view, struct tog_view *parent_view,
+    struct commit_queue_entry *entry, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
-	struct tog_view *view;
+	struct tog_view *tree_view;
 
 	err = got_object_open_as_tree(&tree, repo, entry->commit->tree_id);
 	if (err)
 		return err;
 
-	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_TREE);
-	if (view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = open_tree_view(view, tree, entry->id, repo);
+	tree_view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_TREE);
+	if (tree_view == NULL)
+		return got_error_from_errno();
+
+	err = open_tree_view(tree_view, tree, entry->id, repo);
 	if (err)
-		goto done;
-	err = show_tree_view(view);
-	close_tree_view(view);
-	view_close(view);
-	view_show(parent_view);
-done:
-	got_object_tree_close(tree);
+		got_object_tree_close(tree);
+	else
+		*new_view = tree_view;
 	return err;
 }
 
@@ -959,12 +1062,17 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	    TAILQ_FIRST(&s->commits.head);
 	s->selected_entry = s->first_displayed_entry;
 	s->repo = repo;
+
+	view->show = show_log_view;
+	view->input = input_log_view;
+	view->close = close_log_view;
 done:
 	free(head_id);
 	return err;
 }
 
-static void close_log_view(struct tog_view *view)
+static const struct got_error *
+close_log_view(struct tog_view *view)
 {
 	struct tog_log_view_state *s = &view->state.log;
 
@@ -972,118 +1080,102 @@ static void close_log_view(struct tog_view *view)
 		got_commit_graph_close(s->graph);
 	free_commits(&s->commits);
 	free(s->in_repo_path);
+	return NULL;
 }
 
 static const struct got_error *
 show_log_view(struct tog_view *view)
 {
-	const struct got_error *err = NULL;
-	int ch, done = 0;
 	struct tog_log_view_state *s = &view->state.log;
 
-	view_show(view);
+	return draw_commits(view, &s->last_displayed_entry,
+	    &s->selected_entry, s->first_displayed_entry,
+	    &s->commits, s->selected, view->nlines, s->graph,
+	    s->repo, s->in_repo_path);
+}
 
-	while (!done) {
-		err = draw_commits(view, &s->last_displayed_entry,
-		    &s->selected_entry, s->first_displayed_entry,
-		    &s->commits, s->selected, view->nlines, s->graph,
-		    s->repo, s->in_repo_path);
-		if (err)
-			goto done;
+static const struct got_error *
+input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
+    struct tog_view *view, int ch)
+{
+	const struct got_error *err = NULL;
+	struct tog_log_view_state *s = &view->state.log;
 
-		nodelay(stdscr, FALSE);
-		ch = wgetch(view->window);
-		nodelay(stdscr, TRUE);
-		switch (ch) {
-			case ERR:
+	switch (ch) {
+		case 'k':
+		case KEY_UP:
+			if (s->selected > 0)
+				s->selected--;
+			if (s->selected > 0)
 				break;
-			case 'q':
-				done = 1;
-				break;
-			case 'k':
-			case KEY_UP:
-				if (s->selected > 0)
-					s->selected--;
-				if (s->selected > 0)
-					break;
-				scroll_up(&s->first_displayed_entry, 1,
-				    &s->commits);
-				break;
-			case KEY_PPAGE:
-				if (TAILQ_FIRST(&s->commits.head) ==
-				    s->first_displayed_entry) {
-					s->selected = 0;
-					break;
-				}
-				scroll_up(&s->first_displayed_entry,
-				    view->nlines, &s->commits);
-				break;
-			case 'j':
-			case KEY_DOWN:
-				if (s->selected < MIN(view->nlines - 2,
-				    s->commits.ncommits - 1)) {
-					s->selected++;
-					break;
-				}
-				err = scroll_down(&s->first_displayed_entry, 1,
-				    s->last_displayed_entry, &s->commits,
-				    s->graph, s->repo, s->in_repo_path);
-				if (err) {
-					if (err->code != GOT_ERR_ITER_COMPLETED)
-						goto done;
-					err = NULL;
-				}
-				break;
-			case KEY_NPAGE: {
-				struct commit_queue_entry *first;
-				first = s->first_displayed_entry;
-				err = scroll_down(&s->first_displayed_entry,
-				    view->nlines, s->last_displayed_entry,
-				    &s->commits, s->graph, s->repo,
-				    s->in_repo_path);
-				if (err == NULL)
-					break;
-				if (err->code != GOT_ERR_ITER_COMPLETED)
-					goto done;
-				if (first == s->first_displayed_entry &&
-				    s->selected < MIN(view->nlines - 2,
-				    s->commits.ncommits - 1)) {
-					/* can't scroll further down */
-					s->selected = MIN(view->nlines - 2,
-					    s->commits.ncommits - 1);
-				}
-				err = NULL;
+			scroll_up(&s->first_displayed_entry, 1,
+			    &s->commits);
+			break;
+		case KEY_PPAGE:
+			if (TAILQ_FIRST(&s->commits.head) ==
+			    s->first_displayed_entry) {
+				s->selected = 0;
 				break;
 			}
-			case KEY_RESIZE:
-				err = view_resize(view);
-				if (err)
-					goto done;
-				if (s->selected > view->nlines - 2)
-					s->selected = view->nlines - 2;
-				if (s->selected > s->commits.ncommits - 1)
-					s->selected = s->commits.ncommits - 1;
+			scroll_up(&s->first_displayed_entry,
+			    view->nlines, &s->commits);
+			break;
+		case 'j':
+		case KEY_DOWN:
+			if (s->selected < MIN(view->nlines - 2,
+			    s->commits.ncommits - 1)) {
+				s->selected++;
 				break;
-			case KEY_ENTER:
-			case '\r':
-				err = show_commit(view, s->selected_entry,
-				    s->repo);
-				if (err)
-					goto done;
-				view_show(view);
+			}
+			err = scroll_down(&s->first_displayed_entry, 1,
+			    s->last_displayed_entry, &s->commits,
+			    s->graph, s->repo, s->in_repo_path);
+			if (err) {
+				if (err->code != GOT_ERR_ITER_COMPLETED)
+					break;
+				err = NULL;
+			}
+			break;
+		case KEY_NPAGE: {
+			struct commit_queue_entry *first;
+			first = s->first_displayed_entry;
+			err = scroll_down(&s->first_displayed_entry,
+			    view->nlines, s->last_displayed_entry,
+			    &s->commits, s->graph, s->repo,
+			    s->in_repo_path);
+			if (err == NULL)
 				break;
-			case 't':
-				err = browse_commit(view, s->selected_entry,
-				    s->repo);
-				if (err)
-					goto done;
-				view_show(view);
+			if (err->code != GOT_ERR_ITER_COMPLETED)
 				break;
-			default:
-				break;
+			if (first == s->first_displayed_entry &&
+			    s->selected < MIN(view->nlines - 2,
+			    s->commits.ncommits - 1)) {
+				/* can't scroll further down */
+				s->selected = MIN(view->nlines - 2,
+				    s->commits.ncommits - 1);
+			}
+			err = NULL;
+			break;
 		}
+		case KEY_RESIZE:
+			if (s->selected > view->nlines - 2)
+				s->selected = view->nlines - 2;
+			if (s->selected > s->commits.ncommits - 1)
+				s->selected = s->commits.ncommits - 1;
+			break;
+		case KEY_ENTER:
+		case '\r':
+			err = show_commit(new_view, view, s->selected_entry,
+			    s->repo);
+			break;
+		case 't':
+			err = browse_commit(new_view, view, s->selected_entry,
+			    s->repo);
+			break;
+		default:
+			break;
 	}
-done:
+
 	return err;
 }
 
@@ -1173,9 +1265,7 @@ cmd_log(int argc, char *argv[])
 	error = open_log_view(view, start_id, repo, path);
 	if (error)
 		goto done;
-	error = show_log_view(view);
-	close_log_view(view);
-	view_close(view);
+	error = view_loop(view);
 done:
 	free(repo_path);
 	free(cwd);
@@ -1253,7 +1343,6 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 	*last_displayed_line = nlines;
 
 	update_panels();
-	doupdate();
 
 	return NULL;
 }
@@ -1293,76 +1382,74 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 	view->state.diff.first_displayed_line = 1;
 	view->state.diff.last_displayed_line = view->nlines;
 
+	view->show = show_diff_view;
+	view->input = input_diff_view;
+	view->close = close_diff_view;
+
 	return NULL;
 }
 
-static void
+static const struct got_error *
 close_diff_view(struct tog_view *view)
 {
-	fclose(view->state.diff.f);
+	const struct got_error *err = NULL;
+
+	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
+		err = got_error_from_errno();
+
+	return err;
 }
 
 static const struct got_error *
 show_diff_view(struct tog_view *view)
 {
-	const struct got_error *err = NULL;
-	int ch, done = 0;
-	int eof, i;
 	struct tog_diff_view_state *s = &view->state.diff;
 
-	view_show(view);
+	return draw_file(view, s->f, &s->first_displayed_line,
+	    &s->last_displayed_line, &s->eof, view->nlines);
+}
 
-	while (!done) {
-		err = draw_file(view, s->f, &s->first_displayed_line,
-		    &s->last_displayed_line, &eof, view->nlines);
-		if (err)
+static const struct got_error *
+input_diff_view(struct tog_view **new, struct tog_view **dead,
+    struct tog_view *view, int ch)
+{
+	struct tog_diff_view_state *s = &view->state.diff;
+	int i;
+
+	switch (ch) {
+		case 'k':
+		case KEY_UP:
+			if (s->first_displayed_line > 1)
+				s->first_displayed_line--;
 			break;
-		nodelay(stdscr, FALSE);
-		ch = wgetch(view->window);
-		nodelay(stdscr, TRUE);
-		switch (ch) {
-			case 'q':
-				done = 1;
-				break;
-			case 'k':
-			case KEY_UP:
-				if (s->first_displayed_line > 1)
-					s->first_displayed_line--;
-				break;
-			case KEY_PPAGE:
-			case KEY_BACKSPACE:
-				i = 0;
-				while (i++ < view->nlines - 1 &&
-				    s->first_displayed_line > 1)
-					s->first_displayed_line--;
-				break;
-			case 'j':
-			case KEY_DOWN:
-				if (!eof)
-					s->first_displayed_line++;
-				break;
-			case KEY_NPAGE:
-			case ' ':
-				i = 0;
-				while (!eof && i++ < view->nlines - 1) {
-					char *line;
-					line = parse_next_line(s->f, NULL);
-					s->first_displayed_line++;
-					if (line == NULL)
-						break;
-				}
-				break;
-			case KEY_RESIZE:
-				err = view_resize(view);
-				if (err)
-					goto done;
-				break;
-			default:
-				break;
-		}
+		case KEY_PPAGE:
+		case KEY_BACKSPACE:
+			i = 0;
+			while (i++ < view->nlines - 1 &&
+			    s->first_displayed_line > 1)
+				s->first_displayed_line--;
+			break;
+		case 'j':
+		case KEY_DOWN:
+			if (!s->eof)
+				s->first_displayed_line++;
+			break;
+		case KEY_NPAGE:
+		case ' ':
+			i = 0;
+			while (!s->eof && i++ < view->nlines - 1) {
+				char *line;
+				line = parse_next_line(s->f, NULL);
+				s->first_displayed_line++;
+				if (line == NULL)
+					break;
+			}
+			break;
+		default:
+			break;
 	}
-done:
-	return err;
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -1430,9 +1517,7 @@ cmd_diff(int argc, char *argv[])
 	error = open_diff_view(view, obj1, obj2, repo);
 	if (error)
 		goto done;
-	error = show_diff_view(view);
-	close_diff_view(view);
-	view_close(view);
+	error = view_loop(view);
 done:
 	got_repo_close(repo);
 	if (obj1)
@@ -1570,7 +1655,6 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	*last_displayed_line = lineno;
 
 	update_panels();
-	doupdate();
 
 	return NULL;
 }
@@ -1581,7 +1665,6 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	const struct got_error *err = NULL;
 	struct tog_blame_cb_args *a = arg;
 	struct tog_blame_line *line;
-	int eof;
 
 	if (nlines != a->nlines ||
 	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
@@ -1611,7 +1694,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 
 	err = draw_blame(a->view, a->commit_id, a->f, a->path,
 	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
-	    a->last_displayed_line, &eof, a->view->nlines);
+	    a->last_displayed_line, a->eof, a->view->nlines);
 done:
 	if (pthread_mutex_unlock(a->mutex) != 0)
 		return got_error_from_errno();
@@ -1624,7 +1707,6 @@ blame_thread(void *arg)
 	const struct got_error *err;
 	struct tog_blame_thread_args *ta = arg;
 	struct tog_blame_cb_args *a = ta->cb_args;
-	int eof;
 
 	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->cb_args);
@@ -1638,7 +1720,7 @@ blame_thread(void *arg)
 	if (!err)
 		err = draw_blame(a->view, a->commit_id, a->f, a->path,
 		    a->lines, a->nlines, 1, *a->selected_line,
-		    a->first_displayed_line, a->last_displayed_line, &eof,
+		    a->first_displayed_line, a->last_displayed_line, a->eof,
 		    a->view->nlines);
 
 	if (pthread_mutex_unlock(a->mutex) != 0 && err == NULL)
@@ -1733,7 +1815,7 @@ static const struct got_error *
 run_blame(struct tog_blame *blame, pthread_mutex_t *mutex,
     struct tog_view *view, int *blame_complete,
     int *first_displayed_line, int *last_displayed_line,
-    int *selected_line, int *done, const char *path,
+    int *selected_line, int *done, int *eof, const char *path,
     struct got_object_id *commit_id,
     struct got_repository *repo)
 {
@@ -1788,6 +1870,7 @@ run_blame(struct tog_blame *blame, pthread_mutex_t *mutex,
 	blame->cb_args.selected_line = selected_line;
 	blame->cb_args.last_displayed_line = last_displayed_line;
 	blame->cb_args.quit = done;
+	blame->cb_args.eof = eof;
 
 	blame->thread_args.path = path;
 	blame->thread_args.repo = thread_repo;
@@ -1812,7 +1895,7 @@ done:
 }
 
 static const struct got_error *
-open_blame_view(struct tog_view *view, const char *path,
+open_blame_view(struct tog_view *view, char *path,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -1833,17 +1916,30 @@ open_blame_view(struct tog_view *view, const char *path,
 	s->selected_line = 1;
 	s->blame_complete = 0;
 	s->path = path;
+	if (s->path == NULL)
+		return got_error_from_errno();
 	s->repo = repo;
 	s->commit_id = commit_id;
 	memset(&s->blame, 0, sizeof(s->blame));
 
-	return NULL;
+	view->show = show_blame_view;
+	view->input = input_blame_view;
+	view->close = close_blame_view;
+
+	return run_blame(&s->blame, &s->mutex, view, &s->blame_complete,
+	    &s->first_displayed_line, &s->last_displayed_line,
+	    &s->selected_line, &s->done, &s->eof, s->path,
+	    s->blamed_commit->id, s->repo);
 }
 
-static void
+static const struct got_error *
 close_blame_view(struct tog_view *view)
 {
+	const struct got_error *err = NULL;
 	struct tog_blame_view_state *s = &view->state.blame;
+
+	if (s->blame.thread)
+		err = stop_blame(&s->blame);
 
 	while (!SIMPLEQ_EMPTY(&s->blamed_commits)) {
 		struct got_object_qid *blamed_commit;
@@ -1851,244 +1947,237 @@ close_blame_view(struct tog_view *view)
 		SIMPLEQ_REMOVE_HEAD(&s->blamed_commits, entry);
 		got_object_qid_free(blamed_commit);
 	}
+
+	free(s->path);
+
+	return err;
 }
 
 static const struct got_error *
 show_blame_view(struct tog_view *view)
 {
+	const struct got_error *err = NULL;
+	struct tog_blame_view_state *s = &view->state.blame;
+
+	if (pthread_mutex_lock(&s->mutex) != 0)
+		return got_error_from_errno();
+
+	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
+	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
+	    s->selected_line, &s->first_displayed_line,
+	    &s->last_displayed_line, &s->eof, view->nlines);
+
+	if (pthread_mutex_unlock(&s->mutex) != 0 && err == NULL)
+		err = got_error_from_errno();
+
+	return err;
+}
+
+static const struct got_error *
+input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
+    struct tog_view *view, int ch)
+{
 	const struct got_error *err = NULL, *thread_err = NULL;
-	int ch, done = 0, eof;
 	struct got_object *obj = NULL, *pobj = NULL;
 	struct tog_view *diff_view;
 	struct tog_blame_view_state *s = &view->state.blame;
 
-	view_show(view);
+	if (pthread_mutex_lock(&s->mutex) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
-	err = run_blame(&s->blame, &s->mutex, view, &s->blame_complete,
-	    &s->first_displayed_line, &s->last_displayed_line,
-	    &s->selected_line, &done, s->path, s->blamed_commit->id, s->repo);
-	if (err)
-		return err;
-
-	while (!done) {
-		if (pthread_mutex_lock(&s->mutex) != 0) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		err = draw_blame(view, s->blamed_commit->id, s->blame.f,
-		    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
-		    s->selected_line, &s->first_displayed_line,
-		    &s->last_displayed_line, &eof, view->nlines);
-		if (pthread_mutex_unlock(&s->mutex) != 0) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		if (err)
+	switch (ch) {
+		case 'q':
+			s->done = 1;
+			if (pthread_mutex_unlock(&s->mutex) != 0) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			return stop_blame(&s->blame);
+		case 'k':
+		case KEY_UP:
+			if (s->selected_line > 1)
+				s->selected_line--;
+			else if (s->selected_line == 1 &&
+			    s->first_displayed_line > 1)
+				s->first_displayed_line--;
 			break;
-		nodelay(stdscr, FALSE);
-		ch = wgetch(view->window);
-		nodelay(stdscr, TRUE);
-		if (pthread_mutex_lock(&s->mutex) != 0) {
-			err = got_error_from_errno();
-			goto done;
+		case KEY_PPAGE:
+		case KEY_BACKSPACE:
+			if (s->first_displayed_line == 1) {
+				s->selected_line = 1;
+				break;
+			}
+			if (s->first_displayed_line > view->nlines - 2)
+				s->first_displayed_line -=
+				    (view->nlines - 2);
+			else
+				s->first_displayed_line = 1;
+			break;
+		case 'j':
+		case KEY_DOWN:
+			if (s->selected_line < view->nlines - 2 &&
+			    s->first_displayed_line +
+			    s->selected_line <= s->blame.nlines)
+				s->selected_line++;
+			else if (s->last_displayed_line <
+			    s->blame.nlines)
+				s->first_displayed_line++;
+			break;
+		case 'b':
+		case 'p': {
+			struct got_object_id *id;
+			id = get_selected_commit_id(s->blame.lines,
+			    s->first_displayed_line, s->selected_line);
+			if (id == NULL || got_object_id_cmp(id,
+			    s->blamed_commit->id) == 0)
+				break;
+			err = open_selected_commit(&pobj, &obj,
+			    s->blame.lines, s->first_displayed_line,
+			    s->selected_line, s->repo);
+			if (err)
+				break;
+			if (pobj == NULL && obj == NULL)
+				break;
+			if (ch == 'p' && pobj == NULL)
+				break;
+			s->done = 1;
+			if (pthread_mutex_unlock(&s->mutex) != 0) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			thread_err = stop_blame(&s->blame);
+			s->done = 0;
+			if (pthread_mutex_lock(&s->mutex) != 0) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			if (thread_err)
+				break;
+			id = got_object_get_id(ch == 'b' ? obj : pobj);
+			got_object_close(obj);
+			obj = NULL;
+			if (pobj) {
+				got_object_close(pobj);
+				pobj = NULL;
+			}
+			if (id == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			err = got_object_qid_alloc(
+			    &s->blamed_commit, id);
+			free(id);
+			if (err)
+				goto done;
+			SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
+			    s->blamed_commit, entry);
+			err = run_blame(&s->blame, &s->mutex, view,
+			    &s->blame_complete,
+			    &s->first_displayed_line,
+			    &s->last_displayed_line,
+			    &s->selected_line, &s->done, &s->eof,
+			    s->path, s->blamed_commit->id, s->repo);
+			if (err)
+				break;
+			break;
 		}
-		switch (ch) {
-			case 'q':
-				done = 1;
+		case 'B': {
+			struct got_object_qid *first;
+			first = SIMPLEQ_FIRST(&s->blamed_commits);
+			if (!got_object_id_cmp(first->id, s->commit_id))
 				break;
-			case 'k':
-			case KEY_UP:
-				if (s->selected_line > 1)
-					s->selected_line--;
-				else if (s->selected_line == 1 &&
-				    s->first_displayed_line > 1)
-					s->first_displayed_line--;
+			s->done = 1;
+			if (pthread_mutex_unlock(&s->mutex) != 0) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			thread_err = stop_blame(&s->blame);
+			s->done = 0;
+			if (pthread_mutex_lock(&s->mutex) != 0) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			if (thread_err)
 				break;
-			case KEY_PPAGE:
-			case KEY_BACKSPACE:
-				if (s->first_displayed_line == 1) {
-					s->selected_line = 1;
-					break;
-				}
-				if (s->first_displayed_line > view->nlines - 2)
-					s->first_displayed_line -=
-					    (view->nlines - 2);
-				else
-					s->first_displayed_line = 1;
+			SIMPLEQ_REMOVE_HEAD(&s->blamed_commits, entry);
+			got_object_qid_free(s->blamed_commit);
+			s->blamed_commit =
+			    SIMPLEQ_FIRST(&s->blamed_commits);
+			err = run_blame(&s->blame, &s->mutex, view,
+			    &s->blame_complete,
+			    &s->first_displayed_line,
+			    &s->last_displayed_line,
+			    &s->selected_line, &s->done, &s->eof, s->path,
+			    s->blamed_commit->id, s->repo);
+			if (err)
 				break;
-			case 'j':
-			case KEY_DOWN:
-				if (s->selected_line < view->nlines - 2 &&
-				    s->first_displayed_line +
-				    s->selected_line <= s->blame.nlines)
-					s->selected_line++;
-				else if (s->last_displayed_line <
-				    s->blame.nlines)
-					s->first_displayed_line++;
+			break;
+		}
+		case KEY_ENTER:
+		case '\r':
+			err = open_selected_commit(&pobj, &obj,
+			    s->blame.lines, s->first_displayed_line,
+			    s->selected_line, s->repo);
+			if (err)
 				break;
-			case 'b':
-			case 'p': {
-				struct got_object_id *id;
-				id = get_selected_commit_id(s->blame.lines,
-				    s->first_displayed_line, s->selected_line);
-				if (id == NULL || got_object_id_cmp(id,
-				    s->blamed_commit->id) == 0)
-					break;
-				err = open_selected_commit(&pobj, &obj,
-				    s->blame.lines, s->first_displayed_line,
-				    s->selected_line, s->repo);
-				if (err)
-					break;
-				if (pobj == NULL && obj == NULL)
-					break;
-				if (ch == 'p' && pobj == NULL)
-					break;
-				done = 1;
-				if (pthread_mutex_unlock(&s->mutex) != 0) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				thread_err = stop_blame(&s->blame);
-				done = 0;
-				if (pthread_mutex_lock(&s->mutex) != 0) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				if (thread_err)
-					break;
-				id = got_object_get_id(ch == 'b' ? obj : pobj);
-				got_object_close(obj);
-				obj = NULL;
-				if (pobj) {
-					got_object_close(pobj);
-					pobj = NULL;
-				}
-				if (id == NULL) {
-					err = got_error_from_errno();
-					break;
-				}
-				err = got_object_qid_alloc(
-				    &s->blamed_commit, id);
-				free(id);
-				if (err)
-					goto done;
-				SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
-				    s->blamed_commit, entry);
-				err = run_blame(&s->blame, &s->mutex, view,
-				    &s->blame_complete,
-				    &s->first_displayed_line,
-				    &s->last_displayed_line,
-				    &s->selected_line, &done, s->path,
-				    s->blamed_commit->id, s->repo);
-				if (err)
-					break;
+			if (pobj == NULL && obj == NULL)
+				break;
+			diff_view = view_open(0, 0, 0, 0, view,
+			    TOG_VIEW_DIFF);
+			if (diff_view == NULL) {
+				err = got_error_from_errno();
 				break;
 			}
-			case 'B': {
-				struct got_object_qid *first;
-				first = SIMPLEQ_FIRST(&s->blamed_commits);
-				if (!got_object_id_cmp(first->id, s->commit_id))
-					break;
-				done = 1;
-				if (pthread_mutex_unlock(&s->mutex) != 0) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				thread_err = stop_blame(&s->blame);
-				done = 0;
-				if (pthread_mutex_lock(&s->mutex) != 0) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				if (thread_err)
-					break;
-				SIMPLEQ_REMOVE_HEAD(&s->blamed_commits, entry);
-				got_object_qid_free(s->blamed_commit);
-				s->blamed_commit =
-				    SIMPLEQ_FIRST(&s->blamed_commits);
-				err = run_blame(&s->blame, &s->mutex, view,
-				    &s->blame_complete,
-				    &s->first_displayed_line,
-				    &s->last_displayed_line,
-				    &s->selected_line, &done, s->path,
-				    s->blamed_commit->id, s->repo);
-				if (err)
-					break;
-				break;
-			}
-			case KEY_ENTER:
-			case '\r':
-				err = open_selected_commit(&pobj, &obj,
-				    s->blame.lines, s->first_displayed_line,
-				    s->selected_line, s->repo);
-				if (err)
-					break;
-				if (pobj == NULL && obj == NULL)
-					break;
-				diff_view = view_open(0, 0, 0, 0, view,
-				    TOG_VIEW_DIFF);
-				if (diff_view == NULL) {
-					err = got_error_from_errno();
-					break;
-				}
-				err = open_diff_view(diff_view, pobj, obj,
-				    s->repo);
-				if (err)
-					break;
-				err = show_diff_view(diff_view);
-				close_diff_view(diff_view);
+			err = open_diff_view(diff_view, pobj, obj,
+			    s->repo);
+			if (err) {
 				view_close(diff_view);
-				if (err)
-					break;
-				view_show(view);
-				if (pobj) {
-					got_object_close(pobj);
-					pobj = NULL;
-				}
-				got_object_close(obj);
-				obj = NULL;
-				if (err)
-					break;
 				break;
-			case KEY_NPAGE:
-			case ' ':
-				if (s->last_displayed_line >= s->blame.nlines &&
-				    s->selected_line < view->nlines - 2) {
-					s->selected_line = MIN(s->blame.nlines,
-					    view->nlines - 2);
-					break;
-				}
-				if (s->last_displayed_line + view->nlines - 2
-				    <= s->blame.nlines)
-					s->first_displayed_line +=
-					    view->nlines - 2;
-				else
-					s->first_displayed_line =
-					    s->blame.nlines -
-					    (view->nlines - 3);
+			}
+			*new_view = diff_view;
+			if (pobj) {
+				got_object_close(pobj);
+				pobj = NULL;
+			}
+			got_object_close(obj);
+			obj = NULL;
+			if (err)
 				break;
-			case KEY_RESIZE:
-				err = view_resize(view);
-				if (err)
-					break;
-				if (s->selected_line > view->nlines - 2) {
-					s->selected_line = MIN(s->blame.nlines,
-					    view->nlines - 2);
-				}
+			break;
+		case KEY_NPAGE:
+		case ' ':
+			if (s->last_displayed_line >= s->blame.nlines &&
+			    s->selected_line < view->nlines - 2) {
+				s->selected_line = MIN(s->blame.nlines,
+				    view->nlines - 2);
 				break;
-			default:
-				break;
-		}
-		if (pthread_mutex_unlock(&s->mutex) != 0)
-			err = got_error_from_errno();
-		if (err || thread_err)
+			}
+			if (s->last_displayed_line + view->nlines - 2
+			    <= s->blame.nlines)
+				s->first_displayed_line +=
+				    view->nlines - 2;
+			else
+				s->first_displayed_line =
+				    s->blame.nlines -
+				    (view->nlines - 3);
+			break;
+		case KEY_RESIZE:
+			if (s->selected_line > view->nlines - 2) {
+				s->selected_line = MIN(s->blame.nlines,
+				    view->nlines - 2);
+			}
+			break;
+		default:
 			break;
 	}
+
+	if (pthread_mutex_unlock(&s->mutex) != 0)
+		err = got_error_from_errno();
 done:
 	if (pobj)
 		got_object_close(pobj);
-	if (s->blame.thread)
-		thread_err = stop_blame(&s->blame);
 	return thread_err ? thread_err : err;
 }
 
@@ -2182,11 +2271,8 @@ cmd_blame(int argc, char *argv[])
 	error = open_blame_view(view, in_repo_path, commit_id, repo);
 	if (error)
 		goto done;
-	error = show_blame_view(view);
-	close_blame_view(view);
-	view_close(view);
+	error = view_loop(view);
 done:
-	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
@@ -2398,53 +2484,53 @@ done:
 }
 
 static const struct got_error *
-blame_tree_entry(struct tog_view *parent_view, struct got_tree_entry *te,
-    struct tog_parent_trees *parents, struct got_object_id *commit_id,
-    struct got_repository *repo)
+blame_tree_entry(struct tog_view **new_view, struct tog_view *parent_view,
+    struct got_tree_entry *te, struct tog_parent_trees *parents,
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
-	struct tog_view *view;
+	struct tog_view *blame_view;
 
 	err = tree_entry_path(&path, parents, te);
 	if (err)
 		return err;
 
-	view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
-	if (view) {
-		err = open_blame_view(view, path, commit_id, repo);
-		if (err)
-			goto done;
-		err = show_blame_view(view);
-		close_blame_view(view);
-		view_close(view);
-	} else
-		err = got_error_from_errno();
+	blame_view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_BLAME);
+	if (blame_view == NULL)
+		return got_error_from_errno();
 
-	view_show(parent_view);
-done:
-	free(path);
+	err = open_blame_view(blame_view, path, commit_id, repo);
+	if (err) {
+		view_close(blame_view);
+		free(path);
+	} else
+		*new_view = blame_view;
 	return err;
 }
 
 static const struct got_error *
-log_tree_entry(struct tog_view *view, struct got_tree_entry *te,
-    struct tog_parent_trees *parents, struct got_object_id *commit_id,
-    struct got_repository *repo)
+log_tree_entry(struct tog_view **new_view, struct tog_view *parent_view,
+    struct got_tree_entry *te, struct tog_parent_trees *parents,
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
+	struct tog_view *log_view;
 	const struct got_error *err = NULL;
 	char *path;
+
+	log_view = view_open(0, 0, 0, 0, parent_view, TOG_VIEW_LOG);
+	if (log_view == NULL)
+		return got_error_from_errno();
 
 	err = tree_entry_path(&path, parents, te);
 	if (err)
 		return err;
 
-	err = open_log_view(view, commit_id, repo, path);
+	err = open_log_view(log_view, commit_id, repo, path);
 	if (err)
-		goto done;
-	err = show_log_view(view);
-	close_log_view(view);
-done:
+		view_close(log_view);
+	else
+		*new_view = log_view;
 	free(path);
 	return err;
 }
@@ -2473,6 +2559,10 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->first_displayed_entry = SIMPLEQ_FIRST(&s->entries->head);
 	s->commit_id = commit_id;
 	s->repo = repo;
+
+	view->show = show_tree_view;
+	view->input = input_tree_view;
+	view->close = close_tree_view;
 done:
 	free(commit_id_str);
 	if (err)
@@ -2480,7 +2570,7 @@ done:
 	return err;
 }
 
-static void
+static const struct got_error *
 close_tree_view(struct tog_view *view)
 {
 	struct tog_tree_view_state *s = &view->state.tree;
@@ -2495,6 +2585,9 @@ close_tree_view(struct tog_view *view)
 	}
 	if (s->tree != s->root)
 		got_object_tree_close(s->tree);
+	got_object_tree_close(s->root);
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -2502,161 +2595,139 @@ show_tree_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
-	int ch, done = 0;
-	int nentries;
+	char *parent_path;
 
-	view_show(view);
+	err = tree_entry_path(&parent_path, &s->parents, NULL);
+	if (err)
+		return err;
 
-	while (!done) {
-		char *parent_path;
-		s->entries = got_object_tree_get_entries(s->tree);
-		nentries = s->entries->nentries;
-		if (s->tree != s->root)
-			nentries++; /* '..' directory */
+	err = draw_tree_entries(view, &s->first_displayed_entry,
+	    &s->last_displayed_entry, &s->selected_entry,
+	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
+	    s->entries, s->selected, view->nlines, s->tree == s->root);
+	free(parent_path);
+	return err;
+}
 
-		err = tree_entry_path(&parent_path, &s->parents, NULL);
-		if (err)
-			goto done;
+static const struct got_error *
+input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
+    struct tog_view *view, int ch)
+{
+	const struct got_error *err = NULL;
+	struct tog_tree_view_state *s = &view->state.tree;
 
-		err = draw_tree_entries(view, &s->first_displayed_entry,
-		    &s->last_displayed_entry, &s->selected_entry,
-		    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
-		    s->entries, s->selected, view->nlines, s->tree == s->root);
-		free(parent_path);
-		if (err)
+	switch (ch) {
+		case 'i':
+			s->show_ids = !s->show_ids;
 			break;
-
-		nodelay(stdscr, FALSE);
-		ch = wgetch(view->window);
-		nodelay(stdscr, TRUE);
-		switch (ch) {
-			case 'q':
-				done = 1;
+		case 'l':
+			if (s->selected_entry) {
+				err = log_tree_entry(new_view, view,
+				    s->selected_entry, &s->parents,
+				    s->commit_id, s->repo);
+			}
+			break;
+		case 'k':
+		case KEY_UP:
+			if (s->selected > 0)
+				s->selected--;
+			if (s->selected > 0)
 				break;
-			case 'i':
-				s->show_ids = !s->show_ids;
-				break;
-			case 'l':
-				if (s->selected_entry) {
-					struct tog_view *log_view;
-					log_view = view_open(0, 0, 0, 0, view,
-					    TOG_VIEW_LOG);
-					if (log_view == NULL) {
-						err = got_error_from_errno();
-						goto done;
-					}
-					err = log_tree_entry(log_view,
-					    s->selected_entry, &s->parents,
-					    s->commit_id, s->repo);
-					view_close(log_view);
-					view_show(view);
-					if (err)
-						goto done;
-				}
-				break;
-			case 'k':
-			case KEY_UP:
-				if (s->selected > 0)
-					s->selected--;
-				if (s->selected > 0)
-					break;
-				tree_scroll_up(&s->first_displayed_entry, 1,
-				    s->entries, s->tree == s->root);
-				break;
-			case KEY_PPAGE:
-				if (SIMPLEQ_FIRST(&s->entries->head) ==
-				    s->first_displayed_entry) {
-					if (s->tree != s->root)
-						s->first_displayed_entry = NULL;
-					s->selected = 0;
-					break;
-				}
-				tree_scroll_up(&s->first_displayed_entry,
-				    view->nlines, s->entries,
-				    s->tree == s->root);
-				break;
-			case 'j':
-			case KEY_DOWN:
-				if (s->selected < s->ndisplayed - 1) {
-					s->selected++;
-					break;
-				}
-				tree_scroll_down(&s->first_displayed_entry, 1,
-				    s->last_displayed_entry, s->entries);
-				break;
-			case KEY_NPAGE:
-				tree_scroll_down(&s->first_displayed_entry,
-				    view->nlines, s->last_displayed_entry,
-				    s->entries);
-				if (SIMPLEQ_NEXT(s->last_displayed_entry,
-				    entry))
-					break;
-				/* can't scroll any further; move cursor down */
-				if (s->selected < s->ndisplayed - 1)
-					s->selected = s->ndisplayed - 1;
-				break;
-			case KEY_ENTER:
-			case '\r':
-				if (s->selected_entry == NULL) {
-					struct tog_parent_tree *parent;
-			case KEY_BACKSPACE:
-					/* user selected '..' */
-					if (s->tree == s->root)
-						break;
-					parent = TAILQ_FIRST(&s->parents);
-					TAILQ_REMOVE(&s->parents, parent,
-					    entry);
-					got_object_tree_close(s->tree);
-					s->tree = parent->tree;
-					s->first_displayed_entry =
-					    parent->first_displayed_entry;
-					s->selected_entry =
-					    parent->selected_entry;
-					s->selected = parent->selected;
-					free(parent);
-				} else if (S_ISDIR(s->selected_entry->mode)) {
-					struct tog_parent_tree *parent;
-					struct got_tree_object *child;
-					err = got_object_open_as_tree(&child,
-					    s->repo, s->selected_entry->id);
-					if (err)
-						goto done;
-					parent = calloc(1, sizeof(*parent));
-					if (parent == NULL) {
-						err = got_error_from_errno();
-						goto done;
-					}
-					parent->tree = s->tree;
-					parent->first_displayed_entry =
-					   s->first_displayed_entry;
-					parent->selected_entry =
-					    s->selected_entry;
-					parent->selected = s->selected;
-					TAILQ_INSERT_HEAD(&s->parents, parent,
-					    entry);
-					s->tree = child;
-					s->selected = 0;
+			tree_scroll_up(&s->first_displayed_entry, 1,
+			    s->entries, s->tree == s->root);
+			break;
+		case KEY_PPAGE:
+			if (SIMPLEQ_FIRST(&s->entries->head) ==
+			    s->first_displayed_entry) {
+				if (s->tree != s->root)
 					s->first_displayed_entry = NULL;
-				} else if (S_ISREG(s->selected_entry->mode)) {
-					err = blame_tree_entry(view,
-					    s->selected_entry, &s->parents,
-					    s->commit_id, s->repo);
-					if (err)
-						goto done;
-				}
+				s->selected = 0;
 				break;
-			case KEY_RESIZE:
-				err = view_resize(view);
+			}
+			tree_scroll_up(&s->first_displayed_entry,
+			    view->nlines, s->entries,
+			    s->tree == s->root);
+			break;
+		case 'j':
+		case KEY_DOWN:
+			if (s->selected < s->ndisplayed - 1) {
+				s->selected++;
+				break;
+			}
+			tree_scroll_down(&s->first_displayed_entry, 1,
+			    s->last_displayed_entry, s->entries);
+			break;
+		case KEY_NPAGE:
+			tree_scroll_down(&s->first_displayed_entry,
+			    view->nlines, s->last_displayed_entry,
+			    s->entries);
+			if (SIMPLEQ_NEXT(s->last_displayed_entry,
+			    entry))
+				break;
+			/* can't scroll any further; move cursor down */
+			if (s->selected < s->ndisplayed - 1)
+				s->selected = s->ndisplayed - 1;
+			break;
+		case KEY_ENTER:
+		case '\r':
+			if (s->selected_entry == NULL) {
+				struct tog_parent_tree *parent;
+		case KEY_BACKSPACE:
+				/* user selected '..' */
+				if (s->tree == s->root)
+					break;
+				parent = TAILQ_FIRST(&s->parents);
+				TAILQ_REMOVE(&s->parents, parent,
+				    entry);
+				got_object_tree_close(s->tree);
+				s->tree = parent->tree;
+				s->entries =
+				    got_object_tree_get_entries(s->tree);
+				s->first_displayed_entry =
+				    parent->first_displayed_entry;
+				s->selected_entry =
+				    parent->selected_entry;
+				s->selected = parent->selected;
+				free(parent);
+			} else if (S_ISDIR(s->selected_entry->mode)) {
+				struct tog_parent_tree *parent;
+				struct got_tree_object *child;
+				err = got_object_open_as_tree(&child,
+				    s->repo, s->selected_entry->id);
 				if (err)
-					goto done;
-				if (s->selected > view->nlines)
-					s->selected = s->ndisplayed - 1;
-				break;
-			default:
-				break;
-		}
+					break;
+				parent = calloc(1, sizeof(*parent));
+				if (parent == NULL) {
+					err = got_error_from_errno();
+					break;
+				}
+				parent->tree = s->tree;
+				parent->first_displayed_entry =
+				   s->first_displayed_entry;
+				parent->selected_entry = s->selected_entry;
+				parent->selected = s->selected;
+				TAILQ_INSERT_HEAD(&s->parents, parent, entry);
+				s->tree = child;
+				s->entries =
+				    got_object_tree_get_entries(s->tree);
+				s->selected = 0;
+				s->first_displayed_entry = NULL;
+			} else if (S_ISREG(s->selected_entry->mode)) {
+				err = blame_tree_entry(new_view, view,
+				    s->selected_entry, &s->parents,
+				    s->commit_id, s->repo);
+				if (err)
+					break;
+			}
+			break;
+		case KEY_RESIZE:
+			if (s->selected > view->nlines)
+				s->selected = s->ndisplayed - 1;
+			break;
+		default:
+			break;
 	}
-done:
+
 	return err;
 }
 
@@ -2749,9 +2820,7 @@ cmd_tree(int argc, char *argv[])
 	error = open_tree_view(view, tree, commit_id, repo);
 	if (error)
 		goto done;
-	error = show_tree_view(view);
-	close_tree_view(view);
-	view_close(view);
+	error = view_loop(view);
 done:
 	free(commit_id);
 	if (commit)
