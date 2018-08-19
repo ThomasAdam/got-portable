@@ -90,6 +90,7 @@ enum tog_view_type {
 };
 
 struct tog_diff_view_state {
+	struct got_object_id *id;
 	FILE *f;
 	int first_displayed_line;
 	int last_displayed_line;
@@ -192,6 +193,7 @@ struct tog_tree_view_state {
 	struct got_repository *repo;
 };
 
+TAILQ_HEAD(tog_view_list_head, tog_view);
 struct tog_view {
 	TAILQ_ENTRY(tog_view) entry;
 	WINDOW *window;
@@ -199,6 +201,7 @@ struct tog_view {
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
 	struct tog_view *parent;
+	struct tog_view *child;
 
 	/* type-specific state */
 	enum tog_view_type type;
@@ -212,9 +215,10 @@ struct tog_view {
 	const struct got_error *(*show)(struct tog_view *);
 	const struct got_error *(*input)(struct tog_view **,
 	    struct tog_view **, struct tog_view *, int);
+	const struct got_error *(*set_child)(struct tog_view *,
+	    struct tog_view *);
 	const struct got_error *(*close)(struct tog_view *);
 };
-TAILQ_HEAD(tog_view_list_head, tog_view);
 
 static const struct got_error *open_diff_view(struct tog_view *,
     struct got_object *, struct got_object *, struct got_repository *);
@@ -229,6 +233,8 @@ static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_log_view(struct tog_view *);
+static const struct got_error* set_child_log_view(struct tog_view *,
+    struct tog_view *);
 
 static const struct got_error *open_blame_view(struct tog_view *, char *,
     struct got_object_id *, struct got_repository *);
@@ -249,6 +255,10 @@ view_close(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 
+	if (view->child)
+		view->child->parent = NULL;
+	if (view->parent)
+		view->parent->child = NULL;
 	if (view->close)
 		err = view->close(view);
 	if (view->panel)
@@ -272,6 +282,8 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 		begin_x = parent->ncols - 80;
 
 	view->parent = parent;
+	if (parent)
+		parent->child = view;
 	view->type = type;
 	view->lines = LINES;
 	view->cols = COLS;
@@ -299,10 +311,25 @@ view_show(struct tog_view *view)
 {
 	const struct got_error *err;
 
+	if (view->parent) {
+		err = view->parent->show(view->parent);
+		if (err)
+			return err;
+		show_panel(view->parent->panel);
+	}
+
 	err = view->show(view);
 	if (err)
 		return err;
 	show_panel(view->panel);
+
+	if (view->child) {
+		err = view->child->show(view->child);
+		if (err)
+			return err;
+		show_panel(view->child->panel);
+	}
+
 	update_panels();
 	doupdate();
 
@@ -394,6 +421,21 @@ view_input(struct tog_view **new, struct tog_view **dead,
 }
 
 static const struct got_error *
+view_set_child(struct tog_view *view, struct tog_view *child)
+{
+	const struct got_error *err;
+
+	if (view->set_child) {
+		err = view->set_child(view, child);
+		if (err)
+			return err;
+	}
+
+	view->child = child;
+	return NULL;
+}
+
+static const struct got_error *
 view_loop(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
@@ -412,24 +454,31 @@ view_loop(struct tog_view *view)
 		    view, &views);
 		if (err)
 			break;
-		if (new_view) {
-			/* TODO: de-duplicate! */
-			TAILQ_INSERT_TAIL(&views, new_view, entry);
-			view = new_view;
-		}
 		if (dead_view) {
 			TAILQ_REMOVE(&views, dead_view, entry);
-			TAILQ_FOREACH(view, &views, entry) {
-				if (view->parent == dead_view)
-					view->parent = NULL;
-			}
 			if (dead_view->parent)
 				view = dead_view->parent;
 			else
 				view = TAILQ_LAST(&views, tog_view_list_head);
+			if (dead_view->child) {
+				TAILQ_REMOVE(&views, dead_view->child, entry);
+				err = view_close(dead_view->child);
+				if (err)
+					goto done;
+			}
 			err = view_close(dead_view);
 			if (err)
 				goto done;
+		}
+		if (new_view) {
+			/* TODO: de-duplicate! */
+			TAILQ_INSERT_TAIL(&views, new_view, entry);
+			if (new_view->parent) {
+				err = view_set_child(new_view->parent, new_view);
+				if (err)
+					goto done;
+			}
+			view = new_view;
 		}
 	}
 done:
@@ -1040,6 +1089,43 @@ browse_commit(struct tog_view **new_view, struct tog_view *parent_view,
 }
 
 static const struct got_error *
+set_child_log_view(struct tog_view *view, struct tog_view *child)
+{
+	struct tog_log_view_state *s = &view->state.log;
+	struct tog_diff_view_state *ds;
+	struct commit_queue_entry *commit, *child_entry = NULL;
+	int selected_idx = 0;
+
+	if (child->type != TOG_VIEW_DIFF)
+		return NULL;
+	ds = &child->state.diff;
+
+	TAILQ_FOREACH(commit, &s->commits.head, entry) {
+		if (got_object_id_cmp(commit->id, ds->id) == 0) {
+			child_entry = commit;
+			break;
+		}
+	}
+	if (child_entry == NULL)
+		return NULL;
+
+	commit = s->first_displayed_entry;
+	while (commit) {
+		if (got_object_id_cmp(commit->id, child_entry->id) == 0) {
+			s->selected_entry = child_entry;
+			s->selected = selected_idx;
+			break;
+		}
+		if (commit == s->last_displayed_entry)
+			break;
+		selected_idx++;
+		commit = TAILQ_NEXT(commit, entry);
+	}
+
+	return show_log_view(view);
+}
+
+static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_repository *repo, const char *path)
 {
@@ -1092,6 +1178,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->show = show_log_view;
 	view->input = input_log_view;
 	view->close = close_log_view;
+	view->set_child = set_child_log_view;
 done:
 	free(head_id);
 	return err;
@@ -1110,14 +1197,63 @@ close_log_view(struct tog_view *view)
 }
 
 static const struct got_error *
+update_diff_child_view(struct tog_view *parent,
+    struct commit_queue_entry *selected_entry, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct tog_diff_view_state *ds;
+	struct got_object *obj1 = NULL, *obj2 = NULL;
+	struct got_object_qid *parent_id;
+	struct tog_view *child_view = parent->child;
+
+	if (child_view == NULL)
+		return NULL;
+	if (child_view->type != TOG_VIEW_DIFF)
+		return NULL;
+	ds = &child_view->state.diff;
+	if (got_object_id_cmp(ds->id, selected_entry->id) == 0)
+		return NULL;
+
+	err = got_object_open(&obj2, repo, selected_entry->id);
+	if (err)
+		return err;
+
+	parent_id = SIMPLEQ_FIRST(&selected_entry->commit->parent_ids);
+	if (parent_id) {
+		err = got_object_open(&obj1, repo, parent_id->id);
+		if (err)
+			goto done;
+	}
+
+	err = close_diff_view(child_view);
+	if (err)
+		goto done;
+
+	err = open_diff_view(child_view, obj1, obj2, repo);
+	if (err)
+		goto done;
+done:
+	if (obj1)
+		got_object_close(obj1);
+	if (obj2)
+		got_object_close(obj2);
+	return err;
+}
+
+static const struct got_error *
 show_log_view(struct tog_view *view)
 {
+	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 
-	return draw_commits(view, &s->last_displayed_entry,
+	err = draw_commits(view, &s->last_displayed_entry,
 	    &s->selected_entry, s->first_displayed_entry,
 	    &s->commits, s->selected, view->nlines, s->graph,
 	    s->repo, s->in_repo_path);
+	if (err)
+		return err;
+
+	return update_diff_child_view(view, s->selected_entry, s->repo);
 }
 
 static const struct got_error *
@@ -1130,6 +1266,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 	switch (ch) {
 		case 'k':
 		case KEY_UP:
+		case '[':
 			if (s->selected > 0)
 				s->selected--;
 			if (s->selected > 0)
@@ -1148,6 +1285,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'j':
 		case KEY_DOWN:
+		case ']':
 			if (s->selected < MIN(view->nlines - 2,
 			    s->commits.ncommits - 1)) {
 				s->selected++;
@@ -1404,6 +1542,9 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	fflush(f);
 
+	view->state.diff.id = got_object_get_id(obj2);
+	if (view->state.diff.id == NULL)
+		return got_error_from_errno();
 	view->state.diff.f = f;
 	view->state.diff.first_displayed_line = 1;
 	view->state.diff.last_displayed_line = view->nlines;
@@ -1422,7 +1563,7 @@ close_diff_view(struct tog_view *view)
 
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno();
-
+	free(view->state.diff.id);
 	return err;
 }
 
@@ -1436,9 +1577,10 @@ show_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
-input_diff_view(struct tog_view **new, struct tog_view **dead,
+input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
     struct tog_view *view, int ch)
 {
+	const struct got_error *err = NULL;
 	struct tog_diff_view_state *s = &view->state.diff;
 	int i;
 
@@ -1470,11 +1612,47 @@ input_diff_view(struct tog_view **new, struct tog_view **dead,
 					break;
 			}
 			break;
+		case '[':
+		case ']': {
+			struct tog_log_view_state *ls;
+			struct commit_queue_entry *entry;
+			struct tog_view *diff_view;
+
+			if (view->parent == NULL)
+				break;
+			if (view->parent->type != TOG_VIEW_LOG)
+				break;
+			ls = &view->parent->state.log;
+
+			if (ch == '[') {
+				entry = TAILQ_PREV(ls->selected_entry,
+				    commit_queue_head, entry);
+			} else {
+				entry = TAILQ_NEXT(ls->selected_entry, entry);
+				if (entry == NULL) {
+					err = fetch_next_commit(&entry,
+					    ls->selected_entry,
+					    &ls->commits, ls->graph,
+					    ls->repo, ls->in_repo_path);
+					if (err)
+						break;
+				}
+			}
+			if (entry == NULL)
+				break;
+			err = show_commit(&diff_view, view->parent,
+			    entry, ls->repo);
+			if (err)
+				break;
+			*new_view = diff_view;
+			*dead_view = view;
+			break;
+		}
 		default:
 			break;
 	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *

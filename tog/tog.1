@@ -35,6 +35,9 @@ supports several types of views which display repository data.
 An arbitrary number of views may be opened simultaneously by
 navigating the repository with
 .Nm .
+Sometimes, if one view is opened from another view, the child view
+is linked to its parent view and both views will keep their data
+display in sync.
 The supported views are:
 .Bl -tag -width Ds
 .It Cm log view
@@ -89,14 +92,16 @@ The key bindings for
 .Cm tog log
 are as follows:
 .Bl -tag -width Ds
-.It Cm Down-arrow, j, Page-down
+.It Cm Down-arrow, j, ], Page-down
 Move the selection cursor down.
-.It Cm Up-arrow, k, Page-up
+.It Cm Up-arrow, k, [, Page-up
 Move the selection cursor up.
 .It Cm Enter
 Switch to the
 .Cm diff
 view showing file changes made in the currently selected commit.
+The diff view is linked to the log view so either view will be
+updated when the other switches to a different commit.
 .It Cm t
 Switch to the
 .Cm tree
@@ -135,6 +140,12 @@ are as follows:
 Scroll down.
 .It Cm Up-arrow, k, Page-up
 Scroll up.
+.It [
+Switch to the previous commit in parent
+.Cm log view .
+.It ]
+Switch to the next commit in parent
+.Cm log view .
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.
