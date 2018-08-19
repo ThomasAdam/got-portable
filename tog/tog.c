@@ -268,6 +268,9 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 	if (view == NULL)
 		return NULL;
 
+	if (begin_x == 0 && parent && parent->ncols - 80 > 10)
+		begin_x = parent->ncols - 80;
+
 	view->parent = parent;
 	view->type = type;
 	view->lines = LINES;
