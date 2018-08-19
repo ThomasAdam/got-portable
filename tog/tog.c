@@ -294,7 +294,7 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 	return view;
 }
 
-const struct got_error *
+static const struct got_error *
 view_show(struct tog_view *view)
 {
 	const struct got_error *err;
@@ -309,7 +309,7 @@ view_show(struct tog_view *view)
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 view_resize(struct tog_view *view)
 {
 	int nlines, ncols;
