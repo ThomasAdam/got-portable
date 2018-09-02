@@ -963,7 +963,7 @@ done:
 
 static const struct got_error *
 read_commit_object_privsep(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object *obj, int fd)
+    struct got_object *obj, int fd)
 {
 	const struct got_error *err = NULL, *err_child = NULL;
 	struct imsgbuf parent_ibuf;
@@ -1019,7 +1019,7 @@ got_object_commit_open(struct got_commit_object **commit,
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
-		err = read_commit_object_privsep(commit, repo, obj, fd);
+		err = read_commit_object_privsep(commit, obj, fd);
 		close(fd);
 	}
 
