@@ -435,6 +435,16 @@ view_set_child(struct tog_view *view, struct tog_view *child)
 	return NULL;
 }
 
+void
+view_vborder(struct tog_view *view)
+{
+	if (view->child == NULL)
+		return;
+
+	mvwvline(view->window, view->begin_y, view->child->begin_x - 1,
+	    got_locale_is_utf8() ? ACS_VLINE : '|', view->nlines);
+}
+
 static const struct got_error *
 view_loop(struct tog_view *view)
 {
@@ -972,6 +982,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
+	view_vborder(view);
 	update_panels();
 
 	return err;
@@ -1506,6 +1517,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 	}
 	*last_displayed_line = nlines;
 
+	view_vborder(view);
 	update_panels();
 
 	return NULL;
@@ -1857,6 +1869,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	}
 	*last_displayed_line = lineno;
 
+	view_vborder(view);
 	update_panels();
 
 	return NULL;
@@ -2585,6 +2598,7 @@ draw_tree_entries(struct tog_view *view,
 		te = SIMPLEQ_NEXT(te, entry);
 	}
 
+	view_vborder(view);
 	return err;
 }
 
