@@ -1506,7 +1506,6 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 		err = format_line(&wline, &width, line, view->ncols);
 		if (err) {
 			free(line);
-			free(wline);
 			return err;
 		}
 		waddwstr(view->window, wline);
