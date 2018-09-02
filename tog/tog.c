@@ -401,6 +401,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = prev;
 			else
 				*focus = TAILQ_LAST(views, tog_view_list_head);
+			view->focussed = 0;
+			(*focus)->focussed = 1;
 			break;
 		case 'q':
 			err = view->input(new, dead, view, ch);
