@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <langinfo.h>
 
 #include "got_error.h"
 #include "got_utf8.h"
@@ -64,4 +65,11 @@ got_mbsavis(char** outp, int *widthp, const char *mbs)
 	*dst = '\0';
 	*widthp = total_width;
 	return NULL;
+}
+
+int
+got_locale_is_utf8(void)
+{
+	char *codeset = nl_langinfo(CODESET);
+	return (strcmp(codeset, "UTF-8") == 0);
 }

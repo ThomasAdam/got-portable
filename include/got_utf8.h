@@ -15,3 +15,4 @@
  */
 
 const struct got_error *got_mbsavis(char**, int *, const char *);
+int got_locale_is_utf8(void);
