@@ -465,10 +465,11 @@ view_loop(struct tog_view *view)
 		if (err)
 			break;
 		if (dead_view) {
+			struct tog_view *v;
 			TAILQ_REMOVE(&views, dead_view, entry);
-			TAILQ_FOREACH(view, &views, entry) {
-				if (view->parent == dead_view)
-					view->parent = NULL;
+			TAILQ_FOREACH(v, &views, entry) {
+				if (v->parent == dead_view)
+					v->parent = NULL;
 			}
 			if (dead_view->parent)
 				view = dead_view->parent;
