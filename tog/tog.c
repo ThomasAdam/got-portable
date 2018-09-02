@@ -470,7 +470,9 @@ view_loop(struct tog_view *view)
 			TAILQ_FOREACH_SAFE(v, &views, entry, t) {
 				if (v->parent == dead_view) {
 					TAILQ_REMOVE(&views, v, entry);
-					view_close(v);
+					err = view_close(v);
+					if (err)
+						goto done;
 				}
 			}
 			if (dead_view->parent)
