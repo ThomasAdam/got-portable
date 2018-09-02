@@ -90,7 +90,7 @@ enum tog_view_type {
 };
 
 struct tog_diff_view_state {
-	struct got_object_id *id;
+	struct got_object_id *id1, *id2;
 	FILE *f;
 	int first_displayed_line;
 	int last_displayed_line;
@@ -200,6 +200,7 @@ struct tog_view {
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
+	int focussed;
 	struct tog_view *parent;
 	struct tog_view *child;
 
@@ -323,7 +324,7 @@ view_show(struct tog_view *view)
 		return err;
 	show_panel(view->panel);
 
-	if (view->child) {
+	if (view->child && view->child->begin_x > view->begin_x) {
 		err = view->child->show(view->child);
 		if (err)
 			return err;
@@ -391,6 +392,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = next;
 			else
 				*focus = TAILQ_FIRST(views);
+			view->focussed = 0;
+			(*focus)->focussed = 1;
 			break;
 		case KEY_BACKSPACE:
 			prev = TAILQ_PREV(view, tog_view_list_head, entry);
@@ -445,6 +448,21 @@ view_vborder(struct tog_view *view)
 	    got_locale_is_utf8() ? ACS_VLINE : '|', view->nlines);
 }
 
+int
+view_needs_focus_indication(struct tog_view *view)
+{
+	if (!view->focussed)
+		return 0;
+
+	if (view->child && view->child->begin_x > view->begin_x)
+		return 1;
+
+	if (view->parent && view->begin_x > view->parent->begin_x)
+		return 1;
+
+	return 0;
+}
+
 static const struct got_error *
 view_loop(struct tog_view *view)
 {
@@ -456,6 +474,7 @@ view_loop(struct tog_view *view)
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
+	view->focussed = 1;
 	while (!TAILQ_EMPTY(&views) && !done) {
 		err = view_show(view);
 		if (err)
@@ -479,19 +498,24 @@ view_loop(struct tog_view *view)
 				view = dead_view->parent;
 			else
 				view = TAILQ_LAST(&views, tog_view_list_head);
+			if (view)
+				view->focussed = 1;
 			err = view_close(dead_view);
 			if (err)
 				goto done;
 		}
 		if (new_view) {
+			view->focussed = 0;
 			/* TODO: de-duplicate! */
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
 			if (new_view->parent) {
 				err = view_set_child(new_view->parent, new_view);
 				if (err)
 					goto done;
+				new_view->parent->focussed = 0;
 			}
 			view = new_view;
+			view->focussed = 1;
 		}
 	}
 done:
@@ -951,7 +975,11 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 
 	werase(view->window);
 
+	if (view_needs_focus_indication(view))
+		wstandout(view->window);
 	waddwstr(view->window, wline);
+	if (view_needs_focus_indication(view))
+		wstandend(view->window);
 	if (width < view->ncols)
 		waddch(view->window, '\n');
 	free(wline);
@@ -1114,7 +1142,7 @@ set_child_log_view(struct tog_view *view, struct tog_view *child)
 	ds = &child->state.diff;
 
 	TAILQ_FOREACH(commit, &s->commits.head, entry) {
-		if (got_object_id_cmp(commit->id, ds->id) == 0) {
+		if (got_object_id_cmp(commit->id, ds->id2) == 0) {
 			child_entry = commit;
 			break;
 		}
@@ -1224,7 +1252,7 @@ update_diff_child_view(struct tog_view *parent,
 	if (child_view->type != TOG_VIEW_DIFF)
 		return NULL;
 	ds = &child_view->state.diff;
-	if (got_object_id_cmp(ds->id, selected_entry->id) == 0)
+	if (got_object_id_cmp(ds->id2, selected_entry->id) == 0)
 		return NULL;
 
 	err = got_object_open(&obj2, repo, selected_entry->id);
@@ -1478,7 +1506,8 @@ parse_next_line(FILE *f, size_t *len)
 
 static const struct got_error *
 draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines)
+    int *last_displayed_line, int *eof, int max_lines,
+    char * header)
 {
 	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
@@ -1489,6 +1518,25 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 
 	rewind(f);
 	werase(view->window);
+
+	if (header) {
+		err = format_line(&wline, &width, header, view->ncols);
+		if (err) {
+			return err;
+		}
+
+		if (view_needs_focus_indication(view))
+			wstandout(view->window);
+		waddwstr(view->window, wline);
+		if (view_needs_focus_indication(view))
+			wstandend(view->window);
+		if (width < view->ncols)
+			waddch(view->window, '\n');
+
+		if (max_lines <= 1)
+			return NULL;
+		max_lines--;
+	}
 
 	*eof = 0;
 	while (nprinted < max_lines) {
@@ -1554,8 +1602,9 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	fflush(f);
 
-	view->state.diff.id = got_object_get_id(obj2);
-	if (view->state.diff.id == NULL)
+	view->state.diff.id1 = obj1 ? got_object_get_id(obj1) : NULL;
+	view->state.diff.id2 = got_object_get_id(obj2);
+	if (view->state.diff.id2 == NULL)
 		return got_error_from_errno();
 	view->state.diff.f = f;
 	view->state.diff.first_displayed_line = 1;
@@ -1575,17 +1624,40 @@ close_diff_view(struct tog_view *view)
 
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno();
-	free(view->state.diff.id);
+	free(view->state.diff.id1);
+	free(view->state.diff.id2);
 	return err;
 }
 
 static const struct got_error *
 show_diff_view(struct tog_view *view)
 {
+	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
+	char *id_str1 = NULL, *id_str2, *header;
+
+	if (s->id1) {
+		err = got_object_id_str(&id_str1, s->id1);
+		if (err)
+			return err;
+	}
+	err = got_object_id_str(&id_str2, s->id2);
+	if (err)
+		return err;
+
+	if (asprintf(&header, "diff: %s %s",
+	    id_str1 ? id_str1 : "/dev/null", id_str2) == -1) {
+		err = got_error_from_errno();
+		free(id_str1);
+		free(id_str2);
+		return err;
+	}
+	free(id_str1);
+	free(id_str2);
 
 	return draw_file(view, s->f, &s->first_displayed_line,
-	    &s->last_displayed_line, &s->eof, view->nlines);
+	    &s->last_displayed_line, &s->eof, view->nlines,
+	    header);
 }
 
 static const struct got_error *
@@ -1788,7 +1860,11 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	err = format_line(&wline, &width, line, view->ncols);
 	free(line);
 	line = NULL;
+	if (view_needs_focus_indication(view))
+		wstandout(view->window);
 	waddwstr(view->window, wline);
+	if (view_needs_focus_indication(view))
+		wstandend(view->window);
 	free(wline);
 	wline = NULL;
 	if (width < view->ncols)
@@ -2518,7 +2594,11 @@ draw_tree_entries(struct tog_view *view,
 	err = format_line(&wline, &width, label, view->ncols);
 	if (err)
 		return err;
+	if (view_needs_focus_indication(view))
+		wstandout(view->window);
 	waddwstr(view->window, wline);
+	if (view_needs_focus_indication(view))
+		wstandend(view->window);
 	free(wline);
 	wline = NULL;
 	if (width < view->ncols)
