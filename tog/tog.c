@@ -200,7 +200,6 @@ struct tog_view {
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
-	int focussed;
 	struct tog_view *parent;
 	struct tog_view *child;
 
@@ -392,8 +391,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = next;
 			else
 				*focus = TAILQ_FIRST(views);
-			view->focussed = 0;
-			(*focus)->focussed = 1;
 			break;
 		case KEY_BACKSPACE:
 			prev = TAILQ_PREV(view, tog_view_list_head, entry);
@@ -459,7 +456,6 @@ view_loop(struct tog_view *view)
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
-	view->focussed = 1;
 	while (!TAILQ_EMPTY(&views) && !done) {
 		err = view_show(view);
 		if (err)
@@ -495,10 +491,8 @@ view_loop(struct tog_view *view)
 				err = view_set_child(new_view->parent, new_view);
 				if (err)
 					goto done;
-				new_view->parent->focussed = 0;
 			}
 			view = new_view;
-			view->focussed = 1;
 		}
 	}
 done:
