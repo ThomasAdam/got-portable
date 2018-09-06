@@ -47,6 +47,3 @@ struct got_blob_object {
 	uint8_t *read_buf;
 	struct got_object_id id;
 };
-
-struct got_commit_object *got_object_commit_alloc_partial(void);
-struct got_tree_entry *got_alloc_tree_entry_partial(void);
