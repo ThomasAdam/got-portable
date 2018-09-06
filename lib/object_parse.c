@@ -58,6 +58,35 @@
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
+void
+got_object_close(struct got_object *obj)
+{
+	if (obj->refcnt > 0) {
+		obj->refcnt--;
+		if (obj->refcnt > 0)
+			return;
+	}
+
+	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		struct got_delta *delta;
+		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
+			delta = SIMPLEQ_FIRST(&obj->deltas.entries);
+			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
+			got_delta_close(delta);
+		}
+	}
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		free(obj->path_packfile);
+	free(obj);
+}
+
+void
+got_object_qid_free(struct got_object_qid *qid)
+{
+	free(qid->id);
+	free(qid);
+}
+
 static const struct got_error *
 parse_object_header(struct got_object **obj, char *buf, size_t len)
 {
@@ -359,6 +388,30 @@ parse_commit_time(struct tm *tm, char *committer)
 	return NULL;
 }
 
+void
+got_object_commit_close(struct got_commit_object *commit)
+{
+	struct got_object_qid *qid;
+
+	if (commit->refcnt > 0) {
+		commit->refcnt--;
+		if (commit->refcnt > 0)
+			return;
+	}
+
+	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
+		qid = SIMPLEQ_FIRST(&commit->parent_ids);
+		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
+		got_object_qid_free(qid);
+	}
+
+	free(commit->tree_id);
+	free(commit->author);
+	free(commit->committer);
+	free(commit->logmsg);
+	free(commit);
+}
+
 const struct got_error *
 got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len)
 {
@@ -479,12 +532,32 @@ done:
 	return err;
 }
 
-void
-got_object_tree_entry_close(struct got_tree_entry *te)
+static void
+tree_entry_close(struct got_tree_entry *te)
 {
 	free(te->id);
 	free(te->name);
 	free(te);
+}
+
+void
+got_object_tree_close(struct got_tree_object *tree)
+{
+	struct got_tree_entry *te;
+
+	if (tree->refcnt > 0) {
+		tree->refcnt--;
+		if (tree->refcnt > 0)
+			return;
+	}
+
+	while (!SIMPLEQ_EMPTY(&tree->entries.head)) {
+		te = SIMPLEQ_FIRST(&tree->entries.head);
+		SIMPLEQ_REMOVE_HEAD(&tree->entries.head, entry);
+		tree_entry_close(te);
+	}
+
+	free(tree);
 }
 
 struct got_tree_entry *
@@ -549,7 +622,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	*elen += SHA1_DIGEST_LENGTH;
 done:
 	if (err) {
-		got_object_tree_entry_close(*te);
+		tree_entry_close(*te);
 		*te = NULL;
 	}
 	return err;

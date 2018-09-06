@@ -224,28 +224,6 @@ got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
 	return got_object_open(obj, repo, &id);
 }
 
-void
-got_object_close(struct got_object *obj)
-{
-	if (obj->refcnt > 0) {
-		obj->refcnt--;
-		if (obj->refcnt > 0)
-			return;
-	}
-
-	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
-		struct got_delta *delta;
-		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
-			delta = SIMPLEQ_FIRST(&obj->deltas.entries);
-			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
-			got_delta_close(delta);
-		}
-	}
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		free(obj->path_packfile);
-	free(obj);
-}
-
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id)
@@ -289,13 +267,6 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 	return NULL;
 }
 
-void
-got_object_qid_free(struct got_object_qid *qid)
-{
-	free(qid->id);
-	free(qid);
-}
-
 const struct got_error *
 got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
@@ -335,30 +306,6 @@ got_object_commit_open(struct got_commit_object **commit,
 	}
 
 	return err;
-}
-
-void
-got_object_commit_close(struct got_commit_object *commit)
-{
-	struct got_object_qid *qid;
-
-	if (commit->refcnt > 0) {
-		commit->refcnt--;
-		if (commit->refcnt > 0)
-			return;
-	}
-
-	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
-		qid = SIMPLEQ_FIRST(&commit->parent_ids);
-		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
-		got_object_qid_free(qid);
-	}
-
-	free(commit->tree_id);
-	free(commit->author);
-	free(commit->committer);
-	free(commit->logmsg);
-	free(commit);
 }
 
 const struct got_error *
@@ -423,26 +370,6 @@ got_object_open_as_tree(struct got_tree_object **tree,
 done:
 	got_object_close(obj);
 	return err;
-}
-
-void
-got_object_tree_close(struct got_tree_object *tree)
-{
-	struct got_tree_entry *te;
-
-	if (tree->refcnt > 0) {
-		tree->refcnt--;
-		if (tree->refcnt > 0)
-			return;
-	}
-
-	while (!SIMPLEQ_EMPTY(&tree->entries.head)) {
-		te = SIMPLEQ_FIRST(&tree->entries.head);
-		SIMPLEQ_REMOVE_HEAD(&tree->entries.head, entry);
-		got_object_tree_entry_close(te);
-	}
-
-	free(tree);
 }
 
 const struct got_tree_entries *
