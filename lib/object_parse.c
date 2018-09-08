@@ -105,7 +105,7 @@ request_object(struct got_object **obj, struct got_repository *repo, int fd)
 }
 
 static void
-exec_privsep_child(int imsg_fds[2], const char *path)
+exec_privsep_child(int imsg_fds[2], const char *path, const char *repo_path)
 {
 	close(imsg_fds[0]);
 
@@ -120,7 +120,7 @@ exec_privsep_child(int imsg_fds[2], const char *path)
 		_exit(1);
 	}
 
-	if (execl(path, path, (char *)NULL) == -1) {
+	if (execl(path, path, repo_path, (char *)NULL) == -1) {
 		fprintf(stderr, "%s: %s: %s\n", getprogname(), path,
 		    strerror(errno));
 		_exit(1);
@@ -149,7 +149,8 @@ got_object_read_header_privsep(struct got_object **obj,
 	if (pid == -1)
 		return got_error_from_errno();
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT);
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
+		    repo->path);
 		/* not reached */
 	}
 
@@ -645,7 +646,8 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 	if (pid == -1)
 		return got_error_from_errno();
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT);
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
+		    repo->path);
 		/* not reached */
 	}
 
@@ -697,7 +699,8 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 	if (pid == -1)
 		return got_error_from_errno();
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE);
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
+		    repo->path);
 		/* not reached */
 	}
 
@@ -762,7 +765,8 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	if (pid == -1)
 		return got_error_from_errno();
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB);
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
+		    repo->path);
 		/* not reached */
 	}
 
