@@ -14,8 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include <limits.h>
 #include <stdlib.h>
@@ -25,6 +28,8 @@
 #include <zlib.h>
 #include <errno.h>
 #include <libgen.h>
+#include <stdint.h>
+#include <imsg.h>
 
 #include "got_error.h"
 #include "got_reference.h"
@@ -40,6 +45,7 @@
 #include "got_lib_repository.h"
 #include "got_lib_worktree.h"
 #include "got_lib_object_idcache.h"
+#include "got_lib_privsep.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -391,7 +397,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
 	char *abspath, *normpath = NULL;
-	int tried_root = 0;
+	int i, tried_root = 0;
 
 	*repop = NULL;
 
@@ -406,6 +412,11 @@ got_repo_open(struct got_repository **repop, const char *path)
 	if (repo == NULL) {
 		err = got_error_from_errno();
 		goto done;
+	}
+
+	for (i = 0; i < nitems(repo->privsep_children); i++) {
+		repo->privsep_children[i].imsg_fd = -1;
+		repo->privsep_children[i].pid = 0;
 	}
 
 	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
@@ -460,7 +471,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 	} while (path);
 done:
 	if (err)
-		got_repo_close(repo);
+		err = got_repo_close(repo);
 	else
 		*repop = repo;
 	free(abspath);
@@ -516,9 +527,26 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 }
 #endif
 
-void
+static const struct got_error *
+wait_for_child(pid_t pid)
+{
+	int child_status;
+
+	waitpid(pid, &child_status, 0);
+
+	if (!WIFEXITED(child_status))
+		return got_error(GOT_ERR_PRIVSEP_DIED);
+
+	if (WEXITSTATUS(child_status) != 0)
+		return got_error(GOT_ERR_PRIVSEP_EXIT);
+
+	return NULL;
+}
+
+const struct got_error *
 got_repo_close(struct got_repository *repo)
 {
+	const struct got_error *err = NULL, *child_err;
 	int i;
 
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
@@ -554,7 +582,19 @@ got_repo_close(struct got_repository *repo)
 		got_object_idcache_free(repo->treecache.idcache);
 	if (repo->commitcache.idcache)
 		got_object_idcache_free(repo->commitcache.idcache);
+
+	for (i = 0; i < nitems(repo->privsep_children); i++) {
+		if (repo->privsep_children[i].imsg_fd == -1)
+			continue;
+		err = got_privsep_send_stop(repo->privsep_children[i].imsg_fd);
+		child_err = wait_for_child(repo->privsep_children[i].pid);
+		if (child_err && err == NULL)
+			err = child_err;
+		close(repo->privsep_children[i].imsg_fd);
+	}
 	free(repo);
+
+	return err;
 }
 
 const struct got_error *

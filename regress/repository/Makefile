@@ -6,7 +6,9 @@ SRCS = path.c repository.c error.c reference.c object.c object_idcache.c \
 	pack.c privsep.c delta.c fileindex.c worktree.c inflate.c \
 	repository_test.c
 
-CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
+GOT_LIBEXECDIR = ${HOME}/bin
+CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib \
+	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
 LDADD = -lutil -lz
 DEBUG = -O0 -g
 CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable

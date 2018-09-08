@@ -45,8 +45,8 @@
 #include "got_lib_path.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
-#include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_object_parse.h"
 #include "got_lib_repository.h"
 
 #ifndef MIN
@@ -194,7 +194,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		if (*obj == NULL)
 			err = got_error(GOT_ERR_NO_OBJ);
 	} else {
-		err = got_object_read_header_privsep(obj, fd);
+		err = got_object_read_header_privsep(obj, repo, fd);
 		if (err)
 			goto done;
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
@@ -296,7 +296,7 @@ got_object_commit_open(struct got_commit_object **commit,
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
-		err = got_object_read_commit_privsep(commit, obj, fd);
+		err = got_object_read_commit_privsep(commit, obj, fd, repo);
 		close(fd);
 	}
 
@@ -337,7 +337,7 @@ got_object_tree_open(struct got_tree_object **tree,
 		err = open_loose_object(&fd, obj, repo);
 		if (err)
 			return err;
-		err = got_object_read_tree_privsep(tree, obj, fd);
+		err = got_object_read_tree_privsep(tree, obj, fd, repo);
 		close(fd);
 	}
 
@@ -420,7 +420,7 @@ got_object_blob_open(struct got_blob_object **blob,
 			goto done;
 		}
 
-		err = got_object_read_blob_privsep(&size, outfd, infd);
+		err = got_object_read_blob_privsep(&size, outfd, infd, repo);
 		close(infd);
 		if (err)
 			goto done;

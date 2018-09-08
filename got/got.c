@@ -190,7 +190,8 @@ cmd_checkout(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 1) {
@@ -507,7 +508,8 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -623,8 +625,12 @@ done:
 	if (obj)
 		got_object_close(obj);
 	free(id);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *repo_error;
+		repo_error = got_repo_close(repo);
+		if (error == NULL)
+			error = repo_error;
+	}
 	return error;
 }
 
@@ -648,7 +654,8 @@ cmd_diff(int argc, char *argv[])
 	int ch;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -731,8 +738,12 @@ done:
 		free(id1);
 	if (id2)
 		free(id2);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *repo_error;
+		repo_error = got_repo_close(repo);
+		if (error == NULL)
+			error = repo_error;
+	}
 	return error;
 }
 
@@ -755,7 +766,8 @@ cmd_blame(int argc, char *argv[])
 	int ch;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -830,8 +842,12 @@ done:
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *repo_error;
+		repo_error = got_repo_close(repo);
+		if (error == NULL)
+			error = repo_error;
+	}
 	return error;
 }
 

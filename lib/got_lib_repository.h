@@ -44,6 +44,11 @@ struct got_object_cache {
 	int cache_miss;
 };
 
+struct got_privsep_child {
+	int imsg_fd;
+	pid_t pid;
+};
+
 struct got_repository {
 	char *path;
 	char *path_git_dir;
@@ -54,7 +59,17 @@ struct got_repository {
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
-	/* Caches for opened objects. */
+	/* Handles to child processes for reading pack files. */
+	struct got_privsep_child pack_privsep_children[GOT_PACK_CACHE_SIZE];
+
+	/* Handles to child processes for reading loose objects. */
+	 struct got_privsep_child privsep_children[4];
+#define GOT_REPO_PRIVSEP_CHILD_OBJECT	0
+#define GOT_REPO_PRIVSEP_CHILD_COMMIT	1
+#define GOT_REPO_PRIVSEP_CHILD_TREE	2
+#define GOT_REPO_PRIVSEP_CHILD_BLOB	3
+
+	/* Caches for open objects. */
 	struct got_object_cache objcache;
 	struct got_object_cache treecache;
 	struct got_object_cache commitcache;

@@ -1,14 +1,10 @@
-.PATH:${.CURDIR}/../lib
+.PATH:${.CURDIR}/../../lib
 
-PROG=		got
-SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
-		diffreg.c error.c fileindex.c object.c object_idcache.c \
-		object_idset.c object_parse.c opentemp.c path.c pack.c \
-		privsep.c reference.c repository.c sha1.c worktree.c inflate.c
+PROG=		got-read-commit
+SRCS=		got-read-commit.c delta.c error.c inflate.c object_parse.c \
+		privsep.c sha1.c
 
-GOT_LIBEXECDIR = ${HOME}/bin
-CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
-	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
+CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
 DPADD = ${LIBZ} ${LIBUTIL}
 .if defined(PROFILE)
@@ -23,10 +19,11 @@ CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 #CFLAGS += -DGOT_NO_OBJ_CACHE
 
 # For now, default to installing binary in ~/bin
+LIBEXECDIR = ${HOME}/bin
 GROUP!=id -g -n
 install:
 	${INSTALL} ${INSTALL_COPY} -o ${USER} -g ${GROUP} \
-	-m ${BINMODE} ${PROG} ${HOME}/bin/${PROG}
+	-m ${BINMODE} ${PROG} ${LIBEXECDIR}/${PROG}
 
 # Don't install man pages yet
 NOMAN = Yes

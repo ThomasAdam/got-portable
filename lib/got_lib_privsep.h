@@ -24,18 +24,41 @@
  * if necessary. File descriptors are used in cases where this is impractical,
  * such as when accessing pack files or when transferring large blobs.
  *
- * We currently do not exec(2) after a fork(2).
- * To achieve fork+exec, relevant parts of our library functionality could
- * be made accessible via separate executables in a libexec directory.
+ * We exec(2) after a fork(2). Parts of our library functionality are
+ * accessible via separate executables in a libexec directory.
  */
+
+#define GOT_IMSG_FD_CHILD (STDERR_FILENO + 1)
+
+#ifndef GOT_LIBEXECDIR
+#define GOT_LIBEXECDIR /usr/libexec
+#endif
+
+/* Names of helper programs in libexec directory */
+#define GOT_PROG_READ_OBJECT	got-read-object
+#define GOT_PROG_READ_TREE	got-read-tree
+#define GOT_PROG_READ_COMMIT	got-read-commit
+#define GOT_PROG_READ_BLOB	got-read-blob
+
+#define GOT_STRINGIFY(x) #x
+#define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
+
+/* Paths to helper programs in libexec directory */
+#define GOT_PATH_PROG_READ_OBJECT \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_OBJECT)
+#define GOT_PATH_PROG_READ_TREE \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_TREE)
+#define GOT_PATH_PROG_READ_COMMIT \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_COMMIT)
+#define GOT_PATH_PROG_READ_BLOB \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_BLOB)
 
 enum got_imsg_type {
 	/* An error occured while processing a request. */
 	GOT_IMSG_ERROR,
 
-	/* Messages for transmitting deltas and associated delta streams. */
-	GOT_IMSG_DELTA,
-	GOT_IMSG_DELTA_STREAM,
+	/* Stop the child process. */
+	GOT_IMSG_STOP,
 
 	/*
 	 * Messages concerned with read access to objects in a repository.
@@ -45,11 +68,19 @@ enum got_imsg_type {
 	 * separate process which runs under pledge("stdio").
 	 * This sandboxes our own repository parsing code, as well as zlib.
 	 */
+	GOT_IMSG_OBJECT_REQUEST,
 	GOT_IMSG_OBJECT,
+	GOT_IMSG_COMMIT_REQUEST,
 	GOT_IMSG_COMMIT,
+	GOT_IMSG_TREE_REQUEST,
 	GOT_IMSG_TREE,
 	GOT_IMSG_TREE_ENTRY,
+	GOT_IMSG_BLOB_REQUEST,
+	GOT_IMSG_BLOB_OUTFD,
 	GOT_IMSG_BLOB,
+	/* Messages for transmitting deltas and associated delta streams: */
+	GOT_IMSG_DELTA,
+	GOT_IMSG_DELTA_STREAM,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -84,7 +115,10 @@ struct got_imsg_delta_stream {
 	 */
 };
 
-/* Structure for GOT_IMSG_OBJECT data. */
+/*
+ * Structure for GOT_IMSG_TREE_REQUEST, GOT_IMSG_COMMIT_REQUEST,
+ * and GOT_IMSG_OBJECT data.
+ */
 struct got_imsg_object {
 	/* These fields are the same as in struct got_object. */
 	int type;
@@ -132,7 +166,13 @@ struct got_imsg_blob {
 	size_t size;
 };
 
+const struct got_error *got_privsep_send_stop(int);
+const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
+    size_t);
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
+const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
+    struct got_object *);
+const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *, int);
 const struct got_error *got_privsep_recv_obj(struct got_object **,

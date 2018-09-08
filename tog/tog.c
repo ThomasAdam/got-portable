@@ -1398,7 +1398,8 @@ cmd_log(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -1753,7 +1754,8 @@ cmd_diff(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -2485,7 +2487,8 @@ cmd_blame(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -3051,7 +3054,8 @@ cmd_tree(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 

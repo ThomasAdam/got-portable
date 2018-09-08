@@ -87,8 +87,8 @@ read_imsg(struct imsgbuf *ibuf)
 	return NULL;
 }
 
-static const struct got_error *
-recv_one_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
+const struct got_error *
+got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 {
 	const struct got_error *err;
 	ssize_t n;
@@ -177,6 +177,84 @@ flush_imsg(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_stop(int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf ibuf;
+
+	imsg_init(&ibuf, fd);
+
+	if (imsg_compose(&ibuf, GOT_IMSG_STOP, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno();
+
+	err = flush_imsg(&ibuf);
+	imsg_clear(&ibuf);
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
+{
+	struct got_imsg_object iobj, *iobjp = NULL;
+	size_t iobj_size = 0;
+	int imsg_code = GOT_IMSG_OBJECT_REQUEST;
+
+	if (obj) {
+		switch (obj->type) {
+		case GOT_OBJ_TYPE_TREE:
+			imsg_code = GOT_IMSG_TREE_REQUEST;
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			imsg_code = GOT_IMSG_COMMIT_REQUEST;
+			break;
+		default:
+			return got_error(GOT_ERR_OBJ_TYPE);
+		}
+
+		iobj.type = obj->type;
+		iobj.flags = obj->flags;
+		iobj.hdrlen = obj->hdrlen;
+		iobj.size = obj->size;
+		iobj.ndeltas = 0;
+
+		iobjp = &iobj;
+		iobj_size = sizeof(iobj);
+	}
+
+	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_blob_req(struct imsgbuf *ibuf, int outfd, int infd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, NULL, 0)
+	    == -1) {
+		close(infd);
+		close(outfd);
+		return got_error_from_errno();
+	}
+
+	err = flush_imsg(ibuf);
+	if (err) {
+		close(outfd);
+		return err;
+	}
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
+	    == -1) {
+		close(outfd);
+		return got_error_from_errno();
+	}
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj, int ndeltas)
 {
 	struct got_imsg_object iobj;
@@ -211,7 +289,7 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 
 	*obj = NULL;
 
-	err = recv_one_imsg(&imsg, ibuf, min_datalen);
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
 	if (err)
 		return err;
 
@@ -326,7 +404,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 	*commit = NULL;
 
-	err = recv_one_imsg(&imsg, ibuf, min_datalen);
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
 	if (err)
 		return err;
 
@@ -641,7 +719,7 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 	struct got_imsg_blob iblob;
 	size_t datalen;
 
-	err = recv_one_imsg(&imsg, ibuf, 0);
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
 

@@ -18,7 +18,7 @@ struct got_repository;
 
 /* Open and close repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *);
-void got_repo_close(struct got_repository*);
+const struct got_error *got_repo_close(struct got_repository*);
 
 /*
  * Obtain paths to various directories within a repository.

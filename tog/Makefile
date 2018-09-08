@@ -7,7 +7,9 @@ SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
 		utf8.c inflate.c
 
-CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
+GOT_LIBEXECDIR = ${HOME}/bin
+CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
+	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
 LDADD = -lpanel -lncursesw -lutil -lz -lpthread
 DPADD = ${LIBZ} ${LIBUTIL}
 .if defined(PROFILE)
