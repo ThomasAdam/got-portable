@@ -47,6 +47,7 @@ struct got_object_cache {
 struct got_privsep_child {
 	int imsg_fd;
 	pid_t pid;
+	struct imsgbuf *ibuf;
 };
 
 struct got_repository {

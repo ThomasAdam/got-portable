@@ -93,18 +93,15 @@ static const struct got_error *
 request_object(struct got_object **obj, struct got_repository *repo, int fd)
 {
 	const struct got_error *err = NULL;
-	struct imsgbuf ibuf;
+	struct imsgbuf *ibuf;
 
-	imsg_init(&ibuf,
-	    repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd);
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
 
-	err = got_privsep_send_obj_req(&ibuf, fd, NULL);
+	err = got_privsep_send_obj_req(ibuf, fd, NULL);
 	if (err)
-		goto done;
-	err = got_privsep_recv_obj(obj, &ibuf);
-done:
-	imsg_clear(&ibuf);
-	return err;
+		return err;
+
+	return got_privsep_recv_obj(obj, ibuf);
 }
 
 static void
@@ -136,9 +133,14 @@ got_object_read_header_privsep(struct got_object **obj,
 {
 	int imsg_fds[2];
 	pid_t pid;
+	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
 		return request_object(obj, repo, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -155,6 +157,8 @@ got_object_read_header_privsep(struct got_object **obj,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf = ibuf;
 
 	return request_object(obj, repo, obj_fd);
 }
@@ -608,19 +612,15 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
     struct got_object *obj, int fd)
 {
 	const struct got_error *err = NULL;
-	struct imsgbuf ibuf;
+	struct imsgbuf *ibuf;
 
-	imsg_init(&ibuf, 
-	    repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd);
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
 
-	err = got_privsep_send_obj_req(&ibuf, fd,obj);
+	err = got_privsep_send_obj_req(ibuf, fd,obj);
 	if (err)
-		goto done;
+		return err;
 
-	err = got_privsep_recv_commit(commit, &ibuf);
-done:
-	imsg_clear(&ibuf);
-	return err;
+	return got_privsep_recv_commit(commit, ibuf);
 }
 
 const struct got_error *
@@ -629,9 +629,14 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 {
 	int imsg_fds[2];
 	pid_t pid;
+	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
 		return request_commit(commit, repo, obj, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -648,6 +653,8 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
 
 	return request_commit(commit, repo, obj, obj_fd);
 }
@@ -657,19 +664,15 @@ request_tree(struct got_tree_object **tree, struct got_repository *repo,
     struct got_object *obj, int fd)
 {
 	const struct got_error *err = NULL;
-	struct imsgbuf ibuf;
+	struct imsgbuf *ibuf;
 
-	imsg_init(&ibuf, 
-	    repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd);
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
 
-	err = got_privsep_send_obj_req(&ibuf, fd,obj);
+	err = got_privsep_send_obj_req(ibuf, fd,obj);
 	if (err)
-		goto done;
+		return err;
 
-	err = got_privsep_recv_tree(tree, &ibuf);
-done:
-	imsg_clear(&ibuf);
-	return err;
+	return got_privsep_recv_tree(tree, ibuf);
 }
 
 const struct got_error *
@@ -678,9 +681,14 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 {
 	int imsg_fds[2];
 	pid_t pid;
+	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd != -1)
 		return request_tree(tree, repo, obj, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -694,9 +702,13 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 	}
 
 	close(imsg_fds[1]);
+
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf = ibuf;
+
 
 	return request_tree(tree, repo, obj, obj_fd);
 }
@@ -705,28 +717,26 @@ static const struct got_error *
 request_blob(size_t *size, int outfd, int infd, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct imsgbuf ibuf;
 	int outfd_child;
+	struct imsgbuf *ibuf;
 
 	outfd_child = dup(outfd);
 	if (outfd_child == -1)
 		return got_error_from_errno();
 
-	imsg_init(&ibuf, 
-	    repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd);
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
 
-	err = got_privsep_send_blob_req(&ibuf, outfd_child, infd);
+	err = got_privsep_send_blob_req(ibuf, outfd_child, infd);
 	if (err)
-		goto done;
+		return err;
 
-	err = got_privsep_recv_blob(size, &ibuf);
+	err = got_privsep_recv_blob(size, ibuf);
 	if (err)
-		goto done;
+		return err;
 
 	if (lseek(outfd, SEEK_SET, 0) == -1)
-		err = got_error_from_errno();
-done:
-	imsg_clear(&ibuf);
+		return got_error_from_errno();
+
 	return err;
 }
 
@@ -736,9 +746,14 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 {
 	int imsg_fds[2];
 	pid_t pid;
+	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1)
 		return request_blob(size, outfd, infd, repo);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
 		return got_error_from_errno();
@@ -755,6 +770,8 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
 
 	return request_blob(size, outfd, infd, repo);
 }

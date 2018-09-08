@@ -415,8 +415,9 @@ got_repo_open(struct got_repository **repop, const char *path)
 	}
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
+		memset(&repo->privsep_children[i], 0,
+		    sizeof(repo->privsep_children[0]));
 		repo->privsep_children[i].imsg_fd = -1;
-		repo->privsep_children[i].pid = 0;
 	}
 
 	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
@@ -586,6 +587,8 @@ got_repo_close(struct got_repository *repo)
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		if (repo->privsep_children[i].imsg_fd == -1)
 			continue;
+		imsg_clear(repo->privsep_children[i].ibuf);
+		free(repo->privsep_children[i].ibuf);
 		err = got_privsep_send_stop(repo->privsep_children[i].imsg_fd);
 		child_err = wait_for_child(repo->privsep_children[i].pid);
 		if (child_err && err == NULL)
