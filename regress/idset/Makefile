@@ -7,8 +7,6 @@ SRCS = error.c object.c privsep.c sha1.c pack.c inflate.c path.c opentemp.c \
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
-DEBUG = -O0 -g
-CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 
 NOMAN = yes
 

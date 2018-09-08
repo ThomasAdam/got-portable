@@ -6,21 +6,10 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
 		privsep.c reference.c repository.c sha1.c worktree.c inflate.c
 
-GOT_LIBEXECDIR = ${HOME}/bin
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
 	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
 LDADD = -lutil -lz
 DPADD = ${LIBZ} ${LIBUTIL}
-.if defined(PROFILE)
-CC = gcc
-CPPFLAGS += -DPROFILE
-DEBUG = -O0 -pg
-.else
-DEBUG = -O0 -g
-.endif
-CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
-#CFLAGS += -DGOT_PACK_NO_MMAP
-#CFLAGS += -DGOT_NO_OBJ_CACHE
 
 # For now, default to installing binary in ~/bin
 GROUP!=id -g -n
