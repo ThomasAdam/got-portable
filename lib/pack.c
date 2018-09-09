@@ -1254,7 +1254,7 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 
 static const struct got_error *
 dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
-    const char *path_packfile, FILE *outfile, struct got_repository *repo)
+    struct got_pack *pack, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1293,7 +1293,6 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		if (n == 0) {
-			struct got_pack *pack;
 			size_t base_len, mapoff;
 			off_t delta_data_offset;
 
@@ -1302,12 +1301,6 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			    delta->type != GOT_OBJ_TYPE_TREE &&
 			    delta->type != GOT_OBJ_TYPE_BLOB &&
 			    delta->type != GOT_OBJ_TYPE_TAG) {
-				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
-				goto done;
-			}
-
-			pack = get_cached_pack(path_packfile, repo);
-			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
 			}
@@ -1513,11 +1506,19 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct got_pack *pack;
 
 	*f = NULL;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	pack = get_cached_pack(obj->path_packfile, repo);
+	if (pack == NULL) {
+		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+		if (err)
+			return err;
+	}
 
 	*f = got_opentemp();
 	if (*f == NULL) {
@@ -1526,15 +1527,6 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	}
 
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
-		struct got_pack *pack;
-
-		pack = get_cached_pack(obj->path_packfile, repo);
-		if (pack == NULL) {
-			err = cache_pack(&pack, obj->path_packfile, NULL, repo);
-			if (err)
-				goto done;
-		}
-
 		if (obj->pack_offset >= pack->filesize) {
 			err = got_error(GOT_ERR_PACK_OFFSET);
 			goto done;
@@ -1552,8 +1544,8 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 			err = got_inflate_to_file_fd(&obj->size, pack->fd, *f);
 		}
 	} else
-		err = dump_delta_chain_to_file(&obj->size,
-		    &obj->deltas, obj->path_packfile, *f, repo);
+		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, pack,
+		    *f);
 done:
 	if (err && *f) {
 		fclose(*f);
