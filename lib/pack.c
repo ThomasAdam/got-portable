@@ -1100,10 +1100,9 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_packidx *packidx,
 }
 
 static const struct got_error *
-open_delta_object(struct got_object **obj, struct got_repository *repo,
-    struct got_packidx *packidx, struct got_pack *pack,
-    struct got_object_id *id, off_t offset, size_t tslen,
-    int delta_type, size_t delta_size)
+open_delta_object(struct got_object **obj, struct got_packidx *packidx,
+    struct got_pack *pack, struct got_object_id *id, off_t offset,
+    size_t tslen, int delta_type, size_t delta_size)
 {
 	const struct got_error *err = NULL;
 	int resolved_type;
@@ -1190,7 +1189,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	case GOT_OBJ_TYPE_REF_DELTA:
-		err = open_delta_object(obj, repo, packidx, pack, id, offset,
+		err = open_delta_object(obj, packidx, pack, id, offset,
 		    tslen, type, size);
 		break;
 
