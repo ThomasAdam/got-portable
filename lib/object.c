@@ -438,6 +438,47 @@ got_object_tree_get_entries(struct got_tree_object *tree)
 	return &tree->entries;
 }
 
+static const struct got_error *
+extract_packed_object(FILE **f, struct got_object *obj,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack *pack;
+	int fd;
+
+	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
+		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	fd = got_opentempfd();
+	if (fd == -1)
+		return got_error_from_errno();
+
+	*f = fdopen(fd, "w+");
+	if (*f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo,
+		    obj->path_packfile, NULL);
+		if (err)
+			goto done;
+	}
+
+	err = got_packfile_extract_object(pack, obj, *f);
+done:
+	if (err) {
+		if (*f == NULL)
+			close(fd);
+		else
+			fclose(*f);
+		*f = NULL;
+	}
+	return err;
+}
+
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
@@ -460,7 +501,7 @@ got_object_blob_open(struct got_blob_object **blob,
 		goto done;
 	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		err = got_packfile_extract_object(&((*blob)->f), obj, repo);
+		err = extract_packed_object(&((*blob)->f), obj, repo);
 		if (err)
 			goto done;
 	} else {

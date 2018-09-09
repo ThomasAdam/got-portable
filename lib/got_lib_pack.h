@@ -162,8 +162,8 @@ int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_pack *, struct got_packidx *, int, struct got_object_id *);
-const struct got_error *got_packfile_extract_object(FILE **,
-    struct got_object *, struct got_repository *);
+const struct got_error *got_packfile_extract_object(struct got_pack *,
+    struct got_object *, FILE *);
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
     struct got_object *, struct got_repository *);
 const struct got_error *got_pack_get_packfile_size(size_t *, const char *);

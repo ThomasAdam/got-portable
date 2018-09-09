@@ -1200,55 +1200,32 @@ done:
 }
 
 const struct got_error *
-got_packfile_extract_object(FILE **f, struct got_object *obj,
-    struct got_repository *repo)
+got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	struct got_pack *pack;
-
-	*f = NULL;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
-	if (pack == NULL) {
-		err = got_repo_cache_pack(&pack, repo, obj->path_packfile, NULL);
-		if (err)
-			return err;
-	}
-
-	*f = got_opentemp();
-	if (*f == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
-		if (obj->pack_offset >= pack->filesize) {
-			err = got_error(GOT_ERR_PACK_OFFSET);
-			goto done;
-		}
+		if (obj->pack_offset >= pack->filesize)
+			return got_error(GOT_ERR_PACK_OFFSET);
 
 		if (pack->map) {
 			size_t mapoff = (size_t)obj->pack_offset;
 			err = got_inflate_to_file_mmap(&obj->size, pack->map,
-			    mapoff, pack->filesize - mapoff, *f);
+			    mapoff, pack->filesize - mapoff, outfile);
 		} else {
-			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1) {
-				err = got_error_from_errno();
-				goto done;
-			}
-			err = got_inflate_to_file_fd(&obj->size, pack->fd, *f);
+			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
+				return got_error_from_errno();
+			err = got_inflate_to_file_fd(&obj->size, pack->fd,
+			    outfile);
 		}
 	} else
 		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, pack,
-		    *f);
-done:
-	if (err && *f) {
-		fclose(*f);
-		*f = NULL;
-	}
+		    outfile);
+
 	return err;
 }
 
