@@ -1146,13 +1146,11 @@ done:
 }
 
 static const struct got_error *
-open_packed_object(struct got_object **obj, struct got_repository *repo,
+open_packed_object(struct got_object **obj, struct got_pack *pack,
     struct got_packidx *packidx, int idx, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	off_t offset;
-	char *path_packfile;
-	struct got_pack *pack;
 	uint8_t type;
 	uint64_t size;
 	size_t tslen;
@@ -1162,6 +1160,45 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	offset = get_object_offset(packidx, idx);
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
+
+	err = parse_object_type_and_size(&type, &size, &tslen, pack, offset);
+	if (err)
+		return err;
+
+	switch (type) {
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_BLOB:
+	case GOT_OBJ_TYPE_TAG:
+		err = open_plain_object(obj, pack->path_packfile, id, type,
+		    offset + tslen, size);
+		break;
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	case GOT_OBJ_TYPE_REF_DELTA:
+		err = open_delta_object(obj, packidx, pack, id, offset,
+		    tslen, type, size);
+		break;
+	default:
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		break;
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_packidx *packidx = NULL;
+	struct got_pack *pack;
+	int idx;
+	char *path_packfile;
+
+	err = search_packidx(&packidx, &idx, repo, id);
+	if (err)
+		return err;
 
 	err = get_packfile_path(&path_packfile, packidx);
 	if (err)
@@ -1174,51 +1211,13 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 			goto done;
 	}
 
-	err = parse_object_type_and_size(&type, &size, &tslen, pack, offset);
+	err = open_packed_object(obj, pack, packidx, idx, id);
 	if (err)
 		goto done;
-
-	switch (type) {
-	case GOT_OBJ_TYPE_COMMIT:
-	case GOT_OBJ_TYPE_TREE:
-	case GOT_OBJ_TYPE_BLOB:
-	case GOT_OBJ_TYPE_TAG:
-		err = open_plain_object(obj, path_packfile, id, type,
-		    offset + tslen, size);
-		break;
-
-	case GOT_OBJ_TYPE_OFFSET_DELTA:
-	case GOT_OBJ_TYPE_REF_DELTA:
-		err = open_delta_object(obj, packidx, pack, id, offset,
-		    tslen, type, size);
-		break;
-
-	default:
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-done:
-	free(path_packfile);
-	return err;
-}
-
-const struct got_error *
-got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_packidx *packidx = NULL;
-	int idx;
-
-	err = search_packidx(&packidx, &idx, repo, id);
-	if (err)
-		return err;
-
-	err = open_packed_object(obj, repo, packidx, idx, id);
-	if (err)
-		return err;
 
 	err = cache_pack(NULL, (*obj)->path_packfile, packidx, repo);
+done:
+	free(path_packfile);
 	return err;
 }
 
