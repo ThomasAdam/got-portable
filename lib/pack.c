@@ -19,7 +19,6 @@
 #include <sys/queue.h>
 #include <sys/mman.h>
 
-#include <dirent.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
@@ -48,16 +47,6 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_PACK_PREFIX		"pack-"
-#define GOT_PACKFILE_SUFFIX	".pack"
-#define GOT_PACKIDX_SUFFIX		".idx"
-#define GOT_PACKFILE_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
-				SHA1_DIGEST_STRING_LENGTH - 1 + \
-				strlen(GOT_PACKFILE_SUFFIX))
-#define GOT_PACKIDX_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
-				SHA1_DIGEST_STRING_LENGTH - 1 + \
-				strlen(GOT_PACKIDX_SUFFIX))
-
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
@@ -75,8 +64,8 @@ verify_fanout_table(uint32_t *fanout_table)
 	return NULL;
 }
 
-static const struct got_error *
-get_packfile_size(size_t *size, const char *path)
+const struct got_error *
+got_pack_get_packfile_size(size_t *size, const char *path)
 {
 	struct stat sb;
 	char *dot;
@@ -367,7 +356,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	if (p->fd == -1)
 		return got_error_from_errno();
 
-	err = get_packfile_size(&p->len, path);
+	err = got_pack_get_packfile_size(&p->len, path);
 	if (err) {
 		close(p->fd);
 		free(p);
@@ -427,22 +416,6 @@ got_packidx_close(struct got_packidx *packidx)
 	return err;
 }
 
-static int
-is_packidx_filename(const char *name, size_t len)
-{
-	if (len != GOT_PACKIDX_NAMELEN)
-		return 0;
-
-	if (strncmp(name, GOT_PACK_PREFIX, strlen(GOT_PACK_PREFIX)) != 0)
-		return 0;
-
-	if (strcmp(name + strlen(GOT_PACK_PREFIX) +
-	    SHA1_DIGEST_STRING_LENGTH - 1, GOT_PACKIDX_SUFFIX) != 0)
-		return 0;
-
-	return 1;
-}
-
 static off_t
 get_object_offset(struct got_packidx *packidx, int idx)
 {
@@ -460,8 +433,8 @@ get_object_offset(struct got_packidx *packidx, int idx)
 	return (off_t)(offset & GOT_PACKIDX_OFFSET_VAL_MASK);
 }
 
-static int
-get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
+int
+got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
 {
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
@@ -489,100 +462,6 @@ get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
 }
 
 static const struct got_error *
-cache_packidx(struct got_packidx *packidx, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	int i;
-
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
-		if (repo->packidx_cache[i] == NULL)
-			break;
-	}
-
-	if (i == nitems(repo->packidx_cache)) {
-		err = got_packidx_close(repo->packidx_cache[i - 1]);
-		if (err)
-			return err;
-		memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
-		    sizeof(repo->packidx_cache) -
-		    sizeof(repo->packidx_cache[0]));
-		i = 0;
-	}
-
-	repo->packidx_cache[i] = packidx;
-	return NULL;
-}
-
-static const struct got_error *
-search_packidx(struct got_packidx **packidx, int *idx,
-    struct got_repository *repo, struct got_object_id *id)
-{
-	const struct got_error *err;
-	char *path_packdir;
-	DIR *packdir;
-	struct dirent *dent;
-	char *path_packidx;
-	int i;
-
-	/* Search pack index cache. */
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
-		if (repo->packidx_cache[i] == NULL)
-			break;
-		*idx = get_object_idx(repo->packidx_cache[i], id);
-		if (*idx != -1) {
-			*packidx = repo->packidx_cache[i];
-			return NULL;
-		}
-	}
-	/* No luck. Search the filesystem. */
-
-	path_packdir = got_repo_get_path_objects_pack(repo);
-	if (path_packdir == NULL)
-		return got_error_from_errno();
-
-	packdir = opendir(path_packdir);
-	if (packdir == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	while ((dent = readdir(packdir)) != NULL) {
-		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
-			continue;
-
-		if (asprintf(&path_packidx, "%s/%s", path_packdir,
-		    dent->d_name) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
-
-		err = got_packidx_open(packidx, path_packidx, 0);
-		free(path_packidx);
-		if (err)
-			goto done;
-
-		*idx = get_object_idx(*packidx, id);
-		if (*idx != -1) {
-			err = NULL; /* found the object */
-			err = cache_packidx(*packidx, repo);
-			goto done;
-		}
-
-		err = got_packidx_close(*packidx);
-		*packidx = NULL;
-		if (err)
-			goto done;
-	}
-
-	err = got_error(GOT_ERR_NO_OBJ);
-done:
-	free(path_packdir);
-	if (packdir && closedir(packdir) != 0 && err == 0)
-		err = got_error_from_errno();
-	return err;
-}
-
-static const struct got_error *
 get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 {
 	size_t size;
@@ -607,47 +486,6 @@ get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 	return NULL;
 }
 
-static const struct got_error *
-read_packfile_hdr(int fd, struct got_packidx *packidx)
-{
-	const struct got_error *err = NULL;
-	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
-	struct got_packfile_hdr hdr;
-	ssize_t n;
-
-	n = read(fd, &hdr, sizeof(hdr));
-	if (n < 0)
-		return got_error_from_errno();
-	if (n != sizeof(hdr))
-		return got_error(GOT_ERR_BAD_PACKFILE);
-
-	if (betoh32(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
-	    betoh32(hdr.version) != GOT_PACKFILE_VERSION ||
-	    betoh32(hdr.nobjects) != totobj)
-		err = got_error(GOT_ERR_BAD_PACKFILE);
-
-	return err;
-}
-
-static const struct got_error *
-open_packfile(int *fd, const char *path_packfile, struct got_packidx *packidx)
-{
-	const struct got_error *err = NULL;
-
-	*fd = open(path_packfile, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
-	if (*fd == -1)
-		return got_error_from_errno();
-
-	if (packidx) {
-		err = read_packfile_hdr(*fd, packidx);
-		if (err) {
-			close(*fd);
-			*fd = -1;
-		}
-	}
-	return err;
-}
-
 const struct got_error *
 got_pack_close(struct got_pack *pack)
 {
@@ -662,84 +500,6 @@ got_pack_close(struct got_pack *pack)
 	pack->filesize = 0;
 
 	return err;
-}
-
-static const struct got_error *
-cache_pack(struct got_pack **packp, const char *path_packfile,
-    struct got_packidx *packidx, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pack *pack = NULL;
-	int i;
-
-	if (packp)
-		*packp = NULL;
-
-	for (i = 0; i < nitems(repo->packs); i++) {
-		pack = &repo->packs[i];
-		if (pack->path_packfile == NULL)
-			break;
-		if (strcmp(pack->path_packfile, path_packfile) == 0)
-			return NULL;
-	}
-
-	if (i == nitems(repo->packs) - 1) {
-		err = got_pack_close(&repo->packs[i - 1]);
-		if (err)
-			return err;
-		memmove(&repo->packs[1], &repo->packs[0],
-		    sizeof(repo->packs) - sizeof(repo->packs[0]));
-		i = 0;
-	}
-
-	pack = &repo->packs[i];
-
-	pack->path_packfile = strdup(path_packfile);
-	if (pack->path_packfile == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	err = open_packfile(&pack->fd, path_packfile, packidx);
-	if (err)
-		goto done;
-
-	err = get_packfile_size(&pack->filesize, path_packfile);
-	if (err)
-		goto done;
-
-#ifndef GOT_PACK_NO_MMAP
-	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
-	    pack->fd, 0);
-	if (pack->map == MAP_FAILED)
-		pack->map = NULL; /* fall back to read(2) */
-#endif
-done:
-	if (err) {
-		if (pack) {
-			free(pack->path_packfile);
-			memset(pack, 0, sizeof(*pack));
-		}
-	} else if (packp)
-		*packp = pack;
-	return err;
-}
-
-struct got_pack *
-get_cached_pack(const char *path_packfile, struct got_repository *repo)
-{
-	struct got_pack *pack = NULL;
-	int i;
-
-	for (i = 0; i < nitems(repo->packs); i++) {
-		pack = &repo->packs[i];
-		if (pack->path_packfile == NULL)
-			break;
-		if (strcmp(pack->path_packfile, path_packfile) == 0)
-			return pack;
-	}
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -1035,7 +795,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 		goto done;
 
 	/* Delta base must be in the same pack file. */
-	idx = get_object_idx(packidx, &id);
+	idx = got_packidx_get_object_idx(packidx, &id);
 	if (idx == -1) {
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 		goto done;
@@ -1196,7 +956,7 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 	int idx;
 	char *path_packfile;
 
-	err = search_packidx(&packidx, &idx, repo, id);
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err)
 		return err;
 
@@ -1204,9 +964,9 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 	if (err)
 		return err;
 
-	pack = get_cached_pack(path_packfile, repo);
+	pack = got_repo_get_cached_pack(repo, path_packfile);
 	if (pack == NULL) {
-		err = cache_pack(&pack, path_packfile, packidx, repo);
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
 		if (err)
 			goto done;
 	}
@@ -1215,7 +975,7 @@ got_packfile_open_object(struct got_object **obj, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	err = cache_pack(NULL, (*obj)->path_packfile, packidx, repo);
+	err = got_repo_cache_pack(NULL, repo, (*obj)->path_packfile, packidx);
 done:
 	free(path_packfile);
 	return err;
@@ -1511,9 +1271,9 @@ got_packfile_extract_object(FILE **f, struct got_object *obj,
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	pack = get_cached_pack(obj->path_packfile, repo);
+	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
 	if (pack == NULL) {
-		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+		err = got_repo_cache_pack(&pack, repo, obj->path_packfile, NULL);
 		if (err)
 			return err;
 	}
@@ -1562,9 +1322,9 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	pack = get_cached_pack(obj->path_packfile, repo);
+	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
 	if (pack == NULL) {
-		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+		err = got_repo_cache_pack(&pack, repo, obj->path_packfile, NULL);
 		if (err)
 			goto done;
 	}

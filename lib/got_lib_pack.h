@@ -24,6 +24,16 @@ struct got_pack {
 
 const struct got_error *got_pack_close(struct got_pack *);
 
+#define GOT_PACK_PREFIX		"pack-"
+#define GOT_PACKFILE_SUFFIX	".pack"
+#define GOT_PACKIDX_SUFFIX		".idx"
+#define GOT_PACKFILE_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
+				SHA1_DIGEST_STRING_LENGTH - 1 + \
+				strlen(GOT_PACKFILE_SUFFIX))
+#define GOT_PACKIDX_NAMELEN	(strlen(GOT_PACK_PREFIX) + \
+				SHA1_DIGEST_STRING_LENGTH - 1 + \
+				strlen(GOT_PACKIDX_SUFFIX))
+
 /* See Documentation/technical/pack-format.txt in Git. */
 
 struct got_packidx_trailer {
@@ -148,6 +158,7 @@ const struct got_error *got_packidx_init_hdr(struct got_packidx *, int);
 const struct got_error *got_packidx_open(struct got_packidx **,
     const char *, int);
 const struct got_error* got_packidx_close(struct got_packidx *);
+int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_object_id *, struct got_repository *);
@@ -155,3 +166,5 @@ const struct got_error *got_packfile_extract_object(FILE **,
     struct got_object *, struct got_repository *);
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
     struct got_object *, struct got_repository *);
+const struct got_error *got_pack_get_packfile_size(size_t *, const char *);
+struct got_pack *got_repo_get_cached_pack(struct got_repository *, const char *);
