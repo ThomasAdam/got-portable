@@ -630,8 +630,7 @@ read_packfile_hdr(int fd, struct got_packidx *packidx)
 }
 
 static const struct got_error *
-open_packfile(int *fd, const char *path_packfile,
-    struct got_repository *repo, struct got_packidx *packidx)
+open_packfile(int *fd, const char *path_packfile, struct got_packidx *packidx)
 {
 	const struct got_error *err = NULL;
 
@@ -701,7 +700,7 @@ cache_pack(struct got_pack **packp, const char *path_packfile,
 		goto done;
 	}
 
-	err = open_packfile(&pack->fd, path_packfile, repo, packidx);
+	err = open_packfile(&pack->fd, path_packfile, packidx);
 	if (err)
 		goto done;
 
