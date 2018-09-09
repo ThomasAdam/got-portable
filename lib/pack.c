@@ -119,52 +119,16 @@ get_packfile_size(size_t *size, const char *path)
 }
 
 const struct got_error *
-got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
+got_packidx_init_hdr(struct got_packidx *p, int verify)
 {
-	struct got_packidx *p;
-	struct got_packidx_v2_hdr *h;
 	const struct got_error *err = NULL;
-	size_t nobj, len_fanout, len_ids, offset, remain;
-	ssize_t n;
+	struct got_packidx_v2_hdr *h;
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
-
-	*packidx = NULL;
+	size_t nobj, len_fanout, len_ids, offset, remain;
+	ssize_t n;
 
 	SHA1Init(&ctx);
-
-	p = calloc(1, sizeof(*p));
-	if (p == NULL)
-		return got_error_from_errno();
-
-	p->fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
-	if (p->fd == -1)
-		return got_error_from_errno();
-
-	err = get_packfile_size(&p->len, path);
-	if (err) {
-		close(p->fd);
-		free(p);
-		return err;
-	}
-	if (p->len < sizeof(p->hdr)) {
-		err = got_error(GOT_ERR_BAD_PACKIDX);
-		close(p->fd);
-		free(p);
-		return err;
-	}
-
-	p->path_packidx = strdup(path);
-	if (p->path_packidx == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-#ifndef GOT_PACK_NO_MMAP
-	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
-	if (p->map == MAP_FAILED)
-		p->map = NULL; /* fall back to read(2) */
-#endif
 
 	h = &p->hdr;
 	offset = 0;
@@ -384,10 +348,57 @@ checksum:
 			err = got_error(GOT_ERR_PACKIDX_CSUM);
 	}
 done:
+	return err;
+}
+
+const struct got_error *
+got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
+{
+	const struct got_error *err = NULL;
+	struct got_packidx *p;
+
+	*packidx = NULL;
+
+	p = calloc(1, sizeof(*p));
+	if (p == NULL)
+		return got_error_from_errno();
+
+	p->fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	if (p->fd == -1)
+		return got_error_from_errno();
+
+	err = get_packfile_size(&p->len, path);
+	if (err) {
+		close(p->fd);
+		free(p);
+		return err;
+	}
+	if (p->len < sizeof(p->hdr)) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		close(p->fd);
+		free(p);
+		return err;
+	}
+
+	p->path_packidx = strdup(path);
+	if (p->path_packidx == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+#ifndef GOT_PACK_NO_MMAP
+	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
+	if (p->map == MAP_FAILED)
+		p->map = NULL; /* fall back to read(2) */
+#endif
+
+	err = got_packidx_init_hdr(p, verify);
+done:
 	if (err)
 		got_packidx_close(p);
 	else
 		*packidx = p;
+
 	return err;
 }
 
