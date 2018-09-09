@@ -164,6 +164,66 @@ done:
 	return err;
 }
 
+static const struct got_error *
+get_packfile_path(char **path_packfile, struct got_packidx *packidx)
+{
+	size_t size;
+
+	/* Packfile path contains ".pack" instead of ".idx", so add one byte. */
+	size = strlen(packidx->path_packidx) + 2;
+	if (size < GOT_PACKFILE_NAMELEN + 1)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	*path_packfile = calloc(size, sizeof(**path_packfile));
+	if (*path_packfile == NULL)
+		return got_error_from_errno();
+
+	/* Copy up to and excluding ".idx". */
+	if (strlcpy(*path_packfile, packidx->path_packidx,
+	    size - strlen(GOT_PACKIDX_SUFFIX) - 1) >= size)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	return NULL;
+}
+
+static const struct got_error *
+open_packed_object(struct got_object **obj, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack *pack = NULL;
+	struct got_packidx *packidx = NULL;
+	int idx;
+	char *path_packfile;
+
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
+	if (err)
+		return err;
+
+	err = get_packfile_path(&path_packfile, packidx);
+	if (err)
+		return err;
+
+	pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+		if (err)
+			goto done;
+	}
+
+	err = got_packfile_open_object(obj, pack, packidx, idx, id);
+	if (err)
+		goto done;
+
+	err = got_repo_cache_pack(NULL, repo, (*obj)->path_packfile, packidx);
+done:
+	free(path_packfile);
+	return err;
+}
+
 const struct got_error *
 got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
@@ -188,7 +248,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = got_packfile_open_object(obj, id, repo);
+		err = open_packed_object(obj, id, repo);
 		if (err)
 			goto done;
 		if (*obj == NULL)
