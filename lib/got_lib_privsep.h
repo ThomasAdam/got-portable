@@ -65,7 +65,7 @@ enum got_imsg_type {
 	 * Object and pack files are opened by the main process, where
 	 * data may be read as a byte string but without any interpretation.
 	 * Decompression and parsing of object and pack files occurs in a
-	 * separate process which runs under pledge("stdio").
+	 * separate process which runs under pledge("stdio recvfd").
 	 * This sandboxes our own repository parsing code, as well as zlib.
 	 */
 	GOT_IMSG_OBJECT_REQUEST,
@@ -187,5 +187,3 @@ const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
 const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
 const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
-
-/* TODO: Implement the above, and then add more message data types here. */
