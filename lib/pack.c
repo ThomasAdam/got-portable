@@ -1410,8 +1410,7 @@ done:
 
 static const struct got_error *
 dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
-    struct got_delta_chain *deltas, const char *path_packfile,
-    struct got_repository *repo)
+    struct got_delta_chain *deltas, struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1436,7 +1435,6 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
 		if (n == 0) {
-			struct got_pack *pack;
 			size_t base_len;
 			size_t delta_data_offset;
 
@@ -1445,12 +1443,6 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			    delta->type != GOT_OBJ_TYPE_TREE &&
 			    delta->type != GOT_OBJ_TYPE_BLOB &&
 			    delta->type != GOT_OBJ_TYPE_TAG) {
-				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
-				goto done;
-			}
-
-			pack = get_cached_pack(path_packfile, repo);
-			if (pack == NULL) {
 				err = got_error(GOT_ERR_BAD_DELTA_CHAIN);
 				goto done;
 			}
@@ -1575,20 +1567,19 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
     struct got_object *obj, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct got_pack *pack;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
+	pack = get_cached_pack(obj->path_packfile, repo);
+	if (pack == NULL) {
+		err = cache_pack(&pack, obj->path_packfile, NULL, repo);
+		if (err)
+			goto done;
+	}
+
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
-		struct got_pack *pack;
-
-		pack = get_cached_pack(obj->path_packfile, repo);
-		if (pack == NULL) {
-			err = cache_pack(&pack, obj->path_packfile, NULL, repo);
-			if (err)
-				goto done;
-		}
-
 		if (obj->pack_offset >= pack->filesize) {
 			err = got_error(GOT_ERR_PACK_OFFSET);
 			goto done;
@@ -1605,8 +1596,7 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 			err = got_inflate_to_mem_fd(buf, len, pack->fd);
 		}
 	} else
-		err = dump_delta_chain_to_mem(buf, len, &obj->deltas,
-		    obj->path_packfile, repo);
+		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, pack);
 done:
 	return err;
 }
