@@ -1231,39 +1231,27 @@ got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
 
 const struct got_error *
 got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
-    struct got_object *obj, struct got_repository *repo)
+    struct got_object *obj, struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
-	struct got_pack *pack;
 
 	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
 		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
-	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
-	if (pack == NULL) {
-		err = got_repo_cache_pack(&pack, repo, obj->path_packfile, NULL);
-		if (err)
-			goto done;
-	}
-
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
-		if (obj->pack_offset >= pack->filesize) {
-			err = got_error(GOT_ERR_PACK_OFFSET);
-			goto done;
-		}
+		if (obj->pack_offset >= pack->filesize)
+			return got_error(GOT_ERR_PACK_OFFSET);
 		if (pack->map) {
 			size_t mapoff = (size_t)obj->pack_offset;
 			err = got_inflate_to_mem_mmap(buf, len, pack->map,
 			    mapoff, pack->filesize - mapoff);
 		} else {
-			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1) {
-				err = got_error_from_errno();
-				goto done;
-			}
+			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
+				return got_error_from_errno();
 			err = got_inflate_to_mem_fd(buf, len, pack->fd);
 		}
 	} else
 		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, pack);
-done:
+
 	return err;
 }

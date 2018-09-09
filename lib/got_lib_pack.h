@@ -165,6 +165,6 @@ const struct got_error *got_packfile_open_object(struct got_object **,
 const struct got_error *got_packfile_extract_object(struct got_pack *,
     struct got_object *, FILE *);
 const struct got_error *got_packfile_extract_object_to_mem(uint8_t **, size_t *,
-    struct got_object *, struct got_repository *);
+    struct got_object *, struct got_pack *);
 const struct got_error *got_pack_get_packfile_size(size_t *, const char *);
 struct got_pack *got_repo_get_cached_pack(struct got_repository *, const char *);
