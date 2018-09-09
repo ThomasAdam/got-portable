@@ -893,9 +893,8 @@ parse_offset_delta(off_t *base_offset, size_t *len, struct got_pack *pack,
 }
 
 static const struct got_error *
-resolve_delta_chain(struct got_delta_chain *, struct got_repository *,
-    struct got_packidx *, struct got_pack *, off_t, size_t, int,
-    size_t, unsigned int);
+resolve_delta_chain(struct got_delta_chain *, struct got_packidx *,
+    struct got_pack *, off_t, size_t, int, size_t, unsigned int);
 
 static const struct got_error *
 add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
@@ -917,9 +916,8 @@ add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
 
 static const struct got_error *
 resolve_offset_delta(struct got_delta_chain *deltas,
-    struct got_repository *repo, struct got_packidx *packidx,
-    struct got_pack *pack, off_t delta_offset, size_t tslen,
-    int delta_type, size_t delta_size, unsigned int recursion)
+    struct got_packidx *packidx, struct got_pack *pack, off_t delta_offset,
+    size_t tslen, int delta_type, size_t delta_size, unsigned int recursion)
 
 {
 	const struct got_error *err;
@@ -975,7 +973,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	if (err)
 		goto done;
 
-	err = resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
+	err = resolve_delta_chain(deltas, packidx, pack, base_offset,
 	    base_tslen, base_type, base_size, recursion - 1);
 done:
 	if (err)
@@ -984,10 +982,9 @@ done:
 }
 
 static const struct got_error *
-resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
-    struct got_packidx *packidx, struct got_pack *pack,
-    off_t delta_offset, size_t tslen, int delta_type, size_t delta_size,
-    unsigned int recursion)
+resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
+    struct got_pack *pack, off_t delta_offset, size_t tslen, int delta_type,
+    size_t delta_size, unsigned int recursion)
 {
 	const struct got_error *err;
 	struct got_object_id id;
@@ -1060,7 +1057,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	err = resolve_delta_chain(deltas, repo, packidx, pack, base_offset,
+	err = resolve_delta_chain(deltas, packidx, pack, base_offset,
 	    base_tslen, base_type, base_size, recursion - 1);
 done:
 	if (err)
@@ -1069,9 +1066,9 @@ done:
 }
 
 static const struct got_error *
-resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
-    struct got_packidx *packidx, struct got_pack *pack, off_t delta_offset,
-    size_t tslen, int delta_type, size_t delta_size, unsigned int recursion)
+resolve_delta_chain(struct got_delta_chain *deltas, struct got_packidx *packidx,
+    struct got_pack *pack, off_t delta_offset, size_t tslen, int delta_type,
+    size_t delta_size, unsigned int recursion)
 {
 	const struct got_error *err = NULL;
 
@@ -1088,11 +1085,11 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_repository *repo,
 		    delta_size, 0, NULL, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
-		err = resolve_offset_delta(deltas, repo, packidx, pack,
+		err = resolve_offset_delta(deltas, packidx, pack,
 		    delta_offset, tslen, delta_type, delta_size, recursion - 1);
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
-		err = resolve_ref_delta(deltas, repo, packidx, pack,
+		err = resolve_ref_delta(deltas, packidx, pack,
 		    delta_offset, tslen, delta_type, delta_size, recursion - 1);
 		break;
 	default:
@@ -1131,7 +1128,7 @@ open_delta_object(struct got_object **obj, struct got_repository *repo,
 	SIMPLEQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 
-	err = resolve_delta_chain(&(*obj)->deltas, repo, packidx, pack, offset,
+	err = resolve_delta_chain(&(*obj)->deltas, packidx, pack, offset,
 	    tslen, delta_type, delta_size, GOT_DELTA_CHAIN_RECURSION_MAX);
 	if (err)
 		goto done;
