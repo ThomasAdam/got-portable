@@ -583,8 +583,7 @@ done:
 }
 
 static const struct got_error *
-get_packfile_path(char **path_packfile, struct got_repository *repo,
-    struct got_packidx *packidx)
+get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 {
 	size_t size;
 
@@ -1169,7 +1168,7 @@ open_packed_object(struct got_object **obj, struct got_repository *repo,
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
-	err = get_packfile_path(&path_packfile, repo, packidx);
+	err = get_packfile_path(&path_packfile, packidx);
 	if (err)
 		return err;
 
