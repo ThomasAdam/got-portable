@@ -461,8 +461,7 @@ get_object_offset(struct got_packidx *packidx, int idx)
 }
 
 static int
-get_object_idx(struct got_packidx *packidx, struct got_object_id *id,
-    struct got_repository *repo)
+get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
 {
 	u_int8_t id0 = id->sha1[0];
 	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
@@ -529,7 +528,7 @@ search_packidx(struct got_packidx **packidx, int *idx,
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
-		*idx = get_object_idx(repo->packidx_cache[i], id, repo);
+		*idx = get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
 			*packidx = repo->packidx_cache[i];
 			return NULL;
@@ -562,7 +561,7 @@ search_packidx(struct got_packidx **packidx, int *idx,
 		if (err)
 			goto done;
 
-		*idx = get_object_idx(*packidx, id, repo);
+		*idx = get_object_idx(*packidx, id);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
 			err = cache_packidx(*packidx, repo);
@@ -1041,7 +1040,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_repository *repo,
 		goto done;
 
 	/* Delta base must be in the same pack file. */
-	idx = get_object_idx(packidx, &id, repo);
+	idx = get_object_idx(packidx, &id);
 	if (idx == -1) {
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 		goto done;
