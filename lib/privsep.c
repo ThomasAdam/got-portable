@@ -269,7 +269,9 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 		case GOT_OBJ_TYPE_COMMIT:
 			imsg_code = GOT_IMSG_COMMIT_REQUEST;
 			break;
-		/* Blobs are handled in got_privsep_send_blob_req(). */
+		case GOT_OBJ_TYPE_BLOB:
+			imsg_code = GOT_IMSG_BLOB_REQUEST;
+			break;
 		default:
 			return got_error(GOT_ERR_OBJ_TYPE);
 		}
@@ -306,28 +308,21 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 }
 
 const struct got_error *
-got_privsep_send_blob_req(struct imsgbuf *ibuf, int outfd, int infd)
+got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd)
 {
-	const struct got_error *err = NULL;
-
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, NULL, 0)
-	    == -1) {
-		close(infd);
-		close(outfd);
+	    == -1)
 		return got_error_from_errno();
-	}
 
-	err = flush_imsg(ibuf);
-	if (err) {
-		close(outfd);
-		return err;
-	}
+	return flush_imsg(ibuf);
+}
 
+const struct got_error *
+got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
+{
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
-	    == -1) {
-		close(outfd);
+	    == -1)
 		return got_error_from_errno();
-	}
 
 	return flush_imsg(ibuf);
 }

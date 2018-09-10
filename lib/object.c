@@ -441,52 +441,14 @@ got_object_tree_get_entries(struct got_tree_object *tree)
 	return &tree->entries;
 }
 
-static const struct got_error *
-extract_packed_object(FILE **f, struct got_object *obj,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pack *pack;
-	int fd;
-
-	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
-		return got_error(GOT_ERR_OBJ_NOT_PACKED);
-
-	fd = got_opentempfd();
-	if (fd == -1)
-		return got_error_from_errno();
-
-	*f = fdopen(fd, "w+");
-	if (*f == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
-	if (pack == NULL) {
-		err = got_repo_cache_pack(&pack, repo,
-		    obj->path_packfile, NULL);
-		if (err)
-			goto done;
-	}
-
-	err = got_packfile_extract_object(pack, obj, *f);
-done:
-	if (err) {
-		if (*f == NULL)
-			close(fd);
-		else
-			fclose(*f);
-		*f = NULL;
-	}
-	return err;
-}
-
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
 {
 	const struct got_error *err = NULL;
+	int outfd;
+	size_t size;
+	struct stat sb;
 
 	if (obj->type != GOT_OBJ_TYPE_BLOB)
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -498,31 +460,35 @@ got_object_blob_open(struct got_blob_object **blob,
 	if (*blob == NULL)
 		return got_error_from_errno();
 
+	outfd = got_opentempfd();
+	if (outfd == -1)
+		return got_error_from_errno();
+
 	(*blob)->read_buf = malloc(blocksize);
 	if ((*blob)->read_buf == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		err = extract_packed_object(&((*blob)->f), obj, repo);
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				goto done;
+		}
+		err = got_object_read_packed_blob_privsep(&size, outfd,
+		    obj, pack);
 		if (err)
 			goto done;
+		obj->size = size;
 	} else {
-		int infd, outfd;
-		size_t size;
-		struct stat sb;
+		int infd;
 
 		err = open_loose_object(&infd, obj, repo);
 		if (err)
 			goto done;
-
-
-		outfd = got_opentempfd();
-		if (outfd == -1) {
-			err = got_error_from_errno();
-			close(infd);
-			goto done;
-		}
 
 		err = got_object_read_blob_privsep(&size, outfd, infd, repo);
 		close(infd);
@@ -531,28 +497,25 @@ got_object_blob_open(struct got_blob_object **blob,
 
 		if (size != obj->hdrlen + obj->size) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			close(outfd);
 			goto done;
 		}
+	}
 
-		if (fstat(outfd, &sb) == -1) {
-			err = got_error_from_errno();
-			close(outfd);
-			goto done;
-		}
+	if (fstat(outfd, &sb) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
-		if (sb.st_size != size) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			close(outfd);
-			goto done;
-		}
+	if (sb.st_size != obj->hdrlen + obj->size) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
 
-		(*blob)->f = fdopen(outfd, "rb");
-		if ((*blob)->f == NULL) {
-			err = got_error_from_errno();
-			close(outfd);
-			goto done;
-		}
+	(*blob)->f = fdopen(outfd, "rb");
+	if ((*blob)->f == NULL) {
+		err = got_error_from_errno();
+		close(outfd);
+		goto done;
 	}
 
 	(*blob)->hdrlen = obj->hdrlen;
@@ -560,12 +523,15 @@ got_object_blob_open(struct got_blob_object **blob,
 	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
 
 done:
-	if (err && *blob) {
-		if ((*blob)->f)
-			fclose((*blob)->f);
-		free((*blob)->read_buf);
-		free(*blob);
-		*blob = NULL;
+	if (err) {
+		if (*blob) {
+			if ((*blob)->f)
+				fclose((*blob)->f);
+			free((*blob)->read_buf);
+			free(*blob);
+			*blob = NULL;
+		} else if (outfd != -1)
+			close(outfd);
 	}
 	return err;
 }

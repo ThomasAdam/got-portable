@@ -210,7 +210,8 @@ const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
     struct got_object *);
-const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int, int);
+const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,

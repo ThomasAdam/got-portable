@@ -837,22 +837,57 @@ got_object_read_packed_tree_privsep(struct got_tree_object **tree,
 	return got_privsep_recv_tree(tree, pack->privsep_child->ibuf);
 }
 
-static const struct got_error *
-request_blob(size_t *size, int outfd, int infd, struct got_repository *repo)
+const struct got_error *
+got_object_read_packed_blob_privsep(size_t *size, int outfd,
+    struct got_object *obj, struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 	int outfd_child;
-	struct imsgbuf *ibuf;
 
 	outfd_child = dup(outfd);
 	if (outfd_child == -1)
 		return got_error_from_errno();
 
-	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
-
-	err = got_privsep_send_blob_req(ibuf, outfd_child, infd);
+	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
 	if (err)
 		return err;
+
+	err = got_privsep_send_blob_outfd(pack->privsep_child->ibuf,
+	    outfd_child);
+	if (err) {
+		close(outfd_child);
+		return err;
+	}
+
+	err = got_privsep_recv_blob(size, pack->privsep_child->ibuf);
+	if (err)
+		return err;
+
+	if (lseek(outfd, SEEK_SET, 0) == -1)
+		err = got_error_from_errno();
+
+	return err;
+}
+
+static const struct got_error *
+request_blob(size_t *size, int outfd, int infd, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	int outfd_child;
+
+	outfd_child = dup(outfd);
+	if (outfd_child == -1)
+		return got_error_from_errno();
+
+	err = got_privsep_send_blob_req(ibuf, infd);
+	if (err)
+		return err;
+
+	err = got_privsep_send_blob_outfd(ibuf, outfd_child);
+	if (err) {
+		close(outfd_child);
+		return err;
+	}
 
 	err = got_privsep_recv_blob(size, ibuf);
 	if (err)
@@ -872,8 +907,10 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	pid_t pid;
 	struct imsgbuf *ibuf;
 
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1)
-		return request_blob(size, outfd, infd, repo);
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1) {
+		ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
+		return request_blob(size, outfd, infd, ibuf);
+	}
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -898,5 +935,5 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
 
-	return request_blob(size, outfd, infd, repo);
+	return request_blob(size, outfd, infd, ibuf);
 }

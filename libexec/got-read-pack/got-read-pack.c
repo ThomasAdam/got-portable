@@ -146,7 +146,70 @@ static const struct got_error *
 blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx)
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	FILE *f = NULL;
+	struct imsg imsg_outfd;
+	size_t datalen;
+
+	memset(&imsg_outfd, 0, sizeof(imsg_outfd));
+	imsg_outfd.fd = -1;
+
+	err = got_privsep_get_imsg_obj(&obj, imsg, ibuf);
+	if (err)
+		return err;
+
+	if (obj->type != GOT_OBJ_TYPE_BLOB)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
+		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	err = got_privsep_recv_imsg(&imsg_outfd, ibuf, 0);
+	if (err)
+		return err;
+
+	if (imsg_outfd.hdr.type != GOT_IMSG_BLOB_OUTFD) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
+	datalen = imsg_outfd.hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != 0) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	if (imsg_outfd.fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
+
+	f = fdopen(imsg_outfd.fd, "w+");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_packfile_extract_object(pack, obj, f);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_blob(ibuf, obj->size);
+done:
+	if (f)
+		fclose(f);
+	else if (imsg_outfd.fd != -1)
+		close(imsg_outfd.fd);
+	imsg_free(&imsg_outfd);
+
+	if (err) {
+		if (err->code == GOT_ERR_PRIVSEP_PIPE)
+			err = NULL;
+		else
+			got_privsep_send_error(ibuf, err);
+	}
+
+	return err;
 }
 
 static const struct got_error *

@@ -59,7 +59,9 @@ main(int argc, char *argv[])
 		FILE *f = NULL;
 		size_t size;
 	
+		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
+		memset(&imsg_outfd, 0, sizeof(imsg_outfd));
 		imsg_outfd.fd = -1;
 
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
