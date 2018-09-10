@@ -365,14 +365,15 @@ got_object_commit_open(struct got_commit_object **commit,
 		return got_error(GOT_ERR_OBJ_TYPE);
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		uint8_t *buf;
-		size_t len;
-		err = extract_packed_object_to_mem(&buf, &len, obj, repo);
-		if (err)
-			return err;
-		obj->size = len;
-		err = got_object_parse_commit(commit, buf, len);
-		free(buf);
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				return err;
+		}
+		err = got_object_read_packed_commit_privsep(commit, obj, pack);
 	} else {
 		int fd;
 		err = open_loose_object(&fd, obj, repo);

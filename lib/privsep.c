@@ -449,13 +449,56 @@ receive_delta(struct got_delta **delta, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_object iobj;
+	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	int i;
+
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	if (iobj.ndeltas < 0 ||
+	    iobj.ndeltas > GOT_DELTA_CHAIN_RECURSION_MAX)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	if (iobj.ndeltas > 0 &&
+	    (iobj.flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL)
+		return got_error_from_errno();
+
+	(*obj)->type = iobj.type;
+	(*obj)->flags = iobj.flags;
+	(*obj)->hdrlen = iobj.hdrlen;
+	(*obj)->size = iobj.size;
+	/* id and path_packfile might be copied in by caller */
+	(*obj)->pack_offset = iobj.pack_offset;
+	SIMPLEQ_INIT(&(*obj)->deltas.entries);
+	for (i = 0; i < iobj.ndeltas; i++) {
+		struct got_delta *delta;
+		err = receive_delta(&delta, ibuf);
+		if (err)
+			break;
+		(*obj)->deltas.nentries++;
+		SIMPLEQ_INSERT_TAIL(&(*obj)->deltas.entries, delta,
+		    entry);
+	}
+
+	return err;
+}
+
+const struct got_error *
 got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	struct got_imsg_object iobj;
 	size_t datalen;
-	int i;
 	const size_t min_datalen =
 	    MIN(sizeof(struct got_imsg_error), sizeof(struct got_imsg_object));
 
@@ -472,45 +515,7 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_OBJECT:
-		if (datalen != sizeof(iobj)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-
-		memcpy(&iobj, imsg.data, sizeof(iobj));
-		if (iobj.ndeltas < 0 ||
-		    iobj.ndeltas > GOT_DELTA_CHAIN_RECURSION_MAX) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		if (iobj.ndeltas > 0 &&
-		    (iobj.flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
-			err = got_error(GOT_ERR_BAD_OBJ_DATA);
-			break;
-		}
-
-		*obj = calloc(1, sizeof(**obj));
-		if (*obj == NULL) {
-			err = got_error_from_errno();
-			break;
-		}
-
-		(*obj)->type = iobj.type;
-		(*obj)->flags = iobj.flags;
-		(*obj)->hdrlen = iobj.hdrlen;
-		(*obj)->size = iobj.size;
-		/* id and path_packfile might be copied in by caller */
-		(*obj)->pack_offset = iobj.pack_offset;
-		SIMPLEQ_INIT(&(*obj)->deltas.entries);
-		for (i = 0; i < iobj.ndeltas; i++) {
-			struct got_delta *delta;
-			err = receive_delta(&delta, ibuf);
-			if (err)
-				break;
-			(*obj)->deltas.nentries++;
-			SIMPLEQ_INSERT_TAIL(&(*obj)->deltas.entries, delta,
-			    entry);
-		}
+		err = got_privsep_get_imsg_obj(obj, &imsg, ibuf);
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -576,6 +581,7 @@ done:
 	free(buf);
 	return err;
 }
+
 const struct got_error *
 got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 {

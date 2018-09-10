@@ -213,6 +213,8 @@ const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
 const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
+const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
+    struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,

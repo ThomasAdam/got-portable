@@ -68,7 +68,39 @@ static const struct got_error *
 commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx)
 {
-	return got_error(GOT_ERR_NOT_IMPL);
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	struct got_commit_object *commit = NULL;
+	uint8_t *buf;
+	size_t len;
+
+	err = got_privsep_get_imsg_obj(&obj, imsg, ibuf);
+	if (err)
+		return err;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
+	if (err)
+		return err;
+
+	obj->size = len;
+	err = got_object_parse_commit(&commit, buf, len);
+	free(buf);
+
+	err = got_privsep_send_commit(ibuf, commit);
+	if (obj)
+		got_object_close(obj);
+	got_object_commit_close(commit);
+	if (err) {
+		if (err->code == GOT_ERR_PRIVSEP_PIPE)
+			err = NULL;
+		else
+			got_privsep_send_error(ibuf, err);
+	}
+
+	return err;
 }
 
 static const struct got_error *

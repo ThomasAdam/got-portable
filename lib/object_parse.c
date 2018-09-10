@@ -712,11 +712,24 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd,obj);
+	err = got_privsep_send_obj_req(ibuf, fd, obj);
 	if (err)
 		return err;
 
 	return got_privsep_recv_commit(commit, ibuf);
+}
+
+const struct got_error *
+got_object_read_packed_commit_privsep(struct got_commit_object **commit,
+    struct got_object *obj, struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+
+	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
 }
 
 const struct got_error *
@@ -765,7 +778,7 @@ request_tree(struct got_tree_object **tree, struct got_repository *repo,
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd,obj);
+	err = got_privsep_send_obj_req(ibuf, fd, obj);
 	if (err)
 		return err;
 
