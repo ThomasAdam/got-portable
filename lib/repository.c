@@ -18,8 +18,8 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <sys/mman.h>
+#include <sys/syslimits.h>
 
 #include <fcntl.h>
 #include <limits.h>
@@ -45,10 +45,10 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_pack.h"
+#include "got_lib_privsep.h"
 #include "got_lib_repository.h"
 #include "got_lib_worktree.h"
 #include "got_lib_object_idcache.h"
-#include "got_lib_privsep.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -531,22 +531,6 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 }
 #endif
 
-static const struct got_error *
-wait_for_child(pid_t pid)
-{
-	int child_status;
-
-	waitpid(pid, &child_status, 0);
-
-	if (!WIFEXITED(child_status))
-		return got_error(GOT_ERR_PRIVSEP_DIED);
-
-	if (WEXITSTATUS(child_status) != 0)
-		return got_error(GOT_ERR_PRIVSEP_EXIT);
-
-	return NULL;
-}
-
 const struct got_error *
 got_repo_close(struct got_repository *repo)
 {
@@ -593,7 +577,8 @@ got_repo_close(struct got_repository *repo)
 		imsg_clear(repo->privsep_children[i].ibuf);
 		free(repo->privsep_children[i].ibuf);
 		err = got_privsep_send_stop(repo->privsep_children[i].imsg_fd);
-		child_err = wait_for_child(repo->privsep_children[i].pid);
+		child_err = got_privsep_wait_for_child(
+		    repo->privsep_children[i].pid);
 		if (child_err && err == NULL)
 			err = child_err;
 		close(repo->privsep_children[i].imsg_fd);

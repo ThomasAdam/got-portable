@@ -20,8 +20,10 @@ struct got_pack {
 	int fd;
 	uint8_t *map;
 	size_t filesize;
+	struct got_privsep_child *privsep_child;
 };
 
+const struct got_error *got_pack_stop_privsep_child(struct got_pack *);
 const struct got_error *got_pack_close(struct got_pack *);
 
 #define GOT_PACK_PREFIX		"pack-"

@@ -44,12 +44,6 @@ struct got_object_cache {
 	int cache_miss;
 };
 
-struct got_privsep_child {
-	int imsg_fd;
-	pid_t pid;
-	struct imsgbuf *ibuf;
-};
-
 struct got_repository {
 	char *path;
 	char *path_git_dir;
@@ -59,9 +53,6 @@ struct got_repository {
 
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
-
-	/* Handles to child processes for reading pack files. */
-	struct got_privsep_child pack_privsep_children[GOT_PACK_CACHE_SIZE];
 
 	/* Handles to child processes for reading loose objects. */
 	 struct got_privsep_child privsep_children[4];

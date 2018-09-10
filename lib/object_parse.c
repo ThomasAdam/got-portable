@@ -19,6 +19,7 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
+#include <sys/syslimits.h>
 #include <sys/wait.h>
 
 #include <errno.h>
@@ -162,6 +163,100 @@ got_object_read_header_privsep(struct got_object **obj,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf = ibuf;
 
 	return request_object(obj, repo, obj_fd);
+}
+
+static const struct got_error *
+request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
+    struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
+
+	err = got_privsep_send_packed_obj_req(ibuf, idx);
+	if (err)
+		return err;
+
+	err = got_privsep_recv_obj(obj, ibuf);
+	if (err)
+		return err;
+
+	(*obj)->path_packfile = strdup(pack->path_packfile);
+	if ((*obj)->path_packfile == NULL) {
+		err = got_error_from_errno();
+		return err;
+	}
+	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+
+	return NULL;
+}
+
+const struct got_error *
+got_object_packed_read_privsep(struct got_object **obj,
+    struct got_repository *repo, struct got_pack *pack,
+    struct got_packidx *packidx, int idx, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (pack->privsep_child)
+		return request_packed_object(obj, pack, idx, id);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	pack->privsep_child = calloc(1, sizeof(*pack->privsep_child));
+	if (pack->privsep_child == NULL) {
+		err = got_error_from_errno();
+		free(ibuf);
+		return err;
+	}
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno();
+		goto done;
+	} else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
+		    pack->path_packfile);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	pack->privsep_child->imsg_fd = imsg_fds[0];
+	pack->privsep_child->pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	pack->privsep_child->ibuf = ibuf;
+
+	err = got_privsep_init_pack_child(ibuf, pack, packidx);
+	if (err) {
+		const struct got_error *child_err;
+		err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
+		child_err = got_privsep_wait_for_child(
+		    pack->privsep_child->pid);
+		if (child_err && err == NULL)
+			err = child_err;
+		free(ibuf);
+		free(pack->privsep_child);
+		pack->privsep_child = NULL;
+		return err;
+	}
+
+done:
+	if (err) {
+		free(ibuf);
+		free(pack->privsep_child);
+		pack->privsep_child = NULL;
+	} else
+		err = request_packed_object(obj, pack, idx, id);
+	return err;
 }
 
 struct got_commit_object *

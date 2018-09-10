@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
+#include <sys/syslimits.h>
+#include <sys/wait.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +40,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_pack.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -88,18 +91,37 @@ read_imsg(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_wait_for_child(pid_t pid)
+{
+	int child_status;
+
+	waitpid(pid, &child_status, 0);
+
+	if (!WIFEXITED(child_status))
+		return got_error(GOT_ERR_PRIVSEP_DIED);
+
+	if (WEXITSTATUS(child_status) != 0)
+		return got_error(GOT_ERR_PRIVSEP_EXIT);
+
+	return NULL;
+}
+
+const struct got_error *
 got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
 {
 	const struct got_error *err;
 	ssize_t n;
 
-	err = read_imsg(ibuf);
-	if (err)
-		return err;
-
 	n = imsg_get(ibuf, imsg);
-	if (n == 0)
-		return got_error(GOT_ERR_PRIVSEP_READ);
+	if (n == -1)
+		return got_error_from_errno();
+
+	while (n == 0) {
+		err = read_imsg(ibuf);
+		if (err)
+			return err;
+		n = imsg_get(ibuf, imsg);
+	}
 
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
@@ -216,6 +238,8 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 		iobj.hdrlen = obj->hdrlen;
 		iobj.size = obj->size;
 		iobj.ndeltas = 0;
+		if (iobj.flags & GOT_OBJ_FLAG_PACKED)
+			iobj.pack_offset = obj->pack_offset;
 
 		iobjp = &iobj;
 		iobj_size = sizeof(iobj);
@@ -254,26 +278,159 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int outfd, int infd)
 	return flush_imsg(ibuf);
 }
 
-const struct got_error *
-got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj, int ndeltas)
+static const struct got_error *
+send_delta(struct got_delta *delta, struct imsgbuf *ibuf)
 {
+	struct got_imsg_delta idelta;
+	size_t offset, remain;
+
+	idelta.offset = delta->offset;
+	idelta.tslen = delta->tslen;
+	idelta.type = delta->type;
+	idelta.size = delta->size;
+	idelta.data_offset = delta->data_offset;
+	idelta.delta_len = delta->delta_len;
+
+	if (imsg_compose(ibuf, GOT_IMSG_DELTA, 0, 0, -1,
+	    &idelta, sizeof(idelta)) == -1)
+		return got_error_from_errno();
+
+	if (imsg_flush(ibuf) == -1)
+		return got_error_from_errno();
+
+	offset = 0;
+	remain = delta->delta_len;
+	while (remain > 0) {
+		size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE, remain);
+
+		if (imsg_compose(ibuf, GOT_IMSG_DELTA_STREAM, 0, 0, -1,
+		    delta->delta_buf + offset, n) == -1)
+			return got_error_from_errno();
+
+		if (imsg_flush(ibuf) == -1)
+			return got_error_from_errno();
+
+		offset += n;
+		remain -= n;
+	}
+
+	return NULL;
+}
+
+const struct got_error *
+got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
+{
+	const struct got_error *err = NULL;
 	struct got_imsg_object iobj;
+	struct got_delta *delta;
 
 	iobj.type = obj->type;
 	iobj.flags = obj->flags;
 	iobj.hdrlen = obj->hdrlen;
 	iobj.size = obj->size;
-	iobj.ndeltas = ndeltas;
-
-	if (ndeltas > 0) {
-		/* TODO: Handle deltas */
-	}
+	iobj.ndeltas = obj->deltas.nentries;
+	if (iobj.flags & GOT_OBJ_FLAG_PACKED)
+		iobj.pack_offset = obj->pack_offset;
 
 	if (imsg_compose(ibuf, GOT_IMSG_OBJECT, 0, 0, -1, &iobj, sizeof(iobj))
 	    == -1)
 		return got_error_from_errno();
 
-	return flush_imsg(ibuf);
+	err = flush_imsg(ibuf);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+		err = send_delta(delta, ibuf);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+receive_delta(struct got_delta **delta, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_delta idelta;
+	uint8_t *delta_buf = NULL;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error), sizeof(struct got_imsg_delta));
+	size_t datalen, offset, remain;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	if (imsg.hdr.type == GOT_IMSG_ERROR)
+		return recv_imsg_error(&imsg, datalen);
+
+	if (imsg.hdr.type != GOT_IMSG_DELTA)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	if (datalen != sizeof(idelta))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	memcpy(&idelta, imsg.data, sizeof(idelta));
+	imsg_free(&imsg);
+
+	switch (idelta.type) {
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+	case GOT_OBJ_TYPE_REF_DELTA:
+		if (idelta.delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
+			return got_error(GOT_ERR_BAD_DELTA);
+		break;
+	default:
+		if (idelta.delta_len != 0)
+			return got_error(GOT_ERR_BAD_DELTA);
+		break;
+	}
+
+	if (idelta.delta_len > 0) {
+		delta_buf = calloc(1, idelta.delta_len);
+		if (delta_buf == NULL)
+			return got_error_from_errno();
+
+		offset = 0;
+		remain = idelta.delta_len;
+		while (remain > 0) {
+			size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE, remain);
+
+			err = got_privsep_recv_imsg(&imsg, ibuf, n);
+			if (err)
+				return err;
+
+			if (imsg.hdr.type == GOT_IMSG_ERROR)
+				return recv_imsg_error(&imsg, datalen);
+
+			if (imsg.hdr.type == GOT_IMSG_STOP)
+				break;
+
+			if (imsg.hdr.type != GOT_IMSG_DELTA_STREAM)
+				return got_error(GOT_ERR_PRIVSEP_MSG);
+
+			datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+			if (datalen != n)
+				return got_error(GOT_ERR_PRIVSEP_LEN);
+
+			memcpy(delta_buf + offset, imsg.data, n);
+			imsg_free(&imsg);
+
+			offset += n;
+			remain -= n;
+		}
+	}
+
+	*delta = got_delta_open(idelta.offset, idelta.tslen, idelta.type,
+	    idelta.size, idelta.data_offset, delta_buf, idelta.delta_len);
+	if (*delta == NULL) {
+		err = got_error_from_errno();
+		free(delta_buf);
+	}
+
+	return err;
 }
 
 const struct got_error *
@@ -311,6 +468,11 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
+		if (iobj.ndeltas > 0 &&
+		    (iobj.flags & GOT_OBJ_FLAG_DELTIFIED) == 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			break;
+		}
 
 		*obj = calloc(1, sizeof(**obj));
 		if (*obj == NULL) {
@@ -319,10 +481,20 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 		}
 
 		(*obj)->type = iobj.type;
+		(*obj)->flags = iobj.flags;
 		(*obj)->hdrlen = iobj.hdrlen;
 		(*obj)->size = iobj.size;
+		/* id and path_packfile might be copied in by caller */
+		(*obj)->pack_offset = iobj.pack_offset;
+		SIMPLEQ_INIT(&(*obj)->deltas.entries);
 		for (i = 0; i < iobj.ndeltas; i++) {
-			/* TODO: Handle deltas */
+			struct got_delta *delta;
+			err = receive_delta(&delta, ibuf);
+			if (err)
+				break;
+			(*obj)->deltas.nentries++;
+			SIMPLEQ_INSERT_TAIL(&(*obj)->deltas.entries, delta,
+			    entry);
 		}
 		break;
 	default:
@@ -744,4 +916,51 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 	imsg_free(&imsg);
 
 	return err;
+}
+
+const struct got_error *
+got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
+    struct got_packidx *packidx)
+{
+	struct got_imsg_packidx ipackidx;
+	struct got_imsg_pack ipack;
+	int fd;
+
+	ipackidx.len = packidx->len;
+	fd = dup(packidx->fd);
+	if (fd == -1)
+		return got_error_from_errno();
+
+	if (imsg_compose(ibuf, GOT_IMSG_PACKIDX, 0, 0, fd, &ipackidx,
+	    sizeof(ipackidx)) == -1)
+		return got_error_from_errno();
+
+	if (strlcpy(ipack.path_packfile, pack->path_packfile,
+	    sizeof(ipack.path_packfile)) >= sizeof(ipack.path_packfile))
+		return got_error(GOT_ERR_NO_SPACE);
+	ipack.filesize = pack->filesize;
+
+	fd = dup(pack->fd);
+	if (fd == -1)
+		return got_error_from_errno();
+
+	if (imsg_compose(ibuf, GOT_IMSG_PACK, 0, 0, fd, &ipack, sizeof(ipack))
+	    == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx)
+{
+	struct got_imsg_packed_object iobj;
+
+	iobj.idx = idx;
+
+	if (imsg_compose(ibuf, GOT_IMSG_PACKED_OBJECT_REQUEST, 0, 0, -1,
+	    &iobj, sizeof(iobj)) == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
 }

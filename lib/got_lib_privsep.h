@@ -39,6 +39,7 @@
 #define GOT_PROG_READ_TREE	got-read-tree
 #define GOT_PROG_READ_COMMIT	got-read-commit
 #define GOT_PROG_READ_BLOB	got-read-blob
+#define GOT_PROG_READ_PACK	got-read-pack
 
 #define GOT_STRINGIFY(x) #x
 #define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
@@ -52,6 +53,14 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_COMMIT)
 #define GOT_PATH_PROG_READ_BLOB \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_BLOB)
+#define GOT_PATH_PROG_READ_PACK \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PACK)
+
+struct got_privsep_child {
+	int imsg_fd;
+	pid_t pid;
+	struct imsgbuf *ibuf;
+};
 
 enum got_imsg_type {
 	/* An error occured while processing a request. */
@@ -78,6 +87,12 @@ enum got_imsg_type {
 	GOT_IMSG_BLOB_REQUEST,
 	GOT_IMSG_BLOB_OUTFD,
 	GOT_IMSG_BLOB,
+
+	/* Messages related to pack files. */
+	GOT_IMSG_PACKIDX,
+	GOT_IMSG_PACK,
+	GOT_IMSG_PACKED_OBJECT_REQUEST,
+
 	/* Messages for transmitting deltas and associated delta streams: */
 	GOT_IMSG_DELTA,
 	GOT_IMSG_DELTA_STREAM,
@@ -100,10 +115,8 @@ struct got_imsg_delta {
 	size_t delta_len;
 
 	/*
-	 * Followed by delta stream in remaining bytes of imsg buffer.
-	 * If delta_len exceeds imsg buffer length, followed by one or
-	 * more DELTA_STREAM messages until delta_len bytes of delta
-	 * stream have been transmitted.
+	 * Followed by one or more DELTA_STREAM messages until delta_len
+	 * bytes of delta stream have been transmitted.
 	 */
 };
 
@@ -126,6 +139,7 @@ struct got_imsg_object {
 	size_t hdrlen;
 	size_t size;
 
+	off_t pack_offset;
 	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
 };
 
@@ -166,6 +180,30 @@ struct got_imsg_blob {
 	size_t size;
 };
 
+/* Structure for GOT_IMSG_PACKIDX. */
+struct got_imsg_packidx {
+	size_t len;
+	/* Additionally, a file desciptor is passed via imsg. */
+};
+
+/* Structure for GOT_IMSG_PACK. */
+struct got_imsg_pack {
+	char path_packfile[PATH_MAX];
+	size_t filesize;
+	/* Additionally, a file desciptor is passed via imsg. */
+};
+
+/*
+ * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST data.
+ */
+struct got_imsg_packed_object {
+	int idx;
+};
+
+struct got_pack;
+struct got_packidx;
+
+const struct got_error *got_privsep_wait_for_child(pid_t);
 const struct got_error *got_privsep_send_stop(int);
 const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
     size_t);
@@ -174,7 +212,7 @@ const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
     struct got_object *);
 const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
-    struct got_object *, int);
+    struct got_object *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,
@@ -187,3 +225,7 @@ const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
 const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
 const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
+const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
+    struct got_pack *, struct got_packidx *);
+const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_pack_child_ready(struct imsgbuf *);

@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/queue.h>
+#include <sys/uio.h>
 #include <sys/mman.h>
 
 #include <fcntl.h>
@@ -29,6 +30,7 @@
 #include <sha1.h>
 #include <endian.h>
 #include <zlib.h>
+#include <imsg.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -40,6 +42,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_privsep.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -460,11 +463,30 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 }
 
 const struct got_error *
+got_pack_stop_privsep_child(struct got_pack *pack)
+{
+	const struct got_error *err = NULL, *child_err = NULL;
+
+	if (pack->privsep_child == NULL)
+		return NULL;
+
+	err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
+	child_err = got_privsep_wait_for_child(
+	    pack->privsep_child->pid);
+	if (child_err && err == NULL)
+		err = child_err;
+	free(pack->privsep_child);
+	pack->privsep_child = NULL;
+	return err;
+}
+
+const struct got_error *
 got_pack_close(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 
-	if (pack->map && munmap(pack->map, pack->filesize) == -1)
+	err = got_pack_stop_privsep_child(pack);
+	if (pack->map && munmap(pack->map, pack->filesize) == -1 && !err)
 		err = got_error_from_errno();
 	close(pack->fd);
 	pack->fd = -1;
@@ -550,7 +572,8 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 	(*obj)->flags = GOT_OBJ_FLAG_PACKED;
 	(*obj)->hdrlen = 0;
 	(*obj)->size = size;
-	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	if (id)
+		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset;
 
 	return NULL;
@@ -847,7 +870,8 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 	(*obj)->flags = 0;
 	(*obj)->hdrlen = 0;
 	(*obj)->size = 0; /* Not known because deltas aren't applied yet. */
-	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	if (id)
+		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset + tslen;
 
 	(*obj)->path_packfile = strdup(pack->path_packfile);

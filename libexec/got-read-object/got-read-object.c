@@ -19,6 +19,7 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/limits.h>
+#include <sys/syslimits.h>
 
 #include <stdint.h>
 #include <imsg.h>
@@ -165,7 +166,7 @@ main(int argc, char *argv[])
 	while (1) {
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 		if (err) {
-			if (imsg.hdr.len == 0)
+			if (err->code == GOT_ERR_PRIVSEP_PIPE)
 				err = NULL;
 			break;
 		}
@@ -188,14 +189,17 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
-		err = got_privsep_send_obj(&ibuf, obj, 0);
+		err = got_privsep_send_obj(&ibuf, obj);
 done:
 		close(imsg.fd);
 		imsg_free(&imsg);
 		if (obj)
 			got_object_close(obj);
 		if (err) {
-			got_privsep_send_error(&ibuf, err);
+			if (err->code == GOT_ERR_PRIVSEP_PIPE)
+				err = NULL;
+			else
+				got_privsep_send_error(&ibuf, err);
 			break;
 		}
 	}

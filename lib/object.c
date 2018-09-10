@@ -20,6 +20,7 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/syslimits.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -214,7 +215,7 @@ open_packed_object(struct got_object **obj, struct got_object_id *id,
 			goto done;
 	}
 
-	err = got_packfile_open_object(obj, pack, packidx, idx, id);
+	err = got_object_packed_read_privsep(obj, repo, pack, packidx, idx, id);
 	if (err)
 		goto done;
 

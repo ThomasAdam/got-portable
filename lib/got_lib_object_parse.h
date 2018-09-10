@@ -33,3 +33,10 @@ const struct got_error *got_object_parse_tree(struct got_tree_object **,
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
 
 void got_object_tree_entry_close(struct got_tree_entry *);
+
+struct got_pack;
+struct got_packidx;
+
+const struct got_error *got_object_packed_read_privsep(struct got_object **,
+    struct got_repository *, struct got_pack *, struct got_packidx *, int,
+    struct got_object_id *);
