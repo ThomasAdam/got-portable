@@ -824,6 +824,19 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 	return request_tree(tree, repo, obj, obj_fd);
 }
 
+const struct got_error *
+got_object_read_packed_tree_privsep(struct got_tree_object **tree,
+    struct got_object *obj, struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+
+	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_tree(tree, pack->privsep_child->ibuf);
+}
+
 static const struct got_error *
 request_blob(size_t *size, int outfd, int infd, struct got_repository *repo)
 {

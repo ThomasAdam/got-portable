@@ -328,27 +328,6 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 	return NULL;
 }
 
-static const struct got_error *
-extract_packed_object_to_mem(uint8_t **buf, size_t *len,
-    struct got_object *obj, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pack *pack;
-
-	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
-		return got_error(GOT_ERR_OBJ_NOT_PACKED);
-
-	pack = got_repo_get_cached_pack(repo, obj->path_packfile);
-	if (pack == NULL) {
-		err = got_repo_cache_pack(&pack, repo,
-		    obj->path_packfile, NULL);
-		if (err)
-			return err;
-	}
-
-	return got_packfile_extract_object_to_mem(buf, len, obj, pack);
-}
-
 const struct got_error *
 got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
@@ -407,14 +386,15 @@ got_object_tree_open(struct got_tree_object **tree,
 		return got_error(GOT_ERR_OBJ_TYPE);
 
 	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		uint8_t *buf;
-		size_t len;
-		err = extract_packed_object_to_mem(&buf, &len, obj, repo);
-		if (err)
-			return err;
-		obj->size = len;
-		err = got_object_parse_tree(tree, buf, len);
-		free(buf);
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				return err;
+		}
+		err = got_object_read_packed_tree_privsep(tree, obj, pack);
 	} else {
 		int fd;
 		err = open_loose_object(&fd, obj, repo);

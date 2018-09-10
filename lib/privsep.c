@@ -278,7 +278,7 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 		iobj.flags = obj->flags;
 		iobj.hdrlen = obj->hdrlen;
 		iobj.size = obj->size;
-		iobj.ndeltas = 0;
+		iobj.ndeltas = obj->deltas.nentries;
 		if (iobj.flags & GOT_OBJ_FLAG_PACKED)
 			iobj.pack_offset = obj->pack_offset;
 
