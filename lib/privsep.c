@@ -214,70 +214,6 @@ got_privsep_send_stop(int fd)
 	return err;
 }
 
-const struct got_error *
-got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
-{
-	struct got_imsg_object iobj, *iobjp = NULL;
-	size_t iobj_size = 0;
-	int imsg_code = GOT_IMSG_OBJECT_REQUEST;
-
-	if (obj) {
-		switch (obj->type) {
-		case GOT_OBJ_TYPE_TREE:
-			imsg_code = GOT_IMSG_TREE_REQUEST;
-			break;
-		case GOT_OBJ_TYPE_COMMIT:
-			imsg_code = GOT_IMSG_COMMIT_REQUEST;
-			break;
-		default:
-			return got_error(GOT_ERR_OBJ_TYPE);
-		}
-
-		iobj.type = obj->type;
-		iobj.flags = obj->flags;
-		iobj.hdrlen = obj->hdrlen;
-		iobj.size = obj->size;
-		iobj.ndeltas = 0;
-		if (iobj.flags & GOT_OBJ_FLAG_PACKED)
-			iobj.pack_offset = obj->pack_offset;
-
-		iobjp = &iobj;
-		iobj_size = sizeof(iobj);
-	}
-
-	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
-		return got_error_from_errno();
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_blob_req(struct imsgbuf *ibuf, int outfd, int infd)
-{
-	const struct got_error *err = NULL;
-
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, NULL, 0)
-	    == -1) {
-		close(infd);
-		close(outfd);
-		return got_error_from_errno();
-	}
-
-	err = flush_imsg(ibuf);
-	if (err) {
-		close(outfd);
-		return err;
-	}
-
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
-	    == -1) {
-		close(outfd);
-		return got_error_from_errno();
-	}
-
-	return flush_imsg(ibuf);
-}
-
 static const struct got_error *
 send_delta(struct got_delta *delta, struct imsgbuf *ibuf)
 {
@@ -315,6 +251,85 @@ send_delta(struct got_delta *delta, struct imsgbuf *ibuf)
 	}
 
 	return NULL;
+}
+
+const struct got_error *
+got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_object iobj, *iobjp = NULL;
+	size_t iobj_size = 0;
+	int imsg_code = GOT_IMSG_OBJECT_REQUEST;
+
+	if (obj) {
+		switch (obj->type) {
+		case GOT_OBJ_TYPE_TREE:
+			imsg_code = GOT_IMSG_TREE_REQUEST;
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			imsg_code = GOT_IMSG_COMMIT_REQUEST;
+			break;
+		/* Blobs are handled in got_privsep_send_blob_req(). */
+		default:
+			return got_error(GOT_ERR_OBJ_TYPE);
+		}
+
+		iobj.type = obj->type;
+		iobj.flags = obj->flags;
+		iobj.hdrlen = obj->hdrlen;
+		iobj.size = obj->size;
+		iobj.ndeltas = 0;
+		if (iobj.flags & GOT_OBJ_FLAG_PACKED)
+			iobj.pack_offset = obj->pack_offset;
+
+		iobjp = &iobj;
+		iobj_size = sizeof(iobj);
+	}
+
+	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
+		return got_error_from_errno();
+
+	err = flush_imsg(ibuf);
+	if (err)
+		return err;
+
+	if (obj && obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		struct got_delta *delta;
+		SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+			err = send_delta(delta, ibuf);
+			if (err)
+				break;
+		}
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_blob_req(struct imsgbuf *ibuf, int outfd, int infd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, NULL, 0)
+	    == -1) {
+		close(infd);
+		close(outfd);
+		return got_error_from_errno();
+	}
+
+	err = flush_imsg(ibuf);
+	if (err) {
+		close(outfd);
+		return err;
+	}
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
+	    == -1) {
+		close(outfd);
+		return got_error_from_errno();
+	}
+
+	return flush_imsg(ibuf);
 }
 
 const struct got_error *
