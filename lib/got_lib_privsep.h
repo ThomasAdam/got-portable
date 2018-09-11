@@ -81,6 +81,7 @@ enum got_imsg_type {
 	GOT_IMSG_OBJECT,
 	GOT_IMSG_COMMIT_REQUEST,
 	GOT_IMSG_COMMIT,
+	GOT_IMSG_COMMIT_LOGMSG,
 	GOT_IMSG_TREE_REQUEST,
 	GOT_IMSG_TREE,
 	GOT_IMSG_TREE_ENTRY,
@@ -127,12 +128,15 @@ struct got_imsg_commit_object {
 	int nparents;
 
 	/*
-	 * Followed by author_len + committer_len + logmsg_len data bytes
+	 * Followed by author_len + committer_len data bytes
 	 */
 
 	/* Followed by 'nparents' SHA1_DIGEST_LENGTH length strings */
 
-	/* XXX should use more messages to support very large log messages */
+	/*
+	 * Followed by 'logmsg_len' bytes of commit log message data in
+	 * one or more GOT_IMSG_COMMIT_LOGMSG messages.
+	 */
 } __attribute__((__packed__));
 
 

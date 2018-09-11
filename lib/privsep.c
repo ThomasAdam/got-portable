@@ -363,6 +363,31 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 	return err;
 }
 
+static const struct got_error *
+send_commit_logmsg(struct imsgbuf *ibuf, struct got_commit_object *commit,
+    size_t logmsg_len)
+{
+	size_t offset, remain;
+
+	offset = 0;
+	remain = logmsg_len;
+	while (remain > 0) {
+		size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE, remain);
+
+		if (imsg_compose(ibuf, GOT_IMSG_COMMIT_LOGMSG, 0, 0, -1,
+		    commit->logmsg + offset, n) == -1)
+			return got_error_from_errno();
+
+		if (imsg_flush(ibuf) == -1)
+			return got_error_from_errno();
+
+		offset += n;
+		remain -= n;
+	}
+
+	return NULL;
+}
+
 const struct got_error *
 got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 {
@@ -371,6 +396,7 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	uint8_t *buf;
 	size_t len, total;
 	struct got_object_qid *qid;
+	size_t logmsg_len = strlen(commit->logmsg);
 
 	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
@@ -379,15 +405,11 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	icommit.committer_len = strlen(commit->committer);
 	memcpy(&icommit.tm_committer, &commit->tm_committer,
 	    sizeof(icommit.tm_committer));
-	icommit.logmsg_len = strlen(commit->logmsg);
+	icommit.logmsg_len = logmsg_len;
 	icommit.nparents = commit->nparents;
 
 	total = sizeof(icommit) + icommit.author_len +
-	    icommit.committer_len + icommit.logmsg_len +
-	    icommit.nparents * SHA1_DIGEST_LENGTH;
-	/* XXX TODO support very large log messages properly */
-	if (total > MAX_IMSGSIZE)
-		return got_error(GOT_ERR_NO_SPACE);
+	    icommit.committer_len + icommit.nparents * SHA1_DIGEST_LENGTH;
 
 	buf = malloc(total);
 	if (buf == NULL)
@@ -400,8 +422,6 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	len += icommit.author_len;
 	memcpy(buf + len, commit->committer, icommit.committer_len);
 	len += icommit.committer_len;
-	memcpy(buf + len, commit->logmsg, icommit.logmsg_len);
-	len += icommit.logmsg_len;
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 		memcpy(buf + len, qid->id, SHA1_DIGEST_LENGTH);
 		len += SHA1_DIGEST_LENGTH;
@@ -413,6 +433,10 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	}
 
 	err = flush_imsg(ibuf);
+	if (err)
+		goto done;
+
+	err = send_commit_logmsg(ibuf, commit, logmsg_len);
 done:
 	free(buf);
 	return err;
@@ -453,7 +477,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 		memcpy(&icommit, data, sizeof(icommit));
 		if (datalen != sizeof(icommit) + icommit.author_len +
-		    icommit.committer_len + icommit.logmsg_len +
+		    icommit.committer_len +
 		    icommit.nparents * SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
@@ -521,16 +545,33 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 				break;
 			}
 		} else {
+			size_t offset = 0, remain = icommit.logmsg_len;
+
 			(*commit)->logmsg = malloc(icommit.logmsg_len + 1);
 			if ((*commit)->logmsg == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
-			memcpy((*commit)->logmsg, data + len,
-			    icommit.logmsg_len);
+			while (remain > 0) {
+				struct imsg imsg_log;
+				size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE,
+				    remain);
+
+				err = got_privsep_recv_imsg(&imsg_log, ibuf, n);
+				if (err)
+					return err;
+
+				if (imsg_log.hdr.type != GOT_IMSG_COMMIT_LOGMSG)
+					return got_error(GOT_ERR_PRIVSEP_MSG);
+
+				memcpy((*commit)->logmsg + offset,
+				    imsg_log.data, n);
+				imsg_free(&imsg_log);
+				offset += n;
+				remain -= n;
+			}
 			(*commit)->logmsg[icommit.logmsg_len] = '\0';
 		}
-		len += icommit.logmsg_len;
 
 		for (i = 0; i < icommit.nparents; i++) {
 			struct got_object_qid *qid;
