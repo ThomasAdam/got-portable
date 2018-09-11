@@ -554,7 +554,7 @@ parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 
 static const struct got_error *
 open_plain_object(struct got_object **obj, const char *path_packfile,
-    struct got_object_id *id, uint8_t type, off_t offset, size_t size)
+    struct got_object_id *id, uint8_t type, off_t offset, size_t size, int idx)
 {
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
@@ -570,6 +570,7 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 
 	(*obj)->type = type;
 	(*obj)->flags = GOT_OBJ_FLAG_PACKED;
+	(*obj)->pack_idx = idx;
 	(*obj)->hdrlen = 0;
 	(*obj)->size = size;
 	if (id)
@@ -858,7 +859,7 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_packidx *packidx,
 static const struct got_error *
 open_delta_object(struct got_object **obj, struct got_packidx *packidx,
     struct got_pack *pack, struct got_object_id *id, off_t offset,
-    size_t tslen, int delta_type, size_t delta_size)
+    size_t tslen, int delta_type, size_t delta_size, int idx)
 {
 	const struct got_error *err = NULL;
 	int resolved_type;
@@ -880,6 +881,7 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 		goto done;
 	}
 	(*obj)->flags |= GOT_OBJ_FLAG_PACKED;
+	(*obj)->pack_idx = idx;
 
 	SIMPLEQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
@@ -893,7 +895,6 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 	if (err)
 		goto done;
 	(*obj)->type = resolved_type;
-
 done:
 	if (err) {
 		got_object_close(*obj);
@@ -928,12 +929,12 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
 		err = open_plain_object(obj, pack->path_packfile, id, type,
-		    offset + tslen, size);
+		    offset + tslen, size, idx);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	case GOT_OBJ_TYPE_REF_DELTA:
 		err = open_delta_object(obj, packidx, pack, id, offset,
-		    tslen, type, size);
+		    tslen, type, size, idx);
 		break;
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);

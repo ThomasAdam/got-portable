@@ -218,7 +218,6 @@ got_repo_cache_commit(struct got_repository *repo, struct got_object_id *id,
 	err = got_object_cache_add(&repo->commitcache, id, commit);
 	if (err)
 		return err;
-
 	commit->refcnt++;
 #endif
 	return NULL;

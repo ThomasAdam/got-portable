@@ -1,8 +1,9 @@
 .PATH:${.CURDIR}/../../lib
 
 PROG=		got-read-pack
-SRCS=		got-read-pack.c delta.c error.c inflate.c object_parse.c \
-		opentemp.c pack.c path.c privsep.c sha1.c
+SRCS=		got-read-pack.c delta.c error.c inflate.c object_cache.c \
+		object_idcache.c object_parse.c opentemp.c pack.c path.c \
+		privsep.c sha1.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz

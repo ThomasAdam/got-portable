@@ -37,13 +37,14 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_cache.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
 static const struct got_error *
 object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx)
+    struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
@@ -58,15 +59,55 @@ object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, NULL);
 	if (err)
 		return err;
+	obj->refcnt++;
+
+	err = got_object_cache_add(objcache, &obj->id, obj);
+	if (err)
+		goto done;
+	obj->refcnt++;
 
 	err = got_privsep_send_obj(ibuf, obj);
+done:
 	got_object_close(obj);
 	return err;
 }
 
 static const struct got_error *
+get_object(struct got_object **obj, struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache, int type)
+{
+	const struct got_error *err = NULL;
+	struct got_object *iobj;
+
+	err = got_privsep_get_imsg_obj(&iobj, imsg, ibuf);
+	if (err)
+		return err;
+
+	if (iobj->type != type) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	if ((iobj->flags & GOT_OBJ_FLAG_PACKED) == 0)
+		return got_error(GOT_ERR_OBJ_NOT_PACKED);
+
+	*obj = got_object_cache_get(objcache, &iobj->id);
+	if (*obj == NULL) {
+		err = got_packfile_open_object(obj, pack, packidx,
+		    iobj->pack_idx, &iobj->id);
+		if (err)
+			goto done;
+	}
+	(*obj)->refcnt++;
+done:
+	got_object_close(iobj);
+	return err;
+}
+
+static const struct got_error *
 commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx)
+    struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -74,12 +115,10 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	uint8_t *buf;
 	size_t len;
 
-	err = got_privsep_get_imsg_obj(&obj, imsg, ibuf);
+	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
+	    GOT_OBJ_TYPE_COMMIT);
 	if (err)
 		return err;
-
-	if (obj->type != GOT_OBJ_TYPE_COMMIT)
-		return got_error(GOT_ERR_OBJ_TYPE);
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
@@ -105,7 +144,7 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 static const struct got_error *
 tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx)
+    struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -113,12 +152,10 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	uint8_t *buf;
 	size_t len;
 
-	err = got_privsep_get_imsg_obj(&obj, imsg, ibuf);
+	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
+	    GOT_OBJ_TYPE_TREE);
 	if (err)
 		return err;
-
-	if (obj->type != GOT_OBJ_TYPE_TREE)
-		return got_error(GOT_ERR_OBJ_TYPE);
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
@@ -144,7 +181,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 static const struct got_error *
 blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx)
+    struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -155,15 +192,10 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memset(&imsg_outfd, 0, sizeof(imsg_outfd));
 	imsg_outfd.fd = -1;
 
-	err = got_privsep_get_imsg_obj(&obj, imsg, ibuf);
+	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
+	    GOT_OBJ_TYPE_BLOB);
 	if (err)
 		return err;
-
-	if (obj->type != GOT_OBJ_TYPE_BLOB)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	if ((obj->flags & GOT_OBJ_FLAG_PACKED) == 0)
-		return got_error(GOT_ERR_OBJ_NOT_PACKED);
 
 	err = got_privsep_recv_imsg(&imsg_outfd, ibuf, 0);
 	if (err)
@@ -201,7 +233,8 @@ done:
 	else if (imsg_outfd.fd != -1)
 		close(imsg_outfd.fd);
 	imsg_free(&imsg_outfd);
-
+	if (obj)
+		got_object_close(obj);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -347,13 +380,21 @@ main(int argc, char *argv[])
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
-	struct got_packidx *packidx;
-	struct got_pack *pack;
+	struct got_packidx *packidx = NULL;
+	struct got_pack *pack = NULL;
+	struct got_object_cache objcache;
 
 	//static int attached;
 	//while (!attached) sleep(1);
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+
+	err = got_object_cache_init(&objcache, GOT_OBJECT_CACHE_TYPE_OBJ);
+	if (err) {
+		err = got_error_from_errno();
+		got_privsep_send_error(&ibuf, err);
+		return 1;
+	}
 
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
@@ -389,16 +430,20 @@ main(int argc, char *argv[])
 
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_PACKED_OBJECT_REQUEST:
-			err = object_request(&imsg, &ibuf, pack, packidx);
+			err = object_request(&imsg, &ibuf, pack, packidx,
+			    &objcache);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
-			err = commit_request(&imsg, &ibuf, pack, packidx);
+			err = commit_request(&imsg, &ibuf, pack, packidx,
+			    &objcache);
 			break;
 		case GOT_IMSG_TREE_REQUEST:
-			err = tree_request(&imsg, &ibuf, pack, packidx);
+			err = tree_request(&imsg, &ibuf, pack, packidx,
+			   &objcache);
 			break;
 		case GOT_IMSG_BLOB_REQUEST:
-			err = blob_request(&imsg, &ibuf, pack, packidx);
+			err = blob_request(&imsg, &ibuf, pack, packidx,
+			   &objcache);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -417,7 +462,10 @@ main(int argc, char *argv[])
 		}
 	}
 
-	got_pack_close(pack);
+	if (packidx)
+		got_packidx_close(packidx);
+	if (pack)
+		got_pack_close(pack);
 	imsg_clear(&ibuf);
 	if (err)
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);

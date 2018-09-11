@@ -92,10 +92,6 @@ enum got_imsg_type {
 	GOT_IMSG_PACKIDX,
 	GOT_IMSG_PACK,
 	GOT_IMSG_PACKED_OBJECT_REQUEST,
-
-	/* Messages for transmitting deltas and associated delta streams: */
-	GOT_IMSG_DELTA,
-	GOT_IMSG_DELTA_STREAM,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -104,43 +100,20 @@ struct got_imsg_error {
 	int errno_code; /* in case code equals GOT_ERR_ERRNO */
 };
 
-/* Structure for GOT_IMSG_DELTA data. */
-struct got_imsg_delta {
-	/* These fields are the same as in struct got_delta. */
-	off_t offset;
-	size_t tslen;
-	int type;
-	size_t size;
-	off_t data_offset;
-	size_t delta_len;
-
-	/*
-	 * Followed by one or more DELTA_STREAM messages until delta_len
-	 * bytes of delta stream have been transmitted.
-	 */
-};
-
-/* Structure for GOT_IMSG_DELTA_STREAM data. */
-struct got_imsg_delta_stream {
-	/*
-	 * Empty since the following is implied:
-	 * Read additional delta stream data from imsg buffer.
-	 */
-};
-
 /*
  * Structure for GOT_IMSG_TREE_REQUEST, GOT_IMSG_COMMIT_REQUEST,
  * and GOT_IMSG_OBJECT data.
  */
 struct got_imsg_object {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+
 	/* These fields are the same as in struct got_object. */
 	int type;
 	int flags;
 	size_t hdrlen;
 	size_t size;
-
 	off_t pack_offset;
-	int ndeltas; /* this many GOT_IMSG_DELTA messages follow */
+	int pack_idx;
 };
 
 /* Structure for GOT_IMSG_COMMIT data. */

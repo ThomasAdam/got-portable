@@ -105,7 +105,7 @@ got_object_idcache_get(struct got_object_idcache *cache, struct got_object_id *i
 	struct got_object_idcache_element *entry;
 
 	TAILQ_FOREACH(entry, &cache->entries, entry) {
-		if (got_object_id_cmp(&entry->id, id) != 0)
+		if (memcmp(&entry->id.sha1, id->sha1, SHA1_DIGEST_LENGTH) != 0)
 			continue;
 		if (entry != TAILQ_FIRST(&cache->entries)) {
 			TAILQ_REMOVE(&cache->entries, entry, entry);
@@ -144,7 +144,7 @@ got_object_idcache_contains(struct got_object_idcache *cache,
 	struct got_object_idcache_element *entry;
 
 	TAILQ_FOREACH(entry, &cache->entries, entry) {
-		if (got_object_id_cmp(&entry->id, id) == 0)
+		if (memcmp(&entry->id.sha1, id->sha1, SHA1_DIGEST_LENGTH) == 0)
 			return 1;
 	}
 
