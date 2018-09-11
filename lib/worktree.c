@@ -654,6 +654,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	new_fileindex_path = NULL;
 
 done:
+	if (tree)
+		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
 	if (obj)
