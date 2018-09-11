@@ -2,10 +2,10 @@
 
 PROG=		tog
 SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
-		diffreg.c error.c fileindex.c object.c object_idcache.c \
-		object_idset.c object_parse.c opentemp.c path.c pack.c \
-		privsep.c reference.c repository.c sha1.c worktree.c \
-		utf8.c inflate.c
+		diffreg.c error.c fileindex.c object.c object_cache.c \
+		object_idcache.c object_idset.c object_parse.c opentemp.c \
+		path.c pack.c privsep.c reference.c repository.c sha1.c \
+		worktree.c utf8.c inflate.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
 	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}

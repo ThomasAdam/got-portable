@@ -46,9 +46,9 @@
 #include "got_lib_object.h"
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
-#include "got_lib_repository.h"
 #include "got_lib_worktree.h"
-#include "got_lib_object_idcache.h"
+#include "got_lib_object_cache.h"
+#include "got_lib_repository.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -166,68 +166,13 @@ done:
 
 }
 
-#ifndef GOT_NO_OBJ_CACHE
-static const struct got_error *
-cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
-{
-	const struct got_error *err = NULL;
-	struct got_object_cache_entry *ce;
-	int nelem;
-
-	nelem = got_object_idcache_num_elements(cache->idcache);
-	if (nelem >= cache->size) {
-		err = got_object_idcache_remove_least_used((void **)&ce,
-		    cache->idcache);
-		if (err)
-			return err;
-		switch (cache->type) {
-		case GOT_OBJECT_CACHE_TYPE_OBJ:
-			got_object_close(ce->data.obj);
-			break;
-		case GOT_OBJECT_CACHE_TYPE_TREE:
-			got_object_tree_close(ce->data.tree);
-			break;
-		case GOT_OBJECT_CACHE_TYPE_COMMIT:
-			got_object_commit_close(ce->data.commit);
-			break;
-		}
-		free(ce);
-	}
-
-	ce = calloc(1, sizeof(*ce));
-	if (ce == NULL)
-		return got_error_from_errno();
-	memcpy(&ce->id, id, sizeof(ce->id));
-	switch (cache->type) {
-	case GOT_OBJECT_CACHE_TYPE_OBJ:
-		ce->data.obj = (struct got_object *)item;
-		break;
-	case GOT_OBJECT_CACHE_TYPE_TREE:
-		ce->data.tree = (struct got_tree_object *)item;
-		break;
-	case GOT_OBJECT_CACHE_TYPE_COMMIT:
-		ce->data.commit = (struct got_commit_object *)item;
-		break;
-	}
-
-	err = got_object_idcache_add(cache->idcache, id, ce);
-	if (err) {
-		if (err->code == GOT_ERR_OBJ_EXISTS) {
-			free(ce);
-			err = NULL;
-		}
-	}
-	return err;
-}
-#endif
-
 const struct got_error *
 got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
     struct got_object *obj)
 {
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-	err = cache_add(&repo->objcache, id, obj);
+	err = got_object_cache_add(&repo->objcache, id, obj);
 	if (err)
 		return err;
 	obj->refcnt++;
@@ -239,16 +184,7 @@ struct got_object *
 got_repo_get_cached_object(struct got_repository *repo,
     struct got_object_id *id)
 {
-	struct got_object_cache_entry *ce;
-
-	ce = got_object_idcache_get(repo->objcache.idcache, id);
-	if (ce) {
-		repo->objcache.cache_hit++;
-		return ce->data.obj;
-	}
-
-	repo->objcache.cache_miss++;
-	return NULL;
+	return (struct got_object *)got_object_cache_get(&repo->objcache, id);
 }
 
 const struct got_error *
@@ -257,7 +193,7 @@ got_repo_cache_tree(struct got_repository *repo, struct got_object_id *id,
 {
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-	err = cache_add(&repo->treecache, id, tree);
+	err = got_object_cache_add(&repo->treecache, id, tree);
 	if (err)
 		return err;
 	tree->refcnt++;
@@ -269,16 +205,8 @@ struct got_tree_object *
 got_repo_get_cached_tree(struct got_repository *repo,
     struct got_object_id *id)
 {
-	struct got_object_cache_entry *ce;
-
-	ce = got_object_idcache_get(repo->treecache.idcache, id);
-	if (ce) {
-		repo->treecache.cache_hit++;
-		return ce->data.tree;
-	}
-
-	repo->treecache.cache_miss++;
-	return NULL;
+	return (struct got_tree_object *)got_object_cache_get(
+	    &repo->treecache, id);
 }
 
 const struct got_error *
@@ -287,7 +215,7 @@ got_repo_cache_commit(struct got_repository *repo, struct got_object_id *id,
 {
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
-	err = cache_add(&repo->commitcache, id, commit);
+	err = got_object_cache_add(&repo->commitcache, id, commit);
 	if (err)
 		return err;
 
@@ -300,16 +228,8 @@ struct got_commit_object *
 got_repo_get_cached_commit(struct got_repository *repo,
     struct got_object_id *id)
 {
-	struct got_object_cache_entry *ce;
-
-	ce = got_object_idcache_get(repo->commitcache.idcache, id);
-	if (ce) {
-		repo->commitcache.cache_hit++;
-		return ce->data.commit;
-	}
-
-	repo->commitcache.cache_miss++;
-	return NULL;
+	return (struct got_commit_object *)got_object_cache_get(
+	    &repo->commitcache, id);
 }
 
 const struct got_error *
@@ -423,31 +343,18 @@ got_repo_open(struct got_repository **repop, const char *path)
 		repo->privsep_children[i].imsg_fd = -1;
 	}
 
-	repo->objcache.type = GOT_OBJECT_CACHE_TYPE_OBJ;
-	repo->objcache.size = GOT_OBJECT_CACHE_SIZE_OBJ;
-	repo->objcache.idcache = got_object_idcache_alloc(repo->objcache.size);
-	if (repo->objcache.idcache == NULL) {
-		err = got_error_from_errno();
+	err = got_object_cache_init(&repo->objcache,
+	    GOT_OBJECT_CACHE_TYPE_OBJ);
+	if (err)
 		goto done;
-	}
-
-	repo->treecache.type = GOT_OBJECT_CACHE_TYPE_TREE;
-	repo->treecache.size = GOT_OBJECT_CACHE_SIZE_TREE;
-	repo->treecache.idcache =
-	    got_object_idcache_alloc(repo->treecache.size);
-	if (repo->treecache.idcache == NULL) {
-		err = got_error_from_errno();
+	err = got_object_cache_init(&repo->treecache,
+	    GOT_OBJECT_CACHE_TYPE_TREE);
+	if (err)
 		goto done;
-	}
-
-	repo->commitcache.type = GOT_OBJECT_CACHE_TYPE_COMMIT;
-	repo->commitcache.size = GOT_OBJECT_CACHE_SIZE_COMMIT;
-	repo->commitcache.idcache =
-	    got_object_idcache_alloc(repo->commitcache.size);
-	if (repo->commitcache.idcache == NULL) {
-		err = got_error_from_errno();
+	err = got_object_cache_init(&repo->commitcache,
+	    GOT_OBJECT_CACHE_TYPE_COMMIT);
+	if (err)
 		goto done;
-	}
 
 	normpath = got_path_normalize(abspath);
 	if (normpath == NULL) {
@@ -483,54 +390,6 @@ done:
 	return err;
 }
 
-#if 0
-static void
-print_cache_stats(struct got_object_cache *cache, const char *name)
-{
-	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed\n",
-	    name, got_object_idcache_num_elements(cache->idcache),
-	    cache->cache_hit, cache->cache_miss);
-}
-
-void check_refcount(struct got_object_id *id, void *data, void *arg)
-{
-	struct got_object_cache *cache = arg;
-	struct got_object_cache_entry *ce = data;
-	struct got_object *obj;
-	struct got_tree_object *tree;
-	struct got_commit_object *commit;
-	char *id_str;
-
-	if (got_object_id_str(&id_str, id) != NULL)
-		return;
-
-	switch (cache->type) {
-	case GOT_OBJECT_CACHE_TYPE_OBJ:
-		obj = ce->data.obj;
-		if (obj->refcnt == 1)
-			break;
-		fprintf(stderr, "object %s has %d unclaimed references\n",
-		    id_str, obj->refcnt - 1);
-		break;
-	case GOT_OBJECT_CACHE_TYPE_TREE:
-		tree = ce->data.tree;
-		if (tree->refcnt == 1)
-			break;
-		fprintf(stderr, "tree %s has %d unclaimed references\n",
-		    id_str, tree->refcnt - 1);
-		break;
-	case GOT_OBJECT_CACHE_TYPE_COMMIT:
-		commit = ce->data.commit;
-		if (commit->refcnt == 1)
-			break;
-		fprintf(stderr, "commit %s has %d unclaimed references\n",
-		    id_str, commit->refcnt);
-		break;
-	}
-	free(id_str);
-}
-#endif
-
 const struct got_error *
 got_repo_close(struct got_repository *repo)
 {
@@ -552,24 +411,9 @@ got_repo_close(struct got_repository *repo)
 	free(repo->path);
 	free(repo->path_git_dir);
 
-#if 0
-	print_cache_stats(&repo->objcache, "object");
-	print_cache_stats(&repo->treecache, "tree");
-	print_cache_stats(&repo->commitcache, "commit");
-	got_object_idcache_for_each(repo->objcache.idcache, check_refcount,
-	    &repo->objcache);
-	got_object_idcache_for_each(repo->treecache.idcache, check_refcount,
-	    &repo->treecache);
-	got_object_idcache_for_each(repo->commitcache.idcache, check_refcount,
-	    &repo->commitcache);
-#endif
-
-	if (repo->objcache.idcache)
-		got_object_idcache_free(repo->objcache.idcache);
-	if (repo->treecache.idcache)
-		got_object_idcache_free(repo->treecache.idcache);
-	if (repo->commitcache.idcache)
-		got_object_idcache_free(repo->commitcache.idcache);
+	got_object_cache_close(&repo->objcache);
+	got_object_cache_close(&repo->treecache);
+	got_object_cache_close(&repo->commitcache);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		if (repo->privsep_children[i].imsg_fd == -1)

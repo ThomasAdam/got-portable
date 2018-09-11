@@ -17,33 +17,6 @@
 #define GOT_PACKIDX_CACHE_SIZE	64
 #define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
-#define GOT_OBJECT_CACHE_SIZE_OBJ	1024
-#define GOT_OBJECT_CACHE_SIZE_TREE	128
-#define GOT_OBJECT_CACHE_SIZE_COMMIT	512
-
-enum got_object_chache_type {
-	GOT_OBJECT_CACHE_TYPE_OBJ,
-	GOT_OBJECT_CACHE_TYPE_TREE,
-	GOT_OBJECT_CACHE_TYPE_COMMIT,
-};
-
-struct got_object_cache_entry {
-	struct got_object_id id;
-	union {
-		struct got_object *obj;
-		struct got_tree_object *tree;
-		struct got_commit_object *commit;
-	} data;
-};
-
-struct got_object_cache {
-	enum got_object_chache_type type;
-	struct got_object_idcache *idcache;
-	size_t size;
-	int cache_hit;
-	int cache_miss;
-};
-
 struct got_repository {
 	char *path;
 	char *path_git_dir;
