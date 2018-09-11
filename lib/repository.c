@@ -762,6 +762,8 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	if (err)
 		goto done;
 
+	pack->privsep_child = NULL;
+
 #ifndef GOT_PACK_NO_MMAP
 	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
 	    pack->fd, 0);
