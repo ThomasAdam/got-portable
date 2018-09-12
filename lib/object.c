@@ -443,6 +443,62 @@ got_object_tree_get_entries(struct got_tree_object *tree)
 	return &tree->entries;
 }
 
+static const struct got_error *
+read_packed_blob_privsep(size_t *size, int outfd, struct got_object *obj,
+    struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+	int outfd_child;
+	int basefd, accumfd; /* temporary files for delta application */
+
+	basefd = got_opentempfd();
+	if (basefd == -1)
+		return got_error_from_errno();
+	accumfd = got_opentempfd();
+	if (accumfd == -1)
+		return got_error_from_errno();
+
+	outfd_child = dup(outfd);
+	if (outfd_child == -1)
+		return got_error_from_errno();
+
+	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	if (err)
+		return err;
+
+	err = got_privsep_send_blob_outfd(pack->privsep_child->ibuf,
+	    outfd_child);
+	if (err) {
+		close(outfd_child);
+		return err;
+	}
+	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
+	    basefd);
+	if (err) {
+		close(basefd);
+		close(accumfd);
+		close(outfd_child);
+		return err;
+	}
+
+	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
+	    accumfd);
+	if (err) {
+		close(accumfd);
+		close(outfd_child);
+		return err;
+	}
+
+	err = got_privsep_recv_blob(size, pack->privsep_child->ibuf);
+	if (err)
+		return err;
+
+	if (lseek(outfd, SEEK_SET, 0) == -1)
+		err = got_error_from_errno();
+
+	return err;
+}
+
 const struct got_error *
 got_object_blob_open(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object *obj, size_t blocksize)
@@ -480,8 +536,7 @@ got_object_blob_open(struct got_blob_object **blob,
 			if (err)
 				goto done;
 		}
-		err = got_object_read_packed_blob_privsep(&size, outfd,
-		    obj, pack);
+		err = read_packed_blob_privsep(&size, outfd, obj, pack);
 		if (err)
 			goto done;
 		obj->size = size;

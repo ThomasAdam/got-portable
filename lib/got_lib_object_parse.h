@@ -44,5 +44,3 @@ const struct got_error *got_object_read_packed_commit_privsep(
     struct got_commit_object **, struct got_object *, struct got_pack *);
 const struct got_error *got_object_read_packed_tree_privsep(
     struct got_tree_object **, struct got_object *, struct got_pack *);
-const struct got_error *got_object_read_packed_blob_privsep(size_t *, int,
-    struct got_object *, struct got_pack *);

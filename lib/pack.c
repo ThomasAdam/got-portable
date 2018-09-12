@@ -975,11 +975,10 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 
 static const struct got_error *
 dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
-    struct got_pack *pack, FILE *outfile)
+    struct got_pack *pack, FILE *outfile, FILE *base_file, FILE *accum_file)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	FILE *base_file = NULL, *accum_file = NULL;
 	uint8_t *base_buf = NULL, *accum_buf = NULL;
 	size_t accum_size = 0;
 	uint64_t max_size;
@@ -998,17 +997,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 		accum_buf = malloc(max_size);
 		if (accum_buf == NULL)
 			return got_error_from_errno();
-	} else {
-		base_file = got_opentemp();
-		if (base_file == NULL)
-			return got_error_from_errno();
-
-		accum_file = got_opentemp();
-		if (accum_file == NULL) {
-			err = got_error_from_errno();
-			fclose(base_file);
-			return err;
-		}
+		base_file = NULL;
+		accum_file = NULL;
 	}
 
 	/* Deltas are ordered in ascending order. */
@@ -1224,7 +1214,7 @@ done:
 
 const struct got_error *
 got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
-    FILE *outfile)
+    FILE *outfile, FILE *base_file, FILE *accum_file)
 {
 	const struct got_error *err = NULL;
 
@@ -1247,7 +1237,7 @@ got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
 		}
 	} else
 		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, pack,
-		    outfile);
+		    outfile, base_file, accum_file);
 
 	return err;
 }

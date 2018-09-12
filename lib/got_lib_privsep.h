@@ -93,6 +93,9 @@ enum got_imsg_type {
 	GOT_IMSG_PACKIDX,
 	GOT_IMSG_PACK,
 	GOT_IMSG_PACKED_OBJECT_REQUEST,
+
+	/* Message sending file desciprtor to a temporary file. */
+	GOT_IMSG_TMPFD,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -189,6 +192,7 @@ const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
     struct got_object *);
 const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,

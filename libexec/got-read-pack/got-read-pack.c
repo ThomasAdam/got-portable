@@ -180,67 +180,82 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 }
 
 static const struct got_error *
+receive_file(FILE **f, struct imsgbuf *ibuf, int imsg_code)
+{
+	const struct got_error *err;
+	struct imsg imsg;
+	size_t datalen;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	if (imsg.hdr.type != imsg_code) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != 0) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	if (imsg.fd == -1) {
+		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
+		goto done;
+	}
+
+	*f = fdopen(imsg.fd, "w+");
+	if (*f == NULL) {
+		close(imsg.fd);
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	imsg_free(&imsg);
+	return err;
+}
+
+static const struct got_error *
 blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
-	FILE *f = NULL;
-	struct imsg imsg_outfd;
-	size_t datalen;
-
-	memset(&imsg_outfd, 0, sizeof(imsg_outfd));
-	imsg_outfd.fd = -1;
+	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
 
 	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
 	    GOT_OBJ_TYPE_BLOB);
 	if (err)
 		return err;
 
-	err = got_privsep_recv_imsg(&imsg_outfd, ibuf, 0);
+	err = receive_file(&outfile, ibuf, GOT_IMSG_BLOB_OUTFD);
+	if (err)
+		return err;
+	err = receive_file(&basefile, ibuf, GOT_IMSG_TMPFD);
+	if (err)
+		return err;
+	err = receive_file(&accumfile, ibuf, GOT_IMSG_TMPFD);
 	if (err)
 		return err;
 
-	if (imsg_outfd.hdr.type != GOT_IMSG_BLOB_OUTFD) {
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-		goto done;
-	}
-
-	datalen = imsg_outfd.hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != 0) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-	if (imsg_outfd.fd == -1) {
-		err = got_error(GOT_ERR_PRIVSEP_NO_FD);
-		goto done;
-	}
-
-	f = fdopen(imsg_outfd.fd, "w+");
-	if (f == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	err = got_packfile_extract_object(pack, obj, f);
+	err = got_packfile_extract_object(pack, obj, outfile, basefile,
+	    accumfile);
 	if (err)
 		goto done;
 
 	err = got_privsep_send_blob(ibuf, obj->size);
 done:
-	if (f)
-		fclose(f);
-	else if (imsg_outfd.fd != -1)
-		close(imsg_outfd.fd);
-	imsg_free(&imsg_outfd);
+	if (outfile)
+		fclose(outfile);
+	if (basefile)
+		fclose(basefile);
+	if (accumfile)
+		fclose(accumfile);
 	if (obj)
 		got_object_close(obj);
-	if (err) {
-		if (err->code == GOT_ERR_PRIVSEP_PIPE)
-			err = NULL;
-		else
-			got_privsep_send_error(ibuf, err);
-	}
+	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
+		got_privsep_send_error(ibuf, err);
 
 	return err;
 }

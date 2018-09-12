@@ -277,6 +277,16 @@ got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
 }
 
 const struct got_error *
+got_privsep_send_tmpfd(struct imsgbuf *ibuf, int fd)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_TMPFD, 0, 0, fd, NULL, 0)
+	    == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 {
 	struct got_imsg_object iobj;
