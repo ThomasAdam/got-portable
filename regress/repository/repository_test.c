@@ -427,7 +427,7 @@ repo_diff_tree(const char *repo_path)
 	} else
 		outfile = stdout;
 	test_printf("\n");
-	got_diff_tree(tree1, tree2, repo, outfile);
+	got_diff_tree(tree1, tree2, "", "", repo, outfile);
 	test_printf("\n");
 
 	got_object_tree_close(tree1);

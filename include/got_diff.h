@@ -25,24 +25,32 @@ const struct got_error *got_diff_blob(struct got_blob_object *,
 
 /*
  * Compute the differences between two trees and write unified diff text
- * to the provided output FILE.
+ * to the provided output FILE. Two const char * diff header labels may
+ * be provided which will be used to identify each blob in the diff output.
+ * If a label is NULL, use the blob's SHA1 checksum instead.
  */
 const struct got_error *got_diff_tree(struct got_tree_object *,
-    struct got_tree_object *, struct got_repository *, FILE *);
+    struct got_tree_object *, const char *label1, const char *label2,
+    struct got_repository *, FILE *);
 
 /*
- * Diff two objects, assuming both objects are blobs.
+ * Diff two objects, assuming both objects are blobs. Two const char * diff
+ * header labels may be provided which will be used to identify each blob in
+ * the diff output. If a label is NULL, use the blob's SHA1 checksum instead.
  * Write unified diff text to the provided output FILE.
  */
 const struct got_error *got_diff_objects_as_blobs(struct got_object *,
-    struct got_object *, struct got_repository *, FILE *);
+    struct got_object *, const char *, const char *, struct got_repository *,
+    FILE *);
 
 /*
- * Diff two objects, assuming both objects are trees.
+ * Diff two objects, assuming both objects are trees. Two const char * diff
+ * header labels may be provided which will be used to identify each blob in
+ * the trees. If a label is NULL, use the blob's SHA1 checksum instead.
  * Write unified diff text to the provided output FILE.
  */
 const struct got_error *got_diff_objects_as_trees(struct got_object *,
-    struct got_object *, struct got_repository *, FILE *);
+    struct got_object *, char *, char *, struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
