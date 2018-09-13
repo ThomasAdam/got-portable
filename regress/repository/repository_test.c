@@ -312,10 +312,10 @@ repo_diff_blob(const char *repo_path)
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
 	const char *expected_output[] = {
-		"blob 141f5fdc96126c1f4195558560a3c915e3d9b4c3 ---",
-		"blob de7eb21b21c7823a753261aadf7cba35c9580fbf +++",
-		"--- regress/repository_test/Makefile",
-		"+++ regress/repository_test/Makefile",
+		"blob - 141f5fdc96126c1f4195558560a3c915e3d9b4c3",
+		"blob + de7eb21b21c7823a753261aadf7cba35c9580fbf",
+		"--- 141f5fdc96126c1f4195558560a3c915e3d9b4c3",
+		"+++ de7eb21b21c7823a753261aadf7cba35c9580fbf",
 		"@@ -1,10 +1,10 @@",
 		" .PATH:${.CURDIR}/../../lib",
 		" ",
@@ -367,6 +367,7 @@ repo_diff_blob(const char *repo_path)
 		    strcmp(line, expected_output[i]) != 0) {
 			test_printf("diff output mismatch; expected: '%s'\n",
 			    expected_output[i]);
+			return 0;
 		}
 		i++;
 	}
