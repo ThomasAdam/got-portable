@@ -101,8 +101,10 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	args.diff_context = 3;
 	flags |= D_PROTOTYPE;
 
-	fprintf(outfile, "blob - %s\n", idstr1);
-	fprintf(outfile, "blob + %s\n", idstr2);
+	if (label1 && strcmp(label1, idstr1) != 0)
+		fprintf(outfile, "blob - %s\n", idstr1);
+	if (label2 && strcmp(label2, idstr2) != 0)
+		fprintf(outfile, "blob + %s\n", idstr2);
 
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
 done:
