@@ -608,10 +608,9 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 			break;
 		case 1:
 		case 2:
-			if (cols + width <= wlimit) {
+			if (cols + width <= wlimit)
 				cols += width;
-				i++;
-			}
+			i++;
 			break;
 		case -1:
 			if (wline[i] == L'\t')
