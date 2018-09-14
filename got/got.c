@@ -331,13 +331,11 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
-	datestr = get_datestr(&author_time, datebuf);
-	printf("author: %s  %s UTC\n", commit->author, datestr);
-	if (strcmp(commit->author, commit->committer) != 0 ||
-	    author_time != committer_time) {
-		datestr = get_datestr(&committer_time, datebuf);
-		printf("committer: %s  %s UTC\n", commit->committer, datestr);
-	}
+	datestr = get_datestr(&committer_time, datebuf);
+	printf("from: %s\n", commit->committer);
+	printf("date: %s UTC\n", datestr);
+	if (strcmp(commit->author, commit->committer) != 0)
+		printf("original author: %s\n", commit->author);
 	if (commit->nparents > 1) {
 		struct got_object_qid *qid;
 		int n = 1;
