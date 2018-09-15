@@ -88,7 +88,8 @@ struct got_object_id *got_object_id_dup(struct got_object_id *);
 
 /*
  * Get a newly allocated copy of an object's ID.
- * The caller should dispose of it with free(3).
+ * The caller must treat the ID as read-only and must not call free(3) on it.
+ * Use got_object_id_dup() to get a writable copy.
  */
 struct got_object_id *got_object_get_id(struct got_object *);
 

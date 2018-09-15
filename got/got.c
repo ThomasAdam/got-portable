@@ -386,19 +386,9 @@ detect_change(int *changed, struct got_object_id *commit_id,
 	}
 
 	id = got_object_get_id(obj);
-	if (id == NULL)
-		return got_error_from_errno();
 	pid = got_object_get_id(pobj);
-	if (pid == NULL) {
-		err = got_error_from_errno();
-		free(id);
-		return err;
-	}
-
 	*changed = (got_object_id_cmp(id, pid) != 0);
 	got_object_close(pobj);
-	free(id);
-	free(pid);
 	return NULL;
 }
 
@@ -601,7 +591,7 @@ cmd_log(int argc, char *argv[])
 			    start_commit);
 			if (error != NULL)
 				return error;
-			id = got_object_get_id(obj);
+			id = got_object_id_dup(got_object_get_id(obj));
 			if (id == NULL)
 				error = got_error_from_errno();
 		}
@@ -652,7 +642,6 @@ cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	char *repo_path = NULL;
 	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
@@ -698,21 +687,11 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = got_object_open_by_id_str(&obj1, repo, obj_id_str1);
-	if (error == NULL) {
-		id1 = got_object_get_id(obj1);
-		if (id1 == NULL)
-			error = got_error_from_errno();
-	}
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	error = got_object_open_by_id_str(&obj2, repo, obj_id_str2);
-	if (error == NULL) {
-		id2 = got_object_get_id(obj2);
-		if (id2 == NULL)
-			error = got_error_from_errno();
-	}
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	if (got_object_get_type(obj1) != got_object_get_type(obj2)) {
@@ -741,10 +720,6 @@ done:
 		got_object_close(obj1);
 	if (obj2)
 		got_object_close(obj2);
-	if (id1)
-		free(id1);
-	if (id2)
-		free(id2);
 	if (repo) {
 		const struct got_error *repo_error;
 		repo_error = got_repo_close(repo);
@@ -837,7 +812,7 @@ cmd_blame(int argc, char *argv[])
 		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
 		if (error != NULL)
 			goto done;
-		commit_id = got_object_get_id(obj);
+		commit_id = got_object_id_dup(got_object_get_id(obj));
 		if (commit_id == NULL)
 			error = got_error_from_errno();
 		got_object_close(obj);

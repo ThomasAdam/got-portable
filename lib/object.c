@@ -77,7 +77,7 @@ got_object_id_dup(struct got_object_id *id1)
 struct got_object_id *
 got_object_get_id(struct got_object *obj)
 {
-	return got_object_id_dup(&obj->id);
+	return &obj->id;
 }
 
 const struct got_error *

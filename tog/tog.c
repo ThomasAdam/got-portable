@@ -842,25 +842,10 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 				} else {
 					struct got_object_id *id, *pid;
 					id = got_object_get_id(obj);
-					if (id == NULL) {
-						err = got_error_from_errno();
-						got_object_close(obj);
-						got_object_close(pobj);
-						break;
-					}
 					pid = got_object_get_id(pobj);
-					if (pid == NULL) {
-						err = got_error_from_errno();
-						free(id);
-						got_object_close(obj);
-						got_object_close(pobj);
-						break;
-					}
 					changed =
 					    (got_object_id_cmp(id, pid) != 0);
 					got_object_close(pobj);
-					free(id);
-					free(pid);
 				}
 			}
 			got_object_close(obj);
@@ -1455,7 +1440,7 @@ cmd_log(int argc, char *argv[])
 		struct got_object *obj;
 		error = got_object_open_by_id_str(&obj, repo, start_commit);
 		if (error == NULL) {
-			start_id = got_object_get_id(obj);
+			start_id = got_object_id_dup(got_object_get_id(obj));
 			if (start_id == NULL)
 				error = got_error_from_errno();
 				goto done;
@@ -1607,8 +1592,6 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	view->state.diff.id1 = obj1 ? got_object_get_id(obj1) : NULL;
 	view->state.diff.id2 = got_object_get_id(obj2);
-	if (view->state.diff.id2 == NULL)
-		return got_error_from_errno();
 	view->state.diff.f = f;
 	view->state.diff.first_displayed_line = 1;
 	view->state.diff.last_displayed_line = view->nlines;
@@ -1627,8 +1610,6 @@ close_diff_view(struct tog_view *view)
 
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno();
-	free(view->state.diff.id1);
-	free(view->state.diff.id2);
 	return err;
 }
 
@@ -2356,13 +2337,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 				got_object_close(pobj);
 				pobj = NULL;
 			}
-			if (id == NULL) {
-				err = got_error_from_errno();
-				break;
-			}
-			err = got_object_qid_alloc(
-			    &s->blamed_commit, id);
-			free(id);
+			err = got_object_qid_alloc(&s->blamed_commit, id);
 			if (err)
 				goto done;
 			SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
@@ -2550,7 +2525,7 @@ cmd_blame(int argc, char *argv[])
 		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
 		if (error != NULL)
 			goto done;
-		commit_id = got_object_get_id(obj);
+		commit_id = got_object_id_dup(got_object_get_id(obj));
 		if (commit_id == NULL)
 			error = got_error_from_errno();
 		got_object_close(obj);
@@ -3097,7 +3072,7 @@ cmd_tree(int argc, char *argv[])
 		struct got_object *obj;
 		error = got_object_open_by_id_str(&obj, repo, commit_id_arg);
 		if (error == NULL) {
-			commit_id = got_object_get_id(obj);
+			commit_id = got_object_id_dup(got_object_get_id(obj));
 			if (commit_id == NULL)
 				error = got_error_from_errno();
 		}
