@@ -304,6 +304,10 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 		err = got_error_from_errno();
 		goto done;
 	}
+	if (lseek(p->fd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 #ifndef GOT_PACK_NO_MMAP
 	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
@@ -363,6 +367,10 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 	pack->filesize = ipack.filesize;
 	pack->fd = dup(imsg.fd);
 	if (pack->fd == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (lseek(pack->fd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
