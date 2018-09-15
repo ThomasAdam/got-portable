@@ -371,13 +371,12 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 detect_change(int *changed, struct got_object_id *commit_id,
-    struct got_object *obj, const char *path, struct got_repository *repo)
+    struct got_object_id *obj_id, const char *path, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *id, *pid;
-	struct got_object *pobj;
+	struct got_object_id *obj_id2;
 
-	err = got_object_open_by_path(&pobj, repo, commit_id, path);
+	err = got_object_id_by_path(&obj_id2, repo, commit_id, path);
 	if (err) {
 		if (err->code != GOT_ERR_NO_OBJ)
 			return err;
@@ -385,10 +384,8 @@ detect_change(int *changed, struct got_object_id *commit_id,
 		return NULL;
 	}
 
-	id = got_object_get_id(obj);
-	pid = got_object_get_id(pobj);
-	*changed = (got_object_id_cmp(id, pid) != 0);
-	got_object_close(pobj);
+	*changed = (got_object_id_cmp(obj_id, obj_id2) != 0);
+	free(obj_id2);
 	return NULL;
 }
 
@@ -435,11 +432,11 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		if (err)
 			break;
 		if (!is_root_path) {
-			struct got_object *obj;
+			struct got_object_id *obj_id = NULL;
 			struct got_object_qid *pid;
 			int changed = 0;
 
-			err = got_object_open_by_path(&obj, repo, id, path);
+			err = got_object_id_by_path(&obj_id, repo, id, path);
 			if (err) {
 				got_object_commit_close(commit);
 				if (err->code == GOT_ERR_NO_OBJ && found_obj) {
@@ -457,15 +454,15 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 
 			pid = SIMPLEQ_FIRST(&commit->parent_ids);
 			if (pid) {
-				err = detect_change(&changed, pid->id, obj,
+				err = detect_change(&changed, pid->id, obj_id,
 				    path, repo);
 				if (err) {
-					got_object_close(obj);
+					free(obj_id);
 					got_object_commit_close(commit);
 					break;
 				}
 			}
-			got_object_close(obj);
+			free(obj_id);
 			if (!changed) {
 				got_object_commit_close(commit);
 				continue;

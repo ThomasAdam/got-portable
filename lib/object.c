@@ -691,7 +691,7 @@ find_entry_by_name(struct got_tree_object *tree, const char *name)
 }
 
 const struct got_error *
-got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
+got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
     struct got_object_id *commit_id, const char *path)
 {
 	const struct got_error *err = NULL;
@@ -701,7 +701,7 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 	char *seg, *s, *s0 = NULL;
 	size_t len = strlen(path);
 
-	*obj = NULL;
+	*id = NULL;
 
 	/* We are expecting an absolute in-repository path. */
 	if (path[0] != '/')
@@ -713,7 +713,9 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 
 	/* Handle opening of root of commit's tree. */
 	if (path[1] == '\0') {
-		err = got_object_open(obj, repo, commit->tree_id);
+		*id = got_object_id_dup(commit->tree_id);
+		if (*id == NULL)
+			err = got_error_from_errno();
 		goto done;
 	}
 
@@ -770,9 +772,11 @@ got_object_open_by_path(struct got_object **obj, struct got_repository *repo,
 		}
 	}
 
-	if (te)
-		err = got_object_open(obj, repo, te->id);
-	else
+	if (te) {
+		*id = got_object_id_dup(te->id);
+		if (*id == NULL)
+			return got_error_from_errno();
+	} else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
 	free(s0);

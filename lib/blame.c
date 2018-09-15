@@ -186,18 +186,24 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL, *pobj = NULL;
+	struct got_object_id *obj_id = NULL, *pobj_id = NULL;
 	struct got_blob_object *blob = NULL, *pblob = NULL;
 	struct got_diff_changes *changes = NULL;
 
-	err = got_object_open_by_path(&obj, repo, id, path);
+	err = got_object_id_by_path(&obj_id, repo, id, path);
 	if (err)
 		goto done;
+
+	err = got_object_open(&obj, repo, obj_id);
+	if (err)
+		goto done;
+
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
-	err = got_object_open_by_path(&pobj, repo, pid, path);
+	err = got_object_id_by_path(&pobj_id, repo, pid, path);
 	if (err) {
 		if (err->code == GOT_ERR_NO_OBJ) {
 			/* Blob's history began in previous commit. */
@@ -205,19 +211,24 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		}
 		goto done;
 	}
+
+	/* If IDs match then don't bother with diffing. */
+	if (got_object_id_cmp(obj_id, pobj_id) == 0) {
+		if (cb)
+			err = cb(arg, blame->nlines, -1, id);
+		goto done;
+	}
+
+	err = got_object_open(&pobj, repo, pobj_id);
+	if (err)
+		goto done;
+
 	if (got_object_get_type(pobj) != GOT_OBJ_TYPE_BLOB) {
 		/*
 		 * Encountered a non-blob at the path (probably a tree).
 		 * Blob's history began in previous commit.
 		 */
 		err = got_error(GOT_ERR_ITER_COMPLETED);
-		goto done;
-	}
-
-	/* If blob hashes match then don't bother with diffing. */
-	if (got_object_id_cmp(&obj->id, &pobj->id) == 0) {
-		if (cb)
-			err = cb(arg, blame->nlines, -1, id);
 		goto done;
 	}
 
@@ -239,6 +250,8 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
+	free(obj_id);
+	free(pobj_id);
 	if (obj)
 		got_object_close(obj);
 	if (pobj)
@@ -274,6 +287,7 @@ blame_open(struct got_blame **blamep, const char *path,
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
+	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
 	struct got_commit_object *commit = NULL;
@@ -282,9 +296,14 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	*blamep = NULL;
 
-	err = got_object_open_by_path(&obj, repo, start_commit_id, path);
+	err = got_object_id_by_path(&obj_id, repo, start_commit_id, path);
 	if (err)
 		return err;
+
+	err = got_object_open(&obj, repo, obj_id);
+	if (err)
+		goto done;
+
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
@@ -357,7 +376,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	}
 
 done:
-	free(id);
+	free(obj_id);
 	if (obj)
 		got_object_close(obj);
 	if (blob)

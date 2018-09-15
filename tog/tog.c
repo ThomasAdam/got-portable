@@ -810,11 +810,11 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			break;
 
 		if (!is_root_path) {
-			struct got_object *obj;
+			struct got_object_id *obj_id = NULL;
 			struct got_object_qid *pid;
 			int changed = 0;
 
-			err = got_object_open_by_path(&obj, repo, id, path);
+			err = got_object_id_by_path(&obj_id, repo, id, path);
 			if (err) {
 				got_object_commit_close(commit);
 				if (err->code == GOT_ERR_NO_OBJ &&
@@ -828,27 +828,24 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 
 			pid = SIMPLEQ_FIRST(&commit->parent_ids);
 			if (pid != NULL) {
-				struct got_object *pobj;
-				err = got_object_open_by_path(&pobj, repo,
+				struct got_object_id *pobj_id;
+				err = got_object_id_by_path(&pobj_id, repo,
 				    pid->id, path);
 				if (err) {
 					if (err->code != GOT_ERR_NO_OBJ) {
-						got_object_close(obj);
 						got_object_commit_close(commit);
+						free(obj_id);
 						break;
 					}
 					err = NULL;
 					changed = 1;
 				} else {
-					struct got_object_id *id, *pid;
-					id = got_object_get_id(obj);
-					pid = got_object_get_id(pobj);
-					changed =
-					    (got_object_id_cmp(id, pid) != 0);
-					got_object_close(pobj);
+					changed = (got_object_id_cmp(obj_id,
+					    pobj_id) != 0);
 				}
+				free(pobj_id);
 			}
-			got_object_close(obj);
+			free(obj_id);
 			if (!changed) {
 				got_object_commit_close(commit);
 				continue;
@@ -2098,11 +2095,17 @@ run_blame(struct tog_blame *blame, pthread_mutex_t *mutex,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_repository *thread_repo = NULL;
-	struct got_object *obj;
+	struct got_object_id *obj_id = NULL;
+	struct got_object *obj = NULL;
 
-	err = got_object_open_by_path(&obj, repo, commit_id, path);
+	err = got_object_id_by_path(&obj_id, repo, commit_id, path);
 	if (err)
 		goto done;
+
+	err = got_object_open(&obj, repo, obj_id);
+	if (err)
+		goto done;
+
 	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
@@ -2163,6 +2166,7 @@ run_blame(struct tog_blame *blame, pthread_mutex_t *mutex,
 done:
 	if (blob)
 		got_object_blob_close(blob);
+	free(obj_id);
 	if (obj)
 		got_object_close(obj);
 	if (err)

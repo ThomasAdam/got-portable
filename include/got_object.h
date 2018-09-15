@@ -100,6 +100,15 @@ struct got_object_id *got_object_get_id(struct got_object *);
 const struct got_error *got_object_get_id_str(char **, struct got_object *);
 
 /*
+ * Get a newly allocated ID of the object which resides at the specified
+ * path in the tree of the specified commit.
+ * The caller should dispose of it with free(3).
+ */
+const struct got_error *
+got_object_id_by_path(struct got_object_id **, struct got_repository *,
+    struct got_object_id *, const char *);
+
+/*
  * Obtain the type of an object.
  * Returns one of the GOT_OBJ_TYPE_x values (see above).
  */
@@ -212,10 +221,6 @@ got_object_open_as_tree(struct got_tree_object **,
 const struct got_error *
 got_object_open_as_blob(struct got_blob_object **,
     struct got_repository *, struct got_object_id *, size_t);
-
-const struct got_error *
-got_object_open_by_path(struct got_object **, struct got_repository *,
-    struct got_object_id *, const char *);
 
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);
