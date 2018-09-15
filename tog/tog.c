@@ -764,23 +764,21 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 	const struct got_error *err = NULL;
 	struct got_object_id *id;
 	struct commit_queue_entry *entry;
-	int nfetched, nqueued = 0, found_obj = 0;
+	int nqueued = 0, found_obj = 0;
 	int is_root_path = strcmp(path, "/") == 0;
 
-	err = got_commit_graph_iter_start(graph, start_id);
+	err = got_commit_graph_iter_start(graph, start_id, repo);
 	if (err)
 		return err;
 
 	entry = TAILQ_LAST(&commits->head, commit_queue_head);
 	if (entry && got_object_id_cmp(entry->id, start_id) == 0) {
-		int nfetched;
-
 		/* Start ID's commit is already on the queue; skip over it. */
 		err = got_commit_graph_iter_next(&id, graph);
 		if (err && err->code != GOT_ERR_ITER_NEED_MORE)
 			return err;
 
-		err = got_commit_graph_fetch_commits(&nfetched, graph, 1, repo);
+		err = got_commit_graph_fetch_commits(graph, 1, repo);
 		if (err)
 			return err;
 	}
@@ -796,8 +794,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 				err = NULL;
 				break;
 			}
-			err = got_commit_graph_fetch_commits(&nfetched,
-			    graph, 1, repo);
+			err = got_commit_graph_fetch_commits(graph, 1, repo);
 			if (err)
 				return err;
 			continue;
@@ -1167,7 +1164,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		return err;
 
 	/* The graph contains all commits. */
-	err = got_commit_graph_open(&s->graph, head_id, 0, repo);
+	err = got_commit_graph_open(&s->graph, head_id, "/", 0, repo);
 	if (err)
 		goto done;
 	/* The commit queue contains a subset of commits filtered by path. */

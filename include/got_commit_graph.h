@@ -17,15 +17,16 @@
 struct got_commit_graph;
 
 const struct got_error *got_commit_graph_open(struct got_commit_graph **,
-    struct got_object_id *commit_id, int, struct got_repository *repo);
+    struct got_object_id *commit_id, const char *, int,
+    struct got_repository *repo);
 void got_commit_graph_close(struct got_commit_graph *);
 
 const struct got_error *
-got_commit_graph_fetch_commits(int *, struct got_commit_graph *, int,
+got_commit_graph_fetch_commits(struct got_commit_graph *, int,
     struct got_repository *);
 const struct got_error *got_commit_graph_fetch_commits_up_to(int *,
     struct got_commit_graph *, struct got_object_id *, struct got_repository *);
 const struct got_error *got_commit_graph_iter_start(
-    struct got_commit_graph *, struct got_object_id *);
+    struct got_commit_graph *, struct got_object_id *, struct got_repository *);
 const struct got_error *got_commit_graph_iter_next(struct got_object_id **,
     struct got_commit_graph *);

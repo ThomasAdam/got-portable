@@ -370,63 +370,21 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 }
 
 static const struct got_error *
-detect_change(int *changed, struct got_commit_object *commit,
-    const char *path, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_commit_object *pcommit = NULL;
-	struct got_tree_object *tree = NULL, *ptree = NULL;
-	struct got_object_qid *pid;
-
-	*changed = 0;
-
-	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
-	if (err)
-		return err;
-
-	pid = SIMPLEQ_FIRST(&commit->parent_ids);
-	if (pid == NULL) {
-		*changed = 1;
-		goto done;
-	}
-
-	err = got_object_open_as_commit(&pcommit, repo, pid->id);
-	if (err)
-		goto done;
-
-	err = got_object_open_as_tree(&ptree, repo, pcommit->tree_id);
-	if (err)
-		goto done;
-
-	err = got_object_tree_path_changed(changed, tree, ptree, path, repo);
-done:
-	if (tree)
-		got_object_tree_close(tree);
-	if (ptree)
-		got_object_tree_close(ptree);
-	if (pcommit)
-		got_object_commit_close(pcommit);
-	return err;
-}
-
-static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
     struct got_repository *repo, char *path, int show_patch, int limit,
     int first_parent_traversal)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
-	int ncommits, found_path = 0;
-	int is_root_path = (strcmp(path, "/") == 0);
 
-	err = got_commit_graph_open(&graph, root_id, first_parent_traversal,
-	    repo);
+	err = got_commit_graph_open(&graph, root_id, path,
+	    first_parent_traversal, repo);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, root_id);
+	err = got_commit_graph_iter_start(graph, root_id, repo);
 	if (err)
 		goto done;
-	do {
+	while (1) {
 		struct got_commit_object *commit;
 		struct got_object_id *id;
 
@@ -438,8 +396,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 			}
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
-			err = got_commit_graph_fetch_commits(&ncommits,
-			    graph, 1, repo);
+			err = got_commit_graph_fetch_commits(graph, 1, repo);
 			if (err)
 				break;
 			else
@@ -451,52 +408,11 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
-		if (!is_root_path) {
-			struct got_object_id *obj_id = NULL;
-			int changed;
-
-			err = detect_change(&changed, commit, path, repo);
-			if (err) {
-				if (err->code == GOT_ERR_NO_OBJ) {
-					/*
-					 * History of the path stops here
-					 * on the current commit's branch.
-					 * Keep logging on other branches.
-					 */
-					err = NULL;
-					got_object_commit_close(commit);
-					continue;
-				}
-				return err;
-			}
-			if (!changed) {
-				got_object_commit_close(commit);
-				continue;
-			}
-
-			err = got_object_id_by_path(&obj_id, repo, id, path);
-			if (err) {
-				if (err->code == GOT_ERR_NO_OBJ && found_path) {
-					/*
-					 * History of the path stops here
-					 * on the current commit's branch.
-					 * Keep logging on other branches.
-					 */
-					err = NULL;
-					got_object_commit_close(commit);
-					continue;
-				}
-				got_object_commit_close(commit);
-				return err;
-			}
-			found_path = 1;
-			free(obj_id);
-		}
 		err = print_commit(commit, id, repo, show_patch);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;
-	} while (ncommits > 0);
+	}
 done:
 	got_commit_graph_close(graph);
 	return err;

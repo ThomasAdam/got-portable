@@ -162,8 +162,8 @@ const struct got_tree_entries *got_object_tree_get_entries(
 
 /*
  * Compare two trees and indicate whether the entry at the specified path
- * differs. The path must not be the root path "/"; got_object_id_dup() can
- * be used to compare the tree roots instead.
+ * differs between them. The path must not be the root path "/"; the function
+ * got_object_id_cmp() should be used instead to compare the tree roots.
  */
 const struct got_error *got_object_tree_path_changed(int *,
     struct got_tree_object *, struct got_tree_object *, const char *,

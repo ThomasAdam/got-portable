@@ -133,3 +133,9 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 	}
 	return NULL;
 }
+
+int
+got_path_is_root_dir(const char *path)
+{
+	return (path[0] == '/' && path[1] == '\0');
+}
