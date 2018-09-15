@@ -366,6 +366,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			printf("\n");
 	}
 
+	fflush(stdout);
 	return err;
 }
 
