@@ -35,6 +35,7 @@ struct got_object_cache {
 	size_t size;
 	int cache_hit;
 	int cache_miss;
+	int cache_evict;
 };
 
 const struct got_error *got_object_cache_init(struct got_object_cache *,

@@ -87,6 +87,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 			break;
 		}
 		free(ce);
+		cache->cache_evict++;
 	}
 
 	ce = calloc(1, sizeof(*ce));
@@ -141,9 +142,10 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
-	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed\n",
+	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed, "
+	    "%d evicted\n",
 	    name, got_object_idcache_num_elements(cache->idcache),
-	    cache->cache_hit, cache->cache_miss);
+	    cache->cache_hit, cache->cache_miss, cache->cache_evict);
 }
 
 void check_refcount(struct got_object_id *id, void *data, void *arg)
