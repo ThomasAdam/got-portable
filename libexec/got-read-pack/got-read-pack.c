@@ -49,14 +49,16 @@ object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj;
+	struct got_object_id id;
 	size_t datalen;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, NULL);
+	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
 	if (err)
 		return err;
 	obj->refcnt++;

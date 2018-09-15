@@ -860,11 +860,13 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 }
 
 const struct got_error *
-got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx)
+got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
+    struct got_object_id *id)
 {
 	struct got_imsg_packed_object iobj;
 
 	iobj.idx = idx;
+	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKED_OBJECT_REQUEST, 0, 0, -1,
 	    &iobj, sizeof(iobj)) == -1)

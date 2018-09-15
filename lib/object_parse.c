@@ -191,7 +191,7 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
 
-	err = got_privsep_send_packed_obj_req(ibuf, idx);
+	err = got_privsep_send_packed_obj_req(ibuf, idx, id);
 	if (err)
 		return err;
 

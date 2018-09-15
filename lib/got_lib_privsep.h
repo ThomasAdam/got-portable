@@ -177,6 +177,7 @@ struct got_imsg_pack {
  * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST data.
  */
 struct got_imsg_packed_object {
+	uint8_t id[SHA1_DIGEST_LENGTH];
 	int idx;
 };
 
@@ -211,5 +212,6 @@ const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
 const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
 const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
     struct got_pack *, struct got_packidx *);
-const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int,
+    struct got_object_id *);
 const struct got_error *got_privsep_send_pack_child_ready(struct imsgbuf *);

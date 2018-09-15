@@ -589,8 +589,7 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 	(*obj)->pack_idx = idx;
 	(*obj)->hdrlen = 0;
 	(*obj)->size = size;
-	if (id)
-		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset;
 
 	return NULL;
@@ -887,8 +886,7 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 	(*obj)->flags = 0;
 	(*obj)->hdrlen = 0;
 	(*obj)->size = 0; /* Not known because deltas aren't applied yet. */
-	if (id)
-		memcpy(&(*obj)->id, id, sizeof((*obj)->id));
+	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset + tslen;
 
 	(*obj)->path_packfile = strdup(pack->path_packfile);
