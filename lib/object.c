@@ -872,6 +872,8 @@ got_object_tree_path_changed(int *changed,
 			te1 = NULL;
 			if (err)
 				goto done;
+			if (tree1 != tree01)
+				got_object_tree_close(tree1);
 			tree1 = next_tree1;
 
 			err = got_object_open_as_tree(&next_tree2, repo,
@@ -879,14 +881,16 @@ got_object_tree_path_changed(int *changed,
 			te2 = NULL;
 			if (err)
 				goto done;
+			if (tree2 != tree02)
+				got_object_tree_close(tree2);
 			tree2 = next_tree2;
 		}
 	}
 done:
 	free(s0);
-	if (tree1 != tree01)
+	if (tree1 && tree1 != tree01)
 		got_object_tree_close(tree1);
-	if (tree2 != tree02)
+	if (tree2 && tree2 != tree02)
 		got_object_tree_close(tree2);
 	return err;
 }
