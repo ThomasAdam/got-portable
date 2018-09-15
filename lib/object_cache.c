@@ -138,7 +138,7 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 	return NULL;
 }
 
-#if 0
+#ifdef GOT_OBJ_CACHE_DEBUG
 static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
@@ -190,7 +190,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 void
 got_object_cache_close(struct got_object_cache *cache)
 {
-#if 0
+#ifdef GOT_OBJ_CACHE_DEBUG
 	switch (cache->type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:
 		print_cache_stats(cache, "object");
