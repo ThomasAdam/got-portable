@@ -491,6 +491,7 @@ main(int argc, char *argv[])
 		got_packidx_close(packidx);
 	if (pack)
 		got_pack_close(pack);
+	got_object_cache_close(&objcache);
 	imsg_clear(&ibuf);
 	if (err)
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
