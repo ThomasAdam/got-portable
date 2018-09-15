@@ -161,6 +161,15 @@ const struct got_tree_entries *got_object_tree_get_entries(
     struct got_tree_object *);
 
 /*
+ * Compare two trees and indicate whether the entry at the specified path
+ * differs. The path must not be the root path "/"; got_object_id_dup() can
+ * be used to compare the tree roots instead.
+ */
+const struct got_error *got_object_tree_path_changed(int *,
+    struct got_tree_object *, struct got_tree_object *, const char *,
+    struct got_repository *);
+
+/*
  * Attempt to open a blob object in a repository.
  * The provided object must be of type GOT_OBJ_TYPE_BLOB.
  * The size_t argument specifies the block size of an associated read buffer.

@@ -786,3 +786,110 @@ done:
 		got_object_tree_close(tree);
 	return err;
 }
+
+const struct got_error *
+got_object_tree_path_changed(int *changed,
+    struct got_tree_object *tree01, struct got_tree_object *tree02,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_tree_entry *te1 = NULL, *te2 = NULL;
+	char *seg, *s, *s0 = NULL;
+	size_t len = strlen(path);
+
+	*changed = 0;
+
+	/* We are expecting an absolute in-repository path. */
+	if (path[0] != '/')
+		return got_error(GOT_ERR_NOT_ABSPATH);
+
+	/* We not do support comparing the root path. */
+	if (path[1] == '\0')
+		return got_error(GOT_ERR_BAD_PATH);
+
+	s0 = strdup(path);
+	if (s0 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_canonpath(path, s0, len + 1);
+	if (err)
+		goto done;
+
+	tree1 = tree01;
+	tree2 = tree02;
+	s = s0;
+	s++; /* skip leading '/' */
+	len--;
+	seg = s;
+	while (len > 0) {
+		struct got_tree_object *next_tree1, *next_tree2;
+
+		if (*s != '/') {
+			s++;
+			len--;
+			if (*s)
+				continue;
+		}
+
+		/* end of path segment */
+		*s = '\0';
+
+		te1 = find_entry_by_name(tree1, seg);
+		if (te1 == NULL) {
+			err = got_error(GOT_ERR_NO_OBJ);
+			goto done;
+		}
+
+		te2 = find_entry_by_name(tree2, seg);
+		if (te2 == NULL) {
+			*changed = 1;
+			goto done;
+		}
+
+		if (te1->mode != te2->mode) {
+			*changed = 1;
+			goto done;
+		}
+
+		if (got_object_id_cmp(te1->id, te2->id) == 0) {
+			*changed = 0;
+			goto done;
+		}
+
+		if (S_ISREG(te1->mode)) { /* final path element */
+			*changed = 1;
+			goto done;
+		}
+
+		if (len == 0)
+			break;
+
+		seg = s + 1;
+		s++;
+		len--;
+		if (*s) {
+			err = got_object_open_as_tree(&next_tree1, repo,
+			    te1->id);
+			te1 = NULL;
+			if (err)
+				goto done;
+			tree1 = next_tree1;
+
+			err = got_object_open_as_tree(&next_tree2, repo,
+			    te2->id);
+			te2 = NULL;
+			if (err)
+				goto done;
+			tree2 = next_tree2;
+		}
+	}
+done:
+	free(s0);
+	if (tree1 != tree01)
+		got_object_tree_close(tree1);
+	if (tree2 != tree02)
+		got_object_tree_close(tree2);
+	return err;
+}
