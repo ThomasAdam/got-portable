@@ -220,7 +220,7 @@ add_node_to_iter_list(struct got_commit_graph *graph,
     struct got_commit_graph_node *child_node)
 {
 	struct got_commit_graph_node *n, *next;
-	
+
 	if (TAILQ_EMPTY(&graph->iter_list)) {
 		TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
 		return;
@@ -377,11 +377,6 @@ add_node(struct got_commit_graph_node **new_node,
 		}
 		node->nparents++;
 	}
-	node->commit_timestamp = mktime(&commit->tm_committer); 
-	if (node->commit_timestamp == -1) {
-		free_node(node);
-		return got_error_from_errno();
-	}
 
 	err = got_object_idset_add(NULL, graph->node_ids, &node->id, node);
 	if (err) {
@@ -407,8 +402,14 @@ add_node(struct got_commit_graph_node **new_node,
 		}
 	}
 
-	if (changed)
+	if (changed) {
+		node->commit_timestamp = mktime(&commit->tm_committer);
+		if (node->commit_timestamp == -1) {
+			free_node(node);
+			return got_error_from_errno();
+		}
 		add_node_to_iter_list(graph, node, child_node);
+	}
 
 	if (branch_done)
 		err = close_branch(graph, commit_id);
