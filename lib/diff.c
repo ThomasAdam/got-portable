@@ -440,7 +440,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		const struct got_tree_entries *entries;
 		entries = got_object_tree_get_entries(tree1);
 		te1 = SIMPLEQ_FIRST(&entries->head);
-		if (asprintf(&l1, "%s%s%s", label1, label1[0] ? "/" : "",
+		if (te1 && asprintf(&l1, "%s%s%s", label1, label1[0] ? "/" : "",
 		    te1->name) == -1)
 			return got_error_from_errno();
 	}
@@ -448,7 +448,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		const struct got_tree_entries *entries;
 		entries = got_object_tree_get_entries(tree2);
 		te2 = SIMPLEQ_FIRST(&entries->head);
-		if (asprintf(&l2, "%s%s%s", label2, label2[0] ? "/" : "",
+		if (te2 && asprintf(&l2, "%s%s%s", label2, label2[0] ? "/" : "",
 		    te2->name) == -1)
 			return got_error_from_errno();
 	}
