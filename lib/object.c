@@ -223,21 +223,25 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return NULL;
 	}
 
+	err = open_packed_object(obj, id, repo);
+	if (err && err->code != GOT_ERR_NO_OBJ)
+		return err;
+	if (*obj) {
+		(*obj)->refcnt++;
+		return got_repo_cache_object(repo, id, *obj);
+	}
+
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 
 	fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		err = open_packed_object(obj, id, repo);
-		if (err)
-			goto done;
-		if (*obj == NULL)
+		if (errno == ENOENT)
 			err = got_error(GOT_ERR_NO_OBJ);
+		else
+			err = got_error_from_errno();
+		goto done;
 	} else {
 		err = got_object_read_header_privsep(obj, repo, fd);
 		if (err)
@@ -245,10 +249,8 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 	}
 
-	if (err == NULL) {
-		(*obj)->refcnt++;
-		err = got_repo_cache_object(repo, id, *obj);
-	}
+	(*obj)->refcnt++;
+	err = got_repo_cache_object(repo, id, *obj);
 done:
 	free(path);
 	if (fd != -1)
