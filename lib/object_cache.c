@@ -142,9 +142,9 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
-	fprintf(stderr, "%s cache: %d elements, %d hits, %d missed, "
-	    "%d evicted\n",
-	    name, got_object_idcache_num_elements(cache->idcache),
+	fprintf(stderr, "%s: %s cache: %d elements, %d hits, %d missed, "
+	    "%d evicted\n", getprogname(), name,
+	    got_object_idcache_num_elements(cache->idcache),
 	    cache->cache_hit, cache->cache_miss, cache->cache_evict);
 }
 
