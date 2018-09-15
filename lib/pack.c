@@ -137,7 +137,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->magic, sizeof(*h->magic));
-		if (n != sizeof(*h->magic)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != sizeof(*h->magic)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -165,7 +167,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->version, sizeof(*h->version));
-		if (n != sizeof(*h->version)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != sizeof(*h->version)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -195,7 +199,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->fanout_table, len_fanout);
-		if (n != len_fanout) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != len_fanout) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -224,7 +230,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->sorted_ids, len_ids);
-		if (n != len_ids) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != len_ids) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -247,7 +255,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->crc32, nobj * sizeof(*h->crc32));
-		if (n != nobj * sizeof(*h->crc32)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != nobj * sizeof(*h->crc32)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -270,7 +280,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->offsets, nobj * sizeof(*h->offsets));
-		if (n != nobj * sizeof(*h->offsets)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != nobj * sizeof(*h->offsets)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -299,7 +311,9 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 		}
 		n = read(p->fd, h->large_offsets,
 		    nobj * sizeof(*h->large_offsets));
-		if (n != nobj * sizeof(*h->large_offsets)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != nobj * sizeof(*h->large_offsets)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -325,7 +339,9 @@ checksum:
 			goto done;
 		}
 		n = read(p->fd, h->trailer, sizeof(*h->trailer));
-		if (n != sizeof(*h->trailer)) {
+		if (n < 0)
+			err = got_error_from_errno();
+		else if (n != sizeof(*h->trailer)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
