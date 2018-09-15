@@ -47,7 +47,7 @@ struct delta_test {
 };
 
 static int
-delta_apply()
+delta_apply(void)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -115,8 +115,10 @@ main(int argc, const char *argv[])
 		return 1;
 	}
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
+#endif
 
 	RUN_TEST(delta_apply(), "delta_apply");
 

@@ -62,6 +62,24 @@
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
+const struct got_error *
+got_object_id_str(char **outbuf, struct got_object_id *id)
+{
+	static const size_t len = SHA1_DIGEST_STRING_LENGTH;
+
+	*outbuf = malloc(len);
+	if (*outbuf == NULL)
+		return got_error_from_errno();
+
+	if (got_sha1_digest_to_str(id->sha1, *outbuf, len) == NULL) {
+		free(*outbuf);
+		*outbuf = NULL;
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	}
+
+	return NULL;
+}
+
 void
 got_object_close(struct got_object *obj)
 {

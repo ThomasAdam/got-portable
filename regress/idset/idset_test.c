@@ -206,8 +206,10 @@ main(int argc, char *argv[])
 	int test_ok = 0, failure = 0;
 	int ch;
 
+#ifndef PROFILE
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
+#endif
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
 		switch (ch) {

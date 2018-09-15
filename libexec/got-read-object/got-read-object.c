@@ -156,12 +156,14 @@ main(int argc, char *argv[])
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 
+#ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno();
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
+#endif
 
 	while (1) {
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);

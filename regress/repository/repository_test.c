@@ -458,8 +458,10 @@ main(int argc, char *argv[])
 	const char *repo_path;
 	int ch;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
+#endif
 
 	while ((ch = getopt(argc, argv, "v")) != -1) {
 		switch (ch) {

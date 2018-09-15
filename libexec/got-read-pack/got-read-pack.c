@@ -411,12 +411,14 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
+#ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
 		err = got_error_from_errno();
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
+#endif
 
 	err = receive_packidx(&packidx, &ibuf);
 	if (err) {
