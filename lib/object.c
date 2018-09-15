@@ -679,12 +679,12 @@ got_object_blob_dump_to_file(size_t *total_len, size_t *nlines,
 }
 
 static struct got_tree_entry *
-find_entry_by_name(struct got_tree_object *tree, const char *name)
+find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {
 	struct got_tree_entry *te;
 
 	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		if (strcmp(te->name, name) == 0)
+		if (strncmp(te->name, name, len) == 0)
 			return te;
 	}
 	return NULL;
@@ -698,8 +698,8 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te = NULL;
-	char *seg, *s, *s0 = NULL;
-	size_t len = strlen(path);
+	const char *seg, *s;
+	size_t seglen, len = strlen(path);
 
 	*id = NULL;
 
@@ -723,33 +723,23 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	s0 = strdup(path);
-	if (s0 == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = got_canonpath(path, s0, len + 1);
-	if (err)
-		goto done;
-
-	s = s0;
+	s = path;
 	s++; /* skip leading '/' */
 	len--;
 	seg = s;
+	seglen = 0;
 	while (len > 0) {
 		struct got_tree_object *next_tree;
 
 		if (*s != '/') {
 			s++;
 			len--;
+			seglen++;
 			if (*s)
 				continue;
 		}
 
-		/* end of path segment */
-		*s = '\0';
-
-		te = find_entry_by_name(tree, seg);
+		te = find_entry_by_name(tree, seg, seglen);
 		if (te == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			goto done;
@@ -759,6 +749,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 			break;
 
 		seg = s + 1;
+		seglen = 0;
 		s++;
 		len--;
 		if (*s) {
@@ -779,7 +770,6 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	} else
 		err = got_error(GOT_ERR_NO_OBJ);
 done:
-	free(s0);
 	if (commit)
 		got_object_commit_close(commit);
 	if (tree)
@@ -795,8 +785,8 @@ got_object_tree_path_changed(int *changed,
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_tree_entry *te1 = NULL, *te2 = NULL;
-	char *seg, *s, *s0 = NULL;
-	size_t len = strlen(path);
+	const char *seg, *s;
+	size_t seglen, len = strlen(path);
 
 	*changed = 0;
 
@@ -808,41 +798,31 @@ got_object_tree_path_changed(int *changed,
 	if (path[1] == '\0')
 		return got_error(GOT_ERR_BAD_PATH);
 
-	s0 = strdup(path);
-	if (s0 == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = got_canonpath(path, s0, len + 1);
-	if (err)
-		goto done;
-
 	tree1 = tree01;
 	tree2 = tree02;
-	s = s0;
+	s = path;
 	s++; /* skip leading '/' */
 	len--;
 	seg = s;
+	seglen = 0;
 	while (len > 0) {
 		struct got_tree_object *next_tree1, *next_tree2;
 
 		if (*s != '/') {
 			s++;
 			len--;
+			seglen++;
 			if (*s)
 				continue;
 		}
 
-		/* end of path segment */
-		*s = '\0';
-
-		te1 = find_entry_by_name(tree1, seg);
+		te1 = find_entry_by_name(tree1, seg, seglen);
 		if (te1 == NULL) {
 			err = got_error(GOT_ERR_NO_OBJ);
 			goto done;
 		}
 
-		te2 = find_entry_by_name(tree2, seg);
+		te2 = find_entry_by_name(tree2, seg, seglen);
 		if (te2 == NULL) {
 			*changed = 1;
 			goto done;
@@ -866,6 +846,7 @@ got_object_tree_path_changed(int *changed,
 		seg = s + 1;
 		s++;
 		len--;
+		seglen = 0;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree1, repo,
 			    te1->id);
@@ -887,7 +868,6 @@ got_object_tree_path_changed(int *changed,
 		}
 	}
 done:
-	free(s0);
 	if (tree1 && tree1 != tree01)
 		got_object_tree_close(tree1);
 	if (tree2 && tree2 != tree02)
