@@ -140,11 +140,6 @@ got_object_idset_add(void **existing_data,
 			set->nelem[i]++;
 			set->totelem++;
 			return NULL;
-		} else if (got_object_id_cmp(&new->id, &next->id) > 0) {
-			TAILQ_INSERT_BEFORE(next, new, entry);
-			set->nelem[i]++;
-			set->totelem++;
-			return NULL;
 		}
 	}
 
