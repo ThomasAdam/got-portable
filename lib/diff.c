@@ -610,19 +610,18 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 		goto done;
 	}
 	free(id_str);
-	time = mktime(&commit2->tm_author);
 	if (fprintf(outfile, "from: %s\n", commit2->author) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
+	time = mktime(&commit2->tm_committer);
 	if (fprintf(outfile, "date: %s UTC\n",
 	    get_datestr(&time, datebuf)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	time = mktime(&commit2->tm_committer);
 	if (strcmp(commit2->author, commit2->committer) != 0 &&
-	    fprintf(outfile, "original author: %s\n", commit2->committer) < 0) {
+	    fprintf(outfile, "via: %s\n", commit2->committer) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
