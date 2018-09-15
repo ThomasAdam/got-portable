@@ -370,6 +370,39 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 }
 
 static const struct got_error *
+detect_change(int *changed, struct got_object_id *commit_id,
+    struct got_object *obj, const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id, *pid;
+	struct got_object *pobj;
+
+	err = got_object_open_by_path(&pobj, repo, commit_id, path);
+	if (err) {
+		if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+		*changed = 1;
+		return NULL;
+	}
+
+	id = got_object_get_id(obj);
+	if (id == NULL)
+		return got_error_from_errno();
+	pid = got_object_get_id(pobj);
+	if (pid == NULL) {
+		err = got_error_from_errno();
+		free(id);
+		return err;
+	}
+
+	*changed = (got_object_id_cmp(id, pid) != 0);
+	got_object_close(pobj);
+	free(id);
+	free(pid);
+	return NULL;
+}
+
+static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
     struct got_repository *repo, char *path, int show_patch, int limit,
     int first_parent_traversal)
@@ -433,39 +466,13 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 			found_obj = 1;
 
 			pid = SIMPLEQ_FIRST(&commit->parent_ids);
-			if (pid != NULL) {
-				struct got_object *pobj;
-				err = got_object_open_by_path(&pobj, repo,
-				    pid->id, path);
+			if (pid) {
+				err = detect_change(&changed, pid->id, obj,
+				    path, repo);
 				if (err) {
-					if (err->code != GOT_ERR_NO_OBJ) {
-						got_object_close(obj);
-						got_object_commit_close(commit);
-						break;
-					}
-					err = NULL;
-					changed = 1;
-				} else {
-					struct got_object_id *id, *pid;
-					id = got_object_get_id(obj);
-					if (id == NULL) {
-						err = got_error_from_errno();
-						got_object_close(obj);
-						break;
-					}
-					pid = got_object_get_id(pobj);
-					if (pid == NULL) {
-						err = got_error_from_errno();
-						free(id);
-						got_object_close(obj);
-						got_object_close(pobj);
-						break;
-					}
-					changed =
-					    (got_object_id_cmp(id, pid) != 0);
-					got_object_close(pobj);
-					free(id);
-					free(pid);
+					got_object_close(obj);
+					got_object_commit_close(commit);
+					break;
 				}
 			}
 			got_object_close(obj);
