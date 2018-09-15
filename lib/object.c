@@ -858,13 +858,10 @@ got_object_tree_path_changed(int *changed,
 			goto done;
 		}
 
-		if (S_ISREG(te1->mode)) { /* final path element */
+		if (len == 0) { /* final path element */
 			*changed = 1;
 			goto done;
 		}
-
-		if (len == 0)
-			break;
 
 		seg = s + 1;
 		s++;
