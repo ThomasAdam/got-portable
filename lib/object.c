@@ -278,7 +278,11 @@ got_object_open_as_commit(struct got_commit_object **commit,
 	const struct got_error *err;
 	struct got_object *obj;
 
-	*commit = NULL;
+	*commit = got_repo_get_cached_commit(repo, id);
+	if (*commit != NULL) {
+		(*commit)->refcnt++;
+		return NULL;
+	}
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
@@ -405,7 +409,11 @@ got_object_open_as_tree(struct got_tree_object **tree,
 	const struct got_error *err;
 	struct got_object *obj;
 
-	*tree = NULL;
+	*tree = got_repo_get_cached_tree(repo, id);
+	if (*tree != NULL) {
+		(*tree)->refcnt++;
+		return NULL;
+	}
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
