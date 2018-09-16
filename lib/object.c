@@ -271,64 +271,20 @@ got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
 	return got_object_open(obj, repo, &id);
 }
 
-const struct got_error *
-got_object_open_as_commit(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object_id *id)
-{
-	const struct got_error *err;
-	struct got_object *obj;
-
-	*commit = got_repo_get_cached_commit(repo, id);
-	if (*commit != NULL) {
-		(*commit)->refcnt++;
-		return NULL;
-	}
-
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = got_object_commit_open(commit, repo, obj);
-done:
-	got_object_close(obj);
-	return err;
-}
-
-const struct got_error *
-got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
+static const struct got_error *
+open_commit(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object *obj, int check_cache)
 {
 	const struct got_error *err = NULL;
 
-	*qid = calloc(1, sizeof(**qid));
-	if (*qid == NULL)
-		return got_error_from_errno();
-
-	(*qid)->id = got_object_id_dup(id);
-	if ((*qid)->id == NULL) {
-		err = got_error_from_errno();
-		got_object_qid_free(*qid);
-		*qid = NULL;
-		return err;
-	}
-
-	return NULL;
-}
-
-const struct got_error *
-got_object_commit_open(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object *obj)
-{
-	const struct got_error *err = NULL;
-
-	*commit = got_repo_get_cached_commit(repo, &obj->id);
-	if (*commit != NULL) {
-		(*commit)->refcnt++;
-		return NULL;
-	}
+	if (check_cache) {
+		*commit = got_repo_get_cached_commit(repo, &obj->id);
+		if (*commit != NULL) {
+			(*commit)->refcnt++;
+			return NULL;
+		}
+	} else
+		*commit = NULL;
 
 	if (obj->type != GOT_OBJ_TYPE_COMMIT)
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -358,6 +314,60 @@ got_object_commit_open(struct got_commit_object **commit,
 	}
 
 	return err;
+}
+
+const struct got_error *
+got_object_open_as_commit(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	*commit = got_repo_get_cached_commit(repo, id);
+	if (*commit != NULL) {
+		(*commit)->refcnt++;
+		return NULL;
+	}
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = open_commit(commit, repo, obj, 0);
+done:
+	got_object_close(obj);
+	return err;
+}
+
+const struct got_error *
+got_object_commit_open(struct got_commit_object **commit,
+    struct got_repository *repo, struct got_object *obj)
+{
+	return open_commit(commit, repo, obj, 1);
+}
+
+const struct got_error *
+got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+
+	*qid = calloc(1, sizeof(**qid));
+	if (*qid == NULL)
+		return got_error_from_errno();
+
+	(*qid)->id = got_object_id_dup(id);
+	if ((*qid)->id == NULL) {
+		err = got_error_from_errno();
+		got_object_qid_free(*qid);
+		*qid = NULL;
+		return err;
+	}
+
+	return NULL;
 }
 
 const struct got_error *
