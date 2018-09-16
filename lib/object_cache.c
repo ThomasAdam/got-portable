@@ -121,6 +121,7 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 {
 	struct got_object_cache_entry *ce;
 
+	cache->cache_searches++;
 	ce = got_object_idcache_get(cache->idcache, id);
 	if (ce) {
 		cache->cache_hit++;
@@ -142,10 +143,11 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
-	fprintf(stderr, "%s: %s cache: %d elements, %d hits, %d missed, "
-	    "%d evicted\n", getprogname(), name,
+	fprintf(stderr, "%s: %s cache: %d elements, %d searches, %d hits, "
+	    "%d missed, %d evicted\n", getprogname(), name,
 	    got_object_idcache_num_elements(cache->idcache),
-	    cache->cache_hit, cache->cache_miss, cache->cache_evict);
+	    cache->cache_searches, cache->cache_hit,
+	    cache->cache_miss, cache->cache_evict);
 }
 
 void check_refcount(struct got_object_id *id, void *data, void *arg)
