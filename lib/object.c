@@ -370,17 +370,20 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 	return NULL;
 }
 
-const struct got_error *
-got_object_tree_open(struct got_tree_object **tree,
-    struct got_repository *repo, struct got_object *obj)
+static const struct got_error *
+open_tree(struct got_tree_object **tree,
+    struct got_repository *repo, struct got_object *obj, int check_cache)
 {
 	const struct got_error *err = NULL;
 
-	*tree = got_repo_get_cached_tree(repo, &obj->id);
-	if (*tree != NULL) {
-		(*tree)->refcnt++;
-		return NULL;
-	}
+	if (check_cache) {
+		*tree = got_repo_get_cached_tree(repo, &obj->id);
+		if (*tree != NULL) {
+			(*tree)->refcnt++;
+			return NULL;
+		}
+	} else
+		*tree = NULL;
 
 	if (obj->type != GOT_OBJ_TYPE_TREE)
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -433,10 +436,17 @@ got_object_open_as_tree(struct got_tree_object **tree,
 		goto done;
 	}
 
-	err = got_object_tree_open(tree, repo, obj);
+	err = open_tree(tree, repo, obj, 0);
 done:
 	got_object_close(obj);
 	return err;
+}
+
+const struct got_error *
+got_object_tree_open(struct got_tree_object **tree,
+    struct got_repository *repo, struct got_object *obj)
+{
+	return open_tree(tree, repo, obj, 1);
 }
 
 const struct got_tree_entries *
