@@ -143,12 +143,6 @@ is_head_node(struct got_commit_graph_node *node)
 	return node->nchildren == 0;
 }
 
-static int
-is_merge_point(struct got_commit_graph_node *node)
-{
-	return node->nparents > 1;
-}
-
 int
 is_branch_point(struct got_commit_graph_node *node)
 {
@@ -161,6 +155,12 @@ is_root_node(struct got_commit_graph_node *node)
 	return node->nparents == 0;
 }
 #endif
+
+static int
+is_merge_point(struct got_commit_graph_node *node)
+{
+	return node->nparents > 1;
+}
 
 static const struct got_error *
 detect_changed_path(int *changed, struct got_commit_object *commit,
@@ -222,55 +222,22 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 	struct got_commit_graph_node *n, *next;
 
 	if (TAILQ_EMPTY(&graph->iter_list)) {
-		TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
+		TAILQ_INSERT_HEAD(&graph->iter_list, node, entry);
+		graph->iter_node = node;
 		return;
 	}
 
+	n = graph->iter_node;
 	/* Ensure that an iteration in progress will see this new commit. */
-	if (graph->iter_node) {
-		n = graph->iter_node;
-		while (n) {
-			next = TAILQ_NEXT(n, entry);
-			if (next &&
-			    node->commit_timestamp >= next->commit_timestamp) {
-				TAILQ_INSERT_BEFORE(next, node, entry);
-				return;
-			}
-			n = next;
+	while (n) {
+		next = TAILQ_NEXT(n, entry);
+		if (next && node->commit_timestamp >= next->commit_timestamp) {
+			TAILQ_INSERT_BEFORE(next, node, entry);
+			return;
 		}
-		TAILQ_INSERT_AFTER(&graph->iter_list, graph->iter_node,
-		    node, entry);
-		return;
+		n = next;
 	}
-
-	/*
-	 * If a child node is known, begin looping over the list there
-	 * instead of beginning from the list head.
-	 */
-	n = child_node ? child_node : TAILQ_FIRST(&graph->iter_list);
-
-	/* Insert into list based on committer timestamp. */
-	do {
-		if (node->commit_timestamp == n->commit_timestamp) {
-			TAILQ_INSERT_AFTER(&graph->iter_list, n, node, entry);
-			break;
-		} else if (node->commit_timestamp < n->commit_timestamp) {
-			next = TAILQ_NEXT(n, entry);
-			if (next == NULL) {
-				TAILQ_INSERT_AFTER(&graph->iter_list, n,
-				    node, entry);
-				break;
-			}
-			if (node->commit_timestamp >= next->commit_timestamp) {
-				TAILQ_INSERT_BEFORE(next, node, entry);
-				break;
-			}
-		} else {
-			TAILQ_INSERT_BEFORE(n, node, entry);
-			break;
-		}
-		n = TAILQ_NEXT(n, entry);
-	} while (n);
+	TAILQ_INSERT_AFTER(&graph->iter_list, graph->iter_node, node, entry);
 }
 
 static const struct got_error *
@@ -307,7 +274,8 @@ close_branch(struct got_commit_graph *graph, struct got_object_id *commit_id)
 static const struct got_error *
 advance_branch(struct got_commit_graph *graph,
     struct got_commit_graph_node *node,
-    struct got_object_id *commit_id, struct got_commit_object *commit)
+    struct got_object_id *commit_id, struct got_commit_object *commit,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *qid;
@@ -325,6 +293,74 @@ advance_branch(struct got_commit_graph *graph,
 		if (err && err->code != GOT_ERR_OBJ_EXISTS)
 			return err;
 		return NULL;
+	}
+
+	/*
+	 * If we are graphing commits for a specific path, skip branches
+	 * which do not contribute any content to this path.
+	 */
+	if (is_merge_point(node) && !got_path_is_root_dir(graph->path)) {
+		struct got_object_id *id, *merged_id, *prev_id = NULL;
+		int branches_differ = 0;
+		#if 0
+		int n = 1;
+		#endif
+
+		err = got_object_id_by_path(&merged_id, repo, commit_id,
+		    graph->path);
+		if (err)
+			return err;
+
+		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+			if (got_object_idset_get(graph->node_ids, qid->id))
+				continue; /* parent already traversed */
+
+			err = got_object_id_by_path(&id, repo, qid->id,
+			    graph->path);
+			if (err) {
+				if (err->code == GOT_ERR_NO_OBJ) {
+					branches_differ = 1;
+					continue;
+				}
+				return err;
+			}
+
+			if (prev_id) {
+				if (!branches_differ &&
+				    got_object_id_cmp(merged_id, prev_id) != 0)
+					branches_differ = 1;
+			} else
+				prev_id = id;
+
+			/*
+			 * If a branch has created the merged content we can
+			 * skip any other branches.
+			 */
+			if (got_object_id_cmp(merged_id, id) == 0) {
+				err = got_object_idset_add(NULL,
+				    graph->open_branches, qid->id, node);
+				if (err && err->code != GOT_ERR_OBJ_EXISTS)
+					return err;
+				return NULL;
+			}
+		}
+
+		/*
+		 * If the path's content is the same on all branches,
+		 * follow the first parent only.
+		 */
+		if (!branches_differ) {
+			qid = SIMPLEQ_FIRST(&commit->parent_ids);
+			if (qid == NULL)
+				return NULL;
+			if (got_object_idset_get(graph->node_ids, qid->id))
+				return NULL; /* parent already traversed */
+			err = got_object_idset_add(NULL,
+			    graph->open_branches, qid->id, node);
+			if (err && err->code != GOT_ERR_OBJ_EXISTS)
+				return err;
+			return NULL;
+		}
 	}
 
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
@@ -402,19 +438,19 @@ add_node(struct got_commit_graph_node **new_node,
 		}
 	}
 
-	if (changed) {
-		node->commit_timestamp = mktime(&commit->tm_committer);
-		if (node->commit_timestamp == -1) {
-			free_node(node);
-			return got_error_from_errno();
-		}
-		add_node_to_iter_list(graph, node, child_node);
+	node->commit_timestamp = mktime(&commit->tm_committer);
+	if (node->commit_timestamp == -1) {
+		free_node(node);
+		return got_error_from_errno();
 	}
+
+	if (changed && !is_merge_point(node))
+		add_node_to_iter_list(graph, node, child_node);
 
 	if (branch_done)
 		err = close_branch(graph, commit_id);
 	else
-		err = advance_branch(graph, node, commit_id, commit);
+		err = advance_branch(graph, node, commit_id, commit, repo);
 	if (err)
 		free_node(node);
 	else
@@ -693,7 +729,13 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	if (TAILQ_NEXT(graph->iter_node, entry) == NULL)
 		return got_error(GOT_ERR_ITER_NEED_MORE);
 
-	*id = &graph->iter_node->id;
-	graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
+	if (graph->iter_node == TAILQ_FIRST(&graph->iter_list)) {
+		*id = &graph->iter_node->id;
+		graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
+	} else {
+		graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
+		*id = &graph->iter_node->id;
+	}
+
 	return NULL;
 }
