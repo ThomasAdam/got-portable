@@ -721,8 +721,12 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	    TAILQ_LAST(&graph->iter_list, got_commit_graph_iter_list) &&
 	    got_object_idset_num_elements(graph->open_branches) == 0) {
 		/* We are done iterating. */
+		if (graph->iter_node == TAILQ_FIRST(&graph->iter_list))
+			*id = &graph->iter_node->id;
+		else
+			*id = NULL;
 		graph->iter_node = NULL;
-		return got_error(GOT_ERR_ITER_COMPLETED);
+		return *id ? NULL : got_error(GOT_ERR_ITER_COMPLETED);
 	}
 
 	if (TAILQ_NEXT(graph->iter_node, entry) == NULL)
