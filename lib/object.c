@@ -714,7 +714,7 @@ find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 	struct got_tree_entry *te;
 
 	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		if (strncmp(te->name, name, len) == 0 &&  te->name[len] == '\0')
+		if (strncmp(te->name, name, len) == 0 && te->name[len] == '\0')
 			return te;
 	}
 	return NULL;
