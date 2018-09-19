@@ -381,7 +381,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 	} while (path);
 done:
 	if (err)
-		err = got_repo_close(repo);
+		got_repo_close(repo);
 	else
 		*repop = repo;
 	free(abspath);
