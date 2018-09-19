@@ -182,7 +182,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 		if (commit->refcnt == 1)
 			break;
 		fprintf(stderr, "commit %s has %d unclaimed references\n",
-		    id_str, commit->refcnt);
+		    id_str, commit->refcnt - 1);
 		break;
 	}
 	free(id_str);
