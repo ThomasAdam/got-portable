@@ -90,7 +90,7 @@ struct got_commit_graph {
 	/* Copy of known branch tips for fetch_commits_from_open_branches(). */
 	struct got_commit_graph_branch_tip *tips;
 	size_t ntips;
-#define GOT_COMMIT_GRAPH_MIN_TIPS 100	/* minimum amount of tips to allocate */
+#define GOT_COMMIT_GRAPH_MIN_TIPS 10	/* minimum amount of tips to allocate */
 
 	/* Path of tree entry of interest to the API user. */
 	char *path;
