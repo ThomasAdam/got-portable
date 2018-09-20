@@ -334,7 +334,6 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 
-	/* Loop over first-parent history and try to blame commits. */
 	err = got_commit_graph_open(&graph, start_commit_id, path, 0, repo);
 	if (err)
 		return err;
