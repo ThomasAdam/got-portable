@@ -35,6 +35,7 @@
 #include "got_lib_object.h"
 #include "got_lib_diff.h"
 #include "got_lib_diffoffset.h"
+#include "got_commit_graph.h"
 
 struct got_blame_line {
 	int annotated;
@@ -290,9 +291,9 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	int lineno;
+	struct got_commit_graph *graph = NULL;
 
 	*blamep = NULL;
 
@@ -335,55 +336,62 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	/* Loop over first-parent history and try to blame commits. */
 	/* TODO: Iterate commits via commit graph instead. */
-	err = got_object_open_as_commit(&commit, repo, start_commit_id);
+	err = got_commit_graph_open(&graph, start_commit_id, path, 0, repo);
+	if (err)
+		return err;
+	err = got_commit_graph_iter_start(graph, start_commit_id, repo);
 	if (err)
 		goto done;
-	id = got_object_id_dup(start_commit_id);
-	if (id == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
+
+	id = NULL;
 	while (1) {
-		struct got_object_qid *pid;
+		struct got_object_id *next_id;
 
-		pid = SIMPLEQ_FIRST(&commit->parent_ids);
-		if (pid == NULL)
-			break;
-
-		err = blame_commit(blame, id, pid->id, path, repo, cb, arg);
+		err = got_commit_graph_iter_next(&next_id, graph);
 		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED)
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				err = NULL;
+				break;
+			}
+			if (err->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			if (err)
+				break;
+			else
+				continue;
+		}
+		if (next_id == NULL)
 			break;
+		if (id) {
+			err = blame_commit(blame, id, next_id, path, repo,
+			    cb, arg);
+			if (err) {
+				if (err->code == GOT_ERR_ITER_COMPLETED)
+					err = NULL;
+				break;
+			}
 		}
-
-		free(id);
-		id = got_object_id_dup(pid->id);
-		if (id == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		got_object_commit_close(commit);
-		err = got_object_open_as_commit(&commit, repo, id);
-		if (err)
-			goto done;
+		id = next_id;
 	}
 
-	/* Annotate remaining non-annotated lines with last commit. */
-	for (lineno = 1; lineno <= blame->nlines; lineno++) {
-		err = annotate_line(blame, lineno, id, cb, arg);
-		if (err)
-			goto done;
+	if (id) {
+		/* Annotate remaining non-annotated lines with last commit. */
+		for (lineno = 1; lineno <= blame->nlines; lineno++) {
+			err = annotate_line(blame, lineno, id, cb, arg);
+			if (err)
+				goto done;
+		}
 	}
 
 done:
+	if (graph)
+		got_commit_graph_close(graph);
 	free(obj_id);
 	if (obj)
 		got_object_close(obj);
 	if (blob)
 		got_object_blob_close(blob);
-	if (commit)
-		got_object_commit_close(commit);
 	if (err) {
 		if (blame)
 			blame_close(blame);
