@@ -62,6 +62,8 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 	const struct got_error *err = NULL;
 	int fd;
 
+	*outfile = NULL;
+
 	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
 		*path = NULL;
 		return got_error_from_errno();
