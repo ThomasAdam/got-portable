@@ -302,9 +302,6 @@ advance_branch(struct got_commit_graph *graph,
 	if (is_merge_point(node) && !got_path_is_root_dir(graph->path)) {
 		struct got_object_id *id, *merged_id, *prev_id = NULL;
 		int branches_differ = 0;
-		#if 0
-		int n = 1;
-		#endif
 
 		err = got_object_id_by_path(&merged_id, repo, commit_id,
 		    graph->path);
