@@ -2886,7 +2886,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case '\r':
 			if (s->selected_entry == NULL) {
 				struct tog_parent_tree *parent;
-		case KEY_LEFT:
+		case KEY_BACKSPACE:
 				/* user selected '..' */
 				if (s->tree == s->root)
 					break;
