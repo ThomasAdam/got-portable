@@ -34,6 +34,7 @@
 #include <wchar.h>
 #include <time.h>
 #include <pthread.h>
+#include <libgen.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -117,6 +118,7 @@ struct tog_log_view_state {
 	int selected;
 	char *in_repo_path;
 	struct got_repository *repo;
+	struct got_object_id *start_id;
 };
 
 struct tog_blame_cb_args {
@@ -1136,6 +1138,11 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
 	s->selected_entry = s->first_displayed_entry;
 	s->repo = repo;
+	s->start_id = got_object_id_dup(start_id);
+	if (s->start_id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	view->show = show_log_view;
 	view->input = input_log_view;
@@ -1154,6 +1161,7 @@ close_log_view(struct tog_view *view)
 		got_commit_graph_close(s->graph);
 	free_commits(&s->commits);
 	free(s->in_repo_path);
+	free(s->start_id);
 	return NULL;
 }
 
@@ -1223,6 +1231,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
+	char *parent_path;
 
 	switch (ch) {
 		case 'k':
@@ -1294,6 +1303,22 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case 't':
 			err = browse_commit(new_view, view, s->selected_entry,
 			    s->repo);
+			break;
+		case KEY_BACKSPACE:
+			if (strcmp(s->in_repo_path, "/") == 0)
+				break;
+			parent_path = dirname(s->in_repo_path);
+			if (parent_path && strcmp(parent_path, ".") != 0) {
+				struct tog_view *lv;
+				lv = view_open(0, 0, 0, 0, NULL, TOG_VIEW_LOG);
+				if (lv == NULL)
+					return got_error_from_errno();
+				err = open_log_view(lv, s->start_id, s->repo,
+				    parent_path);
+				if (err)
+					break;
+				*new_view = lv;
+			}
 			break;
 		default:
 			break;
