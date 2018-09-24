@@ -395,7 +395,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 			view->focussed = 0;
 			(*focus)->focussed = 1;
 			break;
-		case KEY_BACKSPACE:
+		case '~':
 			prev = TAILQ_PREV(view, tog_view_list_head, entry);
 			if (prev)
 				*focus = prev;
