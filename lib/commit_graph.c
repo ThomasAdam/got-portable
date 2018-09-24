@@ -237,7 +237,7 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 		}
 		n = next;
 	}
-	TAILQ_INSERT_AFTER(&graph->iter_list, graph->iter_node, node, entry);
+	TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
 }
 
 static const struct got_error *
@@ -614,32 +614,6 @@ got_commit_graph_fetch_commits(struct got_commit_graph *graph, int limit,
 	return NULL;
 }
 
-const struct got_error *
-got_commit_graph_fetch_commits_up_to(int *nfetched,
-    struct got_commit_graph *graph, struct got_object_id *wanted_id,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	int ncommits, wanted_id_added = 0;
-
-	*nfetched = 0;
-
-	if (got_object_idset_get(graph->node_ids, wanted_id) != NULL)
-		return NULL;
-
-	while (!wanted_id_added) {
-		err = fetch_commits_from_open_branches(&ncommits,
-		    &wanted_id_added, NULL, graph, repo, wanted_id);
-		if (err)
-			return err;
-		if (ncommits == 0)
-			return NULL;
-		*nfetched += ncommits;
-	}
-
-	return NULL;
-}
-
 static void
 free_node_iter(struct got_object_id *id, void *data, void *arg)
 {
@@ -670,7 +644,6 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	start_node = got_object_idset_get(graph->node_ids, id);
 	if (start_node == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
-
 
 	err = got_object_open_as_commit(&commit, repo, &start_node->id);
 	if (err)

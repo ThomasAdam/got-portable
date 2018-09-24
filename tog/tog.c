@@ -767,102 +767,50 @@ free_commits(struct commit_queue *commits)
 
 static const struct got_error *
 queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
-    struct got_object_id *start_id, int minqueue, int init,
+    struct got_object_id *start_id, int minqueue,
     struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *id;
-	struct commit_queue_entry *entry;
-	int nqueued = 0, found_obj = 0;
-	int is_root_path = strcmp(path, "/") == 0;
+	int nqueued = 0;
 
-	err = got_commit_graph_iter_start(graph, start_id, repo);
-	if (err)
-		return err;
-
-	entry = TAILQ_LAST(&commits->head, commit_queue_head);
-	if (entry && got_object_id_cmp(entry->id, start_id) == 0) {
-		/* Start ID's commit is already on the queue; skip over it. */
-		err = got_commit_graph_iter_next(&id, graph);
-		if (err && err->code != GOT_ERR_ITER_NEED_MORE)
-			return err;
-
-		err = got_commit_graph_fetch_commits(graph, 1, repo);
+	if (start_id) {
+		err = got_commit_graph_iter_start(graph, start_id, repo);
 		if (err)
 			return err;
 	}
 
-	while (1) {
+	while (nqueued < minqueue) {
+		struct got_object_id *id;
 		struct got_commit_object *commit;
+		struct commit_queue_entry *entry;
 
 		err = got_commit_graph_iter_next(&id, graph);
 		if (err) {
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			if (nqueued >= minqueue) {
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				err = NULL;
 				break;
 			}
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			if (err->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			err = got_commit_graph_fetch_commits(graph,
+			    minqueue, repo);
 			if (err)
 				return err;
 			continue;
 		}
+
 		if (id == NULL)
 			break;
 
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
-
-		if (!is_root_path) {
-			struct got_object_id *obj_id = NULL;
-			struct got_object_qid *pid;
-			int changed = 0;
-
-			err = got_object_id_by_path(&obj_id, repo, id, path);
-			if (err) {
-				got_object_commit_close(commit);
-				if (err->code == GOT_ERR_NO_OBJ &&
-				    (found_obj || !init)) {
-					/* History stops here. */
-					err = got_error(GOT_ERR_ITER_COMPLETED);
-				}
-				break;
-			}
-			found_obj = 1;
-
-			pid = SIMPLEQ_FIRST(&commit->parent_ids);
-			if (pid != NULL) {
-				struct got_object_id *pobj_id;
-				err = got_object_id_by_path(&pobj_id, repo,
-				    pid->id, path);
-				if (err) {
-					if (err->code != GOT_ERR_NO_OBJ) {
-						got_object_commit_close(commit);
-						free(obj_id);
-						break;
-					}
-					err = NULL;
-					changed = 1;
-				} else {
-					changed = (got_object_id_cmp(obj_id,
-					    pobj_id) != 0);
-				}
-				free(pobj_id);
-			}
-			free(obj_id);
-			if (!changed) {
-				got_object_commit_close(commit);
-				continue;
-			}
-		}
-
 		entry = alloc_commit_queue_entry(commit, id);
 		if (entry == NULL) {
 			err = got_error_from_errno();
 			break;
 		}
+
 		TAILQ_INSERT_TAIL(&commits->head, entry, entry);
 		nqueued++;
 		commits->ncommits++;
@@ -881,15 +829,12 @@ fetch_next_commit(struct commit_queue_entry **pentry,
 
 	*pentry = NULL;
 
-	err = queue_commits(graph, commits, entry->id, 1, 0, repo, path);
+	err = queue_commits(graph, commits, NULL, 1, repo, path);
 	if (err)
 		return err;
 
 	/* Next entry to display should now be available. */
 	*pentry = TAILQ_NEXT(entry, entry);
-	if (*pentry == NULL)
-		return got_error(GOT_ERR_NO_OBJ);
-
 	return NULL;
 }
 
@@ -991,8 +936,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		ncommits++;
 		*last = entry;
 		if (entry == TAILQ_LAST(&commits->head, commit_queue_head)) {
-			err = queue_commits(graph, commits, entry->id, 1,
-			    0, repo, path);
+			err = queue_commits(graph, commits, NULL, 1,
+			    repo, path);
 			if (err) {
 				if (err->code != GOT_ERR_ITER_COMPLETED)
 					return err;
@@ -1030,7 +975,7 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 static const struct got_error *
 scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
-    struct commit_queue_entry *last_displayed_entry,
+    struct commit_queue_entry **last_displayed_entry,
     struct commit_queue *commits, struct got_commit_graph *graph,
     struct got_repository *repo, const char *path)
 {
@@ -1039,14 +984,14 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 	int nscrolled = 0;
 
 	do {
-		pentry = TAILQ_NEXT(last_displayed_entry, entry);
+		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 		if (pentry == NULL) {
-			err = fetch_next_commit(&pentry, last_displayed_entry,
+			err = fetch_next_commit(&pentry, *last_displayed_entry,
 			    commits, graph, repo, path);
 			if (err || pentry == NULL)
 				break;
 		}
-		last_displayed_entry = pentry;
+		*last_displayed_entry = pentry;
 
 		pentry = TAILQ_NEXT(*first_displayed_entry, entry);
 		if (pentry == NULL)
@@ -1160,31 +1105,19 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *head_id = NULL;
-	int nfetched;
 	struct tog_log_view_state *s = &view->state.log;
 
 	err = got_repo_map_path(&s->in_repo_path, repo, path);
 	if (err != NULL)
 		goto done;
 
-	err = get_head_commit_id(&head_id, repo);
-	if (err)
-		return err;
-
-	/* The graph contains all commits. */
-	err = got_commit_graph_open(&s->graph, head_id, "/", 0, repo);
+	err = got_commit_graph_open(&s->graph, start_id, s->in_repo_path,
+	    0, repo);
 	if (err)
 		goto done;
-	/* The commit queue contains a subset of commits filtered by path. */
+	/* The commit queue only contains commits being displayed. */
 	TAILQ_INIT(&s->commits.head);
 	s->commits.ncommits = 0;
-
-	/* Populate commit graph with a sufficient number of commits. */
-	err = got_commit_graph_fetch_commits_up_to(&nfetched, s->graph,
-	    start_id, repo);
-	if (err)
-		goto done;
 
 	/*
 	 * Open the initial batch of commits, sorted in commit graph order.
@@ -1192,7 +1125,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	 * in order to avoid having to re-fetch commits from disk while
 	 * updating the display.
 	 */
-	err = queue_commits(s->graph, &s->commits, start_id, view->nlines, 1,
+	err = queue_commits(s->graph, &s->commits, start_id, view->nlines,
 	    repo, s->in_repo_path);
 	if (err) {
 		if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -1200,8 +1133,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		err = NULL;
 	}
 
-	s->first_displayed_entry =
-	    TAILQ_FIRST(&s->commits.head);
+	s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
 	s->selected_entry = s->first_displayed_entry;
 	s->repo = repo;
 
@@ -1210,7 +1142,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->close = close_log_view;
 	view->set_child = set_child_log_view;
 done:
-	free(head_id);
 	return err;
 }
 
@@ -1322,7 +1253,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			err = scroll_down(&s->first_displayed_entry, 1,
-			    s->last_displayed_entry, &s->commits,
+			    &s->last_displayed_entry, &s->commits,
 			    s->graph, s->repo, s->in_repo_path);
 			if (err) {
 				if (err->code != GOT_ERR_ITER_COMPLETED)
@@ -1334,12 +1265,10 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			struct commit_queue_entry *first;
 			first = s->first_displayed_entry;
 			err = scroll_down(&s->first_displayed_entry,
-			    view->nlines, s->last_displayed_entry,
+			    view->nlines, &s->last_displayed_entry,
 			    &s->commits, s->graph, s->repo,
 			    s->in_repo_path);
-			if (err == NULL)
-				break;
-			if (err->code != GOT_ERR_ITER_COMPLETED)
+			if (err && err->code != GOT_ERR_ITER_COMPLETED)
 				break;
 			if (first == s->first_displayed_entry &&
 			    s->selected < MIN(view->nlines - 2,
