@@ -335,6 +335,12 @@ view_resize(struct tog_view *view)
 	return NULL;
 }
 
+static int
+view_is_splitscreen(struct tog_view *view)
+{
+	return view->begin_x > 0;
+}
+
 static const struct got_error *
 view_splitscreen(struct tog_view *view)
 {
@@ -1287,10 +1293,14 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case KEY_ENTER:
 		case '\r':
-			*focus_view = view; /* keep log view focussed */
 			err = open_diff_view_for_commit(new_view, view->begin_x,
 			    s->selected_entry->id, s->selected_entry->commit,
 			    s->repo);
+			if (err)
+				break;
+			/* Keep log view focussed in split-screen mode. */
+			if (view_is_splitscreen(*new_view))
+				*focus_view = view;
 			break;
 		case 't':
 			err = browse_commit(new_view, view->begin_x,
