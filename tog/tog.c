@@ -1006,18 +1006,19 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 static const struct got_error *
 show_commit(struct tog_view **new_view, struct tog_view *parent_view,
-    struct commit_queue_entry *entry, struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_commit_object *commit,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *parent_id;
 	struct tog_view *diff_view;
 
-	err = got_object_open(&obj2, repo, entry->id);
+	err = got_object_open(&obj2, repo, commit_id);
 	if (err)
 		return err;
 
-	parent_id = SIMPLEQ_FIRST(&entry->commit->parent_ids);
+	parent_id = SIMPLEQ_FIRST(&commit->parent_ids);
 	if (parent_id) {
 		err = got_object_open(&obj1, repo, parent_id->id);
 		if (err)
@@ -1297,7 +1298,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case KEY_ENTER:
 		case '\r':
-			err = show_commit(new_view, view, s->selected_entry,
+			err = show_commit(new_view, view,
+			    s->selected_entry->id, s->selected_entry->commit,
 			    s->repo);
 			break;
 		case 't':
@@ -1666,7 +1668,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (entry == NULL)
 				break;
 			err = show_commit(&diff_view, view->parent,
-			    entry, ls->repo);
+			    entry->id, entry->commit, ls->repo);
 			if (err)
 				break;
 			*new_view = diff_view;
