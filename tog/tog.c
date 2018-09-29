@@ -216,10 +216,8 @@ struct tog_view {
 	} state;
 
 	const struct got_error *(*show)(struct tog_view *);
-	const struct got_error *(*update_siblings)(int *, struct tog_view *,
-	    struct tog_view*);
 	const struct got_error *(*input)(struct tog_view **,
-	    struct tog_view **, struct tog_view *, int);
+	    struct tog_view **, struct tog_view**, struct tog_view *, int);
 	const struct got_error *(*set_child)(struct tog_view *,
 	    struct tog_view *);
 	const struct got_error *(*close)(struct tog_view *);
@@ -228,19 +226,15 @@ struct tog_view {
 static const struct got_error *open_diff_view(struct tog_view *,
     struct got_object *, struct got_object *, struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
-static const struct got_error *update_siblings_diff_view(int *,
-    struct tog_view *, struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
-    struct tog_view **, struct tog_view *, int);
+    struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error* close_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_repository *, const char *);
 static const struct got_error * show_log_view(struct tog_view *);
-static const struct got_error *update_siblings_log_view(int *,
-    struct tog_view *, struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
-    struct tog_view **, struct tog_view *, int);
+    struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_log_view(struct tog_view *);
 static const struct got_error* set_child_log_view(struct tog_view *,
     struct tog_view *);
@@ -248,19 +242,15 @@ static const struct got_error* set_child_log_view(struct tog_view *,
 static const struct got_error *open_blame_view(struct tog_view *, char *,
     struct got_object_id *, struct got_repository *);
 static const struct got_error *show_blame_view(struct tog_view *);
-static const struct got_error *update_siblings_blame_view(int *,
-    struct tog_view *, struct tog_view *);
 static const struct got_error *input_blame_view(struct tog_view **,
-    struct tog_view **, struct tog_view *, int);
+    struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
     struct got_tree_object *, struct got_object_id *, struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
-static const struct got_error *update_siblings_tree_view(int *,
-    struct tog_view *, struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
-    struct tog_view **, struct tog_view *, int);
+    struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_tree_view(struct tog_view *);
 
 static const struct got_error *
@@ -308,34 +298,6 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 
 	keypad(view->window, TRUE);
 	return view;
-}
-
-static const struct got_error *
-view_show(struct tog_view *view, struct tog_view_list_head *views)
-{
-	const struct got_error *err;
-	struct tog_view *v;
-
-	err = view->show(view);
-	if (err)
-		return err;
-
-	if (!view->focussed)
-		return NULL;
-
-	TAILQ_FOREACH(v, views, entry) {
-		int updated = 0;
-		err = view->update_siblings(&updated, view, v);
-		if (err)
-			return err;
-		if (updated) {
-			err = v->show(v);
-			if (err)
-				return err;
-		}
-	}
-
-	return err;
 }
 
 static int
@@ -449,7 +411,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = TAILQ_LAST(views, tog_view_list_head);
 			break;
 		case 'q':
-			err = view->input(new, dead, view, ch);
+			err = view->input(new, dead, focus, view, ch);
 			*dead = view;
 			break;
 		case 'Q':
@@ -462,7 +424,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				err = view_fullscreen(view);
 			if (err)
 				break;
-			err = view->input(new, dead, view, KEY_RESIZE);
+			err = view->input(new, dead, focus, view, KEY_RESIZE);
 			if (err)
 				break;
 			*focus = view;
@@ -472,11 +434,11 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				err = view_resize(v);
 				if (err)
 					return err;
-				err = v->input(new, dead, v, ch);
+				err = v->input(new, dead, focus, v, ch);
 			}
 			break;
 		default:
-			err = view->input(new, dead, view, ch);
+			err = view->input(new, dead, focus, view, ch);
 			break;
 	}
 
@@ -535,7 +497,7 @@ view_loop(struct tog_view *view)
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
 	view->focussed = 1;
-	err = view_show(view, &views);
+	err = view->show(view);
 	if (err)
 		return err;
 	update_panels();
@@ -576,7 +538,8 @@ view_loop(struct tog_view *view)
 				break;
 			}
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
-			focus_view = new_view;
+			if (focus_view == NULL)
+				focus_view = new_view;
 		} 
 		if (focus_view) {
 			show_panel(focus_view->panel);
@@ -589,11 +552,13 @@ view_loop(struct tog_view *view)
 			}
 			focus_view->focussed = 1;
 			view = focus_view;
+			if (new_view)
+				show_panel(new_view->panel);
 		}
 		TAILQ_FOREACH(v, &views, entry) {
-			err = view_show(v, &views);
+			err = v->show(v);
 			if (err)
-				break;
+				return err;
 		}
 		update_panels();
 		doupdate();
@@ -1215,7 +1180,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	}
 
 	view->show = show_log_view;
-	view->update_siblings = update_siblings_log_view;
 	view->input = input_log_view;
 	view->close = close_log_view;
 	view->set_child = set_child_log_view;
@@ -1237,46 +1201,6 @@ close_log_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_diff_view(struct tog_view *diff_view,
-    struct got_object_id *commit_id, struct got_commit_object *commit,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct tog_diff_view_state *ds;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
-	struct got_object_qid *parent_id;
-
-	ds = &diff_view->state.diff;
-	if (got_object_id_cmp(ds->id2, commit_id) == 0)
-		return NULL;
-
-	err = got_object_open(&obj2, repo, commit_id);
-	if (err)
-		return err;
-
-	parent_id = SIMPLEQ_FIRST(&commit->parent_ids);
-	if (parent_id) {
-		err = got_object_open(&obj1, repo, parent_id->id);
-		if (err)
-			goto done;
-	}
-
-	err = close_diff_view(diff_view);
-	if (err)
-		goto done;
-
-	err = open_diff_view(diff_view, obj1, obj2, repo);
-	if (err)
-		goto done;
-done:
-	if (obj1)
-		got_object_close(obj1);
-	if (obj2)
-		got_object_close(obj2);
-	return err;
-}
-
-static const struct got_error *
 show_log_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
@@ -1291,28 +1215,8 @@ show_log_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_siblings_log_view(int *updated, struct tog_view *view,
-    struct tog_view *sibling_view)
-{
-	const struct got_error *err = NULL;
-	struct tog_log_view_state *s = &view->state.log;
-
-	switch (sibling_view->type) {
-	case TOG_VIEW_DIFF:
-		err = update_diff_view(sibling_view, s->selected_entry->id,
-		    s->selected_entry->commit, s->repo);
-		*updated = 1;
-		break;
-	default:
-		break;
-	}
-
-	return err;
-}
-
-static const struct got_error *
 input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
-    struct tog_view *view, int ch)
+    struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -1382,6 +1286,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case KEY_ENTER:
 		case '\r':
+			*focus_view = view; /* keep log view focussed */
 			err = open_diff_view_for_commit(new_view, view->begin_x,
 			    s->selected_entry->id, s->selected_entry->commit,
 			    s->repo);
@@ -1641,7 +1546,6 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 	view->state.diff.last_displayed_line = view->nlines;
 
 	view->show = show_diff_view;
-	view->update_siblings = update_siblings_diff_view;
 	view->input = input_diff_view;
 	view->close = close_diff_view;
 
@@ -1690,15 +1594,8 @@ show_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_siblings_diff_view(int *updated, struct tog_view *view,
-    struct tog_view *sibling_view)
-{
-	return NULL;
-}
-
-static const struct got_error *
 input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
-    struct tog_view *view, int ch)
+    struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_diff_view_state *s = &view->state.diff;
@@ -2222,7 +2119,6 @@ open_blame_view(struct tog_view *view, char *path,
 	memset(&s->blame, 0, sizeof(s->blame));
 
 	view->show = show_blame_view;
-	view->update_siblings = update_siblings_blame_view;
 	view->input = input_blame_view;
 	view->close = close_blame_view;
 
@@ -2274,15 +2170,8 @@ show_blame_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_siblings_blame_view(int *updated, struct tog_view *view,
-    struct tog_view *sibling_view)
-{
-	return NULL;
-}
-
-static const struct got_error *
 input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
-    struct tog_view *view, int ch)
+    struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
 	struct got_object *obj = NULL, *pobj = NULL;
@@ -2873,7 +2762,6 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->repo = repo;
 
 	view->show = show_tree_view;
-	view->update_siblings = update_siblings_tree_view;
 	view->input = input_tree_view;
 	view->close = close_tree_view;
 done:
@@ -2928,15 +2816,8 @@ show_tree_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_siblings_tree_view(int *updated, struct tog_view *view,
-    struct tog_view *sibling_view)
-{
-	return NULL;
-}
-
-static const struct got_error *
 input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
-    struct tog_view *view, int ch)
+    struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
