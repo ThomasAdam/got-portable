@@ -202,6 +202,7 @@ struct tog_view {
 	PANEL *panel;
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
+	int focussed;
 	struct tog_view *parent;
 	struct tog_view *child;
 
@@ -320,10 +321,10 @@ view_show(struct tog_view *view)
 		show_panel(view->parent->panel);
 	}
 
-	show_panel(view->panel);
 	err = view->show(view);
 	if (err)
 		return err;
+	show_panel(view->panel);
 
 	if (view->child && view->child->begin_x > view->begin_x) {
 		err = view->child->show(view->child);
@@ -393,6 +394,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = next;
 			else
 				*focus = TAILQ_FIRST(views);
+			view->focussed = 0;
+			(*focus)->focussed = 1;
 			break;
 		case '~':
 			prev = TAILQ_PREV(view, tog_view_list_head, entry);
@@ -400,6 +403,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				*focus = prev;
 			else
 				*focus = TAILQ_LAST(views, tog_view_list_head);
+			view->focussed = 0;
+			(*focus)->focussed = 1;
 			break;
 		case 'q':
 			err = view->input(new, dead, view, ch);
@@ -450,8 +455,7 @@ view_vborder(struct tog_view *view)
 int
 view_needs_focus_indication(struct tog_view *view)
 {
-	PANEL *top_panel = panel_below(NULL);
-	if (view->panel != top_panel)
+	if (!view->focussed)
 		return 0;
 
 	if (view->child && view->child->begin_x > view->begin_x)
@@ -474,6 +478,7 @@ view_loop(struct tog_view *view)
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
+	view->focussed = 1;
 	while (!TAILQ_EMPTY(&views) && !done) {
 		err = view_show(view);
 		if (err)
@@ -497,12 +502,15 @@ view_loop(struct tog_view *view)
 				view = dead_view->parent;
 			else
 				view = TAILQ_LAST(&views, tog_view_list_head);
+			if (view)
+				view->focussed = 1;
 			err = view_close(dead_view);
 			if (err)
 				goto done;
 		}
 		if (new_view) {
 			struct tog_view *v, *t;
+			view->focussed = 0;
 			/* Only allow one view per type. */
 			TAILQ_FOREACH_SAFE(v, &views, entry, t) {
 				if (v->type != new_view->type)
@@ -517,8 +525,10 @@ view_loop(struct tog_view *view)
 				err = view_set_child(new_view->parent, new_view);
 				if (err)
 					goto done;
+				new_view->parent->focussed = 0;
 			}
 			view = new_view;
+			view->focussed = 1;
 		}
 	}
 done:
