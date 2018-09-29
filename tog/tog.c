@@ -2796,7 +2796,11 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->root = s->tree = root;
 	s->entries = got_object_tree_get_entries(root);
 	s->first_displayed_entry = SIMPLEQ_FIRST(&s->entries->head);
-	s->commit_id = commit_id;
+	s->commit_id = got_object_id_dup(commit_id);
+	if (s->commit_id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	s->repo = repo;
 
 	view->show = show_tree_view;
@@ -2804,8 +2808,10 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	view->close = close_tree_view;
 done:
 	free(commit_id_str);
-	if (err)
+	if (err) {
 		free(s->tree_label);
+		s->tree_label = NULL;
+	}
 	return err;
 }
 
@@ -2815,6 +2821,9 @@ close_tree_view(struct tog_view *view)
 	struct tog_tree_view_state *s = &view->state.tree;
 
 	free(s->tree_label);
+	s->tree_label = NULL;
+	free(s->commit_id);
+	s->commit_id = NULL;
 	while (!TAILQ_EMPTY(&s->parents)) {
 		struct tog_parent_tree *parent;
 		parent = TAILQ_FIRST(&s->parents);
