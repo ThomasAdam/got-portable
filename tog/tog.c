@@ -1166,39 +1166,35 @@ close_log_view(struct tog_view *view)
 }
 
 static const struct got_error *
-update_diff_child_view(struct tog_view *parent,
-    struct commit_queue_entry *selected_entry, struct got_repository *repo)
+update_diff_view(struct tog_view *diff_view,
+    struct got_object_id *commit_id, struct got_commit_object *commit,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct tog_diff_view_state *ds;
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *parent_id;
-	struct tog_view *child_view = parent->child;
 
-	if (child_view == NULL)
-		return NULL;
-	if (child_view->type != TOG_VIEW_DIFF)
-		return NULL;
-	ds = &child_view->state.diff;
-	if (got_object_id_cmp(ds->id2, selected_entry->id) == 0)
+	ds = &diff_view->state.diff;
+	if (got_object_id_cmp(ds->id2, commit_id) == 0)
 		return NULL;
 
-	err = got_object_open(&obj2, repo, selected_entry->id);
+	err = got_object_open(&obj2, repo, commit_id);
 	if (err)
 		return err;
 
-	parent_id = SIMPLEQ_FIRST(&selected_entry->commit->parent_ids);
+	parent_id = SIMPLEQ_FIRST(&commit->parent_ids);
 	if (parent_id) {
 		err = got_object_open(&obj1, repo, parent_id->id);
 		if (err)
 			goto done;
 	}
 
-	err = close_diff_view(child_view);
+	err = close_diff_view(diff_view);
 	if (err)
 		goto done;
 
-	err = open_diff_view(child_view, obj1, obj2, repo);
+	err = open_diff_view(diff_view, obj1, obj2, repo);
 	if (err)
 		goto done;
 done:
@@ -1222,7 +1218,11 @@ show_log_view(struct tog_view *view)
 	if (err)
 		return err;
 
-	return update_diff_child_view(view, s->selected_entry, s->repo);
+	if (view->child && view->child->type == TOG_VIEW_DIFF)
+		err = update_diff_view(view->child, s->selected_entry->id,
+		    s->selected_entry->commit, s->repo);
+
+	return err;
 }
 
 static const struct got_error *
