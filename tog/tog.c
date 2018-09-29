@@ -1005,8 +1005,9 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 }
 
 static const struct got_error *
-show_commit(struct tog_view **new_view, struct tog_view *parent_view,
-    struct got_object_id *commit_id, struct got_commit_object *commit,
+open_diff_view_for_commit(struct tog_view **new_view,
+    struct tog_view *parent_view, struct got_object_id *commit_id,
+    struct got_commit_object *commit,
     struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -1298,7 +1299,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case KEY_ENTER:
 		case '\r':
-			err = show_commit(new_view, view,
+			err = open_diff_view_for_commit(new_view, view,
 			    s->selected_entry->id, s->selected_entry->commit,
 			    s->repo);
 			break;
@@ -1667,8 +1668,9 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			}
 			if (entry == NULL)
 				break;
-			err = show_commit(&diff_view, view->parent,
-			    entry->id, entry->commit, ls->repo);
+			err = open_diff_view_for_commit(&diff_view,
+			    view->parent, entry->id, entry->commit,
+			    ls->repo);
 			if (err)
 				break;
 			*new_view = diff_view;
