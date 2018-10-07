@@ -203,8 +203,6 @@ struct tog_view {
 	int nlines, ncols, begin_y, begin_x;
 	int lines, cols; /* copies of LINES and COLS */
 	int focussed;
-	struct tog_view *parent;
-	struct tog_view *child;
 
 	/* type-specific state */
 	enum tog_view_type type;
