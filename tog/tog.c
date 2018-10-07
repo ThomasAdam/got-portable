@@ -216,8 +216,6 @@ struct tog_view {
 	const struct got_error *(*show)(struct tog_view *);
 	const struct got_error *(*input)(struct tog_view **,
 	    struct tog_view **, struct tog_view**, struct tog_view *, int);
-	const struct got_error *(*set_child)(struct tog_view *,
-	    struct tog_view *);
 	const struct got_error *(*close)(struct tog_view *);
 };
 
@@ -234,8 +232,6 @@ static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_log_view(struct tog_view *);
-static const struct got_error* set_child_log_view(struct tog_view *,
-    struct tog_view *);
 
 static const struct got_error *open_blame_view(struct tog_view *, char *,
     struct got_object_id *, struct got_repository *);
@@ -1106,43 +1102,6 @@ browse_commit(struct tog_view **new_view, int begin_x,
 }
 
 static const struct got_error *
-set_child_log_view(struct tog_view *view, struct tog_view *child)
-{
-	struct tog_log_view_state *s = &view->state.log;
-	struct tog_diff_view_state *ds;
-	struct commit_queue_entry *commit, *child_entry = NULL;
-	int selected_idx = 0;
-
-	if (child->type != TOG_VIEW_DIFF)
-		return NULL;
-	ds = &child->state.diff;
-
-	TAILQ_FOREACH(commit, &s->commits.head, entry) {
-		if (got_object_id_cmp(commit->id, ds->id2) == 0) {
-			child_entry = commit;
-			break;
-		}
-	}
-	if (child_entry == NULL)
-		return NULL;
-
-	commit = s->first_displayed_entry;
-	while (commit) {
-		if (got_object_id_cmp(commit->id, child_entry->id) == 0) {
-			s->selected_entry = child_entry;
-			s->selected = selected_idx;
-			break;
-		}
-		if (commit == s->last_displayed_entry)
-			break;
-		selected_idx++;
-		commit = TAILQ_NEXT(commit, entry);
-	}
-
-	return show_log_view(view);
-}
-
-static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_repository *repo, const char *path)
 {
@@ -1187,7 +1146,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->show = show_log_view;
 	view->input = input_log_view;
 	view->close = close_log_view;
-	view->set_child = set_child_log_view;
 done:
 	return err;
 }
