@@ -56,9 +56,9 @@ Quit
 .It Cm q
 Quit the view which is in focus.
 .It Cm Tab
-Switch focus to the next view. Cycles through all views.
+Switch focus between views.
 .It Cm f
-Toggle fullscreen mode for the view which is in focus.
+Toggle fullscreen mode for a split-screen view.
 .El
 .Pp
 Global options must precede the command name, and are as follows:
@@ -88,11 +88,11 @@ Move the selection cursor down.
 .It Cm Up-arrow, k, [, Page-up
 Move the selection cursor up.
 .It Cm Enter
-Switch to the
+Open a
 .Cm diff
 view showing file changes made in the currently selected commit.
 .It Cm t
-Switch to the
+Open a 
 .Cm tree
 view showing the tree for the currently selected commit.
 .It Cm Backspace
@@ -144,22 +144,23 @@ Move the selection cursor down.
 .It Cm Up-arrow, k, Page-up
 Move the selection cursor up.
 .It Cm Enter
-Switch to the
+Open a
 .Cm diff
 view for the currently selected line's commit.
 .It Cm b
-Show the
+Reload the
 .Cm blame
-view for the version of the file in the currently selected line's commit.
+view with the version of the file as found in the currently
+selected line's commit.
 .It Cm p
-Show the
+Reload the
 .Cm blame
-view for the version of the file in the currently selected line's commit's
-parent commit.
+view with the version of the file as found in the parent commit of the
+currently selected line's commit.
 .It Cm B
-Switch the
+Reload the
 .Cm blame
-view back to the previously blamed commit.
+view with the previously blamed commit.
 .El
 .Pp
 The options for
@@ -195,13 +196,13 @@ Enter the currently selected directory, or switch to the
 .Cm blame
 view for the currently selected file.
 .It Cm l
-Switch to the
+Open a
 .Cm log
 view for the currently selected tree entry.
 .It Cm Backspace
 Move back to the parent directory.
 .It Cm i
-Show the object IDs for all objects displayed in the
+Show object IDs for all objects displayed in the
 .Cm tree
 view.
 .El
