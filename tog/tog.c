@@ -488,7 +488,7 @@ view_needs_focus_indication(struct tog_view *view)
 			return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static const struct got_error *
