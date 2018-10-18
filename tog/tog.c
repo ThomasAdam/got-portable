@@ -327,67 +327,7 @@ view_split_begin_x(int begin_x)
 	return (COLS >= 120 ? COLS/2 : 0);
 }
 
-static const struct got_error *
-view_resize(struct tog_view *view)
-{
-	int nlines, ncols;
-
-	if (view->lines > LINES)
-		nlines = view->nlines - (view->lines - LINES);
-	else
-		nlines = view->nlines + (LINES - view->lines);
-
-	if (view->cols > COLS)
-		ncols = view->ncols - (view->cols - COLS);
-	else
-		ncols = view->ncols + (COLS - view->cols);
-
-	if (wresize(view->window, nlines, ncols) == ERR)
-		return got_error_from_errno();
-	replace_panel(view->panel, view->window);
-
-	view->nlines = nlines;
-	view->ncols = ncols;
-	view->lines = LINES;
-	view->cols = COLS;
-
-	return NULL;
-}
-
-static int
-view_is_parent_view(struct tog_view *view)
-{
-	return view->parent == NULL;
-}
-
-static const struct got_error *
-view_close_child(struct tog_view *view)
-{
-	const struct got_error *err;
-
-	if (view->child == NULL)
-		return NULL;
-
-	err = view_close(view->child);
-	view->child = NULL;
-	return err;
-}
-
-static const struct got_error *
-view_set_child(struct tog_view *view, struct tog_view *child)
-{
-	const struct got_error *err = NULL;
-
-	view->child = child;
-	child->parent = view;
-	return err;
-}
-
-static int
-view_is_splitscreen(struct tog_view *view)
-{
-	return !view_is_parent_view(view) && view->begin_x > 0;
-}
+static const struct got_error *view_resize(struct tog_view *);
 
 static const struct got_error *
 view_splitscreen(struct tog_view *view)
@@ -429,6 +369,82 @@ view_fullscreen(struct tog_view *view)
 		return got_error_from_errno();
 
 	return NULL;
+}
+
+static int
+view_is_parent_view(struct tog_view *view)
+{
+	return view->parent == NULL;
+}
+
+static const struct got_error *
+view_resize(struct tog_view *view)
+{
+	int nlines, ncols;
+
+	if (view->lines > LINES)
+		nlines = view->nlines - (view->lines - LINES);
+	else
+		nlines = view->nlines + (LINES - view->lines);
+
+	if (view->cols > COLS)
+		ncols = view->ncols - (view->cols - COLS);
+	else
+		ncols = view->ncols + (COLS - view->cols);
+
+	if (wresize(view->window, nlines, ncols) == ERR)
+		return got_error_from_errno();
+	replace_panel(view->panel, view->window);
+
+	view->nlines = nlines;
+	view->ncols = ncols;
+	view->lines = LINES;
+	view->cols = COLS;
+
+	if (view_is_parent_view(view)) {
+		view->child->begin_x = view_split_begin_x(view->begin_x);
+		if (view->child->begin_x == 0) {
+			view_fullscreen(view->child);
+			if (view->child->focussed)
+				show_panel(view->child->panel);
+			else
+				show_panel(view->panel);
+		} else {
+			view_splitscreen(view->child);
+			show_panel(view->child->panel);
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+view_close_child(struct tog_view *view)
+{
+	const struct got_error *err;
+
+	if (view->child == NULL)
+		return NULL;
+
+	err = view_close(view->child);
+	view->child = NULL;
+	return err;
+}
+
+static const struct got_error *
+view_set_child(struct tog_view *view, struct tog_view *child)
+{
+	const struct got_error *err = NULL;
+
+	view->child = child;
+	child->parent = view;
+	return err;
+}
+
+static int
+view_is_splitscreen(struct tog_view *view)
+{
+	return !view_is_parent_view(view) && view->begin_x > 0;
 }
 
 static const struct got_error *
