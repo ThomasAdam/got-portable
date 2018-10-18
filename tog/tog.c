@@ -1290,7 +1290,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 	switch (ch) {
 		case 'k':
 		case KEY_UP:
-		case '[':
 			if (s->selected > 0)
 				s->selected--;
 			if (s->selected > 0)
@@ -1309,7 +1308,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'j':
 		case KEY_DOWN:
-		case ']':
 			if (s->selected < MIN(view->nlines - 2,
 			    s->commits.ncommits - 1)) {
 				s->selected++;
