@@ -260,7 +260,6 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	printf("Checked out %s\n", worktree_path);
 	printf("Now shut up and hack\n");
 
 done:
