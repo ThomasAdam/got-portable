@@ -355,7 +355,7 @@ repo_diff_blob(const char *repo_path)
 	outfile = got_opentemp();
 	if (outfile == NULL)
 		return 0;
-	got_diff_blob(blob1, blob2, NULL, NULL, outfile);
+	got_diff_blob(blob1, blob2, NULL, NULL, 3, outfile);
 	rewind(outfile);
 	i = 0;
 	while ((line = fparseln(outfile, &len, NULL, delim, 0)) != NULL) {
@@ -428,7 +428,7 @@ repo_diff_tree(const char *repo_path)
 	} else
 		outfile = stdout;
 	test_printf("\n");
-	got_diff_tree(tree1, tree2, "", "", repo, outfile);
+	got_diff_tree(tree1, tree2, "", "", 3, repo, outfile);
 	test_printf("\n");
 
 	got_object_tree_close(tree1);

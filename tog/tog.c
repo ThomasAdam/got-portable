@@ -1625,14 +1625,14 @@ open_diff_view(struct tog_view *view, struct got_object *obj1,
 
 	switch (got_object_get_type(obj1 ? obj1 : obj2)) {
 	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		err = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL, 3,
 		    repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(obj1, obj2, "", "", repo, f);
+		err = got_diff_objects_as_trees(obj1, obj2, "", "", 3, repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		err = got_diff_objects_as_commits(obj1, obj2, repo, f);
+		err = got_diff_objects_as_commits(obj1, obj2, 3, repo, f);
 		break;
 	default:
 		return got_error(GOT_ERR_OBJ_TYPE);

@@ -290,7 +290,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 			return err;
 	}
 
-	err = got_diff_tree(tree1, tree2, "", "", repo, stdout);
+	err = got_diff_tree(tree1, tree2, "", "", 3, repo, stdout);
 	if (tree1)
 		got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
@@ -639,15 +639,15 @@ cmd_diff(int argc, char *argv[])
 
 	switch (got_object_get_type(obj1)) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		error = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL, 3,
 		    repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(obj1, obj2, "", "", repo,
+		error = got_diff_objects_as_trees(obj1, obj2, "", "", 3, repo,
 		    stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = got_diff_objects_as_commits(obj1, obj2, repo, stdout);
+		error = got_diff_objects_as_commits(obj1, obj2, 3, repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
