@@ -18,6 +18,7 @@
 #include <sys/queue.h>
 #include <sys/limits.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include <err.h>
 #include <errno.h>
@@ -54,11 +55,13 @@ __dead static void	usage_checkout(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
+__dead static void	usage_tree(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_log(int, char *[]);
 static const struct got_error*		cmd_diff(int, char *[]);
 static const struct got_error*		cmd_blame(int, char *[]);
+static const struct got_error*		cmd_tree(int, char *[]);
 #ifdef notyet
 static const struct got_error*		cmd_status(int, char *[]);
 #endif
@@ -72,6 +75,8 @@ static struct cmd got_commands[] = {
 	    "compare files and directories" },
 	{ "blame",	cmd_blame,	usage_blame,
 	    " show when lines in a file were changed" },
+	{ "tree",	cmd_tree,	usage_tree,
+	    " list files and directories in repository" },
 #ifdef notyet
 	{ "status",	cmd_status,	usage_status,
 	    "show modification status of files" },
@@ -769,6 +774,162 @@ cmd_blame(int argc, char *argv[])
 	}
 
 	error = got_blame(in_repo_path, commit_id, repo, stdout);
+done:
+	free(in_repo_path);
+	free(repo_path);
+	free(cwd);
+	free(commit_id);
+	if (repo) {
+		const struct got_error *repo_error;
+		repo_error = got_repo_close(repo);
+		if (error == NULL)
+			error = repo_error;
+	}
+	return error;
+}
+
+__dead static void
+usage_tree(void)
+{
+	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path] [-i] path\n",
+	    getprogname());
+	exit(1);
+}
+
+
+static const struct got_error *
+print_tree(const char *path, struct got_object_id *commit_id,
+    int show_ids, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *tree_id = NULL;
+	struct got_tree_object *tree = NULL;
+	const struct got_tree_entries *entries;
+	struct got_tree_entry *te;
+
+	err = got_object_id_by_path(&tree_id, repo, commit_id, path);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		goto done;
+	entries = got_object_tree_get_entries(tree);
+	te = SIMPLEQ_FIRST(&entries->head);
+	while (te) {
+		char *id = NULL;
+		if (show_ids) {
+			char *id_str;
+			err = got_object_id_str(&id_str, te->id);
+			if (err)
+				goto done;
+			if (asprintf(&id, "%s ", id_str) == -1) {
+				err = got_error_from_errno();
+				free(id_str);
+				goto done;
+			}
+			free(id_str);
+		}
+		printf("%s%s%s\n", id ? id : "",
+		    te->name, S_ISDIR(te->mode) ? "/" : "");
+		te = SIMPLEQ_NEXT(te, entry);
+		free(id);
+	}
+done:
+	if (tree)
+		got_object_tree_close(tree);
+	free(tree_id);
+	return err;
+}
+
+static const struct got_error *
+cmd_tree(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	struct got_object_id *commit_id = NULL;
+	char *commit_id_str = NULL;
+	int show_ids = 0;
+	int ch;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "c:r:i")) != -1) {
+		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			break;
+		case 'i':
+			show_ids = 1;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 1)
+		path = argv[0];
+	else if (argc > 1)
+		usage_tree();
+	else
+		path = "/";
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	if (repo_path == NULL) {
+		repo_path = strdup(cwd);
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	}
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_map_path(&in_repo_path, repo, path);
+	if (error != NULL)
+		goto done;
+
+	if (commit_id_str == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			goto done;
+		error = got_ref_resolve(&commit_id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			goto done;
+	} else {
+		struct got_object *obj;
+		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		if (error != NULL)
+			goto done;
+		commit_id = got_object_id_dup(got_object_get_id(obj));
+		if (commit_id == NULL)
+			error = got_error_from_errno();
+		got_object_close(obj);
+	}
+
+	error = print_tree(in_repo_path, commit_id, show_ids, repo);
 done:
 	free(in_repo_path);
 	free(repo_path);
