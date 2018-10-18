@@ -280,7 +280,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	ds->lastline = 0;
 	ds->lastmatchline = 0;
 	ds->context_vec_ptr = ds->context_vec_start - 1;
-	ds->max_context = 64;
+	ds->max_context = GOT_DIFF_MAX_CONTEXT;
 	if (flags & D_IGNORECASE)
 		ds->chrtran = cup2low;
 	else

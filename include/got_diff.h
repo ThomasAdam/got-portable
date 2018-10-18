@@ -63,3 +63,5 @@ const struct got_error *got_diff_objects_as_trees(struct got_object *,
  */
 const struct got_error *got_diff_objects_as_commits(struct got_object *,
     struct got_object *, int, struct got_repository *, FILE *);
+
+#define GOT_DIFF_MAX_CONTEXT	64

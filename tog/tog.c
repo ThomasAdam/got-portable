@@ -1795,7 +1795,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			}
 			break;
 		case ']':
-			if (s->diff_context < INT_MAX) {
+			if (s->diff_context < GOT_DIFF_MAX_CONTEXT) {
 				s->diff_context++;
 				err = create_diff(s);
 			}
