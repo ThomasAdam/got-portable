@@ -602,6 +602,19 @@ view_loop(struct tog_view *view)
 			}
 		}
 		if (new_view) {
+			struct tog_view *v, *t;
+			/* Only allow one parent view per type. */
+			TAILQ_FOREACH_SAFE(v, &views, entry, t) {
+				if (v->type != new_view->type)
+					continue;
+				TAILQ_REMOVE(&views, v, entry);
+				err = view_close(v);
+				if (err)
+					goto done;
+				if (v == view)
+					view = new_view;
+				break;
+			}
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
 			if (focus_view == NULL)
 				focus_view = new_view;
