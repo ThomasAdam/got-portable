@@ -91,7 +91,7 @@ will be checked out.
 .El
 .\".It Cm status
 .\"Show current status of files.
-.It Cm log [ Fl c Ar commit ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
+.It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
 If a
 .Ar path
@@ -124,7 +124,7 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
-.It Cm diff [ Ar repository-path ] Ar object1 Ar object2
+.It Cm diff [ Fl C Ar number ] [ Ar repository-path ] Ar object1 Ar object2
 Display the differences between two objects in the repository.
 Each
 .Ar object
