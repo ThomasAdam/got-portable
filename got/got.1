@@ -106,6 +106,10 @@ Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a SHA1 hash which corresponds
 to a commit object.
+.It Fl C Ar number
+Set the number of context lines shown in diffs with
+.Fl p .
+By default, 3 lines of context are shown.
 .It Fl f
 Restrict history traversal to the first parent of each commit.
 This shows the linear history of the current branch only.
@@ -129,6 +133,15 @@ Both objects must be of the same type (blobs, trees, or commits).
 If the
 .Ar repository path
 is omitted, use the current working directory.
+.Pp
+The options for
+.Cm got diff
+are as follows:
+.Bl -tag -width Ds
+.It Fl C Ar number
+Set the number of context lines shown in the diff.
+By default, 3 lines of context are shown.
+.El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.
 .Pp

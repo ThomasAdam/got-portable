@@ -266,7 +266,7 @@ done:
 
 static const struct got_error *
 print_patch(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo)
+    int diff_context, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2;
@@ -290,7 +290,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 			return err;
 	}
 
-	err = got_diff_tree(tree1, tree2, "", "", 3, repo, stdout);
+	err = got_diff_tree(tree1, tree2, "", "", diff_context, repo, stdout);
 	if (tree1)
 		got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
@@ -309,7 +309,7 @@ get_datestr(time_t *time, char *datebuf)
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, int show_patch)
+    struct got_repository *repo, int show_patch, int diff_context)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
@@ -361,7 +361,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	free(logmsg0);
 
 	if (show_patch) {
-		err = print_patch(commit, id, repo);
+		err = print_patch(commit, id, diff_context, repo);
 		if (err == 0)
 			printf("\n");
 	}
@@ -372,8 +372,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, char *path, int show_patch, int limit,
-    int first_parent_traversal)
+    struct got_repository *repo, char *path, int show_patch, int diff_context,
+    int limit, int first_parent_traversal)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -409,7 +409,7 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
-		err = print_commit(commit, id, repo, show_patch);
+		err = print_commit(commit, id, repo, show_patch, diff_context);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;
@@ -422,7 +422,7 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-c commit] [-f] [ -l N ] [-p] "
+	fprintf(stderr, "usage: %s log [-c commit] [-C number] [-f] [ -l N ] [-p] "
 	    "[-r repository-path] [path]\n", getprogname());
 	exit(1);
 }
@@ -436,7 +436,7 @@ cmd_log(int argc, char *argv[])
 	struct got_object *obj = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
 	char *start_commit = NULL;
-	int ch;
+	int diff_context = 3, ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
 
@@ -446,13 +446,18 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:l:fr:")) != -1) {
+	while ((ch = getopt(argc, argv, "pc:C:l:fr:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
 			break;
 		case 'c':
 			start_commit = optarg;
+			break;
+		case 'C':
+			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
+			if (errstr != NULL)
+				err(1, "-C option %s", errstr);
 			break;
 		case 'l':
 			limit = strtonum(optarg, 1, INT_MAX, &errstr);
@@ -550,7 +555,7 @@ cmd_log(int argc, char *argv[])
 	}
 
 	error = print_commits(obj, id, repo, path, show_patch,
-	    limit, first_parent_traversal);
+	    diff_context, limit, first_parent_traversal);
 done:
 	free(path);
 	free(repo_path);
@@ -570,8 +575,8 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [repository-path] object1 object2\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s diff [-C number] [repository-path] "
+	    "object1 object2\n", getprogname());
 	exit(1);
 }
 
@@ -583,7 +588,8 @@ cmd_diff(int argc, char *argv[])
 	struct got_object *obj1 = NULL, *obj2 = NULL;
 	char *repo_path = NULL;
 	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
-	int ch;
+	int diff_context = 3, ch;
+	const char *errstr;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
@@ -591,8 +597,13 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "C:")) != -1) {
 		switch (ch) {
+		case 'C':
+			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
+			if (errstr != NULL)
+				err(1, "-C option %s", errstr);
+			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -639,15 +650,16 @@ cmd_diff(int argc, char *argv[])
 
 	switch (got_object_get_type(obj1)) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL, 3,
-		    repo, stdout);
+		error = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(obj1, obj2, "", "", 3, repo,
-		    stdout);
+		error = got_diff_objects_as_trees(obj1, obj2, "", "",
+		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = got_diff_objects_as_commits(obj1, obj2, 3, repo, stdout);
+		error = got_diff_objects_as_commits(obj1, obj2, diff_context,
+		    repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
