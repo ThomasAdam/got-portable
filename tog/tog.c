@@ -403,7 +403,7 @@ view_resize(struct tog_view *view)
 	view->lines = LINES;
 	view->cols = COLS;
 
-	if (view_is_parent_view(view)) {
+	if (view->child) {
 		view->child->begin_x = view_split_begin_x(view->begin_x);
 		if (view->child->begin_x == 0) {
 			view_fullscreen(view->child);
