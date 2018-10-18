@@ -96,6 +96,8 @@ struct tog_diff_view_state {
 	int first_displayed_line;
 	int last_displayed_line;
 	int eof;
+	int diff_context;
+	struct got_repository *repo;
 };
 
 struct commit_queue_entry {
@@ -1609,42 +1611,96 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 }
 
 static const struct got_error *
+create_diff(struct tog_diff_view_state *s)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj1 = NULL, *obj2 = NULL;
+	FILE *f = NULL;
+
+	if (s->id1) {
+		err = got_object_open(&obj1, s->repo, s->id1);
+		if (err)
+			return err;
+	}
+
+	err = got_object_open(&obj2, s->repo, s->id2);
+	if (err)
+		goto done;
+
+	f = got_opentemp();
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (s->f)
+		fclose(s->f);
+	s->f = f;
+
+	switch (got_object_get_type(obj1 ? obj1 : obj2)) {
+	case GOT_OBJ_TYPE_BLOB:
+		err = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		    s->diff_context, s->repo, f);
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		err = got_diff_objects_as_trees(obj1, obj2, "", "",
+		    s->diff_context, s->repo, f);
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		err = got_diff_objects_as_commits(obj1, obj2, s->diff_context,
+		    s->repo, f);
+		break;
+	default:
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		break;
+	}
+done:
+	if (obj1)
+		got_object_close(obj1);
+	got_object_close(obj2);
+	if (f)
+		fflush(f);
+	return err;
+}
+
+static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object *obj1,
     struct got_object *obj2, struct got_repository *repo)
 {
 	const struct got_error *err;
-	FILE *f;
 
 	if (obj1 != NULL && obj2 != NULL &&
 	    got_object_get_type(obj1) != got_object_get_type(obj2))
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	f = got_opentemp();
-	if (f == NULL)
+	if (obj1) {
+		struct got_object_id *id1;
+		id1 = got_object_id_dup(got_object_get_id(obj1));
+		if (id1 == NULL)
+			return got_error_from_errno();
+		view->state.diff.id1 = id1;
+	} else
+		view->state.diff.id1 = NULL;
+
+	view->state.diff.id2 = got_object_id_dup(got_object_get_id(obj2));
+	if (view->state.diff.id2 == NULL) {
+		free(view->state.diff.id1);
+		view->state.diff.id1 = NULL;
 		return got_error_from_errno();
-
-	switch (got_object_get_type(obj1 ? obj1 : obj2)) {
-	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL, 3,
-		    repo, f);
-		break;
-	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(obj1, obj2, "", "", 3, repo, f);
-		break;
-	case GOT_OBJ_TYPE_COMMIT:
-		err = got_diff_objects_as_commits(obj1, obj2, 3, repo, f);
-		break;
-	default:
-		return got_error(GOT_ERR_OBJ_TYPE);
 	}
-
-	fflush(f);
-
-	view->state.diff.id1 = obj1 ? got_object_get_id(obj1) : NULL;
-	view->state.diff.id2 = got_object_get_id(obj2);
-	view->state.diff.f = f;
+	view->state.diff.f = NULL;
 	view->state.diff.first_displayed_line = 1;
 	view->state.diff.last_displayed_line = view->nlines;
+	view->state.diff.diff_context = 3;
+	view->state.diff.repo = repo;
+
+	err = create_diff(&view->state.diff);
+	if (err) {
+		free(view->state.diff.id1);
+		view->state.diff.id1 = NULL;
+		free(view->state.diff.id2);
+		view->state.diff.id2 = NULL;
+		return err;
+	}
 
 	view->show = show_diff_view;
 	view->input = input_diff_view;
@@ -1658,6 +1714,10 @@ close_diff_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 
+	free(view->state.diff.id1);
+	view->state.diff.id1 = NULL;
+	free(view->state.diff.id2);
+	view->state.diff.id2 = NULL;
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno();
 	return err;
@@ -1728,6 +1788,18 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->first_displayed_line++;
 				if (line == NULL)
 					break;
+			}
+			break;
+		case '[':
+			if (s->diff_context > 0) {
+				s->diff_context--;
+				err = create_diff(s);
+			}
+			break;
+		case ']':
+			if (s->diff_context < INT_MAX) {
+				s->diff_context++;
+				err = create_diff(s);
 			}
 			break;
 		default:
