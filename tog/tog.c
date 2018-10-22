@@ -3414,6 +3414,7 @@ init_curses(void)
 {
 	initscr();
 	cbreak();
+	halfdelay(10);
 	noecho();
 	nonl();
 	intrflush(stdscr, FALSE);
