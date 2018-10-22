@@ -595,6 +595,7 @@ view_loop(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
 	struct tog_view *new_view, *dead_view, *focus_view, *main_view;
+	int fast_refresh = 10;
 	int done = 0, errcode;
 
 	errcode = pthread_mutex_lock(&tog_mutex);
@@ -612,6 +613,10 @@ view_loop(struct tog_view *view)
 	update_panels();
 	doupdate();
 	while (!TAILQ_EMPTY(&views) && !done) {
+		/* Refresh fast during initialization, then become slower. */
+		if (fast_refresh && fast_refresh-- == 0)
+			halfdelay(10); /* switch to once per second */
+
 		err = view_input(&new_view, &dead_view, &focus_view, &done,
 		    view, &views);
 		if (err)
@@ -3397,7 +3402,7 @@ init_curses(void)
 {
 	initscr();
 	cbreak();
-	halfdelay(10);
+	halfdelay(1); /* Do fast refresh while initial view is loading. */
 	noecho();
 	nonl();
 	intrflush(stdscr, FALSE);
