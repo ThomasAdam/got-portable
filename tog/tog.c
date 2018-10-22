@@ -50,6 +50,11 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+#ifndef MAX
+#define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
+#endif
+
+
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
@@ -344,9 +349,9 @@ view_open(int nlines, int ncols, int begin_y, int begin_x,
 static int
 view_split_begin_x(int begin_x)
 {
-	if (begin_x > 0)
+	if (begin_x > 0 || COLS < 120)
 		return 0;
-	return (COLS >= 120 ? COLS/2 : 0);
+	return (COLS - MAX(COLS / 2, 80));
 }
 
 static const struct got_error *view_resize(struct tog_view *);
