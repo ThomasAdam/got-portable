@@ -433,13 +433,13 @@ got_repo_close(struct got_repository *repo)
 
 const struct got_error *
 got_repo_map_path(char **in_repo_path, struct got_repository *repo,
-    const char *input_path)
+    const char *input_path, int check_disk)
 {
 	const struct got_error *err = NULL;
 	char *repo_abspath = NULL, *cwd = NULL;
 	struct stat sb;
 	size_t repolen, cwdlen, len;
-	char *canonpath, *path;
+	char *canonpath, *path = NULL;
 
 	*in_repo_path = NULL;
 
@@ -464,7 +464,9 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 
 	/* TODO: Call "get in-repository path of work-tree node" API. */
 
-	if (lstat(canonpath, &sb) != 0) {
+	if (!check_disk)
+		path = strdup(canonpath);
+	else if (lstat(canonpath, &sb) != 0) {
 		if (errno != ENOENT) {
 			err = got_error_from_errno();
 			goto done;

@@ -45,4 +45,4 @@ int got_repo_is_bare(struct got_repository *);
 
 /* Attempt to map an arbitrary path to a path within the repository. */
 const struct got_error *got_repo_map_path(char **, struct got_repository *,
-    const char *);
+    const char *, int);

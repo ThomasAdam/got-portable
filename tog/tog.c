@@ -270,7 +270,7 @@ static const struct got_error *input_diff_view(struct tog_view **,
 static const struct got_error* close_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
-    struct got_object_id *, struct got_repository *, const char *);
+    struct got_object_id *, struct got_repository *, const char *, int);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1360,7 +1360,7 @@ close_log_view(struct tog_view *view)
 
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
-    struct got_repository *repo, const char *path)
+    struct got_repository *repo, const char *path, int check_disk)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -1368,7 +1368,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
 
-	err = got_repo_map_path(&s->in_repo_path, repo, path);
+	err = got_repo_map_path(&s->in_repo_path, repo, path, check_disk);
 	if (err != NULL)
 		goto done;
 
@@ -1566,7 +1566,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				if (lv == NULL)
 					return got_error_from_errno();
 				err = open_log_view(lv, s->start_id, s->repo,
-				    parent_path);
+				    parent_path, 0);
 				if (err)
 					return err;;
 				if (view_is_parent_view(view))
@@ -1669,7 +1669,7 @@ cmd_log(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = open_log_view(view, start_id, repo, path);
+	error = open_log_view(view, start_id, repo, path, 1);
 	if (error)
 		goto done;
 	error = view_loop(view);
@@ -2755,7 +2755,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
+	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
 		goto done;
 
@@ -3048,7 +3048,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, repo, path);
+	err = open_log_view(log_view, commit_id, repo, path, 0);
 	if (err)
 		view_close(log_view);
 	else

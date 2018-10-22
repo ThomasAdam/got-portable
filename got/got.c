@@ -551,7 +551,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
+	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
 		goto done;
 	if (in_repo_path) {
@@ -749,7 +749,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
+	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
 		goto done;
 
@@ -905,7 +905,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, path);
+	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
 		goto done;
 
