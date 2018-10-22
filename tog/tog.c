@@ -1578,7 +1578,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 					*new_view = lv;
 				else {
 					view_set_child(view->parent, lv);
-					*dead_view = view;
+					*focus_view = lv;
 				}
 				return NULL;
 			}
