@@ -545,6 +545,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				if (err)
 					return err;
 				err = v->input(new, dead, focus, v, ch);
+				if (err)
+					return err;
 			}
 			break;
 		default:
