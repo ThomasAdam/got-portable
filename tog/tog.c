@@ -487,7 +487,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode);
-	ch = getch();
+	ch = wgetch(view->window);
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
 		return got_error_set_errno(errcode);
