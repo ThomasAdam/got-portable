@@ -125,6 +125,13 @@ const struct got_error *got_error(int);
 const struct got_error *got_error_from_errno(void);
 
 /*
+ * Set errno to the specified error code and return a statically
+ * allocated error object with code GOT_ERR_ERRNO and an error
+ * message obtained from strerror(3).
+ */
+const struct got_error *got_error_set_errno(int);
+
+/*
  * If ferror(3) indicates an error status for the FILE, obtain an error
  * from got_error_from_errno(). Else, obtain the error via got_error()
  * with the error code provided in the second argument.

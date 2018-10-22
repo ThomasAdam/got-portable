@@ -49,6 +49,13 @@ got_error_from_errno()
 }
 
 const struct got_error *
+got_error_set_errno(int code)
+{
+	errno = code;
+	return got_error_from_errno();
+}
+
+const struct got_error *
 got_ferror(FILE *f, int code)
 {
 	if (ferror(f))
