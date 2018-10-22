@@ -1281,12 +1281,7 @@ log_thread(void *arg)
 		    a->selected_entry, *a->first_displayed_entry,
 		    a->commits, *a->selected, a->view->nlines,
 		    a->in_repo_path, a->commits_needed);
-#if 0 /* XXX ncurses isn't thread-safe */
-	if (!err) {
-		update_panels();
-		doupdate();
-	}
-#endif
+
 		if (done)
 			a->commits_needed = 0;
 		else if (a->commits_needed == 0) {
@@ -2220,12 +2215,6 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	err = draw_blame(a->view, a->commit_id, a->f, a->path,
 	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
 	    a->last_displayed_line, a->eof, a->view->nlines);
-#if 0 /* XXX ncurses isn't thread-safe */
-	if (!err) {
-		update_panels();
-		doupdate();
-	}
-#endif
 done:
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
@@ -2256,12 +2245,6 @@ blame_thread(void *arg)
 		    a->lines, a->nlines, 1, *a->selected_line,
 		    a->first_displayed_line, a->last_displayed_line, a->eof,
 		    a->view->nlines);
-#if 0 /* XXX ncurses isn't thread-safe */
-		if (!err) {
-			update_panels();
-			doupdate();
-		}
-#endif
 	}
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
