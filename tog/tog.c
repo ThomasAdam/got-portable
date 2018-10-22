@@ -2216,6 +2216,10 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	err = draw_blame(a->view, a->commit_id, a->f, a->path,
 	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
 	    a->last_displayed_line, a->eof, a->view->nlines);
+	if (!err) {
+		update_panels();
+		doupdate();
+	}
 done:
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
