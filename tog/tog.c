@@ -1352,7 +1352,9 @@ close_log_view(struct tog_view *view)
 	err = stop_log_thread(s);
 	free_commits(&s->commits);
 	free(s->in_repo_path);
+	s->in_repo_path = NULL;
 	free(s->start_id);
+	s->start_id = NULL;
 	return err;
 }
 
