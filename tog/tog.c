@@ -1439,14 +1439,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.view = view;
 	s->thread_args.first_displayed_entry = &s->first_displayed_entry;
 	s->thread_args.selected_entry = &s->selected_entry;
-
-	errcode = pthread_create(&s->thread, NULL, log_thread,
-	    &s->thread_args);
-	if (errcode) {
-		err = got_error_set_errno(errcode);
-		goto done;
-	}
-
 done:
 	if (err)
 		close_log_view(view);
@@ -1457,6 +1449,13 @@ static const struct got_error *
 show_log_view(struct tog_view *view)
 {
 	struct tog_log_view_state *s = &view->state.log;
+
+	if (s->thread == NULL) {
+		int errcode = pthread_create(&s->thread, NULL, log_thread,
+		    &s->thread_args);
+		if (errcode)
+			return got_error_set_errno(errcode);
+	}
 
 	return draw_commits(view, &s->last_displayed_entry,
 	    &s->selected_entry, s->first_displayed_entry,
@@ -1480,6 +1479,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'k':
 		case KEY_UP:
+			if (s->first_displayed_entry == NULL)
+				break;
 			if (s->selected > 0)
 				s->selected--;
 			if (s->selected > 0)
@@ -1488,6 +1489,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			    &s->commits);
 			break;
 		case KEY_PPAGE:
+			if (s->first_displayed_entry == NULL)
+				break;
 			if (TAILQ_FIRST(&s->commits.head) ==
 			    s->first_displayed_entry) {
 				s->selected = 0;
@@ -1498,6 +1501,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'j':
 		case KEY_DOWN:
+			if (s->first_displayed_entry == NULL)
+				break;
 			if (s->selected < MIN(view->nlines - 2,
 			    s->commits.ncommits - 1)) {
 				s->selected++;
@@ -1512,6 +1517,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case KEY_NPAGE: {
 			struct commit_queue_entry *first;
 			first = s->first_displayed_entry;
+			if (first == NULL)
+				break;
 			err = scroll_down(&s->first_displayed_entry,
 			    view->nlines, &s->last_displayed_entry,
 			    &s->commits, &s->thread_args.log_complete,
@@ -1535,6 +1542,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case KEY_ENTER:
 		case '\r':
+			if (s->selected_entry == NULL)
+				break;
 			if (view_is_parent_view(view))
 				begin_x = view_split_begin_x(view->begin_x);
 			err = open_diff_view_for_commit(&diff_view, begin_x,
@@ -1559,6 +1568,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				*new_view = diff_view;
 			break;
 		case 't':
+			if (s->selected_entry == NULL)
+				break;
 			if (view_is_parent_view(view))
 				begin_x = view_split_begin_x(view->begin_x);
 			err = browse_commit(&tree_view, begin_x,
@@ -2379,7 +2390,6 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object *obj = NULL;
-	int errcode;
 
 	err = got_object_id_by_path(&obj_id, repo, commit_id, path);
 	if (err)
@@ -2432,13 +2442,6 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	blame->thread_args.cb_args = &blame->cb_args;
 	blame->thread_args.complete = blame_complete;
 	*blame_complete = 0;
-
-	errcode = pthread_create(&blame->thread, NULL, blame_thread,
-	    &blame->thread_args);
-	if (errcode) {
-		err = got_error_set_errno(errcode);
-		goto done;
-	}
 
 done:
 	if (blob)
@@ -2512,6 +2515,14 @@ show_blame_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_blame_view_state *s = &view->state.blame;
+	int errcode;
+
+	if (s->blame.thread == NULL) {
+		errcode = pthread_create(&s->blame.thread, NULL, blame_thread,
+		    &s->blame.thread_args);
+		if (errcode)
+			return got_error_set_errno(errcode);
+	}
 
 	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
 	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
