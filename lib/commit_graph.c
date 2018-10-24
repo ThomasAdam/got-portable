@@ -441,7 +441,7 @@ add_node(struct got_commit_graph_node **new_node,
 		return got_error_from_errno();
 	}
 
-	if (changed && !is_merge_point(node))
+	if (changed)
 		add_node_to_iter_list(graph, node, child_node);
 
 	if (branch_done)
