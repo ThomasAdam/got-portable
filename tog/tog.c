@@ -697,11 +697,10 @@ view_loop(struct tog_view *view)
 				err = view_close(v);
 				if (err)
 					goto done;
-				if (v == view)
-					view = new_view;
 				break;
 			}
 			TAILQ_INSERT_TAIL(&views, new_view, entry);
+			view = new_view;
 			if (focus_view == NULL)
 				focus_view = new_view;
 		}
