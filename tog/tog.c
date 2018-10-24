@@ -131,9 +131,7 @@ struct tog_log_thread_args {
 	sig_atomic_t *quit;
 	struct tog_view *view;
 	struct commit_queue_entry **first_displayed_entry;
-	struct commit_queue_entry **last_displayed_entry;
 	struct commit_queue_entry **selected_entry;
-	int *selected;
 };
 
 struct tog_log_view_state {
@@ -156,13 +154,7 @@ struct tog_blame_cb_args {
 
 	struct tog_view *view;
 	struct got_object_id *commit_id;
-	FILE *f;
-	const char *path;
-	int *first_displayed_line;
-	int *last_displayed_line;
-	int *selected_line;
 	int *quit;
-	int *eof;
 };
 
 struct tog_blame_thread_args {
@@ -1290,11 +1282,6 @@ log_thread(void *arg)
 			*a->selected_entry = *a->first_displayed_entry;
 		}
 
-		err = draw_commits(a->view, a->last_displayed_entry,
-		    a->selected_entry, *a->first_displayed_entry,
-		    a->commits, *a->selected, a->view->nlines,
-		    a->in_repo_path, a->commits_needed);
-
 		if (done)
 			a->commits_needed = 0;
 		else if (a->commits_needed == 0) {
@@ -1419,9 +1406,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.quit = &s->quit;
 	s->thread_args.view = view;
 	s->thread_args.first_displayed_entry = &s->first_displayed_entry;
-	s->thread_args.last_displayed_entry = &s->last_displayed_entry;
 	s->thread_args.selected_entry = &s->selected_entry;
-	s->thread_args.selected = &s->selected;
 
 	errcode = pthread_create(&s->thread, NULL, log_thread,
 	    &s->thread_args);
@@ -2226,10 +2211,6 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		goto done;
 	}
 	line->annotated = 1;
-
-	err = draw_blame(a->view, a->commit_id, a->f, a->path,
-	    a->lines, a->nlines, 0, *a->selected_line, a->first_displayed_line,
-	    a->last_displayed_line, a->eof, a->view->nlines);
 done:
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
@@ -2255,12 +2236,6 @@ blame_thread(void *arg)
 	got_repo_close(ta->repo);
 	ta->repo = NULL;
 	*ta->complete = 1;
-	if (!err) {
-		err = draw_blame(a->view, a->commit_id, a->f, a->path,
-		    a->lines, a->nlines, 1, *a->selected_line,
-		    a->first_displayed_line, a->last_displayed_line, a->eof,
-		    a->view->nlines);
-	}
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode && err == NULL)
@@ -2416,13 +2391,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		err = got_error_from_errno();
 		goto done;
 	}
-	blame->cb_args.f = blame->f;
-	blame->cb_args.path = path;
-	blame->cb_args.first_displayed_line = first_displayed_line;
-	blame->cb_args.selected_line = selected_line;
-	blame->cb_args.last_displayed_line = last_displayed_line;
 	blame->cb_args.quit = done;
-	blame->cb_args.eof = eof;
 
 	blame->thread_args.path = path;
 	blame->thread_args.repo = thread_repo;
