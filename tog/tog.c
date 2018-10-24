@@ -413,7 +413,8 @@ view_resize(struct tog_view *view)
 
 	if (wresize(view->window, nlines, ncols) == ERR)
 		return got_error_from_errno();
-	replace_panel(view->panel, view->window);
+	if (replace_panel(view->panel, view->window) == ERR)
+		return got_error_from_errno();
 
 	view->nlines = nlines;
 	view->ncols = ncols;
