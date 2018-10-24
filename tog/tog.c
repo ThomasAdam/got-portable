@@ -693,8 +693,11 @@ view_loop(struct tog_view *view)
 		}
 		if (view) {
 			if (focus_view == NULL) {
+				view->focussed = 1;
+				show_panel(view->panel);
+				if (view->child && view_is_splitscreen(view->child))
+					show_panel(view->child->panel);
 				focus_view = view;
-				focus_view->focussed = 1;
 			}
 			if (view->parent) {
 				err = view->parent->show(view->parent);
