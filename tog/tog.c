@@ -657,7 +657,7 @@ view_loop(struct tog_view *view)
 			if (view_is_parent_view(dead_view))
 				prev = TAILQ_PREV(dead_view,
 				    tog_view_list_head, entry);
-			else
+			else if (view->parent != dead_view)
 				prev = view->parent;
 
 			if (dead_view->parent)
