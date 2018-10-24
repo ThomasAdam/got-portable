@@ -1564,6 +1564,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				begin_x = view_split_begin_x(view->begin_x);
 			err = browse_commit(&tree_view, begin_x,
 			    s->selected_entry, s->repo);
+			if (err)
+				break;
 			if (view_is_parent_view(view)) {
 				err = view_close_child(view);
 				if (err)
