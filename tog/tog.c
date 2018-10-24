@@ -16,6 +16,7 @@
 
 #include <sys/queue.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 
 #include <errno.h>
 #define _XOPEN_SOURCE_EXTENDED
@@ -287,6 +288,14 @@ static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_tree_view(struct tog_view *);
 
+static volatile sig_atomic_t tog_sigwinch_received;
+
+static void
+tog_sigwinch(int signo)
+{
+	tog_sigwinch_received = 1;
+}
+
 static const struct got_error *
 view_close(struct tog_view *view)
 {
@@ -415,6 +424,7 @@ view_resize(struct tog_view *view)
 		return got_error_from_errno();
 	if (replace_panel(view->panel, view->window) == ERR)
 		return got_error_from_errno();
+	wclear(view->window);
 
 	view->nlines = nlines;
 	view->ncols = ncols;
@@ -467,6 +477,22 @@ view_is_splitscreen(struct tog_view *view)
 	return !view_is_parent_view(view) && view->begin_x > 0;
 }
 
+static void
+tog_resizeterm()
+{
+	int cols, lines;
+	struct winsize size;
+
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) < 0) {
+		cols = 80;     /* Default */
+		lines = 24;
+	} else {
+		cols = size.ws_col;
+		lines = size.ws_row;
+	}
+	resize_term(lines, cols);
+}
+
 static const struct got_error *
 view_input(struct tog_view **new, struct tog_view **dead,
     struct tog_view **focus, int *done, struct tog_view *view,
@@ -490,6 +516,20 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	if (errcode)
 		return got_error_set_errno(errcode);
 	nodelay(stdscr, TRUE);
+
+	if (tog_sigwinch_received) {
+		tog_resizeterm();
+		tog_sigwinch_received = 0;
+		TAILQ_FOREACH(v, views, entry) {
+			err = view_resize(v);
+			if (err)
+				return err;
+			err = v->input(new, dead, focus, v, KEY_RESIZE);
+			if (err)
+				return err;
+		}
+	}
+
 	switch (ch) {
 		case ERR:
 			break;
@@ -538,14 +578,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 			}
 			break;
 		case KEY_RESIZE:
-			TAILQ_FOREACH(v, views, entry) {
-				err = view_resize(v);
-				if (err)
-					return err;
-				err = v->input(new, dead, focus, v, ch);
-				if (err)
-					return err;
-			}
 			break;
 		default:
 			err = view->input(new, dead, focus, view, ch);
@@ -3377,6 +3409,7 @@ done:
 		got_repo_close(repo);
 	return error;
 }
+
 static void
 init_curses(void)
 {
@@ -3388,6 +3421,7 @@ init_curses(void)
 	intrflush(stdscr, FALSE);
 	keypad(stdscr, TRUE);
 	curs_set(0);
+	signal(SIGWINCH, tog_sigwinch);
 }
 
 __dead static void
