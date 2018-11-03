@@ -3209,11 +3209,11 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			    s->entries, s->tree == s->root);
 			break;
 		case KEY_PPAGE:
+			s->selected = 0;
 			if (SIMPLEQ_FIRST(&s->entries->head) ==
 			    s->first_displayed_entry) {
 				if (s->tree != s->root)
 					s->first_displayed_entry = NULL;
-				s->selected = 0;
 				break;
 			}
 			tree_scroll_up(&s->first_displayed_entry,
