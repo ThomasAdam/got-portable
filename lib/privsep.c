@@ -377,6 +377,7 @@ static const struct got_error *
 send_commit_logmsg(struct imsgbuf *ibuf, struct got_commit_object *commit,
     size_t logmsg_len)
 {
+	const struct got_error *err = NULL;
 	size_t offset, remain;
 
 	offset = 0;
@@ -385,17 +386,20 @@ send_commit_logmsg(struct imsgbuf *ibuf, struct got_commit_object *commit,
 		size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE, remain);
 
 		if (imsg_compose(ibuf, GOT_IMSG_COMMIT_LOGMSG, 0, 0, -1,
-		    commit->logmsg + offset, n) == -1)
-			return got_error_from_errno();
+		    commit->logmsg + offset, n) == -1) {
+			err = got_error_from_errno();
+			break;
+		}
 
-		if (imsg_flush(ibuf) == -1)
-			return got_error_from_errno();
+		err = flush_imsg(ibuf);
+		if (err)
+			break;
 
 		offset += n;
 		remain -= n;
 	}
 
-	return NULL;
+	return err;
 }
 
 const struct got_error *
