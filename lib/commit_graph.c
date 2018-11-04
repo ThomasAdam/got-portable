@@ -515,17 +515,15 @@ gather_branch_tips(struct got_object_id *id, void *data, void *arg)
 }
 
 static const struct got_error *
-fetch_commits_from_open_branches(int *ncommits, int *wanted_id_added,
+fetch_commits_from_open_branches(int *ncommits,
     struct got_object_id **changed_id, struct got_commit_graph *graph,
-    struct got_repository *repo, struct got_object_id *wanted_id)
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct gather_branch_tips_arg arg;
 	int i;
 
 	*ncommits = 0;
-	if (wanted_id_added)
-		*wanted_id_added = 0;
 	if (changed_id)
 		*changed_id = NULL;
 
@@ -585,8 +583,6 @@ fetch_commits_from_open_branches(int *ncommits, int *wanted_id_added,
 			break;
 		if (new_node)
 			(*ncommits)++;
-		if (wanted_id && got_object_id_cmp(commit_id, wanted_id) == 0)
-			*wanted_id_added = 1;
 	}
 
 	return err;
@@ -601,8 +597,8 @@ got_commit_graph_fetch_commits(struct got_commit_graph *graph, int limit,
 	struct got_object_id *changed_id = NULL;
 
 	while (nfetched < limit) {
-		err = fetch_commits_from_open_branches(&ncommits, NULL,
-		    &changed_id, graph, repo, NULL);
+		err = fetch_commits_from_open_branches(&ncommits,
+		    &changed_id, graph, repo);
 		if (err)
 			return err;
 		if (ncommits == 0)
@@ -661,8 +657,8 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 		struct got_object_id *changed_id = NULL;
 		while (changed_id == NULL) {
 			int ncommits;
-			err = fetch_commits_from_open_branches(&ncommits, NULL,
-			    &changed_id, graph, repo, NULL);
+			err = fetch_commits_from_open_branches(&ncommits,
+			    &changed_id, graph, repo);
 			if (err) {
 				got_object_commit_close(commit);
 				return err;
