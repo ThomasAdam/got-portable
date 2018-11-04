@@ -446,10 +446,12 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 		goto done;
 	}
 
-	err = flush_imsg(ibuf);
-	if (err)
-		goto done;
-
+	if (logmsg_len == 0 ||
+	    logmsg_len + len > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+		err = flush_imsg(ibuf);
+		if (err)
+			goto done;
+	}
 	err = send_commit_logmsg(ibuf, commit, logmsg_len);
 done:
 	free(buf);
