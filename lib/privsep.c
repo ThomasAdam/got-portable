@@ -627,6 +627,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 	struct got_imsg_tree_object itree;
 	struct got_tree_entry *te;
 	size_t totlen;
+	int nimsg; /* number of imsg queued in ibuf */
 
 	itree.nentries = tree->entries.nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
@@ -634,6 +635,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 		return got_error_from_errno();
 
 	totlen = sizeof(itree);
+	nimsg = 1;
 	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
 		struct got_imsg_tree_entry ite;
 		uint8_t *buf = NULL;
@@ -642,10 +644,12 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 		if (len > MAX_IMSGSIZE)
 			return got_error(GOT_ERR_NO_SPACE);
 
-		if (totlen + len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+		nimsg++;
+		if (totlen + len >= MAX_IMSGSIZE - (IMSG_HEADER_SIZE * nimsg)) {
 			err = flush_imsg(ibuf);
 			if (err)
 				return err;
+			nimsg = 0;
 		}
 
 		buf = malloc(len);
