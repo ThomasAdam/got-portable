@@ -187,23 +187,24 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 	if (pid == NULL) {
 		struct got_object_id *obj_id;
 		err = got_object_id_by_path(&obj_id, repo, commit_id, path);
-		if (err)
-			err = NULL;
-		else
-			*changed = 1;
+		if (err) {
+			if (err->code == GOT_ERR_NO_OBJ)
+				err = NULL;
+		} else
+			*changed = 1; /* The path was created in this commit. */
 		free(obj_id);
-		goto done;
+	} else {
+		err = got_object_open_as_commit(&pcommit, repo, pid->id);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&ptree, repo, pcommit->tree_id);
+		if (err)
+			goto done;
+
+		err = got_object_tree_path_changed(changed, tree, ptree, path,
+		    repo);
 	}
-
-	err = got_object_open_as_commit(&pcommit, repo, pid->id);
-	if (err)
-		goto done;
-
-	err = got_object_open_as_tree(&ptree, repo, pcommit->tree_id);
-	if (err)
-		goto done;
-
-	err = got_object_tree_path_changed(changed, tree, ptree, path, repo);
 done:
 	if (tree)
 		got_object_tree_close(tree);
