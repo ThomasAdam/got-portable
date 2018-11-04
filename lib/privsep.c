@@ -810,8 +810,10 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_BLOB:
-		if (datalen != sizeof(iblob))
+		if (datalen != sizeof(iblob)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
 		memcpy(&iblob, imsg.data, sizeof(iblob));
 		*size = iblob.size;
 		/* Data has been written to file descriptor. */
