@@ -478,7 +478,7 @@ view_is_splitscreen(struct tog_view *view)
 }
 
 static void
-tog_resizeterm()
+tog_resizeterm(void)
 {
 	int cols, lines;
 	struct winsize size;
