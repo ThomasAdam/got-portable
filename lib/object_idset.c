@@ -97,7 +97,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 	if (set->totelem >= GOT_OBJECT_IDSET_MAX_ELEM)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	new = calloc(1, sizeof(*new));
+	new = malloc(sizeof(*new));
 	if (new == NULL)
 		return got_error_from_errno();
 
