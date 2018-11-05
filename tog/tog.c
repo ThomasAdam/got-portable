@@ -1563,10 +1563,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 					view_close(diff_view);
 					break;
 				}
-				if (!view_is_splitscreen(diff_view)) {
-					*focus_view = diff_view;
-					view->child_focussed = 1;
-				}
+				*focus_view = diff_view;
+				view->child_focussed = 1;
 			} else
 				*new_view = diff_view;
 			break;
