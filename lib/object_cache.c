@@ -32,9 +32,9 @@
 #include "got_lib_object_idcache.h"
 #include "got_lib_object_cache.h"
 
-#define GOT_OBJECT_CACHE_SIZE_OBJ	1024
+#define GOT_OBJECT_CACHE_SIZE_OBJ	256
 #define GOT_OBJECT_CACHE_SIZE_TREE	2048
-#define GOT_OBJECT_CACHE_SIZE_COMMIT	512
+#define GOT_OBJECT_CACHE_SIZE_COMMIT	64
 
 const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
