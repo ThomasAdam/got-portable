@@ -42,6 +42,8 @@ got_object_cache_init(struct got_object_cache *cache,
 {
 	size_t size;
 
+	memset(cache, 0, sizeof(*cache));
+
 	switch (type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:
 		size = GOT_OBJECT_CACHE_SIZE_OBJ;
