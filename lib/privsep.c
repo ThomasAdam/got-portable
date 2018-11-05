@@ -414,11 +414,11 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 
 	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
 	icommit.author_len = strlen(commit->author);
-	memcpy(&icommit.tm_author, &commit->tm_author,
-	    sizeof(icommit.tm_author));
+	icommit.author_time = commit->author_time;
+	icommit.author_gmtoff = commit->author_gmtoff;
 	icommit.committer_len = strlen(commit->committer);
-	memcpy(&icommit.tm_committer, &commit->tm_committer,
-	    sizeof(icommit.tm_committer));
+	icommit.committer_time = commit->committer_time;
+	icommit.committer_gmtoff = commit->committer_gmtoff;
 	icommit.logmsg_len = logmsg_len;
 	icommit.nparents = commit->nparents;
 
@@ -512,10 +512,10 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 		memcpy((*commit)->tree_id->sha1, icommit.tree_id,
 		    SHA1_DIGEST_LENGTH);
-		memcpy(&(*commit)->tm_author, &icommit.tm_author,
-		    sizeof((*commit)->tm_author));
-		memcpy(&(*commit)->tm_committer, &icommit.tm_committer,
-		    sizeof((*commit)->tm_committer));
+		(*commit)->author_time = icommit.author_time;
+		(*commit)->author_gmtoff = icommit.author_gmtoff;
+		(*commit)->committer_time = icommit.committer_time;
+		(*commit)->committer_gmtoff = icommit.committer_gmtoff;
 
 		if (icommit.author_len == 0) {
 			(*commit)->author = strdup("");

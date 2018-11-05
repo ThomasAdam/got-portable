@@ -49,9 +49,11 @@ struct got_commit_object {
 	unsigned int nparents;
 	struct got_object_id_queue parent_ids;
 	char *author;
-	struct tm tm_author;	/* UTC */
+	time_t author_time;	/* UTC */
+	time_t author_gmtoff;
 	char *committer;
-	struct tm tm_committer;	/* UTC */
+	time_t committer_time;	/* UTC */
+	time_t committer_gmtoff;
 	char *logmsg;
 
 	int refcnt; /* for internal use only */

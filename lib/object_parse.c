@@ -187,13 +187,11 @@ parse_gmtoff(time_t *gmtoff, const char *tzstr)
 }
 
 static const struct got_error *
-parse_commit_time(struct tm *tm, char *committer)
+parse_commit_time(time_t *time, time_t *gmtoff, char *committer)
 {
 	const struct got_error *err = NULL;
 	const char *errstr;
 	char *space, *tzstr;
-	time_t gmtoff;
-	time_t time;
 
 	/* Parse and strip off trailing timezone indicator string. */
 	space = strrchr(committer, ' ');
@@ -202,7 +200,7 @@ parse_commit_time(struct tm *tm, char *committer)
 	tzstr = strdup(space + 1);
 	if (tzstr == NULL)
 		return got_error_from_errno();
-	err = parse_gmtoff(&gmtoff, tzstr);
+	err = parse_gmtoff(gmtoff, tzstr);
 	free(tzstr);
 	if (err)
 		return err;
@@ -214,16 +212,12 @@ parse_commit_time(struct tm *tm, char *committer)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
 	/* Timestamp parsed here is expressed in comitter's local time. */
-	time = strtonum(space + 1, 0, INT64_MAX, &errstr);
+	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
 	if (errstr)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
 	/* Express the time stamp in UTC. */
-	memset(tm, 0, sizeof(*tm));
-	time -= gmtoff;
-	if (localtime_r(&time, tm) == NULL)
-		return got_error_from_errno();
-	tm->tm_gmtoff = gmtoff;
+	*time -= *gmtoff;
 
 	/* Strip off parsed time information, leaving just author and email. */
 	*space = '\0';
@@ -320,7 +314,8 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len
 		}
 		*p = '\0';
 		slen = strlen(s);
-		err = parse_commit_time(&(*commit)->tm_author, s);
+		err = parse_commit_time(&(*commit)->author_time,
+		    &(*commit)->author_gmtoff, s);
 		if (err)
 			goto done;
 		(*commit)->author = strdup(s);
@@ -350,7 +345,8 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len
 		}
 		*p = '\0';
 		slen = strlen(s);
-		err = parse_commit_time(&(*commit)->tm_committer, s);
+		err = parse_commit_time(&(*commit)->committer_time,
+		    &(*commit)->committer_gmtoff, s);
 		if (err)
 			goto done;
 		(*commit)->committer = strdup(s);

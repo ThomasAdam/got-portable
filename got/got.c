@@ -318,25 +318,16 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
 	char datebuf[26];
-	time_t author_time, committer_time;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
-	author_time = mktime(&commit->tm_author);
-	committer_time = mktime(&commit->tm_committer);
-#if 0
-	/* This would express the date in committer's timezone. */
-	author_time += commit->tm_author.tm_gmtoff;
-	committer_time += commit->tm_committer.tm_gmtoff;
-#endif
-
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
 	printf("from: %s\n", commit->author);
-	datestr = get_datestr(&committer_time, datebuf);
+	datestr = get_datestr(&commit->committer_time, datebuf);
 	printf("date: %s UTC\n", datestr);
 	if (strcmp(commit->author, commit->committer) != 0)
 		printf("via: %s\n", commit->committer);

@@ -594,7 +594,6 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
 	char *id_str;
 	char datebuf[26];
-	time_t time;
 
 	if (obj2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
@@ -627,9 +626,8 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 		err = got_error_from_errno();
 		goto done;
 	}
-	time = mktime(&commit2->tm_committer);
 	if (fprintf(outfile, "date: %s UTC\n",
-	    get_datestr(&time, datebuf)) < 0) {
+	    get_datestr(&commit2->committer_time, datebuf)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}

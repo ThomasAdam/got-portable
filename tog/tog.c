@@ -874,9 +874,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	static const size_t date_display_cols = 9;
 	static const size_t author_display_cols = 16;
 	const int avail = view->ncols;
+	struct tm tm;
 
-	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ",
-	    &commit->tm_committer) >= sizeof(datebuf))
+	if (localtime_r(&commit->committer_time, &tm) == NULL)
+		return got_error_from_errno();
+	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &tm)
+	    >= sizeof(datebuf))
 		return got_error(GOT_ERR_NO_SPACE);
 
 	if (avail < date_display_cols)

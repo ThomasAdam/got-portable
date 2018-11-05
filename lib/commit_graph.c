@@ -429,7 +429,7 @@ add_node(struct got_commit_graph_node **new_node,
 		}
 	}
 
-	node->commit_timestamp = mktime(&commit->tm_committer);
+	node->commit_timestamp = commit->committer_time;
 	if (node->commit_timestamp == -1) {
 		free_node(node);
 		return got_error_from_errno();
