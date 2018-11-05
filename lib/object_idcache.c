@@ -99,7 +99,7 @@ got_object_idcache_add(struct got_object_idcache *cache,
 	if (cache->totelem >= cache->maxelem)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	entry = calloc(1, sizeof(*entry));
+	entry = malloc(sizeof(*entry));
 	if (entry == NULL)
 		return got_error_from_errno();
 
