@@ -62,6 +62,13 @@
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
+int
+got_object_id_cmp(const struct got_object_id *id1,
+    const struct got_object_id *id2)
+{
+	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
+}
+
 const struct got_error *
 got_object_qid_alloc_partial(struct got_object_qid **qid)
 {

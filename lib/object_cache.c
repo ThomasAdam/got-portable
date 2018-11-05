@@ -29,7 +29,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
-#include "got_lib_object_idcache.h"
+#include "got_lib_object_idset.h"
 #include "got_lib_object_cache.h"
 
 #define GOT_OBJECT_CACHE_SIZE_OBJ	256
@@ -40,27 +40,24 @@ const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
     enum got_object_cache_type type)
 {
-	size_t size;
-
 	memset(cache, 0, sizeof(*cache));
 
+	cache->idset = got_object_idset_alloc();
+	if (cache->idset == NULL)
+		return got_error_from_errno();
+
+	cache->type = type;
 	switch (type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:
-		size = GOT_OBJECT_CACHE_SIZE_OBJ;
+		cache->size = GOT_OBJECT_CACHE_SIZE_OBJ;
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TREE:
-		size = GOT_OBJECT_CACHE_SIZE_TREE;
+		cache->size = GOT_OBJECT_CACHE_SIZE_TREE;
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
-		size = GOT_OBJECT_CACHE_SIZE_COMMIT;
+		cache->size = GOT_OBJECT_CACHE_SIZE_COMMIT;
 		break;
 	}
-
-	cache->idcache = got_object_idcache_alloc(size);
-	if (cache->idcache == NULL)
-		return got_error_from_errno();
-	cache->type = type;
-	cache->size = size;
 	return NULL;
 }
 
@@ -71,10 +68,10 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 	struct got_object_cache_entry *ce;
 	int nelem;
 
-	nelem = got_object_idcache_num_elements(cache->idcache);
+	nelem = got_object_idset_num_elements(cache->idset);
 	if (nelem >= cache->size) {
-		err = got_object_idcache_remove_one((void **)&ce,
-		    cache->idcache, id);
+		err = got_object_idset_remove((void **)&ce,
+		    cache->idset, NULL);
 		if (err)
 			return err;
 		switch (cache->type) {
@@ -108,7 +105,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	}
 
-	err = got_object_idcache_add(cache->idcache, id, ce);
+	err = got_object_idset_add(cache->idset, id, ce);
 	if (err) {
 		if (err->code == GOT_ERR_OBJ_EXISTS) {
 			free(ce);
@@ -124,7 +121,7 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 	struct got_object_cache_entry *ce;
 
 	cache->cache_searches++;
-	ce = got_object_idcache_get(cache->idcache, id);
+	ce = got_object_idset_get(cache->idset, id);
 	if (ce) {
 		cache->cache_hit++;
 		switch (cache->type) {
@@ -147,7 +144,7 @@ print_cache_stats(struct got_object_cache *cache, const char *name)
 {
 	fprintf(stderr, "%s: %s cache: %d elements, %d searches, %d hits, "
 	    "%d missed, %d evicted\n", getprogname(), name,
-	    got_object_idcache_num_elements(cache->idcache),
+	    got_object_idset_num_elements(cache->idset),
 	    cache->cache_searches, cache->cache_hit,
 	    cache->cache_miss, cache->cache_evict);
 }
@@ -207,12 +204,12 @@ got_object_cache_close(struct got_object_cache *cache)
 		break;
 	}
 
-	got_object_idcache_for_each(cache->idcache, check_refcount, cache);
+	got_object_idset_for_each(cache->idset, check_refcount, cache);
 #endif
 
-	if (cache->idcache) {
-		got_object_idcache_free(cache->idcache);
-		cache->idcache = NULL;
+	if (cache->idset) {
+		got_object_idset_free(cache->idset);
+		cache->idset = NULL;
 	}
 	cache->size = 0;
 }

@@ -31,7 +31,7 @@ struct got_object_cache_entry {
 
 struct got_object_cache {
 	enum got_object_cache_type type;
-	struct got_object_idcache *idcache;
+	struct got_object_idset *idset;
 	size_t size;
 	int cache_searches;
 	int cache_hit;

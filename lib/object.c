@@ -56,13 +56,6 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
-int
-got_object_id_cmp(const struct got_object_id *id1,
-    const struct got_object_id *id2)
-{
-	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
-}
-
 struct got_object_id *
 got_object_id_dup(struct got_object_id *id1)
 {
