@@ -378,7 +378,7 @@ open_mini_commit(struct got_mini_commit_object **commit,
 				return err;
 		}
 		err = got_object_read_packed_mini_commit_privsep(commit, obj,
-		    pack);
+		    pack, repo);
 	} else {
 		int fd;
 		err = open_loose_object(&fd, obj, repo);
@@ -1179,12 +1179,11 @@ request_mini_commit(struct got_mini_commit_object **commit,
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
-
 	err = got_privsep_send_mini_commit_req(ibuf, fd, obj);
 	if (err)
 		return err;
 
-	return got_privsep_recv_mini_commit(commit, ibuf);
+	return got_privsep_recv_mini_commit(commit, NULL, ibuf);
 }
 
 const struct got_error *
@@ -1201,17 +1200,32 @@ got_object_read_packed_commit_privsep(struct got_commit_object **commit,
 }
 
 const struct got_error *
-got_object_read_packed_mini_commit_privsep(struct got_mini_commit_object **commit,
-    struct got_object *obj, struct got_pack *pack)
+got_object_read_packed_mini_commit_privsep(
+    struct got_mini_commit_object **commit, struct got_object *obj,
+    struct got_pack *pack, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct got_object_id *pid = NULL;
 
 	err = got_privsep_send_mini_commit_req(pack->privsep_child->ibuf, -1,
 	    obj);
 	if (err)
 		return err;
 
-	return got_privsep_recv_mini_commit(commit, pack->privsep_child->ibuf);
+	 while (1) {
+		err = got_privsep_recv_mini_commit(commit, &pid,
+		    pack->privsep_child->ibuf);
+		if (err || pid == NULL)
+			break;
+
+		/* got-read-pack has sent a parent commit; cache it. */
+		err = got_repo_cache_mini_commit(repo, pid, *commit);
+		free(pid);
+		if (err)
+			break;
+	}
+
+	return err;
 }
 
 const struct got_error *

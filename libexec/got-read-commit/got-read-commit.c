@@ -181,7 +181,7 @@ main(int argc, char *argv[])
 			err = read_commit_object_mini(&commit, obj, f);
 			if (err)
 				goto done;
-			err = got_privsep_send_mini_commit(&ibuf, commit);
+			err = got_privsep_send_mini_commit(&ibuf, commit, NULL);
 			got_object_mini_commit_close(commit);
 		} else {
 			struct got_commit_object *commit;

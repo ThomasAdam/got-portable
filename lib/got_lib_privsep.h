@@ -150,6 +150,13 @@ struct got_imsg_commit_object_mini {
 	struct tm tm_committer;
 	int nparents;
 
+	/*
+	 * Set if this commit is a parent of the requested commit.
+	 * Allows got-read-pack to seed the main process mini-commit cache.
+	 */
+	int is_parent;
+	uint8_t parent_id[SHA1_DIGEST_LENGTH];
+
 	/* Followed by 'nparents' SHA1_DIGEST_LENGTH length strings */
 } __attribute__((__packed__));
 
@@ -213,11 +220,12 @@ const struct got_error *got_privsep_recv_obj(struct got_object **,
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,
     struct got_commit_object *);
 const struct got_error *got_privsep_send_mini_commit(struct imsgbuf *,
-    struct got_mini_commit_object *);
+    struct got_mini_commit_object *, struct got_object_id *);
 const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_mini_commit(
-    struct got_mini_commit_object **, struct imsgbuf *);
+    struct got_mini_commit_object **, struct got_object_id **,
+    struct imsgbuf *);
 const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
