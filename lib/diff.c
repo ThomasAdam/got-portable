@@ -393,6 +393,7 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_entry *te2,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
+	int id_match;
 
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
@@ -404,17 +405,18 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_entry *te2,
 		return err;
 	}
 
+	id_match = (got_object_id_cmp(te1->id, te2->id) == 0);
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
-		if (got_object_id_cmp(te1->id, te2->id) != 0)
+		if (!id_match)
 			return diff_modified_tree(te1->id, te2->id,
 			    label1, label2, diff_context, repo, outfile);
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
-		if (got_object_id_cmp(te1->id, te2->id) != 0)
+		if (!id_match)
 			return diff_modified_blob(te1->id, te2->id,
 			    label1, label2, diff_context, repo, outfile);
 	}
 
-	if (got_object_id_cmp(te1->id, te2->id) == 0)
+	if (id_match)
 		return NULL;
 
 	return diff_kind_mismatch(te1->id, te2->id, label1, label2, outfile);
