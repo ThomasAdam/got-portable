@@ -80,7 +80,8 @@ const struct got_error *got_object_id_str(char **, struct got_object_id *);
 /*
  * Compare two object IDs. Return value behaves like memcmp(3).
  */
-int got_object_id_cmp(struct got_object_id *, struct got_object_id *);
+int got_object_id_cmp(const struct got_object_id *,
+    const struct got_object_id *);
 
 /*
  * Created a newly allocated copy of an object ID.

@@ -57,7 +57,8 @@
 #endif
 
 int
-got_object_id_cmp(struct got_object_id *id1, struct got_object_id *id2)
+got_object_id_cmp(const struct got_object_id *id1,
+    const struct got_object_id *id2)
 {
 	return memcmp(id1->sha1, id2->sha1, SHA1_DIGEST_LENGTH);
 }
