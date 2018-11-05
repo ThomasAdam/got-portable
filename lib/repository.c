@@ -578,18 +578,21 @@ got_repo_cache_packidx(struct got_repository *repo, struct got_packidx *packidx)
 		if (repo->packidx_cache[i] == NULL)
 			break;
 	}
-
 	if (i == nitems(repo->packidx_cache)) {
 		err = got_packidx_close(repo->packidx_cache[i - 1]);
 		if (err)
 			return err;
-		memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
-		    sizeof(repo->packidx_cache) -
-		    sizeof(repo->packidx_cache[0]));
-		i = 0;
 	}
 
-	repo->packidx_cache[i] = packidx;
+	/*
+	 * Insert the new pack index at the front so it will
+	 * be searched first in the future.
+	 */
+	memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
+	    sizeof(repo->packidx_cache) -
+	    sizeof(repo->packidx_cache[0]));
+	repo->packidx_cache[0] = packidx;
+
 	return NULL;
 }
 
