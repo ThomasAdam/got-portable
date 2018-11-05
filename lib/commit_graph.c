@@ -406,6 +406,7 @@ add_node(struct got_commit_graph_node **new_node,
 		}
 		node->nparents++;
 	}
+	node->commit_timestamp = commit->committer_time;
 
 	err = got_object_idset_add(graph->node_ids, &node->id, node);
 	if (err) {
@@ -427,12 +428,6 @@ add_node(struct got_commit_graph_node **new_node,
 			free_node(node);
 			return err;
 		}
-	}
-
-	node->commit_timestamp = commit->committer_time;
-	if (node->commit_timestamp == -1) {
-		free_node(node);
-		return got_error_from_errno();
 	}
 
 	if (changed)
