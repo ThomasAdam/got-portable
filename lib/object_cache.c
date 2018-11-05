@@ -92,7 +92,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		cache->cache_evict++;
 	}
 
-	ce = calloc(1, sizeof(*ce));
+	ce = malloc(sizeof(*ce));
 	if (ce == NULL)
 		return got_error_from_errno();
 	memcpy(&ce->id, id, sizeof(ce->id));
