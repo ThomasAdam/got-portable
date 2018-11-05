@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+const struct got_error *got_object_qid_alloc_partial(struct got_object_qid **);
 struct got_commit_object *got_object_commit_alloc_partial(void);
 struct got_tree_entry *got_alloc_tree_entry_partial(void);
 const struct got_error *got_object_read_header_privsep(struct got_object**,

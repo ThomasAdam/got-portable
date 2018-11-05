@@ -244,18 +244,12 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 static const struct got_error *
 add_vertex(struct got_object_id_queue *ids, struct got_object_id *id)
 {
+	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 
-	qid = calloc(1, sizeof(*qid));
-	if (qid == NULL)
-		return got_error_from_errno();
-
-	qid->id = got_object_id_dup(id);
-	if (qid->id == NULL) {
-		const struct got_error *err = got_error_from_errno();
-		got_object_qid_free(qid);
+	err = got_object_qid_alloc(&qid, id);
+	if (err)
 		return err;
-	}
 
 	SIMPLEQ_INSERT_TAIL(ids, qid, entry);
 	return NULL;

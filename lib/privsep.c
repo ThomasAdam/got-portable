@@ -592,18 +592,9 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		for (i = 0; i < icommit.nparents; i++) {
 			struct got_object_qid *qid;
 
-			qid = calloc(1, sizeof(*qid));
-			if (qid == NULL) {
-				err = got_error_from_errno();
+			err = got_object_qid_alloc_partial(&qid);
+			if (err)
 				break;
-			}
-			qid->id = calloc(1, sizeof(*qid->id));
-			if (qid->id == NULL) {
-				err = got_error_from_errno();
-				free(qid);
-				break;
-			}
-
 			memcpy(qid->id, data + len + i * SHA1_DIGEST_LENGTH,
 			    sizeof(*qid->id));
 			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);

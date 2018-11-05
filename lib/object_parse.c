@@ -63,6 +63,26 @@
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
 
 const struct got_error *
+got_object_qid_alloc_partial(struct got_object_qid **qid)
+{
+	const struct got_error *err = NULL;
+
+	*qid = malloc(sizeof(**qid));
+	if (*qid == NULL)
+		return got_error_from_errno();
+
+	(*qid)->id = malloc(sizeof(*((*qid)->id)));
+	if ((*qid)->id == NULL) {
+		err = got_error_from_errno();
+		got_object_qid_free(*qid);
+		*qid = NULL;
+		return err;
+	}
+
+	return NULL;
+}
+
+const struct got_error *
 got_object_id_str(char **outbuf, struct got_object_id *id)
 {
 	static const size_t len = SHA1_DIGEST_STRING_LENGTH;
@@ -135,16 +155,9 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 
-	qid = malloc(sizeof(*qid));
-	if (qid == NULL)
-		return got_error_from_errno();
-
-	qid->id = malloc(sizeof(*qid->id));
-	if (qid->id == NULL) {
-		err = got_error_from_errno();
-		got_object_qid_free(qid);
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
 		return err;
-	}
 
 	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
