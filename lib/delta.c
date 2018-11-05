@@ -41,7 +41,7 @@ got_delta_open(off_t offset, size_t tslen, int type, size_t size,
 {
 	struct got_delta *delta;
 
-	delta = calloc(1, sizeof(*delta));
+	delta = malloc(sizeof(*delta));
 	if (delta == NULL)
 		return NULL;
 
