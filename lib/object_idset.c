@@ -39,12 +39,12 @@
 #endif
 
 struct got_object_idset_element {
-	RBT_ENTRY(got_object_idset_element)	entry;
+	RB_ENTRY(got_object_idset_element)	entry;
 	struct got_object_id id;
 	void *data;	/* API user data */
 };
 
-RBT_HEAD(got_object_idset_tree, got_object_idset_element);
+RB_HEAD(got_object_idset_tree, got_object_idset_element);
 
 static int
 cmp_elements(const struct got_object_idset_element *e1,
@@ -53,7 +53,7 @@ cmp_elements(const struct got_object_idset_element *e1,
 	return got_object_id_cmp(&e1->id, &e2->id);
 }
 
-RBT_PROTOTYPE(got_object_idset_tree, got_object_idset_element, entry,
+RB_PROTOTYPE(got_object_idset_tree, got_object_idset_element, entry,
     cmp_elements);
 
 struct got_object_idset {
@@ -71,7 +71,7 @@ got_object_idset_alloc(void)
 	if (set == NULL)
 		return NULL;
 
-	RBT_INIT(got_object_idset_tree, &set->entries);
+	RB_INIT(&set->entries);
 	set->totelem = 0;
 
 	return set;
@@ -82,8 +82,8 @@ got_object_idset_free(struct got_object_idset *set)
 {
 	struct got_object_idset_element *entry;
 
-	while ((entry = RBT_MIN(got_object_idset_tree, &set->entries))) {
-		RBT_REMOVE(got_object_idset_tree, &set->entries, entry);
+	while ((entry = RB_MIN(got_object_idset_tree, &set->entries))) {
+		RB_REMOVE(got_object_idset_tree, &set->entries, entry);
 		/* User data should be freed by caller. */
 		free(entry);
 	}
@@ -107,7 +107,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 	memcpy(&new->id, id, sizeof(new->id));
 	new->data = data;
 
-	RBT_INSERT(got_object_idset_tree, &set->entries, new);
+	RB_INSERT(got_object_idset_tree, &set->entries, new);
 	set->totelem++;
 	return NULL;
 }
@@ -117,13 +117,13 @@ find_element(struct got_object_idset *set, struct got_object_id *id)
 {
 	struct got_object_idset_element *entry;
 
-	entry = RBT_ROOT(got_object_idset_tree, &set->entries);
+	entry = RB_ROOT(&set->entries);
 	while (entry) {
 		int cmp = got_object_id_cmp(id, &entry->id);
 		if (cmp < 0)
-			entry = RBT_LEFT(got_object_idset_tree, entry);
+			entry = RB_LEFT(entry, entry);
 		else if (cmp > 0)
-			entry = RBT_RIGHT(got_object_idset_tree, entry);
+			entry = RB_RIGHT(entry, entry);
 		else
 			break;
 	}
@@ -151,13 +151,13 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 		return got_error(GOT_ERR_NO_OBJ);
 
 	if (id == NULL)
-		entry = RBT_ROOT(got_object_idset_tree, &set->entries);
+		entry = RB_ROOT(&set->entries);
 	else
 		entry = find_element(set, id);
 	if (entry == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	RBT_REMOVE(got_object_idset_tree, &set->entries, entry);
+	RB_REMOVE(got_object_idset_tree, &set->entries, entry);
 	if (data)
 		*data = entry->data;
 	free(entry);
@@ -178,7 +178,7 @@ void got_object_idset_for_each(struct got_object_idset *set,
 {
 	struct got_object_idset_element *entry;
 
-	RBT_FOREACH(entry, got_object_idset_tree, &set->entries)
+	RB_FOREACH(entry, got_object_idset_tree, &set->entries)
 		(*cb)(&entry->id, entry->data, arg);
 }
 
@@ -188,5 +188,5 @@ got_object_idset_num_elements(struct got_object_idset *set)
 	return set->totelem;
 }
 
-RBT_GENERATE(got_object_idset_tree, got_object_idset_element, entry,
+RB_GENERATE(got_object_idset_tree, got_object_idset_element, entry,
     cmp_elements);
