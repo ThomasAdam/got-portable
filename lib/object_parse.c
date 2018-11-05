@@ -137,7 +137,7 @@ got_object_commit_alloc_partial(void)
 	commit = calloc(1, sizeof(*commit));
 	if (commit == NULL)
 		return NULL;
-	commit->tree_id = calloc(1, sizeof(*commit->tree_id));
+	commit->tree_id = malloc(sizeof(*commit->tree_id));
 	if (commit->tree_id == NULL) {
 		free(commit);
 		return NULL;
