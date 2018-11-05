@@ -22,8 +22,8 @@ void got_object_idcache_free(struct got_object_idcache *);
 const struct got_error *got_object_idcache_add(struct got_object_idcache *,
     struct got_object_id *, void *);
 void *got_object_idcache_get(struct got_object_idcache *, struct got_object_id *);
-const struct got_error *got_object_idcache_remove_least_used(void **,
-    struct got_object_idcache *);
+const struct got_error *got_object_idcache_remove_one(void **,
+    struct got_object_idcache *, struct got_object_id *);
 int got_object_idcache_contains(struct got_object_idcache *,
     struct got_object_id *);
 void got_object_idcache_for_each(struct got_object_idcache *,

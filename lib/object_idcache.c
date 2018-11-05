@@ -132,10 +132,11 @@ got_object_idcache_get(struct got_object_idcache *cache, struct got_object_id *i
 }
 
 const struct got_error *
-got_object_idcache_remove_least_used(void **data, struct got_object_idcache *cache)
+got_object_idcache_remove_one(void **data, struct got_object_idcache *cache,
+    struct got_object_id *id)
 {
 	struct got_object_idcache_element *entry;
-	int i, idx = 0, maxelem = cache->nelem[0];
+	uint8_t idx = id->sha1[0];
 
 	if (data)
 		*data = NULL;
@@ -143,13 +144,18 @@ got_object_idcache_remove_least_used(void **data, struct got_object_idcache *cac
 	if (cache->totelem == 0)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	/* Remove least used element from longest list. */
-	for (i = 0; i < nitems(cache->entries); i++) {
-		if (maxelem < cache->nelem[i]) {
-			idx = i;
-			maxelem = cache->nelem[i];
+	if (cache->nelem[idx] == 0) {
+		/* Remove an element from the longest list. */
+		int i, maxelem = cache->nelem[0];
+		idx = 0;
+		for (i = 0; i < nitems(cache->entries); i++) {
+			if (maxelem < cache->nelem[i]) {
+				idx = i;
+				maxelem = cache->nelem[i];
+			}
 		}
 	}
+
 	entry = TAILQ_LAST(&cache->entries[idx], got_object_idcache_head);
 	TAILQ_REMOVE(&cache->entries[idx], entry, entry);
 	if (data)

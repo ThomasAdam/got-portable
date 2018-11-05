@@ -73,8 +73,8 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 
 	nelem = got_object_idcache_num_elements(cache->idcache);
 	if (nelem >= cache->size) {
-		err = got_object_idcache_remove_least_used((void **)&ce,
-		    cache->idcache);
+		err = got_object_idcache_remove_one((void **)&ce,
+		    cache->idcache, id);
 		if (err)
 			return err;
 		switch (cache->type) {
