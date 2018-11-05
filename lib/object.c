@@ -316,6 +316,41 @@ open_commit(struct got_commit_object **commit,
 	return err;
 }
 
+static const struct got_error *
+open_mini_commit(struct got_commit_object_mini **commit,
+    struct got_repository *repo, struct got_object *obj)
+{
+	const struct got_error *err = NULL;
+
+	*commit = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				return err;
+		}
+		err = got_object_read_packed_mini_commit_privsep(commit, obj,
+		    pack);
+	} else {
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
+		if (err)
+			return err;
+		err = got_object_read_mini_commit_privsep(commit, obj, fd,
+		    repo);
+		close(fd);
+	}
+
+	return err;
+}
+
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id)
@@ -348,6 +383,27 @@ got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
 {
 	return open_commit(commit, repo, obj, 1);
+}
+
+const struct got_error *
+got_object_open_mini_commit(struct got_commit_object_mini **commit,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = open_mini_commit(commit, repo, obj);
+done:
+	got_object_close(obj);
+	return err;
 }
 
 const struct got_error *
@@ -1074,7 +1130,6 @@ done:
 	return err;
 }
 
-
 static const struct got_error *
 request_commit(struct got_commit_object **commit, struct got_repository *repo,
     struct got_object *obj, int fd)
@@ -1091,6 +1146,22 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
 	return got_privsep_recv_commit(commit, ibuf);
 }
 
+static const struct got_error *
+request_mini_commit(struct got_commit_object_mini **commit,
+    struct got_repository *repo, struct got_object *obj, int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
+
+	err = got_privsep_send_mini_commit_req(ibuf, fd, obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_mini_commit(commit, ibuf);
+}
+
 const struct got_error *
 got_object_read_packed_commit_privsep(struct got_commit_object **commit,
     struct got_object *obj, struct got_pack *pack)
@@ -1102,6 +1173,20 @@ got_object_read_packed_commit_privsep(struct got_commit_object **commit,
 		return err;
 
 	return got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
+}
+
+const struct got_error *
+got_object_read_packed_mini_commit_privsep(struct got_commit_object_mini **commit,
+    struct got_object *obj, struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+
+	err = got_privsep_send_mini_commit_req(pack->privsep_child->ibuf, -1,
+	    obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_mini_commit(commit, pack->privsep_child->ibuf);
 }
 
 const struct got_error *
@@ -1139,6 +1224,43 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
 
 	return request_commit(commit, repo, obj, obj_fd);
+}
+
+const struct got_error *
+got_object_read_mini_commit_privsep(struct got_commit_object_mini **commit,
+    struct got_object *obj, int obj_fd, struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
+		return request_mini_commit(commit, repo, obj, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
+
+	return request_mini_commit(commit, repo, obj, obj_fd);
 }
 
 static const struct got_error *

@@ -42,10 +42,10 @@
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
-#include "got_lib_privsep.h"
-#include "got_lib_pack.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_privsep.h"
+#include "got_lib_pack.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
 
@@ -102,6 +102,24 @@ got_object_close(struct got_object *obj)
 	free(obj);
 }
 
+const struct got_error *
+got_object_qid_alloc_partial(struct got_object_qid **qid)
+{
+	const struct got_error *err = NULL;
+
+	*qid = malloc(sizeof(**qid));
+	if (*qid == NULL)
+		return got_error_from_errno();
+
+	(*qid)->id = malloc(sizeof(*((*qid)->id)));
+	if ((*qid)->id == NULL) {
+		err = got_error_from_errno();
+		got_object_qid_free(*qid);
+		*qid = NULL;
+	}
+	return err;
+}
+
 void
 got_object_qid_free(struct got_object_qid *qid)
 {
@@ -128,6 +146,25 @@ got_object_commit_alloc_partial(void)
 	return commit;
 }
 
+struct got_commit_object_mini *
+got_object_mini_commit_alloc_partial(void)
+{
+	struct got_commit_object_mini *commit;
+
+	commit = calloc(1, sizeof(*commit));
+	if (commit == NULL)
+		return NULL;
+	commit->tree_id = calloc(1, sizeof(*commit->tree_id));
+	if (commit->tree_id == NULL) {
+		free(commit);
+		return NULL;
+	}
+
+	SIMPLEQ_INIT(&commit->parent_ids);
+
+	return commit;
+}
+
 const struct got_error *
 got_object_commit_add_parent(struct got_commit_object *commit,
     const char *id_str)
@@ -135,16 +172,33 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 
-	qid = malloc(sizeof(*qid));
-	if (qid == NULL)
-		return got_error_from_errno();
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
+		return err;
 
-	qid->id = malloc(sizeof(*qid->id));
-	if (qid->id == NULL) {
-		err = got_error_from_errno();
-		got_object_qid_free(qid);
+	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		free(qid->id);
+		free(qid);
 		return err;
 	}
+
+	SIMPLEQ_INSERT_TAIL(&commit->parent_ids, qid, entry);
+	commit->nparents++;
+
+	return NULL;
+}
+
+const struct got_error *
+got_object_mini_commit_add_parent(struct got_commit_object_mini *commit,
+    const char *id_str)
+{
+	const struct got_error *err = NULL;
+	struct got_object_qid *qid;
+
+	err = got_object_qid_alloc_partial(&qid);
+	if (err)
+		return err;
 
 	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -255,14 +309,30 @@ got_object_commit_close(struct got_commit_object *commit)
 	free(commit);
 }
 
+void
+got_object_mini_commit_close(struct got_commit_object_mini *commit)
+{
+	struct got_object_qid *qid;
+
+	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
+		qid = SIMPLEQ_FIRST(&commit->parent_ids);
+		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
+		got_object_qid_free(qid);
+	}
+
+	free(commit->tree_id);
+	free(commit);
+}
+
 const struct got_error *
-got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len)
+got_object_parse_commit(struct got_commit_object **commit, char *buf,
+    size_t len)
 {
 	const struct got_error *err = NULL;
 	char *s = buf;
 	size_t tlen;
 	ssize_t remain = (ssize_t)len;
- 
+
 	*commit = got_object_commit_alloc_partial();
 	if (*commit == NULL)
 		return got_error_from_errno();
@@ -370,6 +440,109 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len
 done:
 	if (err) {
 		got_object_commit_close(*commit);
+		*commit = NULL;
+	}
+	return err;
+}
+
+const struct got_error *
+got_object_parse_mini_commit(struct got_commit_object_mini **commit, char *buf,
+    size_t len)
+{
+	const struct got_error *err = NULL;
+	char *s = buf;
+	size_t tlen;
+	ssize_t remain = (ssize_t)len;
+
+	*commit = got_object_mini_commit_alloc_partial();
+	if (*commit == NULL)
+		return got_error_from_errno();
+
+	tlen = strlen(GOT_COMMIT_TAG_TREE);
+	if (strncmp(s, GOT_COMMIT_TAG_TREE, tlen) == 0) {
+		remain -= tlen;
+		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		if (!got_parse_sha1_digest((*commit)->tree_id->sha1, s)) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		remain -= SHA1_DIGEST_STRING_LENGTH;
+		s += SHA1_DIGEST_STRING_LENGTH;
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_PARENT);
+	while (strncmp(s, GOT_COMMIT_TAG_PARENT, tlen) == 0) {
+		remain -= tlen;
+		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		err = got_object_mini_commit_add_parent(*commit, s);
+		if (err)
+			goto done;
+
+		remain -= SHA1_DIGEST_STRING_LENGTH;
+		s += SHA1_DIGEST_STRING_LENGTH;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_AUTHOR);
+	if (strncmp(s, GOT_COMMIT_TAG_AUTHOR, tlen) == 0) {
+		char *p;
+		size_t slen;
+
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		slen = strlen(s);
+		s += slen + 1;
+		remain -= slen + 1;
+	}
+
+	tlen = strlen(GOT_COMMIT_TAG_COMMITTER);
+	if (strncmp(s, GOT_COMMIT_TAG_COMMITTER, tlen) == 0) {
+		char *p;
+		size_t slen;
+
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		slen = strlen(s);
+		err = parse_commit_time(&(*commit)->tm_committer, s);
+		if (err)
+			goto done;
+		s += slen + 1;
+		remain -= slen + 1;
+	}
+
+done:
+	if (err) {
+		got_object_mini_commit_close(*commit);
 		*commit = NULL;
 	}
 	return err;

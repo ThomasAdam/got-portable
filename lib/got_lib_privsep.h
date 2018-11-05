@@ -82,6 +82,8 @@ enum got_imsg_type {
 	GOT_IMSG_COMMIT_REQUEST,
 	GOT_IMSG_COMMIT,
 	GOT_IMSG_COMMIT_LOGMSG,
+	GOT_IMSG_MINI_COMMIT_REQUEST,
+	GOT_IMSG_MINI_COMMIT,
 	GOT_IMSG_TREE_REQUEST,
 	GOT_IMSG_TREE,
 	GOT_IMSG_TREE_ENTRY,
@@ -142,6 +144,14 @@ struct got_imsg_commit_object {
 	 */
 } __attribute__((__packed__));
 
+/* Structure for GOT_IMSG_MINI_COMMIT data. */
+struct got_imsg_commit_object_mini {
+	uint8_t tree_id[SHA1_DIGEST_LENGTH];
+	struct tm tm_committer;
+	int nparents;
+
+	/* Followed by 'nparents' SHA1_DIGEST_LENGTH length strings */
+} __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_TREE_ENTRY. */
 struct got_imsg_tree_entry {
@@ -202,8 +212,12 @@ const struct got_error *got_privsep_recv_obj(struct got_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,
     struct got_commit_object *);
+const struct got_error *got_privsep_send_mini_commit(struct imsgbuf *,
+    struct got_commit_object_mini *);
 const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
     struct imsgbuf *);
+const struct got_error *got_privsep_recv_mini_commit(
+    struct got_commit_object_mini **, struct imsgbuf *);
 const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
@@ -214,4 +228,5 @@ const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
     struct got_pack *, struct got_packidx *);
 const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int,
     struct got_object_id *);
-const struct got_error *got_privsep_send_pack_child_ready(struct imsgbuf *);
+const struct got_error *got_privsep_send_mini_commit_req(struct imsgbuf *, int,
+    struct got_object *);

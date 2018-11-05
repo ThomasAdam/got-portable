@@ -48,3 +48,16 @@ struct got_blob_object {
 	uint8_t *read_buf;
 	struct got_object_id id;
 };
+
+/* Small version of got_commit_object. Used by commit graph. */
+struct got_commit_object_mini {
+	struct got_object_id *tree_id;
+	unsigned int nparents;
+	struct got_object_id_queue parent_ids;
+	struct tm tm_committer;	/* UTC */
+};
+
+const struct got_error *
+got_object_open_mini_commit(struct got_commit_object_mini **,
+    struct got_repository *, struct got_object_id *);
+void got_object_mini_commit_close(struct got_commit_object_mini *);

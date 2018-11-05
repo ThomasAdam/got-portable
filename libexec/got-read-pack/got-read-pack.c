@@ -145,6 +145,44 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 }
 
 static const struct got_error *
+mini_commit_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	struct got_commit_object_mini *commit = NULL;
+	uint8_t *buf;
+	size_t len;
+
+	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
+	    GOT_OBJ_TYPE_COMMIT);
+	if (err)
+		return err;
+
+	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
+	if (err)
+		return err;
+
+	obj->size = len;
+	err = got_object_parse_mini_commit(&commit, buf, len);
+	free(buf);
+
+	err = got_privsep_send_mini_commit(ibuf, commit);
+	if (obj)
+		got_object_close(obj);
+	got_object_mini_commit_close(commit);
+	if (err) {
+		if (err->code == GOT_ERR_PRIVSEP_PIPE)
+			err = NULL;
+		else
+			got_privsep_send_error(ibuf, err);
+	}
+
+	return err;
+}
+
+static const struct got_error *
 tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
@@ -462,6 +500,10 @@ main(int argc, char *argv[])
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,
+			    &objcache);
+			break;
+		case GOT_IMSG_MINI_COMMIT_REQUEST:
+			err = mini_commit_request(&imsg, &ibuf, pack, packidx,
 			    &objcache);
 			break;
 		case GOT_IMSG_TREE_REQUEST:
