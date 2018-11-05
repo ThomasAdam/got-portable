@@ -404,11 +404,11 @@ got_alloc_tree_entry_partial(void)
 {
 	struct got_tree_entry *te;
 
-	te = calloc(1, sizeof(*te));
+	te = malloc(sizeof(*te));
 	if (te == NULL)
 		return NULL;
 
-	te->id = calloc(1, sizeof(*te->id));
+	te->id = malloc(sizeof(*te->id));
 	if (te->id == NULL) {
 		free(te);
 		te = NULL;
