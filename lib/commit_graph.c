@@ -289,11 +289,8 @@ advance_branch(struct got_commit_graph *graph,
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
 		if (qid == NULL)
 			return NULL;
-		err = got_object_idset_add(NULL, graph->open_branches, qid->id,
-		    node);
-		if (err && err->code != GOT_ERR_OBJ_EXISTS)
-			return err;
-		return NULL;
+		err = got_object_idset_add(graph->open_branches, qid->id, node);
+		return err;
 	}
 
 	/*
@@ -335,11 +332,9 @@ advance_branch(struct got_commit_graph *graph,
 			 * skip any other branches.
 			 */
 			if (got_object_id_cmp(merged_id, id) == 0) {
-				err = got_object_idset_add(NULL,
-				    graph->open_branches, qid->id, node);
-				if (err && err->code != GOT_ERR_OBJ_EXISTS)
-					return err;
-				return NULL;
+				err = got_object_idset_add(graph->open_branches,
+				    qid->id, node);
+				return err;
 			}
 		}
 
@@ -353,20 +348,20 @@ advance_branch(struct got_commit_graph *graph,
 				return NULL;
 			if (got_object_idset_get(graph->node_ids, qid->id))
 				return NULL; /* parent already traversed */
-			err = got_object_idset_add(NULL,
-			    graph->open_branches, qid->id, node);
-			if (err && err->code != GOT_ERR_OBJ_EXISTS)
-				return err;
-			return NULL;
+			if (got_object_idset_get(graph->open_branches, qid->id))
+				return NULL;
+			return got_object_idset_add(graph->open_branches,
+			    qid->id, node);
 		}
 	}
 
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 		if (got_object_idset_get(graph->node_ids, qid->id))
 			continue; /* parent already traversed */
-		err = got_object_idset_add(NULL, graph->open_branches,
-		    qid->id, node);
-		if (err && err->code != GOT_ERR_OBJ_EXISTS)
+		if (got_object_idset_get(graph->open_branches, qid->id))
+			continue;
+		err = got_object_idset_add(graph->open_branches, qid->id, node);
+		if (err)
 			return err;
 	}
 
@@ -412,10 +407,8 @@ add_node(struct got_commit_graph_node **new_node,
 		node->nparents++;
 	}
 
-	err = got_object_idset_add(NULL, graph->node_ids, &node->id, node);
+	err = got_object_idset_add(graph->node_ids, &node->id, node);
 	if (err) {
-		if (err->code == GOT_ERR_OBJ_EXISTS)
-			err = NULL;
 		free_node(node);
 		return err;
 	}

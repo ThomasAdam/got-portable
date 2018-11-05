@@ -54,17 +54,13 @@ static const char *id_str2 = "2222222222222222222222222222222222222222";
 static const char *id_str3 = "ffffffffffffffffffffffffffffffffffffffff";
 static struct got_object_id id1, id2, id3;
 static const char *data1 = "data1", *data2 = "data2", *data3 = "data3";
-static int iter_count;
 
 static void
 idset_cb(struct got_object_id *id, void *data, void *arg) {
-	if (iter_count == 0 &&
-	    (got_object_id_cmp(id, &id1) != 0 || data != (void *)data1))
-		abort();
-	if (iter_count == 1 &&
-	    (got_object_id_cmp(id, &id3) != 0 || data != (void *)data3))
-		abort();
-	iter_count++;
+	if ((got_object_id_cmp(id, &id1) == 0 && data == (void *)data1) ||
+	    (got_object_id_cmp(id, &id3) == 0 && data == (void *)data3))
+		return;
+	abort();
 }
 
 static int
@@ -72,7 +68,6 @@ idset_add_remove_iter(void)
 {
 	const struct got_error *err = NULL;
 	struct got_object_idset *set;
-	void *existing_data;
 
 	set = got_object_idset_alloc();
 	if (set == NULL) {
@@ -97,13 +92,9 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(&existing_data, set, &id1, (void *)data1);
+	err = got_object_idset_add(set, &id1, (void *)data1);
 	if (err)
 		goto done;
-	if (existing_data != NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
 	if (got_object_idset_num_elements(set) != 1) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
@@ -114,24 +105,9 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(&existing_data, set, &id2, (void *)data2);
+	err = got_object_idset_add(set, &id2, (void *)data2);
 	if (err)
 		goto done;
-	if (existing_data != NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-	err = got_object_idset_add(&existing_data, set, &id2, NULL);
-	if (existing_data == NULL) {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
-	}
-	if (err->code != GOT_ERR_OBJ_EXISTS)
-		goto done;
-	err = got_object_idset_add(NULL, set, &id2, NULL);
-	if (err->code != GOT_ERR_OBJ_EXISTS)
-		goto done;
-	err = NULL;
 
 	if (!got_object_idset_contains(set, &id1)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -146,7 +122,7 @@ idset_add_remove_iter(void)
 		goto done;
 	}
 
-	err = got_object_idset_add(NULL, set, &id3, (void *)data3);
+	err = got_object_idset_add(set, &id3, (void *)data3);
 	if (err)
 		goto done;
 

@@ -88,14 +88,11 @@ got_object_idset_free(struct got_object_idset *set)
 }
 
 const struct got_error *
-got_object_idset_add(void **existing_data,
-    struct got_object_idset *set, struct got_object_id *id, void *data)
+got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
+    void *data)
 {
-	struct got_object_idset_element *new, *entry;
+	struct got_object_idset_element *new;
 	uint8_t i = id->sha1[0];
-
-	if (existing_data)
-		*existing_data = NULL;
 
 	if (set->totelem >= GOT_OBJECT_IDSET_MAX_ELEM)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -107,43 +104,10 @@ got_object_idset_add(void **existing_data,
 	memcpy(&new->id, id, sizeof(new->id));
 	new->data = data;
 
-	if (TAILQ_EMPTY(&set->entries[i])) {
-		TAILQ_INSERT_HEAD(&set->entries[i], new, entry);
-		set->nelem[i]++;
-		set->totelem++;
-		return NULL;
-	}
-
-	/*
-	 * Keep the list sorted by ID so that iterations of
-	 * the set occur in a predictable order.
-	 */
-	TAILQ_FOREACH(entry, &set->entries[i], entry) {
-		int cmp = got_object_id_cmp(&new->id, &entry->id);
-		struct got_object_idset_element *next;
-
-		if (cmp == 0) {
-			free(new);
-			if (existing_data)
-				*existing_data = entry->data;
-			return got_error(GOT_ERR_OBJ_EXISTS);
-		} else if (cmp < 0) {
-			TAILQ_INSERT_BEFORE(entry, new, entry);
-			set->nelem[i]++;
-			set->totelem++;
-			return NULL;
-		}
-
-		next = TAILQ_NEXT(entry, entry);
-		if (next == NULL) {
-			TAILQ_INSERT_AFTER(&set->entries[i], entry, new, entry);
-			set->nelem[i]++;
-			set->totelem++;
-			return NULL;
-		}
-	}
-
-	return got_error(GOT_ERR_BAD_OBJ_ID); /* should not get here */
+	TAILQ_INSERT_HEAD(&set->entries[i], new, entry);
+	set->nelem[i]++;
+	set->totelem++;
+	return NULL;
 }
 
 void *
