@@ -55,9 +55,13 @@ struct got_commit_object_mini {
 	unsigned int nparents;
 	struct got_object_id_queue parent_ids;
 	struct tm tm_committer;	/* UTC */
+	int refcnt;		/* > 0 if open and/or cached */
 };
 
 const struct got_error *
-got_object_open_mini_commit(struct got_commit_object_mini **,
-    struct got_repository *, struct got_object_id *);
+got_object_mini_commit_open(struct got_commit_object_mini **,
+    struct got_repository *, struct got_object *);
 void got_object_mini_commit_close(struct got_commit_object_mini *);
+const struct got_error *got_object_open_as_mini_commit(
+    struct got_commit_object_mini **, struct got_repository *,
+    struct got_object_id *);

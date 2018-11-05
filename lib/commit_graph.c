@@ -194,7 +194,7 @@ detect_changed_path(int *changed, struct got_commit_object_mini *commit,
 			*changed = 1; /* The path was created in this commit. */
 		free(obj_id);
 	} else {
-		err = got_object_open_mini_commit(&pcommit, repo, pid->id);
+		err = got_object_open_as_mini_commit(&pcommit, repo, pid->id);
 		if (err)
 			goto done;
 
@@ -460,7 +460,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 
 	*graph = NULL;
 
-	err = got_object_open_mini_commit(&commit, repo, commit_id);
+	err = got_object_open_as_mini_commit(&commit, repo, commit_id);
 	if (err)
 		return err;
 
@@ -553,7 +553,7 @@ fetch_commits_from_open_branches(int *ncommits,
 		commit_id = &graph->tips[i].id;
 		child_node = graph->tips[i].node;
 
-		err = got_object_open_mini_commit(&commit, repo, commit_id);
+		err = got_object_open_as_mini_commit(&commit, repo, commit_id);
 		if (err)
 			break;
 
@@ -635,7 +635,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (start_node == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	err = got_object_open_mini_commit(&commit, repo, &start_node->id);
+	err = got_object_open_as_mini_commit(&commit, repo, &start_node->id);
 	if (err)
 		return err;
 

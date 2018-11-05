@@ -32,9 +32,10 @@
 #include "got_lib_object_idcache.h"
 #include "got_lib_object_cache.h"
 
-#define GOT_OBJECT_CACHE_SIZE_OBJ	1024
-#define GOT_OBJECT_CACHE_SIZE_TREE	2048
-#define GOT_OBJECT_CACHE_SIZE_COMMIT	512
+#define GOT_OBJECT_CACHE_SIZE_OBJ		1024
+#define GOT_OBJECT_CACHE_SIZE_TREE		2048
+#define GOT_OBJECT_CACHE_SIZE_COMMIT		512
+#define GOT_OBJECT_CACHE_SIZE_MINI_COMMIT	512
 
 const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
@@ -51,6 +52,9 @@ got_object_cache_init(struct got_object_cache *cache,
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		size = GOT_OBJECT_CACHE_SIZE_COMMIT;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+		size = GOT_OBJECT_CACHE_SIZE_MINI_COMMIT;
 		break;
 	}
 
@@ -85,6 +89,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		case GOT_OBJECT_CACHE_TYPE_COMMIT:
 			got_object_commit_close(ce->data.commit);
 			break;
+		case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+			got_object_mini_commit_close(ce->data.mini_commit);
+			break;
 		}
 		free(ce);
 		cache->cache_evict++;
@@ -103,6 +110,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		ce->data.commit = (struct got_commit_object *)item;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+		ce->data.mini_commit = (struct got_commit_object_mini *)item;
 		break;
 	}
 
@@ -132,6 +142,8 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 			return ce->data.tree;
 		case GOT_OBJECT_CACHE_TYPE_COMMIT:
 			return ce->data.commit;
+		case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+			return ce->data.mini_commit;
 		}
 	}
 
@@ -157,6 +169,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 	struct got_object *obj;
 	struct got_tree_object *tree;
 	struct got_commit_object *commit;
+	struct got_commit_object_mini *mini_commit;
 	char *id_str;
 
 	if (got_object_id_str(&id_str, id) != NULL)
@@ -184,6 +197,13 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 		fprintf(stderr, "commit %s has %d unclaimed references\n",
 		    id_str, commit->refcnt - 1);
 		break;
+	case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+		mini_commit = ce->data.mini_commit;
+		if (mini_commit->refcnt == 1)
+			break;
+		fprintf(stderr, "commit %s has %d unclaimed references\n",
+		    id_str, mini_commit->refcnt - 1);
+		break;
 	}
 	free(id_str);
 }
@@ -202,6 +222,9 @@ got_object_cache_close(struct got_object_cache *cache)
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		print_cache_stats(cache, "commit");
+		break;
+	case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
+		print_cache_stats(cache, "mini-commit");
 		break;
 	}
 

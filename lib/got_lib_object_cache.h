@@ -18,6 +18,7 @@ enum got_object_cache_type {
 	GOT_OBJECT_CACHE_TYPE_OBJ,
 	GOT_OBJECT_CACHE_TYPE_TREE,
 	GOT_OBJECT_CACHE_TYPE_COMMIT,
+	GOT_OBJECT_CACHE_TYPE_MINI_COMMIT,
 };
 
 struct got_object_cache_entry {
@@ -26,6 +27,7 @@ struct got_object_cache_entry {
 		struct got_object *obj;
 		struct got_tree_object *tree;
 		struct got_commit_object *commit;
+		struct got_commit_object_mini *mini_commit;
 	} data;
 };
 

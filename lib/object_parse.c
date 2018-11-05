@@ -314,6 +314,12 @@ got_object_mini_commit_close(struct got_commit_object_mini *commit)
 {
 	struct got_object_qid *qid;
 
+	if (commit->refcnt > 0) {
+		commit->refcnt--;
+		if (commit->refcnt > 0)
+			return;
+	}
+
 	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
 		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);

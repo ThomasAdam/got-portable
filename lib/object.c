@@ -316,41 +316,6 @@ open_commit(struct got_commit_object **commit,
 	return err;
 }
 
-static const struct got_error *
-open_mini_commit(struct got_commit_object_mini **commit,
-    struct got_repository *repo, struct got_object *obj)
-{
-	const struct got_error *err = NULL;
-
-	*commit = NULL;
-
-	if (obj->type != GOT_OBJ_TYPE_COMMIT)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		struct got_pack *pack;
-		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
-		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo,
-			    obj->path_packfile, NULL);
-			if (err)
-				return err;
-		}
-		err = got_object_read_packed_mini_commit_privsep(commit, obj,
-		    pack);
-	} else {
-		int fd;
-		err = open_loose_object(&fd, obj, repo);
-		if (err)
-			return err;
-		err = got_object_read_mini_commit_privsep(commit, obj, fd,
-		    repo);
-		close(fd);
-	}
-
-	return err;
-}
-
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id)
@@ -385,12 +350,65 @@ got_object_commit_open(struct got_commit_object **commit,
 	return open_commit(commit, repo, obj, 1);
 }
 
+static const struct got_error *
+open_mini_commit(struct got_commit_object_mini **commit,
+    struct got_repository *repo, struct got_object *obj, int check_cache)
+{
+	const struct got_error *err = NULL;
+
+	if (check_cache) {
+		*commit = got_repo_get_cached_mini_commit(repo, &obj->id);
+		if (*commit != NULL) {
+			(*commit)->refcnt++;
+			return NULL;
+		}
+	} else
+		*commit = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				return err;
+		}
+		err = got_object_read_packed_mini_commit_privsep(commit, obj,
+		    pack);
+	} else {
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
+		if (err)
+			return err;
+		err = got_object_read_mini_commit_privsep(commit, obj, fd,
+		    repo);
+		close(fd);
+	}
+
+	if (err == NULL) {
+		(*commit)->refcnt++;
+		err = got_repo_cache_mini_commit(repo, &obj->id, *commit);
+	}
+
+	return err;
+}
+
 const struct got_error *
-got_object_open_mini_commit(struct got_commit_object_mini **commit,
+got_object_open_as_mini_commit(struct got_commit_object_mini **commit,
     struct got_repository *repo, struct got_object_id *id)
 {
 	const struct got_error *err;
 	struct got_object *obj;
+
+	*commit = got_repo_get_cached_mini_commit(repo, id);
+	if (*commit != NULL) {
+		(*commit)->refcnt++;
+		return NULL;
+	}
 
 	err = got_object_open(&obj, repo, id);
 	if (err)
@@ -400,10 +418,17 @@ got_object_open_mini_commit(struct got_commit_object_mini **commit,
 		goto done;
 	}
 
-	err = open_mini_commit(commit, repo, obj);
+	err = open_mini_commit(commit, repo, obj, 0);
 done:
 	got_object_close(obj);
 	return err;
+}
+
+const struct got_error *
+got_object_mini_commit_open(struct got_commit_object_mini **commit,
+    struct got_repository *repo, struct got_object *obj)
+{
+	return open_mini_commit(commit, repo, obj, 1);
 }
 
 const struct got_error *

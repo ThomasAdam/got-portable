@@ -38,6 +38,7 @@ struct got_repository {
 	struct got_object_cache objcache;
 	struct got_object_cache treecache;
 	struct got_object_cache commitcache;
+	struct got_object_cache minicommitcache;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,
@@ -52,6 +53,10 @@ const struct got_error*got_repo_cache_commit(struct got_repository *,
     struct got_object_id *, struct got_commit_object *);
 struct got_commit_object *got_repo_get_cached_commit(struct got_repository *,
     struct got_object_id *);
+const struct got_error*got_repo_cache_mini_commit(struct got_repository *,
+    struct got_object_id *, struct got_commit_object_mini *);
+struct got_commit_object_mini *got_repo_get_cached_mini_commit(
+    struct got_repository *, struct got_object_id *);
 const struct got_error *got_repo_cache_packidx(struct got_repository *,
     struct got_packidx *);
 const struct got_error *got_repo_search_packidx(struct got_packidx **, int *,
