@@ -153,7 +153,7 @@ get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 	if (size < GOT_PACKFILE_NAMELEN + 1)
 		return got_error(GOT_ERR_BAD_PATH);
 
-	*path_packfile = calloc(size, sizeof(**path_packfile));
+	*path_packfile = malloc(size);
 	if (*path_packfile == NULL)
 		return got_error_from_errno();
 
