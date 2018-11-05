@@ -39,7 +39,6 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
-#include "got_lib_object_cache.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
@@ -215,20 +214,6 @@ got_privsep_send_stop(int fd)
 	return err;
 }
 
-static void
-init_imsg_object(struct got_imsg_object *iobj, struct got_object *obj)
-{
-	memcpy(iobj->id, obj->id.sha1, sizeof(iobj->id));
-	iobj->type = obj->type;
-	iobj->flags = obj->flags;
-	iobj->hdrlen = obj->hdrlen;
-	iobj->size = obj->size;
-	if (iobj->flags & GOT_OBJ_FLAG_PACKED) {
-		iobj->pack_offset = obj->pack_offset;
-		iobj->pack_idx = obj->pack_idx;
-	}
-}
-
 const struct got_error *
 got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 {
@@ -251,35 +236,21 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 			return got_error(GOT_ERR_OBJ_TYPE);
 		}
 
-		init_imsg_object(&iobj, obj);
+		memcpy(iobj.id, obj->id.sha1, sizeof(iobj.id));
+		iobj.type = obj->type;
+		iobj.flags = obj->flags;
+		iobj.hdrlen = obj->hdrlen;
+		iobj.size = obj->size;
+		if (iobj.flags & GOT_OBJ_FLAG_PACKED) {
+			iobj.pack_offset = obj->pack_offset;
+			iobj.pack_idx = obj->pack_idx;
+		}
 
 		iobjp = &iobj;
 		iobj_size = sizeof(iobj);
 	}
 
 	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
-		return got_error_from_errno();
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_mini_commit_req(struct imsgbuf *ibuf, int fd,
-    struct got_object *obj)
-{
-	struct got_imsg_object iobj, *iobjp;
-	size_t iobj_size;
-
-	if (obj->type != GOT_OBJ_TYPE_COMMIT)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	init_imsg_object(&iobj, obj);
-
-	iobjp = &iobj;
-	iobj_size = sizeof(iobj);
-
-	if (imsg_compose(ibuf, GOT_IMSG_MINI_COMMIT_REQUEST, 0, 0, fd,
-	    iobjp, iobj_size) == -1)
 		return got_error_from_errno();
 
 	return flush_imsg(ibuf);
@@ -488,54 +459,6 @@ done:
 }
 
 const struct got_error *
-got_privsep_send_mini_commit(struct imsgbuf *ibuf,
-    struct got_mini_commit_object *commit, struct got_object_id *parent_id)
-{
-	const struct got_error *err = NULL;
-	struct got_imsg_commit_object_mini icommit;
-	uint8_t *buf;
-	size_t len, total;
-	struct got_object_qid *qid;
-
-	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
-	memcpy(&icommit.tm_committer, &commit->tm_committer,
-	    sizeof(icommit.tm_committer));
-	icommit.nparents = commit->nparents;
-
-	icommit.is_parent = parent_id ? 1 : 0;
-	if (parent_id)
-		memcpy(icommit.parent_id, parent_id->sha1,
-		    sizeof(icommit.parent_id));
-	else
-		memset(&icommit.parent_id, 0, sizeof(icommit.parent_id));
-
-	total = sizeof(icommit) + icommit.nparents * SHA1_DIGEST_LENGTH;
-
-	buf = malloc(total);
-	if (buf == NULL)
-		return got_error_from_errno();
-
-	len = 0;
-	memcpy(buf + len, &icommit, sizeof(icommit));
-	len += sizeof(icommit);
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-		memcpy(buf + len, qid->id, SHA1_DIGEST_LENGTH);
-		len += SHA1_DIGEST_LENGTH;
-	}
-
-	if (imsg_compose(ibuf, GOT_IMSG_MINI_COMMIT, 0, 0, -1,
-	    buf, len) == -1) {
-		err = got_error_from_errno();
-	}
-
-	free(buf);
-	if (err)
-		return err;
-
-	return parent_id ? NULL : flush_imsg(ibuf);
-}
-
-const struct got_error *
 got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -669,113 +592,23 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		for (i = 0; i < icommit.nparents; i++) {
 			struct got_object_qid *qid;
 
-			err = got_object_qid_alloc_partial(&qid);
-			if (err)
+			qid = calloc(1, sizeof(*qid));
+			if (qid == NULL) {
+				err = got_error_from_errno();
 				break;
+			}
+			qid->id = calloc(1, sizeof(*qid->id));
+			if (qid->id == NULL) {
+				err = got_error_from_errno();
+				free(qid);
+				break;
+			}
 
 			memcpy(qid->id, data + len + i * SHA1_DIGEST_LENGTH,
 			    sizeof(*qid->id));
 			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
 			(*commit)->nparents++;
 		}
-		break;
-	default:
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-		break;
-	}
-
-	imsg_free(&imsg);
-
-	return err;
-}
-
-static const struct got_error *
-get_mini_commit(struct got_mini_commit_object **commit,
-    struct got_imsg_commit_object_mini *icommit, uint8_t *data)
-{
-	const struct got_error *err = NULL;
-	int i;
-
-	*commit = got_object_mini_commit_alloc_partial();
-	if (*commit == NULL)
-		return got_error_from_errno();
-
-	memcpy((*commit)->tree_id->sha1, icommit->tree_id,
-	    SHA1_DIGEST_LENGTH);
-	memcpy(&(*commit)->tm_committer, &icommit->tm_committer,
-	    sizeof((*commit)->tm_committer));
-
-	for (i = 0; i < icommit->nparents; i++) {
-		struct got_object_qid *qid;
-
-		err = got_object_qid_alloc_partial(&qid);
-		if (err)
-			break;
-
-		memcpy(qid->id,
-		    data + sizeof(*icommit) + (i * SHA1_DIGEST_LENGTH),
-		    sizeof(*qid->id));
-		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
-		(*commit)->nparents++;
-	}
-
-	return err;
-}
-
-const struct got_error *
-got_privsep_recv_mini_commit(struct got_mini_commit_object **commit,
-    struct got_object_id **parent_id, struct imsgbuf *ibuf)
-{
-	const struct got_error *err = NULL;
-	struct imsg imsg;
-	struct got_imsg_commit_object_mini icommit;
-	size_t datalen;
-	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_commit_object_mini));
-	uint8_t *data;
-
-	*commit = NULL;
-
-	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
-	if (err)
-		return err;
-
-	data = imsg.data;
-	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-
-	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
-	case GOT_IMSG_MINI_COMMIT:
-		if (datalen < sizeof(icommit)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-
-		memcpy(&icommit, data, sizeof(icommit));
-		if (datalen != sizeof(icommit) +
-		    icommit.nparents * SHA1_DIGEST_LENGTH) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		if (icommit.nparents < 0) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		/* got-read-pack might send us parent commits for caching */
-		if (icommit.is_parent) {
-			if (parent_id == NULL) {
-				err = got_error(GOT_ERR_PRIVSEP_MSG);
-				break;
-			}
-			*parent_id = malloc(sizeof(**parent_id));
-			memcpy((*parent_id)->sha1, &icommit.parent_id,
-			    sizeof(*(*parent_id)->sha1));
-		} else if (parent_id)
-			*parent_id = NULL;
-		err = get_mini_commit(commit, &icommit, data);
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);

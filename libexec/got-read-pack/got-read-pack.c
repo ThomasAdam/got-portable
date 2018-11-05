@@ -145,115 +145,6 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 }
 
 static const struct got_error *
-send_parent_commit(size_t *totlen, struct imsgbuf *ibuf,
-    struct got_object_id *pid, struct got_pack *pack,
-    struct got_packidx *packidx, int recurse)
-{
-	const struct got_error *err = NULL;
-	struct got_object *pobj;
-	struct got_mini_commit_object *pcommit = NULL;
-	uint8_t *buf;
-	size_t len, plen;
-	int idx;
-
-	idx = got_packidx_get_object_idx(packidx, pid);
-	if (idx == -1) /* parent commit not in same pack file */
-		return NULL;
-
-	err = got_packfile_open_object(&pobj, pack, packidx, idx, pid);
-	if (err)
-		return err;
-
-	err = got_packfile_extract_object_to_mem(&buf, &len, pobj,
-	    pack);
-	if (err) {
-		got_object_close(pobj);
-		return err;
-	}
-
-	pobj->size = len;
-	err = got_object_parse_mini_commit(&pcommit, buf, len);
-	free(buf);
-
-	plen = sizeof(*pcommit) + (pcommit->nparents * SHA1_DIGEST_LENGTH);
-	if (*totlen + plen >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-		goto done;
-	*totlen += plen;
-
-	err = got_privsep_send_mini_commit(ibuf, pcommit, pid);
-	if (err)
-		goto done;
-
-	/* Send the first grandparent along as well if there is room. */
-	if (recurse > 0) {
-		struct got_object_qid *qid;
-		qid = SIMPLEQ_FIRST(&pcommit->parent_ids);
-		if (qid)
-			err = send_parent_commit(totlen, ibuf, qid->id, pack,
-			    packidx, recurse - 1);
-	}
-done:
-	got_object_close(pobj);
-	got_object_mini_commit_close(pcommit);
-	return err;
-}
-
-static const struct got_error *
-mini_commit_request(struct imsg *imsg, struct imsgbuf *ibuf,
-    struct got_pack *pack, struct got_packidx *packidx,
-    struct got_object_cache *objcache)
-{
-	const struct got_error *err = NULL;
-	struct got_object *obj = NULL;
-	struct got_mini_commit_object *commit = NULL;
-	uint8_t *buf;
-	size_t len, totlen;
-	struct got_object_qid *qid;
-
-	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
-	    GOT_OBJ_TYPE_COMMIT);
-	if (err)
-		return err;
-
-	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
-	if (err)
-		return err;
-
-	obj->size = len;
-	err = got_object_parse_mini_commit(&commit, buf, len);
-	free(buf);
-
-	/*
-	 * Try to pre-seed the main process mini-commit cache with parent
-	 * commits from this pack file. This makes more efficient use of
-	 * imsg pipe buffers per system call.
-	 */
-	totlen = sizeof(struct got_imsg_commit_object_mini) +
-	    (commit->nparents * sizeof(SHA1_DIGEST_LENGTH));
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-		if (totlen >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-			break;
-		err = send_parent_commit(&totlen, ibuf, qid->id,
-		    pack, packidx, 1);
-		if (err)
-			goto done;
-	}
-
-	err = got_privsep_send_mini_commit(ibuf, commit, NULL);
-done:
-	got_object_close(obj);
-	got_object_mini_commit_close(commit);
-	if (err) {
-		if (err->code == GOT_ERR_PRIVSEP_PIPE)
-			err = NULL;
-		else
-			got_privsep_send_error(ibuf, err);
-	}
-
-	return err;
-}
-
-static const struct got_error *
 tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
@@ -571,10 +462,6 @@ main(int argc, char *argv[])
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:
 			err = commit_request(&imsg, &ibuf, pack, packidx,
-			    &objcache);
-			break;
-		case GOT_IMSG_MINI_COMMIT_REQUEST:
-			err = mini_commit_request(&imsg, &ibuf, pack, packidx,
 			    &objcache);
 			break;
 		case GOT_IMSG_TREE_REQUEST:

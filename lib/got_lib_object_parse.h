@@ -14,11 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-const struct got_error *got_object_qid_alloc_partial(struct got_object_qid **);
 struct got_commit_object *got_object_commit_alloc_partial(void);
-struct got_mini_commit_object *got_object_mini_commit_alloc_partial(void);
-const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
-    const char *);
 struct got_tree_entry *got_alloc_tree_entry_partial(void);
 const struct got_error *got_object_read_header_privsep(struct got_object**,
     struct got_repository *repo, int);
@@ -27,16 +23,11 @@ const struct got_error *got_object_read_blob_privsep(size_t *, int, int,
 const struct got_error *got_object_read_commit_privsep(
     struct got_commit_object **, struct got_object *, int,
     struct got_repository *);
-const struct got_error *got_object_read_mini_commit_privsep(
-    struct got_mini_commit_object **, struct got_object *, int,
-    struct got_repository *);
 const struct got_error *got_object_read_tree_privsep(struct got_tree_object **,
     struct got_object *, int, struct got_repository *);
 
 const struct got_error *got_object_parse_commit(struct got_commit_object **,
     char *, size_t);
-const struct got_error *got_object_parse_mini_commit(
-    struct got_mini_commit_object **, char *, size_t);
 const struct got_error *got_object_parse_tree(struct got_tree_object **,
     uint8_t *, size_t);
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
@@ -51,8 +42,5 @@ const struct got_error *got_object_packed_read_privsep(struct got_object **,
     struct got_object_id *);
 const struct got_error *got_object_read_packed_commit_privsep(
     struct got_commit_object **, struct got_object *, struct got_pack *);
-const struct got_error *got_object_read_packed_mini_commit_privsep(
-    struct got_mini_commit_object **, struct got_object *, struct got_pack *,
-    struct got_repository *);
 const struct got_error *got_object_read_packed_tree_privsep(
     struct got_tree_object **, struct got_object *, struct got_pack *);
