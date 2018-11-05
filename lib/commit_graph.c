@@ -163,12 +163,12 @@ is_merge_point(struct got_commit_graph_node *node)
 }
 
 static const struct got_error *
-detect_changed_path(int *changed, struct got_commit_object_mini *commit,
+detect_changed_path(int *changed, struct got_mini_commit_object *commit,
     struct got_object_id *commit_id, const char *path,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object_mini *pcommit = NULL;
+	struct got_mini_commit_object *pcommit = NULL;
 	struct got_tree_object *tree = NULL, *ptree = NULL;
 	struct got_object_qid *pid;
 
@@ -275,7 +275,7 @@ close_branch(struct got_commit_graph *graph, struct got_object_id *commit_id)
 static const struct got_error *
 advance_branch(struct got_commit_graph *graph,
     struct got_commit_graph_node *node,
-    struct got_object_id *commit_id, struct got_commit_object_mini *commit,
+    struct got_object_id *commit_id, struct got_mini_commit_object *commit,
     struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -382,7 +382,7 @@ free_node(struct got_commit_graph_node *node)
 static const struct got_error *
 add_node(struct got_commit_graph_node **new_node,
     struct got_commit_graph *graph, struct got_object_id *commit_id,
-    struct got_commit_object_mini *commit,
+    struct got_mini_commit_object *commit,
     struct got_commit_graph_node *child_node, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -456,7 +456,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
     int first_parent_traversal, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object_mini *commit;
+	struct got_mini_commit_object *commit;
 
 	*graph = NULL;
 
@@ -547,7 +547,7 @@ fetch_commits_from_open_branches(int *ncommits,
 	for (i = 0; i < arg.ntips; i++) {
 		struct got_object_id *commit_id;
 		struct got_commit_graph_node *child_node, *new_node;
-		struct got_commit_object_mini *commit;
+		struct got_mini_commit_object *commit;
 		int changed;
 
 		commit_id = &graph->tips[i].id;
@@ -628,7 +628,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *start_node;
-	struct got_commit_object_mini *commit;
+	struct got_mini_commit_object *commit;
 	int changed;
 
 	start_node = got_object_idset_get(graph->node_ids, id);

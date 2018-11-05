@@ -488,7 +488,7 @@ done:
 
 const struct got_error *
 got_privsep_send_mini_commit(struct imsgbuf *ibuf,
-    struct got_commit_object_mini *commit)
+    struct got_mini_commit_object *commit)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_commit_object_mini icommit;
@@ -681,7 +681,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_recv_mini_commit(struct got_commit_object_mini **commit,
+got_privsep_recv_mini_commit(struct got_mini_commit_object **commit,
     struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;

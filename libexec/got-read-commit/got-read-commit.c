@@ -80,7 +80,7 @@ read_commit_object(struct got_commit_object **commit, struct got_object *obj,
 }
 
 static const struct got_error *
-read_commit_object_mini(struct got_commit_object_mini **commit,
+read_commit_object_mini(struct got_mini_commit_object **commit,
     struct got_object *obj, FILE *f)
 {
 	const struct got_error *err;
@@ -177,7 +177,7 @@ main(int argc, char *argv[])
 		}
 
 		if (mini) {
-			struct got_commit_object_mini *commit;
+			struct got_mini_commit_object *commit;
 			err = read_commit_object_mini(&commit, obj, f);
 			if (err)
 				goto done;

@@ -146,10 +146,10 @@ got_object_commit_alloc_partial(void)
 	return commit;
 }
 
-struct got_commit_object_mini *
+struct got_mini_commit_object *
 got_object_mini_commit_alloc_partial(void)
 {
-	struct got_commit_object_mini *commit;
+	struct got_mini_commit_object *commit;
 
 	commit = calloc(1, sizeof(*commit));
 	if (commit == NULL)
@@ -190,7 +190,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 }
 
 const struct got_error *
-got_object_mini_commit_add_parent(struct got_commit_object_mini *commit,
+got_object_mini_commit_add_parent(struct got_mini_commit_object *commit,
     const char *id_str)
 {
 	const struct got_error *err = NULL;
@@ -310,7 +310,7 @@ got_object_commit_close(struct got_commit_object *commit)
 }
 
 void
-got_object_mini_commit_close(struct got_commit_object_mini *commit)
+got_object_mini_commit_close(struct got_mini_commit_object *commit)
 {
 	struct got_object_qid *qid;
 
@@ -452,7 +452,7 @@ done:
 }
 
 const struct got_error *
-got_object_parse_mini_commit(struct got_commit_object_mini **commit, char *buf,
+got_object_parse_mini_commit(struct got_mini_commit_object **commit, char *buf,
     size_t len)
 {
 	const struct got_error *err = NULL;

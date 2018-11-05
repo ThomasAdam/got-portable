@@ -351,7 +351,7 @@ got_object_commit_open(struct got_commit_object **commit,
 }
 
 static const struct got_error *
-open_mini_commit(struct got_commit_object_mini **commit,
+open_mini_commit(struct got_mini_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, int check_cache)
 {
 	const struct got_error *err = NULL;
@@ -398,7 +398,7 @@ open_mini_commit(struct got_commit_object_mini **commit,
 }
 
 const struct got_error *
-got_object_open_as_mini_commit(struct got_commit_object_mini **commit,
+got_object_open_as_mini_commit(struct got_mini_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id)
 {
 	const struct got_error *err;
@@ -425,7 +425,7 @@ done:
 }
 
 const struct got_error *
-got_object_mini_commit_open(struct got_commit_object_mini **commit,
+got_object_mini_commit_open(struct got_mini_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
 {
 	return open_mini_commit(commit, repo, obj, 1);
@@ -1172,7 +1172,7 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
 }
 
 static const struct got_error *
-request_mini_commit(struct got_commit_object_mini **commit,
+request_mini_commit(struct got_mini_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, int fd)
 {
 	const struct got_error *err = NULL;
@@ -1201,7 +1201,7 @@ got_object_read_packed_commit_privsep(struct got_commit_object **commit,
 }
 
 const struct got_error *
-got_object_read_packed_mini_commit_privsep(struct got_commit_object_mini **commit,
+got_object_read_packed_mini_commit_privsep(struct got_mini_commit_object **commit,
     struct got_object *obj, struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
@@ -1252,7 +1252,7 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 }
 
 const struct got_error *
-got_object_read_mini_commit_privsep(struct got_commit_object_mini **commit,
+got_object_read_mini_commit_privsep(struct got_mini_commit_object **commit,
     struct got_object *obj, int obj_fd, struct got_repository *repo)
 {
 	int imsg_fds[2];

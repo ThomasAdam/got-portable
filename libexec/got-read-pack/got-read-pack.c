@@ -151,7 +151,7 @@ mini_commit_request(struct imsg *imsg, struct imsgbuf *ibuf,
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
-	struct got_commit_object_mini *commit = NULL;
+	struct got_mini_commit_object *commit = NULL;
 	uint8_t *buf;
 	size_t len;
 

@@ -233,7 +233,7 @@ got_repo_get_cached_commit(struct got_repository *repo,
 
 const struct got_error *
 got_repo_cache_mini_commit(struct got_repository *repo,
-    struct got_object_id *id, struct got_commit_object_mini *commit)
+    struct got_object_id *id, struct got_mini_commit_object *commit)
 {
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
@@ -245,11 +245,11 @@ got_repo_cache_mini_commit(struct got_repository *repo,
 	return NULL;
 }
 
-struct got_commit_object_mini *
+struct got_mini_commit_object *
 got_repo_get_cached_mini_commit(struct got_repository *repo,
     struct got_object_id *id)
 {
-	return (struct got_commit_object_mini *)got_object_cache_get(
+	return (struct got_mini_commit_object *)got_object_cache_get(
 	    &repo->minicommitcache, id);
 }
 

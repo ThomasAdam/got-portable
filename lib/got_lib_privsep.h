@@ -213,11 +213,11 @@ const struct got_error *got_privsep_recv_obj(struct got_object **,
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,
     struct got_commit_object *);
 const struct got_error *got_privsep_send_mini_commit(struct imsgbuf *,
-    struct got_commit_object_mini *);
+    struct got_mini_commit_object *);
 const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_mini_commit(
-    struct got_commit_object_mini **, struct imsgbuf *);
+    struct got_mini_commit_object **, struct imsgbuf *);
 const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,

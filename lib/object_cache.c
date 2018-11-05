@@ -112,7 +112,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		ce->data.commit = (struct got_commit_object *)item;
 		break;
 	case GOT_OBJECT_CACHE_TYPE_MINI_COMMIT:
-		ce->data.mini_commit = (struct got_commit_object_mini *)item;
+		ce->data.mini_commit = (struct got_mini_commit_object *)item;
 		break;
 	}
 
@@ -169,7 +169,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 	struct got_object *obj;
 	struct got_tree_object *tree;
 	struct got_commit_object *commit;
-	struct got_commit_object_mini *mini_commit;
+	struct got_mini_commit_object *mini_commit;
 	char *id_str;
 
 	if (got_object_id_str(&id_str, id) != NULL)

@@ -50,7 +50,7 @@ struct got_blob_object {
 };
 
 /* Small version of got_commit_object. Used by commit graph. */
-struct got_commit_object_mini {
+struct got_mini_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;
 	struct got_object_id_queue parent_ids;
@@ -59,9 +59,9 @@ struct got_commit_object_mini {
 };
 
 const struct got_error *
-got_object_mini_commit_open(struct got_commit_object_mini **,
+got_object_mini_commit_open(struct got_mini_commit_object **,
     struct got_repository *, struct got_object *);
-void got_object_mini_commit_close(struct got_commit_object_mini *);
+void got_object_mini_commit_close(struct got_mini_commit_object *);
 const struct got_error *got_object_open_as_mini_commit(
-    struct got_commit_object_mini **, struct got_repository *,
+    struct got_mini_commit_object **, struct got_repository *,
     struct got_object_id *);
