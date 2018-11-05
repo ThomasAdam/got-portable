@@ -454,6 +454,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 		*te = NULL;
 		return err;
 	}
+	(*te)->mode = 0;
 	while (*p != ' ') {
 		if (*p < '0' && *p > '7') {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
