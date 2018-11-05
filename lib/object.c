@@ -816,7 +816,7 @@ got_object_tree_path_changed(int *changed,
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_tree_entry *te1 = NULL, *te2 = NULL;
 	const char *seg, *s;
-	size_t seglen, len = strlen(path);
+	size_t seglen, remain = strlen(path);
 
 	*changed = 0;
 
@@ -832,15 +832,15 @@ got_object_tree_path_changed(int *changed,
 	tree2 = tree02;
 	s = path;
 	s++; /* skip leading '/' */
-	len--;
+	remain--;
 	seg = s;
 	seglen = 0;
-	while (len > 0) {
+	while (remain > 0) {
 		struct got_tree_object *next_tree1, *next_tree2;
 
 		if (*s != '/') {
 			s++;
-			len--;
+			remain--;
 			seglen++;
 			if (*s)
 				continue;
@@ -868,14 +868,14 @@ got_object_tree_path_changed(int *changed,
 			goto done;
 		}
 
-		if (len == 0) { /* final path element */
+		if (remain == 0) { /* final path element */
 			*changed = 1;
 			goto done;
 		}
 
 		seg = s + 1;
 		s++;
-		len--;
+		remain--;
 		seglen = 0;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree1, repo,
