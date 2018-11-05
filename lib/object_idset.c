@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stddef.h>
 #include <sys/queue.h>
 #include <sys/tree.h>
 
