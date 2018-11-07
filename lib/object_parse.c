@@ -477,7 +477,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
-	buf += strlen(buf) + 1;
+	buf += *elen;
 	memcpy((*te)->id->sha1, buf, SHA1_DIGEST_LENGTH);
 	*elen += SHA1_DIGEST_LENGTH;
 done:
