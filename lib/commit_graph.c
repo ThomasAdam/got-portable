@@ -36,6 +36,10 @@
 #include "got_lib_object_idset.h"
 #include "got_lib_path.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 struct got_commit_graph_node {
 	struct got_object_id id;
 
@@ -56,8 +60,11 @@ struct got_commit_graph_node {
 TAILQ_HEAD(got_commit_graph_iter_list, got_commit_graph_node);
 
 struct got_commit_graph_branch_tip {
-	struct got_object_id id;
-	struct got_commit_graph_node *node;
+	struct got_object_id *commit_id;
+	struct got_commit_object *commit;
+	struct got_commit_graph_node *new_node;
+	int changed;
+	int branch_done;
 };
 
 struct got_commit_graph {
@@ -87,7 +94,7 @@ struct got_commit_graph {
 	 */
 	struct got_object_idset *open_branches;
 
-	/* Copy of known branch tips for fetch_commits_from_open_branches(). */
+	/* Array of branch tips for fetch_commits_from_open_branches(). */
 	struct got_commit_graph_branch_tip *tips;
 	size_t ntips;
 #define GOT_COMMIT_GRAPH_MIN_TIPS 10	/* minimum amount of tips to allocate */
@@ -485,87 +492,103 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	return NULL;
 }
 
-struct gather_branch_tips_arg {
+struct add_branch_tip_arg {
 	struct got_commit_graph_branch_tip *tips;
 	int ntips;
+	struct got_repository *repo;
+	struct got_commit_graph *graph;
 };
 
 static const struct got_error *
-gather_branch_tips(struct got_object_id *id, void *data, void *arg)
+add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 {
-	struct gather_branch_tips_arg *a = arg;
-	memcpy(&a->tips[a->ntips].id, id, sizeof(*id));
-	a->tips[a->ntips].node = data;
+	const struct got_error *err;
+	struct got_commit_graph_node *child_node = data;
+	struct add_branch_tip_arg *a = arg;
+	struct got_commit_graph_node *new_node;
+	struct got_commit_object *commit;
+	int changed, branch_done;
+
+	err = got_object_open_as_commit(&commit, a->repo, commit_id);
+	if (err)
+		return err;
+
+	err = add_node(&new_node, &changed, &branch_done, a->graph,
+	    commit_id, commit, child_node, a->repo);
+	if (err)
+		return err;
+
+	a->tips[a->ntips].commit_id = new_node ? &new_node->id : NULL;
+	a->tips[a->ntips].commit = commit;
+	a->tips[a->ntips].new_node = new_node;
+	a->tips[a->ntips].changed = changed;
+	a->tips[a->ntips].branch_done = branch_done;
 	a->ntips++;
+
 	return NULL;
 }
 
 static const struct got_error *
-fetch_commits_from_open_branches(int *ncommits,
+fetch_commits_from_open_branches(int *nfetched,
     struct got_object_id **changed_id, struct got_commit_graph *graph,
     struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct gather_branch_tips_arg arg;
-	int i;
+	struct add_branch_tip_arg arg;
+	int i, ntips;
 
-	*ncommits = 0;
+	*nfetched = 0;
 	*changed_id = NULL;
 
-	arg.ntips = got_object_idset_num_elements(graph->open_branches);
-	if (arg.ntips == 0)
+	ntips = got_object_idset_num_elements(graph->open_branches);
+	if (ntips == 0)
 		return NULL;
 
-	/*
-	 * Adding nodes to the graph might change the graph's open
-	 * branches state. Create a local copy of the current state.
-	 */
-	if (graph->ntips < arg.ntips) {
+	/* (Re-)allocate branch tips array if necessary. */
+	if (graph->ntips < ntips) {
 		struct got_commit_graph_branch_tip *tips;
-		if (arg.ntips < GOT_COMMIT_GRAPH_MIN_TIPS)
-			arg.ntips = GOT_COMMIT_GRAPH_MIN_TIPS;
-		tips = reallocarray(graph->tips, arg.ntips, sizeof(*tips));
+		tips = reallocarray(graph->tips,
+		    MIN(ntips, GOT_COMMIT_GRAPH_MIN_TIPS), sizeof(*tips));
 		if (tips == NULL)
 			return got_error_from_errno();
 		graph->tips = tips;
-		graph->ntips = arg.ntips;
+		graph->ntips = ntips;
 	}
-	arg.ntips = 0; /* reset; gather_branch_tips() will increment */
 	arg.tips = graph->tips;
-	err = got_object_idset_for_each(graph->open_branches,
-	    gather_branch_tips, &arg);
+	arg.ntips = 0; /* add_branch_tip() will increment */
+	arg.repo = repo;
+	arg.graph = graph;
+	err = got_object_idset_for_each(graph->open_branches, add_branch_tip,
+	    &arg);
 	if (err)
-		return err;
+		goto done;
 
 	for (i = 0; i < arg.ntips; i++) {
 		struct got_object_id *commit_id;
-		struct got_commit_graph_node *child_node, *new_node;
 		struct got_commit_object *commit;
-		int changed, branch_done;
+		struct got_commit_graph_node *new_node;
+		int branch_done, changed;
 
-		commit_id = &graph->tips[i].id;
-		child_node = graph->tips[i].node;
+		commit_id = arg.tips[i].commit_id;
+		commit = arg.tips[i].commit;
+		new_node = arg.tips[i].new_node;
+		branch_done = arg.tips[i].branch_done;
+		changed = arg.tips[i].changed;
 
-		err = got_object_open_as_commit(&commit, repo, commit_id);
-		if (err)
-			break;
-
-		err = add_node(&new_node, &changed, &branch_done, graph,
-		    commit_id, commit, child_node, repo);
 		if (branch_done)
 			err = close_branch(graph, commit_id);
 		else
 			err = advance_branch(graph, new_node, commit_id,
 			    commit, repo);
-		if (changed && *changed_id == NULL)
-			*changed_id = commit_id;
-		got_object_commit_close(commit);
 		if (err)
 			break;
-		if (new_node)
-			(*ncommits)++;
+		if (changed && *changed_id == NULL)
+			*changed_id = commit_id;
 	}
-
+done:
+	for (i = 0; i < ntips; i++)
+		got_object_commit_close(arg.tips[i].commit);
+	(*nfetched) = arg.ntips;
 	return err;
 }
 
