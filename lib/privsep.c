@@ -684,7 +684,7 @@ get_more:
 		struct imsg imsg;
 		size_t n;
 		size_t datalen;
-		struct got_imsg_tree_entry ite;
+		struct got_imsg_tree_entry *ite;
 		struct got_tree_entry *te = NULL;
 
 		n = imsg_get(ibuf, &imsg);
@@ -728,18 +728,18 @@ get_more:
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			if (datalen < sizeof(ite) || datalen > MAX_IMSGSIZE) {
+			if (datalen < sizeof(*ite) || datalen > MAX_IMSGSIZE) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
 
 			/* Remaining data contains the entry's name. */
-			datalen -= sizeof(ite);
-			memcpy(&ite, imsg.data, sizeof(ite));
+			datalen -= sizeof(*ite);
 			if (datalen == 0 || datalen > MAX_IMSGSIZE) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
+			ite = imsg.data;
 
 			te = got_alloc_tree_entry_partial();
 			if (te == NULL) {
@@ -752,11 +752,11 @@ get_more:
 				err = got_error_from_errno();
 				break;
 			}
-			memcpy(te->name, imsg.data + sizeof(ite), datalen);
+			memcpy(te->name, imsg.data + sizeof(*ite), datalen);
 			te->name[datalen] = '\0';
 
-			memcpy(te->id->sha1, ite.id, SHA1_DIGEST_LENGTH);
-			te->mode = ite.mode;
+			memcpy(te->id->sha1, ite->id, SHA1_DIGEST_LENGTH);
+			te->mode = ite->mode;
 			SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
 			nentries++;
 			break;
