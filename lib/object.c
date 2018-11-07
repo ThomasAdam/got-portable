@@ -707,8 +707,14 @@ find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {
 	struct got_tree_entry *te;
 
+	/* Note that tree entries are sorted in strncmp() order. */
 	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		if (strncmp(te->name, name, len) == 0 && te->name[len] == '\0')
+		int cmp = strncmp(te->name, name, len);
+		if (cmp < 0)
+			continue;
+		if (cmp > 0)
+			break;
+		if (te->name[len] == '\0')
 			return te;
 	}
 	return NULL;
