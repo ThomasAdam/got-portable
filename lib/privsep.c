@@ -624,9 +624,9 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 	totlen = sizeof(itree);
 	nimsg = 1;
 	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		struct got_imsg_tree_entry ite;
+		struct got_imsg_tree_entry *ite;
 		uint8_t *buf = NULL;
-		size_t len = sizeof(ite) + strlen(te->name);
+		size_t len = sizeof(*ite) + strlen(te->name);
 
 		if (len > MAX_IMSGSIZE)
 			return got_error(GOT_ERR_NO_SPACE);
@@ -643,10 +643,10 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 		if (buf == NULL)
 			return got_error_from_errno();
 
-		memcpy(ite.id, te->id->sha1, sizeof(ite.id));
-		ite.mode = te->mode;
-		memcpy(buf, &ite, sizeof(ite));
-		memcpy(buf + sizeof(ite), te->name, strlen(te->name));
+		ite = (struct got_imsg_tree_entry *)buf;
+		memcpy(ite->id, te->id->sha1, sizeof(ite->id));
+		ite->mode = te->mode;
+		memcpy(buf + sizeof(*ite), te->name, strlen(te->name));
 
 		if (imsg_compose(ibuf, GOT_IMSG_TREE_ENTRY, 0, 0, -1,
 		    buf, len) == -1)
