@@ -102,7 +102,7 @@ enum got_imsg_type {
 struct got_imsg_error {
 	int code; /* an error code from got_error.h */
 	int errno_code; /* in case code equals GOT_ERR_ERRNO */
-};
+} __attribute__((__packed__));
 
 /*
  * Structure for GOT_IMSG_TREE_REQUEST, GOT_IMSG_COMMIT_REQUEST,
@@ -118,7 +118,7 @@ struct got_imsg_object {
 	size_t size;
 	off_t pack_offset;
 	int pack_idx;
-};
+}  __attribute__((__packed__));
 
 /* Structure for GOT_IMSG_COMMIT data. */
 struct got_imsg_commit_object {
@@ -173,7 +173,7 @@ struct got_imsg_pack {
 	char path_packfile[PATH_MAX];
 	size_t filesize;
 	/* Additionally, a file desciptor is passed via imsg. */
-};
+} __attribute__((__packed__));
 
 /*
  * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST data.
@@ -181,7 +181,7 @@ struct got_imsg_pack {
 struct got_imsg_packed_object {
 	uint8_t id[SHA1_DIGEST_LENGTH];
 	int idx;
-};
+} __attribute__((__packed__));
 
 struct got_pack;
 struct got_packidx;

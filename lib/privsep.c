@@ -132,20 +132,20 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datale
 static const struct got_error *
 recv_imsg_error(struct imsg *imsg, size_t datalen)
 {
-	struct got_imsg_error ierr;
+	struct got_imsg_error *ierr;
 
-	if (datalen != sizeof(ierr))
+	if (datalen != sizeof(*ierr))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	memcpy(&ierr, imsg->data, sizeof(ierr));
-	if (ierr.code == GOT_ERR_ERRNO) {
+	ierr = imsg->data;
+	if (ierr->code == GOT_ERR_ERRNO) {
 		static struct got_error serr;
 		serr.code = GOT_ERR_ERRNO;
-		serr.msg = strerror(ierr.errno_code);
+		serr.msg = strerror(ierr->errno_code);
 		return &serr;
 	}
 
-	return got_error(ierr.code);
+	return got_error(ierr->code);
 }
 
 /* Attempt to send an error in an imsg. Complain on stderr as a last resort. */
@@ -313,27 +313,26 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
     struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_object iobj;
+	struct got_imsg_object *iobj;
 	size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 
-	if (datalen != sizeof(iobj))
+	if (datalen != sizeof(*iobj))
 		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	memcpy(&iobj, imsg->data, sizeof(iobj));
+	iobj = imsg->data;
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
 		return got_error_from_errno();
 
-	memcpy((*obj)->id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
-	(*obj)->type = iobj.type;
-	(*obj)->flags = iobj.flags;
-	(*obj)->hdrlen = iobj.hdrlen;
-	(*obj)->size = iobj.size;
+	memcpy((*obj)->id.sha1, iobj->id, SHA1_DIGEST_LENGTH);
+	(*obj)->type = iobj->type;
+	(*obj)->flags = iobj->flags;
+	(*obj)->hdrlen = iobj->hdrlen;
+	(*obj)->size = iobj->size;
 	/* path_packfile is handled by caller */
-	if (iobj.flags & GOT_OBJ_FLAG_PACKED) {
-		(*obj)->pack_offset = iobj.pack_offset;
-		(*obj)->pack_idx = iobj.pack_idx;
+	if (iobj->flags & GOT_OBJ_FLAG_PACKED) {
+		(*obj)->pack_offset = iobj->pack_offset;
+		(*obj)->pack_idx = iobj->pack_idx;
 	}
 
 	return err;
@@ -463,13 +462,12 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	struct got_imsg_commit_object icommit;
+	struct got_imsg_commit_object *icommit;
 	size_t len, datalen;
 	int i;
 	const size_t min_datalen =
 	    MIN(sizeof(struct got_imsg_error),
 	    sizeof(struct got_imsg_commit_object));
-	uint8_t *data;
 
 	*commit = NULL;
 
@@ -477,7 +475,6 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 	if (err)
 		return err;
 
-	data = imsg.data;
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	len = 0;
 
@@ -486,23 +483,22 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_COMMIT:
-		if (datalen < sizeof(icommit)) {
+		if (datalen < sizeof(*icommit)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
-
-		memcpy(&icommit, data, sizeof(icommit));
-		if (datalen != sizeof(icommit) + icommit.author_len +
-		    icommit.committer_len +
-		    icommit.nparents * SHA1_DIGEST_LENGTH) {
+		icommit = imsg.data;
+		if (datalen != sizeof(*icommit) + icommit->author_len +
+		    icommit->committer_len +
+		    icommit->nparents * SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
-		if (icommit.nparents < 0) {
+		if (icommit->nparents < 0) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
-		len += sizeof(icommit);
+		len += sizeof(*icommit);
 
 		*commit = got_object_commit_alloc_partial();
 		if (*commit == NULL) {
@@ -510,32 +506,32 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			break;
 		}
 
-		memcpy((*commit)->tree_id->sha1, icommit.tree_id,
+		memcpy((*commit)->tree_id->sha1, icommit->tree_id,
 		    SHA1_DIGEST_LENGTH);
-		(*commit)->author_time = icommit.author_time;
-		(*commit)->author_gmtoff = icommit.author_gmtoff;
-		(*commit)->committer_time = icommit.committer_time;
-		(*commit)->committer_gmtoff = icommit.committer_gmtoff;
+		(*commit)->author_time = icommit->author_time;
+		(*commit)->author_gmtoff = icommit->author_gmtoff;
+		(*commit)->committer_time = icommit->committer_time;
+		(*commit)->committer_gmtoff = icommit->committer_gmtoff;
 
-		if (icommit.author_len == 0) {
+		if (icommit->author_len == 0) {
 			(*commit)->author = strdup("");
 			if ((*commit)->author == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
 		} else {
-			(*commit)->author = malloc(icommit.author_len + 1);
+			(*commit)->author = malloc(icommit->author_len + 1);
 			if ((*commit)->author == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
-			memcpy((*commit)->author, data + len,
-			    icommit.author_len);
-			(*commit)->author[icommit.author_len] = '\0';
+			memcpy((*commit)->author, imsg.data + len,
+			    icommit->author_len);
+			(*commit)->author[icommit->author_len] = '\0';
 		}
-		len += icommit.author_len;
+		len += icommit->author_len;
 
-		if (icommit.committer_len == 0) {
+		if (icommit->committer_len == 0) {
 			(*commit)->committer = strdup("");
 			if ((*commit)->committer == NULL) {
 				err = got_error_from_errno();
@@ -543,27 +539,27 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 			}
 		} else {
 			(*commit)->committer =
-			    malloc(icommit.committer_len + 1);
+			    malloc(icommit->committer_len + 1);
 			if ((*commit)->committer == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
-			memcpy((*commit)->committer, data + len,
-			    icommit.committer_len);
-			(*commit)->committer[icommit.committer_len] = '\0';
+			memcpy((*commit)->committer, imsg.data + len,
+			    icommit->committer_len);
+			(*commit)->committer[icommit->committer_len] = '\0';
 		}
-		len += icommit.committer_len;
+		len += icommit->committer_len;
 
-		if (icommit.logmsg_len == 0) {
+		if (icommit->logmsg_len == 0) {
 			(*commit)->logmsg = strdup("");
 			if ((*commit)->logmsg == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
 		} else {
-			size_t offset = 0, remain = icommit.logmsg_len;
+			size_t offset = 0, remain = icommit->logmsg_len;
 
-			(*commit)->logmsg = malloc(icommit.logmsg_len + 1);
+			(*commit)->logmsg = malloc(icommit->logmsg_len + 1);
 			if ((*commit)->logmsg == NULL) {
 				err = got_error_from_errno();
 				break;
@@ -586,17 +582,17 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 				offset += n;
 				remain -= n;
 			}
-			(*commit)->logmsg[icommit.logmsg_len] = '\0';
+			(*commit)->logmsg[icommit->logmsg_len] = '\0';
 		}
 
-		for (i = 0; i < icommit.nparents; i++) {
+		for (i = 0; i < icommit->nparents; i++) {
 			struct got_object_qid *qid;
 
 			err = got_object_qid_alloc_partial(&qid);
 			if (err)
 				break;
-			memcpy(qid->id, data + len + i * SHA1_DIGEST_LENGTH,
-			    sizeof(*qid->id));
+			memcpy(qid->id, imsg.data + len +
+			    i * SHA1_DIGEST_LENGTH, sizeof(*qid->id));
 			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
 			(*commit)->nparents++;
 		}
@@ -671,7 +667,7 @@ got_privsep_recv_tree(struct got_tree_object **tree, struct imsgbuf *ibuf)
 	const size_t min_datalen =
 	    MIN(sizeof(struct got_imsg_error),
 	    sizeof(struct got_imsg_tree_object));
-	struct got_imsg_tree_object itree = { 0 };
+	struct got_imsg_tree_object *itree;
 	int nentries = 0;
 
 	*tree = NULL;
@@ -709,17 +705,17 @@ get_more:
 				err = got_error(GOT_ERR_PRIVSEP_MSG);
 				break;
 			}
-			if (datalen != sizeof(itree)) {
+			if (datalen != sizeof(*itree)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
-			memcpy(&itree, imsg.data, sizeof(itree));
+			itree = imsg.data;
 			*tree = calloc(1, sizeof(**tree));
 			if (*tree == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
-			(*tree)->entries.nentries = itree.nentries;
+			(*tree)->entries.nentries = itree->nentries;
 			SIMPLEQ_INIT(&(*tree)->entries.head);
 			break;
 		case GOT_IMSG_TREE_ENTRY:
@@ -798,7 +794,7 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	struct got_imsg_blob iblob;
+	struct got_imsg_blob *iblob;
 	size_t datalen;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
@@ -812,12 +808,12 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_BLOB:
-		if (datalen != sizeof(iblob)) {
+		if (datalen != sizeof(*iblob)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
-		memcpy(&iblob, imsg.data, sizeof(iblob));
-		*size = iblob.size;
+		iblob = imsg.data;
+		*size = iblob->size;
 		/* Data has been written to file descriptor. */
 		break;
 	default:
