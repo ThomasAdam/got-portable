@@ -710,13 +710,14 @@ get_more:
 				break;
 			}
 			itree = imsg.data;
-			*tree = calloc(1, sizeof(**tree));
+			*tree = malloc(sizeof(**tree));
 			if (*tree == NULL) {
 				err = got_error_from_errno();
 				break;
 			}
 			(*tree)->entries.nentries = itree->nentries;
 			SIMPLEQ_INIT(&(*tree)->entries.head);
+			(*tree)->refcnt = 0;
 			break;
 		case GOT_IMSG_TREE_ENTRY:
 			/* This message should be preceeded by GOT_IMSG_TREE. */
