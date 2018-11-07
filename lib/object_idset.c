@@ -172,13 +172,20 @@ got_object_idset_contains(struct got_object_idset *set,
 	return entry ? 1 : 0;
 }
 
-void got_object_idset_for_each(struct got_object_idset *set,
-    void (*cb)(struct got_object_id *, void *, void *), void *arg)
+const struct got_error *
+got_object_idset_for_each(struct got_object_idset *set,
+    const struct got_error *(*cb)(struct got_object_id *, void *, void *),
+    void *arg)
 {
+	const struct got_error *err;
 	struct got_object_idset_element *entry;
 
-	RB_FOREACH(entry, got_object_idset_tree, &set->entries)
-		(*cb)(&entry->id, entry->data, arg);
+	RB_FOREACH(entry, got_object_idset_tree, &set->entries) {
+		err = (*cb)(&entry->id, entry->data, arg);
+		if (err)
+			return err;
+	}
+	return NULL;
 }
 
 int

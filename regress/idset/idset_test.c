@@ -55,12 +55,13 @@ static const char *id_str3 = "ffffffffffffffffffffffffffffffffffffffff";
 static struct got_object_id id1, id2, id3;
 static const char *data1 = "data1", *data2 = "data2", *data3 = "data3";
 
-static void
+static const struct got_error *
 idset_cb(struct got_object_id *id, void *data, void *arg) {
 	if ((got_object_id_cmp(id, &id1) == 0 && data == (void *)data1) ||
 	    (got_object_id_cmp(id, &id3) == 0 && data == (void *)data3))
-		return;
+		return NULL;
 	abort();
+	return NULL; /* not reached */
 }
 
 static int

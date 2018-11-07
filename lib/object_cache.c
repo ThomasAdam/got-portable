@@ -149,7 +149,8 @@ print_cache_stats(struct got_object_cache *cache, const char *name)
 	    cache->cache_miss, cache->cache_evict);
 }
 
-void check_refcount(struct got_object_id *id, void *data, void *arg)
+const struct got_error *
+check_refcount(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_object_cache *cache = arg;
 	struct got_object_cache_entry *ce = data;
@@ -159,7 +160,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 	char *id_str;
 
 	if (got_object_id_str(&id_str, id) != NULL)
-		return;
+		return NULL;
 
 	switch (cache->type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:
@@ -185,6 +186,7 @@ void check_refcount(struct got_object_id *id, void *data, void *arg)
 		break;
 	}
 	free(id_str);
+	return NULL;
 }
 #endif
 

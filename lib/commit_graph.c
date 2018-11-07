@@ -490,13 +490,14 @@ struct gather_branch_tips_arg {
 	int ntips;
 };
 
-static void
+static const struct got_error *
 gather_branch_tips(struct got_object_id *id, void *data, void *arg)
 {
 	struct gather_branch_tips_arg *a = arg;
 	memcpy(&a->tips[a->ntips].id, id, sizeof(*id));
 	a->tips[a->ntips].node = data;
 	a->ntips++;
+	return NULL;
 }
 
 static const struct got_error *
@@ -531,8 +532,10 @@ fetch_commits_from_open_branches(int *ncommits,
 	}
 	arg.ntips = 0; /* reset; gather_branch_tips() will increment */
 	arg.tips = graph->tips;
-	got_object_idset_for_each(graph->open_branches,
+	err = got_object_idset_for_each(graph->open_branches,
 	    gather_branch_tips, &arg);
+	if (err)
+		return err;
 
 	for (i = 0; i < arg.ntips; i++) {
 		struct got_object_id *commit_id;
@@ -588,11 +591,12 @@ got_commit_graph_fetch_commits(struct got_commit_graph *graph, int limit,
 	return NULL;
 }
 
-static void
+static const struct got_error *
 free_node_iter(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_commit_graph_node *node = data;
 	free_node(node);
+	return NULL;
 }
 
 void
