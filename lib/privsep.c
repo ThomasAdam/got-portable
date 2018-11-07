@@ -405,36 +405,37 @@ const struct got_error *
 got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_commit_object icommit;
+	struct got_imsg_commit_object *icommit;
 	uint8_t *buf;
 	size_t len, total;
 	struct got_object_qid *qid;
+	size_t author_len = strlen(commit->author);
+	size_t committer_len = strlen(commit->committer);
 	size_t logmsg_len = strlen(commit->logmsg);
 
-	memcpy(icommit.tree_id, commit->tree_id->sha1, sizeof(icommit.tree_id));
-	icommit.author_len = strlen(commit->author);
-	icommit.author_time = commit->author_time;
-	icommit.author_gmtoff = commit->author_gmtoff;
-	icommit.committer_len = strlen(commit->committer);
-	icommit.committer_time = commit->committer_time;
-	icommit.committer_gmtoff = commit->committer_gmtoff;
-	icommit.logmsg_len = logmsg_len;
-	icommit.nparents = commit->nparents;
-
-	total = sizeof(icommit) + icommit.author_len +
-	    icommit.committer_len + icommit.nparents * SHA1_DIGEST_LENGTH;
+	total = sizeof(*icommit) + author_len + committer_len +
+	    commit->nparents * SHA1_DIGEST_LENGTH;
 
 	buf = malloc(total);
 	if (buf == NULL)
 		return got_error_from_errno();
 
-	len = 0;
-	memcpy(buf + len, &icommit, sizeof(icommit));
-	len += sizeof(icommit);
-	memcpy(buf + len, commit->author, icommit.author_len);
-	len += icommit.author_len;
-	memcpy(buf + len, commit->committer, icommit.committer_len);
-	len += icommit.committer_len;
+	icommit = (struct got_imsg_commit_object *)buf;
+	memcpy(icommit->tree_id, commit->tree_id->sha1, sizeof(icommit->tree_id));
+	icommit->author_len = author_len;
+	icommit->author_time = commit->author_time;
+	icommit->author_gmtoff = commit->author_gmtoff;
+	icommit->committer_len = committer_len;
+	icommit->committer_time = commit->committer_time;
+	icommit->committer_gmtoff = commit->committer_gmtoff;
+	icommit->logmsg_len = logmsg_len;
+	icommit->nparents = commit->nparents;
+
+	len = sizeof(*icommit);
+	memcpy(buf + len, commit->author, author_len);
+	len += author_len;
+	memcpy(buf + len, commit->committer, committer_len);
+	len += committer_len;
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 		memcpy(buf + len, qid->id, SHA1_DIGEST_LENGTH);
 		len += SHA1_DIGEST_LENGTH;
