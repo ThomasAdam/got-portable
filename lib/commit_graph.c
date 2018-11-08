@@ -36,10 +36,6 @@
 #include "got_lib_object_idset.h"
 #include "got_lib_path.h"
 
-#ifndef MIN
-#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
-#endif
-
 struct got_commit_graph_node {
 	struct got_object_id id;
 
@@ -96,8 +92,7 @@ struct got_commit_graph {
 
 	/* Array of branch tips for fetch_commits_from_open_branches(). */
 	struct got_commit_graph_branch_tip *tips;
-	size_t ntips;
-#define GOT_COMMIT_GRAPH_MIN_TIPS 10	/* minimum amount of tips to allocate */
+	int ntips;
 
 	/* Path of tree entry of interest to the API user. */
 	char *path;
@@ -547,8 +542,8 @@ fetch_commits_from_open_branches(int *nfetched,
 	/* (Re-)allocate branch tips array if necessary. */
 	if (graph->ntips < ntips) {
 		struct got_commit_graph_branch_tip *tips;
-		tips = reallocarray(graph->tips,
-		    MIN(ntips, GOT_COMMIT_GRAPH_MIN_TIPS), sizeof(*tips));
+		tips = recallocarray(graph->tips, graph->ntips, ntips,
+		    sizeof(*tips));
 		if (tips == NULL)
 			return got_error_from_errno();
 		graph->tips = tips;
