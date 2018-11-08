@@ -581,7 +581,7 @@ fetch_commits_from_open_branches(int *nfetched,
 			*changed_id = commit_id;
 	}
 done:
-	for (i = 0; i < ntips; i++)
+	for (i = 0; i < arg.ntips; i++)
 		got_object_commit_close(arg.tips[i].commit);
 	(*nfetched) = arg.ntips;
 	return err;
