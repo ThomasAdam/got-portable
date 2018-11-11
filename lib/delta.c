@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <zlib.h>
 #include <sha1.h>
@@ -287,7 +288,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 			err = parse_opcode(&offset, &len, &p, &remain);
 			if (err)
 				break;
-			if (base_bufsz < offset + len ||
+			if (SIZE_MAX - offset < len || offset + len < 0 ||
+			    base_bufsz < offset + len ||
 			    *outsize + len > maxoutsize)
 				return got_error(GOT_ERR_BAD_DELTA);
 			memcpy(outbuf + *outsize, base_buf + offset, len);
@@ -307,7 +309,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 			err = next_delta_byte(&p, &remain);
 			if (err)
 				break;
-			if (remain < len || *outsize + len > maxoutsize)
+			if (remain < len || SIZE_MAX - *outsize < len ||
+			    *outsize + len > maxoutsize)
 				return got_error(GOT_ERR_BAD_DELTA);
 			memcpy(outbuf + *outsize, p, len);
 			p += len;
