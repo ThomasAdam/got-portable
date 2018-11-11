@@ -34,16 +34,21 @@
 
 struct delta_test {
 	const char *base;
+	size_t base_len;
 	const char *delta;
 	size_t delta_len;
 	const char *expected;
+	size_t result_len;
 } delta_tests[] = {
 	/* base len 0, target len 4, append 4 'x' */
-	{ "", "\x00\x04\x04xxxx", 7, "xxxx" },
+	{ "", 0, "\x00\x04\x04xxxx", 7, "xxxx", 4 },
 	/* copy 4 bytes at offset 0 from base, append 4 'x' */
-	{ "aabbccdd", "\x08\x08\x90\x04\x04xxxx", 9, "aabbxxxx" },
+	{ "aabbccdd", 8, "\x08\x08\x90\x04\x04xxxx", 9, "aabbxxxx", 8 },
 	/* copy 4 bytes at offset 4 from base, append 4 'x' */
-	{ "aabbccdd", "\x08\x08\x91\x04\x04\x04xxxx", 10, "ccddxxxx" },
+	{ "aabbccdd", 8, "\x08\x08\x91\x04\x04\x04xxxx", 10, "ccddxxxx", 8 },
+	/* git 48fb7deb5 Fix big left-shifts of unsigned char, 2009-06-17) */
+	{ "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+	  16, "\x10\x10\xff\xff\xff\xff\xff\x10\00\00", 10 , NULL, 0 }
 };
 
 static int
@@ -61,36 +66,45 @@ delta_apply(void)
 		struct delta_test *dt = &delta_tests[i];
 		FILE *base_file;
 		char buf[1024];
-		size_t n, len, result_len;
+		size_t n, result_len;
 
-		len = strlen(dt->base);
 		base_file = got_opentemp();
 		if (base_file == NULL) {
 			err = got_error_from_errno();
 			break;
 		}
 
-		n = fwrite(dt->base, 1, len, base_file);
-		if (n != len) {
+		n = fwrite(dt->base, 1, dt->base_len, base_file);
+		if (n != dt->base_len) {
 			err = got_ferror(base_file, GOT_ERR_IO);
 			break;
 		}
 		rewind(base_file);
 
 		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
-		    result_file, &len);
+		    result_file, &result_len);
 		fclose(base_file);
-		if (err)
-			break;
-		result_len = strlen(dt->expected);
-		if (result_len != len) {
-			err = got_ferror(result_file, GOT_ERR_BAD_DELTA);
-			break;
-		}
-		n = fread(buf, result_len, 1, result_file);
-		if (n != 1 || strncmp(buf, dt->expected, result_len) != 0) {
-			err = got_ferror(result_file, GOT_ERR_BAD_DELTA);
-			break;
+		if (dt->expected == NULL) {
+			/* Invalid delta, expect an error. */
+			if (err == NULL)
+				err = got_error(GOT_ERR_EXPECTED);
+			else if (err->code == GOT_ERR_BAD_DELTA)
+				err = NULL;
+		} else {
+			if (err)
+				break;
+			if (result_len != dt->result_len) {
+				err = got_ferror(result_file,
+				    GOT_ERR_BAD_DELTA);
+				break;
+			}
+			n = fread(buf, result_len, 1, result_file);
+			if (n != 1 ||
+			    strncmp(buf, dt->expected, result_len) != 0) {
+				err = got_ferror(result_file,
+				    GOT_ERR_BAD_DELTA);
+				break;
+			}
 		}
 		rewind(result_file);
 	}
