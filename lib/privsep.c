@@ -106,6 +106,25 @@ got_privsep_wait_for_child(pid_t pid)
 	return NULL;
 }
 
+static const struct got_error *
+recv_imsg_error(struct imsg *imsg, size_t datalen)
+{
+	struct got_imsg_error *ierr;
+
+	if (datalen != sizeof(*ierr))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	ierr = imsg->data;
+	if (ierr->code == GOT_ERR_ERRNO) {
+		static struct got_error serr;
+		serr.code = GOT_ERR_ERRNO;
+		serr.msg = strerror(ierr->errno_code);
+		return &serr;
+	}
+
+	return got_error(ierr->code);
+}
+
 const struct got_error *
 got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
     size_t min_datalen)
@@ -127,26 +146,12 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
 		return got_error(GOT_ERR_PRIVSEP_LEN);
 
-	return NULL;
-}
-
-static const struct got_error *
-recv_imsg_error(struct imsg *imsg, size_t datalen)
-{
-	struct got_imsg_error *ierr;
-
-	if (datalen != sizeof(*ierr))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-
-	ierr = imsg->data;
-	if (ierr->code == GOT_ERR_ERRNO) {
-		static struct got_error serr;
-		serr.code = GOT_ERR_ERRNO;
-		serr.msg = strerror(ierr->errno_code);
-		return &serr;
+	if (imsg->hdr.type == GOT_IMSG_ERROR) {
+		size_t datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+		return recv_imsg_error(imsg, datalen);
 	}
 
-	return got_error(ierr->code);
+	return NULL;
 }
 
 /* Attempt to send an error in an imsg. Complain on stderr as a last resort. */
@@ -357,9 +362,6 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_OBJECT:
 		err = got_privsep_get_imsg_obj(obj, &imsg, ibuf);
 		break;
@@ -481,9 +483,6 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 	len = 0;
 
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_COMMIT:
 		if (datalen < sizeof(*icommit)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
@@ -807,9 +806,6 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
-	case GOT_IMSG_ERROR:
-		err = recv_imsg_error(&imsg, datalen);
-		break;
 	case GOT_IMSG_BLOB:
 		if (datalen != sizeof(*iblob)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
