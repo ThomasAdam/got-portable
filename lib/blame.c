@@ -206,7 +206,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 
 	err = got_object_id_by_path(&pobj_id, repo, pid, path);
 	if (err) {
-		if (err->code == GOT_ERR_NO_OBJ) {
+		if (err->code == GOT_ERR_NO_TREE_ENTRY) {
 			/* Blob's history began in previous commit. */
 			err = got_error(GOT_ERR_ITER_COMPLETED);
 		}

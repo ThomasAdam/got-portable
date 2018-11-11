@@ -63,6 +63,7 @@
 #define GOT_ERR_RANGE		47
 #define GOT_ERR_EXPECTED	48 /* for use in regress tests only */
 #define GOT_ERR_CANCELLED	49
+#define GOT_ERR_NO_TREE_ENTRY	50
 
 static const struct got_error {
 	int code;
@@ -114,6 +115,7 @@ static const struct got_error {
 	{ GOT_ERR_RANGE,	"value out of range" },
 	{ GOT_ERR_EXPECTED,	"expected an error but have no error" },
 	{ GOT_ERR_CANCELLED,	"operation in progress has been cancelled" },
+	{ GOT_ERR_NO_TREE_ENTRY,"no such entry found in tree" },
 };
 
 /*

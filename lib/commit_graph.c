@@ -190,7 +190,7 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 		struct got_object_id *obj_id;
 		err = got_object_id_by_path(&obj_id, repo, commit_id, path);
 		if (err) {
-			if (err->code == GOT_ERR_NO_OBJ)
+			if (err->code == GOT_ERR_NO_TREE_ENTRY)
 				err = NULL;
 		} else
 			*changed = 1; /* The path was created in this commit. */
@@ -309,7 +309,7 @@ advance_branch(struct got_commit_graph *graph,
 			err = got_object_id_by_path(&id, repo, qid->id,
 			    graph->path);
 			if (err) {
-				if (err->code == GOT_ERR_NO_OBJ) {
+				if (err->code == GOT_ERR_NO_TREE_ENTRY) {
 					branches_differ = 1;
 					continue;
 				}
