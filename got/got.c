@@ -412,6 +412,9 @@ print_commits(struct got_object *root_obj, struct got_object_id *root_id,
 		struct got_commit_object *commit;
 		struct got_object_id *id;
 
+		if (sigint_received || sigpipe_received)
+			break;
+
 		err = got_commit_graph_iter_next(&id, graph);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
@@ -837,6 +840,10 @@ print_tree(const char *path, struct got_object_id *commit_id,
 	te = SIMPLEQ_FIRST(&entries->head);
 	while (te) {
 		char *id = NULL;
+
+		if (sigint_received || sigpipe_received)
+			break;
+
 		if (show_ids) {
 			char *id_str;
 			err = got_object_id_str(&id_str, te->id);
