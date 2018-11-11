@@ -107,7 +107,8 @@ got_privsep_wait_for_child(pid_t pid)
 }
 
 const struct got_error *
-got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf, size_t min_datalen)
+got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
+    size_t min_datalen)
 {
 	const struct got_error *err;
 	ssize_t n;
