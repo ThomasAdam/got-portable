@@ -481,16 +481,15 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 const struct got_error *
 got_pack_stop_privsep_child(struct got_pack *pack)
 {
-	const struct got_error *err = NULL, *child_err = NULL;
+	const struct got_error *err = NULL;
 
 	if (pack->privsep_child == NULL)
 		return NULL;
 
 	err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
-	child_err = got_privsep_wait_for_child(
-	    pack->privsep_child->pid);
-	if (child_err && err == NULL)
-		err = child_err;
+	if (err)
+		return err;
+	err = got_privsep_wait_for_child(pack->privsep_child->pid);
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;
 	return err;
