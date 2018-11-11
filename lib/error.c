@@ -14,12 +14,22 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sha1.h>
+#include <zlib.h>
 
 #include "got_error.h"
+#include "got_object.h"
+
+#include "got_lib_delta.h"
+#include "got_lib_inflate.h"
+#include "got_lib_object.h"
+#include "got_lib_sha1.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -33,6 +43,23 @@ got_error(int code)
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code)
 			return &got_errors[i];
+	}
+
+	abort();
+}
+
+const struct got_error *
+got_error_msg(int code, const char *msg)
+{
+	static struct got_error err;
+	int i;
+
+	for (i = 0; i < nitems(got_errors); i++) {
+		if (code == got_errors[i].code) {
+			err.code = code;
+			err.msg = msg;
+			return (const struct got_error *)&err;
+		}
 	}
 
 	abort();
@@ -61,4 +88,22 @@ got_ferror(FILE *f, int code)
 	if (ferror(f))
 		return got_error_from_errno();
 	return got_error(code);
+}
+
+const struct got_error *
+got_error_no_obj(struct got_object_id *id)
+{
+	static char msg[sizeof("object   not found") +
+	    SHA1_DIGEST_STRING_LENGTH];
+	char id_str[SHA1_DIGEST_STRING_LENGTH];
+	int ret;
+
+	if (!got_sha1_digest_to_str(id->sha1, id_str, sizeof(id_str)))
+		return got_error(GOT_ERR_NO_OBJ);
+
+	ret = snprintf(msg, sizeof(msg), "object %s not found", id_str);
+	if (ret == -1 || ret >= sizeof(msg))
+		return got_error(GOT_ERR_NO_OBJ);
+
+	return got_error_msg(GOT_ERR_NO_OBJ, msg);
 }

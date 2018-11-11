@@ -123,6 +123,14 @@ static const struct got_error {
 const struct got_error *got_error(int);
 
 /*
+ * Get an error object from the above list, for a given error code.
+ * Use the specified error message instead of the default one.
+ * Caution: If the message buffer lives in dynamically allocated memory,
+ * then this memory likely won't be freed.
+ */
+const struct got_error *got_error_msg(int, const char *);
+
+/*
  * Get a statically allocated error object with code GOT_ERR_ERRNO
  * and an error message obtained from strerror(3).
  */
@@ -141,3 +149,12 @@ const struct got_error *got_error_set_errno(int);
  * with the error code provided in the second argument.
  */
 const struct got_error *got_ferror(FILE *, int);
+
+/*
+ * Obtain an error with code GOT_ERR_NO_OBJ and an error message which
+ * contains the specified object ID. The message buffer is statically
+ * allocated; future invocations of this function will overwrite the
+ * message set during earlier invocations.
+ */
+struct got_object_id; /* forward declaration */
+const struct got_error *got_error_no_obj(struct got_object_id *);

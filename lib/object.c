@@ -232,7 +232,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		if (errno == ENOENT)
-			err = got_error(GOT_ERR_NO_OBJ);
+			err = got_error_no_obj(id);
 		else
 			err = got_error_from_errno();
 		goto done;

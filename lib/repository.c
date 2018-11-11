@@ -673,7 +673,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 	}
 
-	err = got_error(GOT_ERR_NO_OBJ);
+	err = got_error_no_obj(id);
 done:
 	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == 0)

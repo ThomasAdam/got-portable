@@ -639,7 +639,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 
 	start_node = got_object_idset_get(graph->node_ids, id);
 	if (start_node == NULL)
-		return got_error(GOT_ERR_NO_OBJ);
+		return got_error_no_obj(id);
 
 	err = got_object_open_as_commit(&commit, repo, &start_node->id);
 	if (err)
