@@ -58,7 +58,7 @@ got_error_msg(int code, const char *msg)
 		if (code == got_errors[i].code) {
 			err.code = code;
 			err.msg = msg;
-			return (const struct got_error *)&err;
+			return &err;
 		}
 	}
 
