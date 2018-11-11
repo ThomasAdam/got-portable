@@ -258,8 +258,9 @@ got_delta_get_sizes(uint64_t *base_size, uint64_t *result_size,
 }
 
 const struct got_error *
-got_delta_apply_in_mem(uint8_t *base_buf, const uint8_t *delta_buf,
-    size_t delta_len, uint8_t *outbuf, size_t *outsize)
+got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
+    const uint8_t *delta_buf, size_t delta_len, uint8_t *outbuf,
+    size_t *outsize, size_t maxoutsize)
 {
 	const struct got_error *err = NULL;
 	uint64_t base_size, result_size;
@@ -286,6 +287,9 @@ got_delta_apply_in_mem(uint8_t *base_buf, const uint8_t *delta_buf,
 			err = parse_opcode(&offset, &len, &p, &remain);
 			if (err)
 				break;
+			if (base_bufsz < offset + len ||
+			    *outsize + len > maxoutsize)
+				return got_error(GOT_ERR_BAD_DELTA);
 			memcpy(outbuf + *outsize, base_buf + offset, len);
 			if (err == NULL) {
 				*outsize += len;
@@ -303,7 +307,7 @@ got_delta_apply_in_mem(uint8_t *base_buf, const uint8_t *delta_buf,
 			err = next_delta_byte(&p, &remain);
 			if (err)
 				break;
-			if (remain < len)
+			if (remain < len || *outsize + len > maxoutsize)
 				return got_error(GOT_ERR_BAD_DELTA);
 			memcpy(outbuf + *outsize, p, len);
 			p += len;
