@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <imsg.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +38,14 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+
+static volatile sig_atomic_t sigint_received;
+
+static void
+catch_sigint(int signo)
+{
+	sigint_received = 1;
+}
 
 static const struct got_error *
 read_commit_object(struct got_commit_object **commit, struct got_object *obj,
@@ -74,6 +83,8 @@ main(int argc, char *argv[])
 	struct imsgbuf ibuf;
 	size_t datalen;
 
+	signal(SIGINT, catch_sigint);
+
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 
 #ifndef PROFILE
@@ -90,6 +101,11 @@ main(int argc, char *argv[])
 		struct got_imsg_object iobj;
 		FILE *f = NULL;
 		struct got_object *obj = NULL;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			break;
+		}
 	
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 		if (err) {
@@ -152,18 +168,16 @@ done:
 		imsg_free(&imsg);
 		if (obj)
 			got_object_close(obj);
-		if (err) {
-			if (err->code == GOT_ERR_PRIVSEP_PIPE)
-				err = NULL;
-			else
-				got_privsep_send_error(&ibuf, err);
+		if (err)
 			break;
-		}
 	}
 
 	imsg_clear(&ibuf);
-	if (err)
+	if (err) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE)
+			got_privsep_send_error(&ibuf, err);
+	}
 	close(GOT_IMSG_FD_CHILD);
 	return err ? 1 : 0;
 }

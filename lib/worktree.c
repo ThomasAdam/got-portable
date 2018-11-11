@@ -470,13 +470,15 @@ done:
 static const struct got_error *
 tree_checkout(struct got_worktree *, struct got_fileindex *,
     struct got_tree_object *, const char *, struct got_repository *,
-    got_worktree_checkout_cb progress_cb, void *progress_arg);
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg);
 
 static const struct got_error *
 tree_checkout_entry(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_tree_entry *te,
     const char *parent, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -525,8 +527,9 @@ tree_checkout_entry(struct got_worktree *worktree,
 			if (err)
 				break;
 		}
+		/* XXX infinite recursion possible */
 		err = tree_checkout(worktree, fileindex, tree, path, repo,
-		    progress_cb, progress_arg);
+		    progress_cb, progress_arg, cancel_cb, cancel_arg);
 		break;
 	default:
 		break;
@@ -547,7 +550,8 @@ static const struct got_error *
 tree_checkout(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_tree_object *tree,
     const char *path, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	const struct got_tree_entries *entries;
@@ -561,8 +565,13 @@ tree_checkout(struct got_worktree *worktree,
 
 	entries = got_object_tree_get_entries(tree);
 	SIMPLEQ_FOREACH(te, &entries->head, entry) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
 		err = tree_checkout_entry(worktree, fileindex, te, path, repo,
-		    progress_cb, progress_arg);
+		    progress_cb, progress_arg, cancel_cb, cancel_arg);
 		if (err)
 			break;
 	}
@@ -573,7 +582,8 @@ tree_checkout(struct got_worktree *worktree,
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
     struct got_reference *head_ref, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *unlockerr;
 	struct got_object_id *commit_id = NULL;
@@ -637,7 +647,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		goto done;
 
 	err = tree_checkout(worktree, fileindex, tree, "/", repo,
-	    progress_cb, progress_arg);
+	    progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 

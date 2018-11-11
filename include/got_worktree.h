@@ -51,6 +51,10 @@ char  *got_worktree_get_head_ref_name(struct got_worktree *);
 /* A callback function which is invoked when a path is checked out. */
 typedef void (*got_worktree_checkout_cb)(void *, const char *);
 
+/* A callback function which is invoked at cancellation points.
+ * May return GOT_ERR_CANCELLED to abort the runing operation. */
+typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
+
 /*
  * Attempt to check out files into a work tree from its associated repository
  * and path prefix, and update the work tree's file index accordingly.
@@ -61,4 +65,5 @@ typedef void (*got_worktree_checkout_cb)(void *, const char *);
  */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     struct got_reference *, struct got_repository *,
-    got_worktree_checkout_cb progress, void *);
+    got_worktree_checkout_cb progress, void *,
+    got_worktree_cancel_cb, void *);

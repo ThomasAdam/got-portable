@@ -23,6 +23,7 @@
 #include <err.h>
 #include <errno.h>
 #include <locale.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,22 @@
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
+
+static volatile sig_atomic_t sigint_received;
+static volatile sig_atomic_t sigpipe_received;
+
+static void
+catch_sigint(int signo)
+{
+	sigint_received = 1;
+}
+
+static void
+catch_sigpipe(int signo)
+{
+	sigpipe_received = 1;
+}
+
 
 struct cmd {
 	const char	 *cmd_name;
@@ -111,6 +128,9 @@ main(int argc, char *argv[])
 	if (argc <= 0)
 		usage();
 
+	signal(SIGINT, catch_sigint);
+	signal(SIGPIPE, catch_sigpipe);
+
 	for (i = 0; i < nitems(got_commands); i++) {
 		const struct got_error *error;
 
@@ -166,6 +186,14 @@ checkout_progress(void *arg, const char *path)
 		path++;
 
 	printf("A  %s/%s\n", worktree_path, path);
+}
+
+static const struct got_error *
+checkout_cancel(void *arg)
+{
+	if (sigint_received || sigpipe_received)
+		return got_error(GOT_ERR_CANCELLED);
+	return NULL;
 }
 
 static const struct got_error *
@@ -256,7 +284,7 @@ cmd_checkout(int argc, char *argv[])
 		goto done;
 
 	error = got_worktree_checkout_files(worktree, head_ref, repo,
-	    checkout_progress, worktree_path);
+	    checkout_progress, worktree_path, checkout_cancel, NULL);
 	if (error != NULL)
 		goto done;
 

@@ -23,6 +23,7 @@
 #include <sys/mman.h>
 
 #include <limits.h>
+#include <signal.h>
 #include <stdint.h>
 #include <imsg.h>
 #include <stdio.h>
@@ -41,6 +42,14 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
+
+static volatile sig_atomic_t sigint_received;
+
+static void
+catch_sigint(int signo)
+{
+	sigint_received = 1;
+}
 
 static const struct got_error *
 object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
@@ -412,6 +421,8 @@ main(int argc, char *argv[])
 	//static int attached;
 	//while (!attached) sleep(1);
 
+	signal(SIGINT, catch_sigint);
+
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 
 	err = got_object_cache_init(&objcache, GOT_OBJECT_CACHE_TYPE_OBJ);
@@ -444,6 +455,11 @@ main(int argc, char *argv[])
 
 	while (1) {
 		imsg.fd = -1;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			break;
+		}
 
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 		if (err) {
@@ -480,13 +496,8 @@ main(int argc, char *argv[])
 		if (imsg.fd != -1)
 			close(imsg.fd);
 		imsg_free(&imsg);
-		if (err) {
-			if (err->code == GOT_ERR_PRIVSEP_PIPE)
-				err = NULL;
-			else
-				got_privsep_send_error(&ibuf, err);
+		if (err)
 			break;
-		}
 	}
 
 	if (packidx)
@@ -495,8 +506,11 @@ main(int argc, char *argv[])
 		got_pack_close(pack);
 	got_object_cache_close(&objcache);
 	imsg_clear(&ibuf);
-	if (err)
+	if (err) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE)
+			got_privsep_send_error(&ibuf, err);
+	}
 	close(GOT_IMSG_FD_CHILD);
 	return err ? 1 : 0;
 }

@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <imsg.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,12 +39,22 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 
+static volatile sig_atomic_t sigint_received;
+
+static void
+catch_sigint(int signo)
+{
+	sigint_received = 1;
+}
+
 int
 main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
 	size_t datalen;
+
+	signal(SIGINT, catch_sigint);
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 
@@ -65,6 +76,11 @@ main(int argc, char *argv[])
 		imsg.fd = -1;
 		memset(&imsg_outfd, 0, sizeof(imsg_outfd));
 		imsg_outfd.fd = -1;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			break;
+		}
 
 		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
 		if (err) {
@@ -136,18 +152,16 @@ done:
 			close(imsg_outfd.fd);
 		imsg_free(&imsg);
 		imsg_free(&imsg_outfd);
-		if (err) {
-			if (err->code == GOT_ERR_PRIVSEP_PIPE)
-				err = NULL;
-			else
-				got_privsep_send_error(&ibuf, err);
+		if (err)
 			break;
-		}
 	}
 
 	imsg_clear(&ibuf);
-	if (err)
+	if (err) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
+		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE)
+			got_privsep_send_error(&ibuf, err);
+	}
 	close(GOT_IMSG_FD_CHILD);
 	return err ? 1 : 0;
 }

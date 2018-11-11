@@ -335,7 +335,7 @@ worktree_checkout(const char *repo_path)
 		goto done;
 
 	err = got_worktree_checkout_files(worktree, head_ref, repo,
-	    process_cb, NULL);
+	    process_cb, NULL, NULL, NULL);
 	if (err != NULL)
 		goto done;
 
