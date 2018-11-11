@@ -162,7 +162,7 @@ got_privsep_send_error(struct imsgbuf *ibuf, const struct got_error *err)
 	else
 		ierr.errno_code = 0;
 	ret = imsg_compose(ibuf, GOT_IMSG_ERROR, 0, 0, -1, &ierr, sizeof(ierr));
-	if (ret != -1) {
+	if (ret == -1) {
 		fprintf(stderr, "%s: error %d \"%s\": imsg_compose: %s\n",
 		    getprogname(), err->code, err->msg, strerror(errno));
 		return;
