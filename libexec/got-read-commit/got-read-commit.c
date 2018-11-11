@@ -174,9 +174,10 @@ done:
 
 	imsg_clear(&ibuf);
 	if (err) {
-		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
-		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE)
+		if (!sigint_received && err->code != GOT_ERR_PRIVSEP_PIPE) {
+			fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 			got_privsep_send_error(&ibuf, err);
+		}
 	}
 	close(GOT_IMSG_FD_CHILD);
 	return err ? 1 : 0;

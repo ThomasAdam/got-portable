@@ -143,7 +143,7 @@ main(int argc, char *argv[])
 			got_commands[i].cmd_usage();
 
 		error = got_commands[i].cmd_main(argc, argv);
-		if (error) {
+		if (error && !(sigint_received || sigpipe_received)) {
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}
