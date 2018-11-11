@@ -178,9 +178,9 @@ got_object_idset_for_each(struct got_object_idset *set,
     void *arg)
 {
 	const struct got_error *err;
-	struct got_object_idset_element *entry;
+	struct got_object_idset_element *entry, *tmp;
 
-	RB_FOREACH(entry, got_object_idset_tree, &set->entries) {
+	RB_FOREACH_SAFE(entry, got_object_idset_tree, &set->entries, tmp) {
 		err = (*cb)(&entry->id, entry->data, arg);
 		if (err)
 			return err;
