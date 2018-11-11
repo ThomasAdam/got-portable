@@ -48,7 +48,10 @@ struct delta_test {
 	{ "aabbccdd", 8, "\x08\x08\x91\x04\x04\x04xxxx", 10, "ccddxxxx", 8 },
 	/* git 48fb7deb5 Fix big left-shifts of unsigned char, 2009-06-17) */
 	{ "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-	  16, "\x10\x10\xff\xff\xff\xff\xff\x10\00\00", 10 , NULL, 0 }
+	  16, "\x10\x10\xff\xff\xff\xff\xff\x10\00\00", 10 , NULL, 0 },
+	/* libgit2 9844d38be delta: fix out-of-bounds read of delta */
+	{ "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+	  16, "\x10\x70\xff", 3, NULL, 0}
 };
 
 static int
