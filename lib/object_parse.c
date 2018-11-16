@@ -53,10 +53,6 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_OBJ_TAG_COMMIT	"commit"
-#define GOT_OBJ_TAG_TREE	"tree"
-#define GOT_OBJ_TAG_BLOB	"blob"
-
 #define GOT_COMMIT_TAG_TREE		"tree "
 #define GOT_COMMIT_TAG_PARENT		"parent "
 #define GOT_COMMIT_TAG_AUTHOR		"author "
