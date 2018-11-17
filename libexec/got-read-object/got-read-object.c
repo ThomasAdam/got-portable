@@ -72,6 +72,8 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 	int i;
 	char *p = strchr(buf, '\0');
 
+	*obj = NULL;
+
 	if (p == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
@@ -115,6 +117,8 @@ read_object_header(struct got_object **obj, int fd)
 	const size_t zbsize = 64;
 	size_t outlen, totlen;
 	int nbuf = 1;
+
+	*obj = NULL;
 
 	buf = malloc(zbsize);
 	if (buf == NULL)
