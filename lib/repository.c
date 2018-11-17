@@ -232,6 +232,27 @@ got_repo_get_cached_commit(struct got_repository *repo,
 }
 
 const struct got_error *
+got_repo_cache_tag(struct got_repository *repo, struct got_object_id *id,
+    struct got_tag_object *tag)
+{
+#ifndef GOT_NO_OBJ_CACHE
+	const struct got_error *err = NULL;
+	err = got_object_cache_add(&repo->tagcache, id, tag);
+	if (err)
+		return err;
+	tag->refcnt++;
+#endif
+	return NULL;
+}
+
+struct got_tag_object *
+got_repo_get_cached_tag(struct got_repository *repo, struct got_object_id *id)
+{
+	return (struct got_tag_object *)got_object_cache_get(
+	    &repo->tagcache, id);
+}
+
+const struct got_error *
 open_repo(struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
@@ -354,6 +375,10 @@ got_repo_open(struct got_repository **repop, const char *path)
 	    GOT_OBJECT_CACHE_TYPE_COMMIT);
 	if (err)
 		goto done;
+	err = got_object_cache_init(&repo->tagcache,
+	    GOT_OBJECT_CACHE_TYPE_TAG);
+	if (err)
+		goto done;
 
 	normpath = got_path_normalize(abspath);
 	if (normpath == NULL) {
@@ -413,6 +438,7 @@ got_repo_close(struct got_repository *repo)
 	got_object_cache_close(&repo->objcache);
 	got_object_cache_close(&repo->treecache);
 	got_object_cache_close(&repo->commitcache);
+	got_object_cache_close(&repo->tagcache);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		if (repo->privsep_children[i].imsg_fd == -1)

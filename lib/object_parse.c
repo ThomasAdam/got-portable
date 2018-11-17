@@ -53,10 +53,20 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+#define GOT_OBJ_TAG_COMMIT	"commit"
+#define GOT_OBJ_TAG_TREE	"tree"
+#define GOT_OBJ_TAG_BLOB	"blob"
+#define GOT_OBJ_TAG_TAG		"tag"
+
 #define GOT_COMMIT_TAG_TREE		"tree "
 #define GOT_COMMIT_TAG_PARENT		"parent "
 #define GOT_COMMIT_TAG_AUTHOR		"author "
 #define GOT_COMMIT_TAG_COMMITTER	"committer "
+
+#define GOT_TAG_TAG_OBJECT		"object "
+#define GOT_TAG_TAG_TYPE		"type "
+#define GOT_TAG_TAG_TAG			"tag "
+#define GOT_TAG_TAG_TAGGER		"tagger "
 
 int
 got_object_id_cmp(const struct got_object_id *id1,
@@ -516,6 +526,187 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 	}
 
 	return NULL;
+}
+
+void
+got_object_tag_close(struct got_tag_object *tag)
+{
+	free(tag->tag);
+	free(tag->tagger);
+	free(tag->tagmsg);
+	free(tag);
+}
+
+const struct got_error *
+got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
+{
+	const struct got_error *err = NULL;
+	size_t remain = len;
+	char *s = buf;
+	size_t tlen;
+
+	*tag = calloc(1, sizeof(**tag));
+	if (*tag == NULL)
+		return got_error_from_errno();
+
+	tlen = strlen(GOT_TAG_TAG_OBJECT);
+	if (strncmp(s, GOT_TAG_TAG_OBJECT, tlen) == 0) {
+		remain -= tlen;
+		if (remain < SHA1_DIGEST_STRING_LENGTH) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		if (!got_parse_sha1_digest((*tag)->id.sha1, s)) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		remain -= SHA1_DIGEST_STRING_LENGTH;
+		s += SHA1_DIGEST_STRING_LENGTH;
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	if (remain <= 0) {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	tlen = strlen(GOT_TAG_TAG_TYPE);
+	if (strncmp(s, GOT_TAG_TAG_TYPE, tlen) == 0) {
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		if (strncmp(s, GOT_OBJ_TAG_COMMIT,
+		    strlen(GOT_OBJ_TAG_COMMIT)) == 0) {
+			(*tag)->obj_type = GOT_OBJ_TYPE_COMMIT;
+			tlen = strlen(GOT_OBJ_TAG_COMMIT);
+			s += tlen;
+			remain -= tlen;
+		} else if (strncmp(s, GOT_OBJ_TAG_TREE,
+		    strlen(GOT_OBJ_TAG_TREE)) == 0) {
+			(*tag)->obj_type = GOT_OBJ_TYPE_TREE;
+			tlen = strlen(GOT_OBJ_TAG_TREE);
+			s += tlen;
+			remain -= tlen;
+		} else if (strncmp(s, GOT_OBJ_TAG_BLOB,
+		    strlen(GOT_OBJ_TAG_BLOB)) == 0) {
+			(*tag)->obj_type = GOT_OBJ_TYPE_BLOB;
+			tlen = strlen(GOT_OBJ_TAG_BLOB);
+			s += tlen;
+			remain -= tlen;
+		} else if (strncmp(s, GOT_OBJ_TAG_TAG,
+		    strlen(GOT_OBJ_TAG_TAG)) == 0) {
+			(*tag)->obj_type = GOT_OBJ_TYPE_TAG;
+			tlen = strlen(GOT_OBJ_TAG_TAG);
+			s += tlen;
+			remain -= tlen;
+		} else {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+
+		if (remain <= 0 || *s != '\n') {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s++;
+		remain--;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	tlen = strlen(GOT_TAG_TAG_TAG);
+	if (strncmp(s, GOT_TAG_TAG_TAG, tlen) == 0) {
+		char *p;
+		size_t slen;
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		slen = strlen(s);
+		(*tag)->tag = strndup(s, slen);
+		if ((*tag)->tag == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		s += slen + 1;
+		remain -= slen + 1;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	tlen = strlen(GOT_TAG_TAG_TAGGER);
+	if (strncmp(s, GOT_TAG_TAG_TAGGER, tlen) == 0) {
+		char *p;
+		size_t slen;
+
+		remain -= tlen;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		s += tlen;
+		p = strchr(s, '\n');
+		if (p == NULL) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+		*p = '\0';
+		slen = strlen(s);
+		err = parse_commit_time(&(*tag)->tagger_time,
+		    &(*tag)->tagger_gmtoff, s);
+		if (err)
+			goto done;
+		(*tag)->tagger = strdup(s);
+		if ((*tag)->tagger == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		s += slen + 1;
+		remain -= slen + 1;
+		if (remain <= 0) {
+			err = got_error(GOT_ERR_BAD_OBJ_DATA);
+			goto done;
+		}
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
+	}
+
+	(*tag)->tagmsg = strndup(s, remain);
+	if ((*tag)->tagmsg == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	if (err) {
+		got_object_tag_close(*tag);
+		*tag = NULL;
+	}
+	return err;
 }
 
 const struct got_error *

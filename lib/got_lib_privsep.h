@@ -39,6 +39,7 @@
 #define GOT_PROG_READ_TREE	got-read-tree
 #define GOT_PROG_READ_COMMIT	got-read-commit
 #define GOT_PROG_READ_BLOB	got-read-blob
+#define GOT_PROG_READ_TAG	got-read-tag
 #define GOT_PROG_READ_PACK	got-read-pack
 
 #define GOT_STRINGIFY(x) #x
@@ -53,6 +54,8 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_COMMIT)
 #define GOT_PATH_PROG_READ_BLOB \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_BLOB)
+#define GOT_PATH_PROG_READ_TAG \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_TAG)
 #define GOT_PATH_PROG_READ_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PACK)
 
@@ -88,6 +91,9 @@ enum got_imsg_type {
 	GOT_IMSG_BLOB_REQUEST,
 	GOT_IMSG_BLOB_OUTFD,
 	GOT_IMSG_BLOB,
+	GOT_IMSG_TAG_REQUEST,
+	GOT_IMSG_TAG,
+	GOT_IMSG_TAG_TAGMSG,
 
 	/* Messages related to pack files. */
 	GOT_IMSG_PACKIDX,
@@ -162,6 +168,26 @@ struct got_imsg_blob {
 	size_t size;
 };
 
+/* Structure for GOT_IMSG_TAG data. */
+struct got_imsg_tag_object {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	int obj_type;
+	size_t tag_len;
+	size_t tagger_len;
+	time_t tagger_time;
+	time_t tagger_gmtoff;
+	size_t tagmsg_len;
+
+	/*
+	 * Followed by tag_len + tagger_len data bytes
+	 */
+
+	/*
+	 * Followed by 'tagmsg_len' bytes of tag message data in
+	 * one or more GOT_IMSG_TAG_TAGMSG messages.
+	 */
+} __attribute__((__packed__));
+
 /* Structure for GOT_IMSG_PACKIDX. */
 struct got_imsg_packidx {
 	size_t len;
@@ -212,6 +238,10 @@ const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
 const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
 const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
+const struct got_error *got_privsep_send_tag(struct imsgbuf *,
+    struct got_tag_object *);
+const struct got_error *got_privsep_recv_tag(struct got_tag_object **,
+    struct imsgbuf *);
 const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
     struct got_pack *, struct got_packidx *);
 const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int,

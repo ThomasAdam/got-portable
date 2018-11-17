@@ -45,6 +45,7 @@
 #define GOT_OBJ_TAG_COMMIT	"commit"
 #define GOT_OBJ_TAG_TREE	"tree"
 #define GOT_OBJ_TAG_BLOB	"blob"
+#define GOT_OBJ_TAG_TAG		"tag"
 
 static volatile sig_atomic_t sigint_received;
 
@@ -60,12 +61,14 @@ parse_object_header(struct got_object **obj, char *buf, size_t len)
 	const char *obj_tags[] = {
 		GOT_OBJ_TAG_COMMIT,
 		GOT_OBJ_TAG_TREE,
-		GOT_OBJ_TAG_BLOB
+		GOT_OBJ_TAG_BLOB,
+		GOT_OBJ_TAG_TAG,
 	};
 	const int obj_types[] = {
 		GOT_OBJ_TYPE_COMMIT,
 		GOT_OBJ_TYPE_TREE,
 		GOT_OBJ_TYPE_BLOB,
+		GOT_OBJ_TYPE_TAG,
 	};
 	int type = 0;
 	size_t size = 0, hdrlen = 0;

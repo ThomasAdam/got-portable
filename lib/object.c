@@ -702,6 +702,85 @@ got_object_blob_dump_to_file(size_t *total_len, size_t *nlines,
 	return NULL;
 }
 
+static const struct got_error *
+open_tag(struct got_tag_object **tag,
+    struct got_repository *repo, struct got_object *obj, int check_cache)
+{
+	const struct got_error *err = NULL;
+
+	if (check_cache) {
+		*tag = got_repo_get_cached_tag(repo, &obj->id);
+		if (*tag != NULL) {
+			(*tag)->refcnt++;
+			return NULL;
+		}
+	} else
+		*tag = NULL;
+
+	if (obj->type != GOT_OBJ_TYPE_TAG)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
+	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
+		struct got_pack *pack;
+		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo,
+			    obj->path_packfile, NULL);
+			if (err)
+				return err;
+		}
+		err = got_object_read_packed_tag_privsep(tag, obj, pack);
+	} else {
+		int fd;
+		err = open_loose_object(&fd, obj, repo);
+		if (err)
+			return err;
+		err = got_object_read_tag_privsep(tag, obj, fd, repo);
+		close(fd);
+	}
+
+	if (err == NULL) {
+		(*tag)->refcnt++;
+		err = got_repo_cache_tag(repo, &obj->id, *tag);
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_object_open_as_tag(struct got_tag_object **tag,
+    struct got_repository *repo, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct got_object *obj;
+
+	*tag = got_repo_get_cached_tag(repo, id);
+	if (*tag != NULL) {
+		(*tag)->refcnt++;
+		return NULL;
+	}
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	err = open_tag(tag, repo, obj, 0);
+done:
+	got_object_close(obj);
+	return err;
+}
+
+const struct got_error *
+got_object_tag_open(struct got_tag_object **tag,
+    struct got_repository *repo, struct got_object *obj)
+{
+	return open_tag(tag, repo, obj, 1);
+}
+
 static struct got_tree_entry *
 find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {
@@ -1074,7 +1153,6 @@ done:
 	return err;
 }
 
-
 static const struct got_error *
 request_commit(struct got_commit_object **commit, struct got_repository *repo,
     struct got_object *obj, int fd)
@@ -1276,4 +1354,70 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
 
 	return request_blob(size, outfd, infd, ibuf);
+}
+
+static const struct got_error *
+request_tag(struct got_tag_object **tag, struct got_repository *repo,
+    struct got_object *obj, int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf;
+
+	err = got_privsep_send_obj_req(ibuf, fd, obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_tag(tag, ibuf);
+}
+
+const struct got_error *
+got_object_read_packed_tag_privsep(struct got_tag_object **tag,
+    struct got_object *obj, struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+
+	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	if (err)
+		return err;
+
+	return got_privsep_recv_tag(tag, pack->privsep_child->ibuf);
+}
+
+const struct got_error *
+got_object_read_tag_privsep(struct got_tag_object **tag,
+    struct got_object *obj, int obj_fd, struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd != -1)
+		return request_tag(tag, repo, obj, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf = ibuf;
+
+	return request_tag(tag, repo, obj, obj_fd);
 }

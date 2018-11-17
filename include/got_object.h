@@ -18,6 +18,7 @@ struct got_object_id;
 
 struct got_blob_object;
 struct got_tree_object;
+struct got_tag_object;
 
 struct got_tree_entry {
 	SIMPLEQ_ENTRY(got_tree_entry) entry;
@@ -224,6 +225,17 @@ const struct got_error *got_object_blob_read_block(size_t *,
 const struct got_error *got_object_blob_dump_to_file(size_t *, size_t *,
     FILE *, struct got_blob_object *);
 
+/*
+ * Attempt to open a tag object in a repository.
+ * The provided object must be of type GOT_OBJ_TYPE_TAG.
+ * The caller must dispose of the tree with got_object_tag_close().
+ */
+const struct got_error *got_object_tag_open(struct got_tag_object **,
+    struct got_repository *, struct got_object *);
+
+/* Dispose of a tag object. */
+void got_object_tag_close(struct got_tag_object *);
+
 const struct got_error *
 got_object_open_as_commit(struct got_commit_object **,
     struct got_repository *, struct got_object_id *);
@@ -233,6 +245,8 @@ got_object_open_as_tree(struct got_tree_object **,
 const struct got_error *
 got_object_open_as_blob(struct got_blob_object **,
     struct got_repository *, struct got_object_id *, size_t);
+const struct got_error *got_object_open_as_tag(struct got_tag_object **,
+    struct got_repository *, struct got_object_id *);
 
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);

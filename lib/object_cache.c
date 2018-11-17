@@ -35,6 +35,7 @@
 #define GOT_OBJECT_CACHE_SIZE_OBJ	256
 #define GOT_OBJECT_CACHE_SIZE_TREE	256
 #define GOT_OBJECT_CACHE_SIZE_COMMIT	64
+#define GOT_OBJECT_CACHE_SIZE_TAG	32
 
 const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
@@ -56,6 +57,9 @@ got_object_cache_init(struct got_object_cache *cache,
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		cache->size = GOT_OBJECT_CACHE_SIZE_COMMIT;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		cache->size = GOT_OBJECT_CACHE_SIZE_TAG;
 		break;
 	}
 	return NULL;
@@ -84,6 +88,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		case GOT_OBJECT_CACHE_TYPE_COMMIT:
 			got_object_commit_close(ce->data.commit);
 			break;
+		case GOT_OBJECT_CACHE_TYPE_TAG:
+			got_object_tag_close(ce->data.tag);
+			break;
 		}
 		free(ce);
 		cache->cache_evict++;
@@ -102,6 +109,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		ce->data.commit = (struct got_commit_object *)item;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		ce->data.tag = (struct got_tag_object *)item;
 		break;
 	}
 
@@ -131,6 +141,8 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 			return ce->data.tree;
 		case GOT_OBJECT_CACHE_TYPE_COMMIT:
 			return ce->data.commit;
+		case GOT_OBJECT_CACHE_TYPE_TAG:
+			return ce->data.tag;
 		}
 	}
 
@@ -157,6 +169,7 @@ check_refcount(struct got_object_id *id, void *data, void *arg)
 	struct got_object *obj;
 	struct got_tree_object *tree;
 	struct got_commit_object *commit;
+	struct got_tag_object *tag;
 	char *id_str;
 
 	if (got_object_id_str(&id_str, id) != NULL)
@@ -183,6 +196,13 @@ check_refcount(struct got_object_id *id, void *data, void *arg)
 			break;
 		fprintf(stderr, "commit %s has %d unclaimed references\n",
 		    id_str, commit->refcnt - 1);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		tag = ce->data.tag;
+		if (tag->refcnt == 1)
+			break;
+		fprintf(stderr, "tag %s has %d unclaimed references\n",
+		    id_str, tag->refcnt - 1);
 		break;
 	}
 	free(id_str);

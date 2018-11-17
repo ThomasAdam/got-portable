@@ -26,10 +26,14 @@ const struct got_error *got_object_read_commit_privsep(
     struct got_repository *);
 const struct got_error *got_object_read_tree_privsep(struct got_tree_object **,
     struct got_object *, int, struct got_repository *);
+const struct got_error *got_object_read_tag_privsep(struct got_tag_object **,
+    struct got_object *, int, struct got_repository *);
 
 const struct got_error *got_object_parse_commit(struct got_commit_object **,
     char *, size_t);
 const struct got_error *got_object_parse_tree(struct got_tree_object **,
+    uint8_t *, size_t);
+const struct got_error *got_object_parse_tag(struct got_tag_object **,
     uint8_t *, size_t);
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
 
@@ -45,3 +49,5 @@ const struct got_error *got_object_read_packed_commit_privsep(
     struct got_commit_object **, struct got_object *, struct got_pack *);
 const struct got_error *got_object_read_packed_tree_privsep(
     struct got_tree_object **, struct got_object *, struct got_pack *);
+const struct got_error *got_object_read_packed_tag_privsep(
+    struct got_tag_object **, struct got_object *, struct got_pack *);

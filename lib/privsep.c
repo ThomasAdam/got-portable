@@ -238,6 +238,9 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 		case GOT_OBJ_TYPE_BLOB:
 			imsg_code = GOT_IMSG_BLOB_REQUEST;
 			break;
+		case GOT_OBJ_TYPE_TAG:
+			imsg_code = GOT_IMSG_TAG_REQUEST;
+			break;
 		default:
 			return got_error(GOT_ERR_OBJ_TYPE);
 		}
@@ -814,6 +817,211 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 		iblob = imsg.data;
 		*size = iblob->size;
 		/* Data has been written to file descriptor. */
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}
+
+static const struct got_error *
+send_tagmsg(struct imsgbuf *ibuf, struct got_tag_object *tag, size_t tagmsg_len)
+{
+	const struct got_error *err = NULL;
+	size_t offset, remain;
+
+	offset = 0;
+	remain = tagmsg_len;
+	while (remain > 0) {
+		size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE, remain);
+
+		if (imsg_compose(ibuf, GOT_IMSG_TAG_TAGMSG, 0, 0, -1,
+		    tag->tagmsg + offset, n) == -1) {
+			err = got_error_from_errno();
+			break;
+		}
+
+		err = flush_imsg(ibuf);
+		if (err)
+			break;
+
+		offset += n;
+		remain -= n;
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_tag(struct imsgbuf *ibuf, struct got_tag_object *tag)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_tag_object *itag;
+	uint8_t *buf;
+	size_t len, total;
+	size_t tag_len = strlen(tag->tag);
+	size_t tagger_len = strlen(tag->tagger);
+	size_t tagmsg_len = strlen(tag->tagmsg);
+
+	total = sizeof(*itag) + tag_len + tagger_len + tagmsg_len;
+
+	buf = malloc(total);
+	if (buf == NULL)
+		return got_error_from_errno();
+
+	itag = (struct got_imsg_tag_object *)buf;
+	memcpy(itag->id, tag->id.sha1, sizeof(itag->id));
+	itag->obj_type = tag->obj_type;
+	itag->tag_len = tag_len;
+	itag->tagger_len = tagger_len;
+	itag->tagger_time = tag->tagger_time;
+	itag->tagger_gmtoff = tag->tagger_gmtoff;
+	itag->tagmsg_len = tagmsg_len;
+
+	len = sizeof(*itag);
+	memcpy(buf + len, tag->tag, tag_len);
+	len += tag_len;
+	memcpy(buf + len, tag->tagger, tagger_len);
+	len += tagger_len;
+
+	if (imsg_compose(ibuf, GOT_IMSG_TAG, 0, 0, -1, buf, len) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (tagmsg_len == 0 ||
+	    tagmsg_len + len > MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+		err = flush_imsg(ibuf);
+		if (err)
+			goto done;
+	}
+	err = send_tagmsg(ibuf, tag, tagmsg_len);
+done:
+	free(buf);
+	return err;
+}
+
+const struct got_error *
+got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_tag_object *itag;
+	size_t len, datalen;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error),
+	    sizeof(struct got_imsg_tag_object));
+
+	*tag = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	len = 0;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_TAG:
+		if (datalen < sizeof(*itag)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		itag = imsg.data;
+		if (datalen != sizeof(*itag) + itag->tag_len +
+		    itag->tagger_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		len += sizeof(*itag);
+
+		*tag = calloc(1, sizeof(**tag));
+		if (*tag == NULL) {
+			err = got_error_from_errno();
+			break;
+		}
+
+		memcpy((*tag)->id.sha1, itag->id, SHA1_DIGEST_LENGTH);
+
+		if (itag->tag_len == 0) {
+			(*tag)->tag = strdup("");
+			if ((*tag)->tag == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*tag)->tag = malloc(itag->tag_len + 1);
+			if ((*tag)->tag == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*tag)->tag, imsg.data + len,
+			    itag->tag_len);
+			(*tag)->tag[itag->tag_len] = '\0';
+		}
+		len += itag->tag_len;
+
+		(*tag)->obj_type = itag->obj_type;
+		(*tag)->tagger_time = itag->tagger_time;
+		(*tag)->tagger_gmtoff = itag->tagger_gmtoff;
+
+		if (itag->tagger_len == 0) {
+			(*tag)->tagger = strdup("");
+			if ((*tag)->tagger == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			(*tag)->tagger = malloc(itag->tagger_len + 1);
+			if ((*tag)->tagger == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			memcpy((*tag)->tagger, imsg.data + len,
+			    itag->tagger_len);
+			(*tag)->tagger[itag->tagger_len] = '\0';
+		}
+		len += itag->tagger_len;
+
+		if (itag->tagmsg_len == 0) {
+			(*tag)->tagmsg = strdup("");
+			if ((*tag)->tagmsg == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+		} else {
+			size_t offset = 0, remain = itag->tagmsg_len;
+
+			(*tag)->tagmsg = malloc(itag->tagmsg_len + 1);
+			if ((*tag)->tagmsg == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			while (remain > 0) {
+				struct imsg imsg_log;
+				size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE,
+				    remain);
+
+				err = got_privsep_recv_imsg(&imsg_log, ibuf, n);
+				if (err)
+					return err;
+
+				if (imsg_log.hdr.type != GOT_IMSG_TAG_TAGMSG)
+					return got_error(GOT_ERR_PRIVSEP_MSG);
+
+				memcpy((*tag)->tagmsg + offset, imsg_log.data,
+				    n);
+				imsg_free(&imsg_log);
+				offset += n;
+				remain -= n;
+			}
+			(*tag)->tagmsg[itag->tagmsg_len] = '\0';
+		}
+
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);

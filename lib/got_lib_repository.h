@@ -28,16 +28,18 @@ struct got_repository {
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
 
 	/* Handles to child processes for reading loose objects. */
-	 struct got_privsep_child privsep_children[4];
+	 struct got_privsep_child privsep_children[5];
 #define GOT_REPO_PRIVSEP_CHILD_OBJECT	0
 #define GOT_REPO_PRIVSEP_CHILD_COMMIT	1
 #define GOT_REPO_PRIVSEP_CHILD_TREE	2
 #define GOT_REPO_PRIVSEP_CHILD_BLOB	3
+#define GOT_REPO_PRIVSEP_CHILD_TAG	4
 
 	/* Caches for open objects. */
 	struct got_object_cache objcache;
 	struct got_object_cache treecache;
 	struct got_object_cache commitcache;
+	struct got_object_cache tagcache;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,
@@ -51,6 +53,10 @@ struct got_tree_object *got_repo_get_cached_tree(struct got_repository *,
 const struct got_error*got_repo_cache_commit(struct got_repository *,
     struct got_object_id *, struct got_commit_object *);
 struct got_commit_object *got_repo_get_cached_commit(struct got_repository *,
+    struct got_object_id *);
+const struct got_error*got_repo_cache_tag(struct got_repository *,
+    struct got_object_id *, struct got_tag_object *);
+struct got_tag_object *got_repo_get_cached_tag(struct got_repository *,
     struct got_object_id *);
 const struct got_error *got_repo_cache_packidx(struct got_repository *,
     struct got_packidx *);

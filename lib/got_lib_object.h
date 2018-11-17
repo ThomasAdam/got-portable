@@ -48,3 +48,14 @@ struct got_blob_object {
 	uint8_t *read_buf;
 	struct got_object_id id;
 };
+
+struct got_tag_object {
+	struct got_object_id id;
+	int obj_type;
+	char *tag;
+	time_t tagger_time;
+	time_t tagger_gmtoff;
+	char *tagger;
+	char *tagmsg;
+	int refcnt;		/* > 0 if open and/or cached */
+};
