@@ -486,6 +486,16 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			struct got_tree_entry *te = NULL;
 			if (tree1)
 				te = match_entry_by_name(te2, tree1);
+			free(l2);
+			if (te) {
+				if (asprintf(&l2, "%s%s%s", label2,
+				    label2[0] ? "/" : "", te->name) == -1)
+					return got_error_from_errno();
+			} else {
+				if (asprintf(&l2, "%s%s%s", label2,
+				    label2[0] ? "/" : "", te2->name) == -1)
+					return got_error_from_errno();
+			}
 			err = diff_entry_new_old(te2, te, l2, diff_context,
 			    repo, outfile);
 			if (err)
