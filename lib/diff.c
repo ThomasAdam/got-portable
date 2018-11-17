@@ -162,7 +162,13 @@ match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
 
 	entries2 = got_object_tree_get_entries(tree2); 
 	SIMPLEQ_FOREACH(te2, &entries2->head, entry) {
-		if (strcmp(te1->name, te2->name) == 0)
+		/* Note that tree entries are sorted in strcmp() order. */
+		int cmp = strcmp(te1->name, te2->name);
+		if (cmp < 0)
+			continue;
+		else if (cmp > 0)
+			break;
+		else
 			return te2;
 	}
 	return NULL;
