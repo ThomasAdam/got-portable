@@ -511,6 +511,7 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 
 	if (remain != 0) {
 		got_object_tree_close(*tree);
+		*tree = NULL;
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	}
 
