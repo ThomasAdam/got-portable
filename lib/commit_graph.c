@@ -322,7 +322,7 @@ advance_branch(struct got_commit_graph *graph,
 
 			if (prev_id) {
 				if (!branches_differ &&
-				    got_object_id_cmp(merged_id, prev_id) != 0)
+				    got_object_id_cmp(id, prev_id) != 0)
 					branches_differ = 1;
 				free(prev_id);
 			}
