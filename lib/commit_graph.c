@@ -283,10 +283,11 @@ advance_branch(struct got_commit_graph *graph,
 
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
-		if (qid == NULL)
+		if (qid == NULL ||
+		    got_object_idset_get(graph->open_branches, qid->id))
 			return NULL;
-		err = got_object_idset_add(graph->open_branches, qid->id, node);
-		return err;
+		return got_object_idset_add(graph->open_branches,
+		    qid->id, node);
 	}
 
 	/*
@@ -307,6 +308,8 @@ advance_branch(struct got_commit_graph *graph,
 
 			if (got_object_idset_get(graph->node_ids, qid->id))
 				continue; /* parent already traversed */
+			if (got_object_idset_get(graph->open_branches, qid->id))
+				continue;
 
 			err = got_object_id_by_path(&id, repo, qid->id,
 			    graph->path);
