@@ -38,7 +38,7 @@
 
 struct got_commit_graph_node {
 	struct got_object_id id;
-	time_t commit_timestamp;
+	time_t timestamp;
 
 	/* Used during graph iteration. */
 	TAILQ_ENTRY(got_commit_graph_node) entry;
@@ -200,7 +200,7 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 	/* Ensure that an iteration in progress will see this new commit. */
 	while (n) {
 		next = TAILQ_NEXT(n, entry);
-		if (next && node->commit_timestamp >= next->commit_timestamp) {
+		if (next && node->timestamp >= next->timestamp) {
 			TAILQ_INSERT_BEFORE(next, node, entry);
 			return;
 		}
@@ -349,7 +349,7 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 		return got_error_from_errno();
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
-	node->commit_timestamp = commit->committer_time;
+	node->timestamp = commit->committer_time;
 
 	err = got_object_idset_add(graph->node_ids, &node->id, node);
 	if (err) {
