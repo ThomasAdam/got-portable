@@ -306,20 +306,20 @@ advance_branch(struct got_commit_graph *graph,
 			qid = SIMPLEQ_FIRST(&commit->parent_ids);
 			if (qid == NULL)
 				return NULL;
-			if (got_object_idset_get(graph->node_ids, qid->id))
-				return NULL; /* parent already traversed */
 			if (got_object_idset_get(graph->open_branches, qid->id))
 				return NULL;
+			if (got_object_idset_get(graph->node_ids, qid->id))
+				return NULL; /* parent already traversed */
 			return got_object_idset_add(graph->open_branches,
 			    qid->id, node);
 		}
 	}
 
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-		if (got_object_idset_get(graph->node_ids, qid->id))
-			continue; /* parent already traversed */
 		if (got_object_idset_get(graph->open_branches, qid->id))
 			continue;
+		if (got_object_idset_get(graph->node_ids, qid->id))
+			continue; /* parent already traversed */
 		err = got_object_idset_add(graph->open_branches, qid->id, node);
 		if (err)
 			return err;
