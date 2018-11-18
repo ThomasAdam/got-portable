@@ -444,16 +444,10 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 		}
 	}
 
-	if (err) {
-		got_object_idset_remove(NULL, graph->node_ids, &node->id);
-		free_node(node);
-	} else {
-		if (*changed)
-			add_node_to_iter_list(graph, node, child_node);
-		*new_node = node;
-	}
-
-	return err;
+	if (*changed)
+		add_node_to_iter_list(graph, node, child_node);
+	*new_node = node;
+	return NULL;
 }
 
 const struct got_error *
