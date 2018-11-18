@@ -171,8 +171,7 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 	if (err)
 		goto done;
 
-	err = got_object_tree_path_changed(changed, tree, ptree, path,
-	    repo);
+	err = got_object_tree_path_changed(changed, tree, ptree, path, repo);
 done:
 	if (tree)
 		got_object_tree_close(tree);
