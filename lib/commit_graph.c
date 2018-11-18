@@ -294,7 +294,7 @@ advance_branch(struct got_commit_graph *graph,
 	 * which do not contribute any content to this path.
 	 */
 	if (is_merge_point(node) && !got_path_is_root_dir(graph->path)) {
-		struct got_object_id *id, *merged_id, *prev_id = NULL;
+		struct got_object_id *merged_id, *prev_id = NULL;
 		int branches_differ = 0;
 
 		err = got_object_id_by_path(&merged_id, repo, commit_id,
@@ -303,6 +303,8 @@ advance_branch(struct got_commit_graph *graph,
 			return err;
 
 		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+			struct got_object_id *id;
+
 			if (got_object_idset_get(graph->node_ids, qid->id))
 				continue; /* parent already traversed */
 
@@ -313,6 +315,8 @@ advance_branch(struct got_commit_graph *graph,
 					branches_differ = 1;
 					continue;
 				}
+				free(merged_id);
+				free(prev_id);
 				return err;
 			}
 
@@ -320,8 +324,9 @@ advance_branch(struct got_commit_graph *graph,
 				if (!branches_differ &&
 				    got_object_id_cmp(merged_id, prev_id) != 0)
 					branches_differ = 1;
-			} else
-				prev_id = id;
+				free(prev_id);
+			}
+			prev_id = id;
 
 			/*
 			 * If a branch has created the merged content we can
@@ -330,9 +335,16 @@ advance_branch(struct got_commit_graph *graph,
 			if (got_object_id_cmp(merged_id, id) == 0) {
 				err = got_object_idset_add(graph->open_branches,
 				    qid->id, node);
+				free(merged_id);
+				free(id);
 				return err;
 			}
 		}
+
+		free(prev_id);
+		prev_id = NULL;
+		free(merged_id);
+		merged_id = NULL;
 
 		/*
 		 * If the path's content is the same on all branches,
