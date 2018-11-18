@@ -181,10 +181,6 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 
 	*changed = 0;
 
-	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
-	if (err)
-		return err;
-
 	pid = SIMPLEQ_FIRST(&commit->parent_ids);
 	if (pid == NULL) {
 		struct got_object_id *obj_id;
@@ -196,6 +192,10 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 			*changed = 1; /* The path was created in this commit. */
 		free(obj_id);
 	} else {
+		err = got_object_open_as_tree(&tree, repo, commit->tree_id);
+		if (err)
+			return err;
+
 		err = got_object_open_as_commit(&pcommit, repo, pid->id);
 		if (err)
 			goto done;
