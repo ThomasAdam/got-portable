@@ -257,8 +257,6 @@ advance_branch(struct got_commit_graph *graph,
 		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 			struct got_object_id *id;
 
-			if (got_object_idset_get(graph->node_ids, qid->id))
-				continue; /* parent already traversed */
 			if (got_object_idset_get(graph->open_branches, qid->id))
 				continue;
 
