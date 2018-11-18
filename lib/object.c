@@ -808,7 +808,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te = NULL;
 	const char *seg, *s;
-	size_t seglen, len = strlen(path);
+	size_t seglen;
 
 	*id = NULL;
 
@@ -834,15 +834,13 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 
 	s = path;
 	s++; /* skip leading '/' */
-	len--;
 	seg = s;
 	seglen = 0;
-	while (len > 0) {
+	while (*s) {
 		struct got_tree_object *next_tree;
 
 		if (*s != '/') {
 			s++;
-			len--;
 			seglen++;
 			if (*s)
 				continue;
@@ -854,13 +852,12 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 			goto done;
 		}
 
-		if (len == 0)
+		if (*s == '\0')
 			break;
 
 		seg = s + 1;
 		seglen = 0;
 		s++;
-		len--;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree, repo,
 			    te->id);
