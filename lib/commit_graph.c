@@ -38,15 +38,6 @@
 
 struct got_commit_graph_node {
 	struct got_object_id id;
-
-	/*
-	 * Each graph node corresponds to a commit object.
-	 * Graph vertices are modelled with an adjacency list.
-	 * Adjacencies of a graph node are parent (older) commits.
-	 */
-	int nparents;
-	struct got_object_id_queue parent_ids;
-
 	time_t commit_timestamp;
 
 	/* Used during graph iteration. */
@@ -138,32 +129,6 @@ alloc_graph(const char *path)
 	return graph;
 }
 
-#if 0
-static int
-is_head_node(struct got_commit_graph_node *node)
-{
-	return node->nchildren == 0;
-}
-
-int
-is_branch_point(struct got_commit_graph_node *node)
-{
-	return node->nchildren > 1;
-}
-
-static int
-is_root_node(struct got_commit_graph_node *node)
-{
-	return node->nparents == 0;
-}
-#endif
-
-static int
-is_merge_point(struct got_commit_graph_node *node)
-{
-	return node->nparents > 1;
-}
-
 static const struct got_error *
 detect_changed_path(int *changed, struct got_commit_object *commit,
     struct got_object_id *commit_id, const char *path,
@@ -245,20 +210,6 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 }
 
 static const struct got_error *
-add_vertex(struct got_object_id_queue *ids, struct got_object_id *id)
-{
-	const struct got_error *err = NULL;
-	struct got_object_qid *qid;
-
-	err = got_object_qid_alloc(&qid, id);
-	if (err)
-		return err;
-
-	SIMPLEQ_INSERT_TAIL(ids, qid, entry);
-	return NULL;
-}
-
-static const struct got_error *
 close_branch(struct got_commit_graph *graph, struct got_object_id *commit_id)
 {
 	const struct got_error *err;
@@ -295,7 +246,7 @@ advance_branch(struct got_commit_graph *graph,
 	 * If we are graphing commits for a specific path, skip branches
 	 * which do not contribute any content to this path.
 	 */
-	if (is_merge_point(node) && !got_path_is_root_dir(graph->path)) {
+	if (commit->nparents > 1 && !got_path_is_root_dir(graph->path)) {
 		struct got_object_id *merged_id, *prev_id = NULL;
 		int branches_differ = 0;
 
@@ -380,17 +331,6 @@ advance_branch(struct got_commit_graph *graph,
 	return NULL;
 }
 
-static void
-free_node(struct got_commit_graph_node *node)
-{
-	while (!SIMPLEQ_EMPTY(&node->parent_ids)) {
-		struct got_object_qid *pid = SIMPLEQ_FIRST(&node->parent_ids);
-		SIMPLEQ_REMOVE_HEAD(&node->parent_ids, entry);
-		got_object_qid_free(pid);
-	}
-	free(node);
-}
-
 static const struct got_error *
 add_node(struct got_commit_graph_node **new_node, int *changed,
     int *branch_done, struct got_commit_graph *graph,
@@ -399,7 +339,6 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node;
-	struct got_object_qid *pid;
 
 	*new_node = NULL;
 	*changed = 0;
@@ -410,20 +349,11 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 		return got_error_from_errno();
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
-	SIMPLEQ_INIT(&node->parent_ids);
-	SIMPLEQ_FOREACH(pid, &commit->parent_ids, entry) {
-		err = add_vertex(&node->parent_ids, pid->id);
-		if (err) {
-			free_node(node);
-			return err;
-		}
-		node->nparents++;
-	}
 	node->commit_timestamp = commit->committer_time;
 
 	err = got_object_idset_add(graph->node_ids, &node->id, node);
 	if (err) {
-		free_node(node);
+		free(node);
 		return err;
 	}
 
@@ -440,7 +370,7 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 		} else {
 			got_object_idset_remove(NULL, graph->node_ids,
 			    &node->id);
-			free_node(node);
+			free(node);
 			return err;
 		}
 	}
@@ -626,7 +556,7 @@ static const struct got_error *
 free_node_iter(struct got_object_id *id, void *data, void *arg)
 {
 	struct got_commit_graph_node *node = data;
-	free_node(node);
+	free(node);
 	return NULL;
 }
 
