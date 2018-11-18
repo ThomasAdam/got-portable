@@ -437,18 +437,21 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 			err = NULL;
 			*branch_done = 1;
 		} else {
+			got_object_idset_remove(NULL, graph->node_ids,
+			    &node->id);
 			free_node(node);
 			return err;
 		}
 	}
 
-	if (*changed)
-		add_node_to_iter_list(graph, node, child_node);
-
-	if (err)
+	if (err) {
+		got_object_idset_remove(NULL, graph->node_ids, &node->id);
 		free_node(node);
-	else
+	} else {
+		if (*changed)
+			add_node_to_iter_list(graph, node, child_node);
 		*new_node = node;
+	}
 
 	return err;
 }
