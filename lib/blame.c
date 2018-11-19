@@ -53,6 +53,7 @@ SLIST_HEAD(got_blame_diff_offsets_list, got_blame_diff_offsets);
 struct got_blame {
 	FILE *f;
 	int nlines;
+	int nannotated;
 	struct got_blame_line *lines; /* one per line */
 	int ncommits;
 	struct got_blame_diff_offsets_list diff_offsets_list;
@@ -111,6 +112,7 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 
 	memcpy(&line->id, id, sizeof(line->id));
 	line->annotated = 1;
+	blame->nannotated++;
 	if (cb)
 		err = cb(arg, blame->nlines, lineno, id);
 	return err;
@@ -151,6 +153,8 @@ blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
 			    commit_id, cb, arg);
 			if (err)
 				return err;
+			if (blame->nlines == blame->nannotated)
+				return NULL;
 		}
 	}
 
@@ -369,11 +373,13 @@ blame_open(struct got_blame **blamep, const char *path,
 					err = NULL;
 				break;
 			}
+			if (blame->nannotated == blame->nlines)
+				break;
 		}
 		id = next_id;
 	}
 
-	if (id) {
+	if (id && blame->nannotated < blame->nlines) {
 		/* Annotate remaining non-annotated lines with last commit. */
 		for (lineno = 1; lineno <= blame->nlines; lineno++) {
 			err = annotate_line(blame, lineno, id, cb, arg);
