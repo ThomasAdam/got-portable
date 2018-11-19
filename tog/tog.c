@@ -169,7 +169,7 @@ struct tog_blame {
 	FILE *f;
 	size_t filesize;
 	struct tog_blame_line *lines;
-	size_t nlines;
+	int nlines;
 	pthread_t thread;
 	struct tog_blame_thread_args thread_args;
 	struct tog_blame_cb_args cb_args;

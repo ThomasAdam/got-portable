@@ -52,7 +52,7 @@ SLIST_HEAD(got_blame_diff_offsets_list, got_blame_diff_offsets);
 
 struct got_blame {
 	FILE *f;
-	size_t nlines;
+	int nlines;
 	struct got_blame_line *lines; /* one per line */
 	int ncommits;
 	struct got_blame_diff_offsets_list diff_offsets_list;
