@@ -103,7 +103,7 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	struct got_blame_line *line;
 
 	if (lineno < 1 || lineno > blame->nlines)
-		return got_error(GOT_ERR_RANGE);
+		return NULL;
 	
 	line = &blame->lines[lineno - 1];
 	if (line->annotated)
