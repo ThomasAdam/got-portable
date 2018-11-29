@@ -339,6 +339,17 @@ get_datestr(time_t *time, char *datebuf)
 	return s;
 }
 
+static int
+count_lines(char *s)
+{
+	int nlines = 0;
+	while (*s) {
+		if (*s++ == '\n')
+			nlines++;
+	}
+	return nlines;
+}
+
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, int show_patch, int diff_context)
@@ -346,12 +357,17 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
 	char datebuf[26];
+	int nlines = 3 + commit->nparents - 1;
+
+	if (strcmp(commit->author, commit->committer) != 0)
+		nlines++;
+	nlines += count_lines(commit->logmsg);
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
-	printf("-----------------------------------------------\n");
+	printf("----------------------------------------------- %d\n", nlines);
 	printf("commit %s\n", id_str);
 	free(id_str);
 	printf("from: %s\n", commit->author);
