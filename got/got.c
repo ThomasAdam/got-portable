@@ -685,6 +685,8 @@ cmd_diff(int argc, char *argv[])
 		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
+		printf("diff: %s %s\n", obj_id_str1 ? obj_id_str1 : "/dev/null",
+		    obj_id_str2);
 		error = got_diff_objects_as_commits(obj1, obj2, diff_context,
 		    repo, stdout);
 		break;
