@@ -303,6 +303,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2;
 	struct got_object_qid *qid;
+	char *id_str1 = NULL, *id_str2;
 
 	err = got_object_open_as_tree(&tree2, repo, commit->tree_id);
 	if (err)
@@ -320,12 +321,24 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		got_object_commit_close(pcommit);
 		if (err)
 			return err;
+
+		err = got_object_id_str(&id_str1, qid->id);
+		if (err)
+			return err;
 	}
 
+	err = got_object_id_str(&id_str2, id);
+	if (err)
+		goto done;
+
+	printf("diff: %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
 	err = got_diff_tree(tree1, tree2, "", "", diff_context, repo, stdout);
+done:
 	if (tree1)
 		got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
+	free(id_str1);
+	free(id_str2);
 	return err;
 }
 
