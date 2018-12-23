@@ -2453,10 +2453,12 @@ stop_blame(struct tog_blame *blame)
 		fclose(blame->f);
 		blame->f = NULL;
 	}
-	for (i = 0; i < blame->nlines; i++)
-		free(blame->lines[i].id);
-	free(blame->lines);
-	blame->lines = NULL;
+	if (blame->lines) {
+		for (i = 0; i < blame->nlines; i++)
+			free(blame->lines[i].id);
+		free(blame->lines);
+		blame->lines = NULL;
+	}
 	free(blame->cb_args.commit_id);
 	blame->cb_args.commit_id = NULL;
 
