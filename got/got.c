@@ -416,9 +416,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 }
 
 static const struct got_error *
-print_commits(struct got_object *root_obj, struct got_object_id *root_id,
-    struct got_repository *repo, char *path, int show_patch, int diff_context,
-    int limit, int first_parent_traversal)
+print_commits(struct got_object_id *root_id, struct got_repository *repo,
+    char *path, int show_patch, int diff_context, int limit,
+    int first_parent_traversal)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -480,8 +480,8 @@ cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
-	struct got_object *obj = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
 	char *start_commit = NULL;
 	int diff_context = 3, ch;
@@ -565,7 +565,7 @@ cmd_log(int argc, char *argv[])
 		got_ref_close(head_ref);
 		if (error != NULL)
 			return error;
-		error = got_object_open(&obj, repo, id);
+		error = got_object_open_as_commit(&commit, repo, id);
 	} else {
 		struct got_reference *ref;
 		error = got_ref_open(&ref, repo, start_commit);
@@ -574,26 +574,19 @@ cmd_log(int argc, char *argv[])
 			got_ref_close(ref);
 			if (error != NULL)
 				return error;
-			error = got_object_open(&obj, repo, id);
+			error = got_object_open_as_commit(&commit, repo, id);
 			if (error != NULL)
 				return error;
 		}
-		if (obj == NULL) {
-			error = got_object_open_by_id_str(&obj, repo,
+		if (commit == NULL) {
+			error = got_object_resolve_id_str(&id, repo,
 			    start_commit);
 			if (error != NULL)
 				return error;
-			id = got_object_id_dup(got_object_get_id(obj));
-			if (id == NULL)
-				error = got_error_from_errno();
 		}
 	}
 	if (error != NULL)
 		goto done;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
-		error = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
 
 	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
@@ -603,14 +596,12 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
-	error = print_commits(obj, id, repo, path, show_patch,
+	error = print_commits(id, repo, path, show_patch,
 	    diff_context, limit, first_parent_traversal);
 done:
 	free(path);
 	free(repo_path);
 	free(cwd);
-	if (obj)
-		got_object_close(obj);
 	free(id);
 	if (repo) {
 		const struct got_error *repo_error;
@@ -634,9 +625,10 @@ cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
 	char *repo_path = NULL;
-	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
+	struct got_object_id *id1 = NULL, *id2 = NULL;
+	char *id_str1 = NULL, *id_str2 = NULL;
+	int type1, type2;
 	int diff_context = 3, ch;
 	const char *errstr;
 
@@ -668,14 +660,14 @@ cmd_diff(int argc, char *argv[])
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
 			return got_error_from_errno();
-		obj_id_str1 = argv[0];
-		obj_id_str2 = argv[1];
+		id_str1 = argv[0];
+		id_str2 = argv[1];
 	} else if (argc == 3) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
 			return got_error_from_errno();
-		obj_id_str1 = argv[1];
-		obj_id_str2 = argv[2];
+		id_str1 = argv[1];
+		id_str2 = argv[2];
 	} else
 		usage_diff();
 
@@ -684,32 +676,40 @@ cmd_diff(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_object_open_by_id_str(&obj1, repo, obj_id_str1);
+	error = got_object_resolve_id_str(&id1, repo, id_str1);
 	if (error)
 		goto done;
 
-	error = got_object_open_by_id_str(&obj2, repo, obj_id_str2);
+	error = got_object_resolve_id_str(&id2, repo, id_str2);
 	if (error)
 		goto done;
 
-	if (got_object_get_type(obj1) != got_object_get_type(obj2)) {
+	error = got_object_get_type(&type1, repo, id1);
+	if (error)
+		goto done;
+
+	error = got_object_get_type(&type2, repo, id2);
+	if (error)
+		goto done;
+
+	if (type1 != type2) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
-	switch (got_object_get_type(obj1)) {
+	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL,
 		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(obj1, obj2, "", "",
+		error = got_diff_objects_as_trees(id1, id2, "", "",
 		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		printf("diff %s %s\n", obj_id_str1 ? obj_id_str1 : "/dev/null",
-		    obj_id_str2);
-		error = got_diff_objects_as_commits(obj1, obj2, diff_context,
+		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null",
+		    id_str2);
+		error = got_diff_objects_as_commits(id1, id2, diff_context,
 		    repo, stdout);
 		break;
 	default:
@@ -717,10 +717,8 @@ cmd_diff(int argc, char *argv[])
 	}
 
 done:
-	if (obj1)
-		got_object_close(obj1);
-	if (obj2)
-		got_object_close(obj2);
+	free(id1);
+	free(id2);
 	if (repo) {
 		const struct got_error *repo_error;
 		repo_error = got_repo_close(repo);
@@ -809,14 +807,10 @@ cmd_blame(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		struct got_object *obj;
-		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_str);
 		if (error != NULL)
 			goto done;
-		commit_id = got_object_id_dup(got_object_get_id(obj));
-		if (commit_id == NULL)
-			error = got_error_from_errno();
-		got_object_close(obj);
 	}
 
 	error = got_blame(in_repo_path, commit_id, repo, stdout);
@@ -969,14 +963,10 @@ cmd_tree(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		struct got_object *obj;
-		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_str);
 		if (error != NULL)
 			goto done;
-		commit_id = got_object_id_dup(got_object_get_id(obj));
-		if (commit_id == NULL)
-			error = got_error_from_errno();
-		got_object_close(obj);
 	}
 
 	error = print_tree(in_repo_path, commit_id, show_ids, repo);

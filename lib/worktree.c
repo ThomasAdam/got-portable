@@ -509,7 +509,7 @@ tree_checkout_entry(struct got_worktree *worktree,
 		progress_path += len;
 	(*progress_cb)(progress_arg, progress_path);
 
-	switch (got_object_get_type(obj)) {
+	switch (obj->type) {
 	case GOT_OBJ_TYPE_BLOB:
 		if (strlen(worktree->path_prefix) >= strlen(path))
 			break;
@@ -623,7 +623,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -637,7 +637,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE) {
+	if (obj->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}

@@ -37,12 +37,12 @@
 #include "got_opentemp.h"
 
 #include "got_lib_sha1.h"
-#include "got_lib_pack.h"
 #include "got_lib_path.h"
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_privsep.h"
+#include "got_lib_pack.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

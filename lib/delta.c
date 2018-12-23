@@ -23,6 +23,7 @@
 #include <zlib.h>
 #include <sha1.h>
 #include <time.h>
+#include <zlib.h>
 
 #include "got_error.h"
 #include "got_repository.h"
@@ -31,6 +32,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_path.h"
 #include "got_lib_inflate.h"
+#include "got_lib_object.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

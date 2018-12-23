@@ -42,7 +42,6 @@
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
-#include "got_lib_pack.h"
 #include "got_lib_path.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
@@ -50,6 +49,7 @@
 #include "got_lib_object_idcache.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_object_parse.h"
+#include "got_lib_pack.h"
 #include "got_lib_repository.h"
 
 #ifndef MIN
@@ -80,22 +80,31 @@ got_object_get_id_str(char **outbuf, struct got_object *obj)
 	return got_object_id_str(outbuf, &obj->id);
 }
 
-int
-got_object_get_type(struct got_object *obj)
+const struct got_error *
+got_object_get_type(int *type, struct got_repository *repo,
+    struct got_object_id *id)
 {
+	const struct got_error *err = NULL;
+	struct got_object *obj;
+
+	err = got_object_open(&obj, repo, id);
+	if (err)
+		return err;
+
 	switch (obj->type) {
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
-		return obj->type;
+		*type = obj->type;
+		break;
 	default:
-		abort();
+		err = got_error(GOT_ERR_OBJ_TYPE);
 		break;
 	}
 
-	/* not reached */
-	return 0;
+	got_object_close(obj);
+	return err;
 }
 
 static const struct got_error *
@@ -265,6 +274,25 @@ got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
 	return got_object_open(obj, repo, &id);
 }
 
+const struct got_error *
+got_object_resolve_id_str(struct got_object_id **id,
+    struct got_repository *repo, const char *id_str)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj;
+
+	err = got_object_open_by_id_str(&obj, repo, id_str);
+	if (err)
+		return err;
+
+	*id = got_object_id_dup(got_object_get_id(obj));
+	got_object_close(obj);
+	if (*id == NULL)
+		return got_error_from_errno();
+
+	return NULL;
+}
+
 static const struct got_error *
 open_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj, int check_cache)
@@ -326,7 +354,7 @@ got_object_open_as_commit(struct got_commit_object **commit,
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -425,7 +453,7 @@ got_object_open_as_tree(struct got_tree_object **tree,
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE) {
+	if (obj->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -612,7 +640,7 @@ got_object_open_as_blob(struct got_blob_object **blob,
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+	if (obj->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -763,7 +791,7 @@ got_object_open_as_tag(struct got_tag_object **tag,
 	err = got_object_open(&obj, repo, id);
 	if (err)
 		return err;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT) {
+	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}

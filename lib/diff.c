@@ -32,6 +32,9 @@
 
 #include "got_lib_diff.h"
 #include "got_lib_path.h"
+#include "got_lib_delta.h"
+#include "got_lib_inflate.h"
+#include "got_lib_object.h"
 
 static const struct got_error *
 diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
@@ -205,7 +208,7 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	err = got_object_open(&obj1, repo, id1);
 	if (err)
 		return err;
-	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB) {
+	if (obj1->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -213,7 +216,7 @@ diff_modified_blob(struct got_object_id *id1, struct got_object_id *id2,
 	err = got_object_open(&obj2, repo, id2);
 	if (err)
 		goto done;
-	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB) {
+	if (obj2->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
@@ -276,7 +279,7 @@ diff_added_tree(struct got_object_id *id, const char *label,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
+	if (treeobj->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -311,7 +314,7 @@ diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(treeobj1) != GOT_OBJ_TYPE_TREE) {
+	if (treeobj1->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -320,7 +323,7 @@ diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(treeobj2) != GOT_OBJ_TYPE_TREE) {
+	if (treeobj2->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -360,7 +363,7 @@ diff_deleted_tree(struct got_object_id *id, const char *label,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
+	if (treeobj->type != GOT_OBJ_TYPE_TREE) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -526,23 +529,23 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 }
 
 const struct got_error *
-got_diff_objects_as_blobs(struct got_object *obj1, struct got_object *obj2,
+got_diff_objects_as_blobs(struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2, int diff_context,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
 
-	if (obj1 == NULL && obj2 == NULL)
+	if (id1 == NULL && id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	if (obj1) {
-		err = got_object_blob_open(&blob1, repo, obj1, 8192);
+	if (id1) {
+		err = got_object_open_as_blob(&blob1, repo, id1, 8192);
 		if (err)
 			goto done;
 	}
-	if (obj2) {
-		err = got_object_blob_open(&blob2, repo, obj2, 8192);
+	if (id2) {
+		err = got_object_open_as_blob(&blob2, repo, id2, 8192);
 		if (err)
 			goto done;
 	}
@@ -557,23 +560,23 @@ done:
 }
 
 const struct got_error *
-got_diff_objects_as_trees(struct got_object *obj1, struct got_object *obj2,
+got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
     char *label1, char *label2, int diff_context, struct got_repository *repo,
     FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 
-	if (obj1 == NULL && obj2 == NULL)
+	if (id1 == NULL && id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	if (obj1) {
-		err = got_object_tree_open(&tree1, repo, obj1);
+	if (id1) {
+		err = got_object_open_as_tree(&tree1, repo, id1);
 		if (err)
 			goto done;
 	}
-	if (obj2) {
-		err = got_object_tree_open(&tree2, repo, obj2);
+	if (id2) {
+		err = got_object_open_as_tree(&tree2, repo, id2);
 		if (err)
 			goto done;
 	}
@@ -588,41 +591,31 @@ done:
 }
 
 const struct got_error *
-got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
-    int diff_context, struct got_repository *repo, FILE *outfile)
+got_diff_objects_as_commits(struct got_object_id *id1,
+    struct got_object_id *id2, int diff_context,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
-	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
 
-	if (obj2 == NULL)
+	if (id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	if (obj1) {
-		err = got_object_commit_open(&commit1, repo, obj1);
-		if (err)
-			goto done;
-		err = got_object_open(&tree_obj1, repo,
-		    got_object_commit_get_tree_id(commit1));
+	if (id1) {
+		err = got_object_open_as_commit(&commit1, repo, id1);
 		if (err)
 			goto done;
 	}
 
-	err = got_object_commit_open(&commit2, repo, obj2);
-	if (err)
-		goto done;
-	err = got_object_open(&tree_obj2, repo,
-	    got_object_commit_get_tree_id(commit2));
+	err = got_object_open_as_commit(&commit2, repo, id2);
 	if (err)
 		goto done;
 
-	err = got_diff_objects_as_trees(tree_obj1, tree_obj2, "", "",
-	    diff_context, repo, outfile);
+	err = got_diff_objects_as_trees(
+	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
+	    got_object_commit_get_tree_id(commit2), "", "", diff_context, repo,
+	    outfile);
 done:
-	if (tree_obj1)
-		got_object_close(tree_obj1);
-	if (tree_obj2)
-		got_object_close(tree_obj2);
 	if (commit1)
 		got_object_commit_close(commit1);
 	if (commit2)

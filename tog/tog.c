@@ -261,7 +261,7 @@ struct tog_view {
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
-    struct got_object *, struct got_object *, struct got_repository *);
+    struct got_object_id *, struct got_object_id *, struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1225,35 +1225,18 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
     struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
 	struct got_object_qid *parent_id;
 	struct tog_view *diff_view;
 
-	err = got_object_open(&obj2, repo, commit_id);
-	if (err)
-		return err;
-
 	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-	if (parent_id) {
-		err = got_object_open(&obj1, repo, parent_id->id);
-		if (err)
-			goto done;
-	}
 
 	diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
-	if (diff_view == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (diff_view == NULL)
+		return got_error_from_errno();
 
-	err = open_diff_view(diff_view, obj1, obj2, repo);
+	err = open_diff_view(diff_view, parent_id->id, commit_id, repo);
 	if (err == NULL)
 		*new_view = diff_view;
-done:
-	if (obj1)
-		got_object_close(obj1);
-	if (obj2)
-		got_object_close(obj2);
 	return err;
 }
 
@@ -1689,20 +1672,11 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (start_commit == NULL) {
+	if (start_commit == NULL)
 		error = get_head_commit_id(&start_id, repo);
-		if (error != NULL)
-			goto done;
-	} else {
-		struct got_object *obj;
-		error = got_object_open_by_id_str(&obj, repo, start_commit);
-		if (error == NULL) {
-			start_id = got_object_id_dup(got_object_get_id(obj));
-			if (start_id == NULL)
-				error = got_error_from_errno();
-				goto done;
-		}
-	}
+	else
+		error = got_object_resolve_id_str(&start_id, repo,
+		    start_commit);
 	if (error != NULL)
 		goto done;
 
@@ -1826,21 +1800,25 @@ get_datestr(time_t *time, char *datebuf)
 }
 
 static const struct got_error *
-write_commit_info(struct got_object *obj, struct got_repository *repo,
+write_commit_info(struct got_object_id *commit_id, struct got_repository *repo,
     FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	char *id_str;
 	char datebuf[26];
-	struct got_commit_object *commit = NULL;
+	struct got_commit_object *commit;
+	char *id_str = NULL;
 	time_t committer_time;
 	const char *author, *committer;
 
-	err = got_object_id_str(&id_str, got_object_get_id(obj));
+	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
 		return err;
 
-	err = got_object_commit_open(&commit, repo, obj);
+	err = got_object_id_str(&id_str, commit_id);
+	if (err) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (fprintf(outfile, "commit: %s\n", id_str) < 0) {
 		err = got_error_from_errno();
@@ -1871,8 +1849,7 @@ write_commit_info(struct got_object *obj, struct got_repository *repo,
 	}
 done:
 	free(id_str);
-	if (commit)
-		got_object_commit_close(commit);
+	got_object_commit_close(commit);
 	return err;
 }
 
@@ -1880,18 +1857,8 @@ static const struct got_error *
 create_diff(struct tog_diff_view_state *s)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
 	FILE *f = NULL;
-
-	if (s->id1) {
-		err = got_object_open(&obj1, s->repo, s->id1);
-		if (err)
-			return err;
-	}
-
-	err = got_object_open(&obj2, s->repo, s->id2);
-	if (err)
-		goto done;
+	int obj_type;
 
 	f = got_opentemp();
 	if (f == NULL) {
@@ -1902,13 +1869,20 @@ create_diff(struct tog_diff_view_state *s)
 		fclose(s->f);
 	s->f = f;
 
-	switch (got_object_get_type(obj1 ? obj1 : obj2)) {
+	if (s->id1)
+		err = got_object_get_type(&obj_type, s->repo, s->id1);
+	else
+		err = got_object_get_type(&obj_type, s->repo, s->id2);
+	if (err)
+		goto done;
+
+	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(obj1, obj2, NULL, NULL,
+		err = got_diff_objects_as_blobs(s->id1, s->id2, NULL, NULL,
 		    s->diff_context, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(obj1, obj2, "", "",
+		err = got_diff_objects_as_trees(s->id1, s->id2, "", "",
 		    s->diff_context, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
@@ -1916,22 +1890,21 @@ create_diff(struct tog_diff_view_state *s)
 		struct got_object_qid *pid;
 		struct got_commit_object *commit2;
 
-		err = got_object_commit_open(&commit2, s->repo, obj2);
+		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
 		if (err)
 			break;
 		/* Show commit info if we're diffing to a parent commit. */
 		parent_ids = got_object_commit_get_parent_ids(commit2);
 		SIMPLEQ_FOREACH(pid, parent_ids, entry) {
-			struct got_object_id *id1 = got_object_get_id(obj1);
-			if (got_object_id_cmp(id1, pid->id) == 0) {
-				write_commit_info(obj2, s->repo, f);
+			if (got_object_id_cmp(s->id1, pid->id) == 0) {
+				write_commit_info(s->id2, s->repo, f);
 				break;
 			}
 		}
 		got_object_commit_close(commit2);
 
-		err = got_diff_objects_as_commits(obj1, obj2, s->diff_context,
-		    s->repo, f);
+		err = got_diff_objects_as_commits(s->id1, s->id2,
+		    s->diff_context, s->repo, f);
 		break;
 	}
 	default:
@@ -1939,34 +1912,38 @@ create_diff(struct tog_diff_view_state *s)
 		break;
 	}
 done:
-	if (obj1)
-		got_object_close(obj1);
-	got_object_close(obj2);
 	if (f)
 		fflush(f);
 	return err;
 }
 
 static const struct got_error *
-open_diff_view(struct tog_view *view, struct got_object *obj1,
-    struct got_object *obj2, struct got_repository *repo)
+open_diff_view(struct tog_view *view, struct got_object_id *id1,
+    struct got_object_id *id2, struct got_repository *repo)
 {
 	const struct got_error *err;
 
-	if (obj1 != NULL && obj2 != NULL &&
-	    got_object_get_type(obj1) != got_object_get_type(obj2))
-		return got_error(GOT_ERR_OBJ_TYPE);
+	if (id1 != NULL && id2 != NULL) {
+	    int type1, type2;
+	    err = got_object_get_type(&type1, repo, id1);
+	    if (err)
+		return err;
+	    err = got_object_get_type(&type2, repo, id2);
+	    if (err)
+		return err;
 
-	if (obj1) {
-		struct got_object_id *id1;
-		id1 = got_object_id_dup(got_object_get_id(obj1));
-		if (id1 == NULL)
+	    if (type1 != type2)
+		return got_error(GOT_ERR_OBJ_TYPE);
+	}
+
+	if (id1) {
+		view->state.diff.id1 = got_object_id_dup(id1);
+		if (view->state.diff.id1 == NULL)
 			return got_error_from_errno();
-		view->state.diff.id1 = id1;
 	} else
 		view->state.diff.id1 = NULL;
 
-	view->state.diff.id2 = got_object_id_dup(got_object_get_id(obj2));
+	view->state.diff.id2 = got_object_id_dup(id2);
 	if (view->state.diff.id2 == NULL) {
 		free(view->state.diff.id1);
 		view->state.diff.id1 = NULL;
@@ -2099,9 +2076,9 @@ cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
-	struct got_object *obj1 = NULL, *obj2 = NULL;
+	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *repo_path = NULL;
-	char *obj_id_str1 = NULL, *obj_id_str2 = NULL;
+	char *id_str1 = NULL, *id_str2 = NULL;
 	int ch;
 	struct tog_view *view;
 
@@ -2128,14 +2105,14 @@ cmd_diff(int argc, char *argv[])
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
 			return got_error_from_errno();
-		obj_id_str1 = argv[0];
-		obj_id_str2 = argv[1];
+		id_str1 = argv[0];
+		id_str2 = argv[1];
 	} else if (argc == 3) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
 			return got_error_from_errno();
-		obj_id_str1 = argv[1];
-		obj_id_str2 = argv[2];
+		id_str1 = argv[1];
+		id_str2 = argv[2];
 	} else
 		usage_diff();
 
@@ -2144,11 +2121,11 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_object_open_by_id_str(&obj1, repo, obj_id_str1);
+	error = got_object_resolve_id_str(&id1, repo, id_str1);
 	if (error)
 		goto done;
 
-	error = got_object_open_by_id_str(&obj2, repo, obj_id_str2);
+	error = got_object_resolve_id_str(&id2, repo, id_str2);
 	if (error)
 		goto done;
 
@@ -2157,16 +2134,12 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = open_diff_view(view, obj1, obj2, repo);
+	error = open_diff_view(view, id1, id2, repo);
 	if (error)
 		goto done;
 	error = view_loop(view);
 done:
 	got_repo_close(repo);
-	if (obj1)
-		got_object_close(obj1);
-	if (obj2)
-		got_object_close(obj2);
 	return error;
 }
 
@@ -2374,8 +2347,8 @@ blame_thread(void *arg)
 }
 
 static struct got_object_id *
-get_selected_commit_id(struct tog_blame_line *lines,
-    int first_displayed_line, int selected_line)
+get_selected_commit_id(struct tog_blame_line *lines, int first_displayed_line,
+    int selected_line)
 {
 	struct tog_blame_line *line;
 
@@ -2384,44 +2357,6 @@ get_selected_commit_id(struct tog_blame_line *lines,
 		return NULL;
 
 	return line->id;
-}
-
-static const struct got_error *
-open_selected_commit(struct got_object **pobj, struct got_object **obj,
-    struct tog_blame_line *lines, int first_displayed_line,
-    int selected_line, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_commit_object *commit = NULL;
-	struct got_object_id *selected_id;
-	struct got_object_qid *pid;
-
-	*pobj = NULL;
-	*obj = NULL;
-
-	selected_id = get_selected_commit_id(lines,
-	    first_displayed_line, selected_line);
-	if (selected_id == NULL)
-		return NULL;
-
-	err = got_object_open(obj, repo, selected_id);
-	if (err)
-		goto done;
-
-	err = got_object_commit_open(&commit, repo, *obj);
-	if (err)
-		goto done;
-
-	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-	if (pid) {
-		err = got_object_open(pobj, repo, pid->id);
-		if (err)
-			goto done;
-	}
-done:
-	if (commit)
-		got_object_commit_close(commit);
-	return err;
 }
 
 static const struct got_error *
@@ -2475,22 +2410,24 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	struct got_blob_object *blob = NULL;
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
-	struct got_object *obj = NULL;
+	int obj_type;
 
 	err = got_object_id_by_path(&obj_id, repo, commit_id, path);
 	if (err)
-		goto done;
+		return err;
+	if (obj_id == NULL)
+		return got_error(GOT_ERR_NO_OBJ);
 
-	err = got_object_open(&obj, repo, obj_id);
+	err = got_object_get_type(&obj_type, repo, obj_id);
 	if (err)
 		goto done;
 
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+	if (obj_type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
-	err = got_object_blob_open(&blob, repo, obj, 8192);
+	err = got_object_open_as_blob(&blob, repo, obj_id, 8192);
 	if (err)
 		goto done;
 	blame->f = got_opentemp();
@@ -2533,8 +2470,6 @@ done:
 	if (blob)
 		got_object_blob_close(blob);
 	free(obj_id);
-	if (obj)
-		got_object_close(obj);
 	if (err)
 		stop_blame(blame);
 	return err;
@@ -2624,7 +2559,6 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
     struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL, *thread_err = NULL;
-	struct got_object *obj = NULL, *pobj = NULL;
 	struct tog_view *diff_view;
 	struct tog_blame_view_state *s = &view->state.blame;
 	int begin_x = 0;
@@ -2664,36 +2598,60 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'b':
 		case 'p': {
-			struct got_object_id *id;
+			struct got_object_id *id = NULL;
 			id = get_selected_commit_id(s->blame.lines,
 			    s->first_displayed_line, s->selected_line);
-			if (id == NULL || got_object_id_cmp(id,
-			    s->blamed_commit->id) == 0)
+			if (id == NULL)
 				break;
-			err = open_selected_commit(&pobj, &obj,
-			    s->blame.lines, s->first_displayed_line,
-			    s->selected_line, s->repo);
+			if (ch == 'p') {
+				struct got_commit_object *commit;
+				struct got_object_qid *pid;
+				struct got_object_id *blob_id = NULL;
+				int obj_type;
+				err = got_object_open_as_commit(&commit,
+				    s->repo, id);
+				if (err)
+					break;
+				pid = SIMPLEQ_FIRST(
+				    got_object_commit_get_parent_ids(commit));
+				if (pid == NULL) {
+					got_object_commit_close(commit);
+					break;
+				}
+				/* Check if path history ends here. */
+				err = got_object_id_by_path(&blob_id, s->repo,
+				    pid->id, s->path);
+				if (err) {
+					if (err->code == GOT_ERR_NO_TREE_ENTRY)
+						err = NULL;
+					got_object_commit_close(commit);
+					break;
+				}
+				err = got_object_get_type(&obj_type, s->repo,
+				    blob_id);
+				free(blob_id);
+				/* Can't blame non-blob type objects. */
+				if (obj_type != GOT_OBJ_TYPE_BLOB) {
+					got_object_commit_close(commit);
+					break;
+				}
+				err = got_object_qid_alloc(&s->blamed_commit,
+				    pid->id);
+				got_object_commit_close(commit);
+			} else {
+				if (got_object_id_cmp(id,
+				    s->blamed_commit->id) == 0)
+					break;
+				err = got_object_qid_alloc(&s->blamed_commit,
+				    id);
+			}
 			if (err)
-				break;
-			if (pobj == NULL && obj == NULL)
-				break;
-			if (ch == 'p' && pobj == NULL)
 				break;
 			s->done = 1;
 			thread_err = stop_blame(&s->blame);
 			s->done = 0;
 			if (thread_err)
 				break;
-			id = got_object_get_id(ch == 'b' ? obj : pobj);
-			got_object_close(obj);
-			obj = NULL;
-			if (pobj) {
-				got_object_close(pobj);
-				pobj = NULL;
-			}
-			err = got_object_qid_alloc(&s->blamed_commit, id);
-			if (err)
-				goto done;
 			SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
 			    s->blamed_commit, entry);
 			err = run_blame(&s->blame, view, &s->blame_complete,
@@ -2727,23 +2685,31 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		}
 		case KEY_ENTER:
-		case '\r':
-			err = open_selected_commit(&pobj, &obj,
-			    s->blame.lines, s->first_displayed_line,
-			    s->selected_line, s->repo);
+		case '\r': {
+			struct got_object_id *id = NULL;
+			struct got_object_qid *pid;
+			struct got_commit_object *commit = NULL;
+			id = get_selected_commit_id(s->blame.lines,
+			    s->first_displayed_line, s->selected_line);
+			if (id == NULL || got_object_id_cmp(id,
+			    s->blamed_commit->id) == 0)
+				break;
+			err = got_object_open_as_commit(&commit, s->repo, id);
 			if (err)
 				break;
-			if (pobj == NULL && obj == NULL)
-				break;
-
+			pid = SIMPLEQ_FIRST(
+			    got_object_commit_get_parent_ids(commit));
 			if (view_is_parent_view(view))
 			    begin_x = view_split_begin_x(view->begin_x);
 			diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
 			if (diff_view == NULL) {
+				got_object_commit_close(commit);
 				err = got_error_from_errno();
 				break;
 			}
-			err = open_diff_view(diff_view, pobj, obj, s->repo);
+			err = open_diff_view(diff_view, pid ? pid->id : NULL,
+			    id, s->repo);
+			got_object_commit_close(commit);
 			if (err) {
 				view_close(diff_view);
 				break;
@@ -2751,7 +2717,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (view_is_parent_view(view)) {
 				err = view_close_child(view);
 				if (err)
-					return err;
+					break;
 				err = view_set_child(view, diff_view);
 				if (err) {
 					view_close(diff_view);
@@ -2761,15 +2727,10 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 				view->child_focussed = 1;
 			} else
 				*new_view = diff_view;
-			if (pobj) {
-				got_object_close(pobj);
-				pobj = NULL;
-			}
-			got_object_close(obj);
-			obj = NULL;
 			if (err)
 				break;
 			break;
+		}
 		case KEY_NPAGE:
 		case ' ':
 			if (s->last_displayed_line >= s->blame.nlines &&
@@ -2796,9 +2757,6 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		default:
 			break;
 	}
-done:
-	if (pobj)
-		got_object_close(pobj);
 	return thread_err ? thread_err : err;
 }
 
@@ -2873,14 +2831,8 @@ cmd_blame(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 	} else {
-		struct got_object *obj;
-		error = got_object_open_by_id_str(&obj, repo, commit_id_str);
-		if (error != NULL)
-			goto done;
-		commit_id = got_object_id_dup(got_object_get_id(obj));
-		if (commit_id == NULL)
-			error = got_error_from_errno();
-		got_object_close(obj);
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_str);
 	}
 	if (error != NULL)
 		goto done;
@@ -3462,19 +3414,11 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		return error;
 
-	if (commit_id_arg == NULL) {
+	if (commit_id_arg == NULL)
 		error = get_head_commit_id(&commit_id, repo);
-		if (error != NULL)
-			goto done;
-	} else {
-		struct got_object *obj;
-		error = got_object_open_by_id_str(&obj, repo, commit_id_arg);
-		if (error == NULL) {
-			commit_id = got_object_id_dup(got_object_get_id(obj));
-			if (commit_id == NULL)
-				error = got_error_from_errno();
-		}
-	}
+	else
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_arg);
 	if (error != NULL)
 		goto done;
 

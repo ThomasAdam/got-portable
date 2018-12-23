@@ -203,7 +203,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+	if (obj->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -228,7 +228,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(pobj) != GOT_OBJ_TYPE_BLOB) {
+	if (pobj->type != GOT_OBJ_TYPE_BLOB) {
 		/*
 		 * Encountered a non-blob at the path (probably a tree).
 		 * Blob's history began in previous commit.
@@ -309,7 +309,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err)
 		goto done;
 
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB) {
+	if (obj->type != GOT_OBJ_TYPE_BLOB) {
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}

@@ -57,7 +57,7 @@ test_printf(char *fmt, ...)
 }
 
 static const struct got_error *
-print_commit_object(struct got_object *, struct got_repository *);
+print_commit_object(struct got_object_id *, struct got_repository *);
 
 static const struct got_error *
 print_parent_commits(struct got_commit_object *commit,
@@ -66,18 +66,10 @@ print_parent_commits(struct got_commit_object *commit,
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid;
 	const struct got_error *err = NULL;
-	struct got_object *obj;
 
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
-		err = got_object_open(&obj, repo, qid->id);
-		if (err != NULL)
-			return err;
-		if (got_object_get_type(obj) != GOT_OBJ_TYPE_COMMIT)
-			err = got_error(GOT_ERR_OBJ_TYPE);
-		else
-			err = print_commit_object(obj, repo);
-		got_object_close(obj);
+		err = print_commit_object(qid->id, repo);
 		if (err)
 			break;
 	}
@@ -86,7 +78,7 @@ print_parent_commits(struct got_commit_object *commit,
 }
 
 static const struct got_error *
-print_tree_object(struct got_object *obj, char *parent,
+print_tree_object(struct got_object_id *id, char *parent,
     struct got_repository *repo)
 {
 	struct got_tree_object *tree;
@@ -94,13 +86,12 @@ print_tree_object(struct got_object *obj, char *parent,
 	struct got_tree_entry *te;
 	const struct got_error *err;
 
-	err = got_object_tree_open(&tree, repo, obj);
+	err = got_object_open_as_tree(&tree, repo, id);
 	if (err != NULL)
 		return err;
 
 	entries = got_object_tree_get_entries(tree);
 	SIMPLEQ_FOREACH(te, &entries->head, entry) {
-		struct got_object *treeobj;
 		char *next_parent;
 		char *hex;
 
@@ -116,30 +107,15 @@ print_tree_object(struct got_object *obj, char *parent,
 		test_printf("%s %s/%s\n", hex, parent, te->name);
 		free(hex);
 
-		err = got_object_open(&treeobj, repo, te->id);
-		if (err != NULL)
-			break;
-
-		if (got_object_get_type(treeobj) != GOT_OBJ_TYPE_TREE) {
-			err = got_error(GOT_ERR_OBJ_TYPE);
-			got_object_close(treeobj);
-			break;
-		}
-
 		if (asprintf(&next_parent, "%s/%s", parent, te->name) == -1) {
 			err = got_error_from_errno();
-			got_object_close(treeobj);
 			break;
 		}
 
-		err = print_tree_object(treeobj, next_parent, repo);
+		err = print_tree_object(te->id, next_parent, repo);
 		free(next_parent);
-		if (err) {
-			got_object_close(treeobj);
+		if (err)
 			break;
-		}
-
-		got_object_close(treeobj);
 	}
 
 	got_object_tree_close(tree);
@@ -147,22 +123,24 @@ print_tree_object(struct got_object *obj, char *parent,
 }
 
 static const struct got_error *
-print_commit_object(struct got_object *obj, struct got_repository *repo)
+print_commit_object(struct got_object_id *id, struct got_repository *repo)
 {
 	struct got_commit_object *commit;
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid;
 	char *buf;
 	const struct got_error *err;
-	struct got_object* treeobj;
+	int obj_type;
 
-	err = got_object_commit_open(&commit, repo, obj);
+	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
 		return err;
 
-	err = got_object_id_str(&buf, got_object_commit_get_tree_id(commit));
-	if (err)
+	err = got_object_id_str(&buf, id);
+	if (err) {
+		got_object_commit_close(commit);
 		return err;
+	}
 	test_printf("tree: %s\n", buf);
 	free(buf);
 	test_printf("parent%s: ",
@@ -170,8 +148,10 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
 		err = got_object_id_str(&buf, qid->id);
-		if (err)
+		if (err) {
+			got_object_commit_close(commit);
 			return err;
+		}
 		test_printf("%s\n", buf);
 		free(buf);
 	}
@@ -179,15 +159,14 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	test_printf("committer: %s\n", got_object_commit_get_committer(commit));
 	test_printf("log: %s\n", got_object_commit_get_logmsg(commit));
 
-	err = got_object_open(&treeobj, repo,
+	err = got_object_get_type(&obj_type, repo,
 	    got_object_commit_get_tree_id(commit));
-	if (err != NULL)
+	if (err != NULL) {
+		got_object_commit_close(commit);
 		return err;
-	if (got_object_get_type(treeobj) == GOT_OBJ_TYPE_TREE) {
-		print_tree_object(treeobj, "", repo);
-		test_printf("\n");
 	}
-	got_object_close(treeobj);
+	if (obj_type == GOT_OBJ_TYPE_TREE)
+		test_printf("\n");
 
 	err = print_parent_commits(commit, repo);
 	got_object_commit_close(commit);
@@ -202,7 +181,6 @@ repo_read_log(const char *repo_path)
 	struct got_repository *repo;
 	struct got_reference *head_ref;
 	struct got_object_id *id;
-	struct got_object *obj;
 	char *buf;
 
 	err = got_repo_open(&repo, repo_path);
@@ -219,16 +197,9 @@ repo_read_log(const char *repo_path)
 		return 0;
 	test_printf("HEAD is at %s\n", buf);
 	free(buf);
-	err = got_object_open(&obj, repo, id);
-	if (err != NULL || obj == NULL)
+	err = print_commit_object(id, repo);
+	if (err)
 		return 0;
-	if (got_object_get_type(obj) == GOT_OBJ_TYPE_COMMIT) {
-		err = print_commit_object(obj, repo);
-		if (err)
-			return 0;
-	} else
-		return 0;
-	got_object_close(obj);
 	free(id);
 	got_ref_close(head_ref);
 	got_repo_close(repo);
@@ -241,21 +212,18 @@ repo_read_tree(const char *repo_path)
 	const char *tree_sha1 = "6cc96e0e093fb30630ba7f199d0a008b24c6a690";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object *obj;
+	struct got_object_id *id;
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_object_open_by_id_str(&obj, repo, tree_sha1);
-	if (err != NULL || obj == NULL)
-		return 0;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_TREE)
+	err = got_object_resolve_id_str(&id, repo, tree_sha1);
+	if (err != NULL)
 		return 0;
 
-	print_tree_object(obj, "", repo);
+	print_tree_object(id, "", repo);
 	test_printf("\n");
 
-	got_object_close(obj);
 	got_repo_close(repo);
 	return (err == NULL);
 }
@@ -266,7 +234,7 @@ repo_read_blob(const char *repo_path)
 	const char *blob_sha1 = "141f5fdc96126c1f4195558560a3c915e3d9b4c3";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object *obj;
+	struct got_object_id *id;
 	struct got_blob_object *blob;
 	int i;
 	size_t len;
@@ -274,13 +242,10 @@ repo_read_blob(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_object_open_by_id_str(&obj, repo, blob_sha1);
-	if (err != NULL || obj == NULL)
+	err = got_object_resolve_id_str(&id, repo, blob_sha1);
+	if (err != NULL)
 		return 0;
-	if (got_object_get_type(obj) != GOT_OBJ_TYPE_BLOB)
-		return 0;
-
-	err = got_object_blob_open(&blob, repo, obj, 64);
+	err = got_object_open_as_blob(&blob, repo, id, 64);
 	if (err != NULL)
 		return 0;
 
@@ -296,7 +261,6 @@ repo_read_blob(const char *repo_path)
 	test_printf("\n");
 
 	got_object_blob_close(blob);
-	got_object_close(obj);
 	got_repo_close(repo);
 	return (err == NULL);
 }
@@ -308,8 +272,7 @@ repo_diff_blob(const char *repo_path)
 	const char *blob2_sha1 = "de7eb21b21c7823a753261aadf7cba35c9580fbf";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object *obj1;
-	struct got_object *obj2;
+	struct got_object_id *id1, *id2;
 	struct got_blob_object *blob1;
 	struct got_blob_object *blob2;
 	FILE *outfile;
@@ -338,22 +301,19 @@ repo_diff_blob(const char *repo_path)
 	if (err != NULL || repo == NULL)
 		return 0;
 
-	err = got_object_open_by_id_str(&obj1, repo, blob1_sha1);
-	if (err != NULL || obj1 == NULL)
-		return 0;
-	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_BLOB)
-		return 0;
-	err = got_object_open_by_id_str(&obj2, repo, blob2_sha1);
-	if (err != NULL || obj2 == NULL)
-		return 0;
-	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_BLOB)
-		return 0;
-
-	err = got_object_blob_open(&blob1, repo, obj1, 512);
+	err = got_object_resolve_id_str(&id1, repo, blob1_sha1);
 	if (err != NULL)
 		return 0;
 
-	err = got_object_blob_open(&blob2, repo, obj2, 512);
+	err = got_object_resolve_id_str(&id2, repo, blob2_sha1);
+	if (err != NULL)
+		return 0;
+
+	err = got_object_open_as_blob(&blob1, repo, id1, 512);
+	if (err != NULL)
+		return 0;
+
+	err = got_object_open_as_blob(&blob2, repo, id2, 512);
 	if (err != NULL)
 		return 0;
 
@@ -385,8 +345,6 @@ repo_diff_blob(const char *repo_path)
 
 	got_object_blob_close(blob1);
 	got_object_blob_close(blob2);
-	got_object_close(obj1);
-	got_object_close(obj2);
 	got_repo_close(repo);
 	return (err == NULL);
 }
@@ -398,8 +356,8 @@ repo_diff_tree(const char *repo_path)
 	const char *tree2_sha1 = "4aa8f2933839ff8a8fb3f905a4c232d22c6ff5f3";
 	const struct got_error *err;
 	struct got_repository *repo;
-	struct got_object *obj1;
-	struct got_object *obj2;
+	struct got_object_id *id1;
+	struct got_object_id *id2;
 	struct got_tree_object *tree1;
 	struct got_tree_object *tree2;
 	FILE *outfile;
@@ -408,22 +366,18 @@ repo_diff_tree(const char *repo_path)
 	if (err != NULL || repo == NULL)
 		return 0;
 
-	err = got_object_open_by_id_str(&obj1, repo, tree1_sha1);
-	if (err != NULL || obj1 == NULL)
+	err = got_object_resolve_id_str(&id1, repo, tree1_sha1);
+	if (err != NULL)
 		return 0;
-	if (got_object_get_type(obj1) != GOT_OBJ_TYPE_TREE)
-		return 0;
-	err = got_object_open_by_id_str(&obj2, repo, tree2_sha1);
-	if (err != NULL || obj2 == NULL)
-		return 0;
-	if (got_object_get_type(obj2) != GOT_OBJ_TYPE_TREE)
-		return 0;
-
-	err = got_object_tree_open(&tree1, repo, obj1);
+	err = got_object_resolve_id_str(&id2, repo, tree2_sha1);
 	if (err != NULL)
 		return 0;
 
-	err = got_object_tree_open(&tree2, repo, obj2);
+	err = got_object_open_as_tree(&tree1, repo, id1);
+	if (err != NULL)
+		return 0;
+
+	err = got_object_open_as_tree(&tree2, repo, id2);
 	if (err != NULL)
 		return 0;
 
@@ -439,8 +393,6 @@ repo_diff_tree(const char *repo_path)
 
 	got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
-	got_object_close(obj1);
-	got_object_close(obj2);
 	got_repo_close(repo);
 	return (err == NULL);
 }

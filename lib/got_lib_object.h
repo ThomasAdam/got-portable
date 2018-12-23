@@ -20,6 +20,7 @@ struct got_object_id {
 
 struct got_object {
 	int type;
+
 	int flags;
 #define GOT_OBJ_FLAG_PACKED		0x01
 #define GOT_OBJ_FLAG_DELTIFIED		0x02
@@ -73,3 +74,19 @@ struct got_tag_object {
 	char *tagmsg;
 	int refcnt;		/* > 0 if open and/or cached */
 };
+
+struct got_object_id *got_object_get_id(struct got_object *);
+const struct got_error *got_object_get_id_str(char **, struct got_object *);
+const struct got_error *got_object_open(struct got_object **,
+    struct got_repository *, struct got_object_id *);
+const struct got_error *got_object_open_by_id_str(struct got_object **,
+    struct got_repository *, const char *);
+void got_object_close(struct got_object *);
+const struct got_error *got_object_commit_open(struct got_commit_object **,
+    struct got_repository *, struct got_object *);
+const struct got_error *got_object_tree_open(struct got_tree_object **,
+    struct got_repository *, struct got_object *);
+const struct got_error *got_object_blob_open(struct got_blob_object **,
+    struct got_repository *, struct got_object *, size_t);
+const struct got_error *got_object_tag_open(struct got_tag_object **,
+    struct got_repository *, struct got_object *);
