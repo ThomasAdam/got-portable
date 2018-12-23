@@ -274,12 +274,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		    pack->privsep_child->pid);
 		if (child_err && err == NULL)
 			err = child_err;
-		free(ibuf);
-		free(pack->privsep_child);
-		pack->privsep_child = NULL;
-		return err;
 	}
-
 done:
 	if (err) {
 		free(ibuf);
