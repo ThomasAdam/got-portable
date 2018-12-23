@@ -602,7 +602,8 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 		err = got_object_commit_open(&commit1, repo, obj1);
 		if (err)
 			goto done;
-		err = got_object_open(&tree_obj1, repo, commit1->tree_id);
+		err = got_object_open(&tree_obj1, repo,
+		    got_object_commit_get_tree_id(commit1));
 		if (err)
 			goto done;
 	}
@@ -610,7 +611,8 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	err = got_object_commit_open(&commit2, repo, obj2);
 	if (err)
 		goto done;
-	err = got_object_open(&tree_obj2, repo, commit2->tree_id);
+	err = got_object_open(&tree_obj2, repo,
+	    got_object_commit_get_tree_id(commit2));
 	if (err)
 		goto done;
 

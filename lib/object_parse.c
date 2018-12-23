@@ -275,6 +275,65 @@ got_object_commit_close(struct got_commit_object *commit)
 	free(commit);
 }
 
+struct got_object_id *
+got_object_commit_get_tree_id(struct got_commit_object *commit)
+{
+	return commit->tree_id;
+}
+
+int
+got_object_commit_get_nparents(struct got_commit_object *commit)
+{
+	return commit->nparents;
+}
+
+const struct got_object_id_queue *
+got_object_commit_get_parent_ids(struct got_commit_object *commit)
+{
+	return &commit->parent_ids;
+}
+
+const char *
+got_object_commit_get_author(struct got_commit_object *commit)
+{
+	return commit->author;
+}
+
+time_t
+got_object_commit_get_author_time(struct got_commit_object *commit)
+{
+	return commit->author_time;
+}
+
+time_t got_object_commit_get_author_gmtoff(struct got_commit_object *commit)
+{
+	return commit->author_gmtoff;
+}
+
+const char *
+got_object_commit_get_committer(struct got_commit_object *commit)
+{
+	return commit->committer;
+}
+
+time_t
+got_object_commit_get_committer_time(struct got_commit_object *commit)
+{
+	return commit->committer_time;
+}
+
+time_t
+got_object_commit_get_committer_gmtoff(struct got_commit_object *commit)
+{
+	return commit->committer_gmtoff;
+}
+
+const char *
+got_object_commit_get_logmsg(struct got_commit_object *commit)
+{
+	return commit->logmsg;
+}
+
 const struct got_error *
 got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len)
 {

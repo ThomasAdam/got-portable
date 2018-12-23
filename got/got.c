@@ -305,11 +305,12 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	struct got_object_qid *qid;
 	char *id_str1 = NULL, *id_str2;
 
-	err = got_object_open_as_tree(&tree2, repo, commit->tree_id);
+	err = got_object_open_as_tree(&tree2, repo,
+	    got_object_commit_get_tree_id(commit));
 	if (err)
 		return err;
 
-	qid = SIMPLEQ_FIRST(&commit->parent_ids);
+	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 
@@ -317,7 +318,8 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		if (err)
 			return err;
 
-		err = got_object_open_as_tree(&tree1, repo, pcommit->tree_id);
+		err = got_object_open_as_tree(&tree1, repo,
+		    got_object_commit_get_tree_id(pcommit));
 		got_object_commit_close(pcommit);
 		if (err)
 			return err;
@@ -359,6 +361,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
 	char datebuf[26];
+	time_t committer_time;
+	const char *author, *committer;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
@@ -367,15 +371,20 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("-----------------------------------------------\n");
 	printf("commit %s\n", id_str);
 	free(id_str);
-	printf("from: %s\n", commit->author);
-	datestr = get_datestr(&commit->committer_time, datebuf);
+	printf("from: %s\n", got_object_commit_get_author(commit));
+	committer_time = got_object_commit_get_committer_time(commit);
+	datestr = get_datestr(&committer_time, datebuf);
 	printf("date: %s UTC\n", datestr);
-	if (strcmp(commit->author, commit->committer) != 0)
-		printf("via: %s\n", commit->committer);
-	if (commit->nparents > 1) {
+	author = got_object_commit_get_author(commit);
+	committer = got_object_commit_get_committer(commit);
+	if (strcmp(author, committer) != 0)
+		printf("via: %s\n", committer);
+	if (got_object_commit_get_nparents(commit) > 1) {
+		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *qid;
 		int n = 1;
-		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		SIMPLEQ_FOREACH(qid, parent_ids, entry) {
 			err = got_object_id_str(&id_str, qid->id);
 			if (err)
 				return err;
@@ -384,7 +393,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		}
 	}
 
-	logmsg0 = strdup(commit->logmsg);
+	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
 	if (logmsg0 == NULL)
 		return got_error_from_errno();
 

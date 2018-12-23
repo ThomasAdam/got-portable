@@ -35,6 +35,20 @@ struct got_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+struct got_commit_object {
+	struct got_object_id *tree_id;
+	unsigned int nparents;
+	struct got_object_id_queue parent_ids;
+	char *author;
+	time_t author_time;	/* UTC */
+	time_t author_gmtoff;
+	char *committer;
+	time_t committer_time;	/* UTC */
+	time_t committer_gmtoff;
+	char *logmsg;
+	int refcnt;		/* > 0 if open and/or cached */
+};
+
 struct got_tree_object {
 	struct got_tree_entries entries;
 	int refcnt;

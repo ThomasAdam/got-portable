@@ -19,6 +19,7 @@ struct got_object_id;
 struct got_blob_object;
 struct got_tree_object;
 struct got_tag_object;
+struct got_commit_object;
 
 struct got_tree_entry {
 	SIMPLEQ_ENTRY(got_tree_entry) entry;
@@ -44,21 +45,6 @@ SIMPLEQ_HEAD(got_object_id_queue, got_object_qid);
 const struct got_error *got_object_qid_alloc(struct got_object_qid **,
     struct got_object_id *);
 void got_object_qid_free(struct got_object_qid *);
-
-struct got_commit_object {
-	struct got_object_id *tree_id;
-	unsigned int nparents;
-	struct got_object_id_queue parent_ids;
-	char *author;
-	time_t author_time;	/* UTC */
-	time_t author_gmtoff;
-	char *committer;
-	time_t committer_time;	/* UTC */
-	time_t committer_gmtoff;
-	char *logmsg;
-
-	int refcnt; /* for internal use only */
-};
 
 /* A generic object. Used as a handle which holds an ID and an object type. */
 struct got_object;
@@ -148,6 +134,37 @@ const struct got_error *got_object_commit_open(struct got_commit_object **,
 
 /* Dispose of a commit object. */
 void got_object_commit_close(struct got_commit_object *);
+
+/* Obtain the ID of the tree created in a commit. */
+struct got_object_id *got_object_commit_get_tree_id(struct got_commit_object *);
+
+/* Obtain the number of parent commits of a commit. */
+int got_object_commit_get_nparents(struct got_commit_object *);
+
+/* Obtain the list of parent commits of a commit. */
+const struct got_object_id_queue *got_object_commit_get_parent_ids(
+    struct got_commit_object *);
+
+/* Get the author's name and email address. */
+const char *got_object_commit_get_author(struct got_commit_object *);
+
+/* Get an author's commit timestamp. */
+time_t got_object_commit_get_author_time(struct got_commit_object *);
+
+/* Get an author's timezone offset. */
+time_t got_object_commit_get_author_gmtoff(struct got_commit_object *);
+
+/* Get the committer's name and email address. */
+const char *got_object_commit_get_committer(struct got_commit_object *);
+
+/* Get an committer's commit timestamp. */
+time_t got_object_commit_get_committer_time(struct got_commit_object *);
+
+/* Get an committer's timezone offset. */
+time_t got_object_commit_get_committer_gmtoff(struct got_commit_object *);
+
+/* Get the commit log message. */
+const char *got_object_commit_get_logmsg(struct got_commit_object *);
 
 /*
  * Attempt to open a tree object in a repository.

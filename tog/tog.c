@@ -875,8 +875,10 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	static const size_t author_display_cols = 16;
 	const int avail = view->ncols;
 	struct tm tm;
+	time_t committer_time;
 
-	if (localtime_r(&commit->committer_time, &tm) == NULL)
+	committer_time = got_object_commit_get_committer_time(commit);
+	if (localtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno();
 	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &tm)
 	    >= sizeof(datebuf))
@@ -891,7 +893,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (col > avail)
 		goto done;
 
-	author0 = strdup(commit->author);
+	author0 = strdup(got_object_commit_get_author(commit));
 	if (author0 == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -919,7 +921,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (col > avail)
 		goto done;
 
-	logmsg0 = strdup(commit->logmsg);
+	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
 	if (logmsg0 == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -1231,7 +1233,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	parent_id = SIMPLEQ_FIRST(&commit->parent_ids);
+	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (parent_id) {
 		err = got_object_open(&obj1, repo, parent_id->id);
 		if (err)
@@ -1263,7 +1265,8 @@ browse_commit(struct tog_view **new_view, int begin_x,
 	struct got_tree_object *tree;
 	struct tog_view *tree_view;
 
-	err = got_object_open_as_tree(&tree, repo, entry->commit->tree_id);
+	err = got_object_open_as_tree(&tree, repo,
+	    got_object_commit_get_tree_id(entry->commit));
 	if (err)
 		return err;
 
@@ -1830,6 +1833,8 @@ write_commit_info(struct got_object *obj, struct got_repository *repo,
 	char *id_str;
 	char datebuf[26];
 	struct got_commit_object *commit = NULL;
+	time_t committer_time;
+	const char *author, *committer;
 
 	err = got_object_id_str(&id_str, got_object_get_id(obj));
 	if (err)
@@ -1841,21 +1846,26 @@ write_commit_info(struct got_object *obj, struct got_repository *repo,
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (fprintf(outfile, "from: %s\n", commit->author) < 0) {
+	if (fprintf(outfile, "from: %s\n",
+	    got_object_commit_get_author(commit)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
+	committer_time = got_object_commit_get_committer_time(commit);
 	if (fprintf(outfile, "date: %s UTC\n",
-	    get_datestr(&commit->committer_time, datebuf)) < 0) {
+	    get_datestr(&committer_time, datebuf)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (strcmp(commit->author, commit->committer) != 0 &&
-	    fprintf(outfile, "via: %s\n", commit->committer) < 0) {
+	author = got_object_commit_get_author(commit);
+	committer = got_object_commit_get_committer(commit);
+	if (strcmp(author, committer) != 0 &&
+	    fprintf(outfile, "via: %s\n", committer) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (fprintf(outfile, "%s\n", commit->logmsg) < 0) {
+	if (fprintf(outfile, "%s\n",
+	    got_object_commit_get_logmsg(commit)) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -1902,6 +1912,7 @@ create_diff(struct tog_diff_view_state *s)
 		    s->diff_context, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
+		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *pid;
 		struct got_commit_object *commit2;
 
@@ -1909,7 +1920,8 @@ create_diff(struct tog_diff_view_state *s)
 		if (err)
 			break;
 		/* Show commit info if we're diffing to a parent commit. */
-		SIMPLEQ_FOREACH(pid, &commit2->parent_ids, entry) {
+		parent_ids = got_object_commit_get_parent_ids(commit2);
+		SIMPLEQ_FOREACH(pid, parent_ids, entry) {
 			struct got_object_id *id1 = got_object_get_id(obj1);
 			if (got_object_id_cmp(id1, pid->id) == 0) {
 				write_commit_info(obj2, s->repo, f);
@@ -2400,7 +2412,7 @@ open_selected_commit(struct got_object **pobj, struct got_object **obj,
 	if (err)
 		goto done;
 
-	pid = SIMPLEQ_FIRST(&commit->parent_ids);
+	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (pid) {
 		err = got_object_open(pobj, repo, pid->id);
 		if (err)
@@ -3468,7 +3480,8 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_object_open_as_tree(&tree, repo, commit->tree_id);
+	error = got_object_open_as_tree(&tree, repo,
+	    got_object_commit_get_tree_id(commit));
 	if (error != NULL)
 		goto done;
 

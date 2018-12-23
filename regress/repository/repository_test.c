@@ -63,11 +63,13 @@ static const struct got_error *
 print_parent_commits(struct got_commit_object *commit,
     struct got_repository *repo)
 {
+	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid;
 	const struct got_error *err = NULL;
 	struct got_object *obj;
 
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+	parent_ids = got_object_commit_get_parent_ids(commit);
+	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
 		err = got_object_open(&obj, repo, qid->id);
 		if (err != NULL)
 			return err;
@@ -148,6 +150,7 @@ static const struct got_error *
 print_commit_object(struct got_object *obj, struct got_repository *repo)
 {
 	struct got_commit_object *commit;
+	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid;
 	char *buf;
 	const struct got_error *err;
@@ -157,24 +160,27 @@ print_commit_object(struct got_object *obj, struct got_repository *repo)
 	if (err)
 		return err;
 
-	err = got_object_id_str(&buf, commit->tree_id);
+	err = got_object_id_str(&buf, got_object_commit_get_tree_id(commit));
 	if (err)
 		return err;
 	test_printf("tree: %s\n", buf);
 	free(buf);
-	test_printf("parent%s: ", (commit->nparents == 1) ? "" : "s");
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+	test_printf("parent%s: ",
+	    (got_object_commit_get_nparents(commit) == 1) ? "" : "s");
+	parent_ids = got_object_commit_get_parent_ids(commit);
+	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
 		err = got_object_id_str(&buf, qid->id);
 		if (err)
 			return err;
 		test_printf("%s\n", buf);
 		free(buf);
 	}
-	test_printf("author: %s\n", commit->author);
-	test_printf("committer: %s\n", commit->committer);
-	test_printf("log: %s\n", commit->logmsg);
+	test_printf("author: %s\n", got_object_commit_get_author(commit));
+	test_printf("committer: %s\n", got_object_commit_get_committer(commit));
+	test_printf("log: %s\n", got_object_commit_get_logmsg(commit));
 
-	err = got_object_open(&treeobj, repo, commit->tree_id);
+	err = got_object_open(&treeobj, repo,
+	    got_object_commit_get_tree_id(commit));
 	if (err != NULL)
 		return err;
 	if (got_object_get_type(treeobj) == GOT_OBJ_TYPE_TREE) {
