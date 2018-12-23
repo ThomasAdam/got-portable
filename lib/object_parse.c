@@ -377,7 +377,6 @@ got_object_commit_close(struct got_commit_object *commit)
 	free(commit->author);
 	free(commit->committer);
 	free(commit->logmsg);
-	got_object_close(commit->obj);
 	free(commit);
 }
 

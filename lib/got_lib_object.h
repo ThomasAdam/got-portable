@@ -37,7 +37,6 @@ struct got_object {
 };
 
 struct got_commit_object {
-	struct got_object *obj;
 	struct got_object_id *tree_id;
 	unsigned int nparents;
 	struct got_object_id_queue parent_ids;

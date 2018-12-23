@@ -1171,25 +1171,6 @@ done:
 }
 
 static const struct got_error *
-receive_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
-{
-	const struct got_error *err = NULL;
-	struct got_object *obj;
-
-	err = got_privsep_recv_obj(&obj, ibuf);
-	if (err)
-		return err;
-
-	err = got_privsep_recv_commit(commit, ibuf);
-	if (err)
-		got_object_close(obj);
-	else
-		(*commit)->obj = obj; /* XXX should be embedded */
-
-	return err;
-}
-
-static const struct got_error *
 request_commit(struct got_commit_object **commit, struct got_repository *repo,
     int fd)
 {
@@ -1202,7 +1183,7 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
 	if (err)
 		return err;
 
-	return receive_commit(commit, ibuf);
+	return got_privsep_recv_commit(commit, ibuf);
 }
 
 static const struct got_error *
@@ -1216,7 +1197,7 @@ request_packed_commit(struct got_commit_object **commit, struct got_pack *pack,
 	if (err)
 		return err;
 
-	return receive_commit(commit, pack->privsep_child->ibuf);
+	return got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
 }
 
 const struct got_error *

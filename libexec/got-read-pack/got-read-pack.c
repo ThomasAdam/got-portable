@@ -149,18 +149,8 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (err) {
 		got_object_close(obj);
 		return err;
-	} else
-		commit->obj = obj; /* XXX should be embedded */
-
-	/* XXX This flushes the pipe, should only fill it instead. */
-	err = got_privsep_send_obj(ibuf, commit->obj);
-	if (err) {
-		got_object_commit_close(commit);
-		return err;
 	}
 
-	/* XXX Assumes full imsg buf size, should take obj into
-	 * account when above flush is removed. */
 	err = got_privsep_send_commit(ibuf, commit);
 	got_object_commit_close(commit);
 	if (err) {

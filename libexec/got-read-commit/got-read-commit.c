@@ -78,11 +78,7 @@ read_commit_object(struct got_commit_object **commit, FILE *f)
 	err = got_object_parse_commit(commit, p + obj->hdrlen, len);
 done:
 	free(p);
-	if (err)
-		got_object_close(obj);
-	else
-		(*commit)->obj = obj; /* XXX should be embedded in struct */
-
+	got_object_close(obj);
 	return err;
 }
 
@@ -146,13 +142,6 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
-		/* XXX This flushes the pipe, should only fill it instead. */
-		err = got_privsep_send_obj(&ibuf, commit->obj);
-		if (err)
-			goto done;
-
-		/* XXX Assumes full imsg buf size, should take obj into
-		 * account when above flush is removed. */
 		err = got_privsep_send_commit(&ibuf, commit);
 done:
 		if (f)
