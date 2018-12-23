@@ -142,6 +142,111 @@ got_object_qid_free(struct got_object_qid *qid)
 	free(qid);
 }
 
+const struct got_error *
+got_object_parse_header(struct got_object **obj, char *buf, size_t len)
+{
+	const char *obj_tags[] = {
+		GOT_OBJ_TAG_COMMIT,
+		GOT_OBJ_TAG_TREE,
+		GOT_OBJ_TAG_BLOB,
+		GOT_OBJ_TAG_TAG,
+	};
+	const int obj_types[] = {
+		GOT_OBJ_TYPE_COMMIT,
+		GOT_OBJ_TYPE_TREE,
+		GOT_OBJ_TYPE_BLOB,
+		GOT_OBJ_TYPE_TAG,
+	};
+	int type = 0;
+	size_t size = 0, hdrlen = 0;
+	int i;
+	char *p = strchr(buf, '\0');
+
+	*obj = NULL;
+
+	if (p == NULL)
+		return got_error(GOT_ERR_BAD_OBJ_HDR);
+
+	hdrlen = strlen(buf) + 1 /* '\0' */;
+
+	for (i = 0; i < nitems(obj_tags); i++) {
+		const char *tag = obj_tags[i];
+		size_t tlen = strlen(tag);
+		const char *errstr;
+
+		if (strncmp(buf, tag, tlen) != 0)
+			continue;
+
+		type = obj_types[i];
+		if (len <= tlen)
+			return got_error(GOT_ERR_BAD_OBJ_HDR);
+		size = strtonum(buf + tlen, 0, LONG_MAX, &errstr);
+		if (errstr != NULL)
+			return got_error(GOT_ERR_BAD_OBJ_HDR);
+		break;
+	}
+
+	if (type == 0)
+		return got_error(GOT_ERR_BAD_OBJ_HDR);
+
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL)
+		return got_error_from_errno();
+	(*obj)->type = type;
+	(*obj)->hdrlen = hdrlen;
+	(*obj)->size = size;
+	return NULL;
+}
+
+const struct got_error *
+got_object_read_header(struct got_object **obj, int fd)
+{
+	const struct got_error *err;
+	struct got_zstream_buf zb;
+	char *buf;
+	const size_t zbsize = 64;
+	size_t outlen, totlen;
+	int nbuf = 1;
+
+	*obj = NULL;
+
+	buf = malloc(zbsize);
+	if (buf == NULL)
+		return got_error_from_errno();
+
+	err = got_inflate_init(&zb, buf, zbsize);
+	if (err)
+		return err;
+
+	totlen = 0;
+	do {
+		err = got_inflate_read_fd(&zb, fd, &outlen);
+		if (err)
+			goto done;
+		if (outlen == 0)
+			break;
+		totlen += outlen;
+		if (strchr(zb.outbuf, '\0') == NULL) {
+			char *newbuf;
+			nbuf++;
+			newbuf = recallocarray(buf, nbuf - 1, nbuf, zbsize);
+			if (newbuf == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			buf = newbuf;
+			zb.outbuf = newbuf + totlen;
+			zb.outlen = (nbuf * zbsize) - totlen;
+		}
+	} while (strchr(zb.outbuf, '\0') == NULL);
+
+	err = got_object_parse_header(obj, buf, totlen);
+done:
+	free(buf);
+	got_inflate_end(&zb);
+	return err;
+}
+
 struct got_commit_object *
 got_object_commit_alloc_partial(void)
 {
@@ -272,6 +377,7 @@ got_object_commit_close(struct got_commit_object *commit)
 	free(commit->author);
 	free(commit->committer);
 	free(commit->logmsg);
+	got_object_close(commit->obj);
 	free(commit);
 }
 

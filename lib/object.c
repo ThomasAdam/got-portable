@@ -296,12 +296,15 @@ got_object_resolve_id_str(struct got_object_id **id,
 
 static const struct got_error *
 open_commit(struct got_commit_object **commit,
-    struct got_repository *repo, struct got_object *obj, int check_cache)
+    struct got_repository *repo, struct got_object_id *id, int check_cache)
 {
 	const struct got_error *err = NULL;
+	struct got_packidx *packidx = NULL;
+	int idx;
+	char *path_packfile;
 
 	if (check_cache) {
-		*commit = got_repo_get_cached_commit(repo, &obj->id);
+		*commit = got_repo_get_cached_commit(repo, id);
 		if (*commit != NULL) {
 			(*commit)->refcnt++;
 			return NULL;
@@ -309,31 +312,36 @@ open_commit(struct got_commit_object **commit,
 	} else
 		*commit = NULL;
 
-	if (obj->type != GOT_OBJ_TYPE_COMMIT)
-		return got_error(GOT_ERR_OBJ_TYPE);
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
+	if (err == NULL) {
+		struct got_pack *pack = NULL;
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		struct got_pack *pack;
-		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		err = get_packfile_path(&path_packfile, packidx);
+		if (err)
+			return err;
+
+		pack = got_repo_get_cached_pack(repo, path_packfile);
 		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo,
-			    obj->path_packfile, NULL);
+			err = got_repo_cache_pack(&pack, repo, path_packfile,
+			    packidx);
 			if (err)
 				return err;
 		}
-		err = got_object_read_packed_commit_privsep(commit, obj, pack);
-	} else {
+		err = got_object_read_packed_commit_privsep(commit, pack,
+		    packidx, idx, id);
+	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
-		err = open_loose_object(&fd, got_object_get_id(obj), repo);
+
+		err = open_loose_object(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_commit_privsep(commit, obj, fd, repo);
+		err = got_object_read_commit_privsep(commit, fd, repo);
 		close(fd);
 	}
 
 	if (err == NULL) {
 		(*commit)->refcnt++;
-		err = got_repo_cache_commit(repo, &obj->id, *commit);
+		err = got_repo_cache_commit(repo, id, *commit);
 	}
 
 	return err;
@@ -343,34 +351,20 @@ const struct got_error *
 got_object_open_as_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id)
 {
-	const struct got_error *err;
-	struct got_object *obj;
-
 	*commit = got_repo_get_cached_commit(repo, id);
 	if (*commit != NULL) {
 		(*commit)->refcnt++;
 		return NULL;
 	}
 
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = open_commit(commit, repo, obj, 0);
-done:
-	got_object_close(obj);
-	return err;
+	return open_commit(commit, repo, id, 0);
 }
 
 const struct got_error *
 got_object_commit_open(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object *obj)
 {
-	return open_commit(commit, repo, obj, 1);
+	return open_commit(commit, repo, got_object_get_id(obj), 1);
 }
 
 const struct got_error *
@@ -1177,44 +1171,133 @@ done:
 }
 
 static const struct got_error *
+receive_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj;
+
+	err = got_privsep_recv_obj(&obj, ibuf);
+	if (err)
+		return err;
+
+	err = got_privsep_recv_commit(commit, ibuf);
+	if (err)
+		got_object_close(obj);
+	else
+		(*commit)->obj = obj; /* XXX should be embedded */
+
+	return err;
+}
+
+static const struct got_error *
 request_commit(struct got_commit_object **commit, struct got_repository *repo,
-    struct got_object *obj, int fd)
+    int fd)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd, obj);
+	err = got_privsep_send_commit_req(ibuf, fd, NULL, -1);
 	if (err)
 		return err;
 
-	return got_privsep_recv_commit(commit, ibuf);
+	return receive_commit(commit, ibuf);
+}
+
+static const struct got_error *
+request_packed_commit(struct got_commit_object **commit, struct got_pack *pack,
+    int pack_idx, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+
+	err = got_privsep_send_commit_req(pack->privsep_child->ibuf, -1, id,
+	    pack_idx);
+	if (err)
+		return err;
+
+	return receive_commit(commit, pack->privsep_child->ibuf);
 }
 
 const struct got_error *
 got_object_read_packed_commit_privsep(struct got_commit_object **commit,
-    struct got_object *obj, struct got_pack *pack)
+    struct got_pack *pack, struct got_packidx *packidx, int idx,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
 
-	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
-	if (err)
+	if (pack->privsep_child)
+		return request_packed_commit(commit, pack, idx, id);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	pack->privsep_child = calloc(1, sizeof(*pack->privsep_child));
+	if (pack->privsep_child == NULL) {
+		err = got_error_from_errno();
+		free(ibuf);
 		return err;
+	}
 
-	return got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno();
+		goto done;
+	} else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
+		    pack->path_packfile);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	pack->privsep_child->imsg_fd = imsg_fds[0];
+	pack->privsep_child->pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	pack->privsep_child->ibuf = ibuf;
+
+	err = got_privsep_init_pack_child(ibuf, pack, packidx);
+	if (err) {
+		const struct got_error *child_err;
+		err = got_privsep_send_stop(pack->privsep_child->imsg_fd);
+		child_err = got_privsep_wait_for_child(
+		    pack->privsep_child->pid);
+		if (child_err && err == NULL)
+			err = child_err;
+		free(ibuf);
+		free(pack->privsep_child);
+		pack->privsep_child = NULL;
+		return err;
+	}
+
+done:
+	if (err) {
+		free(ibuf);
+		free(pack->privsep_child);
+		pack->privsep_child = NULL;
+	} else
+		err = request_packed_commit(commit, pack, idx, id);
+	return err;
 }
 
 const struct got_error *
 got_object_read_commit_privsep(struct got_commit_object **commit,
-    struct got_object *obj, int obj_fd, struct got_repository *repo)
+    int obj_fd, struct got_repository *repo)
 {
 	int imsg_fds[2];
 	pid_t pid;
 	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
-		return request_commit(commit, repo, obj, obj_fd);
+		return request_commit(commit, repo, obj_fd);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -1239,7 +1322,7 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
 
-	return request_commit(commit, repo, obj, obj_fd);
+	return request_commit(commit, repo, obj_fd);
 }
 
 static const struct got_error *

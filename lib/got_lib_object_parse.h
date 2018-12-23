@@ -22,8 +22,7 @@ const struct got_error *got_object_read_header_privsep(struct got_object**,
 const struct got_error *got_object_read_blob_privsep(size_t *, int, int,
     struct got_repository *repo);
 const struct got_error *got_object_read_commit_privsep(
-    struct got_commit_object **, struct got_object *, int,
-    struct got_repository *);
+    struct got_commit_object **, int, struct got_repository *);
 const struct got_error *got_object_read_tree_privsep(struct got_tree_object **,
     struct got_object *, int, struct got_repository *);
 const struct got_error *got_object_read_tag_privsep(struct got_tag_object **,
@@ -45,9 +44,12 @@ struct got_packidx;
 const struct got_error *got_object_packed_read_privsep(struct got_object **,
     struct got_repository *, struct got_pack *, struct got_packidx *, int,
     struct got_object_id *);
-const struct got_error *got_object_read_packed_commit_privsep(
-    struct got_commit_object **, struct got_object *, struct got_pack *);
+const struct got_error *
+got_object_read_packed_commit_privsep(struct got_commit_object **,
+    struct got_pack *, struct got_packidx *, int, struct got_object_id *);
 const struct got_error *got_object_read_packed_tree_privsep(
     struct got_tree_object **, struct got_object *, struct got_pack *);
 const struct got_error *got_object_read_packed_tag_privsep(
     struct got_tag_object **, struct got_object *, struct got_pack *);
+const struct got_error *got_object_parse_header(struct got_object **, char *, size_t);
+const struct got_error *got_object_read_header(struct got_object **, int);

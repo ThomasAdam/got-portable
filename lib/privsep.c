@@ -233,7 +233,7 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 			imsg_code = GOT_IMSG_TREE_REQUEST;
 			break;
 		case GOT_OBJ_TYPE_COMMIT:
-			imsg_code = GOT_IMSG_COMMIT_REQUEST;
+			abort(); /* should not get here */
 			break;
 		case GOT_OBJ_TYPE_BLOB:
 			imsg_code = GOT_IMSG_BLOB_REQUEST;
@@ -260,6 +260,30 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
 	}
 
 	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
+		return got_error_from_errno();
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
+    struct got_object_id *id, int pack_idx)
+{
+	struct got_imsg_packed_object iobj, *iobjp;
+	size_t len;
+
+	if (id) { /* commit is packed */
+		iobj.idx = pack_idx;
+		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+		iobjp = &iobj;
+		len = sizeof(iobj);
+	} else {
+		iobjp = NULL;
+		len = 0;
+	}
+
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_REQUEST, 0, 0, fd, iobjp, len)
+	    == -1)
 		return got_error_from_errno();
 
 	return flush_imsg(ibuf);

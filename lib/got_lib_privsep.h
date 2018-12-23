@@ -111,8 +111,7 @@ struct got_imsg_error {
 } __attribute__((__packed__));
 
 /*
- * Structure for GOT_IMSG_TREE_REQUEST, GOT_IMSG_COMMIT_REQUEST,
- * and GOT_IMSG_OBJECT data.
+ * Structure for GOT_IMSG_TREE_REQUEST and GOT_IMSG_OBJECT data.
  */
 struct got_imsg_object {
 	uint8_t id[SHA1_DIGEST_LENGTH];
@@ -219,6 +218,8 @@ const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
     struct got_object *);
+const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
+    struct got_object_id *, int);
 const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);

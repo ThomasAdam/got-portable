@@ -121,13 +121,21 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj = NULL;
+	struct got_imsg_packed_object iobj;
+	struct got_object *obj;
 	struct got_commit_object *commit = NULL;
 	uint8_t *buf;
 	size_t len;
+	struct got_object_id id;
+	size_t datalen;
 
-	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
-	    GOT_OBJ_TYPE_COMMIT);
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
 	if (err)
 		return err;
 
@@ -138,10 +146,22 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	obj->size = len;
 	err = got_object_parse_commit(&commit, buf, len);
 	free(buf);
-
-	err = got_privsep_send_commit(ibuf, commit);
-	if (obj)
+	if (err) {
 		got_object_close(obj);
+		return err;
+	} else
+		commit->obj = obj; /* XXX should be embedded */
+
+	/* XXX This flushes the pipe, should only fill it instead. */
+	err = got_privsep_send_obj(ibuf, commit->obj);
+	if (err) {
+		got_object_commit_close(commit);
+		return err;
+	}
+
+	/* XXX Assumes full imsg buf size, should take obj into
+	 * account when above flush is removed. */
+	err = got_privsep_send_commit(ibuf, commit);
 	got_object_commit_close(commit);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
