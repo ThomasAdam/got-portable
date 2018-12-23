@@ -14,5 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* Return a sanitized UTF-8 string which is safe to write to a terminal. */
 const struct got_error *got_mbsavis(char**, int *, const char *);
+
+/* Indicate whether the current locale supports UTF-8. */
 int got_locale_is_utf8(void);
