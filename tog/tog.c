@@ -1103,14 +1103,14 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		return got_error_from_errno();
 
 	if (path && strcmp(path, "/") != 0) {
-		if (asprintf(&header, "commit: %s %s%s",
+		if (asprintf(&header, "commit %s %s%s",
 		    id_str ? id_str : "........................................",
 		    path, ncommits_str) == -1) {
 			err = got_error_from_errno();
 			header = NULL;
 			goto done;
 		}
-	} else if (asprintf(&header, "commit: %s%s",
+	} else if (asprintf(&header, "commit %s%s",
 	    id_str ? id_str : "........................................",
 	    ncommits_str) == -1) {
 		err = got_error_from_errno();
@@ -1820,7 +1820,7 @@ write_commit_info(struct got_object_id *commit_id, struct got_repository *repo,
 		goto done;
 	}
 
-	if (fprintf(outfile, "commit: %s\n", id_str) < 0) {
+	if (fprintf(outfile, "commit %s\n", id_str) < 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
@@ -2180,7 +2180,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	rewind(f);
 	werase(view->window);
 
-	if (asprintf(&line, "commit: %s", id_str) == -1) {
+	if (asprintf(&line, "commit %s", id_str) == -1) {
 		err = got_error_from_errno();
 		free(id_str);
 		return err;
@@ -3129,7 +3129,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	if (err != NULL)
 		goto done;
 
-	if (asprintf(&s->tree_label, "commit: %s", commit_id_str) == -1) {
+	if (asprintf(&s->tree_label, "commit %s", commit_id_str) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
