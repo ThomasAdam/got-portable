@@ -1812,6 +1812,60 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 	return NULL;
 }
 
+static char *
+get_datestr(time_t *time, char *datebuf)
+{
+	char *p, *s = ctime_r(time, datebuf);
+	p = strchr(s, '\n');
+	if (p)
+		*p = '\0';
+	return s;
+}
+
+static const struct got_error *
+write_commit_info(struct got_object *obj, struct got_repository *repo,
+    FILE *outfile)
+{
+	const struct got_error *err = NULL;
+	char *id_str;
+	char datebuf[26];
+	struct got_commit_object *commit = NULL;
+
+	err = got_object_id_str(&id_str, got_object_get_id(obj));
+	if (err)
+		return err;
+
+	err = got_object_commit_open(&commit, repo, obj);
+
+	if (fprintf(outfile, "commit: %s\n", id_str) < 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (fprintf(outfile, "from: %s\n", commit->author) < 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (fprintf(outfile, "date: %s UTC\n",
+	    get_datestr(&commit->committer_time, datebuf)) < 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (strcmp(commit->author, commit->committer) != 0 &&
+	    fprintf(outfile, "via: %s\n", commit->committer) < 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (fprintf(outfile, "%s\n", commit->logmsg) < 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	free(id_str);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
 static const struct got_error *
 create_diff(struct tog_diff_view_state *s)
 {
@@ -1847,10 +1901,27 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_diff_objects_as_trees(obj1, obj2, "", "",
 		    s->diff_context, s->repo, f);
 		break;
-	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_COMMIT: {
+		struct got_object_qid *pid;
+		struct got_commit_object *commit2;
+
+		err = got_object_commit_open(&commit2, s->repo, obj2);
+		if (err)
+			break;
+		/* Show commit info if we're diffing to a parent commit. */
+		SIMPLEQ_FOREACH(pid, &commit2->parent_ids, entry) {
+			struct got_object_id *id1 = got_object_get_id(obj1);
+			if (got_object_id_cmp(id1, pid->id) == 0) {
+				write_commit_info(obj2, s->repo, f);
+				break;
+			}
+		}
+		got_object_commit_close(commit2);
+
 		err = got_diff_objects_as_commits(obj1, obj2, s->diff_context,
 		    s->repo, f);
 		break;
+	}
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		break;

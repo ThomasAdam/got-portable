@@ -587,16 +587,6 @@ done:
 	return err;
 }
 
-static char *
-get_datestr(time_t *time, char *datebuf)
-{
-	char *p, *s = ctime_r(time, datebuf);
-	p = strchr(s, '\n');
-	if (p)
-		*p = '\0';
-	return s;
-}
-
 const struct got_error *
 got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
     int diff_context, struct got_repository *repo, FILE *outfile)
@@ -604,8 +594,6 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	const struct got_error *err;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 	struct got_object *tree_obj1  = NULL, *tree_obj2 = NULL;
-	char *id_str;
-	char datebuf[26];
 
 	if (obj2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
@@ -625,33 +613,6 @@ got_diff_objects_as_commits(struct got_object *obj1, struct got_object *obj2,
 	err = got_object_open(&tree_obj2, repo, commit2->tree_id);
 	if (err)
 		goto done;
-	err = got_object_get_id_str(&id_str, obj2);
-	if (err)
-		goto done;
-	if (fprintf(outfile, "commit: %s\n", id_str) < 0) {
-		err = got_error_from_errno();
-		free(id_str);
-		goto done;
-	}
-	free(id_str);
-	if (fprintf(outfile, "from: %s\n", commit2->author) < 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (fprintf(outfile, "date: %s UTC\n",
-	    get_datestr(&commit2->committer_time, datebuf)) < 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (strcmp(commit2->author, commit2->committer) != 0 &&
-	    fprintf(outfile, "via: %s\n", commit2->committer) < 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (fprintf(outfile, "%s\n", commit2->logmsg) < 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
 
 	err = got_diff_objects_as_trees(tree_obj1, tree_obj2, "", "",
 	    diff_context, repo, outfile);
