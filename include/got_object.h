@@ -148,7 +148,7 @@ const struct got_object_id_queue *got_object_commit_get_parent_ids(
 /* Get the author's name and email address. */
 const char *got_object_commit_get_author(struct got_commit_object *);
 
-/* Get an author's commit timestamp. */
+/* Get an author's commit timestamp in UTC. */
 time_t got_object_commit_get_author_time(struct got_commit_object *);
 
 /* Get an author's timezone offset. */
@@ -157,7 +157,7 @@ time_t got_object_commit_get_author_gmtoff(struct got_commit_object *);
 /* Get the committer's name and email address. */
 const char *got_object_commit_get_committer(struct got_commit_object *);
 
-/* Get an committer's commit timestamp. */
+/* Get an committer's commit timestamp in UTC. */
 time_t got_object_commit_get_committer_time(struct got_commit_object *);
 
 /* Get an committer's timezone offset. */
