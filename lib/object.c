@@ -134,12 +134,13 @@ done:
 }
 
 static const struct got_error *
-open_loose_object(int *fd, struct got_object *obj, struct got_repository *repo)
+open_loose_object(int *fd, struct got_object_id *id,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
 
-	err = object_path(&path, &obj->id, repo);
+	err = object_path(&path, id, repo);
 	if (err)
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
@@ -323,7 +324,7 @@ open_commit(struct got_commit_object **commit,
 		err = got_object_read_packed_commit_privsep(commit, obj, pack);
 	} else {
 		int fd;
-		err = open_loose_object(&fd, obj, repo);
+		err = open_loose_object(&fd, got_object_get_id(obj), repo);
 		if (err)
 			return err;
 		err = got_object_read_commit_privsep(commit, obj, fd, repo);
@@ -422,7 +423,7 @@ open_tree(struct got_tree_object **tree,
 		err = got_object_read_packed_tree_privsep(tree, obj, pack);
 	} else {
 		int fd;
-		err = open_loose_object(&fd, obj, repo);
+		err = open_loose_object(&fd, got_object_get_id(obj), repo);
 		if (err)
 			return err;
 		err = got_object_read_tree_privsep(tree, obj, fd, repo);
@@ -577,7 +578,7 @@ got_object_blob_open(struct got_blob_object **blob,
 	} else {
 		int infd;
 
-		err = open_loose_object(&infd, obj, repo);
+		err = open_loose_object(&infd, got_object_get_id(obj), repo);
 		if (err)
 			goto done;
 
@@ -760,7 +761,7 @@ open_tag(struct got_tag_object **tag,
 		err = got_object_read_packed_tag_privsep(tag, obj, pack);
 	} else {
 		int fd;
-		err = open_loose_object(&fd, obj, repo);
+		err = open_loose_object(&fd, got_object_get_id(obj), repo);
 		if (err)
 			return err;
 		err = got_object_read_tag_privsep(tag, obj, fd, repo);
