@@ -104,7 +104,7 @@ static const struct got_error {
 	{ GOT_ERR_PRIVSEP_LEN,	"unexpected amount of data received in imsg" },
 	{ GOT_ERR_PRIVSEP_PIPE,	"privsep peer process closed pipe" },
 	{ GOT_ERR_PRIVSEP_NO_FD,"privsep file descriptor unavailable" },
-	{ GOT_ERR_PRIVSEP_MSG,	"unexpected message from unprivileged process" },
+	{ GOT_ERR_PRIVSEP_MSG,	"received unexpected privsep message" },
 	{ GOT_ERR_PRIVSEP_DIED,	"unprivileged process died unexpectedly" },
 	{ GOT_ERR_PRIVSEP_EXIT,	"bad exit code from unprivileged process" },
 	{ GOT_ERR_PACK_OFFSET,	"bad offset in pack file" },
