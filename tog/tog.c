@@ -2012,7 +2012,7 @@ show_diff_view(struct tog_view *view)
 	if (err)
 		return err;
 
-	if (asprintf(&header, "diff: %s %s",
+	if (asprintf(&header, "diff %s %s",
 	    id_str1 ? id_str1 : "/dev/null", id_str2) == -1) {
 		err = got_error_from_errno();
 		free(id_str1);
