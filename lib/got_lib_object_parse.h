@@ -41,15 +41,5 @@ void got_object_tree_entry_close(struct got_tree_entry *);
 struct got_pack;
 struct got_packidx;
 
-const struct got_error *got_object_packed_read_privsep(struct got_object **,
-    struct got_repository *, struct got_pack *, struct got_packidx *, int,
-    struct got_object_id *);
-const struct got_error *
-got_object_read_packed_commit_privsep(struct got_commit_object **,
-    struct got_pack *, struct got_packidx *, int, struct got_object_id *);
-const struct got_error *got_object_read_packed_tree_privsep(
-    struct got_tree_object **, struct got_object *, struct got_pack *);
-const struct got_error *got_object_read_packed_tag_privsep(
-    struct got_tag_object **, struct got_object *, struct got_pack *);
 const struct got_error *got_object_parse_header(struct got_object **, char *, size_t);
 const struct got_error *got_object_read_header(struct got_object **, int);
