@@ -102,7 +102,6 @@ got_object_resolve_id_str(struct got_object_id **, struct got_repository *,
 
 /*
  * Attempt to open a commit object in a repository.
- * The provided object must be of type GOT_OBJ_TYPE_COMMIT.
  * The caller must dispose of the commit with got_object_commit_close().
  */
 const struct got_error *
@@ -145,7 +144,6 @@ const char *got_object_commit_get_logmsg(struct got_commit_object *);
 
 /*
  * Attempt to open a tree object in a repository.
- * The provided object must be of type GOT_OBJ_TYPE_TREE.
  * The caller must dispose of the tree with got_object_tree_close().
  */
 const struct got_error *
@@ -170,7 +168,6 @@ const struct got_error *got_object_tree_path_changed(int *,
 
 /*
  * Attempt to open a blob object in a repository.
- * The provided object must be of type GOT_OBJ_TYPE_BLOB.
  * The size_t argument specifies the block size of an associated read buffer.
  * The caller must dispose of the blob with got_object_blob_close().
  */
@@ -214,7 +211,6 @@ const struct got_error *got_object_blob_dump_to_file(size_t *, int *,
 
 /*
  * Attempt to open a tag object in a repository.
- * The provided object must be of type GOT_OBJ_TYPE_TAG.
  * The caller must dispose of the tree with got_object_tag_close().
  */
 const struct got_error *got_object_open_as_tag(struct got_tag_object **,
