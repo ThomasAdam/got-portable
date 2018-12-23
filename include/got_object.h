@@ -182,14 +182,6 @@ got_object_open_as_blob(struct got_blob_object **,
 void got_object_blob_close(struct got_blob_object *);
 
 /*
- * Write the string representation of the object ID of a blob to a buffer.
- * The size_t argument speficies the size of the buffer. In the current
- * implementation, it must be at least SHA1_DIGEST_STRING_LENGTH bytes.
- * XXX This is a bad API, use got_object_id_str() instead.
- */
-char *got_object_blob_id_str(struct got_blob_object*, char *, size_t);
-
-/*
  * Get the length of header data at the beginning of the blob's read buffer.
  * Note that header data is only present upon the first invocation of
  * got_object_blob_read_block() after the blob is opened.
