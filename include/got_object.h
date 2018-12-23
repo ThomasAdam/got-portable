@@ -157,10 +157,10 @@ time_t got_object_commit_get_author_gmtoff(struct got_commit_object *);
 /* Get the committer's name and email address. */
 const char *got_object_commit_get_committer(struct got_commit_object *);
 
-/* Get an committer's commit timestamp in UTC. */
+/* Get a committer's commit timestamp in UTC. */
 time_t got_object_commit_get_committer_time(struct got_commit_object *);
 
-/* Get an committer's timezone offset. */
+/* Get a committer's timezone offset. */
 time_t got_object_commit_get_committer_gmtoff(struct got_commit_object *);
 
 /* Get the commit log message. */
