@@ -147,6 +147,11 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
+		if (size < obj->hdrlen) {
+			err = got_error(GOT_ERR_BAD_OBJ_HDR);
+			goto done;
+		}
+
 		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen);
 done:
 		if (f)
