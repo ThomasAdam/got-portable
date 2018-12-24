@@ -405,14 +405,14 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		if (len > 0) {
 			/* Skip blob object header first time around. */
 			ssize_t outlen = write(fd, buf + hdrlen, len - hdrlen);
-			hdrlen = 0;
 			if (outlen == -1) {
 				err = got_error_from_errno();
 				goto done;
-			} else if (outlen != len) {
+			} else if (outlen != len - hdrlen) {
 				err = got_error(GOT_ERR_IO);
 				goto done;
 			}
+			hdrlen = 0;
 		}
 	} while (len != 0);
 
