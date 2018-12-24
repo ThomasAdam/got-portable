@@ -440,7 +440,8 @@ got_object_commit_get_logmsg(struct got_commit_object *commit)
 }
 
 const struct got_error *
-got_object_parse_commit(struct got_commit_object **commit, char *buf, size_t len)
+got_object_parse_commit(struct got_commit_object **commit, char *buf,
+    size_t len)
 {
 	const struct got_error *err = NULL;
 	char *s = buf;
