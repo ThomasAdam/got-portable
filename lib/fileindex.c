@@ -265,3 +265,197 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 
 	return NULL;
 }
+
+static const struct got_error *
+read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
+{
+	uint8_t buf[sizeof(uint64_t)];
+	size_t n;
+
+	n = fread(buf, 1, sizeof(buf), infile);
+	if (n != sizeof(buf))
+		return got_ferror(infile, GOT_ERR_IO);
+	SHA1Update(ctx, buf, sizeof(buf));
+	memcpy(val, buf, sizeof(*val));
+	*val = htobe64(*val);
+	return NULL;
+}
+
+static const struct got_error *
+read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
+{
+	uint8_t buf[sizeof(uint32_t)];
+	size_t n;
+
+	n = fread(buf, 1, sizeof(buf), infile);
+	if (n != sizeof(buf))
+		return got_ferror(infile, GOT_ERR_IO);
+	SHA1Update(ctx, buf, sizeof(buf));
+	memcpy(val, buf, sizeof(*val));
+	*val = htobe32(*val);
+	return NULL;
+}
+
+static const struct got_error *
+read_fileindex_val16(uint16_t *val, SHA1_CTX *ctx, FILE *infile)
+{
+	uint8_t buf[sizeof(uint16_t)];
+	size_t n;
+
+	n = fread(buf, 1, sizeof(buf), infile);
+	if (n != sizeof(buf))
+		return got_ferror(infile, GOT_ERR_IO);
+	SHA1Update(ctx, buf, sizeof(buf));
+	memcpy(val, buf, sizeof(*val));
+	*val = htobe16(*val);
+	return NULL;
+}
+
+static const struct got_error *
+read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
+{
+	const struct got_error *err = NULL;
+	uint8_t buf[8];
+	size_t n, len = 0, totlen = sizeof(buf);
+
+	*path = malloc(totlen);
+	if (*path == NULL)
+		return got_error_from_errno();
+
+	do {
+		n = fread(buf, 1, sizeof(buf), infile);
+		if (n != sizeof(buf))
+			return got_ferror(infile, GOT_ERR_IO);
+		if (len + sizeof(buf) > totlen) {
+			char *p = reallocarray(*path, totlen + sizeof(buf), 1);
+			if (p == NULL) {
+				err = got_error_from_errno();
+				break;
+			}
+			totlen += sizeof(buf);
+			*path = p;
+		}
+		SHA1Update(ctx, buf, sizeof(buf));
+		memcpy(*path + len, buf, sizeof(buf));
+		len += sizeof(buf);
+	} while (strchr(buf, '\0') == NULL);
+
+	if (err) {
+		free(*path);
+		*path = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
+    FILE *infile)
+{
+	const struct got_error *err;
+	struct got_fileindex_entry *entry;
+	size_t n;
+
+	*entryp = NULL;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL)
+		return got_error_from_errno();
+
+	err = read_fileindex_val64(&entry->ctime_sec, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val64(&entry->ctime_nsec, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val64(&entry->mtime_sec, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val64(&entry->mtime_nsec, ctx, infile);
+	if (err)
+		goto done;
+
+	err = read_fileindex_val32(&entry->uid, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val32(&entry->gid, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val32(&entry->size, ctx, infile);
+	if (err)
+		goto done;
+
+	err = read_fileindex_val16(&entry->mode, ctx, infile);
+	if (err)
+		goto done;
+
+	n = fread(entry->blob_sha1, 1, SHA1_DIGEST_LENGTH, infile);
+	if (n != SHA1_DIGEST_LENGTH) {
+		err = got_ferror(infile, GOT_ERR_IO);
+		goto done;
+	}
+	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
+
+	err = read_fileindex_val32(&entry->flags, ctx, infile);
+	if (err)
+		goto done;
+
+	err = read_fileindex_path(&entry->path, ctx, infile);
+done:
+	if (err)
+		free(entry);
+	else
+		*entryp = entry;
+	return err;
+}
+
+const struct got_error *
+got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
+{
+	const struct got_error *err = NULL;
+	struct got_fileindex_hdr hdr;
+	SHA1_CTX ctx;
+	struct got_fileindex_entry *entry;
+	uint8_t sha1_expected[SHA1_DIGEST_LENGTH];
+	uint8_t sha1[SHA1_DIGEST_LENGTH];
+	size_t n;
+	const size_t len = sizeof(hdr.signature) + sizeof(hdr.version) +
+	    sizeof(hdr.nentries);
+	uint8_t buf[len];
+	int i;
+
+	SHA1Init(&ctx);
+
+	n = fread(buf, 1, len, infile);
+	if (n != len)
+		return got_ferror(infile, GOT_ERR_IO);
+
+	SHA1Update(&ctx, buf, len);
+
+	memcpy(&hdr, buf, len);
+	hdr.signature = htobe32(hdr.signature);
+	hdr.version = htobe32(hdr.version);
+	hdr.nentries = htobe32(hdr.nentries);
+
+	if (hdr.signature != GOT_FILE_INDEX_SIGNATURE)
+		return got_error(GOT_ERR_FILEIDX_SIG);
+	if (hdr.version != GOT_FILE_INDEX_VERSION)
+		return got_error(GOT_ERR_FILEIDX_VER);
+
+	for (i = 0; i < hdr.nentries; i++) {
+		err = read_fileindex_entry(&entry, &ctx, infile);
+		if (err)
+			return err;
+		err = got_fileindex_entry_add(fileindex, entry);
+		if (err)
+			return err;
+	}
+
+	n = fread(sha1_expected, 1, sizeof(sha1_expected), infile);
+	if (n != sizeof(sha1_expected))
+		return got_ferror(infile, GOT_ERR_IO);
+	SHA1Final(sha1, &ctx);
+	if (memcmp(sha1, sha1_expected, SHA1_DIGEST_LENGTH) != 0)
+		return got_error(GOT_ERR_FILEIDX_CSUM);
+
+	return NULL;
+}

@@ -90,3 +90,4 @@ void got_fileindex_close(struct got_fileindex *);
 const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
 const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
     struct got_fileindex_entry *);
+const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *);
