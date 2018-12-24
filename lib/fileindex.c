@@ -116,13 +116,11 @@ got_fileindex_free(struct got_fileindex *fileindex)
 static const struct got_error *
 write_fileindex_val64(SHA1_CTX *ctx, uint64_t val, FILE *outfile)
 {
-	uint8_t buf[sizeof(uint64_t)];
 	size_t n;
 
 	val = htobe64(val);
-	memcpy(buf, &val, sizeof(val));
-	SHA1Update(ctx, buf, sizeof(val));
-	n = fwrite(buf, 1, sizeof(val), outfile);
+	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
 	return NULL;
@@ -131,13 +129,11 @@ write_fileindex_val64(SHA1_CTX *ctx, uint64_t val, FILE *outfile)
 static const struct got_error *
 write_fileindex_val32(SHA1_CTX *ctx, uint32_t val, FILE *outfile)
 {
-	uint8_t buf[sizeof(uint32_t)];
 	size_t n;
 
 	val = htobe32(val);
-	memcpy(buf, &val, sizeof(val));
-	SHA1Update(ctx, buf, sizeof(val));
-	n = fwrite(buf, 1, sizeof(val), outfile);
+	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
 	return NULL;
@@ -146,13 +142,11 @@ write_fileindex_val32(SHA1_CTX *ctx, uint32_t val, FILE *outfile)
 static const struct got_error *
 write_fileindex_val16(SHA1_CTX *ctx, uint16_t val, FILE *outfile)
 {
-	uint8_t buf[sizeof(uint16_t)];
 	size_t n;
 
 	val = htobe16(val);
-	memcpy(buf, &val, sizeof(val));
-	SHA1Update(ctx, buf, sizeof(val));
-	n = fwrite(buf, 1, sizeof(val), outfile);
+	SHA1Update(ctx, (uint8_t *)&val, sizeof(val));
+	n = fwrite(&val, 1, sizeof(val), outfile);
 	if (n != sizeof(val))
 		return got_ferror(outfile, GOT_ERR_IO);
 	return NULL;
@@ -269,14 +263,12 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 static const struct got_error *
 read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
 {
-	uint8_t buf[sizeof(uint64_t)];
 	size_t n;
 
-	n = fread(buf, 1, sizeof(buf), infile);
-	if (n != sizeof(buf))
+	n = fread(val, 1, sizeof(*val), infile);
+	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_IO);
-	SHA1Update(ctx, buf, sizeof(buf));
-	memcpy(val, buf, sizeof(*val));
+	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be64toh(*val);
 	return NULL;
 }
@@ -284,14 +276,12 @@ read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
 static const struct got_error *
 read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
 {
-	uint8_t buf[sizeof(uint32_t)];
 	size_t n;
 
-	n = fread(buf, 1, sizeof(buf), infile);
-	if (n != sizeof(buf))
+	n = fread(val, 1, sizeof(*val), infile);
+	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_IO);
-	SHA1Update(ctx, buf, sizeof(buf));
-	memcpy(val, buf, sizeof(*val));
+	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be32toh(*val);
 	return NULL;
 }
@@ -299,14 +289,12 @@ read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
 static const struct got_error *
 read_fileindex_val16(uint16_t *val, SHA1_CTX *ctx, FILE *infile)
 {
-	uint8_t buf[sizeof(uint16_t)];
 	size_t n;
 
-	n = fread(buf, 1, sizeof(buf), infile);
-	if (n != sizeof(buf))
+	n = fread(val, 1, sizeof(*val), infile);
+	if (n != sizeof(*val))
 		return got_ferror(infile, GOT_ERR_IO);
-	SHA1Update(ctx, buf, sizeof(buf));
-	memcpy(val, buf, sizeof(*val));
+	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be16toh(*val);
 	return NULL;
 }
