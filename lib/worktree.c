@@ -592,7 +592,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *findex = NULL;
+	FILE *new_index = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -611,7 +611,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_opentemp_named(&new_fileindex_path, &findex, fileindex_path);
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
 	if (err)
 		goto done;
 
@@ -651,7 +652,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_fileindex_write(fileindex, findex);
+	err = got_fileindex_write(fileindex, new_index);
 	if (err)
 		goto done;
 
@@ -673,8 +674,8 @@ done:
 	free(commit_id);
 	if (new_fileindex_path)
 		unlink(new_fileindex_path);
-	if (findex)
-		fclose(findex);
+	if (new_index)
+		fclose(new_index);
 	free(new_fileindex_path);
 	free(fileindex_path);
 	got_fileindex_close(fileindex);
