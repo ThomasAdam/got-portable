@@ -168,13 +168,21 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
+	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
 	struct got_tree_object *tree = NULL;
 	uint8_t *buf;
 	size_t len;
+	struct got_object_id id;
+	size_t datalen;
 
-	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
-	    GOT_OBJ_TYPE_TREE);
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
 	if (err)
 		return err;
 

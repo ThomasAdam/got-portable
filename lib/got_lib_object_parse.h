@@ -24,7 +24,7 @@ const struct got_error *got_object_read_blob_privsep(size_t *, int, int,
 const struct got_error *got_object_read_commit_privsep(
     struct got_commit_object **, int, struct got_repository *);
 const struct got_error *got_object_read_tree_privsep(struct got_tree_object **,
-    struct got_object *, int, struct got_repository *);
+    int, struct got_repository *);
 const struct got_error *got_object_read_tag_privsep(struct got_tag_object **,
     struct got_object *, int, struct got_repository *);
 

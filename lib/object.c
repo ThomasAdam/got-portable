@@ -543,12 +543,13 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 }
 
 static const struct got_error *
-read_packed_tree_privsep(struct got_tree_object **tree,
-    struct got_object *obj, struct got_pack *pack)
+request_packed_tree(struct got_tree_object **tree, struct got_pack *pack,
+    int pack_idx, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 
-	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	err = got_privsep_send_tree_req(pack->privsep_child->ibuf, -1, id,
+	    pack_idx);
 	if (err)
 		return err;
 
@@ -556,13 +557,33 @@ read_packed_tree_privsep(struct got_tree_object **tree,
 }
 
 static const struct got_error *
-open_tree(struct got_tree_object **tree,
-    struct got_repository *repo, struct got_object *obj, int check_cache)
+read_packed_tree_privsep(struct got_tree_object **tree,
+    struct got_pack *pack, struct got_packidx *packidx, int idx,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 
+	if (pack->privsep_child)
+		return request_packed_tree(tree, pack, idx, id);
+
+	err = start_pack_privsep_child(pack, packidx);
+	if (err)
+		return err;
+
+	return request_packed_tree(tree, pack, idx, id);
+}
+
+static const struct got_error *
+open_tree(struct got_tree_object **tree, struct got_repository *repo,
+    struct got_object_id *id, int check_cache)
+{
+	const struct got_error *err = NULL;
+	struct got_packidx *packidx = NULL;
+	int idx;
+	char *path_packfile;
+
 	if (check_cache) {
-		*tree = got_repo_get_cached_tree(repo, &obj->id);
+		*tree = got_repo_get_cached_tree(repo, id);
 		if (*tree != NULL) {
 			(*tree)->refcnt++;
 			return NULL;
@@ -570,31 +591,36 @@ open_tree(struct got_tree_object **tree,
 	} else
 		*tree = NULL;
 
-	if (obj->type != GOT_OBJ_TYPE_TREE)
-		return got_error(GOT_ERR_OBJ_TYPE);
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
+	if (err == NULL) {
+		struct got_pack *pack = NULL;
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		struct got_pack *pack;
-		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+		err = get_packfile_path(&path_packfile, packidx);
+		if (err)
+			return err;
+
+		pack = got_repo_get_cached_pack(repo, path_packfile);
 		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo,
-			    obj->path_packfile, NULL);
+			err = got_repo_cache_pack(&pack, repo, path_packfile,
+			    packidx);
 			if (err)
 				return err;
 		}
-		err = read_packed_tree_privsep(tree, obj, pack);
-	} else {
+		err = read_packed_tree_privsep(tree, pack,
+		    packidx, idx, id);
+	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
-		err = open_loose_object(&fd, got_object_get_id(obj), repo);
+
+		err = open_loose_object(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_tree_privsep(tree, obj, fd, repo);
+		err = got_object_read_tree_privsep(tree, fd, repo);
 		close(fd);
 	}
 
 	if (err == NULL) {
 		(*tree)->refcnt++;
-		err = got_repo_cache_tree(repo, &obj->id, *tree);
+		err = got_repo_cache_tree(repo, id, *tree);
 	}
 
 	return err;
@@ -604,34 +630,20 @@ const struct got_error *
 got_object_open_as_tree(struct got_tree_object **tree,
     struct got_repository *repo, struct got_object_id *id)
 {
-	const struct got_error *err;
-	struct got_object *obj;
-
 	*tree = got_repo_get_cached_tree(repo, id);
 	if (*tree != NULL) {
 		(*tree)->refcnt++;
 		return NULL;
 	}
 
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (obj->type != GOT_OBJ_TYPE_TREE) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = open_tree(tree, repo, obj, 0);
-done:
-	got_object_close(obj);
-	return err;
+	return open_tree(tree, repo, id, 0);
 }
 
 const struct got_error *
 got_object_tree_open(struct got_tree_object **tree,
     struct got_repository *repo, struct got_object *obj)
 {
-	return open_tree(tree, repo, obj, 1);
+	return open_tree(tree, repo, got_object_get_id(obj), 1);
 }
 
 const struct got_tree_entries *
@@ -1290,14 +1302,14 @@ got_object_read_commit_privsep(struct got_commit_object **commit,
 
 static const struct got_error *
 request_tree(struct got_tree_object **tree, struct got_repository *repo,
-    struct got_object *obj, int fd)
+    int fd)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd, obj);
+	err = got_privsep_send_tree_req(ibuf, fd, NULL, -1);
 	if (err)
 		return err;
 
@@ -1306,14 +1318,14 @@ request_tree(struct got_tree_object **tree, struct got_repository *repo,
 
 const struct got_error *
 got_object_read_tree_privsep(struct got_tree_object **tree,
-    struct got_object *obj, int obj_fd, struct got_repository *repo)
+    int obj_fd, struct got_repository *repo)
 {
 	int imsg_fds[2];
 	pid_t pid;
 	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd != -1)
-		return request_tree(tree, repo, obj, obj_fd);
+		return request_tree(tree, repo, obj_fd);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -1340,7 +1352,7 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf = ibuf;
 
 
-	return request_tree(tree, repo, obj, obj_fd);
+	return request_tree(tree, repo, obj_fd);
 }
 
 static const struct got_error *

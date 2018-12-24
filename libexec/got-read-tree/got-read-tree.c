@@ -47,16 +47,18 @@ catch_sigint(int signo)
 	sigint_received = 1;
 }
 static const struct got_error *
-read_tree_object(struct got_tree_object **tree, struct got_object *obj, FILE *f)
+read_tree_object(struct got_tree_object **tree, FILE *f)
 {
 	const struct got_error *err = NULL;
+	struct got_object *obj;
 	size_t len;
 	uint8_t *p;
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		err = got_read_file_to_mem(&p, &len, f);
-	else
-		err = got_inflate_to_mem(&p, &len, f);
+	err = got_inflate_to_mem(&p, &len, f);
+	if (err)
+		return err;
+
+	err = got_object_parse_header(&obj, p, len);
 	if (err)
 		return err;
 
@@ -68,8 +70,9 @@ read_tree_object(struct got_tree_object **tree, struct got_object *obj, FILE *f)
 	/* Skip object header. */
 	len -= obj->hdrlen;
 	err = got_object_parse_tree(tree, p + obj->hdrlen, len);
-	free(p);
 done:
+	free(p);
+	got_object_close(obj);
 	return err;
 }
 
@@ -77,9 +80,7 @@ int
 main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
-	struct got_tree_object *tree = NULL;
 	struct imsgbuf ibuf;
-	size_t datalen;
 
 	signal(SIGINT, catch_sigint);
 
@@ -96,9 +97,8 @@ main(int argc, char *argv[])
 
 	while (1) {
 		struct imsg imsg;
-		struct got_imsg_object iobj;
 		FILE *f = NULL;
-		struct got_object *obj = NULL;
+		struct got_tree_object *tree = NULL;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -120,31 +120,10 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-		if (datalen != sizeof(iobj)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
-
-		memcpy(&iobj, imsg.data, sizeof(iobj));
-		if (iobj.type != GOT_OBJ_TYPE_TREE) {
-			err = got_error(GOT_ERR_OBJ_TYPE);
-			goto done;
-		}
-
 		if (imsg.fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
 		}
-
-		obj = calloc(1, sizeof(*obj));
-		if (obj == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
-		obj->type = iobj.type;
-		obj->hdrlen = iobj.hdrlen;
-		obj->size = iobj.size;
 
 		/* Always assume file offset zero. */
 		f = fdopen(imsg.fd, "rb");
@@ -153,7 +132,7 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		err = read_tree_object(&tree, obj, f);
+		err = read_tree_object(&tree, f);
 		if (err)
 			goto done;
 
@@ -164,8 +143,6 @@ done:
 		else if (imsg.fd != -1)
 			close(imsg.fd);
 		imsg_free(&imsg);
-		if (obj)
-			got_object_close(obj);
 		if (err)
 			break;
 	}
