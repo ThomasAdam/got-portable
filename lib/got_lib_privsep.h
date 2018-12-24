@@ -217,8 +217,7 @@ const struct got_error *got_privsep_send_stop(int);
 const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
     size_t);
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
-const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
-    struct got_object *);
+const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
     struct got_object_id *, int);
 const struct got_error *got_privsep_send_tree_req(struct imsgbuf *, int,

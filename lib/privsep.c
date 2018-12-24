@@ -221,45 +221,10 @@ got_privsep_send_stop(int fd)
 }
 
 const struct got_error *
-got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd, struct got_object *obj)
+got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
 {
-	struct got_imsg_object iobj, *iobjp = NULL;
-	size_t iobj_size = 0;
-	int imsg_code = GOT_IMSG_OBJECT_REQUEST;
-
-	if (obj) {
-		switch (obj->type) {
-		case GOT_OBJ_TYPE_TREE:
-			imsg_code = GOT_IMSG_TREE_REQUEST;
-			break;
-		case GOT_OBJ_TYPE_COMMIT:
-			abort(); /* should not get here */
-			break;
-		case GOT_OBJ_TYPE_BLOB:
-			imsg_code = GOT_IMSG_BLOB_REQUEST;
-			break;
-		case GOT_OBJ_TYPE_TAG:
-			imsg_code = GOT_IMSG_TAG_REQUEST;
-			break;
-		default:
-			return got_error(GOT_ERR_OBJ_TYPE);
-		}
-
-		memcpy(iobj.id, obj->id.sha1, sizeof(iobj.id));
-		iobj.type = obj->type;
-		iobj.flags = obj->flags;
-		iobj.hdrlen = obj->hdrlen;
-		iobj.size = obj->size;
-		if (iobj.flags & GOT_OBJ_FLAG_PACKED) {
-			iobj.pack_offset = obj->pack_offset;
-			iobj.pack_idx = obj->pack_idx;
-		}
-
-		iobjp = &iobj;
-		iobj_size = sizeof(iobj);
-	}
-
-	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, iobjp, iobj_size) == -1)
+	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
+	    == -1)
 		return got_error_from_errno();
 
 	return flush_imsg(ibuf);

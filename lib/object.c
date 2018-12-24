@@ -345,7 +345,7 @@ request_object(struct got_object **obj, struct got_repository *repo, int fd)
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd, NULL);
+	err = got_privsep_send_obj_req(ibuf, fd);
 	if (err)
 		return err;
 
