@@ -277,7 +277,7 @@ read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
 		return got_ferror(infile, GOT_ERR_IO);
 	SHA1Update(ctx, buf, sizeof(buf));
 	memcpy(val, buf, sizeof(*val));
-	*val = htobe64(*val);
+	*val = be64toh(*val);
 	return NULL;
 }
 
@@ -292,7 +292,7 @@ read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
 		return got_ferror(infile, GOT_ERR_IO);
 	SHA1Update(ctx, buf, sizeof(buf));
 	memcpy(val, buf, sizeof(*val));
-	*val = htobe32(*val);
+	*val = be32toh(*val);
 	return NULL;
 }
 
@@ -307,7 +307,7 @@ read_fileindex_val16(uint16_t *val, SHA1_CTX *ctx, FILE *infile)
 		return got_ferror(infile, GOT_ERR_IO);
 	SHA1Update(ctx, buf, sizeof(buf));
 	memcpy(val, buf, sizeof(*val));
-	*val = htobe16(*val);
+	*val = be16toh(*val);
 	return NULL;
 }
 
@@ -432,9 +432,9 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	SHA1Update(&ctx, buf, len);
 
 	memcpy(&hdr, buf, len);
-	hdr.signature = htobe32(hdr.signature);
-	hdr.version = htobe32(hdr.version);
-	hdr.nentries = htobe32(hdr.nentries);
+	hdr.signature = be32toh(hdr.signature);
+	hdr.version = be32toh(hdr.version);
+	hdr.nentries = be32toh(hdr.nentries);
 
 	if (hdr.signature != GOT_FILE_INDEX_SIGNATURE)
 		return got_error(GOT_ERR_FILEIDX_SIG);
