@@ -478,7 +478,8 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 		return got_error_from_errno();
 
 	icommit = (struct got_imsg_commit_object *)buf;
-	memcpy(icommit->tree_id, commit->tree_id->sha1, sizeof(icommit->tree_id));
+	memcpy(icommit->tree_id, commit->tree_id->sha1,
+	    sizeof(icommit->tree_id));
 	icommit->author_len = author_len;
 	icommit->author_time = commit->author_time;
 	icommit->author_gmtoff = commit->author_gmtoff;
