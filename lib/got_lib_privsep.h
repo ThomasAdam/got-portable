@@ -222,6 +222,8 @@ const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
     struct got_object_id *, int);
 const struct got_error *got_privsep_send_tree_req(struct imsgbuf *, int,
     struct got_object_id *, int);
+const struct got_error *got_privsep_send_tag_req(struct imsgbuf *, int,
+    struct got_object_id *, int);
 const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
