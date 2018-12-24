@@ -408,10 +408,10 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			hdrlen = 0;
 			if (outlen == -1) {
 				err = got_error_from_errno();
-				break;
+				goto done;
 			} else if (outlen != len) {
 				err = got_error(GOT_ERR_IO);
-				break;
+				goto done;
 			}
 		}
 	} while (len != 0);
