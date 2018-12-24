@@ -337,6 +337,59 @@ done:
 	return err;
 }
 
+static const struct got_error *
+request_object(struct got_object **obj, struct got_repository *repo, int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
+
+	err = got_privsep_send_obj_req(ibuf, fd, NULL);
+	if (err)
+		return err;
+
+	return got_privsep_recv_obj(obj, ibuf);
+}
+
+static const struct got_error *
+read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
+    int obj_fd)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
+		return request_object(obj, repo, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf = ibuf;
+
+	return request_object(obj, repo, obj_fd);
+}
+
+
 const struct got_error *
 got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
@@ -371,7 +424,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 			err = got_error_from_errno();
 		goto done;
 	} else {
-		err = got_object_read_header_privsep(obj, repo, fd);
+		err = read_object_header_privsep(obj, repo, fd);
 		if (err)
 			goto done;
 		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
@@ -450,6 +503,60 @@ read_packed_commit_privsep(struct got_commit_object **commit,
 }
 
 static const struct got_error *
+request_commit(struct got_commit_object **commit, struct got_repository *repo,
+    int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
+
+	err = got_privsep_send_commit_req(ibuf, fd, NULL, -1);
+	if (err)
+		return err;
+
+	return got_privsep_recv_commit(commit, ibuf);
+}
+
+static const struct got_error *
+read_commit_privsep(struct got_commit_object **commit, int obj_fd,
+    struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
+		return request_commit(commit, repo, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
+
+	return request_commit(commit, repo, obj_fd);
+}
+
+
+static const struct got_error *
 open_commit(struct got_commit_object **commit,
     struct got_repository *repo, struct got_object_id *id, int check_cache)
 {
@@ -490,7 +597,7 @@ open_commit(struct got_commit_object **commit,
 		err = open_loose_object(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_commit_privsep(commit, fd, repo);
+		err = read_commit_privsep(commit, fd, repo);
 		close(fd);
 	}
 
@@ -574,6 +681,61 @@ read_packed_tree_privsep(struct got_tree_object **tree,
 }
 
 static const struct got_error *
+request_tree(struct got_tree_object **tree, struct got_repository *repo,
+    int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
+
+	err = got_privsep_send_tree_req(ibuf, fd, NULL, -1);
+	if (err)
+		return err;
+
+	return got_privsep_recv_tree(tree, ibuf);
+}
+
+const struct got_error *
+read_tree_privsep(struct got_tree_object **tree, int obj_fd,
+    struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd != -1)
+		return request_tree(tree, repo, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf = ibuf;
+
+
+	return request_tree(tree, repo, obj_fd);
+}
+
+static const struct got_error *
 open_tree(struct got_tree_object **tree, struct got_repository *repo,
     struct got_object_id *id, int check_cache)
 {
@@ -614,7 +776,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 		err = open_loose_object(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_tree_privsep(tree, fd, repo);
+		err = read_tree_privsep(tree, fd, repo);
 		close(fd);
 	}
 
@@ -727,6 +889,76 @@ read_packed_blob_privsep(size_t *size, size_t *hdrlen, int outfd,
 }
 
 static const struct got_error *
+request_blob(size_t *size, size_t *hdrlen, int outfd, int infd,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	int outfd_child;
+
+	outfd_child = dup(outfd);
+	if (outfd_child == -1)
+		return got_error_from_errno();
+
+	err = got_privsep_send_blob_req(ibuf, infd, NULL, -1);
+	if (err)
+		return err;
+
+	err = got_privsep_send_blob_outfd(ibuf, outfd_child);
+	if (err) {
+		close(outfd_child);
+		return err;
+	}
+
+	err = got_privsep_recv_blob(size, hdrlen, ibuf);
+	if (err)
+		return err;
+
+	if (lseek(outfd, SEEK_SET, 0) == -1)
+		return got_error_from_errno();
+
+	return err;
+}
+
+static const struct got_error *
+read_blob_privsep(size_t *size, size_t *hdrlen,
+    int outfd, int infd, struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1) {
+		ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
+		return request_blob(size, hdrlen, outfd, infd, ibuf);
+	}
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
+
+	return request_blob(size, hdrlen, outfd, infd, ibuf);
+}
+
+static const struct got_error *
 open_blob(struct got_blob_object **blob, struct got_repository *repo,
     struct got_object_id *id, size_t blocksize)
 {
@@ -775,8 +1007,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		err = open_loose_object(&infd, id, repo);
 		if (err)
 			goto done;
-		err = got_object_read_blob_privsep(&size, &hdrlen, outfd,
-		    infd, repo);
+		err = read_blob_privsep(&size, &hdrlen, outfd, infd, repo);
 		close(infd);
 	}
 	if (err)
@@ -947,6 +1178,58 @@ read_packed_tag_privsep(struct got_tag_object **tag,
 	return request_packed_tag(tag, pack, idx, id);
 }
 
+static const struct got_error *
+request_tag(struct got_tag_object **tag, struct got_repository *repo,
+    int fd)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf;
+
+	err = got_privsep_send_tag_req(ibuf, fd, NULL, -1);
+	if (err)
+		return err;
+
+	return got_privsep_recv_tag(tag, ibuf);
+}
+
+static const struct got_error *
+read_tag_privsep(struct got_tag_object **tag, int obj_fd,
+    struct got_repository *repo)
+{
+	int imsg_fds[2];
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd != -1)
+		return request_tag(tag, repo, obj_fd);
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL)
+		return got_error_from_errno();
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
+		return got_error_from_errno();
+
+	pid = fork();
+	if (pid == -1)
+		return got_error_from_errno();
+	else if (pid == 0) {
+		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
+		    repo->path);
+		/* not reached */
+	}
+
+	close(imsg_fds[1]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd =
+	    imsg_fds[0];
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].pid = pid;
+	imsg_init(ibuf, imsg_fds[0]);
+	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf = ibuf;
+
+	return request_tag(tag, repo, obj_fd);
+}
 
 static const struct got_error *
 open_tag(struct got_tag_object **tag, struct got_repository *repo,
@@ -989,7 +1272,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		err = open_loose_object(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_tag_privsep(tag, fd, repo);
+		err = read_tag_privsep(tag, fd, repo);
 		close(fd);
 	}
 
@@ -1216,287 +1499,4 @@ done:
 	if (tree2 && tree2 != tree02)
 		got_object_tree_close(tree2);
 	return err;
-}
-
-static const struct got_error *
-request_object(struct got_object **obj, struct got_repository *repo, int fd)
-{
-	const struct got_error *err = NULL;
-	struct imsgbuf *ibuf;
-
-	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
-
-	err = got_privsep_send_obj_req(ibuf, fd, NULL);
-	if (err)
-		return err;
-
-	return got_privsep_recv_obj(obj, ibuf);
-}
-
-const struct got_error *
-got_object_read_header_privsep(struct got_object **obj,
-    struct got_repository *repo, int obj_fd)
-{
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
-		return request_object(obj, repo, obj_fd);
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno();
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno();
-	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
-		    repo->path);
-		/* not reached */
-	}
-
-	close(imsg_fds[1]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd =
-	    imsg_fds[0];
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf = ibuf;
-
-	return request_object(obj, repo, obj_fd);
-}
-
-static const struct got_error *
-request_commit(struct got_commit_object **commit, struct got_repository *repo,
-    int fd)
-{
-	const struct got_error *err = NULL;
-	struct imsgbuf *ibuf;
-
-	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
-
-	err = got_privsep_send_commit_req(ibuf, fd, NULL, -1);
-	if (err)
-		return err;
-
-	return got_privsep_recv_commit(commit, ibuf);
-}
-
-const struct got_error *
-got_object_read_commit_privsep(struct got_commit_object **commit,
-    int obj_fd, struct got_repository *repo)
-{
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
-		return request_commit(commit, repo, obj_fd);
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno();
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno();
-	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
-		    repo->path);
-		/* not reached */
-	}
-
-	close(imsg_fds[1]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd =
-	    imsg_fds[0];
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
-
-	return request_commit(commit, repo, obj_fd);
-}
-
-static const struct got_error *
-request_tree(struct got_tree_object **tree, struct got_repository *repo,
-    int fd)
-{
-	const struct got_error *err = NULL;
-	struct imsgbuf *ibuf;
-
-	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
-
-	err = got_privsep_send_tree_req(ibuf, fd, NULL, -1);
-	if (err)
-		return err;
-
-	return got_privsep_recv_tree(tree, ibuf);
-}
-
-const struct got_error *
-got_object_read_tree_privsep(struct got_tree_object **tree,
-    int obj_fd, struct got_repository *repo)
-{
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd != -1)
-		return request_tree(tree, repo, obj_fd);
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno();
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno();
-	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
-		    repo->path);
-		/* not reached */
-	}
-
-	close(imsg_fds[1]);
-
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd =
-	    imsg_fds[0];
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf = ibuf;
-
-
-	return request_tree(tree, repo, obj_fd);
-}
-
-static const struct got_error *
-request_blob(size_t *size, size_t *hdrlen, int outfd, int infd,
-    struct imsgbuf *ibuf)
-{
-	const struct got_error *err = NULL;
-	int outfd_child;
-
-	outfd_child = dup(outfd);
-	if (outfd_child == -1)
-		return got_error_from_errno();
-
-	err = got_privsep_send_blob_req(ibuf, infd, NULL, -1);
-	if (err)
-		return err;
-
-	err = got_privsep_send_blob_outfd(ibuf, outfd_child);
-	if (err) {
-		close(outfd_child);
-		return err;
-	}
-
-	err = got_privsep_recv_blob(size, hdrlen, ibuf);
-	if (err)
-		return err;
-
-	if (lseek(outfd, SEEK_SET, 0) == -1)
-		return got_error_from_errno();
-
-	return err;
-}
-
-const struct got_error *
-got_object_read_blob_privsep(size_t *size, size_t *hdrlen,
-    int outfd, int infd, struct got_repository *repo)
-{
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1) {
-		ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
-		return request_blob(size, hdrlen, outfd, infd, ibuf);
-	}
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno();
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno();
-	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
-		    repo->path);
-		/* not reached */
-	}
-
-	close(imsg_fds[1]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd =
-	    imsg_fds[0];
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
-
-	return request_blob(size, hdrlen, outfd, infd, ibuf);
-}
-
-static const struct got_error *
-request_tag(struct got_tag_object **tag, struct got_repository *repo,
-    int fd)
-{
-	const struct got_error *err = NULL;
-	struct imsgbuf *ibuf;
-
-	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf;
-
-	err = got_privsep_send_tag_req(ibuf, fd, NULL, -1);
-	if (err)
-		return err;
-
-	return got_privsep_recv_tag(tag, ibuf);
-}
-
-const struct got_error *
-got_object_read_tag_privsep(struct got_tag_object **tag,
-    int obj_fd, struct got_repository *repo)
-{
-	int imsg_fds[2];
-	pid_t pid;
-	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd != -1)
-		return request_tag(tag, repo, obj_fd);
-
-	ibuf = calloc(1, sizeof(*ibuf));
-	if (ibuf == NULL)
-		return got_error_from_errno();
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno();
-	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
-		    repo->path);
-		/* not reached */
-	}
-
-	close(imsg_fds[1]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd =
-	    imsg_fds[0];
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].pid = pid;
-	imsg_init(ibuf, imsg_fds[0]);
-	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf = ibuf;
-
-	return request_tag(tag, repo, obj_fd);
 }
