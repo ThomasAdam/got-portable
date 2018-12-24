@@ -1111,7 +1111,7 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
     FILE *outfile, struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
-	size_t len, hdrlen;
+	size_t n, len, hdrlen;
 	const uint8_t *buf;
 	int i;
 
@@ -1137,7 +1137,9 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 			}
 		}
 		/* Skip blob object header first time around. */
-		fwrite(buf + hdrlen, len - hdrlen, 1, outfile);
+		n = fwrite(buf + hdrlen, len - hdrlen, 1, outfile);
+		if (n != len - hdrlen)
+			return got_ferror(outfile, GOT_ERR_IO);
 		hdrlen = 0;
 	} while (len != 0);
 
