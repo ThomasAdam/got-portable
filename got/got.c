@@ -283,7 +283,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_worktree_checkout_files(worktree, head_ref, repo,
+	error = got_worktree_checkout_files(worktree, repo,
 	    checkout_progress, worktree_path, checkout_cancel, NULL);
 	if (error != NULL)
 		goto done;

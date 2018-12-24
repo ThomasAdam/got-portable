@@ -21,8 +21,8 @@ struct got_worktree;
  * The first argument is the path to a directory where the work tree
  * will be created. The path itself must not yet exist, but the dirname(3)
  * of the path must already exist.
- * The reference provided will be used as the new worktree's HEAD.
- * The third argument speficies the work tree's path prefix.
+ * The reference provided will be used to determine the new worktree's
+ * base commit. The third argument speficies the work tree's path prefix.
  */
 const struct got_error *got_worktree_init(const char *, struct got_reference *,
     const char *, struct got_repository *);
@@ -59,11 +59,10 @@ typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
  * Attempt to check out files into a work tree from its associated repository
  * and path prefix, and update the work tree's file index accordingly.
  * File content is obtained from blobs within the work tree's path prefix
- * inside the tree resolved via the provided reference.
+ * inside the tree corresponding to the work tree's base commit.
  * The checkout progress callback will be invoked with the provided
  * void * argument, and the path of each checked out file.
  */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
-    struct got_reference *, struct got_repository *,
-    got_worktree_checkout_cb progress, void *,
+    struct got_repository *, got_worktree_checkout_cb progress, void *,
     got_worktree_cancel_cb, void *);

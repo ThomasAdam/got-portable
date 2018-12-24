@@ -324,6 +324,10 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
+	err = read_meta_file(&(*worktree)->base, path_got, GOT_WORKTREE_BASE);
+	if (err)
+		goto done;
+
 	err = read_meta_file(&(*worktree)->head_ref, path_got,
 	    GOT_WORKTREE_HEAD);
 	if (err)
@@ -350,7 +354,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->root_path);
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
-	free(worktree->base_commit);
+	free(worktree->base);
 	free(worktree->head_ref);
 	if (worktree->lockfd != -1)
 		close(worktree->lockfd);
@@ -603,13 +607,11 @@ tree_checkout(struct got_worktree *worktree,
 
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
-    struct got_reference *head_ref, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *unlockerr;
 	struct got_object_id *commit_id = NULL;
-	struct got_object *obj = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
@@ -619,6 +621,10 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = got_object_resolve_id_str(&commit_id, repo, worktree->base);
+	if (err)
+		goto done;
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
@@ -638,34 +644,11 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_ref_resolve(&commit_id, repo, head_ref);
+	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
 		goto done;
 
-	err = got_object_open(&obj, repo, commit_id);
-	if (err)
-		goto done;
-
-	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = got_object_commit_open(&commit, repo, obj);
-	if (err)
-		goto done;
-
-	got_object_close(obj);
-	err = got_object_open(&obj, repo, commit->tree_id);
-	if (err)
-		goto done;
-
-	if (obj->type != GOT_OBJ_TYPE_TREE) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = got_object_tree_open(&tree, repo, obj);
+	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
 	if (err)
 		goto done;
 
@@ -691,8 +674,6 @@ done:
 		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
-	if (obj)
-		got_object_close(obj);
 	free(commit_id);
 	if (new_fileindex_path)
 		unlink(new_fileindex_path);
