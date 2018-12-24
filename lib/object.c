@@ -1023,7 +1023,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
-	if (hdrlen >= size) {
+	if (hdrlen > size) {
 		err = got_error(GOT_ERR_BAD_OBJ_HDR);
 		goto done;
 	}
