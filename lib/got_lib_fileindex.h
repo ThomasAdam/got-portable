@@ -82,11 +82,11 @@ struct got_fileindex_hdr {
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
 
-const struct got_error *got_fileindex_entry_open(struct got_fileindex_entry **,
+const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *, const char *, uint8_t *);
-void got_fileindex_entry_close(struct got_fileindex_entry *);
-struct got_fileindex *got_fileindex_open(void);
-void got_fileindex_close(struct got_fileindex *);
+void got_fileindex_entry_free(struct got_fileindex_entry *);
+struct got_fileindex *got_fileindex_alloc(void);
+void got_fileindex_free(struct got_fileindex *);
 const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
 const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
     struct got_fileindex_entry *);

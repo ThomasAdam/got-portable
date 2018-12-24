@@ -28,7 +28,7 @@
 #include "got_lib_fileindex.h"
 
 const struct got_error *
-got_fileindex_entry_open(struct got_fileindex_entry **entry,
+got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
     const char *ondisk_path, const char *relpath, uint8_t *blob_sha1)
 {
 	struct stat sb;
@@ -72,7 +72,7 @@ got_fileindex_entry_open(struct got_fileindex_entry **entry,
 }
 
 void
-got_fileindex_entry_close(struct got_fileindex_entry *entry)
+got_fileindex_entry_free(struct got_fileindex_entry *entry)
 {
 	free(entry->path);
 	free(entry);
@@ -89,7 +89,7 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
 }
 
 struct got_fileindex *
-got_fileindex_open(void)
+got_fileindex_alloc(void)
 {
 	struct got_fileindex *fileindex;
 
@@ -100,14 +100,14 @@ got_fileindex_open(void)
 }
 
 void
-got_fileindex_close(struct got_fileindex *fileindex)
+got_fileindex_free(struct got_fileindex *fileindex)
 {
 	struct got_fileindex_entry *entry;
 
 	while (!TAILQ_EMPTY(&fileindex->entries)) {
 		entry = TAILQ_FIRST(&fileindex->entries);
 		TAILQ_REMOVE(&fileindex->entries, entry, entry);
-		got_fileindex_entry_close(entry);
+		got_fileindex_entry_free(entry);
 		fileindex->nentries--;
 	}
 	free(fileindex);

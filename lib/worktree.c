@@ -418,7 +418,7 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	fsync(fd);
 
-	err = got_fileindex_entry_open(&entry, ondisk_path,
+	err = got_fileindex_entry_alloc(&entry, ondisk_path,
 	    apply_path_prefix(worktree, path), blob->id.sha1);
 	if (err)
 		goto done;
@@ -598,7 +598,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	fileindex = got_fileindex_open();
+	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -678,7 +678,7 @@ done:
 		fclose(new_index);
 	free(new_fileindex_path);
 	free(fileindex_path);
-	got_fileindex_close(fileindex);
+	got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
