@@ -1137,7 +1137,7 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 			}
 		}
 		/* Skip blob object header first time around. */
-		n = fwrite(buf + hdrlen, len - hdrlen, 1, outfile);
+		n = fwrite(buf + hdrlen, 1, len - hdrlen, outfile);
 		if (n != len - hdrlen)
 			return got_ferror(outfile, GOT_ERR_IO);
 		hdrlen = 0;
