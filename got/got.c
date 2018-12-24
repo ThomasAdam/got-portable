@@ -304,9 +304,6 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	struct got_tree_object *tree1 = NULL, *tree2;
 	struct got_object_qid *qid;
 	char *id_str1 = NULL, *id_str2;
-	time_t time1 = 0, time2;
-
-	time2 = got_object_commit_get_committer_time(commit);
 
 	err = got_object_open_as_tree(&tree2, repo,
 	    got_object_commit_get_tree_id(commit));
@@ -321,7 +318,6 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		if (err)
 			return err;
 
-		time1 = got_object_commit_get_committer_time(pcommit);
 		err = got_object_open_as_tree(&tree1, repo,
 		    got_object_commit_get_tree_id(pcommit));
 		got_object_commit_close(pcommit);
@@ -338,8 +334,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		goto done;
 
 	printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
-	err = got_diff_tree(tree1, tree2, "", "", time1, time2, diff_context,
-	    repo, stdout);
+	err = got_diff_tree(tree1, tree2, "", "", diff_context, repo, stdout);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
@@ -705,11 +700,11 @@ cmd_diff(int argc, char *argv[])
 	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL,
-		    0, 0, diff_context, repo, stdout);
+		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(id1, id2, "", "",
-		    0, 0, diff_context, repo, stdout);
+		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null",
