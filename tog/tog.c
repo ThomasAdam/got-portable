@@ -1879,10 +1879,10 @@ create_diff(struct tog_diff_view_state *s)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(s->id1, s->id2, NULL, NULL,
-		    s->diff_context, s->repo, f);
+		    0, 0, s->diff_context, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(s->id1, s->id2, "", "",
+		err = got_diff_objects_as_trees(s->id1, s->id2, "", "", 0, 0,
 		    s->diff_context, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
