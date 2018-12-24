@@ -1228,13 +1228,13 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 	struct got_object_qid *parent_id;
 	struct tog_view *diff_view;
 
-	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-
 	diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
 	if (diff_view == NULL)
 		return got_error_from_errno();
 
-	err = open_diff_view(diff_view, parent_id->id, commit_id, repo);
+	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
+	    commit_id, repo);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
