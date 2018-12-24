@@ -653,8 +653,9 @@ got_object_tree_get_entries(struct got_tree_object *tree)
 }
 
 static const struct got_error *
-read_packed_blob_privsep(size_t *size, int outfd, struct got_object *obj,
-    struct got_pack *pack)
+request_packed_blob(size_t *size, size_t *hdrlen, int outfd,
+    struct got_pack *pack, struct got_packidx *packidx, int idx,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	int outfd_child;
@@ -671,7 +672,7 @@ read_packed_blob_privsep(size_t *size, int outfd, struct got_object *obj,
 	if (outfd_child == -1)
 		return got_error_from_errno();
 
-	err = got_privsep_send_obj_req(pack->privsep_child->ibuf, -1, obj);
+	err = got_privsep_send_blob_req(pack->privsep_child->ibuf, -1, id, idx);
 	if (err)
 		return err;
 
@@ -698,7 +699,8 @@ read_packed_blob_privsep(size_t *size, int outfd, struct got_object *obj,
 		return err;
 	}
 
-	err = got_privsep_recv_blob(size, pack->privsep_child->ibuf);
+	err = got_privsep_recv_blob(size, hdrlen,
+	    pack->privsep_child->ibuf);
 	if (err)
 		return err;
 
@@ -708,20 +710,33 @@ read_packed_blob_privsep(size_t *size, int outfd, struct got_object *obj,
 	return err;
 }
 
-const struct got_error *
-got_object_blob_open(struct got_blob_object **blob,
-    struct got_repository *repo, struct got_object *obj, size_t blocksize)
+static const struct got_error *
+read_packed_blob_privsep(size_t *size, size_t *hdrlen, int outfd,
+    struct got_pack *pack, struct got_packidx *packidx, int idx,
+    struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
+
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			return err;
+	}
+
+	return request_packed_blob(size, hdrlen, outfd, pack, packidx, idx, id);
+}
+
+static const struct got_error *
+open_blob(struct got_blob_object **blob, struct got_repository *repo,
+    struct got_object_id *id, size_t blocksize)
+{
+	const struct got_error *err = NULL;
+	struct got_packidx *packidx = NULL;
+	int idx;
+	char *path_packfile;
 	int outfd;
-	size_t size;
+	size_t size, hdrlen;
 	struct stat sb;
-
-	if (obj->type != GOT_OBJ_TYPE_BLOB)
-		return got_error(GOT_ERR_OBJ_TYPE);
-
-	if (blocksize < obj->hdrlen)
-		return got_error(GOT_ERR_NO_SPACE);
 
 	*blob = calloc(1, sizeof(**blob));
 	if (*blob == NULL)
@@ -736,44 +751,49 @@ got_object_blob_open(struct got_blob_object **blob,
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (obj->flags & GOT_OBJ_FLAG_PACKED) {
-		struct got_pack *pack;
-		pack = got_repo_get_cached_pack(repo, obj->path_packfile);
+
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
+	if (err == NULL) {
+		struct got_pack *pack = NULL;
+
+		err = get_packfile_path(&path_packfile, packidx);
+		if (err)
+			goto done;
+
+		pack = got_repo_get_cached_pack(repo, path_packfile);
 		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo,
-			    obj->path_packfile, NULL);
+			err = got_repo_cache_pack(&pack, repo, path_packfile,
+			    packidx);
 			if (err)
 				goto done;
 		}
-		err = read_packed_blob_privsep(&size, outfd, obj, pack);
-		if (err)
-			goto done;
-		obj->size = size;
-	} else {
+		err = read_packed_blob_privsep(&size, &hdrlen, outfd, pack,
+		    packidx, idx, id);
+	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int infd;
 
-		err = open_loose_object(&infd, got_object_get_id(obj), repo);
+		err = open_loose_object(&infd, id, repo);
 		if (err)
 			goto done;
-
-		err = got_object_read_blob_privsep(&size, outfd, infd, repo);
+		err = got_object_read_blob_privsep(&size, &hdrlen, outfd,
+		    infd, repo);
 		close(infd);
-		if (err)
-			goto done;
-
-		if (size != obj->hdrlen + obj->size) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
 	}
+	if (err)
+		goto done;
 
 	if (fstat(outfd, &sb) == -1) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	if (sb.st_size != obj->hdrlen + obj->size) {
+	if (sb.st_size != size) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+
+	if (hdrlen >= size) {
+		err = got_error(GOT_ERR_BAD_OBJ_HDR);
 		goto done;
 	}
 
@@ -784,9 +804,9 @@ got_object_blob_open(struct got_blob_object **blob,
 		goto done;
 	}
 
-	(*blob)->hdrlen = obj->hdrlen;
+	(*blob)->hdrlen = hdrlen;
 	(*blob)->blocksize = blocksize;
-	memcpy(&(*blob)->id.sha1, obj->id.sha1, SHA1_DIGEST_LENGTH);
+	memcpy(&(*blob)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 
 done:
 	if (err) {
@@ -807,23 +827,14 @@ got_object_open_as_blob(struct got_blob_object **blob,
     struct got_repository *repo, struct got_object_id *id,
     size_t blocksize)
 {
-	const struct got_error *err;
-	struct got_object *obj;
+	return open_blob(blob, repo, id, blocksize);
+}
 
-	*blob = NULL;
-
-	err = got_object_open(&obj, repo, id);
-	if (err)
-		return err;
-	if (obj->type != GOT_OBJ_TYPE_BLOB) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	err = got_object_blob_open(blob, repo, obj, blocksize);
-done:
-	got_object_close(obj);
-	return err;
+const struct got_error *
+got_object_blob_open(struct got_blob_object **blob,
+    struct got_repository *repo, struct got_object *obj, size_t blocksize)
+{
+	return open_blob(blob, repo, got_object_get_id(obj), blocksize);
 }
 
 void
@@ -1368,7 +1379,8 @@ got_object_read_tree_privsep(struct got_tree_object **tree,
 }
 
 static const struct got_error *
-request_blob(size_t *size, int outfd, int infd, struct imsgbuf *ibuf)
+request_blob(size_t *size, size_t *hdrlen, int outfd, int infd,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	int outfd_child;
@@ -1377,7 +1389,7 @@ request_blob(size_t *size, int outfd, int infd, struct imsgbuf *ibuf)
 	if (outfd_child == -1)
 		return got_error_from_errno();
 
-	err = got_privsep_send_blob_req(ibuf, infd);
+	err = got_privsep_send_blob_req(ibuf, infd, NULL, -1);
 	if (err)
 		return err;
 
@@ -1387,7 +1399,7 @@ request_blob(size_t *size, int outfd, int infd, struct imsgbuf *ibuf)
 		return err;
 	}
 
-	err = got_privsep_recv_blob(size, ibuf);
+	err = got_privsep_recv_blob(size, hdrlen, ibuf);
 	if (err)
 		return err;
 
@@ -1398,8 +1410,8 @@ request_blob(size_t *size, int outfd, int infd, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_object_read_blob_privsep(size_t *size, int outfd, int infd,
-    struct got_repository *repo)
+got_object_read_blob_privsep(size_t *size, size_t *hdrlen,
+    int outfd, int infd, struct got_repository *repo)
 {
 	int imsg_fds[2];
 	pid_t pid;
@@ -1407,7 +1419,7 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1) {
 		ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
-		return request_blob(size, outfd, infd, ibuf);
+		return request_blob(size, hdrlen, outfd, infd, ibuf);
 	}
 
 	ibuf = calloc(1, sizeof(*ibuf));
@@ -1433,7 +1445,7 @@ got_object_read_blob_privsep(size_t *size, int outfd, int infd,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
 
-	return request_blob(size, outfd, infd, ibuf);
+	return request_blob(size, hdrlen, outfd, infd, ibuf);
 }
 
 static const struct got_error *

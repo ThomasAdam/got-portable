@@ -84,39 +84,6 @@ done:
 }
 
 static const struct got_error *
-get_object(struct got_object **obj, struct imsg *imsg, struct imsgbuf *ibuf,
-    struct got_pack *pack, struct got_packidx *packidx,
-    struct got_object_cache *objcache, int type)
-{
-	const struct got_error *err = NULL;
-	struct got_object *iobj;
-
-	err = got_privsep_get_imsg_obj(&iobj, imsg, ibuf);
-	if (err)
-		return err;
-
-	if (iobj->type != type) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	if ((iobj->flags & GOT_OBJ_FLAG_PACKED) == 0)
-		return got_error(GOT_ERR_OBJ_NOT_PACKED);
-
-	*obj = got_object_cache_get(objcache, &iobj->id);
-	if (*obj == NULL) {
-		err = got_packfile_open_object(obj, pack, packidx,
-		    iobj->pack_idx, &iobj->id);
-		if (err)
-			goto done;
-	}
-	(*obj)->refcnt++;
-done:
-	got_object_close(iobj);
-	return err;
-}
-
-static const struct got_error *
 commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
@@ -250,11 +217,19 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
+	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
 	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
+	struct got_object_id id;
+	size_t datalen;
 
-	err = get_object(&obj, imsg, ibuf, pack, packidx, objcache,
-	    GOT_OBJ_TYPE_BLOB);
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
 	if (err)
 		return err;
 
@@ -273,7 +248,7 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	if (err)
 		goto done;
 
-	err = got_privsep_send_blob(ibuf, obj->size);
+	err = got_privsep_send_blob(ibuf, obj->size, obj->hdrlen);
 done:
 	if (outfile)
 		fclose(outfile);

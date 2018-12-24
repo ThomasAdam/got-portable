@@ -165,6 +165,7 @@ struct got_imsg_tree_object {
 /* Structure for GOT_IMSG_BLOB. */
 struct got_imsg_blob {
 	size_t size;
+	size_t hdrlen;
 };
 
 /* Structure for GOT_IMSG_TAG data. */
@@ -224,7 +225,8 @@ const struct got_error *got_privsep_send_tree_req(struct imsgbuf *, int,
     struct got_object_id *, int);
 const struct got_error *got_privsep_send_tag_req(struct imsgbuf *, int,
     struct got_object_id *, int);
-const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_blob_req(struct imsgbuf *, int,
+    struct got_object_id *, int);
 const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
@@ -241,8 +243,9 @@ const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
-const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t);
-const struct got_error *got_privsep_recv_blob(size_t *, struct imsgbuf *);
+const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t, size_t);
+const struct got_error *got_privsep_recv_blob(size_t *, size_t *,
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_tag(struct imsgbuf *,
     struct got_tag_object *);
 const struct got_error *got_privsep_recv_tag(struct got_tag_object **,

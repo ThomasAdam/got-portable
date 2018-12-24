@@ -71,6 +71,7 @@ main(int argc, char *argv[])
 		struct imsg imsg, imsg_outfd;
 		FILE *f = NULL;
 		size_t size;
+		struct got_object *obj = NULL;
 	
 		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
@@ -97,11 +98,6 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-		if (datalen != 0) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			goto done;
-		}
 		if (imsg.fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
@@ -132,6 +128,15 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
+		err = got_object_read_header(&obj, imsg.fd);
+		if (err)
+			goto done;
+
+		if (lseek(imsg.fd, SEEK_SET, 0) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
 		f = fdopen(imsg.fd, "rb");
 		if (f == NULL) {
 			err = got_error_from_errno();
@@ -142,7 +147,7 @@ main(int argc, char *argv[])
 		if (err)
 			goto done;
 
-		err = got_privsep_send_blob(&ibuf, size);
+		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen);
 done:
 		if (f)
 			fclose(f);
@@ -152,6 +157,8 @@ done:
 			close(imsg_outfd.fd);
 		imsg_free(&imsg);
 		imsg_free(&imsg_outfd);
+		if (obj)
+			got_object_close(obj);
 		if (err)
 			break;
 	}

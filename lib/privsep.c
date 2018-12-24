@@ -338,9 +338,23 @@ got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
 }
 
 const struct got_error *
-got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd)
+got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
+    struct got_object_id *id, int pack_idx)
 {
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, NULL, 0)
+	struct got_imsg_packed_object iobj, *iobjp;
+	size_t len;
+
+	if (id) { /* blob is packed */
+		iobj.idx = pack_idx;
+		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+		iobjp = &iobj;
+		len = sizeof(iobj);
+	} else {
+		iobjp = NULL;
+		len = 0;
+	}
+
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, iobjp, len)
 	    == -1)
 		return got_error_from_errno();
 
@@ -852,11 +866,12 @@ done:
 }
 
 const struct got_error *
-got_privsep_send_blob(struct imsgbuf *ibuf, size_t size)
+got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen)
 {
 	struct got_imsg_blob iblob;
 
 	iblob.size = size;
+	iblob.hdrlen = hdrlen;
 	/* Data has already been written to file descriptor. */
 
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, &iblob, sizeof(iblob))
@@ -867,7 +882,7 @@ got_privsep_send_blob(struct imsgbuf *ibuf, size_t size)
 }
 
 const struct got_error *
-got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
+got_privsep_recv_blob(size_t *size, size_t *hdrlen, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -888,6 +903,7 @@ got_privsep_recv_blob(size_t *size, struct imsgbuf *ibuf)
 		}
 		iblob = imsg.data;
 		*size = iblob->size;
+		*hdrlen = iblob->hdrlen;
 		/* Data has been written to file descriptor. */
 		break;
 	default:

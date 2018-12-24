@@ -17,10 +17,12 @@
 const struct got_error *got_object_qid_alloc_partial(struct got_object_qid **);
 struct got_commit_object *got_object_commit_alloc_partial(void);
 struct got_tree_entry *got_alloc_tree_entry_partial(void);
+
+/* XXX these declarations don't belong here */
 const struct got_error *got_object_read_header_privsep(struct got_object**,
     struct got_repository *repo, int);
-const struct got_error *got_object_read_blob_privsep(size_t *, int, int,
-    struct got_repository *repo);
+const struct got_error *got_object_read_blob_privsep(size_t *, size_t *, int,
+    int, struct got_repository *repo);
 const struct got_error *got_object_read_commit_privsep(
     struct got_commit_object **, int, struct got_repository *);
 const struct got_error *got_object_read_tree_privsep(struct got_tree_object **,
