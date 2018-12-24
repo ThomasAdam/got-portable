@@ -156,14 +156,10 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 {
 	const struct got_error *err = NULL;
 	char *path_got = NULL;
-	char *ref_str = NULL;
+	char *refstr = NULL;
 	char *repo_path = NULL;
 	char *formatstr = NULL;
 	char *absprefix = NULL;
-	struct got_object_id *commit_id = NULL;
-	char *id_str = NULL;
-	char *head_content = NULL;
-	int obj_type;
 
 	if (!got_path_is_absolute(prefix)) {
 		if (asprintf(&absprefix, "/%s", prefix) == -1)
@@ -196,30 +192,13 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
-	/* Write the commit hash and HEAD reference. */
-	err = got_ref_resolve(&commit_id, repo, head_ref);
-	if (err)
-		goto done;
-	err = got_object_get_type(&obj_type, repo, commit_id);
-	if (err)
-		goto done;
-	if (obj_type != GOT_OBJ_TYPE_COMMIT) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-	err = got_object_id_str(&id_str, commit_id);
-	if (err)
-		goto done;
-	ref_str = got_ref_to_str(head_ref);
-	if (ref_str == NULL) {
+	/* Write the HEAD reference. */
+	refstr = got_ref_to_str(head_ref);
+	if (refstr == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (asprintf(&head_content, "%s %s", id_str, ref_str) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = create_meta_file(path_got, GOT_WORKTREE_HEAD, head_content);
+	err = create_meta_file(path_got, GOT_WORKTREE_HEAD, refstr);
 	if (err)
 		goto done;
 
@@ -251,12 +230,9 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 done:
 	free(path_got);
 	free(formatstr);
-	free(ref_str);
+	free(refstr);
 	free(repo_path);
 	free(absprefix);
-	free(id_str);
-	free(commit_id);
-	free(head_content);
 	return err;
 }
 
