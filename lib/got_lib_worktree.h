@@ -39,6 +39,7 @@ struct got_worktree {
 #define GOT_WORKTREE_REPOSITORY		"repository"
 #define GOT_WORKTREE_PATH_PREFIX	"path-prefix"
 #define GOT_WORKTREE_HEAD		"head"
+#define GOT_WORKTREE_BASE		"base"
 #define GOT_WORKTREE_LOCK		"lock"
 #define GOT_WORKTREE_FORMAT		"format"
 

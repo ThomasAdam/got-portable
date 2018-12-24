@@ -155,11 +155,23 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
     const char *prefix, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct got_object_id *commit_id = NULL;
+	int obj_type;
 	char *path_got = NULL;
 	char *refstr = NULL;
 	char *repo_path = NULL;
 	char *formatstr = NULL;
 	char *absprefix = NULL;
+	char *basestr = NULL;
+
+	err = got_ref_resolve(&commit_id, repo, head_ref);
+	if (err)
+		return err;
+	err = got_object_get_type(&obj_type, repo, commit_id);
+	if (err)
+		return err;
+	if (obj_type != GOT_OBJ_TYPE_COMMIT)
+		return got_error(GOT_ERR_OBJ_TYPE);
 
 	if (!got_path_is_absolute(prefix)) {
 		if (asprintf(&absprefix, "/%s", prefix) == -1)
@@ -202,6 +214,14 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
+	/* Record our base commit. */
+	err = got_object_id_str(&basestr, commit_id);
+	if (err)
+		goto done;
+	err = create_meta_file(path_got, GOT_WORKTREE_BASE, basestr);
+	if (err)
+		goto done;
+
 	/* Store path to repository. */
 	repo_path = got_repo_get_path(repo);
 	if (repo_path == NULL) {
@@ -228,11 +248,13 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 done:
+	free(commit_id);
 	free(path_got);
 	free(formatstr);
 	free(refstr);
 	free(repo_path);
 	free(absprefix);
+	free(basestr);
 	return err;
 }
 
