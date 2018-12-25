@@ -35,11 +35,11 @@ struct got_worktree {
 };
 
 #define GOT_WORKTREE_GOT_DIR		".got"
-#define GOT_WORKTREE_FILE_INDEX		"fileindex"
+#define GOT_WORKTREE_FILE_INDEX		"file-index"
 #define GOT_WORKTREE_REPOSITORY		"repository"
 #define GOT_WORKTREE_PATH_PREFIX	"path-prefix"
-#define GOT_WORKTREE_HEAD		"head"
-#define GOT_WORKTREE_BASE		"base"
+#define GOT_WORKTREE_HEAD_REF		"head-ref"
+#define GOT_WORKTREE_BASE_COMMIT	"base-commit"
 #define GOT_WORKTREE_LOCK		"lock"
 #define GOT_WORKTREE_FORMAT		"format"
 

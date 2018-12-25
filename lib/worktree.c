@@ -210,7 +210,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = create_meta_file(path_got, GOT_WORKTREE_HEAD, refstr);
+	err = create_meta_file(path_got, GOT_WORKTREE_HEAD_REF, refstr);
 	if (err)
 		goto done;
 
@@ -218,7 +218,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	err = got_object_id_str(&basestr, commit_id);
 	if (err)
 		goto done;
-	err = create_meta_file(path_got, GOT_WORKTREE_BASE, basestr);
+	err = create_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT, basestr);
 	if (err)
 		goto done;
 
@@ -324,12 +324,13 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
-	err = read_meta_file(&(*worktree)->base, path_got, GOT_WORKTREE_BASE);
+	err = read_meta_file(&(*worktree)->base, path_got,
+	    GOT_WORKTREE_BASE_COMMIT);
 	if (err)
 		goto done;
 
 	err = read_meta_file(&(*worktree)->head_ref, path_got,
-	    GOT_WORKTREE_HEAD);
+	    GOT_WORKTREE_HEAD_REF);
 	if (err)
 		goto done;
 

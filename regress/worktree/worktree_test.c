@@ -84,9 +84,9 @@ remove_meta_file(const char *worktree_path, const char *name)
 static int
 remove_worktree(const char *worktree_path)
 {
-	if (!remove_meta_file(worktree_path, GOT_WORKTREE_HEAD))
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_HEAD_REF))
 		return 0;
-	if (!remove_meta_file(worktree_path, GOT_WORKTREE_BASE))
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_BASE_COMMIT))
 		return 0;
 	if (!remove_meta_file(worktree_path, GOT_WORKTREE_FILE_INDEX))
 		return 0;
@@ -172,9 +172,9 @@ worktree_init(const char *repo_path)
 		goto done;
 
 	/* Ensure required files were created. */
-	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_HEAD))
+	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_HEAD_REF))
 		goto done;
-	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_BASE))
+	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_BASE_COMMIT))
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_LOCK))
 		goto done;
@@ -274,10 +274,10 @@ worktree_init_exists(const char *repo_path)
 
 	/* Create files which got_worktree_init() will try to create as well. */
 	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
-	    GOT_WORKTREE_HEAD))
+	    GOT_WORKTREE_HEAD_REF))
 		goto done;
 	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
-	    GOT_WORKTREE_BASE))
+	    GOT_WORKTREE_BASE_COMMIT))
 		goto done;
 	if (!obstruct_meta_file_and_init(&ok, repo, worktree_path,
 	    GOT_WORKTREE_LOCK))
