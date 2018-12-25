@@ -28,15 +28,39 @@
 #include "got_lib_fileindex.h"
 
 const struct got_error *
+got_fileindex_entry_update(struct got_fileindex_entry *entry,
+    const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1)
+{
+	struct stat sb;
+
+	if (lstat(ondisk_path, &sb) != 0)
+		return got_error_from_errno();
+
+	entry->ctime_sec = sb.st_ctime;
+	entry->ctime_nsec = sb.st_ctimensec;
+	entry->mtime_sec = sb.st_mtime;
+	entry->mtime_nsec = sb.st_mtimensec;
+	entry->uid = sb.st_uid;
+	entry->gid = sb.st_gid;
+	entry->size = (sb.st_size & 0xffffffff);
+	if (sb.st_mode & S_IFLNK)
+		entry->mode = GOT_INDEX_ENTRY_MODE_SYMLINK;
+	else
+		entry->mode = GOT_INDEX_ENTRY_MODE_REGULAR_FILE;
+	entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
+	    GOT_INDEX_ENTRY_MODE_PERMS_SHIFT);
+	memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+	memcpy(entry->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+
+	return NULL;
+}
+
+const struct got_error *
 got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
     const char *ondisk_path, const char *relpath, uint8_t *blob_sha1,
     uint8_t *commit_sha1)
 {
-	struct stat sb;
 	size_t len;
-
-	if (lstat(ondisk_path, &sb) != 0)
-		return got_error_from_errno();
 
 	*entry = calloc(1, sizeof(**entry));
 	if (*entry == NULL)
@@ -49,28 +73,14 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 		*entry = NULL;
 		return err;
 	}
-	
-	(*entry)->ctime_sec = sb.st_ctime;
-	(*entry)->ctime_nsec = sb.st_ctimensec;
-	(*entry)->mtime_sec = sb.st_mtime;
-	(*entry)->mtime_nsec = sb.st_mtimensec;
-	(*entry)->uid = sb.st_uid;
-	(*entry)->gid = sb.st_gid;
-	(*entry)->size = (sb.st_size & 0xffffffff);
-	if (sb.st_mode & S_IFLNK)
-		(*entry)->mode = GOT_INDEX_ENTRY_MODE_SYMLINK;
-	else
-		(*entry)->mode = GOT_INDEX_ENTRY_MODE_REGULAR_FILE;
-	(*entry)->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
-	    GOT_INDEX_ENTRY_MODE_PERMS_SHIFT);
-	memcpy((*entry)->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
-	memcpy((*entry)->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+
 	len = strlen(relpath);
 	if (len > GOT_INDEX_ENTRY_F_PATH_LEN)
 		len = GOT_INDEX_ENTRY_F_PATH_LEN;
 	(*entry)->flags |= len;
 
-	return NULL;
+	return got_fileindex_entry_update(*entry, ondisk_path, blob_sha1,
+	    commit_sha1);
 }
 
 void
@@ -87,6 +97,18 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
 	/* TODO keep entries sorted by name */
 	TAILQ_INSERT_TAIL(&fileindex->entries, entry, entry);
 	fileindex->nentries++;
+	return NULL;
+}
+
+struct got_fileindex_entry *
+got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
+{
+	struct got_fileindex_entry *entry;
+	TAILQ_FOREACH(entry, &fileindex->entries, entry) {
+		if (strcmp(entry->path, path) == 0)
+			return entry;
+	}
+
 	return NULL;
 }
 
@@ -428,8 +450,11 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	SHA1Init(&ctx);
 
 	n = fread(buf, 1, len, infile);
-	if (n != len)
+	if (n != len) {
+		if (n == 0) /* EOF */
+			return NULL;
 		return got_ferror(infile, GOT_ERR_IO);
+	}
 
 	SHA1Update(&ctx, buf, len);
 

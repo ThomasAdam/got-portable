@@ -463,13 +463,19 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	fsync(fd);
 
-	err = got_fileindex_entry_alloc(&entry, ondisk_path,
-	    apply_path_prefix(worktree, path), blob->id.sha1,
-	    worktree->base_commit_id->sha1);
-	if (err)
-		goto done;
-
-	err = got_fileindex_entry_add(fileindex, entry);
+	entry = got_fileindex_entry_get(fileindex,
+	    apply_path_prefix(worktree, path));
+	if (entry)
+		err = got_fileindex_entry_update(entry, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1);
+	else {
+		err = got_fileindex_entry_alloc(&entry, ondisk_path,
+		    apply_path_prefix(worktree, path), blob->id.sha1,
+		    worktree->base_commit_id->sha1);
+		if (err)
+			goto done;
+		err = got_fileindex_entry_add(fileindex, entry);
+	}
 	if (err)
 		goto done;
 done:
@@ -635,7 +641,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *new_index = NULL;
+	FILE *index = NULL, *new_index = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -653,6 +659,21 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		fileindex_path = NULL;
 		goto done;
 	}
+
+	/*
+	 * Read the file index.
+	 * Checking out files is supposed to be an idempotent operation.
+	 * If the on-disk file index is incomplete we will try to complete it.
+	 */
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_fileindex_read(fileindex, index);
+	fclose(index);
+	if (err)
+		goto done;
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
