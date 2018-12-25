@@ -265,8 +265,10 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	char *path_got;
 	char *formatstr = NULL;
 	char *path_lock = NULL;
+	char *base_commit_id_str = NULL;
 	int version, fd = -1;
 	const char *errstr;
+	struct got_repository *repo = NULL;
 
 	*worktree = NULL;
 
@@ -319,13 +321,23 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	    GOT_WORKTREE_REPOSITORY);
 	if (err)
 		goto done;
+
 	err = read_meta_file(&(*worktree)->path_prefix, path_got,
 	    GOT_WORKTREE_PATH_PREFIX);
 	if (err)
 		goto done;
 
-	err = read_meta_file(&(*worktree)->base, path_got,
+	err = read_meta_file(&base_commit_id_str, path_got,
 	    GOT_WORKTREE_BASE_COMMIT);
+	if (err)
+		goto done;
+
+	err = got_repo_open(&repo, (*worktree)->repo_path);
+	if (err)
+		goto done;
+
+	err = got_object_resolve_id_str(&(*worktree)->base_commit_id, repo,
+	    base_commit_id_str);
 	if (err)
 		goto done;
 
@@ -335,8 +347,11 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		goto done;
 
 done:
+	if (repo)
+		got_repo_close(repo);
 	free(path_got);
 	free(path_lock);
+	free(base_commit_id_str);
 	if (err) {
 		if (fd != -1)
 			close(fd);
@@ -355,7 +370,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->root_path);
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
-	free(worktree->base);
+	free(worktree->base_commit_id);
 	free(worktree->head_ref);
 	if (worktree->lockfd != -1)
 		close(worktree->lockfd);
@@ -612,7 +627,6 @@ got_worktree_checkout_files(struct got_worktree *worktree,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *unlockerr;
-	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
@@ -622,10 +636,6 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
-
-	err = got_object_resolve_id_str(&commit_id, repo, worktree->base);
-	if (err)
-		goto done;
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
@@ -645,7 +655,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_commit(&commit, repo, commit_id);
+	err = got_object_open_as_commit(&commit, repo,
+	   worktree->base_commit_id);
 	if (err)
 		goto done;
 
@@ -675,7 +686,6 @@ done:
 		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
-	free(commit_id);
 	if (new_fileindex_path)
 		unlink(new_fileindex_path);
 	if (new_index)
