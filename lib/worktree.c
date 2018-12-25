@@ -266,6 +266,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	char *formatstr = NULL;
 	char *path_lock = NULL;
 	char *base_commit_id_str = NULL;
+	char *head_ref_str = NULL;
 	int version, fd = -1;
 	const char *errstr;
 	struct got_repository *repo = NULL;
@@ -341,16 +342,17 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
-	err = read_meta_file(&(*worktree)->head_ref, path_got,
-	    GOT_WORKTREE_HEAD_REF);
+	err = read_meta_file(&head_ref_str, path_got, GOT_WORKTREE_HEAD_REF);
 	if (err)
 		goto done;
 
+	err = got_ref_open(&(*worktree)->head_ref, repo, head_ref_str);
 done:
 	if (repo)
 		got_repo_close(repo);
 	free(path_got);
 	free(path_lock);
+	free(head_ref_str);
 	free(base_commit_id_str);
 	if (err) {
 		if (fd != -1)
@@ -371,7 +373,8 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit_id);
-	free(worktree->head_ref);
+	if (worktree->head_ref)
+		got_ref_close(worktree->head_ref);
 	if (worktree->lockfd != -1)
 		close(worktree->lockfd);
 	free(worktree);
@@ -386,7 +389,7 @@ got_worktree_get_repo_path(struct got_worktree *worktree)
 char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {
-	return strdup(worktree->head_ref);
+	return got_ref_to_str(worktree->head_ref);
 }
 
 static const struct got_error *

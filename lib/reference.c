@@ -299,15 +299,18 @@ char *
 got_ref_to_str(struct got_reference *ref)
 {
 	char *str;
-	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
-		if (asprintf(&str, "ref: %s", ref->ref.symref.ref) == -1)
-			return NULL;
-	} else {
-		str = calloc(1, SHA1_DIGEST_STRING_LENGTH);
-		if (str == NULL)
-			return NULL;
-		str = got_sha1_digest_to_str(ref->ref.ref.sha1, str,
-		    SHA1_DIGEST_STRING_LENGTH);
+
+	if (ref->flags & GOT_REF_IS_SYMBOLIC)
+		return strdup(ref->ref.symref.ref);
+
+	str = malloc(SHA1_DIGEST_STRING_LENGTH);
+	if (str == NULL)
+		return NULL;
+
+	if (got_sha1_digest_to_str(ref->ref.ref.sha1, str,
+	    SHA1_DIGEST_STRING_LENGTH) == NULL) {
+		free(str);
+		return NULL;
 	}
 
 	return str;
