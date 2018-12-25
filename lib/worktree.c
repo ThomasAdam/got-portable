@@ -630,7 +630,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL, *unlockerr;
+	const struct got_error *err = NULL, *unlockerr, *checkout_err = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
@@ -668,11 +668,10 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = tree_checkout(worktree, fileindex, tree, "/", repo,
+	checkout_err = tree_checkout(worktree, fileindex, tree, "/", repo,
 	    progress_cb, progress_arg, cancel_cb, cancel_arg);
-	if (err)
-		goto done;
 
+	/* Try to sync the fileindex back to disk in any case. */
 	err = got_fileindex_write(fileindex, new_index);
 	if (err)
 		goto done;
@@ -697,6 +696,8 @@ done:
 	free(new_fileindex_path);
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
+	if (checkout_err)
+		err = checkout_err;
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
