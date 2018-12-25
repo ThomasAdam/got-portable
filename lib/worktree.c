@@ -461,7 +461,8 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	fsync(fd);
 
 	err = got_fileindex_entry_alloc(&entry, ondisk_path,
-	    apply_path_prefix(worktree, path), blob->id.sha1);
+	    apply_path_prefix(worktree, path), blob->id.sha1,
+	    worktree->base_commit_id->sha1);
 	if (err)
 		goto done;
 

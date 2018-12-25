@@ -29,7 +29,8 @@
 
 const struct got_error *
 got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
-    const char *ondisk_path, const char *relpath, uint8_t *blob_sha1)
+    const char *ondisk_path, const char *relpath, uint8_t *blob_sha1,
+    uint8_t *commit_sha1)
 {
 	struct stat sb;
 	size_t len;
@@ -63,6 +64,7 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 	(*entry)->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
 	    GOT_INDEX_ENTRY_MODE_PERMS_SHIFT);
 	memcpy((*entry)->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+	memcpy((*entry)->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
 	len = strlen(relpath);
 	if (len > GOT_INDEX_ENTRY_F_PATH_LEN)
 		len = GOT_INDEX_ENTRY_F_PATH_LEN;
@@ -210,6 +212,11 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *entry,
 
 	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
 	n = fwrite(entry->blob_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
+	if (n != SHA1_DIGEST_LENGTH)
+		return got_ferror(outfile, GOT_ERR_IO);
+
+	SHA1Update(ctx, entry->commit_sha1, SHA1_DIGEST_LENGTH);
+	n = fwrite(entry->commit_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
 	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
 
@@ -382,6 +389,13 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 		goto done;
 	}
 	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
+
+	n = fread(entry->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
+	if (n != SHA1_DIGEST_LENGTH) {
+		err = got_ferror(infile, GOT_ERR_IO);
+		goto done;
+	}
+	SHA1Update(ctx, entry->commit_sha1, SHA1_DIGEST_LENGTH);
 
 	err = read_fileindex_val32(&entry->flags, ctx, infile);
 	if (err)

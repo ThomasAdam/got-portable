@@ -45,6 +45,9 @@ struct got_fileindex_entry {
 	/* SHA1 of corresponding blob in repository. */
 	uint8_t blob_sha1[SHA1_DIGEST_LENGTH];
 
+	/* SHA1 of corresponding base commit in repository. */
+	uint8_t commit_sha1[SHA1_DIGEST_LENGTH];
+
 	uint32_t flags;
 #define GOT_INDEX_ENTRY_F_PATH_LEN	0x00000fff
 #define GOT_INDEX_ENTRY_F_STAGE		0x00003000
@@ -83,7 +86,7 @@ struct got_fileindex_hdr {
 };
 
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
-    const char *, const char *, uint8_t *);
+    const char *, const char *, uint8_t *, uint8_t *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);
 struct got_fileindex *got_fileindex_alloc(void);
 void got_fileindex_free(struct got_fileindex *);
