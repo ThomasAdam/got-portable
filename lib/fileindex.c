@@ -355,7 +355,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 		SHA1Update(ctx, buf, sizeof(buf));
 		memcpy(*path + len, buf, sizeof(buf));
 		len += sizeof(buf);
-	} while (strchr(buf, '\0') == NULL);
+	} while (memchr(buf, '\0', sizeof(buf)) == NULL);
 
 	if (err) {
 		free(*path);
