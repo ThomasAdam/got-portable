@@ -426,6 +426,9 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			} else if (!S_ISREG(sb.st_mode)) {
 				/* TODO file is obstructed; do something */
 				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+			} else {
+				/* TODO: Merge the file! */
+				return NULL;
 			}
 		}
 		return err;

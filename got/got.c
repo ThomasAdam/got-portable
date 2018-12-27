@@ -276,7 +276,7 @@ cmd_checkout(int argc, char *argv[])
 		goto done;
 
 	error = got_worktree_init(worktree_path, head_ref, path_prefix, repo);
-	if (error != NULL)
+	if (error != NULL && !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
 		goto done;
 
 	error = got_worktree_open(&worktree, worktree_path);
