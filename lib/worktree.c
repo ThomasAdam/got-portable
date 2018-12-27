@@ -53,8 +53,6 @@ create_meta_file(const char *path_got, const char *name, const char *content)
 	const struct got_error *err = NULL;
 	char *path;
 	int fd = -1;
-	char buf[4];
-	ssize_t n;
 
 	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
 		err = got_error_from_errno();
@@ -66,14 +64,6 @@ create_meta_file(const char *path_got, const char *name, const char *content)
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		err = got_error_from_errno();
-		goto done;
-	}
-
-	/* The file should be empty. */
-	n = read(fd, buf, sizeof(buf));
-	if (n != 0) {
-		err = (n == -1 ? got_error_from_errno() :
-		    got_error(GOT_ERR_WORKTREE_EXISTS));
 		goto done;
 	}
 
