@@ -403,7 +403,9 @@ apply_path_prefix(struct got_worktree *worktree, const char *path)
 
 static const struct got_error *
 add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
-   const char *path, struct got_blob_object *blob, struct got_repository *repo)
+   const char *path, struct got_blob_object *blob, struct got_repository *repo,
+   got_worktree_checkout_cb progress_cb, void *progress_arg,
+   const char *progress_path)
 {
 	const struct got_error *err = NULL;
 	char *ondisk_path;
@@ -428,11 +430,15 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
 			} else {
 				/* TODO: Merge the file! */
+				(*progress_cb)(progress_arg, 'E',
+				    progress_path);
 				return NULL;
 			}
 		}
 		return err;
 	}
+
+	(*progress_cb)(progress_arg, 'A', progress_path);
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -552,7 +558,6 @@ tree_checkout_entry(struct got_worktree *worktree,
 	progress_path = path;
 	if (strncmp(progress_path, worktree->path_prefix, len) == 0)
 		progress_path += len;
-	(*progress_cb)(progress_arg, progress_path);
 
 	switch (obj->type) {
 	case GOT_OBJ_TYPE_BLOB:
@@ -561,7 +566,8 @@ tree_checkout_entry(struct got_worktree *worktree,
 		err = got_object_blob_open(&blob, repo, obj, 8192);
 		if (err)
 			goto done;
-		err = add_file_on_disk(worktree, fileindex, path, blob, repo);
+		err = add_file_on_disk(worktree, fileindex, path, blob, repo,
+		    progress_cb, progress_arg, progress_path);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_object_tree_open(&tree, repo, obj);

@@ -178,14 +178,14 @@ usage_checkout(void)
 }
 
 static void
-checkout_progress(void *arg, const char *path)
+checkout_progress(void *arg, char status, const char *path)
 {
 	char *worktree_path = arg;
 
 	while (path[0] == '/')
 		path++;
 
-	printf("A  %s/%s\n", worktree_path, path);
+	printf("%c  %s/%s\n", status, worktree_path, path);
 }
 
 static const struct got_error *

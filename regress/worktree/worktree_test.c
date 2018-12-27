@@ -305,7 +305,7 @@ done:
 }
 
 static void
-process_cb(void *arg, const char *path)
+progress_cb(void *arg, char status, const char *path)
 {
 }
 
@@ -341,7 +341,7 @@ worktree_checkout(const char *repo_path)
 	if (err != NULL)
 		goto done;
 
-	err = got_worktree_checkout_files(worktree, repo, process_cb, NULL,
+	err = got_worktree_checkout_files(worktree, repo, progress_cb, NULL,
 	    NULL, NULL);
 	if (err != NULL)
 		goto done;
