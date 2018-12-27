@@ -179,18 +179,19 @@ write_fileindex_val16(SHA1_CTX *ctx, uint16_t val, FILE *outfile)
 static const struct got_error *
 write_fileindex_path(SHA1_CTX *ctx, const char *path, FILE *outfile)
 {
-	size_t n, len, pad;
+	size_t n, len, pad = 0;
 	static const uint8_t zero[8] = { 0 };
 
 	len = strlen(path);
-	pad = (len % 8);
+	while ((len + pad) % 8 != 0)
+		pad++;
+	if (pad == 0)
+		pad = 8; /* NUL-terminate */
 
 	SHA1Update(ctx, path, len);
 	n = fwrite(path, 1, len, outfile);
 	if (n != len)
 		return got_ferror(outfile, GOT_ERR_IO);
-	if (pad == 0)
-		return NULL;
 	SHA1Update(ctx, zero, pad);
 	n = fwrite(zero, 1, pad, outfile);
 	if (n != pad)
