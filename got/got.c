@@ -396,6 +396,8 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
+	/* TODO: Ensure that we are staying on the current branch. */
+
 	if (got_object_id_cmp(got_worktree_get_base_commit_id(worktree),
 	    commit_id) != 0) {
 		error = got_worktree_set_base_commit_id(worktree, repo,
