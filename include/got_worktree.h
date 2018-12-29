@@ -42,13 +42,11 @@ void got_worktree_close(struct got_worktree *);
 
 /*
  * Get the path to the repository associated with a worktree.
- * The caller must dispose of it with free(3).
  */
-char *got_worktree_get_repo_path(struct got_worktree *);
+const char *got_worktree_get_repo_path(struct got_worktree *);
 
 /*
  * Get the path prefix associated with a worktree.
- * The caller must dispose of it with free(3).
  */
 const char *got_worktree_get_path_prefix(struct got_worktree *);
 

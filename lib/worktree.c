@@ -370,10 +370,10 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree);
 }
 
-char *
+const char *
 got_worktree_get_repo_path(struct got_worktree *worktree)
 {
-	return strdup(worktree->repo_path);
+	return worktree->repo_path;
 }
 
 const char *
