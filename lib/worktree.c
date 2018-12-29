@@ -402,7 +402,7 @@ apply_path_prefix(struct got_worktree *worktree, const char *path)
 }
 
 static const struct got_error *
-add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
+blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
    const char *path, struct got_blob_object *blob, struct got_repository *repo,
    got_worktree_checkout_cb progress_cb, void *progress_arg,
    const char *progress_path)
@@ -570,7 +570,7 @@ tree_checkout_entry(struct got_worktree *worktree,
 		err = got_object_blob_open(&blob, repo, obj, 8192);
 		if (err)
 			goto done;
-		err = add_file_on_disk(worktree, fileindex, path, blob, repo,
+		err = blob_checkout(worktree, fileindex, path, blob, repo,
 		    progress_cb, progress_arg, progress_path);
 		break;
 	case GOT_OBJ_TYPE_TREE:
