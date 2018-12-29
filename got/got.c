@@ -206,7 +206,7 @@ cmd_checkout(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
-	int ch;
+	int ch, same_path_prefix;
 
 	while ((ch = getopt(argc, argv, "p:")) != -1) {
 		switch (ch) {
@@ -283,7 +283,11 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (strcmp(path_prefix, got_worktree_get_path_prefix(worktree)) != 0) {
+	error = got_worktree_match_path_prefix(&same_path_prefix, worktree,
+	    path_prefix);
+	if (error != NULL)
+		goto done;
+	if (!same_path_prefix) {
 		error = got_error(GOT_ERR_PATH_PREFIX);
 		goto done;
 	}

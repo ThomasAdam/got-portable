@@ -382,6 +382,22 @@ got_worktree_get_path_prefix(struct got_worktree *worktree)
 	return worktree->path_prefix;
 }
 
+const struct got_error *
+got_worktree_match_path_prefix(int *match, struct got_worktree *worktree,
+    const char *path_prefix)
+{
+	char *absprefix = NULL;
+
+	if (!got_path_is_absolute(path_prefix)) {
+		if (asprintf(&absprefix, "/%s", path_prefix) == -1)
+			return got_error_from_errno();
+	}
+	*match = (strcmp(absprefix ? absprefix : path_prefix,
+	    worktree->path_prefix) == 0);
+	free(absprefix);
+	return NULL;
+}
+
 char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {

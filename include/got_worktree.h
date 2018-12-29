@@ -51,6 +51,12 @@ const char *got_worktree_get_repo_path(struct got_worktree *);
 const char *got_worktree_get_path_prefix(struct got_worktree *);
 
 /*
+ * Check if a user-provided path prefix matches that of the worktree.
+ */
+const struct got_error *got_worktree_match_path_prefix(int *,
+    struct got_worktree *, const char *);
+
+/*
  * Get the name of a work tree's HEAD reference.
  * The caller must dispose of it with free(3).
  */
