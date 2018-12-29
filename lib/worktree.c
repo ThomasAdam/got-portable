@@ -417,6 +417,12 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	    apply_path_prefix(worktree, path)) == -1)
 		return got_error_from_errno();
 
+	entry = got_fileindex_entry_get(fileindex,
+	    apply_path_prefix(worktree, path));
+	if (entry && memcmp(entry->commit_sha1, worktree->base_commit_id->sha1,
+	    SHA1_DIGEST_LENGTH) == 0)
+		return NULL;
+
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
@@ -462,8 +468,6 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	fsync(fd);
 
-	entry = got_fileindex_entry_get(fileindex,
-	    apply_path_prefix(worktree, path));
 	if (entry)
 		err = got_fileindex_entry_update(entry, ondisk_path,
 		    blob->id.sha1, worktree->base_commit_id->sha1);
