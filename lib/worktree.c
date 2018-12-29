@@ -403,7 +403,8 @@ apply_path_prefix(struct got_worktree *worktree, const char *path)
 
 static const struct got_error *
 blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
-   const char *path, struct got_blob_object *blob, struct got_repository *repo,
+   struct got_fileindex_entry *entry, const char *path,
+   struct got_blob_object *blob, struct got_repository *repo,
    got_worktree_checkout_cb progress_cb, void *progress_arg,
    const char *progress_path)
 {
@@ -411,17 +412,10 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	char *ondisk_path;
 	int fd;
 	size_t len, hdrlen;
-	struct got_fileindex_entry *entry;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)
 		return got_error_from_errno();
-
-	entry = got_fileindex_entry_get(fileindex,
-	    apply_path_prefix(worktree, path));
-	if (entry && memcmp(entry->commit_sha1, worktree->base_commit_id->sha1,
-	    SHA1_DIGEST_LENGTH) == 0)
-		return NULL;
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -538,6 +532,7 @@ tree_checkout_entry(struct got_worktree *worktree,
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
 	struct got_blob_object *blob = NULL;
+	struct got_fileindex_entry *entry = NULL;
 	struct got_tree_object *tree = NULL;
 	char *path = NULL;
 	char *progress_path = NULL;
@@ -567,11 +562,17 @@ tree_checkout_entry(struct got_worktree *worktree,
 	case GOT_OBJ_TYPE_BLOB:
 		if (strlen(worktree->path_prefix) >= strlen(path))
 			break;
+		entry = got_fileindex_entry_get(fileindex,
+		    apply_path_prefix(worktree, path));
+		if (entry &&
+		    memcmp(entry->commit_sha1, worktree->base_commit_id->sha1,
+		    SHA1_DIGEST_LENGTH) == 0)
+			break; /* file already checked out */
 		err = got_object_blob_open(&blob, repo, obj, 8192);
 		if (err)
 			goto done;
-		err = blob_checkout(worktree, fileindex, path, blob, repo,
-		    progress_cb, progress_arg, progress_path);
+		err = blob_checkout(worktree, fileindex, entry, path, blob,
+		    repo, progress_cb, progress_arg, progress_path);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_object_tree_open(&tree, repo, obj);
