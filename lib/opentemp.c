@@ -86,3 +86,28 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	return err;
 }
+
+const struct got_error *
+got_opentemp_named_fd(char **path, int *outfd, const char *basepath)
+{
+	const struct got_error *err = NULL;
+	int fd;
+
+	*outfd = -1;
+
+	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
+		*path = NULL;
+		return got_error_from_errno();
+	}
+
+	fd = mkstemp(*path);
+	if (fd == -1) {
+		err = got_error_from_errno();
+		free(*path);
+		*path = NULL;
+		return err;
+	}
+
+	*outfd = fd;
+	return err;
+}

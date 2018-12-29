@@ -27,3 +27,6 @@ FILE *got_opentemp(void);
 /* Open a new temporary file for writing.
  * The file is visible in the filesystem. */
 const struct got_error *got_opentemp_named(char **, FILE **, const char *);
+
+/* Like got_opentemp_named() but returns a file descriptor instead of a FILE. */
+const struct got_error *got_opentemp_named_fd(char **, int *, const char *);

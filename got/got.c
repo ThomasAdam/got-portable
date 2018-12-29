@@ -69,12 +69,14 @@ struct cmd {
 
 __dead static void	usage(void);
 __dead static void	usage_checkout(void);
+__dead static void	usage_update(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
+static const struct got_error*		cmd_update(int, char *[]);
 static const struct got_error*		cmd_log(int, char *[]);
 static const struct got_error*		cmd_diff(int, char *[]);
 static const struct got_error*		cmd_blame(int, char *[]);
@@ -86,6 +88,8 @@ static const struct got_error*		cmd_status(int, char *[]);
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
 	    "check out a new work tree from a repository" },
+	{ "update",	cmd_update,	usage_update,
+	    "update a work tree to a different commit" },
 	{ "log",	cmd_log,	usage_log,
 	    "show repository history" },
 	{ "diff",	cmd_diff,	usage_diff,
@@ -302,6 +306,114 @@ cmd_checkout(int argc, char *argv[])
 done:
 	free(repo_path);
 	free(worktree_path);
+	return error;
+}
+
+__dead static void
+usage_update(void)
+{
+	fprintf(stderr, "usage: %s update [-c commit] [worktree-path]\n",
+	    getprogname());
+	exit(1);
+}
+
+static void
+update_progress(void *arg, unsigned char status, const char *path)
+{
+	if (status == GOT_STATUS_EXISTS)
+		return;
+
+	while (path[0] == '/')
+		path++;
+	printf("%c  %s\n", status, path);
+}
+
+static const struct got_error *
+cmd_update(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *worktree_path = NULL;
+	struct got_object_id *commit_id = NULL;
+	const char *commit_id_str = NULL;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
+		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
+		default:
+			usage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	    == -1)
+		err(1, "pledge");
+#endif
+	if (argc == 0) {
+		worktree_path = getcwd(NULL, 0);
+		if (worktree_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	} else if (argc == 1) {
+		worktree_path = realpath(argv[0], NULL);
+		if (worktree_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	} else
+		usage_update();
+
+	error = got_worktree_open(&worktree, worktree_path);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	if (commit_id_str == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		if (error != NULL)
+			goto done;
+		error = got_ref_resolve(&commit_id, repo, head_ref);
+		if (error != NULL)
+			goto done;
+	} else {
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_str);
+		if (error != NULL)
+			goto done;
+	}
+
+	if (got_object_id_cmp(got_worktree_get_base_commit_id(worktree),
+	    commit_id) != 0) {
+		error = got_worktree_set_base_commit_id(worktree, repo,
+		    commit_id);
+		if (error)
+			goto done;
+	}
+
+	error = got_worktree_checkout_files(worktree, repo,
+	    update_progress, NULL, checkout_cancel, NULL);
+	if (error != NULL)
+		goto done;
+
+	printf("Now shut up and hack\n");
+
+done:
+	free(worktree_path);
+	free(commit_id);
 	return error;
 }
 

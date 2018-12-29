@@ -83,6 +83,43 @@ done:
 }
 
 static const struct got_error *
+update_meta_file(const char *path_got, const char *name, const char *content)
+{
+	const struct got_error *err = NULL;
+	FILE *tmpfile = NULL;
+	char *tmppath = NULL;
+	char *path = NULL;
+
+	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
+		err = got_error_from_errno();
+		path = NULL;
+		goto done;
+	}
+
+	err = got_opentemp_named(&tmppath, &tmpfile, path);
+	if (err)
+		goto done;
+
+	if (content) {
+		int len = fprintf(tmpfile, "%s\n", content);
+		if (len != strlen(content) + 1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+
+	if (rename(tmppath, path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+done:
+	free(tmppath);
+	fclose(tmpfile);
+	return err;
+}
+
+static const struct got_error *
 read_meta_file(char **content, const char *path_got, const char *name)
 {
 	const struct got_error *err = NULL;
@@ -404,6 +441,59 @@ got_worktree_get_head_ref_name(struct got_worktree *worktree)
 	return got_ref_to_str(worktree->head_ref);
 }
 
+const struct got_object_id *
+got_worktree_get_base_commit_id(struct got_worktree *worktree)
+{
+	return worktree->base_commit_id;
+}
+
+const struct got_error *
+got_worktree_set_base_commit_id(struct got_worktree *worktree,
+    struct got_repository *repo, struct got_object_id *commit_id)
+{
+	const struct got_error *err;
+	struct got_object *obj = NULL;
+	char *id_str = NULL;
+	char *path_got = NULL;
+
+	if (asprintf(&path_got, "%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR) == -1) {
+		err = got_error_from_errno();
+		path_got = NULL;
+		goto done;
+	}
+
+	err = got_object_open(&obj, repo, commit_id);
+	if (err)
+		return err;
+
+	if (obj->type != GOT_OBJ_TYPE_COMMIT) {
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	/* Record our base commit. */
+	err = got_object_id_str(&id_str, commit_id);
+	if (err)
+		goto done;
+	err = update_meta_file(path_got, GOT_WORKTREE_BASE_COMMIT, id_str);
+	if (err)
+		goto done;
+
+	free(worktree->base_commit_id);
+	worktree->base_commit_id = got_object_id_dup(commit_id);
+	if (worktree->base_commit_id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	if (obj)
+		got_object_close(obj);
+	free(id_str);
+	free(path_got);
+	return err;
+}
+
 static const struct got_error *
 lock_worktree(struct got_worktree *worktree, int operation)
 {
@@ -432,8 +522,10 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 {
 	const struct got_error *err = NULL;
 	char *ondisk_path;
-	int fd;
+	int fd = -1;
 	size_t len, hdrlen;
+	int update = 0;
+	char *tmppath = NULL;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 	    apply_path_prefix(worktree, path)) == -1)
@@ -447,20 +539,24 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();
+				goto done;
 			} else if (!S_ISREG(sb.st_mode)) {
 				/* TODO file is obstructed; do something */
 				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+				goto done;
 			} else {
-				/* TODO: Merge the file! */
-				(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
-				    progress_path);
-				return NULL;
+				err = got_opentemp_named_fd(&tmppath, &fd,
+				    ondisk_path);
+				if (err)
+					goto done;
+				update = 1;
 			}
-		}
-		return err;
+		} else
+			return err;
 	}
 
-	(*progress_cb)(progress_arg, GOT_STATUS_ADD, progress_path);
+	(*progress_cb)(progress_arg,
+	    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, progress_path);
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -484,6 +580,13 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	fsync(fd);
 
+	if (update) {
+		if (rename(tmppath, ondisk_path) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+
 	if (entry)
 		err = got_fileindex_entry_update(entry, ondisk_path,
 		    blob->id.sha1, worktree->base_commit_id->sha1);
@@ -498,8 +601,10 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		goto done;
 done:
-	close(fd);
+	if (fd != -1)
+		close(fd);
 	free(ondisk_path);
+	free(tmppath);
 	return err;
 }
 
@@ -588,8 +693,14 @@ tree_checkout_entry(struct got_worktree *worktree,
 		    apply_path_prefix(worktree, path));
 		if (entry &&
 		    memcmp(entry->commit_sha1, worktree->base_commit_id->sha1,
+		    SHA1_DIGEST_LENGTH) == 0) {
+			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
+			    progress_path);
+			break;
+		}
+		if (entry && memcmp(entry->blob_sha1, obj->id.sha1,
 		    SHA1_DIGEST_LENGTH) == 0)
-			break; /* file already checked out */
+			break;
 		err = got_object_blob_open(&blob, repo, obj, 8192);
 		if (err)
 			goto done;

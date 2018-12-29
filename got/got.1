@@ -89,6 +89,23 @@ Only files beneath the specified
 .Ar path-prefix
 will be checked out.
 .El
+.It Cm update [ Fl c Ar commit ] [ work-tree-path ]
+Update an existing work tree to another commit.
+By default, the latest commit on the current branch is assumed.
+If the
+.Ar work tree path
+is omitted, use the current working directory.
+.Pp
+The options for
+.Cm got update
+are as follows:
+.Bl -tag -width Ds
+.It Fl c Ar commit
+Update the work tree to the specified
+.Ar commit .
+The expected argument is the name of a branch or a SHA1 hash which corresponds
+to a commit object.
+.El
 .\".It Cm status
 .\"Show current status of files.
 .It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
