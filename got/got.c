@@ -408,9 +408,6 @@ cmd_update(int argc, char *argv[])
 	    update_progress, NULL, checkout_cancel, NULL);
 	if (error != NULL)
 		goto done;
-
-	printf("Now shut up and hack\n");
-
 done:
 	free(worktree_path);
 	free(commit_id);
