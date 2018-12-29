@@ -16,6 +16,10 @@
 
 struct got_worktree;
 
+/* status codes */
+#define GOT_STATUS_ADD		'A'
+#define GOT_STATUS_EXISTS	'E'
+
 /*
  * Attempt to initialize a new work tree on disk.
  * The first argument is the path to a directory where the work tree

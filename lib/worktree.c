@@ -430,7 +430,7 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
 			} else {
 				/* TODO: Merge the file! */
-				(*progress_cb)(progress_arg, 'E',
+				(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
 				    progress_path);
 				return NULL;
 			}
@@ -438,7 +438,7 @@ add_file_on_disk(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		return err;
 	}
 
-	(*progress_cb)(progress_arg, 'A', progress_path);
+	(*progress_cb)(progress_arg, GOT_STATUS_ADD, progress_path);
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
