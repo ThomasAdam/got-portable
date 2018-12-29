@@ -305,7 +305,7 @@ done:
 }
 
 static void
-progress_cb(void *arg, char status, const char *path)
+progress_cb(void *arg, unsigned char status, const char *path)
 {
 }
 

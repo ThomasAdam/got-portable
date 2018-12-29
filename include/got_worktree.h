@@ -49,7 +49,7 @@ char *got_worktree_get_repo_path(struct got_worktree *);
 char  *got_worktree_get_head_ref_name(struct got_worktree *);
 
 /* A callback function which is invoked when a path is checked out. */
-typedef void (*got_worktree_checkout_cb)(void *, char, const char *);
+typedef void (*got_worktree_checkout_cb)(void *, unsigned char, const char *);
 
 /* A callback function which is invoked at cancellation points.
  * May return GOT_ERR_CANCELLED to abort the runing operation. */

@@ -178,7 +178,7 @@ usage_checkout(void)
 }
 
 static void
-checkout_progress(void *arg, char status, const char *path)
+checkout_progress(void *arg, unsigned char status, const char *path)
 {
 	char *worktree_path = arg;
 
