@@ -379,7 +379,7 @@ got_worktree_get_repo_path(struct got_worktree *worktree)
 const char *
 got_worktree_get_path_prefix(struct got_worktree *worktree)
 {
-	return worktree->repo_path;
+	return worktree->path_prefix;
 }
 
 char *
