@@ -376,6 +376,12 @@ got_worktree_get_repo_path(struct got_worktree *worktree)
 	return strdup(worktree->repo_path);
 }
 
+const char *
+got_worktree_get_path_prefix(struct got_worktree *worktree)
+{
+	return worktree->repo_path;
+}
+
 char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {

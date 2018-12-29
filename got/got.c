@@ -283,6 +283,11 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (strcmp(path_prefix, got_worktree_get_path_prefix(worktree)) != 0) {
+		error = got_error(GOT_ERR_PATH_PREFIX);
+		goto done;
+	}
+
 	error = got_worktree_checkout_files(worktree, repo,
 	    checkout_progress, worktree_path, checkout_cancel, NULL);
 	if (error != NULL)
