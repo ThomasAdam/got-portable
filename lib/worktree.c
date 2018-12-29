@@ -575,14 +575,14 @@ tree_checkout_entry(struct got_worktree *worktree,
 		    repo, progress_cb, progress_arg, progress_path);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_object_tree_open(&tree, repo, obj);
-		if (err)
-			goto done;
 		if (strlen(worktree->path_prefix) < strlen(path)) {
 			err = add_dir_on_disk(worktree, path);
 			if (err)
 				break;
 		}
+		err = got_object_tree_open(&tree, repo, obj);
+		if (err)
+			goto done;
 		/* XXX infinite recursion possible */
 		err = tree_checkout(worktree, fileindex, tree, path, repo,
 		    progress_cb, progress_arg, cancel_cb, cancel_arg);
