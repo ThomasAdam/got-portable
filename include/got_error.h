@@ -68,6 +68,7 @@
 #define GOT_ERR_FILEIDX_VER	52
 #define GOT_ERR_FILEIDX_CSUM	53
 #define GOT_ERR_PATH_PREFIX	54
+#define GOT_ERR_ANCESTRY	55
 
 static const struct got_error {
 	int code;
@@ -125,6 +126,8 @@ static const struct got_error {
 	{ GOT_ERR_FILEIDX_CSUM,	"bad file index checksum" },
 	{ GOT_ERR_PATH_PREFIX,	"worktree already contains items from a "
 				"different path prefix" },
+	{ GOT_ERR_ANCESTRY,	"specified commit does not share ancestry with "
+				"the current branch" },
 };
 
 /*

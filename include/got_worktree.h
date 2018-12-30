@@ -64,6 +64,12 @@ const struct got_error *got_worktree_match_path_prefix(int *,
 char  *got_worktree_get_head_ref_name(struct got_worktree *);
 
 /*
+ * Get the work tree's HEAD reference.
+ * The caller must dispose of it with free(3).
+ */
+struct got_reference *got_worktree_get_head_ref(struct got_worktree *);
+
+/*
  * Get the current base commit ID of a worktree.
  */
 const struct got_object_id *got_worktree_get_base_commit_id(struct got_worktree *);

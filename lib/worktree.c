@@ -441,6 +441,12 @@ got_worktree_get_head_ref_name(struct got_worktree *worktree)
 	return got_ref_to_str(worktree->head_ref);
 }
 
+struct got_reference *
+got_worktree_get_head_ref(struct got_worktree *worktree)
+{
+	return got_ref_dup(worktree->head_ref);
+}
+
 const struct got_object_id *
 got_worktree_get_base_commit_id(struct got_worktree *worktree)
 {
