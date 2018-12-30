@@ -341,6 +341,7 @@ check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
 	if (head_ref == NULL)
 		return got_error_from_errno();
 
+	/* TODO: Check the reflog. The head ref may have been rebased. */
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
 	if (err)
 		goto done;
