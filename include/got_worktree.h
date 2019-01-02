@@ -20,6 +20,7 @@ struct got_worktree;
 #define GOT_STATUS_ADD		'A'
 #define GOT_STATUS_EXISTS	'E'
 #define GOT_STATUS_UPDATE	'U'
+#define GOT_STATUS_DELETE	'D'
 
 /*
  * Attempt to initialize a new work tree on disk.

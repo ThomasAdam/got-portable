@@ -26,6 +26,13 @@ function git_commit
 	(cd $repo && git commit -q -a "$@")
 }
 
+function git_rm
+{
+	local repo="$1"
+	shift
+	(cd $repo && git rm -q "$@")
+}
+
 function git_show_head
 {
 	local repo="$1"

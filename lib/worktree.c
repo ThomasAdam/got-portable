@@ -27,6 +27,7 @@
 #include <sha1.h>
 #include <zlib.h>
 #include <fnmatch.h>
+#include <libgen.h>
 
 #include "got_error.h"
 #include "got_repository.h"
@@ -741,6 +742,105 @@ done:
 	return err;
 }
 
+struct collect_missing_entry_args {
+	struct got_fileindex *fileindex;
+	const struct got_tree_entries *entries;
+	struct got_fileindex missing_entries;
+	const char *path_prefix;
+};
+
+static const struct got_error *
+collect_missing_file(void *args, struct got_fileindex_entry *entry)
+{
+	struct collect_missing_entry_args *a = args;
+	char *name;
+	struct got_tree_entry *te;
+	int found = 0;
+
+	if (a->path_prefix[0] == '\0' && strchr(entry->path, '/') != NULL)
+		return NULL;
+	if (a->path_prefix[0] != '\0' &&
+	    strncmp(a->path_prefix, entry->path, strlen(a->path_prefix)) != 0)
+		return NULL;
+
+	name = basename(entry->path);
+	if (name == NULL)
+		return got_error_from_errno();
+
+	SIMPLEQ_FOREACH(te, &a->entries->head, entry) {
+		if (strcmp(te->name, name) == 0) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found)
+		return NULL;
+
+	got_fileindex_entry_remove(a->fileindex, entry);
+	return got_fileindex_entry_add(&a->missing_entries, entry);
+}
+
+/* Remove files which exist in the file index but not in the tree. */
+static const struct got_error *
+remove_missing_files(struct got_worktree *worktree, const char *path,
+    struct got_fileindex *fileindex, const struct got_tree_entries *entries,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	struct collect_missing_entry_args a;
+	struct got_fileindex_entry *entry, *tmp;
+
+	a.fileindex = fileindex;
+	a.entries = entries;
+	a.missing_entries.nentries = 0;
+	a.path_prefix = path;
+	while (a.path_prefix[0] == '/')
+		a.path_prefix++;
+	TAILQ_INIT(&a.missing_entries.entries);
+	err = got_fileindex_for_each_entry(fileindex, collect_missing_file, &a);
+	if (err)
+		return err;
+
+	TAILQ_FOREACH_SAFE(entry, &a.missing_entries.entries, entry, tmp) {
+		char *ondisk_path = NULL;
+
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
+		(*progress_cb)(progress_arg, GOT_STATUS_DELETE, entry->path);
+
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    entry->path) == -1) {
+			err = got_error_from_errno();
+			break;
+		}
+
+		if (unlink(ondisk_path) == -1)
+			err = got_error_from_errno();
+		free(ondisk_path);
+		if (err)
+			break;
+
+		TAILQ_REMOVE(&a.missing_entries.entries, entry, entry);
+		got_fileindex_entry_free(entry);
+	}
+
+	if (err) {
+		while (!TAILQ_EMPTY(&a.missing_entries.entries)) {
+			entry = TAILQ_FIRST(&a.missing_entries.entries);
+			TAILQ_REMOVE(&a.missing_entries.entries, entry, entry);
+			got_fileindex_entry_free(entry);
+		}
+	}
+
+	return err;
+}
+
 static const struct got_error *
 tree_checkout(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_tree_object *tree,
@@ -763,12 +863,20 @@ tree_checkout(struct got_worktree *worktree,
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
-				break;
+				return err;
 		}
 		err = tree_checkout_entry(worktree, fileindex, te, path, repo,
 		    progress_cb, progress_arg, cancel_cb, cancel_arg);
 		if (err)
-			break;
+			return err;
+	}
+
+	len = strlen(worktree->path_prefix);
+	if (strncmp(worktree->path_prefix, path, len) == 0) {
+		err = remove_missing_files(worktree, path, fileindex, entries,
+		    progress_cb, progress_arg, cancel_cb, cancel_arg);
+		if (err)
+			return err;
 	}
 
 	return err;

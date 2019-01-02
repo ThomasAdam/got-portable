@@ -98,5 +98,50 @@ function test_update_adds_file {
 	test_done "$testroot" "$?"
 }
 
+function test_update_deletes_file {
+	local testroot=`test_init update_deletes_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	(cd $testroot/repo && git_rm $testroot/repo beta)
+	git_commit $testroot/repo -m "deleting a file"
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/beta ]; then
+		echo "removed file beta still exists on disk" >&2
+		return 1
+	fi
+
+	echo "alpha" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$?"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
+run_test test_update_deletes_file

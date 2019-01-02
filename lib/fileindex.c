@@ -100,6 +100,14 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
 	return NULL;
 }
 
+void
+got_fileindex_entry_remove(struct got_fileindex *fileindex,
+    struct got_fileindex_entry *entry)
+{
+	TAILQ_REMOVE(&fileindex->entries, entry, entry);
+	fileindex->nentries--;
+}
+
 struct got_fileindex_entry *
 got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 {
@@ -110,6 +118,23 @@ got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 	}
 
 	return NULL;
+}
+
+const struct got_error *
+got_fileindex_for_each_entry(struct got_fileindex *fileindex,
+    const struct got_error *(cb)(void *, struct got_fileindex_entry *),
+    void *cb_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_fileindex_entry *entry;
+
+	TAILQ_FOREACH(entry, &fileindex->entries, entry) {
+		err = cb(cb_arg, entry);
+		if (err)
+			break;
+	}
+
+	return err;
 }
 
 struct got_fileindex *
