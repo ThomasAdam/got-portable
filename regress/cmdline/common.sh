@@ -69,7 +69,7 @@ function test_cleanup
 function run_test
 {
 	testfunc="$1"
-	echo "$testfunc"
+	echo -n "$testfunc "
 	$testfunc
 }
 
@@ -79,6 +79,7 @@ function test_done
 	local result="$2"
 	if [ "$result" == "0" ]; then
 		test_cleanup "$testroot"
+		echo "ok"
 	else
 		echo "test failed; leaving test data in $testroot"
 	fi
