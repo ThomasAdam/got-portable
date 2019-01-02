@@ -19,7 +19,7 @@
 function test_update_basic {
 	local testroot=`test_init update_basic`
 
-	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	got checkout $testroot/repo $testroot/wt > /dev/null
 	if [ "$?" != "0" ]; then
 		test_done "$testroot" "$?"
 		return 1
