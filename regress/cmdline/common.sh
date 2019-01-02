@@ -26,6 +26,12 @@ function git_commit
 	(cd $repo && git commit -q -a "$@")
 }
 
+function git_show_head
+{
+	local repo="$1"
+	(cd $repo && git show --no-patch --pretty='format:%H')
+}
+
 function make_test_tree
 {
 	repo="$1"

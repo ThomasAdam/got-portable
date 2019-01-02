@@ -394,13 +394,15 @@ cmd_update(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *worktree_path = NULL;
 	struct got_object_id *commit_id = NULL;
-	const char *commit_id_str = NULL;
+	char *commit_id_str = NULL;
 	int ch;
 
 	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
 		case 'c':
-			commit_id_str = optarg;
+			commit_id_str = strdup(optarg);
+			if (commit_id_str == NULL)
+				return got_error_from_errno();
 			break;
 		default:
 			usage();
@@ -447,6 +449,9 @@ cmd_update(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		if (error != NULL)
 			goto done;
+		error = got_object_id_str(&commit_id_str, commit_id);
+		if (error != NULL)
+			goto done;
 	} else {
 		error = got_object_resolve_id_str(&commit_id, repo,
 		    commit_id_str);
@@ -470,9 +475,12 @@ cmd_update(int argc, char *argv[])
 	    update_progress, NULL, checkout_cancel, NULL);
 	if (error != NULL)
 		goto done;
+
+	printf("Updated to commit %s\n", commit_id_str);
 done:
 	free(worktree_path);
 	free(commit_id);
+	free(commit_id_str);
 	return error;
 }
 

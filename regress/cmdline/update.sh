@@ -29,6 +29,9 @@ function test_update_basic {
 	git_commit $testroot/repo -m "modified alpha"
 
 	echo "U  alpha" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
