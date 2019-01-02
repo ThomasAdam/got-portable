@@ -14,7 +14,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-
 . ./common.sh
 
 function test_checkout_basic {
@@ -53,5 +52,4 @@ function test_checkout_basic {
 	test_done "$testroot" "$?"
 }
 
-# run tests
 run_test test_checkout_basic
