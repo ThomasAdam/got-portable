@@ -15,8 +15,8 @@ This will install the following commands to ~/bin:
  tog (ncurses interface)
  and several helper programs from the libexec directory
 
-The tests will pass only after 'make install' because
-they rely on installed libexec binaries:
+Tests will pass only after 'make install' because they rely on installed
+libexec binaries. Tests in the cmdline directory currently depend on git(1).
 
  $ make regress
 
