@@ -17,7 +17,7 @@
 . ./common.sh
 
 function test_update_basic {
-	local testroot=`test_init checkout_basic`
+	local testroot=`test_init update_basic`
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
 	if [ "$?" != "0" ]; then
