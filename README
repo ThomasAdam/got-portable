@@ -16,8 +16,9 @@ This will install the following commands to ~/bin:
  and several helper programs from the libexec directory
 
 Tests will pass only after 'make install' because they rely on installed
-libexec binaries. Tests in the cmdline directory currently depend on git(1).
+binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
 
+ $ doas pkg_add git
  $ make regress
 
 Man pages are not installed yet but can be viewed with mandoc:
