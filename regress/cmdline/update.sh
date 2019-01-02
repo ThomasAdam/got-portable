@@ -56,4 +56,47 @@ function test_update_basic {
 	test_done "$testroot" "$?"
 }
 
+function test_update_adds_file {
+	local testroot=`test_init update_adds_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo "new" > $testroot/repo/gamma/new
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding a new file"
+
+	echo "A  gamma/new" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo "alpha" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	echo "new" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta $testroot/wt/gamma/new > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$?"
+}
+
 run_test test_update_basic
+run_test test_update_adds_file
