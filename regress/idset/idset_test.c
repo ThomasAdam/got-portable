@@ -168,7 +168,7 @@ done:
 
 #define RUN_TEST(expr, name) \
 	{ test_ok = (expr);  \
-	printf("test %s %s\n", (name), test_ok ? "ok" : "failed"); \
+	printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
 void
