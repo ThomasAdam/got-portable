@@ -50,10 +50,11 @@ function test_update_basic {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
-	test_done "$testroot" "$?"
+	test_done "$testroot" "$ret"
 }
 
 function test_update_adds_file {
@@ -92,10 +93,11 @@ function test_update_adds_file {
 	    $testroot/wt/gamma/delta $testroot/wt/gamma/new > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
-	test_done "$testroot" "$?"
+	test_done "$testroot" "$ret"
 }
 
 function test_update_deletes_file {
@@ -136,10 +138,11 @@ function test_update_deletes_file {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
-	test_done "$testroot" "$?"
+	test_done "$testroot" "$ret"
 }
 
 run_test test_update_basic

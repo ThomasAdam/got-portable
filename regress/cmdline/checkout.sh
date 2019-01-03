@@ -46,10 +46,11 @@ function test_checkout_basic {
 	    $testroot/wt/gamma/delta > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
 	fi
-	test_done "$testroot" "$?"
+	test_done "$testroot" "$ret"
 }
 
 run_test test_checkout_basic
