@@ -718,7 +718,8 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL)
 	    == -1)
 		err(1, "pledge");
 #endif
@@ -780,6 +781,10 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		}
 	}
+
+	error = apply_unveil(repo_path, NULL);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
