@@ -46,6 +46,7 @@
 #include "got_commit_graph.h"
 #include "got_utf8.h"
 #include "got_blame.h"
+#include "got_privsep.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -1611,6 +1612,30 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 }
 
 static const struct got_error *
+apply_unveil(const char *repo_path, const char *worktree_path)
+{
+	const struct got_error *error;
+
+	if (repo_path && unveil(repo_path, "r") != 0)
+		return got_error_from_errno();
+
+	if (worktree_path && unveil(worktree_path, "rwc") != 0)
+		return got_error_from_errno();
+
+	if ( unveil("/tmp", "rwc") != 0)
+		return got_error_from_errno();
+
+	error = got_privsep_unveil_exec_helpers();
+	if (error != NULL)
+		return error;
+
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno();
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -1622,8 +1647,8 @@ cmd_log(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
-	    == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
+	    NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -1667,6 +1692,10 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		}
 	}
+
+	error = apply_unveil(repo_path, NULL);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
