@@ -174,6 +174,30 @@ usage(void)
 	exit(1);
 }
 
+static const struct got_error *
+apply_unveil(const char *repo_path, const char *worktree_path)
+{
+	const struct got_error *error;
+
+	if (repo_path && unveil(repo_path, "r") != 0)
+		return got_error_from_errno();
+
+	if (worktree_path && unveil(worktree_path, "rwc") != 0)
+		return got_error_from_errno();
+
+	if ( unveil("/tmp", "rwc") != 0)
+		return got_error_from_errno();
+
+	error = got_privsep_unveil_exec_helpers();
+	if (error != NULL)
+		return error;
+
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno();
+
+	return NULL;
+}
+
 __dead static void
 usage_checkout(void)
 {
@@ -273,20 +297,9 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	if (unveil(repo_path, "r") != 0 ||
-	    unveil(worktree_path, "rwc") != 0 ||
-	    unveil("/tmp", "rwc") != 0) {
-		error = got_error_from_errno();
+	error = apply_unveil(repo_path, worktree_path);
+	if (error)
 		goto done;
-	}
-	error = got_privsep_unveil_exec_helpers();
-	if (error != NULL)
-		goto done;
-
-	if (unveil(NULL, NULL) != 0) {
-		error = got_error_from_errno();
-		goto done;
-	}
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
@@ -409,6 +422,7 @@ cmd_update(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *worktree_path = NULL;
+	char *repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -430,8 +444,8 @@ cmd_update(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
-	    == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 0) {
@@ -455,6 +469,16 @@ cmd_update(int argc, char *argv[])
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
+		goto done;
+
+	repo_path = got_repo_get_path(repo);
+	if (repo_path == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	error = apply_unveil(repo_path, worktree_path);
+	if (error)
 		goto done;
 
 	if (commit_id_str == NULL) {
@@ -497,6 +521,7 @@ done:
 	free(worktree_path);
 	free(commit_id);
 	free(commit_id_str);
+	free(repo_path);
 	return error;
 }
 
