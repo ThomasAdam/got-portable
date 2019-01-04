@@ -2112,8 +2112,8 @@ cmd_diff(int argc, char *argv[])
 	struct tog_view *view;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd", NULL)
-	    == -1)
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
+	    NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -2144,6 +2144,10 @@ cmd_diff(int argc, char *argv[])
 		id_str2 = argv[2];
 	} else
 		usage_diff();
+
+	error = apply_unveil(repo_path, NULL);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, repo_path);
 	free(repo_path);
