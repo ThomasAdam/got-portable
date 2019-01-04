@@ -2724,8 +2724,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			struct got_commit_object *commit = NULL;
 			id = get_selected_commit_id(s->blame.lines,
 			    s->first_displayed_line, s->selected_line);
-			if (id == NULL || got_object_id_cmp(id,
-			    s->blamed_commit->id) == 0)
+			if (id == NULL)
 				break;
 			err = got_object_open_as_commit(&commit, s->repo, id);
 			if (err)
