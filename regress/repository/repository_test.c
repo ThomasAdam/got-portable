@@ -32,6 +32,7 @@
 #include "got_repository.h"
 #include "got_diff.h"
 #include "got_opentemp.h"
+#include "got_privsep.h"
 
 #include "got_lib_path.h"
 
@@ -411,15 +412,50 @@ usage(void)
 	fprintf(stderr, "usage: repository_test [-v] [REPO_PATH]\n");
 }
 
+static const struct got_error *
+apply_unveil(const char *repo_path)
+{
+	const struct got_error *error;
+	char *normpath = NULL;
+
+	if (repo_path) {
+		normpath = got_path_normalize(repo_path);
+		if (normpath == NULL)
+			return got_error_from_errno();
+		if (unveil(normpath, "r") != 0) {
+			free(normpath);
+			return got_error_from_errno();
+		}
+		free(normpath);
+	}
+
+	if (unveil("/tmp", "rwc") != 0)
+		return got_error_from_errno();
+
+	if (unveil("/dev/null", "rwc") != 0)
+		return got_error_from_errno();
+
+	error = got_privsep_unveil_exec_helpers();
+	if (error != NULL)
+		return error;
+
+	if (unveil(NULL, NULL) != 0)
+		return got_error_from_errno();
+
+	return NULL;
+}
+
 int
 main(int argc, char *argv[])
 {
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
 	int ch;
+	const struct got_error *error;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath proc exec sendfd", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil", NULL)
+	    == -1)
 		err(1, "pledge");
 #endif
 
@@ -442,6 +478,12 @@ main(int argc, char *argv[])
 		repo_path = argv[0];
 	else {
 		usage();
+		return 1;
+	}
+
+	error = apply_unveil(repo_path);
+	if (error) {
+		fprintf(stderr, "unveil: %s", error->msg);
 		return 1;
 	}
 
