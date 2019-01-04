@@ -2853,7 +2853,7 @@ cmd_blame(int argc, char *argv[])
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
-		return error;
+		goto done;
 
 	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
