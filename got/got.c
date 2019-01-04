@@ -39,6 +39,7 @@
 #include "got_diff.h"
 #include "got_commit_graph.h"
 #include "got_blame.h"
+#include "got_privsep.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -227,8 +228,8 @@ cmd_checkout(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
-	    == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 1) {
@@ -271,6 +272,21 @@ cmd_checkout(int argc, char *argv[])
 		}
 	} else
 		usage_checkout();
+
+	if (unveil(repo_path, "r") != 0 ||
+	    unveil(worktree_path, "rwc") != 0 ||
+	    unveil("/tmp", "rwc") != 0) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_privsep_unveil_exec_helpers();
+	if (error != NULL)
+		goto done;
+
+	if (unveil(NULL, NULL) != 0) {
+		error = got_error_from_errno();
+		goto done;
+	}
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)

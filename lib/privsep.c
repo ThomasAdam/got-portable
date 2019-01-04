@@ -1135,3 +1135,17 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 
 	return flush_imsg(ibuf);
 }
+
+const struct got_error *
+got_privsep_unveil_exec_helpers(void)
+{
+	if (unveil(GOT_PATH_PROG_READ_PACK, "x") != 0 ||
+	    unveil(GOT_PATH_PROG_READ_OBJECT, "x") != 0 ||
+	    unveil(GOT_PATH_PROG_READ_COMMIT, "x") != 0 ||
+	    unveil(GOT_PATH_PROG_READ_TREE, "x") != 0 ||
+	    unveil(GOT_PATH_PROG_READ_BLOB, "x") != 0 ||
+	    unveil(GOT_PATH_PROG_READ_TAG, "x") != 0)
+		return got_error_from_errno();
+
+	return NULL;
+}
