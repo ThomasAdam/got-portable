@@ -35,6 +35,7 @@
 #include "got_repository.h"
 #include "got_worktree.h"
 #include "got_opentemp.h"
+#include "got_privsep.h"
 
 #include "got_lib_worktree.h"
 #include "got_lib_path.h"
@@ -395,11 +396,12 @@ main(int argc, char *argv[])
 {
 	int test_ok = 0, failure = 0;
 	const char *repo_path;
+	char *cwd = NULL;
 	int ch;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd", NULL)
-	    == -1)
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
 		err(1, "pledge");
 #endif
 
@@ -424,6 +426,25 @@ main(int argc, char *argv[])
 		usage();
 		return 1;
 	}
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		err(1, "getcwd");
+	if (unveil(cwd, "rwc") != 0)
+		err(1, "unvail");
+	free(cwd);
+
+	if (unveil("/tmp", "rwc") != 0)
+		err(1, "unveil");
+
+	if (unveil(repo_path, "r") != 0)
+		err(1, "unveil");
+
+	if (got_privsep_unveil_exec_helpers() != NULL)
+		return 1;
+
+	if (unveil(NULL, NULL) != 0)
+		err(1, "unveil");
 
 	RUN_TEST(worktree_init(repo_path), "init");
 	RUN_TEST(worktree_init_exists(repo_path), "init exists");
