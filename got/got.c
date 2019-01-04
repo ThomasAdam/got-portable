@@ -185,7 +185,7 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 	if (worktree_path && unveil(worktree_path, "rwc") != 0)
 		return got_error_from_errno();
 
-	if ( unveil("/tmp", "rwc") != 0)
+	if (unveil("/tmp", "rwc") != 0)
 		return got_error_from_errno();
 
 	error = got_privsep_unveil_exec_helpers();
