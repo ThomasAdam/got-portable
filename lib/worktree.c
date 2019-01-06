@@ -860,7 +860,7 @@ tree_checkout(struct got_worktree *worktree,
 	struct got_tree_entry *te;
 	size_t len;
 
-	/* Skip this tree if it is outside of our path prefix. */
+	/* Skip this tree if it shares no path components with the prefix. */
 	len = MIN(strlen(worktree->path_prefix), strlen(path));
 	if (strncmp(path, worktree->path_prefix, len) != 0)
 		return NULL;
