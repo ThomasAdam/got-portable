@@ -741,7 +741,7 @@ struct collect_missing_entry_args {
 	struct got_fileindex *fileindex;
 	const struct got_tree_entries *entries;
 	struct got_fileindex missing_entries;
-	const char *path_prefix;
+	const char *current_subdir;
 };
 
 static const struct got_error *
@@ -753,11 +753,12 @@ collect_missing_file(void *args, struct got_fileindex_entry *entry)
 	struct got_tree_entry *te;
 	int found = 0;
 
-	if (a->path_prefix[0] != '\0' &&
-	    strncmp(a->path_prefix, entry->path, strlen(a->path_prefix)) != 0)
+	if (a->current_subdir[0] != '\0' &&
+	    strncmp(a->current_subdir, entry->path,
+	    strlen(a->current_subdir)) != 0)
 		return NULL;
 
-	start = entry->path + strlen(a->path_prefix);
+	start = entry->path + strlen(a->current_subdir);
 	while (start[0] == '/')
 		start++;
 	end = strchr(start, '/');
@@ -797,9 +798,9 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 	a.fileindex = fileindex;
 	a.entries = entries;
 	a.missing_entries.nentries = 0;
-	a.path_prefix = path;
-	while (a.path_prefix[0] == '/')
-		a.path_prefix++;
+	a.current_subdir = path;
+	while (a.current_subdir[0] == '/')
+		a.current_subdir++;
 	TAILQ_INIT(&a.missing_entries.entries);
 	err = got_fileindex_for_each_entry(fileindex, collect_missing_file, &a);
 	if (err)
