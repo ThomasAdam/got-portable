@@ -4,6 +4,7 @@ lib:
   to fix empty directories left behind, and write a test for this problem
 
 tog:
+- make diff view generate diffs in a background thread
 - bug: page-down in tree view may move cursor beyond the last visible item
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
