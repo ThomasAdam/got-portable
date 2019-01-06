@@ -1,0 +1,11 @@
+lib:
+- convert file index to RB tree and provide a depth-first iteration API
+- use first-depth file index iteration when removing files during updates
+  to fix empty directories left behind, and write a test for this problem
+
+tog:
+- bug: page-down in tree view may move cursor beyond the last visible item
+- implement horizonal scrolling in all views
+- implement horizonal split view mode
+- make it possible to move between commit diffs with a single key press
+- implement search feature
