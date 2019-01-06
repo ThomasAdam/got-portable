@@ -145,6 +145,52 @@ function test_update_deletes_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_deletes_dir {
+	local testroot=`test_init update_deletes_dir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	(cd $testroot/repo && git_rm $testroot/repo -r epsilon)
+	git_commit $testroot/repo -m "deleting a directory"
+
+	echo "D  epsilon/zeta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon ]; then
+		echo "removed dir epsilon still exists on disk" >&2
+		return 1
+	fi
+
+	echo "alpha" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
+run_test test_update_deletes_dir

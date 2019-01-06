@@ -18,6 +18,7 @@
 #include <sys/limits.h>
 #include <sys/queue.h>
 
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -747,22 +748,29 @@ static const struct got_error *
 collect_missing_file(void *args, struct got_fileindex_entry *entry)
 {
 	struct collect_missing_entry_args *a = args;
-	char *name;
+	char *start, *end;
+	ptrdiff_t len;
 	struct got_tree_entry *te;
 	int found = 0;
 
-	if (a->path_prefix[0] == '\0' && strchr(entry->path, '/') != NULL)
-		return NULL;
 	if (a->path_prefix[0] != '\0' &&
 	    strncmp(a->path_prefix, entry->path, strlen(a->path_prefix)) != 0)
 		return NULL;
 
-	name = basename(entry->path);
-	if (name == NULL)
-		return got_error_from_errno();
+	start = entry->path + strlen(a->path_prefix);
+	while (start[0] == '/')
+		start++;
+	end = strchr(start, '/');
+	if (end == NULL) {
+		end = strchr(start, '\0');
+		if (end == NULL)
+			return got_error(GOT_ERR_BAD_PATH);
+	}
+	len = end - start;
 
 	SIMPLEQ_FOREACH(te, &a->entries->head, entry) {
-		if (strcmp(te->name, name) == 0) {
+		if (strncmp(start, te->name, len) == 0 &&
+		    te->name[len] == '\0') {
 			found = 1;
 			break;
 		}
@@ -816,6 +824,11 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 
 		if (unlink(ondisk_path) == -1)
 			err = got_error_from_errno();
+		else {
+			char *parent = dirname(ondisk_path);
+			if (rmdir(parent) == -1 && errno != ENOTEMPTY)
+				err = got_error_from_errno();
+		}
 		free(ondisk_path);
 		if (err)
 			break;
