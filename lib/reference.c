@@ -153,7 +153,7 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
 	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0 ||
 	    strncmp(refname, "refs/", 5) == 0)
-		return got_repo_get_path_git_dir(repo);
+		return strdup(got_repo_get_path_git_dir(repo));
 
 	return got_repo_get_path_refs(repo);
 }

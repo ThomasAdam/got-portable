@@ -21,12 +21,12 @@ const struct got_error *got_repo_open(struct got_repository**, const char *);
 const struct got_error *got_repo_close(struct got_repository*);
 
 const char *got_repo_get_path(struct got_repository *);
+const char *got_repo_get_path_git_dir(struct got_repository *);
 
 /*
  * Obtain paths to various directories within a repository.
  * The caller must dispose of a path with free(3).
  */
-char *got_repo_get_path_git_dir(struct got_repository *);
 char *got_repo_get_path_objects(struct got_repository *);
 char *got_repo_get_path_objects_pack(struct got_repository *);
 char *got_repo_get_path_refs(struct got_repository *);

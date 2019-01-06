@@ -72,10 +72,10 @@ got_repo_get_path(struct got_repository *repo)
 	return repo->path;
 }
 
-char *
+const char *
 got_repo_get_path_git_dir(struct got_repository *repo)
 {
-	return strdup(repo->path_git_dir);
+	return repo->path_git_dir;
 }
 
 int
@@ -123,7 +123,7 @@ get_path_head(struct got_repository *repo)
 static int
 is_git_repo(struct got_repository *repo)
 {
-	char *path_git = got_repo_get_path_git_dir(repo);
+	const char *path_git = got_repo_get_path_git_dir(repo);
 	char *path_objects = got_repo_get_path_objects(repo);
 	char *path_refs = got_repo_get_path_refs(repo);
 	char *path_head = get_path_head(repo);
@@ -158,7 +158,6 @@ is_git_repo(struct got_repository *repo)
 
 	ret = 1;
 done:
-	free(path_git);
 	free(path_objects);
 	free(path_refs);
 	free(path_head);
