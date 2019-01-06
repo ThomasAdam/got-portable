@@ -190,7 +190,54 @@ function test_update_deletes_dir {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_deletes_dir_with_path_prefix {
+	local testroot=`test_init update_deletes_dir_with_path_prefix`
+	local first_rev=`git_show_head $testroot/repo`
+
+	mkdir $testroot/repo/epsilon/psi
+	echo mu > $testroot/repo/epsilon/psi/mu
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
+
+	# check out the epsilon/ sub-tree
+	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	# update back to first commit and expect psi/mu to be deleted
+	echo "D  psi/mu" > $testroot/stdout.expected
+	echo "Updated to commit $first_rev" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/psi ]; then
+		echo "removed dir psi still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "zeta" >> $testroot/content.expected
+	cat $testroot/wt/zeta > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
 run_test test_update_deletes_dir
+run_test test_update_deletes_dir_with_path_prefix

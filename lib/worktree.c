@@ -798,9 +798,7 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 	a.fileindex = fileindex;
 	a.entries = entries;
 	a.missing_entries.nentries = 0;
-	a.current_subdir = path;
-	while (a.current_subdir[0] == '/')
-		a.current_subdir++;
+	a.current_subdir = apply_path_prefix(worktree, path);
 	TAILQ_INIT(&a.missing_entries.entries);
 	err = got_fileindex_for_each_entry(fileindex, collect_missing_file, &a);
 	if (err)
