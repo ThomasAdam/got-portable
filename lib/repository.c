@@ -66,10 +66,10 @@
 #define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
 #define GOT_OBJECTS_PACK_DIR	"objects/pack"
 
-char *
+const char *
 got_repo_get_path(struct got_repository *repo)
 {
-	return strdup(repo->path);
+	return repo->path;
 }
 
 char *
@@ -462,10 +462,10 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
     const char *input_path, int check_disk)
 {
 	const struct got_error *err = NULL;
-	char *repo_abspath = NULL, *cwd = NULL;
+	const char *repo_abspath = NULL;
 	struct stat sb;
 	size_t repolen, cwdlen, len;
-	char *canonpath, *path = NULL;
+	char *cwd, *canonpath, *path = NULL;
 
 	*in_repo_path = NULL;
 
@@ -483,10 +483,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 		goto done;
 
 	repo_abspath = got_repo_get_path(repo);
-	if (repo_abspath == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
 
 	/* TODO: Call "get in-repository path of work-tree node" API. */
 
@@ -584,7 +580,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 	}
 
 done:
-	free(repo_abspath);
 	free(cwd);
 	free(canonpath);
 	if (err)

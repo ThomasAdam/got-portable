@@ -422,7 +422,6 @@ cmd_update(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *worktree_path = NULL;
-	char *repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -471,13 +470,7 @@ cmd_update(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	repo_path = got_repo_get_path(repo);
-	if (repo_path == NULL) {
-		error = got_error_from_errno();
-		goto done;
-	}
-
-	error = apply_unveil(repo_path, worktree_path);
+	error = apply_unveil(got_repo_get_path(repo), worktree_path);
 	if (error)
 		goto done;
 
@@ -521,7 +514,6 @@ done:
 	free(worktree_path);
 	free(commit_id);
 	free(commit_id_str);
-	free(repo_path);
 	return error;
 }
 

@@ -187,7 +187,6 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	int obj_type;
 	char *path_got = NULL;
 	char *refstr = NULL;
-	char *repo_path = NULL;
 	char *formatstr = NULL;
 	char *absprefix = NULL;
 	char *basestr = NULL;
@@ -251,12 +250,8 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Store path to repository. */
-	repo_path = got_repo_get_path(repo);
-	if (repo_path == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY, repo_path);
+	err = create_meta_file(path_got, GOT_WORKTREE_REPOSITORY,
+	    got_repo_get_path(repo));
 	if (err)
 		goto done;
 
@@ -280,7 +275,6 @@ done:
 	free(path_got);
 	free(formatstr);
 	free(refstr);
-	free(repo_path);
 	free(absprefix);
 	free(basestr);
 	return err;
