@@ -43,11 +43,7 @@ function test_update_basic {
 	fi
 
 	echo "modified alpha" > $testroot/content.expected
-	echo "beta" >> $testroot/content.expected
-	echo "zeta" >> $testroot/content.expected
-	echo "delta" >> $testroot/content.expected
-	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
-	    $testroot/wt/gamma/delta > $testroot/content
+	cat $testroot/wt/alpha > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
 	ret="$?"
@@ -84,13 +80,8 @@ function test_update_adds_file {
 		return 1
 	fi
 
-	echo "alpha" >> $testroot/content.expected
-	echo "beta" >> $testroot/content.expected
-	echo "zeta" >> $testroot/content.expected
-	echo "delta" >> $testroot/content.expected
 	echo "new" >> $testroot/content.expected
-	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
-	    $testroot/wt/gamma/delta $testroot/wt/gamma/new > $testroot/content
+	cat $testroot/wt/gamma/new > $testroot/content
 
 	cmp $testroot/content.expected $testroot/content
 	ret="$?"
@@ -128,21 +119,11 @@ function test_update_deletes_file {
 
 	if [ -e $testroot/wt/beta ]; then
 		echo "removed file beta still exists on disk" >&2
+		test_done "$testroot" "1"
 		return 1
 	fi
 
-	echo "alpha" >> $testroot/content.expected
-	echo "zeta" >> $testroot/content.expected
-	echo "delta" >> $testroot/content.expected
-	cat $testroot/wt/alpha $testroot/wt/epsilon/zeta \
-	    $testroot/wt/gamma/delta > $testroot/content
-
-	cmp $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/content.expected $testroot/content
-	fi
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 function test_update_deletes_dir {
@@ -173,21 +154,11 @@ function test_update_deletes_dir {
 
 	if [ -e $testroot/wt/epsilon ]; then
 		echo "removed dir epsilon still exists on disk" >&2
+		test_done "$testroot" "1"
 		return 1
 	fi
 
-	echo "alpha" >> $testroot/content.expected
-	echo "beta" >> $testroot/content.expected
-	echo "delta" >> $testroot/content.expected
-	cat $testroot/wt/alpha $testroot/wt/beta \
-	    $testroot/wt/gamma/delta > $testroot/content
-
-	cmp $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/content.expected $testroot/content
-	fi
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 function test_update_deletes_dir_with_path_prefix {
@@ -225,15 +196,7 @@ function test_update_deletes_dir_with_path_prefix {
 		return 1
 	fi
 
-	echo "zeta" >> $testroot/content.expected
-	cat $testroot/wt/zeta > $testroot/content
-
-	cmp $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/content.expected $testroot/content
-	fi
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 run_test test_update_basic
