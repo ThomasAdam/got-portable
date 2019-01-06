@@ -121,14 +121,14 @@ got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 }
 
 const struct got_error *
-got_fileindex_for_each_entry(struct got_fileindex *fileindex,
+got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
     const struct got_error *(cb)(void *, struct got_fileindex_entry *),
     void *cb_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_fileindex_entry *entry;
+	struct got_fileindex_entry *entry, *tmp;
 
-	TAILQ_FOREACH(entry, &fileindex->entries, entry) {
+	TAILQ_FOREACH_SAFE(entry, &fileindex->entries, entry, tmp) {
 		err = cb(cb_arg, entry);
 		if (err)
 			break;

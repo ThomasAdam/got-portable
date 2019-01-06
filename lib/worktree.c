@@ -800,7 +800,8 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 	a.missing_entries.nentries = 0;
 	a.current_subdir = apply_path_prefix(worktree, path);
 	TAILQ_INIT(&a.missing_entries.entries);
-	err = got_fileindex_for_each_entry(fileindex, collect_missing_file, &a);
+	err = got_fileindex_for_each_entry_safe(fileindex,
+	    collect_missing_file, &a);
 	if (err)
 		return err;
 

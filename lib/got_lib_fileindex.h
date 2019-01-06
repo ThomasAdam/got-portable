@@ -100,5 +100,6 @@ void got_fileindex_entry_remove(struct got_fileindex *,
 struct got_fileindex_entry *got_fileindex_entry_get(struct got_fileindex *,
     const char *);
 const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *);
-const struct got_error *got_fileindex_for_each_entry(struct got_fileindex *,
+const struct got_error *got_fileindex_for_each_entry_safe(
+    struct got_fileindex *,
     const struct got_error *(cb)(void *, struct got_fileindex_entry *), void *);
