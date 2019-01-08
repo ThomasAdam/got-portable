@@ -155,9 +155,18 @@ got_fileindex_alloc(struct got_fileindex **fileindex)
 	return NULL;
 }
 
+static const struct got_error *
+free_entry_cb(const char *path, void *data, void *arg)
+{
+	struct got_fileindex_entry *entry = data;
+	got_fileindex_entry_free(entry);
+	return NULL;
+}
+
 void
 got_fileindex_free(struct got_fileindex *fileindex)
 {
+	got_pathset_for_each_safe(fileindex->entries, free_entry_cb, NULL);
 	got_pathset_free(fileindex->entries);
 	free(fileindex);
 }
