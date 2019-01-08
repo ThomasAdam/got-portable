@@ -22,11 +22,8 @@
 #include <limits.h>
 
 #include "got_error.h"
+#include "got_lib_path.h"
 #include "got_lib_pathset.h"
-
-#ifndef MIN
-#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
-#endif
 
 struct got_pathset_element {
 	RB_ENTRY(got_pathset_element)	entry;
@@ -40,31 +37,7 @@ static int
 cmp_elements(const struct got_pathset_element *e1,
     const struct got_pathset_element *e2)
 {
-	size_t len1 = strlen(e1->path);
-	size_t len2 = strlen(e2->path);
-	size_t min_len = MIN(len1, len2);
-	size_t i = 0;
-
-	/* Skip over common prefix. */
-	while (i < min_len && e1->path[i] == e2->path[i])
-		i++;
-
-	/* Are the paths exactly equal? */
-	if (len1 == len2 && i >= min_len)
-		return 0;
-
-	/* Order children in subdirectories directly after their parents. */
-	if (e1->path[i] == '/' && e2->path[i] == '\0')
-		return 1;
-	if (e2->path[i] == '/' && e1->path[i] == '\0')
-		return -1;
-	if (e1->path[i] == '/')
-		return -1;
-	if (e2->path[i] == '/')
-		return 1;
-
-	/* Next character following the common prefix determines order. */
-	return (unsigned char)e1->path[i] < (unsigned char)e2->path[i] ? -1 : 1;
+	return got_compare_paths(e1->path, e2->path);
 }
 
 RB_PROTOTYPE(got_pathset_tree, got_pathset_element, entry, cmp_elements);

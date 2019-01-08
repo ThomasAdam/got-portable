@@ -25,6 +25,10 @@
 
 #include "got_lib_path.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 int
 got_path_is_absolute(const char *path)
 {
@@ -138,4 +142,34 @@ int
 got_path_is_root_dir(const char *path)
 {
 	return (path[0] == '/' && path[1] == '\0');
+}
+
+int
+got_compare_paths(const char *path1, const char *path2)
+{
+	size_t len1 = strlen(path1);
+	size_t len2 = strlen(path2);
+	size_t min_len = MIN(len1, len2);
+	size_t i = 0;
+
+	/* Skip over common prefix. */
+	while (i < min_len && path1[i] == path2[i])
+		i++;
+
+	/* Are the paths exactly equal? */
+	if (len1 == len2 && i >= min_len)
+		return 0;
+
+	/* Order children in subdirectories directly after their parents. */
+	if (path1[i] == '/' && path2[i] == '\0')
+		return 1;
+	if (path2[i] == '/' && path1[i] == '\0')
+		return -1;
+	if (path1[i] == '/')
+		return -1;
+	if (path2[i] == '/')
+		return 1;
+
+	/* Next character following the common prefix determines order. */
+	return (unsigned char)path1[i] < (unsigned char)path2[i] ? -1 : 1;
 }
