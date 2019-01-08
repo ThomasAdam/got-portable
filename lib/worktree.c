@@ -819,8 +819,9 @@ remove_missing_file(const char *path, void *data, void *arg)
 	else {
 		char *parent = dirname(ondisk_path);
 		while (parent && strcmp(parent, a->root_path) != 0) {
-			if (rmdir(parent) == -1 && errno != ENOTEMPTY) {
-				err = got_error_from_errno();
+			if (rmdir(parent) == -1) {
+				if (errno != ENOTEMPTY)
+					err = got_error_from_errno();
 				break;
 			}
 			parent = dirname(parent);
