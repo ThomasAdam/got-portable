@@ -760,6 +760,8 @@ collect_missing_file(void *args, struct got_fileindex_entry *entry)
 		return NULL;
 
 	start = entry->path + strlen(a->current_subdir);
+	if (a->current_subdir[0] != '\0' && start[0] != '/')
+		return NULL;
 	while (start[0] == '/')
 		start++;
 	end = strchr(start, '/');
