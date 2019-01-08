@@ -22,7 +22,6 @@
  * applied back to the filesystem.
  */
 struct got_fileindex_entry {
-	TAILQ_ENTRY(got_fileindex_entry) entry;
 	uint64_t ctime_sec;
 	uint64_t ctime_nsec;
 	uint64_t mtime_sec;
@@ -70,8 +69,7 @@ struct got_fileindex_entry {
 #define GOT_INDEX_ENTRY_STAGE_THEIRS	3
 
 struct got_fileindex {
-	uint32_t nentries;
-	TAILQ_HEAD(, got_fileindex_entry) entries;
+	struct got_pathset *entries;
 };
 
 /* On-disk file index header structure. */
@@ -90,16 +88,17 @@ const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *, const char *, uint8_t *, uint8_t *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);
-struct got_fileindex *got_fileindex_alloc(void);
+const struct got_error *got_fileindex_alloc(struct got_fileindex **);
 void got_fileindex_free(struct got_fileindex *);
 const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
 const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
     struct got_fileindex_entry *);
-void got_fileindex_entry_remove(struct got_fileindex *,
+const struct got_error *got_fileindex_entry_remove(struct got_fileindex *,
     struct got_fileindex_entry *);
 struct got_fileindex_entry *got_fileindex_entry_get(struct got_fileindex *,
     const char *);
 const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *);
+typedef const struct got_error *(*got_fileindex_cb)(void *,
+    struct got_fileindex_entry *);
 const struct got_error *got_fileindex_for_each_entry_safe(
-    struct got_fileindex *,
-    const struct got_error *(cb)(void *, struct got_fileindex_entry *), void *);
+    struct got_fileindex *, got_fileindex_cb cb, void *);

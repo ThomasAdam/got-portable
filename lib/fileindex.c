@@ -25,6 +25,7 @@
 
 #include "got_error.h"
 
+#include "got_lib_pathset.h"
 #include "got_lib_fileindex.h"
 
 const struct got_error *
@@ -94,71 +95,70 @@ const struct got_error *
 got_fileindex_entry_add(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
-	/* TODO keep entries sorted by name */
-	TAILQ_INSERT_TAIL(&fileindex->entries, entry, entry);
-	fileindex->nentries++;
-	return NULL;
+	return got_pathset_add(fileindex->entries, entry->path, entry);
 }
 
-void
+const struct got_error *
 got_fileindex_entry_remove(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
-	TAILQ_REMOVE(&fileindex->entries, entry, entry);
-	fileindex->nentries--;
+	return got_pathset_remove(NULL, fileindex->entries, entry->path);
 }
 
 struct got_fileindex_entry *
 got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 {
 	struct got_fileindex_entry *entry;
-	TAILQ_FOREACH(entry, &fileindex->entries, entry) {
-		if (strcmp(entry->path, path) == 0)
-			return entry;
+	entry = (struct got_fileindex_entry *)got_pathset_get(
+	    fileindex->entries, path);
+	return entry;
+}
+
+struct pathset_cb_arg {
+    got_fileindex_cb cb;
+    void *cb_arg;
+};
+
+static const struct got_error *
+pathset_cb(const char *path, void *data, void *arg)
+{
+	struct got_fileindex_entry *entry = data;
+	struct pathset_cb_arg *a = arg;
+	return (*a->cb)(a->cb_arg, entry);
+}
+
+const struct got_error *
+got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
+    got_fileindex_cb cb, void *cb_arg)
+{
+	struct pathset_cb_arg arg;
+
+	arg.cb = cb;
+	arg.cb_arg = cb_arg;
+	return got_pathset_for_each_safe(fileindex->entries, pathset_cb, &arg);
+}
+
+const struct got_error *
+got_fileindex_alloc(struct got_fileindex **fileindex)
+{
+	*fileindex = calloc(1, sizeof(**fileindex));
+	if (*fileindex == NULL)
+		return got_error_from_errno();
+
+	(*fileindex)->entries = got_pathset_alloc();
+	if ((*fileindex)->entries == NULL) {
+		free(*fileindex);
+		*fileindex = NULL;
+		return got_error_from_errno();
 	}
 
 	return NULL;
 }
 
-const struct got_error *
-got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
-    const struct got_error *(cb)(void *, struct got_fileindex_entry *),
-    void *cb_arg)
-{
-	const struct got_error *err = NULL;
-	struct got_fileindex_entry *entry, *tmp;
-
-	TAILQ_FOREACH_SAFE(entry, &fileindex->entries, entry, tmp) {
-		err = cb(cb_arg, entry);
-		if (err)
-			break;
-	}
-
-	return err;
-}
-
-struct got_fileindex *
-got_fileindex_alloc(void)
-{
-	struct got_fileindex *fileindex;
-
-	fileindex = calloc(1, sizeof(*fileindex));
-	if (fileindex)
-		TAILQ_INIT(&fileindex->entries);
-	return fileindex;
-}
-
 void
 got_fileindex_free(struct got_fileindex *fileindex)
 {
-	struct got_fileindex_entry *entry;
-
-	while (!TAILQ_EMPTY(&fileindex->entries)) {
-		entry = TAILQ_FIRST(&fileindex->entries);
-		TAILQ_REMOVE(&fileindex->entries, entry, entry);
-		got_fileindex_entry_free(entry);
-		fileindex->nentries--;
-	}
+	got_pathset_free(fileindex->entries);
 	free(fileindex);
 }
 
@@ -276,23 +276,38 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *entry,
 	return err;
 }
 
+struct write_entry_cb_arg {
+	SHA1_CTX *ctx;
+	FILE *outfile;
+};
+
+static const struct got_error *
+write_entry_cb(const char *path, void *data, void *arg)
+{
+	struct got_fileindex_entry *entry = data;
+	struct write_entry_cb_arg *a = arg;
+
+	return write_fileindex_entry(a->ctx, entry, a->outfile);
+}
+
 const struct got_error *
 got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 {
+	const struct got_error *err = NULL;
 	struct got_fileindex_hdr hdr;
-	struct got_fileindex_entry *entry;
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
 	const size_t len = sizeof(hdr.signature) + sizeof(hdr.version) +
 	    sizeof(hdr.nentries);
 	uint8_t buf[len];
+	struct write_entry_cb_arg arg;
 
 	SHA1Init(&ctx);
 
 	hdr.signature = htobe32(GOT_FILE_INDEX_SIGNATURE);
 	hdr.version = htobe32(GOT_FILE_INDEX_VERSION);
-	hdr.nentries = htobe32(fileindex->nentries);
+	hdr.nentries = htobe32(got_pathset_num_elements(fileindex->entries));
 
 	memcpy(buf, &hdr, len);
 	SHA1Update(&ctx, buf, len);
@@ -300,12 +315,12 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != len)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	TAILQ_FOREACH(entry, &fileindex->entries, entry) {
-		const struct got_error *err;
-		err = write_fileindex_entry(&ctx, entry, outfile);
-		if (err)
-			return err;
-	}
+	arg.ctx = &ctx;
+	arg.outfile = outfile;
+	err = got_pathset_for_each_safe(fileindex->entries, write_entry_cb,
+	    &arg);
+	if (err)
+		return err;
 
 	SHA1Final(sha1, &ctx);
 	n = fwrite(sha1, 1, sizeof(sha1), outfile);

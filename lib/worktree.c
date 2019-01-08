@@ -925,11 +925,9 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno();
+	err = got_fileindex_alloc(&fileindex);
+	if (err)
 		goto done;
-	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
