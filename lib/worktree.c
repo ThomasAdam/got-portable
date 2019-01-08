@@ -858,7 +858,6 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 	a2.cancel_arg = cancel_arg;
 	a2.progress_cb = progress_cb;
 	a2.progress_arg = progress_arg;
-
 	err = got_pathset_for_each(a.missing_entries, remove_missing_file, &a2);
 	got_pathset_free(a.missing_entries);
 	return err;
