@@ -124,7 +124,7 @@ pathset_add_remove_iter(void)
 		goto done;
 	}
 
-	got_pathset_for_each(set, pathset_add_remove_iter_cb, NULL);
+	got_pathset_for_each_safe(set, pathset_add_remove_iter_cb, NULL);
 done:
 	got_pathset_free(set);
 	return (err == NULL);
@@ -213,9 +213,9 @@ pathset_iter_order(void)
 		goto done;
 
 	test_printf("normal order:\n");
-	got_pathset_for_each(set, pathset_iter_order_cb, NULL);
+	got_pathset_for_each_safe(set, pathset_iter_order_cb, NULL);
 	test_printf("reverse order:\n");
-	got_pathset_for_each_reverse(set, pathset_iter_reverse_order_cb,
+	got_pathset_for_each_reverse_safe(set, pathset_iter_reverse_order_cb,
 	    NULL);
 done:
 	got_pathset_free(set);

@@ -185,7 +185,7 @@ got_pathset_contains(struct got_pathset *set, const char *path)
 }
 
 const struct got_error *
-got_pathset_for_each(struct got_pathset *set,
+got_pathset_for_each_safe(struct got_pathset *set,
     const struct got_error *(*cb)(const char *, void *, void *), void *arg)
 {
 	const struct got_error *err;
@@ -200,7 +200,7 @@ got_pathset_for_each(struct got_pathset *set,
 }
 
 const struct got_error *
-got_pathset_for_each_reverse(struct got_pathset *set,
+got_pathset_for_each_reverse_safe(struct got_pathset *set,
     const struct got_error *(*cb)(const char *, void *, void *), void *arg)
 {
 	const struct got_error *err;
