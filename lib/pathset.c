@@ -72,7 +72,7 @@ RB_PROTOTYPE(got_pathset_tree, got_pathset_element, entry, cmp_elements);
 struct got_pathset {
 	struct got_pathset_tree entries;
 	int totelem;
-#define GOT_OBJECT_IDSET_MAX_ELEM INT_MAX
+#define GOT_PATHSET_MAX_ELEM INT_MAX
 };
 
 struct got_pathset *
@@ -116,7 +116,7 @@ got_pathset_add(struct got_pathset *set, const char *path, void *data)
 {
 	struct got_pathset_element *new;
 
-	if (set->totelem >= GOT_OBJECT_IDSET_MAX_ELEM)
+	if (set->totelem >= GOT_PATHSET_MAX_ELEM)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	new = malloc(sizeof(*new));
