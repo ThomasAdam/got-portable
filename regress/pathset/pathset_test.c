@@ -130,7 +130,8 @@ done:
 }
 
 static const struct got_error *
-pathset_iter_ordering_cb(const char *path, void *data, void *arg) {
+pathset_iter_order_cb(const char *path, void *data, void *arg)
+{
 	static int i;
 	test_printf("%s\n", path);
 	if (i == 0 && strcmp(path, "/") != 0)
@@ -151,8 +152,31 @@ pathset_iter_ordering_cb(const char *path, void *data, void *arg) {
 	return NULL;
 }
 
+static const struct got_error *
+pathset_iter_reverse_order_cb(const char *path, void *data, void *arg)
+{
+	static int i;
+	test_printf("%s\n", path);
+	if (i == 0 && strcmp(path, "/usr.sbin/zic") != 0)
+		abort();
+	if (i == 1 && strcmp(path, "/usr.sbin/unbound") != 0)
+		abort();
+	if (i == 2 && strcmp(path, "/usr.sbin") != 0)
+		abort();
+	if (i == 3 && strcmp(path, "/usr.bin/vi") != 0)
+		abort();
+	if (i == 4 && strcmp(path, "/usr.bin") != 0)
+		abort();
+	if (i == 5 && strcmp(path, "/") != 0)
+		abort();
+	if (i > 5)
+		abort();
+	i++;
+	return NULL;
+}
+
 static int
-pathset_iter_ordering(void)
+pathset_iter_order(void)
 {
 	const struct got_error *err = NULL;
 	struct got_pathset *set;
@@ -187,7 +211,11 @@ pathset_iter_ordering(void)
 	if (err)
 		goto done;
 
-	got_pathset_for_each(set, pathset_iter_ordering_cb, NULL);
+	test_printf("normal order:\n");
+	got_pathset_for_each(set, pathset_iter_order_cb, NULL);
+	test_printf("reverse order:\n");
+	got_pathset_for_each_reverse(set, pathset_iter_reverse_order_cb,
+	    NULL);
 done:
 	got_pathset_free(set);
 	return (err == NULL);
@@ -229,7 +257,7 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	RUN_TEST(pathset_add_remove_iter(), "pathset_add_remove_iter");
-	RUN_TEST(pathset_iter_ordering(), "pathset_iter_ordering");
+	RUN_TEST(pathset_iter_order(), "pathset_iter_order");
 
 	return failure ? 1 : 0;
 }

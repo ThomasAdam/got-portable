@@ -199,6 +199,21 @@ got_pathset_for_each(struct got_pathset *set,
 	return NULL;
 }
 
+const struct got_error *
+got_pathset_for_each_reverse(struct got_pathset *set,
+    const struct got_error *(*cb)(const char *, void *, void *), void *arg)
+{
+	const struct got_error *err;
+	struct got_pathset_element *entry, *tmp;
+
+	RB_FOREACH_REVERSE_SAFE(entry, got_pathset_tree, &set->entries, tmp) {
+		err = (*cb)(entry->path, entry->data, arg);
+		if (err)
+			return err;
+	}
+	return NULL;
+}
+
 int
 got_pathset_num_elements(struct got_pathset *set)
 {

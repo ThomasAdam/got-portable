@@ -28,4 +28,7 @@ int got_pathset_contains(struct got_pathset *, const char *);
 const struct got_error *got_pathset_for_each(struct got_pathset *,
     const struct got_error *(*cb)(const char *, void *, void *),
     void *);
+const struct got_error *got_pathset_for_each_reverse(struct got_pathset *,
+    const struct got_error *(*cb)(const char *, void *, void *),
+    void *);
 int got_pathset_num_elements(struct got_pathset *);
