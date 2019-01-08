@@ -30,22 +30,11 @@
 #include "got_lib_path.h"
 #include "got_lib_fileindex.h"
 
-RB_HEAD(got_fileindex_tree, got_fileindex_entry);
-
 struct got_fileindex {
 	struct got_fileindex_tree entries;
 	int nentries;
 #define GOT_FILEIDX_MAX_ENTRIES INT_MAX
 };
-
-static int
-cmp_entries(const struct got_fileindex_entry *e1,
-    const struct got_fileindex_entry *e2)
-{
-	return got_compare_paths(e1->path, e2->path);
-}
-
-RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, cmp_entries);
 
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *entry,
@@ -530,4 +519,4 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	return NULL;
 }
 
-RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, cmp_entries);
+RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

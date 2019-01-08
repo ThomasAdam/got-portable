@@ -40,7 +40,6 @@
 
 #include "got_lib_worktree.h"
 #include "got_lib_path.h"
-#include "got_lib_pathset.h"
 #include "got_lib_sha1.h"
 #include "got_lib_fileindex.h"
 #include "got_lib_inflate.h"
@@ -742,7 +741,7 @@ done:
 struct collect_missing_entry_args {
 	struct got_fileindex *fileindex;
 	const struct got_tree_entries *entries;
-	struct got_pathset *missing_entries;
+	struct got_fileindex_tree missing_entries;
 	const char *current_subdir;
 };
 
@@ -779,45 +778,28 @@ collect_missing_file(void *args, struct got_fileindex_entry *entry)
 		}
 	}
 
-	if (found)
-		return NULL;
+	if (!found) {
+		got_fileindex_entry_remove(a->fileindex, entry);
+		RB_INSERT(got_fileindex_tree, &a->missing_entries, entry);
+	}
 
-	return got_pathset_add(a->missing_entries, entry->path, entry);
+	return NULL;
 }
 
-struct remove_missing_file_args {
-    const char *root_path;
-    struct got_fileindex *fileindex;
-    got_worktree_checkout_cb progress_cb;
-    void *progress_arg;
-    got_worktree_cancel_cb cancel_cb;
-    void *cancel_arg;
-};
-
 static const struct got_error *
-remove_missing_file(const char *path, void *data, void *arg)
+remove_ondisk_file(const char *root_path, const char *path)
 {
 	const struct got_error *err = NULL;
 	char *ondisk_path = NULL;
-	struct remove_missing_file_args *a = arg;
-	struct got_fileindex_entry *entry = data;
 
-	if (a->cancel_cb) {
-		err = (*a->cancel_cb)(a->cancel_arg);
-		if (err)
-			return err;
-	}
-
-	(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE, path);
-
-	if (asprintf(&ondisk_path, "%s/%s", a->root_path, path) == -1)
+	if (asprintf(&ondisk_path, "%s/%s", root_path, path) == -1)
 		return got_error_from_errno();
 
 	if (unlink(ondisk_path) == -1)
 		err = got_error_from_errno();
 	else {
 		char *parent = dirname(ondisk_path);
-		while (parent && strcmp(parent, a->root_path) != 0) {
+		while (parent && strcmp(parent, root_path) != 0) {
 			if (rmdir(parent) == -1) {
 				if (errno != ENOTEMPTY)
 					err = got_error_from_errno();
@@ -827,11 +809,6 @@ remove_missing_file(const char *path, void *data, void *arg)
 		}
 	}
 	free(ondisk_path);
-
-	if (err == NULL) {
-		got_fileindex_entry_remove(a->fileindex, entry);
-		got_fileindex_entry_free(entry);
-	}
 	return err;
 }
 
@@ -844,28 +821,41 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 {
 	const struct got_error *err = NULL;
 	struct collect_missing_entry_args a;
-	struct remove_missing_file_args a2;
+	struct got_fileindex_entry *entry, *tmp;
 
 	a.fileindex = fileindex;
 	a.entries = entries;
-	a.missing_entries = got_pathset_alloc();
-	if (a.missing_entries == NULL)
-		return got_error_from_errno();
+	RB_INIT(&a.missing_entries);
 	a.current_subdir = apply_path_prefix(worktree, path);
 	err = got_fileindex_for_each_entry_safe(fileindex,
 	    collect_missing_file, &a);
 	if (err)
 		return err;
 
-	a2.root_path = worktree->root_path;
-	a2.fileindex = fileindex;
-	a2.cancel_cb = cancel_cb;
-	a2.cancel_arg = cancel_arg;
-	a2.progress_cb = progress_cb;
-	a2.progress_arg = progress_arg;
-	err = got_pathset_for_each_safe(a.missing_entries, remove_missing_file,
-	    &a2);
-	got_pathset_free(a.missing_entries);
+	RB_FOREACH_SAFE(entry, got_fileindex_tree, &a.missing_entries, tmp) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
+		(*progress_cb)(progress_arg, GOT_STATUS_DELETE, entry->path);
+		err = remove_ondisk_file(worktree->root_path, entry->path);
+		if (err)
+			break;
+
+		RB_REMOVE(got_fileindex_tree, &a.missing_entries, entry);
+		got_fileindex_entry_free(entry);
+	}
+
+	if (err) {
+		/* Add back any entries which weeren't deleted from disk. */
+		RB_FOREACH(entry, got_fileindex_tree, &a.missing_entries) {
+			if (got_fileindex_entry_add(fileindex, entry) != NULL)
+				break;
+		}
+	}
+
 	return err;
 }
 

@@ -71,6 +71,17 @@ struct got_fileindex_entry {
 
 struct got_fileindex;
 
+RB_HEAD(got_fileindex_tree, got_fileindex_entry);
+
+static inline int
+got_fileindex_cmp(const struct got_fileindex_entry *e1,
+    const struct got_fileindex_entry *e2)
+{
+	return got_compare_paths(e1->path, e2->path);
+}
+
+RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);
+
 /* On-disk file index header structure. */
 struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian */
