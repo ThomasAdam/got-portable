@@ -1,3 +1,3 @@
-SUBDIR = cmdline delta idset pathset repository worktree
+SUBDIR = cmdline delta idset repository worktree
 
 .include <bsd.subdir.mk>
