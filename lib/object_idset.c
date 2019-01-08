@@ -33,10 +33,6 @@
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
 
-#ifndef nitems
-#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
-#endif
-
 struct got_object_idset_element {
 	RB_ENTRY(got_object_idset_element)	entry;
 	struct got_object_id id;
