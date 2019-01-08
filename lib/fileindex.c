@@ -15,6 +15,7 @@
  */
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <stdio.h>
@@ -22,11 +23,29 @@
 #include <string.h>
 #include <sha1.h>
 #include <endian.h>
+#include <limits.h>
 
 #include "got_error.h"
 
-#include "got_lib_pathset.h"
+#include "got_lib_path.h"
 #include "got_lib_fileindex.h"
+
+RB_HEAD(got_fileindex_tree, got_fileindex_entry);
+
+struct got_fileindex {
+	struct got_fileindex_tree entries;
+	int nentries;
+#define GOT_FILEIDX_MAX_ENTRIES INT_MAX
+};
+
+static int
+cmp_entries(const struct got_fileindex_entry *e1,
+    const struct got_fileindex_entry *e2)
+{
+	return got_compare_paths(e1->path, e2->path);
+}
+
+RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, cmp_entries);
 
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *entry,
@@ -95,79 +114,68 @@ const struct got_error *
 got_fileindex_entry_add(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
-	return got_pathset_add(fileindex->entries, entry->path, entry);
+	if (fileindex->nentries >= GOT_FILEIDX_MAX_ENTRIES)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	RB_INSERT(got_fileindex_tree, &fileindex->entries, entry);
+	fileindex->nentries++;
+	return NULL;
 }
 
-const struct got_error *
+void
 got_fileindex_entry_remove(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
-	return got_pathset_remove(NULL, fileindex->entries, entry->path);
+	RB_REMOVE(got_fileindex_tree, &fileindex->entries, entry);
+	fileindex->nentries--;
 }
 
 struct got_fileindex_entry *
 got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 {
-	struct got_fileindex_entry *entry;
-	entry = (struct got_fileindex_entry *)got_pathset_get(
-	    fileindex->entries, path);
-	return entry;
-}
-
-struct pathset_cb_arg {
-    got_fileindex_cb cb;
-    void *cb_arg;
-};
-
-static const struct got_error *
-pathset_cb(const char *path, void *data, void *arg)
-{
-	struct got_fileindex_entry *entry = data;
-	struct pathset_cb_arg *a = arg;
-	return (*a->cb)(a->cb_arg, entry);
+	struct got_fileindex_entry key;
+	memset(&key, 0, sizeof(key));
+	key.path = (char *)path;
+	return RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
 }
 
 const struct got_error *
 got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
     got_fileindex_cb cb, void *cb_arg)
 {
-	struct pathset_cb_arg arg;
+	const struct got_error *err;
+	struct got_fileindex_entry *entry, *tmp;
 
-	arg.cb = cb;
-	arg.cb_arg = cb_arg;
-	return got_pathset_for_each_safe(fileindex->entries, pathset_cb, &arg);
-}
-
-const struct got_error *
-got_fileindex_alloc(struct got_fileindex **fileindex)
-{
-	*fileindex = calloc(1, sizeof(**fileindex));
-	if (*fileindex == NULL)
-		return got_error_from_errno();
-
-	(*fileindex)->entries = got_pathset_alloc();
-	if ((*fileindex)->entries == NULL) {
-		free(*fileindex);
-		*fileindex = NULL;
-		return got_error_from_errno();
+	RB_FOREACH_SAFE(entry, got_fileindex_tree, &fileindex->entries, tmp) {
+		err = (*cb)(cb_arg, entry);
+		if (err)
+			return err;
 	}
-
 	return NULL;
 }
 
-static const struct got_error *
-free_entry_cb(const char *path, void *data, void *arg)
+struct got_fileindex *
+got_fileindex_alloc(void)
 {
-	struct got_fileindex_entry *entry = data;
-	got_fileindex_entry_free(entry);
-	return NULL;
+	struct got_fileindex *fileindex;
+
+	fileindex = calloc(1, sizeof(*fileindex));
+	if (fileindex == NULL)
+		return NULL;
+
+	RB_INIT(&fileindex->entries);
+	return fileindex;
 }
 
 void
 got_fileindex_free(struct got_fileindex *fileindex)
 {
-	got_pathset_for_each_safe(fileindex->entries, free_entry_cb, NULL);
-	got_pathset_free(fileindex->entries);
+	struct got_fileindex_entry *entry;
+
+	while ((entry = RB_MIN(got_fileindex_tree, &fileindex->entries))) {
+		RB_REMOVE(got_fileindex_tree, &fileindex->entries, entry);
+		got_fileindex_entry_free(entry);
+	}
 	free(fileindex);
 }
 
@@ -285,20 +293,6 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *entry,
 	return err;
 }
 
-struct write_entry_cb_arg {
-	SHA1_CTX *ctx;
-	FILE *outfile;
-};
-
-static const struct got_error *
-write_entry_cb(const char *path, void *data, void *arg)
-{
-	struct got_fileindex_entry *entry = data;
-	struct write_entry_cb_arg *a = arg;
-
-	return write_fileindex_entry(a->ctx, entry, a->outfile);
-}
-
 const struct got_error *
 got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 {
@@ -310,13 +304,13 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	const size_t len = sizeof(hdr.signature) + sizeof(hdr.version) +
 	    sizeof(hdr.nentries);
 	uint8_t buf[len];
-	struct write_entry_cb_arg arg;
+	struct got_fileindex_entry *entry;
 
 	SHA1Init(&ctx);
 
 	hdr.signature = htobe32(GOT_FILE_INDEX_SIGNATURE);
 	hdr.version = htobe32(GOT_FILE_INDEX_VERSION);
-	hdr.nentries = htobe32(got_pathset_num_elements(fileindex->entries));
+	hdr.nentries = htobe32(fileindex->nentries);
 
 	memcpy(buf, &hdr, len);
 	SHA1Update(&ctx, buf, len);
@@ -324,12 +318,11 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != len)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	arg.ctx = &ctx;
-	arg.outfile = outfile;
-	err = got_pathset_for_each_safe(fileindex->entries, write_entry_cb,
-	    &arg);
-	if (err)
-		return err;
+	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
+		err = write_fileindex_entry(&ctx, entry, outfile);
+		if (err)
+			return err;
+	}
 
 	SHA1Final(sha1, &ctx);
 	n = fwrite(sha1, 1, sizeof(sha1), outfile);
@@ -536,3 +529,5 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 
 	return NULL;
 }
+
+RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, cmp_entries);
