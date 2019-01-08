@@ -240,8 +240,8 @@ function test_update_deletes_dir_recursively {
 	test_done "$testroot" "0"
 }
 
-function test_update_with_sibling_dirs_with_common_prefix {
-	local testroot=`test_init update_with_sibling_dirs_with_common_prefix`
+function test_update_sibling_dirs_with_common_prefix {
+	local testroot=`test_init update_sibling_dirs_with_common_prefix`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	if [ "$?" != "0" ]; then
@@ -308,4 +308,4 @@ run_test test_update_deletes_file
 run_test test_update_deletes_dir
 run_test test_update_deletes_dir_with_path_prefix
 run_test test_update_deletes_dir_recursively
-run_test test_update_with_sibling_dirs_with_common_prefix
+run_test test_update_sibling_dirs_with_common_prefix
