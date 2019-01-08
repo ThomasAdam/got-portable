@@ -44,7 +44,8 @@ static const char *path1 = "/", *path2 = "/usr", *path3 = "/usr/bin";
 static const char *data1 = "data1", *data2 = "data2", *data3 = "data3";
 
 static const struct got_error *
-pathset_add_remove_iter_cb(const char *path, void *data, void *arg) {
+pathset_add_remove_iter_cb(const char *path, void *data, void *arg)
+{
 	test_printf("%s\n", path);
 	if ((strcmp(path, path1) == 0 && data == (void *)data1) ||
 	    (strcmp(path, path3) == 0 && data == (void *)data3))
