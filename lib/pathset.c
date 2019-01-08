@@ -138,9 +138,9 @@ static struct got_pathset_element *
 find_element(struct got_pathset *set, const char *path)
 {
 	struct got_pathset_element key, *entry;
-	key.path = strdup(path);
+	key.path = (char *)path;
+	key.data = NULL;
 	entry = RB_FIND(got_pathset_tree, &set->entries, &key);
-	free(key.path);
 	return entry;
 }
 
