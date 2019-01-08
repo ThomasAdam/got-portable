@@ -748,7 +748,6 @@ struct collect_missing_entry_args {
 static const struct got_error *
 collect_missing_file(void *args, struct got_fileindex_entry *entry)
 {
-	const struct got_error *err = NULL;
 	struct collect_missing_entry_args *a = args;
 	char *start, *end;
 	ptrdiff_t len;
@@ -782,14 +781,12 @@ collect_missing_file(void *args, struct got_fileindex_entry *entry)
 	if (found)
 		return NULL;
 
-	got_fileindex_entry_remove(a->fileindex, entry);
-	err = got_pathset_add(a->missing_entries, entry->path, NULL);
-	got_fileindex_entry_free(entry);
-	return err;
+	return got_pathset_add(a->missing_entries, entry->path, entry);
 }
 
 struct remove_missing_file_args {
     const char *root_path;
+    struct got_fileindex *fileindex;
     got_worktree_checkout_cb progress_cb;
     void *progress_arg;
     got_worktree_cancel_cb cancel_cb;
@@ -802,6 +799,7 @@ remove_missing_file(const char *path, void *data, void *arg)
 	const struct got_error *err = NULL;
 	char *ondisk_path = NULL;
 	struct remove_missing_file_args *a = arg;
+	struct got_fileindex_entry *entry = data;
 
 	if (a->cancel_cb) {
 		err = (*a->cancel_cb)(a->cancel_arg);
@@ -828,6 +826,11 @@ remove_missing_file(const char *path, void *data, void *arg)
 		}
 	}
 	free(ondisk_path);
+
+	if (err == NULL) {
+		got_fileindex_entry_remove(a->fileindex, entry);
+		got_fileindex_entry_free(entry);
+	}
 	return err;
 }
 
@@ -854,6 +857,7 @@ remove_missing_files(struct got_worktree *worktree, const char *path,
 		return err;
 
 	a2.root_path = worktree->root_path;
+	a2.fileindex = fileindex;
 	a2.cancel_cb = cancel_cb;
 	a2.cancel_arg = cancel_arg;
 	a2.progress_cb = progress_cb;
