@@ -2,6 +2,8 @@ lib:
 - convert file index to RB tree and provide a depth-first iteration API
 - use first-depth file index iteration when removing files during updates
   to fix empty directories left behind, and write a test for this problem
+- handle checkout of trees which contain submodules by identifying and
+  ignoring such tree entries; requires a .ini config parser (from isakmpd?)
 
 tog:
 - make diff view generate diffs in a background thread
