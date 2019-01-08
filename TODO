@@ -4,6 +4,8 @@ lib:
   to fix empty directories left behind, and write a test for this problem
 - handle checkout of trees which contain submodules by identifying and
   ignoring such tree entries; requires a .ini config parser (from isakmpd?)
+- 'got log' in a work tree does not work because the current working directory
+   is unveiled instead of the repository path
 
 tog:
 - make diff view generate diffs in a background thread
