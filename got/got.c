@@ -1065,15 +1065,31 @@ done:
 __dead static void
 usage_tree(void)
 {
-	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path] [-i] path\n",
+	fprintf(stderr,
+	    "usage: %s tree [-c commit] [-r repository-path] [-iR] path\n",
 	    getprogname());
 	exit(1);
 }
 
+static void
+print_entry(struct got_tree_entry *te, const char *id, const char *path,
+    const char *root_path)
+{
+	int is_root_path = (strcmp(path, root_path) == 0);
+
+	path += strlen(root_path);
+	while (path[0] == '/')
+		path++;
+
+	printf("%s%s%s%s%s\n", id ? id : "", path,
+	    is_root_path ? "" : "/",
+	    te->name, S_ISDIR(te->mode) ? "/" : "");
+}
 
 static const struct got_error *
 print_tree(const char *path, struct got_object_id *commit_id,
-    int show_ids, struct got_repository *repo)
+    int show_ids, int recurse, const char *root_path,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *tree_id = NULL;
@@ -1108,10 +1124,25 @@ print_tree(const char *path, struct got_object_id *commit_id,
 			}
 			free(id_str);
 		}
-		printf("%s%s%s\n", id ? id : "",
-		    te->name, S_ISDIR(te->mode) ? "/" : "");
-		te = SIMPLEQ_NEXT(te, entry);
+		print_entry(te, id, path, root_path);
 		free(id);
+
+		if (recurse && S_ISDIR(te->mode)) {
+			char *child_path;
+			if (asprintf(&child_path, "%s%s%s", path,
+			    path[0] == '/' && path[1] == '\0' ? "" : "/",
+			    te->name) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			err = print_tree(child_path, commit_id, show_ids, 1,
+			    root_path, repo);
+			free(child_path);
+			if (err)
+				goto done;
+		}
+
+		te = SIMPLEQ_NEXT(te, entry);
 	}
 done:
 	if (tree)
@@ -1128,7 +1159,7 @@ cmd_tree(int argc, char *argv[])
 	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
-	int show_ids = 0;
+	int show_ids = 0, recurse = 0;
 	int ch;
 
 #ifndef PROFILE
@@ -1137,7 +1168,7 @@ cmd_tree(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:r:i")) != -1) {
+	while ((ch = getopt(argc, argv, "c:r:iR")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_str = optarg;
@@ -1149,6 +1180,9 @@ cmd_tree(int argc, char *argv[])
 			break;
 		case 'i':
 			show_ids = 1;
+			break;
+		case 'R':
+			recurse = 1;
 			break;
 		default:
 			usage();
@@ -1207,7 +1241,8 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	}
 
-	error = print_tree(in_repo_path, commit_id, show_ids, repo);
+	error = print_tree(in_repo_path, commit_id, show_ids, recurse,
+	    in_repo_path, repo);
 done:
 	free(in_repo_path);
 	free(repo_path);
