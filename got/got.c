@@ -434,9 +434,12 @@ usage_update(void)
 static void
 update_progress(void *arg, unsigned char status, const char *path)
 {
+	int *did_something = arg;
+
 	if (status == GOT_STATUS_EXISTS)
 		return;
 
+	*did_something = 1;
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);
@@ -451,7 +454,7 @@ cmd_update(int argc, char *argv[])
 	char *worktree_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
-	int ch;
+	int ch, did_something = 0;
 
 	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
@@ -532,11 +535,14 @@ cmd_update(int argc, char *argv[])
 	}
 
 	error = got_worktree_checkout_files(worktree, repo,
-	    update_progress, NULL, checkout_cancel, NULL);
+	    update_progress, &did_something, checkout_cancel, NULL);
 	if (error != NULL)
 		goto done;
 
-	printf("Updated to commit %s\n", commit_id_str);
+	if (did_something)
+		printf("Updated to commit %s\n", commit_id_str);
+	else
+		printf("Already up-to-date\n");
 done:
 	free(worktree_path);
 	free(commit_id);
