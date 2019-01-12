@@ -329,7 +329,7 @@ read_fileindex_val64(uint64_t *val, SHA1_CTX *ctx, FILE *infile)
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
-		return got_ferror(infile, GOT_ERR_IO);
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be64toh(*val);
 	return NULL;
@@ -342,7 +342,7 @@ read_fileindex_val32(uint32_t *val, SHA1_CTX *ctx, FILE *infile)
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
-		return got_ferror(infile, GOT_ERR_IO);
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be32toh(*val);
 	return NULL;
@@ -355,7 +355,7 @@ read_fileindex_val16(uint16_t *val, SHA1_CTX *ctx, FILE *infile)
 
 	n = fread(val, 1, sizeof(*val), infile);
 	if (n != sizeof(*val))
-		return got_ferror(infile, GOT_ERR_IO);
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	SHA1Update(ctx, (uint8_t *)val, sizeof(*val));
 	*val = be16toh(*val);
 	return NULL;
@@ -375,7 +375,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 	do {
 		n = fread(buf, 1, sizeof(buf), infile);
 		if (n != sizeof(buf))
-			return got_ferror(infile, GOT_ERR_IO);
+			return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		if (len + sizeof(buf) > totlen) {
 			char *p = reallocarray(*path, totlen + sizeof(buf), 1);
 			if (p == NULL) {
@@ -440,14 +440,14 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 
 	n = fread(entry->blob_sha1, 1, SHA1_DIGEST_LENGTH, infile);
 	if (n != SHA1_DIGEST_LENGTH) {
-		err = got_ferror(infile, GOT_ERR_IO);
+		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
 	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
 
 	n = fread(entry->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
 	if (n != SHA1_DIGEST_LENGTH) {
-		err = got_ferror(infile, GOT_ERR_IO);
+		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
 	SHA1Update(ctx, entry->commit_sha1, SHA1_DIGEST_LENGTH);
@@ -486,7 +486,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	if (n != len) {
 		if (n == 0) /* EOF */
 			return NULL;
-		return got_ferror(infile, GOT_ERR_IO);
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	}
 
 	SHA1Update(&ctx, buf, len);
@@ -512,7 +512,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 
 	n = fread(sha1_expected, 1, sizeof(sha1_expected), infile);
 	if (n != sizeof(sha1_expected))
-		return got_ferror(infile, GOT_ERR_IO);
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	SHA1Final(sha1, &ctx);
 	if (memcmp(sha1, sha1_expected, SHA1_DIGEST_LENGTH) != 0)
 		return got_error(GOT_ERR_FILEIDX_CSUM);
