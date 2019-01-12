@@ -526,7 +526,6 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		err = got_error_from_errno();
 		if (errno == EEXIST) {
 			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
@@ -544,7 +543,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 				update = 1;
 			}
 		} else
-			return err;
+			return got_error_from_errno();
 	}
 
 	(*progress_cb)(progress_arg,
