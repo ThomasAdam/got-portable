@@ -68,7 +68,7 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width checkout
-.It Cm checkout [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
+.It Cm checkout [ Fl c Ar commit ] [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
 Copy files from a repository into a new work tree.
 If the
 .Ar work tree path
@@ -83,6 +83,10 @@ The options for
 .Cm got checkout
 are as follows:
 .Bl -tag -width Ds
+.It Fl c Ar commit
+Check out files from the specified
+.Ar commit .
+By default, the HEAD commit is used.
 .It Fl p Ar path-prefix
 Restrict the work tree to a subset of the repository's tree hierarchy.
 Only files beneath the specified

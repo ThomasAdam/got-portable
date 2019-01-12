@@ -226,6 +226,65 @@ checkout_cancel(void *arg)
 }
 
 static const struct got_error *
+check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *head_ref = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	struct got_commit_graph *graph = NULL;
+
+	head_ref = got_worktree_get_head_ref(worktree);
+	if (head_ref == NULL)
+		return got_error_from_errno();
+
+	/* TODO: Check the reflog. The head ref may have been rebased. */
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
+	if (err)
+		goto done;
+	while (1) {
+		struct got_object_id *id;
+
+		if (sigint_received || sigpipe_received)
+			break;
+
+		err = got_commit_graph_iter_next(&id, graph);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
+				err = got_error(GOT_ERR_ANCESTRY);
+				break;
+			}
+			if (err->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			if (err)
+				break;
+			else
+				continue;
+		}
+		if (id == NULL)
+			break;
+		if (got_object_id_cmp(id, commit_id) == 0)
+			break;
+	}
+done:
+	if (head_ref)
+		got_ref_close(head_ref);
+	if (graph)
+		got_commit_graph_close(graph);
+	return err;
+}
+
+
+static const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -235,10 +294,16 @@ cmd_checkout(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
+	char *commit_id_str = NULL;
 	int ch, same_path_prefix;
 
-	while ((ch = getopt(argc, argv, "p:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:p:")) != -1) {
 		switch (ch) {
+		case 'c':
+			commit_id_str = strdup(optarg);
+			if (commit_id_str == NULL)
+				return got_error_from_errno();
+			break;
 		case 'p':
 			path_prefix = optarg;
 			break;
@@ -304,6 +369,7 @@ cmd_checkout(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
 		goto done;
+
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
 	if (error != NULL)
 		goto done;
@@ -325,6 +391,24 @@ cmd_checkout(int argc, char *argv[])
 		goto done;
 	}
 
+	if (commit_id_str) {
+		struct got_object_id *commit_id;
+		error = got_object_resolve_id_str(&commit_id, repo,
+		    commit_id_str);
+		if (error != NULL)
+			goto done;
+		error = check_ancestry(worktree, commit_id, repo);
+		if (error != NULL) {
+			free(commit_id);
+			goto done;
+		}
+		error = got_worktree_set_base_commit_id(worktree, repo,
+		    commit_id);
+		free(commit_id);
+		if (error)
+			goto done;
+	}
+
 	error = got_worktree_checkout_files(worktree, repo,
 	    checkout_progress, worktree_path, checkout_cancel, NULL);
 	if (error != NULL)
@@ -333,6 +417,7 @@ cmd_checkout(int argc, char *argv[])
 	printf("Now shut up and hack\n");
 
 done:
+	free(commit_id_str);
 	free(repo_path);
 	free(worktree_path);
 	return error;
@@ -355,64 +440,6 @@ update_progress(void *arg, unsigned char status, const char *path)
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);
-}
-
-static const struct got_error *
-check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_reference *head_ref = NULL;
-	struct got_object_id *head_commit_id = NULL;
-	struct got_commit_graph *graph = NULL;
-
-	head_ref = got_worktree_get_head_ref(worktree);
-	if (head_ref == NULL)
-		return got_error_from_errno();
-
-	/* TODO: Check the reflog. The head ref may have been rebased. */
-	err = got_ref_resolve(&head_commit_id, repo, head_ref);
-	if (err)
-		goto done;
-
-	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
-	if (err)
-		goto done;
-
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
-	if (err)
-		goto done;
-	while (1) {
-		struct got_object_id *id;
-
-		if (sigint_received || sigpipe_received)
-			break;
-
-		err = got_commit_graph_iter_next(&id, graph);
-		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED) {
-				err = got_error(GOT_ERR_ANCESTRY);
-				break;
-			}
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
-			if (err)
-				break;
-			else
-				continue;
-		}
-		if (id == NULL)
-			break;
-		if (got_object_id_cmp(id, commit_id) == 0)
-			break;
-	}
-done:
-	if (head_ref)
-		got_ref_close(head_ref);
-	if (graph)
-		got_commit_graph_close(graph);
-	return err;
 }
 
 static const struct got_error *
