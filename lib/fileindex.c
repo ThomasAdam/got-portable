@@ -26,6 +26,7 @@
 #include <limits.h>
 
 #include "got_error.h"
+#include "got_object.h"
 
 #include "got_lib_path.h"
 #include "got_lib_fileindex.h"
@@ -517,6 +518,172 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		return got_error(GOT_ERR_FILEIDX_CSUM);
 
 	return NULL;
+}
+
+static int
+in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
+    struct got_tree_entry *te)
+{
+	size_t parent_len = strlen(parent_path);
+	size_t te_name_len = strlen(te->name);
+	char *ie_name;
+
+	if (!got_path_is_child(ie->path, parent_path, parent_len))
+		return 0;
+
+	ie_name = ie->path + parent_len;
+	while (ie_name[0] == '/')
+		ie_name++;
+	if (strncmp(ie_name, te->name, te_name_len) != 0)
+		return 0;
+	if (ie_name[te_name_len] == '/')
+		return 0;
+
+	return 1;
+}
+
+static int
+cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
+    struct got_tree_entry *te)
+{
+	size_t parent_len = strlen(parent_path);
+	char *ie_name;
+
+	if (!in_same_subdir(ie, parent_path, te)) {
+		if (parent_path[0])
+			return got_compare_paths(ie->path, parent_path);
+		return got_compare_paths(ie->path, te->name);
+	}
+
+	ie_name = ie->path + parent_len;
+	while (ie_name[0] == '/')
+		ie_name++;
+
+	return got_compare_paths(ie_name, te->name);
+}
+
+static const struct got_error *
+diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
+    struct got_tree_object *, const char *, struct got_repository *,
+    struct got_fileindex_diff_cb *, void *);
+
+static const struct got_error *
+walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
+    struct got_fileindex_entry **ie, struct got_tree_entry *te,
+    const char *path, struct got_repository *repo,
+    struct got_fileindex_diff_cb *cb, void *cb_arg)
+{
+	const struct got_error *err = NULL;
+
+	if (te && S_ISREG(te->mode)) {
+		*next = SIMPLEQ_NEXT(te, entry);
+		return NULL;
+	}
+
+	while (te && S_ISDIR(te->mode)) {
+		char *subpath;
+		struct got_tree_object *subtree;
+
+		if (asprintf(&subpath, "%s%s%s", path,
+		    path[0] == '\0' ? "" : "/", te->name) == -1)
+			return got_error_from_errno();
+
+		err = got_object_open_as_tree(&subtree, repo, te->id);
+		if (err) {
+			free(subpath);
+			return err;
+		}
+
+		if (*ie == NULL || !in_same_subdir(*ie, path, te)) {
+			err = cb->diff_new(cb_arg, te, path);
+			if (err)
+				return err;
+		}
+
+		err = diff_fileindex_tree(fileindex, ie, subtree,
+		    subpath, repo, cb, cb_arg);
+		free(subpath);
+		got_object_tree_close(subtree);
+		if (err)
+			return err;
+		te = SIMPLEQ_NEXT(te, entry);
+	}
+
+	*next = te;
+	return NULL;
+}
+
+static const struct got_error *
+diff_fileindex_tree(struct got_fileindex *fileindex,
+    struct got_fileindex_entry **ie, struct got_tree_object *tree,
+    const char *path, struct got_repository *repo,
+    struct got_fileindex_diff_cb *cb, void *cb_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_entry *te = NULL;
+	size_t path_len = strlen(path);
+	const struct got_tree_entries *entries;
+	struct got_fileindex_entry *next;
+
+	entries = got_object_tree_get_entries(tree);
+	te = SIMPLEQ_FIRST(&entries->head);
+	do {
+		if (te && *ie) {
+			int cmp = cmp_entries(*ie, path, te);
+			if (cmp == 0) {
+				err = cb->diff_old_new(cb_arg, *ie, te,
+				    path);
+				if (err)
+					break;
+				*ie = RB_NEXT(got_fileindex_tree,
+				    &fileindex->entries, *ie);
+				err = walk_tree(&te, fileindex, ie, te,
+				    path, repo, cb, cb_arg);
+			} else if (cmp < 0) {
+				next = RB_NEXT(got_fileindex_tree,
+				    &fileindex->entries, *ie);
+				err = cb->diff_old(cb_arg, *ie, path);
+				if (err)
+					break;
+				*ie = next;
+			} else {
+				err = cb->diff_new(cb_arg, te, path);
+				if (err)
+					break;
+				err = walk_tree(&te, fileindex, ie, te,
+				    path, repo, cb, cb_arg);
+			}
+			if (err)
+				break;
+		} else if (*ie) {
+			next = RB_NEXT(got_fileindex_tree,
+			    &fileindex->entries, *ie);
+			err = cb->diff_old(cb_arg, *ie, path);
+			if (err)
+				break;
+			*ie = next;
+		} else if (te) {
+			err = cb->diff_new(cb_arg, te, path);
+			if (err)
+				break;
+			err = walk_tree(&te, fileindex, ie, te, path, repo, cb,
+			    cb_arg);
+			if (err)
+				break;
+		}
+	} while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || te);
+
+	return err;
+}
+
+const struct got_error *
+got_fileindex_diff_tree(struct got_fileindex *fileindex,
+    struct got_tree_object *tree, struct got_repository *repo,
+    struct got_fileindex_diff_cb *cb, void *cb_arg)
+{
+	struct got_fileindex_entry *min;
+	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
+	return diff_fileindex_tree(fileindex, &min, tree, "", repo, cb, cb_arg);
 }
 
 RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

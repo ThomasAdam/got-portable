@@ -52,6 +52,9 @@ const struct got_error *got_path_skip_common_ancestor(char **, const char *,
 /* Determine whether a path points to the root directory "/" . */
 int got_path_is_root_dir(const char *);
 
+/* Determine whether a path is a path-wise child of another path. */
+int got_path_is_child(const char *, const char *, size_t);
+
 /*
  * Like strcmp() but orders children in subdirectories directly after
  * their parents.

@@ -145,6 +145,20 @@ got_path_is_root_dir(const char *path)
 }
 
 int
+got_path_is_child(const char *child, const char *parent, size_t parent_len)
+{
+	if (parent_len == 0)
+		return 1;
+
+	if (strncmp(parent, child, parent_len) != 0)
+		return 0;
+	if (child[parent_len] != '/')
+		return 0;
+
+	return 1;
+}
+
+int
 got_compare_paths(const char *path1, const char *path2)
 {
 	size_t len1 = strlen(path1);

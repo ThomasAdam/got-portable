@@ -506,22 +506,12 @@ lock_worktree(struct got_worktree *worktree, int operation)
 	return NULL;
 }
 
-static const char *
-apply_path_prefix(struct got_worktree *worktree, const char *path)
-{
-	const char *p = path;
-	p += strlen(worktree->path_prefix);
-	if (*p == '/')
-		p++;
-	return p;
-}
-
 static const struct got_error *
-blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
+install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *entry, const char *path,
-   struct got_blob_object *blob, struct got_repository *repo,
-   got_worktree_checkout_cb progress_cb, void *progress_arg,
-   const char *progress_path)
+   struct got_blob_object *blob,
+   struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+   void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	char *ondisk_path;
@@ -530,8 +520,7 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	int update = 0;
 	char *tmppath = NULL;
 
-	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-	    apply_path_prefix(worktree, path)) == -1)
+	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno();
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
@@ -559,7 +548,7 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	}
 
 	(*progress_cb)(progress_arg,
-	    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, progress_path);
+	    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -595,8 +584,7 @@ blob_checkout(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		    blob->id.sha1, worktree->base_commit_id->sha1);
 	else {
 		err = got_fileindex_entry_alloc(&entry, ondisk_path,
-		    apply_path_prefix(worktree, path), blob->id.sha1,
-		    worktree->base_commit_id->sha1);
+		    path, blob->id.sha1, worktree->base_commit_id->sha1);
 		if (err)
 			goto done;
 		err = got_fileindex_entry_add(fileindex, entry);
@@ -617,8 +605,7 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 	const struct got_error *err = NULL;
 	char *abspath;
 
-	if (asprintf(&abspath, "%s/%s", worktree->root_path,
-	    apply_path_prefix(worktree, path)) == -1)
+	if (asprintf(&abspath, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno();
 
 	/* XXX queue work rather than editing disk directly? */
@@ -647,145 +634,35 @@ done:
 }
 
 static const struct got_error *
-tree_checkout(struct got_worktree *, struct got_fileindex *,
-    struct got_tree_object *, const char *, struct got_repository *,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg);
-
-static const struct got_error *
-tree_checkout_entry(struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_tree_entry *te,
-    const char *parent, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+update_blob(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
+    struct got_tree_entry *te, const char *path,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj = NULL;
 	struct got_blob_object *blob = NULL;
-	struct got_fileindex_entry *entry = NULL;
-	struct got_tree_object *tree = NULL;
-	char *path = NULL;
-	char *progress_path = NULL;
-	size_t len;
 
-	if (parent[0] == '/' && parent[1] == '\0')
-		parent = "";
-	if (asprintf(&path, "%s/%s", parent, te->name) == -1)
-		return got_error_from_errno();
-
-	/* Skip this entry if it is outside of our path prefix. */
-	len = MIN(strlen(worktree->path_prefix), strlen(path));
-	if (strncmp(path, worktree->path_prefix, len) != 0) {
-		free(path);
-		return NULL;
-	}
-
-	err = got_object_open(&obj, repo, te->id);
-	if (err)
-		goto done;
-
-	progress_path = path;
-	if (strncmp(progress_path, worktree->path_prefix, len) == 0)
-		progress_path += len;
-
-	switch (obj->type) {
-	case GOT_OBJ_TYPE_BLOB:
-		if (strlen(worktree->path_prefix) >= strlen(path))
-			break;
-		entry = got_fileindex_entry_get(fileindex,
-		    apply_path_prefix(worktree, path));
-		if (entry &&
-		    memcmp(entry->commit_sha1, worktree->base_commit_id->sha1,
+	if (ie) {
+		if (memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
-			    progress_path);
-			break;
+			    path);
+			return NULL;
 		}
-		if (entry && memcmp(entry->blob_sha1, obj->id.sha1,
-		    SHA1_DIGEST_LENGTH) == 0)
-			break;
-		err = got_object_blob_open(&blob, repo, obj, 8192);
-		if (err)
-			goto done;
-		err = blob_checkout(worktree, fileindex, entry, path, blob,
-		    repo, progress_cb, progress_arg, progress_path);
-		break;
-	case GOT_OBJ_TYPE_TREE:
-		if (strlen(worktree->path_prefix) < strlen(path)) {
-			err = add_dir_on_disk(worktree, path);
-			if (err)
-				break;
-		}
-		err = got_object_tree_open(&tree, repo, obj);
-		if (err)
-			goto done;
-		/* XXX infinite recursion possible */
-		err = tree_checkout(worktree, fileindex, tree, path, repo,
-		    progress_cb, progress_arg, cancel_cb, cancel_arg);
-		break;
-	default:
-		break;
+		if (memcmp(ie->blob_sha1,
+		    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
+			return NULL;
 	}
 
-done:
-	if (blob)
-		got_object_blob_close(blob);
-	if (tree)
-		got_object_tree_close(tree);
-	if (obj)
-		got_object_close(obj);
-	free(path);
+	err = got_object_open_as_blob(&blob, repo, te->id, 8192);
+	if (err)
+		return err;
+
+	err = install_blob(worktree, fileindex, ie, path, blob, repo,
+	    progress_cb, progress_arg);
+	got_object_blob_close(blob);
 	return err;
-}
-
-struct collect_missing_entry_args {
-	struct got_fileindex *fileindex;
-	const struct got_tree_entries *entries;
-	struct got_fileindex_tree missing_entries;
-	const char *current_subdir;
-};
-
-static const struct got_error *
-collect_missing_file(void *args, struct got_fileindex_entry *entry)
-{
-	struct collect_missing_entry_args *a = args;
-	char *start, *end;
-	ptrdiff_t len;
-	struct got_tree_entry *te;
-	int found = 0;
-
-	if (a->current_subdir[0] != '\0' &&
-	    strncmp(a->current_subdir, entry->path,
-	    strlen(a->current_subdir)) != 0)
-		return NULL;
-
-	start = entry->path + strlen(a->current_subdir);
-	if (a->current_subdir[0] != '\0' && start[0] != '/')
-		return NULL;
-	while (start[0] == '/')
-		start++;
-	end = strchr(start, '/');
-	if (end == NULL) {
-		end = strchr(start, '\0');
-		if (end == NULL)
-			return got_error(GOT_ERR_BAD_PATH);
-	}
-	len = end - start;
-
-	SIMPLEQ_FOREACH(te, &a->entries->head, entry) {
-		if (strncmp(start, te->name, len) == 0 &&
-		    te->name[len] == '\0') {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
-		got_fileindex_entry_remove(a->fileindex, entry);
-		RB_INSERT(got_fileindex_tree, &a->missing_entries, entry);
-	}
-
-	return NULL;
 }
 
 static const struct got_error *
@@ -814,91 +691,62 @@ remove_ondisk_file(const char *root_path, const char *path)
 	return err;
 }
 
-/* Remove files which exist in the file index but not in the tree. */
+struct diff_cb_arg {
+    struct got_fileindex *fileindex;
+    struct got_worktree *worktree;
+    struct got_repository *repo;
+    got_worktree_checkout_cb progress_cb;
+    void *progress_arg;
+    got_worktree_cancel_cb cancel_cb;
+    void *cancel_arg;
+};
+
 static const struct got_error *
-remove_missing_files(struct got_worktree *worktree, const char *path,
-    struct got_fileindex *fileindex, const struct got_tree_entries *entries,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+diff_old_new(void *arg, struct got_fileindex_entry *ie,
+    struct got_tree_entry *te, const char *parent_path)
 {
-	const struct got_error *err = NULL;
-	struct collect_missing_entry_args a;
-	struct got_fileindex_entry *entry, *tmp;
+	struct diff_cb_arg *a = arg;
 
-	a.fileindex = fileindex;
-	a.entries = entries;
-	RB_INIT(&a.missing_entries);
-	a.current_subdir = apply_path_prefix(worktree, path);
-	err = got_fileindex_for_each_entry_safe(fileindex,
-	    collect_missing_file, &a);
-	if (err)
-		return err;
-
-	RB_FOREACH_SAFE(entry, got_fileindex_tree, &a.missing_entries, tmp) {
-		if (cancel_cb) {
-			err = (*cancel_cb)(cancel_arg);
-			if (err)
-				break;
-		}
-
-		(*progress_cb)(progress_arg, GOT_STATUS_DELETE, entry->path);
-		err = remove_ondisk_file(worktree->root_path, entry->path);
-		if (err)
-			break;
-
-		RB_REMOVE(got_fileindex_tree, &a.missing_entries, entry);
-		got_fileindex_entry_free(entry);
-	}
-
-	if (err) {
-		/* Add back any entries which weeren't deleted from disk. */
-		RB_FOREACH(entry, got_fileindex_tree, &a.missing_entries) {
-			if (got_fileindex_entry_add(fileindex, entry) != NULL)
-				break;
-		}
-	}
-
-	return err;
+	return update_blob(a->worktree, a->fileindex, ie, te,
+	    ie->path, a->repo, a->progress_cb, a->progress_arg,
+	    a->cancel_cb, a->cancel_arg);
 }
 
 static const struct got_error *
-tree_checkout(struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_tree_object *tree,
-    const char *path, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
-	const struct got_error *err = NULL;
-	const struct got_tree_entries *entries;
-	struct got_tree_entry *te;
-	size_t len;
+	const struct got_error *err;
+	struct diff_cb_arg *a = arg;
 
-	/* Skip this tree if it shares no path components with the prefix. */
-	len = MIN(strlen(worktree->path_prefix), strlen(path));
-	if (strncmp(path, worktree->path_prefix, len) != 0)
-		return NULL;
+	(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE, ie->path);
 
-	entries = got_object_tree_get_entries(tree);
-	SIMPLEQ_FOREACH(te, &entries->head, entry) {
-		if (cancel_cb) {
-			err = (*cancel_cb)(cancel_arg);
-			if (err)
-				return err;
-		}
-		err = tree_checkout_entry(worktree, fileindex, te, path, repo,
-		    progress_cb, progress_arg, cancel_cb, cancel_arg);
-		if (err)
-			return err;
-	}
+	err = remove_ondisk_file(a->worktree->root_path, ie->path);
+	if (err)
+		return err;
+	got_fileindex_entry_remove(a->fileindex, ie);
+	return NULL;
+}
 
-	len = strlen(worktree->path_prefix);
-	if (strncmp(worktree->path_prefix, path, len) == 0) {
-		err = remove_missing_files(worktree, path, fileindex, entries,
-		    progress_cb, progress_arg, cancel_cb, cancel_arg);
-		if (err)
-			return err;
-	}
+static const struct got_error *
+diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
+{
+	struct diff_cb_arg *a = arg;
+	const struct got_error *err;
+	char *path;
 
+	if (asprintf(&path, "%s%s%s", parent_path,
+	    parent_path[0] ? "/" : "", te->name)
+	    == -1)
+		return got_error_from_errno();
+
+	if (S_ISDIR(te->mode))
+		err = add_dir_on_disk(a->worktree, path);
+	else
+		err = update_blob(a->worktree, a->fileindex, NULL, te, path,
+		    a->repo, a->progress_cb, a->progress_arg,
+		    a->cancel_cb, a->cancel_arg);
+
+	free(path);
 	return err;
 }
 
@@ -909,10 +757,13 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL, *unlockerr, *checkout_err = NULL;
 	struct got_commit_object *commit = NULL;
+	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
 	FILE *index = NULL, *new_index = NULL;
+	struct got_fileindex_diff_cb diff_cb;
+	struct diff_cb_arg arg;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -956,12 +807,27 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
+	err = got_object_id_by_path(&tree_id, repo,
+	    worktree->base_commit_id, worktree->path_prefix);
 	if (err)
 		goto done;
 
-	checkout_err = tree_checkout(worktree, fileindex, tree, "/", repo,
-	    progress_cb, progress_arg, cancel_cb, cancel_arg);
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		goto done;
+
+	diff_cb.diff_old_new = diff_old_new;
+	diff_cb.diff_old = diff_old;
+	diff_cb.diff_new = diff_new;
+	arg.fileindex = fileindex;
+	arg.worktree = worktree;
+	arg.repo = repo;
+	arg.progress_cb = progress_cb;
+	arg.progress_arg = progress_arg;
+	arg.cancel_cb = cancel_cb;
+	arg.cancel_arg = cancel_arg;
+	checkout_err = got_fileindex_diff_tree(fileindex, tree, repo,
+	    &diff_cb, &arg);
 
 	/* Try to sync the fileindex back to disk in any case. */
 	err = got_fileindex_write(fileindex, new_index);
