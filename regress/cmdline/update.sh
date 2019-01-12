@@ -359,6 +359,111 @@ function test_update_dir_with_dot_sibling {
 	test_done "$testroot" "0"
 }
 
+function test_update_moves_files_upwards {
+	local testroot=`test_init update_moves_files_upwards`
+
+	mkdir $testroot/repo/epsilon/psi
+	echo mu > $testroot/repo/epsilon/psi/mu
+	mkdir $testroot/repo/epsilon/psi/chi
+	echo tau > $testroot/repo/epsilon/psi/chi/tau
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	(cd $testroot/repo && git mv epsilon/psi/mu epsilon/mu)
+	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon/psi/tau)
+	git_commit $testroot/repo -m "moving files upwards"
+
+	echo "A  epsilon/mu" > $testroot/stdout.expected
+	echo "A  epsilon/psi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/chi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon/psi/chi ]; then
+		echo "removed dir epsilon/psi/chi still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon/psi/mu ]; then
+		echo "removed file epsilon/psi/mu still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
+function test_update_moves_files_to_new_dir {
+	local testroot=`test_init update_moves_files_to_new_dir`
+
+	mkdir $testroot/repo/epsilon/psi
+	echo mu > $testroot/repo/epsilon/psi/mu
+	mkdir $testroot/repo/epsilon/psi/chi
+	echo tau > $testroot/repo/epsilon/psi/chi/tau
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	mkdir -p $testroot/repo/epsilon-new/psi
+	(cd $testroot/repo && git mv epsilon/psi/mu epsilon-new/mu)
+	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon-new/psi/tau)
+	git_commit $testroot/repo -m "moving files upwards"
+
+	echo "A  epsilon-new/mu" > $testroot/stdout.expected
+	echo "A  epsilon-new/psi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/chi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon/psi/chi ]; then
+		echo "removed dir epsilon/psi/chi still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon/psi/mu ]; then
+		echo "removed file epsilon/psi/mu still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -367,3 +472,5 @@ run_test test_update_deletes_dir_with_path_prefix
 run_test test_update_deletes_dir_recursively
 run_test test_update_sibling_dirs_with_common_prefix
 run_test test_update_dir_with_dot_sibling
+run_test test_update_moves_files_upwards
+#run_test test_update_moves_files_to_new_dir  # test is failing
