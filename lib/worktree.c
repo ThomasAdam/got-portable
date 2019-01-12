@@ -800,13 +800,16 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	 */
 	index = fopen(fileindex_path, "rb");
 	if (index == NULL) {
-		err = got_error_from_errno();
-		goto done;
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else {
+		err = got_fileindex_read(fileindex, index);
+		fclose(index);
+		if (err)
+			goto done;
 	}
-	err = got_fileindex_read(fileindex, index);
-	fclose(index);
-	if (err)
-		goto done;
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
