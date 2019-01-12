@@ -300,9 +300,6 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
-	const size_t len = sizeof(hdr.signature) + sizeof(hdr.version) +
-	    sizeof(hdr.nentries);
-	uint8_t buf[len];
 	struct got_fileindex_entry *entry;
 
 	SHA1Init(&ctx);
@@ -311,10 +308,17 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	hdr.version = htobe32(GOT_FILE_INDEX_VERSION);
 	hdr.nentries = htobe32(fileindex->nentries);
 
-	memcpy(buf, &hdr, len);
-	SHA1Update(&ctx, buf, len);
-	n = fwrite(buf, 1, len, outfile);
-	if (n != len)
+	SHA1Update(&ctx, (uint8_t *)&hdr.signature, sizeof(hdr.signature));
+	SHA1Update(&ctx, (uint8_t *)&hdr.version, sizeof(hdr.version));
+	SHA1Update(&ctx, (uint8_t *)&hdr.nentries, sizeof(hdr.nentries));
+	n = fwrite(&hdr.signature, 1, sizeof(hdr.signature), outfile);
+	if (n != sizeof(hdr.signature))
+		return got_ferror(outfile, GOT_ERR_IO);
+	n = fwrite(&hdr.version, 1, sizeof(hdr.version), outfile);
+	if (n != sizeof(hdr.version))
+		return got_ferror(outfile, GOT_ERR_IO);
+	n = fwrite(&hdr.nentries, 1, sizeof(hdr.nentries), outfile);
+	if (n != sizeof(hdr.nentries))
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
