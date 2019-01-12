@@ -55,6 +55,7 @@ function make_test_tree
 function test_init
 {
 	local testname="$1"
+	local no_tree="$2"
 	if [ -z "$testname" ]; then
 		echo "No test name provided" >&2
 		return 1
@@ -62,8 +63,10 @@ function test_init
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 	mkdir $testroot/repo
 	git_init $testroot/repo
-	make_test_tree $testroot/repo
-	git_commit $testroot/repo -m "adding the test tree"
+	if [ -z "$no_tree" ]; then
+		make_test_tree $testroot/repo
+		git_commit $testroot/repo -m "adding the test tree"
+	fi
 	echo "$testroot"
 }
 

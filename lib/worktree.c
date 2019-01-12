@@ -507,6 +507,40 @@ lock_worktree(struct got_worktree *worktree, int operation)
 }
 
 static const struct got_error *
+add_dir_on_disk(struct got_worktree *worktree, const char *path)
+{
+	const struct got_error *err = NULL;
+	char *abspath;
+
+	if (asprintf(&abspath, "%s/%s", worktree->root_path, path) == -1)
+		return got_error_from_errno();
+
+	/* XXX queue work rather than editing disk directly? */
+	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
+		struct stat sb;
+
+		if (errno != EEXIST) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (lstat(abspath, &sb) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (!S_ISDIR(sb.st_mode)) {
+			/* TODO directory is obstructed; do something */
+			return got_error(GOT_ERR_FILE_OBSTRUCTED);
+		}
+	}
+
+done:
+	free(abspath);
+	return err;
+}
+
+static const struct got_error *
 install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *entry, const char *path,
    struct got_blob_object *blob,
@@ -526,7 +560,19 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		if (errno == EEXIST) {
+		if (errno == ENOENT) {
+			char *parent = dirname(path);
+			if (parent == NULL)
+				return got_error_from_errno();
+			err = add_dir_on_disk(worktree, parent);
+			if (err)
+				return err;
+			fd = open(ondisk_path,
+			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+			    GOT_DEFAULT_FILE_MODE);
+			if (fd == -1)
+				return got_error_from_errno();
+		} else if (errno == EEXIST) {
 			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();
@@ -595,40 +641,6 @@ done:
 		close(fd);
 	free(ondisk_path);
 	free(tmppath);
-	return err;
-}
-
-static const struct got_error *
-add_dir_on_disk(struct got_worktree *worktree, const char *path)
-{
-	const struct got_error *err = NULL;
-	char *abspath;
-
-	if (asprintf(&abspath, "%s/%s", worktree->root_path, path) == -1)
-		return got_error_from_errno();
-
-	/* XXX queue work rather than editing disk directly? */
-	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
-		struct stat sb;
-
-		if (errno != EEXIST) {
-			err = got_error_from_errno();
-			goto done;
-		}
-
-		if (lstat(abspath, &sb) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
-
-		if (!S_ISDIR(sb.st_mode)) {
-			/* TODO directory is obstructed; do something */
-			return got_error(GOT_ERR_FILE_OBSTRUCTED);
-		}
-	}
-
-done:
-	free(abspath);
 	return err;
 }
 
