@@ -159,7 +159,7 @@ got_path_is_child(const char *child, const char *parent, size_t parent_len)
 }
 
 int
-got_compare_paths(const char *path1, const char *path2)
+got_path_cmp(const char *path1, const char *path2)
 {
 	size_t len1 = strlen(path1);
 	size_t len2 = strlen(path2);

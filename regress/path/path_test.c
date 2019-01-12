@@ -44,7 +44,7 @@ test_printf(char *fmt, ...)
 }
 
 static int
-path_compare(void)
+path_cmp(void)
 {
 	struct path_cmp_test {
 		const char *path1;
@@ -76,7 +76,7 @@ path_compare(void)
 		const char *path1 = test_data[i].path1;
 		const char *path2 = test_data[i].path2;
 		int expected = test_data[i].expected;
-		int cmp = got_compare_paths(path1, path2);
+		int cmp = got_path_cmp(path1, path2);
 
 		if (cmp != expected) {
 			test_printf("%d: '%s' vs '%s' == %d; expected %d\n",
@@ -123,7 +123,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	RUN_TEST(path_compare(), "path_compare");
+	RUN_TEST(path_cmp(), "path_cmp");
 
 	return failure ? 1 : 0;
 }

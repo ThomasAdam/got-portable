@@ -59,4 +59,4 @@ int got_path_is_child(const char *, const char *, size_t);
  * Like strcmp() but orders children in subdirectories directly after
  * their parents.
  */
-int got_compare_paths(const char *, const char *);
+int got_path_cmp(const char *, const char *);
