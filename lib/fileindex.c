@@ -333,6 +333,9 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != sizeof(sha1))
 		return got_ferror(outfile, GOT_ERR_IO);
 
+	if (fflush(outfile) != 0)
+		return got_error_from_errno();
+
 	return NULL;
 }
 
