@@ -302,6 +302,63 @@ function test_update_sibling_dirs_with_common_prefix {
 	test_done "$testroot" "0"
 }
 
+function test_update_dir_with_dot_sibling {
+	local testroot=`test_init update_dir_with_dot_sibling`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo text > $testroot/repo/epsilon.txt
+	(cd $testroot/repo && git add epsilon.txt)
+	git_commit $testroot/repo -m "adding sibling of epsilon"
+	echo change > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "changing epsilon/zeta"
+
+	echo "A  epsilon.txt" > $testroot/stdout.expected
+	echo "U  epsilon/zeta" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo "another change" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "changing epsilon/zeta again"
+
+	echo "U  epsilon/zeta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -309,3 +366,4 @@ run_test test_update_deletes_dir
 run_test test_update_deletes_dir_with_path_prefix
 run_test test_update_deletes_dir_recursively
 run_test test_update_sibling_dirs_with_common_prefix
+run_test test_update_dir_with_dot_sibling

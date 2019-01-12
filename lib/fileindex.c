@@ -100,9 +100,8 @@ got_fileindex_entry_free(struct got_fileindex_entry *entry)
 	free(entry);
 }
 
-const struct got_error *
-got_fileindex_entry_add(struct got_fileindex *fileindex,
-    struct got_fileindex_entry *entry)
+static const struct got_error *
+add_entry(struct got_fileindex *fileindex, struct got_fileindex_entry *entry)
 {
 	if (fileindex->nentries >= GOT_FILEIDX_MAX_ENTRIES)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -110,6 +109,16 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
 	RB_INSERT(got_fileindex_tree, &fileindex->entries, entry);
 	fileindex->nentries++;
 	return NULL;
+}
+
+const struct got_error *
+got_fileindex_entry_add(struct got_fileindex *fileindex,
+    struct got_fileindex_entry *entry)
+{
+	/* Flag this entry until it gets written out to disk. */
+	entry->flags |= GOT_INDEX_ENTRY_F_INTENT_TO_ADD;
+
+	return add_entry(fileindex, entry);
 }
 
 void
@@ -309,6 +318,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
+		entry->flags &= ~GOT_INDEX_ENTRY_F_INTENT_TO_ADD;
 		err = write_fileindex_entry(&ctx, entry, outfile);
 		if (err)
 			return err;
@@ -505,7 +515,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		err = read_fileindex_entry(&entry, &ctx, infile);
 		if (err)
 			return err;
-		err = got_fileindex_entry_add(fileindex, entry);
+		err = add_entry(fileindex, entry);
 		if (err)
 			return err;
 	}
@@ -525,7 +535,6 @@ in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
     struct got_tree_entry *te)
 {
 	size_t parent_len = strlen(parent_path);
-	size_t te_name_len = strlen(te->name);
 	char *ie_name;
 
 	if (!got_path_is_child(ie->path, parent_path, parent_len))
@@ -534,12 +543,8 @@ in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
 	ie_name = ie->path + parent_len;
 	while (ie_name[0] == '/')
 		ie_name++;
-	if (strncmp(ie_name, te->name, te_name_len) != 0)
-		return 0;
-	if (ie_name[te_name_len] == '/')
-		return 0;
 
-	return 1;
+	return strchr(ie_name, '/') == NULL;
 }
 
 static int
@@ -551,21 +556,35 @@ cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
 
 	if (!in_same_subdir(ie, parent_path, te)) {
 		if (parent_path[0])
-			return got_compare_paths(ie->path, parent_path);
-		return got_compare_paths(ie->path, te->name);
+			return strcmp(ie->path, parent_path);
+		return strcmp(ie->path, te->name);
 	}
 
 	ie_name = ie->path + parent_len;
 	while (ie_name[0] == '/')
 		ie_name++;
 
-	return got_compare_paths(ie_name, te->name);
+	return strcmp(ie_name, te->name);
 }
 
 static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
     struct got_tree_object *, const char *, struct got_repository *,
     struct got_fileindex_diff_cb *, void *);
+
+struct got_fileindex_entry *
+walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
+{
+	struct got_fileindex_entry *next;
+
+	next = RB_NEXT(got_fileindex_tree, &fileindex->entries, ie);
+
+	/* Skip entries which were newly added by diff callbacks. */
+	while (next && (next->flags & GOT_INDEX_ENTRY_F_INTENT_TO_ADD))
+		next = RB_NEXT(got_fileindex_tree, &fileindex->entries, next);
+
+	return next;
+}
 
 static const struct got_error *
 walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
@@ -635,13 +654,11 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 				    path);
 				if (err)
 					break;
-				*ie = RB_NEXT(got_fileindex_tree,
-				    &fileindex->entries, *ie);
+				*ie = walk_fileindex(fileindex, *ie);
 				err = walk_tree(&te, fileindex, ie, te,
 				    path, repo, cb, cb_arg);
-			} else if (cmp < 0) {
-				next = RB_NEXT(got_fileindex_tree,
-				    &fileindex->entries, *ie);
+			} else if (cmp < 0 ) {
+				next = walk_fileindex(fileindex, *ie);
 				err = cb->diff_old(cb_arg, *ie, path);
 				if (err)
 					break;
@@ -656,8 +673,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			if (err)
 				break;
 		} else if (*ie) {
-			next = RB_NEXT(got_fileindex_tree,
-			    &fileindex->entries, *ie);
+			next = walk_fileindex(fileindex, *ie);
 			err = cb->diff_old(cb_arg, *ie, path);
 			if (err)
 				break;

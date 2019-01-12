@@ -53,6 +53,7 @@ struct got_fileindex_entry {
 #define GOT_INDEX_ENTRY_F_STAGE		0x00003000
 #define GOT_INDEX_ENTRY_F_EXTENDED	0x00004000
 #define GOT_INDEX_ENTRY_F_ASSUME_VALID	0x00008000
+#define GOT_INDEX_ENTRY_F_INTENT_TO_ADD	0x20000000
 
 	/*
 	 * UNIX-style path, relative to work tree root.
@@ -77,7 +78,7 @@ static inline int
 got_fileindex_cmp(const struct got_fileindex_entry *e1,
     const struct got_fileindex_entry *e2)
 {
-	return got_compare_paths(e1->path, e2->path);
+	return strcmp(e1->path, e2->path);
 }
 
 RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);
