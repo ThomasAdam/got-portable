@@ -687,9 +687,10 @@ remove_ondisk_file(const char *root_path, const char *path)
 	if (asprintf(&ondisk_path, "%s/%s", root_path, path) == -1)
 		return got_error_from_errno();
 
-	if (unlink(ondisk_path) == -1)
-		err = got_error_from_errno();
-	else {
+	if (unlink(ondisk_path) == -1) {
+		if (errno != ENOENT)
+			err = got_error_from_errno();
+	} else {
 		char *parent = dirname(ondisk_path);
 		while (parent && strcmp(parent, root_path) != 0) {
 			if (rmdir(parent) == -1) {
