@@ -832,28 +832,53 @@ done:
 }
 
 const struct got_error *
-got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen)
+got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen,
+    const uint8_t *data)
 {
 	struct got_imsg_blob iblob;
 
 	iblob.size = size;
 	iblob.hdrlen = hdrlen;
-	/* Data has already been written to file descriptor. */
 
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, &iblob, sizeof(iblob))
-	    == -1)
-		return got_error_from_errno();
+	if (data) {
+		uint8_t *buf;
+
+		if (size > GOT_PRIVSEP_INLINE_BLOB_DATA_MAX)
+			return got_error(GOT_ERR_NO_SPACE);
+
+		buf = malloc(sizeof(iblob) + size);
+		if (buf == NULL)
+			return got_error_from_errno();
+
+		memcpy(buf, &iblob, sizeof(iblob));
+		memcpy(buf + sizeof(iblob), data, size);
+		if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, buf,
+		   sizeof(iblob) + size) == -1) {
+			free(buf);
+			return got_error_from_errno();
+		}
+		free(buf);
+	} else {
+		/* Data has already been written to file descriptor. */
+		if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, &iblob,
+		    sizeof(iblob)) == -1)
+			return got_error_from_errno();
+	}
+
 
 	return flush_imsg(ibuf);
 }
 
 const struct got_error *
-got_privsep_recv_blob(size_t *size, size_t *hdrlen, struct imsgbuf *ibuf)
+got_privsep_recv_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	struct got_imsg_blob *iblob;
 	size_t datalen;
+
+	*outbuf = NULL;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
@@ -863,14 +888,30 @@ got_privsep_recv_blob(size_t *size, size_t *hdrlen, struct imsgbuf *ibuf)
 
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_BLOB:
-		if (datalen != sizeof(*iblob)) {
+		if (datalen < sizeof(*iblob)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
 		iblob = imsg.data;
 		*size = iblob->size;
 		*hdrlen = iblob->hdrlen;
-		/* Data has been written to file descriptor. */
+
+		if (datalen == sizeof(*iblob)) {
+			/* Data has been written to file descriptor. */
+			break;
+		}
+
+		if (*size > GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+
+		*outbuf = malloc(*size);
+		if (*outbuf == NULL) {
+			err = got_error_from_errno();
+			break;
+		}
+		memcpy(*outbuf, imsg.data + sizeof(*iblob), *size);
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);

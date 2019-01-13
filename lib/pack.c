@@ -986,6 +986,12 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 	return NULL;
 }
 
+const struct got_error *
+got_pack_get_object_size(uint64_t *size, struct got_object *obj)
+{
+	return get_delta_chain_max_size(size, &obj->deltas);
+}
+
 static const struct got_error *
 dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
     struct got_pack *pack, FILE *outfile, FILE *base_file, FILE *accum_file)

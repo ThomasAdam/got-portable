@@ -166,7 +166,16 @@ struct got_imsg_tree_object {
 struct got_imsg_blob {
 	size_t size;
 	size_t hdrlen;
+
+	/*
+	 * If size <= GOT_PRIVSEP_INLINE_BLOB_DATA_MAX, blob data follows
+	 * in the imsg buffer. Otherwise, blob data has been written to a
+	 * file descriptor passed via the GOT_IMSG_BLOB_OUTFD imsg.
+	 */
+#define GOT_PRIVSEP_INLINE_BLOB_DATA_MAX \
+	(MAX_IMSGSIZE - IMSG_HEADER_SIZE - sizeof(struct got_imsg_blob))
 };
+
 
 /* Structure for GOT_IMSG_TAG data. */
 struct got_imsg_tag_object {
@@ -242,8 +251,9 @@ const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
     struct got_tree_object *);
-const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t, size_t);
-const struct got_error *got_privsep_recv_blob(size_t *, size_t *,
+const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t, size_t,
+    const uint8_t *);
+const struct got_error *got_privsep_recv_blob(uint8_t **, size_t *, size_t *,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tag(struct imsgbuf *,
     struct got_tag_object *);

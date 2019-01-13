@@ -72,6 +72,7 @@ main(int argc, char *argv[])
 		FILE *f = NULL;
 		size_t size;
 		struct got_object *obj = NULL;
+		uint8_t *buf = NULL;
 	
 		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
@@ -143,16 +144,22 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		err = got_inflate_to_fd(&size, f, imsg_outfd.fd);
-		if (err)
-			goto done;
+		if (obj->size <= GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
+			err = got_inflate_to_mem(&buf, &size, f);
+			if (err)
+				goto done;
+		} else {
+			err = got_inflate_to_fd(&size, f, imsg_outfd.fd);
+			if (err)
+				goto done;
+		}
 
 		if (size < obj->hdrlen) {
 			err = got_error(GOT_ERR_BAD_OBJ_HDR);
 			goto done;
 		}
 
-		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen);
+		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen, buf);
 done:
 		if (f)
 			fclose(f);

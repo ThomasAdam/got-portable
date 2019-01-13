@@ -222,6 +222,8 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
 	struct got_object_id id;
 	size_t datalen;
+	uint64_t blob_size;
+	uint8_t *buf = NULL;
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(iobj))
@@ -235,21 +237,33 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 	err = receive_file(&outfile, ibuf, GOT_IMSG_BLOB_OUTFD);
 	if (err)
-		return err;
+		goto done;
 	err = receive_file(&basefile, ibuf, GOT_IMSG_TMPFD);
 	if (err)
-		return err;
+		goto done;
 	err = receive_file(&accumfile, ibuf, GOT_IMSG_TMPFD);
-	if (err)
-		return err;
-
-	err = got_packfile_extract_object(pack, obj, outfile, basefile,
-	    accumfile);
 	if (err)
 		goto done;
 
-	err = got_privsep_send_blob(ibuf, obj->size, obj->hdrlen);
+	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		err = got_pack_get_object_size(&blob_size, obj);
+		if (err)
+			goto done;
+	} else
+		blob_size = obj->size;
+
+	if (blob_size <= GOT_PRIVSEP_INLINE_BLOB_DATA_MAX)
+		err = got_packfile_extract_object_to_mem(&buf, &obj->size,
+		    obj, pack);
+	else
+		err = got_packfile_extract_object(pack, obj, outfile, basefile,
+		    accumfile);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_blob(ibuf, obj->size, obj->hdrlen, buf);
 done:
+	free(buf);
 	if (outfile)
 		fclose(outfile);
 	if (basefile)
