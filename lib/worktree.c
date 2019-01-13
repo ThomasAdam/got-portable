@@ -520,11 +520,13 @@ make_parent_dirs(const char *abspath)
 			err = make_parent_dirs(parent);
 			if (err)
 				return err;
+			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1)
+				return got_error_from_errno();
 		} else
-			return got_error_from_errno();
+			err = got_error_from_errno();
 	}
 
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -548,22 +550,19 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 
 			if (!S_ISDIR(sb.st_mode)) {
 				/* TODO directory is obstructed; do something */
-				return got_error(GOT_ERR_FILE_OBSTRUCTED);
+				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+				goto done;
 			}
 
 			return NULL;
-		}
-
-		if (errno == ENOENT) {
+		} else if (errno == ENOENT) {
 			err = make_parent_dirs(abspath);
 			if (err)
-				return err;
-			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == 0)
-				return NULL;
-		} else {
+				goto done;
+			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1)
+				err = got_error_from_errno();
+		} else
 			err = got_error_from_errno();
-			goto done;
-		}
 	}
 
 done:
