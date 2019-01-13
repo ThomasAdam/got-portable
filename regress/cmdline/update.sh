@@ -465,7 +465,7 @@ function test_update_moves_files_to_new_dir {
 }
 
 function test_update_creates_missing_parent {
-	local testroot=`test_init update_creates_missing_parent no_tree`
+	local testroot=`test_init update_creates_missing_parent 1`
 
 	touch $testroot/repo/Makefile
 	touch $testroot/repo/snake.6
@@ -518,7 +518,7 @@ function test_update_creates_missing_parent {
 }
 
 function test_update_creates_missing_parent_with_subdir {
-	local testroot=`test_init update_creates_missing_parent no_tree`
+	local testroot=`test_init update_creates_missing_parent_with_subdir 1`
 
 	touch $testroot/repo/Makefile
 	touch $testroot/repo/snake.6
@@ -571,7 +571,7 @@ function test_update_creates_missing_parent_with_subdir {
 }
 
 function test_update_file_in_subsubdir {
-	local testroot=`test_init update_fle_in_subsubdir no_tree`
+	local testroot=`test_init update_fle_in_subsubdir 1`
 
 	touch $testroot/repo/Makefile
 	mkdir -p $testroot/repo/altq
