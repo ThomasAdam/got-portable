@@ -507,6 +507,27 @@ lock_worktree(struct got_worktree *worktree, int operation)
 }
 
 static const struct got_error *
+make_parent_dirs(const char *abspath)
+{
+	const struct got_error *err = NULL;
+
+	char *parent = dirname(abspath);
+	if (parent == NULL)
+		return NULL;
+
+	if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
+		if (errno == ENOENT) {
+			err = make_parent_dirs(parent);
+			if (err)
+				return err;
+		} else
+			return got_error_from_errno();
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 add_dir_on_disk(struct got_worktree *worktree, const char *path)
 {
 	const struct got_error *err = NULL;
@@ -519,19 +540,29 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
 		struct stat sb;
 
-		if (errno != EEXIST) {
-			err = got_error_from_errno();
-			goto done;
+		if (errno == EEXIST) {
+			if (lstat(abspath, &sb) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			if (!S_ISDIR(sb.st_mode)) {
+				/* TODO directory is obstructed; do something */
+				return got_error(GOT_ERR_FILE_OBSTRUCTED);
+			}
+
+			return NULL;
 		}
 
-		if (lstat(abspath, &sb) == -1) {
+		if (errno == ENOENT) {
+			err = make_parent_dirs(abspath);
+			if (err)
+				return err;
+			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == 0)
+				return NULL;
+		} else {
 			err = got_error_from_errno();
 			goto done;
-		}
-
-		if (!S_ISDIR(sb.st_mode)) {
-			/* TODO directory is obstructed; do something */
-			return got_error(GOT_ERR_FILE_OBSTRUCTED);
 		}
 	}
 
@@ -560,7 +591,19 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		if (errno == EEXIST) {
+		if (errno == ENOENT) {
+			char *parent = dirname(path);
+			if (parent == NULL)
+				return got_error_from_errno();
+			err = add_dir_on_disk(worktree, parent);
+			if (err)
+				return err;
+			fd = open(ondisk_path,
+			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+			    GOT_DEFAULT_FILE_MODE);
+			if (fd == -1)
+				return got_error_from_errno();
+		} else if (errno == EEXIST) {
 			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();
