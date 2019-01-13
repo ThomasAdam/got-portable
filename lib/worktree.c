@@ -666,8 +666,6 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			goto done;
 		err = got_fileindex_entry_add(fileindex, entry);
 	}
-	if (err)
-		goto done;
 done:
 	if (fd != -1)
 		close(fd);
