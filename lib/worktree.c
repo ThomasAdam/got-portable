@@ -624,6 +624,8 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 	}
 
+	if (entry == NULL)
+		entry = got_fileindex_entry_get(fileindex, path);
 	if (entry)
 		err = got_fileindex_entry_update(entry, ondisk_path,
 		    blob->id.sha1, worktree->base_commit_id->sha1);
