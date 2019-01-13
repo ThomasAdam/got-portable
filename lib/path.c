@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2015 Theo de Raadt <deraadt@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
