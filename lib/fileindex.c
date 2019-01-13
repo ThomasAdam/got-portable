@@ -492,23 +492,33 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	uint8_t sha1_expected[SHA1_DIGEST_LENGTH];
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
-	const size_t len = sizeof(hdr.signature) + sizeof(hdr.version) +
-	    sizeof(hdr.nentries);
-	uint8_t buf[len];
 	int i;
 
 	SHA1Init(&ctx);
 
-	n = fread(buf, 1, len, infile);
-	if (n != len) {
+	n = fread(&hdr.signature, 1, sizeof(hdr.signature), infile);
+	if (n != sizeof(hdr.signature)) {
+		if (n == 0) /* EOF */
+			return NULL;
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+	}
+	n = fread(&hdr.version, 1, sizeof(hdr.version), infile);
+	if (n != sizeof(hdr.version)) {
+		if (n == 0) /* EOF */
+			return NULL;
+		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+	}
+	n = fread(&hdr.nentries, 1, sizeof(hdr.nentries), infile);
+	if (n != sizeof(hdr.nentries)) {
 		if (n == 0) /* EOF */
 			return NULL;
 		return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 	}
 
-	SHA1Update(&ctx, buf, len);
+	SHA1Update(&ctx, (uint8_t *)&hdr.signature, sizeof(hdr.signature));
+	SHA1Update(&ctx, (uint8_t *)&hdr.version, sizeof(hdr.version));
+	SHA1Update(&ctx, (uint8_t *)&hdr.nentries, sizeof(hdr.nentries));
 
-	memcpy(&hdr, buf, len);
 	hdr.signature = be32toh(hdr.signature);
 	hdr.version = be32toh(hdr.version);
 	hdr.nentries = be32toh(hdr.nentries);
