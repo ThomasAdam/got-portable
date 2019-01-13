@@ -379,10 +379,10 @@ function test_update_moves_files_upwards {
 	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon/psi/tau)
 	git_commit $testroot/repo -m "moving files upwards"
 
-	echo "A  epsilon/mu" > $testroot/stdout.expected
-	echo "A  epsilon/psi/tau" >> $testroot/stdout.expected
-	echo "D  epsilon/psi/chi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/chi/tau" > $testroot/stdout.expected
 	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
+	echo "A  epsilon/mu" >> $testroot/stdout.expected
+	echo "A  epsilon/psi/tau" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
@@ -491,16 +491,69 @@ function test_update_creates_missing_parent {
 	git_commit $testroot/repo -m "restructuring snake tree"
 
 	echo "D  Makefile" > $testroot/stdout.expected
+	echo "D  snake.6" >> $testroot/stdout.expected
+	echo "D  snake.c" >> $testroot/stdout.expected
 	echo "A  snake/Makefile" >> $testroot/stdout.expected
 	echo "A  snake/move.c" >> $testroot/stdout.expected
 	echo "A  snake/pathnames.h" >> $testroot/stdout.expected
 	echo "A  snake/snake.6" >> $testroot/stdout.expected
 	echo "A  snake/snake.c" >> $testroot/stdout.expected
 	echo "A  snake/snake.h" >> $testroot/stdout.expected
+	echo "A  snscore/Makefile" >> $testroot/stdout.expected
+	echo "A  snscore/snscore.c" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
+function test_update_creates_missing_parent_with_subdir {
+	local testroot=`test_init update_creates_missing_parent no_tree`
+
+	touch $testroot/repo/Makefile
+	touch $testroot/repo/snake.6
+	touch $testroot/repo/snake.c
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding initial snake tree"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	mkdir -p $testroot/repo/sss/snake
+	(cd $testroot/repo && git mv Makefile snake.6 snake.c sss/snake)
+	touch $testroot/repo/sss/snake/move.c
+	touch $testroot/repo/sss/snake/pathnames.h
+	touch $testroot/repo/sss/snake/snake.h
+	mkdir -p $testroot/repo/snscore
+	touch $testroot/repo/snscore/Makefile
+	touch $testroot/repo/snscore/snscore.c
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "restructuring snake tree"
+
+	echo "D  Makefile" > $testroot/stdout.expected
 	echo "D  snake.6" >> $testroot/stdout.expected
 	echo "D  snake.c" >> $testroot/stdout.expected
 	echo "A  snscore/Makefile" >> $testroot/stdout.expected
 	echo "A  snscore/snscore.c" >> $testroot/stdout.expected
+	echo "A  sss/snake/Makefile" >> $testroot/stdout.expected
+	echo "A  sss/snake/move.c" >> $testroot/stdout.expected
+	echo "A  sss/snake/pathnames.h" >> $testroot/stdout.expected
+	echo "A  sss/snake/snake.6" >> $testroot/stdout.expected
+	echo "A  sss/snake/snake.c" >> $testroot/stdout.expected
+	echo "A  sss/snake/snake.h" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
@@ -526,5 +579,6 @@ run_test test_update_deletes_dir_recursively
 run_test test_update_sibling_dirs_with_common_prefix
 run_test test_update_dir_with_dot_sibling
 run_test test_update_moves_files_upwards
-#run_test test_update_moves_files_to_new_dir  # test is failing
+run_test test_update_moves_files_to_new_dir
 run_test test_update_creates_missing_parent
+run_test test_update_creates_missing_parent_with_subdir

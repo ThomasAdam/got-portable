@@ -560,19 +560,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		if (errno == ENOENT) {
-			char *parent = dirname(path);
-			if (parent == NULL)
-				return got_error_from_errno();
-			err = add_dir_on_disk(worktree, parent);
-			if (err)
-				return err;
-			fd = open(ondisk_path,
-			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
-			    GOT_DEFAULT_FILE_MODE);
-			if (fd == -1)
-				return got_error_from_errno();
-		} else if (errno == EEXIST) {
+		if (errno == EEXIST) {
 			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();

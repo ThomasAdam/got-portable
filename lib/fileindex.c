@@ -564,24 +564,29 @@ in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
 	return strchr(ie_name, '/') == NULL;
 }
 
+/*
+ * Decide whether ie or te are equivalent, and if they aren't,
+ * then decide which should be processed first.
+ */
 static int
 cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
     struct got_tree_entry *te)
 {
 	size_t parent_len = strlen(parent_path);
-	char *ie_name;
+	int cmp;
 
 	if (!in_same_subdir(ie, parent_path, te)) {
-		if (parent_path[0])
-			return strcmp(ie->path, parent_path);
-		return strcmp(ie->path, te->name);
+		cmp = strncmp(ie->path, parent_path, parent_len);
+		if (cmp == 0)
+			cmp = strcmp(ie->path + parent_len, te->name);
+	} else {
+		char *ie_name = ie->path + parent_len;
+		while (ie_name[0] == '/')
+			ie_name++;
+		cmp = strcmp(ie_name, te->name);
 	}
+	return cmp;
 
-	ie_name = ie->path + parent_len;
-	while (ie_name[0] == '/')
-		ie_name++;
-
-	return strcmp(ie_name, te->name);
 }
 
 static const struct got_error *
@@ -611,12 +616,7 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 {
 	const struct got_error *err = NULL;
 
-	if (te && S_ISREG(te->mode)) {
-		*next = SIMPLEQ_NEXT(te, entry);
-		return NULL;
-	}
-
-	while (te && S_ISDIR(te->mode)) {
+	if (S_ISDIR(te->mode)) {
 		char *subpath;
 		struct got_tree_object *subtree;
 
@@ -630,22 +630,15 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 			return err;
 		}
 
-		if (*ie == NULL || !in_same_subdir(*ie, path, te)) {
-			err = cb->diff_new(cb_arg, te, path);
-			if (err)
-				return err;
-		}
-
 		err = diff_fileindex_tree(fileindex, ie, subtree,
 		    subpath, repo, cb, cb_arg);
 		free(subpath);
 		got_object_tree_close(subtree);
 		if (err)
 			return err;
-		te = SIMPLEQ_NEXT(te, entry);
 	}
 
-	*next = te;
+	*next = SIMPLEQ_NEXT(te, entry);
 	return NULL;
 }
 
