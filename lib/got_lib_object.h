@@ -58,7 +58,6 @@ struct got_tree_object {
 struct got_blob_object {
 	FILE *f;
 	uint8_t *data;
-	struct got_zstream_buf zb;
 	size_t hdrlen;
 	size_t blocksize;
 	uint8_t *read_buf;
