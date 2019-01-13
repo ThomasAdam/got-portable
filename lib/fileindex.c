@@ -54,11 +54,11 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 	entry->gid = sb.st_gid;
 	entry->size = (sb.st_size & 0xffffffff);
 	if (sb.st_mode & S_IFLNK)
-		entry->mode = GOT_INDEX_ENTRY_MODE_SYMLINK;
+		entry->mode = GOT_FILEIDX_MODE_SYMLINK;
 	else
-		entry->mode = GOT_INDEX_ENTRY_MODE_REGULAR_FILE;
+		entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
 	entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
-	    GOT_INDEX_ENTRY_MODE_PERMS_SHIFT);
+	    GOT_FILEIDX_MODE_PERMS_SHIFT);
 	memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
 	memcpy(entry->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
 
@@ -85,8 +85,8 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 	}
 
 	len = strlen(relpath);
-	if (len > GOT_INDEX_ENTRY_F_PATH_LEN)
-		len = GOT_INDEX_ENTRY_F_PATH_LEN;
+	if (len > GOT_FILEIDX_F_PATH_LEN)
+		len = GOT_FILEIDX_F_PATH_LEN;
 	(*entry)->flags |= len;
 
 	return got_fileindex_entry_update(*entry, ondisk_path, blob_sha1,
@@ -116,7 +116,7 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
 	/* Flag this entry until it gets written out to disk. */
-	entry->flags |= GOT_INDEX_ENTRY_F_INTENT_TO_ADD;
+	entry->flags |= GOT_FILEIDX_F_INTENT_TO_ADD;
 
 	return add_entry(fileindex, entry);
 }
@@ -322,7 +322,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
-		entry->flags &= ~GOT_INDEX_ENTRY_F_INTENT_TO_ADD;
+		entry->flags &= ~GOT_FILEIDX_F_INTENT_TO_ADD;
 		err = write_fileindex_entry(&ctx, entry, outfile);
 		if (err)
 			return err;
@@ -597,7 +597,7 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 	next = RB_NEXT(got_fileindex_tree, &fileindex->entries, ie);
 
 	/* Skip entries which were newly added by diff callbacks. */
-	while (next && (next->flags & GOT_INDEX_ENTRY_F_INTENT_TO_ADD))
+	while (next && (next->flags & GOT_FILEIDX_F_INTENT_TO_ADD))
 		next = RB_NEXT(got_fileindex_tree, &fileindex->entries, next);
 
 	return next;
