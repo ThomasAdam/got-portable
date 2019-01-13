@@ -164,7 +164,7 @@ int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_pack *, struct got_packidx *, int, struct got_object_id *);
-const struct got_error *got_pack_get_object_size(uint64_t *,
+const struct got_error *got_pack_get_max_delta_object_size(uint64_t *,
     struct got_object *);
 const struct got_error *got_packfile_extract_object(struct got_pack *,
     struct got_object *, FILE *, FILE *, FILE *);

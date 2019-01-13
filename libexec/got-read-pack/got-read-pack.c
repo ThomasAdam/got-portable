@@ -246,7 +246,7 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		goto done;
 
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
-		err = got_pack_get_object_size(&blob_size, obj);
+		err = got_pack_get_max_delta_object_size(&blob_size, obj);
 		if (err)
 			goto done;
 	} else

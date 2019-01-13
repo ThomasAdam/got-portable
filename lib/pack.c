@@ -987,8 +987,11 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 }
 
 const struct got_error *
-got_pack_get_object_size(uint64_t *size, struct got_object *obj)
+got_pack_get_max_delta_object_size(uint64_t *size, struct got_object *obj)
 {
+	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
+		return got_error(GOT_ERR_OBJ_TYPE);
+
 	return get_delta_chain_max_size(size, &obj->deltas);
 }
 
