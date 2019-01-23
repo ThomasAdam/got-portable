@@ -94,7 +94,7 @@ Only files beneath the specified
 will be checked out.
 .El
 .It Cm update [ Fl c Ar commit ] [ work-tree-path ]
-Update an existing work tree to another commit.
+Update an existing work tree to another commit on the current branch.
 By default, the latest commit on the current branch is assumed.
 If the
 .Ar work tree path
@@ -107,8 +107,7 @@ are as follows:
 .It Fl c Ar commit
 Update the work tree to the specified
 .Ar commit .
-The expected argument is the name of a branch or a SHA1 hash which corresponds
-to a commit object.
+The expected argument is a SHA1 hash which corresponds to a commit object.
 .El
 .\".It Cm status
 .\"Show current status of files.
