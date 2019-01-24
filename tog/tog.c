@@ -3283,16 +3283,13 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			    s->entries, s->tree == s->root);
 			break;
 		case KEY_PPAGE:
+			tree_scroll_up(&s->first_displayed_entry,
+			    MAX(0, view->nlines - 4 - s->selected), s->entries,
+			    s->tree == s->root);
 			s->selected = 0;
 			if (SIMPLEQ_FIRST(&s->entries->head) ==
-			    s->first_displayed_entry) {
-				if (s->tree != s->root)
-					s->first_displayed_entry = NULL;
-				break;
-			}
-			tree_scroll_up(&s->first_displayed_entry,
-			    view->nlines, s->entries,
-			    s->tree == s->root);
+			    s->first_displayed_entry && s->tree != s->root)
+				s->first_displayed_entry = NULL;
 			break;
 		case 'j':
 		case KEY_DOWN:
