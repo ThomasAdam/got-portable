@@ -3046,10 +3046,8 @@ tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 		next = SIMPLEQ_NEXT(*first_displayed_entry, entry);
 	else
 		next = SIMPLEQ_FIRST(&entries->head);
-	while (next) {
+	while (next && n++ < maxscroll) {
 		*first_displayed_entry = next;
-		if (++n >= maxscroll)
-			break;
 		next = SIMPLEQ_NEXT(next, entry);
 	}
 }
