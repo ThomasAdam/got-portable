@@ -3272,8 +3272,11 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'k':
 		case KEY_UP:
-			if (s->selected > 0)
+			if (s->selected > 0) {
 				s->selected--;
+				if (s->selected == 0)
+					break;
+			}
 			if (s->selected > 0)
 				break;
 			tree_scroll_up(&s->first_displayed_entry, 1,
