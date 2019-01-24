@@ -3031,25 +3031,27 @@ tree_scroll_up(struct got_tree_entry **first_displayed_entry, int maxscroll,
 		*first_displayed_entry = NULL;
 }
 
-static void
+static int
 tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 	struct got_tree_entry *last_displayed_entry,
 	const struct got_tree_entries *entries)
 {
-	struct got_tree_entry *next;
+	struct got_tree_entry *next, *last;
 	int n = 0;
-
-	if (SIMPLEQ_NEXT(last_displayed_entry, entry) == NULL)
-		return;
 
 	if (*first_displayed_entry)
 		next = SIMPLEQ_NEXT(*first_displayed_entry, entry);
 	else
 		next = SIMPLEQ_FIRST(&entries->head);
-	while (next && n++ < maxscroll) {
-		*first_displayed_entry = next;
-		next = SIMPLEQ_NEXT(next, entry);
+	last = last_displayed_entry;
+	while (next && last && n++ < maxscroll) {
+		last = SIMPLEQ_NEXT(last, entry);
+		if (last) {
+			*first_displayed_entry = next;
+			next = SIMPLEQ_NEXT(next, entry);
+		}
 	}
+	return n;
 }
 
 static const struct got_error *
@@ -3240,7 +3242,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct tog_view *log_view;
-	int begin_x = 0;
+	int begin_x = 0, nscrolled;
 
 	switch (ch) {
 		case 'i':
@@ -3295,19 +3297,34 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected++;
 				break;
 			}
+			if (SIMPLEQ_NEXT(s->last_displayed_entry, entry)
+			    == NULL) {
+				/* can't scroll any further */
+				break;
+			}
 			tree_scroll_down(&s->first_displayed_entry, 1,
 			    s->last_displayed_entry, s->entries);
 			break;
 		case KEY_NPAGE:
-			tree_scroll_down(&s->first_displayed_entry,
-			    view->nlines, s->last_displayed_entry,
-			    s->entries);
-			if (SIMPLEQ_NEXT(s->last_displayed_entry,
-			    entry))
+			if (SIMPLEQ_NEXT(s->last_displayed_entry, entry)
+			    == NULL) {
+				/* can't scroll any further; move cursor down */
+				if (s->selected < s->ndisplayed - 1)
+					s->selected = s->ndisplayed - 1;
 				break;
-			/* can't scroll any further; move cursor down */
-			if (s->selected < s->ndisplayed - 1)
-				s->selected = s->ndisplayed - 1;
+			}
+			nscrolled = tree_scroll_down(&s->first_displayed_entry,
+			    view->nlines, s->last_displayed_entry, s->entries);
+			if (nscrolled < view->nlines) {
+				int ndisplayed = 0;
+				struct got_tree_entry *te;
+				te = s->first_displayed_entry;
+				do {
+					ndisplayed++;
+					te = SIMPLEQ_NEXT(te, entry);
+				} while (te);
+				s->selected = ndisplayed - 1;
+			}
 			break;
 		case KEY_ENTER:
 		case '\r':
