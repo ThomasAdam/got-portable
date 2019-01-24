@@ -210,7 +210,7 @@ struct tog_tree_view_state {
 	struct got_tree_entry *first_displayed_entry;
 	struct got_tree_entry *last_displayed_entry;
 	struct got_tree_entry *selected_entry;
-	int nentries, ndisplayed, selected, show_ids;
+	int ndisplayed, selected, show_ids;
 	struct tog_parent_trees parents;
 	struct got_object_id *commit_id;
 	struct got_repository *repo;
