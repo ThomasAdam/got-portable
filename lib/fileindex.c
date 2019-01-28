@@ -551,10 +551,8 @@ static int
 in_same_subdir(struct got_fileindex_entry *ie, const char *ie_name,
     const char *parent_path, size_t parent_len)
 {
-	if (!got_path_is_child(ie->path, parent_path, parent_len))
-		return 0;
-
-	return strchr(ie_name, '/') == NULL;
+	return (got_path_is_child(ie->path, parent_path, parent_len) &&
+	    strchr(ie_name, '/') == NULL);
 }
 
 /*
