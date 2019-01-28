@@ -548,8 +548,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 }
 
 static int
-in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
-    struct got_tree_entry *te)
+in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path)
 {
 	size_t parent_len = strlen(parent_path);
 	char *ie_name;
@@ -575,7 +574,7 @@ cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
 	size_t parent_len = strlen(parent_path);
 	int cmp;
 
-	if (!in_same_subdir(ie, parent_path, te)) {
+	if (!in_same_subdir(ie, parent_path)) {
 		cmp = strncmp(ie->path, parent_path, parent_len);
 		if (cmp == 0) {
 			char *ie_name = ie->path + parent_len;
