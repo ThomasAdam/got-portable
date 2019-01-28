@@ -548,17 +548,11 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 }
 
 static int
-in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path,
-    size_t parent_len)
+in_same_subdir(struct got_fileindex_entry *ie, const char *ie_name,
+    const char *parent_path, size_t parent_len)
 {
-	char *ie_name;
-
 	if (!got_path_is_child(ie->path, parent_path, parent_len))
 		return 0;
-
-	ie_name = ie->path + parent_len;
-	while (ie_name[0] == '/')
-		ie_name++;
 
 	return strchr(ie_name, '/') == NULL;
 }
@@ -572,12 +566,11 @@ cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
     size_t parent_len, struct got_tree_entry *te)
 {
 	int cmp = strncmp(ie->path, parent_path, parent_len);
-	if (cmp == 0 || in_same_subdir(ie, parent_path, parent_len)) {
-		char *ie_name = ie->path + parent_len;
-		while (ie_name[0] == '/')
-			ie_name++;
+	char *ie_name = ie->path + parent_len;
+	while (ie_name[0] == '/')
+		ie_name++;
+	if (cmp == 0 || in_same_subdir(ie, ie_name, parent_path, parent_len))
 		cmp = strcmp(ie_name, te->name);
-	}
 	return cmp;
 
 }
