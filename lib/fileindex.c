@@ -569,11 +569,9 @@ in_same_subdir(struct got_fileindex_entry *ie, const char *parent_path)
  */
 static int
 cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
-    struct got_tree_entry *te)
+    size_t parent_len, struct got_tree_entry *te)
 {
-	size_t parent_len = strlen(parent_path);
 	int cmp = strncmp(ie->path, parent_path, parent_len);
-
 	if (cmp == 0 || in_same_subdir(ie, parent_path)) {
 		char *ie_name = ie->path + parent_len;
 		while (ie_name[0] == '/')
@@ -653,7 +651,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 	te = SIMPLEQ_FIRST(&entries->head);
 	do {
 		if (te && *ie) {
-			int cmp = cmp_entries(*ie, path, te);
+			int cmp = cmp_entries(*ie, path, path_len, te);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, te,
 				    path);
