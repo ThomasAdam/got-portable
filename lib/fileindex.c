@@ -547,11 +547,6 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	return NULL;
 }
 
-static const struct got_error *
-diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
-    struct got_tree_object *, const char *, struct got_repository *,
-    struct got_fileindex_diff_cb *, void *);
-
 struct got_fileindex_entry *
 walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 {
@@ -565,6 +560,11 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 
 	return next;
 }
+
+static const struct got_error *
+diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
+    struct got_tree_object *, const char *, struct got_repository *,
+    struct got_fileindex_diff_cb *, void *);
 
 static const struct got_error *
 walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
