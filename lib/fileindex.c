@@ -609,7 +609,7 @@ cmp_entries(const char *ie_path, const char *parent_path,
     size_t parent_len, const char *te_name)
 {
 	int cmp = strncmp(ie_path, parent_path, parent_len);
-	if (cmp == 0 || parent_len == 0) {
+	if (cmp == 0) {
 		const char *ie_name = ie_path + parent_len;
 		while (ie_name[0] == '/')
 			ie_name++;
