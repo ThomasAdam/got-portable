@@ -547,25 +547,6 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	return NULL;
 }
 
-/*
- * Decide whether ie or te are equivalent, and if they aren't,
- * then decide which should be processed first.
- */
-static int
-cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
-    size_t parent_len, struct got_tree_entry *te)
-{
-	int cmp = strncmp(ie->path, parent_path, parent_len);
-	if (cmp == 0 || parent_len == 0) {
-		char *ie_name = ie->path + parent_len;
-		while (ie_name[0] == '/')
-			ie_name++;
-		cmp = strcmp(ie_name, te->name);
-	}
-	return cmp;
-
-}
-
 static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
     struct got_tree_object *, const char *, struct got_repository *,
@@ -617,6 +598,25 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 
 	*next = SIMPLEQ_NEXT(te, entry);
 	return NULL;
+}
+
+/*
+ * Decide whether ie or te are equivalent, and if they aren't,
+ * then decide which should be processed first.
+ */
+static int
+cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
+    size_t parent_len, struct got_tree_entry *te)
+{
+	int cmp = strncmp(ie->path, parent_path, parent_len);
+	if (cmp == 0 || parent_len == 0) {
+		char *ie_name = ie->path + parent_len;
+		while (ie_name[0] == '/')
+			ie_name++;
+		cmp = strcmp(ie_name, te->name);
+	}
+	return cmp;
+
 }
 
 static const struct got_error *
