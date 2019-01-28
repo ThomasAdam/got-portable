@@ -601,19 +601,19 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 }
 
 /*
- * Decide whether ie or te are equivalent, and if they aren't,
- * then decide which should be processed first.
+ * Decide whether a fileindex entry path is equivalent to a tree entry path,
+ * and if it is not, then decide which of the two should be processed first.
  */
 static int
-cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
-    size_t parent_len, struct got_tree_entry *te)
+cmp_entries(const char *ie_path, const char *parent_path,
+    size_t parent_len, const char *te_name)
 {
-	int cmp = strncmp(ie->path, parent_path, parent_len);
+	int cmp = strncmp(ie_path, parent_path, parent_len);
 	if (cmp == 0 || parent_len == 0) {
-		char *ie_name = ie->path + parent_len;
+		const char *ie_name = ie_path + parent_len;
 		while (ie_name[0] == '/')
 			ie_name++;
-		cmp = strcmp(ie_name, te->name);
+		cmp = strcmp(ie_name, te_name);
 	}
 	return cmp;
 
@@ -635,7 +635,8 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 	te = SIMPLEQ_FIRST(&entries->head);
 	do {
 		if (te && *ie) {
-			int cmp = cmp_entries(*ie, path, path_len, te);
+			int cmp = cmp_entries((*ie)->path, path, path_len,
+			    te->name);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, te,
 				    path);
