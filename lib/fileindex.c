@@ -574,7 +574,12 @@ cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
 	size_t parent_len = strlen(parent_path);
 	int cmp;
 
-	if (!in_same_subdir(ie, parent_path)) {
+	if (in_same_subdir(ie, parent_path)) {
+		char *ie_name = ie->path + parent_len;
+		while (ie_name[0] == '/')
+			ie_name++;
+		cmp = strcmp(ie_name, te->name);
+	} else {
 		cmp = strncmp(ie->path, parent_path, parent_len);
 		if (cmp == 0) {
 			char *ie_name = ie->path + parent_len;
@@ -582,11 +587,6 @@ cmp_entries(struct got_fileindex_entry *ie, const char *parent_path,
 				ie_name++;
 			cmp = strcmp(ie_name, te->name);
 		}
-	} else {
-		char *ie_name = ie->path + parent_len;
-		while (ie_name[0] == '/')
-			ie_name++;
-		cmp = strcmp(ie_name, te->name);
 	}
 	return cmp;
 
