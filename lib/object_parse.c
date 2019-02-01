@@ -857,8 +857,12 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 			goto done;
 		}
 	} else {
-		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		goto done;
+		/* Some old tags in the Linux git repo have no tagger. */
+		(*tag)->tagger = strdup("");
+		if ((*tag)->tagger == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
 	}
 
 	(*tag)->tagmsg = strndup(s, remain);
