@@ -176,7 +176,7 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 
 	*ref = NULL;
 
-	if (line[0] == '#')
+	if (line[0] == '#' || line[0] == '^')
 		return NULL;
 
 	if (!got_parse_sha1_digest(digest, line))
@@ -224,7 +224,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 			err = parse_packed_ref_line(ref, abs_refname, line);
 			if (!ref_is_absolute)
 				free(abs_refname);
-			if (err)
+			if (err || *ref != NULL)
 				break;
 		}
 		free(line);
