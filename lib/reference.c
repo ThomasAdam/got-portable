@@ -149,14 +149,19 @@ done:
 	return err;
 }
 
+static int
+is_well_known_ref(const char *refname)
+{
+	return (strcmp(refname, GOT_REF_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_ORIG_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
+	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0);
+}
+
 static char *
 get_refs_dir_path(struct got_repository *repo, const char *refname)
 {
-	if (strcmp(refname, GOT_REF_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_ORIG_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_MERGE_HEAD) == 0 ||
-	    strcmp(refname, GOT_REF_FETCH_HEAD) == 0 ||
-	    strncmp(refname, "refs/", 5) == 0)
+	if (is_well_known_ref(refname) || strncmp(refname, "refs/", 5) == 0)
 		return strdup(got_repo_get_path_git_dir(repo));
 
 	return got_repo_get_path_refs(repo);
@@ -255,23 +260,34 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
    const char *refname)
 {
 	const struct got_error *err = NULL;
-	char *path_refs;
+	char *path_refs = NULL;
 	const char *subdirs[] = {
 	    GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
 	};
-	char *packed_refs_path = got_repo_get_path_packed_refs(repo);
-	FILE *f = fopen(packed_refs_path, "rb");
-	int i;
+	int i, well_known = is_well_known_ref(refname);
 
-	if (f) {
-		for (i = 0; i < nitems(subdirs); i++) {
-			err = open_packed_ref(ref, f, subdirs[i], refname);
-			if (err == NULL)
-				return NULL;
-			rewind(f);
+	if (!well_known) {
+		char *packed_refs_path;
+		FILE *f;
+
+		packed_refs_path = got_repo_get_path_packed_refs(repo);
+		if (packed_refs_path == NULL)
+			return got_error_from_errno();
+
+		f = fopen(packed_refs_path, "rb");
+		free(packed_refs_path);
+		if (f != NULL) {
+			for (i = 0; i < nitems(subdirs); i++) {
+				err = open_packed_ref(ref, f, subdirs[i],
+				    refname);
+				if (err == NULL) {
+					fclose(f);
+					goto done;
+				}
+				rewind(f);
+			}
+			fclose(f);
 		}
-		fclose(f);
-		f = NULL;
 	}
 
 	path_refs = get_refs_dir_path(repo, refname);
@@ -279,12 +295,15 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		err = got_error_from_errno();
 		goto done;
 	}
-	
-	for (i = 0; i < nitems(subdirs); i++) {
-		err = open_ref(ref, path_refs, subdirs[i], refname);
-		if (err == NULL)
-			goto done;
+
+	if (!well_known) {
+		for (i = 0; i < nitems(subdirs); i++) {
+			err = open_ref(ref, path_refs, subdirs[i], refname);
+			if (err == NULL)
+				goto done;
+		}
 	}
+
 	err = open_ref(ref, path_refs, "", refname);
 done:
 	free(path_refs);
