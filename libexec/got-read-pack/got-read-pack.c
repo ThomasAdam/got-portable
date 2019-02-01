@@ -308,6 +308,8 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	obj->size = len;
 	err = got_object_parse_tag(&tag, buf, len);
 	free(buf);
+	if (err)
+		return err;
 
 	err = got_privsep_send_tag(ibuf, tag);
 	if (obj)
