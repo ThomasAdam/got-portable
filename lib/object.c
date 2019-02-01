@@ -1324,6 +1324,18 @@ got_object_tag_open(struct got_tag_object **tag,
 	return open_tag(tag, repo, got_object_get_id(obj), 1);
 }
 
+int
+got_object_tag_get_object_type(struct got_tag_object *tag)
+{
+	return tag->obj_type;
+}
+
+struct got_object_id *
+got_object_tag_get_object_id(struct got_tag_object *tag)
+{
+	return &tag->id;
+}
+
 static struct got_tree_entry *
 find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {

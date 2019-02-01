@@ -219,5 +219,14 @@ const struct got_error *got_object_open_as_tag(struct got_tag_object **,
 /* Dispose of a tag object. */
 void got_object_tag_close(struct got_tag_object *);
 
+/* Get type of the object a tag points to. */
+int got_object_tag_get_object_type(struct got_tag_object *);
+
+/*
+ * Get ID of the object a tag points to.
+ * This must not be freed by the caller. Use got_object_id_dup() if needed.
+ */
+struct got_object_id *got_object_tag_get_object_id(struct got_tag_object *);
+
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);

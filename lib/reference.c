@@ -416,3 +416,12 @@ got_ref_to_str(struct got_reference *ref)
 
 	return str;
 }
+
+const char *
+got_ref_get_name(struct got_reference *ref)
+{
+	if (ref->flags & GOT_REF_IS_SYMBOLIC)
+		return ref->ref.symref.name;
+
+	return ref->ref.ref.name;
+}

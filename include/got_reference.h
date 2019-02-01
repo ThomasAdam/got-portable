@@ -36,6 +36,9 @@ const struct got_error * got_ref_open(struct got_reference **,
 /* Dispose of a reference. */
 void got_ref_close(struct got_reference *);
 
+/* Get the name of the reference. */
+const char *got_ref_get_name(struct got_reference *);
+
 /*
  * Create a duplicate copy of a reference.
  * The caller must dispose of this copy with got_ref_close().
