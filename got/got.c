@@ -829,13 +829,40 @@ cmd_log(int argc, char *argv[])
 		struct got_reference *ref;
 		error = got_ref_open(&ref, repo, start_commit);
 		if (error == NULL) {
+			int obj_type;
 			error = got_ref_resolve(&id, repo, ref);
 			got_ref_close(ref);
 			if (error != NULL)
-				return error;
+				goto done;
+			error = got_object_get_type(&obj_type, repo, id);
+			if (error != NULL)
+				goto done;
+			if (obj_type == GOT_OBJ_TYPE_TAG) {
+				struct got_tag_object *tag;
+				error = got_object_open_as_tag(&tag, repo, id);
+				if (error != NULL)
+					goto done;
+				if (got_object_tag_get_object_type(tag) !=
+				    GOT_OBJ_TYPE_COMMIT) {
+					got_object_tag_close(tag);
+					error = got_error(GOT_ERR_OBJ_TYPE);
+					goto done;
+				}
+				free(id);
+				id = got_object_id_dup(
+				    got_object_tag_get_object_id(tag));
+				if (id == NULL)
+					error = got_error_from_errno();
+				got_object_tag_close(tag);
+				if (error)
+					goto done;
+			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+				error = got_error(GOT_ERR_OBJ_TYPE);
+				goto done;
+			}
 			error = got_object_open_as_commit(&commit, repo, id);
 			if (error != NULL)
-				return error;
+				goto done;
 		}
 		if (commit == NULL) {
 			error = got_object_resolve_id_str(&id, repo,
