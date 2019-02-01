@@ -36,6 +36,10 @@
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
+
 #define GOT_REF_HEADS	"heads"
 #define GOT_REF_TAGS	"tags"
 #define GOT_REF_REMOTES	"remotes"
@@ -159,6 +163,66 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 }
 
 static const struct got_error *
+parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
+    const char *line)
+{
+	uint8_t digest[SHA1_DIGEST_LENGTH];
+	char *name;
+
+	*ref = NULL;
+
+	if (line[0] == '#')
+		return NULL;
+
+	if (!got_parse_sha1_digest(digest, line))
+		return got_error(GOT_ERR_NOT_REF);
+
+	if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
+		return NULL;
+
+	name = strdup(abs_refname);
+	if (name == NULL)
+		return got_error_from_errno();
+
+	*ref = calloc(1, sizeof(**ref));
+	if (*ref == NULL)
+		return got_error_from_errno();
+	(*ref)->ref.ref.name = name;;
+	memcpy(&(*ref)->ref.ref.sha1, digest, SHA1_DIGEST_LENGTH);
+	return NULL;
+}
+
+static const struct got_error *
+open_packed_ref(struct got_reference **ref, FILE *f, const char *subdir,
+    const char *refname)
+{
+	const struct got_error *err = NULL;
+	char *abs_refname;
+	char *line;
+	size_t len;
+	const char delim[3] = {'\0', '\0', '\0'};
+
+	if (asprintf(&abs_refname, "refs/%s/%s", subdir, refname) == -1)
+		return got_error_from_errno();
+
+	do {
+		line = fparseln(f, &len, NULL, delim, 0);
+		if (line == NULL) {
+			err = got_error(GOT_ERR_NOT_REF);
+			break;
+		}
+
+		err = parse_packed_ref_line(ref, abs_refname, line);
+		free(line);
+		if (err)
+			break;
+	} while (*ref == NULL);
+
+	free(abs_refname);
+	return err;
+}
+
+static const struct got_error *
 open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
     const char *refname)
 {
@@ -187,22 +251,37 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
    const char *refname)
 {
 	const struct got_error *err = NULL;
-	char *path_refs = get_refs_dir_path(repo, refname);
+	char *path_refs;
+	const char *subdirs[] = {
+	    GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
+	};
+	char *packed_refs_path = got_repo_get_path_packed_refs(repo);
+	FILE *f = fopen(packed_refs_path, "rb");
+	int i;
 
+	if (f) {
+		for (i = 0; i < nitems(subdirs); i++) {
+			err = open_packed_ref(ref, f, subdirs[i], refname);
+			if (err == NULL)
+				return NULL;
+			rewind(f);
+		}
+		fclose(f);
+		f = NULL;
+	}
+
+	path_refs = get_refs_dir_path(repo, refname);
 	if (path_refs == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 	
-	/* XXX For now, this assumes that refs exist in the filesystem. */
-
-	err = open_ref(ref, path_refs, GOT_REF_HEADS, refname);
-	if (err != NULL)
-		err = open_ref(ref, path_refs, GOT_REF_TAGS, refname);
-	if (err != NULL)
-		err = open_ref(ref, path_refs, GOT_REF_REMOTES, refname);
-	if (err != NULL)
-		err = open_ref(ref, path_refs, "", refname);
+	for (i = 0; i < nitems(subdirs); i++) {
+		err = open_ref(ref, path_refs, subdirs[i], refname);
+		if (err == NULL)
+			goto done;
+	}
+	err = open_ref(ref, path_refs, "", refname);
 done:
 	free(path_refs);
 	return err;

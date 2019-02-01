@@ -65,6 +65,7 @@
 #define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
 #define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
 #define GOT_OBJECTS_PACK_DIR	"objects/pack"
+#define GOT_PACKED_REFS_FILE	"packed-refs"
 
 const char *
 got_repo_get_path(struct got_repository *repo)
@@ -112,6 +113,12 @@ char *
 got_repo_get_path_refs(struct got_repository *repo)
 {
 	return get_path_git_child(repo, GOT_REFS_DIR);
+}
+
+char *
+got_repo_get_path_packed_refs(struct got_repository *repo)
+{
+	return get_path_git_child(repo, GOT_PACKED_REFS_FILE);
 }
 
 static char *

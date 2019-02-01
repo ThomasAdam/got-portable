@@ -36,6 +36,7 @@ const char *got_repo_get_path_git_dir(struct got_repository *);
 char *got_repo_get_path_objects(struct got_repository *);
 char *got_repo_get_path_objects_pack(struct got_repository *);
 char *got_repo_get_path_refs(struct got_repository *);
+char *got_repo_get_path_packed_refs(struct got_repository *);
 
 struct got_reference;
 
