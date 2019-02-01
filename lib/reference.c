@@ -202,7 +202,11 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char *subdir,
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
 
-	if (asprintf(&abs_refname, "refs/%s/%s", subdir, refname) == -1)
+	if (strncmp(refname, "refs/", 5) == 0) {
+		abs_refname = strdup(refname);
+		if (abs_refname == NULL)
+			return got_error_from_errno();
+	} else if (asprintf(&abs_refname, "refs/%s/%s", subdir, refname) == -1)
 		return got_error_from_errno();
 
 	do {
