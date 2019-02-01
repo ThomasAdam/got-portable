@@ -198,36 +198,40 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 }
 
 static const struct got_error *
-open_packed_ref(struct got_reference **ref, FILE *f, const char *subdir,
-    const char *refname)
+open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
+    int nsubdirs, const char *refname)
 {
 	const struct got_error *err = NULL;
 	char *abs_refname;
 	char *line;
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
+	int i, ref_is_absolute = (strncmp(refname, "refs/", 5) == 0);
 
-	if (strncmp(refname, "refs/", 5) == 0) {
-		abs_refname = strdup(refname);
-		if (abs_refname == NULL)
-			return got_error_from_errno();
-	} else if (asprintf(&abs_refname, "refs/%s/%s", subdir, refname) == -1)
-		return got_error_from_errno();
-
+	if (ref_is_absolute)
+		abs_refname = (char *)refname;
 	do {
 		line = fparseln(f, &len, NULL, delim, 0);
 		if (line == NULL) {
 			err = got_error(GOT_ERR_NOT_REF);
 			break;
 		}
-
-		err = parse_packed_ref_line(ref, abs_refname, line);
+		for (i = 0; i < nsubdirs; i++) {
+			if (!ref_is_absolute &&
+			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
+			    refname) == -1)
+				return got_error_from_errno();
+			err = parse_packed_ref_line(ref, abs_refname, line);
+			if (!ref_is_absolute)
+				free(abs_refname);
+			if (err)
+				break;
+		}
 		free(line);
 		if (err)
 			break;
 	} while (*ref == NULL);
 
-	free(abs_refname);
 	return err;
 }
 
@@ -277,16 +281,11 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		f = fopen(packed_refs_path, "rb");
 		free(packed_refs_path);
 		if (f != NULL) {
-			for (i = 0; i < nitems(subdirs); i++) {
-				err = open_packed_ref(ref, f, subdirs[i],
-				    refname);
-				if (err == NULL) {
-					fclose(f);
-					goto done;
-				}
-				rewind(f);
-			}
+			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
+			    refname);
 			fclose(f);
+			if (err == NULL)
+				goto done;
 		}
 	}
 
