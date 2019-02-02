@@ -182,12 +182,15 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 	if (!got_parse_sha1_digest(digest, line))
 		return got_error(GOT_ERR_NOT_REF);
 
-	if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
-		return NULL;
+	if (abs_refname) {
+		if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
+			return NULL;
 
-	name = strdup(abs_refname);
-	if (name == NULL)
-		return got_error_from_errno();
+		name = strdup(abs_refname);
+		if (name == NULL)
+			return got_error_from_errno();
+	} else
+		name = strdup(line + SHA1_DIGEST_STRING_LENGTH);
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
@@ -424,4 +427,72 @@ got_ref_get_name(struct got_reference *ref)
 		return ref->ref.symref.name;
 
 	return ref->ref.ref.name;
+}
+
+static const struct got_error *
+append_ref(struct got_reflist_head *refs, struct got_reference *ref,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object_id *id;
+	struct got_reflist_entry *entry;
+
+	err = got_ref_resolve(&id, repo, ref);
+	if (err)
+		return err;
+	entry = malloc(sizeof(*entry));
+	if (entry == NULL)
+		return got_error_from_errno();
+	entry->ref = ref;
+	entry->id = id;
+	SIMPLEQ_INSERT_TAIL(refs, entry, entry);
+	return NULL;
+}
+
+const struct got_error *
+got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *packed_refs_path, *path_refs;
+	FILE *f;
+	struct got_reference *ref;
+
+	packed_refs_path = got_repo_get_path_packed_refs(repo);
+	if (packed_refs_path == NULL)
+		return got_error_from_errno();
+
+	f = fopen(packed_refs_path, "r");
+	free(packed_refs_path);
+	if (f) {
+		char *line;
+		size_t len;
+		const char delim[3] = {'\0', '\0', '\0'};
+		while (1) {
+			line = fparseln(f, &len, NULL, delim, 0);
+			if (line == NULL)
+				break;
+			err = parse_packed_ref_line(&ref, NULL, line);
+			if (err)
+				goto done;
+			if (ref)
+				append_ref(refs, ref, repo);
+		}
+	}
+
+	/* HEAD ref should always exist. */
+	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
+	free(path_refs);
+	if (err)
+		goto done;
+	append_ref(refs, ref, repo);
+
+done:
+	if (f)
+		fclose(f);
+	return err;
 }

@@ -610,20 +610,41 @@ get_datestr(time_t *time, char *datebuf)
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, int show_patch, int diff_context)
+    struct got_repository *repo, int show_patch, int diff_context,
+    struct got_reflist_head *refs)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
 	char datebuf[26];
 	time_t committer_time;
 	const char *author, *committer;
+	char *refs_str = NULL;
+	struct got_reflist_entry *re;
 
+	SIMPLEQ_FOREACH(re, refs, entry) {
+		char *s;
+		const char *name;
+		if (got_object_id_cmp(re->id, id) != 0)
+			continue;
+		name = got_ref_get_name(re->ref);
+		if (strncmp(name, "refs/", 5) == 0)
+			name += 5;
+		s = refs_str;
+		if (asprintf(&refs_str, "%s%s%s", s ? s : "", s ? ", " : "",
+		    name) == -1) {
+			err = got_error_from_errno();
+			free(s);
+			break;
+		}
+		free(s);
+	}
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
 	printf("-----------------------------------------------\n");
-	printf("commit %s\n", id_str);
+	printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
+	    refs_str ? refs_str : "", refs_str ? ")" : "");
 	free(id_str);
 	printf("from: %s\n", got_object_commit_get_author(commit));
 	committer_time = got_object_commit_get_committer_time(commit);
@@ -672,7 +693,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_repository *repo,
     char *path, int show_patch, int diff_context, int limit,
-    int first_parent_traversal)
+    int first_parent_traversal, struct got_reflist_head *refs)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -711,7 +732,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
-		err = print_commit(commit, id, repo, show_patch, diff_context);
+		err = print_commit(commit, id, repo, show_patch, diff_context,
+		    refs);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;
@@ -741,6 +763,7 @@ cmd_log(int argc, char *argv[])
 	int diff_context = 3, ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
+	struct got_reflist_head refs;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -882,8 +905,13 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
+	SIMPLEQ_INIT(&refs);
+	error = got_ref_list(&refs, repo);
+	if (error)
+		goto done;
+
 	error = print_commits(id, repo, path, show_patch,
-	    diff_context, limit, first_parent_traversal);
+	    diff_context, limit, first_parent_traversal, &refs);
 done:
 	free(path);
 	free(repo_path);

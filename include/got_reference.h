@@ -54,3 +54,15 @@ const struct got_error *got_ref_resolve(struct got_object_id **,
  * The caller must dispose of it with free(3).
  */
 char *got_ref_to_str(struct got_reference *);
+
+/* A list of references and the object ID which they resolve to. */
+struct got_reflist_entry {
+	SIMPLEQ_ENTRY(got_reflist_entry) entry;
+	struct got_reference *ref;
+	struct got_object_id *id;
+};
+SIMPLEQ_HEAD(got_reflist_head, got_reflist_entry);
+
+/* Append all known references to a caller-provided ref list head. */
+const struct got_error *got_ref_list(struct got_reflist_head *,
+    struct got_repository *);
