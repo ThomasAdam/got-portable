@@ -629,6 +629,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		name = got_ref_get_name(re->ref);
 		if (strncmp(name, "refs/", 5) == 0)
 			name += 5;
+		if (strncmp(name, "heads/", 6) == 0)
+			name += 6;
 		s = refs_str;
 		if (asprintf(&refs_str, "%s%s%s", s ? s : "", s ? ", " : "",
 		    name) == -1) {
