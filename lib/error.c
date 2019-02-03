@@ -107,3 +107,16 @@ got_error_no_obj(struct got_object_id *id)
 
 	return got_error_msg(GOT_ERR_NO_OBJ, msg);
 }
+
+const struct got_error *
+got_error_not_ref(const char *refname)
+{
+	static char msg[sizeof("reference   not found") + 1004];
+	int ret;
+
+	ret = snprintf(msg, sizeof(msg), "reference %s not found", refname);
+	if (ret == -1 || ret >= sizeof(msg))
+		return got_error(GOT_ERR_NOT_REF);
+
+	return got_error_msg(GOT_ERR_NOT_REF, msg);
+}
