@@ -70,6 +70,7 @@
 #define GOT_ERR_PATH_PREFIX	54
 #define GOT_ERR_ANCESTRY	55
 #define GOT_ERR_FILEIDX_BAD	56
+#define GOT_ERR_BAD_REF_DATA	57
 
 static const struct got_error {
 	int code;
@@ -130,6 +131,7 @@ static const struct got_error {
 	{ GOT_ERR_ANCESTRY,	"specified commit does not share ancestry with "
 				"the current branch" },
 	{ GOT_ERR_FILEIDX_BAD,	"file index is corrupt" },
+	{ GOT_ERR_BAD_REF_DATA,	"could not parse reference data" },
 };
 
 /*
