@@ -75,7 +75,7 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 	char *symref_ref;
 
 	if (line[0] == '\0')
-		return got_error(GOT_ERR_NOT_REF);
+		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	symref_name = strdup(name);
 	if (symref_name == NULL)
@@ -113,7 +113,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 		return got_error_from_errno();
 
 	if (!got_parse_sha1_digest(digest, line))
-		return got_error(GOT_ERR_NOT_REF);
+		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
@@ -134,11 +134,11 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	const char delim[3] = {'\0', '\0', '\0'};
 
 	if (f == NULL)
-		return got_error(GOT_ERR_NOT_REF);
+		return got_error_not_ref(name);
 
 	line = fparseln(f, &len, NULL, delim, 0);
 	if (line == NULL) {
-		err = got_error(GOT_ERR_NOT_REF);
+		err = got_error(GOT_ERR_BAD_REF_DATA);
 		goto done;
 	}
 
@@ -180,7 +180,7 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 		return NULL;
 
 	if (!got_parse_sha1_digest(digest, line))
-		return got_error(GOT_ERR_NOT_REF);
+		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	if (abs_refname) {
 		if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
@@ -216,7 +216,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 	do {
 		line = fparseln(f, &len, NULL, delim, 0);
 		if (line == NULL) {
-			err = got_error(GOT_ERR_NOT_REF);
+			err = got_error_not_ref(refname);
 			break;
 		}
 		for (i = 0; i < nsubdirs; i++) {
@@ -251,7 +251,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 
 	normpath = got_path_normalize(path_ref);
 	if (normpath == NULL) {
-		err = got_error(GOT_ERR_NOT_REF);
+		err = got_error_from_errno();
 		goto done;
 	}
 
