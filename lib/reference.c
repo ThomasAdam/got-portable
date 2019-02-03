@@ -474,8 +474,11 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 			err = parse_packed_ref_line(&ref, NULL, line);
 			if (err)
 				goto done;
-			if (ref)
-				append_ref(refs, ref, repo);
+			if (ref) {
+				err = append_ref(refs, ref, repo);
+				if (err)
+					goto done;
+			}
 		}
 	}
 
@@ -489,7 +492,9 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	free(path_refs);
 	if (err)
 		goto done;
-	append_ref(refs, ref, repo);
+	err = append_ref(refs, ref, repo);
+	if (err)
+		goto done;
 
 done:
 	if (f)
