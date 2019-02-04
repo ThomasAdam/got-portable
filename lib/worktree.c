@@ -907,3 +907,213 @@ done:
 		err = unlockerr;
 	return err;
 }
+
+struct diff_dir_cb_arg {
+    struct got_fileindex *fileindex;
+    struct got_worktree *worktree;
+    struct got_repository *repo;
+    got_worktree_status_cb status_cb;
+    void *status_arg;
+    got_worktree_cancel_cb cancel_cb;
+    void *cancel_arg;
+};
+
+
+static const struct got_error *
+get_modified_file_status(unsigned char *status, struct got_fileindex_entry *ie,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id id;
+	size_t hdrlen;
+	char *abspath;
+	FILE *f = NULL;
+	uint8_t fbuf[8192];
+	struct got_blob_object *blob = NULL;
+	size_t flen, blen;
+
+	*status = GOT_STATUS_NO_CHANGE;
+
+	if (asprintf(&abspath, "%s/%s", worktree->root_path, ie->path) == -1)
+		return got_error_from_errno();
+
+	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
+	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
+	if (err)
+		goto done;
+
+	f = fopen(abspath, "r");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	while (1) {
+		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
+		err = got_object_blob_read_block(&blen, blob);
+		if (err)
+			break;
+		flen = fread(fbuf, 1, sizeof(fbuf), f);
+		if (blen == 0) {
+			if (flen != 0)
+				*status = GOT_STATUS_MODIFIY;
+			break;
+		} else if (flen == 0) {
+			if (blen != 0)
+				*status = GOT_STATUS_MODIFIY;
+			break;
+		} else if (blen == flen) {
+			/* Skip blob object header first time around. */
+			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
+				*status = GOT_STATUS_MODIFIY;
+				break;
+			}
+		} else {
+			*status = GOT_STATUS_MODIFIY;
+			break;
+		}
+		hdrlen = 0;
+	}
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (f)
+		fclose(f);
+	free(abspath);
+	return err;
+}
+
+static const struct got_error *
+status_old_new(void *arg, struct got_fileindex_entry *ie,
+    struct dirent *de, const char *parent_path)
+{
+	const struct got_error *err = NULL;
+	struct diff_dir_cb_arg *a = arg;
+	char *abspath;
+	struct stat sb;
+	unsigned char status = GOT_STATUS_NO_CHANGE;
+
+	if (parent_path[0]) {
+		if (asprintf(&abspath, "%s/%s/%s", a->worktree->root_path,
+		    parent_path, de->d_name) == -1)
+			return got_error_from_errno();
+	} else {
+		if (asprintf(&abspath, "%s/%s", a->worktree->root_path,
+		    de->d_name) == -1)
+			return got_error_from_errno();
+	}
+
+	if (lstat(abspath, &sb) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (!S_ISREG(sb.st_mode))
+		goto done;
+
+	if (ie->ctime_sec == sb.st_ctime &&
+	    ie->ctime_nsec == sb.st_ctimensec &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_nsec == sb.st_mtimensec &&
+	    ie->size == (sb.st_size & 0xffffffff))
+		goto done;
+
+	err = get_modified_file_status(&status, ie, a->worktree, a->repo);
+	if (err)
+		goto done;
+	if (status != GOT_STATUS_NO_CHANGE)
+		(*a->status_cb)(a->status_arg, status, ie->path);
+done:
+	free(abspath);
+	return err;
+}
+
+static const struct got_error *
+status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
+{
+	struct diff_dir_cb_arg *a = arg;
+	(*a->status_cb)(a->status_arg, GOT_STATUS_MISSING, ie->path);
+	return NULL;
+}
+
+static const struct got_error *
+status_new(void *arg, struct dirent *de, const char *parent_path)
+{
+	struct diff_dir_cb_arg *a = arg;
+	char *path = NULL;
+
+	if (de->d_type == DT_DIR)
+		return NULL;
+
+	if (parent_path[0]) {
+		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
+			return got_error_from_errno();
+	} else {
+		path = de->d_name;
+	}
+
+	(*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED, path);
+	if (parent_path[0])
+		free(path);
+	return NULL;
+}
+
+const struct got_error *
+got_worktree_status(struct got_worktree *worktree,
+    struct got_repository *repo, got_worktree_status_cb status_cb,
+    void *status_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	DIR *workdir = NULL;
+	char *fileindex_path = NULL;
+	struct got_fileindex *fileindex = NULL;
+	FILE *index = NULL;
+	struct got_fileindex_diff_dir_cb diff_cb;
+	struct diff_dir_cb_arg arg;
+
+	fileindex = got_fileindex_alloc();
+	if (fileindex == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno();
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else {
+		err = got_fileindex_read(fileindex, index);
+		fclose(index);
+		if (err)
+			goto done;
+	}
+
+	workdir = opendir(worktree->root_path);
+	diff_cb.diff_old_new = status_old_new;
+	diff_cb.diff_old = status_old;
+	diff_cb.diff_new = status_new;
+	arg.fileindex = fileindex;
+	arg.worktree = worktree;
+	arg.repo = repo;
+	arg.status_cb = status_cb;
+	arg.status_arg = status_arg;
+	arg.cancel_cb = cancel_cb;
+	arg.cancel_arg = cancel_arg;
+	err = got_fileindex_diff_dir(fileindex, workdir, repo, &diff_cb, &arg);
+done:
+	if (workdir)
+		closedir(workdir);
+	free(fileindex_path);
+	got_fileindex_free(fileindex);
+	return err;
+}

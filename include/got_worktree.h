@@ -17,10 +17,14 @@
 struct got_worktree;
 
 /* status codes */
+#define GOT_STATUS_NO_CHANGE	' '
 #define GOT_STATUS_ADD		'A'
 #define GOT_STATUS_EXISTS	'E'
 #define GOT_STATUS_UPDATE	'U'
 #define GOT_STATUS_DELETE	'D'
+#define GOT_STATUS_MODIFIY	'M'
+#define GOT_STATUS_MISSING	'!'
+#define GOT_STATUS_UNVERSIONED	'?'
 
 /*
  * Attempt to initialize a new work tree on disk.
@@ -100,3 +104,14 @@ const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     struct got_repository *, got_worktree_checkout_cb progress, void *,
     got_worktree_cancel_cb, void *);
 
+/* A callback function which is invoked to report a path's status. */
+typedef void (*got_worktree_status_cb)(void *, unsigned char, const char *);
+
+/*
+ * Report the status of paths in the work tree.
+ * The status callback will be invoked with the provided void * argument,
+ * a path, and a corresponding status code.
+ */
+const struct got_error *
+got_worktree_status(struct got_worktree *, struct got_repository *,
+    got_worktree_status_cb, void *, got_worktree_cancel_cb cancel_cb, void *);
