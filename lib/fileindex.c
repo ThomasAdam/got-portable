@@ -635,7 +635,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 
 	entries = got_object_tree_get_entries(tree);
 	te = SIMPLEQ_FIRST(&entries->head);
-	do {
+	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || te) {
 		if (te && *ie) {
 			int cmp = cmp_entries((*ie)->path, path, path_len,
 			    te->name);
@@ -677,7 +677,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			if (err)
 				break;
 		}
-	} while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || te);
+	}
 
 	return err;
 }
@@ -697,20 +697,26 @@ diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **, DIR *,
     const char *, struct got_repository *, struct got_fileindex_diff_dir_cb *,
     void *);
 
+struct dirlist_entry {
+	SIMPLEQ_ENTRY(dirlist_entry) entry;
+	struct dirent *de;
+};
+SIMPLEQ_HEAD(dirlist_head, dirlist_entry);
+
 static const struct got_error *
-walk_dir(struct dirent **next, struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, struct dirent *de, const char *path,
-    DIR *dir, struct got_repository *repo,
+walk_dir(struct dirlist_entry **next, struct got_fileindex *fileindex,
+    struct got_fileindex_entry **ie, struct dirlist_entry *dle,
+    const char *path, DIR *dir, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 
-	if (de->d_type == DT_DIR) {
+	if (dle->de->d_type == DT_DIR) {
 		char *subpath;
 		DIR *subdir;
 
 		if (asprintf(&subpath, "%s%s%s", path,
-		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
+		    path[0] == '\0' ? "" : "/", dle->de->d_name) == -1)
 			return got_error_from_errno();
 
 		subdir = opendir(subpath);
@@ -727,7 +733,45 @@ walk_dir(struct dirent **next, struct got_fileindex *fileindex,
 			return err;
 	}
 
-	*next = readdir(dir);
+	*next = SIMPLEQ_NEXT(dle, entry);
+	return NULL;
+}
+
+static const struct got_error *
+insert_dirent(struct dirlist_head *dirlist, struct dirent *de)
+{
+	struct dirlist_entry *dle, *prev = NULL;
+
+	/*
+	 * Keep dirents sorted in same order as used by file index.
+	 * Git orders tree object entries based on length and then memcmp().
+	 */
+	SIMPLEQ_FOREACH(dle, dirlist, entry) {
+		int cmp;
+
+		if (dle->de->d_namlen > de->d_namlen) {
+			prev = dle;
+			continue;
+		}
+
+		cmp = strcmp(dle->de->d_name, de->d_name);
+		if (cmp == 0)
+			return NULL; /* duplicate, should not happen */
+		else if (cmp > 0)
+			break;
+		else
+			prev = dle;
+	}
+
+	dle = malloc(sizeof(*dle));
+	if (dle == NULL)
+		return got_error_from_errno();
+	dle->de = de;
+	if (prev)
+		SIMPLEQ_INSERT_AFTER(dirlist, prev, dle, entry);
+	else
+		SIMPLEQ_INSERT_HEAD(dirlist, dle, entry);
+
 	return NULL;
 }
 
@@ -741,27 +785,37 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	struct dirent *de = NULL;
 	size_t path_len = strlen(path);
 	struct got_fileindex_entry *next;
+	struct dirlist_head dirlist;
+	struct dirlist_entry *dle;
 
-	de = readdir(dir);
-	do {
+	SIMPLEQ_INIT(&dirlist);
+
+	while (1) {
+		de = readdir(dir);
+		if (de == NULL)
+			break;
+
 		if (strcmp(de->d_name, ".") == 0 ||
 		    strcmp(de->d_name, "..") == 0 ||
 		    (path[0] == '\0' &&
-		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
-			de = readdir(dir);
+		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0))
 			continue;
-		}
 
+		insert_dirent(&dirlist, de);
+	}
 
-		if (de && *ie) {
+	dle = SIMPLEQ_FIRST(&dirlist);
+	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
+		if (dle && *ie) {
 			int cmp = cmp_entries((*ie)->path, path, path_len,
-			    de->d_name);
+			    dle->de->d_name);
 			if (cmp == 0) {
-				err = cb->diff_old_new(cb_arg, *ie, de, path);
+				err = cb->diff_old_new(cb_arg, *ie, dle->de,
+				    path);
 				if (err)
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
-				err = walk_dir(&de, fileindex, ie, de, path,
+				err = walk_dir(&dle, fileindex, ie, dle, path,
 				    dir, repo, cb, cb_arg);
 			} else if (cmp < 0 ) {
 				next = walk_fileindex(fileindex, *ie);
@@ -770,16 +824,22 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 					break;
 				*ie = next;
 			} else {
-				err = cb->diff_new(cb_arg, de, path);
+				err = cb->diff_new(cb_arg, dle->de, path);
 				if (err)
 					break;
-				err = walk_dir(&de, fileindex, ie, de, path,
+				err = walk_dir(&dle, fileindex, ie, dle, path,
 				    dir, repo, cb, cb_arg);
 			}
 			if (err)
 				break;
 		}
-	} while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || de);
+	}
+
+	while (!SIMPLEQ_EMPTY(&dirlist)) {
+		dle = SIMPLEQ_FIRST(&dirlist);
+		SIMPLEQ_REMOVE_HEAD(&dirlist, entry);
+		free(dle);
+	}
 
 	return err;
 }
