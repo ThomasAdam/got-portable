@@ -31,6 +31,7 @@
 
 #include "got_lib_path.h"
 #include "got_lib_fileindex.h"
+#include "got_lib_worktree.h"
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
@@ -744,10 +745,14 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	de = readdir(dir);
 	do {
 		if (strcmp(de->d_name, ".") == 0 ||
-		    strcmp(de->d_name, "..") == 0) {
+		    strcmp(de->d_name, "..") == 0 ||
+		    (path[0] == '\0' &&
+		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
 			de = readdir(dir);
 			continue;
 		}
+
+
 		if (de && *ie) {
 			int cmp = cmp_entries((*ie)->path, path, path_len,
 			    de->d_name);
