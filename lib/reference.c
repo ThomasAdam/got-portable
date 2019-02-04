@@ -135,7 +135,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	const char delim[3] = {'\0', '\0', '\0'};
 
 	if (f == NULL)
-		return got_error_not_ref(name);
+		return NULL;
 
 	line = fparseln(f, &len, NULL, delim, 0);
 	if (line == NULL) {
@@ -212,14 +212,14 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 	const char delim[3] = {'\0', '\0', '\0'};
 	int i, ref_is_absolute = (strncmp(refname, "refs/", 5) == 0);
 
+	*ref = NULL;
+
 	if (ref_is_absolute)
 		abs_refname = (char *)refname;
 	do {
 		line = fparseln(f, &len, NULL, delim, 0);
-		if (line == NULL) {
-			err = got_error_not_ref(refname);
+		if (line == NULL)
 			break;
-		}
 		for (i = 0; i < nsubdirs; i++) {
 			if (!ref_is_absolute &&
 			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
@@ -249,6 +249,8 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 	char *absname = NULL;
 	int ref_is_absolute = (strncmp(name, "refs/", 5) == 0);
 	int ref_is_well_known = is_well_known_ref(name);
+
+	*ref = NULL;
 
 	if (ref_is_absolute || ref_is_well_known) {
 		if (asprintf(&path, "%s/%s", path_refs, name) == -1)
@@ -290,6 +292,8 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	};
 	int i, well_known = is_well_known_ref(refname);
 
+	*ref = NULL;
+
 	if (!well_known) {
 		char *packed_refs_path;
 		FILE *f;
@@ -304,7 +308,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
 			    refname);
 			fclose(f);
-			if (err == NULL)
+			if (err || *ref)
 				goto done;
 		}
 	}
@@ -318,12 +322,16 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	if (!well_known) {
 		for (i = 0; i < nitems(subdirs); i++) {
 			err = open_ref(ref, path_refs, subdirs[i], refname);
-			if (err == NULL)
+			if (err || *ref)
 				goto done;
 		}
 	}
 
 	err = open_ref(ref, path_refs, "", refname);
+	if (err)
+		goto done;
+	if (*ref == NULL)
+		err = got_error_not_ref(refname);
 done:
 	free(path_refs);
 	return err;
@@ -497,7 +505,7 @@ gather_refs(struct got_reflist_head *refs, const char *path_refs,
 		switch (dent->d_type) {
 		case DT_REG:
 			err = open_ref(&ref, path_refs, subdir, dent->d_name);
-			if (err && err->code != GOT_ERR_NOT_REF)
+			if (err)
 				goto done;
 			if (ref) {
 				err = append_ref(refs, ref, repo);
