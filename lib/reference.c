@@ -491,7 +491,7 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 	if (prev)
 		SIMPLEQ_INSERT_AFTER(refs, prev, re, entry);
 	else
-		SIMPLEQ_INSERT_HEAD(refs, re, entry);
+		SIMPLEQ_INSERT_TAIL(refs, re, entry);
 
 	return NULL;
 }
