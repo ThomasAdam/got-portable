@@ -804,7 +804,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
 	FILE *index = NULL, *new_index = NULL;
-	struct got_fileindex_diff_cb diff_cb;
+	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
 
 	err = lock_worktree(worktree, LOCK_EX);

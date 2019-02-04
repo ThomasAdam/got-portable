@@ -114,18 +114,18 @@ typedef const struct got_error *(*got_fileindex_cb)(void *,
 const struct got_error *got_fileindex_for_each_entry_safe(
     struct got_fileindex *, got_fileindex_cb cb, void *);
 
-typedef const struct got_error *(*got_fileindex_diff_old_new_cb)(void *,
+typedef const struct got_error *(*got_fileindex_diff_tree_old_new_cb)(void *,
     struct got_fileindex_entry *, struct got_tree_entry *, const char *);
-typedef const struct got_error *(*got_fileindex_diff_old_cb)(void *,
+typedef const struct got_error *(*got_fileindex_diff_tree_old_cb)(void *,
     struct got_fileindex_entry *, const char *);
-typedef const struct got_error *(*got_fileindex_diff_new_cb)(void *,
+typedef const struct got_error *(*got_fileindex_diff_tree_new_cb)(void *,
     struct got_tree_entry *, const char *);
-struct got_fileindex_diff_cb {
-	got_fileindex_diff_old_new_cb diff_old_new;
-	got_fileindex_diff_old_cb diff_old;
-	got_fileindex_diff_new_cb diff_new;
+struct got_fileindex_diff_tree_cb {
+	got_fileindex_diff_tree_old_new_cb diff_old_new;
+	got_fileindex_diff_tree_old_cb diff_old;
+	got_fileindex_diff_tree_new_cb diff_new;
 };
 
 const struct got_error *got_fileindex_diff_tree(struct got_fileindex *,
     struct got_tree_object *, struct got_repository *,
-    struct got_fileindex_diff_cb *, void *);
+    struct got_fileindex_diff_tree_cb *, void *);

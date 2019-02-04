@@ -564,13 +564,13 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
     struct got_tree_object *, const char *, struct got_repository *,
-    struct got_fileindex_diff_cb *, void *);
+    struct got_fileindex_diff_tree_cb *, void *);
 
 static const struct got_error *
 walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_tree_entry *te,
     const char *path, struct got_repository *repo,
-    struct got_fileindex_diff_cb *cb, void *cb_arg)
+    struct got_fileindex_diff_tree_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 
@@ -623,7 +623,7 @@ static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_tree_object *tree,
     const char *path, struct got_repository *repo,
-    struct got_fileindex_diff_cb *cb, void *cb_arg)
+    struct got_fileindex_diff_tree_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te = NULL;
@@ -683,7 +683,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 const struct got_error *
 got_fileindex_diff_tree(struct got_fileindex *fileindex,
     struct got_tree_object *tree, struct got_repository *repo,
-    struct got_fileindex_diff_cb *cb, void *cb_arg)
+    struct got_fileindex_diff_tree_cb *cb, void *cb_arg)
 {
 	struct got_fileindex_entry *min;
 	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
