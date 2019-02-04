@@ -113,7 +113,7 @@ main(int argc, char *argv[])
 	int ch;
 	int hflag = 0;
 
-	setlocale(LC_ALL, "");
+	setlocale(LC_CTYPE, "");
 
 	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch (ch) {

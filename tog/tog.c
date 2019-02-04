@@ -3562,7 +3562,7 @@ main(int argc, char *argv[])
 	int ch, hflag = 0;
 	char **cmd_argv = NULL;
 
-	setlocale(LC_ALL, "");
+	setlocale(LC_CTYPE, "");
 
 	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch (ch) {
