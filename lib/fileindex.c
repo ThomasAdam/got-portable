@@ -832,6 +832,20 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			}
 			if (err)
 				break;
+		} else if (*ie) {
+			next = walk_fileindex(fileindex, *ie);
+			err = cb->diff_old(cb_arg, *ie, path);
+			if (err)
+				break;
+			*ie = next;
+		} else if (dle) {
+			err = cb->diff_new(cb_arg, dle->de, path);
+			if (err)
+				break;
+			err = walk_dir(&dle, fileindex, ie, dle, path, dir,
+			    repo, cb, cb_arg);
+			if (err)
+				break;
 		}
 	}
 
