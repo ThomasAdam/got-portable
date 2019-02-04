@@ -75,6 +75,7 @@ __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
+__dead static void	usage_status(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -82,9 +83,7 @@ static const struct got_error*		cmd_log(int, char *[]);
 static const struct got_error*		cmd_diff(int, char *[]);
 static const struct got_error*		cmd_blame(int, char *[]);
 static const struct got_error*		cmd_tree(int, char *[]);
-#ifdef notyet
 static const struct got_error*		cmd_status(int, char *[]);
-#endif
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -99,10 +98,8 @@ static struct cmd got_commands[] = {
 	    " show when lines in a file were changed" },
 	{ "tree",	cmd_tree,	usage_tree,
 	    " list files and directories in repository" },
-#ifdef notyet
 	{ "status",	cmd_status,	usage_status,
 	    "show modification status of files" },
-#endif
 };
 
 int
@@ -218,7 +215,7 @@ checkout_progress(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
-checkout_cancel(void *arg)
+check_cancelled(void *arg)
 {
 	if (sigint_received || sigpipe_received)
 		return got_error(GOT_ERR_CANCELLED);
@@ -410,7 +407,7 @@ cmd_checkout(int argc, char *argv[])
 	}
 
 	error = got_worktree_checkout_files(worktree, repo,
-	    checkout_progress, worktree_path, checkout_cancel, NULL);
+	    checkout_progress, worktree_path, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -535,7 +532,7 @@ cmd_update(int argc, char *argv[])
 	}
 
 	error = got_worktree_checkout_files(worktree, repo,
-	    update_progress, &did_something, checkout_cancel, NULL);
+	    update_progress, &did_something, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -1349,83 +1346,74 @@ done:
 	return error;
 }
 
-#ifdef notyet
-static const struct got_error *
-cmd_status(int argc __unused, char *argv[] __unused)
+__dead static void
+usage_status(void)
 {
-	git_repository *repo = NULL;
-	git_status_list *status;
-	git_status_options statusopts;
-	size_t i;
+	fprintf(stderr, "usage: %s status [worktree-path]\n", getprogname());
+	exit(1);
+}
 
-	git_libgit2_init();
+static void
+print_status(void *arg, unsigned char status, const char *path)
+{
+	printf("%c  %s\n", status, path);
+}
 
-	if (git_repository_open_ext(&repo, ".", 0, NULL))
-		errx(1, "git_repository_open: %s", giterr_last()->message);
+static const struct got_error *
+cmd_status(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *worktree_path = NULL;
+	int ch;
 
-	if (git_repository_is_bare(repo))
-		errx(1, "bar repository");
-
-	if (git_status_init_options(&statusopts, GIT_STATUS_OPTIONS_VERSION))
-		errx(1, "git_status_init_options: %s", giterr_last()->message);
-
-	statusopts.show  = GIT_STATUS_SHOW_INDEX_AND_WORKDIR;
-	statusopts.flags = GIT_STATUS_OPT_INCLUDE_UNTRACKED |
-	    GIT_STATUS_OPT_RENAMES_HEAD_TO_INDEX |
-	    GIT_STATUS_OPT_SORT_CASE_SENSITIVELY;
-
-	if (git_status_list_new(&status, repo, &statusopts))
-		errx(1, "git_status_list_new: %s", giterr_last()->message);
-
-	for (i = 0; i < git_status_list_entrycount(status); i++) {
-		const git_status_entry *se;
-
-		se = git_status_byindex(status, i);
-		switch (se->status) {
-		case GIT_STATUS_WT_NEW:
-			printf("? %s\n", se->index_to_workdir->new_file.path);
-			break;
-		case GIT_STATUS_WT_MODIFIED:
-			printf("M %s\n", se->index_to_workdir->new_file.path);
-			break;
-		case GIT_STATUS_WT_DELETED:
-			printf("R %s\n", se->index_to_workdir->new_file.path);
-			break;
-		case GIT_STATUS_WT_RENAMED:
-			printf("m %s -> %s\n",
-			    se->index_to_workdir->old_file.path,
-			    se->index_to_workdir->new_file.path);
-			break;
-		case GIT_STATUS_WT_TYPECHANGE:
-			printf("t %s\n", se->index_to_workdir->new_file.path);
-			break;
-		case GIT_STATUS_INDEX_NEW:
-			printf("A %s\n", se->head_to_index->new_file.path);
-			break;
-		case GIT_STATUS_INDEX_MODIFIED:
-			printf("M %s\n", se->head_to_index->old_file.path);
-			break;
-		case GIT_STATUS_INDEX_DELETED:
-			printf("R %s\n", se->head_to_index->old_file.path);
-			break;
-		case GIT_STATUS_INDEX_RENAMED:
-			printf("m %s -> %s\n",
-			    se->head_to_index->old_file.path,
-			    se->head_to_index->new_file.path);
-			break;
-		case GIT_STATUS_INDEX_TYPECHANGE:
-			printf("t %s\n", se->head_to_index->old_file.path);
-			break;
-		case GIT_STATUS_CURRENT:
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
 		default:
-			break;
+			usage();
+			/* NOTREACHED */
 		}
 	}
 
-	git_status_list_free(status);
-	git_repository_free(repo);
-	git_libgit2_shutdown();
+	argc -= optind;
+	argv += optind;
 
-	return 0;
-}
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
 #endif
+	if (argc == 0) {
+		worktree_path = getcwd(NULL, 0);
+		if (worktree_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	} else if (argc == 1) {
+		worktree_path = realpath(argv[0], NULL);
+		if (worktree_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	} else
+		usage_status();
+
+	error = got_worktree_open(&worktree, worktree_path);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), worktree_path);
+	if (error)
+		goto done;
+
+	error = got_worktree_status(worktree, repo, print_status, NULL,
+	    check_cancelled, NULL);
+done:
+	free(worktree_path);
+	return error;
+}

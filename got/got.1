@@ -109,8 +109,19 @@ Update the work tree to the specified
 .Ar commit .
 The expected argument is a SHA1 hash which corresponds to a commit object.
 .El
-.\".It Cm status
-.\"Show current status of files.
+.It Cm status [ Ar worktree-path ]
+Show the current modification status of files in a worktree,
+using the following status codes:
+.Bl -column YXZ description
+.It M Ta modified file
+.It ! Ta versioned file was expected on disk but is missing
+.It ? Ta unversioned item not tracked by
+.Nm
+.El
+.Pp
+If the
+.Ar work tree path
+is omitted, use the current working directory.
 .It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
 If a
