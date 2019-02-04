@@ -455,12 +455,27 @@ got_ref_get_name(struct got_reference *ref)
 }
 
 static const struct got_error *
-append_ref(struct got_reflist_head *refs, struct got_reference *ref,
+insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
     struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_id *id;
 	struct got_reflist_entry *entry;
+
+	/*
+	 * We must de-duplicate entries on insert because packed-refs may
+	 * contain redundant entries. On-disk refs take precedence.
+	 * This code assumes that on-disk revs are read before packed-refs.
+	 */
+	SIMPLEQ_FOREACH(entry, refs, entry) {
+		/* Check for duplicates. */
+		if (strcmp(got_ref_get_name(entry->ref),
+		    got_ref_get_name(ref)) == 0) {
+			free(ref);
+			return NULL;
+		}
+		/* TODO: sort list while here */
+	}
 
 	err = got_ref_resolve(&id, repo, ref);
 	if (err)
@@ -475,7 +490,7 @@ append_ref(struct got_reflist_head *refs, struct got_reference *ref,
 }
 
 static const struct got_error *
-gather_refs(struct got_reflist_head *refs, const char *path_refs,
+gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
     const char *subdir, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -508,7 +523,7 @@ gather_refs(struct got_reflist_head *refs, const char *path_refs,
 			if (err)
 				goto done;
 			if (ref) {
-				err = append_ref(refs, ref, repo);
+				err = insert_ref(refs, ref, repo);
 				if (err)
 					goto done;
 			}
@@ -519,7 +534,7 @@ gather_refs(struct got_reflist_head *refs, const char *path_refs,
 				err = got_error_from_errno();
 				break;
 			}
-			err = gather_refs(refs, path_refs, child, repo);
+			err = gather_on_disk_refs(refs, path_refs, child, repo);
 			free(child);
 			break;
 		default:
@@ -538,12 +553,42 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
-	FILE *f;
+	FILE *f = NULL;
 	struct got_reference *ref;
 
+	/* HEAD ref should always exist. */
+	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
+	if (err)
+		goto done;
+	err = insert_ref(refs, ref, repo);
+	if (err)
+		goto done;
+
+	/* Gather on-disk refs before parsing packed-refs. */
+	free(path_refs);
+	path_refs = get_refs_dir_path(repo, "");
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = gather_on_disk_refs(refs, path_refs, "", repo);
+	if (err)
+		goto done;
+
+	/*
+	 * The packed-refs file may contain redundant entries, in which
+	 * case on-disk refs take precedence.
+	 */
 	packed_refs_path = got_repo_get_path_packed_refs(repo);
-	if (packed_refs_path == NULL)
-		return got_error_from_errno();
+	if (packed_refs_path == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	f = fopen(packed_refs_path, "r");
 	free(packed_refs_path);
@@ -559,33 +604,13 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 			if (err)
 				goto done;
 			if (ref) {
-				err = append_ref(refs, ref, repo);
+				err = insert_ref(refs, ref, repo);
 				if (err)
 					goto done;
 			}
 		}
 	}
 
-	/* HEAD ref should always exist. */
-	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
-	if (path_refs == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
-	if (err)
-		goto done;
-	err = append_ref(refs, ref, repo);
-	if (err)
-		goto done;
-
-	free(path_refs);
-	path_refs = get_refs_dir_path(repo, "");
-	if (path_refs == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	err = gather_refs(refs, path_refs, "", repo);
 done:
 	free(path_refs);
 	if (f)
