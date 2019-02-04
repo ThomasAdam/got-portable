@@ -743,6 +743,11 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 
 	de = readdir(dir);
 	do {
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0) {
+			de = readdir(dir);
+			continue;
+		}
 		if (de && *ie) {
 			int cmp = cmp_entries((*ie)->path, path, path_len,
 			    de->d_name);
