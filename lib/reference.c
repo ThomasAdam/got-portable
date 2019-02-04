@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <dirent.h>
 #include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -240,24 +241,40 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 
 static const struct got_error *
 open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
-    const char *refname)
+    const char *name)
 {
 	const struct got_error *err = NULL;
-	char *path_ref;
-	char *normpath;
+	char *path = NULL;
+	char *normpath = NULL;
+	char *absname = NULL;
+	int ref_is_absolute = (strncmp(name, "refs/", 5) == 0);
+	int ref_is_well_known = is_well_known_ref(name);
 
-	if (asprintf(&path_ref, "%s/%s/%s", path_refs, subdir, refname) == -1)
-		return got_error_from_errno();
+	if (ref_is_absolute || ref_is_well_known) {
+		if (asprintf(&path, "%s/%s", path_refs, name) == -1)
+			return got_error_from_errno();
+		absname = (char *)name;
+	} else {
+		if (asprintf(&path, "%s/%s/%s", path_refs, subdir, name) == -1)
+			return got_error_from_errno();
 
-	normpath = got_path_normalize(path_ref);
+		if (asprintf(&absname, "refs/%s/%s", subdir, name) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+
+	normpath = got_path_normalize(path);
 	if (normpath == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	err = parse_ref_file(ref, refname, normpath);
+	err = parse_ref_file(ref, absname, normpath);
 done:
-	free(path_ref);
+	if (!ref_is_absolute && !ref_is_well_known)
+		free(absname);
+	free(path);
 	free(normpath);
 	return err;
 }
@@ -449,11 +466,70 @@ append_ref(struct got_reflist_head *refs, struct got_reference *ref,
 	return NULL;
 }
 
+static const struct got_error *
+gather_refs(struct got_reflist_head *refs, const char *path_refs,
+    const char *subdir, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	DIR *d = NULL;
+	char *path_subdir;
+
+	if (asprintf(&path_subdir, "%s/%s", path_refs, subdir) == -1)
+		return got_error_from_errno();
+
+	d = opendir(path_subdir);
+	if (d == NULL)
+		goto done;
+
+	while (1) {
+		struct dirent *dent;
+		struct got_reference *ref;
+		char *child;
+
+		dent = readdir(d);
+		if (dent == NULL)
+			break;
+
+		if (strcmp(dent->d_name, ".") == 0 ||
+		    strcmp(dent->d_name, "..") == 0)
+			continue;
+
+		switch (dent->d_type) {
+		case DT_REG:
+			err = open_ref(&ref, path_refs, subdir, dent->d_name);
+			if (err && err->code != GOT_ERR_NOT_REF)
+				goto done;
+			if (ref) {
+				err = append_ref(refs, ref, repo);
+				if (err)
+					goto done;
+			}
+			break;
+		case DT_DIR:
+			if (asprintf(&child, "%s%s%s", subdir,
+			    subdir[0] == '\0' ? "" : "/", dent->d_name) == -1) {
+				err = got_error_from_errno();
+				break;
+			}
+			err = gather_refs(refs, path_refs, child, repo);
+			free(child);
+			break;
+		default:
+			break;
+		}
+	}
+done:
+	if (d)
+		closedir(d);
+	free(path_subdir);
+	return err;
+}
+
 const struct got_error *
 got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 {
 	const struct got_error *err;
-	char *packed_refs_path, *path_refs;
+	char *packed_refs_path, *path_refs = NULL;
 	FILE *f;
 	struct got_reference *ref;
 
@@ -489,14 +565,21 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 		goto done;
 	}
 	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
-	free(path_refs);
 	if (err)
 		goto done;
 	err = append_ref(refs, ref, repo);
 	if (err)
 		goto done;
 
+	free(path_refs);
+	path_refs = get_refs_dir_path(repo, "");
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = gather_refs(refs, path_refs, "", repo);
 done:
+	free(path_refs);
 	if (f)
 		fclose(f);
 	return err;
