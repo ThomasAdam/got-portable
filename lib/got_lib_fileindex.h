@@ -125,7 +125,20 @@ struct got_fileindex_diff_tree_cb {
 	got_fileindex_diff_tree_old_cb diff_old;
 	got_fileindex_diff_tree_new_cb diff_new;
 };
-
 const struct got_error *got_fileindex_diff_tree(struct got_fileindex *,
     struct got_tree_object *, struct got_repository *,
     struct got_fileindex_diff_tree_cb *, void *);
+
+typedef const struct got_error *(*got_fileindex_diff_dir_old_new_cb)(void *,
+    struct got_fileindex_entry *, struct dirent *, const char *);
+typedef const struct got_error *(*got_fileindex_diff_dir_old_cb)(void *,
+    struct got_fileindex_entry *, const char *);
+typedef const struct got_error *(*got_fileindex_diff_dir_new_cb)(void *,
+    struct dirent *, const char *);
+struct got_fileindex_diff_dir_cb {
+	got_fileindex_diff_dir_old_new_cb diff_old_new;
+	got_fileindex_diff_dir_old_cb diff_old;
+	got_fileindex_diff_dir_new_cb diff_new;
+};
+const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, DIR *,
+    struct got_repository *, struct got_fileindex_diff_dir_cb *, void *);

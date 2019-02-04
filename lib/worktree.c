@@ -19,6 +19,7 @@
 #include <sys/queue.h>
 #include <sys/tree.h>
 
+#include <dirent.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
