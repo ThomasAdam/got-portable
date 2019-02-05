@@ -1,4 +1,5 @@
 lib:
+- 'got tree' does not work in a subdirectory of a work tree
 - handle checkout of trees which contain submodules by identifying and
   ignoring such tree entries; requires a .ini config parser (from isakmpd?)
 - 'got log' in a work tree does not work because the current working directory
