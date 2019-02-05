@@ -999,7 +999,7 @@ get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
 			if (blen != 0)
 				*status = GOT_STATUS_MODIFIY;
 			break;
-		} else if (blen == flen) {
+		} else if (blen - hdrlen == flen) {
 			/* Skip blob object header first time around. */
 			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
 				*status = GOT_STATUS_MODIFIY;

@@ -28,6 +28,7 @@ function test_status_basic {
 	echo "modified alpha" > $testroot/wt/alpha
 	echo "unversioned file" > $testroot/wt/foo
 	rm $testroot/wt/epsilon/zeta
+	touch $testroot/wt/beta
 
 	echo 'M  alpha' > $testroot/stdout.expected
 	echo '!  epsilon/zeta' >> $testroot/stdout.expected
