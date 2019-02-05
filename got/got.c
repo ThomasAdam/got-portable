@@ -1292,12 +1292,12 @@ cmd_tree(int argc, char *argv[])
 	else
 		path = NULL;
 
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
 	if (repo_path == NULL) {
-		cwd = getcwd(NULL, 0);
-		if (cwd == NULL) {
-			error = got_error_from_errno();
-			goto done;
-		}
 		error = got_worktree_open(&worktree, cwd);
 		if (error && (error->code != GOT_ERR_ERRNO && errno != ENOENT))
 			goto done;
@@ -1310,8 +1310,6 @@ cmd_tree(int argc, char *argv[])
 				error = got_error_from_errno();
 			if (error)
 				goto done;
-			if (path == NULL)
-				path = got_worktree_get_path_prefix(worktree);
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
@@ -1329,11 +1327,28 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (path == NULL)
-		path = "/";
-	error = got_repo_map_path(&in_repo_path, repo, path, 1);
-	if (error != NULL)
-		goto done;
+	if (path == NULL) {
+		if (worktree) {
+			char *p, *worktree_subdir = cwd +
+			    strlen(got_worktree_get_root_path(worktree));
+			if (asprintf(&p, "%s/%s",
+			    got_worktree_get_path_prefix(worktree),
+			    worktree_subdir) == -1) {
+				error = got_error_from_errno();
+				goto done;
+			}
+			error = got_repo_map_path(&in_repo_path, repo, p, 1);
+			free(p);
+			if (error)
+				goto done;
+		} else
+			path = "/";
+	}
+	if (in_repo_path == NULL) {
+		error = got_repo_map_path(&in_repo_path, repo, path, 1);
+		if (error != NULL)
+			goto done;
+	}
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
