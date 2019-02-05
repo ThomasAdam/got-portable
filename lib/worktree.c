@@ -918,29 +918,39 @@ struct diff_dir_cb_arg {
     void *cancel_arg;
 };
 
-
 static const struct got_error *
-get_modified_file_status(unsigned char *status, struct got_fileindex_entry *ie,
-    struct got_worktree *worktree, struct got_repository *repo)
+get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
+    const char *abspath, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id id;
 	size_t hdrlen;
-	char *abspath;
 	FILE *f = NULL;
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
 	size_t flen, blen;
+	struct stat sb;
 
 	*status = GOT_STATUS_NO_CHANGE;
 
-	if (asprintf(&abspath, "%s/%s", worktree->root_path, ie->path) == -1)
+	if (lstat(abspath, &sb) == -1)
 		return got_error_from_errno();
+
+	if (!S_ISREG(sb.st_mode))
+		return NULL;
+
+	if (ie->ctime_sec == sb.st_ctime &&
+	    ie->ctime_nsec == sb.st_ctimensec &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_nsec == sb.st_mtimensec &&
+	    ie->size == (sb.st_size & 0xffffffff))
+		return NULL;
 
 	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
 	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
 	if (err)
-		goto done;
+		return err;
 
 	f = fopen(abspath, "r");
 	if (f == NULL) {
@@ -979,7 +989,6 @@ done:
 		got_object_blob_close(blob);
 	if (f)
 		fclose(f);
-	free(abspath);
 	return err;
 }
 
@@ -990,7 +999,6 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
-	struct stat sb;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 
 	if (parent_path[0]) {
@@ -1003,28 +1011,9 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 			return got_error_from_errno();
 	}
 
-	if (lstat(abspath, &sb) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	if (!S_ISREG(sb.st_mode))
-		goto done;
-
-	if (ie->ctime_sec == sb.st_ctime &&
-	    ie->ctime_nsec == sb.st_ctimensec &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_nsec == sb.st_mtimensec &&
-	    ie->size == (sb.st_size & 0xffffffff))
-		goto done;
-
-	err = get_modified_file_status(&status, ie, a->worktree, a->repo);
-	if (err)
-		goto done;
-	if (status != GOT_STATUS_NO_CHANGE)
+	err = get_file_status(&status, ie, abspath, a->repo);
+	if (err == NULL && status != GOT_STATUS_NO_CHANGE)
 		(*a->status_cb)(a->status_arg, status, ie->path);
-done:
 	free(abspath);
 	return err;
 }
