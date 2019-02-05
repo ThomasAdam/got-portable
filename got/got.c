@@ -758,6 +758,7 @@ cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
@@ -824,12 +825,17 @@ cmd_log(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+	error = NULL;
+
+	repo_path = worktree ?
+	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
 	if (repo_path == NULL) {
-		repo_path = strdup(cwd);
-		if (repo_path == NULL) {
-			error = got_error_from_errno();
-			goto done;
-		}
+		error = got_error_from_errno();
+		goto done;
 	}
 
 	error = apply_unveil(repo_path, NULL);
@@ -919,6 +925,8 @@ done:
 	free(repo_path);
 	free(cwd);
 	free(id);
+	if (worktree)
+		got_worktree_close(worktree);
 	if (repo) {
 		const struct got_error *repo_error;
 		repo_error = got_repo_close(repo);
