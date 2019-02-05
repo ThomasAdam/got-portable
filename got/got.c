@@ -1059,7 +1059,8 @@ done:
 __dead static void
 usage_blame(void)
 {
-	fprintf(stderr, "usage: %s blame [-c commit] [-r repository-path] path\n",
+	fprintf(stderr,
+	    "usage: %s blame [-c commit] [-r repository-path] path\n",
 	    getprogname());
 	exit(1);
 }
