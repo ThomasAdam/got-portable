@@ -770,7 +770,7 @@ insert_dirent(struct dirlist_head *dirlist, struct dirent *de)
 	if (prev)
 		SIMPLEQ_INSERT_AFTER(dirlist, prev, dle, entry);
 	else
-		SIMPLEQ_INSERT_HEAD(dirlist, dle, entry);
+		SIMPLEQ_INSERT_TAIL(dirlist, dle, entry);
 
 	return NULL;
 }
