@@ -28,7 +28,7 @@
 #define GOT_ERR_BAD_OBJ_HDR	10
 #define GOT_ERR_OBJ_TYPE	11
 #define GOT_ERR_BAD_OBJ_DATA	12
-#define GOT_ERR_FILE_OPEN	13
+/* 13 is currently free for re-use */
 #define GOT_ERR_BAD_PACKIDX	14
 #define GOT_ERR_PACKIDX_CSUM	15
 #define GOT_ERR_BAD_PACKFILE	16
@@ -92,7 +92,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_OBJ_HDR,	"bad object header" },
 	{ GOT_ERR_OBJ_TYPE,	"wrong type of object" },
 	{ GOT_ERR_BAD_OBJ_DATA,	"bad object data" },
-	{ GOT_ERR_FILE_OPEN,	"could not open file" },
+	{ 13,			"unused error code" },
 	{ GOT_ERR_BAD_PACKIDX,	"bad pack index file" },
 	{ GOT_ERR_PACKIDX_CSUM, "pack index file checksum error" },
 	{ GOT_ERR_BAD_PACKFILE,	"bad pack file" },

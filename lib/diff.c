@@ -54,7 +54,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	if (blob1) {
 		f1 = got_opentemp();
 		if (f1 == NULL)
-			return got_error(GOT_ERR_FILE_OPEN);
+			return got_error_from_errno();
 	} else
 		flags |= D_EMPTY1;
 
@@ -62,7 +62,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 		f2 = got_opentemp();
 		if (f2 == NULL) {
 			fclose(f1);
-			return got_error(GOT_ERR_FILE_OPEN);
+			return got_error_from_errno();
 		}
 	} else
 		flags |= D_EMPTY2;
