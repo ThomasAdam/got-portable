@@ -749,16 +749,31 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 
 	while (1) {
 		struct got_pathlist_entry *new = NULL;
+		struct dirent *dep = NULL;
 
-		de = readdir(dir);
-		if (de == NULL)
+		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
+		if (de == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (readdir_r(dir, de, &dep) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (dep == NULL) {
+			free(de);
+			de = NULL;
 			break;
+		}
 
 		if (strcmp(de->d_name, ".") == 0 ||
 		    strcmp(de->d_name, "..") == 0 ||
 		    (path[0] == '\0' &&
-		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0))
+		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
+			free(de);
 			continue;
+		}
 
 		err = got_pathlist_insert(&new, &dirlist, de->d_name, de);
 		if (err)
@@ -816,6 +831,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 		}
 	}
 done:
+	TAILQ_FOREACH(dle, &dirlist, entry)
+		free(dle->data);
 	got_pathlist_free(&dirlist);
 	return err;
 }
