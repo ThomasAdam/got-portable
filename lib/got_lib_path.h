@@ -60,3 +60,26 @@ int got_path_is_child(const char *, const char *, size_t);
  * their parents.
  */
 int got_path_cmp(const char *, const char *);
+
+/*
+ * Path lists allow for predictable concurrent iteration over multiple lists
+ * of paths obtained from disparate sources which don't all provide the same
+ * ordering guarantees (e.g. git trees, file index, and on-disk directories).
+ */
+struct got_pathlist_entry {
+	TAILQ_ENTRY(got_pathlist_entry) entry;
+	const char *path;
+};
+TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);
+
+/*
+ * Insert a path into the list of paths in a predictable order.
+ * The caller should already have initialized the list head. This list stores
+ * the pointer to the path as-is, i.e. the path is not copied internally and
+ * must remain available until the list is freed with got_pathlist_free().
+ */
+const struct got_error *got_pathlist_insert(struct got_pathlist_head *,
+    const char *);
+
+/* Free resources allocated for a path list. */
+void got_pathlist_free(struct got_pathlist_head *);

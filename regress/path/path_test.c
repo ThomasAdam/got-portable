@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
+#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -56,15 +59,21 @@ path_cmp(void)
 		{ "/a", "/b", -1 },
 		{ "x/a", "x.a", -1 },
 		{ "x.a", "x/a", 1 },
-		{ "//foo", "/bar", -1 },
+		{ "//foo", "/bar", 1 },
 		{ "/foo", "/bar", 1 },
+		{ "foo", "bar", 1 },
 		{ "/foo/sub", "/bar", 1 },
 		{ "/foo", "/bar/sub", 1 },
 		{ "/foo/", "/bar", 1 },
 		{ "/foo", "/bar/", 1 },
 		{ "/foo/", "/bar/", 1 },
 		{ "/bar/", "/bar/", 0 },
+		{ "/bar/", "/bar", 0 },
+		{ "//bar//", "/bar/", 0 },
+		{ "//bar//", "/bar////", 0 },
+		{ "/bar/sub", "/bar.", -1 },
 		{ "/bar/sub", "/bar/", 1 },
+		{ "/bar/sub/", "/bar///", 1 },
 		{ "/bar/sub/sub2", "/bar/", 1 },
 		{ "/bar/sub/sub2", "/bar", 1 },
 		{ "/bar.sub.sub2", "/bar", 1 },
@@ -85,6 +94,112 @@ path_cmp(void)
 		}
 	}
 
+	return 1;
+}
+
+const char *path_list_input[] = {
+	"", "/", "a", "/b", "/bar", "bar/sub", "/bar/sub", "/bar/",
+	"/bar.c", "/bar/sub/sub2", "/bar.sub.sub2", "/foo",
+	"/foo/sub", "/foo/", "/foo/", "x/a",
+};
+const char *path_list_expected[] = {
+	"",
+	"a",
+	"/b",
+	"/bar",
+	"bar/sub",
+	"/bar/sub/sub2",
+	"/bar.c",
+	"/bar.sub.sub2",
+	"/foo",
+	"/foo/sub",
+	"x/a",
+};
+
+/* If inserting pathlist_input in reverse the result is slightly different. */
+const char *path_list_expected_reverse[] = {
+	"/",
+	"a",
+	"/b",
+	"/bar/",
+	"/bar/sub",
+	"/bar/sub/sub2",
+	"/bar.c",
+	"/bar.sub.sub2",
+	"/foo/",
+	"/foo/sub",
+	"x/a",
+};
+
+
+static int
+path_list(void)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	int i;
+
+	TAILQ_INIT(&paths);
+	for (i = 0; i < nitems(path_list_input); i++) {
+		err = got_pathlist_insert(&paths, path_list_input[i]);
+		if (err) {
+			test_printf("%s\n", __func__, err->msg);
+			return 0;
+		}
+	}
+
+	i = 0;
+	TAILQ_FOREACH(pe, &paths, entry) {
+		test_printf("'%s' -- '%s'\n", pe->path, path_list_expected[i]);
+		if (i >= nitems(path_list_expected)) {
+			test_printf("too many elements on list\n");
+			return 0;
+		}
+		if (strcmp(pe->path, path_list_expected[i]) != 0) {
+			test_printf("unordered elements on list\n");
+			return 0;
+		}
+		i++;
+	}
+
+	got_pathlist_free(&paths);
+	return 1;
+}
+
+static int
+path_list_reverse_input(void)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	int i;
+
+	TAILQ_INIT(&paths);
+	for (i = nitems(path_list_input) - 1; i >= 0; i--) {
+		err = got_pathlist_insert(&paths, path_list_input[i]);
+		if (err) {
+			test_printf("%s\n", __func__, err->msg);
+			return 0;
+		}
+	}
+
+	i = 0;
+	TAILQ_FOREACH(pe, &paths, entry) {
+		test_printf("'%s' -- '%s'\n", pe->path,
+		    path_list_expected_reverse[i]);
+		if (i >= nitems(path_list_expected_reverse)) {
+			test_printf("too many elements on list\n");
+			return 0;
+		}
+		if (strcmp(pe->path, path_list_expected_reverse[i]) != 0) {
+			test_printf("unordered elements on list\n");
+			return 0;
+		}
+		i++;
+	}
+
+	got_pathlist_free(&paths);
 	return 1;
 }
 
@@ -124,6 +239,8 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	RUN_TEST(path_cmp(), "path_cmp");
+	RUN_TEST(path_list(), "path_list");
+	RUN_TEST(path_list_reverse_input(), "path_list_reverse_input");
 
 	return failure ? 1 : 0;
 }

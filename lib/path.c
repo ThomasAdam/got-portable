@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
+
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -166,12 +168,34 @@ got_path_cmp(const char *path1, const char *path2)
 	size_t min_len = MIN(len1, len2);
 	size_t i = 0;
 
+	/* Leading directory separators are insignificant. */
+	while (path1[0] == '/')
+		path1++;
+	while (path2[0] == '/')
+		path2++;
+
+	len1 = strlen(path1);
+	len2 = strlen(path2);
+	min_len = MIN(len1, len2);
+
 	/* Skip over common prefix. */
 	while (i < min_len && path1[i] == path2[i])
 		i++;
 
-	/* Are the paths exactly equal? */
+	/* Are the paths exactly equal (besides path separators)? */
 	if (len1 == len2 && i >= min_len)
+		return 0;
+
+	/* Skip over redundant trailing path seperators. */
+	while (path1[i] == '/' && path1[i + 1] == '/')
+		path1++;
+	while (path2[i] == '/' && path2[i + 1] == '/')
+		path2++;
+
+	/* Trailing path separators are insignificant. */
+	if (path1[i] == '/' && path1[i + 1] == '\0' && path2[i] == '\0')
+		return 0;
+	if (path2[i] == '/' && path2[i + 1] == '\0' && path1[i] == '\0')
 		return 0;
 
 	/* Order children in subdirectories directly after their parents. */
@@ -179,11 +203,56 @@ got_path_cmp(const char *path1, const char *path2)
 		return 1;
 	if (path2[i] == '/' && path1[i] == '\0')
 		return -1;
-	if (path1[i] == '/')
+	if (path1[i] == '/' && path2[i] != '\0')
 		return -1;
-	if (path2[i] == '/')
+	if (path2[i] == '/' && path1[i] != '\0')
 		return 1;
 
 	/* Next character following the common prefix determines order. */
 	return (unsigned char)path1[i] < (unsigned char)path2[i] ? -1 : 1;
+}
+
+const struct got_error *
+got_pathlist_insert(struct got_pathlist_head *pathlist, const char *path)
+{
+	struct got_pathlist_entry *new, *pe;
+
+	new = malloc(sizeof(*new));
+	if (new == NULL)
+		return got_error_from_errno();
+	new->path = path;
+
+	/*
+	 * Many callers will provide paths in a somewhat sorted order while
+	 * constructing a path list from inputs such as tree objects or
+	 * dirents. Iterating backwards from the tail of the list should
+	 * be more efficient than traversing through the entire list each
+	 * time an element is inserted.
+	 */
+	pe = TAILQ_LAST(pathlist, got_pathlist_head);
+	while (pe) {
+		int cmp = got_path_cmp(pe->path, path);
+		if (cmp == 0) {
+			free(new); /* duplicate */
+			return NULL;
+		} else if (cmp < 0) {
+			TAILQ_INSERT_AFTER(pathlist, pe, new, entry);
+			return NULL;
+		}
+		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
+	}
+
+	TAILQ_INSERT_HEAD(pathlist, new, entry);
+	return NULL;
+}
+
+void
+got_pathlist_free(struct got_pathlist_head *pathlist)
+{
+	struct got_pathlist_entry *pe;
+
+	while ((pe = TAILQ_FIRST(pathlist)) != NULL) {
+		TAILQ_REMOVE(pathlist, pe, entry);
+		free(pe);
+	}
 }
