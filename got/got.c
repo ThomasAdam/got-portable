@@ -1069,6 +1069,7 @@ cmd_blame(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
 	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
@@ -1110,10 +1111,24 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 	}
 	if (repo_path == NULL) {
-		repo_path = strdup(cwd);
-		if (repo_path == NULL) {
-			error = got_error_from_errno();
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL)
+				error = got_error_from_errno();
+			if (error)
+				goto done;
+		} else {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno();
+				goto done;
+			}
 		}
 	}
 
@@ -1125,8 +1140,21 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, path, 1);
-	if (error != NULL)
+	if (worktree) {
+		char *p, *worktree_subdir = cwd +
+		    strlen(got_worktree_get_root_path(worktree));
+		if (asprintf(&p, "%s/%s/%s",
+		    got_worktree_get_path_prefix(worktree),
+		    worktree_subdir, path) == -1) {
+			error = got_error_from_errno();
+			goto done;
+		}
+		error = got_repo_map_path(&in_repo_path, repo, p, 1);
+		free(p);
+	} else {
+		error = got_repo_map_path(&in_repo_path, repo, path, 1);
+	}
+	if (error)
 		goto done;
 
 	if (commit_id_str == NULL) {
@@ -1151,6 +1179,8 @@ done:
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
+	if (worktree)
+		got_worktree_close(worktree);
 	if (repo) {
 		const struct got_error *repo_error;
 		repo_error = got_repo_close(repo);
