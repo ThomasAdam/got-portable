@@ -3459,9 +3459,24 @@ cmd_tree(int argc, char *argv[])
 	argv += optind;
 
 	if (argc == 0) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
+		struct got_worktree *worktree;
+		char *cwd = getcwd(NULL, 0);
+		if (cwd == NULL)
 			return got_error_from_errno();
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		if (worktree) {
+			free(cwd);
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			got_worktree_close(worktree);
+		} else
+			repo_path = cwd;
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
 	} else if (argc == 1) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
@@ -3471,12 +3486,11 @@ cmd_tree(int argc, char *argv[])
 
 	error = apply_unveil(repo_path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
 	if (error != NULL)
-		return error;
+		goto done;
 
 	if (commit_id_arg == NULL)
 		error = get_head_commit_id(&commit_id, repo);
@@ -3505,6 +3519,7 @@ cmd_tree(int argc, char *argv[])
 		goto done;
 	error = view_loop(view);
 done:
+	free(repo_path);
 	free(commit_id);
 	if (commit)
 		got_object_commit_close(commit);
