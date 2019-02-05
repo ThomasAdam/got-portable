@@ -1636,6 +1636,20 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 	return NULL;
 }
 
+static void
+init_curses(void)
+{
+	initscr();
+	cbreak();
+	halfdelay(1); /* Do fast refresh while initial view is loading. */
+	noecho();
+	nonl();
+	intrflush(stdscr, FALSE);
+	keypad(stdscr, TRUE);
+	curs_set(0);
+	signal(SIGWINCH, tog_sigwinch);
+}
+
 static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
@@ -1702,6 +1716,8 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		}
 	}
+
+	init_curses();
 
 	error = apply_unveil(repo_path, NULL);
 	if (error)
@@ -2154,6 +2170,8 @@ cmd_diff(int argc, char *argv[])
 		id_str2 = argv[2];
 	} else
 		usage_diff();
+
+	init_curses();
 
 	error = apply_unveil(repo_path, NULL);
 	if (error)
@@ -2856,6 +2874,8 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
+	init_curses();
+
 	error = apply_unveil(repo_path, NULL);
 	if (error)
 		goto done;
@@ -3484,6 +3504,8 @@ cmd_tree(int argc, char *argv[])
 	} else
 		usage_log();
 
+	init_curses();
+
 	error = apply_unveil(repo_path, NULL);
 	if (error)
 		goto done;
@@ -3528,20 +3550,6 @@ done:
 	if (repo)
 		got_repo_close(repo);
 	return error;
-}
-
-static void
-init_curses(void)
-{
-	initscr();
-	cbreak();
-	halfdelay(1); /* Do fast refresh while initial view is loading. */
-	noecho();
-	nonl();
-	intrflush(stdscr, FALSE);
-	keypad(stdscr, TRUE);
-	curs_set(0);
-	signal(SIGWINCH, tog_sigwinch);
 }
 
 __dead static void
@@ -3654,8 +3662,6 @@ main(int argc, char *argv[])
 			free(repo_path);
 		}
 	}
-
-	init_curses();
 
 	error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
 	if (error)
