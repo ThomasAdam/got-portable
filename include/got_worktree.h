@@ -25,6 +25,7 @@ struct got_worktree;
 #define GOT_STATUS_MODIFIY	'M'
 #define GOT_STATUS_MISSING	'!'
 #define GOT_STATUS_UNVERSIONED	'?'
+#define GOT_STATUS_OBSTRUCTED	'~'
 
 /*
  * Attempt to initialize a new work tree on disk.

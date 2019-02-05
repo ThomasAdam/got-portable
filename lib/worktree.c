@@ -936,8 +936,10 @@ get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
 	if (lstat(abspath, &sb) == -1)
 		return got_error_from_errno();
 
-	if (!S_ISREG(sb.st_mode))
+	if (!S_ISREG(sb.st_mode)) {
+		*status = GOT_STATUS_OBSTRUCTED;
 		return NULL;
+	}
 
 	if (ie->ctime_sec == sb.st_ctime &&
 	    ie->ctime_nsec == sb.st_ctimensec &&

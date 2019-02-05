@@ -125,6 +125,33 @@ function test_status_subdir_no_mods2 {
 	test_done "$testroot" "0"
 }
 
+function test_status_obstructed {
+	local testroot=`test_init status_obstructed`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	rm $testroot/wt/epsilon/zeta
+	mkdir $testroot/wt/epsilon/zeta
+
+	echo '~  epsilon/zeta' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
+run_test test_status_obstructed
