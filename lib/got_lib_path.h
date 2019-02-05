@@ -69,6 +69,7 @@ int got_path_cmp(const char *, const char *);
 struct got_pathlist_entry {
 	TAILQ_ENTRY(got_pathlist_entry) entry;
 	const char *path;
+	void *data; /* data pointer provided to got_pathlist_insert() */
 };
 TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);
 
@@ -81,7 +82,7 @@ TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);
  * element, or to a NULL pointer in case the path was already on the list.
  */
 const struct got_error *got_pathlist_insert(struct got_pathlist_entry **,
-    struct got_pathlist_head *, const char *);
+    struct got_pathlist_head *, const char *, void *);
 
 /* Free resources allocated for a path list. */
 void got_pathlist_free(struct got_pathlist_head *);

@@ -214,7 +214,7 @@ got_path_cmp(const char *path1, const char *path2)
 
 const struct got_error *
 got_pathlist_insert(struct got_pathlist_entry **inserted,
-    struct got_pathlist_head *pathlist, const char *path)
+    struct got_pathlist_head *pathlist, const char *path, void *data)
 {
 	struct got_pathlist_entry *new, *pe;
 
@@ -225,6 +225,7 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	if (new == NULL)
 		return got_error_from_errno();
 	new->path = path;
+	new->data = data;
 
 	/*
 	 * Many callers will provide paths in a somewhat sorted order while
