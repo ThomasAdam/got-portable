@@ -403,7 +403,9 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 		if (*worktree)
 			return NULL;
 		path = dirname(path);
-	} while (path && !(path[0] == '.' && path[1] == '\0'));
+		if (path == NULL)
+			return got_error_from_errno();
+	} while (!((path[0] == '.' || path[0] == '/') && path[1] == '\0'));
 
 	return got_error(GOT_ERR_NOT_WORKTREE);
 }
