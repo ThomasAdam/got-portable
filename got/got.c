@@ -497,7 +497,8 @@ cmd_update(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), worktree_path);
+	error = apply_unveil(got_repo_get_path(repo),
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
