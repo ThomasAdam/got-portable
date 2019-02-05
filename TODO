@@ -3,7 +3,6 @@ lib:
 - handle checkout of trees which contain submodules by identifying and
   ignoring such tree entries; requires a .ini config parser (from isakmpd?)
 - 'got log' in a work tree does not work
-- implement 'got status' to detect modified files in work tree
 - make 'got update' perform a 3-way merge for modified files
 
 tog:
