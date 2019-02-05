@@ -1090,6 +1090,10 @@ got_worktree_status(struct got_worktree *worktree,
 	}
 
 	workdir = opendir(worktree->root_path);
+	if (workdir == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	fdiff_cb.diff_old_new = status_old_new;
 	fdiff_cb.diff_old = status_old;
 	fdiff_cb.diff_new = status_new;
