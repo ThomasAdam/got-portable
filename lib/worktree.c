@@ -1060,7 +1060,7 @@ got_worktree_status(struct got_worktree *worktree,
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
 	FILE *index = NULL;
-	struct got_fileindex_diff_dir_cb diff_cb;
+	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 
 	fileindex = got_fileindex_alloc();
@@ -1090,9 +1090,9 @@ got_worktree_status(struct got_worktree *worktree,
 	}
 
 	workdir = opendir(worktree->root_path);
-	diff_cb.diff_old_new = status_old_new;
-	diff_cb.diff_old = status_old;
-	diff_cb.diff_new = status_new;
+	fdiff_cb.diff_old_new = status_old_new;
+	fdiff_cb.diff_old = status_old;
+	fdiff_cb.diff_new = status_new;
 	arg.fileindex = fileindex;
 	arg.worktree = worktree;
 	arg.repo = repo;
@@ -1100,7 +1100,7 @@ got_worktree_status(struct got_worktree *worktree,
 	arg.status_arg = status_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
-	err = got_fileindex_diff_dir(fileindex, workdir, repo, &diff_cb, &arg);
+	err = got_fileindex_diff_dir(fileindex, workdir, repo, &fdiff_cb, &arg);
 done:
 	if (workdir)
 		closedir(workdir);
