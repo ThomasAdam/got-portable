@@ -804,6 +804,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 			*ie = next;
 		} else if (dle) {
+			de = dle->data;
 			err = cb->diff_new(cb_arg, de, path);
 			if (err)
 				break;
