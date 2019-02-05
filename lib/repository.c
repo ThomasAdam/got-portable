@@ -262,14 +262,11 @@ const struct got_error *
 open_repo(struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
-	struct got_worktree *worktree = NULL;
 
 	/* bare git repository? */
 	repo->path_git_dir = strdup(path);
-	if (repo->path_git_dir == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (repo->path_git_dir == NULL)
+		return got_error_from_errno();
 	if (is_git_repo(repo)) {
 		repo->path = strdup(repo->path_git_dir);
 		if (repo->path == NULL) {
@@ -294,49 +291,14 @@ open_repo(struct got_repository *repo, const char *path)
 		return NULL;
 	}
 
-	/* got work tree checked out from bare git repository? */
-	free(repo->path_git_dir);
-	repo->path_git_dir = NULL;
-	err = got_worktree_open(&worktree, path);
-	if (err) {
-		if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
-			err = got_error(GOT_ERR_NOT_GIT_REPO);
-		goto done;
-	}
-	repo->path_git_dir = strdup(worktree->repo_path);
-	if (repo->path_git_dir == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	/* got work tree checked out from git repository with working tree? */
-	if (!is_git_repo(repo)) {
-		free(repo->path_git_dir);
-		if (asprintf(&repo->path_git_dir, "%s/%s", worktree->repo_path,
-		    GOT_GIT_DIR) == -1) {
-			err = got_error_from_errno();
-			repo->path_git_dir = NULL;
-			goto done;
-		}
-		if (!is_git_repo(repo)) {
-			err = got_error(GOT_ERR_NOT_GIT_REPO);
-			goto done;
-		}
-		repo->path = strdup(worktree->repo_path);
-		if (repo->path == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
-	} else {
-		repo->path = strdup(repo->path_git_dir);
-		if (repo->path == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
-	}
+	err = got_error(GOT_ERR_NOT_GIT_REPO);
 done:
-	if (worktree)
-		got_worktree_close(worktree);
+	if (err) {
+		free(repo->path);
+		repo->path = NULL;
+		free(repo->path_git_dir);
+		repo->path_git_dir = NULL;
+	}
 	return err;
 }
 
