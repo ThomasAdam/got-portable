@@ -73,6 +73,7 @@
 #define GOT_ERR_BAD_REF_DATA	57
 #define GOT_ERR_TREE_DUP_ENTRY	58
 #define GOT_ERR_DIR_DUP_ENTRY	59
+#define GOT_ERR_NOT_WORKTREE	60
 
 static const struct got_error {
 	int code;
@@ -136,6 +137,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_REF_DATA,	"could not parse reference data" },
 	{ GOT_ERR_TREE_DUP_ENTRY,"duplicate entry in tree object" },
 	{ GOT_ERR_DIR_DUP_ENTRY,"duplicate entry in directory" },
+	{ GOT_ERR_NOT_WORKTREE, "no got work tree found" },
 };
 
 /*

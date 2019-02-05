@@ -39,7 +39,7 @@ const struct got_error *got_worktree_init(const char *, struct got_reference *,
     const char *, struct got_repository *);
 
 /*
- * Attempt to open a worktree at the specified path.
+ * Attempt to open a worktree at or above the specified path.
  * The caller must dispose of it with got_worktree_close().
  */
 const struct got_error *got_worktree_open(struct got_worktree **, const char *);

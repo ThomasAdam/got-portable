@@ -283,8 +283,8 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_worktree_open(struct got_worktree **worktree, const char *path)
+static const struct got_error *
+open_worktree(struct got_worktree **worktree, const char *path)
 {
 	const struct got_error *err = NULL;
 	char *path_got;
@@ -389,6 +389,23 @@ done:
 		(*worktree)->lockfd = fd;
 
 	return err;
+}
+
+const struct got_error *
+got_worktree_open(struct got_worktree **worktree, const char *path)
+{
+	const struct got_error *err = NULL;
+
+	do {
+		err = open_worktree(worktree, path);
+		if (err && (err->code != GOT_ERR_ERRNO && errno != ENOENT))
+			return err;
+		if (*worktree)
+			return NULL;
+		path = dirname(path);
+	} while (path && !(path[0] == '.' && path[1] == '\0'));
+
+	return got_error(GOT_ERR_NOT_WORKTREE);
 }
 
 void
