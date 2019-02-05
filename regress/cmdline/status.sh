@@ -45,4 +45,86 @@ function test_status_basic {
 	test_done "$testroot" "0"
 }
 
+function test_status_subdir_no_mods {
+	local testroot=`test_init status_subdir_no_mods 1`
+
+	mkdir $testroot/repo/Basic/
+	mkdir $testroot/repo/Basic/Targets/
+	touch $testroot/repo/Basic/Targets/AArch64.cpp
+	touch $testroot/repo/Basic/Targets.cpp
+	touch $testroot/repo/Basic/Targets.h
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add subdir with files"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	touch $testroot/stdout.expected
+
+	# This used to erroneously print:
+	#
+	# !  Basic/Targets.cpp
+	# ?  Basic/Targets.cpp
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
+function test_status_subdir_no_mods2 {
+	local testroot=`test_init status_subdir_no_mods2 1`
+
+	mkdir $testroot/repo/AST
+	touch $testroot/repo/AST/APValue.cpp
+	mkdir $testroot/repo/ASTMatchers
+	touch $testroot/repo/ASTMatchers/ASTMatchFinder.cpp
+	mkdir $testroot/repo/Frontend
+	touch $testroot/repo/Frontend/ASTConsumers.cpp
+	mkdir $testroot/repo/Frontend/Rewrite
+	touch $testroot/repo/Frontend/Rewrite/CMakeLists.txt
+	mkdir $testroot/repo/FrontendTool
+	touch $testroot/repo/FrontendTool/CMakeLists.txt
+	touch $testroot/repo/FrontendTool/ExecuteCompilerInvocation.cpp
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add subdir with files"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	touch $testroot/stdout.expected
+
+	# This used to erroneously print:
+	#
+	# !  AST/APValue.cpp
+	# ?  AST/APValue.cpp
+	# !  Frontend/ASTConsumers.cpp
+	# !  Frontend/Rewrite/CMakeLists.txt
+	# ?  Frontend/ASTConsumers.cpp
+	# ?  Frontend/Rewrite/CMakeLists.txt
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_status_basic
+run_test test_status_subdir_no_mods
+run_test test_status_subdir_no_mods2
