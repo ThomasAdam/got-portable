@@ -460,8 +460,20 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 {
 	const struct got_error *err;
 	struct got_object_id *id;
-	struct got_reflist_entry *re, *prev = NULL;
+	struct got_reflist_entry *new, *re, *prev;
 	int cmp;
+
+	err = got_ref_resolve(&id, repo, ref);
+	if (err)
+		return err;
+
+	new = malloc(sizeof(*re));
+	if (new == NULL) {
+		free(id);
+		return got_error_from_errno();
+	}
+	new->ref = ref;
+	new->id = id;
 
 	/*
 	 * We must de-duplicate entries on insert because packed-refs may
@@ -469,30 +481,26 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 	 * This code assumes that on-disk revs are read before packed-refs.
 	 * We're iterating the list anyway, so insert elements sorted by name.
 	 */
-	SIMPLEQ_FOREACH(re, refs, entry) {
-		cmp = strcmp(got_ref_get_name(re->ref), got_ref_get_name(ref));
+	re = SIMPLEQ_FIRST(refs);
+	while (re) {
+		cmp = got_path_cmp(got_ref_get_name(re->ref),
+		    got_ref_get_name(ref));
 		if (cmp == 0) {
-			free(ref);
+			free(ref); /* duplicate */
 			return NULL;
-		} else if (cmp > 0)
-			break;
-		else
+		} else if (cmp > 0) {
+			if (prev)
+				SIMPLEQ_INSERT_AFTER(refs, prev, new, entry);
+			else
+				SIMPLEQ_INSERT_HEAD(refs, new, entry);
+			return NULL;
+		} else {
 			prev = re;
+			re = SIMPLEQ_NEXT(re, entry);
+		}
 	}
 
-	err = got_ref_resolve(&id, repo, ref);
-	if (err)
-		return err;
-	re = malloc(sizeof(*re));
-	if (re == NULL)
-		return got_error_from_errno();
-	re->ref = ref;
-	re->id = id;
-	if (prev)
-		SIMPLEQ_INSERT_AFTER(refs, prev, re, entry);
-	else
-		SIMPLEQ_INSERT_TAIL(refs, re, entry);
-
+	SIMPLEQ_INSERT_TAIL(refs, new, entry);
 	return NULL;
 }
 
