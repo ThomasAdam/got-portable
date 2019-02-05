@@ -939,9 +939,60 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-C number] [repository-path] "
-	    "object1 object2\n", getprogname());
+	fprintf(stderr, "usage: %s diff [-C number] [-r repository-path] "
+	    "[object1 object2]\n", getprogname());
 	exit(1);
+}
+
+struct print_diff_arg {
+	struct got_repository *repo;
+	struct got_worktree *worktree;
+	int diff_context;
+};
+
+static const struct got_error *
+print_diff(void *arg, unsigned char status, const char *path,
+    struct got_object_id *id)
+{
+	struct print_diff_arg *a = arg;
+	const struct got_error *err = NULL;
+	struct got_blob_object *blob1 = NULL;
+	FILE *f2 = NULL;
+	char *abspath = NULL;
+	struct stat sb;
+
+	if (status != GOT_STATUS_MODIFIY)
+		return NULL;
+
+	err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
+	if (err)
+		goto done;
+
+	if (asprintf(&abspath, "%s/%s",
+	    got_worktree_get_root_path(a->worktree), path) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	f2 = fopen(abspath, "r");
+	if (f2 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (lstat(abspath, &sb) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_diff_blob_file(blob1, f2, sb.st_size, path, a->diff_context,
+	    stdout);
+done:
+	if (blob1)
+		got_object_blob_close(blob1);
+	if (f2)
+		fclose(f2);
+	free(abspath);
+	return err;
 }
 
 static const struct got_error *
@@ -949,7 +1000,8 @@ cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	char *repo_path = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *id_str1 = NULL, *id_str2 = NULL;
 	int type1, type2;
@@ -962,12 +1014,17 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "C:")) != -1) {
+	while ((ch = getopt(argc, argv, "C:r:")) != -1) {
 		switch (ch) {
 		case 'C':
 			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr != NULL)
 				err(1, "-C option %s", errstr);
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
 			break;
 		default:
 			usage();
@@ -978,24 +1035,35 @@ cmd_diff(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
 	if (argc == 0) {
-		usage_diff(); /* TODO show local worktree changes */
-	} else if (argc == 2) {
-		repo_path = getcwd(NULL, 0);
+		if (repo_path)
+			errx(1,
+			    "-r option can't be used when diffing a work tree");
+		error = got_worktree_open(&worktree, cwd);
+		if (error)
+			goto done;
+		repo_path = strdup(got_worktree_get_repo_path(worktree));
 		if (repo_path == NULL)
 			return got_error_from_errno();
+	} else if (argc == 2) {
 		id_str1 = argv[0];
 		id_str2 = argv[1];
-	} else if (argc == 3) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno();
-		id_str1 = argv[1];
-		id_str2 = argv[2];
 	} else
 		usage_diff();
 
-	error = apply_unveil(repo_path, NULL);
+	if (repo_path == NULL) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno();
+	}
+
+	error = apply_unveil(repo_path,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -1003,6 +1071,25 @@ cmd_diff(int argc, char *argv[])
 	free(repo_path);
 	if (error != NULL)
 		goto done;
+
+	if (worktree) {
+		struct print_diff_arg arg;
+		char *id_str;
+		error = got_object_id_str(&id_str,
+		    got_worktree_get_base_commit_id(worktree));
+		if (error)
+			goto done;
+		arg.repo = repo;
+		arg.worktree = worktree;
+		arg.diff_context = diff_context;
+
+		printf("diff %s %s\n", id_str,
+		    got_worktree_get_root_path(worktree));
+		error = got_worktree_status(worktree, repo, print_diff,
+		    &arg, check_cancelled, NULL);
+		free(id_str);
+		goto done;
+	}
 
 	error = got_object_resolve_id_str(&id1, repo, id_str1);
 	if (error)
@@ -1047,6 +1134,8 @@ cmd_diff(int argc, char *argv[])
 done:
 	free(id1);
 	free(id2);
+	if (worktree)
+		got_worktree_close(worktree);
 	if (repo) {
 		const struct got_error *repo_error;
 		repo_error = got_repo_close(repo);
@@ -1432,10 +1521,12 @@ usage_status(void)
 	exit(1);
 }
 
-static void
-print_status(void *arg, unsigned char status, const char *path)
+static const struct got_error *
+print_status(void *arg, unsigned char status, const char *path,
+    struct got_object_id *id)
 {
 	printf("%c  %s\n", status, path);
+	return NULL;
 }
 
 static const struct got_error *

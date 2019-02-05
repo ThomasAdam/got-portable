@@ -83,7 +83,7 @@ struct got_reference *got_worktree_get_head_ref(struct got_worktree *);
 /*
  * Get the current base commit ID of a worktree.
  */
-const struct got_object_id *got_worktree_get_base_commit_id(struct got_worktree *);
+struct got_object_id *got_worktree_get_base_commit_id(struct got_worktree *);
 
 /*
  * Set the base commit Id of a worktree.
@@ -111,7 +111,8 @@ const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     got_worktree_cancel_cb, void *);
 
 /* A callback function which is invoked to report a path's status. */
-typedef void (*got_worktree_status_cb)(void *, unsigned char, const char *);
+typedef const struct got_error *(*got_worktree_status_cb)(void *,
+    unsigned char, const char *, struct got_object_id *);
 
 /*
  * Report the status of paths in the work tree.

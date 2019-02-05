@@ -159,15 +159,13 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff [ Fl C Ar number ] [ Ar repository-path ] Ar object1 Ar object2
-Display the differences between two objects in the repository.
-Each
+.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Ar object1 Ar object2 ]
+Display differences between blobs in the repository and files in the
+work tree, or between two specified objects in a repository.
+If specified, each
 .Ar object
 argument is a SHA1 hash which corresponds to the object.
 Both objects must be of the same type (blobs, trees, or commits).
-If the
-.Ar repository path
-is omitted, use the current working directory.
 .Pp
 The options for
 .Cm got diff
@@ -176,6 +174,13 @@ are as follows:
 .It Fl C Ar number
 Set the number of context lines shown in the diff.
 By default, 3 lines of context are shown.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.

@@ -470,7 +470,7 @@ got_worktree_get_head_ref(struct got_worktree *worktree)
 	return got_ref_dup(worktree->head_ref);
 }
 
-const struct got_object_id *
+struct got_object_id *
 got_worktree_get_base_commit_id(struct got_worktree *worktree)
 {
 	return worktree->base_commit_id;
@@ -1039,8 +1039,11 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	}
 
 	err = get_file_status(&status, ie, abspath, a->repo);
-	if (err == NULL && status != GOT_STATUS_NO_CHANGE)
-		(*a->status_cb)(a->status_arg, status, ie->path);
+	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
+		struct got_object_id id;
+		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		err = (*a->status_cb)(a->status_arg, status, ie->path, &id);
+	}
 	free(abspath);
 	return err;
 }
@@ -1049,13 +1052,16 @@ static const struct got_error *
 status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	struct diff_dir_cb_arg *a = arg;
-	(*a->status_cb)(a->status_arg, GOT_STATUS_MISSING, ie->path);
-	return NULL;
+	struct got_object_id id;
+	memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	return (*a->status_cb)(a->status_arg, GOT_STATUS_MISSING, ie->path,
+	    &id);
 }
 
 static const struct got_error *
 status_new(void *arg, struct dirent *de, const char *parent_path)
 {
+	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	char *path = NULL;
 
@@ -1069,10 +1075,11 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 		path = de->d_name;
 	}
 
-	(*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED, path);
+	err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED, path,
+	    NULL);
 	if (parent_path[0])
 		free(path);
-	return NULL;
+	return err;
 }
 
 const struct got_error *

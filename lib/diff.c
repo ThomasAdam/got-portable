@@ -126,6 +126,63 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 }
 
 const struct got_error *
+got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
+    const char *label2, int diff_context, FILE *outfile)
+{
+	struct got_diff_state ds;
+	struct got_diff_args args;
+	const struct got_error *err = NULL;
+	FILE *f1 = NULL;
+	char hex1[SHA1_DIGEST_STRING_LENGTH];
+	char *idstr1 = NULL;
+	size_t size1;
+	int res, flags = 0;
+
+	size1 = 0;
+	if (blob1) {
+		f1 = got_opentemp();
+		if (f1 == NULL)
+			return got_error_from_errno();
+		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
+		err = got_object_blob_dump_to_file(&size1, NULL, f1, blob1);
+		if (err)
+			goto done;
+	} else {
+		flags |= D_EMPTY1;
+		idstr1 = "/dev/null";
+	}
+
+	if (f2 == NULL)
+		flags |= D_EMPTY2;
+
+	memset(&ds, 0, sizeof(ds));
+	/* XXX should stat buffers be passed in args instead of ds? */
+	ds.stb1.st_mode = S_IFREG;
+	if (blob1)
+		ds.stb1.st_size = size1;
+	ds.stb1.st_mtime = 0; /* XXX */
+
+	ds.stb2.st_mode = S_IFREG;
+	ds.stb2.st_size = size2;
+	ds.stb2.st_mtime = 0; /* XXX */
+
+	memset(&args, 0, sizeof(args));
+	args.diff_format = D_UNIFIED;
+	args.label[0] = label2;
+	args.label[1] = label2;
+	args.diff_context = diff_context;
+	flags |= D_PROTOTYPE;
+
+	fprintf(outfile, "blob - %s\n", idstr1);
+	fprintf(outfile, "file + %s\n", label2);
+	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, NULL);
+done:
+	if (f1)
+		fclose(f1);
+	return err;
+}
+
+const struct got_error *
 got_diff_blob_lines_changed(struct got_diff_changes **changes,
     struct got_blob_object *blob1, struct got_blob_object *blob2)
 {
