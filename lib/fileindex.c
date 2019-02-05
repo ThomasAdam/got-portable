@@ -759,11 +759,11 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 
 		if (readdir_r(dir, de, &dep) != 0) {
 			err = got_error_from_errno();
+			free(de);
 			goto done;
 		}
 		if (dep == NULL) {
 			free(de);
-			de = NULL;
 			break;
 		}
 
