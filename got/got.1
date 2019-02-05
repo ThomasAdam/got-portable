@@ -194,7 +194,11 @@ working directory.
 .It Cm tree [ Fl c Ar commit ] [ Fl r Ar repository-path ] [ Fl i ] [ Fl R] [ Ar path ]
 Display a listing of files and directories at the specified
 directory path in the repository.
-If no path is specified, the root directory is listed.
+If no
+.Ar path
+is specified, list the repository path corresponding to the current
+directory of the work tree, or the root directory of the repository
+if there is no work tree.
 .Pp
 The options for
 .Cm got tree
@@ -209,10 +213,13 @@ to a commit object.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
 .It Fl i
 Show object IDs of files (blob objects) and directories (tree objects).
 .It Fl R
-Recurse into sub-directories.
+Recurse into sub-directories in the repository.
 .El
 .Sh EXIT STATUS
 .Ex -std got
