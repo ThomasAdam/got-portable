@@ -694,35 +694,46 @@ got_fileindex_diff_tree(struct got_fileindex *fileindex,
 
 static const struct got_error *
 diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **, DIR *,
-    const char *, struct got_repository *, struct got_fileindex_diff_dir_cb *,
-    void *);
+    const char *, const char *, struct got_repository *,
+    struct got_fileindex_diff_dir_cb *, void *);
 
 static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_pathlist_entry *dle,
-    const char *path, DIR *dir, struct got_repository *repo,
-    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
+    const char *path, DIR *dir, const char *rootpath,
+    struct got_repository *repo, struct got_fileindex_diff_dir_cb *cb,
+    void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = dle->data;
 
 	if (de->d_type == DT_DIR) {
 		char *subpath;
+		char *subdirpath;
 		DIR *subdir;
 
 		if (asprintf(&subpath, "%s%s%s", path,
 		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
 			return got_error_from_errno();
 
-		subdir = opendir(subpath);
-		if (subdir == NULL) {
+		if (asprintf(&subdirpath, "%s/%s", rootpath, subpath) == -1) {
 			free(subpath);
 			return got_error_from_errno();
 		}
 
-		err = diff_fileindex_dir(fileindex, ie, subdir, subpath, repo,
-		    cb, cb_arg);
+		subdir = opendir(subdirpath);
+		if (subdir == NULL) {
+			#if 0
+			free(subpath);
+			free(subdirpath);
+			#endif
+			return got_error_from_errno();
+		}
+
+		err = diff_fileindex_dir(fileindex, ie, subdir, rootpath,
+		    subpath, repo, cb, cb_arg);
 		free(subpath);
+		free(subdirpath);
 		closedir(subdir);
 		if (err)
 			return err;
@@ -734,9 +745,9 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 static const struct got_error *
 diff_fileindex_dir(struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, DIR *dir, const char *path,
-    struct got_repository *repo, struct got_fileindex_diff_dir_cb *cb,
-    void *cb_arg)
+    struct got_fileindex_entry **ie, DIR *dir, const char *rootpath,
+    const char *path, struct got_repository *repo,
+    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = NULL;
@@ -797,7 +808,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
 				err = walk_dir(&dle, fileindex, ie, dle, path,
-				    dir, repo, cb, cb_arg);
+				    dir, rootpath, repo, cb, cb_arg);
 			} else if (cmp < 0 ) {
 				next = walk_fileindex(fileindex, *ie);
 				err = cb->diff_old(cb_arg, *ie, path);
@@ -809,7 +820,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				if (err)
 					break;
 				err = walk_dir(&dle, fileindex, ie, dle, path,
-				    dir, repo, cb, cb_arg);
+				    dir, rootpath, repo, cb, cb_arg);
 			}
 			if (err)
 				break;
@@ -825,7 +836,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			if (err)
 				break;
 			err = walk_dir(&dle, fileindex, ie, dle, path, dir,
-			    repo, cb, cb_arg);
+			    rootpath, repo, cb, cb_arg);
 			if (err)
 				break;
 		}
@@ -838,13 +849,14 @@ done:
 }
 
 const struct got_error *
-got_fileindex_diff_dir(struct got_fileindex *fileindex, DIR *dir,
-    struct got_repository *repo, struct got_fileindex_diff_dir_cb *cb,
-    void *cb_arg)
+got_fileindex_diff_dir(struct got_fileindex *fileindex, DIR *rootdir,
+    const char *rootpath, struct got_repository *repo,
+    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	struct got_fileindex_entry *min;
 	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
-	return diff_fileindex_dir(fileindex, &min, dir, "", repo, cb, cb_arg);
+	return diff_fileindex_dir(fileindex, &min, rootdir, rootpath, "",
+	    repo, cb, cb_arg);
 }
 
 RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

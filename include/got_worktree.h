@@ -48,6 +48,11 @@ const struct got_error *got_worktree_open(struct got_worktree **, const char *);
 void got_worktree_close(struct got_worktree *);
 
 /*
+ * Get the path to the root directory of a worktree.
+ */
+const char *got_worktree_get_root_path(struct got_worktree *);
+
+/*
  * Get the path to the repository associated with a worktree.
  */
 const char *got_worktree_get_repo_path(struct got_worktree *);

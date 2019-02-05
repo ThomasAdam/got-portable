@@ -423,6 +423,12 @@ got_worktree_close(struct got_worktree *worktree)
 }
 
 const char *
+got_worktree_get_root_path(struct got_worktree *worktree)
+{
+	return worktree->root_path;
+}
+
+const char *
 got_worktree_get_repo_path(struct got_worktree *worktree)
 {
 	return worktree->repo_path;
@@ -1121,7 +1127,8 @@ got_worktree_status(struct got_worktree *worktree,
 	arg.status_arg = status_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
-	err = got_fileindex_diff_dir(fileindex, workdir, repo, &fdiff_cb, &arg);
+	err = got_fileindex_diff_dir(fileindex, workdir, worktree->root_path,
+	    repo, &fdiff_cb, &arg);
 done:
 	if (workdir)
 		closedir(workdir);
