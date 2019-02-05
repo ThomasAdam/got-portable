@@ -47,6 +47,7 @@
 #include "got_utf8.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+#include "got_worktree.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -1686,7 +1687,16 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 	if (repo_path == NULL) {
-		repo_path = strdup(cwd);
+		struct got_worktree *worktree;
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			got_worktree_close(worktree);
+		} else
+			repo_path = strdup(cwd);
 		if (repo_path == NULL) {
 			error = got_error_from_errno();
 			goto done;
