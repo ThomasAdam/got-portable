@@ -1307,7 +1307,7 @@ cmd_tree(int argc, char *argv[])
 	}
 	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
-		if (error && (error->code != GOT_ERR_ERRNO && errno != ENOENT))
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		else
 			error = NULL;
