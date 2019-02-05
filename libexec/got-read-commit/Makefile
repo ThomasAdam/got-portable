@@ -2,7 +2,7 @@
 
 PROG=		got-read-commit
 SRCS=		got-read-commit.c delta.c error.c inflate.c object_parse.c \
-		privsep.c sha1.c
+		path.c privsep.c sha1.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz

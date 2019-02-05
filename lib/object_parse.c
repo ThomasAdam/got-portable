@@ -48,6 +48,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
 #include "got_lib_repository.h"
+#include "got_lib_path.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -664,6 +665,10 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 {
 	const struct got_error *err;
 	size_t remain = len;
+	struct got_pathlist_head pathlist;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&pathlist);
 
 	*tree = calloc(1, sizeof(**tree));
 	if (*tree == NULL)
@@ -673,13 +678,19 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 
 	while (remain > 0) {
 		struct got_tree_entry *te;
+		struct got_pathlist_entry *new = NULL;
 		size_t elen;
 
 		err = parse_tree_entry(&te, &elen, buf, remain);
 		if (err)
-			return err;
-		(*tree)->entries.nentries++;
-		SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
+			goto done;
+		err = got_pathlist_insert(&new, &pathlist, te->name, te);
+		if (err)
+			goto done;
+		if (new == NULL) {
+			err = got_error(GOT_ERR_TREE_DUP_ENTRY);
+			goto done;
+		}
 		buf += elen;
 		remain -= elen;
 	}
@@ -687,10 +698,18 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 	if (remain != 0) {
 		got_object_tree_close(*tree);
 		*tree = NULL;
-		return got_error(GOT_ERR_BAD_OBJ_DATA);
+		err = got_error(GOT_ERR_BAD_OBJ_DATA);
+		goto done;
 	}
 
-	return NULL;
+	TAILQ_FOREACH(pe, &pathlist, entry) {
+		struct got_tree_entry *te = pe->data;
+		(*tree)->entries.nentries++;
+		SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
+	}
+done:
+	got_pathlist_free(&pathlist);
+	return err;
 }
 
 void

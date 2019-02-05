@@ -78,7 +78,7 @@ static inline int
 got_fileindex_cmp(const struct got_fileindex_entry *e1,
     const struct got_fileindex_entry *e2)
 {
-	return strcmp(e1->path, e2->path);
+	return got_path_cmp(e1->path, e2->path);
 }
 
 RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);

@@ -697,26 +697,21 @@ diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **, DIR *,
     const char *, struct got_repository *, struct got_fileindex_diff_dir_cb *,
     void *);
 
-struct dirlist_entry {
-	SIMPLEQ_ENTRY(dirlist_entry) entry;
-	struct dirent *de;
-};
-SIMPLEQ_HEAD(dirlist_head, dirlist_entry);
-
 static const struct got_error *
-walk_dir(struct dirlist_entry **next, struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, struct dirlist_entry *dle,
+walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
+    struct got_fileindex_entry **ie, struct got_pathlist_entry *dle,
     const char *path, DIR *dir, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
+	struct dirent *de = dle->data;
 
-	if (dle->de->d_type == DT_DIR) {
+	if (de->d_type == DT_DIR) {
 		char *subpath;
 		DIR *subdir;
 
 		if (asprintf(&subpath, "%s%s%s", path,
-		    path[0] == '\0' ? "" : "/", dle->de->d_name) == -1)
+		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
 			return got_error_from_errno();
 
 		subdir = opendir(subpath);
@@ -733,45 +728,7 @@ walk_dir(struct dirlist_entry **next, struct got_fileindex *fileindex,
 			return err;
 	}
 
-	*next = SIMPLEQ_NEXT(dle, entry);
-	return NULL;
-}
-
-static const struct got_error *
-insert_dirent(struct dirlist_head *dirlist, struct dirent *de)
-{
-	struct dirlist_entry *dle, *prev = NULL;
-
-	/*
-	 * Keep dirents sorted in same order as used by file index.
-	 * Git orders tree object entries based on length and then memcmp().
-	 */
-	SIMPLEQ_FOREACH(dle, dirlist, entry) {
-		int cmp;
-
-		if (dle->de->d_namlen > de->d_namlen) {
-			prev = dle;
-			continue;
-		}
-
-		cmp = strcmp(dle->de->d_name, de->d_name);
-		if (cmp == 0)
-			return NULL; /* duplicate, should not happen */
-		else if (cmp > 0)
-			break;
-		else
-			prev = dle;
-	}
-
-	dle = malloc(sizeof(*dle));
-	if (dle == NULL)
-		return got_error_from_errno();
-	dle->de = de;
-	if (prev)
-		SIMPLEQ_INSERT_AFTER(dirlist, prev, dle, entry);
-	else
-		SIMPLEQ_INSERT_TAIL(dirlist, dle, entry);
-
+	*next = TAILQ_NEXT(dle, entry);
 	return NULL;
 }
 
@@ -785,12 +742,14 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	struct dirent *de = NULL;
 	size_t path_len = strlen(path);
 	struct got_fileindex_entry *next;
-	struct dirlist_head dirlist;
-	struct dirlist_entry *dle;
+	struct got_pathlist_head dirlist;
+	struct got_pathlist_entry *dle;
 
-	SIMPLEQ_INIT(&dirlist);
+	TAILQ_INIT(&dirlist);
 
 	while (1) {
+		struct got_pathlist_entry *new = NULL;
+
 		de = readdir(dir);
 		if (de == NULL)
 			break;
@@ -801,17 +760,23 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0))
 			continue;
 
-		insert_dirent(&dirlist, de);
+		err = got_pathlist_insert(&new, &dirlist, de->d_name, de);
+		if (err)
+			goto done;
+		if (new == NULL) {
+			err = got_error(GOT_ERR_DIR_DUP_ENTRY);
+			goto done;
+		}
 	}
 
-	dle = SIMPLEQ_FIRST(&dirlist);
+	dle = TAILQ_FIRST(&dirlist);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
 		if (dle && *ie) {
+			de = dle->data;
 			int cmp = cmp_entries((*ie)->path, path, path_len,
-			    dle->de->d_name);
+			    de->d_name);
 			if (cmp == 0) {
-				err = cb->diff_old_new(cb_arg, *ie, dle->de,
-				    path);
+				err = cb->diff_old_new(cb_arg, *ie, de, path);
 				if (err)
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
@@ -824,7 +789,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 					break;
 				*ie = next;
 			} else {
-				err = cb->diff_new(cb_arg, dle->de, path);
+				err = cb->diff_new(cb_arg, de, path);
 				if (err)
 					break;
 				err = walk_dir(&dle, fileindex, ie, dle, path,
@@ -839,7 +804,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 			*ie = next;
 		} else if (dle) {
-			err = cb->diff_new(cb_arg, dle->de, path);
+			err = cb->diff_new(cb_arg, de, path);
 			if (err)
 				break;
 			err = walk_dir(&dle, fileindex, ie, dle, path, dir,
@@ -848,13 +813,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 		}
 	}
-
-	while (!SIMPLEQ_EMPTY(&dirlist)) {
-		dle = SIMPLEQ_FIRST(&dirlist);
-		SIMPLEQ_REMOVE_HEAD(&dirlist, entry);
-		free(dle);
-	}
-
+done:
+	got_pathlist_free(&dirlist);
 	return err;
 }
 

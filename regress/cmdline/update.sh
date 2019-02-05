@@ -317,8 +317,8 @@ function test_update_dir_with_dot_sibling {
 	echo change > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "changing epsilon/zeta"
 
-	echo "A  epsilon.txt" > $testroot/stdout.expected
-	echo "U  epsilon/zeta" >> $testroot/stdout.expected
+	echo "U  epsilon/zeta" > $testroot/stdout.expected
+	echo "A  epsilon.txt" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
@@ -432,10 +432,10 @@ function test_update_moves_files_to_new_dir {
 	(cd $testroot/repo && git mv epsilon/psi/chi/tau epsilon-new/psi/tau)
 	git_commit $testroot/repo -m "moving files upwards"
 
-	echo "A  epsilon-new/mu" > $testroot/stdout.expected
-	echo "A  epsilon-new/psi/tau" >> $testroot/stdout.expected
-	echo "D  epsilon/psi/chi/tau" >> $testroot/stdout.expected
+	echo "D  epsilon/psi/chi/tau" > $testroot/stdout.expected
 	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
+	echo "A  epsilon-new/mu" >> $testroot/stdout.expected
+	echo "A  epsilon-new/psi/tau" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
