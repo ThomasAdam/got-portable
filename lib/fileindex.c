@@ -723,10 +723,8 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 		subdir = opendir(subdirpath);
 		if (subdir == NULL) {
-			#if 0
 			free(subpath);
 			free(subdirpath);
-			#endif
 			return got_error_from_errno();
 		}
 
