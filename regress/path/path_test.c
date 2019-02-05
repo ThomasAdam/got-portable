@@ -142,7 +142,7 @@ path_list(void)
 
 	TAILQ_INIT(&paths);
 	for (i = 0; i < nitems(path_list_input); i++) {
-		err = got_pathlist_insert(&paths, path_list_input[i]);
+		err = got_pathlist_insert(NULL, &paths, path_list_input[i]);
 		if (err) {
 			test_printf("%s\n", __func__, err->msg);
 			return 0;
@@ -177,7 +177,7 @@ path_list_reverse_input(void)
 
 	TAILQ_INIT(&paths);
 	for (i = nitems(path_list_input) - 1; i >= 0; i--) {
-		err = got_pathlist_insert(&paths, path_list_input[i]);
+		err = got_pathlist_insert(NULL, &paths, path_list_input[i]);
 		if (err) {
 			test_printf("%s\n", __func__, err->msg);
 			return 0;

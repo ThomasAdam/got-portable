@@ -213,9 +213,13 @@ got_path_cmp(const char *path1, const char *path2)
 }
 
 const struct got_error *
-got_pathlist_insert(struct got_pathlist_head *pathlist, const char *path)
+got_pathlist_insert(struct got_pathlist_entry **inserted,
+    struct got_pathlist_head *pathlist, const char *path)
 {
 	struct got_pathlist_entry *new, *pe;
+
+	if (inserted)
+		*inserted = NULL;
 
 	new = malloc(sizeof(*new));
 	if (new == NULL)
@@ -237,12 +241,16 @@ got_pathlist_insert(struct got_pathlist_head *pathlist, const char *path)
 			return NULL;
 		} else if (cmp < 0) {
 			TAILQ_INSERT_AFTER(pathlist, pe, new, entry);
+			if (inserted)
+				*inserted = new;
 			return NULL;
 		}
 		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
 	}
 
 	TAILQ_INSERT_HEAD(pathlist, new, entry);
+	if (inserted)
+		*inserted = new;
 	return NULL;
 }
 

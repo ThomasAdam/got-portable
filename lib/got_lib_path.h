@@ -77,9 +77,11 @@ TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);
  * The caller should already have initialized the list head. This list stores
  * the pointer to the path as-is, i.e. the path is not copied internally and
  * must remain available until the list is freed with got_pathlist_free().
+ * If the first argument is not NULL, set it to a pointer to the newly inserted
+ * element, or to a NULL pointer in case the path was already on the list.
  */
-const struct got_error *got_pathlist_insert(struct got_pathlist_head *,
-    const char *);
+const struct got_error *got_pathlist_insert(struct got_pathlist_entry **,
+    struct got_pathlist_head *, const char *);
 
 /* Free resources allocated for a path list. */
 void got_pathlist_free(struct got_pathlist_head *);
