@@ -772,8 +772,9 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	dle = TAILQ_FIRST(&dirlist);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
 		if (dle && *ie) {
+			int cmp;
 			de = dle->data;
-			int cmp = cmp_entries((*ie)->path, path, path_len,
+			cmp = cmp_entries((*ie)->path, path, path_len,
 			    de->d_name);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, de, path);
