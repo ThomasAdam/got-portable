@@ -1142,15 +1142,17 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 
 	if (worktree) {
+		const char *prefix = got_worktree_get_path_prefix(worktree);
 		char *p, *worktree_subdir = cwd +
 		    strlen(got_worktree_get_root_path(worktree));
-		if (asprintf(&p, "%s/%s/%s",
-		    got_worktree_get_path_prefix(worktree),
-		    worktree_subdir, path) == -1) {
+		if (asprintf(&p, "%s%s%s%s%s",
+		    prefix, (strcmp(prefix, "/") != 0) ? "/" : "",
+		    worktree_subdir, worktree_subdir[0] ? "/" : "",
+		    path) == -1) {
 			error = got_error_from_errno();
 			goto done;
 		}
-		error = got_repo_map_path(&in_repo_path, repo, p, 1);
+		error = got_repo_map_path(&in_repo_path, repo, p, 0);
 		free(p);
 	} else {
 		error = got_repo_map_path(&in_repo_path, repo, path, 1);
