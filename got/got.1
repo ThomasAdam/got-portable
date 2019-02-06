@@ -72,11 +72,11 @@ are as follows:
 Copy files from a repository into a new work tree.
 If the
 .Ar work tree path
-is not specified, either use the base name of the
+is not specified, either use the last component of
 .Ar repository path ,
 or if a
 .Ar path prefix
-was specified use the base name of the
+was specified use the last component of
 .Ar path prefix .
 .Pp
 The options for
@@ -86,7 +86,8 @@ are as follows:
 .It Fl c Ar commit
 Check out files from the specified
 .Ar commit .
-By default, the HEAD commit is used.
+If this option is not specified, a commit resolved via the repository's HEAD
+reference will be used.
 .It Fl p Ar path-prefix
 Restrict the work tree to a subset of the repository's tree hierarchy.
 Only files beneath the specified
