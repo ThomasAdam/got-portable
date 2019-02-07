@@ -29,32 +29,36 @@
 #include <err.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "worklist.h"
-#include "xmalloc.h"
+#include "got_error.h"
 
 /*
  * adds a path to a worklist.
  */
-void
+const struct got_error *
 worklist_add(const char *path, struct wklhead *worklist)
 {
 	size_t len;
 	struct worklist *wkl;
 	sigset_t old, new;
 
-	wkl = xcalloc(1, sizeof(*wkl));
+	wkl = calloc(1, sizeof(*wkl));
+	if (wkl == NULL)
+		return got_error_from_errno();
 
 	len = strlcpy(wkl->wkl_path, path, sizeof(wkl->wkl_path));
 	if (len >= sizeof(wkl->wkl_path))
-		errx(1, "path truncation in worklist_add");
+		return got_error(GOT_ERR_NO_SPACE);
 
 	sigfillset(&new);
 	sigprocmask(SIG_BLOCK, &new, &old);
 	SLIST_INSERT_HEAD(worklist, wkl, wkl_list);
 	sigprocmask(SIG_SETMASK, &old, NULL);
+	return NULL;
 }
 
 /*

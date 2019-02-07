@@ -37,12 +37,10 @@ struct worklist {
 
 SLIST_HEAD(wklhead, worklist);
 
-void worklist_add(const char *, struct wklhead *);
+const struct got_error *worklist_add(const char *, struct wklhead *);
 void worklist_run(struct wklhead *, void (*cb)(struct worklist *));
 void worklist_clean(struct wklhead *, void (*cb)(struct worklist *));
 
 void worklist_unlink(struct worklist *);
-
-extern struct wklhead temp_files;
 
 #endif
