@@ -27,7 +27,6 @@
 #include <sys/queue.h>
 #include <sys/stat.h>
 
-#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -37,8 +36,9 @@
 #include <unistd.h>
 
 #include "buf.h"
-#include "xmalloc.h"
 #include "worklist.h"
+
+#include "got_error.h"
 
 #define BUF_INCR	128
 
@@ -51,7 +51,7 @@ struct buf {
 
 #define SIZE_LEFT(b)	(b->cb_size - b->cb_len)
 
-static void	buf_grow(BUF *, size_t);
+static const struct got_error *buf_grow(BUF *, size_t);
 
 /*
  * Create a new buffer structure and return a pointer to it.  This structure
@@ -63,11 +63,15 @@ buf_alloc(size_t len)
 {
 	BUF *b;
 
-	b = xmalloc(sizeof(*b));
+	b = malloc(sizeof(*b));
+	if (b == NULL)
+		return NULL;
 	/* Postpone creation of zero-sized buffers */
-	if (len > 0)
-		b->cb_buf = xcalloc(1, len);
-	else
+	if (len > 0) {
+		b->cb_buf = calloc(1, len);
+		if (b->cb_buf == NULL)
+			return NULL;
+	} else
 		b->cb_buf = NULL;
 
 	b->cb_size = len;
@@ -178,25 +182,30 @@ buf_empty(BUF *b)
 /*
  * Append a single character <c> to the end of the buffer <b>.
  */
-void
+const struct got_error *
 buf_putc(BUF *b, int c)
 {
+	const struct got_error *err = NULL;
 	u_char *bp;
 
-	if (SIZE_LEFT(b) == 0)
-		buf_grow(b, BUF_INCR);
+	if (SIZE_LEFT(b) == 0) {
+		err = buf_grow(b, BUF_INCR);
+		if (err)
+			return err;
+	}
 	bp = b->cb_buf + b->cb_len;
 	*bp = (u_char)c;
 	b->cb_len++;
+	return NULL;
 }
 
 /*
  * Append a string <s> to the end of buffer <b>.
  */
-void
-buf_puts(BUF *b, const char *str)
+const struct got_error *
+buf_puts(size_t *newlen, BUF *b, const char *str)
 {
-	buf_append(b, str, strlen(str));
+	return buf_append(newlen, b, str, strlen(str));
 }
 
 /*
@@ -214,22 +223,27 @@ buf_getc(BUF *b, size_t pos)
  * appropriate size to accept all data.
  * Returns the number of bytes successfully appended to the buffer.
  */
-size_t
-buf_append(BUF *b, const void *data, size_t len)
+const struct got_error *
+buf_append(size_t *newlen, BUF *b, const void *data, size_t len)
 {
+	const struct got_error *err = NULL;
 	size_t left, rlen;
 	u_char *bp;
 
 	left = SIZE_LEFT(b);
 	rlen = len;
 
-	if (left < len)
-		buf_grow(b, len - left);
+	if (left < len) {
+		err = buf_grow(b, len - left);
+		if (err)
+			return err;
+	}
 	bp = b->cb_buf + b->cb_len;
 	memcpy(bp, data, rlen);
 	b->cb_len += rlen;
 
-	return (rlen);
+	*newlen = rlen;
+	return NULL;
 }
 
 /*
@@ -273,29 +287,31 @@ buf_write_fd(BUF *b, int fd)
  * Write the contents of the buffer <b> to the file whose path is given in
  * <path>.  If the file does not exist, it is created with mode <mode>.
  */
-int
+const struct got_error *
 buf_write(BUF *b, const char *path, mode_t mode)
 {
+	const struct got_error *err = NULL;
 	int fd;
  open:
 	if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, mode)) == -1) {
 		if (errno == EACCES && unlink(path) != -1)
 			goto open;
 		else
-			err(1, "%s", path);
+			return got_error_from_errno();
 	}
 
 	if (buf_write_fd(b, fd) == -1) {
+		err = got_error_from_errno();
 		(void)unlink(path);
-		errx(1, "buf_write: buf_write_fd: `%s'", path);
+		return err;
 	}
 
 	if (fchmod(fd, mode) < 0)
-		warn("permissions not set on file %s", path);
+		err = got_error_from_errno();
 
 	(void)close(fd);
 
-	return (0);
+	return err;
 }
 
 /*
@@ -303,31 +319,38 @@ buf_write(BUF *b, const char *path, mode_t mode)
  * specified using <template> (see mkstemp.3).
  * NB. This function will modify <template>, as per mkstemp
  */
-void
-buf_write_stmp(BUF *b, char *template)
+const struct got_error *
+buf_write_stmp(BUF *b, char *template, struct wklhead *temp_files)
 {
+	const struct got_error *err = NULL;
 	int fd;
 
 	if ((fd = mkstemp(template)) == -1)
-		err(1, "%s", template);
+		return got_error_from_errno();
 
-	worklist_add(template, &temp_files);
+	worklist_add(template, temp_files);
 
 	if (buf_write_fd(b, fd) == -1) {
+		err = got_error_from_errno();
 		(void)unlink(template);
-		errx(1, "buf_write_stmp: buf_write_fd: `%s'", template);
 	}
 
 	(void)close(fd);
+	return err;
 }
 
 /*
  * Grow the buffer <b> by <len> bytes.  The contents are unchanged by this
  * operation regardless of the result.
  */
-static void
+static const struct got_error *
 buf_grow(BUF *b, size_t len)
 {
-	b->cb_buf = xreallocarray(b->cb_buf, 1, b->cb_size + len);
+	u_char *buf;
+	buf = reallocarray(b->cb_buf, 1, b->cb_size + len);
+	if (buf == NULL)
+		return got_error_from_errno();
+	b->cb_buf = buf;
 	b->cb_size += len;
+	return NULL;
 }

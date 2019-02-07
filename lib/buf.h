@@ -41,6 +41,7 @@
 #include <sys/types.h>
 
 typedef struct buf BUF;
+struct wklhead;
 
 BUF		*buf_alloc(size_t);
 BUF		*buf_load(const char *);
@@ -48,13 +49,13 @@ void		 buf_free(BUF *);
 void		*buf_release(BUF *);
 u_char		 buf_getc(BUF *, size_t);
 void		 buf_empty(BUF *);
-size_t		 buf_append(BUF *, const void *, size_t);
-void		 buf_putc(BUF *, int);
-void		 buf_puts(BUF *b, const char *str);
+const struct got_error *buf_append(size_t *, BUF *, const void *, size_t);
+const struct got_error *buf_putc(BUF *, int);
+const struct got_error *buf_puts(size_t *, BUF *b, const char *str);
 size_t		 buf_len(BUF *);
 int		 buf_write_fd(BUF *, int);
-int		 buf_write(BUF *, const char *, mode_t);
-void		 buf_write_stmp(BUF *, char *);
+const struct got_error *buf_write(BUF *, const char *, mode_t);
+const struct got_error *buf_write_stmp(BUF *, char *, struct wklhead *);
 u_char		*buf_get(BUF *b);
 
 #endif	/* BUF_H */
