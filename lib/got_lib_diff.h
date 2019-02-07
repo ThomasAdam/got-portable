@@ -37,6 +37,7 @@
 /*
  * Output format options
  */
+#define	D_NORMAL	0	/* Normal output */
 #define	D_UNIFIED	3	/* Unified context diff */
 #define	D_BRIEF		6	/* Say if the files differ */
 

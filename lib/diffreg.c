@@ -174,6 +174,7 @@ struct line {
 static void	 diff_output(FILE *, const char *, ...);
 static int	 output(FILE *, struct got_diff_changes *, struct got_diff_state *, struct got_diff_args *, const char *, FILE *, const char *, FILE *, int);
 static void	 check(struct got_diff_state *, FILE *, FILE *, int);
+static void	 range(FILE *, int, int, char *);
 static void	 uni_range(FILE *, int, int);
 static void	 dump_unified_vec(FILE *, struct got_diff_changes *, struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);
 static int	 prepare(struct got_diff_state *, int, FILE *, off_t, int);
@@ -874,10 +875,18 @@ output(FILE *outfile, struct got_diff_changes *changes,
 		if (error)
 			return (error);
 	}
-	if (ds->anychange != 0)
+	if (ds->anychange != 0 && args->diff_format == D_UNIFIED)
 		dump_unified_vec(outfile, changes, ds, args, f1, f2, flags);
 
 	return (0);
+}
+
+static void
+range(FILE *outfile, int a, int b, char *separator)
+{
+	diff_output(outfile, "%d", a > b ? b : a);
+	if (a < b)
+		diff_output(outfile, "%s%d", separator, b);
 }
 
 static void
@@ -960,7 +969,17 @@ change(FILE *outfile, struct got_diff_changes *changes,
 		ds->anychange = 1;
 	if (args->diff_format == D_BRIEF)
 		return (0);
-	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2, '\0', 0, *pflags);
+	if (args->diff_format == D_NORMAL) {
+		range(outfile, a, b, ",");
+		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
+		range(outfile, c, d, ",");
+		diff_output(outfile, "\n");
+		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
+		if (a <= b && c <= d)
+			diff_output(outfile, "---\n");
+	}
+	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2,
+	    args->diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
 	return (0);
 }
 
@@ -977,7 +996,8 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 		nc = f[i] - f[i - 1];
 		if (ch != '\0') {
 			diff_output(outfile, "%c", ch);
-			if (args->Tflag && args->diff_format == D_UNIFIED)
+			if (args->Tflag && (args->diff_format == D_UNIFIED ||
+			    args->diff_format == D_NORMAL))
 				diff_output(outfile, "\t");
 			else if (args->diff_format != D_UNIFIED)
 				diff_output(outfile, " ");
