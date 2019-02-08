@@ -563,6 +563,8 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 	char kind, *p;
 	size_t i;
 
+	*n = 0;
+
 	d3s->fp[0] = fopen(name, "r");
 	if (d3s->fp[0] == NULL)
 		return got_error_from_errno();
@@ -602,6 +604,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 
 	(void)fclose(d3s->fp[0]);
 
+	*n = i;
 	return NULL;
 }
 
