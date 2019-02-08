@@ -89,10 +89,6 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-/* flags shared between merge(1) and rcsmerge(1) */
-#define MERGE_EFLAG     (1<<16)
-#define MERGE_OFLAG     (1<<17)
-
 /* diff3 - 3-way differential file comparison */
 
 /* diff3 [-ex3EX] d13 d23 f1 f2 f3 [m1 m3]
@@ -265,7 +261,7 @@ done:
  * For merge(1).
  */
 const struct got_error *
-merge_diff3(int outfd, char *p1, char *p2, char *p3, int flags)
+got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -285,9 +281,6 @@ merge_diff3(int outfd, char *p1, char *p2, char *p3, int flags)
 	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
 	data = patch = NULL;
-
-	if ((flags & MERGE_EFLAG) && !(flags & MERGE_OFLAG))
-		d3s->oflag = 0;
 
 	if ((b1 = buf_load(p1)) == NULL)
 		goto out;
