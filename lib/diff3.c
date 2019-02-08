@@ -148,14 +148,17 @@ struct diff3_state {
 	int oflag;
 	int debug;
 	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
+
+	char *buf;
+	size_t bufsize;
 };
 
 static BUF *diffbuf;
 
 static int duplicate(struct range *, struct range *, struct diff3_state *);
 static int edit(struct diff *, int, int, struct diff3_state *);
-static char *getchange(FILE *);
-static char *get_line(FILE *, size_t *);
+static char *getchange(FILE *, struct diff3_state *);
+static char *get_line(FILE *, size_t *, struct diff3_state *);
 static int number(char **);
 static ssize_t readin(char *, struct diff **, struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
@@ -569,7 +572,7 @@ readin(char *name, struct diff **dd, struct diff3_state *d3s)
 	d3s->fp[0] = fopen(name, "r");
 	if (d3s->fp[0] == NULL)
 		return (-1);
-	for (i = 0; (p = getchange(d3s->fp[0])); i++) {
+	for (i = 0; (p = getchange(d3s->fp[0], d3s)); i++) {
 		if (i >= d3s->szchanges - 1)
 			increase(d3s); /* XXX check error! */
 		a = b = number(&p);
@@ -618,11 +621,11 @@ number(char **lc)
 }
 
 static char *
-getchange(FILE *b)
+getchange(FILE *b, struct diff3_state *d3s)
 {
 	char *line;
 
-	while ((line = get_line(b, NULL))) {
+	while ((line = get_line(b, NULL, d3s))) {
 		if (isdigit((unsigned char)line[0]))
 			return (line);
 	}
@@ -631,13 +634,10 @@ getchange(FILE *b)
 }
 
 static char *
-get_line(FILE *b, size_t *n)
+get_line(FILE *b, size_t *n, struct diff3_state *d3s)
 {
 	char *cp;
 	size_t len;
-	/* XXX must be part of diff3state */
-	static char *buf;
-	static size_t bufsize;
 	char *new;
 
 	if ((cp = fgetln(b, &len)) == NULL)
@@ -645,22 +645,22 @@ get_line(FILE *b, size_t *n)
 
 	if (cp[len - 1] != '\n')
 		len++;
-	if (len + 1 > bufsize) {
+	if (len + 1 > d3s->bufsize) {
 		do {
-			bufsize += 1024;
-		} while (len + 1 > bufsize);
-		new = reallocarray(buf, 1, bufsize);
+			d3s->bufsize += 1024;
+		} while (len + 1 > d3s->bufsize);
+		new = reallocarray(d3s->buf, 1, d3s->bufsize);
 		if (new == NULL)
 			return NULL;
-		buf = new;
+		d3s->buf = new;
 	}
-	memcpy(buf, cp, len - 1);
-	buf[len - 1] = '\n';
-	buf[len] = '\0';
+	memcpy(d3s->buf, cp, len - 1);
+	d3s->buf[len - 1] = '\n';
+	d3s->buf[len] = '\0';
 	if (n != NULL)
 		*n = len;
 
-	return (buf);
+	return (d3s->buf);
 }
 
 static int
@@ -843,7 +843,7 @@ skip(int i, int from, char *pr, struct diff3_state *d3s)
 	char *line;
 
 	for (n = 0; d3s->cline[i] < from - 1; n += j) {
-		if ((line = get_line(d3s->fp[i], &j)) == NULL)
+		if ((line = get_line(d3s->fp[i], &j, d3s)) == NULL)
 			return (-1);
 		if (pr != NULL)
 			diff_output("%s%s", pr, line);
