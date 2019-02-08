@@ -172,8 +172,6 @@ static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
     char *, char *, const char *, const char *, struct diff3_state *);
 
-int diff3_conflicts = 0;
-
 static const struct got_error *
 diff_output(BUF *diffbuf, const char *fmt, ...)
 {
