@@ -85,6 +85,10 @@
 #include "got_lib_diff.h"
 #include "worklist.h"
 
+#ifndef nitems
+#define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
+#endif
+
 /* flags shared between merge(1) and rcsmerge(1) */
 #define MERGE_EFLAG     (1<<16)
 #define MERGE_OFLAG     (1<<17)
@@ -266,6 +270,7 @@ merge_diff3(BUF **buf, char **av, int flags)
 	size_t dlen, plen;
 	struct wklhead temp_files;
 	struct diff3_state *d3s;
+	int i;
 
 	*buf = NULL;
 
@@ -391,6 +396,11 @@ out:
 
 	worklist_clean(&temp_files, worklist_unlink);
 
+	for (i = 0; i < nitems(d3s->fp); i++) {
+		if (d3s->fp[i])
+			fclose(d3s->fp[i]);
+	}
+	free(d3s);
 	if (err == NULL)
 		*buf = diffb;
 	return err;
@@ -420,7 +430,6 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 	if ((n = readin(dp23, &d3s->d23, d3s)) < 0)
 		return got_error_from_errno();
 
-	/* XXX LEAK: at present we never close these files! */
 	if ((d3s->fp[0] = fopen(path1, "r")) == NULL)
 		return got_error_from_errno();
 	if ((d3s->fp[1] = fopen(path2, "r")) == NULL)
