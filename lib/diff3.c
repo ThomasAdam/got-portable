@@ -268,6 +268,8 @@ got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3)
 	struct diff3_state *d3s;
 	int i;
 
+	SLIST_INIT(&temp_files);
+
 	d3s = calloc(1, sizeof(*d3s));
 	if (d3s == NULL)
 		return got_error_from_errno();
