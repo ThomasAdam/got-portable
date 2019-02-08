@@ -115,54 +115,57 @@ struct diff {
 	struct range new;
 };
 
-static size_t szchanges;
+struct diff3_state {
+	size_t szchanges;
 
-static struct diff *d13;
-static struct diff *d23;
+	struct diff *d13;
+	struct diff *d23;
 
-/*
- * "de" is used to gather editing scripts.  These are later spewed out in
- * reverse order.  Its first element must be all zero, the "new" component
- * of "de" contains line positions or byte positions depending on when you
- * look (!?).  Array overlap indicates which sections in "de" correspond to
- * lines that are different in all three files.
- */
-static struct diff *de;
-static char *overlap;
-static int overlapcnt = 0;
-static FILE *fp[3];
-static int cline[3];		/* # of the last-read line in each file (0-2) */
+	/*
+	 * "de" is used to gather editing scripts.  These are later spewed out
+	 * in reverse order.  Its first element must be all zero, the "new"
+	 * component of "de" contains line positions or byte positions
+	 * depending on when you look (!?).  Array overlap indicates which
+	 * sections in "de" correspond to lines that are different in all
+	 * three files.
+	 */
+	struct diff *de;
+	char *overlap;
+	int overlapcnt;
+	FILE *fp[3];
+	int cline[3];		/* # of the last-read line in each file (0-2) */
+
+	/*
+	 * the latest known correspondence between line numbers of the 3 files
+	 * is stored in last[1-3];
+	 */
+	int last[4];
+	int eflag;
+	int oflag;
+	int debug;
+	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
+};
 
 static BUF *diffbuf;
 
-/*
- * the latest known correspondence between line numbers of the 3 files
- * is stored in last[1-3];
- */
-static int last[4];
-static int eflag = 3;	/* default -E for compatibility with former RCS */
-static int oflag = 1;	/* default -E for compatibility with former RCS */
-static int debug  = 0;
-static char f1mark[PATH_MAX], f3mark[PATH_MAX];	/* markers for -E and -X */
-
-static int duplicate(struct range *, struct range *);
-static int edit(struct diff *, int, int);
+static int duplicate(struct range *, struct range *, struct diff3_state *);
+static int edit(struct diff *, int, int, struct diff3_state *);
 static char *getchange(FILE *);
 static char *get_line(FILE *, size_t *);
 static int number(char **);
-static ssize_t readin(char *, struct diff **);
+static ssize_t readin(char *, struct diff **, struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
-static int skip(int, int, char *);
-static int edscript(int);
-static int merge(size_t, size_t);
-static void change(int, struct range *, int);
-static void keep(int, struct range *);
+static int skip(int, int, char *, struct diff3_state *);
+static int edscript(int, struct diff3_state *);
+static int merge(size_t, size_t, struct diff3_state *);
+static void change(int, struct range *, int, struct diff3_state *);
+static void keep(int, struct range *, struct diff3_state *);
 static void prange(struct range *);
-static void repos(int);
+static void repos(int, struct diff3_state *);
 static void separate(const char *);
-static const struct got_error *increase(void);
+static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
-    char *, char *, const char *, const char *);
+    char *, char *, const char *, const char *, struct diff3_state *);
 
 int diff3_conflicts = 0;
 
@@ -262,15 +265,22 @@ merge_diff3(BUF **buf, char **av, int flags)
 	u_char *data, *patch;
 	size_t dlen, plen;
 	struct wklhead temp_files;
+	struct diff3_state *d3s;
 
 	*buf = NULL;
+
+	d3s = calloc(1, sizeof(*d3s));
+	if (d3s == NULL)
+		return got_error_from_errno();
+	d3s->eflag = 3; /* default -E for compatibility with former RCS */
+	d3s->oflag = 1; /* default -E for compatibility with former RCS */
 
 	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
 	data = patch = NULL;
 
 	if ((flags & MERGE_EFLAG) && !(flags & MERGE_OFLAG))
-		oflag = 0;
+		d3s->oflag = 0;
 
 	if ((b1 = buf_load(av[0])) == NULL)
 		goto out;
@@ -344,7 +354,8 @@ merge_diff3(BUF **buf, char **av, int flags)
 	d2 = NULL;
 
 	diffbuf = diffb;
-	err = diff3_internal(dp13, dp23, path1, path2, path3, av[0], av[2]);
+	err = diff3_internal(dp13, dp23, path1, path2, path3, av[0], av[2],
+	    d3s);
 	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
@@ -387,37 +398,37 @@ out:
 
 static const struct got_error *
 diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
-    const char *fmark, const char *rmark)
+    const char *fmark, const char *rmark, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 	ssize_t m, n;
 	int i;
 
-	i = snprintf(f1mark, sizeof(f1mark), "<<<<<<< %s", fmark);
-	if (i < 0 || i >= (int)sizeof(f1mark))
+	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark), "<<<<<<< %s", fmark);
+	if (i < 0 || i >= (int)sizeof(d3s->f1mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	i = snprintf(f3mark, sizeof(f3mark), ">>>>>>> %s", rmark);
-	if (i < 0 || i >= (int)sizeof(f3mark))
+	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark), ">>>>>>> %s", rmark);
+	if (i < 0 || i >= (int)sizeof(d3s->f3mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	err = increase();
+	err = increase(d3s);
 	if (err)
 		return err;
-	if ((m = readin(dp13, &d13)) < 0)
+	if ((m = readin(dp13, &d3s->d13, d3s)) < 0)
 		return got_error_from_errno();
-	if ((n = readin(dp23, &d23)) < 0)
+	if ((n = readin(dp23, &d3s->d23, d3s)) < 0)
 		return got_error_from_errno();
 
 	/* XXX LEAK: at present we never close these files! */
-	if ((fp[0] = fopen(path1, "r")) == NULL)
+	if ((d3s->fp[0] = fopen(path1, "r")) == NULL)
 		return got_error_from_errno();
-	if ((fp[1] = fopen(path2, "r")) == NULL)
+	if ((d3s->fp[1] = fopen(path2, "r")) == NULL)
 		return got_error_from_errno();
-	if ((fp[2] = fopen(path3, "r")) == NULL)
+	if ((d3s->fp[2] = fopen(path3, "r")) == NULL)
 		return got_error_from_errno();
 
-	if (merge(m, n) < 0)
+	if (merge(m, n, d3s) < 0)
 		return got_error_from_errno();
 	return NULL;
 }
@@ -540,18 +551,18 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
  * The vector could be optimized out of existence)
  */
 static ssize_t
-readin(char *name, struct diff **dd)
+readin(char *name, struct diff **dd, struct diff3_state *d3s)
 {
 	int a, b, c, d;
 	char kind, *p;
 	size_t i;
 
-	fp[0] = fopen(name, "r");
-	if (fp[0] == NULL)
+	d3s->fp[0] = fopen(name, "r");
+	if (d3s->fp[0] == NULL)
 		return (-1);
-	for (i = 0; (p = getchange(fp[0])); i++) {
-		if (i >= szchanges - 1)
-			increase();
+	for (i = 0; (p = getchange(d3s->fp[0])); i++) {
+		if (i >= d3s->szchanges - 1)
+			increase(d3s); /* XXX check error! */
 		a = b = number(&p);
 		if (*p == ',') {
 			p++;
@@ -580,7 +591,7 @@ readin(char *name, struct diff **dd)
 		(*dd)[i].new.from = (*dd)[i-1].new.to;
 	}
 
-	(void)fclose(fp[0]);
+	(void)fclose(d3s->fp[0]);
 
 	return (i);
 }
@@ -644,21 +655,21 @@ get_line(FILE *b, size_t *n)
 }
 
 static int
-merge(size_t m1, size_t m2)
+merge(size_t m1, size_t m2, struct diff3_state *d3s)
 {
 	struct diff *d1, *d2, *d3;
 	int dpl, j, t1, t2;
 
-	d1 = d13;
-	d2 = d23;
+	d1 = d3s->d13;
+	d2 = d3s->d23;
 	j = 0;
 	for (;;) {
-		t1 = (d1 < d13 + m1);
-		t2 = (d2 < d23 + m2);
+		t1 = (d1 < d3s->d13 + m1);
+		t2 = (d2 < d3s->d23 + m2);
 		if (!t1 && !t2)
 			break;
 
-		if (debug) {
+		if (d3s->debug) {
 			printf("%d,%d=%d,%d %d,%d=%d,%d\n",
 			d1->old.from, d1->old.to,
 			d1->new.from, d1->new.to,
@@ -669,11 +680,11 @@ merge(size_t m1, size_t m2)
 		/* first file is different from others */
 		if (!t2 || (t1 && d1->new.to < d2->new.from)) {
 			/* stuff peculiar to 1st file */
-			if (eflag==0) {
+			if (d3s->eflag == 0) {
 				separate("1");
-				change(1, &d1->old, 0);
-				keep(2, &d1->new);
-				change(3, &d1->new, 0);
+				change(1, &d1->old, 0, d3s);
+				keep(2, &d1->new, d3s);
+				change(3, &d1->new, 0, d3s);
 			}
 			d1++;
 			continue;
@@ -681,11 +692,11 @@ merge(size_t m1, size_t m2)
 
 		/* second file is different from others */
 		if (!t1 || (t2 && d2->new.to < d1->new.from)) {
-			if (eflag==0) {
+			if (d3s->eflag == 0) {
 				separate("2");
-				keep(1, &d2->new);
-				change(2, &d2->old, 0);
-				change(3, &d2->new, 0);
+				keep(1, &d2->new, d3s);
+				change(2, &d2->old, 0, d3s);
+				change(3, &d2->new, 0, d3s);
 			}
 			d2++;
 			continue;
@@ -695,7 +706,7 @@ merge(size_t m1, size_t m2)
 		 * Merge overlapping changes in first file
 		 * this happens after extension (see below).
 		 */
-		if (d1 + 1 < d13 + m1 && d1->new.to >= d1[1].new.from) {
+		if (d1 + 1 < d3s->d13 + m1 && d1->new.to >= d1[1].new.from) {
 			d1[1].old.from = d1->old.from;
 			d1[1].new.from = d1->new.from;
 			d1++;
@@ -703,7 +714,7 @@ merge(size_t m1, size_t m2)
 		}
 
 		/* merge overlapping changes in second */
-		if (d2 + 1 < d23 + m2 && d2->new.to >= d2[1].new.from) {
+		if (d2 + 1 < d3s->d23 + m2 && d2->new.to >= d2[1].new.from) {
 			d2[1].old.from = d2->old.from;
 			d2[1].new.from = d2->new.from;
 			d2++;
@@ -711,7 +722,7 @@ merge(size_t m1, size_t m2)
 		}
 		/* stuff peculiar to third file or different in all */
 		if (d1->new.from == d2->new.from && d1->new.to == d2->new.to) {
-			dpl = duplicate(&d1->old,&d2->old);
+			dpl = duplicate(&d1->old, &d2->old, d3s);
 			if (dpl == -1)
 				return (-1);
 
@@ -719,14 +730,14 @@ merge(size_t m1, size_t m2)
 			 * dpl = 0 means all files differ
 			 * dpl = 1 means files 1 and 2 identical
 			 */
-			if (eflag==0) {
+			if (d3s->eflag == 0) {
 				separate(dpl ? "3" : "");
-				change(1, &d1->old, dpl);
-				change(2, &d2->old, 0);
+				change(1, &d1->old, dpl, d3s);
+				change(2, &d2->old, 0, d3s);
 				d3 = d1->old.to > d1->old.from ? d1 : d2;
-				change(3, &d3->new, 0);
+				change(3, &d3->new, 0, d3s);
 			} else
-				j = edit(d1, dpl, j);
+				j = edit(d1, dpl, j, d3s);
 			d1++;
 			d2++;
 			continue;
@@ -752,7 +763,7 @@ merge(size_t m1, size_t m2)
 		}
 	}
 
-	return (edscript(j));
+	return (edscript(j, d3s));
 }
 
 static void
@@ -767,16 +778,16 @@ separate(const char *s)
  * printed later.
  */
 static void
-change(int i, struct range *rold, int fdup)
+change(int i, struct range *rold, int fdup, struct diff3_state *d3s)
 {
 	diff_output("%d:", i);
-	last[i] = rold->to;
+	d3s->last[i] = rold->to;
 	prange(rold);
-	if (fdup || debug)
+	if (fdup || d3s->debug)
 		return;
 	i--;
-	(void)skip(i, rold->from, NULL);
-	(void)skip(i, rold->to, "  ");
+	(void)skip(i, rold->from, NULL, d3s);
+	(void)skip(i, rold->to, "  ", d3s);
 }
 
 /*
@@ -801,15 +812,15 @@ prange(struct range *rold)
  * correspond to the change reported in the other file.
  */
 static void
-keep(int i, struct range *rnew)
+keep(int i, struct range *rnew, struct diff3_state *d3s)
 {
 	int delta;
 	struct range trange;
 
-	delta = last[3] - last[i];
+	delta = d3s->last[3] - d3s->last[i];
 	trange.from = rnew->from - delta;
 	trange.to = rnew->to - delta;
-	change(i, &trange, 1);
+	change(i, &trange, 1, d3s);
 }
 
 /*
@@ -817,17 +828,17 @@ keep(int i, struct range *rnew)
  * print all skipped stuff with string pr as a prefix.
  */
 static int
-skip(int i, int from, char *pr)
+skip(int i, int from, char *pr, struct diff3_state *d3s)
 {
 	size_t j, n;
 	char *line;
 
-	for (n = 0; cline[i] < from - 1; n += j) {
-		if ((line = get_line(fp[i], &j)) == NULL)
+	for (n = 0; d3s->cline[i] < from - 1; n += j) {
+		if ((line = get_line(d3s->fp[i], &j)) == NULL)
 			return (-1);
 		if (pr != NULL)
 			diff_output("%s%s", pr, line);
-		cline[i]++;
+		d3s->cline[i]++;
 	}
 	return ((int) n);
 }
@@ -837,7 +848,7 @@ skip(int i, int from, char *pr)
  * the same data as the new range (in file 2).
  */
 static int
-duplicate(struct range *r1, struct range *r2)
+duplicate(struct range *r1, struct range *r2, struct diff3_state *d3s)
 {
 	int c,d;
 	int nchar;
@@ -845,121 +856,125 @@ duplicate(struct range *r1, struct range *r2)
 
 	if (r1->to-r1->from != r2->to-r2->from)
 		return (0);
-	(void)skip(0, r1->from, NULL);
-	(void)skip(1, r2->from, NULL);
+	(void)skip(0, r1->from, NULL, d3s);
+	(void)skip(1, r2->from, NULL, d3s);
 	nchar = 0;
 	for (nline=0; nline < r1->to - r1->from; nline++) {
 		do {
-			c = getc(fp[0]);
-			d = getc(fp[1]);
+			c = getc(d3s->fp[0]);
+			d = getc(d3s->fp[1]);
 			if (c == -1 || d== -1)
 				return (-1);
 			nchar++;
 			if (c != d) {
-				repos(nchar);
+				repos(nchar, d3s);
 				return (0);
 			}
 		} while (c != '\n');
 	}
-	repos(nchar);
+	repos(nchar, d3s);
 	return (1);
 }
 
 static void
-repos(int nchar)
+repos(int nchar, struct diff3_state *d3s)
 {
 	int i;
 
 	for (i = 0; i < 2; i++)
-		(void)fseek(fp[i], (long)-nchar, SEEK_CUR);
+		(void)fseek(d3s->fp[i], (long)-nchar, SEEK_CUR);
 }
 
 /*
  * collect an editing script for later regurgitation
  */
 static int
-edit(struct diff *diff, int fdup, int j)
+edit(struct diff *diff, int fdup, int j, struct diff3_state *d3s)
 {
-	if (((fdup + 1) & eflag) == 0)
+	if (((fdup + 1) & d3s->eflag) == 0)
 		return (j);
 	j++;
-	overlap[j] = !fdup;
+	d3s->overlap[j] = !fdup;
 	if (!fdup)
-		overlapcnt++;
-	de[j].old.from = diff->old.from;
-	de[j].old.to = diff->old.to;
-	de[j].new.from = de[j-1].new.to + skip(2, diff->new.from, NULL);
-	de[j].new.to = de[j].new.from + skip(2, diff->new.to, NULL);
+		d3s->overlapcnt++;
+	d3s->de[j].old.from = diff->old.from;
+	d3s->de[j].old.to = diff->old.to;
+	d3s->de[j].new.from =
+	    d3s->de[j-1].new.to + skip(2, diff->new.from, NULL, d3s);
+	d3s->de[j].new.to =
+	    d3s->de[j].new.from + skip(2, diff->new.to, NULL, d3s);
 	return (j);
 }
 
 /* regurgitate */
 static int
-edscript(int n)
+edscript(int n, struct diff3_state *d3s)
 {
 	int j, k;
 	char block[BUFSIZ+1];
 
 	for (; n > 0; n--) {
-		if (!oflag || !overlap[n])
-			prange(&de[n].old);
+		if (!d3s->oflag || !d3s->overlap[n])
+			prange(&d3s->de[n].old);
 		else
-			diff_output("%da\n=======\n", de[n].old.to -1);
-		(void)fseek(fp[2], (long)de[n].new.from, SEEK_SET);
-		for (k = de[n].new.to-de[n].new.from; k > 0; k-= j) {
+			diff_output("%da\n=======\n", d3s->de[n].old.to -1);
+		(void)fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET);
+		k = d3s->de[n].new.to - d3s->de[n].new.from;
+		for (; k > 0; k-= j) {
 			j = k > BUFSIZ ? BUFSIZ : k;
-			if (fread(block, 1, j, fp[2]) != (size_t)j)
+			if (fread(block, 1, j, d3s->fp[2]) != (size_t)j)
 				return (-1);
 			block[j] = '\0';
 			diff_output("%s", block);
 		}
 
-		if (!oflag || !overlap[n])
+		if (!d3s->oflag || !d3s->overlap[n])
 			diff_output(".\n");
 		else {
-			diff_output("%s\n.\n", f3mark);
-			diff_output("%da\n%s\n.\n", de[n].old.from - 1, f1mark);
+			diff_output("%s\n.\n", d3s->f3mark);
+			diff_output("%da\n%s\n.\n", d3s->de[n].old.from - 1,
+			    d3s->f1mark);
 		}
 	}
 
-	return (overlapcnt);
+	return (d3s->overlapcnt);
 }
 
 static const struct got_error *
-increase(void)
+increase(struct diff3_state *d3s)
 {
 	size_t newsz, incr;
 	struct diff *d;
 	char *s;
 
 	/* are the memset(3) calls needed? */
-	newsz = szchanges == 0 ? 64 : 2 * szchanges;
-	incr = newsz - szchanges;
+	newsz = d3s->szchanges == 0 ? 64 : 2 * d3s->szchanges;
+	incr = newsz - d3s->szchanges;
 
-	d = reallocarray(d13, newsz, sizeof(*d13));
+	d = reallocarray(d3s->d13, newsz, sizeof(*d3s->d13));
 	if (d == NULL)
 		return got_error_from_errno();
-	d13 = d;
-	memset(d13 + szchanges, 0, incr * sizeof(*d13));
+	d3s->d13 = d;
+	memset(d3s->d13 + d3s->szchanges, 0, incr * sizeof(*d3s->d13));
 
-	d = reallocarray(d23, newsz, sizeof(*d23));
+	d = reallocarray(d3s->d23, newsz, sizeof(*d3s->d23));
 	if (d == NULL)
 		return got_error_from_errno();
-	d23 = d;
-	memset(d23 + szchanges, 0, incr * sizeof(*d23));
+	d3s->d23 = d;
+	memset(d3s->d23 + d3s->szchanges, 0, incr * sizeof(*d3s->d23));
 
-	d = reallocarray(de, newsz, sizeof(*de));
+	d = reallocarray(d3s->de, newsz, sizeof(*d3s->de));
 	if (d == NULL)
 		return got_error_from_errno();
-	de = d;
-	memset(de + szchanges, 0, incr * sizeof(*de));
+	d3s->de = d;
+	memset(d3s->de + d3s->szchanges, 0, incr * sizeof(*d3s->de));
 
-	s = reallocarray(overlap, newsz, sizeof(*overlap));
+	s = reallocarray(d3s->overlap, newsz, sizeof(*d3s->overlap));
 	if (s == NULL)
 		return got_error_from_errno();
-	overlap = s;
-	memset(overlap + szchanges, 0, incr * sizeof(*overlap));
-	szchanges = newsz;
+	d3s->overlap = s;
+	memset(d3s->overlap + d3s->szchanges, 0, incr * sizeof(*d3s->overlap));
+	d3s->szchanges = newsz;
 
 	return NULL;
 }
