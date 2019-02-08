@@ -160,7 +160,8 @@ static int edit(struct diff *, int, int, struct diff3_state *);
 static char *getchange(FILE *, struct diff3_state *);
 static char *get_line(FILE *, size_t *, struct diff3_state *);
 static int number(char **);
-static ssize_t readin(char *, struct diff **, struct diff3_state *);
+static const struct got_error *readin(size_t *, char *, struct diff **,
+    struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
 static int skip(int, int, char *, struct diff3_state *);
 static int edscript(int, struct diff3_state *);
@@ -428,10 +429,13 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 	err = increase(d3s);
 	if (err)
 		return err;
-	if ((m = readin(dp13, &d3s->d13, d3s)) < 0)
-		return got_error_from_errno();
-	if ((n = readin(dp23, &d3s->d23, d3s)) < 0)
-		return got_error_from_errno();
+
+	err = readin(&m, dp13, &d3s->d13, d3s);
+	if (err)
+		return err;
+	err = readin(&n, dp23, &d3s->d23, d3s);
+	if (err)
+		return err;
 
 	if ((d3s->fp[0] = fopen(path1, "r")) == NULL)
 		return got_error_from_errno();
@@ -562,19 +566,23 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
  * since the vector is processed in one sequential pass.
  * The vector could be optimized out of existence)
  */
-static ssize_t
-readin(char *name, struct diff **dd, struct diff3_state *d3s)
+static const struct got_error *
+readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	int a, b, c, d;
 	char kind, *p;
 	size_t i;
 
 	d3s->fp[0] = fopen(name, "r");
 	if (d3s->fp[0] == NULL)
-		return (-1);
+		return got_error_from_errno();
 	for (i = 0; (p = getchange(d3s->fp[0], d3s)); i++) {
-		if (i >= d3s->szchanges - 1)
-			increase(d3s); /* XXX check error! */
+		if (i >= d3s->szchanges - 1) {
+			err = increase(d3s);
+			if (err)
+				return err;
+		}
 		a = b = number(&p);
 		if (*p == ',') {
 			p++;
@@ -605,7 +613,7 @@ readin(char *name, struct diff **dd, struct diff3_state *d3s)
 
 	(void)fclose(d3s->fp[0]);
 
-	return (i);
+	return NULL;
 }
 
 static int
