@@ -963,7 +963,7 @@ print_diff(void *arg, unsigned char status, const char *path,
 	char *abspath = NULL;
 	struct stat sb;
 
-	if (status != GOT_STATUS_MODIFIY)
+	if (status != GOT_STATUS_MODIFY)
 		return NULL;
 
 	err = got_object_open_as_blob(&blob1, a->repo, id, 8192);

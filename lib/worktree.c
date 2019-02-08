@@ -839,20 +839,20 @@ get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
 		flen = fread(fbuf, 1, sizeof(fbuf), f);
 		if (blen == 0) {
 			if (flen != 0)
-				*status = GOT_STATUS_MODIFIY;
+				*status = GOT_STATUS_MODIFY;
 			break;
 		} else if (flen == 0) {
 			if (blen != 0)
-				*status = GOT_STATUS_MODIFIY;
+				*status = GOT_STATUS_MODIFY;
 			break;
 		} else if (blen - hdrlen == flen) {
 			/* Skip blob object header first time around. */
 			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
-				*status = GOT_STATUS_MODIFIY;
+				*status = GOT_STATUS_MODIFY;
 				break;
 			}
 		} else {
-			*status = GOT_STATUS_MODIFIY;
+			*status = GOT_STATUS_MODIFY;
 			break;
 		}
 		hdrlen = 0;
@@ -905,7 +905,7 @@ update_blob(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (status == GOT_STATUS_MODIFIY)
+	if (status == GOT_STATUS_MODIFY)
 		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
 		    blob, repo, progress_cb, progress_arg);
 	else
