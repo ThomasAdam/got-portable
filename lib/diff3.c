@@ -170,7 +170,8 @@ static void repos(int, struct diff3_state *);
 static void separate(const char *, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
-    char *, char *, const char *, const char *, struct diff3_state *);
+    char *, char *, const char *, const char *, struct diff3_state *,
+    const char *, const char *);
 
 static const struct got_error *
 diff_output(BUF *diffbuf, const char *fmt, ...)
@@ -213,7 +214,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		goto done;
 	}
 
-	err = got_opentemp_named(&outpath, &outfile, "/tmp/got-diff");
+	err = got_opentemp_named(&outpath, &outfile, "/tmp/got-diffreg");
 	if (err)
 		goto done;
 
@@ -239,11 +240,16 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	if (err)
 		goto done;
 
+	fflush(outfile);
+
 	*d = buf_load(outpath);
 	if (*d == NULL)
 		err = got_error_from_errno();
 done:
-	free(outpath);
+	if (outpath) {
+		unlink(outpath);
+		free(outpath);
+	}
 	if (outfile)
 		fclose(outfile);
 	if (f1)
@@ -257,7 +263,8 @@ done:
  * For merge(1).
  */
 const struct got_error *
-got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3)
+got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3,
+    const char *label1, const char *label3)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -352,8 +359,8 @@ got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3)
 	d2 = NULL;
 
 	d3s->diffbuf = diffb;
-	err = diff3_internal(dp13, dp23, path1, path2, path3, p1, p3,
-	    d3s);
+	err = diff3_internal(dp13, dp23, path1, path2, path3,
+	    label1, label3, d3s, label1, label3);
 	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
@@ -403,17 +410,18 @@ out:
 
 static const struct got_error *
 diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
-    const char *fmark, const char *rmark, struct diff3_state *d3s)
+    const char *fmark, const char *rmark, struct diff3_state *d3s,
+    const char *label1, const char *label3)
 {
 	const struct got_error *err = NULL;
 	ssize_t m, n;
 	int i;
 
-	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark), "<<<<<<< %s", fmark);
+	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark), "<<<<<<< %s", label1);
 	if (i < 0 || i >= (int)sizeof(d3s->f1mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark), ">>>>>>> %s", rmark);
+	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark), ">>>>>>> %s", label3);
 	if (i < 0 || i >= (int)sizeof(d3s->f3mark))
 		return got_error(GOT_ERR_NO_SPACE);
 

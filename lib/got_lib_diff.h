@@ -141,4 +141,4 @@ const struct got_error *got_diff_blob_lines_changed(struct got_diff_changes **,
 void got_diff_free_changes(struct got_diff_changes *);
 
 const struct got_error *got_merge_diff3(int, const char *, const char *,
-    const char *);
+    const char *, const char *, const char *);
