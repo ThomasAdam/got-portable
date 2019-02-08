@@ -23,6 +23,8 @@ struct got_worktree;
 #define GOT_STATUS_UPDATE	'U'
 #define GOT_STATUS_DELETE	'D'
 #define GOT_STATUS_MODIFIY	'M'
+#define GOT_STATUS_CONFLICT	'C'
+#define GOT_STATUS_MERGE	'G'
 #define GOT_STATUS_MISSING	'!'
 #define GOT_STATUS_UNVERSIONED	'?'
 #define GOT_STATUS_OBSTRUCTED	'~'

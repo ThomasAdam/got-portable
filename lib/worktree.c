@@ -46,6 +46,7 @@
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
+#include "got_lib_diff.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -596,22 +597,111 @@ done:
 	return err;
 }
 
+/*
+ * Perform a 3-way merge where the file's version in the file index (blob2)
+ * acts as the common ancestor, the incoming blob (blob1) acts as the first
+ * derived version, and the file on disk acts as the second derived version.
+ */
+static const struct got_error *
+merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
+   struct got_fileindex_entry *ie, const char *ondisk_path, const char *path,
+   struct got_blob_object *blob1, struct got_repository *repo,
+   got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	int merged_fd = -1;
+	struct got_blob_object *blob2 = NULL;
+	FILE *f1 = NULL, *f2 = NULL;
+	char *blob1_path = NULL, *blob2_path = NULL;
+	char *merged_path = NULL;
+	struct got_object_id id2;
+	char *id_str = NULL;
+	char *label1 = NULL;
+	int overlapcnt = 0;
+
+	err = got_opentemp_named_fd(&merged_path, &merged_fd, "/tmp/got-merged");
+	if (err)
+		return err;
+	err = got_opentemp_named(&blob1_path, &f1, "/tmp/got-merge-blob1");
+	if (err)
+		goto done;
+	err = got_object_blob_dump_to_file(NULL, NULL, f1, blob1);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named(&blob2_path, &f2, "/tmp/got-merge-blob2");
+	if (err)
+		goto done;
+
+	memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
+	if (err)
+		goto done;
+	err = got_object_blob_dump_to_file(NULL, NULL, f2, blob2);
+	if (err)
+		goto done;
+
+	err = got_object_id_str(&id_str, worktree->base_commit_id);
+	if (err)
+		goto done;
+	if (asprintf(&label1, "commit %s", id_str) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_merge_diff3(&overlapcnt, merged_fd, blob1_path,
+	    blob2_path, ondisk_path, label1, path);
+	if (err)
+		goto done;
+
+	(*progress_cb)(progress_arg,
+	    overlapcnt > 0 ? GOT_STATUS_CONFLICT : GOT_STATUS_MERGE, path);
+
+
+	fsync(merged_fd);
+
+	if (rename(merged_path, ondisk_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_fileindex_entry_update(ie, ondisk_path,
+	    blob1->id.sha1, worktree->base_commit_id->sha1);
+done:
+	if (merged_fd != -1)
+		close(merged_fd);
+	if (f1)
+		fclose(f1);
+	if (f2)
+		fclose(f2);
+	if (blob2)
+		got_object_blob_close(blob2);
+	free(merged_path);
+	if (blob1_path) {
+		unlink(blob1_path);
+		free(blob1_path);
+	}
+	if (blob2_path) {
+		unlink(blob2_path);
+		free(blob2_path);
+	}
+	free(id_str);
+	free(label1);
+	return err;
+}
+
 static const struct got_error *
 install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
-   struct got_fileindex_entry *entry, const char *path,
+   struct got_fileindex_entry *entry, const char *ondisk_path, const char *path,
    struct got_blob_object *blob,
    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
    void *progress_arg)
 {
 	const struct got_error *err = NULL;
-	char *ondisk_path;
 	int fd = -1;
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
-
-	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
-		return got_error_from_errno();
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -695,8 +785,83 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 done:
 	if (fd != -1)
 		close(fd);
-	free(ondisk_path);
 	free(tmppath);
+	return err;
+}
+
+static const struct got_error *
+get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
+    const char *abspath, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id id;
+	size_t hdrlen;
+	FILE *f = NULL;
+	uint8_t fbuf[8192];
+	struct got_blob_object *blob = NULL;
+	size_t flen, blen;
+	struct stat sb;
+
+	*status = GOT_STATUS_NO_CHANGE;
+
+	if (lstat(abspath, &sb) == -1)
+		return got_error_from_errno();
+
+	if (!S_ISREG(sb.st_mode)) {
+		*status = GOT_STATUS_OBSTRUCTED;
+		return NULL;
+	}
+
+	if (ie->ctime_sec == sb.st_ctime &&
+	    ie->ctime_nsec == sb.st_ctimensec &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_sec == sb.st_mtime &&
+	    ie->mtime_nsec == sb.st_mtimensec &&
+	    ie->size == (sb.st_size & 0xffffffff))
+		return NULL;
+
+	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
+	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
+	if (err)
+		return err;
+
+	f = fopen(abspath, "r");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	while (1) {
+		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
+		err = got_object_blob_read_block(&blen, blob);
+		if (err)
+			break;
+		flen = fread(fbuf, 1, sizeof(fbuf), f);
+		if (blen == 0) {
+			if (flen != 0)
+				*status = GOT_STATUS_MODIFIY;
+			break;
+		} else if (flen == 0) {
+			if (blen != 0)
+				*status = GOT_STATUS_MODIFIY;
+			break;
+		} else if (blen - hdrlen == flen) {
+			/* Skip blob object header first time around. */
+			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
+				*status = GOT_STATUS_MODIFIY;
+				break;
+			}
+		} else {
+			*status = GOT_STATUS_MODIFIY;
+			break;
+		}
+		hdrlen = 0;
+	}
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (f)
+		fclose(f);
 	return err;
 }
 
@@ -709,26 +874,47 @@ update_blob(struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
+	char *ondisk_path;
+	unsigned char status = GOT_STATUS_NO_CHANGE;
+
+	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
+		return got_error_from_errno();
 
 	if (ie) {
 		if (memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
 			    path);
-			return NULL;
+			goto done;
 		}
 		if (memcmp(ie->blob_sha1,
 		    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
-			return NULL;
+			goto done;
+
+		err = get_file_status(&status, ie, ondisk_path, repo);
+		if (err)
+			goto done;
+
+		if (status == GOT_STATUS_OBSTRUCTED) {
+			(*progress_cb)(progress_arg, status, path);
+			goto done;
+		}
 	}
 
 	err = got_object_open_as_blob(&blob, repo, te->id, 8192);
 	if (err)
-		return err;
+		goto done;
 
-	err = install_blob(worktree, fileindex, ie, path, blob, repo,
-	    progress_cb, progress_arg);
+	if (status == GOT_STATUS_MODIFIY)
+		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
+		    blob, repo, progress_cb, progress_arg);
+	else
+		err = install_blob(worktree, fileindex, ie, ondisk_path, path,
+		    blob, repo, progress_cb, progress_arg);
+
 	got_object_blob_close(blob);
+done:
+	free(ondisk_path);
 	return err;
 }
 
@@ -942,82 +1128,6 @@ struct diff_dir_cb_arg {
     got_worktree_cancel_cb cancel_cb;
     void *cancel_arg;
 };
-
-static const struct got_error *
-get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
-    const char *abspath, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_object_id id;
-	size_t hdrlen;
-	FILE *f = NULL;
-	uint8_t fbuf[8192];
-	struct got_blob_object *blob = NULL;
-	size_t flen, blen;
-	struct stat sb;
-
-	*status = GOT_STATUS_NO_CHANGE;
-
-	if (lstat(abspath, &sb) == -1)
-		return got_error_from_errno();
-
-	if (!S_ISREG(sb.st_mode)) {
-		*status = GOT_STATUS_OBSTRUCTED;
-		return NULL;
-	}
-
-	if (ie->ctime_sec == sb.st_ctime &&
-	    ie->ctime_nsec == sb.st_ctimensec &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_nsec == sb.st_mtimensec &&
-	    ie->size == (sb.st_size & 0xffffffff))
-		return NULL;
-
-	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
-	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
-	if (err)
-		return err;
-
-	f = fopen(abspath, "r");
-	if (f == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	hdrlen = got_object_blob_get_hdrlen(blob);
-	while (1) {
-		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
-		err = got_object_blob_read_block(&blen, blob);
-		if (err)
-			break;
-		flen = fread(fbuf, 1, sizeof(fbuf), f);
-		if (blen == 0) {
-			if (flen != 0)
-				*status = GOT_STATUS_MODIFIY;
-			break;
-		} else if (flen == 0) {
-			if (blen != 0)
-				*status = GOT_STATUS_MODIFIY;
-			break;
-		} else if (blen - hdrlen == flen) {
-			/* Skip blob object header first time around. */
-			if (memcmp(bbuf + hdrlen, fbuf, flen) != 0) {
-				*status = GOT_STATUS_MODIFIY;
-				break;
-			}
-		} else {
-			*status = GOT_STATUS_MODIFIY;
-			break;
-		}
-		hdrlen = 0;
-	}
-done:
-	if (blob)
-		got_object_blob_close(blob);
-	if (f)
-		fclose(f);
-	return err;
-}
 
 static const struct got_error *
 status_old_new(void *arg, struct got_fileindex_entry *ie,

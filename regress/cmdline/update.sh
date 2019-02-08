@@ -608,6 +608,80 @@ function test_update_file_in_subsubdir {
 	test_done "$testroot" "0"
 }
 
+function test_update_merges_file_edits {
+	local testroot=`test_init update_merges_file_edits`
+
+	echo "1" > $testroot/repo/numbers
+	echo "2" >> $testroot/repo/numbers
+	echo "3" >> $testroot/repo/numbers
+	echo "4" >> $testroot/repo/numbers
+	echo "5" >> $testroot/repo/numbers
+	echo "6" >> $testroot/repo/numbers
+	echo "7" >> $testroot/repo/numbers
+	echo "8" >> $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	if [ "$?" != "0" ]; then
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	echo "modified beta" > $testroot/repo/beta
+	sed -i 's/2/22/' $testroot/repo/numbers
+	git_commit $testroot/repo -m "modified 3 files"
+
+	echo "modified alpha, too" > $testroot/wt/alpha
+	touch $testroot/wt/beta
+	sed -i 's/7/77/' $testroot/wt/numbers
+
+	echo "C  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo "G  numbers" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	if [ "$?" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$?"
+		return 1
+	fi
+
+	echo -n "<<<<<<< commit " > $testroot/content.expected
+	git_show_head $testroot/repo >> $testroot/content.expected
+	echo >> $testroot/content.expected
+	echo "modified alpha" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "modified alpha, too" >> $testroot/content.expected
+	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo "modified beta" >> $testroot/content.expected
+	echo "1" >> $testroot/content.expected
+	echo "22" >> $testroot/content.expected
+	echo "3" >> $testroot/content.expected
+	echo "4" >> $testroot/content.expected
+	echo "5" >> $testroot/content.expected
+	echo "6" >> $testroot/content.expected
+	echo "77" >> $testroot/content.expected
+	echo "8" >> $testroot/content.expected
+
+	cat $testroot/wt/alpha > $testroot/content
+	cat $testroot/wt/beta >> $testroot/content
+	cat $testroot/wt/numbers >> $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -621,3 +695,4 @@ run_test test_update_moves_files_to_new_dir
 run_test test_update_creates_missing_parent
 run_test test_update_creates_missing_parent_with_subdir
 run_test test_update_file_in_subsubdir
+run_test test_update_merges_file_edits
