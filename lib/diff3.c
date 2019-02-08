@@ -64,16 +64,30 @@
  *	@(#)diff3.c	8.1 (Berkeley) 6/6/93
  */
 
+#include <sys/stat.h>
+#include <sys/queue.h>
+
 #include <ctype.h>
-#include <err.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "diff.h"
-#include "rcsprog.h"
+#include "got_error.h"
+#include "got_opentemp.h"
+#include "got_object.h"
+
+#include "buf.h"
+#include "rcsutil.h"
+#include "got_lib_diff.h"
+#include "worklist.h"
+
+/* flags shared between merge(1) and rcsmerge(1) */
+#define MERGE_EFLAG     (1<<16)
+#define MERGE_OFLAG     (1<<17)
 
 /* diff3 - 3-way differential file comparison */
 
@@ -119,6 +133,8 @@ static int overlapcnt = 0;
 static FILE *fp[3];
 static int cline[3];		/* # of the last-read line in each file (0-2) */
 
+static BUF *diffbuf;
+
 /*
  * the latest known correspondence between line numbers of the 3 files
  * is stored in last[1-3];
@@ -135,6 +151,7 @@ static char *getchange(FILE *);
 static char *get_line(FILE *, size_t *);
 static int number(char **);
 static ssize_t readin(char *, struct diff **);
+static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
 static int skip(int, int, char *);
 static int edscript(int);
 static int merge(size_t, size_t);
@@ -143,22 +160,110 @@ static void keep(int, struct range *);
 static void prange(struct range *);
 static void repos(int);
 static void separate(const char *);
-static void increase(void);
-static int diff3_internal(int, char **, const char *, const char *);
+static const struct got_error *increase(void);
+static const struct got_error *diff3_internal(char *, char *, char *,
+    char *, char *, const char *, const char *);
 
 int diff3_conflicts = 0;
+
+static const struct got_error *
+diff_output(const char *fmt, ...)
+{
+	va_list vap;
+	int i;
+	char *str;
+	size_t newsize;
+
+	va_start(vap, fmt);
+	i = vasprintf(&str, fmt, vap);
+	va_end(vap);
+	if (i == -1)
+		return got_error_from_errno();
+	if (diffbuf != NULL)
+		buf_append(&newsize, diffbuf, str, strlen(str));
+	else
+		printf("%s", str);
+	free(str);
+	return NULL;
+}
+
+static const struct got_error*
+diffreg(BUF **d, const char *path1, const char *path2)
+{
+	const struct got_error *err = NULL;
+	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
+	char *outpath = NULL;
+	struct got_diff_state ds;
+	struct got_diff_args args;
+	int res;
+
+	*d = NULL;
+
+	f1 = fopen(path1, "r");
+	if (f1 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	f2 = fopen(path2, "r");
+	if (f1 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_opentemp_named(&outpath, &outfile, "/tmp/got-diff");
+	if (err)
+		goto done;
+
+	memset(&ds, 0, sizeof(ds));
+	/* XXX should stat buffers be passed in args instead of ds? */
+	if (stat(path1, &ds.stb1) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (stat(path2, &ds.stb2) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	memset(&args, 0, sizeof(args));
+	args.diff_format = D_NORMAL;
+	args.label[0] = "";
+	args.label[1] = "";
+	args.diff_context = 0;
+
+	err = got_diffreg(&res, f1, f2, D_FORCEASCII, &args, &ds,
+	    outfile, NULL);
+	if (err)
+		goto done;
+
+	*d = buf_load(outpath);
+	if (*d == NULL)
+		err = got_error_from_errno();
+done:
+	free(outpath);
+	if (outfile)
+		fclose(outfile);
+	if (f1)
+		fclose(f1);
+	if (f2)
+		fclose(f2);
+	return err;
+}
 
 /*
  * For merge(1).
  */
-BUF *
-merge_diff3(char **av, int flags)
+const struct got_error *
+merge_diff3(BUF **buf, char **av, int flags)
 {
-	int argc;
-	char *argv[5], *dp13, *dp23, *path1, *path2, *path3;
+	const struct got_error *err = NULL;
+	char *dp13, *dp23, *path1, *path2, *path3;
 	BUF *b1, *b2, *b3, *d1, *d2, *diffb;
 	u_char *data, *patch;
 	size_t dlen, plen;
+	struct wklhead temp_files;
+
+	*buf = NULL;
 
 	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
@@ -174,50 +279,73 @@ merge_diff3(char **av, int flags)
 	if ((b3 = buf_load(av[2])) == NULL)
 		goto out;
 
-	d1 = buf_alloc(128);
-	d2 = buf_alloc(128);
 	diffb = buf_alloc(128);
 
-	(void)xasprintf(&path1, "%s/diff1.XXXXXXXXXX", rcs_tmpdir);
-	(void)xasprintf(&path2, "%s/diff2.XXXXXXXXXX", rcs_tmpdir);
-	(void)xasprintf(&path3, "%s/diff3.XXXXXXXXXX", rcs_tmpdir);
+	if (asprintf(&path1, "/tmp/got-diff1.XXXXXXXX") == -1) {
+		err = got_error_from_errno();
+		goto out;
+	}
+	if (asprintf(&path2, "/tmp/got-diff2.XXXXXXXX") == -1) {
+		err = got_error_from_errno();
+		goto out;
+	}
+	if (asprintf(&path3, "/tmp/got-diff3.XXXXXXXX") == -1) {
+		err = got_error_from_errno();
+		goto out;
+	}
 
-	buf_write_stmp(b1, path1);
-	buf_write_stmp(b2, path2);
-	buf_write_stmp(b3, path3);
+	err = buf_write_stmp(b1, path1, &temp_files);
+	if (err)
+		goto out;
+	err = buf_write_stmp(b2, path2, &temp_files);
+	if (err)
+		goto out;
+	err = buf_write_stmp(b3, path3, &temp_files);
+	if (err)
+		goto out;
 
 	buf_free(b2);
 	b2 = NULL;
 
-	if ((diffreg(path1, path3, d1, D_FORCEASCII) == D_ERROR) ||
-	    (diffreg(path2, path3, d2, D_FORCEASCII) == D_ERROR)) {
+	err = diffreg(&d1, path1, path3);
+	if (err) {
+		buf_free(diffb);
+		diffb = NULL;
+		goto out;
+
+	}
+	err = diffreg(&d2, path2, path3);
+	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
 		goto out;
 	}
 
-	(void)xasprintf(&dp13, "%s/d13.XXXXXXXXXX", rcs_tmpdir);
-	buf_write_stmp(d1, dp13);
+	if (asprintf(&dp13, "/tmp/got-d13.XXXXXXXXXX") == -1) {
+		err = got_error_from_errno();
+		goto out;
+	}
+	err = buf_write_stmp(d1, dp13, &temp_files);
+	if (err)
+		goto out;
 
 	buf_free(d1);
 	d1 = NULL;
 
-	(void)xasprintf(&dp23, "%s/d23.XXXXXXXXXX", rcs_tmpdir);
-	buf_write_stmp(d2, dp23);
+	if (asprintf(&dp23, "/tmp/got-d23.XXXXXXXXXX") == -1) {
+		err = got_error_from_errno();
+		goto out;
+	}
+	err = buf_write_stmp(d2, dp23, &temp_files);
+	if (err)
+		goto out;
 
 	buf_free(d2);
 	d2 = NULL;
 
-	argc = 0;
 	diffbuf = diffb;
-	argv[argc++] = dp13;
-	argv[argc++] = dp23;
-	argv[argc++] = path1;
-	argv[argc++] = path2;
-	argv[argc++] = path3;
-
-	diff3_conflicts = diff3_internal(argc, argv, av[0], av[2]);
-	if (diff3_conflicts < 0) {
+	err = diff3_internal(dp13, dp23, path1, path2, path3, av[0], av[2]);
+	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
 		goto out;
@@ -230,10 +358,6 @@ merge_diff3(char **av, int flags)
 
 	if ((diffb = rcs_patchfile(data, dlen, patch, plen, ed_patch_lines)) == NULL)
 		goto out;
-
-	if (!(flags & QUIET) && diff3_conflicts != 0)
-		warnx("warning: overlaps or other problems during merge");
-
 out:
 	buf_free(b2);
 	buf_free(b3);
@@ -254,164 +378,51 @@ out:
 	free(data);
 	free(patch);
 
-	return (diffb);
+	worklist_clean(&temp_files, worklist_unlink);
+
+	if (err == NULL)
+		*buf = diffb;
+	return err;
 }
 
-BUF *
-rcs_diff3(RCSFILE *rf, char *workfile, RCSNUM *rev1, RCSNUM *rev2, int flags)
+static const struct got_error *
+diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
+    const char *fmark, const char *rmark)
 {
-	int argc;
-	char *argv[5], r1[RCS_REV_BUFSZ], r2[RCS_REV_BUFSZ];
-	char *dp13, *dp23, *path1, *path2, *path3;
-	BUF *b1, *b2, *b3, *d1, *d2, *diffb;
-	size_t dlen, plen;
-	u_char *data, *patch;
-
-	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
-	dp13 = dp23 = path1 = path2 = path3 = NULL;
-	data = patch = NULL;
-
-	if ((flags & MERGE_EFLAG) && !(flags & MERGE_OFLAG))
-		oflag = 0;
-
-	rcsnum_tostr(rev1, r1, sizeof(r1));
-	rcsnum_tostr(rev2, r2, sizeof(r2));
-
-	if ((b1 = buf_load(workfile)) == NULL)
-		goto out;
-
-	if (!(flags & QUIET))
-		(void)fprintf(stderr, "retrieving revision %s\n", r1);
-	if ((b2 = rcs_getrev(rf, rev1)) == NULL)
-		goto out;
-
-	if (!(flags & QUIET))
-		(void)fprintf(stderr, "retrieving revision %s\n", r2);
-	if ((b3 = rcs_getrev(rf, rev2)) == NULL)
-		goto out;
-
-	d1 = buf_alloc(128);
-	d2 = buf_alloc(128);
-	diffb = buf_alloc(128);
-
-	(void)xasprintf(&path1, "%s/diff1.XXXXXXXXXX", rcs_tmpdir);
-	(void)xasprintf(&path2, "%s/diff2.XXXXXXXXXX", rcs_tmpdir);
-	(void)xasprintf(&path3, "%s/diff3.XXXXXXXXXX", rcs_tmpdir);
-
-	buf_write_stmp(b1, path1);
-	buf_write_stmp(b2, path2);
-	buf_write_stmp(b3, path3);
-
-	buf_free(b2);
-	b2 = NULL;
-
-	if ((diffreg(path1, path3, d1, D_FORCEASCII) == D_ERROR) ||
-	    (diffreg(path2, path3, d2, D_FORCEASCII) == D_ERROR)) {
-		buf_free(diffb);
-		diffb = NULL;
-		goto out;
-	}
-
-	(void)xasprintf(&dp13, "%s/d13.XXXXXXXXXX", rcs_tmpdir);
-	buf_write_stmp(d1, dp13);
-
-	buf_free(d1);
-	d1 = NULL;
-
-	(void)xasprintf(&dp23, "%s/d23.XXXXXXXXXX", rcs_tmpdir);
-	buf_write_stmp(d2, dp23);
-
-	buf_free(d2);
-	d2 = NULL;
-
-	argc = 0;
-	diffbuf = diffb;
-	argv[argc++] = dp13;
-	argv[argc++] = dp23;
-	argv[argc++] = path1;
-	argv[argc++] = path2;
-	argv[argc++] = path3;
-
-	diff3_conflicts = diff3_internal(argc, argv, workfile, r2);
-	if (diff3_conflicts < 0) {
-		buf_free(diffb);
-		diffb = NULL;
-		goto out;
-	}
-
-	plen = buf_len(diffb);
-	patch = buf_release(diffb);
-	dlen = buf_len(b1);
-	data = buf_release(b1);
-
-	if ((diffb = rcs_patchfile(data, dlen, patch, plen, ed_patch_lines)) == NULL)
-		goto out;
-
-	if (!(flags & QUIET) && diff3_conflicts != 0)
-		warnx("warning: overlaps or other problems during merge");
-
-out:
-	buf_free(b2);
-	buf_free(b3);
-	buf_free(d1);
-	buf_free(d2);
-
-	(void)unlink(path1);
-	(void)unlink(path2);
-	(void)unlink(path3);
-	(void)unlink(dp13);
-	(void)unlink(dp23);
-
-	free(path1);
-	free(path2);
-	free(path3);
-	free(dp13);
-	free(dp23);
-	free(data);
-	free(patch);
-
-	return (diffb);
-}
-
-static int
-diff3_internal(int argc, char **argv, const char *fmark, const char *rmark)
-{
+	const struct got_error *err = NULL;
 	ssize_t m, n;
 	int i;
 
-	if (argc < 5)
-		return (-1);
+	i = snprintf(f1mark, sizeof(f1mark), "<<<<<<< %s", fmark);
+	if (i < 0 || i >= (int)sizeof(f1mark))
+		return got_error(GOT_ERR_NO_SPACE);
 
-	if (oflag) {
-		i = snprintf(f1mark, sizeof(f1mark), "<<<<<<< %s", fmark);
-		if (i < 0 || i >= (int)sizeof(f1mark))
-			errx(1, "diff3_internal: string truncated");
+	i = snprintf(f3mark, sizeof(f3mark), ">>>>>>> %s", rmark);
+	if (i < 0 || i >= (int)sizeof(f3mark))
+		return got_error(GOT_ERR_NO_SPACE);
 
-		i = snprintf(f3mark, sizeof(f3mark), ">>>>>>> %s", rmark);
-		if (i < 0 || i >= (int)sizeof(f3mark))
-			errx(1, "diff3_internal: string truncated");
-	}
+	err = increase();
+	if (err)
+		return err;
+	if ((m = readin(dp13, &d13)) < 0)
+		return got_error_from_errno();
+	if ((n = readin(dp23, &d23)) < 0)
+		return got_error_from_errno();
 
-	increase();
-	if ((m = readin(argv[0], &d13)) < 0) {
-		warn("%s", argv[0]);
-		return (-1);
-	}
-	if ((n = readin(argv[1], &d23)) < 0) {
-		warn("%s", argv[1]);
-		return (-1);
-	}
+	/* XXX LEAK: at present we never close these files! */
+	if ((fp[0] = fopen(path1, "r")) == NULL)
+		return got_error_from_errno();
+	if ((fp[1] = fopen(path2, "r")) == NULL)
+		return got_error_from_errno();
+	if ((fp[2] = fopen(path3, "r")) == NULL)
+		return got_error_from_errno();
 
-	for (i = 0; i <= 2; i++)
-		if ((fp[i] = fopen(argv[i + 2], "r")) == NULL) {
-			warn("%s", argv[i + 2]);
-			return (-1);
-		}
-
-	return (merge(m, n));
+	if (merge(m, n) < 0)
+		return got_error_from_errno();
+	return NULL;
 }
 
-int
+static int
 ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 {
 	char op, *ep;
@@ -443,17 +454,17 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 		if (op == 'a') {
 			if (start > dlines->l_nblines ||
 			    start < 0 || *ep != 'a')
-				errx(1, "ed_patch_lines");
+				return -1;
 		} else if (op == 'c') {
 			if (start > dlines->l_nblines ||
 			    start < 0 || (*ep != ',' && *ep != 'c'))
-				errx(1, "ed_patch_lines");
+				return -1;
 
 			if (*ep == ',') {
 				ep++;
 				end = (int)strtol(ep, &ep, 10);
 				if (end < 0 || *ep != 'c')
-					errx(1, "ed_patch_lines");
+					return -1;
 			} else {
 				end = start;
 			}
@@ -476,7 +487,7 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 		}
 
 		if (dlp == NULL)
-			errx(1, "ed_patch_lines");
+			return -1;
 
 
 		if (op == 'c') {
@@ -494,7 +505,7 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 				ndlp = lp;
 				lp = TAILQ_NEXT(lp, l_list);
 				if (lp == NULL)
-					errx(1, "ed_patch_lines");
+					return -1;
 
 				if (!memcmp(lp->l_line, ".", 1))
 					break;
@@ -604,8 +615,10 @@ get_line(FILE *b, size_t *n)
 {
 	char *cp;
 	size_t len;
+	/* XXX must be part of diff3state */
 	static char *buf;
 	static size_t bufsize;
+	char *new;
 
 	if ((cp = fgetln(b, &len)) == NULL)
 		return (NULL);
@@ -616,7 +629,10 @@ get_line(FILE *b, size_t *n)
 		do {
 			bufsize += 1024;
 		} while (len + 1 > bufsize);
-		buf = xreallocarray(buf, 1, bufsize);
+		new = reallocarray(buf, 1, bufsize);
+		if (new == NULL)
+			return NULL;
+		buf = new;
 	}
 	memcpy(buf, cp, len - 1);
 	buf[len - 1] = '\n';
@@ -909,22 +925,41 @@ edscript(int n)
 	return (overlapcnt);
 }
 
-static void
+static const struct got_error *
 increase(void)
 {
 	size_t newsz, incr;
+	struct diff *d;
+	char *s;
 
 	/* are the memset(3) calls needed? */
 	newsz = szchanges == 0 ? 64 : 2 * szchanges;
 	incr = newsz - szchanges;
 
-	d13 = xreallocarray(d13, newsz, sizeof(*d13));
+	d = reallocarray(d13, newsz, sizeof(*d13));
+	if (d == NULL)
+		return got_error_from_errno();
+	d13 = d;
 	memset(d13 + szchanges, 0, incr * sizeof(*d13));
-	d23 = xreallocarray(d23, newsz, sizeof(*d23));
+
+	d = reallocarray(d23, newsz, sizeof(*d23));
+	if (d == NULL)
+		return got_error_from_errno();
+	d23 = d;
 	memset(d23 + szchanges, 0, incr * sizeof(*d23));
-	de = xreallocarray(de, newsz, sizeof(*de));
+
+	d = reallocarray(de, newsz, sizeof(*de));
+	if (d == NULL)
+		return got_error_from_errno();
+	de = d;
 	memset(de + szchanges, 0, incr * sizeof(*de));
-	overlap = xreallocarray(overlap, newsz, sizeof(*overlap));
+
+	s = reallocarray(overlap, newsz, sizeof(*overlap));
+	if (s == NULL)
+		return got_error_from_errno();
+	overlap = s;
 	memset(overlap + szchanges, 0, incr * sizeof(*overlap));
 	szchanges = newsz;
+
+	return NULL;
 }
