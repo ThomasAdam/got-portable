@@ -27,8 +27,6 @@
 #ifndef RCSUTIL_H
 #define RCSUTIL_H
 
-#include "rcs.h"
-
 struct rcs_line {
 	u_char			*l_line;
 	int			 l_lineno;
@@ -43,29 +41,10 @@ struct rcs_lines {
 	struct tqh	 l_lines;
 };
 
-struct rcs_argvector {
-	char *str;
-	char **argv;
-};
-
 /* rcsutil.c */
-int			 rcs_getopt(int, char **, const char *);
-void			 rcs_set_mtime(RCSFILE *, time_t);
-int			 rcs_choosefile(const char *, char *, size_t);
-time_t			 rcs_get_mtime(RCSFILE *);
-RCSNUM			*rcs_getrevnum(const char *, RCSFILE *);
-char			*rcs_prompt(const char *, int);
-u_int			 rcs_rev_select(RCSFILE *, const char *);
-int			 rcs_set_description(RCSFILE *, const char *, int);
-void			 rcs_setrevstr(char **, char *);
-void			 rcs_setrevstr2(char **, char **, char *);
 BUF			*rcs_patchfile(u_char *, size_t, u_char *, size_t,
 			    int (*p)(struct rcs_lines *,struct rcs_lines *));
 struct rcs_lines	*rcs_splitlines(u_char *, size_t);
 void			 rcs_freelines(struct rcs_lines *);
-int			 rcs_yesno(int);
-struct rcs_argvector	*rcs_strsplit(const char *, const char *);
-void			 rcs_argv_destroy(struct rcs_argvector *);
-void			 rcs_strip_suffix(char *);
 
 #endif	/* RCSUTIL_H */
