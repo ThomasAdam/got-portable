@@ -263,8 +263,8 @@ done:
  * For merge(1).
  */
 const struct got_error *
-got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3,
-    const char *label1, const char *label3)
+got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
+    const char *p3, const char *label1, const char *label3)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -274,6 +274,8 @@ got_merge_diff3(int outfd, const char *p1, const char *p2, const char *p3,
 	struct wklhead temp_files;
 	struct diff3_state *d3s;
 	int i;
+
+	*overlapcnt = 0;
 
 	SLIST_INIT(&temp_files);
 
@@ -399,11 +401,12 @@ out:
 		if (d3s->fp[i])
 			fclose(d3s->fp[i]);
 	}
-	free(d3s);
 	if (err == NULL && diffb) {
 		if (buf_write_fd(diffb, outfd) < 0)
 			err = got_error_from_errno();
+		*overlapcnt = d3s->overlapcnt;
 	}
+	free(d3s);
 	buf_free(diffb);
 	return err;
 }
