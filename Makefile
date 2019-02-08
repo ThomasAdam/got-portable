@@ -1,6 +1,6 @@
 SUBDIR = libexec got tog
 
-.if make(regress)
+.if make(regress) || make(obj)
 SUBDIR += regress
 .endif
 
