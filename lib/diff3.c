@@ -374,8 +374,7 @@ merge_diff3(int outfd, char *p1, char *p2, char *p3, int flags)
 	dlen = buf_len(b1);
 	data = buf_release(b1);
 
-	if ((diffb = rcs_patchfile(data, dlen, patch, plen, ed_patch_lines)) == NULL)
-		goto out;
+	diffb = rcs_patchfile(data, dlen, patch, plen, ed_patch_lines);
 out:
 	buf_free(b2);
 	buf_free(b3);
@@ -403,7 +402,7 @@ out:
 			fclose(d3s->fp[i]);
 	}
 	free(d3s);
-	if (err == NULL) {
+	if (err == NULL && diffb) {
 		if (buf_write_fd(diffb, outfd) < 0)
 			err = got_error_from_errno();
 	}
