@@ -265,7 +265,7 @@ done:
  * For merge(1).
  */
 const struct got_error *
-merge_diff3(BUF **buf, char **av, int flags)
+merge_diff3(BUF **buf, char *p1, char *p2, char *p3, int flags)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -291,11 +291,11 @@ merge_diff3(BUF **buf, char **av, int flags)
 	if ((flags & MERGE_EFLAG) && !(flags & MERGE_OFLAG))
 		d3s->oflag = 0;
 
-	if ((b1 = buf_load(av[0])) == NULL)
+	if ((b1 = buf_load(p1)) == NULL)
 		goto out;
-	if ((b2 = buf_load(av[1])) == NULL)
+	if ((b2 = buf_load(p2)) == NULL)
 		goto out;
-	if ((b3 = buf_load(av[2])) == NULL)
+	if ((b3 = buf_load(p3)) == NULL)
 		goto out;
 
 	diffb = buf_alloc(128);
@@ -363,7 +363,7 @@ merge_diff3(BUF **buf, char **av, int flags)
 	d2 = NULL;
 
 	diffbuf = diffb;
-	err = diff3_internal(dp13, dp23, path1, path2, path3, av[0], av[2],
+	err = diff3_internal(dp13, dp23, path1, path2, path3, p1, p3,
 	    d3s);
 	if (err) {
 		buf_free(diffb);
