@@ -265,7 +265,7 @@ done:
  * For merge(1).
  */
 const struct got_error *
-merge_diff3(BUF **buf, char *p1, char *p2, char *p3, int flags)
+merge_diff3(int outfd, char *p1, char *p2, char *p3, int flags)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -275,8 +275,6 @@ merge_diff3(BUF **buf, char *p1, char *p2, char *p3, int flags)
 	struct wklhead temp_files;
 	struct diff3_state *d3s;
 	int i;
-
-	*buf = NULL;
 
 	d3s = calloc(1, sizeof(*d3s));
 	if (d3s == NULL)
@@ -405,8 +403,11 @@ out:
 			fclose(d3s->fp[i]);
 	}
 	free(d3s);
-	if (err == NULL)
-		*buf = diffb;
+	if (err == NULL) {
+		if (buf_write_fd(diffb, outfd) < 0)
+			err = got_error_from_errno();
+	}
+	buf_free(diffb);
 	return err;
 }
 
