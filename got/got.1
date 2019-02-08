@@ -97,9 +97,20 @@ will be checked out.
 .It Cm update [ Fl c Ar commit ] [ work-tree-path ]
 Update an existing work tree to another commit on the current branch.
 By default, the latest commit on the current branch is assumed.
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It U Ta file was updated and contained no local changes
+.It G Ta file was updated and local changes were merged cleanly
+.It C Ta file was updated and conflicts occurred during merge
+.It D Ta file was deleted
+.It A Ta new file was added
+.It ~ Ta versioned file is obstructed by a non-regular file
+.El
+.Pp
 If the
 .Ar work tree path
 is omitted, use the current working directory.
+.Pp
 .Pp
 The options for
 .Cm got update
