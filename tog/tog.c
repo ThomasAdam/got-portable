@@ -3029,7 +3029,8 @@ draw_tree_entries(struct tog_view *view,
 				return got_error_from_errno();
 		}
 		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
-		    te->name, S_ISDIR(te->mode) ? "/" : "") == -1) {
+		    te->name, S_ISDIR(te->mode) ? "/" :
+		    ((te->mode & S_IXUSR) ? "*" : "")) == -1) {
 			free(id_str);
 			return got_error_from_errno();
 		}
