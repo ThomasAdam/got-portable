@@ -1304,8 +1304,8 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 		path++;
 
 	printf("%s%s%s%s%s\n", id ? id : "", path,
-	    is_root_path ? "" : "/",
-	    te->name, S_ISDIR(te->mode) ? "/" : "");
+	    is_root_path ? "" : "/", te->name,
+	    S_ISDIR(te->mode) ? "/" : ((te->mode & S_IXUSR) ? "*" : ""));
 }
 
 static const struct got_error *
