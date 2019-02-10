@@ -436,7 +436,8 @@ update_progress(void *arg, unsigned char status, const char *path)
 	if (status == GOT_STATUS_EXISTS)
 		return;
 
-	*did_something = 1;
+	if (status != GOT_STATUS_MISSING)
+		*did_something = 1;
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);

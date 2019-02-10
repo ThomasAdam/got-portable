@@ -697,7 +697,7 @@ done:
 static const struct got_error *
 install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *entry, const char *ondisk_path, const char *path,
-   uint16_t mode, struct got_blob_object *blob,
+   uint16_t mode, struct got_blob_object *blob, int restoring_missing_file,
    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
    void *progress_arg)
 {
@@ -742,8 +742,11 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			return got_error_from_errno();
 	}
 
-	(*progress_cb)(progress_arg,
-	    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
+	if (restoring_missing_file)
+		(*progress_cb)(progress_arg, GOT_STATUS_MISSING, path);
+	else
+		(*progress_cb)(progress_arg,
+		    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -826,8 +829,13 @@ get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
 
 	*status = GOT_STATUS_NO_CHANGE;
 
-	if (lstat(abspath, &sb) == -1)
+	if (lstat(abspath, &sb) == -1) {
+		if (errno == ENOENT) {
+			*status = GOT_STATUS_MISSING;
+			return NULL;
+		}
 		return got_error_from_errno();
+	}
 
 	if (!S_ISREG(sb.st_mode)) {
 		*status = GOT_STATUS_OBSTRUCTED;
@@ -903,16 +911,6 @@ update_blob(struct got_worktree *worktree,
 		return got_error_from_errno();
 
 	if (ie) {
-		if (memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
-		    SHA1_DIGEST_LENGTH) == 0) {
-			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
-			    path);
-			goto done;
-		}
-		if (memcmp(ie->blob_sha1,
-		    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
-			goto done;
-
 		err = get_file_status(&status, ie, ondisk_path, repo);
 		if (err)
 			goto done;
@@ -920,6 +918,19 @@ update_blob(struct got_worktree *worktree,
 		if (status == GOT_STATUS_OBSTRUCTED) {
 			(*progress_cb)(progress_arg, status, path);
 			goto done;
+		}
+
+		if (status == GOT_STATUS_NO_CHANGE) {
+			if (memcmp(ie->commit_sha1,
+			    worktree->base_commit_id->sha1,
+			    SHA1_DIGEST_LENGTH) == 0) {
+				(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
+				    path);
+				goto done;
+			}
+			if (memcmp(ie->blob_sha1,
+			    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
+				goto done;
 		}
 	}
 
@@ -932,7 +943,8 @@ update_blob(struct got_worktree *worktree,
 		    te->mode, blob, repo, progress_cb, progress_arg);
 	else
 		err = install_blob(worktree, fileindex, ie, ondisk_path, path,
-		    te->mode, blob, repo, progress_cb, progress_arg);
+		    te->mode, blob, status == GOT_STATUS_MISSING, repo,
+		    progress_cb, progress_arg);
 
 	got_object_blob_close(blob);
 done:

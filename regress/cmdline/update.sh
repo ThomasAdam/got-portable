@@ -810,6 +810,42 @@ function test_update_clears_xbit {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_restores_missing_file {
+	local testroot=`test_init update_restores_missing_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/wt/alpha
+
+	echo "!  alpha" > $testroot/stdout.expected
+	echo "Already up-to-date" >> $testroot/stdout.expected
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -826,3 +862,4 @@ run_test test_update_file_in_subsubdir
 run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
 run_test test_update_clears_xbit
+run_test test_update_restores_missing_file
