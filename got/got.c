@@ -950,6 +950,8 @@ struct print_diff_arg {
 	struct got_repository *repo;
 	struct got_worktree *worktree;
 	int diff_context;
+	const char *id_str;
+	int header_shown;
 };
 
 static const struct got_error *
@@ -965,6 +967,12 @@ print_diff(void *arg, unsigned char status, const char *path,
 
 	if (status != GOT_STATUS_MODIFY)
 		return NULL;
+
+	if (!a->header_shown) {
+		printf("diff %s %s\n", a->id_str,
+		    got_worktree_get_root_path(a->worktree));
+		a->header_shown = 1;
+	}
 
 	err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
 	if (err)
@@ -1084,9 +1092,9 @@ cmd_diff(int argc, char *argv[])
 		arg.repo = repo;
 		arg.worktree = worktree;
 		arg.diff_context = diff_context;
+		arg.id_str = id_str;
+		arg.header_shown = 0;
 
-		printf("diff %s %s\n", id_str,
-		    got_worktree_get_root_path(worktree));
 		error = got_worktree_status(worktree, repo, print_diff,
 		    &arg, check_cancelled, NULL);
 		free(id_str);
