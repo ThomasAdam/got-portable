@@ -605,7 +605,8 @@ done:
 static const struct got_error *
 merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *ie, const char *ondisk_path, const char *path,
-   uint16_t mode, struct got_blob_object *blob1, struct got_repository *repo,
+   uint16_t te_mode, uint16_t st_mode, struct got_blob_object *blob1,
+   struct got_repository *repo,
    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -697,16 +698,15 @@ done:
 static const struct got_error *
 install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *entry, const char *ondisk_path, const char *path,
-   uint16_t mode, struct got_blob_object *blob, int restoring_missing_file,
-   struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-   void *progress_arg)
+   uint16_t te_mode, uint16_t st_mode, struct got_blob_object *blob,
+   int restoring_missing_file, struct got_repository *repo,
+   got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
-	struct stat sb;
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -724,10 +724,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			if (fd == -1)
 				return got_error_from_errno();
 		} else if (errno == EEXIST) {
-			if (lstat(ondisk_path, &sb) == -1) {
-				err = got_error_from_errno();
-				goto done;
-			} else if (!S_ISREG(sb.st_mode)) {
+			if (!S_ISREG(st_mode)) {
 				/* TODO file is obstructed; do something */
 				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
 				goto done;
@@ -775,21 +772,15 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			err = got_error_from_errno();
 			goto done;
 		}
-	} else {
-		/* In case of an update stat buf has been loaded above. */
-		if (lstat(ondisk_path, &sb) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
 	}
 
-	if (mode & S_IXUSR) {
-		if (chmod(ondisk_path, sb.st_mode | S_IXUSR) == -1) {
+	if (te_mode & S_IXUSR) {
+		if (chmod(ondisk_path, st_mode | S_IXUSR) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}
 	} else {
-		if (chmod(ondisk_path, sb.st_mode & ~S_IXUSR) == -1) {
+		if (chmod(ondisk_path, st_mode & ~S_IXUSR) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}
@@ -815,8 +806,9 @@ done:
 }
 
 static const struct got_error *
-get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
-    const char *abspath, struct got_repository *repo)
+get_file_status(unsigned char *status, struct stat *sb,
+    struct got_fileindex_entry *ie, const char *abspath,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id id;
@@ -825,29 +817,37 @@ get_file_status(unsigned char *status, struct got_fileindex_entry *ie,
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
 	size_t flen, blen;
-	struct stat sb;
 
 	*status = GOT_STATUS_NO_CHANGE;
 
-	if (lstat(abspath, &sb) == -1) {
+	if (lstat(abspath, sb) == -1) {
 		if (errno == ENOENT) {
-			*status = GOT_STATUS_MISSING;
+			if (ie) {
+				*status = GOT_STATUS_MISSING;
+				sb->st_mode =
+				    ((ie->mode >> GOT_FILEIDX_MODE_PERMS_SHIFT)
+				    & (S_IRWXU | S_IRWXG | S_IRWXO));
+			} else
+				sb->st_mode = GOT_DEFAULT_FILE_MODE;
 			return NULL;
 		}
 		return got_error_from_errno();
 	}
 
-	if (!S_ISREG(sb.st_mode)) {
+	if (!S_ISREG(sb->st_mode)) {
 		*status = GOT_STATUS_OBSTRUCTED;
 		return NULL;
 	}
 
-	if (ie->ctime_sec == sb.st_ctime &&
-	    ie->ctime_nsec == sb.st_ctimensec &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_sec == sb.st_mtime &&
-	    ie->mtime_nsec == sb.st_mtimensec &&
-	    ie->size == (sb.st_size & 0xffffffff))
+	if (ie == NULL)
+		return NULL;
+
+	if (ie->ctime_sec == sb->st_ctime &&
+	    ie->ctime_nsec == sb->st_ctimensec &&
+	    ie->mtime_sec == sb->st_mtime &&
+	    ie->mtime_sec == sb->st_mtime &&
+	    ie->mtime_nsec == sb->st_mtimensec &&
+	    ie->size == (sb->st_size & 0xffffffff))
 		return NULL;
 
 	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
@@ -906,32 +906,30 @@ update_blob(struct got_worktree *worktree,
 	struct got_blob_object *blob = NULL;
 	char *ondisk_path;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
+	struct stat sb;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno();
 
-	if (ie) {
-		err = get_file_status(&status, ie, ondisk_path, repo);
-		if (err)
-			goto done;
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		goto done;
 
-		if (status == GOT_STATUS_OBSTRUCTED) {
-			(*progress_cb)(progress_arg, status, path);
+	if (status == GOT_STATUS_OBSTRUCTED) {
+		(*progress_cb)(progress_arg, status, path);
+		goto done;
+	}
+
+	if (ie && status != GOT_STATUS_MISSING) {
+		if (memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
+		    SHA1_DIGEST_LENGTH) == 0) {
+			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
+			    path);
 			goto done;
 		}
-
-		if (status == GOT_STATUS_NO_CHANGE) {
-			if (memcmp(ie->commit_sha1,
-			    worktree->base_commit_id->sha1,
-			    SHA1_DIGEST_LENGTH) == 0) {
-				(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
-				    path);
-				goto done;
-			}
-			if (memcmp(ie->blob_sha1,
-			    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
-				goto done;
-		}
+		if (memcmp(ie->blob_sha1,
+		    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
+			goto done;
 	}
 
 	err = got_object_open_as_blob(&blob, repo, te->id, 8192);
@@ -940,11 +938,12 @@ update_blob(struct got_worktree *worktree,
 
 	if (status == GOT_STATUS_MODIFY)
 		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
-		    te->mode, blob, repo, progress_cb, progress_arg);
+		    te->mode, sb.st_mode, blob, repo, progress_cb,
+		    progress_arg);
 	else
 		err = install_blob(worktree, fileindex, ie, ondisk_path, path,
-		    te->mode, blob, status == GOT_STATUS_MISSING, repo,
-		    progress_cb, progress_arg);
+		    te->mode, sb.st_mode, blob, status == GOT_STATUS_MISSING,
+		    repo, progress_cb, progress_arg);
 
 	got_object_blob_close(blob);
 done:
@@ -1171,6 +1170,7 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
+	struct stat sb;
 
 	if (parent_path[0]) {
 		if (asprintf(&abspath, "%s/%s/%s", a->worktree->root_path,
@@ -1182,7 +1182,7 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 			return got_error_from_errno();
 	}
 
-	err = get_file_status(&status, ie, abspath, a->repo);
+	err = get_file_status(&status, &sb, ie, abspath, a->repo);
 	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
 		struct got_object_id id;
 		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
