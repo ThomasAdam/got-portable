@@ -294,13 +294,28 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 
 	*ref = NULL;
 
+	path_refs = get_refs_dir_path(repo, refname);
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
 	if (!well_known) {
 		char *packed_refs_path;
 		FILE *f;
 
+		/* Search on-disk refs before packed refs! */
+		for (i = 0; i < nitems(subdirs); i++) {
+			err = open_ref(ref, path_refs, subdirs[i], refname);
+			if (err || *ref)
+				goto done;
+		}
+
 		packed_refs_path = got_repo_get_path_packed_refs(repo);
-		if (packed_refs_path == NULL)
-			return got_error_from_errno();
+		if (packed_refs_path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
 
 		f = fopen(packed_refs_path, "rb");
 		free(packed_refs_path);
@@ -313,26 +328,12 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		}
 	}
 
-	path_refs = get_refs_dir_path(repo, refname);
-	if (path_refs == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	if (!well_known) {
-		for (i = 0; i < nitems(subdirs); i++) {
-			err = open_ref(ref, path_refs, subdirs[i], refname);
-			if (err || *ref)
-				goto done;
-		}
-	}
-
 	err = open_ref(ref, path_refs, "", refname);
 	if (err)
 		goto done;
+done:
 	if (*ref == NULL)
 		err = got_error_not_ref(refname);
-done:
 	free(path_refs);
 	return err;
 }
