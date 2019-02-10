@@ -314,8 +314,8 @@ cmd_checkout(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 1) {
@@ -470,8 +470,8 @@ cmd_update(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc == 0) {

@@ -605,7 +605,7 @@ done:
 static const struct got_error *
 merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *ie, const char *ondisk_path, const char *path,
-   struct got_blob_object *blob1, struct got_repository *repo,
+   uint16_t mode, struct got_blob_object *blob1, struct got_repository *repo,
    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -693,7 +693,7 @@ done:
 static const struct got_error *
 install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
    struct got_fileindex_entry *entry, const char *ondisk_path, const char *path,
-   struct got_blob_object *blob,
+   uint16_t mode, struct got_blob_object *blob,
    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
    void *progress_arg)
 {
@@ -702,6 +702,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
+	struct stat sb;
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -719,7 +720,6 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			if (fd == -1)
 				return got_error_from_errno();
 		} else if (errno == EEXIST) {
-			struct stat sb;
 			if (lstat(ondisk_path, &sb) == -1) {
 				err = got_error_from_errno();
 				goto done;
@@ -765,6 +765,16 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (update) {
 		if (rename(tmppath, ondisk_path) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+	if (mode & S_IRWXU) {
+		if (!update && lstat(ondisk_path, &sb) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (chmod(ondisk_path, sb.st_mode | S_IRWXU) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}
@@ -907,10 +917,10 @@ update_blob(struct got_worktree *worktree,
 
 	if (status == GOT_STATUS_MODIFY)
 		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
-		    blob, repo, progress_cb, progress_arg);
+		    te->mode, blob, repo, progress_cb, progress_arg);
 	else
 		err = install_blob(worktree, fileindex, ie, ondisk_path, path,
-		    blob, repo, progress_cb, progress_arg);
+		    te->mode, blob, repo, progress_cb, progress_arg);
 
 	got_object_blob_close(blob);
 done:

@@ -400,8 +400,8 @@ main(int argc, char *argv[])
 	int ch;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
-	    NULL) == -1)
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
 
