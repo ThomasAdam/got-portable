@@ -792,7 +792,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			if (asprintf(&de_path, "%s/%s", path,
 			    de->d_name) == -1) {
 				err = got_error_from_errno();
-				goto done;
+				break;
 			}
 			cmp = got_path_cmp((*ie)->path, de_path);
 			free(de_path);
