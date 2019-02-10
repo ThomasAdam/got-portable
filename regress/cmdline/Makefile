@@ -1,4 +1,5 @@
 REGRESS_TARGETS=checkout update status
+NOOBJ=Yes
 
 checkout:
 	./checkout.sh
