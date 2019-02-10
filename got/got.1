@@ -218,6 +218,13 @@ work tree, use the repository path associated with this work tree.
 .It Cm tree [ Fl c Ar commit ] [ Fl r Ar repository-path ] [ Fl i ] [ Fl R] [ Ar path ]
 Display a listing of files and directories at the specified
 directory path in the repository.
+Entries shown in this listing may carry one of the following trailing
+annotations:
+.Bl -column YXZ description
+.It / Ta entry is a directory
+.It * Ta entry is an executable file
+.El
+.Pp
 If no
 .Ar path
 is specified, list the repository path corresponding to the current
