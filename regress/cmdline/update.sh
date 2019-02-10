@@ -823,7 +823,9 @@ function test_update_restores_missing_file {
 	rm $testroot/wt/alpha
 
 	echo "!  alpha" > $testroot/stdout.expected
-	echo "Already up-to-date" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
