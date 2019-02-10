@@ -250,9 +250,40 @@ function test_status_unversioned_subdirs {
 	test_done "$testroot" "$ret"
 }
 
+# 'got status' ignores symlinks at present; this might change eventually
+function test_status_ignores_symlink {
+	local testroot=`test_init status_ignores_symlink 1`
+
+	mkdir $testroot/repo/ramdisk/
+	touch $testroot/repo/ramdisk/Makefile
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "first commit"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ln -s /usr/obj/distrib/i386/ramdisk $testroot/wt/ramdisk/obj
+
+	echo -n > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
 run_test test_status_obstructed
 run_test test_status_shows_local_mods_after_update
 run_test test_status_unversioned_subdirs
+run_test test_status_ignores_symlink

@@ -1212,6 +1212,10 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	if (de->d_type == DT_DIR)
 		return NULL;
 
+	/* XXX ignore symlinks for now */
+	if (de->d_type == DT_LNK)
+		return NULL;
+
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
 			return got_error_from_errno();
