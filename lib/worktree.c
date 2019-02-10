@@ -768,13 +768,21 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			err = got_error_from_errno();
 			goto done;
 		}
-	}
-	if (mode & S_IRWXU) {
-		if (!update && lstat(ondisk_path, &sb) == -1) {
+	} else {
+		/* In case of an update stat buf has been loaded above. */
+		if (lstat(ondisk_path, &sb) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		if (chmod(ondisk_path, sb.st_mode | S_IRWXU) == -1) {
+	}
+
+	if (mode & S_IXUSR) {
+		if (chmod(ondisk_path, sb.st_mode | S_IXUSR) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else {
+		if (chmod(ondisk_path, sb.st_mode & ~S_IXUSR) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}

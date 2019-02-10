@@ -729,6 +729,64 @@ function test_update_keeps_xbit {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_clears_xbit {
+	local testroot=`test_init update_clears_xbit 1`
+
+	touch $testroot/repo/xfile
+	chmod +x $testroot/repo/xfile
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding executable file"
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ls -l $testroot/wt/xfile | grep -q '^-rwx'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is not executable" >&2
+		ls -l $testroot/wt/xfile >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# XXX git seems to require a file edit when flipping the x bit?
+	echo foo > $testroot/repo/xfile
+	chmod -x $testroot/repo/xfile
+	git_commit $testroot/repo -m "not an executable file anymore"
+
+	echo "U  xfile" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ls -l $testroot/wt/xfile | grep -q '^-rw-'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is unexpectedly executable" >&2
+		ls -l $testroot/wt/xfile >&2
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -744,3 +802,4 @@ run_test test_update_creates_missing_parent_with_subdir
 run_test test_update_file_in_subsubdir
 run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
+run_test test_update_clears_xbit
