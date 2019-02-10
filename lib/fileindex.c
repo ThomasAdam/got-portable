@@ -844,12 +844,12 @@ done:
 
 const struct got_error *
 got_fileindex_diff_dir(struct got_fileindex *fileindex, DIR *rootdir,
-    const char *rootpath, struct got_repository *repo,
+    const char *rootpath, const char *path, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	struct got_fileindex_entry *min;
 	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
-	return diff_fileindex_dir(fileindex, &min, rootdir, rootpath, "",
+	return diff_fileindex_dir(fileindex, &min, rootdir, rootpath, path,
 	    repo, cb, cb_arg);
 }
 

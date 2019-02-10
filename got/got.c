@@ -942,7 +942,7 @@ __dead static void
 usage_diff(void)
 {
 	fprintf(stderr, "usage: %s diff [-C number] [-r repository-path] "
-	    "[object1 object2]\n", getprogname());
+	    "[object1 object2 | path]\n", getprogname());
 	exit(1);
 }
 
@@ -1006,6 +1006,47 @@ done:
 }
 
 static const struct got_error *
+get_status_path(char **status_path, struct got_worktree *worktree,
+    const char *arg)
+{
+	const struct got_error *err = NULL;
+	char *resolved, *path = NULL;
+	size_t len;
+
+	*status_path = NULL;
+
+	resolved = realpath(arg, NULL);
+	if (resolved == NULL)
+		return got_error_from_errno();
+
+	if (strncmp(got_worktree_get_root_path(worktree), resolved,
+	    strlen(got_worktree_get_root_path(worktree)))) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	path = strdup(resolved + strlen(got_worktree_get_root_path(worktree)));
+	if (path == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* XXX status walk can't deal with trailing slash! */
+	len = strlen(path);
+	while (path[len - 1] == '/') {
+		path[len - 1] = '\0';
+		len--;
+	}
+done:
+	free(resolved);
+	if (err == NULL)
+		*status_path = path;
+	else
+		free(path);
+	return err;
+}
+
+static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -1017,6 +1058,7 @@ cmd_diff(int argc, char *argv[])
 	int type1, type2;
 	int diff_context = 3, ch;
 	const char *errstr;
+	char *path = NULL;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -1050,16 +1092,33 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	if (argc == 0) {
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+	if (argc <= 1) {
+		if (worktree == NULL) {
+			error = got_error(GOT_ERR_NOT_WORKTREE);
+			goto done;
+		}
 		if (repo_path)
 			errx(1,
 			    "-r option can't be used when diffing a work tree");
-		error = got_worktree_open(&worktree, cwd);
-		if (error)
-			goto done;
 		repo_path = strdup(got_worktree_get_repo_path(worktree));
-		if (repo_path == NULL)
-			return got_error_from_errno();
+		if (repo_path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+		if (argc == 1) {
+			error = get_status_path(&path, worktree, argv[0]);
+			if (error)
+				goto done;
+		} else {
+			path = strdup("");
+			if (path == NULL) {
+				error = got_error_from_errno();
+				goto done;
+			}
+		}
 	} else if (argc == 2) {
 		id_str1 = argv[0];
 		id_str2 = argv[1];
@@ -1095,7 +1154,7 @@ cmd_diff(int argc, char *argv[])
 		arg.id_str = id_str;
 		arg.header_shown = 0;
 
-		error = got_worktree_status(worktree, repo, print_diff,
+		error = got_worktree_status(worktree, path, repo, print_diff,
 		    &arg, check_cancelled, NULL);
 		free(id_str);
 		goto done;
@@ -1144,6 +1203,7 @@ cmd_diff(int argc, char *argv[])
 done:
 	free(id1);
 	free(id2);
+	free(path);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -1527,7 +1587,7 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [worktree-path]\n", getprogname());
+	fprintf(stderr, "usage: %s status [path]\n", getprogname());
 	exit(1);
 }
 
@@ -1545,7 +1605,7 @@ cmd_status(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *worktree_path = NULL;
+	char *cwd = NULL, *path = NULL;
 	int ch;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
@@ -1564,24 +1624,28 @@ cmd_status(int argc, char *argv[])
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error != NULL)
+		goto done;
+
 	if (argc == 0) {
-		worktree_path = getcwd(NULL, 0);
-		if (worktree_path == NULL) {
+		path = strdup("");
+		if (path == NULL) {
 			error = got_error_from_errno();
 			goto done;
 		}
 	} else if (argc == 1) {
-		worktree_path = realpath(argv[0], NULL);
-		if (worktree_path == NULL) {
-			error = got_error_from_errno();
+		error = get_status_path(&path, worktree, argv[0]);
+		if (error)
 			goto done;
-		}
 	} else
 		usage_status();
-
-	error = got_worktree_open(&worktree, worktree_path);
-	if (error != NULL)
-		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -1592,9 +1656,10 @@ cmd_status(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_status(worktree, repo, print_status, NULL,
+	error = got_worktree_status(worktree, path, repo, print_status, NULL,
 	    check_cancelled, NULL);
 done:
-	free(worktree_path);
+	free(cwd);
+	free(path);
 	return error;
 }

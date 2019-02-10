@@ -122,7 +122,7 @@ Update the work tree to the specified
 .Ar commit .
 The expected argument is a SHA1 hash which corresponds to a commit object.
 .El
-.It Cm status [ Ar worktree-path ]
+.It Cm status [ Ar path ]
 Show the current modification status of files in a worktree,
 using the following status codes:
 .Bl -column YXZ description
@@ -133,9 +133,9 @@ using the following status codes:
 .Nm
 .El
 .Pp
-If the
-.Ar work tree path
-is omitted, use the current working directory.
+If a
+.Ar path
+is specified, only show modifications within this path.
 .It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
 If a
@@ -172,12 +172,16 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Ar object1 Ar object2 ]
-Display differences between blobs in the repository and files in the
-work tree, or between two specified objects in a repository.
-If specified, each
-.Ar object
-argument is a SHA1 hash which corresponds to the object.
+.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Ar object1 Ar object2 | Ar path ]
+When invoked within a work tree with less than two arguments, display
+uncommitted changes in the work tree.
+If a
+.Ar path
+is specified, only show changes within this path.
+.Pp
+If two arguments are provided, treat each argument as a SHA1 hash which
+corresponds to an object in the repository, and display differences
+between these objects.
 Both objects must be of the same type (blobs, trees, or commits).
 .Pp
 The options for

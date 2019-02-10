@@ -122,5 +122,6 @@ typedef const struct got_error *(*got_worktree_status_cb)(void *,
  * a path, and a corresponding status code.
  */
 const struct got_error *
-got_worktree_status(struct got_worktree *, struct got_repository *,
-    got_worktree_status_cb, void *, got_worktree_cancel_cb cancel_cb, void *);
+got_worktree_status(struct got_worktree *, const char *,
+    struct got_repository *, got_worktree_status_cb, void *,
+    got_worktree_cancel_cb cancel_cb, void *);

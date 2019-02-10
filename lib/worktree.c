@@ -1155,6 +1155,8 @@ done:
 struct diff_dir_cb_arg {
     struct got_fileindex *fileindex;
     struct got_worktree *worktree;
+    const char *status_path;
+    size_t status_path_len;
     struct got_repository *repo;
     got_worktree_status_cb status_cb;
     void *status_arg;
@@ -1163,14 +1165,34 @@ struct diff_dir_cb_arg {
 };
 
 static const struct got_error *
+report_file_status(struct got_fileindex_entry *ie, const char *abspath,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	unsigned char status = GOT_STATUS_NO_CHANGE;
+	struct stat sb;
+	struct got_object_id id;
+
+	err = get_file_status(&status, &sb, ie, abspath, repo);
+	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
+		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		err = (*status_cb)(status_arg, status, ie->path, &id);
+	}
+	return err;
+}
+
+static const struct got_error *
 status_old_new(void *arg, struct got_fileindex_entry *ie,
     struct dirent *de, const char *parent_path)
 {
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
-	unsigned char status = GOT_STATUS_NO_CHANGE;
-	struct stat sb;
+
+	if (got_path_cmp(parent_path, a->status_path) != 0 &&
+	    !got_path_is_child(parent_path, a->status_path, a->status_path_len))
+		return NULL;
 
 	if (parent_path[0]) {
 		if (asprintf(&abspath, "%s/%s/%s", a->worktree->root_path,
@@ -1182,12 +1204,8 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 			return got_error_from_errno();
 	}
 
-	err = get_file_status(&status, &sb, ie, abspath, a->repo);
-	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
-		struct got_object_id id;
-		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		err = (*a->status_cb)(a->status_arg, status, ie->path, &id);
-	}
+	err = report_file_status(ie, abspath, a->status_cb, a->status_arg,
+	    a->repo);
 	free(abspath);
 	return err;
 }
@@ -1197,6 +1215,10 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	struct diff_dir_cb_arg *a = arg;
 	struct got_object_id id;
+
+	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
+		return NULL;
+
 	memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 	return (*a->status_cb)(a->status_arg, GOT_STATUS_MISSING, ie->path,
 	    &id);
@@ -1216,6 +1238,9 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	if (de->d_type == DT_LNK)
 		return NULL;
 
+	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
+		return NULL;
+
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
 			return got_error_from_errno();
@@ -1231,7 +1256,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 }
 
 const struct got_error *
-got_worktree_status(struct got_worktree *worktree,
+got_worktree_status(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_status_cb status_cb,
     void *status_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -1242,6 +1267,7 @@ got_worktree_status(struct got_worktree *worktree,
 	FILE *index = NULL;
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
+	char *ondisk_path = NULL;
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
@@ -1269,26 +1295,46 @@ got_worktree_status(struct got_worktree *worktree,
 			goto done;
 	}
 
-	workdir = opendir(worktree->root_path);
-	if (workdir == NULL) {
+	if (asprintf(&ondisk_path, "%s%s%s",
+	    worktree->root_path, path[0] ? "/" : "", path) == -1) {
 		err = got_error_from_errno();
 		goto done;
+	}
+	workdir = opendir(ondisk_path);
+	if (workdir == NULL) {
+		if (errno == ENOTDIR) {
+			struct got_fileindex_entry *ie;
+			ie = got_fileindex_entry_get(fileindex, path);
+			if (ie == NULL) {
+				err = got_error(GOT_ERR_BAD_PATH);
+				goto done;
+			}
+			err = report_file_status(ie, ondisk_path,
+			    status_cb, status_arg, repo);
+			goto done;
+		} else {
+			err = got_error_from_errno();
+			goto done;
+		}
 	}
 	fdiff_cb.diff_old_new = status_old_new;
 	fdiff_cb.diff_old = status_old;
 	fdiff_cb.diff_new = status_new;
 	arg.fileindex = fileindex;
 	arg.worktree = worktree;
+	arg.status_path = path;
+	arg.status_path_len = strlen(path);
 	arg.repo = repo;
 	arg.status_cb = status_cb;
 	arg.status_arg = status_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
 	err = got_fileindex_diff_dir(fileindex, workdir, worktree->root_path,
-	    repo, &fdiff_cb, &arg);
+	    path, repo, &fdiff_cb, &arg);
 done:
 	if (workdir)
 		closedir(workdir);
+	free(ondisk_path);
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	return err;
