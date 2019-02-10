@@ -26,15 +26,17 @@ function test_checkout_basic {
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 

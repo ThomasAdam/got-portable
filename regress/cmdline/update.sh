@@ -20,8 +20,9 @@ function test_update_basic {
 	local testroot=`test_init update_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -36,9 +37,10 @@ function test_update_basic {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -57,8 +59,9 @@ function test_update_adds_file {
 	local testroot=`test_init update_adds_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -74,9 +77,10 @@ function test_update_adds_file {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -95,8 +99,9 @@ function test_update_deletes_file {
 	local testroot=`test_init update_deletes_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -111,9 +116,10 @@ function test_update_deletes_file {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -130,8 +136,9 @@ function test_update_deletes_dir {
 	local testroot=`test_init update_deletes_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -146,9 +153,10 @@ function test_update_deletes_dir {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -172,8 +180,9 @@ function test_update_deletes_dir_with_path_prefix {
 
 	# check out the epsilon/ sub-tree
 	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -184,9 +193,10 @@ function test_update_deletes_dir_with_path_prefix {
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -212,8 +222,9 @@ function test_update_deletes_dir_recursively {
 
 	# check out the epsilon/ sub-tree
 	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -225,9 +236,10 @@ function test_update_deletes_dir_recursively {
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
 	if [ "$?" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -244,8 +256,9 @@ function test_update_sibling_dirs_with_common_prefix {
 	local testroot=`test_init update_sibling_dirs_with_common_prefix`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -265,9 +278,10 @@ function test_update_sibling_dirs_with_common_prefix {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -286,28 +300,28 @@ function test_update_sibling_dirs_with_common_prefix {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_update_dir_with_dot_sibling {
 	local testroot=`test_init update_dir_with_dot_sibling`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$ret"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -326,9 +340,10 @@ function test_update_dir_with_dot_sibling {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -343,20 +358,19 @@ function test_update_dir_with_dot_sibling {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_update_moves_files_upwards {
@@ -370,8 +384,9 @@ function test_update_moves_files_upwards {
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -390,9 +405,10 @@ function test_update_moves_files_upwards {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -422,8 +438,9 @@ function test_update_moves_files_to_new_dir {
 	git_commit $testroot/repo -m "adding a sub-directory beneath epsilon"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -443,9 +460,10 @@ function test_update_moves_files_to_new_dir {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -474,8 +492,9 @@ function test_update_creates_missing_parent {
 	git_commit $testroot/repo -m "adding initial snake tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -508,13 +527,11 @@ function test_update_creates_missing_parent {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_update_creates_missing_parent_with_subdir {
@@ -527,8 +544,9 @@ function test_update_creates_missing_parent_with_subdir {
 	git_commit $testroot/repo -m "adding initial snake tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -561,9 +579,10 @@ function test_update_creates_missing_parent_with_subdir {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -582,8 +601,9 @@ function test_update_file_in_subsubdir {
 	git_commit $testroot/repo -m "adding initial tree"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -599,9 +619,10 @@ function test_update_file_in_subsubdir {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -623,8 +644,9 @@ function test_update_merges_file_edits {
 	git_commit $testroot/repo -m "added numbers file"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -647,9 +669,10 @@ function test_update_merges_file_edits {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 

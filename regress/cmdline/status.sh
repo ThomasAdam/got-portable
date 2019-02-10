@@ -20,8 +20,9 @@ function test_status_basic {
 	local testroot=`test_init status_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -37,13 +38,11 @@ function test_status_basic {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_status_subdir_no_mods {
@@ -58,8 +57,9 @@ function test_status_subdir_no_mods {
 	git_commit $testroot/repo -m "add subdir with files"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -72,13 +72,11 @@ function test_status_subdir_no_mods {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_status_subdir_no_mods2 {
@@ -99,8 +97,9 @@ function test_status_subdir_no_mods2 {
 	git_commit $testroot/repo -m "add subdir with files"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -117,21 +116,20 @@ function test_status_subdir_no_mods2 {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
-	if [ "$?" != "0" ]; then
+	ret="$?"
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_status_obstructed {
 	local testroot=`test_init status_obstructed`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
-	if [ "$?" != "0" ]; then
-		test_done "$testroot" "$?"
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
@@ -143,13 +141,11 @@ function test_status_obstructed {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
 	if [ "$?" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$?"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 function test_status_shows_local_mods_after_update {
@@ -202,11 +198,8 @@ function test_status_shows_local_mods_after_update {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
-		return 1
 	fi
-
-	test_done "$testroot" "0"
+	test_done "$testroot" "$ret"
 }
 
 run_test test_status_basic
