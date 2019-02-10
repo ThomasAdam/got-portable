@@ -41,17 +41,20 @@ struct got_fileindex {
 
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *entry,
-    const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1)
+    const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1,
+    int update_timestamps)
 {
 	struct stat sb;
 
 	if (lstat(ondisk_path, &sb) != 0)
 		return got_error_from_errno();
 
-	entry->ctime_sec = sb.st_ctime;
-	entry->ctime_nsec = sb.st_ctimensec;
-	entry->mtime_sec = sb.st_mtime;
-	entry->mtime_nsec = sb.st_mtimensec;
+	if (update_timestamps) {
+		entry->ctime_sec = sb.st_ctime;
+		entry->ctime_nsec = sb.st_ctimensec;
+		entry->mtime_sec = sb.st_mtime;
+		entry->mtime_nsec = sb.st_mtimensec;
+	}
 	entry->uid = sb.st_uid;
 	entry->gid = sb.st_gid;
 	entry->size = (sb.st_size & 0xffffffff);
@@ -92,7 +95,7 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 	(*entry)->flags |= len;
 
 	return got_fileindex_entry_update(*entry, ondisk_path, blob_sha1,
-	    commit_sha1);
+	    commit_sha1, 1);
 }
 
 void

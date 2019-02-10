@@ -95,7 +95,7 @@ struct got_fileindex_hdr {
 };
 
 const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
-    const char *, uint8_t *, uint8_t *);
+    const char *, uint8_t *, uint8_t *, int);
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *, const char *, uint8_t *, uint8_t *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);

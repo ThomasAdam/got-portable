@@ -665,8 +665,12 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		goto done;
 	}
 
+	/*
+	 * Do not update timestamps of already modified files. Otherwise,
+	 * the status walk would treat them as unmodified files again.
+	 */
 	err = got_fileindex_entry_update(ie, ondisk_path,
-	    blob1->id.sha1, worktree->base_commit_id->sha1);
+	    blob1->id.sha1, worktree->base_commit_id->sha1, 0);
 done:
 	if (merged_fd != -1)
 		close(merged_fd);
@@ -792,7 +796,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		entry = got_fileindex_entry_get(fileindex, path);
 	if (entry)
 		err = got_fileindex_entry_update(entry, ondisk_path,
-		    blob->id.sha1, worktree->base_commit_id->sha1);
+		    blob->id.sha1, worktree->base_commit_id->sha1, 1);
 	else {
 		err = got_fileindex_entry_alloc(&entry, ondisk_path,
 		    path, blob->id.sha1, worktree->base_commit_id->sha1);
