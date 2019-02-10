@@ -510,14 +510,14 @@ function test_update_creates_missing_parent {
 	git_commit $testroot/repo -m "restructuring snake tree"
 
 	echo "D  Makefile" > $testroot/stdout.expected
-	echo "D  snake.6" >> $testroot/stdout.expected
-	echo "D  snake.c" >> $testroot/stdout.expected
 	echo "A  snake/Makefile" >> $testroot/stdout.expected
 	echo "A  snake/move.c" >> $testroot/stdout.expected
 	echo "A  snake/pathnames.h" >> $testroot/stdout.expected
 	echo "A  snake/snake.6" >> $testroot/stdout.expected
 	echo "A  snake/snake.c" >> $testroot/stdout.expected
 	echo "A  snake/snake.h" >> $testroot/stdout.expected
+	echo "D  snake.6" >> $testroot/stdout.expected
+	echo "D  snake.c" >> $testroot/stdout.expected
 	echo "A  snscore/Makefile" >> $testroot/stdout.expected
 	echo "A  snscore/snscore.c" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected

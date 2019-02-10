@@ -202,8 +202,57 @@ function test_status_shows_local_mods_after_update {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_unversioned_subdirs {
+	local testroot=`test_init status_unversioned_subdirs 1`
+
+	mkdir $testroot/repo/cdfs/
+	touch $testroot/repo/cdfs/Makefile
+	mkdir $testroot/repo/common/
+	touch $testroot/repo/common/Makefile
+	mkdir $testroot/repo/iso/
+	touch $testroot/repo/iso/Makefile
+	mkdir $testroot/repo/ramdisk/
+	touch $testroot/repo/ramdisk/Makefile
+	touch $testroot/repo/ramdisk/list.local
+	mkdir $testroot/repo/ramdisk_cd/
+	touch $testroot/repo/ramdisk_cd/Makefile
+	touch $testroot/repo/ramdisk_cd/list.local
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "first commit"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir $testroot/wt/cdfs/obj
+	mkdir $testroot/wt/ramdisk/obj
+	mkdir $testroot/wt/ramdisk_cd/obj
+	mkdir $testroot/wt/iso/obj
+
+	echo -n > $testroot/stdout.expected
+
+	# This used to erroneously print:
+	#
+	# !  ramdisk_cd/Makefile
+	# !  ramdisk_cd/list.local
+	# ?  ramdisk_cd/Makefile
+	# ?  ramdisk_cd/list.local
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
 run_test test_status_obstructed
 run_test test_status_shows_local_mods_after_update
+run_test test_status_unversioned_subdirs
