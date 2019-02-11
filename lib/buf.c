@@ -309,7 +309,8 @@ buf_write(BUF *b, const char *path, mode_t mode)
 	if (fchmod(fd, mode) < 0)
 		err = got_error_from_errno();
 
-	(void)close(fd);
+	if (close(fd) != 0 && err == NULL)
+		err = got_error_from_errno();
 
 	return err;
 }
@@ -335,7 +336,9 @@ buf_write_stmp(BUF *b, char *template, struct wklhead *temp_files)
 		(void)unlink(template);
 	}
 
-	(void)close(fd);
+	if (close(fd) != 0 && err == NULL)
+		err = got_error_from_errno();
+
 	return err;
 }
 

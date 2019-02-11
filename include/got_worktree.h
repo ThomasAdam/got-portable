@@ -47,7 +47,7 @@ const struct got_error *got_worktree_init(const char *, struct got_reference *,
 const struct got_error *got_worktree_open(struct got_worktree **, const char *);
 
 /* Dispose of an open work tree. */
-void got_worktree_close(struct got_worktree *);
+const struct got_error *got_worktree_close(struct got_worktree *);
 
 /*
  * Get the path to the root directory of a worktree.

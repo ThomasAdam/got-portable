@@ -418,7 +418,9 @@ got_repo_close(struct got_repository *repo)
 		    repo->privsep_children[i].pid);
 		if (child_err && err == NULL)
 			err = child_err;
-		close(repo->privsep_children[i].imsg_fd);
+		if (close(repo->privsep_children[i].imsg_fd) != 0 &&
+		    err == NULL)
+			err = got_error_from_errno();
 	}
 	free(repo);
 

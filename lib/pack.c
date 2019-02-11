@@ -427,7 +427,8 @@ got_packidx_close(struct got_packidx *packidx)
 		free(packidx->hdr.large_offsets);
 		free(packidx->hdr.trailer);
 	}
-	close(packidx->fd);
+	if (close(packidx->fd) != 0 && err == NULL)
+		err = got_error_from_errno();
 	free(packidx);
 
 	return err;
@@ -503,7 +504,8 @@ got_pack_close(struct got_pack *pack)
 	err = got_pack_stop_privsep_child(pack);
 	if (pack->map && munmap(pack->map, pack->filesize) == -1 && !err)
 		err = got_error_from_errno();
-	close(pack->fd);
+	if (pack->fd != -1 && close(pack->fd) != 0 && err == NULL)
+		err = got_error_from_errno();
 	pack->fd = -1;
 	free(pack->path_packfile);
 	pack->path_packfile = NULL;

@@ -412,9 +412,10 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 	return got_error(GOT_ERR_NOT_WORKTREE);
 }
 
-void
+const struct got_error *
 got_worktree_close(struct got_worktree *worktree)
 {
+	const struct got_error *err = NULL;
 	free(worktree->root_path);
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
@@ -422,8 +423,10 @@ got_worktree_close(struct got_worktree *worktree)
 	if (worktree->head_ref)
 		got_ref_close(worktree->head_ref);
 	if (worktree->lockfd != -1)
-		close(worktree->lockfd);
+		if (close(worktree->lockfd) != 0)
+			err = got_error_from_errno();
 	free(worktree);
+	return err;
 }
 
 const char *
@@ -674,12 +677,12 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	err = got_fileindex_entry_update(ie, ondisk_path,
 	    blob1->id.sha1, worktree->base_commit_id->sha1, 0);
 done:
-	if (merged_fd != -1)
-		close(merged_fd);
-	if (f1)
-		fclose(f1);
-	if (f2)
-		fclose(f2);
+	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
 	if (blob2)
 		got_object_blob_close(blob2);
 	free(merged_path);
@@ -800,8 +803,8 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		err = got_fileindex_entry_add(fileindex, entry);
 	}
 done:
-	if (fd != -1)
-		close(fd);
+	if (fd != -1 && close(fd) != 0 && err == NULL)
+		err = got_error_from_errno();
 	free(tmppath);
 	return err;
 }

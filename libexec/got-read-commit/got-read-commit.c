@@ -147,8 +147,10 @@ done:
 		if (f) {
 			if (fclose(f) != 0 && err == NULL)
 				err = got_error_from_errno();
-		} else if (imsg.fd != -1)
-			close(imsg.fd);
+		} else if (imsg.fd != -1) {
+			if (close(imsg.fd) != 0 && err == NULL)
+				err = got_error_from_errno();
+		}
 		imsg_free(&imsg);
 		if (err)
 			break;
@@ -161,6 +163,7 @@ done:
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
-	close(GOT_IMSG_FD_CHILD);
+	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err ? 1 : 0;
 }
