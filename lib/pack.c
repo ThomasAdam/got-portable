@@ -1134,10 +1134,6 @@ done:
 		if (len != accum_size)
 			err = got_ferror(outfile, GOT_ERR_IO);
 	}
-	if (base_file && fclose(base_file) != 0 && err == NULL)
-		err = got_error_from_errno();
-	if (accum_file && fclose(accum_file) != 0 && err == NULL)
-		err = got_error_from_errno();
 	rewind(outfile);
 	if (err == NULL)
 		*result_size = accum_size;
