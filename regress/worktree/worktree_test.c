@@ -121,7 +121,8 @@ read_meta_file(char **content, const char *path)
 	*content = fparseln(f, &len, NULL, delim, 0);
 	if (*content == NULL)
 		ret = errno;
-	fclose(f);
+	if (fclose(f) != 0 && ret == 0)
+		ret = errno;
 	return ret;
 }
 
@@ -218,7 +219,8 @@ obstruct_meta_file(char **path, const char *worktree_path, const char *name)
 		free(*path);
 		ret = 0;
 	}
-	fclose(f);
+	if (fclose(f) != 0)
+		ret = 0;
 	return ret;
 }
 

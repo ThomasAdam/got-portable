@@ -1000,8 +1000,8 @@ print_diff(void *arg, unsigned char status, const char *path,
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
-	if (f2)
-		fclose(f2);
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
 	free(abspath);
 	return err;
 }

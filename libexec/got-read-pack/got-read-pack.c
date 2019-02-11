@@ -264,12 +264,12 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	err = got_privsep_send_blob(ibuf, obj->size, obj->hdrlen, buf);
 done:
 	free(buf);
-	if (outfile)
-		fclose(outfile);
-	if (basefile)
-		fclose(basefile);
-	if (accumfile)
-		fclose(accumfile);
+	if (outfile && fclose(outfile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (basefile && fclose(basefile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (accumfile && fclose(accumfile) != 0 && err == NULL)
+		err = got_error_from_errno();
 	if (obj)
 		got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)

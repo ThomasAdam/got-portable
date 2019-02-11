@@ -146,7 +146,8 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	err = parse_ref_line(ref, name, line);
 done:
 	free(line);
-	fclose(f);
+	if (fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 
@@ -322,7 +323,8 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		if (f != NULL) {
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
 			    refname);
-			fclose(f);
+			if (fclose(f) != 0 && err == NULL)
+				err = got_error_from_errno();
 			if (err || *ref)
 				goto done;
 		}
@@ -628,7 +630,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	}
 done:
 	free(path_refs);
-	if (f)
-		fclose(f);
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }

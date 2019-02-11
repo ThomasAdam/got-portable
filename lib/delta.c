@@ -390,7 +390,8 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 		err = got_error(GOT_ERR_BAD_DELTA);
 
 	if (memstream != NULL) {
-		fclose(memstream);
+		if (fclose(memstream) != 0)
+			err = got_error_from_errno();
 		if (err == NULL) {
 			size_t n;
 			n = fwrite(memstream_buf, 1, memstream_size, outfile);

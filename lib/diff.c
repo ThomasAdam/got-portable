@@ -61,8 +61,9 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	if (blob2) {
 		f2 = got_opentemp();
 		if (f2 == NULL) {
+			err = got_error_from_errno();
 			fclose(f1);
-			return got_error_from_errno();
+			return err;
 		}
 	} else
 		flags |= D_EMPTY2;
@@ -110,10 +111,10 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	}
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
 done:
-	if (f1)
-		fclose(f1);
-	if (f2)
-		fclose(f2);
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 
@@ -177,8 +178,8 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	fprintf(outfile, "file + %s\n", label2);
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, NULL);
 done:
-	if (f1)
-		fclose(f1);
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 

@@ -419,10 +419,10 @@ closem:
 		if (*rval == D_SAME)
 			*rval = D_DIFFER;
 	}
-	if (f1 != NULL)
-		fclose(f1);
-	if (f2 != NULL)
-		fclose(f2);
+	if (f1 != NULL && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f2 != NULL && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
 
 	return (err);
 }

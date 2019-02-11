@@ -176,7 +176,7 @@ got_object_open_as_blob(struct got_blob_object **,
     struct got_repository *, struct got_object_id *, size_t);
 
 /* Dispose of a blob object. */
-void got_object_blob_close(struct got_blob_object *);
+const struct got_error *got_object_blob_close(struct got_blob_object *);
 
 /*
  * Get the length of header data at the beginning of the blob's read buffer.

@@ -268,13 +268,14 @@ done:
 	return err;
 }
 
-static void
+static const struct got_error *
 blame_close(struct got_blame *blame)
 {
+	const struct got_error *err = NULL;
 	struct got_blame_diff_offsets *diff_offsets;
 
-	if (blame->f)
-		fclose(blame->f);
+	if (blame->f && fclose(blame->f) != 0)
+		err = got_error_from_errno();
 	free(blame->lines);
 	while (!SLIST_EMPTY(&blame->diff_offsets_list)) {
 		diff_offsets = SLIST_FIRST(&blame->diff_offsets_list);
@@ -282,6 +283,7 @@ blame_close(struct got_blame *blame)
 		free_diff_offsets(diff_offsets);
 	}
 	free(blame);
+	return err;
 }
 
 static const struct got_error *
@@ -432,7 +434,7 @@ const struct got_error *
 got_blame(const char *path, struct got_object_id *start_commit_id,
     struct got_repository *repo, FILE *outfile)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
 	int lineno;
 	char *abspath;
@@ -472,9 +474,9 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 		free(id_str);
 	}
 
-	blame_close(blame);
+	close_err = blame_close(blame);
 	free(abspath);
-	return err;
+	return err ? err : close_err;
 }
 
 const struct got_error *
@@ -483,7 +485,7 @@ got_blame_incremental(const char *path, struct got_object_id *commit_id,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
 	char *abspath;
 
@@ -493,6 +495,6 @@ got_blame_incremental(const char *path, struct got_object_id *commit_id,
 	err = blame_open(&blame, abspath, commit_id, repo, cb, arg);
 	free(abspath);
 	if (blame)
-		blame_close(blame);
-	return err;
+		close_err = blame_close(blame);
+	return err ? err : close_err;
 }

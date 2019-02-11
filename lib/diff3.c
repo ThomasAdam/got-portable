@@ -253,12 +253,12 @@ done:
 		unlink(outpath);
 		free(outpath);
 	}
-	if (outfile)
-		fclose(outfile);
-	if (f1)
-		fclose(f1);
-	if (f2)
-		fclose(f2);
+	if (outfile && fclose(outfile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 
@@ -401,8 +401,8 @@ out:
 	worklist_clean(&temp_files, worklist_unlink);
 
 	for (i = 0; i < nitems(d3s->fp); i++) {
-		if (d3s->fp[i])
-			fclose(d3s->fp[i]);
+		if (d3s->fp[i] && fclose(d3s->fp[i]) != 0 && err == NULL)
+			err = got_error_from_errno();
 	}
 	if (err == NULL && diffb) {
 		if (buf_write_fd(diffb, outfd) < 0)
@@ -618,10 +618,11 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		(*dd)[i].new.from = (*dd)[i-1].new.to;
 	}
 
-	(void)fclose(d3s->fp[0]);
+	if (fclose(d3s->fp[0]) != 0)
+		err = got_error_from_errno();
 
 	*n = i;
-	return NULL;
+	return err;
 }
 
 static int

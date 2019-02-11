@@ -1920,8 +1920,10 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_error_from_errno();
 		goto done;
 	}
-	if (s->f)
-		fclose(s->f);
+	if (s->f && fclose(s->f) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	s->f = f;
 
 	if (s->id1)
@@ -2446,7 +2448,8 @@ stop_blame(struct tog_blame *blame)
 		blame->thread_args.repo = NULL;
 	}
 	if (blame->f) {
-		fclose(blame->f);
+		if (fclose(blame->f) != 0 && err == NULL)
+			err = got_error_from_errno();
 		blame->f = NULL;
 	}
 	if (blame->lines) {

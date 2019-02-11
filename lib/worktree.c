@@ -120,7 +120,8 @@ update_meta_file(const char *path_got, const char *name, const char *content)
 
 done:
 	free(tmppath);
-	fclose(tmpfile);
+	if (fclose(tmpfile) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 

@@ -338,7 +338,8 @@ repo_diff_blob(const char *repo_path)
 		}
 		i++;
 	}
-	fclose(outfile);
+	if (fclose(outfile) != 0 && err == NULL)
+		err = got_error_from_errno();
 	test_printf("\n");
 	if (i != nitems(expected_output) + 1) {
 		test_printf("number of lines expected: %d; actual: %d\n",

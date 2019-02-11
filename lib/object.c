@@ -1085,13 +1085,16 @@ got_object_blob_open(struct got_blob_object **blob,
 	return open_blob(blob, repo, got_object_get_id(obj), blocksize);
 }
 
-void
+const struct got_error *
 got_object_blob_close(struct got_blob_object *blob)
 {
+	const struct got_error *err = NULL;
 	free(blob->read_buf);
-	fclose(blob->f);
+	if (fclose(blob->f) != 0)
+		err = got_error_from_errno();
 	free(blob->data);
 	free(blob);
+	return err;
 }
 
 char *

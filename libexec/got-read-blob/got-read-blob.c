@@ -161,9 +161,10 @@ main(int argc, char *argv[])
 
 		err = got_privsep_send_blob(&ibuf, size, obj->hdrlen, buf);
 done:
-		if (f)
-			fclose(f);
-		else if (imsg.fd != -1)
+		if (f) {
+			if (fclose(f) != 0 && err == NULL)
+				err = got_error_from_errno();
+		} else if (imsg.fd != -1)
 			close(imsg.fd);
 		if (imsg_outfd.fd != -1)
 			close(imsg_outfd.fd);
