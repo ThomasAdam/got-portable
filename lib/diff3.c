@@ -240,7 +240,10 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	if (err)
 		goto done;
 
-	fflush(outfile);
+	if (fflush(outfile) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	*d = buf_load(outpath);
 	if (*d == NULL)

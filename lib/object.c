@@ -1161,7 +1161,8 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 		hdrlen = 0;
 	} while (len != 0);
 
-	fflush(outfile);
+	if (fflush(outfile) != 0)
+		return got_error_from_errno();
 	rewind(outfile);
 
 	return NULL;

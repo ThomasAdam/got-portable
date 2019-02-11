@@ -690,7 +690,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			printf("\n");
 	}
 
-	fflush(stdout);
+	if (fflush(stdout) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 

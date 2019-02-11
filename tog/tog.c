@@ -1967,8 +1967,8 @@ create_diff(struct tog_diff_view_state *s)
 		break;
 	}
 done:
-	if (f)
-		fflush(f);
+	if (f && fflush(f) != 0 && err == NULL)
+		err = got_error_from_errno();
 	return err;
 }
 
