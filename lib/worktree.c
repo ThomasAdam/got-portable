@@ -663,7 +663,10 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	    overlapcnt > 0 ? GOT_STATUS_CONFLICT : GOT_STATUS_MERGE, path);
 
 
-	fsync(merged_fd);
+	if (fsync(merged_fd) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (rename(merged_path, ondisk_path) != 0) {
 		err = got_error_from_errno();
@@ -769,7 +772,10 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 	} while (len != 0);
 
-	fsync(fd);
+	if (fsync(fd) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 
 	if (update) {
 		if (rename(tmppath, ondisk_path) != 0) {
