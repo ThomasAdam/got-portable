@@ -900,7 +900,8 @@ get_file_status(unsigned char *status, struct stat *sb,
 		err = got_object_blob_read_block(&blen, blob);
 		if (err)
 			break;
-		flen = fread(fbuf, 1, sizeof(fbuf), f);
+		/* Skip length of blob object header first time around. */
+		flen = fread(fbuf, 1, sizeof(fbuf) - hdrlen, f);
 		if (blen == 0) {
 			if (flen != 0)
 				*status = GOT_STATUS_MODIFY;

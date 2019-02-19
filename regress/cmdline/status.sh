@@ -280,6 +280,59 @@ function test_status_ignores_symlink {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_shows_no_mods_after_complete_merge {
+	local testroot=`test_init status_shows_no_mods_after_complete_merge 1`
+
+	# make this file larger than the usual blob buffer size of 8192
+	echo -n > $testroot/repo/numbers
+	for i in `jot 16384`; do
+		echo "$i" >> $testroot/repo/numbers
+	done
+
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i 's/2/22/' $testroot/repo/numbers
+	git_commit $testroot/repo -m "modified line 2"
+
+	sleep 1
+	# modify line 2 again; no local changes are left after merge
+	sed -i 's/2/22/' $testroot/wt/numbers
+
+	echo "G  numbers" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -287,3 +340,4 @@ run_test test_status_obstructed
 run_test test_status_shows_local_mods_after_update
 run_test test_status_unversioned_subdirs
 run_test test_status_ignores_symlink
+run_test test_status_shows_no_mods_after_complete_merge
