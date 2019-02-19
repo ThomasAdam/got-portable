@@ -153,7 +153,10 @@ read_meta_file(char **content, const char *path_got, const char *name)
 		goto done;
 	}
 
-	stat(path, &sb);
+	if (lstat(path, &sb) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
 	*content = calloc(1, sb.st_size);
 	if (*content == NULL) {
 		err = got_error_from_errno();
