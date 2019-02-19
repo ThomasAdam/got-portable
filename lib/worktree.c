@@ -601,6 +601,96 @@ done:
 	return err;
 }
 
+static const struct got_error *
+check_file_contents_equal(int *same, FILE *f1, FILE *f2)
+{
+	const struct got_error *err = NULL;
+	uint8_t fbuf1[8192];
+	uint8_t fbuf2[8192];
+	size_t flen1 = 0, flen2 = 0;
+
+	*same = 1;
+
+	while (1) {
+		flen1 = fread(fbuf1, 1, sizeof(fbuf1), f1);
+		if (flen1 == 0 && ferror(f1)) {
+			err = got_error_from_errno();
+			break;
+		}
+		flen2 = fread(fbuf2, 1, sizeof(fbuf2), f2);
+		if (flen2 == 0 && ferror(f2)) {
+			err = got_error_from_errno();
+			break;
+		}
+		if (flen1 == 0) {
+			if (flen2 != 0)
+				*same = 0;
+			break;
+		} else if (flen2 == 0) {
+			if (flen1 != 0)
+				*same = 0;
+			break;
+		} else if (flen1 == flen2) {
+			if (memcmp(fbuf1, fbuf2, flen2) != 0) {
+				*same = 0;
+				break;
+			}
+		} else {
+			*same = 0;
+			break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
+check_files_equal(int *same, const char *f1_path, const char *f2_path)
+{
+	const struct got_error *err = NULL;
+	struct stat sb;
+	size_t size1, size2;
+	FILE *f1 = NULL, *f2 = NULL;
+
+	*same = 1;
+
+	if (lstat(f1_path, &sb) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	size1 = sb.st_size;
+
+	if (lstat(f2_path, &sb) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	size2 = sb.st_size;
+
+	if (size1 != size2) {
+		*same = 0;
+		return NULL;
+	}
+
+	f1 = fopen(f1_path, "r");
+	if (f1 == NULL)
+		return got_error_from_errno();
+
+	f2 = fopen(f2_path, "r");
+	if (f2 == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = check_file_contents_equal(same, f1, f2);
+done:
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno();
+
+	return err;
+}
+
 /*
  * Perform a 3-way merge where the file's version in the file index (blob2)
  * acts as the common ancestor, the incoming blob (blob1) acts as the first
@@ -622,7 +712,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct got_object_id id2;
 	char *id_str = NULL;
 	char *label1 = NULL;
-	int overlapcnt = 0;
+	int overlapcnt = 0, update_timestamps = 0;
 	char *parent;
 
 	parent = dirname(ondisk_path);
@@ -691,6 +781,14 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		goto done;
 	}
 
+	/* Check if a clean merge has subsumed all local changes. */
+	if (overlapcnt == 0) {
+		err = check_files_equal(&update_timestamps, blob1_path,
+		    merged_path);
+		if (err)
+			goto done;
+	}
+
 	if (rename(merged_path, ondisk_path) != 0) {
 		err = got_error_from_errno();
 		goto done;
@@ -701,7 +799,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	 * the status walk would treat them as unmodified files again.
 	 */
 	err = got_fileindex_entry_update(ie, ondisk_path,
-	    blob1->id.sha1, worktree->base_commit_id->sha1, 0);
+	    blob1->id.sha1, worktree->base_commit_id->sha1, update_timestamps);
 done:
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno();
