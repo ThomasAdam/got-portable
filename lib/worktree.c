@@ -618,23 +618,46 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct got_blob_object *blob2 = NULL;
 	FILE *f1 = NULL, *f2 = NULL;
 	char *blob1_path = NULL, *blob2_path = NULL;
-	char *merged_path = NULL;
+	char *merged_path = NULL, *base_path = NULL;
 	struct got_object_id id2;
 	char *id_str = NULL;
 	char *label1 = NULL;
 	int overlapcnt = 0;
+	char *parent;
 
-	err = got_opentemp_named_fd(&merged_path, &merged_fd, "/tmp/got-merged");
+	parent = dirname(ondisk_path);
+	if (parent == NULL)
+		return got_error_from_errno();
+
+	if (asprintf(&base_path, "%s/got-merged", parent) == -1)
+		return got_error_from_errno();
+
+	err = got_opentemp_named_fd(&merged_path, &merged_fd, base_path);
 	if (err)
-		return err;
-	err = got_opentemp_named(&blob1_path, &f1, "/tmp/got-merge-blob1");
+		goto done;
+
+	free(base_path);
+	if (asprintf(&base_path, "%s/got-merge-blob1", parent) == -1) {
+		err = got_error_from_errno();
+		base_path = NULL;
+		goto done;
+	}
+
+	err = got_opentemp_named(&blob1_path, &f1, base_path);
 	if (err)
 		goto done;
 	err = got_object_blob_dump_to_file(NULL, NULL, f1, blob1);
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(&blob2_path, &f2, "/tmp/got-merge-blob2");
+	free(base_path);
+	if (asprintf(&base_path, "%s/got-merge-blob2", parent) == -1) {
+		err = got_error_from_errno();
+		base_path = NULL;
+		goto done;
+	}
+
+	err = got_opentemp_named(&blob2_path, &f2, base_path);
 	if (err)
 		goto done;
 
@@ -689,6 +712,7 @@ done:
 	if (blob2)
 		got_object_blob_close(blob2);
 	free(merged_path);
+	free(base_path);
 	if (blob1_path) {
 		unlink(blob1_path);
 		free(blob1_path);
