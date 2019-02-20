@@ -793,6 +793,11 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			goto done;
 	}
 
+	if (chmod(merged_path, st_mode) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
 	if (rename(merged_path, ondisk_path) != 0) {
 		err = got_error_from_errno();
 		unlink(merged_path);
