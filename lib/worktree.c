@@ -115,6 +115,7 @@ update_meta_file(const char *path_got, const char *name, const char *content)
 
 	if (rename(tmppath, path) != 0) {
 		err = got_error_from_errno();
+		unlink(tmppath);
 		goto done;
 	}
 
@@ -794,6 +795,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (rename(merged_path, ondisk_path) != 0) {
 		err = got_error_from_errno();
+		unlink(merged_path);
 		goto done;
 	}
 
@@ -905,6 +907,7 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (update) {
 		if (rename(tmppath, ondisk_path) != 0) {
 			err = got_error_from_errno();
+			unlink(tmppath);
 			goto done;
 		}
 	}
@@ -1266,6 +1269,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
 		err = got_error_from_errno();
+		unlink(new_fileindex_path);
 		goto done;
 	}
 
