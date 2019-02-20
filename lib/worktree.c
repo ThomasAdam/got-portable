@@ -799,7 +799,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	/*
 	 * Do not update timestamps of already modified files. Otherwise,
-	 * the status walk would treat them as unmodified files again.
+	 * a future status walk would treat them as unmodified files again.
 	 */
 	err = got_fileindex_entry_update(ie, ondisk_path,
 	    blob1->id.sha1, worktree->base_commit_id->sha1, update_timestamps);
