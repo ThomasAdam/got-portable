@@ -1209,16 +1209,26 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
-		if (pentry == NULL) {
+		while (pentry == NULL) {
 			int errcode;
 			if (*log_complete)
-				return NULL;
+				break;
 			*commits_needed = maxscroll + 20;
 			errcode = pthread_cond_signal(need_commits);
 			if (errcode)
 				return got_error_set_errno(errcode);
-			return NULL;
+			errcode = pthread_mutex_unlock(&tog_mutex);
+			if (errcode)
+				return got_error_set_errno(errcode);
+			pthread_yield();
+			errcode = pthread_mutex_lock(&tog_mutex);
+			if (errcode)
+				return got_error_set_errno(errcode);
+			pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 		}
+		if (pentry == NULL)
+			break;
+
 		*last_displayed_entry = pentry;
 
 		pentry = TAILQ_NEXT(*first_displayed_entry, entry);
