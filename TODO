@@ -1,7 +1,6 @@
 lib:
 - handle checkout of trees which contain submodules by identifying and
   ignoring such tree entries; requires a .ini config parser (from isakmpd?)
-- make 'got update' perform a 3-way merge for modified files
 
 tog:
 - allow loading new commits in 'tog log' after startup (e.g. via Ctrl-L, 'r')
