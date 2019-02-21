@@ -98,16 +98,6 @@ enum tog_view_type {
 	TOG_VIEW_TREE
 };
 
-struct tog_diff_view_state {
-	struct got_object_id *id1, *id2;
-	FILE *f;
-	int first_displayed_line;
-	int last_displayed_line;
-	int eof;
-	int diff_context;
-	struct got_repository *repo;
-};
-
 struct commit_queue_entry {
 	TAILQ_ENTRY(commit_queue_entry) entry;
 	struct got_object_id *id;
@@ -118,6 +108,23 @@ TAILQ_HEAD(commit_queue_head, commit_queue_entry);
 struct commit_queue {
 	int ncommits;
 	struct commit_queue_head head;
+};
+
+struct tog_diff_view_state {
+	struct got_object_id *id1, *id2;
+	FILE *f;
+	int first_displayed_line;
+	int last_displayed_line;
+	int eof;
+	int diff_context;
+	struct got_repository *repo;
+
+	/* passed from log view; may be NULL */
+	struct commit_queue_entry *selected_entry;
+	struct commit_queue *commits;
+	int *log_complete;
+	pthread_cond_t *need_commits;
+	int *commits_needed;
 };
 
 pthread_mutex_t tog_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -263,7 +270,9 @@ struct tog_view {
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
-    struct got_object_id *, struct got_object_id *, struct got_repository *);
+    struct got_object_id *, struct got_object_id *, struct commit_queue_entry *,
+    struct commit_queue *, int *, pthread_cond_t *, int *,
+    struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1223,12 +1232,16 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 static const struct got_error *
 open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
-    struct got_object_id *commit_id, struct got_commit_object *commit,
+    struct commit_queue_entry *selected_entry,
+    struct commit_queue *commits, int *log_complete,
+    pthread_cond_t *need_commits, int *commits_needed,
     struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *parent_id;
 	struct tog_view *diff_view;
+	struct got_commit_object *commit = selected_entry->commit;
+	struct got_object_id *commit_id = selected_entry->id;
 
 	diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
 	if (diff_view == NULL)
@@ -1236,7 +1249,8 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 
 	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
-	    commit_id, repo);
+	    commit_id, selected_entry, commits, log_complete, need_commits,
+	    commits_needed, repo);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
@@ -1538,8 +1552,10 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (view_is_parent_view(view))
 				begin_x = view_split_begin_x(view->begin_x);
 			err = open_diff_view_for_commit(&diff_view, begin_x,
-			    s->selected_entry->id, s->selected_entry->commit,
-			    s->repo);
+			    s->selected_entry, &s->commits,
+			    &s->thread_args.log_complete,
+			    &s->thread_args.need_commits,
+			    &s->thread_args.commits_needed, s->repo);
 			if (err)
 				break;
 			if (view_is_parent_view(view)) {
@@ -1950,12 +1966,16 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
 		if (err)
 			break;
-		/* Show commit info if we're diffing to a parent commit. */
-		parent_ids = got_object_commit_get_parent_ids(commit2);
-		SIMPLEQ_FOREACH(pid, parent_ids, entry) {
-			if (got_object_id_cmp(s->id1, pid->id) == 0) {
-				write_commit_info(s->id2, s->repo, f);
-				break;
+		/* Show commit info if we're diffing to a parent/root commit. */
+		if (s->id1 == NULL)
+			write_commit_info(s->id2, s->repo, f);
+		else {
+			parent_ids = got_object_commit_get_parent_ids(commit2);
+			SIMPLEQ_FOREACH(pid, parent_ids, entry) {
+				if (got_object_id_cmp(s->id1, pid->id) == 0) {
+					write_commit_info(s->id2, s->repo, f);
+					break;
+				}
 			}
 		}
 		got_object_commit_close(commit2);
@@ -1976,7 +1996,10 @@ done:
 
 static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
-    struct got_object_id *id2, struct got_repository *repo)
+    struct got_object_id *id2, struct commit_queue_entry *selected_entry,
+    struct commit_queue *commits, int *log_complete,
+    pthread_cond_t *need_commits, int *commits_needed,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 
@@ -2010,6 +2033,11 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->state.diff.first_displayed_line = 1;
 	view->state.diff.last_displayed_line = view->nlines;
 	view->state.diff.diff_context = 3;
+	view->state.diff.selected_entry = selected_entry;
+	view->state.diff.commits = commits;
+	view->state.diff.log_complete = log_complete;
+	view->state.diff.need_commits = need_commits;
+	view->state.diff.commits_needed = commits_needed;
 	view->state.diff.repo = repo;
 
 	err = create_diff(&view->state.diff);
@@ -2074,11 +2102,36 @@ show_diff_view(struct tog_view *view)
 }
 
 static const struct got_error *
+set_selected_commit(struct tog_diff_view_state *s,
+    struct commit_queue_entry *entry)
+{
+	struct commit_queue_entry *pentry;
+
+	free(s->id2);
+	s->id2 = got_object_id_dup(entry->id);
+	if (s->id2 == NULL)
+		return got_error_from_errno();
+
+	free(s->id1);
+	s->id1 = NULL;
+	pentry = TAILQ_NEXT(entry, entry);
+	if (pentry) {
+		s->id1 = got_object_id_dup(pentry->id);
+		if (s->id1 == NULL)
+			return got_error_from_errno();
+	}
+
+	s->selected_entry = entry;
+	return NULL;
+}
+
+static const struct got_error *
 input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
     struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_diff_view_state *s = &view->state.diff;
+	struct commit_queue_entry *entry, *pentry;
 	int i;
 
 	switch (ch) {
@@ -2120,6 +2173,66 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->diff_context++;
 				err = create_diff(s);
 			}
+			break;
+		case '<':
+		case ',':
+			if (s->commits == NULL)
+				break;
+			entry = TAILQ_PREV(s->selected_entry,
+			    commit_queue_head, entry);
+			if (entry == NULL)
+				break;
+
+			err = set_selected_commit(s, entry);
+			if (err)
+				break;
+
+			s->first_displayed_line = 1;
+			s->last_displayed_line = view->nlines;
+
+			err = create_diff(s);
+			break;
+		case '>':
+		case '.':
+			if (s->commits == NULL)
+				break;
+			entry = TAILQ_NEXT(s->selected_entry, entry);
+			if (entry)
+				pentry = TAILQ_NEXT(entry, entry);
+			if (entry == NULL || pentry == NULL) {
+				if (!*s->log_complete)
+					*s->commits_needed = 2;
+			}
+			while (entry == NULL || pentry == NULL) {
+				int errcode;
+				if (*s->log_complete)
+					break;
+				errcode = pthread_cond_signal(s->need_commits);
+				if (errcode)
+					return got_error_set_errno(errcode);
+				errcode = pthread_mutex_unlock(&tog_mutex);
+				if (errcode)
+					return got_error_set_errno(errcode);
+				pthread_yield();
+				errcode = pthread_mutex_lock(&tog_mutex);
+				if (errcode)
+					return got_error_set_errno(errcode);
+				entry = TAILQ_NEXT(s->selected_entry, entry);
+				if (entry)
+					pentry = TAILQ_NEXT(entry, entry);
+			}
+
+			if (entry == NULL)
+				break;
+
+			err = set_selected_commit(s, entry);
+			if (err)
+				break;
+
+			s->first_displayed_line = 1;
+			s->last_displayed_line = view->nlines;
+
+			err = create_diff(s);
 			break;
 		default:
 			break;
@@ -2197,7 +2310,8 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
-	error = open_diff_view(view, id1, id2, repo);
+	error = open_diff_view(view, id1, id2, NULL, NULL, NULL, NULL, NULL,
+	    repo);
 	if (error)
 		goto done;
 	error = view_loop(view);
@@ -2771,7 +2885,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			err = open_diff_view(diff_view, pid ? pid->id : NULL,
-			    id, s->repo);
+			    id, NULL, NULL, NULL, NULL, NULL, s->repo);
 			got_object_commit_close(commit);
 			if (err) {
 				view_close(diff_view);

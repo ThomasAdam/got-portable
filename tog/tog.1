@@ -135,6 +135,11 @@ Scroll up.
 Reduce the amount of diff context lines.
 .It Cm ]
 Increase the amount of diff context lines.
+.It Cm <, Comma
+If the diff view was opened via the log view, move to the previous (younger)
+commit.
+.It Cm >, Full stop
+If the diff view was opened via the log view, move to the next (older) commit.
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.

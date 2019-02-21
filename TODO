@@ -7,5 +7,4 @@ tog:
 - make diff view generate diffs in a background thread
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
-- make it possible to move between commit diffs with a single key press
 - implement search feature
