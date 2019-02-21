@@ -234,6 +234,7 @@ const struct got_error *
 got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
+	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj, *iobjp;
 	size_t len;
 
@@ -248,8 +249,11 @@ got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_REQUEST, 0, 0, fd, iobjp, len)
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -258,6 +262,7 @@ const struct got_error *
 got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
+	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj, *iobjp;
 	size_t len;
 
@@ -272,8 +277,11 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, fd, iobjp, len)
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -306,6 +314,7 @@ const struct got_error *
 got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
     struct got_object_id *id, int pack_idx)
 {
+	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj, *iobjp;
 	size_t len;
 
@@ -320,8 +329,11 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, iobjp, len)
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(infd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -329,9 +341,14 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
 const struct got_error *
 got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
 {
+	const struct got_error *err = NULL;
+
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(outfd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -339,9 +356,14 @@ got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
 const struct got_error *
 got_privsep_send_tmpfd(struct imsgbuf *ibuf, int fd)
 {
+	const struct got_error *err = NULL;
+
 	if (imsg_compose(ibuf, GOT_IMSG_TMPFD, 0, 0, fd, NULL, 0)
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }
@@ -1132,6 +1154,7 @@ const struct got_error *
 got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx)
 {
+	const struct got_error *err = NULL;
 	struct got_imsg_packidx ipackidx;
 	struct got_imsg_pack ipack;
 	int fd;
@@ -1142,8 +1165,11 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 		return got_error_from_errno();
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKIDX, 0, 0, fd, &ipackidx,
-	    sizeof(ipackidx)) == -1)
-		return got_error_from_errno();
+	    sizeof(ipackidx)) == -1) {
+		err = got_error_from_errno();
+		close(fd);
+		return err;
+	}
 
 	if (strlcpy(ipack.path_packfile, pack->path_packfile,
 	    sizeof(ipack.path_packfile)) >= sizeof(ipack.path_packfile))
@@ -1155,8 +1181,11 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 		return got_error_from_errno();
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACK, 0, 0, fd, &ipack, sizeof(ipack))
-	    == -1)
-		return got_error_from_errno();
+	    == -1) {
+		err = got_error_from_errno();
+		close(fd);
+		return err;
+	}
 
 	return flush_imsg(ibuf);
 }

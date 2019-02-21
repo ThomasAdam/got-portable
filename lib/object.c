@@ -440,8 +440,6 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	err = got_repo_cache_object(repo, id, *obj);
 done:
 	free(path);
-	if (fd != -1 && close(fd) != 0 && errno != EBADF && err == NULL)
-		err = got_error_from_errno();
 	return err;
 
 }
@@ -605,8 +603,6 @@ open_commit(struct got_commit_object **commit,
 		if (err)
 			return err;
 		err = read_commit_privsep(commit, fd, repo);
-		if (close(fd) != 0 && errno != EBADF && err == NULL)
-			err = got_error_from_errno();
 	}
 
 	if (err == NULL) {
@@ -785,8 +781,6 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 		if (err)
 			return err;
 		err = read_tree_privsep(tree, fd, repo);
-		if (close(fd) != 0 && errno != EBADF && err == NULL)
-			err = got_error_from_errno();
 	}
 
 	if (err == NULL) {
@@ -850,25 +844,22 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	err = got_privsep_send_blob_outfd(pack->privsep_child->ibuf,
 	    outfd_child);
 	if (err) {
-		close(outfd_child);
+		close(basefd);
+		close(accumfd);
 		return err;
 	}
+
 	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
 	    basefd);
 	if (err) {
-		close(basefd);
 		close(accumfd);
-		close(outfd_child);
 		return err;
 	}
 
 	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
 	    accumfd);
-	if (err) {
-		close(accumfd);
-		close(outfd_child);
+	if (err)
 		return err;
-	}
 
 	err = got_privsep_recv_blob(outbuf, size, hdrlen,
 	    pack->privsep_child->ibuf);
@@ -914,10 +905,8 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 		return err;
 
 	err = got_privsep_send_blob_outfd(ibuf, outfd_child);
-	if (err) {
-		close(outfd_child);
+	if (err)
 		return err;
-	}
 
 	err = got_privsep_recv_blob(outbuf, size, hdrlen, ibuf);
 	if (err)
@@ -1021,8 +1010,6 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 			goto done;
 		err = read_blob_privsep(&outbuf, &size, &hdrlen, outfd, infd,
 		    repo);
-		if (close(infd) != 0 && errno != EBADF && err == NULL)
-			err = got_error_from_errno();
 	}
 	if (err)
 		goto done;
@@ -1310,8 +1297,6 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		if (err)
 			return err;
 		err = read_tag_privsep(tag, fd, repo);
-		if (close(fd) != 0 && errno != EBADF && err == NULL)
-			err = got_error_from_errno();
 	}
 
 	if (err == NULL) {
