@@ -1484,6 +1484,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'k':
 		case KEY_UP:
+		case '<':
+		case ',':
 			if (s->first_displayed_entry == NULL)
 				break;
 			if (s->selected > 0)
@@ -1506,6 +1508,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'j':
 		case KEY_DOWN:
+		case '>':
+		case '.':
 			if (s->first_displayed_entry == NULL)
 				break;
 			if (s->selected < MIN(view->nlines - 2,
