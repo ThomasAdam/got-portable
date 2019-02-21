@@ -1204,11 +1204,12 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
+		if (pentry == NULL)
+			*commits_needed = maxscroll + 20;
 		while (pentry == NULL) {
 			int errcode;
 			if (*log_complete)
 				break;
-			*commits_needed = maxscroll + 20;
 			errcode = pthread_cond_signal(need_commits);
 			if (errcode)
 				return got_error_set_errno(errcode);
