@@ -2174,14 +2174,15 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case ',':
 			if (s->log_view == NULL)
 				break;
-			err = input_log_view(NULL, NULL, NULL, s->log_view,
-			    KEY_UP);
-			if (err)
-				break;
 			ls = &s->log_view->state.log;
 			entry = TAILQ_PREV(ls->selected_entry,
 			    commit_queue_head, entry);
 			if (entry == NULL)
+				break;
+
+			err = input_log_view(NULL, NULL, NULL, s->log_view,
+			    KEY_UP);
+			if (err)
 				break;
 
 			err = set_selected_commit(s, entry);
@@ -2197,7 +2198,6 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case '.':
 			if (s->log_view == NULL)
 				break;
-
 			ls = &s->log_view->state.log;
 			err = input_log_view(NULL, NULL, NULL, s->log_view,
 			    KEY_DOWN);
