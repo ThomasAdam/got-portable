@@ -394,8 +394,13 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 
 #ifndef GOT_PACK_NO_MMAP
 	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
-	if (p->map == MAP_FAILED)
+	if (p->map == MAP_FAILED) {
+		if (errno != ENOMEM) {
+			err = got_error_from_errno();
+			goto done;
+		}
 		p->map = NULL; /* fall back to read(2) */
+	}
 #endif
 
 	err = got_packidx_init_hdr(p, verify);

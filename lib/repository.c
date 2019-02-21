@@ -763,8 +763,13 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 #ifndef GOT_PACK_NO_MMAP
 	pack->map = mmap(NULL, pack->filesize, PROT_READ, MAP_PRIVATE,
 	    pack->fd, 0);
-	if (pack->map == MAP_FAILED)
+	if (pack->map == MAP_FAILED) {
+		if (errno != ENOMEM) {
+			err = got_error_from_errno();
+			goto done;
+		}
 		pack->map = NULL; /* fall back to read(2) */
+	}
 #endif
 done:
 	if (err) {
