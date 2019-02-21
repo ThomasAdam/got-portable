@@ -2101,21 +2101,23 @@ static const struct got_error *
 set_selected_commit(struct tog_diff_view_state *s,
     struct commit_queue_entry *entry)
 {
-	struct commit_queue_entry *pentry;
+	const struct got_error *err;
+	const struct got_object_id_queue *parent_ids;
+	struct got_commit_object *selected_commit;
+	struct got_object_qid *pid;
 
 	free(s->id2);
 	s->id2 = got_object_id_dup(entry->id);
 	if (s->id2 == NULL)
 		return got_error_from_errno();
 
+	err = got_object_open_as_commit(&selected_commit, s->repo, entry->id);
+	if (err)
+		return err;
+	parent_ids = got_object_commit_get_parent_ids(selected_commit);
 	free(s->id1);
-	s->id1 = NULL;
-	pentry = TAILQ_NEXT(entry, entry);
-	if (pentry) {
-		s->id1 = got_object_id_dup(pentry->id);
-		if (s->id1 == NULL)
-			return got_error_from_errno();
-	}
+	pid = SIMPLEQ_FIRST(parent_ids);
+	s->id1 = pid ? got_object_id_dup(pid->id) : NULL;
 
 	return NULL;
 }
