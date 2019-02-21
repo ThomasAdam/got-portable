@@ -1204,7 +1204,7 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
-		if (pentry == NULL) {
+		if (pentry == NULL && !*log_complete) {
 			*commits_needed = maxscroll + 20;
 			while (*commits_needed > 0) {
 				int errcode;
