@@ -2118,7 +2118,7 @@ set_selected_commit(struct tog_diff_view_state *s,
 	free(s->id1);
 	pid = SIMPLEQ_FIRST(parent_ids);
 	s->id1 = pid ? got_object_id_dup(pid->id) : NULL;
-
+	got_object_commit_close(selected_commit);
 	return NULL;
 }
 
