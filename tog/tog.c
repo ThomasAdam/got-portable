@@ -1259,7 +1259,7 @@ scroll_down(struct tog_view *view,
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 		if (pentry == NULL && !*log_complete) {
-			*commits_needed = maxscroll;
+			(*commits_needed)++;
 
 			/* Redraw screen for "loading..." message. */
 			err = show_log_view(view);
