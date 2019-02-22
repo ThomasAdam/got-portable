@@ -489,6 +489,19 @@ view_is_splitscreen(struct tog_view *view)
 	return view->begin_x > 0;
 }
 
+/*
+ * Erase all content of the view. Can be used to "flash" the view because
+ * the view loop will redraw it quickly, providing a more subtle visual
+ * effect than curs_flash(3) would provide.
+ */
+static void
+view_flash(struct tog_view *view)
+{
+	werase(view->window);
+	update_panels();
+	doupdate();
+}
+
 static void
 tog_resizeterm(void)
 {
@@ -1225,15 +1238,18 @@ done:
 }
 
 static void
-scroll_up(struct commit_queue_entry **first_displayed_entry, int maxscroll,
+scroll_up(struct tog_view *view,
+    struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue *commits)
 {
 	struct commit_queue_entry *entry;
 	int nscrolled = 0;
 
 	entry = TAILQ_FIRST(&commits->head);
-	if (*first_displayed_entry == entry)
+	if (*first_displayed_entry == entry) {
+		view_flash(view);
 		return;
+	}
 
 	entry = *first_displayed_entry;
 	while (entry && nscrolled < maxscroll) {
@@ -1285,7 +1301,8 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
 }
 
 static const struct got_error *
-scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
+scroll_down(struct tog_view *view,
+    struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue_entry **last_displayed_entry,
     struct commit_queue *commits, int *log_complete, int *commits_needed,
     pthread_cond_t *need_commits)
@@ -1312,8 +1329,11 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
-		if (pentry == NULL)
+		if (pentry == NULL) {
+			if (*log_complete)
+				view_flash(view);
 			break;
+		}
 
 		*last_displayed_entry = pentry;
 
@@ -1587,7 +1607,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected--;
 			if (s->selected > 0)
 				break;
-			scroll_up(&s->first_displayed_entry, 1,
+			scroll_up(view, &s->first_displayed_entry, 1,
 			    &s->commits);
 			break;
 		case KEY_PPAGE:
@@ -1595,10 +1615,14 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			if (TAILQ_FIRST(&s->commits.head) ==
 			    s->first_displayed_entry) {
+				if (s->selected == 0) {
+					view_flash(view);
+					break;
+				}
 				s->selected = 0;
 				break;
 			}
-			scroll_up(&s->first_displayed_entry,
+			scroll_up(view, &s->first_displayed_entry,
 			    view->nlines, &s->commits);
 			break;
 		case 'j':
@@ -1612,7 +1636,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected++;
 				break;
 			}
-			err = scroll_down(&s->first_displayed_entry, 1,
+			err = scroll_down(view, &s->first_displayed_entry, 1,
 			    &s->last_displayed_entry, &s->commits,
 			    &s->thread_args.log_complete,
 			    &s->thread_args.commits_needed,
@@ -1623,7 +1647,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			first = s->first_displayed_entry;
 			if (first == NULL)
 				break;
-			err = scroll_down(&s->first_displayed_entry,
+			err = scroll_down(view, &s->first_displayed_entry,
 			    view->nlines, &s->last_displayed_entry,
 			    &s->commits, &s->thread_args.log_complete,
 			    &s->thread_args.commits_needed,
@@ -2262,8 +2286,14 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case KEY_UP:
 			if (s->first_displayed_line > 1)
 				s->first_displayed_line--;
+			else
+				view_flash(view);
 			break;
 		case KEY_PPAGE:
+			if (s->first_displayed_line == 1) {
+				view_flash(view);
+				break;
+			}
 			i = 0;
 			while (i++ < view->nlines - 1 &&
 			    s->first_displayed_line > 1)
@@ -2273,9 +2303,15 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case KEY_DOWN:
 			if (!s->eof)
 				s->first_displayed_line++;
+			else
+				view_flash(view);
 			break;
 		case KEY_NPAGE:
 		case ' ':
+			if (s->eof) {
+				view_flash(view);
+				break;
+			}
 			i = 0;
 			while (!s->eof && i++ < view->nlines - 1) {
 				char *line;
@@ -2889,9 +2925,15 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			else if (s->selected_line == 1 &&
 			    s->first_displayed_line > 1)
 				s->first_displayed_line--;
+			else
+				view_flash(view);
 			break;
 		case KEY_PPAGE:
 			if (s->first_displayed_line == 1) {
+				if (s->selected_line == 1) {
+					view_flash(view);
+					break;
+				}
 				s->selected_line = 1;
 				break;
 			}
@@ -2910,6 +2952,8 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			else if (s->last_displayed_line <
 			    s->blame.nlines)
 				s->first_displayed_line++;
+			else
+				view_flash(view);
 			break;
 		case 'b':
 		case 'p': {
@@ -3047,6 +3091,12 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		}
 		case KEY_NPAGE:
 		case ' ':
+			if (s->last_displayed_line >= s->blame.nlines &&
+			    s->selected_line >= MIN(s->blame.nlines,
+			        view->nlines - 2)) {
+				view_flash(view);
+				break;
+			}
 			if (s->last_displayed_line >= s->blame.nlines &&
 			    s->selected_line < view->nlines - 2) {
 				s->selected_line = MIN(s->blame.nlines,
@@ -3325,7 +3375,8 @@ draw_tree_entries(struct tog_view *view,
 }
 
 static void
-tree_scroll_up(struct got_tree_entry **first_displayed_entry, int maxscroll,
+tree_scroll_up(struct tog_view *view,
+    struct got_tree_entry **first_displayed_entry, int maxscroll,
     const struct got_tree_entries *entries, int isroot)
 {
 	struct got_tree_entry *te, *prev;
@@ -3336,6 +3387,7 @@ tree_scroll_up(struct got_tree_entry **first_displayed_entry, int maxscroll,
 
 	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == te) {
+		view_flash(view);
 		if (!isroot)
 			*first_displayed_entry = NULL;
 		return;
@@ -3599,6 +3651,10 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'k':
 		case KEY_UP:
+			if (s->selected == 0) {
+				view_flash(view);
+				break;
+			}
 			if (s->selected > 0) {
 				s->selected--;
 				if (s->selected == 0)
@@ -3606,11 +3662,11 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			}
 			if (s->selected > 0)
 				break;
-			tree_scroll_up(&s->first_displayed_entry, 1,
+			tree_scroll_up(view, &s->first_displayed_entry, 1,
 			    s->entries, s->tree == s->root);
 			break;
 		case KEY_PPAGE:
-			tree_scroll_up(&s->first_displayed_entry,
+			tree_scroll_up(view, &s->first_displayed_entry,
 			    MAX(0, view->nlines - 4 - s->selected), s->entries,
 			    s->tree == s->root);
 			s->selected = 0;
@@ -3627,6 +3683,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (SIMPLEQ_NEXT(s->last_displayed_entry, entry)
 			    == NULL) {
 				/* can't scroll any further */
+				view_flash(view);
 				break;
 			}
 			tree_scroll_down(&s->first_displayed_entry, 1,
@@ -3638,6 +3695,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				/* can't scroll any further; move cursor down */
 				if (s->selected < s->ndisplayed - 1)
 					s->selected = s->ndisplayed - 1;
+				else
+					view_flash(view);
 				break;
 			}
 			nscrolled = tree_scroll_down(&s->first_displayed_entry,
