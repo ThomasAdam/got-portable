@@ -2286,18 +2286,6 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (err)
 				break;
 
-			/* Hack: Ensure two commits get loaded. */
-			if (!ls->thread_args.log_complete) {
-				err = input_log_view(NULL, NULL, NULL,
-				    s->log_view, KEY_DOWN);
-				if (err)
-					break;
-				err = input_log_view(NULL, NULL, NULL,
-				    s->log_view, KEY_UP);
-				if (err)
-					break;
-			}
-
 			entry = TAILQ_NEXT(ls->selected_entry, entry);
 			if (entry == NULL)
 				break;
