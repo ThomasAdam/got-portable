@@ -486,7 +486,7 @@ view_set_child(struct tog_view *view, struct tog_view *child)
 static int
 view_is_splitscreen(struct tog_view *view)
 {
-	return !view_is_parent_view(view) && view->begin_x > 0;
+	return view->begin_x > 0;
 }
 
 static void
@@ -2107,6 +2107,15 @@ done:
 	return err;
 }
 
+static void
+diff_view_indicate_progress(struct tog_view *view)
+{
+	werase(view->window);
+	waddstr(view->window, "diffing...");
+	update_panels();
+	doupdate();
+}
+
 static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, struct tog_view *log_view,
@@ -2147,6 +2156,10 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->state.diff.log_view = log_view;
 	view->state.diff.repo = repo;
 	view->state.diff.refs = refs;
+
+	if (log_view && view_is_splitscreen(view))
+		show_log_view(log_view); /* draw vborder */
+	diff_view_indicate_progress(view);
 
 	err = create_diff(&view->state.diff);
 	if (err) {
@@ -2275,12 +2288,14 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 		case '[':
 			if (s->diff_context > 0) {
 				s->diff_context--;
+				diff_view_indicate_progress(view);
 				err = create_diff(s);
 			}
 			break;
 		case ']':
 			if (s->diff_context < GOT_DIFF_MAX_CONTEXT) {
 				s->diff_context++;
+				diff_view_indicate_progress(view);
 				err = create_diff(s);
 			}
 			break;
@@ -2306,6 +2321,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->first_displayed_line = 1;
 			s->last_displayed_line = view->nlines;
 
+			diff_view_indicate_progress(view);
 			err = create_diff(s);
 			break;
 		case '>':
@@ -2345,6 +2361,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->first_displayed_line = 1;
 			s->last_displayed_line = view->nlines;
 
+			diff_view_indicate_progress(view);
 			err = create_diff(s);
 			break;
 		default:
