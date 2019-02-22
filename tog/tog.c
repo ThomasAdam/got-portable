@@ -1256,34 +1256,30 @@ scroll_down(struct tog_view *view,
 	if (*last_displayed_entry == NULL)
 		return NULL;
 
-	do {
-		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
-		if (pentry == NULL && !*log_complete) {
-			(*commits_needed)++;
-
-			if (nscrolled == 0) {
-				/* Redraw screen for "loading..." message. */
-				err = show_log_view(view);
-				if (err)
-					return err;
-				update_panels();
-				doupdate();
-			}
-
-			while (*commits_needed > 0) {
-				int errcode;
-				errcode = pthread_cond_signal(need_commits);
-				if (errcode)
-					return got_error_set_errno(errcode);
-				errcode = pthread_mutex_unlock(&tog_mutex);
-				if (errcode)
-					return got_error_set_errno(errcode);
-				pthread_yield();
-				errcode = pthread_mutex_lock(&tog_mutex);
-				if (errcode)
-					return got_error_set_errno(errcode);
-			}
+	pentry = TAILQ_NEXT(*last_displayed_entry, entry);
+	if (pentry == NULL && !*log_complete) {
+		int errcode;
+		if (*commits_needed > 0)
+			return NULL;
+		(*commits_needed) = maxscroll;
+		errcode = pthread_cond_signal(need_commits);
+		if (errcode)
+			return got_error_set_errno(errcode);
+		errcode = pthread_mutex_unlock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode);
+		pthread_yield();
+		errcode = pthread_mutex_lock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode);
+		if (*commits_needed > 0) {
+			/* Thread is not done yet; lose a key press
+			 * and let the user retry... */
+			return NULL;
 		}
+	}
+
+	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 		if (pentry == NULL)
 			break;
