@@ -1243,7 +1243,8 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 }
 
 static const struct got_error *
-scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
+scroll_down(struct tog_view *view,
+    struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue_entry **last_displayed_entry,
     struct commit_queue *commits, int *log_complete, int *commits_needed,
     pthread_cond_t *need_commits)
@@ -1259,6 +1260,14 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 		if (pentry == NULL && !*log_complete) {
 			*commits_needed = maxscroll;
+
+			/* Redraw screen for "loading..." message. */
+			err = show_log_view(view);
+			if (err)
+				return err;
+			update_panels();
+			doupdate();
+
 			while (*commits_needed > 0) {
 				int errcode;
 				errcode = pthread_cond_signal(need_commits);
@@ -1574,7 +1583,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected++;
 				break;
 			}
-			err = scroll_down(&s->first_displayed_entry, 1,
+			err = scroll_down(view, &s->first_displayed_entry, 1,
 			    &s->last_displayed_entry, &s->commits,
 			    &s->thread_args.log_complete,
 			    &s->thread_args.commits_needed,
@@ -1585,7 +1594,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			first = s->first_displayed_entry;
 			if (first == NULL)
 				break;
-			err = scroll_down(&s->first_displayed_entry,
+			err = scroll_down(view, &s->first_displayed_entry,
 			    view->nlines, &s->last_displayed_entry,
 			    &s->commits, &s->thread_args.log_complete,
 			    &s->thread_args.commits_needed,
