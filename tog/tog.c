@@ -1297,7 +1297,11 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 	if (pentry == NULL && !*log_complete) {
-		(*commits_needed) += maxscroll;
+		/*
+		 * Ask the log thread for required amount of commits
+		 * plus some amount of pre-fetching.
+		 */
+		(*commits_needed) += maxscroll + 20;
 		err = trigger_log_thread(0, commits_needed, log_complete,
 		    need_commits);
 		if (err)
