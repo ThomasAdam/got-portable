@@ -1243,6 +1243,42 @@ scroll_up(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 }
 
 static const struct got_error *
+trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
+    pthread_cond_t *need_commits)
+{
+	int errcode;
+
+	while (*commits_needed > 0) {
+		if (*log_complete)
+			break;
+
+		/* Wake the log thread. */
+		errcode = pthread_cond_signal(need_commits);
+		if (errcode)
+			return got_error_set_errno(errcode);
+		errcode = pthread_mutex_unlock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode);
+		pthread_yield();
+		errcode = pthread_mutex_lock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode);
+
+		if (*commits_needed > 0 && !load_all) {
+			/*
+			 * Thread is not done yet; lose a key press
+			 * and let the user retry... this way the GUI
+			 * remains interactive while logging deep paths
+			 * with few commits in history.
+			 */
+			return NULL;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
     struct commit_queue_entry **last_displayed_entry,
     struct commit_queue *commits, int *log_complete, int *commits_needed,
@@ -1257,25 +1293,11 @@ scroll_down(struct commit_queue_entry **first_displayed_entry, int maxscroll,
 
 	pentry = TAILQ_NEXT(*last_displayed_entry, entry);
 	if (pentry == NULL && !*log_complete) {
-		int errcode;
-		if (*commits_needed > 0)
-			return NULL;
-		(*commits_needed) = maxscroll;
-		errcode = pthread_cond_signal(need_commits);
-		if (errcode)
-			return got_error_set_errno(errcode);
-		errcode = pthread_mutex_unlock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode);
-		pthread_yield();
-		errcode = pthread_mutex_lock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode);
-		if (*commits_needed > 0) {
-			/* Thread is not done yet; lose a key press
-			 * and let the user retry... */
-			return NULL;
-		}
+		(*commits_needed) += maxscroll;
+		err = trigger_log_thread(0, commits_needed, log_complete,
+		    need_commits);
+		if (err)
+			return err;
 	}
 
 	do {
@@ -2281,6 +2303,22 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (s->log_view == NULL)
 				break;
 			ls = &s->log_view->state.log;
+
+			if (ls->thread_args.commits_needed == 0) {
+				ls->thread_args.commits_needed++;
+
+				/* Display "loading..." in log view. */
+				show_log_view(s->log_view);
+				update_panels();
+				doupdate();
+			}
+			err = trigger_log_thread(1 /* load_all */,
+			    &ls->thread_args.commits_needed,
+			    &ls->thread_args.log_complete,
+			    &ls->thread_args.need_commits);
+			if (err)
+				break;
+
 			err = input_log_view(NULL, NULL, NULL, s->log_view,
 			    KEY_DOWN);
 			if (err)
