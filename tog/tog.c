@@ -1152,6 +1152,9 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		}
 	}
 
+	if (commits_needed == 0)
+		halfdelay(10); /* disable fast refresh */
+
 	if (asprintf(&ncommits_str, " [%d/%d] %s",
 	    entry ? entry->idx + 1 : 0, commits->ncommits,
 	    commits_needed > 0 ? "loading... " :
@@ -1271,6 +1274,7 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
 			 * remains interactive while logging deep paths
 			 * with few commits in history.
 			 */
+			halfdelay(1); /* fast refresh while loading */
 			return NULL;
 		}
 	}
