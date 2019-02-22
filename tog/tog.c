@@ -1250,6 +1250,9 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
     pthread_cond_t *need_commits)
 {
 	int errcode;
+	int max_wait = 20;
+
+	halfdelay(1); /* fast refresh while loading commits */
 
 	while (*commits_needed > 0) {
 		if (*log_complete)
@@ -1267,14 +1270,13 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
 		if (errcode)
 			return got_error_set_errno(errcode);
 
-		if (*commits_needed > 0 && !load_all) {
+		if (*commits_needed > 0 && (!load_all || --max_wait <= 0)) {
 			/*
 			 * Thread is not done yet; lose a key press
 			 * and let the user retry... this way the GUI
 			 * remains interactive while logging deep paths
 			 * with few commits in history.
 			 */
-			halfdelay(1); /* fast refresh while loading */
 			return NULL;
 		}
 	}
