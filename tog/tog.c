@@ -2312,21 +2312,21 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			ls = &s->log_view->state.log;
 
-			if (ls->thread_args.commits_needed == 0) {
+			if (TAILQ_NEXT(ls->selected_entry, entry) == NULL) {
 				ls->thread_args.commits_needed++;
 
 				/* Display "loading..." in log view. */
 				show_log_view(s->log_view);
 				update_panels();
 				doupdate();
-			}
-			err = trigger_log_thread(1 /* load_all */,
-			    &ls->thread_args.commits_needed,
-			    &ls->thread_args.log_complete,
-			    &ls->thread_args.need_commits);
-			if (err)
-				break;
 
+				err = trigger_log_thread(1 /* load_all */,
+				    &ls->thread_args.commits_needed,
+				    &ls->thread_args.log_complete,
+				    &ls->thread_args.need_commits);
+				if (err)
+					break;
+			}
 			err = input_log_view(NULL, NULL, NULL, s->log_view,
 			    KEY_DOWN);
 			if (err)
