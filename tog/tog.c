@@ -1261,12 +1261,14 @@ scroll_down(struct tog_view *view,
 		if (pentry == NULL && !*log_complete) {
 			(*commits_needed)++;
 
-			/* Redraw screen for "loading..." message. */
-			err = show_log_view(view);
-			if (err)
-				return err;
-			update_panels();
-			doupdate();
+			if (nscrolled == 0) {
+				/* Redraw screen for "loading..." message. */
+				err = show_log_view(view);
+				if (err)
+					return err;
+				update_panels();
+				doupdate();
+			}
 
 			while (*commits_needed > 0) {
 				int errcode;
