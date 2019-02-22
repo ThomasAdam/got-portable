@@ -2463,7 +2463,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 
 	if (asprintf(&line, "[%d/%d] %s%s",
 	    *first_displayed_line - 1 + selected_line, nlines,
-	    blame_complete ? "" : "annotating ", path) == -1) {
+	    blame_complete ? "" : "annotating... ", path) == -1) {
 		free(id_str);
 		return got_error_from_errno();
 	}
