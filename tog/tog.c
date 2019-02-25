@@ -864,7 +864,7 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 			break;
 		case -1:
 			if (wline[i] == L'\t')
-				cols += TABSIZE - ((cols + 1) % TABSIZE);
+				cols += TABSIZE - ((cols + 1) % TABSIZE) + 1;
 			i++;
 			break;
 		default:
