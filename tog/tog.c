@@ -3382,8 +3382,10 @@ tree_scroll_up(struct tog_view *view,
 	struct got_tree_entry *te, *prev;
 	int i;
 
-	if (*first_displayed_entry == NULL)
+	if (*first_displayed_entry == NULL) {
+		view_flash(view);
 		return;
+	}
 
 	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == te) {
@@ -3651,10 +3653,6 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		case 'k':
 		case KEY_UP:
-			if (s->selected == 0) {
-				view_flash(view);
-				break;
-			}
 			if (s->selected > 0) {
 				s->selected--;
 				if (s->selected == 0)
