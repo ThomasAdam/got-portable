@@ -1216,10 +1216,10 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	while (entry) {
 		if (ncommits >= limit - 1)
 			break;
-		if (view->focussed && ncommits == selected_idx)
+		if (ncommits == selected_idx)
 			wstandout(view->window);
 		err = draw_commit(view, entry->commit, entry->id, refs);
-		if (view->focussed && ncommits == selected_idx)
+		if (ncommits == selected_idx)
 			wstandend(view->window);
 		if (err)
 			break;
