@@ -844,7 +844,8 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = apply_unveil(repo_path, NULL);
+	error = apply_unveil(repo_path,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
