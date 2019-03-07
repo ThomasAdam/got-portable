@@ -4,7 +4,7 @@ lib:
 
 tog:
 - allow loading new commits in 'tog log' after startup (e.g. via Ctrl-L, 'r')
-- make diff view generate diffs in a background thread
+- make diff view generate diffs in a background thread?
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
 - implement search feature
