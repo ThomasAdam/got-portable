@@ -8,3 +8,5 @@ tog:
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
 - implement search feature
+- allow moving to prev/next blamed line in diff view if opened from blame view,
+  similar to how the diff view can switch commits if opened from log view
