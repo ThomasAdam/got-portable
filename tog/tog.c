@@ -1792,6 +1792,7 @@ cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
 	struct got_reflist_head refs;
 	struct got_object_id *start_id = NULL;
 	char *path = NULL, *repo_path = NULL, *cwd = NULL;
@@ -1839,14 +1840,12 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 	if (repo_path == NULL) {
-		struct got_worktree *worktree;
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
 		if (worktree) {
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
-			got_worktree_close(worktree);
 		} else
 			repo_path = strdup(cwd);
 		if (repo_path == NULL) {
@@ -1857,7 +1856,8 @@ cmd_log(int argc, char *argv[])
 
 	init_curses();
 
-	error = apply_unveil(repo_path, NULL);
+	error = apply_unveil(repo_path,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -1894,6 +1894,8 @@ done:
 	free(start_id);
 	if (repo)
 		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
 	return error;
 }
 
