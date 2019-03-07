@@ -1817,7 +1817,7 @@ cmd_log(int argc, char *argv[])
 				err(1, "-r option");
 			break;
 		default:
-			usage();
+			usage_log();
 			/* NOTREACHED */
 		}
 	}
@@ -2430,7 +2430,7 @@ cmd_diff(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
 		default:
-			usage();
+			usage_diff();
 			/* NOTREACHED */
 		}
 	}
@@ -3156,7 +3156,7 @@ cmd_blame(int argc, char *argv[])
 				err(1, "-r option");
 			break;
 		default:
-			usage();
+			usage_blame();
 			/* NOTREACHED */
 		}
 	}
@@ -3827,7 +3827,7 @@ cmd_tree(int argc, char *argv[])
 			commit_id_arg = optarg;
 			break;
 		default:
-			usage();
+			usage_tree();
 			/* NOTREACHED */
 		}
 	}
