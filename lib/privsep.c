@@ -95,7 +95,8 @@ got_privsep_wait_for_child(pid_t pid)
 {
 	int child_status;
 
-	waitpid(pid, &child_status, 0);
+	if (waitpid(pid, &child_status, WNOHANG) == 0)
+		return NULL;
 
 	if (!WIFEXITED(child_status))
 		return got_error(GOT_ERR_PRIVSEP_DIED);
