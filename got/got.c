@@ -305,7 +305,7 @@ cmd_checkout(int argc, char *argv[])
 			path_prefix = optarg;
 			break;
 		default:
-			usage();
+			usage_checkout();
 			/* NOTREACHED */
 		}
 	}
@@ -461,7 +461,7 @@ cmd_update(int argc, char *argv[])
 				return got_error_from_errno();
 			break;
 		default:
-			usage();
+			usage_update();
 			/* NOTREACHED */
 		}
 	}
@@ -809,7 +809,7 @@ cmd_log(int argc, char *argv[])
 				err(1, "-r option");
 			break;
 		default:
-			usage();
+			usage_log();
 			/* NOTREACHED */
 		}
 	}
@@ -1084,7 +1084,7 @@ cmd_diff(int argc, char *argv[])
 				err(1, "-r option");
 			break;
 		default:
-			usage();
+			usage_diff();
 			/* NOTREACHED */
 		}
 	}
@@ -1257,7 +1257,7 @@ cmd_blame(int argc, char *argv[])
 				err(1, "-r option");
 			break;
 		default:
-			usage();
+			usage_blame();
 			/* NOTREACHED */
 		}
 	}
@@ -1482,7 +1482,7 @@ cmd_tree(int argc, char *argv[])
 			recurse = 1;
 			break;
 		default:
-			usage();
+			usage_tree();
 			/* NOTREACHED */
 		}
 	}
@@ -1616,7 +1616,7 @@ cmd_status(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
 		default:
-			usage();
+			usage_status();
 			/* NOTREACHED */
 		}
 	}
