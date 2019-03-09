@@ -921,20 +921,33 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 }
 
 static const struct got_error *
+format_author(wchar_t **wauthor, int *author_width, char *author, int limit)
+{
+	char *smallerthan, *at;
+
+	smallerthan = strchr(author, '<');
+	if (smallerthan && smallerthan[1] != '\0')
+		author = smallerthan + 1;
+	at = strchr(author, '@');
+	if (at)
+		*at = '\0';
+	return format_line(wauthor, author_width, author, limit);
+}
+
+static const struct got_error *
 draw_commit(struct tog_view *view, struct got_commit_object *commit,
-    struct got_object_id *id, struct got_reflist_head *refs)
+    struct got_object_id *id, struct got_reflist_head *refs,
+    int author_display_cols)
 {
 	const struct got_error *err = NULL;
 	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
-	char *author0 = NULL, *author = NULL;
+	char *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
 	int author_width, logmsg_width;
-	char *newline, *smallerthan, *at;
-	char *line = NULL;
+	char *newline, *line = NULL;
 	int col, limit;
 	static const size_t date_display_cols = 9;
-	static const size_t author_display_cols = 10;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
@@ -955,25 +968,17 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (col > avail)
 		goto done;
 
-	author0 = strdup(got_object_commit_get_author(commit));
-	if (author0 == NULL) {
+	author = strdup(got_object_commit_get_author(commit));
+	if (author == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	author = author0;
-	smallerthan = strchr(author, '<');
-	if (smallerthan && smallerthan[1] != '\0')
-		author = smallerthan + 1;
-	at = strchr(author, '@');
-	if (at)
-		*at = '\0';
-	limit = avail - col;
-	err = format_line(&wauthor, &author_width, author, limit);
+	err = format_author(&wauthor, &author_width, author, avail - col);
 	if (err)
 		goto done;
 	waddwstr(view->window, wauthor);
 	col += author_width;
-	while (col <= avail && author_width < author_display_cols + 1) {
+	while (col <= avail && author_width < author_display_cols + 2) {
 		waddch(view->window, ' ');
 		col++;
 		author_width++;
@@ -1005,7 +1010,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 done:
 	free(logmsg0);
 	free(wlogmsg);
-	free(author0);
+	free(author);
 	free(wauthor);
 	free(line);
 	return err;
@@ -1137,6 +1142,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
 	int ncommits, width;
+	int author_cols = 10;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
@@ -1208,6 +1214,28 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	if (limit <= 1)
 		goto done;
 
+	/* Grow author column size if necessary. */
+	entry = first;
+	ncommits = 0;
+	while (entry) {
+		char *author;
+		wchar_t *wauthor;
+		int width;
+		if (ncommits >= limit - 1)
+			break;
+		author = strdup(got_object_commit_get_author(entry->commit));
+		if (author == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = format_author(&wauthor, &width, author, COLS);
+		if (author_cols < width)
+			author_cols = width;
+		free(wauthor);
+		free(author);
+		entry = TAILQ_NEXT(entry, entry);
+	}
+
 	entry = first;
 	*last = first;
 	ncommits = 0;
@@ -1216,7 +1244,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 			break;
 		if (ncommits == selected_idx)
 			wstandout(view->window);
-		err = draw_commit(view, entry->commit, entry->id, refs);
+		err = draw_commit(view, entry->commit, entry->id, refs,
+		    author_cols);
 		if (ncommits == selected_idx)
 			wstandend(view->window);
 		if (err)
