@@ -930,11 +930,11 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	char *author0 = NULL, *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
 	int author_width, logmsg_width;
-	char *newline, *smallerthan;
+	char *newline, *smallerthan, *at;
 	char *line = NULL;
 	int col, limit;
 	static const size_t date_display_cols = 9;
-	static const size_t author_display_cols = 16;
+	static const size_t author_display_cols = 10;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
@@ -962,13 +962,11 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	}
 	author = author0;
 	smallerthan = strchr(author, '<');
-	if (smallerthan)
-		*smallerthan = '\0';
-	else {
-		char *at = strchr(author, '@');
-		if (at)
-			*at = '\0';
-	}
+	if (smallerthan && smallerthan[1] != '\0')
+		author = smallerthan + 1;
+	at = strchr(author, '@');
+	if (at)
+		*at = '\0';
 	limit = avail - col;
 	err = format_line(&wauthor, &author_width, author, limit);
 	if (err)
