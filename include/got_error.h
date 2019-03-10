@@ -74,6 +74,9 @@
 #define GOT_ERR_TREE_DUP_ENTRY	58
 #define GOT_ERR_DIR_DUP_ENTRY	59
 #define GOT_ERR_NOT_WORKTREE	60
+#define GOT_ERR_UUID_VERSION	61
+#define GOT_ERR_UUID_INVALID	62
+#define GOT_ERR_UUID		63
 
 static const struct got_error {
 	int code;
@@ -138,6 +141,9 @@ static const struct got_error {
 	{ GOT_ERR_TREE_DUP_ENTRY,"duplicate entry in tree object" },
 	{ GOT_ERR_DIR_DUP_ENTRY,"duplicate entry in directory" },
 	{ GOT_ERR_NOT_WORKTREE, "no got work tree found" },
+	{ GOT_ERR_UUID_VERSION, "bad uuid version" },
+	{ GOT_ERR_UUID_INVALID, "uuid invalid" },
+	{ GOT_ERR_UUID,		"uuid error" },
 };
 
 /*
@@ -190,3 +196,6 @@ const struct got_error *got_error_no_obj(struct got_object_id *);
  * message set during earlier invocations.
  */
 const struct got_error *got_error_not_ref(const char *);
+
+/* Return an error based on a uuid(3) status code. */
+const struct got_error *got_error_uuid(uint32_t);

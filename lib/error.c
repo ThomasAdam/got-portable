@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sha1.h>
 #include <zlib.h>
+#include <uuid.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -119,4 +120,21 @@ got_error_not_ref(const char *refname)
 		return got_error(GOT_ERR_NOT_REF);
 
 	return got_error_msg(GOT_ERR_NOT_REF, msg);
+}
+
+const struct got_error *
+got_error_uuid(uint32_t uuid_status)
+{
+	switch (uuid_status) {
+	case uuid_s_ok:
+		return NULL;
+	case uuid_s_bad_version:
+		return got_error(GOT_ERR_UUID_VERSION);
+	case uuid_s_invalid_string_uuid:
+		return got_error(GOT_ERR_UUID_INVALID);
+	case uuid_s_no_memory:
+		return got_error_set_errno(ENOMEM);
+	default:
+		return got_error(GOT_ERR_UUID);
+	}
 }
