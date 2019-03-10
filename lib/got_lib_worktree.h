@@ -42,6 +42,7 @@ struct got_worktree {
 #define GOT_WORKTREE_BASE_COMMIT	"base-commit"
 #define GOT_WORKTREE_LOCK		"lock"
 #define GOT_WORKTREE_FORMAT		"format"
+#define GOT_WORKTREE_UUID		"uuid"
 
 #define GOT_WORKTREE_FORMAT_VERSION	1
 #define GOT_WORKTREE_INVALID_COMMIT_ID	GOT_SHA1_STRING_ZERO

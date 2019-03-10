@@ -31,6 +31,7 @@
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>
+#include <uuid.h>
 
 #include "got_error.h"
 #include "got_repository.h"
@@ -193,12 +194,15 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL;
+	uuid_t uuid;
+	uint32_t uuid_status;
 	int obj_type;
 	char *path_got = NULL;
 	char *refstr = NULL;
 	char *formatstr = NULL;
 	char *absprefix = NULL;
 	char *basestr = NULL;
+	char *uuidstr = NULL;
 
 	err = got_ref_resolve(&commit_id, repo, head_ref);
 	if (err)
@@ -270,6 +274,21 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	if (err)
 		goto done;
 
+	/* Generate UUID. */
+	uuid_create(&uuid, &uuid_status);
+	if (uuid_status != uuid_s_ok) {
+		err = got_error_uuid(uuid_status);
+		goto done;
+	}
+	uuid_to_string(&uuid, &uuidstr, &uuid_status);
+	if (uuid_status != uuid_s_ok) {
+		err = got_error_uuid(uuid_status);
+		goto done;
+	}
+	err = create_meta_file(path_got, GOT_WORKTREE_UUID, uuidstr);
+	if (err)
+		goto done;
+
 	/* Stamp work tree with format file. */
 	if (asprintf(&formatstr, "%d", GOT_WORKTREE_FORMAT_VERSION) == -1) {
 		err = got_error_from_errno();
@@ -286,6 +305,7 @@ done:
 	free(refstr);
 	free(absprefix);
 	free(basestr);
+	free(uuidstr);
 	return err;
 }
 

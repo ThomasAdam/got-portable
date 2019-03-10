@@ -99,6 +99,8 @@ remove_worktree(const char *worktree_path)
 		return 0;
 	if (!remove_meta_file(worktree_path, GOT_WORKTREE_FORMAT))
 		return 0;
+	if (!remove_meta_file(worktree_path, GOT_WORKTREE_UUID))
+		return 0;
 	if (!remove_got_dir(worktree_path))
 		return 0;
 	if (rmdir(worktree_path) == -1)
@@ -187,6 +189,8 @@ worktree_init(const char *repo_path)
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_PATH_PREFIX))
 		goto done;
 	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_FORMAT))
+		goto done;
+	if (!check_meta_file_exists(worktree_path, GOT_WORKTREE_UUID))
 		goto done;
 
 	if (!remove_worktree(worktree_path))
