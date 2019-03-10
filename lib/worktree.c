@@ -315,12 +315,14 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	const struct got_error *err = NULL;
 	char *path_got;
 	char *formatstr = NULL;
+	char *uuidstr = NULL;
 	char *path_lock = NULL;
 	char *base_commit_id_str = NULL;
 	char *head_ref_str = NULL;
 	int version, fd = -1;
 	const char *errstr;
 	struct got_repository *repo = NULL;
+	uint32_t uuid_status;
 
 	*worktree = NULL;
 
@@ -384,6 +386,15 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
+	err = read_meta_file(&uuidstr, path_got, GOT_WORKTREE_UUID);
+	if (err)
+		goto done;
+	uuid_from_string(uuidstr, &(*worktree)->uuid, &uuid_status);
+	if (uuid_status != uuid_s_ok) {
+		err = got_error_uuid(uuid_status);
+		goto done;
+	}
+
 	err = got_repo_open(&repo, (*worktree)->repo_path);
 	if (err)
 		goto done;
@@ -405,6 +416,7 @@ done:
 	free(path_lock);
 	free(head_ref_str);
 	free(base_commit_id_str);
+	free(uuidstr);
 	if (err) {
 		if (fd != -1)
 			close(fd);

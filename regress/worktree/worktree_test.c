@@ -28,6 +28,7 @@
 #include <util.h>
 #include <err.h>
 #include <unistd.h>
+#include <uuid.h>
 
 #include "got_error.h"
 #include "got_object.h"

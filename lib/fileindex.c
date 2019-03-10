@@ -25,6 +25,7 @@
 #include <sha1.h>
 #include <endian.h>
 #include <limits.h>
+#include <uuid.h>
 
 #include "got_error.h"
 #include "got_object.h"
