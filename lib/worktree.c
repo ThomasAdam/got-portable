@@ -417,6 +417,7 @@ done:
 	free(head_ref_str);
 	free(base_commit_id_str);
 	free(uuidstr);
+	free(formatstr);
 	if (err) {
 		if (fd != -1)
 			close(fd);
