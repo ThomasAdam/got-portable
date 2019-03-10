@@ -101,27 +101,17 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 static const struct got_error *
 parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 {
-	uint8_t digest[SHA1_DIGEST_LENGTH];
-	char *ref_name;
+	struct got_object_id id;
 
 	if (strncmp(line, "ref: ", 5) == 0) {
 		line += 5;
 		return parse_symref(ref, name, line);
 	}
 
-	ref_name = strdup(name);
-	if (ref_name == NULL)
-		return got_error_from_errno();
-
-	if (!got_parse_sha1_digest(digest, line))
+	if (!got_parse_sha1_digest(id.sha1, line))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
-	*ref = calloc(1, sizeof(**ref));
-	if (*ref == NULL)
-		return got_error_from_errno();
-	(*ref)->ref.ref.name = ref_name;
-	memcpy(&(*ref)->ref.ref.sha1, digest, SHA1_DIGEST_LENGTH);
-	return NULL;
+	return got_ref_alloc(ref, name, &id);
 }
 
 static const struct got_error *
@@ -169,37 +159,49 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 	return got_repo_get_path_refs(repo);
 }
 
+const struct got_error *
+got_ref_alloc(struct got_reference **ref, const char *name,
+    struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+
+	*ref = calloc(1, sizeof(**ref));
+	if (*ref == NULL)
+		return got_error_from_errno();
+
+	memcpy(&(*ref)->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	(*ref)->ref.ref.name = strdup(name);
+	if ((*ref)->ref.ref.name == NULL) {
+		err = got_error_from_errno();
+		free(*ref);
+		*ref = NULL;
+	}
+	return err;
+}
+
 static const struct got_error *
 parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
     const char *line)
 {
-	uint8_t digest[SHA1_DIGEST_LENGTH];
-	char *name;
+	struct got_object_id id;
+	const char *name;
 
 	*ref = NULL;
 
 	if (line[0] == '#' || line[0] == '^')
 		return NULL;
 
-	if (!got_parse_sha1_digest(digest, line))
+	if (!got_parse_sha1_digest(id.sha1, line))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
 	if (abs_refname) {
 		if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
 			return NULL;
-
-		name = strdup(abs_refname);
-		if (name == NULL)
-			return got_error_from_errno();
+		name = abs_refname;
 	} else
-		name = strdup(line + SHA1_DIGEST_STRING_LENGTH);
+		name = line + SHA1_DIGEST_STRING_LENGTH;
 
-	*ref = calloc(1, sizeof(**ref));
-	if (*ref == NULL)
-		return got_error_from_errno();
-	(*ref)->ref.ref.name = name;;
-	memcpy(&(*ref)->ref.ref.sha1, digest, SHA1_DIGEST_LENGTH);
-	return NULL;
+	return got_ref_alloc(ref, name, &id);
 }
 
 static const struct got_error *

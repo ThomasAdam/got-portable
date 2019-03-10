@@ -33,6 +33,13 @@ struct got_object_id;
 const struct got_error * got_ref_open(struct got_reference **,
     struct got_repository *, const char *);
 
+/*
+ * Allocate a new reference for a given object ID.
+ * The caller must dispose of it with got_ref_close().
+ */
+const struct got_error *got_ref_alloc(struct got_reference **, const char *,
+    struct got_object_id *);
+
 /* Dispose of a reference. */
 void got_ref_close(struct got_reference *);
 
