@@ -374,7 +374,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	}
 	(*worktree)->lockfd = -1;
 
-	(*worktree)->root_path = realpath(path, NULL);
+	(*worktree)->root_path = strdup(path);
 	if ((*worktree)->root_path == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -1180,8 +1180,7 @@ const struct got_error *
 got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	const char *root_path;
-	char *uuidstr = NULL, *s;
+	char *uuidstr = NULL;
 	uint32_t uuid_status;
 
 	*refname = NULL;
@@ -1190,23 +1189,11 @@ got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
 	if (uuid_status != uuid_s_ok)
 		return got_error_uuid(uuid_status);
 
-	root_path = got_worktree_get_root_path(worktree);
-	while (root_path[0] == '/')
-		root_path++;
-	if (asprintf(refname, "%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
-	    root_path, uuidstr) == -1) {
+	if (asprintf(refname, "%s-%s", GOT_WORKTREE_BASE_REF_PREFIX, uuidstr)
+	    == -1) {
 		err = got_error_from_errno();
-		goto done;
+		*refname = NULL;
 	}
-
-	/* Replace slashes from worktree's on-disk path with dashes. */
-	s = *refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
-	while (*s) {
-		if (*s == '/')
-			*s = '-';
-		s++;
-	}
-done:
 	free(uuidstr);
 	return err;
 }
