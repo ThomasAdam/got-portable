@@ -47,3 +47,5 @@ struct got_worktree {
 
 #define GOT_WORKTREE_FORMAT_VERSION	1
 #define GOT_WORKTREE_INVALID_COMMIT_ID	GOT_SHA1_STRING_ZERO
+
+#define GOT_WORKTREE_BASE_REF_PREFIX "got/worktree-base"

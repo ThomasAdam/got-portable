@@ -369,7 +369,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	}
 	(*worktree)->lockfd = -1;
 
-	(*worktree)->root_path = strdup(path);
+	(*worktree)->root_path = realpath(path, NULL);
 	if ((*worktree)->root_path == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -578,29 +578,6 @@ lock_worktree(struct got_worktree *worktree, int operation)
 }
 
 static const struct got_error *
-make_parent_dirs(const char *abspath)
-{
-	const struct got_error *err = NULL;
-
-	char *parent = dirname(abspath);
-	if (parent == NULL)
-		return NULL;
-
-	if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
-		if (errno == ENOENT) {
-			err = make_parent_dirs(parent);
-			if (err)
-				return err;
-			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1)
-				return got_error_from_errno();
-		} else
-			err = got_error_from_errno();
-	}
-
-	return err;
-}
-
-static const struct got_error *
 add_dir_on_disk(struct got_worktree *worktree, const char *path)
 {
 	const struct got_error *err = NULL;
@@ -609,34 +586,7 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 	if (asprintf(&abspath, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno();
 
-	/* XXX queue work rather than editing disk directly? */
-	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
-		struct stat sb;
-
-		if (errno == EEXIST) {
-			if (lstat(abspath, &sb) == -1) {
-				err = got_error_from_errno();
-				goto done;
-			}
-
-			if (!S_ISDIR(sb.st_mode)) {
-				/* TODO directory is obstructed; do something */
-				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
-				goto done;
-			}
-
-			return NULL;
-		} else if (errno == ENOENT) {
-			err = make_parent_dirs(abspath);
-			if (err)
-				goto done;
-			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1)
-				err = got_error_from_errno();
-		} else
-			err = got_error_from_errno();
-	}
-
-done:
+	err = got_path_mkdir(abspath);
 	free(abspath);
 	return err;
 }
@@ -1221,6 +1171,54 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	return err;
 }
 
+/*
+ * Prevent Git's garbage collector from deleting our base commit by
+ * setting a reference to our base commit's ID.
+ */
+static const struct got_error *
+ref_base_commit(struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref = NULL;
+	const char *root_path;
+	char *refname = NULL, *uuidstr = NULL, *s;
+	uint32_t uuid_status;
+
+	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
+	if (uuid_status != uuid_s_ok)
+		return got_error_uuid(uuid_status);
+
+	root_path = got_worktree_get_root_path(worktree);
+	while (root_path[0] == '/')
+		root_path++;
+	if (asprintf(&refname, "%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
+	    root_path, uuidstr) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* Replace slashes from worktree's on-disk path with dashes. */
+	s = refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
+	while (*s) {
+		if (*s == '/')
+			*s = '-';
+		s++;
+	}
+
+	err = got_ref_alloc(&ref, refname, worktree->base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+done:
+	free(uuidstr);
+	free(refname);
+	if (ref)
+		got_ref_close(ref);
+	return err;
+}
+
+
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
@@ -1273,6 +1271,10 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
+	if (err)
+		goto done;
+
+	err = ref_base_commit(worktree, repo);
 	if (err)
 		goto done;
 

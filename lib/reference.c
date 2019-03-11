@@ -28,6 +28,7 @@
 #include <util.h>
 #include <zlib.h>
 #include <time.h>
+#include <libgen.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -741,8 +742,24 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	err = got_opentemp_named(&tmppath, &f, path);
 	if (f == NULL) {
-		err = got_error_from_errno();
-		goto done;
+		char *parent;
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		parent = dirname(path);
+		if (parent == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = got_path_mkdir(parent);
+		if (err)
+			goto done;
+		err = got_opentemp_named(&tmppath, &f, path);
+		if (f == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
 	}
 
 	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
@@ -771,9 +788,12 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	/* XXX: check if old content matches our expectations? */
 
-	if (stat(path, &sb) != 0 && errno != ENOENT) {
-		err = got_error_from_errno();
-		goto done;
+	if (stat(path, &sb) != 0) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	}
 
 	if (rename(tmppath, path) != 0) {

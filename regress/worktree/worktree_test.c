@@ -83,6 +83,48 @@ remove_meta_file(const char *worktree_path, const char *name)
 	return 1;
 }
 
+static const struct got_error *
+remove_worktree_base_ref(struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	const char *root_path;
+	struct got_reference *base_ref;
+	char *refname = NULL, *uuidstr = NULL, *s;
+	uint32_t uuid_status;
+
+	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
+	if (uuid_status != uuid_s_ok)
+		return got_error_uuid(uuid_status);
+	root_path = got_worktree_get_root_path(worktree);
+	while (*root_path == '/')
+		root_path++;
+	if (asprintf(&refname, "refs/%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
+	    root_path, uuidstr) == -1)
+		return got_error_from_errno();
+
+	/* Replace slashes from worktree's on-disk path with dashes. */
+	s = refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
+	while (*s) {
+		if (*s == '/')
+			*s = '-';
+		s++;
+	}
+
+	err = got_ref_open(&base_ref, repo, refname);
+	if (err)
+		goto done;
+
+	err = got_ref_delete(base_ref, repo);
+done:
+	if (base_ref)
+		got_ref_close(base_ref);
+	free(uuidstr);
+	free(refname);
+	return err;
+
+}
+
 static int
 remove_worktree(const char *worktree_path)
 {
@@ -370,6 +412,9 @@ worktree_checkout(const char *repo_path)
 	else
 		unlink(cfile_path);
 
+	err = remove_worktree_base_ref(worktree, repo);
+	if (err)
+		goto done;
 	if (!remove_worktree(worktree_path))
 		goto done;
 
@@ -444,7 +489,7 @@ main(int argc, char *argv[])
 	if (unveil("/tmp", "rwc") != 0)
 		err(1, "unveil");
 
-	if (unveil(repo_path, "r") != 0)
+	if (unveil(repo_path, "rwc") != 0)
 		err(1, "unveil");
 
 	if (got_privsep_unveil_exec_helpers() != NULL)

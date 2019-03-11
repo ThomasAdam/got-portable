@@ -364,7 +364,7 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	error = apply_unveil(repo_path, 1, worktree_path);
+	error = apply_unveil(repo_path, 0, worktree_path);
 	if (error)
 		goto done;
 

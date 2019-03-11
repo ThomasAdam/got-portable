@@ -16,8 +16,11 @@
  */
 
 #include <sys/queue.h>
+#include <sys/stat.h>
 
+#include <errno.h>
 #include <limits.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -264,4 +267,62 @@ got_pathlist_free(struct got_pathlist_head *pathlist)
 		TAILQ_REMOVE(pathlist, pe, entry);
 		free(pe);
 	}
+}
+
+static const struct got_error *
+make_parent_dirs(const char *abspath)
+{
+	const struct got_error *err = NULL;
+
+	char *parent = dirname(abspath);
+	if (parent == NULL)
+		return NULL;
+
+	if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
+		if (errno == ENOENT) {
+			err = make_parent_dirs(parent);
+			if (err)
+				return err;
+			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1)
+				return got_error_from_errno();
+		} else
+			err = got_error_from_errno();
+	}
+
+	return err;
+}
+
+const struct got_error *
+got_path_mkdir(const char *abspath)
+{
+	const struct got_error *err = NULL;
+
+	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
+		struct stat sb;
+
+		if (errno == EEXIST) {
+			if (lstat(abspath, &sb) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			if (!S_ISDIR(sb.st_mode)) {
+				/* TODO directory is obstructed; do something */
+				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+				goto done;
+			}
+
+			return NULL;
+		} else if (errno == ENOENT) {
+			err = make_parent_dirs(abspath);
+			if (err)
+				goto done;
+			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1)
+				err = got_error_from_errno();
+		} else
+			err = got_error_from_errno();
+	}
+
+done:
+	return err;
 }
