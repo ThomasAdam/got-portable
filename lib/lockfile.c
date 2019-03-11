@@ -37,7 +37,7 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 	const int flags = O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK;
 	int attempts = 5;
 
-	*lf = calloc(1, sizeof(*lf));
+	*lf = calloc(1, sizeof(**lf));
 	if (*lf == NULL)
 		return got_error_from_errno();
 	(*lf)->fd = -1;
