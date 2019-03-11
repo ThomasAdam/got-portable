@@ -744,7 +744,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 			goto done;
 		}
 		n = fprintf(f, "%s\n", hex);
-		if (n != sizeof(hex) + 1) {
+		if (n != sizeof(hex)) {
 			err = got_ferror(f, GOT_ERR_IO);
 			goto done;
 		}
