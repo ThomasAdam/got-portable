@@ -788,3 +788,41 @@ done:
 	}
 	return err ? err : unlock_err;
 }
+
+const struct got_error *
+got_ref_delete(struct got_reference *ref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err = NULL;
+	const char *name = got_ref_get_name(ref);
+	char *path_refs = NULL, *path = NULL;
+	struct got_lockfile *lf = NULL;
+
+	/* TODO: handle packed refs ! */
+
+	path_refs = get_refs_dir_path(repo, name);
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&path, "%s/%s", path_refs, name) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_lockfile_lock(&lf, path);
+	if (err)
+		goto done;
+
+	/* XXX: check if old content matches our expectations? */
+
+	if (unlink(path) != 0)
+		err = got_error_from_errno();
+done:
+	if (lf)
+		unlock_err = got_lockfile_unlock(lf);
+
+	free(path_refs);
+	free(path);
+	return err ? err : unlock_err;
+}

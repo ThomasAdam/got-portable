@@ -77,3 +77,7 @@ const struct got_error *got_ref_list(struct got_reflist_head *,
 /* Write a reference to its on-disk path in the repository. */
 const struct got_error *got_ref_write(struct got_reference *,
     struct got_repository *);
+
+/* Delete a reference from its on-disk path in the repository. */
+const struct got_error *got_ref_delete(struct got_reference *,
+    struct got_repository *);
