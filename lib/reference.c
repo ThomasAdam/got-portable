@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/stat.h>
 
 #include <ctype.h>
 #include <dirent.h>
@@ -31,6 +32,7 @@
 #include "got_object.h"
 #include "got_repository.h"
 #include "got_reference.h"
+#include "got_opentemp.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_path.h"
@@ -695,4 +697,91 @@ done:
 	if (f && fclose(f) != 0 && err == NULL)
 		err = got_error_from_errno();
 	return err;
+}
+
+const struct got_error *
+got_ref_write(struct got_reference *ref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err = NULL;
+	const char *name = got_ref_get_name(ref);
+	char *path_refs = NULL, *path = NULL, *tmppath = NULL;
+	struct got_lockfile *lf = NULL;
+	FILE *f = NULL;
+	size_t n;
+	struct stat sb;
+
+	path_refs = get_refs_dir_path(repo, name);
+	if (path_refs == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&path, "%s/%s", path_refs, name) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_opentemp_named(&tmppath, &f, path);
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
+		n = fprintf(f, "ref: %s\n", ref->ref.symref.ref);
+		if (n != strlen(ref->ref.symref.ref) + 6) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+	} else {
+		char hex[SHA1_DIGEST_STRING_LENGTH];
+		if (got_sha1_digest_to_str(ref->ref.ref.sha1, hex,
+		    sizeof(hex)) == NULL) {
+			err = got_error(GOT_ERR_BAD_REF_DATA);
+			goto done;
+		}
+		n = fprintf(f, "%s\n", hex);
+		if (n != sizeof(hex) + 1) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+	}
+
+	err = got_lockfile_lock(&lf, path);
+	if (err)
+		goto done;
+
+	/* XXX: check if old content matches our expectations? */
+
+	if (stat(path, &sb) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (rename(tmppath, path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	free(tmppath);
+	tmppath = NULL;
+
+	if (chmod(path, sb.st_mode) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	if (lf)
+		unlock_err = got_lockfile_unlock(lf);
+	if (f) {
+		if (fclose(f) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	free(path_refs);
+	free(path);
+	if (tmppath) {
+		if (unlink(tmppath) != 0 && err == NULL)
+			err = got_error_from_errno();
+		free(tmppath);
+	}
+	return err ? err : unlock_err;
 }
