@@ -1,0 +1,90 @@
+/*
+ * Copyright (c) 2019 Stefan Sperling <stsp@openbsd.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include <sys/stat.h>
+#include <sys/queue.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+#include <time.h>
+
+#include "got_error.h"
+
+#include "got_lib_lockfile.h"
+#include "got_lib_path.h"
+
+const struct got_error *
+got_lockfile_lock(struct got_lockfile **lf, const char *path)
+{
+	const struct got_error *err = NULL;
+	const int flags = O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK;
+	int attempts = 5;
+
+	*lf = calloc(1, sizeof(*lf));
+	if (*lf == NULL)
+		return got_error_from_errno();
+	(*lf)->fd = -1;
+
+	(*lf)->locked_path = strdup(path);
+	if ((*lf)->locked_path == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&(*lf)->path, "%s%s", path, GOT_LOCKFILE_SUFFIX) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	do {
+		(*lf)->fd = open((*lf)->path, flags, GOT_DEFAULT_FILE_MODE);
+		if ((*lf)->fd == -1) {
+			if (errno != EEXIST) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			sleep(1);
+		}
+	} while (--attempts > 0);
+
+	if ((*lf)->fd == -1)
+		err = got_error(GOT_ERR_LOCKFILE_TIMEOUT);
+done:
+	if (err) {
+		got_lockfile_unlock(*lf);
+		*lf = NULL;
+	}
+	return err;
+}
+
+const struct got_error *
+got_lockfile_unlock(struct got_lockfile *lf)
+{
+	const struct got_error *err = NULL;
+
+	if (lf->path && lf->fd != -1 && unlink(lf->path) != 0)
+		err = got_error_from_errno();
+	if (lf->fd != -1 && close(lf->fd) != 0 && err == NULL)
+		err = got_error_from_errno();
+	free(lf->path);
+	free(lf->locked_path);
+	free(lf);
+	return err;
+}

@@ -77,6 +77,7 @@
 #define GOT_ERR_UUID_VERSION	61
 #define GOT_ERR_UUID_INVALID	62
 #define GOT_ERR_UUID		63
+#define GOT_ERR_LOCKFILE_TIMEOUT 64
 
 static const struct got_error {
 	int code;
@@ -144,6 +145,7 @@ static const struct got_error {
 	{ GOT_ERR_UUID_VERSION, "bad uuid version" },
 	{ GOT_ERR_UUID_INVALID, "uuid invalid" },
 	{ GOT_ERR_UUID,		"uuid error" },
+	{ GOT_ERR_LOCKFILE_TIMEOUT,"lockfile timeout" },
 };
 
 /*
