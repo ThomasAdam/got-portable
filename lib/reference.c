@@ -702,6 +702,21 @@ done:
 	return err;
 }
 
+void
+got_ref_list_free(struct got_reflist_head *refs)
+{
+	struct got_reflist_entry *re;
+
+	while (!SIMPLEQ_EMPTY(refs)) {
+		re = SIMPLEQ_FIRST(refs);
+		SIMPLEQ_REMOVE_HEAD(refs, entry);
+		got_ref_close(re->ref);
+		free(re->id);
+		free(re);
+	}
+
+}
+
 const struct got_error *
 got_ref_write(struct got_reference *ref, struct got_repository *repo)
 {

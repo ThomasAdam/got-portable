@@ -74,6 +74,9 @@ SIMPLEQ_HEAD(got_reflist_head, got_reflist_entry);
 const struct got_error *got_ref_list(struct got_reflist_head *,
     struct got_repository *);
 
+/* Free all references on a ref list. */
+void got_ref_list_free(struct got_reflist_head *);
+
 /* Write a reference to its on-disk path in the repository. */
 const struct got_error *got_ref_write(struct got_reference *,
     struct got_repository *);

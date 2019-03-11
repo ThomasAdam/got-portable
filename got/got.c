@@ -945,6 +945,7 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -1704,6 +1705,7 @@ list_refs(struct got_repository *repo)
 		free(refstr);
 	}
 
+	got_ref_list_free(&refs);
 	return NULL;
 }
 

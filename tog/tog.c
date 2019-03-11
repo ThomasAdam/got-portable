@@ -1923,6 +1923,7 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
+	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -2517,6 +2518,7 @@ cmd_diff(int argc, char *argv[])
 	error = view_loop(view);
 done:
 	got_repo_close(repo);
+	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -3288,6 +3290,7 @@ done:
 		got_worktree_close(worktree);
 	if (repo)
 		got_repo_close(repo);
+	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -3938,6 +3941,7 @@ done:
 		got_object_tree_close(tree);
 	if (repo)
 		got_repo_close(repo);
+	got_ref_list_free(&refs);
 	return error;
 }
 
