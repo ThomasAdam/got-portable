@@ -742,19 +742,12 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	err = got_opentemp_named(&tmppath, &f, path);
 	if (err) {
-		char *p, *parent;
+		char *parent;
 		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
 			goto done;
-		p = dirname(path);
-		if (p == NULL) {
-			err = got_error_from_errno();
+		err = got_path_dirname(&parent, path);
+		if (err)
 			goto done;
-		}
-		parent = strdup(p);
-		if (parent == NULL) {
-			err = got_error_from_errno();
-			goto done;
-		}
 		err = got_path_mkdir(parent);
 		free(parent);
 		if (err)
