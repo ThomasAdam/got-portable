@@ -273,22 +273,29 @@ static const struct got_error *
 make_parent_dirs(const char *abspath)
 {
 	const struct got_error *err = NULL;
+	char *p, *parent;
 
-	char *parent = dirname(abspath);
+	p = dirname(abspath);
+	if (p == NULL)
+		return got_error_from_errno();
+	parent = strdup(p);
 	if (parent == NULL)
-		return NULL;
+		return got_error_from_errno();
 
 	if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
 		if (errno == ENOENT) {
 			err = make_parent_dirs(parent);
 			if (err)
-				return err;
-			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1)
-				return got_error_from_errno();
+				goto done;
+			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
 		} else
 			err = got_error_from_errno();
 	}
-
+done:
+	free(parent);
 	return err;
 }
 
