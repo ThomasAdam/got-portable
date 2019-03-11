@@ -741,12 +741,10 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 	}
 
 	err = got_opentemp_named(&tmppath, &f, path);
-	if (f == NULL) {
+	if (err) {
 		char *parent;
-		if (errno != ENOENT) {
-			err = got_error_from_errno();
+		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
 			goto done;
-		}
 		parent = dirname(path);
 		if (parent == NULL) {
 			err = got_error_from_errno();
@@ -756,10 +754,8 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		if (err)
 			goto done;
 		err = got_opentemp_named(&tmppath, &f, path);
-		if (f == NULL) {
-			err = got_error_from_errno();
+		if (err)
 			goto done;
-		}
 	}
 
 	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
