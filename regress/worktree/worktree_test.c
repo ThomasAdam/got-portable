@@ -88,30 +88,18 @@ remove_worktree_base_ref(struct got_worktree *worktree,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	const char *root_path;
-	struct got_reference *base_ref;
-	char *refname = NULL, *uuidstr = NULL, *s;
-	uint32_t uuid_status;
+	struct got_reference *base_ref = NULL;
+	char *refname = NULL, *absrefname = NULL;
 
-	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
-	if (uuid_status != uuid_s_ok)
-		return got_error_uuid(uuid_status);
-	root_path = got_worktree_get_root_path(worktree);
-	while (*root_path == '/')
-		root_path++;
-	if (asprintf(&refname, "refs/%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
-	    root_path, uuidstr) == -1)
-		return got_error_from_errno();
+	err = got_worktree_get_base_ref_name(&refname, worktree);
+	if (err)
+		return err;
 
-	/* Replace slashes from worktree's on-disk path with dashes. */
-	s = refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
-	while (*s) {
-		if (*s == '/')
-			*s = '-';
-		s++;
+	if (asprintf(&absrefname, "refs/%s", refname) == -1) {
+		err = got_error_from_errno();
+		goto done;
 	}
-
-	err = got_ref_open(&base_ref, repo, refname);
+	err = got_ref_open(&base_ref, repo, absrefname);
 	if (err)
 		goto done;
 
@@ -119,8 +107,8 @@ remove_worktree_base_ref(struct got_worktree *worktree,
 done:
 	if (base_ref)
 		got_ref_close(base_ref);
-	free(uuidstr);
 	free(refname);
+	free(absrefname);
 	return err;
 
 }

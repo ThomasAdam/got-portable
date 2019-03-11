@@ -1176,6 +1176,41 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	return err;
 }
 
+const struct got_error *
+got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+	const char *root_path;
+	char *uuidstr = NULL, *s;
+	uint32_t uuid_status;
+
+	*refname = NULL;
+
+	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
+	if (uuid_status != uuid_s_ok)
+		return got_error_uuid(uuid_status);
+
+	root_path = got_worktree_get_root_path(worktree);
+	while (root_path[0] == '/')
+		root_path++;
+	if (asprintf(refname, "%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
+	    root_path, uuidstr) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* Replace slashes from worktree's on-disk path with dashes. */
+	s = *refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
+	while (*s) {
+		if (*s == '/')
+			*s = '-';
+		s++;
+	}
+done:
+	free(uuidstr);
+	return err;
+}
+
 /*
  * Prevent Git's garbage collector from deleting our base commit by
  * setting a reference to our base commit's ID.
@@ -1185,30 +1220,11 @@ ref_base_commit(struct got_worktree *worktree, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_reference *ref = NULL;
-	const char *root_path;
-	char *refname = NULL, *uuidstr = NULL, *s;
-	uint32_t uuid_status;
+	char *refname;
 
-	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
-	if (uuid_status != uuid_s_ok)
-		return got_error_uuid(uuid_status);
-
-	root_path = got_worktree_get_root_path(worktree);
-	while (root_path[0] == '/')
-		root_path++;
-	if (asprintf(&refname, "%s-%s-%s", GOT_WORKTREE_BASE_REF_PREFIX,
-	    root_path, uuidstr) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	/* Replace slashes from worktree's on-disk path with dashes. */
-	s = refname + sizeof(GOT_WORKTREE_BASE_REF_PREFIX) - 1;
-	while (*s) {
-		if (*s == '/')
-			*s = '-';
-		s++;
-	}
+	err = got_worktree_get_base_ref_name(&refname, worktree);
+	if (err)
+		return err;
 
 	err = got_ref_alloc(&ref, refname, worktree->base_commit_id);
 	if (err)
@@ -1216,7 +1232,6 @@ ref_base_commit(struct got_worktree *worktree, struct got_repository *repo)
 
 	err = got_ref_write(ref, repo);
 done:
-	free(uuidstr);
 	free(refname);
 	if (ref)
 		got_ref_close(ref);

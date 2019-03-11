@@ -49,3 +49,6 @@ struct got_worktree {
 #define GOT_WORKTREE_INVALID_COMMIT_ID	GOT_SHA1_STRING_ZERO
 
 #define GOT_WORKTREE_BASE_REF_PREFIX "got/worktree-base"
+
+const struct got_error *got_worktree_get_base_ref_name(char **,
+    struct got_worktree *worktree);
