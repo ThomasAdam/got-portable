@@ -146,7 +146,10 @@ read_meta_file(char **content, const char *path_got, const char *name)
 
 	fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
-		err = got_error_from_errno();
+		if (errno == ENOENT)
+			err = got_error(GOT_ERR_WORKTREE_META);
+		else
+			err = got_error_from_errno();
 		goto done;
 	}
 	if (flock(fd, LOCK_SH | LOCK_NB) == -1) {
@@ -437,7 +440,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 
 	do {
 		err = open_worktree(worktree, path);
-		if (err && (err->code != GOT_ERR_ERRNO && errno != ENOENT))
+		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT))
 			return err;
 		if (*worktree)
 			return NULL;
