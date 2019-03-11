@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <ctype.h>
 #include <dirent.h>
 #include <sha1.h>
 #include <stdio.h>
@@ -36,6 +37,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_lockfile.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -159,11 +161,69 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 	return got_repo_get_path_refs(repo);
 }
 
+static int
+is_valid_ref_name(const char *name)
+{
+	const char *s, *slash, *seg;
+	const char forbidden[] = { ' ', '~', '^', ':', '?', '*', '[' , '\\' };
+	const char *forbidden_seq[] = { "//", "..", "@{" };
+	const char *lfs = GOT_LOCKFILE_SUFFIX;
+	const size_t lfs_len = sizeof(GOT_LOCKFILE_SUFFIX) - 1;
+	int i;
+
+	if (name[0] == '@' && name[1] == '\0')
+		return 0;
+
+	slash = strchr(name, '/');
+	if (slash == NULL)
+		return 0;
+
+	s = name;
+	seg = s;
+	if (seg[0] == '\0' || seg[0] == '.' || seg[0] == '/')
+		return 0;
+	while (*s) {
+		for (i = 0; i < nitems(forbidden); i++) {
+			if (*s == forbidden[i])
+				return 0;
+		}
+		for (i = 0; i < nitems(forbidden_seq); i++) {
+			if (s[0] == forbidden_seq[i][0] &&
+			    s[1] == forbidden_seq[i][1])
+				return 0;
+		}
+		if (iscntrl((unsigned char)s[0]))
+			return 0;
+		if (s[0] == '.' && s[1] == '\0')
+			return 0;
+		if (*s == '/') {
+			const char *nextseg = s + 1;
+			if (nextseg[0] == '\0' || nextseg[0] == '.' ||
+			    nextseg[0] == '/')
+				return 0;
+			if (seg <= s - lfs_len &&
+			    strncmp(s - lfs_len, lfs, lfs_len) == 0)
+				return 0;
+			seg = nextseg;
+		}
+		s++;
+	}
+
+	if (seg <= s - lfs_len &&
+	    strncmp(s - lfs_len, lfs, lfs_len) == 0)
+		return 0;
+
+	return 1;
+}
+
 const struct got_error *
 got_ref_alloc(struct got_reference **ref, const char *name,
     struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
+
+	if (!is_valid_ref_name(name))
+		return got_error(GOT_ERR_BAD_REF_NAME);
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)

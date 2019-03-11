@@ -78,6 +78,7 @@
 #define GOT_ERR_UUID_INVALID	62
 #define GOT_ERR_UUID		63
 #define GOT_ERR_LOCKFILE_TIMEOUT 64
+#define GOT_ERR_BAD_REF_NAME	65
 
 static const struct got_error {
 	int code;
@@ -146,6 +147,7 @@ static const struct got_error {
 	{ GOT_ERR_UUID_INVALID, "uuid invalid" },
 	{ GOT_ERR_UUID,		"uuid error" },
 	{ GOT_ERR_LOCKFILE_TIMEOUT,"lockfile timeout" },
+	{ GOT_ERR_BAD_REF_NAME,	"bad reference name" },
 };
 
 /*
