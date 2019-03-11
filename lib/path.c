@@ -298,22 +298,7 @@ got_path_mkdir(const char *abspath)
 	const struct got_error *err = NULL;
 
 	if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1) {
-		struct stat sb;
-
-		if (errno == EEXIST) {
-			if (lstat(abspath, &sb) == -1) {
-				err = got_error_from_errno();
-				goto done;
-			}
-
-			if (!S_ISDIR(sb.st_mode)) {
-				/* TODO directory is obstructed; do something */
-				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
-				goto done;
-			}
-
-			return NULL;
-		} else if (errno == ENOENT) {
+		if (errno == ENOENT) {
 			err = make_parent_dirs(abspath);
 			if (err)
 				goto done;

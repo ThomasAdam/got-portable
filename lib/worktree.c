@@ -592,6 +592,16 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 		return got_error_from_errno();
 
 	err = got_path_mkdir(abspath);
+	if (err && err->code == GOT_ERR_ERRNO && errno == EEXIST) {
+		struct stat sb;
+		err = NULL;
+		if (lstat(abspath, &sb) == -1) {
+			err = got_error_from_errno();
+		} else if (!S_ISDIR(sb.st_mode)) {
+			/* TODO directory is obstructed; do something */
+			err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+		}
+	}
 	free(abspath);
 	return err;
 }
