@@ -55,13 +55,13 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 
 	do {
 		(*lf)->fd = open((*lf)->path, flags, GOT_DEFAULT_FILE_MODE);
-		if ((*lf)->fd == -1) {
-			if (errno != EEXIST) {
-				err = got_error_from_errno();
-				goto done;
-			}
-			sleep(1);
+		if ((*lf)->fd != -1)
+			break;
+		if (errno != EEXIST) {
+			err = got_error_from_errno();
+			goto done;
 		}
+		sleep(1);
 	} while (--attempts > 0);
 
 	if ((*lf)->fd == -1)
