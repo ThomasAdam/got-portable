@@ -322,10 +322,12 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 			return got_error_from_errno();
 		absname = (char *)name;
 	} else {
-		if (asprintf(&path, "%s/%s/%s", path_refs, subdir, name) == -1)
+		if (asprintf(&path, "%s/%s%s%s", path_refs, subdir,
+		    subdir[0] ? "/" : "", name) == -1)
 			return got_error_from_errno();
 
-		if (asprintf(&absname, "refs/%s/%s", subdir, name) == -1) {
+		if (asprintf(&absname, "refs/%s%s%s",
+		    subdir, subdir[0] ? "/" : "", name) == -1) {
 			err = got_error_from_errno();
 			goto done;
 		}
