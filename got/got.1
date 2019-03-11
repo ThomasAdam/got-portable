@@ -256,6 +256,34 @@ Show object IDs of files (blob objects) and directories (tree objects).
 .It Fl R
 Recurse into sub-directories in the repository.
 .El
+.It Cm ref [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name Ar object ]
+Manage references in a repository.
+.Pp
+If no options are passed, expect two arguments and attempt to create,
+or update, the reference with the given
+.Ar name ,
+and make it point at the given
+.Ar object .
+The object argument is a SHA1 hash which corresponds to an existing
+object in the repository.
+.Pp
+The options for
+.Cm got ref
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl l
+List all existing references in the repository.
+.It Fl d Ar name
+Delete the reference with the specified name from the repository.
+.El
+.El
 .Sh EXIT STATUS
 .Ex -std got
 .Sh EXAMPLES

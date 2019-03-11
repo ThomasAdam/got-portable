@@ -76,6 +76,7 @@ __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
 __dead static void	usage_status(void);
+__dead static void	usage_ref(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -84,6 +85,7 @@ static const struct got_error*		cmd_diff(int, char *[]);
 static const struct got_error*		cmd_blame(int, char *[]);
 static const struct got_error*		cmd_tree(int, char *[]);
 static const struct got_error*		cmd_status(int, char *[]);
+static const struct got_error*		cmd_ref(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -100,6 +102,8 @@ static struct cmd got_commands[] = {
 	    " list files and directories in repository" },
 	{ "status",	cmd_status,	usage_status,
 	    "show modification status of files" },
+	{ "ref",	cmd_ref,	usage_ref,
+	    "manage references in repository" },
 };
 
 int
@@ -172,11 +176,12 @@ usage(void)
 }
 
 static const struct got_error *
-apply_unveil(const char *repo_path, const char *worktree_path)
+apply_unveil(const char *repo_path, int repo_read_only,
+    const char *worktree_path)
 {
 	const struct got_error *error;
 
-	if (repo_path && unveil(repo_path, "r") != 0)
+	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
 		return got_error_from_errno();
 
 	if (worktree_path && unveil(worktree_path, "rwc") != 0)
@@ -359,7 +364,7 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	error = apply_unveil(repo_path, worktree_path);
+	error = apply_unveil(repo_path, 1, worktree_path);
 	if (error)
 		goto done;
 
@@ -497,7 +502,7 @@ cmd_update(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo),
+	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
@@ -844,7 +849,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = apply_unveil(repo_path,
+	error = apply_unveil(repo_path, 1,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
@@ -1136,7 +1141,7 @@ cmd_diff(int argc, char *argv[])
 			return got_error_from_errno();
 	}
 
-	error = apply_unveil(repo_path,
+	error = apply_unveil(repo_path, 1,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
@@ -1297,7 +1302,7 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
-	error = apply_unveil(repo_path, NULL);
+	error = apply_unveil(repo_path, 1, NULL);
 	if (error)
 		goto done;
 
@@ -1524,7 +1529,7 @@ cmd_tree(int argc, char *argv[])
 		}
 	}
 
-	error = apply_unveil(repo_path, NULL);
+	error = apply_unveil(repo_path, 1, NULL);
 	if (error)
 		goto done;
 
@@ -1656,7 +1661,7 @@ cmd_status(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo),
+	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
@@ -1666,5 +1671,176 @@ cmd_status(int argc, char *argv[])
 done:
 	free(cwd);
 	free(path);
+	return error;
+}
+
+__dead static void
+usage_ref(void)
+{
+	fprintf(stderr,
+	    "usage: %s ref [-r repository] -l | -d name | name object\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+list_refs(struct got_repository *repo)
+{
+	static const struct got_error *err = NULL;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
+
+	SIMPLEQ_INIT(&refs);
+	err = got_ref_list(&refs, repo);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(re, &refs, entry) {
+		char *refstr;
+		refstr = got_ref_to_str(re->ref);
+		if (refstr == NULL)
+			return got_error_from_errno();
+		printf("%s: %s\n", got_ref_get_name(re->ref), refstr);
+		free(refstr);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+delete_ref(struct got_repository *repo, const char *refname)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref;
+
+	err = got_ref_open(&ref, repo, refname);
+	if (err)
+		return err;
+
+	err = got_ref_delete(ref, repo);
+	got_ref_close(ref);
+	return err;
+}
+
+static const struct got_error *
+add_ref(struct got_repository *repo, const char *refname, const char *id_str)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id;
+	struct got_reference *ref = NULL;
+
+	err = got_object_resolve_id_str(&id, repo, id_str);
+	if (err)
+		return err;
+
+	err = got_ref_alloc(&ref, refname, id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+done:
+	if (ref)
+		got_ref_close(ref);
+	free(id);
+	return err;
+}
+
+static const struct got_error *
+cmd_ref(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	int ch, do_list = 0;
+	const char *delref = NULL;
+
+	/* TODO: Add -s option for adding symbolic references. */
+	while ((ch = getopt(argc, argv, "d:r:l")) != -1) {
+		switch (ch) {
+		case 'd':
+			delref = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			break;
+		case 'l':
+			do_list = 1;
+			break;
+		default:
+			usage_ref();
+			/* NOTREACHED */
+		}
+	}
+
+	if (do_list && delref)
+		errx(1, "-l and -d options are mutually exclusive\n");
+
+	argc -= optind;
+	argv += optind;
+
+	if (do_list || delref) {
+		if (argc > 0)
+			usage_ref();
+	} else if (argc != 2)
+		usage_ref();
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL)
+				error = got_error_from_errno();
+			if (error)
+				goto done;
+		} else {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno();
+				goto done;
+			}
+		}
+	}
+
+	error = apply_unveil(repo_path, do_list,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL)
+		goto done;
+
+	if (do_list)
+		error = list_refs(repo);
+	else if (delref)
+		error = delete_ref(repo, delref);
+	else
+		error = add_ref(repo, argv[0], argv[1]);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(cwd);
+	free(repo_path);
 	return error;
 }
