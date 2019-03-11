@@ -18,6 +18,7 @@
 #include <sys/queue.h>
 #include <sys/stat.h>
 
+#include <errno.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <sha1.h>
@@ -755,7 +756,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	/* XXX: check if old content matches our expectations? */
 
-	if (stat(path, &sb) != 0) {
+	if (stat(path, &sb) != 0 && errno != ENOENT) {
 		err = got_error_from_errno();
 		goto done;
 	}
