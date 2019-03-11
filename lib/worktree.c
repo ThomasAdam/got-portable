@@ -207,6 +207,11 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	char *basestr = NULL;
 	char *uuidstr = NULL;
 
+	if (strcmp(path, got_repo_get_path(repo)) == 0) {
+		err = got_error(GOT_ERR_WORKTREE_REPO);
+		goto done;
+	}
+
 	err = got_ref_resolve(&commit_id, repo, head_ref);
 	if (err)
 		return err;
