@@ -634,6 +634,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			continue;
 		if (strncmp(name, "refs/", 5) == 0)
 			name += 5;
+		if (strncmp(name, "got/", 4) == 0)
+			continue;
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0)
