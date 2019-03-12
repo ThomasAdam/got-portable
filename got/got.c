@@ -1792,9 +1792,15 @@ cmd_ref(int argc, char *argv[])
 		usage_ref();
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
-	    "unveil", NULL) == -1)
-		err(1, "pledge");
+	if (do_list) {
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+	} else {
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+	}
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
