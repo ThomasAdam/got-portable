@@ -67,6 +67,7 @@ struct got_ref {
 struct got_reference {
 	unsigned int flags;
 #define GOT_REF_IS_SYMBOLIC	0x01
+#define GOT_REF_IS_PACKED	0x02
 
 	union {
 		struct got_ref ref;
@@ -75,33 +76,59 @@ struct got_reference {
 };
 
 static const struct got_error *
-parse_symref(struct got_reference **ref, const char *name, const char *line)
+alloc_ref(struct got_reference **ref, const char *name,
+    struct got_object_id *id, int flags)
 {
-	struct got_symref *symref;
-	char *symref_name;
-	char *symref_ref;
-
-	if (line[0] == '\0')
-		return got_error(GOT_ERR_BAD_REF_DATA);
-
-	symref_name = strdup(name);
-	if (symref_name == NULL)
-		return got_error_from_errno();
-	symref_ref = strdup(line);
-	if (symref_ref == NULL) {
-		const struct got_error *err = got_error_from_errno();
-		free(symref_name);
-		return err;
-	}
+	const struct got_error *err = NULL;
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
 		return got_error_from_errno();
-	(*ref)->flags |= GOT_REF_IS_SYMBOLIC;
-	symref = &((*ref)->ref.symref);
-	symref->name = symref_name;
-	symref->ref = symref_ref;
-	return NULL;
+
+	memcpy(&(*ref)->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	(*ref)->ref.ref.name = strdup(name);
+	if ((*ref)->ref.ref.name == NULL) {
+		err = got_error_from_errno();
+		free(*ref);
+		*ref = NULL;
+	}
+	(*ref)->flags = flags;
+	return err;
+}
+
+static const struct got_error *
+alloc_symref(struct got_reference **ref, const char *name,
+    const char *target_ref, int flags)
+{
+	const struct got_error *err = NULL;
+
+	*ref = calloc(1, sizeof(**ref));
+	if (*ref == NULL)
+		return got_error_from_errno();
+
+	(*ref)->flags = GOT_REF_IS_SYMBOLIC | flags;
+	(*ref)->ref.symref.name = strdup(name);
+	if ((*ref)->ref.symref.name == NULL) {
+		err = got_error_from_errno();
+		got_ref_close(*ref);
+		*ref = NULL;
+	}
+	(*ref)->ref.symref.ref = strdup(target_ref);
+	if ((*ref)->ref.symref.ref == NULL) {
+		err = got_error_from_errno();
+		got_ref_close(*ref);
+		*ref = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+parse_symref(struct got_reference **ref, const char *name, const char *line)
+{
+	if (line[0] == '\0')
+		return got_error(GOT_ERR_BAD_REF_DATA);
+
+	return alloc_symref(ref, name, line, 0);
 }
 
 static const struct got_error *
@@ -117,7 +144,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 	if (!got_parse_sha1_digest(id.sha1, line))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
-	return got_ref_alloc(ref, name, &id);
+	return alloc_ref(ref, name, &id, 0);
 }
 
 static const struct got_error *
@@ -224,23 +251,10 @@ const struct got_error *
 got_ref_alloc(struct got_reference **ref, const char *name,
     struct got_object_id *id)
 {
-	const struct got_error *err = NULL;
-
 	if (!is_valid_ref_name(name))
 		return got_error(GOT_ERR_BAD_REF_NAME);
 
-	*ref = calloc(1, sizeof(**ref));
-	if (*ref == NULL)
-		return got_error_from_errno();
-
-	memcpy(&(*ref)->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
-	(*ref)->ref.ref.name = strdup(name);
-	if ((*ref)->ref.ref.name == NULL) {
-		err = got_error_from_errno();
-		free(*ref);
-		*ref = NULL;
-	}
-	return err;
+	return alloc_ref(ref, name, id, 0);
 }
 
 static const struct got_error *
@@ -265,7 +279,7 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 	} else
 		name = line + SHA1_DIGEST_STRING_LENGTH;
 
-	return got_ref_alloc(ref, name, &id);
+	return alloc_ref(ref, name, &id, GOT_REF_IS_PACKED);
 }
 
 static const struct got_error *
