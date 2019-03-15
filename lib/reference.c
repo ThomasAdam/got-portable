@@ -703,9 +703,14 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 		const char delim[3] = {'\0', '\0', '\0'};
 		while (1) {
 			line = fparseln(f, &len, NULL, delim, 0);
-			if (line == NULL)
-				break;
+			if (line == NULL) {
+				if (feof(f))
+					break;
+				err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
+				goto done;
+			}
 			err = parse_packed_ref_line(&ref, NULL, line);
+			free(line);
 			if (err)
 				goto done;
 			if (ref) {
