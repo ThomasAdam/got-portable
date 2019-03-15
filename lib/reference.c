@@ -551,7 +551,7 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 {
 	const struct got_error *err;
 	struct got_object_id *id;
-	struct got_reflist_entry *new, *re, *prev;
+	struct got_reflist_entry *new, *re, *prev = NULL;
 	int cmp;
 
 	*newp = NULL;
