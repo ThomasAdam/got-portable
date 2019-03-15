@@ -214,7 +214,7 @@ got_diff_free_changes(struct got_diff_changes *changes)
 	free(changes);
 }
 
-struct got_tree_entry *
+static struct got_tree_entry *
 match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
 {
 	struct got_tree_entry *te2;

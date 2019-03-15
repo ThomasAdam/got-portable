@@ -553,7 +553,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	return NULL;
 }
 
-struct got_fileindex_entry *
+static struct got_fileindex_entry *
 walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 {
 	struct got_fileindex_entry *next;
