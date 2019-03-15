@@ -152,11 +152,12 @@ parse_ref_file(struct got_reference **ref, const char *name,
     const char *abspath)
 {
 	const struct got_error *err = NULL;
-	FILE *f = fopen(abspath, "rb");
+	FILE *f;
 	char *line;
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
 
+	f = fopen(abspath, "rb");
 	if (f == NULL)
 		return NULL;
 
