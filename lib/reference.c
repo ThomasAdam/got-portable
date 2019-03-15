@@ -411,9 +411,10 @@ done:
 void
 got_ref_close(struct got_reference *ref)
 {
-	if (ref->flags & GOT_REF_IS_SYMBOLIC)
+	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
 		free(ref->ref.symref.name);
-	else
+		free(ref->ref.symref.ref);
+	} else
 		free(ref->ref.ref.name);
 	free(ref);
 }
@@ -557,7 +558,7 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 		cmp = got_path_cmp(got_ref_get_name(re->ref),
 		    got_ref_get_name(ref));
 		if (cmp == 0) {
-			free(ref); /* duplicate */
+			got_ref_close(ref); /* duplicate */
 			return NULL;
 		} else if (cmp > 0) {
 			if (prev)
