@@ -51,6 +51,13 @@
 #define GOT_REF_TAGS	"tags"
 #define GOT_REF_REMOTES	"remotes"
 
+/*
+ * We do not resolve tags yet, and don't yet care about sorting refs either,
+ * so packed-refs files we write contain a minimal header which disables all
+ * packed-refs "traits" supported by Git.
+ */
+#define GOT_PACKED_REFS_HEADER	"# pack-refs with:"
+
 /* A symbolic reference. */
 struct got_symref {
 	char *name;
@@ -858,6 +865,147 @@ done:
 	return err ? err : unlock_err;
 }
 
+static const struct got_error *
+delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err = NULL;
+	struct got_lockfile *lf = NULL;
+	FILE *f = NULL, *tmpf = NULL;
+	char *packed_refs_path, *tmppath = NULL;
+	struct got_reflist_head refs;
+	int found_delref = 0;
+
+	/* The packed-refs file does not cotain symbolic references. */
+	if (delref->flags & GOT_REF_IS_SYMBOLIC)
+		return got_error(GOT_ERR_BAD_REF_DATA);
+
+	SIMPLEQ_INIT(&refs);
+
+	packed_refs_path = got_repo_get_path_packed_refs(repo);
+	if (packed_refs_path == NULL)
+		return got_error_from_errno();
+
+	err = got_opentemp_named(&tmppath, &tmpf, packed_refs_path);
+	if (err)
+		goto done;
+
+	err = got_lockfile_lock(&lf, packed_refs_path);
+	if (err)
+		goto done;
+
+	f = fopen(packed_refs_path, "r");
+	if (f == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	while (1) {
+		char *line;
+		size_t len;
+		const char delim[3] = {'\0', '\0', '\0'};
+		struct got_reference *ref;
+		struct got_reflist_entry *new;
+
+		line = fparseln(f, &len, NULL, delim, 0);
+		if (line == NULL) {
+			if (feof(f))
+				break;
+			err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
+			goto done;
+		}
+		err = parse_packed_ref_line(&ref, NULL, line);
+		free(line);
+		if (err)
+			goto done;
+		if (ref == NULL)
+			continue;
+
+		if (strcmp(ref->ref.ref.name, delref->ref.ref.name) == 0 &&
+		    memcmp(ref->ref.ref.sha1, delref->ref.ref.sha1,
+		    sizeof(delref->ref.ref.sha1)) == 0) {
+			found_delref = 1;
+			got_ref_close(ref);
+			continue;
+		}
+
+		err = insert_ref(&new, &refs, ref, repo);
+		if (err || new == NULL /* duplicate */)
+			got_ref_close(ref);
+		if (err)
+			goto done;
+	}
+
+	if (found_delref) {
+		struct got_reflist_entry *re;
+		size_t n;
+		struct stat sb;
+
+		n = fprintf(tmpf, "%s\n", GOT_PACKED_REFS_HEADER);
+		if (n != sizeof(GOT_PACKED_REFS_HEADER)) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+
+		SIMPLEQ_FOREACH(re, &refs, entry) {
+			uint8_t hex[SHA1_DIGEST_STRING_LENGTH];
+
+			if (got_sha1_digest_to_str(re->ref->ref.ref.sha1, hex,
+			    sizeof(hex)) == NULL) {
+				err = got_error(GOT_ERR_BAD_REF_DATA);
+				goto done;
+			}
+			n = fprintf(tmpf, "%s ", hex);
+			if (n != sizeof(hex)) {
+				err = got_ferror(f, GOT_ERR_IO);
+				goto done;
+			}
+			n = fprintf(tmpf, "%s\n", re->ref->ref.ref.name);
+			if (n != strlen(re->ref->ref.ref.name) + 1) {
+				err = got_ferror(f, GOT_ERR_IO);
+				goto done;
+			}
+		}
+
+		if (fflush(tmpf) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (stat(packed_refs_path, &sb) != 0) {
+			if (errno != ENOENT) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			sb.st_mode = GOT_DEFAULT_FILE_MODE;
+		}
+
+		if (rename(tmppath, packed_refs_path) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		if (chmod(packed_refs_path, sb.st_mode) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	}
+done:
+	if (lf)
+		unlock_err = got_lockfile_unlock(lf);
+	if (f) {
+		if (fclose(f) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	if (tmpf) {
+		unlink(tmppath);
+		if (fclose(tmpf) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	free(tmppath);
+	free(packed_refs_path);
+	got_ref_list_free(&refs);
+	return err ? err : unlock_err;
+}
+
 const struct got_error *
 got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 {
@@ -866,7 +1014,8 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 	char *path_refs = NULL, *path = NULL;
 	struct got_lockfile *lf = NULL;
 
-	/* TODO: handle packed refs ! */
+	if (ref->flags & GOT_REF_IS_PACKED)
+		return delete_packed_ref(ref, repo);
 
 	path_refs = get_refs_dir_path(repo, name);
 	if (path_refs == NULL) {
