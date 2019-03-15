@@ -86,13 +86,13 @@ alloc_ref(struct got_reference **ref, const char *name,
 		return got_error_from_errno();
 
 	memcpy(&(*ref)->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	(*ref)->flags = flags;
 	(*ref)->ref.ref.name = strdup(name);
 	if ((*ref)->ref.ref.name == NULL) {
 		err = got_error_from_errno();
-		free(*ref);
+		got_ref_close(*ref);
 		*ref = NULL;
 	}
-	(*ref)->flags = flags;
 	return err;
 }
 
