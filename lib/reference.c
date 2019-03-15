@@ -574,9 +574,11 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 	re = SIMPLEQ_FIRST(refs);
 	while (re) {
 		cmp = got_path_cmp(got_ref_get_name(re->ref),
-		    got_ref_get_name(ref));
+		    got_ref_get_name(new->ref));
 		if (cmp == 0) {
-			got_ref_close(ref); /* duplicate */
+			/* duplicate */
+			free(new->id);
+			free(new);
 			return NULL;
 		} else if (cmp > 0) {
 			if (prev)
