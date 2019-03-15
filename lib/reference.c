@@ -560,7 +560,7 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 	if (err)
 		return err;
 
-	new = malloc(sizeof(*re));
+	new = malloc(sizeof(*new));
 	if (new == NULL) {
 		free(id);
 		return got_error_from_errno();
