@@ -122,7 +122,7 @@ got_fileindex_entry_add(struct got_fileindex *fileindex,
     struct got_fileindex_entry *entry)
 {
 	/* Flag this entry until it gets written out to disk. */
-	entry->flags |= GOT_FILEIDX_F_INTENT_TO_ADD;
+	entry->flags |= GOT_FILEIDX_F_NOT_ON_DISK;
 
 	return add_entry(fileindex, entry);
 }
@@ -328,7 +328,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
-		entry->flags &= ~GOT_FILEIDX_F_INTENT_TO_ADD;
+		entry->flags &= ~GOT_FILEIDX_F_NOT_ON_DISK;
 		err = write_fileindex_entry(&ctx, entry, outfile);
 		if (err)
 			return err;
@@ -561,7 +561,7 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 	next = RB_NEXT(got_fileindex_tree, &fileindex->entries, ie);
 
 	/* Skip entries which were newly added by diff callbacks. */
-	while (next && (next->flags & GOT_FILEIDX_F_INTENT_TO_ADD))
+	while (next && (next->flags & GOT_FILEIDX_F_NOT_ON_DISK))
 		next = RB_NEXT(got_fileindex_tree, &fileindex->entries, next);
 
 	return next;
