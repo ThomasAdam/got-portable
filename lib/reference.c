@@ -299,8 +299,12 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 		abs_refname = (char *)refname;
 	do {
 		line = fparseln(f, &len, NULL, delim, 0);
-		if (line == NULL)
+		if (line == NULL) {
+			if (feof(f))
+				break;
+			err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
 			break;
+		}
 		for (i = 0; i < nsubdirs; i++) {
 			if (!ref_is_absolute &&
 			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
