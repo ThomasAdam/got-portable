@@ -545,13 +545,15 @@ got_ref_get_name(struct got_reference *ref)
 }
 
 static const struct got_error *
-insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
-    struct got_repository *repo)
+insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
+    struct got_reference *ref, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_id *id;
 	struct got_reflist_entry *new, *re, *prev;
 	int cmp;
+
+	*newp = NULL;
 
 	err = got_ref_resolve(&id, repo, ref);
 	if (err)
@@ -564,6 +566,7 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 	}
 	new->ref = ref;
 	new->id = id;
+	*newp = new;
 
 	/*
 	 * We must de-duplicate entries on insert because packed-refs may
@@ -579,6 +582,7 @@ insert_ref(struct got_reflist_head *refs, struct got_reference *ref,
 			/* duplicate */
 			free(new->id);
 			free(new);
+			*newp = NULL;
 			return NULL;
 		} else if (cmp > 0) {
 			if (prev)
@@ -630,7 +634,10 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 			if (err)
 				goto done;
 			if (ref) {
-				err = insert_ref(refs, ref, repo);
+				struct got_reflist_entry *new;
+				err = insert_ref(&new, refs, ref, repo);
+				if (err || new == NULL /* duplicate */)
+					got_ref_close(ref);
 				if (err)
 					goto done;
 			}
@@ -662,6 +669,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	char *packed_refs_path, *path_refs = NULL;
 	FILE *f = NULL;
 	struct got_reference *ref;
+	struct got_reflist_entry *new;
 
 	/* HEAD ref should always exist. */
 	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
@@ -672,7 +680,9 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
 	if (err)
 		goto done;
-	err = insert_ref(refs, ref, repo);
+	err = insert_ref(&new, refs, ref, repo);
+	if (err || new == NULL /* duplicate */)
+		got_ref_close(ref);
 	if (err)
 		goto done;
 
@@ -716,7 +726,9 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 			if (err)
 				goto done;
 			if (ref) {
-				err = insert_ref(refs, ref, repo);
+				err = insert_ref(&new, refs, ref, repo);
+				if (err || new == NULL /* duplicate */)
+					got_ref_close(ref);
 				if (err)
 					goto done;
 			}
