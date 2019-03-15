@@ -499,7 +499,7 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 		err = resolve_symbolic_ref(&resolved, repo, ref);
 		if (err == NULL)
 			err = got_ref_resolve(id, repo, resolved);
-		free(resolved);
+		got_ref_close(resolved);
 		return err;
 	}
 
