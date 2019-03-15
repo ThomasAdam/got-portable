@@ -85,7 +85,7 @@ alloc_ref(struct got_reference **ref, const char *name,
 	if (*ref == NULL)
 		return got_error_from_errno();
 
-	memcpy(&(*ref)->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	memcpy((*ref)->ref.ref.sha1, id->sha1, sizeof((*ref)->ref.ref.sha1));
 	(*ref)->flags = flags;
 	(*ref)->ref.ref.name = strdup(name);
 	if ((*ref)->ref.ref.name == NULL) {
@@ -467,7 +467,7 @@ got_ref_dup(struct got_reference *ref)
 			return NULL;
 		}
 		memcpy(ret->ref.ref.sha1, ref->ref.ref.sha1,
-		    SHA1_DIGEST_LENGTH);
+		    sizeof(ret->ref.ref.sha1));
 	}
 
 	return ret;
@@ -511,7 +511,7 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 	*id = calloc(1, sizeof(**id));
 	if (*id == NULL)
 		return got_error_from_errno();
-	memcpy((*id)->sha1, ref->ref.ref.sha1, SHA1_DIGEST_LENGTH);
+	memcpy((*id)->sha1, ref->ref.ref.sha1, sizeof((*id)->sha1));
 	return NULL;
 }
 
