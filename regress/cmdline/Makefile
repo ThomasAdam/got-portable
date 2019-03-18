@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status
+REGRESS_TARGETS=checkout update status log
 NOOBJ=Yes
 
 checkout:
