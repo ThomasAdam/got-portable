@@ -125,3 +125,10 @@ const struct got_error *
 got_worktree_status(struct got_worktree *, const char *,
     struct got_repository *, got_worktree_status_cb, void *,
     got_worktree_cancel_cb cancel_cb, void *);
+
+/*
+ * Try to resolve a user-provided path to an on-disk path in the work tree.
+ * The caller must dispose of the resolved path with free(3).
+ */
+const struct got_error *got_worktree_resolve_path(char **,
+    struct got_worktree *, const char *);

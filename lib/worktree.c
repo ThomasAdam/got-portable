@@ -1543,3 +1543,44 @@ done:
 	got_fileindex_free(fileindex);
 	return err;
 }
+
+const struct got_error *
+got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
+    const char *arg)
+{
+	const struct got_error *err = NULL;
+	char *resolved, *path = NULL;
+	size_t len;
+
+	*wt_path = NULL;
+
+	resolved = realpath(arg, NULL);
+	if (resolved == NULL)
+		return got_error_from_errno();
+
+	if (strncmp(got_worktree_get_root_path(worktree), resolved,
+	    strlen(got_worktree_get_root_path(worktree)))) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	path = strdup(resolved + strlen(got_worktree_get_root_path(worktree)));
+	if (path == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* XXX status walk can't deal with trailing slash! */
+	len = strlen(path);
+	while (path[len - 1] == '/') {
+		path[len - 1] = '\0';
+		len--;
+	}
+done:
+	free(resolved);
+	if (err == NULL)
+		*wt_path = path;
+	else
+		free(path);
+	return err;
+}
