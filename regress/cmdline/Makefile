@@ -10,4 +10,7 @@ update:
 status:
 	./status.sh
 
+log:
+	./log.sh
+
 .include <bsd.regress.mk>

@@ -200,6 +200,47 @@ apply_unveil(const char *repo_path, int repo_read_only,
 	return NULL;
 }
 
+static const struct got_error *
+resolve_path_in_worktree(char **wt_path, struct got_worktree *worktree,
+    const char *arg)
+{
+	const struct got_error *err = NULL;
+	char *resolved, *path = NULL;
+	size_t len;
+
+	*wt_path = NULL;
+
+	resolved = realpath(arg, NULL);
+	if (resolved == NULL)
+		return got_error_from_errno();
+
+	if (strncmp(got_worktree_get_root_path(worktree), resolved,
+	    strlen(got_worktree_get_root_path(worktree)))) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	path = strdup(resolved + strlen(got_worktree_get_root_path(worktree)));
+	if (path == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* XXX status walk can't deal with trailing slash! */
+	len = strlen(path);
+	while (path[len - 1] == '/') {
+		path[len - 1] = '\0';
+		len--;
+	}
+done:
+	free(resolved);
+	if (err == NULL)
+		*wt_path = path;
+	else
+		free(path);
+	return err;
+}
+
 __dead static void
 usage_checkout(void)
 {
@@ -824,15 +865,6 @@ cmd_log(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0)
-		path = strdup("");
-	else if (argc == 1)
-		path = strdup(argv[0]);
-	else
-		usage_log();
-	if (path == NULL)
-		return got_error_from_errno();
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno();
@@ -843,6 +875,17 @@ cmd_log(int argc, char *argv[])
 	if (error && error->code != GOT_ERR_NOT_WORKTREE)
 		goto done;
 	error = NULL;
+
+	if (argc == 0)
+		path = strdup("");
+	else if (argc == 1) {
+		error = resolve_path_in_worktree(&path, worktree, argv[0]);
+		if (error)
+			goto done;
+	} else
+		usage_log();
+	if (path == NULL)
+		goto done;
 
 	repo_path = worktree ?
 	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
@@ -1019,47 +1062,6 @@ done:
 }
 
 static const struct got_error *
-get_status_path(char **status_path, struct got_worktree *worktree,
-    const char *arg)
-{
-	const struct got_error *err = NULL;
-	char *resolved, *path = NULL;
-	size_t len;
-
-	*status_path = NULL;
-
-	resolved = realpath(arg, NULL);
-	if (resolved == NULL)
-		return got_error_from_errno();
-
-	if (strncmp(got_worktree_get_root_path(worktree), resolved,
-	    strlen(got_worktree_get_root_path(worktree)))) {
-		err = got_error(GOT_ERR_BAD_PATH);
-		goto done;
-	}
-
-	path = strdup(resolved + strlen(got_worktree_get_root_path(worktree)));
-	if (path == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	/* XXX status walk can't deal with trailing slash! */
-	len = strlen(path);
-	while (path[len - 1] == '/') {
-		path[len - 1] = '\0';
-		len--;
-	}
-done:
-	free(resolved);
-	if (err == NULL)
-		*status_path = path;
-	else
-		free(path);
-	return err;
-}
-
-static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -1122,7 +1124,8 @@ cmd_diff(int argc, char *argv[])
 			goto done;
 		}
 		if (argc == 1) {
-			error = get_status_path(&path, worktree, argv[0]);
+			error = resolve_path_in_worktree(&path, worktree,
+			    argv[0]);
 			if (error)
 				goto done;
 		} else {
@@ -1654,7 +1657,7 @@ cmd_status(int argc, char *argv[])
 			goto done;
 		}
 	} else if (argc == 1) {
-		error = get_status_path(&path, worktree, argv[0]);
+		error = resolve_path_in_worktree(&path, worktree, argv[0]);
 		if (error)
 			goto done;
 	} else
