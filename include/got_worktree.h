@@ -74,7 +74,7 @@ const struct got_error *got_worktree_match_path_prefix(int *,
  * Get the name of a work tree's HEAD reference.
  * The caller must dispose of it with free(3).
  */
-char  *got_worktree_get_head_ref_name(struct got_worktree *);
+char *got_worktree_get_head_ref_name(struct got_worktree *);
 
 /*
  * Get the work tree's HEAD reference.
@@ -121,9 +121,8 @@ typedef const struct got_error *(*got_worktree_status_cb)(void *,
  * The status callback will be invoked with the provided void * argument,
  * a path, and a corresponding status code.
  */
-const struct got_error *
-got_worktree_status(struct got_worktree *, const char *,
-    struct got_repository *, got_worktree_status_cb, void *,
+const struct got_error *got_worktree_status(struct got_worktree *,
+    const char *, struct got_repository *, got_worktree_status_cb, void *,
     got_worktree_cancel_cb cancel_cb, void *);
 
 /*

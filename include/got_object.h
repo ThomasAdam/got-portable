@@ -80,9 +80,8 @@ struct got_object_id *got_object_id_dup(struct got_object_id *);
  * path in the tree of the specified commit.
  * The caller should dispose of it with free(3).
  */
-const struct got_error *
-got_object_id_by_path(struct got_object_id **, struct got_repository *,
-    struct got_object_id *, const char *);
+const struct got_error *got_object_id_by_path(struct got_object_id **,
+    struct got_repository *, struct got_object_id *, const char *);
 
 /*
  * Obtain the type of an object.
@@ -96,16 +95,14 @@ const struct got_error *got_object_get_type(int *, struct got_repository *,
  * to the ID of an existing object in the repository.
  * The caller should dispose of the ID with free(3).
  */
-const struct got_error *
-got_object_resolve_id_str(struct got_object_id **, struct got_repository *,
-    const char *);
+const struct got_error *got_object_resolve_id_str(struct got_object_id **,
+    struct got_repository *, const char *);
 
 /*
  * Attempt to open a commit object in a repository.
  * The caller must dispose of the commit with got_object_commit_close().
  */
-const struct got_error *
-got_object_open_as_commit(struct got_commit_object **,
+const struct got_error *got_object_open_as_commit(struct got_commit_object **,
     struct got_repository *, struct got_object_id *);
 
 /* Dispose of a commit object. */
@@ -146,8 +143,7 @@ const char *got_object_commit_get_logmsg(struct got_commit_object *);
  * Attempt to open a tree object in a repository.
  * The caller must dispose of the tree with got_object_tree_close().
  */
-const struct got_error *
-got_object_open_as_tree(struct got_tree_object **,
+const struct got_error *got_object_open_as_tree(struct got_tree_object **,
     struct got_repository *, struct got_object_id *);
 
 /* Dispose of a tree object. */
@@ -171,8 +167,7 @@ const struct got_error *got_object_tree_path_changed(int *,
  * The size_t argument specifies the block size of an associated read buffer.
  * The caller must dispose of the blob with got_object_blob_close().
  */
-const struct got_error *
-got_object_open_as_blob(struct got_blob_object **,
+const struct got_error *got_object_open_as_blob(struct got_blob_object **,
     struct got_repository *, struct got_object_id *, size_t);
 
 /* Dispose of a blob object. */

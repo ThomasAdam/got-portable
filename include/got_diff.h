@@ -30,9 +30,8 @@ const struct got_error *got_diff_blob(struct got_blob_object *,
  * well as a const char * diff header label which identifies the file.
  * The number of context lines to show in the diff must be specified as well.
  */
-const struct got_error *
-got_diff_blob_file(struct got_blob_object *, FILE *, size_t, const char *, int,
-    FILE *);
+const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
+    size_t, const char *, int, FILE *);
 
 /*
  * Compute the differences between two trees and write unified diff text

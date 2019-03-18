@@ -30,7 +30,7 @@ struct got_object_id;
  * Attempt to open the reference with the provided name in a repository.
  * The caller must dispose of it with got_ref_close().
  */
-const struct got_error * got_ref_open(struct got_reference **,
+const struct got_error *got_ref_open(struct got_reference **,
     struct got_repository *, const char *);
 
 /*
