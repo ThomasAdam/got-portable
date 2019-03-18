@@ -434,7 +434,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	const char *repo_abspath = NULL;
-	struct stat sb;
 	size_t repolen, cwdlen, len;
 	char *cwd, *canonpath, *path = NULL;
 
@@ -455,27 +454,30 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 
 	repo_abspath = got_repo_get_path(repo);
 
-	/* TODO: Call "get in-repository path of work-tree node" API. */
-
-	if (!check_disk)
+	if (!check_disk) {
 		path = strdup(canonpath);
-	else if (lstat(canonpath, &sb) != 0) {
-		if (errno != ENOENT) {
+		if (path == NULL) {
 			err = got_error_from_errno();
 			goto done;
 		}
-		/*
-		 * Path is not on disk.
-		 * Assume it is already relative to repository root.
-		 */
-		path = strdup(canonpath);
 	} else {
 		int is_repo_child = 0, is_cwd_child = 0;
 
 		path = realpath(canonpath, NULL);
 		if (path == NULL) {
-			err = got_error_from_errno();
-			goto done;
+			if (errno != ENOENT) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			/*
+			 * Path is not on disk.
+			 * Assume it is already relative to repository root.
+			 */
+			path = strdup(canonpath);
+			if (path == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
 		}
 
 		repolen = strlen(repo_abspath);
@@ -496,7 +498,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			}
 		} else if (is_repo_child && is_cwd_child) {
 			char *child;
-			/* TODO: Is path inside a got worktree? */
 			/* Strip common prefix with repository path. */
 			err = got_path_skip_common_ancestor(&child,
 			    repo_abspath, path);
@@ -523,7 +524,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			}
 		} else if (is_cwd_child) {
 			char *child;
-			/* TODO: Is path inside a got worktree? */
 			/* Strip common prefix with cwd. */
 			err = got_path_skip_common_ancestor(&child, cwd,
 			    path);

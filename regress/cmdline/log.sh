@@ -34,6 +34,39 @@ function test_log_in_repo {
 		fi
 	done
 
+	for p in "" "." zeta; do
+		(cd $testroot/repo/epsilon && got log $p | \
+			grep ^commit > $testroot/stdout)
+		cmp $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
+}
+
+function test_log_in_bare_repo {
+	local testroot=`test_init log_in_bare_repo`
+	local head_rev=`git_show_head $testroot/repo`
+
+	echo "commit $head_rev (master)" > $testroot/stdout.expected
+
+	for p in "" "." alpha epsilon epsilon/zeta; do
+		(cd $testroot/repo/.git && got log $p | \
+			grep ^commit > $testroot/stdout)
+		cmp $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
 	test_done "$testroot" "0"
 }
 
@@ -78,4 +111,5 @@ function test_log_in_worktree {
 }
 
 run_test test_log_in_repo
+run_test test_log_in_bare_repo
 run_test test_log_in_worktree
