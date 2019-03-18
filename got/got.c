@@ -835,16 +835,27 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	error = NULL;
 
-	if (argc == 0)
+	if (argc == 0) {
 		path = strdup("");
-	else if (argc == 1) {
-		error = got_worktree_resolve_path(&path, worktree, argv[0]);
-		if (error)
+		if (path == NULL) {
+			error = got_error_from_errno();
 			goto done;
+		}
+	} else if (argc == 1) {
+		if (worktree) {
+			error = got_worktree_resolve_path(&path, worktree,
+			    argv[0]);
+			if (error)
+				goto done;
+		} else {
+			path = strdup(argv[0]);
+			if (path == NULL) {
+				error = got_error_from_errno();
+				goto done;
+			}
+		}
 	} else
 		usage_log();
-	if (path == NULL)
-		goto done;
 
 	repo_path = worktree ?
 	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
