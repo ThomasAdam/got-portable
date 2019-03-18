@@ -781,6 +781,8 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 	struct got_reflist_head refs;
 
+	SIMPLEQ_INIT(&refs);
+
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
 	    NULL)
@@ -940,7 +942,6 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
-	SIMPLEQ_INIT(&refs);
 	error = got_ref_list(&refs, repo);
 	if (error)
 		goto done;
