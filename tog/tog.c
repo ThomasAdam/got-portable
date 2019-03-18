@@ -1854,33 +1854,43 @@ cmd_log(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0)
-		path = strdup("");
-	else if (argc == 1)
-		path = strdup(argv[0]);
-	else
-		usage_log();
-	if (path == NULL)
-		return got_error_from_errno();
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno();
 		goto done;
 	}
-	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
-		if (error && error->code != GOT_ERR_NOT_WORKTREE)
-			goto done;
-		if (worktree) {
-			repo_path =
-			    strdup(got_worktree_get_repo_path(worktree));
-		} else
-			repo_path = strdup(cwd);
-		if (repo_path == NULL) {
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+	error = NULL;
+
+	if (argc == 0) {
+		path = strdup("");
+		if (path == NULL) {
 			error = got_error_from_errno();
 			goto done;
 		}
+	} else if (argc == 1) {
+		if (worktree) {
+			error = got_worktree_resolve_path(&path, worktree,
+			    argv[0]);
+			if (error)
+				goto done;
+		} else {
+			path = strdup(argv[0]);
+			if (path == NULL) {
+				error = got_error_from_errno();
+				goto done;
+			}
+		}
+	} else
+		usage_log();
+
+	repo_path = worktree ?
+	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
+	if (repo_path == NULL) {
+		error = got_error_from_errno();
+		goto done;
 	}
 
 	init_curses();
