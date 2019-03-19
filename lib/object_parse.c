@@ -54,20 +54,20 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_OBJ_TAG_COMMIT	"commit"
-#define GOT_OBJ_TAG_TREE	"tree"
-#define GOT_OBJ_TAG_BLOB	"blob"
-#define GOT_OBJ_TAG_TAG		"tag"
+#define GOT_OBJ_LABEL_COMMIT	"commit"
+#define GOT_OBJ_LABEL_TREE	"tree"
+#define GOT_OBJ_LABEL_BLOB	"blob"
+#define GOT_OBJ_LABEL_TAG	"tag"
 
-#define GOT_COMMIT_TAG_TREE		"tree "
-#define GOT_COMMIT_TAG_PARENT		"parent "
-#define GOT_COMMIT_TAG_AUTHOR		"author "
-#define GOT_COMMIT_TAG_COMMITTER	"committer "
+#define GOT_COMMIT_LABEL_TREE		"tree "
+#define GOT_COMMIT_LABEL_PARENT		"parent "
+#define GOT_COMMIT_LABEL_AUTHOR		"author "
+#define GOT_COMMIT_LABEL_COMMITTER	"committer "
 
-#define GOT_TAG_TAG_OBJECT		"object "
-#define GOT_TAG_TAG_TYPE		"type "
-#define GOT_TAG_TAG_TAG			"tag "
-#define GOT_TAG_TAG_TAGGER		"tagger "
+#define GOT_TAG_LABEL_OBJECT		"object "
+#define GOT_TAG_LABEL_TYPE		"type "
+#define GOT_TAG_LABEL_TAG		"tag "
+#define GOT_TAG_LABEL_TAGGER		"tagger "
 
 int
 got_object_id_cmp(const struct got_object_id *id1,
@@ -146,11 +146,11 @@ got_object_qid_free(struct got_object_qid *qid)
 const struct got_error *
 got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 {
-	const char *obj_tags[] = {
-		GOT_OBJ_TAG_COMMIT,
-		GOT_OBJ_TAG_TREE,
-		GOT_OBJ_TAG_BLOB,
-		GOT_OBJ_TAG_TAG,
+	const char *obj_labels[] = {
+		GOT_OBJ_LABEL_COMMIT,
+		GOT_OBJ_LABEL_TREE,
+		GOT_OBJ_LABEL_BLOB,
+		GOT_OBJ_LABEL_TAG,
 	};
 	const int obj_types[] = {
 		GOT_OBJ_TYPE_COMMIT,
@@ -170,18 +170,18 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 
 	hdrlen = strlen(buf) + 1 /* '\0' */;
 
-	for (i = 0; i < nitems(obj_tags); i++) {
-		const char *tag = obj_tags[i];
-		size_t tlen = strlen(tag);
+	for (i = 0; i < nitems(obj_labels); i++) {
+		const char *label = obj_labels[i];
+		size_t label_len = strlen(label);
 		const char *errstr;
 
-		if (strncmp(buf, tag, tlen) != 0)
+		if (strncmp(buf, label, label_len) != 0)
 			continue;
 
 		type = obj_types[i];
-		if (len <= tlen)
+		if (len <= label_len)
 			return got_error(GOT_ERR_BAD_OBJ_HDR);
-		size = strtonum(buf + tlen, 0, LONG_MAX, &errstr);
+		size = strtonum(buf + label_len, 0, LONG_MAX, &errstr);
 		if (errstr != NULL)
 			return got_error(GOT_ERR_BAD_OBJ_HDR);
 		break;
@@ -446,21 +446,21 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 {
 	const struct got_error *err = NULL;
 	char *s = buf;
-	size_t tlen;
+	size_t label_len;
 	ssize_t remain = (ssize_t)len;
  
 	*commit = got_object_commit_alloc_partial();
 	if (*commit == NULL)
 		return got_error_from_errno();
 
-	tlen = strlen(GOT_COMMIT_TAG_TREE);
-	if (strncmp(s, GOT_COMMIT_TAG_TREE, tlen) == 0) {
-		remain -= tlen;
+	label_len = strlen(GOT_COMMIT_LABEL_TREE);
+	if (strncmp(s, GOT_COMMIT_LABEL_TREE, label_len) == 0) {
+		remain -= label_len;
 		if (remain < SHA1_DIGEST_STRING_LENGTH) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		if (!got_parse_sha1_digest((*commit)->tree_id->sha1, s)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -472,14 +472,14 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 		goto done;
 	}
 
-	tlen = strlen(GOT_COMMIT_TAG_PARENT);
-	while (strncmp(s, GOT_COMMIT_TAG_PARENT, tlen) == 0) {
-		remain -= tlen;
+	label_len = strlen(GOT_COMMIT_LABEL_PARENT);
+	while (strncmp(s, GOT_COMMIT_LABEL_PARENT, label_len) == 0) {
+		remain -= label_len;
 		if (remain < SHA1_DIGEST_STRING_LENGTH) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		err = got_object_commit_add_parent(*commit, s);
 		if (err)
 			goto done;
@@ -488,17 +488,17 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 		s += SHA1_DIGEST_STRING_LENGTH;
 	}
 
-	tlen = strlen(GOT_COMMIT_TAG_AUTHOR);
-	if (strncmp(s, GOT_COMMIT_TAG_AUTHOR, tlen) == 0) {
+	label_len = strlen(GOT_COMMIT_LABEL_AUTHOR);
+	if (strncmp(s, GOT_COMMIT_LABEL_AUTHOR, label_len) == 0) {
 		char *p;
 		size_t slen;
 
-		remain -= tlen;
+		remain -= label_len;
 		if (remain <= 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		p = strchr(s, '\n');
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -519,17 +519,17 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 		remain -= slen + 1;
 	}
 
-	tlen = strlen(GOT_COMMIT_TAG_COMMITTER);
-	if (strncmp(s, GOT_COMMIT_TAG_COMMITTER, tlen) == 0) {
+	label_len = strlen(GOT_COMMIT_LABEL_COMMITTER);
+	if (strncmp(s, GOT_COMMIT_LABEL_COMMITTER, label_len) == 0) {
 		char *p;
 		size_t slen;
 
-		remain -= tlen;
+		remain -= label_len;
 		if (remain <= 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		p = strchr(s, '\n');
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -727,20 +727,20 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 	const struct got_error *err = NULL;
 	size_t remain = len;
 	char *s = buf;
-	size_t tlen;
+	size_t label_len;
 
 	*tag = calloc(1, sizeof(**tag));
 	if (*tag == NULL)
 		return got_error_from_errno();
 
-	tlen = strlen(GOT_TAG_TAG_OBJECT);
-	if (strncmp(s, GOT_TAG_TAG_OBJECT, tlen) == 0) {
-		remain -= tlen;
+	label_len = strlen(GOT_TAG_LABEL_OBJECT);
+	if (strncmp(s, GOT_TAG_LABEL_OBJECT, label_len) == 0) {
+		remain -= label_len;
 		if (remain < SHA1_DIGEST_STRING_LENGTH) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		if (!got_parse_sha1_digest((*tag)->id.sha1, s)) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -757,38 +757,38 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		goto done;
 	}
 
-	tlen = strlen(GOT_TAG_TAG_TYPE);
-	if (strncmp(s, GOT_TAG_TAG_TYPE, tlen) == 0) {
-		remain -= tlen;
+	label_len = strlen(GOT_TAG_LABEL_TYPE);
+	if (strncmp(s, GOT_TAG_LABEL_TYPE, label_len) == 0) {
+		remain -= label_len;
 		if (remain <= 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
-		if (strncmp(s, GOT_OBJ_TAG_COMMIT,
-		    strlen(GOT_OBJ_TAG_COMMIT)) == 0) {
+		s += label_len;
+		if (strncmp(s, GOT_OBJ_LABEL_COMMIT,
+		    strlen(GOT_OBJ_LABEL_COMMIT)) == 0) {
 			(*tag)->obj_type = GOT_OBJ_TYPE_COMMIT;
-			tlen = strlen(GOT_OBJ_TAG_COMMIT);
-			s += tlen;
-			remain -= tlen;
-		} else if (strncmp(s, GOT_OBJ_TAG_TREE,
-		    strlen(GOT_OBJ_TAG_TREE)) == 0) {
+			label_len = strlen(GOT_OBJ_LABEL_COMMIT);
+			s += label_len;
+			remain -= label_len;
+		} else if (strncmp(s, GOT_OBJ_LABEL_TREE,
+		    strlen(GOT_OBJ_LABEL_TREE)) == 0) {
 			(*tag)->obj_type = GOT_OBJ_TYPE_TREE;
-			tlen = strlen(GOT_OBJ_TAG_TREE);
-			s += tlen;
-			remain -= tlen;
-		} else if (strncmp(s, GOT_OBJ_TAG_BLOB,
-		    strlen(GOT_OBJ_TAG_BLOB)) == 0) {
+			label_len = strlen(GOT_OBJ_LABEL_TREE);
+			s += label_len;
+			remain -= label_len;
+		} else if (strncmp(s, GOT_OBJ_LABEL_BLOB,
+		    strlen(GOT_OBJ_LABEL_BLOB)) == 0) {
 			(*tag)->obj_type = GOT_OBJ_TYPE_BLOB;
-			tlen = strlen(GOT_OBJ_TAG_BLOB);
-			s += tlen;
-			remain -= tlen;
-		} else if (strncmp(s, GOT_OBJ_TAG_TAG,
-		    strlen(GOT_OBJ_TAG_TAG)) == 0) {
+			label_len = strlen(GOT_OBJ_LABEL_BLOB);
+			s += label_len;
+			remain -= label_len;
+		} else if (strncmp(s, GOT_OBJ_LABEL_TAG,
+		    strlen(GOT_OBJ_LABEL_TAG)) == 0) {
 			(*tag)->obj_type = GOT_OBJ_TYPE_TAG;
-			tlen = strlen(GOT_OBJ_TAG_TAG);
-			s += tlen;
-			remain -= tlen;
+			label_len = strlen(GOT_OBJ_LABEL_TAG);
+			s += label_len;
+			remain -= label_len;
 		} else {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -809,16 +809,16 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		goto done;
 	}
 
-	tlen = strlen(GOT_TAG_TAG_TAG);
-	if (strncmp(s, GOT_TAG_TAG_TAG, tlen) == 0) {
+	label_len = strlen(GOT_TAG_LABEL_TAG);
+	if (strncmp(s, GOT_TAG_LABEL_TAG, label_len) == 0) {
 		char *p;
 		size_t slen;
-		remain -= tlen;
+		remain -= label_len;
 		if (remain <= 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		p = strchr(s, '\n');
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -842,17 +842,17 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		goto done;
 	}
 
-	tlen = strlen(GOT_TAG_TAG_TAGGER);
-	if (strncmp(s, GOT_TAG_TAG_TAGGER, tlen) == 0) {
+	label_len = strlen(GOT_TAG_LABEL_TAGGER);
+	if (strncmp(s, GOT_TAG_LABEL_TAGGER, label_len) == 0) {
 		char *p;
 		size_t slen;
 
-		remain -= tlen;
+		remain -= label_len;
 		if (remain <= 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		s += tlen;
+		s += label_len;
 		p = strchr(s, '\n');
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
