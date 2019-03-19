@@ -16,6 +16,7 @@
 
 #include <sys/queue.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,14 +38,21 @@ const struct got_error *
 got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 {
 	const struct got_error *err = NULL;
+	int zerr;
 
 	memset(&zb->z, 0, sizeof(zb->z));
 
 	zb->z.zalloc = Z_NULL;
 	zb->z.zfree = Z_NULL;
-	if (inflateInit(&zb->z) != Z_OK) {
-		err = got_error(GOT_ERR_IO);
-		goto done;
+	zerr = inflateInit(&zb->z);
+	if (zerr != Z_OK) {
+		if  (zerr == Z_ERRNO)
+			return got_error_from_errno();
+		if  (zerr == Z_MEM_ERROR) {
+			errno = ENOMEM;
+			return got_error_from_errno();
+		}
+		return got_error(GOT_ERR_DECOMPRESSION);
 	}
 
 	zb->inlen = zb->outlen = bufsize;
