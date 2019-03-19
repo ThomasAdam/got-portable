@@ -54,21 +54,6 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_OBJ_LABEL_COMMIT	"commit"
-#define GOT_OBJ_LABEL_TREE	"tree"
-#define GOT_OBJ_LABEL_BLOB	"blob"
-#define GOT_OBJ_LABEL_TAG	"tag"
-
-#define GOT_COMMIT_LABEL_TREE		"tree "
-#define GOT_COMMIT_LABEL_PARENT		"parent "
-#define GOT_COMMIT_LABEL_AUTHOR		"author "
-#define GOT_COMMIT_LABEL_COMMITTER	"committer "
-
-#define GOT_TAG_LABEL_OBJECT		"object "
-#define GOT_TAG_LABEL_TYPE		"type "
-#define GOT_TAG_LABEL_TAG		"tag "
-#define GOT_TAG_LABEL_TAGGER		"tagger "
-
 int
 got_object_id_cmp(const struct got_object_id *id1,
     const struct got_object_id *id2)

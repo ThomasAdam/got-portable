@@ -75,6 +75,21 @@ struct got_tag_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+#define GOT_OBJ_LABEL_COMMIT	"commit"
+#define GOT_OBJ_LABEL_TREE	"tree"
+#define GOT_OBJ_LABEL_BLOB	"blob"
+#define GOT_OBJ_LABEL_TAG	"tag"
+
+#define GOT_COMMIT_LABEL_TREE		"tree "
+#define GOT_COMMIT_LABEL_PARENT		"parent "
+#define GOT_COMMIT_LABEL_AUTHOR		"author "
+#define GOT_COMMIT_LABEL_COMMITTER	"committer "
+
+#define GOT_TAG_LABEL_OBJECT		"object "
+#define GOT_TAG_LABEL_TYPE		"type "
+#define GOT_TAG_LABEL_TAG		"tag "
+#define GOT_TAG_LABEL_TAGGER		"tagger "
+
 struct got_object_id *got_object_get_id(struct got_object *);
 const struct got_error *got_object_get_id_str(char **, struct got_object *);
 const struct got_error *got_object_open(struct got_object **,
