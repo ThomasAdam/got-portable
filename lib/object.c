@@ -1057,10 +1057,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 done:
 	if (err) {
 		if (*blob) {
-			if ((*blob)->f)
-				fclose((*blob)->f);
-			free((*blob)->read_buf);
-			free((*blob)->data);
+			got_object_blob_close(*blob);
 			free(*blob);
 			*blob = NULL;
 		} else if (outfd != -1)
@@ -1089,7 +1086,7 @@ got_object_blob_close(struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
 	free(blob->read_buf);
-	if (fclose(blob->f) != 0)
+	if (blob->f && fclose(blob->f) != 0)
 		err = got_error_from_errno();
 	free(blob->data);
 	free(blob);
