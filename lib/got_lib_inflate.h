@@ -14,28 +14,28 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_zstream_buf {
+struct got_inflate_buf {
 	z_stream z;
 	char *inbuf;
 	size_t inlen;
 	char *outbuf;
 	size_t outlen;
 	int flags;
-#define GOT_ZSTREAM_F_HAVE_MORE		0x01
-#define GOT_ZSTREAM_F_OWN_OUTBUF	0x02
+#define GOT_INFLATE_F_HAVE_MORE		0x01
+#define GOT_INFLATE_F_OWN_OUTBUF	0x02
 };
 
-#define GOT_ZSTREAM_BUFSIZE		8192
+#define GOT_INFLATE_BUFSIZE		8192
 
-const struct got_error *got_inflate_init(struct got_zstream_buf *, uint8_t *,
+const struct got_error *got_inflate_init(struct got_inflate_buf *, uint8_t *,
     size_t);
-const struct got_error *got_inflate_read(struct got_zstream_buf *, FILE *,
+const struct got_error *got_inflate_read(struct got_inflate_buf *, FILE *,
     size_t *);
-const struct got_error *got_inflate_read_fd(struct got_zstream_buf *, int,
+const struct got_error *got_inflate_read_fd(struct got_inflate_buf *, int,
     size_t *);
-const struct got_error *got_inflate_read_mmap(struct got_zstream_buf *,
+const struct got_error *got_inflate_read_mmap(struct got_inflate_buf *,
     uint8_t *, size_t, size_t, size_t *, size_t *);
-void got_inflate_end(struct got_zstream_buf *);
+void got_inflate_end(struct got_inflate_buf *);
 const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, FILE *);
 const struct got_error *got_inflate_to_mem_fd(uint8_t **, size_t *, int);
 const struct got_error *got_inflate_to_mem_mmap(uint8_t **, size_t *, uint8_t *,

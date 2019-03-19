@@ -188,7 +188,7 @@ const struct got_error *
 got_object_read_header(struct got_object **obj, int fd)
 {
 	const struct got_error *err;
-	struct got_zstream_buf zb;
+	struct got_inflate_buf zb;
 	char *buf;
 	const size_t zbsize = 64;
 	size_t outlen, totlen;
