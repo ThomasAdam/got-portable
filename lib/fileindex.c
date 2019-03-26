@@ -34,6 +34,13 @@
 #include "got_lib_fileindex.h"
 #include "got_lib_worktree.h"
 
+/* got_fileindex_entry flags */
+#define GOT_FILEIDX_F_PATH_LEN		0x00000fff
+#define GOT_FILEIDX_F_STAGE		0x00003000
+#define GOT_FILEIDX_F_EXTENDED		0x00004000
+#define GOT_FILEIDX_F_ASSUME_VALID	0x00008000
+#define GOT_FILEIDX_F_NOT_FLUSHED	0x20000000
+
 struct got_fileindex {
 	struct got_fileindex_tree entries;
 	int nentries;

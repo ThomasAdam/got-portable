@@ -49,11 +49,6 @@ struct got_fileindex_entry {
 	uint8_t commit_sha1[SHA1_DIGEST_LENGTH];
 
 	uint32_t flags;
-#define GOT_FILEIDX_F_PATH_LEN		0x00000fff
-#define GOT_FILEIDX_F_STAGE		0x00003000
-#define GOT_FILEIDX_F_EXTENDED		0x00004000
-#define GOT_FILEIDX_F_ASSUME_VALID	0x00008000
-#define GOT_FILEIDX_F_NOT_FLUSHED	0x20000000
 
 	/*
 	 * UNIX-style path, relative to work tree root.
