@@ -27,6 +27,7 @@ function test_status_basic {
 	fi
 
 	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
 	echo "unversioned file" > $testroot/wt/foo
 	rm $testroot/wt/epsilon/zeta
 	touch $testroot/wt/beta
@@ -34,6 +35,7 @@ function test_status_basic {
 	(cd $testroot/wt && got add new >/dev/null)
 
 	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
 	echo '!  epsilon/zeta' >> $testroot/stdout.expected
 	echo '?  foo' >> $testroot/stdout.expected
 	echo 'A  new' >> $testroot/stdout.expected

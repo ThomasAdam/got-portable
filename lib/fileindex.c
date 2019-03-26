@@ -42,6 +42,7 @@
 #define GOT_FILEIDX_F_NOT_FLUSHED	0x00010000
 #define GOT_FILEIDX_F_NO_BLOB		0x00020000
 #define GOT_FILEIDX_F_NO_COMMIT		0x00040000
+#define GOT_FILEIDX_F_NO_FILE_ON_DISK	0x00080000
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
@@ -58,6 +59,8 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 
 	if (lstat(ondisk_path, &sb) != 0)
 		return got_error_from_errno();
+
+	entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
 
 	if (update_timestamps) {
 		entry->ctime_sec = sb.st_ctime;
@@ -88,6 +91,12 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 		entry->flags |= GOT_FILEIDX_F_NO_COMMIT;
 
 	return NULL;
+}
+
+void
+got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *entry)
+{
+	entry->flags |= GOT_FILEIDX_F_NO_FILE_ON_DISK;
 }
 
 const struct got_error *
@@ -135,6 +144,12 @@ int
 got_fileindex_entry_has_commit(struct got_fileindex_entry *ie)
 {
 	return (ie->flags & GOT_FILEIDX_F_NO_COMMIT) == 0;
+}
+
+int
+got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *ie)
+{
+	return (ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0;
 }
 
 static const struct got_error *

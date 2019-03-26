@@ -78,6 +78,7 @@ __dead static void	usage_tree(void);
 __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
 __dead static void	usage_add(void);
+__dead static void	usage_rm(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -88,6 +89,7 @@ static const struct got_error*		cmd_tree(int, char *[]);
 static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
+static const struct got_error*		cmd_rm(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -108,6 +110,8 @@ static struct cmd got_commands[] = {
 	    "manage references in repository" },
 	{ "add",	cmd_add,	usage_add,
 	    "add a new file to version control" },
+	{ "rm",		cmd_rm,		usage_rm,
+	    "remove a versioned file" },
 };
 
 int
@@ -996,7 +1000,8 @@ print_diff(void *arg, unsigned char status, const char *path,
 	char *abspath = NULL;
 	struct stat sb;
 
-	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD)
+	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_DELETE)
 		return NULL;
 
 	if (!a->header_shown) {
@@ -1005,28 +1010,31 @@ print_diff(void *arg, unsigned char status, const char *path,
 		a->header_shown = 1;
 	}
 
-	if (status == GOT_STATUS_MODIFY) {
+	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_DELETE) {
 		err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
 		if (err)
 			goto done;
 
 	}
 
-	if (asprintf(&abspath, "%s/%s",
-	    got_worktree_get_root_path(a->worktree), path) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD) {
+		if (asprintf(&abspath, "%s/%s",
+		    got_worktree_get_root_path(a->worktree), path) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
 
-	f2 = fopen(abspath, "r");
-	if (f2 == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	if (lstat(abspath, &sb) == -1) {
-		err = got_error_from_errno();
-		goto done;
-	}
+		f2 = fopen(abspath, "r");
+		if (f2 == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (lstat(abspath, &sb) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else
+		sb.st_size = 0;
 
 	err = got_diff_blob_file(blob1, f2, sb.st_size, path, a->diff_context,
 	    stdout);
@@ -1893,6 +1901,76 @@ done:
 		got_worktree_close(worktree);
 	free(path);
 	free(relpath);
+	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_rm(void)
+{
+	fprintf(stderr, "usage: %s rm [-f] file-path\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_rm(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL, *path = NULL;
+	int ch, delete_local_mods = 0;
+
+	while ((ch = getopt(argc, argv, "f")) != -1) {
+		switch (ch) {
+		case 'f':
+			delete_local_mods = 1;
+			break;
+		default:
+			usage_add();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_rm();
+
+	path = realpath(argv[0], NULL);
+	if (path == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = got_worktree_schedule_delete(worktree, path, delete_local_mods,
+	    print_status, NULL, repo);
+	if (error)
+		goto done;
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(path);
 	free(cwd);
 	return error;
 }

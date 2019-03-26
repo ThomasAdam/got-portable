@@ -141,3 +141,6 @@ const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, DIR *,
 
 int got_fileindex_entry_has_blob(struct got_fileindex_entry *);
 int got_fileindex_entry_has_commit(struct got_fileindex_entry *);
+int got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *);
+
+void got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *);

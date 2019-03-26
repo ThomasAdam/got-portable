@@ -80,6 +80,8 @@
 #define GOT_ERR_LOCKFILE_TIMEOUT 64
 #define GOT_ERR_BAD_REF_NAME	65
 #define GOT_ERR_WORKTREE_REPO	66
+#define GOT_ERR_FILE_MODIFIED	67
+#define GOT_ERR_FILE_STATUS	68
 
 static const struct got_error {
 	int code;
@@ -150,6 +152,8 @@ static const struct got_error {
 	{ GOT_ERR_LOCKFILE_TIMEOUT,"lockfile timeout" },
 	{ GOT_ERR_BAD_REF_NAME,	"bad reference name" },
 	{ GOT_ERR_WORKTREE_REPO,"cannot create worktree inside a git repository" },
+	{ GOT_ERR_FILE_MODIFIED,"file contains modifications" },
+	{ GOT_ERR_FILE_STATUS,	"file has unexpected status" },
 };
 
 /*

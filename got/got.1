@@ -286,6 +286,17 @@ Delete the reference with the specified name from the repository.
 .It Cm add Ar file-path
 Schedule an unversioned file in a work tree for addition to the
 repository in the next commit.
+.It Cm rm Ar file-path
+Remove a versioned file from a work tree and schedule it for deletion
+from the repository in the next commit.
+.Pp
+The options for
+.Cm got rm
+are as follows:
+.Bl -tag -width Ds
+.It Fl f
+Perform the operation even if the file contains uncommitted modifications.
+.El
 .El
 .Sh EXIT STATUS
 .Ex -std got

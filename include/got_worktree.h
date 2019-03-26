@@ -139,3 +139,12 @@ const struct got_error *got_worktree_resolve_path(char **,
  */
 const struct got_error *got_worktree_schedule_add(char **,
     struct got_worktree *, const char *);
+
+/*
+ * Remove a file from disk and schedule it to be deleted in the next commit.
+ * Don't allow deleting files with uncommitted modifications, unless the
+ * parameter 'delete_local_mods' is set.
+ */
+const struct got_error *
+got_worktree_schedule_delete(struct got_worktree *, const char *, int,
+   got_worktree_status_cb, void *, struct got_repository *);

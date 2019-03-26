@@ -967,7 +967,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (lstat(abspath, sb) == -1) {
 		if (errno == ENOENT) {
 			if (ie) {
-				*status = GOT_STATUS_MISSING;
+				if (got_fileindex_entry_has_file_on_disk(ie))
+					*status = GOT_STATUS_MISSING;
+				else
+					*status = GOT_STATUS_DELETE;
 				sb->st_mode =
 				    ((ie->mode >> GOT_FILEIDX_MODE_PERMS_SHIFT)
 				    & (S_IRWXU | S_IRWXG | S_IRWXO));
@@ -986,7 +989,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (ie == NULL)
 		return NULL;
 
-	if (!got_fileindex_entry_has_blob(ie)) {
+	if (!got_fileindex_entry_has_file_on_disk(ie)) {
+		*status = GOT_STATUS_DELETE;
+		return NULL;
+	} else if (!got_fileindex_entry_has_blob(ie)) {
 		*status = GOT_STATUS_ADD;
 		return NULL;
 	}
@@ -1424,13 +1430,17 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	struct diff_dir_cb_arg *a = arg;
 	struct got_object_id id;
+	unsigned char status;
 
 	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
 		return NULL;
 
 	memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-	return (*a->status_cb)(a->status_arg, GOT_STATUS_MISSING, ie->path,
-	    &id);
+	if (got_fileindex_entry_has_file_on_disk(ie))
+		status = GOT_STATUS_MISSING;
+	else
+		status = GOT_STATUS_DELETE;
+	return (*a->status_cb)(a->status_arg, status, ie->path, &id);
 }
 
 static const struct got_error *
@@ -1511,7 +1521,7 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 	}
 	workdir = opendir(ondisk_path);
 	if (workdir == NULL) {
-		if (errno == ENOTDIR) {
+		if (errno == ENOTDIR || errno == ENOENT) {
 			struct got_fileindex_entry *ie;
 			ie = got_fileindex_entry_get(fileindex, path);
 			if (ie == NULL) {
@@ -1680,5 +1690,116 @@ done:
 		free(*relpath);
 		*relpath = NULL;
 	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_schedule_delete(struct got_worktree *worktree,
+    const char *ondisk_path, int delete_local_mods,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
+{
+	struct got_fileindex *fileindex = NULL;
+	struct got_fileindex_entry *ie = NULL;
+	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
+	FILE *index = NULL, *new_index = NULL;
+	const struct got_error *err = NULL, *unlockerr = NULL;
+	unsigned char status;
+	struct stat sb;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = got_path_skip_common_ancestor(&relpath,
+	    got_worktree_get_root_path(worktree), ondisk_path);
+	if (err)
+		goto done;
+
+	fileindex = got_fileindex_alloc();
+	if (fileindex == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno();
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_fileindex_read(fileindex, index);
+	if (err)
+		goto done;
+
+	ie = got_fileindex_entry_get(fileindex, relpath);
+	if (ie == NULL) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		goto done;
+
+	if (status != GOT_STATUS_NO_CHANGE) {
+		if (status != GOT_STATUS_MODIFY) {
+			err = got_error(GOT_ERR_FILE_STATUS);
+			goto done;
+		}
+		if (!delete_local_mods) {
+			err = got_error(GOT_ERR_FILE_MODIFIED);
+			goto done;
+		}
+	}
+
+	if (unlink(ondisk_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	got_fileindex_entry_mark_deleted_from_disk(ie);
+
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
+	if (err)
+		goto done;
+
+	err = got_fileindex_write(fileindex, new_index);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	free(new_fileindex_path);
+	new_fileindex_path = NULL;
+
+	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
+done:
+	free(relpath);
+	if (index) {
+		if (fclose(index) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	if (new_fileindex_path) {
+		if (unlink(new_fileindex_path) != 0 && err == NULL)
+			err = got_error_from_errno();
+		free(new_fileindex_path);
+	}
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
 	return err;
 }
