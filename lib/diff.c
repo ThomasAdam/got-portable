@@ -175,7 +175,7 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	flags |= D_PROTOTYPE;
 
 	fprintf(outfile, "blob - %s\n", idstr1);
-	fprintf(outfile, "file + %s\n", label2);
+	fprintf(outfile, "file + %s\n", f2 == NULL ? "/dev/null" : label2);
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, NULL);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
