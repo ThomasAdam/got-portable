@@ -1601,27 +1601,27 @@ done:
 }
 
 const struct got_error *
-got_worktree_schedule_add(char **relpath, struct got_worktree *worktree,
-    const char *ondisk_path)
+got_worktree_schedule_add(struct got_worktree *worktree,
+    const char *ondisk_path, got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
 	struct got_fileindex_entry *ie = NULL;
-	char *fileindex_path = NULL, *new_fileindex_path = NULL;
+	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
 	FILE *index = NULL, *new_index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
-
-	*relpath = NULL;
+	int ie_added = 0;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
-	err = got_path_skip_common_ancestor(relpath,
+	err = got_path_skip_common_ancestor(&relpath,
 	    got_worktree_get_root_path(worktree), ondisk_path);
 	if (err)
 		goto done;
 
-	err = got_fileindex_entry_alloc(&ie, ondisk_path, *relpath, NULL, NULL);
+	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -1651,7 +1651,7 @@ got_worktree_schedule_add(char **relpath, struct got_worktree *worktree,
 	err = got_fileindex_entry_add(fileindex, ie);
 	if (err)
 		goto done;
-	ie = NULL; /* now owned by fileindex; don't free separately */
+	ie_added = 1; /* now owned by fileindex; don't free separately */
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
@@ -1669,6 +1669,8 @@ got_worktree_schedule_add(char **relpath, struct got_worktree *worktree,
 
 	free(new_fileindex_path);
 	new_fileindex_path = NULL;
+
+	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
@@ -1679,17 +1681,14 @@ done:
 			err = got_error_from_errno();
 		free(new_fileindex_path);
 	}
-	if (ie)
+	if (!ie_added)
 		got_fileindex_entry_free(ie);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
-	if (err) {
-		free(*relpath);
-		*relpath = NULL;
-	}
+	free(relpath);
 	return err;
 }
 

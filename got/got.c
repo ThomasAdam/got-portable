@@ -1855,6 +1855,7 @@ static const struct got_error *
 cmd_add(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *path = NULL, *relpath = NULL;
 	int ch;
@@ -1888,15 +1889,22 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
-	error = got_worktree_schedule_add(&relpath, worktree, path);
+	error = got_worktree_schedule_add(worktree, path, print_status, NULL,
+	    repo);
 	if (error)
 		goto done;
-	printf("%c  %s\n", GOT_STATUS_ADD, relpath);
 done:
+	if (repo)
+		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
 	free(path);
