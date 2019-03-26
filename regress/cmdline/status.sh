@@ -30,10 +30,13 @@ function test_status_basic {
 	echo "unversioned file" > $testroot/wt/foo
 	rm $testroot/wt/epsilon/zeta
 	touch $testroot/wt/beta
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
 
 	echo 'M  alpha' > $testroot/stdout.expected
 	echo '!  epsilon/zeta' >> $testroot/stdout.expected
 	echo '?  foo' >> $testroot/stdout.expected
+	echo 'A  new' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 

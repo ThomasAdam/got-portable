@@ -138,3 +138,6 @@ struct got_fileindex_diff_dir_cb {
 const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, DIR *,
     const char *, const char *, struct got_repository *,
     struct got_fileindex_diff_dir_cb *, void *);
+
+int got_fileindex_entry_has_blob(struct got_fileindex_entry *);
+int got_fileindex_entry_has_commit(struct got_fileindex_entry *);

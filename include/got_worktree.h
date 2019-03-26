@@ -131,3 +131,11 @@ const struct got_error *got_worktree_status(struct got_worktree *,
  */
 const struct got_error *got_worktree_resolve_path(char **,
     struct got_worktree *, const char *);
+
+/*
+ * Schedule a file at an on-disk path for addition in the next commit.
+ * Return the added file's path relative to the root of the work tree.
+ * The caller must dispose of this relative path with free(3).
+ */
+const struct got_error *got_worktree_schedule_add(char **,
+    struct got_worktree *, const char *);

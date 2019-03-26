@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log
+REGRESS_TARGETS=checkout update status log add
 NOOBJ=Yes
 
 checkout:
@@ -12,5 +12,8 @@ status:
 
 log:
 	./log.sh
+
+add:
+	./add.sh
 
 .include <bsd.regress.mk>

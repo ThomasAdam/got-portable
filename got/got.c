@@ -77,6 +77,7 @@ __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
 __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
+__dead static void	usage_add(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -86,6 +87,7 @@ static const struct got_error*		cmd_blame(int, char *[]);
 static const struct got_error*		cmd_tree(int, char *[]);
 static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
+static const struct got_error*		cmd_add(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -104,6 +106,8 @@ static struct cmd got_commands[] = {
 	    "show modification status of files" },
 	{ "ref",	cmd_ref,	usage_ref,
 	    "manage references in repository" },
+	{ "add",	cmd_add,	usage_add,
+	    "add a new file to version control" },
 };
 
 int
@@ -992,7 +996,7 @@ print_diff(void *arg, unsigned char status, const char *path,
 	char *abspath = NULL;
 	struct stat sb;
 
-	if (status != GOT_STATUS_MODIFY)
+	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD)
 		return NULL;
 
 	if (!a->header_shown) {
@@ -1001,9 +1005,12 @@ print_diff(void *arg, unsigned char status, const char *path,
 		a->header_shown = 1;
 	}
 
-	err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
-	if (err)
-		goto done;
+	if (status == GOT_STATUS_MODIFY) {
+		err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
+		if (err)
+			goto done;
+
+	}
 
 	if (asprintf(&abspath, "%s/%s",
 	    got_worktree_get_root_path(a->worktree), path) == -1) {
@@ -1826,5 +1833,66 @@ done:
 		got_worktree_close(worktree);
 	free(cwd);
 	free(repo_path);
+	return error;
+}
+
+__dead static void
+usage_add(void)
+{
+	fprintf(stderr, "usage: %s add file-path\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_add(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *path = NULL, *relpath = NULL;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_add();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_add();
+
+	path = realpath(argv[0], NULL);
+	if (path == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = got_worktree_schedule_add(&relpath, worktree, path);
+	if (error)
+		goto done;
+	printf("%c  %s\n", GOT_STATUS_ADD, relpath);
+done:
+	if (worktree)
+		got_worktree_close(worktree);
+	free(path);
+	free(relpath);
+	free(cwd);
 	return error;
 }

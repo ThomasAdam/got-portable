@@ -986,6 +986,11 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (ie == NULL)
 		return NULL;
 
+	if (!got_fileindex_entry_has_blob(ie)) {
+		*status = GOT_STATUS_ADD;
+		return NULL;
+	}
+
 	if (ie->ctime_sec == sb->st_ctime &&
 	    ie->ctime_nsec == sb->st_ctimensec &&
 	    ie->mtime_sec == sb->st_mtime &&
@@ -1582,5 +1587,98 @@ done:
 		*wt_path = path;
 	else
 		free(path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_schedule_add(char **relpath, struct got_worktree *worktree,
+    const char *ondisk_path)
+{
+	struct got_fileindex *fileindex = NULL;
+	struct got_fileindex_entry *ie = NULL;
+	char *fileindex_path = NULL, *new_fileindex_path = NULL;
+	FILE *index = NULL, *new_index = NULL;
+	const struct got_error *err = NULL, *unlockerr = NULL;
+
+	*relpath = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = got_path_skip_common_ancestor(relpath,
+	    got_worktree_get_root_path(worktree), ondisk_path);
+	if (err)
+		goto done;
+
+	err = got_fileindex_entry_alloc(&ie, ondisk_path, *relpath, NULL, NULL);
+	if (err)
+		goto done;
+
+	fileindex = got_fileindex_alloc();
+	if (fileindex == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno();
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_fileindex_read(fileindex, index);
+	if (err)
+		goto done;
+
+	err = got_fileindex_entry_add(fileindex, ie);
+	if (err)
+		goto done;
+	ie = NULL; /* now owned by fileindex; don't free separately */
+
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
+	if (err)
+		goto done;
+
+	err = got_fileindex_write(fileindex, new_index);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	free(new_fileindex_path);
+	new_fileindex_path = NULL;
+done:
+	if (index) {
+		if (fclose(index) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	if (new_fileindex_path) {
+		if (unlink(new_fileindex_path) != 0 && err == NULL)
+			err = got_error_from_errno();
+		free(new_fileindex_path);
+	}
+	if (ie)
+		got_fileindex_entry_free(ie);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	if (err) {
+		free(*relpath);
+		*relpath = NULL;
+	}
 	return err;
 }

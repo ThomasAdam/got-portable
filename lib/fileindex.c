@@ -125,6 +125,18 @@ got_fileindex_entry_free(struct got_fileindex_entry *entry)
 	free(entry);
 }
 
+int
+got_fileindex_entry_has_blob(struct got_fileindex_entry *ie)
+{
+	return (ie->flags & GOT_FILEIDX_F_NO_BLOB) == 0;
+}
+
+int
+got_fileindex_entry_has_commit(struct got_fileindex_entry *ie)
+{
+	return (ie->flags & GOT_FILEIDX_F_NO_COMMIT) == 0;
+}
+
 static const struct got_error *
 add_entry(struct got_fileindex *fileindex, struct got_fileindex_entry *entry)
 {
