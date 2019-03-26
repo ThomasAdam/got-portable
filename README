@@ -25,4 +25,5 @@ Man pages are not installed yet but can be viewed with mandoc:
 
  $ mandoc got/got.1 | less
  $ mandoc got/git-repository.5 | less
+ $ mandoc got/got-worktree.5 | less
  $ mandoc tog/tog.1 | less
