@@ -135,6 +135,18 @@ Corresponding on-disk references take precedence over those stored here.
 .It Pa refs/
 The default directory to store references in.
 .El
+.Pp
+A typical Git repository exposes a work tree which allows the user to make
+changes to versioned files and create new commits.
+When a Git work tree is present, the actual repository data is stored in a
+.Pa .git
+subfolder of the repository's root directory.
+A Git repository without a work tree is known as a
+.Dq bare
+repository.
+.Xr got 1
+does not make use of Git's work tree and treats every repository as if it
+was bare.
 .Sh SEE ALSO
 .Xr got 1 ,
 .Xr deflate 3 ,
