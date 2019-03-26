@@ -76,12 +76,13 @@ The pack file format knows two additional types of objects in addition
 to blobs, trees, and commits:
 .Bl -tag -width Ds
 .It Offset Delta Objects
-This object is representated as a delta against another object in the
-same pack file,
-which is referred to by its offset in the pack file.
+This object is represented as a delta against another object in the
+same pack file.
+This other object is referred to by its offset in the pack file.
 .It Reference Delta Objects
-This object is representated as a delta against another object in the
-same pack file, which is referred to by its SHA1 object identifier.
+This object is represented as a delta against another object in the
+same pack file.
+The other object is referred to by its SHA1 object identifier.
 .El
 .Pp
 Pack files are self-contained and may not refer to loose objects or
@@ -105,7 +106,7 @@ The previous head commit of the Git work tree.
 .It Pa FETCH_HEAD
 The commit most recently fetched from another repository.
 .It Pa branches/
-Rerefences to branch tips are stored in this directory.
+References to branch tips are stored in this directory.
 .It Pa config
 Git configuration file. See
 .Xr git-config 1 .
