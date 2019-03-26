@@ -39,7 +39,9 @@
 #define GOT_FILEIDX_F_STAGE		0x00003000
 #define GOT_FILEIDX_F_EXTENDED		0x00004000
 #define GOT_FILEIDX_F_ASSUME_VALID	0x00008000
-#define GOT_FILEIDX_F_NOT_FLUSHED	0x20000000
+#define GOT_FILEIDX_F_NOT_FLUSHED	0x00010000
+#define GOT_FILEIDX_F_NO_BLOB		0x00020000
+#define GOT_FILEIDX_F_NO_COMMIT		0x00040000
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
@@ -72,8 +74,18 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 		entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
 	entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
 	    GOT_FILEIDX_MODE_PERMS_SHIFT);
-	memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
-	memcpy(entry->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+
+	if (blob_sha1) {
+		memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+		entry->flags &= ~GOT_FILEIDX_F_NO_BLOB;
+	} else
+		entry->flags |= GOT_FILEIDX_F_NO_BLOB;
+
+	if (commit_sha1) {
+		memcpy(entry->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+		entry->flags &= ~GOT_FILEIDX_F_NO_COMMIT;
+	} else
+		entry->flags |= GOT_FILEIDX_F_NO_COMMIT;
 
 	return NULL;
 }
