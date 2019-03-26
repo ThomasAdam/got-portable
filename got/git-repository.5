@@ -21,33 +21,36 @@
 .Nd Git repository format
 .Sh DESCRIPTION
 A Git repository stores a series of versioned snapshots of a file hierarchy.
-The repository's core data model is a directed acyclic graph which
-contains three types of objects as nodes.
-.Pp
+Conceptually, the repository's data model is a directed acyclic graph which
+contains three types of objects as nodes:
+.Bl -tag -width Ds
+.It Blobs
 The content of tracked files is stored in objects of type
 .Em blob .
-.Pp
+.It Trees
 A
 .Em tree
 object points to any number of such blobs, and also to other trees in
 order to represent a hierarchy of files and directories.
-.Pp
+.It Commits
 A
 .Em commit
 object points to the root element of one tree, and thus records the
 state of this entire tree as a snapshot.
-Commit objects are chained together to form a line of history of snapshots.
-A given commit can be suceeded by an arbitrary number of subsequent commits,
-such that diverging lines of version control history, known as
+Commit objects are chained together to form lines of version control history.
+Most commits have just one successor commit, but commits may be succeeded by
+an arbitrary number of subsequent commits so that diverging lines of version
+control history, known as
 .Em branches ,
 can be represented.
-A commit which preceeds another commit is referred to as that other commit's
+A commit which precedes another commit is referred to as that other commit's
 .Em parent commit .
-A commit with multiple parents reunites diverged lines of history and is
+A commit with multiple parents unites disparate lines of history and is
 known as a
 .Em merge commit .
 .Pp
-Each object is identified by a SHA1 hash calculated over the object's
+.El
+Each object is identified by a SHA1 hash calculated over both the object's
 header and the data stored in the object.
 .Sh OBJECT STORAGE
 Loose objects are stored as individual files beneath the directory
@@ -69,26 +72,66 @@ Loose objects files are compressed with
 Multiple objects can be bundled in a
 .Em pack file
 for better disk space efficiency and increased run-time performance.
-The pack file format adds two additional types of objects:
-offset delta objects and reference delta objects.
+The pack file format knows two additional types of objects in addition
+to blobs, trees, and commits:
+.Bl -tag -width Ds
+.It Offset Delta Objects
+This object is representated as a delta against another object in the
+same pack file,
+which is referred to by its offset in the pack file.
+.It Reference Delta Objects
+This object is representated as a delta against another object in the
+same pack file, which is referred to by its SHA1 object identifier.
+.El
 .Pp
-TODO describe pack file format
+Pack files are self-contained and may not refer to loose objects or
+objects stored in other pack files.
+Deltified objects may refer to other deltified objects as their delta base,
+forming chains of deltas.
+The ultimate base of a delta chain must be an object of the same type as
+the original object which is stored in deltified form.
 .Pp
+Each pack file is accompanied by a corresponding
+.Em pack index
+file, which lists the IDs and offsets of all objects contained in the
+pack file.
 .Sh FILES
-.Bl -tag -width /etc/rpc -compact
+.Bl -tag -width packed-refs -compact
 .It Pa HEAD
+The current head commit of the Git work tree.
+In bare repositories, this files serves as a default reference.
 .It Pa ORIG_HEAD
+The previous head commit of the Git work tree.
 .It Pa FETCH_HEAD
+The commit most recently fetched from another repository.
 .It Pa branches/
+Rerefences to branch tips are stored in this directory.
 .It Pa config
+Git configuration file. See
+.Xr git-config 1 .
 .It Pa description
+A human-readable description of the repository.
 .It Pa hooks/
+This directory contains hook scripts to run when certain events occur.
 .It Pa index
+The file index used by
+.Xr git 1 .
+This file is not used by
+.Xr got 1 ,
+which uses the
+.Xr got-worktree 5
+file index instead.
 .It Pa info
+Various configuration items.
 .It Pa logs/
+Directory where reflogs are stored.
 .It Pa objects/
+Loose and packed objects are stored in this directory.
 .It Pa packed-refs
+A file which stores references.
+Corresponding references found on disk take precedence over packed references.
 .It Pa refs/
+The default directory to store references in.
 .El
 .Sh SEE ALSO
 .Xr got 1 ,
