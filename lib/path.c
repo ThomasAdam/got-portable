@@ -132,6 +132,8 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 		return got_error(GOT_ERR_BAD_PATH);
 	if (abspath[len_parent] != '/')
 		return got_error(GOT_ERR_BAD_PATH);
+	while (abspath[len_parent] == '/')
+		abspath++;
 	bufsize = len - len_parent + 1;
 	*child = malloc(bufsize);
 	if (*child == NULL)
