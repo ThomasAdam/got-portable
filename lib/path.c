@@ -122,6 +122,8 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 	const struct got_error *err = NULL;
 	size_t len_parent, len, bufsize;
 
+	*child = NULL;
+
 	len_parent = strlen(parent_abspath);
 	len = strlen(abspath);
 	if (len_parent >= len)
