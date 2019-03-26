@@ -1,0 +1,122 @@
+.\"
+.\" Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOT-WORKTREE 5
+.Os
+.Sh NAME
+.Nm got-worktree
+.Nd got worktree format
+.Sh DESCRIPTION
+A got
+.Em work tree
+stores a file hierarchy which corresponds to a versioned
+snapshot stored in a Git repository.
+The work tree's meta data is stored in the
+.Pa .got
+directory.
+A work tree is created with
+.Cm got checkout
+and is required to make changes to a Git repository with
+.Xr got 1 .
+.Pp
+A work tree stores the path to its Git repository, the name of a reference
+to the branch which files were checked out from, and the ID of a commit on
+this branch known as the
+.Em base commit .
+.Pp
+File meta-data is stored in a structured file called the
+.Em file index
+and tracks the status of file modifications, additions, and deletions,
+relative to the base commit in the repository.
+The file index contains a series of records, and each such record contains
+the following status information for a particular file:
+.Bl -tag -width Ds
+.It Copy of filesystem meta-data
+Timestamp, file size, and file ownership information from
+.Xr stat 2 .
+This is only used to detect file modifications and is never applied
+back to the filesystem.
+File permissions are not tracked, except for the executable bit.
+When versioned files are checked out into the work tree, the current
+.Xr umask 2
+is heeded.
+.It Blob object ID
+The SHA1 hash of the blob object which corresponds to the contents
+of this file in the repository.
+The hash is stored as binary data.
+.It Commit object ID
+The SHA1 hash of the commit object the file was checked out from.
+The hash is stored as binary data.
+This data is used to detect past incomplete update operations.
+Entries which do not match the work tree's base commit may still need
+to be updated to match file content stored in the base commit.
+.It Flags
+A flags field (intentionally not documented).
+.It Path data
+The path of the entry, relative to the work tree root.
+Path data is of variable length and NUL-padded to a multiple of 8 bytes.
+.El
+.Pp
+A corrupt or missing file index can be recreated on demand with
+.Cm got update .
+When the file index is modified, it is read into memory in its entirety,
+modified in place, and written to a temporary file.
+This temporary file is then moved on top of the old file index with
+.Xr rename 2 .
+This ensures that no other processes see an inconsistent file index
+which is in the process of being written.
+.Pp
+Work tree meta data must only be modified while the work tree's
+.Pa lock
+file has been exclusively locked with
+.Xr lockf 3 .
+.Pp
+Each work tree has a universal unique identifier.
+When a work tree is checked out or updated, this identifier is used to
+create a reference to the current base commit in the Git repository.
+The presence of this reference prevents Git garbage collectors from
+discarding the base commit and any objects it refers to.
+When a work tree is no longer needed its reference can be deleted from
+the Git repository with
+.Cm got ref -d .
+.Sh FILES
+.Bl -tag -width path-prefix -compact
+.It Pa .got
+Meta-data directory where all files listed below reside.
+.It Pa base-commit
+SHA1 hex-string representation of the current base commit.
+.It Pa file-index
+File status information.
+.It Pa format
+Work tree format number.
+.It Pa head-ref
+Name of the reference to the current branch.
+.It Pa lock
+Lock file to obtain exclusive write access to meta data.
+.It Pa path-prefix
+Path inside repository the work tree was checked out from.
+.It Pa repository
+Path to the repository the work tree was checked out from.
+.It Pa uuid
+A universal unique identififer for the work tree.
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr rename 2 ,
+.Xr stat 2 ,
+.Xr umask 2 ,
+.Xr lockf 3 ,
+.Xr git-repository 5
