@@ -1754,6 +1754,10 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 		goto done;
 
 	if (status != GOT_STATUS_NO_CHANGE) {
+		if (status == GOT_STATUS_DELETE) {
+			err = got_error_set_errno(ENOENT);
+			goto done;
+		}
 		if (status != GOT_STATUS_MODIFY) {
 			err = got_error(GOT_ERR_FILE_STATUS);
 			goto done;

@@ -84,5 +84,37 @@ function test_rm_with_local_mods {
 	test_done "$testroot" "$ret"
 }
 
+function test_double_rm {
+	local testroot=`test_init double_rm`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	for fflag in "" "-f"; do
+		echo "got: No such file or directory" > $testroot/stderr.expected
+		(cd $testroot/wt && got rm $fflag beta 2> $testroot/stderr)
+		ret="$?"
+		if [ "$ret" == "0" ]; then
+			echo "got rm command succeeded unexpectedly" >&2
+			test_done "$testroot" 1
+		fi
+
+		cmp $testroot/stderr.expected $testroot/stderr
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
+		fi
+	done
+	test_done "$testroot" "0"
+}
+
 run_test test_rm_basic
 run_test test_rm_with_local_mods
+run_test test_double_rm
