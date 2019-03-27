@@ -58,6 +58,7 @@ function test_double_add {
 	if [ "$ret" == "0" ]; then
 		echo "got add command succeeded unexpectedly" >&2
 		test_done "$testroot" 1
+		return 1
 	fi
 
 	cmp $testroot/stderr.expected $testroot/stderr
