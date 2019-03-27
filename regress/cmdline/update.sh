@@ -1022,6 +1022,55 @@ function test_update_conflict_wt_rm_vs_repo_edit {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_conflict_wt_rm_vs_repo_rm {
+	local testroot=`test_init update_conflict_wt_rm_vs_repo_rm`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git rm -q beta)
+	git_commit $testroot/repo -m "removing a file"
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# beta is now gone... we don't flag tree conflicts yet
+	echo 'got: bad path' > $testroot/stderr.expected
+	(cd $testroot/wt && got status beta 2> $testroot/stderr)
+	cmp $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/beta ]; then
+		echo "removed file beta still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1042,3 +1091,4 @@ run_test test_update_restores_missing_file
 run_test test_update_conflict_wt_add_vs_repo_add
 run_test test_update_conflict_wt_edit_vs_repo_rm
 run_test test_update_conflict_wt_rm_vs_repo_edit
+run_test test_update_conflict_wt_rm_vs_repo_rm
