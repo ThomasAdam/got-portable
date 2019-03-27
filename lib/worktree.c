@@ -1188,6 +1188,38 @@ remove_ondisk_file(const char *root_path, const char *path)
 	return err;
 }
 
+static const struct got_error *
+delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_fileindex_entry *ie, const char *parent_path,
+    struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	unsigned char status;
+	struct stat sb;
+	char *ondisk_path;
+
+	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, ie->path)
+	    == -1)
+		return got_error_from_errno();
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		return err;
+
+	(*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
+
+	if (status == GOT_STATUS_NO_CHANGE) {
+		err = remove_ondisk_file(worktree->root_path, ie->path);
+		if (err)
+			return err;
+	}
+
+	got_fileindex_entry_remove(fileindex, ie);
+	return NULL;
+}
+
 struct diff_cb_arg {
     struct got_fileindex *fileindex;
     struct got_worktree *worktree;
@@ -1212,16 +1244,11 @@ diff_old_new(void *arg, struct got_fileindex_entry *ie,
 static const struct got_error *
 diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
-	const struct got_error *err;
 	struct diff_cb_arg *a = arg;
 
-	(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE, ie->path);
-
-	err = remove_ondisk_file(a->worktree->root_path, ie->path);
-	if (err)
-		return err;
-	got_fileindex_entry_remove(a->fileindex, ie);
-	return NULL;
+	return delete_blob(a->worktree, a->fileindex, ie, parent_path,
+	    a->repo, a->progress_cb, a->progress_arg,
+	    a->cancel_cb, a->cancel_arg);
 }
 
 static const struct got_error *

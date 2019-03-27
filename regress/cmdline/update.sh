@@ -909,6 +909,58 @@ function test_update_conflict_add_vs_add {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_conflict_local_edit_vs_rm {
+	local testroot=`test_init update_conflict_local_edit_vs_rm`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git rm -q beta)
+	git_commit $testroot/repo -m "removing a file"
+
+	echo "modified beta" > $testroot/wt/beta
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified beta" > $testroot/content.expected
+
+	cat $testroot/wt/beta > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# beta is now an unversioned file... we don't flag tree conflicts yet
+	echo '?  beta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -927,3 +979,4 @@ run_test test_update_keeps_xbit
 run_test test_update_clears_xbit
 run_test test_update_restores_missing_file
 run_test test_update_conflict_add_vs_add
+run_test test_update_conflict_local_edit_vs_rm
