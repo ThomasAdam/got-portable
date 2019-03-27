@@ -848,8 +848,8 @@ function test_update_restores_missing_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_add_vs_add {
-	local testroot=`test_init update_conflict_add_vs_add`
+function test_update_conflict_wt_add_vs_repo_add {
+	local testroot=`test_init update_conflict_wt_add_vs_repo_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -909,8 +909,8 @@ function test_update_conflict_add_vs_add {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_local_edit_vs_rm {
-	local testroot=`test_init update_conflict_local_edit_vs_rm`
+function test_update_conflict_wt_edit_vs_repo_rm {
+	local testroot=`test_init update_conflict_wt_edit_vs_repo_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -978,5 +978,5 @@ run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
 run_test test_update_clears_xbit
 run_test test_update_restores_missing_file
-run_test test_update_conflict_add_vs_add
-run_test test_update_conflict_local_edit_vs_rm
+run_test test_update_conflict_wt_add_vs_repo_add
+run_test test_update_conflict_wt_edit_vs_repo_rm
