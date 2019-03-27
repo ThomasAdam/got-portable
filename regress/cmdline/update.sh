@@ -893,6 +893,18 @@ function test_update_conflict_add_vs_add {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# resolve the conflict
+	echo "new and also new" > $testroot/wt/gamma/new
+	echo 'M  gamma/new' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
