@@ -338,6 +338,60 @@ function test_status_shows_no_mods_after_complete_merge {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_shows_conflict {
+	local testroot=`test_init status_shows_conflict 1`
+
+	echo "1" > $testroot/repo/numbers
+	echo "2" >> $testroot/repo/numbers
+	echo "3" >> $testroot/repo/numbers
+	echo "4" >> $testroot/repo/numbers
+	echo "5" >> $testroot/repo/numbers
+	echo "6" >> $testroot/repo/numbers
+	echo "7" >> $testroot/repo/numbers
+	echo "8" >> $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i 's/2/22/' $testroot/repo/numbers
+	git_commit $testroot/repo -m "modified line 2"
+
+	# modify line 2 in a conflicting way
+	sed -i 's/2/77/' $testroot/wt/numbers
+
+	echo "C  numbers" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'C  numbers' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -346,3 +400,4 @@ run_test test_status_shows_local_mods_after_update
 run_test test_status_unversioned_subdirs
 run_test test_status_ignores_symlink
 run_test test_status_shows_no_mods_after_complete_merge
+run_test test_status_shows_conflict

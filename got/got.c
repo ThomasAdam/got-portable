@@ -1001,7 +1001,7 @@ print_diff(void *arg, unsigned char status, const char *path,
 	struct stat sb;
 
 	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_DELETE)
+	    status != GOT_STATUS_DELETE && status != GOT_STATUS_CONFLICT)
 		return NULL;
 
 	if (!a->header_shown) {
@@ -1010,14 +1010,14 @@ print_diff(void *arg, unsigned char status, const char *path,
 		a->header_shown = 1;
 	}
 
-	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_DELETE) {
+	if (status != GOT_STATUS_ADD) {
 		err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
 		if (err)
 			goto done;
 
 	}
 
-	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD) {
+	if (status != GOT_STATUS_DELETE) {
 		if (asprintf(&abspath, "%s/%s",
 		    got_worktree_get_root_path(a->worktree), path) == -1) {
 			err = got_error_from_errno();

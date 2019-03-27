@@ -32,6 +32,7 @@
 #include <fnmatch.h>
 #include <libgen.h>
 #include <uuid.h>
+#include <util.h>
 
 #include "got_error.h"
 #include "got_repository.h"
@@ -956,6 +957,41 @@ done:
 	return err;
 }
 
+/* Upgrade STATUS_MODIFY to STATUS_CONFLICT if a conflict marker is found. */
+static const struct got_error *
+get_modified_file_content_status(unsigned char *status, FILE *f)
+{
+	const struct got_error *err = NULL;
+	const char *markers[3] = {
+		GOT_DIFF_CONFLICT_MARKER_BEGIN,
+		GOT_DIFF_CONFLICT_MARKER_SEP,
+		GOT_DIFF_CONFLICT_MARKER_END
+	};
+	int i = 0;
+	char *line;
+	size_t len;
+	const char delim[3] = {'\0', '\0', '\0'};
+
+	while (*status == GOT_STATUS_MODIFY) {
+		line = fparseln(f, &len, NULL, delim, 0);
+		if (line == NULL) {
+			if (feof(f))
+				break;
+			err = got_ferror(f, GOT_ERR_IO);
+			break;
+		}
+
+		if (strncmp(line, markers[i], strlen(markers[i])) == 0) {
+			if (markers[i] == GOT_DIFF_CONFLICT_MARKER_END)
+				*status = GOT_STATUS_CONFLICT;
+			else
+				i++;
+		}
+	}
+
+	return err;
+}
+
 static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
@@ -1027,12 +1063,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
 		err = got_object_blob_read_block(&blen, blob);
 		if (err)
-			break;
+			goto done;
 		/* Skip length of blob object header first time around. */
 		flen = fread(fbuf, 1, sizeof(fbuf) - hdrlen, f);
 		if (flen == 0 && ferror(f)) {
 			err = got_error_from_errno();
-			break;
+			goto done;
 		}
 		if (blen == 0) {
 			if (flen != 0)
@@ -1053,6 +1089,11 @@ get_file_status(unsigned char *status, struct stat *sb,
 			break;
 		}
 		hdrlen = 0;
+	}
+
+	if (*status == GOT_STATUS_MODIFY) {
+		rewind(f);
+		err = get_modified_file_content_status(status, f);
 	}
 done:
 	if (blob)
