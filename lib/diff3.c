@@ -423,11 +423,13 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 	ssize_t m, n;
 	int i;
 
-	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark), "<<<<<<< %s", label1);
+	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark),
+	    "%s %s", GOT_DIFF_CONFLICT_MARKER_BEGIN, label1);
 	if (i < 0 || i >= (int)sizeof(d3s->f1mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark), ">>>>>>> %s", label3);
+	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark),
+	    "%s %s", GOT_DIFF_CONFLICT_MARKER_END, label3);
 	if (i < 0 || i >= (int)sizeof(d3s->f3mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
@@ -943,8 +945,8 @@ edscript(int n, struct diff3_state *d3s)
 		if (!d3s->oflag || !d3s->overlap[n])
 			prange(&d3s->de[n].old, d3s);
 		else
-			diff_output(d3s->diffbuf, "%da\n=======\n",
-			    d3s->de[n].old.to -1);
+			diff_output(d3s->diffbuf, "%da\n%s\n",
+			    d3s->de[n].old.to -1, GOT_DIFF_CONFLICT_MARKER_SEP);
 		(void)fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET);
 		k = d3s->de[n].new.to - d3s->de[n].new.from;
 		for (; k > 0; k-= j) {

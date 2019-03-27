@@ -132,6 +132,10 @@ struct got_diff_args {
 	const char *label[2];
 };
 
+#define GOT_DIFF_CONFLICT_MARKER_BEGIN	"<<<<<<<"
+#define GOT_DIFF_CONFLICT_MARKER_SEP	"======="
+#define GOT_DIFF_CONFLICT_MARKER_END	">>>>>>>"
+
 const struct got_error *got_diffreg(int *, FILE *,
     FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *,
     struct got_diff_changes *);
