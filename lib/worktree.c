@@ -714,7 +714,6 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	FILE *f1 = NULL, *f2 = NULL;
 	char *blob1_path = NULL, *blob2_path = NULL;
 	char *merged_path = NULL, *base_path = NULL;
-	struct got_object_id id2;
 	char *id_str = NULL;
 	char *label1 = NULL;
 	int overlapcnt = 0, update_timestamps = 0;
@@ -755,14 +754,22 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	err = got_opentemp_named(&blob2_path, &f2, base_path);
 	if (err)
 		goto done;
-
-	memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-	err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
-	if (err)
-		goto done;
-	err = got_object_blob_dump_to_file(NULL, NULL, f2, blob2);
-	if (err)
-		goto done;
+	if (got_fileindex_entry_has_blob(ie)) {
+		struct got_object_id id2;
+		memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
+		if (err)
+			goto done;
+		err = got_object_blob_dump_to_file(NULL, NULL, f2, blob2);
+		if (err)
+			goto done;
+	} else {
+		/*
+		 * If the file has no blob, this is an "add vs add" conflict,
+		 * and we simply use an empty ancestor file to make both files
+		 * appear in the merged result in their entirety.
+		 */
+	}
 
 	err = got_object_id_str(&id_str, worktree->base_commit_id);
 	if (err)
@@ -1081,14 +1088,16 @@ update_blob(struct got_worktree *worktree,
 	}
 
 	if (ie && status != GOT_STATUS_MISSING) {
-		if (memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
+		if (got_fileindex_entry_has_commit(ie) &&
+		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
 			    path);
 			goto done;
 		}
-		if (memcmp(ie->blob_sha1,
-		    te->id->sha1, SHA1_DIGEST_LENGTH) == 0)
+		if (got_fileindex_entry_has_blob(ie) &&
+		    memcmp(ie->blob_sha1, te->id->sha1,
+		    SHA1_DIGEST_LENGTH) == 0)
 			goto done;
 	}
 
@@ -1096,7 +1105,7 @@ update_blob(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (status == GOT_STATUS_MODIFY)
+	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD)
 		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
 		    te->mode, sb.st_mode, blob, repo, progress_cb,
 		    progress_arg);

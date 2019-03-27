@@ -848,6 +848,55 @@ function test_update_restores_missing_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_conflict_add_vs_add {
+	local testroot=`test_init update_conflict_add_vs_add`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/repo/gamma/new
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding a new file"
+
+	echo "also new" > $testroot/wt/gamma/new
+	(cd $testroot/wt && got add gamma/new >/dev/null)
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "C  gamma/new" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "<<<<<<< commit " > $testroot/content.expected
+	git_show_head $testroot/repo >> $testroot/content.expected
+	echo >> $testroot/content.expected
+	echo "new" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "also new" >> $testroot/content.expected
+	echo '>>>>>>> gamma/new' >> $testroot/content.expected
+
+	cat $testroot/wt/gamma/new > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -865,3 +914,4 @@ run_test test_update_merges_file_edits
 run_test test_update_keeps_xbit
 run_test test_update_clears_xbit
 run_test test_update_restores_missing_file
+run_test test_update_conflict_add_vs_add
