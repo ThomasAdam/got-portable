@@ -1219,7 +1219,7 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
     got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	unsigned char status;
 	struct stat sb;
 	char *ondisk_path;
@@ -1232,16 +1232,28 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		return err;
 
-	(*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
-
-	if (status == GOT_STATUS_NO_CHANGE) {
-		err = remove_ondisk_file(worktree->root_path, ie->path);
+	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_CONFLICT ||
+	    status == GOT_STATUS_ADD) {
+		(*progress_cb)(progress_arg, GOT_STATUS_MERGE, ie->path);
+		/*
+		 * Preserve the working file and change the deleted blob's
+		 * entry into a schedule-add entry.
+		 */
+		err = got_fileindex_entry_update(ie, ondisk_path, NULL, NULL,
+		    0);
 		if (err)
 			return err;
+	} else {
+		(*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
+		if (status == GOT_STATUS_NO_CHANGE) {
+			err = remove_ondisk_file(worktree->root_path, ie->path);
+			if (err)
+				return err;
+		}
+		got_fileindex_entry_remove(fileindex, ie);
 	}
 
-	got_fileindex_entry_remove(fileindex, ie);
-	return NULL;
+	return err;
 }
 
 struct diff_cb_arg {

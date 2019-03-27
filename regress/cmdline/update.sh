@@ -926,7 +926,7 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	echo "D  beta" > $testroot/stdout.expected
+	echo "G  beta" > $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
@@ -950,8 +950,8 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 		return 1
 	fi
 
-	# beta is now an unversioned file... we don't flag tree conflicts yet
-	echo '?  beta' > $testroot/stdout.expected
+	# beta is now an added file... we don't flag tree conflicts yet
+	echo 'A  beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp $testroot/stdout.expected $testroot/stdout
 	ret="$?"
