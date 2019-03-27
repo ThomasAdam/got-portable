@@ -961,6 +961,67 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_conflict_wt_rm_vs_repo_edit {
+	local testroot=`test_init update_conflict_wt_rm_vs_repo_edit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified beta" > $testroot/repo/beta
+	git_commit $testroot/repo -m "modified a file"
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "G  beta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# beta remains a deleted file... we don't flag tree conflicts yet
+	echo 'D  beta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# 'got diff' should show post-update contents of beta being deleted
+	local head_rev=`git_show_head $testroot/repo`
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ beta' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-modified beta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -980,3 +1041,4 @@ run_test test_update_clears_xbit
 run_test test_update_restores_missing_file
 run_test test_update_conflict_wt_add_vs_repo_add
 run_test test_update_conflict_wt_edit_vs_repo_rm
+run_test test_update_conflict_wt_rm_vs_repo_edit

@@ -57,26 +57,29 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 {
 	struct stat sb;
 
-	if (lstat(ondisk_path, &sb) != 0)
-		return got_error_from_errno();
+	if (lstat(ondisk_path, &sb) != 0) {
+		if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
+			return got_error_from_errno();
+	} else
+		entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
 
-	entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
-
-	if (update_timestamps) {
-		entry->ctime_sec = sb.st_ctime;
-		entry->ctime_nsec = sb.st_ctimensec;
-		entry->mtime_sec = sb.st_mtime;
-		entry->mtime_nsec = sb.st_mtimensec;
+	if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
+		if (update_timestamps) {
+			entry->ctime_sec = sb.st_ctime;
+			entry->ctime_nsec = sb.st_ctimensec;
+			entry->mtime_sec = sb.st_mtime;
+			entry->mtime_nsec = sb.st_mtimensec;
+		}
+		entry->uid = sb.st_uid;
+		entry->gid = sb.st_gid;
+		entry->size = (sb.st_size & 0xffffffff);
+		if (sb.st_mode & S_IFLNK)
+			entry->mode = GOT_FILEIDX_MODE_SYMLINK;
+		else
+			entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
+		entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
+		    GOT_FILEIDX_MODE_PERMS_SHIFT);
 	}
-	entry->uid = sb.st_uid;
-	entry->gid = sb.st_gid;
-	entry->size = (sb.st_size & 0xffffffff);
-	if (sb.st_mode & S_IFLNK)
-		entry->mode = GOT_FILEIDX_MODE_SYMLINK;
-	else
-		entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
-	entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
-	    GOT_FILEIDX_MODE_PERMS_SHIFT);
 
 	if (blob_sha1) {
 		memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);

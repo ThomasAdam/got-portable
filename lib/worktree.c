@@ -844,11 +844,35 @@ done:
 }
 
 static const struct got_error *
-install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
-   struct got_fileindex_entry *entry, const char *ondisk_path, const char *path,
-   uint16_t te_mode, uint16_t st_mode, struct got_blob_object *blob,
-   int restoring_missing_file, struct got_repository *repo,
-   got_worktree_checkout_cb progress_cb, void *progress_arg)
+update_blob_fileindex_entry(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
+    const char *ondisk_path, const char *path, struct got_blob_object *blob,
+    int update_timestamps)
+{
+	const struct got_error *err = NULL;
+
+	if (ie == NULL)
+		ie = got_fileindex_entry_get(fileindex, path);
+	if (ie)
+		err = got_fileindex_entry_update(ie, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1,
+		    update_timestamps);
+	else {
+		struct got_fileindex_entry *new_ie;
+		err = got_fileindex_entry_alloc(&new_ie, ondisk_path,
+		    path, blob->id.sha1, worktree->base_commit_id->sha1);
+		if (!err)
+			err = got_fileindex_entry_add(fileindex, new_ie);
+	}
+	return err;
+}
+
+static const struct got_error *
+install_blob(struct got_worktree *worktree, const char *ondisk_path,
+   const char *path, uint16_t te_mode, uint16_t st_mode,
+   struct got_blob_object *blob, int restoring_missing_file,
+   struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+   void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
@@ -938,18 +962,6 @@ install_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 	}
 
-	if (entry == NULL)
-		entry = got_fileindex_entry_get(fileindex, path);
-	if (entry)
-		err = got_fileindex_entry_update(entry, ondisk_path,
-		    blob->id.sha1, worktree->base_commit_id->sha1, 1);
-	else {
-		err = got_fileindex_entry_alloc(&entry, ondisk_path,
-		    path, blob->id.sha1, worktree->base_commit_id->sha1);
-		if (err)
-			goto done;
-		err = got_fileindex_entry_add(fileindex, entry);
-	}
 done:
 	if (fd != -1 && close(fd) != 0 && err == NULL)
 		err = got_error_from_errno();
@@ -1150,11 +1162,23 @@ update_blob(struct got_worktree *worktree,
 		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
 		    te->mode, sb.st_mode, blob, repo, progress_cb,
 		    progress_arg);
-	else
-		err = install_blob(worktree, fileindex, ie, ondisk_path, path,
-		    te->mode, sb.st_mode, blob, status == GOT_STATUS_MISSING,
-		    repo, progress_cb, progress_arg);
-
+	else if (status == GOT_STATUS_DELETE) {
+		(*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+		err = update_blob_fileindex_entry(worktree, fileindex, ie,
+		    ondisk_path, path, blob, 0);
+		if (err)
+			goto done;
+	} else {
+		err = install_blob(worktree, ondisk_path, path, te->mode,
+		    sb.st_mode, blob, status == GOT_STATUS_MISSING, repo,
+		    progress_cb, progress_arg);
+		if (err)
+			goto done;
+		err = update_blob_fileindex_entry(worktree, fileindex, ie,
+		    ondisk_path, path, blob, 1);
+		if (err)
+			goto done;
+	}
 	got_object_blob_close(blob);
 done:
 	free(ondisk_path);
