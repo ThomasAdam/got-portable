@@ -39,4 +39,34 @@ function test_add_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_double_add {
+	local testroot=`test_init double_add`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	echo "got: File exists" > $testroot/stderr.expected
+	(cd $testroot/wt && got add foo 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got add command succeeded unexpectedly" >&2
+		test_done "$testroot" 1
+	fi
+
+	cmp $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
+run_test test_double_add

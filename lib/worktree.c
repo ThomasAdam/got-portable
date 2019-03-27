@@ -1621,10 +1621,6 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
-	if (err)
-		goto done;
-
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
 		err = got_error_from_errno();
@@ -1645,6 +1641,15 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	}
 
 	err = got_fileindex_read(fileindex, index);
+	if (err)
+		goto done;
+
+	if (got_fileindex_entry_get(fileindex, relpath) != NULL) {
+		err = got_error_set_errno(EEXIST);
+		goto done;
+	}
+
+	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -1681,7 +1686,7 @@ done:
 			err = got_error_from_errno();
 		free(new_fileindex_path);
 	}
-	if (!ie_added)
+	if (ie && !ie_added)
 		got_fileindex_entry_free(ie);
 	if (fileindex)
 		got_fileindex_free(fileindex);
