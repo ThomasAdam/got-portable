@@ -1829,6 +1829,8 @@ cmd_log(int argc, char *argv[])
 	int ch;
 	struct tog_view *view;
 
+	SIMPLEQ_INIT(&refs);
+
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
 	    NULL) == -1)
@@ -1912,7 +1914,6 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	SIMPLEQ_INIT(&refs);
 	error = got_ref_list(&refs, repo);
 	if (error)
 		goto done;
