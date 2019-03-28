@@ -292,6 +292,19 @@ are as follows:
 .It Fl f
 Perform the operation even if the file contains uncommitted modifications.
 .El
+.It Cm revert Ar file-path
+Revert any uncommited changes in the file at the specified path.
+File contents will be overwritten with those contained in the
+work tree's base commit. There is no way to bring discarded
+changes back after
+.Cm got revert !
+.Pp
+If the file was added with
+.Cm got add
+it will become an unversioned file again.
+If the file was deleted with
+.Cm got rm
+it will be restored.
 .El
 .Sh EXIT STATUS
 .Ex -std got

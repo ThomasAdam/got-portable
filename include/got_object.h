@@ -153,6 +153,10 @@ void got_object_tree_close(struct got_tree_object *);
 const struct got_tree_entries *got_object_tree_get_entries(
     struct got_tree_object *);
 
+/* Find a particular entry in a tree. */
+const struct got_tree_entry *got_object_tree_find_entry(
+    struct got_tree_object *, const char *);
+
 /*
  * Compare two trees and indicate whether the entry at the specified path
  * differs between them. The path must not be the root path "/"; the function

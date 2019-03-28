@@ -871,8 +871,8 @@ static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
    const char *path, uint16_t te_mode, uint16_t st_mode,
    struct got_blob_object *blob, int restoring_missing_file,
-   struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-   void *progress_arg)
+   int reverting_versioned_file, struct got_repository *repo,
+   got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
@@ -913,6 +913,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 
 	if (restoring_missing_file)
 		(*progress_cb)(progress_arg, GOT_STATUS_MISSING, path);
+	else if (reverting_versioned_file)
+		(*progress_cb)(progress_arg, GOT_STATUS_REVERT, path);
 	else
 		(*progress_cb)(progress_arg,
 		    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
@@ -1170,8 +1172,8 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 	} else {
 		err = install_blob(worktree, ondisk_path, path, te->mode,
-		    sb.st_mode, blob, status == GOT_STATUS_MISSING, repo,
-		    progress_cb, progress_arg);
+		    sb.st_mode, blob, status == GOT_STATUS_MISSING, 0,
+		    repo, progress_cb, progress_arg);
 		if (err)
 			goto done;
 		err = update_blob_fileindex_entry(worktree, fileindex, ie,
@@ -1908,6 +1910,187 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 done:
 	free(relpath);
+	if (index) {
+		if (fclose(index) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+	if (new_fileindex_path) {
+		if (unlink(new_fileindex_path) != 0 && err == NULL)
+			err = got_error_from_errno();
+		free(new_fileindex_path);
+	}
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_revert(struct got_worktree *worktree,
+    const char *ondisk_path,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    struct got_repository *repo)
+{
+	struct got_fileindex *fileindex = NULL;
+	struct got_fileindex_entry *ie = NULL;
+	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
+	char *tree_path = NULL, *parent_path, *te_name;
+	FILE *index = NULL, *new_index = NULL;
+	const struct got_error *err = NULL, *unlockerr = NULL;
+	struct got_tree_object *tree = NULL;
+	struct got_object_id id, *tree_id = NULL;
+	const struct got_tree_entry *te;
+	struct got_blob_object *blob = NULL;
+	unsigned char status;
+	struct stat sb;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = got_path_skip_common_ancestor(&relpath,
+	    got_worktree_get_root_path(worktree), ondisk_path);
+	if (err)
+		goto done;
+
+	fileindex = got_fileindex_alloc();
+	if (fileindex == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno();
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = got_fileindex_read(fileindex, index);
+	if (err)
+		goto done;
+
+	ie = got_fileindex_entry_get(fileindex, relpath);
+	if (ie == NULL) {
+		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	/* Construct in-repository path of tree which contains this blob. */
+	err = got_path_dirname(&parent_path, ie->path);
+	if (err) {
+		if (err->code != GOT_ERR_BAD_PATH)
+			goto done;
+		parent_path = "/";
+	}
+	if (got_path_is_root_dir(worktree->path_prefix)) {
+		tree_path = strdup(parent_path);
+		if (tree_path == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+	} else {
+		if (got_path_is_root_dir(parent_path)) {
+			tree_path = strdup(worktree->path_prefix);
+			if (tree_path == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+		} else {
+			if (asprintf(&tree_path, "%s/%s",
+			    worktree->path_prefix, parent_path) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
+		}
+	}
+
+	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
+	    tree_path);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		goto done;
+
+	te_name = basename(ie->path);
+	if (te_name == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		goto done;
+
+	te = got_object_tree_find_entry(tree, te_name);
+	if (te == NULL && status != GOT_STATUS_ADD) {
+		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		goto done;
+	}
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+		(*progress_cb)(progress_arg, GOT_STATUS_REVERT, ie->path);
+		got_fileindex_entry_remove(fileindex, ie);
+		break;
+	case GOT_STATUS_DELETE:
+	case GOT_STATUS_MODIFY:
+	case GOT_STATUS_CONFLICT:
+	case GOT_STATUS_MISSING:
+		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		err = got_object_open_as_blob(&blob, repo, &id, 8192);
+		if (err)
+			goto done;
+		err = install_blob(worktree, ondisk_path, ie->path,
+		    te->mode, sb.st_mode, blob, 0, 1, repo, progress_cb,
+		    progress_arg);
+		if (err)
+			goto done;
+		if (status == GOT_STATUS_DELETE) {
+			err = update_blob_fileindex_entry(worktree,
+			    fileindex, ie, ondisk_path, ie->path, blob, 1);
+			if (err)
+				goto done;
+		}
+		break;
+	default:
+			goto done;
+	}
+
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
+	if (err)
+		goto done;
+
+	err = got_fileindex_write(fileindex, new_index);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	free(new_fileindex_path);
+	new_fileindex_path = NULL;
+done:
+	free(relpath);
+	free(tree_path);
+	if (blob)
+		got_object_blob_close(blob);
+	if (tree)
+		got_object_tree_close(tree);
+	free(tree_id);
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno();

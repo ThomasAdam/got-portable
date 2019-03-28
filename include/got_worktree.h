@@ -28,6 +28,7 @@ struct got_worktree;
 #define GOT_STATUS_MISSING	'!'
 #define GOT_STATUS_UNVERSIONED	'?'
 #define GOT_STATUS_OBSTRUCTED	'~'
+#define GOT_STATUS_REVERT	'R'
 
 /*
  * Attempt to initialize a new work tree on disk.
@@ -109,7 +110,7 @@ typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
  * void * argument, and the path of each checked out file.
  */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
-    struct got_repository *, got_worktree_checkout_cb progress, void *,
+    struct got_repository *, got_worktree_checkout_cb, void *,
     got_worktree_cancel_cb, void *);
 
 /* A callback function which is invoked to report a path's status. */
@@ -144,3 +145,10 @@ const struct got_error *got_worktree_schedule_add(struct got_worktree *,
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *, const char *, int,
    got_worktree_status_cb, void *, struct got_repository *);
+
+/*
+ * Revert a file at the specified path such that it matches its
+ * original state in the worktree's base commit.
+ */
+const struct got_error *got_worktree_revert(struct got_worktree *,
+    const char *, got_worktree_checkout_cb, void *, struct got_repository *);

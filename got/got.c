@@ -79,6 +79,7 @@ __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
 __dead static void	usage_add(void);
 __dead static void	usage_rm(void);
+__dead static void	usage_revert(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -90,6 +91,7 @@ static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_rm(int, char *[]);
+static const struct got_error*		cmd_revert(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -112,6 +114,8 @@ static struct cmd got_commands[] = {
 	    "add a new file to version control" },
 	{ "rm",		cmd_rm,		usage_rm,
 	    "remove a versioned file" },
+	{ "revert",	cmd_revert,	usage_revert,
+	    "revert uncommitted changes" },
 };
 
 int
@@ -1972,6 +1976,82 @@ cmd_rm(int argc, char *argv[])
 
 	error = got_worktree_schedule_delete(worktree, path, delete_local_mods,
 	    print_status, NULL, repo);
+	if (error)
+		goto done;
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(path);
+	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_revert(void)
+{
+	fprintf(stderr, "usage: %s revert file-path\n", getprogname());
+	exit(1);
+}
+
+static void
+revert_progress(void *arg, unsigned char status, const char *path)
+{
+	while (path[0] == '/')
+		path++;
+	printf("%c  %s\n", status, path);
+}
+
+static const struct got_error *
+cmd_revert(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL, *path = NULL;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_revert();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_revert();
+
+	path = realpath(argv[0], NULL);
+	if (path == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = got_worktree_revert(worktree, path,
+	    revert_progress, NULL, repo);
 	if (error)
 		goto done;
 done:

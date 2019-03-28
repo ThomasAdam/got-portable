@@ -1354,6 +1354,12 @@ find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 	return NULL;
 }
 
+const struct got_tree_entry *
+got_object_tree_find_entry(struct got_tree_object *tree, const char *name)
+{
+	return find_entry_by_name(tree, name, strlen(name));
+}
+
 const struct got_error *
 got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
     struct got_object_id *commit_id, const char *path)
