@@ -115,6 +115,7 @@ static const struct got_error {
 	{ GOT_ERR_WORKTREE_META,"bad worktree meta data" },
 	{ GOT_ERR_WORKTREE_VERS,"unsupported worktree format version" },
 	{ GOT_ERR_WORKTREE_BUSY,"worktree already locked" },
+	{ GOT_ERR_FILE_OBSTRUCTED,"file is obstructed" },
 	{ GOT_ERR_RECURSION,	"recursion limit reached" },
 	{ GOT_ERR_TIMEOUT,	"operation timed out" },
 	{ GOT_ERR_INTERRUPT,	"operation interrupted" },
