@@ -1897,13 +1897,13 @@ cmd_log(int argc, char *argv[])
 
 	init_curses();
 
-	error = apply_unveil(repo_path,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo),
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
 		goto done;
 
 	if (start_commit == NULL)
@@ -2500,12 +2500,11 @@ cmd_diff(int argc, char *argv[])
 
 	init_curses();
 
-	error = apply_unveil(repo_path, NULL);
+	error = got_repo_open(&repo, repo_path);
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, repo_path);
-	free(repo_path);
+	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
 		goto done;
 
@@ -2531,6 +2530,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	error = view_loop(view);
 done:
+	free(repo_path);
 	got_repo_close(repo);
 	got_ref_list_free(&refs);
 	return error;
@@ -3243,12 +3243,12 @@ cmd_blame(int argc, char *argv[])
 
 	init_curses();
 
-	error = apply_unveil(repo_path, NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), NULL);
+	if (error)
 		goto done;
 
 	if (worktree) {
@@ -3910,12 +3910,12 @@ cmd_tree(int argc, char *argv[])
 
 	init_curses();
 
-	error = apply_unveil(repo_path, NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), NULL);
+	if (error)
 		goto done;
 
 	if (commit_id_arg == NULL)

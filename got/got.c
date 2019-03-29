@@ -376,12 +376,12 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	error = apply_unveil(repo_path, 0, worktree_path);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path);
+	if (error)
 		goto done;
 
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
@@ -878,13 +878,13 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = apply_unveil(repo_path, 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
 		goto done;
 
 	if (start_commit == NULL) {
@@ -1137,14 +1137,14 @@ cmd_diff(int argc, char *argv[])
 			return got_error_from_errno();
 	}
 
-	error = apply_unveil(repo_path, 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	free(repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
 		goto done;
 
 	if (worktree) {
@@ -1298,12 +1298,12 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
-	error = apply_unveil(repo_path, 1, NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+	if (error)
 		goto done;
 
 	if (worktree) {
@@ -1525,12 +1525,12 @@ cmd_tree(int argc, char *argv[])
 		}
 	}
 
-	error = apply_unveil(repo_path, 1, NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+	if (error)
 		goto done;
 
 	if (path == NULL) {
@@ -1823,13 +1823,13 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	error = apply_unveil(repo_path, do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), do_list,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
 		goto done;
 
 	if (do_list)
