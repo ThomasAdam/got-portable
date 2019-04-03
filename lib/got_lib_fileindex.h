@@ -121,8 +121,8 @@ struct got_fileindex_diff_tree_cb {
 	got_fileindex_diff_tree_new_cb diff_new;
 };
 const struct got_error *got_fileindex_diff_tree(struct got_fileindex *,
-    struct got_tree_object *, struct got_repository *,
-    struct got_fileindex_diff_tree_cb *, void *);
+    struct got_tree_object *, const char *, const char *,
+    struct got_repository *, struct got_fileindex_diff_tree_cb *, void *);
 
 typedef const struct got_error *(*got_fileindex_diff_dir_old_new_cb)(void *,
     struct got_fileindex_entry *, struct dirent *, const char *);

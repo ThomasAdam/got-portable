@@ -1071,6 +1071,177 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	test_done "$testroot" "0"
 }
 
+function test_update_partial {
+	local testroot=`test_init update_partial`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	echo "modified beta" > $testroot/repo/beta
+	echo "modified epsilon/zeta" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "modified two files"
+
+	for f in alpha beta epsilon/zeta; do
+		echo "U  $f" > $testroot/stdout.expected
+		echo -n "Updated to commit " >> $testroot/stdout.expected
+		git_show_head $testroot/repo >> $testroot/stdout.expected
+		echo >> $testroot/stdout.expected
+
+		(cd $testroot/wt && got update $f > $testroot/stdout)
+
+		cmp $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		echo "modified $f" > $testroot/content.expected
+		cat $testroot/wt/$f > $testroot/content
+
+		cmp $testroot/content.expected $testroot/content
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/content.expected $testroot/content
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+	test_done "$testroot" "$ret"
+}
+
+function test_update_partial_add {
+	local testroot=`test_init update_partial_add`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/repo/new
+	echo "epsilon/new2" > $testroot/repo/epsilon/new2
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "added two files"
+
+	for f in new epsilon/new2; do
+		echo "A  $f" > $testroot/stdout.expected
+		echo -n "Updated to commit " >> $testroot/stdout.expected
+		git_show_head $testroot/repo >> $testroot/stdout.expected
+		echo >> $testroot/stdout.expected
+
+		(cd $testroot/wt && got update $f > $testroot/stdout)
+
+		cmp $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		echo "$f" > $testroot/content.expected
+		cat $testroot/wt/$f > $testroot/content
+
+		cmp $testroot/content.expected $testroot/content
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/content.expected $testroot/content
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+	test_done "$testroot" "$ret"
+}
+
+function test_update_partial_rm {
+	local testroot=`test_init update_partial_rm`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git rm -q alpha)
+	(cd $testroot/repo && git rm -q epsilon/zeta)
+	git_commit $testroot/repo -m "removed two files"
+
+	for f in alpha epsilon/zeta; do
+		echo "got: no such entry found in tree" \
+			> $testroot/stderr.expected
+
+		(cd $testroot/wt && got update $f 2> $testroot/stderr)
+		ret="$?"
+		if [ "$ret" == "0" ]; then
+			echo "update succeeded unexpectedly" >&2
+			test_done "$testroot" "1"
+			return 1
+		fi
+
+		cmp $testroot/stderr.expected $testroot/stderr
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+	test_done "$testroot" "$ret"
+}
+
+function test_update_partial_dir {
+	local testroot=`test_init update_partial_dir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	echo "modified beta" > $testroot/repo/beta
+	echo "modified epsilon/zeta" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "modified two files"
+
+	echo "U  epsilon/zeta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update epsilon > $testroot/stdout)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified epsilon/zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1092,3 +1263,7 @@ run_test test_update_conflict_wt_add_vs_repo_add
 run_test test_update_conflict_wt_edit_vs_repo_rm
 run_test test_update_conflict_wt_rm_vs_repo_edit
 run_test test_update_conflict_wt_rm_vs_repo_rm
+run_test test_update_partial
+run_test test_update_partial_add
+run_test test_update_partial_rm
+run_test test_update_partial_dir

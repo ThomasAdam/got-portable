@@ -108,9 +108,21 @@ typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
  * inside the tree corresponding to the work tree's base commit.
  * The checkout progress callback will be invoked with the provided
  * void * argument, and the path of each checked out file.
+ *
+ * It is possible to restrict the checkout operation to a specific path in
+ * the work tree, in which case all files outside this path will remain at
+ * their currently recorded base commit. Inconsistent base commits can be
+ * repaired later by running another update operation across the entire work
+ * tree. Inconsistent base-commits may also occur if this function runs into
+ * an error or if the checkout operation is cancelled by the cancel callback.
+ * The specified path is relative to the work tree's root. Pass "" to check
+ * out files across the entire work tree.
+ *
+ * Some operations may refuse to run while the work tree contains files from
+ * multiple base commits.
  */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
-    struct got_repository *, got_worktree_checkout_cb, void *,
+    const char *, struct got_repository *, got_worktree_checkout_cb, void *,
     got_worktree_cancel_cb, void *);
 
 /* A callback function which is invoked to report a path's status. */

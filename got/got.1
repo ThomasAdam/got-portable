@@ -86,7 +86,7 @@ Only files beneath the specified
 .Ar path-prefix
 will be checked out.
 .El
-.It Cm update [ Fl c Ar commit ] [ work-tree-path ]
+.It Cm update [ Fl c Ar commit ] [ Ar path ]
 Update an existing work tree to another commit on the current branch.
 By default, the latest commit on the current branch is assumed.
 Show the status of each affected file, using the following status codes:
@@ -100,10 +100,14 @@ Show the status of each affected file, using the following status codes:
 .It ! Ta a missing versioned file was restored
 .El
 .Pp
-If the
-.Ar work tree path
-is omitted, use the current working directory.
-.Pp
+If a
+.Ar path
+is specified, restrict the update operation to files at or within this path.
+Files outside this path will remain at their currently recorded base commit.
+Some operations may refuse to run while the work tree contains files from
+multiple base commits.
+Inconsistent base commits in a work tree can be repaired by running another
+update operation across the entire work tree.
 .Pp
 The options for
 .Cm got update

@@ -1363,7 +1363,7 @@ done:
 
 
 const struct got_error *
-got_worktree_checkout_files(struct got_worktree *worktree,
+got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -1376,6 +1376,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	FILE *index = NULL, *new_index = NULL;
 	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
+	char *relpath = NULL, *entry_name = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -1426,14 +1427,86 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id, repo,
-	    worktree->base_commit_id, worktree->path_prefix);
-	if (err)
-		goto done;
+	if (path[0]) {
+		char *tree_path;
+		int obj_type;
+		relpath = strdup(path);
+		if (relpath == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		if (asprintf(&tree_path, "%s%s%s", worktree->path_prefix,
+		    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
+		    path) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = got_object_id_by_path(&tree_id, repo,
+		    worktree->base_commit_id, tree_path);
+		free(tree_path);
+		if (err)
+			goto done;
+		err = got_object_get_type(&obj_type, repo, tree_id);
+		if (err)
+			goto done;
+		if (obj_type == GOT_OBJ_TYPE_BLOB) {
+			/* Split provided path into parent dir + entry name. */
+			if (strchr(path, '/')  == NULL) {
+				relpath = strdup("");
+				if (relpath == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				tree_path = strdup(worktree->path_prefix);
+				if (tree_path == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+			} else {
+				err = got_path_dirname(&relpath, path);
+				if (err)
+					goto done;
+				if (asprintf(&tree_path, "%s%s%s",
+				    worktree->path_prefix,
+				    got_path_is_root_dir(
+				    worktree->path_prefix) ? "" : "/",
+				    relpath) == -1) {
+					err = got_error_from_errno();
+					goto done;
+				}
+			}
+			err = got_object_id_by_path(&tree_id, repo,
+			    worktree->base_commit_id, tree_path);
+			free(tree_path);
+			if (err)
+				goto done;
+			entry_name = basename(path);
+			if (entry_name == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+		}
+	} else {
+		relpath = strdup("");
+		if (relpath == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = got_object_id_by_path(&tree_id, repo,
+		    worktree->base_commit_id, worktree->path_prefix);
+		if (err)
+			goto done;
+	}
 
 	err = got_object_open_as_tree(&tree, repo, tree_id);
 	if (err)
 		goto done;
+
+	if (entry_name &&
+	    got_object_tree_find_entry(tree, entry_name) == NULL) {
+		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		goto done;
+	}
 
 	diff_cb.diff_old_new = diff_old_new;
 	diff_cb.diff_old = diff_old;
@@ -1445,8 +1518,8 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	arg.progress_arg = progress_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
-	checkout_err = got_fileindex_diff_tree(fileindex, tree, repo,
-	    &diff_cb, &arg);
+	checkout_err = got_fileindex_diff_tree(fileindex, tree, relpath,
+	    entry_name, repo, &diff_cb, &arg);
 
 	/* Try to sync the fileindex back to disk in any case. */
 	err = got_fileindex_write(fileindex, new_index);
@@ -1463,6 +1536,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	new_fileindex_path = NULL;
 
 done:
+	free(relpath);
 	if (tree)
 		got_object_tree_close(tree);
 	if (commit)
@@ -1694,7 +1768,8 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 		goto done;
 	}
 
-	path = strdup(resolved + strlen(got_worktree_get_root_path(worktree)));
+	path = strdup(resolved +
+	    strlen(got_worktree_get_root_path(worktree)) + 1 /* skip '/' */);
 	if (path == NULL) {
 		err = got_error_from_errno();
 		goto done;

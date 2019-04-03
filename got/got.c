@@ -423,7 +423,7 @@ cmd_checkout(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_worktree_checkout_files(worktree, repo,
+	error = got_worktree_checkout_files(worktree, "", repo,
 	    checkout_progress, worktree_path, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
@@ -440,7 +440,7 @@ done:
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-c commit] [worktree-path]\n",
+	fprintf(stderr, "usage: %s update [-c commit] [path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -465,7 +465,7 @@ cmd_update(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *worktree_path = NULL;
+	char *worktree_path = NULL, *path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch, did_something = 0;
@@ -491,24 +491,27 @@ cmd_update(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
+	worktree_path = getcwd(NULL, 0);
+	if (worktree_path == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_worktree_open(&worktree, worktree_path);
+	if (error)
+		goto done;
+
 	if (argc == 0) {
-		worktree_path = getcwd(NULL, 0);
-		if (worktree_path == NULL) {
+		path = strdup("");
+		if (path == NULL) {
 			error = got_error_from_errno();
 			goto done;
 		}
 	} else if (argc == 1) {
-		worktree_path = realpath(argv[0], NULL);
-		if (worktree_path == NULL) {
-			error = got_error_from_errno();
+		error = got_worktree_resolve_path(&path, worktree, argv[0]);
+		if (error)
 			goto done;
-		}
 	} else
 		usage_update();
-
-	error = got_worktree_open(&worktree, worktree_path);
-	if (error != NULL)
-		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -549,7 +552,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_worktree_checkout_files(worktree, repo,
+	error = got_worktree_checkout_files(worktree, path, repo,
 	    update_progress, &did_something, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
@@ -560,6 +563,7 @@ cmd_update(int argc, char *argv[])
 		printf("Already up-to-date\n");
 done:
 	free(worktree_path);
+	free(path);
 	free(commit_id);
 	free(commit_id_str);
 	return error;
