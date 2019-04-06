@@ -1058,7 +1058,6 @@ done:
 	if (err) {
 		if (*blob) {
 			got_object_blob_close(*blob);
-			free(*blob);
 			*blob = NULL;
 		} else if (outfd != -1)
 			close(outfd);
