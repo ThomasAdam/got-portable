@@ -845,10 +845,13 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 		}
 
 		err = got_pathlist_insert(&new, &dirlist, de->d_name, de);
-		if (err)
+		if (err) {
+			free(de);
 			goto done;
+		}
 		if (new == NULL) {
 			err = got_error(GOT_ERR_DIR_DUP_ENTRY);
+			free(de);
 			goto done;
 		}
 	}
