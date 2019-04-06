@@ -767,6 +767,8 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 	const struct got_error *err = NULL;
 	struct dirent *de = dle->data;
 
+	*next = NULL;
+
 	if (de->d_type == DT_DIR) {
 		char *subpath;
 		char *subdirpath;
