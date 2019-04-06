@@ -1122,7 +1122,7 @@ update_blob(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
     struct got_tree_entry *te, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
@@ -1218,8 +1218,7 @@ static const struct got_error *
 delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_fileindex_entry *ie, const char *parent_path,
     struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	unsigned char status;
@@ -1274,9 +1273,11 @@ diff_old_new(void *arg, struct got_fileindex_entry *ie,
 {
 	struct diff_cb_arg *a = arg;
 
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
+
 	return update_blob(a->worktree, a->fileindex, ie, te,
-	    ie->path, a->repo, a->progress_cb, a->progress_arg,
-	    a->cancel_cb, a->cancel_arg);
+	    ie->path, a->repo, a->progress_cb, a->progress_arg);
 }
 
 static const struct got_error *
@@ -1284,9 +1285,11 @@ diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	struct diff_cb_arg *a = arg;
 
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
+
 	return delete_blob(a->worktree, a->fileindex, ie, parent_path,
-	    a->repo, a->progress_cb, a->progress_arg,
-	    a->cancel_cb, a->cancel_arg);
+	    a->repo, a->progress_cb, a->progress_arg);
 }
 
 static const struct got_error *
@@ -1295,6 +1298,9 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	struct diff_cb_arg *a = arg;
 	const struct got_error *err;
 	char *path;
+
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
 
 	if (asprintf(&path, "%s%s%s", parent_path,
 	    parent_path[0] ? "/" : "", te->name)
@@ -1305,8 +1311,7 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 		err = add_dir_on_disk(a->worktree, path);
 	else
 		err = update_blob(a->worktree, a->fileindex, NULL, te, path,
-		    a->repo, a->progress_cb, a->progress_arg,
-		    a->cancel_cb, a->cancel_arg);
+		    a->repo, a->progress_cb, a->progress_arg);
 
 	free(path);
 	return err;
@@ -1594,6 +1599,9 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	struct diff_dir_cb_arg *a = arg;
 	char *abspath;
 
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
+
 	if (got_path_cmp(parent_path, a->status_path) != 0 &&
 	    !got_path_is_child(parent_path, a->status_path, a->status_path_len))
 		return NULL;
@@ -1621,6 +1629,9 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	struct got_object_id id;
 	unsigned char status;
 
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
+
 	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
 		return NULL;
 
@@ -1638,6 +1649,9 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	char *path = NULL;
+
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
 
 	if (de->d_type == DT_DIR)
 		return NULL;
