@@ -1447,15 +1447,12 @@ log_thread(void *arg)
 			a->commits_needed--;
 
 		errcode = pthread_mutex_lock(&tog_mutex);
-		if (errcode)
-			return (void *)got_error_set_errno(errcode);
-
-		if (done)
-			a->log_complete = 1;
-		else if (*a->quit) {
+		if (errcode) {
+			err = got_error_set_errno(errcode);
+			break;
+		} else if (*a->quit)
 			done = 1;
-			a->log_complete = 1;
-		} else if (*a->first_displayed_entry == NULL) {
+		else if (*a->first_displayed_entry == NULL) {
 			*a->first_displayed_entry =
 			    TAILQ_FIRST(&a->commits->head);
 			*a->selected_entry = *a->first_displayed_entry;
@@ -1474,6 +1471,7 @@ log_thread(void *arg)
 		if (errcode && err == NULL)
 			err = got_error_set_errno(errcode);
 	}
+	a->log_complete = 1;
 	return (void *)err;
 }
 
