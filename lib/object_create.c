@@ -81,6 +81,7 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 		err = got_error_from_errno();
 		goto done;
 	}
+	fd = -1;
 
 	err = got_opentemp_named(&blobpath, &blobfile, "/tmp/got-blob-create");
 	if (err)
