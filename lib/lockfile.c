@@ -34,7 +34,6 @@ const struct got_error *
 got_lockfile_lock(struct got_lockfile **lf, const char *path)
 {
 	const struct got_error *err = NULL;
-	const int flags = O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK;
 	int attempts = 5;
 
 	*lf = calloc(1, sizeof(**lf));
@@ -54,7 +53,9 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 	}
 
 	do {
-		(*lf)->fd = open((*lf)->path, flags, GOT_DEFAULT_FILE_MODE);
+		(*lf)->fd = open((*lf)->path,
+		    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK,
+		    GOT_DEFAULT_FILE_MODE);
 		if ((*lf)->fd != -1)
 			break;
 		if (errno != EEXIST) {
