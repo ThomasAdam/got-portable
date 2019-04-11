@@ -81,6 +81,11 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	if (err)
 		goto done;
 
+	outlen = fwrite(header, 1, strlen(header) + 1, blobfile);
+	if (outlen != strlen(header) + 1) {
+		err = got_ferror(blobfile, GOT_ERR_IO);
+		goto done;
+	}
 	while (1) {
 		char buf[8192];
 		ssize_t inlen;
