@@ -55,7 +55,7 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	SHA1_CTX sha1_ctx;
 	uint8_t digest[SHA1_DIGEST_LENGTH];
 	struct got_lockfile *lf = NULL;
-	size_t outlen = 0;
+	size_t outlen = 0, headerlen = 0;
 
 	*id = NULL;
 
@@ -75,14 +75,15 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 		err = got_error_from_errno();
 		goto done;
 	}
-	SHA1Update(&sha1_ctx, header, strlen(header) + 1);
+	headerlen = strlen(header) + 1;
+	SHA1Update(&sha1_ctx, header, headerlen);
 
 	err = got_opentemp_named(&blobpath, &blobfile, "/tmp/got-blob-create");
 	if (err)
 		goto done;
 
-	outlen = fwrite(header, 1, strlen(header) + 1, blobfile);
-	if (outlen != strlen(header) + 1) {
+	outlen = fwrite(header, 1, headerlen, blobfile);
+	if (outlen != headerlen) {
 		err = got_ferror(blobfile, GOT_ERR_IO);
 		goto done;
 	}
