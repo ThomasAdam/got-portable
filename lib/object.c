@@ -107,8 +107,9 @@ got_object_get_type(int *type, struct got_repository *repo,
 	return err;
 }
 
-static const struct got_error *
-object_path(char **path, struct got_object_id *id, struct got_repository *repo)
+const struct got_error *
+got_object_get_path(char **path, struct got_object_id *id,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *hex = NULL;
@@ -140,7 +141,7 @@ open_loose_object(int *fd, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	char *path;
 
-	err = object_path(&path, id, repo);
+	err = got_object_get_path(&path, id, repo);
 	if (err)
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW);
@@ -418,7 +419,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return got_repo_cache_object(repo, id, *obj);
 	}
 
-	err = object_path(&path, id, repo);
+	err = got_object_get_path(&path, id, repo);
 	if (err)
 		return err;
 
