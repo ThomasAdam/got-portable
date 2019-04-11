@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <sha1.h>
+#include <unistd.h>
 #include <zlib.h>
 
 #include "got_error.h"
@@ -48,7 +49,7 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
 	char *header = NULL, *blobpath = NULL, *objpath = NULL, *outpath = NULL;
-	FILE *infile = NULL, *blobfile = NULL, *outfile = NULL;
+	FILE *blobfile = NULL, *outfile = NULL;
 	int fd = -1;
 	struct stat sb;
 	SHA1_CTX sha1_ctx;
@@ -76,29 +77,22 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	}
 	SHA1Update(&sha1_ctx, header, strlen(header) + 1);
 
-	infile = fdopen(fd, "r");
-	if (infile == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	fd = -1;
-
 	err = got_opentemp_named(&blobpath, &blobfile, "/tmp/got-blob-create");
 	if (err)
 		goto done;
 
 	while (1) {
 		char buf[8192];
-		size_t inlen, outlen;
+		ssize_t inlen;
+		size_t outlen;
 
-		inlen = fread(buf, 1, sizeof(buf), infile);
-		if (inlen == 0) {
-			if (ferror(infile)) {
-				err = got_error_from_errno();
-				goto done;
-			}
-			break; /* EOF */
+		inlen = read(fd, buf, sizeof(buf));
+		if (inlen == -1) {
+			err = got_error_from_errno();
+			goto done;
 		}
+		if (inlen == 0)
+			break; /* EOF */
 		SHA1Update(&sha1_ctx, buf, inlen);
 		outlen = fwrite(buf, 1, inlen, blobfile);
 		if (outlen != inlen) {
@@ -157,8 +151,6 @@ done:
 		free(outpath);
 	}
 	if (fd != -1 && close(fd) != 0 && err == NULL)
-		err = got_error_from_errno();
-	if (infile && fclose(infile) != 0 && err == NULL)
 		err = got_error_from_errno();
 	if (blobfile && fclose(blobfile) != 0 && err == NULL)
 		err = got_error_from_errno();
