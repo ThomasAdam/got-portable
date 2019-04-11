@@ -143,7 +143,7 @@ open_loose_object(int *fd, struct got_object_id *id,
 	err = object_path(&path, id, repo);
 	if (err)
 		return err;
-	*fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	*fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1) {
 		err = got_error_from_errno();
 		goto done;
@@ -422,7 +422,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	if (err)
 		return err;
 
-	fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
 		if (errno == ENOENT)
 			err = got_error_no_obj(id);

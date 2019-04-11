@@ -700,7 +700,7 @@ open_packfile(int *fd, const char *path_packfile, struct got_packidx *packidx)
 {
 	const struct got_error *err = NULL;
 
-	*fd = open(path_packfile, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	*fd = open(path_packfile, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1)
 		return got_error_from_errno();
 

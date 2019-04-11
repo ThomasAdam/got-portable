@@ -369,7 +369,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	if (p == NULL)
 		return got_error_from_errno();
 
-	p->fd = open(path, O_RDONLY | O_NOFOLLOW, GOT_DEFAULT_FILE_MODE);
+	p->fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (p->fd == -1)
 		return got_error_from_errno();
 
