@@ -152,6 +152,7 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	}
 done:
 	free(header);
+	free(objpath);
 	if (outpath) {
 		if (unlink(outpath) != 0 && err == NULL)
 			err = got_error_from_errno();
