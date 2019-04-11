@@ -48,7 +48,7 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
     const char *ondisk_path)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
-	char *header = NULL, *blobpath = NULL, *objpath = NULL, *outpath = NULL;
+	char *header = NULL, *objpath = NULL, *outpath = NULL;
 	FILE *blobfile = NULL, *outfile = NULL;
 	int fd = -1;
 	struct stat sb;
@@ -78,9 +78,11 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	headerlen = strlen(header) + 1;
 	SHA1Update(&sha1_ctx, header, headerlen);
 
-	err = got_opentemp_named(&blobpath, &blobfile, "/tmp/got-blob-create");
-	if (err)
+	blobfile = got_opentemp();
+	if (blobfile == NULL) {
+		err = got_error_from_errno();
 		goto done;
+	}
 
 	outlen = fwrite(header, 1, headerlen, blobfile);
 	if (outlen != headerlen) {
@@ -150,7 +152,6 @@ got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
 	}
 done:
 	free(header);
-	free(blobpath);
 	if (outpath) {
 		if (unlink(outpath) != 0 && err == NULL)
 			err = got_error_from_errno();
