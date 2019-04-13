@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -128,8 +129,21 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		goto done;
 
 	err = got_opentemp_named(&outpath, &outfile, objpath);
-	if (err)
-		goto done;
+	if (err) {
+		char *parent_path;
+		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
+			goto done;
+		err = got_path_dirname(&parent_path, objpath);
+		if (err)
+			goto done;
+		err = got_path_mkdir(parent_path);
+		free(parent_path);
+		if (err)
+			goto done;
+		err = got_opentemp_named(&outpath, &outfile, objpath);
+		if (err)
+			goto done;
+	}
 
 	err = got_deflate_to_file(&outlen, blobfile, outfile);
 	if (err)
