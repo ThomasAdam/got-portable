@@ -49,16 +49,16 @@ create_loose_object(struct got_object_id *id, FILE *content,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
-	char *objpath = NULL, *outpath = NULL;
-	FILE *outfile = NULL;
+	char *objpath = NULL, *tmppath = NULL;
+	FILE *tmpfile = NULL;
 	struct got_lockfile *lf = NULL;
-	size_t outlen = 0;
+	size_t tmplen = 0;
 
 	err = got_object_get_path(&objpath, id, repo);
 	if (err)
 		return err;
 
-	err = got_opentemp_named(&outpath, &outfile, objpath);
+	err = got_opentemp_named(&tmppath, &tmpfile, objpath);
 	if (err) {
 		char *parent_path;
 		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
@@ -70,12 +70,12 @@ create_loose_object(struct got_object_id *id, FILE *content,
 		free(parent_path);
 		if (err)
 			goto done;
-		err = got_opentemp_named(&outpath, &outfile, objpath);
+		err = got_opentemp_named(&tmppath, &tmpfile, objpath);
 		if (err)
 			goto done;
 	}
 
-	err = got_deflate_to_file(&outlen, content, outfile);
+	err = got_deflate_to_file(&tmplen, content, tmpfile);
 	if (err)
 		goto done;
 
@@ -83,12 +83,12 @@ create_loose_object(struct got_object_id *id, FILE *content,
 	if (err)
 		goto done;
 
-	if (rename(outpath, objpath) != 0) {
+	if (rename(tmppath, objpath) != 0) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	free(outpath);
-	outpath = NULL;
+	free(tmppath);
+	tmppath = NULL;
 
 	if (chmod(objpath, GOT_DEFAULT_FILE_MODE) != 0) {
 		err = got_error_from_errno();
@@ -96,12 +96,12 @@ create_loose_object(struct got_object_id *id, FILE *content,
 	}
 done:
 	free(objpath);
-	if (outpath) {
-		if (unlink(outpath) != 0 && err == NULL)
+	if (tmppath) {
+		if (unlink(tmppath) != 0 && err == NULL)
 			err = got_error_from_errno();
-		free(outpath);
+		free(tmppath);
 	}
-	if (outfile && fclose(outfile) != 0 && err == NULL)
+	if (tmpfile && fclose(tmpfile) != 0 && err == NULL)
 		err = got_error_from_errno();
 	if (lf)
 		unlock_err = got_lockfile_unlock(lf);
