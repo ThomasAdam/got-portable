@@ -98,7 +98,7 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 				if (ferror(f))
 					return got_ferror(f, GOT_ERR_IO);
 				/* EOF */
-				ret = Z_STREAM_END;
+				ret = deflate(z, Z_FINISH);
 				break;
 			}
 			z->next_in = zb->inbuf;
