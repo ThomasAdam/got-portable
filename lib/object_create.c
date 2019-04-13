@@ -44,19 +44,82 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+static const struct got_error *
+create_loose_object(struct got_object_id *id, FILE *content,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err = NULL;
+	char *objpath = NULL, *outpath = NULL;
+	FILE *outfile = NULL;
+	struct got_lockfile *lf = NULL;
+	size_t outlen = 0;
+
+	err = got_object_get_path(&objpath, id, repo);
+	if (err)
+		return err;
+
+	err = got_opentemp_named(&outpath, &outfile, objpath);
+	if (err) {
+		char *parent_path;
+		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
+			goto done;
+		err = got_path_dirname(&parent_path, objpath);
+		if (err)
+			goto done;
+		err = got_path_mkdir(parent_path);
+		free(parent_path);
+		if (err)
+			goto done;
+		err = got_opentemp_named(&outpath, &outfile, objpath);
+		if (err)
+			goto done;
+	}
+
+	err = got_deflate_to_file(&outlen, content, outfile);
+	if (err)
+		goto done;
+
+	err = got_lockfile_lock(&lf, objpath);
+	if (err)
+		goto done;
+
+	if (rename(outpath, objpath) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	free(outpath);
+	outpath = NULL;
+
+	if (chmod(objpath, GOT_DEFAULT_FILE_MODE) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	free(objpath);
+	if (outpath) {
+		if (unlink(outpath) != 0 && err == NULL)
+			err = got_error_from_errno();
+		free(outpath);
+	}
+	if (outfile && fclose(outfile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (lf)
+		unlock_err = got_lockfile_unlock(lf);
+	return err ? err : unlock_err;
+}
+
 const struct got_error *
 got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
     struct got_repository *repo)
 {
-	const struct got_error *err = NULL, *unlock_err = NULL;
-	char *header = NULL, *objpath = NULL, *outpath = NULL;
-	FILE *blobfile = NULL, *outfile = NULL;
+	const struct got_error *err = NULL;
+	char *header = NULL;
+	FILE *blobfile = NULL;
 	int fd = -1;
 	struct stat sb;
 	SHA1_CTX sha1_ctx;
 	uint8_t digest[SHA1_DIGEST_LENGTH];
-	struct got_lockfile *lf = NULL;
-	size_t outlen = 0, headerlen = 0;
+	size_t headerlen = 0, n;
 
 	*id = NULL;
 
@@ -85,15 +148,14 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		goto done;
 	}
 
-	outlen = fwrite(header, 1, headerlen, blobfile);
-	if (outlen != headerlen) {
+	n = fwrite(header, 1, headerlen, blobfile);
+	if (n != headerlen) {
 		err = got_ferror(blobfile, GOT_ERR_IO);
 		goto done;
 	}
 	while (1) {
 		char buf[8192];
 		ssize_t inlen;
-		size_t outlen;
 
 		inlen = read(fd, buf, sizeof(buf));
 		if (inlen == -1) {
@@ -103,8 +165,8 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		if (inlen == 0)
 			break; /* EOF */
 		SHA1Update(&sha1_ctx, buf, inlen);
-		outlen = fwrite(buf, 1, inlen, blobfile);
-		if (outlen != inlen) {
+		n = fwrite(buf, 1, inlen, blobfile);
+		if (n != inlen) {
 			err = got_ferror(blobfile, GOT_ERR_IO);
 			goto done;
 		}
@@ -124,65 +186,16 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	}
 	rewind(blobfile);
 
-	err = got_object_get_path(&objpath, *id, repo);
-	if (err)
-		goto done;
-
-	err = got_opentemp_named(&outpath, &outfile, objpath);
-	if (err) {
-		char *parent_path;
-		if (!(err->code == GOT_ERR_ERRNO && errno == ENOENT))
-			goto done;
-		err = got_path_dirname(&parent_path, objpath);
-		if (err)
-			goto done;
-		err = got_path_mkdir(parent_path);
-		free(parent_path);
-		if (err)
-			goto done;
-		err = got_opentemp_named(&outpath, &outfile, objpath);
-		if (err)
-			goto done;
-	}
-
-	err = got_deflate_to_file(&outlen, blobfile, outfile);
-	if (err)
-		goto done;
-
-	err = got_lockfile_lock(&lf, objpath);
-	if (err)
-		goto done;
-
-	if (rename(outpath, objpath) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	free(outpath);
-	outpath = NULL;
-
-	if (chmod(objpath, GOT_DEFAULT_FILE_MODE) != 0) {
-		err = got_error_from_errno();
-		goto done;
-	}
+	err = create_loose_object(*id, blobfile, repo);
 done:
 	free(header);
-	free(objpath);
-	if (outpath) {
-		if (unlink(outpath) != 0 && err == NULL)
-			err = got_error_from_errno();
-		free(outpath);
-	}
 	if (fd != -1 && close(fd) != 0 && err == NULL)
 		err = got_error_from_errno();
 	if (blobfile && fclose(blobfile) != 0 && err == NULL)
-		err = got_error_from_errno();
-	if (outfile && fclose(outfile) != 0 && err == NULL)
 		err = got_error_from_errno();
 	if (err) {
 		free(*id);
 		*id = NULL;
 	}
-	if (lf)
-		unlock_err = got_lockfile_unlock(lf);
-	return err ? err : unlock_err;
+	return err;
 }
