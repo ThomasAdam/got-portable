@@ -146,12 +146,8 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 	int type = 0;
 	size_t size = 0, hdrlen = 0;
 	int i;
-	char *p = strchr(buf, '\0');
 
 	*obj = NULL;
-
-	if (p == NULL)
-		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
 	hdrlen = strnlen(buf, len) + 1 /* '\0' */;
 	if (hdrlen > len)
