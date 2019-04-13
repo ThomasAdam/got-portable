@@ -595,7 +595,7 @@ static const struct got_error *
 parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
     size_t maxlen)
 {
-	char *p = buf, *space;
+	char *p, *space;
 	const struct got_error *err = NULL;
 
 	*te = got_alloc_tree_entry_partial();
@@ -610,14 +610,15 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	}
 
 	space = memchr(buf, ' ', *elen);
-	if (space == NULL) {
+	if (space == NULL || space <= buf) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		free(*te);
 		*te = NULL;
 		return err;
 	}
 	(*te)->mode = 0;
-	while (*p != ' ') {
+	p = buf;
+	while (p < space) {
 		if (*p < '0' && *p > '7') {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
