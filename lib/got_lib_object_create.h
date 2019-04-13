@@ -15,4 +15,4 @@
  */
 
 const struct got_error *got_object_blob_create(struct got_object_id **,
-    struct got_repository *, const char *);
+    const char *, struct got_repository *);

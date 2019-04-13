@@ -44,8 +44,8 @@
 #endif
 
 const struct got_error *
-got_object_blob_create(struct got_object_id **id, struct got_repository *repo,
-    const char *ondisk_path)
+got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
 	char *header = NULL, *objpath = NULL, *outpath = NULL;
