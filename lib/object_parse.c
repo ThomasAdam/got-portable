@@ -153,7 +153,9 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 	if (p == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
-	hdrlen = strlen(buf) + 1 /* '\0' */;
+	hdrlen = strnlen(buf, len) + 1 /* '\0' */;
+	if (hdrlen > len)
+		return got_error(GOT_ERR_BAD_OBJ_HDR);
 
 	for (i = 0; i < nitems(obj_labels); i++) {
 		const char *label = obj_labels[i];
@@ -604,7 +606,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	if (*te == NULL)
 		return got_error_from_errno();
 
-	*elen = strlen(buf) + 1;
+	*elen = strnlen(buf, maxlen) + 1;
 	if (*elen > maxlen) {
 		free(*te);
 		*te = NULL;
