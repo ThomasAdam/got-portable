@@ -210,7 +210,7 @@ got_object_read_header(struct got_object **obj, int fd)
 		if (outlen == 0)
 			break;
 		totlen += outlen;
-		if (strchr(zb.outbuf, '\0') == NULL) {
+		if (memchr(zb.outbuf, '\0', outlen) == NULL) {
 			char *newbuf;
 			nbuf++;
 			newbuf = recallocarray(buf, nbuf - 1, nbuf, zbsize);
@@ -222,7 +222,7 @@ got_object_read_header(struct got_object **obj, int fd)
 			zb.outbuf = newbuf + totlen;
 			zb.outlen = (nbuf * zbsize) - totlen;
 		}
-	} while (strchr(zb.outbuf, '\0') == NULL);
+	} while (memchr(zb.outbuf, '\0', outlen) == NULL);
 
 	err = got_object_parse_header(obj, buf, totlen);
 done:
@@ -482,7 +482,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		}
 		s += label_len;
-		p = strchr(s, '\n');
+		p = memchr(s, '\n', remain);
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -513,7 +513,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		}
 		s += label_len;
-		p = strchr(s, '\n');
+		p = memchr(s, '\n', remain);
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -609,7 +609,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	}
 
-	space = strchr(buf, ' ');
+	space = memchr(buf, ' ', *elen);
 	if (space == NULL) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		free(*te);
@@ -802,7 +802,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 			goto done;
 		}
 		s += label_len;
-		p = strchr(s, '\n');
+		p = memchr(s, '\n', remain);
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
@@ -836,7 +836,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 			goto done;
 		}
 		s += label_len;
-		p = strchr(s, '\n');
+		p = memchr(s, '\n', remain);
 		if (p == NULL) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
