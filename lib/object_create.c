@@ -199,3 +199,110 @@ done:
 	}
 	return err;
 }
+
+static const struct got_error *
+mode2str(char *buf, size_t len, mode_t mode)
+{
+	int ret;
+	ret = snprintf(buf, len, "%o ", mode);
+	if (ret == -1 || ret >= len)
+		return got_error(GOT_ERR_NO_SPACE);
+	return NULL;
+}
+
+const struct got_error *
+got_object_tree_create(struct got_object_id **id,
+    struct got_tree_entries *entries, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char modebuf[sizeof("100644 ")];
+	SHA1_CTX sha1_ctx;
+	uint8_t digest[SHA1_DIGEST_LENGTH];
+	char *header = NULL;
+	size_t headerlen, len = 0, n;
+	FILE *treefile = NULL;
+	struct got_tree_entry *te;
+
+	*id = NULL;
+
+	SIMPLEQ_FOREACH(te, &entries->head, entry) {
+		err = mode2str(modebuf, sizeof(modebuf), te->mode);
+		if (err)
+			return err;
+		len += strlen(modebuf) + strlen(te->name) + 1 +
+		    SHA1_DIGEST_LENGTH;
+	}
+
+	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_TREE, len) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	headerlen = strlen(header) + 1;
+	SHA1Update(&sha1_ctx, header, headerlen);
+
+	treefile = got_opentemp();
+	if (treefile == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	n = fwrite(header, 1, headerlen, treefile);
+	if (n != headerlen) {
+		err = got_ferror(treefile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SIMPLEQ_FOREACH(te, &entries->head, entry) {
+		err = mode2str(modebuf, sizeof(modebuf), te->mode);
+		if (err)
+			goto done;
+		len = strlen(modebuf);
+		n = fwrite(modebuf, 1, len, treefile);
+		if (n != len) {
+			err = got_ferror(treefile, GOT_ERR_IO);
+			goto done;
+		}
+		SHA1Update(&sha1_ctx, modebuf, len);
+
+		len = strlen(te->name) + 1; /* must include NUL */
+		n = fwrite(te->name, 1, len, treefile);
+		if (n != len) {
+			err = got_ferror(treefile, GOT_ERR_IO);
+			goto done;
+		}
+		SHA1Update(&sha1_ctx, te->name, len);
+
+		len = SHA1_DIGEST_LENGTH;
+		n = fwrite(te->id->sha1, 1, len, treefile);
+		if (n != len) {
+			err = got_ferror(treefile, GOT_ERR_IO);
+			goto done;
+		}
+		SHA1Update(&sha1_ctx, te->id->sha1, len);
+	}
+
+	SHA1Final(digest, &sha1_ctx);
+	*id = malloc(sizeof(**id));
+	if (*id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	memcpy((*id)->sha1, digest, SHA1_DIGEST_LENGTH);
+
+	if (fflush(treefile) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	rewind(treefile);
+
+	err = create_loose_object(*id, treefile, repo);
+done:
+	free(header);
+	if (treefile && fclose(treefile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (err) {
+		free(*id);
+		*id = NULL;
+	}
+	return err;
+}
