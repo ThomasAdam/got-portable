@@ -118,7 +118,6 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	int fd = -1;
 	struct stat sb;
 	SHA1_CTX sha1_ctx;
-	uint8_t digest[SHA1_DIGEST_LENGTH];
 	size_t headerlen = 0, n;
 
 	*id = NULL;
@@ -172,13 +171,12 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		}
 	}
 
-	SHA1Final(digest, &sha1_ctx);
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	memcpy((*id)->sha1, digest, SHA1_DIGEST_LENGTH);
+	SHA1Final((*id)->sha1, &sha1_ctx);
 
 	if (fflush(blobfile) != 0) {
 		err = got_error_from_errno();
@@ -217,7 +215,6 @@ got_object_tree_create(struct got_object_id **id,
 	const struct got_error *err = NULL;
 	char modebuf[sizeof("100644 ")];
 	SHA1_CTX sha1_ctx;
-	uint8_t digest[SHA1_DIGEST_LENGTH];
 	char *header = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *treefile = NULL;
@@ -281,13 +278,12 @@ got_object_tree_create(struct got_object_id **id,
 		SHA1Update(&sha1_ctx, te->id->sha1, len);
 	}
 
-	SHA1Final(digest, &sha1_ctx);
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	memcpy((*id)->sha1, digest, SHA1_DIGEST_LENGTH);
+	SHA1Final((*id)->sha1, &sha1_ctx);
 
 	if (fflush(treefile) != 0) {
 		err = got_error_from_errno();
