@@ -45,7 +45,7 @@
 #endif
 
 static const struct got_error *
-create_loose_object(struct got_object_id *id, FILE *content,
+create_object_file(struct got_object_id *id, FILE *content,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
@@ -184,7 +184,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	}
 	rewind(blobfile);
 
-	err = create_loose_object(*id, blobfile, repo);
+	err = create_object_file(*id, blobfile, repo);
 done:
 	free(header);
 	if (fd != -1 && close(fd) != 0 && err == NULL)
@@ -291,7 +291,7 @@ got_object_tree_create(struct got_object_id **id,
 	}
 	rewind(treefile);
 
-	err = create_loose_object(*id, treefile, repo);
+	err = create_object_file(*id, treefile, repo);
 done:
 	free(header);
 	if (treefile && fclose(treefile) != 0 && err == NULL)
