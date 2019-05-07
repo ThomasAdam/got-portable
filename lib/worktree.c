@@ -49,6 +49,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_object_create.h"
+#include "got_lib_object_idset.h"
 #include "got_lib_diff.h"
 
 #ifndef MIN
@@ -2199,26 +2200,36 @@ done:
 }
 
 struct committable {
+	char *path;
 	unsigned char status;
 	struct got_object_id *id;
+	struct got_object_id *tree_id;
 };
 
 static void
 free_committable(struct committable *ct)
 {
+	free(ct->path);
 	free(ct->id);
+	free(ct->tree_id);
 	free(ct);
 }
+
+struct collect_committables_arg {
+	struct got_pathlist_head *paths;
+	struct got_repository *repo;
+	struct got_worktree *worktree;
+};
 
 static const struct got_error *
 collect_committables(void *arg, unsigned char status, const char *path,
     struct got_object_id *id)
 {
-	struct got_pathlist_head *paths = arg;
+	struct collect_committables_arg *a = arg;
 	const struct got_error *err = NULL;
-	char *new_path = NULL;
 	struct committable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
+	char *parent_path = NULL;
 
 	if (status == GOT_STATUS_CONFLICT)
 		return got_error(GOT_ERR_COMMIT_CONFLICT);
@@ -2227,9 +2238,9 @@ collect_committables(void *arg, unsigned char status, const char *path,
 	    status != GOT_STATUS_DELETE)
 		return NULL;
 	
-	new_path = strdup(path);
-	if (new_path == NULL)
-		return got_error_from_errno();
+	err = got_path_dirname(&parent_path, path);
+	if (err)
+		goto done;
 
 	ct = malloc(sizeof(*ct));
 	if (ct == NULL) {
@@ -2239,12 +2250,20 @@ collect_committables(void *arg, unsigned char status, const char *path,
 
 	ct->status = status;
 	ct->id = NULL;
-	err = got_pathlist_insert(&new, paths, new_path, ct);
-done:
-	if (err || new == NULL) {
-		free(new_path);
-		free_committable(ct);
+	err = got_object_id_by_path(&ct->tree_id, a->repo,
+	    a->worktree->base_commit_id, parent_path);
+	if (err)
+		goto done;
+	ct->path = strdup(path);
+	if (ct->path == NULL) {
+		err = got_error_from_errno();
+		goto done;
 	}
+	err = got_pathlist_insert(&new, a->paths, ct->path, ct);
+done:
+	if (err || new == NULL)
+		free_committable(ct);
+	free(parent_path);
 	return err;
 }
 
@@ -2254,11 +2273,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
     const char *logmsg, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlockerr = NULL;
+	struct collect_committables_arg cc_arg;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 	struct got_commit_object *base_commit = NULL;
 	struct got_tree_object *base_tree = NULL;
+	struct got_object_idset *tree_ids = NULL;
 
 	*new_commit_id = NULL;
 
@@ -2271,12 +2292,19 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			return err;
 	}
 
+	tree_ids = got_object_idset_alloc();
+	if (tree_ids == NULL)
+		return got_error_from_errno();
+
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		goto done;
 
+	cc_arg.paths = &paths;
+	cc_arg.worktree = worktree;
+	cc_arg.repo = repo;
 	err = got_worktree_status(worktree, relpath ? relpath : "",
-	    repo, collect_committables, &paths, NULL, NULL);
+	    repo, collect_committables, &cc_arg, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -2302,6 +2330,21 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
+	/* Collect IDs of affected leaf trees. */
+	TAILQ_FOREACH(pe, &paths, entry) {
+		struct committable *ct = pe->data;
+
+		if (got_object_idset_contains(tree_ids, ct->tree_id))
+			continue;
+
+		err = got_object_idset_add(tree_ids, ct->tree_id, NULL);
+		if (err)
+			goto done;
+	}
+
+	/* Write new leaf tree objects. */
+	/* err = got_object_idset_for_each(tree_ids, write_tree, &wt_arg); */
+
 	err = got_object_open_as_commit(&base_commit, repo,
 	    worktree->base_commit_id);
 	if (err)
@@ -2310,13 +2353,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	    base_commit->tree_id);
 	if (err)
 		goto done;
-
-	/* TODO: walk base tree and patch it to create a new tree */
-	printf("committables:\n");
-	TAILQ_FOREACH(pe, &paths, entry) {
-		unsigned char *status = pe->data;
-		printf("%c %s\n", *status, pe->path);
-	}
 done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -2325,6 +2361,7 @@ done:
 		struct committable *ct = pe->data;
 		free_committable(ct);
 	}
+	got_object_idset_free(tree_ids);
 	got_pathlist_free(&paths);
 	got_object_tree_close(base_tree);
 	free(relpath);
