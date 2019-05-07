@@ -48,6 +48,7 @@
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
+#include "got_lib_object_parse.h"
 #include "got_lib_object_create.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_diff.h"
@@ -2199,7 +2200,7 @@ done:
 	return err;
 }
 
-struct committable {
+struct commitable {
 	char *path;
 	unsigned char status;
 	struct got_object_id *id;
@@ -2207,7 +2208,7 @@ struct committable {
 };
 
 static void
-free_committable(struct committable *ct)
+free_commitable(struct commitable *ct)
 {
 	free(ct->path);
 	free(ct->id);
@@ -2215,19 +2216,19 @@ free_committable(struct committable *ct)
 	free(ct);
 }
 
-struct collect_committables_arg {
+struct collect_commitables_arg {
 	struct got_pathlist_head *paths;
 	struct got_repository *repo;
 	struct got_worktree *worktree;
 };
 
 static const struct got_error *
-collect_committables(void *arg, unsigned char status, const char *path,
+collect_commitables(void *arg, unsigned char status, const char *path,
     struct got_object_id *id)
 {
-	struct collect_committables_arg *a = arg;
+	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
-	struct committable *ct = NULL;
+	struct commitable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
 	char *parent_path = NULL;
 
@@ -2262,8 +2263,58 @@ collect_committables(void *arg, unsigned char status, const char *path,
 	err = got_pathlist_insert(&new, a->paths, ct->path, ct);
 done:
 	if (err || new == NULL)
-		free_committable(ct);
+		free_commitable(ct);
 	free(parent_path);
+	return err;
+}
+
+struct write_tree_arg {
+	struct got_pathlist_head *commitable_paths;
+	struct got_object_idset *affected_trees;
+	struct got_repository *repo;
+};
+
+static const struct got_error *
+write_tree(struct got_object_id *base_tree_id, void *data, void *arg)
+{
+	const struct got_error *err = NULL;
+	struct write_tree_arg *a = arg;
+	struct got_tree_entries new_entries;
+	const struct got_tree_entries *base_entries = NULL;
+	struct got_tree_object *base_tree = NULL;
+	struct got_tree_entry *te;
+	struct got_pathlist_entry *pe;
+
+	new_entries.nentries = 0;
+	SIMPLEQ_INIT(&new_entries.head);
+
+	err = got_object_open_as_tree(&base_tree, a->repo, base_tree_id);
+	if (err)
+		return err;
+
+	base_entries = got_object_tree_get_entries(base_tree);
+
+	SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
+		struct commitable *ct = NULL;
+		struct got_tree_entry *new_te;
+
+		TAILQ_FOREACH(pe, a->commitable_paths, entry) {
+			ct = pe->data;
+			if (got_object_id_cmp(ct->tree_id, te->id) == 0)
+				break;
+		}
+
+		if (ct) {
+		} else {
+			err = got_object_tree_entry_dup(&new_te, te);
+			if (err)
+				goto done;
+		}
+	}
+done:
+	got_object_tree_close(base_tree);
+	if (err)
+		got_object_tree_entries_close(&new_entries);
 	return err;
 }
 
@@ -2273,7 +2324,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
     const char *logmsg, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlockerr = NULL;
-	struct collect_committables_arg cc_arg;
+	struct collect_commitables_arg cc_arg;
+	struct write_tree_arg wt_arg;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
@@ -2304,15 +2356,27 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
 	err = got_worktree_status(worktree, relpath ? relpath : "",
-	    repo, collect_committables, &cc_arg, NULL, NULL);
+	    repo, collect_commitables, &cc_arg, NULL, NULL);
 	if (err)
 		goto done;
 
 	/* TODO: collect commit message if not specified */
 
+	/* Collect IDs of affected leaf trees. */
+	TAILQ_FOREACH(pe, &paths, entry) {
+		struct commitable *ct = pe->data;
+
+		if (got_object_idset_contains(tree_ids, ct->tree_id))
+			continue;
+
+		err = got_object_idset_add(tree_ids, ct->tree_id, NULL);
+		if (err)
+			goto done;
+	}
+
 	/* Create blobs from added and modified files and record their IDs. */
 	TAILQ_FOREACH(pe, &paths, entry) {
-		struct committable *ct = pe->data;
+		struct commitable *ct = pe->data;
 		char *ondisk_path;
 
 		if (ct->status != GOT_STATUS_ADD &&
@@ -2330,20 +2394,17 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
-	/* Collect IDs of affected leaf trees. */
-	TAILQ_FOREACH(pe, &paths, entry) {
-		struct committable *ct = pe->data;
-
-		if (got_object_idset_contains(tree_ids, ct->tree_id))
-			continue;
-
-		err = got_object_idset_add(tree_ids, ct->tree_id, NULL);
-		if (err)
-			goto done;
-	}
-
 	/* Write new leaf tree objects. */
-	/* err = got_object_idset_for_each(tree_ids, write_tree, &wt_arg); */
+	wt_arg.commitable_paths = &paths;
+	wt_arg.affected_trees = got_object_idset_alloc();
+	if (wt_arg.affected_trees == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	wt_arg.repo = repo;
+	err = got_object_idset_for_each(tree_ids, write_tree, &wt_arg);
+	if (err)
+		goto done;
 
 	err = got_object_open_as_commit(&base_commit, repo,
 	    worktree->base_commit_id);
@@ -2358,8 +2419,8 @@ done:
 	if (unlockerr && err == NULL)
 		err = unlockerr;
 	TAILQ_FOREACH(pe, &paths, entry) {
-		struct committable *ct = pe->data;
-		free_committable(ct);
+		struct commitable *ct = pe->data;
+		free_commitable(ct);
 	}
 	got_object_idset_free(tree_ids);
 	got_pathlist_free(&paths);

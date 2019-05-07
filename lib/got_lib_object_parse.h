@@ -27,6 +27,7 @@ const struct got_error *got_object_parse_tag(struct got_tag_object **,
 const struct got_error *got_read_file_to_mem(uint8_t **, size_t *, FILE *);
 
 void got_object_tree_entry_close(struct got_tree_entry *);
+void got_object_tree_entries_close(struct got_tree_entries *);
 
 struct got_pack;
 struct got_packidx;

@@ -108,3 +108,5 @@ const struct got_error *got_object_blob_open(struct got_blob_object **,
 char *got_object_blob_id_str(struct got_blob_object*, char *, size_t);
 const struct got_error *got_object_tag_open(struct got_tag_object **,
     struct got_repository *, struct got_object *);
+const struct got_error *got_object_tree_entry_dup(struct got_tree_entry **,
+    struct got_tree_entry *);

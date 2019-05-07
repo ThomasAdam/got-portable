@@ -555,22 +555,27 @@ got_object_tree_entry_close(struct got_tree_entry *te)
 }
 
 void
-got_object_tree_close(struct got_tree_object *tree)
+got_object_tree_entries_close(struct got_tree_entries *entries)
 {
 	struct got_tree_entry *te;
 
+	while (!SIMPLEQ_EMPTY(&entries->head)) {
+		te = SIMPLEQ_FIRST(&entries->head);
+		SIMPLEQ_REMOVE_HEAD(&entries->head, entry);
+		got_object_tree_entry_close(te);
+	}
+}
+
+void
+got_object_tree_close(struct got_tree_object *tree)
+{
 	if (tree->refcnt > 0) {
 		tree->refcnt--;
 		if (tree->refcnt > 0)
 			return;
 	}
 
-	while (!SIMPLEQ_EMPTY(&tree->entries.head)) {
-		te = SIMPLEQ_FIRST(&tree->entries.head);
-		SIMPLEQ_REMOVE_HEAD(&tree->entries.head, entry);
-		got_object_tree_entry_close(te);
-	}
-
+	got_object_tree_entries_close(&tree->entries);
 	free(tree);
 }
 

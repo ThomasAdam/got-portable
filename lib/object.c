@@ -1538,3 +1538,32 @@ done:
 		got_object_tree_close(tree2);
 	return err;
 }
+
+const struct got_error *
+got_object_tree_entry_dup(struct got_tree_entry **new_te,
+    struct got_tree_entry *te)
+{
+	const struct got_error *err = NULL;
+
+	*new_te = calloc(1, sizeof(**new_te));
+	if (*new_te == NULL)
+		return got_error_from_errno();
+
+	(*new_te)->mode = te->mode;
+	(*new_te)->name = strdup(te->name);
+	if ((*new_te)->name == NULL) {
+		err = got_error_from_errno();
+		got_object_tree_entry_close(*new_te);
+		return err;
+	}
+
+	(*new_te)->id = got_object_id_dup(te->id);
+	if ((*new_te)->id == NULL) {
+		err = got_error_from_errno();
+		got_object_tree_entry_close(*new_te);
+		return err;
+	}
+
+	return NULL;
+}
+
