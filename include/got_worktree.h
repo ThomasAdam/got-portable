@@ -164,3 +164,17 @@ got_worktree_schedule_delete(struct got_worktree *, const char *, int,
  */
 const struct got_error *got_worktree_revert(struct got_worktree *,
     const char *, got_worktree_checkout_cb, void *, struct got_repository *);
+
+/*
+ * Create a new commit from changes in the work tree.
+ * Return the ID of the newly created commit.
+ * The worktree's base commit will be set to this new commit.
+ * Files unaffected by this commit operation will retain their
+ * current base commit.
+ * A non-empty log message must be specified.
+ * If an on-disk path is specified, only commit changes at or within this path.
+ */
+const struct got_error *
+got_worktree_commit(struct got_object_id **,
+    struct got_worktree *, const char *, const char *,
+    struct got_repository *);

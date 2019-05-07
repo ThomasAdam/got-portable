@@ -5,7 +5,8 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
-		inflate.c buf.c worklist.c rcsutil.c diff3.c lockfile.c
+		inflate.c buf.c worklist.c rcsutil.c diff3.c lockfile.c \
+		deflate.c object_create.c
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
 	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}

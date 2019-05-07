@@ -80,6 +80,7 @@ __dead static void	usage_ref(void);
 __dead static void	usage_add(void);
 __dead static void	usage_rm(void);
 __dead static void	usage_revert(void);
+__dead static void	usage_commit(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -92,6 +93,7 @@ static const struct got_error*		cmd_ref(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_rm(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
+static const struct got_error*		cmd_commit(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -116,6 +118,8 @@ static struct cmd got_commands[] = {
 	    "remove a versioned file" },
 	{ "revert",	cmd_revert,	usage_revert,
 	    "revert uncommitted changes" },
+	{ "commit",	cmd_commit,	usage_commit,
+	    "create blob from file (WIP; can't create commits yet)" },
 };
 
 int
@@ -2065,5 +2069,84 @@ done:
 		got_worktree_close(worktree);
 	free(path);
 	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_commit(void)
+{
+	fprintf(stderr, "usage: %s commit file-path\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_commit(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL, *path = NULL, *id_str = NULL;
+	struct got_object_id *id = NULL;
+	const char *logmsg = "<no log message was specified>";
+	int ch;
+
+	while ((ch = getopt(argc, argv, "m:")) != -1) {
+		switch (ch) {
+		case 'm':
+			logmsg = optarg;
+			break;
+		default:
+			usage_commit();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc == 1) {
+		path = realpath(argv[0], NULL);
+		if (path == NULL) {
+			error = got_error_from_errno();
+			goto done;
+		}
+	} else if (argc != 0)
+		usage_commit();
+
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno();
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = got_worktree_commit(&id, worktree, path, logmsg, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_str(&id_str, id);
+	if (error)
+		goto done;
+	printf("created commit %s\n", id_str);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(path);
+	free(cwd);
+	free(id_str);
 	return error;
 }

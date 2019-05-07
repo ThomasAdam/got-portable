@@ -2196,3 +2196,96 @@ done:
 		err = unlockerr;
 	return err;
 }
+
+static const struct got_error *
+collect_committables(void *arg, unsigned char status, const char *path,
+    struct got_object_id *id)
+{
+	struct got_pathlist_head *paths = arg;
+	const struct got_error *err = NULL;
+	char *new_path = NULL;
+	unsigned char *new_status = NULL;
+	struct got_pathlist_entry *new = NULL;
+
+	if (status == GOT_STATUS_CONFLICT)
+		return got_error(GOT_ERR_COMMIT_CONFLICT);
+
+	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_DELETE)
+		return NULL;
+	
+	new_path = strdup(path);
+	if (new_path == NULL)
+		return got_error_from_errno();
+
+	new_status = malloc(sizeof(*new_status));
+	if (new_status == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	*new_status = status;
+	err = got_pathlist_insert(&new, paths, new_path, new_status);
+done:
+	if (err || new == NULL) {
+		free(new_path);
+		free(new_status);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_commit(struct got_object_id **new_commit_id,
+    struct got_worktree *worktree, const char *ondisk_path,
+    const char *logmsg, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlockerr = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	char *relpath = NULL;
+	struct got_commit_object *base_commit = NULL;
+	struct got_tree_object *base_tree = NULL;
+
+	*new_commit_id = NULL;
+
+	TAILQ_INIT(&paths);
+
+	if (ondisk_path) {
+		err = got_path_skip_common_ancestor(&relpath,
+		    worktree->root_path, ondisk_path);
+		if (err)
+			return err;
+	}
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_commit(&base_commit, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+	err = got_object_open_as_tree(&base_tree, repo,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_worktree_status(worktree, relpath ? relpath : "",
+	    repo, collect_committables, &paths, NULL, NULL);
+	if (err)
+		goto done;
+
+	/* TODO: walk base tree and patch it to create a new tree */
+	printf("committables:\n");
+	TAILQ_FOREACH(pe, &paths, entry) {
+		unsigned char *status = pe->data;
+		printf("%c %s\n", *status, pe->path);
+	}
+done:
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	got_object_tree_close(base_tree);
+	free(relpath);
+	return err;
+}
