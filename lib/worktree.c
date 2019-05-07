@@ -2273,7 +2273,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 	err = got_object_open_as_tree(&base_tree, repo,
-	    worktree->base_commit_id);
+	    base_commit->tree_id);
 	if (err)
 		goto done;
 
