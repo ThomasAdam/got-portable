@@ -48,6 +48,7 @@
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
+#include "got_lib_object_create.h"
 #include "got_lib_diff.h"
 
 #ifndef MIN
@@ -2197,6 +2198,18 @@ done:
 	return err;
 }
 
+struct committable {
+	unsigned char status;
+	struct got_object_id *id;
+};
+
+static void
+free_committable(struct committable *ct)
+{
+	free(ct->id);
+	free(ct);
+}
+
 static const struct got_error *
 collect_committables(void *arg, unsigned char status, const char *path,
     struct got_object_id *id)
@@ -2204,7 +2217,7 @@ collect_committables(void *arg, unsigned char status, const char *path,
 	struct got_pathlist_head *paths = arg;
 	const struct got_error *err = NULL;
 	char *new_path = NULL;
-	unsigned char *new_status = NULL;
+	struct committable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
 
 	if (status == GOT_STATUS_CONFLICT)
@@ -2218,18 +2231,19 @@ collect_committables(void *arg, unsigned char status, const char *path,
 	if (new_path == NULL)
 		return got_error_from_errno();
 
-	new_status = malloc(sizeof(*new_status));
-	if (new_status == NULL) {
+	ct = malloc(sizeof(*ct));
+	if (ct == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
-	*new_status = status;
-	err = got_pathlist_insert(&new, paths, new_path, new_status);
+	ct->status = status;
+	ct->id = NULL;
+	err = got_pathlist_insert(&new, paths, new_path, ct);
 done:
 	if (err || new == NULL) {
 		free(new_path);
-		free(new_status);
+		free_committable(ct);
 	}
 	return err;
 }
@@ -2268,6 +2282,25 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	/* TODO: collect commit message if not specified */
 
+	/* Create blobs from added and modified files and record their IDs. */
+	TAILQ_FOREACH(pe, &paths, entry) {
+		struct committable *ct = pe->data;
+		char *ondisk_path;
+
+		if (ct->status != GOT_STATUS_ADD &&
+		    ct->status != GOT_STATUS_MODIFY)
+			continue;
+
+		if (asprintf(&ondisk_path, "%s/%s",
+		    worktree->root_path, pe->path) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		err = got_object_blob_create(&ct->id, pe->path, repo);
+		if (err)
+			goto done;
+	}
+
 	err = got_object_open_as_commit(&base_commit, repo,
 	    worktree->base_commit_id);
 	if (err)
@@ -2287,6 +2320,11 @@ done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
+	TAILQ_FOREACH(pe, &paths, entry) {
+		struct committable *ct = pe->data;
+		free_committable(ct);
+	}
+	got_pathlist_free(&paths);
 	got_object_tree_close(base_tree);
 	free(relpath);
 	return err;
