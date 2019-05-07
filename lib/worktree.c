@@ -2261,6 +2261,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = got_worktree_status(worktree, relpath ? relpath : "",
+	    repo, collect_committables, &paths, NULL, NULL);
+	if (err)
+		goto done;
+
+	/* TODO: collect commit message if not specified */
+
 	err = got_object_open_as_commit(&base_commit, repo,
 	    worktree->base_commit_id);
 	if (err)
@@ -2269,13 +2276,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	    worktree->base_commit_id);
 	if (err)
 		goto done;
-
-	err = got_worktree_status(worktree, relpath ? relpath : "",
-	    repo, collect_committables, &paths, NULL, NULL);
-	if (err)
-		goto done;
-
-	/* TODO: collect commit message if not specified */
 
 	/* TODO: walk base tree and patch it to create a new tree */
 	printf("committables:\n");
