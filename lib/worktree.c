@@ -2275,6 +2275,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	/* TODO: collect commit message if not specified */
+
 	/* TODO: walk base tree and patch it to create a new tree */
 	printf("committables:\n");
 	TAILQ_FOREACH(pe, &paths, entry) {
