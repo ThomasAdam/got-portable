@@ -2296,7 +2296,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = got_object_blob_create(&ct->id, pe->path, repo);
+		err = got_object_blob_create(&ct->id, ondisk_path, repo);
+		free(ondisk_path);
 		if (err)
 			goto done;
 	}
