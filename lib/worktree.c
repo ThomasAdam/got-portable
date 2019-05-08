@@ -2219,20 +2219,20 @@ free_commitable(struct commitable *ct)
 }
 
 struct collect_commitables_arg {
-	struct got_pathlist_head *paths;
+	struct got_pathlist_head *commitable_paths;
 	struct got_repository *repo;
 	struct got_worktree *worktree;
 };
 
 static const struct got_error *
-collect_commitables(void *arg, unsigned char status, const char *path,
+collect_commitables(void *arg, unsigned char status, const char *relpath,
     struct got_object_id *id)
 {
 	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct commitable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
-	char *parent_path = NULL;
+	char *parent_path = NULL, *path = NULL;
 
 	if (status == GOT_STATUS_CONFLICT)
 		return got_error(GOT_ERR_COMMIT_CONFLICT);
@@ -2241,8 +2241,12 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 	    status != GOT_STATUS_DELETE)
 		return NULL;
 
-	if (strchr(path, '/') == NULL) {
-		parent_path = strdup("/");
+	if (asprintf(&path, "/%s", relpath) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (strcmp(path, "/") == 0) {
+		parent_path = strdup("");
 		if (parent_path == NULL)
 			return got_error_from_errno();
 	} else {
@@ -2251,18 +2255,20 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 			return err;
 	}
 
-	ct = malloc(sizeof(*ct));
+	ct = calloc(1, sizeof(*ct));
 	if (ct == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
 
 	ct->status = status;
-	ct->id = NULL;
-	ct->base_id = got_object_id_dup(id);
-	if (ct->base_id == NULL) {
-		err = got_error_from_errno();
-		goto done;
+	ct->id = NULL; /* will be filled in when blob gets created */
+	if (ct->status != GOT_STATUS_ADD) {
+		ct->base_id = got_object_id_dup(id);
+		if (ct->base_id == NULL) {
+			err = got_error_from_errno();
+			goto done;
+		}
 	}
 	err = got_object_id_by_path(&ct->tree_id, a->repo,
 	    a->worktree->base_commit_id, parent_path);
@@ -2273,129 +2279,298 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = got_pathlist_insert(&new, a->paths, ct->path, ct);
+	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
 done:
 	if (ct && (err || new == NULL))
 		free_commitable(ct);
 	free(parent_path);
+	free(path);
 	return err;
 }
 
-struct write_tree_arg {
-	struct got_pathlist_head *commitable_paths;
-	struct got_object_idset *affected_trees;
-	struct got_repository *repo;
-};
+static const struct got_error *write_tree(struct got_object_id **,
+    struct got_tree_object *, const char *, struct got_pathlist_head *,
+    struct got_repository *);
 
 static const struct got_error *
-write_tree(struct got_object_id *base_tree_id, void *data, void *arg)
+write_subtree(struct got_object_id **new_subtree_id,
+    struct got_tree_entry *te, const char *parent_path,
+    struct got_pathlist_head *commitable_paths, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct write_tree_arg *a = arg;
-	const struct got_tree_entries *base_entries = NULL;
-	struct got_pathlist_head new_entries;
-	struct got_tree_entries new_tree_entries;
-	struct got_tree_object *base_tree = NULL;
-	struct got_tree_entry *te;
-	struct got_pathlist_entry *pe;
-	struct got_object_id *new_tree_id = NULL;
+	struct got_tree_object *subtree;
+	char *subpath;
 
-	TAILQ_INIT(&new_entries);
-	new_tree_entries.nentries = 0;
-	SIMPLEQ_INIT(&new_tree_entries.head);
+	if (asprintf(&subpath, "%s%s%s", parent_path,
+	    parent_path[0] == '\0' ? "" : "/", te->name) == -1)
+		return got_error_from_errno();
 
-	err = got_object_open_as_tree(&base_tree, a->repo, base_tree_id);
+	err = got_object_open_as_tree(&subtree, repo, te->id);
 	if (err)
 		return err;
 
-	base_entries = got_object_tree_get_entries(base_tree);
+	err = write_tree(new_subtree_id, subtree, subpath, commitable_paths,
+	    repo);
+	got_object_tree_close(subtree);
+	free(subpath);
+	return err;
+}
 
-	SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
-		struct got_tree_entry *new_te = NULL;
-		struct got_pathlist_entry *new_pe = NULL;
-		int ct_found = 0;
-		TAILQ_FOREACH(pe, a->commitable_paths, entry) {
-			struct commitable *ct = NULL;
-			char *ct_name = NULL;
+static const struct got_error *
+match_ct_parent_path(int *match, struct commitable *ct, const char *path)
+{
+	const struct got_error *err = NULL;
+	char *ct_parent_path = NULL;
 
-			ct = pe->data;
+	*match = 0;
 
-			if (got_object_id_cmp(ct->base_id, te->id) != 0)
-				continue; /* not part of this tree */
+	if (strchr(ct->path, '/') == NULL) {
+		ct_parent_path = strdup("/");
+		if (ct_parent_path == NULL)
+			return got_error_from_errno();
+	} else {
+		err = got_path_dirname(&ct_parent_path, ct->path);
+		if (err)
+			return err;
+	}
 
-			ct_name = basename(pe->path);
-			if (ct_name == NULL) {
-				err = got_error_from_errno();
-				goto done;
-			}
-			/* Commitable and tree entry must correspond. */
-			if (strcmp(te->name, ct_name) != 0)
-				continue;
+	*match = (strcmp(path, ct_parent_path) == 0);
+	free(ct_parent_path);
+	return err;
+}
 
-			ct_found = 1;
+static const struct got_error *
+alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
+    struct got_tree_entry *te, struct commitable *ct)
+{
+	const struct got_error *err = NULL;
 
-			if (ct->status == GOT_STATUS_DELETE) {
-				/* Deleted entries disappear. */
-				break;
-			}
+	*new_te = NULL;
 
-			/* Modified entries get updated mode and ID. */
-			if (ct->status == GOT_STATUS_MODIFY) {
-				err = got_object_tree_entry_dup(&new_te, te);
-				if (err)
-					goto done;
-				free(new_te->id);
-			} else if (ct->status == GOT_STATUS_ADD) {
-				/* Added entries get... well, added. */
-				new_te = calloc(1, sizeof(*new_te));
-				if (new_te == NULL) {
-					err = got_error_from_errno();
-					goto done;
-				}
-				new_te->name = strdup(ct_name);
-				if (new_te->name == NULL) {
-					err = got_error_from_errno();
-					goto done;
-				}
-			}
-			new_te->mode = GOT_DEFAULT_FILE_MODE; /* XXX */
-			new_te->id = got_object_id_dup(ct->id);
-			if (new_te->id == NULL) {
-				err = got_error_from_errno();
-				goto done;
-			}
-			break;
+	err = got_object_tree_entry_dup(new_te, te);
+	if (err)
+		goto done;
+
+	/* XXX TODO: update mode from disk (derive from ct?)! */
+	(*new_te)->mode = GOT_DEFAULT_FILE_MODE;
+
+	free((*new_te)->id);
+	(*new_te)->id = got_object_id_dup(ct->id);
+	if ((*new_te)->id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	if (err && *new_te) {
+		got_object_tree_entry_close(*new_te);
+		*new_te = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
+    struct commitable *ct)
+{
+	const struct got_error *err = NULL;
+	char *ct_name;
+
+	 *new_te = NULL;
+
+	*new_te = calloc(1, sizeof(*new_te));
+	if (*new_te == NULL)
+		return got_error_from_errno();
+
+	ct_name = basename(ct->path);
+	if (ct_name == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	(*new_te)->name = strdup(ct_name);
+	if ((*new_te)->name == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	/* XXX TODO: update mode from disk (derive from ct?)! */
+	(*new_te)->mode = GOT_DEFAULT_FILE_MODE;
+
+	(*new_te)->id = got_object_id_dup(ct->id);
+	if ((*new_te)->id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+done:
+	if (err && *new_te) {
+		got_object_tree_entry_close(*new_te);
+		*new_te = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+insert_tree_entry(struct got_tree_entry *new_te,
+    struct got_pathlist_head *paths)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *new_pe;
+
+	err = got_pathlist_insert(&new_pe, paths, new_te->name, new_te);
+	if (err)
+		return err;
+	if (new_pe == NULL)
+		return got_error(GOT_ERR_TREE_DUP_ENTRY);
+	return NULL;
+}
+
+static const struct got_error *
+match_deleted_or_modified_ct(struct commitable **ctp,
+    struct got_tree_entry *te, const char *base_tree_path,
+    struct got_pathlist_head *commitable_paths)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+
+	*ctp = NULL;
+
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct commitable *ct = pe->data;
+		char *ct_name = NULL;
+		int path_matches;
+
+		if (ct->status != GOT_STATUS_MODIFY &&
+		    ct->status != GOT_STATUS_DELETE)
+			continue;
+
+		if (got_object_id_cmp(ct->base_id, te->id) != 0)
+			continue;
+
+		 err = match_ct_parent_path(&path_matches, ct, base_tree_path);
+		 if (err)
+			return err;
+		if (!path_matches)
+			continue;
+
+		ct_name = basename(pe->path);
+		if (ct_name == NULL)
+			return got_error_from_errno();
+
+		if (strcmp(te->name, ct_name) != 0)
+			continue;
+
+		*ctp = ct;
+		break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+write_tree(struct got_object_id **new_tree_id,
+    struct got_tree_object *base_tree, const char *path_base_tree,
+    struct got_pathlist_head *commitable_paths,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	const struct got_tree_entries *base_entries = NULL;
+	struct got_pathlist_head paths;
+	struct got_tree_entries new_tree_entries;
+	struct got_tree_entry *te;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&paths);
+	new_tree_entries.nentries = 0;
+	SIMPLEQ_INIT(&new_tree_entries.head);
+
+	/* Insert, and recurse into, newly added entries first. */
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct commitable *ct = pe->data;
+		char *child_path = NULL;
+
+		if (ct->status != GOT_STATUS_ADD)
+			continue;
+
+		 printf("pe->path='%s'\n", pe->path);
+		 printf("path_base_tree='%s'\n", path_base_tree);
+		 if (!got_path_is_child(pe->path, path_base_tree,
+		     strlen(path_base_tree))) {
+			printf("not a child\n");
+			continue;
 		}
 
-		if (new_te == NULL) {
-			if (ct_found) /* GOT_STATUS_DELETE */
-				continue;
-			err = got_object_tree_entry_dup(&new_te, te);
-			if (err)
-				goto done;
-		}
-
-		err = got_pathlist_insert(&new_pe, &new_entries,
-		    new_te->name, new_te);
+		err = got_path_skip_common_ancestor(&child_path, path_base_tree,
+		    pe->path);
 		if (err)
 			goto done;
-		if (new_pe == NULL) {
-			err = got_error(GOT_ERR_TREE_DUP_ENTRY);
-			goto done;
+
+		if (strchr(child_path, '/') == NULL) {
+			struct got_tree_entry *new_te;
+			err = alloc_added_blob_tree_entry(&new_te, ct);
+			if (err)
+				goto done;
+			err = insert_tree_entry(new_te, &paths);
+			if (err)
+				goto done;
+		} else {
+			/* TODO: Create subtree and insert element for it. */
 		}
 	}
 
-	TAILQ_FOREACH(pe, &new_entries, entry) {
+	/* Handle modified and deleted entries. */
+	base_entries = got_object_tree_get_entries(base_tree);
+	SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
+		struct got_tree_entry *new_te = NULL;
+		struct commitable *ct = NULL;
+
+		if (S_ISDIR(te->mode)) {
+			err = got_object_tree_entry_dup(&new_te, te);
+			if (err)
+				goto done;
+			free(new_te->id);
+			err = write_subtree(&new_te->id, te, path_base_tree,
+			    commitable_paths, repo);
+			if (err)
+				goto done;
+			err = insert_tree_entry(new_te, &paths);
+			if (err)
+				goto done;
+			continue;
+		}
+
+		err = match_deleted_or_modified_ct(&ct, te, path_base_tree,
+		    commitable_paths);
+		if (ct) {
+			/* NB: Deleted entries get dropped here. */
+			if (ct->status == GOT_STATUS_MODIFY) {
+				err = alloc_modified_blob_tree_entry(&new_te,
+				    te, ct);
+				if (err)
+					goto done;
+				err = insert_tree_entry(new_te, &paths);
+				if (err)
+					goto done;
+			}
+		} else {
+			/* Entry is unchanged; just copy it. */
+			err = got_object_tree_entry_dup(&new_te, te);
+			if (err)
+				goto done;
+			err = insert_tree_entry(new_te, &paths);
+			if (err)
+				goto done;
+		}
+	}
+
+	/* Write new list of entries; deleted entries have been dropped. */
+	TAILQ_FOREACH(pe, &paths, entry) {
 		struct got_tree_entry *te = pe->data;
 		new_tree_entries.nentries++;
 		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
 	}
-
-	err = got_object_tree_create(&new_tree_id, &new_tree_entries, a->repo);
+	err = got_object_tree_create(new_tree_id, &new_tree_entries, repo);
 done:
-	free(new_tree_id);
 	got_object_tree_entries_close(&new_tree_entries);
-	got_pathlist_free(&new_entries);
+	got_pathlist_free(&paths);
 	if (base_tree)
 		got_object_tree_close(base_tree);
 	return err;
@@ -2408,17 +2583,16 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 {
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct collect_commitables_arg cc_arg;
-	struct write_tree_arg wt_arg;
-	struct got_pathlist_head paths;
+	struct got_pathlist_head commitable_paths;
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 	struct got_commit_object *base_commit = NULL;
 	struct got_tree_object *base_tree = NULL;
-	struct got_object_idset *tree_ids = NULL;
+	struct got_object_id *new_tree_id = NULL;
 
 	*new_commit_id = NULL;
 
-	TAILQ_INIT(&paths);
+	TAILQ_INIT(&commitable_paths);
 
 	if (ondisk_path) {
 		err = got_path_skip_common_ancestor(&relpath,
@@ -2427,15 +2601,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			return err;
 	}
 
-	tree_ids = got_object_idset_alloc();
-	if (tree_ids == NULL)
-		return got_error_from_errno();
-
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		goto done;
 
-	cc_arg.paths = &paths;
+	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
 	err = got_worktree_status(worktree, relpath ? relpath : "",
@@ -2445,20 +2615,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	/* TODO: collect commit message if not specified */
 
-	/* Collect IDs of affected leaf trees. */
-	TAILQ_FOREACH(pe, &paths, entry) {
-		struct commitable *ct = pe->data;
-
-		if (got_object_idset_contains(tree_ids, ct->tree_id))
-			continue;
-
-		err = got_object_idset_add(tree_ids, ct->tree_id, NULL);
-		if (err)
-			goto done;
-	}
-
 	/* Create blobs from added and modified files and record their IDs. */
-	TAILQ_FOREACH(pe, &paths, entry) {
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct commitable *ct = pe->data;
 		char *ondisk_path;
 
@@ -2477,38 +2635,34 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
-	/* Write new leaf tree objects. */
-	wt_arg.commitable_paths = &paths;
-	wt_arg.affected_trees = got_object_idset_alloc();
-	if (wt_arg.affected_trees == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-	wt_arg.repo = repo;
-	err = got_object_idset_for_each(tree_ids, write_tree, &wt_arg);
-	if (err)
-		goto done;
-
 	err = got_object_open_as_commit(&base_commit, repo,
 	    worktree->base_commit_id);
 	if (err)
 		goto done;
-	err = got_object_open_as_tree(&base_tree, repo,
-	    base_commit->tree_id);
+	err = got_object_open_as_tree(&base_tree, repo, base_commit->tree_id);
 	if (err)
 		goto done;
+
+	/* Recursively write new tree objects. */
+	err = write_tree(&new_tree_id, base_tree, "/", &commitable_paths, repo);
+	if (err)
+		goto done;
+
+	/* TODO: Write new commit. */
+
 done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
-	TAILQ_FOREACH(pe, &paths, entry) {
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct commitable *ct = pe->data;
 		free_commitable(ct);
 	}
-	got_object_idset_free(tree_ids);
-	got_pathlist_free(&paths);
+	got_pathlist_free(&commitable_paths);
 	if (base_tree)
 		got_object_tree_close(base_tree);
+	if (base_commit)
+		got_object_commit_close(base_commit);
 	free(relpath);
 	return err;
 }

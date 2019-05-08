@@ -19,6 +19,8 @@
 function test_commit_basic {
 	local testroot=`test_init commit_basic`
 
+	find $testroot/repo/.git/objects > /tmp/1
+
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -35,6 +37,8 @@ function test_commit_basic {
 	(cd $testroot/wt && got add new >/dev/null)
 
 	(cd $testroot/wt && got commit -m 'test commit_basic' > $testroot/stdout)
+
+	find $testroot/repo/.git/objects > /tmp/2
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "M alpha" > $testroot/stdout.expected
