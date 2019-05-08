@@ -2238,7 +2238,7 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
 	    status != GOT_STATUS_DELETE)
 		return NULL;
-	
+
 	err = got_path_dirname(&parent_path, path);
 	if (err)
 		goto done;
@@ -2279,14 +2279,15 @@ write_tree(struct got_object_id *base_tree_id, void *data, void *arg)
 {
 	const struct got_error *err = NULL;
 	struct write_tree_arg *a = arg;
-	struct got_tree_entries new_entries;
 	const struct got_tree_entries *base_entries = NULL;
+	struct got_pathlist_head new_entries;
+	struct got_tree_entries new_tree_entries;
 	struct got_tree_object *base_tree = NULL;
 	struct got_tree_entry *te;
 	struct got_pathlist_entry *pe;
+	struct got_object_id *new_tree_id = NULL;
 
-	new_entries.nentries = 0;
-	SIMPLEQ_INIT(&new_entries.head);
+	TAILQ_INIT(&new_entries);
 
 	err = got_object_open_as_tree(&base_tree, a->repo, base_tree_id);
 	if (err)
@@ -2295,26 +2296,84 @@ write_tree(struct got_object_id *base_tree_id, void *data, void *arg)
 	base_entries = got_object_tree_get_entries(base_tree);
 
 	SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
-		struct commitable *ct = NULL;
-		struct got_tree_entry *new_te;
-
 		TAILQ_FOREACH(pe, a->commitable_paths, entry) {
-			ct = pe->data;
-			if (got_object_id_cmp(ct->tree_id, te->id) == 0)
-				break;
-		}
+			struct commitable *ct = NULL;
+			struct got_tree_entry *new_te = NULL;
+			struct got_pathlist_entry *new_pe = NULL;
+			char *ct_name = NULL;
 
-		if (ct) {
-		} else {
-			err = got_object_tree_entry_dup(&new_te, te);
+			ct = pe->data;
+
+			if (got_object_id_cmp(ct->tree_id, te->id) != 0)
+				continue; /* not part of this tree */
+
+			ct_name = basename(pe->path);
+			if (ct_name == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			/* Commitable and tree entry must correspond. */
+			if (strcmp(te->name, ct_name) != 0)
+				continue;
+
+			if (ct->status == GOT_STATUS_DELETE) {
+				/* Deleted entries disappear. */
+				continue;
+			}
+
+			/* Modified entries get updated mode and ID. */
+			if (ct->status == GOT_STATUS_MODIFY) {
+				err = got_object_tree_entry_dup(&new_te, te);
+				if (err)
+					goto done;
+				new_te->mode = GOT_DEFAULT_FILE_MODE; /* XXX */
+				free(new_te->id);
+			} else if (ct->status == GOT_STATUS_ADD) {
+				/* Added entries get... well, added. */
+				new_te = calloc(1, sizeof(*new_te));
+				if (new_te == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+				new_te->mode = GOT_DEFAULT_FILE_MODE; /* XXX */
+				new_te->name = strdup(ct_name);
+				if (new_te->name == NULL) {
+					err = got_error_from_errno();
+					goto done;
+				}
+			}
+			new_te->id = got_object_id_dup(ct->id);
+			if (new_te->id == NULL) {
+				err = got_error_from_errno();
+				goto done;
+			}
+
+			err = got_pathlist_insert(&new_pe, &new_entries,
+			    te->name, new_te);
 			if (err)
 				goto done;
+			if (new_pe == NULL) {
+				err = got_error(GOT_ERR_TREE_DUP_ENTRY);
+				goto done;
+			}
 		}
 	}
+
+	new_tree_entries.nentries = 0;
+	SIMPLEQ_INIT(&new_tree_entries.head);
+	TAILQ_FOREACH(pe, &new_entries, entry) {
+		struct got_tree_entry *te = pe->data;
+		new_tree_entries.nentries++;
+		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
+	}
+
+	 err = got_object_tree_create(&new_tree_id, &new_tree_entries, a->repo);
 done:
-	got_object_tree_close(base_tree);
-	if (err)
-		got_object_tree_entries_close(&new_entries);
+	free(new_tree_id);
+	if (base_tree)
+		got_object_tree_close(base_tree);
+	got_pathlist_free(&new_entries);
+	got_object_tree_entries_close(&new_tree_entries);
 	return err;
 }
 
