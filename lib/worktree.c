@@ -2290,12 +2290,15 @@ done:
 
 static const struct got_error *write_tree(struct got_object_id **,
     struct got_tree_object *, const char *, struct got_pathlist_head *,
+    got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *);
 
 static const struct got_error *
 write_subtree(struct got_object_id **new_subtree_id,
     struct got_tree_entry *te, const char *parent_path,
-    struct got_pathlist_head *commitable_paths, struct got_repository *repo)
+    struct got_pathlist_head *commitable_paths,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *subtree;
@@ -2310,7 +2313,7 @@ write_subtree(struct got_object_id **new_subtree_id,
 		return err;
 
 	err = write_tree(new_subtree_id, subtree, subpath, commitable_paths,
-	    repo);
+	    status_cb, status_arg, repo);
 	got_object_tree_close(subtree);
 	free(subpath);
 	return err;
@@ -2424,6 +2427,16 @@ insert_tree_entry(struct got_tree_entry *new_te,
 }
 
 static const struct got_error *
+report_ct_status(struct commitable *ct,
+    got_worktree_status_cb status_cb, void *status_arg)
+{
+	const char *ct_path = ct->path;
+	while (ct_path[0] == '/')
+		ct_path++;
+	return (*status_cb)(status_arg, ct->status, ct_path, ct->id);
+}
+
+static const struct got_error *
 match_deleted_or_modified_ct(struct commitable **ctp,
     struct got_tree_entry *te, const char *base_tree_path,
     struct got_pathlist_head *commitable_paths)
@@ -2469,6 +2482,7 @@ static const struct got_error *
 write_tree(struct got_object_id **new_tree_id,
     struct got_tree_object *base_tree, const char *path_base_tree,
     struct got_pathlist_head *commitable_paths,
+    got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -2504,6 +2518,9 @@ write_tree(struct got_object_id **new_tree_id,
 			err = alloc_added_blob_tree_entry(&new_te, ct);
 			if (err)
 				goto done;
+			err = report_ct_status(ct, status_cb, status_arg);
+			if (err)
+				goto done;
 		} else {
 			char *subtree_path;
 
@@ -2523,7 +2540,7 @@ write_tree(struct got_object_id **new_tree_id,
 				goto done;
 			}
 			err = write_subtree(&new_te->id, NULL, subtree_path,
-			    commitable_paths, repo);
+			    commitable_paths, status_cb, status_arg, repo);
 			free(subtree_path);
 			if (err)
 				goto done;
@@ -2546,7 +2563,8 @@ write_tree(struct got_object_id **new_tree_id,
 					goto done;
 				free(new_te->id);
 				err = write_subtree(&new_te->id, te,
-				    path_base_tree, commitable_paths, repo);
+				    path_base_tree, commitable_paths,
+				    status_cb, status_arg, repo);
 				if (err)
 					goto done;
 				err = insert_tree_entry(new_te, &paths);
@@ -2568,6 +2586,9 @@ write_tree(struct got_object_id **new_tree_id,
 					if (err)
 						goto done;
 				}
+				err = report_ct_status(ct, status_cb, status_arg);
+				if (err)
+					goto done;
 			} else {
 				/* Entry is unchanged; just copy it. */
 				err = got_object_tree_entry_dup(&new_te, te);
@@ -2598,8 +2619,9 @@ done:
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, const char *ondisk_path,
-    const char *author, const char *committer,
-    const char *logmsg, struct got_repository *repo)
+    const char *author, const char *committer, const char *logmsg,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct collect_commitables_arg cc_arg;
@@ -2669,7 +2691,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	/* Recursively write new tree objects. */
-	err = write_tree(&new_tree_id, base_tree, "/", &commitable_paths, repo);
+	err = write_tree(&new_tree_id, base_tree, "/", &commitable_paths,
+	    status_cb, status_arg, repo);
 	if (err)
 		goto done;
 

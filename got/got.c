@@ -2133,7 +2133,8 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 
 	error = got_worktree_commit(&id, worktree, path,
-	    "Stefan Sperling <stsp@stsp.name>", NULL, logmsg, repo);
+	    "Stefan Sperling <stsp@stsp.name>", NULL, logmsg,
+	    print_status, NULL, repo);
 	if (error)
 		goto done;
 

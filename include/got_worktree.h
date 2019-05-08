@@ -177,4 +177,4 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, const char *, const char *, const char *,
-    const char *, struct got_repository *);
+    const char *, got_worktree_status_cb, void *, struct got_repository *);
