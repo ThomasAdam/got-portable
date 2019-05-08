@@ -2680,6 +2680,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
 	    1, author, time(NULL), committer, time(NULL), logmsg, repo);
 	got_object_qid_free(pid);
+	if (err)
+		goto done;
+
+	/* TODO: bump base-commit; rewrite fileindex */
+
 done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
