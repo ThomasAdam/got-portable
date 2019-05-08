@@ -18,3 +18,7 @@ const struct got_error *got_object_blob_create(struct got_object_id **,
     const char *, struct got_repository *);
 const struct got_error *got_object_tree_create(struct got_object_id **,
     struct got_tree_entries *, struct got_repository *);
+const struct got_error *got_object_commit_create(struct got_object_id **,
+    struct got_object_id *, struct got_object_id_queue *, int,
+    const char *, time_t, const char *, time_t, const char *,
+    struct got_repository *);

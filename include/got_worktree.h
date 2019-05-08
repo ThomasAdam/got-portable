@@ -171,10 +171,10 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
  * The worktree's base commit will be set to this new commit.
  * Files unaffected by this commit operation will retain their
  * current base commit.
- * A non-empty log message must be specified.
+ * An author and a non-empty log message must be specified.
+ * The name of the committer is optional (may be NULL).
  * If an on-disk path is specified, only commit changes at or within this path.
  */
-const struct got_error *
-got_worktree_commit(struct got_object_id **,
-    struct got_worktree *, const char *, const char *,
-    struct got_repository *);
+const struct got_error *got_worktree_commit(struct got_object_id **,
+    struct got_worktree *, const char *, const char *, const char *,
+    const char *, struct got_repository *);

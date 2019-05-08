@@ -304,3 +304,165 @@ done:
 	}
 	return err;
 }
+
+const struct got_error *
+got_object_commit_create(struct got_object_id **id,
+    struct got_object_id *tree_id, struct got_object_id_queue *parent_ids,
+    int nparents, const char *author, time_t author_time,
+    const char *committer, time_t committer_time,
+    const char *logmsg, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	SHA1_CTX sha1_ctx;
+	char *header = NULL, *tree_str = NULL;
+	char *author_str = NULL, *committer_str = NULL;
+	char *id_str = NULL;
+	size_t headerlen, len = 0, n;
+	FILE *commitfile = NULL;
+	struct got_object_qid *qid;
+
+	*id = NULL;
+
+	SHA1Init(&sha1_ctx);
+
+	if (asprintf(&author_str, "%s%s %lld +0000\n",
+	    GOT_COMMIT_LABEL_AUTHOR, author, author_time) == -1)
+		return got_error_from_errno();
+
+	if (asprintf(&committer_str, "%s%s %lld +0000\n",
+	    GOT_COMMIT_LABEL_COMMITTER, committer ? committer : author,
+	    committer ? committer_time : author_time)
+	    == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	len = strlen(GOT_COMMIT_LABEL_TREE) + SHA1_DIGEST_STRING_LENGTH +
+	    nparents *
+	    (strlen(GOT_COMMIT_LABEL_PARENT) + SHA1_DIGEST_STRING_LENGTH) +
+	    + strlen(author_str) + strlen(committer_str) + 2 + strlen(logmsg);
+
+	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_COMMIT, len) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	headerlen = strlen(header) + 1;
+	SHA1Update(&sha1_ctx, header, headerlen);
+
+	commitfile = got_opentemp();
+	if (commitfile == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+
+	n = fwrite(header, 1, headerlen, commitfile);
+	if (n != headerlen) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	err = got_object_id_str(&id_str, tree_id);
+	if (err)
+		goto done;
+	if (asprintf(&tree_str, "%s%s\n", GOT_COMMIT_LABEL_TREE, id_str)
+	    == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	len = strlen(tree_str);
+	SHA1Update(&sha1_ctx, tree_str, len);
+	n = fwrite(tree_str, 1, len, commitfile);
+	if (n != len) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
+		char *parent_str = NULL;
+
+		free(id_str);
+
+		err = got_object_id_str(&id_str, qid->id);
+		if (err)
+			goto done;
+		if (asprintf(&parent_str, "%s%s\n", GOT_COMMIT_LABEL_PARENT,
+		    id_str) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		len = strlen(parent_str);
+		SHA1Update(&sha1_ctx, parent_str, len);
+		n = fwrite(parent_str, 1, len, commitfile);
+		if (n != len) {
+			err = got_ferror(commitfile, GOT_ERR_IO);
+			free(parent_str);
+			goto done;
+		}
+		free(parent_str);
+	}
+
+	len = strlen(author_str);
+	SHA1Update(&sha1_ctx, author_str, len);
+	n = fwrite(author_str, 1, len, commitfile);
+	if (n != len) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	len = strlen(committer_str);
+	SHA1Update(&sha1_ctx, committer_str, len);
+	n = fwrite(committer_str, 1, len, commitfile);
+	if (n != len) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SHA1Update(&sha1_ctx, "\n", 1);
+	n = fwrite("\n", 1, 1, commitfile);
+	if (n != 1) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	len = strlen(logmsg);
+	SHA1Update(&sha1_ctx, logmsg, len);
+	n = fwrite(logmsg, 1, len, commitfile);
+	if (n != len) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SHA1Update(&sha1_ctx, "\n", 1);
+	n = fwrite("\n", 1, 1, commitfile);
+	if (n != 1) {
+		err = got_ferror(commitfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	*id = malloc(sizeof(**id));
+	if (*id == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	SHA1Final((*id)->sha1, &sha1_ctx);
+
+	if (fflush(commitfile) != 0) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	rewind(commitfile);
+
+	err = create_object_file(*id, commitfile, repo);
+done:
+	free(header);
+	free(tree_str);
+	free(author_str);
+	free(committer_str);
+	if (commitfile && fclose(commitfile) != 0 && err == NULL)
+		err = got_error_from_errno();
+	if (err) {
+		free(*id);
+		*id = NULL;
+	}
+	return err;
+}

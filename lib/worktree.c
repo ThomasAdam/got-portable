@@ -2598,6 +2598,7 @@ done:
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, const char *ondisk_path,
+    const char *author, const char *committer,
     const char *logmsg, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlockerr = NULL;
@@ -2608,10 +2609,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_commit_object *base_commit = NULL;
 	struct got_tree_object *base_tree = NULL;
 	struct got_object_id *new_tree_id = NULL;
+	struct got_object_id_queue parent_ids;
+	struct got_object_qid *pid = NULL;
 
 	*new_commit_id = NULL;
 
 	TAILQ_INIT(&commitable_paths);
+	SIMPLEQ_INIT(&parent_ids);
 
 	if (ondisk_path) {
 		err = got_path_skip_common_ancestor(&relpath,
@@ -2631,6 +2635,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	    repo, collect_commitables, &cc_arg, NULL, NULL);
 	if (err)
 		goto done;
+
+	/* TODO: out-of-dateness check */
 
 	/* TODO: collect commit message if not specified */
 
@@ -2667,8 +2673,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* TODO: Write new commit. */
-
+	err = got_object_qid_alloc(&pid, worktree->base_commit_id);
+	if (err)
+		goto done;
+	SIMPLEQ_INSERT_TAIL(&parent_ids, pid, entry);
+	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
+	    1, author, time(NULL), committer, time(NULL), logmsg, repo);
+	got_object_qid_free(pid);
 done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
