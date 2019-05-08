@@ -130,7 +130,7 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 		return got_error(GOT_ERR_BAD_PATH);
 	if (strncmp(parent_abspath, abspath, len_parent) != 0)
 		return got_error(GOT_ERR_BAD_PATH);
-	if (abspath[len_parent] != '/')
+	if (!got_path_is_root_dir(parent_abspath) && abspath[len_parent] != '/')
 		return got_error(GOT_ERR_BAD_PATH);
 	while (abspath[len_parent] == '/')
 		abspath++;
@@ -162,7 +162,7 @@ got_path_is_current_dir(const char *path)
 int
 got_path_is_child(const char *child, const char *parent, size_t parent_len)
 {
-	if (parent_len == 0)
+	if (parent_len == 0 || got_path_is_root_dir(parent))
 		return 1;
 
 	if (strncmp(parent, child, parent_len) != 0)
