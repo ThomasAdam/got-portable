@@ -2239,9 +2239,15 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 	    status != GOT_STATUS_DELETE)
 		return NULL;
 
-	err = got_path_dirname(&parent_path, path);
-	if (err)
-		return err;
+	if (strchr(path, '/') == NULL) {
+		parent_path = strdup("/");
+		if (parent_path == NULL)
+			return got_error_from_errno();
+	} else {
+		err = got_path_dirname(&parent_path, path);
+		if (err)
+			return err;
+	}
 
 	ct = malloc(sizeof(*ct));
 	if (ct == NULL) {
