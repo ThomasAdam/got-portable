@@ -222,6 +222,8 @@ got_object_tree_create(struct got_object_id **id,
 
 	*id = NULL;
 
+	SHA1Init(&sha1_ctx);
+
 	SIMPLEQ_FOREACH(te, &entries->head, entry) {
 		err = mode2str(modebuf, sizeof(modebuf), te->mode);
 		if (err)
