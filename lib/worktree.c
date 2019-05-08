@@ -2241,7 +2241,7 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 
 	err = got_path_dirname(&parent_path, path);
 	if (err)
-		goto done;
+		return err;
 
 	ct = malloc(sizeof(*ct));
 	if (ct == NULL) {
@@ -2262,7 +2262,7 @@ collect_commitables(void *arg, unsigned char status, const char *path,
 	}
 	err = got_pathlist_insert(&new, a->paths, ct->path, ct);
 done:
-	if (err || new == NULL)
+	if (ct && (err || new == NULL))
 		free_commitable(ct);
 	free(parent_path);
 	return err;
