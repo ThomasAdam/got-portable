@@ -2373,7 +2373,7 @@ write_tree(struct got_object_id *base_tree_id, void *data, void *arg)
 		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
 	}
 
-	 err = got_object_tree_create(&new_tree_id, &new_tree_entries, a->repo);
+	err = got_object_tree_create(&new_tree_id, &new_tree_entries, a->repo);
 done:
 	free(new_tree_id);
 	if (base_tree)
