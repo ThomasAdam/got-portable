@@ -2483,7 +2483,8 @@ done:
 	}
 	got_object_idset_free(tree_ids);
 	got_pathlist_free(&paths);
-	got_object_tree_close(base_tree);
+	if (base_tree)
+		got_object_tree_close(base_tree);
 	free(relpath);
 	return err;
 }
