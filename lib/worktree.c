@@ -2475,7 +2475,7 @@ write_tree(struct got_object_id **new_tree_id,
 	const struct got_tree_entries *base_entries = NULL;
 	struct got_pathlist_head paths;
 	struct got_tree_entries new_tree_entries;
-	struct got_tree_entry *te;
+	struct got_tree_entry *te, *new_te = NULL;
 	struct got_pathlist_entry *pe;
 
 	TAILQ_INIT(&paths);
@@ -2485,79 +2485,98 @@ write_tree(struct got_object_id **new_tree_id,
 	/* Insert, and recurse into, newly added entries first. */
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct commitable *ct = pe->data;
-		char *child_path = NULL;
+		char *child_path = NULL, *slash;
 
 		if (ct->status != GOT_STATUS_ADD)
 			continue;
 
-		 printf("pe->path='%s'\n", pe->path);
-		 printf("path_base_tree='%s'\n", path_base_tree);
 		 if (!got_path_is_child(pe->path, path_base_tree,
-		     strlen(path_base_tree))) {
-			printf("not a child\n");
+		     strlen(path_base_tree)))
 			continue;
-		}
 
 		err = got_path_skip_common_ancestor(&child_path, path_base_tree,
 		    pe->path);
 		if (err)
 			goto done;
 
-		if (strchr(child_path, '/') == NULL) {
-			struct got_tree_entry *new_te;
+		slash = strchr(child_path, '/');
+		if (slash == NULL) {
 			err = alloc_added_blob_tree_entry(&new_te, ct);
 			if (err)
 				goto done;
-			err = insert_tree_entry(new_te, &paths);
+		} else {
+			char *subtree_path;
+
+			*slash = '\0'; /* trim trailing path components */
+
+			new_te = calloc(1, sizeof(*new_te));
+			new_te->mode = GOT_DEFAULT_DIR_MODE;
+			new_te->name = strdup(child_path);
+			if (new_te->name == NULL) {
+				got_object_tree_entry_close(new_te);
+				err = got_error_from_errno();
+				goto done;
+			}
+			if (asprintf(&subtree_path, "%s/%s", path_base_tree,
+			    child_path) == -1) {
+				err = got_error_from_errno();
+				goto done;
+			}
+			err = write_subtree(&new_te->id, NULL, subtree_path,
+			    commitable_paths, repo);
+			free(subtree_path);
 			if (err)
 				goto done;
-		} else {
-			/* TODO: Create subtree and insert element for it. */
 		}
+
+		err = insert_tree_entry(new_te, &paths);
+		if (err)
+			goto done;
 	}
 
-	/* Handle modified and deleted entries. */
-	base_entries = got_object_tree_get_entries(base_tree);
-	SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
-		struct got_tree_entry *new_te = NULL;
-		struct commitable *ct = NULL;
+	if (base_tree) {
+		/* Handle modified and deleted entries. */
+		base_entries = got_object_tree_get_entries(base_tree);
+		SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
+			struct commitable *ct = NULL;
 
-		if (S_ISDIR(te->mode)) {
-			err = got_object_tree_entry_dup(&new_te, te);
-			if (err)
-				goto done;
-			free(new_te->id);
-			err = write_subtree(&new_te->id, te, path_base_tree,
-			    commitable_paths, repo);
-			if (err)
-				goto done;
-			err = insert_tree_entry(new_te, &paths);
-			if (err)
-				goto done;
-			continue;
-		}
+			if (S_ISDIR(te->mode)) {
+				err = got_object_tree_entry_dup(&new_te, te);
+				if (err)
+					goto done;
+				free(new_te->id);
+				err = write_subtree(&new_te->id, te,
+				    path_base_tree, commitable_paths, repo);
+				if (err)
+					goto done;
+				err = insert_tree_entry(new_te, &paths);
+				if (err)
+					goto done;
+				continue;
+			}
 
-		err = match_deleted_or_modified_ct(&ct, te, path_base_tree,
-		    commitable_paths);
-		if (ct) {
-			/* NB: Deleted entries get dropped here. */
-			if (ct->status == GOT_STATUS_MODIFY) {
-				err = alloc_modified_blob_tree_entry(&new_te,
-				    te, ct);
+			err = match_deleted_or_modified_ct(&ct, te,
+			    path_base_tree, commitable_paths);
+			if (ct) {
+				/* NB: Deleted entries get dropped here. */
+				if (ct->status == GOT_STATUS_MODIFY) {
+					err = alloc_modified_blob_tree_entry(
+					    &new_te, te, ct);
+					if (err)
+						goto done;
+					err = insert_tree_entry(new_te, &paths);
+					if (err)
+						goto done;
+				}
+			} else {
+				/* Entry is unchanged; just copy it. */
+				err = got_object_tree_entry_dup(&new_te, te);
 				if (err)
 					goto done;
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
 			}
-		} else {
-			/* Entry is unchanged; just copy it. */
-			err = got_object_tree_entry_dup(&new_te, te);
-			if (err)
-				goto done;
-			err = insert_tree_entry(new_te, &paths);
-			if (err)
-				goto done;
 		}
 	}
 
