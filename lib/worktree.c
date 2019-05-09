@@ -2217,15 +2217,18 @@ done:
 
 struct commitable {
 	char *path;
+	char *ondisk_path;
 	unsigned char status;
 	struct got_object_id *id;
 	struct got_object_id *base_id;
+	mode_t mode;
 };
 
 static void
 free_commitable(struct commitable *ct)
 {
 	free(ct->path);
+	free(ct->ondisk_path);
 	free(ct->id);
 	free(ct->base_id);
 	free(ct);
@@ -2246,6 +2249,7 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	struct commitable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
 	char *parent_path = NULL, *path = NULL;
+	struct stat sb;
 
 	if (status == GOT_STATUS_CONFLICT)
 		return got_error(GOT_ERR_COMMIT_CONFLICT);
@@ -2272,6 +2276,21 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	if (ct == NULL) {
 		err = got_error_from_errno();
 		goto done;
+	}
+
+	if (asprintf(&ct->ondisk_path, "%s/%s", a->worktree->root_path,
+	    relpath) == -1) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	if (status == GOT_STATUS_DELETE) {
+		sb.st_mode = GOT_DEFAULT_FILE_MODE;
+	} else {
+		if (lstat(ct->ondisk_path, &sb) != 0) {
+			err = got_error_from_errno();
+			goto done;
+		}
+		ct->mode = sb.st_mode;
 	}
 
 	ct->status = status;
@@ -2351,6 +2370,12 @@ match_ct_parent_path(int *match, struct commitable *ct, const char *path)
 	return err;
 }
 
+static mode_t
+get_ct_file_mode(struct commitable *ct)
+{
+	return S_IFREG | (ct->mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
+}
+
 static const struct got_error *
 alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
     struct got_tree_entry *te, struct commitable *ct)
@@ -2363,8 +2388,7 @@ alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
 	if (err)
 		goto done;
 
-	/* XXX TODO: update mode from disk (derive from ct?)! */
-	(*new_te)->mode = GOT_DEFAULT_FILE_MODE;
+	(*new_te)->mode = get_ct_file_mode(ct);
 
 	free((*new_te)->id);
 	(*new_te)->id = got_object_id_dup(ct->id);
@@ -2404,8 +2428,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 		goto done;
 	}
 
-	/* XXX TODO: update mode from disk (derive from ct?)! */
-	(*new_te)->mode = GOT_DEFAULT_FILE_MODE;
+	(*new_te)->mode = get_ct_file_mode(ct);
 
 	(*new_te)->id = got_object_id_dup(ct->id);
 	if ((*new_te)->id == NULL) {
@@ -2538,7 +2561,7 @@ write_tree(struct got_object_id **new_tree_id,
 			*slash = '\0'; /* trim trailing path components */
 
 			new_te = calloc(1, sizeof(*new_te));
-			new_te->mode = GOT_DEFAULT_DIR_MODE;
+			new_te->mode = S_IFDIR;
 			new_te->name = strdup(child_path);
 			if (new_te->name == NULL) {
 				got_object_tree_entry_close(new_te);
@@ -2658,13 +2681,6 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_fileindex_entry *ie;
 		struct commitable *ct = pe->data;
-		char *ondisk_path;
-
-		if (asprintf(&ondisk_path, "%s/%s",
-		    worktree->root_path, pe->path) == -1) {
-			err = got_error_from_errno();
-			goto done;
-		}
 
 		ie = got_fileindex_entry_get(fileindex, pe->path);
 		if (ie) {
@@ -2673,11 +2689,11 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				got_fileindex_entry_free(ie);
 			} else
 				err = got_fileindex_entry_update(ie,
-				    ondisk_path, ct->id->sha1,
+				    ct->ondisk_path, ct->id->sha1,
 				    new_base_commit_id->sha1, 1);
 		} else {
 			err = got_fileindex_entry_alloc(&ie,
-			    ondisk_path, pe->path, ct->id->sha1,
+			    ct->ondisk_path, pe->path, ct->id->sha1,
 			    new_base_commit_id->sha1);
 			if (err)
 				goto done;
@@ -2685,7 +2701,6 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 			if (err)
 				goto done;
 		}
-		free(ondisk_path);
 	}
 
 	err = got_fileindex_write(fileindex, new_index);
