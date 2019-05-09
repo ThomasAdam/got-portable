@@ -110,6 +110,35 @@ function test_commit_subdir {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_single_file {
+	local testroot=`test_init commit_single_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+
+	(cd $testroot/wt && got commit -m 'test commit_subdir' epsilon/zeta \
+		> $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  epsilon/zeta" >> $testroot/stdout.expected
+	echo "created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
+run_test test_commit_single_file
