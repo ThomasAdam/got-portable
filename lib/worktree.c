@@ -2217,6 +2217,7 @@ done:
 
 struct commitable {
 	char *path;
+	char *in_repo_path;
 	char *ondisk_path;
 	unsigned char status;
 	struct got_object_id *id;
@@ -2228,6 +2229,7 @@ static void
 free_commitable(struct commitable *ct)
 {
 	free(ct->path);
+	free(ct->in_repo_path);
 	free(ct->ondisk_path);
 	free(ct->id);
 	free(ct->base_id);
@@ -2291,6 +2293,13 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 			goto done;
 		}
 		ct->mode = sb.st_mode;
+	}
+
+	if (asprintf(&ct->in_repo_path, "%s%s%s", a->worktree->path_prefix,
+	    got_path_is_root_dir(a->worktree->path_prefix) ? "" : "/",
+	    relpath) == -1) {
+		err = got_error_from_errno();
+		goto done;
 	}
 
 	ct->status = status;
@@ -2469,6 +2478,42 @@ report_ct_status(struct commitable *ct,
 }
 
 static const struct got_error *
+match_modified_subtree(int *modified, struct got_tree_entry *te,
+    const char *base_tree_path, struct got_pathlist_head *commitable_paths)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	char *te_path;
+
+	*modified = 0;
+
+	if (asprintf(&te_path, "%s%s%s", base_tree_path,
+	    got_path_is_root_dir(base_tree_path) ? "" : "/",
+	    te->name) == -1)
+		return got_error_from_errno();
+
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct commitable *ct = pe->data;
+		char *ct_path;
+
+		if (asprintf(&ct_path, "%s%s%s", base_tree_path,
+		    got_path_is_root_dir(base_tree_path) ? "" : "/",
+		    te->name) == -1) {
+			err = got_error_from_errno();
+			break;
+		}
+
+		*modified = got_path_is_child(ct->in_repo_path, te_path,
+		    strlen(te_path));
+		 if (*modified)
+			break;
+	}
+
+	free(te_path);
+	return err;
+}
+
+static const struct got_error *
 match_deleted_or_modified_ct(struct commitable **ctp,
     struct got_tree_entry *te, const char *base_tree_path,
     struct got_pathlist_head *commitable_paths)
@@ -2601,15 +2646,23 @@ write_tree(struct got_object_id **new_tree_id,
 			struct commitable *ct = NULL;
 
 			if (S_ISDIR(te->mode)) {
+				int modified;
 				err = got_object_tree_entry_dup(&new_te, te);
 				if (err)
 					goto done;
-				free(new_te->id);
-				err = write_subtree(&new_te->id, te,
-				    path_base_tree, commitable_paths,
-				    status_cb, status_arg, repo);
+				err = match_modified_subtree(&modified, te,
+				    path_base_tree, commitable_paths);
 				if (err)
 					goto done;
+				/* Avoid recursion into unmodified subtrees. */
+				if (modified) {
+					free(new_te->id);
+					err = write_subtree(&new_te->id, te,
+					    path_base_tree, commitable_paths,
+					    status_cb, status_arg, repo);
+					if (err)
+						goto done;
+				}
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
