@@ -2654,8 +2654,6 @@ write_tree(struct got_object_id **new_tree_id,
 done:
 	got_object_tree_entries_close(&new_tree_entries);
 	got_pathlist_free(&paths);
-	if (base_tree)
-		got_object_tree_close(base_tree);
 	return err;
 }
 
