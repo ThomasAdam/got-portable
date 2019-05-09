@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log add rm diff
+REGRESS_TARGETS=checkout update status log add rm diff commit
 NOOBJ=Yes
 
 checkout:
@@ -21,5 +21,8 @@ rm:
 
 diff:
 	./diff.sh
+
+commit:
+	./commit.sh
 
 .include <bsd.regress.mk>
