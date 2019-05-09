@@ -313,6 +313,27 @@ it will become an unversioned file again.
 If the file was deleted with
 .Cm got rm
 it will be restored.
+.It Cm commit [ Fl m Ar msg ] [ file-path ]
+Create a new commit in the repository from local changes in a work tree.
+This command requires the
+.Ev GOT_AUTHOR
+environment variable to be set.
+.Pp
+The options for
+.Cm got commit
+are as follows:
+.Bl -tag -width Ds
+.It Fl m Ar msg
+Use the specified log message when creating the new commit.
+.El
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width GOT_AUTHOR
+.It Ev GOT_AUTHOR
+The author's name and email address for
+.Cm got commit ,
+for example:
+.An Stefan Sperling Aq Mt stsp@openbsd.org
 .El
 .Sh EXIT STATUS
 .Ex -std got
