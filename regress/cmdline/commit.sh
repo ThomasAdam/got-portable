@@ -28,9 +28,6 @@ function test_commit_basic {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	(cd $testroot/wt && got rm beta >/dev/null)
-	echo "unversioned file" > $testroot/wt/foo
-	rm $testroot/wt/epsilon/zeta
-	touch $testroot/wt/beta
 	echo "new file" > $testroot/wt/new
 	(cd $testroot/wt && got add new >/dev/null)
 
