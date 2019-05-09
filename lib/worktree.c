@@ -2738,8 +2738,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct collect_commitables_arg cc_arg;
 	struct got_pathlist_head commitable_paths;
 	struct got_pathlist_entry *pe;
-	char *relpath = NULL;
+	char *relpath = NULL, *head_ref_str = NULL;
 	struct got_commit_object *base_commit = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	struct got_reference *head_ref2 = NULL;
+	struct got_object_id *head_commit_id2 = NULL;
 	struct got_tree_object *base_tree = NULL;
 	struct got_object_id *new_tree_id = NULL;
 	struct got_object_id_queue parent_ids;
@@ -2758,6 +2761,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		goto done;
+
+	/* XXX should re-read head ref here now that work tree is locked */
+	err = got_ref_resolve(&head_commit_id, repo, worktree->head_ref);
 	if (err)
 		goto done;
 
@@ -2817,14 +2825,33 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = got_worktree_set_base_commit_id(worktree, repo, *new_commit_id);
+	/* Check if a concurrent commit to our branch has occurred. */
+	/* XXX ideally we'd lock the reference file here to avoid a race */
+	head_ref_str = got_ref_to_str(worktree->head_ref);
+	if (head_ref_str == NULL) {
+		err = got_error_from_errno();
+		goto done;
+	}
+	err = got_ref_open(&head_ref2, repo, head_ref_str);
 	if (err)
 		goto done;
-
+	err = got_ref_resolve(&head_commit_id2, repo, head_ref2);
+	if (err)
+		goto done;
+	if (got_object_id_cmp(head_commit_id, head_commit_id2) != 0) {
+		err = got_error(GOT_ERR_COMMIT_HEAD_CHANGED);
+		goto done;
+	}
+	/* Update branch head in repository. */
 	err = got_ref_change_ref(worktree->head_ref, *new_commit_id);
 	if (err)
 		goto done;
 	err = got_ref_write(worktree->head_ref, repo);
+	if (err)
+		goto done;
+	/* XXX race has ended here */
+
+	err = got_worktree_set_base_commit_id(worktree, repo, *new_commit_id);
 	if (err)
 		goto done;
 
@@ -2850,5 +2877,10 @@ done:
 	if (base_commit)
 		got_object_commit_close(base_commit);
 	free(relpath);
+	free(head_commit_id);
+	free(head_commit_id2);
+	free(head_ref_str);
+	if (head_ref2)
+		got_ref_close(head_ref2);
 	return err;
 }
