@@ -2806,6 +2806,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = got_ref_change_ref(worktree->head_ref, *new_commit_id);
+	if (err)
+		goto done;
+	err = got_ref_write(worktree->head_ref, repo);
+	if (err)
+		goto done;
+
 	err = ref_base_commit(worktree, repo);
 	if (err)
 		goto done;
