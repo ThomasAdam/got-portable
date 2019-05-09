@@ -77,6 +77,18 @@ const struct got_error *got_ref_list(struct got_reflist_head *,
 /* Free all references on a ref list. */
 void got_ref_list_free(struct got_reflist_head *);
 
+/* Indicate whether the provided reference is symbolic (points at another
+ * refernce) or not (points at an object ID). */
+int got_ref_is_symbolic(struct got_reference *);
+
+/* Change the object ID a reference points to. */
+const struct got_error *
+got_ref_change_ref(struct got_reference *, struct got_object_id *);
+
+/* Change the reference name a symbolic reference points to. */
+const struct got_error *got_ref_change_symref(struct got_reference *,
+    char *);
+
 /* Write a reference to its on-disk path in the repository. */
 const struct got_error *got_ref_write(struct got_reference *,
     struct got_repository *);

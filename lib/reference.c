@@ -765,6 +765,39 @@ got_ref_list_free(struct got_reflist_head *refs)
 
 }
 
+int
+got_ref_is_symbolic(struct got_reference *ref)
+{
+	return (ref->flags & GOT_REF_IS_SYMBOLIC);
+}
+
+const struct got_error *
+got_ref_change_ref(struct got_reference *ref, struct got_object_id *id)
+{
+	if (ref->flags & GOT_REF_IS_SYMBOLIC)
+		return got_error(GOT_ERR_BAD_REF_TYPE);
+
+	memcpy(ref->ref.ref.sha1, id->sha1, sizeof(ref->ref.ref.sha1));
+	return NULL;
+}
+
+const struct got_error *
+got_ref_change_symref(struct got_reference *ref, char *refname)
+{
+	char *new_name;
+
+	if ((ref->flags & GOT_REF_IS_SYMBOLIC) == 0)
+		return got_error(GOT_ERR_BAD_REF_TYPE);
+
+	new_name = strdup(refname);
+	if (new_name == NULL)
+		return got_error_from_errno();
+
+	free(ref->ref.symref.name);
+	ref->ref.symref.name = new_name;
+	return NULL;
+}
+
 const struct got_error *
 got_ref_write(struct got_reference *ref, struct got_repository *repo)
 {
