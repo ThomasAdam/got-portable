@@ -512,10 +512,10 @@ got_worktree_match_path_prefix(int *match, struct got_worktree *worktree,
 	return NULL;
 }
 
-char *
+const char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {
-	return got_ref_to_str(worktree->head_ref);
+	return got_ref_get_name(worktree->head_ref);
 }
 
 struct got_reference *
@@ -2738,7 +2738,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct collect_commitables_arg cc_arg;
 	struct got_pathlist_head commitable_paths;
 	struct got_pathlist_entry *pe;
-	char *relpath = NULL, *head_ref_str = NULL;
+	char *relpath = NULL;
+	const char *head_ref_name = NULL;
 	struct got_commit_object *base_commit = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_reference *head_ref2 = NULL;
@@ -2827,12 +2828,12 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	/* Check if a concurrent commit to our branch has occurred. */
 	/* XXX ideally we'd lock the reference file here to avoid a race */
-	head_ref_str = got_ref_to_str(worktree->head_ref);
-	if (head_ref_str == NULL) {
+	head_ref_name = got_worktree_get_head_ref_name(worktree);
+	if (head_ref_name == NULL) {
 		err = got_error_from_errno();
 		goto done;
 	}
-	err = got_ref_open(&head_ref2, repo, head_ref_str);
+	err = got_ref_open(&head_ref2, repo, head_ref_name);
 	if (err)
 		goto done;
 	err = got_ref_resolve(&head_commit_id2, repo, head_ref2);
@@ -2879,7 +2880,6 @@ done:
 	free(relpath);
 	free(head_commit_id);
 	free(head_commit_id2);
-	free(head_ref_str);
 	if (head_ref2)
 		got_ref_close(head_ref2);
 	return err;
