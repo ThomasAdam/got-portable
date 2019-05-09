@@ -1369,6 +1369,43 @@ done:
 	return err;
 }
 
+static const struct got_error *
+open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
+   struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+	FILE *index = NULL;
+
+	*fileindex_path = NULL;
+	*fileindex = got_fileindex_alloc();
+	if (*fileindex == NULL)
+		return got_error_from_errno();
+
+	if (asprintf(fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno();
+		*fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(*fileindex_path, "rb");
+	if (index == NULL) {
+		if (errno != ENOENT)
+			err = got_error_from_errno();
+	} else {
+		err = got_fileindex_read(*fileindex, index);
+		if (fclose(index) != 0 && err == NULL)
+			err = got_error_from_errno();
+	}
+done:
+	if (err) {
+		free(*fileindex_path);
+		*fileindex_path = NULL;
+		free(*fileindex);
+		*fileindex = NULL;
+	}
+	return err;
+}
 
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
@@ -1381,7 +1418,7 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	struct got_tree_object *tree = NULL;
 	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *index = NULL, *new_index = NULL;
+	FILE *new_index = NULL;
 	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
 	char *relpath = NULL, *entry_name = NULL;
@@ -1390,36 +1427,14 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	if (err)
 		return err;
 
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno();
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
-		fileindex_path = NULL;
-		goto done;
-	}
-
 	/*
 	 * Read the file index.
 	 * Checking out files is supposed to be an idempotent operation.
 	 * If the on-disk file index is incomplete we will try to complete it.
 	 */
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno();
-			goto done;
-		}
-	} else {
-		err = got_fileindex_read(fileindex, index);
-		fclose(index);
-		if (err)
-			goto done;
-	}
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
@@ -2621,6 +2636,82 @@ done:
 	return err;
 }
 
+static const struct got_error *
+update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
+    struct got_object_id *new_base_commit_id, struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+	char *fileindex_path = NULL, *new_fileindex_path = NULL;
+	struct got_fileindex *fileindex = NULL;
+	FILE *new_index = NULL;
+	struct got_pathlist_entry *pe;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		return err;
+
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct got_fileindex_entry *ie;
+		struct commitable *ct = pe->data;
+		char *ondisk_path;
+
+		if (asprintf(&ondisk_path, "%s/%s",
+		    worktree->root_path, pe->path) == -1) {
+			err = got_error_from_errno();
+			goto done;
+		}
+
+		ie = got_fileindex_entry_get(fileindex, pe->path);
+		if (ie) {
+			if (ct->status == GOT_STATUS_DELETE) {
+				got_fileindex_entry_remove(fileindex, ie);
+				got_fileindex_entry_free(ie);
+			} else
+				err = got_fileindex_entry_update(ie,
+				    ondisk_path, ct->id->sha1,
+				    new_base_commit_id->sha1, 1);
+		} else {
+			err = got_fileindex_entry_alloc(&ie,
+			    ondisk_path, pe->path, ct->id->sha1,
+			    new_base_commit_id->sha1);
+			if (err)
+				goto done;
+			err = got_fileindex_entry_add(fileindex, ie);
+			if (err)
+				goto done;
+		}
+		free(ondisk_path);
+	}
+
+	err = got_fileindex_write(fileindex, new_index);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno();
+		unlink(new_fileindex_path);
+		goto done;
+	}
+
+	free(new_fileindex_path);
+	new_fileindex_path = NULL;
+
+done:
+	if (new_fileindex_path)
+		unlink(new_fileindex_path);
+	if (new_index)
+		fclose(new_index);
+	free(new_fileindex_path);
+	free(fileindex_path);
+	got_fileindex_free(fileindex);
+	return err;
+}
+
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, const char *ondisk_path,
@@ -2711,8 +2802,18 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* TODO: bump base-commit; rewrite fileindex */
+	err = got_worktree_set_base_commit_id(worktree, repo, *new_commit_id);
+	if (err)
+		goto done;
 
+	err = ref_base_commit(worktree, repo);
+	if (err)
+		goto done;
+
+	err = update_fileindex_after_commit(&commitable_paths,
+	    *new_commit_id, worktree);
+	if (err)
+		goto done;
 done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
