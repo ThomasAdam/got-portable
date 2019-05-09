@@ -50,4 +50,37 @@ function test_commit_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_new_subdir {
+	local testroot=`test_init commit_new_subdir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/d
+	echo "new file" > $testroot/wt/d/new
+	echo "another new file" > $testroot/wt/d/new2
+	(cd $testroot/wt && got add d/new >/dev/null)
+	(cd $testroot/wt && got add d/new2 >/dev/null)
+
+	(cd $testroot/wt && \
+		got commit -m 'test commit_new_subdir' > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  d/new" > $testroot/stdout.expected
+	echo "A  d/new2" >> $testroot/stdout.expected
+	echo "created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
+run_test test_commit_new_subdir

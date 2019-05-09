@@ -2205,7 +2205,6 @@ struct commitable {
 	unsigned char status;
 	struct got_object_id *id;
 	struct got_object_id *base_id;
-	struct got_object_id *tree_id;
 };
 
 static void
@@ -2214,7 +2213,6 @@ free_commitable(struct commitable *ct)
 	free(ct->path);
 	free(ct->id);
 	free(ct->base_id);
-	free(ct->tree_id);
 	free(ct);
 }
 
@@ -2270,10 +2268,6 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 			goto done;
 		}
 	}
-	err = got_object_id_by_path(&ct->tree_id, a->repo,
-	    a->worktree->base_commit_id, parent_path);
-	if (err)
-		goto done;
 	ct->path = strdup(path);
 	if (ct->path == NULL) {
 		err = got_error_from_errno();
@@ -2305,7 +2299,7 @@ write_subtree(struct got_object_id **new_subtree_id,
 	char *subpath;
 
 	if (asprintf(&subpath, "%s%s%s", parent_path,
-	    parent_path[0] == '\0' ? "" : "/", te->name) == -1)
+	    got_path_is_root_dir(parent_path) ? "" : "/", te->name) == -1)
 		return got_error_from_errno();
 
 	err = got_object_open_as_tree(&subtree, repo, te->id);
@@ -2523,6 +2517,8 @@ write_tree(struct got_object_id **new_tree_id,
 				goto done;
 		} else {
 			char *subtree_path;
+			struct got_pathlist_entry *pe2;
+			int visited = 0;
 
 			*slash = '\0'; /* trim trailing path components */
 
@@ -2534,18 +2530,27 @@ write_tree(struct got_object_id **new_tree_id,
 				err = got_error_from_errno();
 				goto done;
 			}
-			if (asprintf(&subtree_path, "%s/%s", path_base_tree,
+			if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
+			    got_path_is_root_dir(path_base_tree) ? "" : "/",
 			    child_path) == -1) {
 				err = got_error_from_errno();
 				goto done;
 			}
-			err = write_subtree(&new_te->id, NULL, subtree_path,
+			TAILQ_FOREACH(pe2, &paths, entry) {
+				if (got_path_cmp(subtree_path, pe2->path) != 0)
+					continue;
+				visited = 1;
+				break;
+			}
+			if (visited)
+				continue;
+
+			err = write_tree(&new_te->id, NULL, subtree_path,
 			    commitable_paths, status_cb, status_arg, repo);
 			free(subtree_path);
 			if (err)
 				goto done;
 		}
-
 		err = insert_tree_entry(new_te, &paths);
 		if (err)
 			goto done;
