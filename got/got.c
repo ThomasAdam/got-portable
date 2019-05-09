@@ -2088,6 +2088,7 @@ cmd_commit(int argc, char *argv[])
 	char *cwd = NULL, *path = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = "<no log message was specified>";
+	const char *got_author = getenv("GOT_AUTHOR");
 	int ch;
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
@@ -2113,6 +2114,11 @@ cmd_commit(int argc, char *argv[])
 	} else if (argc != 0)
 		usage_commit();
 
+	if (got_author == NULL) {
+		/* TODO: Look current user up in password database */
+		error = got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+		goto done;
+	}
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -2132,9 +2138,8 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_commit(&id, worktree, path,
-	    "Stefan Sperling <stsp@stsp.name>", NULL, logmsg,
-	    print_status, NULL, repo);
+	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
+	    logmsg, print_status, NULL, repo);
 	if (error)
 		goto done;
 

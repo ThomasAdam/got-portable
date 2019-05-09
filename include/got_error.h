@@ -84,6 +84,7 @@
 #define GOT_ERR_FILE_STATUS	68
 #define GOT_ERR_COMMIT_CONFLICT	69
 #define GOT_ERR_BAD_REF_TYPE	70
+#define GOT_ERR_COMMIT_NO_AUTHOR 71
 
 static const struct got_error {
 	int code;
@@ -159,6 +160,7 @@ static const struct got_error {
 	{ GOT_ERR_FILE_STATUS,	"file has unexpected status" },
 	{ GOT_ERR_COMMIT_CONFLICT,"cannot commit file in conflicted status" },
 	{ GOT_ERR_BAD_REF_TYPE,	"bad reference type" },
+	{ GOT_ERR_COMMIT_NO_AUTHOR,"GOT_AUTHOR environment variable is not set" },
 };
 
 /*
