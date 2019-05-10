@@ -2833,7 +2833,29 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* TODO: out-of-dateness check */
+	/* Out-of-dateness check against branch head. */
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+		struct commitable *ct = pe->data;
+		struct got_object_id *id_in_head;
+
+		err = got_object_id_by_path(&id_in_head, repo,
+		    head_commit_id, ct->in_repo_path);
+		if (err) {
+			if (err->code == GOT_ERR_NO_TREE_ENTRY &&
+			    ct->status == GOT_STATUS_ADD) {
+				err = NULL;
+				id_in_head = NULL;
+			} else
+				goto done;
+		}
+		if (id_in_head &&
+		    got_object_id_cmp(id_in_head, ct->base_id) != 0) {
+			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+			free(id_in_head);
+			goto done;
+		}
+		free(id_in_head);
+	}
 
 	err = got_object_open_as_tree(&head_tree, repo, head_commit->tree_id);
 	if (err)

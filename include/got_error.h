@@ -86,6 +86,7 @@
 #define GOT_ERR_BAD_REF_TYPE	70
 #define GOT_ERR_COMMIT_NO_AUTHOR 71
 #define GOT_ERR_COMMIT_HEAD_CHANGED 72
+#define GOT_ERR_COMMIT_OUT_OF_DATE 73
 
 static const struct got_error {
 	int code;
@@ -164,6 +165,8 @@ static const struct got_error {
 	{ GOT_ERR_COMMIT_NO_AUTHOR,"GOT_AUTHOR environment variable is not set" },
 	{ GOT_ERR_COMMIT_HEAD_CHANGED, "branch head in repository has changed "
 	    "while commit was in progress" },
+	{ GOT_ERR_COMMIT_OUT_OF_DATE, "work tree must be updated before these "
+	    "changes can be committed" },
 };
 
 /*

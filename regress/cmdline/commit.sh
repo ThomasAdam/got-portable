@@ -138,7 +138,47 @@ function test_commit_single_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_out_of_date {
+	local testroot=`test_init commit_out_of_date`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -m 'test commit_out_of_date' \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo -n > $testroot/stdout.expected
+	echo "got: work tree must be updated before these" \
+		"changes can be committed" > $testroot/stderr.expected
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
 run_test test_commit_single_file
+run_test test_commit_out_of_date
