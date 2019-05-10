@@ -2778,6 +2778,31 @@ done:
 	return err;
 }
 
+static const struct got_error *
+check_ct_out_of_date(struct commitable *ct, struct got_repository *repo,
+	struct got_object_id *head_commit_id)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id_in_head;
+
+	err = got_object_id_by_path(&id_in_head, repo,
+	    head_commit_id, ct->in_repo_path);
+	if (err) {
+		if (err->code != GOT_ERR_NO_TREE_ENTRY)
+			return err;
+		if (ct->status != GOT_STATUS_ADD)
+			return got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+		err = NULL;
+		id_in_head = NULL;
+	}
+
+	if (id_in_head && got_object_id_cmp(id_in_head, ct->base_id) != 0)
+		err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+
+	free(id_in_head);
+	return err;
+}
+
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, const char *ondisk_path,
@@ -2833,33 +2858,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* Out-of-dateness check against branch head. */
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct commitable *ct = pe->data;
-		struct got_object_id *id_in_head;
-
-		err = got_object_id_by_path(&id_in_head, repo,
-		    head_commit_id, ct->in_repo_path);
-		if (err) {
-			if (err->code == GOT_ERR_NO_TREE_ENTRY) {
-				if (ct->status == GOT_STATUS_ADD) {
-					err = NULL;
-					id_in_head = NULL;
-				} else {
-					err = got_error(
-					    GOT_ERR_COMMIT_OUT_OF_DATE);
-					goto done;
-				}
-			} else
-				goto done;
-		}
-		if (id_in_head &&
-		    got_object_id_cmp(id_in_head, ct->base_id) != 0) {
-			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
-			free(id_in_head);
+		err = check_ct_out_of_date(ct, repo, head_commit_id);
+		if (err)
 			goto done;
-		}
-		free(id_in_head);
 	}
 
 	err = got_object_open_as_tree(&head_tree, repo, head_commit->tree_id);
