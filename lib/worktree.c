@@ -2791,11 +2791,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 	const char *head_ref_name = NULL;
-	struct got_commit_object *base_commit = NULL;
+	struct got_commit_object *head_commit = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_reference *head_ref2 = NULL;
 	struct got_object_id *head_commit_id2 = NULL;
-	struct got_tree_object *base_tree = NULL;
+	struct got_tree_object *head_tree = NULL;
 	struct got_object_id *new_tree_id = NULL;
 	struct got_object_id_queue parent_ids;
 	struct got_object_qid *pid = NULL;
@@ -2829,7 +2829,15 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = got_object_open_as_commit(&head_commit, repo, head_commit_id);
+	if (err)
+		goto done;
+
 	/* TODO: out-of-dateness check */
+
+	err = got_object_open_as_tree(&head_tree, repo, head_commit->tree_id);
+	if (err)
+		goto done;
 
 	/* TODO: collect commit message if not specified */
 
@@ -2853,16 +2861,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
-	err = got_object_open_as_commit(&base_commit, repo,
-	    worktree->base_commit_id);
-	if (err)
-		goto done;
-	err = got_object_open_as_tree(&base_tree, repo, base_commit->tree_id);
-	if (err)
-		goto done;
-
 	/* Recursively write new tree objects. */
-	err = write_tree(&new_tree_id, base_tree, "/", &commitable_paths,
+	err = write_tree(&new_tree_id, head_tree, "/", &commitable_paths,
 	    status_cb, status_arg, repo);
 	if (err)
 		goto done;
@@ -2924,10 +2924,10 @@ done:
 		free_commitable(ct);
 	}
 	got_pathlist_free(&commitable_paths);
-	if (base_tree)
-		got_object_tree_close(base_tree);
-	if (base_commit)
-		got_object_commit_close(base_commit);
+	if (head_tree)
+		got_object_tree_close(head_tree);
+	if (head_commit)
+		got_object_commit_close(head_commit);
 	free(relpath);
 	free(head_commit_id);
 	free(head_commit_id2);
