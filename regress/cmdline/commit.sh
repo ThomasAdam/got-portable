@@ -31,8 +31,7 @@ function test_commit_basic {
 	echo "new file" > $testroot/wt/new
 	(cd $testroot/wt && got add new >/dev/null)
 
-	(cd $testroot/wt && got commit -m 'test commit_basic')
-	#(cd $testroot/wt && egdb --args got commit -m 'test commit_basic')
+	(cd $testroot/wt && got commit -m 'test commit_basic' > $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "A  new" > $testroot/stdout.expected
@@ -176,7 +175,7 @@ function test_commit_out_of_date {
 }
 
 run_test test_commit_basic
-#run_test test_commit_new_subdir
-#run_test test_commit_subdir
-#run_test test_commit_single_file
-#run_test test_commit_out_of_date
+run_test test_commit_new_subdir
+run_test test_commit_subdir
+run_test test_commit_single_file
+run_test test_commit_out_of_date

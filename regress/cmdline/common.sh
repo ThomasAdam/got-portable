@@ -17,8 +17,6 @@
 name=$(getent passwd $USER | cut -d: -f5)
 export GOT_AUTHOR="$name <$(whoami)@$(hostname)>"
 
-export MALLOC_OPTIONS=S
-
 function git_init
 {
 	git init -q "$@"
