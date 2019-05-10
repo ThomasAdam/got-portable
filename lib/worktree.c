@@ -330,7 +330,6 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	char *uuidstr = NULL;
 	char *path_lock = NULL;
 	char *base_commit_id_str = NULL;
-	char *head_ref_str = NULL;
 	int version, fd = -1;
 	const char *errstr;
 	struct got_repository *repo = NULL;
@@ -416,17 +415,13 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	if (err)
 		goto done;
 
-	err = read_meta_file(&head_ref_str, path_got, GOT_WORKTREE_HEAD_REF);
-	if (err)
-		goto done;
-
-	err = got_ref_open(&(*worktree)->head_ref, repo, head_ref_str);
+	err = read_meta_file(&(*worktree)->head_ref_name, path_got,
+	    GOT_WORKTREE_HEAD_REF);
 done:
 	if (repo)
 		got_repo_close(repo);
 	free(path_got);
 	free(path_lock);
-	free(head_ref_str);
 	free(base_commit_id_str);
 	free(uuidstr);
 	free(formatstr);
@@ -469,8 +464,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit_id);
-	if (worktree->head_ref)
-		got_ref_close(worktree->head_ref);
+	free(worktree->head_ref_name);
 	if (worktree->lockfd != -1)
 		if (close(worktree->lockfd) != 0)
 			err = got_error_from_errno();
@@ -515,13 +509,7 @@ got_worktree_match_path_prefix(int *match, struct got_worktree *worktree,
 const char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {
-	return got_ref_get_name(worktree->head_ref);
-}
-
-struct got_reference *
-got_worktree_get_head_ref(struct got_worktree *worktree)
-{
-	return got_ref_dup(worktree->head_ref);
+	return worktree->head_ref_name;
 }
 
 struct got_object_id *
@@ -2824,6 +2812,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_pathlist_entry *pe;
 	char *relpath = NULL;
 	const char *head_ref_name = NULL;
+	struct got_reference *head_ref = NULL;
 	struct got_commit_object *head_commit = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_reference *head_ref2 = NULL;
@@ -2849,8 +2838,10 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* XXX should re-read head ref here now that work tree is locked */
-	err = got_ref_resolve(&head_commit_id, repo, worktree->head_ref);
+	err = got_ref_open(&head_ref, repo, worktree->head_ref_name);
+	if (err)
+		goto done;
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
 	if (err)
 		goto done;
 
@@ -2933,10 +2924,10 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 	}
 	/* Update branch head in repository. */
-	err = got_ref_change_ref(worktree->head_ref, *new_commit_id);
+	err = got_ref_change_ref(head_ref, *new_commit_id);
 	if (err)
 		goto done;
-	err = got_ref_write(worktree->head_ref, repo);
+	err = got_ref_write(head_ref, repo);
 	if (err)
 		goto done;
 	/* XXX race has ended here */
@@ -2969,6 +2960,8 @@ done:
 	free(relpath);
 	free(head_commit_id);
 	free(head_commit_id2);
+	if (head_ref)
+		got_ref_close(head_ref);
 	if (head_ref2)
 		got_ref_close(head_ref2);
 	return err;

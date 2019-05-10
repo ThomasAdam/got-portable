@@ -252,9 +252,10 @@ check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
 	struct got_object_id *head_commit_id = NULL;
 	struct got_commit_graph *graph = NULL;
 
-	head_ref = got_worktree_get_head_ref(worktree);
-	if (head_ref == NULL)
-		return got_error_from_errno();
+	err = got_ref_open(&head_ref, repo,
+	    got_worktree_get_head_ref_name(worktree));
+	if (err)
+		return err;
 
 	/* TODO: Check the reflog. The head ref may have been rebased. */
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
