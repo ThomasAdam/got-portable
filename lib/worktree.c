@@ -2592,15 +2592,6 @@ write_tree(struct got_object_id **new_tree_id,
 			int visited = 0;
 
 			*slash = '\0'; /* trim trailing path components */
-
-			new_te = calloc(1, sizeof(*new_te));
-			new_te->mode = S_IFDIR;
-			new_te->name = strdup(child_path);
-			if (new_te->name == NULL) {
-				got_object_tree_entry_close(new_te);
-				err = got_error_from_errno();
-				goto done;
-			}
 			if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
 			    got_path_is_root_dir(path_base_tree) ? "" : "/",
 			    child_path) == -1) {
@@ -2616,11 +2607,23 @@ write_tree(struct got_object_id **new_tree_id,
 			if (visited)
 				continue;
 
+			new_te = calloc(1, sizeof(*new_te));
+			new_te->mode = S_IFDIR;
+			new_te->name = strdup(child_path);
+			if (new_te->name == NULL) {
+				err = got_error_from_errno();
+				got_object_tree_entry_close(new_te);
+				new_te = NULL;
+				goto done;
+			}
 			err = write_tree(&new_te->id, NULL, subtree_path,
 			    commitable_paths, status_cb, status_arg, repo);
 			free(subtree_path);
-			if (err)
+			if (err) {
+				got_object_tree_entry_close(new_te);
+				new_te = NULL;
 				goto done;
+			}
 		}
 		err = insert_tree_entry(new_te, &paths);
 		if (err)
