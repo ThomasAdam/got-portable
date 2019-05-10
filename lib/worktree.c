@@ -2220,7 +2220,7 @@ struct commitable {
 	char *in_repo_path;
 	char *ondisk_path;
 	unsigned char status;
-	struct got_object_id *id;
+	struct got_object_id *blob_id;
 	struct got_object_id *base_id;
 	mode_t mode;
 };
@@ -2231,7 +2231,7 @@ free_commitable(struct commitable *ct)
 	free(ct->path);
 	free(ct->in_repo_path);
 	free(ct->ondisk_path);
-	free(ct->id);
+	free(ct->blob_id);
 	free(ct->base_id);
 	free(ct);
 }
@@ -2303,7 +2303,7 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	}
 
 	ct->status = status;
-	ct->id = NULL; /* will be filled in when blob gets created */
+	ct->blob_id = NULL; /* will be filled in when blob gets created */
 	if (ct->status != GOT_STATUS_ADD) {
 		ct->base_id = got_object_id_dup(id);
 		if (ct->base_id == NULL) {
@@ -2400,7 +2400,7 @@ alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
 	(*new_te)->mode = get_ct_file_mode(ct);
 
 	free((*new_te)->id);
-	(*new_te)->id = got_object_id_dup(ct->id);
+	(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -2439,7 +2439,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 
 	(*new_te)->mode = get_ct_file_mode(ct);
 
-	(*new_te)->id = got_object_id_dup(ct->id);
+	(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
 		err = got_error_from_errno();
 		goto done;
@@ -2474,7 +2474,7 @@ report_ct_status(struct commitable *ct,
 	const char *ct_path = ct->path;
 	while (ct_path[0] == '/')
 		ct_path++;
-	return (*status_cb)(status_arg, ct->status, ct_path, ct->id);
+	return (*status_cb)(status_arg, ct->status, ct_path, ct->blob_id);
 }
 
 static const struct got_error *
@@ -2740,11 +2740,11 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				got_fileindex_entry_free(ie);
 			} else
 				err = got_fileindex_entry_update(ie,
-				    ct->ondisk_path, ct->id->sha1,
+				    ct->ondisk_path, ct->blob_id->sha1,
 				    new_base_commit_id->sha1, 1);
 		} else {
 			err = got_fileindex_entry_alloc(&ie,
-			    ct->ondisk_path, pe->path, ct->id->sha1,
+			    ct->ondisk_path, pe->path, ct->blob_id->sha1,
 			    new_base_commit_id->sha1);
 			if (err)
 				goto done;
@@ -2855,7 +2855,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			err = got_error_from_errno();
 			goto done;
 		}
-		err = got_object_blob_create(&ct->id, ondisk_path, repo);
+		err = got_object_blob_create(&ct->blob_id, ondisk_path, repo);
 		free(ondisk_path);
 		if (err)
 			goto done;
