@@ -314,7 +314,7 @@ cmd_checkout(int argc, char *argv[])
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
 	char *commit_id_str = NULL;
-	int ch, same_path_prefix;
+	int ch, same_path_prefix, x;
 
 	while ((ch = getopt(argc, argv, "c:p:")) != -1) {
 		switch (ch) {
@@ -380,6 +380,9 @@ cmd_checkout(int argc, char *argv[])
 		}
 	} else
 		usage_checkout();
+
+	if (worktree_path[x = strlen(worktree_path) - 1] == '/')
+		worktree_path[x] = '\0';
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)
