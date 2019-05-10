@@ -2353,15 +2353,13 @@ match_ct_parent_path(int *match, struct commitable *ct, const char *path)
 	*match = 0;
 
 	if (strchr(ct->path, '/') == NULL) {
-		ct_parent_path = strdup("/");
-		if (ct_parent_path == NULL)
-			return got_error_from_errno();
-	} else {
-		err = got_path_dirname(&ct_parent_path, ct->path);
-		if (err)
-			return err;
+		*match = got_path_is_root_dir(path);
+		return NULL;
 	}
 
+	err = got_path_dirname(&ct_parent_path, ct->path);
+	if (err)
+		return err;
 	*match = (strcmp(path, ct_parent_path) == 0);
 	free(ct_parent_path);
 	return err;
