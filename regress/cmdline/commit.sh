@@ -16,9 +16,6 @@
 
 . ./common.sh
 
-name=$(getent passwd $USER | cut -d: -f5)
-export GOT_AUTHOR="$name <$(whoami)@$(hostname)>"
-
 function test_commit_basic {
 	local testroot=`test_init commit_basic`
 

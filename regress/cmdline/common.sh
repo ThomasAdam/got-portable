@@ -14,6 +14,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+name=$(getent passwd $USER | cut -d: -f5)
+export GOT_AUTHOR="$name <$(whoami)@$(hostname)>"
+
 function git_init
 {
 	git init -q "$@"
