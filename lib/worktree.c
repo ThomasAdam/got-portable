@@ -2482,15 +2482,6 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct commitable *ct = pe->data;
-		char *ct_path;
-
-		if (asprintf(&ct_path, "%s%s%s", base_tree_path,
-		    got_path_is_root_dir(base_tree_path) ? "" : "/",
-		    te->name) == -1) {
-			err = got_error_from_errno();
-			break;
-		}
-
 		*modified = got_path_is_child(ct->in_repo_path, te_path,
 		    strlen(te_path));
 		 if (*modified)
