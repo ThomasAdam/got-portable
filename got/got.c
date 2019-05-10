@@ -119,7 +119,7 @@ static struct cmd got_commands[] = {
 	{ "revert",	cmd_revert,	usage_revert,
 	    "revert uncommitted changes" },
 	{ "commit",	cmd_commit,	usage_commit,
-	    "create blob from file (WIP; can't create commits yet)" },
+	    "write changes from work tree to repository" },
 };
 
 int
