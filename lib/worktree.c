@@ -2841,10 +2841,15 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		err = got_object_id_by_path(&id_in_head, repo,
 		    head_commit_id, ct->in_repo_path);
 		if (err) {
-			if (err->code == GOT_ERR_NO_TREE_ENTRY &&
-			    ct->status == GOT_STATUS_ADD) {
-				err = NULL;
-				id_in_head = NULL;
+			if (err->code == GOT_ERR_NO_TREE_ENTRY) {
+				if (ct->status == GOT_STATUS_ADD) {
+					err = NULL;
+					id_in_head = NULL;
+				} else {
+					err = got_error(
+					    GOT_ERR_COMMIT_OUT_OF_DATE);
+					goto done;
+				}
 			} else
 				goto done;
 		}
