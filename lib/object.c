@@ -1553,17 +1553,19 @@ got_object_tree_entry_dup(struct got_tree_entry **new_te,
 	(*new_te)->name = strdup(te->name);
 	if ((*new_te)->name == NULL) {
 		err = got_error_from_errno();
-		got_object_tree_entry_close(*new_te);
-		return err;
+		goto done;
 	}
 
 	(*new_te)->id = got_object_id_dup(te->id);
 	if ((*new_te)->id == NULL) {
 		err = got_error_from_errno();
-		got_object_tree_entry_close(*new_te);
-		return err;
+		goto done;
 	}
-
-	return NULL;
+done:
+	if (err) {
+		got_object_tree_entry_close(*new_te);
+		*new_te = NULL;
+	}
+	return err;
 }
 
