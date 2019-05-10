@@ -2785,6 +2785,14 @@ check_ct_out_of_date(struct commitable *ct, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_object_id *id_in_head;
 
+	/*
+	 * XXX This should probably be checking each commit from
+	 * worktree's base_commit -> head and verify that the
+	 * same blob exists in each of these commits.
+	 * Removals+additions within this line of history could mean
+	 * that renames have occured in which case we should really
+	 * be forcing the user to run an update...
+	 */
 	err = got_object_id_by_path(&id_in_head, repo,
 	    head_commit_id, ct->in_repo_path);
 	if (err) {
