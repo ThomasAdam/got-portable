@@ -2595,8 +2595,10 @@ write_tree(struct got_object_id **new_tree_id,
 				visited = 1;
 				break;
 			}
-			if (visited)
+			if (visited) {
+				free(subtree_path);
 				continue;
+			}
 
 			new_te = calloc(1, sizeof(*new_te));
 			new_te->mode = S_IFDIR;
