@@ -496,6 +496,8 @@ got_pack_stop_privsep_child(struct got_pack *pack)
 	if (err)
 		return err;
 	err = got_privsep_wait_for_child(pack->privsep_child->pid);
+	if (close(pack->privsep_child->imsg_fd) != 0 && err == NULL)
+		err = got_error_from_errno();
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;
 	return err;
