@@ -1886,7 +1886,7 @@ done:
 __dead static void
 usage_add(void)
 {
-	fprintf(stderr, "usage: %s add [ file-path ... ]\n", getprogname());
+	fprintf(stderr, "usage: %s add file-path ...\n", getprogname());
 	exit(1);
 }
 
