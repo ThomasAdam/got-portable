@@ -535,11 +535,11 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	/* Allow threads to make progress while we are waiting for input. */
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode);
+		return got_error_set_errno(errcode, "pthread_mutex_unlock");
 	ch = wgetch(view->window);
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode);
+		return got_error_set_errno(errcode, "pthread_mutex_lock");
 	nodelay(stdscr, TRUE);
 
 	if (tog_sigwinch_received) {
@@ -655,7 +655,7 @@ view_loop(struct tog_view *view)
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode);
+		return got_error_set_errno(errcode, "pthread_mutex_lock");
 
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
@@ -774,7 +774,7 @@ done:
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode);
+		return got_error_set_errno(errcode, "pthread_mutex_unlock");
 
 	return err;
 }
@@ -1096,7 +1096,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode) {
-			err = got_error_set_errno(errcode);
+			err = got_error_set_errno(errcode, "pthread_mutex_lock");
 			break;
 		}
 
@@ -1107,7 +1107,8 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode && err == NULL)
-			err = got_error_set_errno(errcode);
+			err = got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
 	}
 
 	return err;
@@ -1306,14 +1307,17 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
 		/* Wake the log thread. */
 		errcode = pthread_cond_signal(need_commits);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_cond_signal");
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
 		pthread_yield();
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
 
 		if (*commits_needed > 0 && (!load_all || --max_wait <= 0)) {
 			/*
@@ -1448,7 +1452,8 @@ log_thread(void *arg)
 
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode) {
-			err = got_error_set_errno(errcode);
+			err = got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
 			break;
 		} else if (*a->quit)
 			done = 1;
@@ -1464,12 +1469,14 @@ log_thread(void *arg)
 			errcode = pthread_cond_wait(&a->need_commits,
 			    &tog_mutex);
 			if (errcode)
-				err = got_error_set_errno(errcode);
+				err = got_error_set_errno(errcode,
+				    "pthread_cond_wait");
 		}
 
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode && err == NULL)
-			err = got_error_set_errno(errcode);
+			err = got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
 	}
 	a->log_complete = 1;
 	return (void *)err;
@@ -1485,22 +1492,25 @@ stop_log_thread(struct tog_log_view_state *s)
 		s->quit = 1;
 		errcode = pthread_cond_signal(&s->thread_args.need_commits);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_cond_signal");
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
 		errcode = pthread_join(s->thread, (void **)&err);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode, "pthread_join");
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
 		s->thread = NULL;
 	}
 
 	errcode = pthread_cond_destroy(&s->thread_args.need_commits);
 	if (errcode && err == NULL)
-		err = got_error_set_errno(errcode);
+		err = got_error_set_errno(errcode, "pthread_cond_destroy");
 
 	if (s->thread_args.repo) {
 		got_repo_close(s->thread_args.repo);
@@ -1571,7 +1581,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 
 	errcode = pthread_cond_init(&s->thread_args.need_commits, NULL);
 	if (errcode) {
-		err = got_error_set_errno(errcode);
+		err = got_error_set_errno(errcode, "pthread_cond_init");
 		goto done;
 	}
 
@@ -1601,7 +1611,7 @@ show_log_view(struct tog_view *view)
 		int errcode = pthread_create(&s->thread, NULL, log_thread,
 		    &s->thread_args);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode, "pthread_create");
 	}
 
 	return draw_commits(view, &s->last_displayed_entry,
@@ -2685,7 +2695,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
-		return got_error_set_errno(errcode);
+		return got_error_set_errno(errcode, "pthread_mutex_lock");
 
 	if (*a->quit) {	/* user has quit the blame view */
 		err = got_error(GOT_ERR_ITER_COMPLETED);
@@ -2708,7 +2718,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 done:
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode)
-		err = got_error_set_errno(errcode);
+		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
 	return err;
 }
 
@@ -2725,7 +2735,8 @@ blame_thread(void *arg)
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
-		return (void *)got_error_set_errno(errcode);
+		return (void *)got_error_set_errno(errcode,
+		    "pthread_mutex_lock");
 
 	got_repo_close(ta->repo);
 	ta->repo = NULL;
@@ -2733,7 +2744,7 @@ blame_thread(void *arg)
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
 	if (errcode && err == NULL)
-		err = got_error_set_errno(errcode);
+		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
 
 	return (void *)err;
 }
@@ -2761,13 +2772,15 @@ stop_blame(struct tog_blame *blame)
 		int errcode;
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
 		errcode = pthread_join(blame->thread, (void **)&err);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode, "pthread_join");
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
 		if (err && err->code == GOT_ERR_ITER_COMPLETED)
 			err = NULL;
 		blame->thread = NULL;
@@ -2937,7 +2950,7 @@ show_blame_view(struct tog_view *view)
 		errcode = pthread_create(&s->blame.thread, NULL, blame_thread,
 		    &s->blame.thread_args);
 		if (errcode)
-			return got_error_set_errno(errcode);
+			return got_error_set_errno(errcode, "pthread_create");
 	}
 
 	err = draw_blame(view, s->blamed_commit->id, s->blame.f,

@@ -1861,7 +1861,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 		goto done;
 
 	if (got_fileindex_entry_get(fileindex, relpath) != NULL) {
-		err = got_error_set_errno(EEXIST);
+		err = got_error_set_errno(EEXIST, relpath);
 		goto done;
 	}
 
@@ -1973,7 +1973,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 
 	if (status != GOT_STATUS_NO_CHANGE) {
 		if (status == GOT_STATUS_DELETE) {
-			err = got_error_set_errno(ENOENT);
+			err = got_error_set_errno(ENOENT, ondisk_path);
 			goto done;
 		}
 		if (status != GOT_STATUS_MODIFY) {

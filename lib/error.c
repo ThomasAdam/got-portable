@@ -111,10 +111,10 @@ got_error_prefix_errno3(const char *prefix, const char *prefix2,
 }
 
 const struct got_error *
-got_error_set_errno(int code)
+got_error_set_errno(int code, const char *prefix)
 {
 	errno = code;
-	return got_error_prefix_errno("");
+	return got_error_prefix_errno(prefix);
 }
 
 const struct got_error *
@@ -167,7 +167,7 @@ got_error_uuid(uint32_t uuid_status)
 	case uuid_s_invalid_string_uuid:
 		return got_error(GOT_ERR_UUID_INVALID);
 	case uuid_s_no_memory:
-		return got_error_set_errno(ENOMEM);
+		return got_error_set_errno(ENOMEM, NULL);
 	default:
 		return got_error(GOT_ERR_UUID);
 	}

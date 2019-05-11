@@ -2020,7 +2020,7 @@ cmd_rm(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,

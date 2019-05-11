@@ -97,7 +97,6 @@ function test_double_rm {
 	(cd $testroot/wt && got rm beta > /dev/null)
 
 	for fflag in "" "-f"; do
-		echo "got: No such file or directory" > $testroot/stderr.expected
 		(cd $testroot/wt && got rm $fflag beta 2> $testroot/stderr)
 		ret="$?"
 		if [ "$ret" == "0" ]; then
@@ -105,10 +104,11 @@ function test_double_rm {
 			test_done "$testroot" 1
 		fi
 
-		cmp $testroot/stderr.expected $testroot/stderr
+		grep "No such file or directory" $testroot/stderr > \
+			$testroot/stderr.actual
 		ret="$?"
 		if [ "$ret" != "0" ]; then
-			diff -u $testroot/stderr.expected $testroot/stderr
+			cat $testroot/stderr
 			test_done "$testroot" "$ret"
 		fi
 	done

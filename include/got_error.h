@@ -208,9 +208,10 @@ const struct got_error *got_error_prefix_errno3(const char *, const char *,
 /*
  * Set errno to the specified error code and return a statically
  * allocated error object with code GOT_ERR_ERRNO and an error
- * message obtained from strerror(3).
+ * message obtained from strerror(3), optionally prefixed with a
+ * string.
  */
-const struct got_error *got_error_set_errno(int);
+const struct got_error *got_error_set_errno(int, const char *);
 
 /*
  * If ferror(3) indicates an error status for the FILE, obtain an error
