@@ -47,6 +47,7 @@
 #include "got_utf8.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+#include "got_path.h"
 #include "got_worktree.h"
 
 #ifndef MIN

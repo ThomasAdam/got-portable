@@ -35,12 +35,12 @@
 #include "got_object.h"
 #include "got_reference.h"
 #include "got_repository.h"
+#include "got_path.h"
 #include "got_worktree.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
-#include "got_path.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -1896,8 +1896,12 @@ cmd_add(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *cwd = NULL, *path = NULL, *relpath = NULL;
+	char *cwd = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
 	int ch, x;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -1915,11 +1919,12 @@ cmd_add(int argc, char *argv[])
 
 	/* make sure each file exists before doing anything halfway */
 	for (x = 0; x < argc; x++) {
-		path = realpath(argv[x], NULL);
+		char *path = realpath(argv[x], NULL);
 		if (path == NULL) {
 			error = got_error_prefix_errno2("realpath", argv[x]);
 			goto done;
 		}
+		free(path);
 	}
 
 	cwd = getcwd(NULL, 0);
@@ -1942,30 +1947,29 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	for (x = 0; x < argc; x++) {
-		path = realpath(argv[x], NULL);
+		char *path = realpath(argv[x], NULL);
 		if (path == NULL) {
 			error = got_error_prefix_errno2("realpath", argv[x]);
 			goto done;
 		}
 
 		got_path_strip_trailing_slashes(path);
-
-		error = got_worktree_schedule_add(worktree, path, print_status,
-		    NULL, repo);
-		if (errno == EEXIST) {
-			error = NULL;
-			continue;
-		}
-		else if (error)
+		error = got_pathlist_insert(&pe, &paths, path, NULL);
+		if (error) {
+			free(path);
 			goto done;
+		}
 	}
+	error = got_worktree_schedule_add(worktree, &paths, print_status,
+	    NULL, repo);
 done:
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
-	free(path);
-	free(relpath);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
 	free(cwd);
 	return error;
 }

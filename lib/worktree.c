@@ -38,9 +38,9 @@
 #include "got_repository.h"
 #include "got_reference.h"
 #include "got_object.h"
+#include "got_path.h"
 #include "got_worktree.h"
 #include "got_opentemp.h"
-#include "got_path.h"
 
 #include "got_lib_worktree.h"
 #include "got_lib_sha1.h"
@@ -1818,24 +1818,20 @@ done:
 
 const struct got_error *
 got_worktree_schedule_add(struct got_worktree *worktree,
-    const char *ondisk_path, got_worktree_status_cb status_cb, void *status_arg,
+    struct got_pathlist_head *ondisk_paths,
+    got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
-	struct got_fileindex_entry *ie = NULL;
-	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
+	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	FILE *index = NULL, *new_index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
-	int ie_added = 0;
+	struct got_pathlist_entry *pe;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
-	err = got_path_skip_common_ancestor(&relpath,
-	    got_worktree_get_root_path(worktree), ondisk_path);
-	if (err)
-		goto done;
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
@@ -1860,19 +1856,36 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (got_fileindex_entry_get(fileindex, relpath) != NULL) {
-		err = got_error_set_errno(EEXIST, relpath);
-		goto done;
+	TAILQ_FOREACH(pe, ondisk_paths, entry) {
+		struct got_fileindex_entry *ie = NULL;
+		char *relpath;
+
+		err = got_path_skip_common_ancestor(&relpath,
+		    got_worktree_get_root_path(worktree), pe->path);
+		if (err)
+			goto done;
+
+		/* Re-adding an existing entry is a no-op. */
+		if (got_fileindex_entry_get(fileindex, relpath) != NULL)
+			continue;
+
+		err = got_fileindex_entry_alloc(&ie, pe->path, relpath,
+		    NULL, NULL);
+		free(relpath);
+		if (err)
+			goto done;
+
+		err = got_fileindex_entry_add(fileindex, ie);
+		if (err) {
+			got_fileindex_entry_free(ie);
+			goto done;
+		}
+
+		err = report_file_status(ie, pe->path, status_cb, status_arg,
+		    repo);
+		if (err)
+			goto done;
 	}
-
-	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
-	if (err)
-		goto done;
-
-	err = got_fileindex_entry_add(fileindex, ie);
-	if (err)
-		goto done;
-	ie_added = 1; /* now owned by fileindex; don't free separately */
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
@@ -1892,7 +1905,6 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	free(new_fileindex_path);
 	new_fileindex_path = NULL;
 
-	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
@@ -1904,14 +1916,11 @@ done:
 			    new_fileindex_path);
 		free(new_fileindex_path);
 	}
-	if (ie && !ie_added)
-		got_fileindex_entry_free(ie);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
-	free(relpath);
 	return err;
 }
 
