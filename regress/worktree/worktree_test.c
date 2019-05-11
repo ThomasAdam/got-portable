@@ -37,9 +37,9 @@
 #include "got_worktree.h"
 #include "got_opentemp.h"
 #include "got_privsep.h"
+#include "got_path.h"
 
 #include "got_lib_worktree.h"
-#include "got_lib_path.h"
 
 #define GOT_REPO_PATH "../../../"
 

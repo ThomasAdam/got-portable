@@ -26,9 +26,9 @@
 #include <time.h>
 
 #include "got_error.h"
+#include "got_path.h"
 
 #include "got_lib_lockfile.h"
-#include "got_lib_path.h"
 
 const struct got_error *
 got_lockfile_lock(struct got_lockfile **lf, const char *path)

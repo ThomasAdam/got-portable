@@ -27,8 +27,7 @@
 #include <string.h>
 
 #include "got_error.h"
-
-#include "got_lib_path.h"
+#include "got_path.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))

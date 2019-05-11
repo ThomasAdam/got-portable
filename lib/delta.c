@@ -28,9 +28,9 @@
 #include "got_error.h"
 #include "got_repository.h"
 #include "got_object.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
-#include "got_lib_path.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 

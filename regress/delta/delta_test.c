@@ -24,9 +24,9 @@
 
 #include "got_error.h"
 #include "got_opentemp.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
-#include "got_lib_path.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

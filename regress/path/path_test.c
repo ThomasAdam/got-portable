@@ -24,8 +24,7 @@
 #include <err.h>
 
 #include "got_error.h"
-
-#include "got_lib_path.h"
+#include "got_path.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))

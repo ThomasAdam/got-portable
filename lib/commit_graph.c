@@ -29,12 +29,12 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_commit_graph.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_idset.h"
-#include "got_lib_path.h"
 
 struct got_commit_graph_node {
 	struct got_object_id id;
