@@ -23,6 +23,7 @@
 #include <sha1.h>
 #include <zlib.h>
 #include <uuid.h>
+#include <sys/param.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -73,6 +74,20 @@ got_error_from_errno(void)
 
 	err.code = GOT_ERR_ERRNO;
 	err.msg = strerror(errno);
+	return &err;
+}
+
+const struct got_error *
+got_error_prefix_errno(const char *prefix)
+{
+	static struct got_error err;
+	static char err_msg[MAXPATHLEN + 20];
+
+	snprintf(err_msg, sizeof(err_msg), "%s: %s", prefix,
+	    strerror(errno));
+
+	err.code = GOT_ERR_ERRNO;
+	err.msg = err_msg;
 	return &err;
 }
 

@@ -118,7 +118,7 @@ got_object_get_path(char **path, struct got_object_id *id,
 	*path = NULL;
 
 	if (path_objects == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_repo_get_path_objects");
 
 	err = got_object_id_str(&hex, id);
 	if (err)
@@ -126,7 +126,7 @@ got_object_get_path(char **path, struct got_object_id *id,
 
 	if (asprintf(path, "%s/%.2x/%s", path_objects,
 	    id->sha1[0], hex + 2) == -1)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 
 done:
 	free(hex);
@@ -146,7 +146,7 @@ open_loose_object(int *fd, struct got_object_id *id,
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno(path);
 		goto done;
 	}
 done:
@@ -166,7 +166,7 @@ get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 
 	*path_packfile = malloc(size);
 	if (*path_packfile == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("malloc");
 
 	/* Copy up to and excluding ".idx". */
 	if (strlcpy(*path_packfile, packidx->path_packidx,
@@ -183,19 +183,16 @@ static void
 exec_privsep_child(int imsg_fds[2], const char *path, const char *repo_path)
 {
 	if (close(imsg_fds[0]) != 0) {
-		fprintf(stderr, "%s: %s\n", getprogname(),
-		    strerror(errno));
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
 		_exit(1);
 	}
 
 	if (dup2(imsg_fds[1], GOT_IMSG_FD_CHILD) == -1) {
-		fprintf(stderr, "%s: %s\n", getprogname(),
-		    strerror(errno));
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
 		_exit(1);
 	}
 	if (closefrom(GOT_IMSG_FD_CHILD + 1) == -1) {
-		fprintf(stderr, "%s: %s\n", getprogname(),
-		    strerror(errno));
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
 		_exit(1);
 	}
 
@@ -223,7 +220,7 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 
 	(*obj)->path_packfile = strdup(pack->path_packfile);
 	if ((*obj)->path_packfile == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		return err;
 	}
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
@@ -241,23 +238,23 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	pack->privsep_child = calloc(1, sizeof(*pack->privsep_child));
 	if (pack->privsep_child == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		free(ibuf);
 		return err;
 	}
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("socketpair");
 		goto done;
 	}
 
 	pid = fork();
 	if (pid == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fork");
 		goto done;
 	} else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
@@ -371,14 +368,14 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fork");
 	else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
 		    repo->path);
@@ -428,7 +425,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		if (errno == ENOENT)
 			err = got_error_no_obj(id);
 		else
-			err = got_error_from_errno();
+			err = got_error_prefix_errno(path);
 		goto done;
 	} else {
 		err = read_object_header_privsep(obj, repo, fd);
@@ -471,7 +468,7 @@ got_object_resolve_id_str(struct got_object_id **id,
 	*id = got_object_id_dup(got_object_get_id(obj));
 	got_object_close(obj);
 	if (*id == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_object_id_dup");
 
 	return NULL;
 }
@@ -536,14 +533,14 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fork");
 	else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
 		    repo->path);
@@ -641,11 +638,11 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 
 	*qid = calloc(1, sizeof(**qid));
 	if (*qid == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	(*qid)->id = got_object_id_dup(id);
 	if ((*qid)->id == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_id_dup");
 		got_object_qid_free(*qid);
 		*qid = NULL;
 		return err;
@@ -714,14 +711,14 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fork");
 	else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
 		    repo->path);
@@ -829,14 +826,14 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 
 	basefd = got_opentempfd();
 	if (basefd == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_opentempfd");
 	accumfd = got_opentempfd();
 	if (accumfd == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_opentempfd");
 
 	outfd_child = dup(outfd);
 	if (outfd_child == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("dup");
 
 	err = got_privsep_send_blob_req(pack->privsep_child->ibuf, -1, id, idx);
 	if (err)
@@ -868,7 +865,7 @@ request_packed_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 		return err;
 
 	if (lseek(outfd, SEEK_SET, 0) == -1)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("lseek");
 
 	return err;
 }
@@ -899,7 +896,7 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 
 	outfd_child = dup(outfd);
 	if (outfd_child == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("dup");
 
 	err = got_privsep_send_blob_req(ibuf, infd, NULL, -1);
 	if (err)
@@ -914,7 +911,7 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 		return err;
 
 	if (lseek(outfd, SEEK_SET, 0) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("lseek");
 
 	return err;
 }
@@ -934,14 +931,14 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fork");
 	else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
 		    repo->path);
@@ -974,15 +971,15 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 
 	*blob = calloc(1, sizeof(**blob));
 	if (*blob == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	outfd = got_opentempfd();
 	if (outfd == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_opentempfd");
 
 	(*blob)->read_buf = malloc(blocksize);
 	if ((*blob)->read_buf == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("malloc");
 		goto done;
 	}
 
@@ -1026,14 +1023,14 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		outfd = -1;
 		(*blob)->f = fmemopen(outbuf, size, "rb");
 		if ((*blob)->f == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fmemopen");
 			free(outbuf);
 			goto done;
 		}
 		(*blob)->data = outbuf;
 	} else {
 		if (fstat(outfd, &sb) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fstat");
 			goto done;
 		}
 
@@ -1044,7 +1041,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 
 		(*blob)->f = fdopen(outfd, "rb");
 		if ((*blob)->f == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fdopen");
 			close(outfd);
 			outfd = -1;
 			goto done;
@@ -1161,7 +1158,7 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 	} while (len != 0);
 
 	if (fflush(outfile) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fflush");
 	rewind(outfile);
 
 	return NULL;
@@ -1227,14 +1224,14 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fork");
 	else if (pid == 0) {
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
 		    repo->path);
@@ -1385,7 +1382,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	if (path[1] == '\0') {
 		*id = got_object_id_dup(commit->tree_id);
 		if (*id == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("got_object_id_dup");
 		goto done;
 	}
 
@@ -1433,7 +1430,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	if (te) {
 		*id = got_object_id_dup(te->id);
 		if (*id == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno("got_object_id_dup");
 	} else
 		err = got_error(GOT_ERR_NO_TREE_ENTRY);
 done:
@@ -1547,18 +1544,18 @@ got_object_tree_entry_dup(struct got_tree_entry **new_te,
 
 	*new_te = calloc(1, sizeof(**new_te));
 	if (*new_te == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	(*new_te)->mode = te->mode;
 	(*new_te)->name = strdup(te->name);
 	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
 	(*new_te)->id = got_object_id_dup(te->id);
 	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_id_dup");
 		goto done;
 	}
 done:

@@ -190,6 +190,13 @@ const struct got_error *got_error_msg(int, const char *);
 const struct got_error *got_error_from_errno(void);
 
 /*
+ * Get a statically allocated error object with code GOT_ERR_ERRNO
+ * and an error message obtained from strerror(3), prefixed with a
+ * string.
+ */
+const struct got_error *got_error_prefix_errno(const char *);
+
+/*
  * Set errno to the specified error code and return a statically
  * allocated error object with code GOT_ERR_ERRNO and an error
  * message obtained from strerror(3).
