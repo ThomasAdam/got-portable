@@ -322,7 +322,7 @@ cmd_checkout(int argc, char *argv[])
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
 	char *commit_id_str = NULL;
-	int ch, same_path_prefix, x;
+	int ch, same_path_prefix;
 
 	while ((ch = getopt(argc, argv, "c:p:")) != -1) {
 		switch (ch) {
@@ -389,8 +389,7 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	while (worktree_path[x = strlen(worktree_path) - 1] == '/')
-		worktree_path[x] = '\0';
+	got_path_strip_trailing_slashes(worktree_path);
 
 	error = got_repo_open(&repo, repo_path);
 	if (error != NULL)

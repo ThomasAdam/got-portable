@@ -92,3 +92,6 @@ const struct got_error *got_path_mkdir(const char *);
 
 /* dirname(3) with error handling and dynamically allocated result. */
 const struct got_error *got_path_dirname(char **, const char *);
+
+/* Strip trailing slashes from a path; path will be modified in-place. */
+void got_path_strip_trailing_slashes(char *);

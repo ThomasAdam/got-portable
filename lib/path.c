@@ -343,3 +343,12 @@ got_path_dirname(char **parent, const char *path)
 
 	return NULL;
 }
+
+void
+got_path_strip_trailing_slashes(char *path)
+{
+	int x;
+
+	while (path[x = strlen(path) - 1] == '/')
+		path[x] = '\0';
+}
