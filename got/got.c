@@ -1897,7 +1897,7 @@ cmd_add(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *path = NULL, *relpath = NULL;
-	int ch;
+	int ch, x;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -1910,21 +1910,24 @@ cmd_add(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
+	if (argc < 1)
 		usage_add();
 
-	path = realpath(argv[0], NULL);
-	if (path == NULL) {
-		error = got_error_prefix_errno2("realpath", argv[0]);
-		goto done;
+	/* make sure each file exists before doing anything halfway */
+	for (x = 0; x < argc; x++) {
+		path = realpath(argv[x], NULL);
+		if (path == NULL) {
+			error = got_error_prefix_errno2("realpath", argv[x]);
+			goto done;
+		}
 	}
-	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_prefix_errno("getcwd");
 		goto done;
 	}
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error)
 		goto done;
@@ -1938,10 +1941,24 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_schedule_add(worktree, path, print_status, NULL,
-	    repo);
-	if (error)
-		goto done;
+	for (x = 0; x < argc; x++) {
+		path = realpath(argv[x], NULL);
+		if (path == NULL) {
+			error = got_error_prefix_errno2("realpath", argv[x]);
+			goto done;
+		}
+
+		got_path_strip_trailing_slashes(path);
+
+		error = got_worktree_schedule_add(worktree, path, print_status,
+		    NULL, repo);
+		if (errno == EEXIST) {
+			error = NULL;
+			continue;
+		}
+		else if (error)
+			goto done;
+	}
 done:
 	if (repo)
 		got_repo_close(repo);

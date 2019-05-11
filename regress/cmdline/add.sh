@@ -52,20 +52,39 @@ function test_double_add {
 	echo "new file" > $testroot/wt/foo
 	(cd $testroot/wt && got add foo > /dev/null)
 
-	echo "got: File exists" > $testroot/stderr.expected
-	(cd $testroot/wt && got add foo 2> $testroot/stderr)
+	(cd $testroot/wt && got add foo)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "got add command succeeded unexpectedly" >&2
+	if [ "$ret" != "0" ]; then
+		echo "got add failed unexpectedly" >&2
 		test_done "$testroot" 1
 		return 1
 	fi
 
-	cmp $testroot/stderr.expected $testroot/stderr
+	test_done "$testroot" "$ret"
+}
+
+function test_add_multiple {
+	local testroot=`test_init multiple_add`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	echo "new file" > $testroot/wt/foo
+	echo "new file" > $testroot/wt/bar
+	echo "new file" > $testroot/wt/baz
+	(cd $testroot/wt && got add foo bar baz)
+
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got add failed unexpectedly" >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
