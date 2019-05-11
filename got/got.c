@@ -40,6 +40,7 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+#include "got_path.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -193,9 +194,16 @@ usage(void)
 
 static const struct got_error *
 apply_unveil(const char *repo_path, int repo_read_only,
-    const char *worktree_path)
+    const char *worktree_path, int create_worktree)
 {
 	const struct got_error *error;
+
+	if (create_worktree) {
+		/* Pre-create work tree path to avoid unveiling its parents. */
+		error = got_path_mkdir(worktree_path);
+		if (error && (error->code != GOT_ERR_ERRNO || errno != EISDIR))
+			return error;
+	}
 
 	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
 		return got_error_from_errno();
@@ -388,7 +396,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path);
+	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1);
 	if (error)
 		goto done;
 
@@ -526,7 +534,7 @@ cmd_update(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -895,7 +903,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1155,7 +1163,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1314,7 +1322,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
 	if (error)
 		goto done;
 
@@ -1541,7 +1549,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
 	if (error)
 		goto done;
 
@@ -1670,7 +1678,7 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -1840,7 +1848,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1910,7 +1918,7 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -1982,7 +1990,7 @@ cmd_rm(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -2058,7 +2066,7 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -2138,7 +2146,7 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
