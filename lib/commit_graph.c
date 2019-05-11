@@ -405,7 +405,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	*graph = alloc_graph(path);
 	if (*graph == NULL) {
 		got_object_commit_close(commit);
-		return got_error_prefix_errno("got_object_commit_close");
+		return got_error_prefix_errno("alloc_graph");
 	}
 
 	if (first_parent_traversal)
