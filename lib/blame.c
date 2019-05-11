@@ -76,11 +76,11 @@ alloc_diff_offsets(struct got_blame_diff_offsets **diff_offsets,
 
 	*diff_offsets = calloc(1, sizeof(**diff_offsets));
 	if (*diff_offsets == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	(*diff_offsets)->commit_id = got_object_id_dup(commit_id);
 	if ((*diff_offsets)->commit_id == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_id_dup");
 		free_diff_offsets(*diff_offsets);
 		*diff_offsets = NULL;
 		return err;
@@ -275,7 +275,7 @@ blame_close(struct got_blame *blame)
 	struct got_blame_diff_offsets *diff_offsets;
 
 	if (blame->f && fclose(blame->f) != 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	free(blame->lines);
 	while (!SLIST_EMPTY(&blame->diff_offsets_list)) {
 		diff_offsets = SLIST_FIRST(&blame->diff_offsets_list);
@@ -322,11 +322,11 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	blame = calloc(1, sizeof(*blame));
 	if (blame == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	blame->f = got_opentemp();
 	if (blame->f == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_opentemp");
 		goto done;
 	}
 	err = got_object_blob_dump_to_file(NULL, &blame->nlines, blame->f,
@@ -336,7 +336,7 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	blame->lines = calloc(blame->nlines, sizeof(*blame->lines));
 	if (blame->lines == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -440,7 +440,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 	char *abspath;
 
 	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("asprintf", path);
 
 	err = blame_open(&blame, abspath, start_commit_id, repo, NULL, NULL);
 	if (err) {
@@ -451,7 +451,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 	for (lineno = 1; lineno <= blame->nlines; lineno++) {
 		struct got_object_id *id;
 		char *line, *id_str;
-		
+
 		line = parse_next_line(blame->f, NULL);
 		if (line == NULL)
 			break;
@@ -490,7 +490,7 @@ got_blame_incremental(const char *path, struct got_object_id *commit_id,
 	char *abspath;
 
 	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("asprintf", path);
 
 	err = blame_open(&blame, abspath, commit_id, repo, cb, arg);
 	free(abspath);

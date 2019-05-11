@@ -68,16 +68,6 @@ got_error_msg(int code, const char *msg)
 }
 
 const struct got_error *
-got_error_from_errno(void)
-{
-	static struct got_error err;
-
-	err.code = GOT_ERR_ERRNO;
-	err.msg = strerror(errno);
-	return &err;
-}
-
-const struct got_error *
 got_error_prefix_errno(const char *prefix)
 {
 	static struct got_error err;
@@ -92,17 +82,46 @@ got_error_prefix_errno(const char *prefix)
 }
 
 const struct got_error *
+got_error_prefix_errno2(const char *prefix, const char *prefix2)
+{
+	static struct got_error err;
+	static char err_msg[(MAXPATHLEN * 2) + 20];
+
+	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s", prefix, prefix2,
+	    strerror(errno));
+
+	err.code = GOT_ERR_ERRNO;
+	err.msg = err_msg;
+	return &err;
+}
+
+const struct got_error *
+got_error_prefix_errno3(const char *prefix, const char *prefix2,
+    const char *prefix3)
+{
+	static struct got_error err;
+	static char err_msg[(MAXPATHLEN * 3) + 20];
+
+	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s: %s", prefix, prefix2,
+	    prefix3, strerror(errno));
+
+	err.code = GOT_ERR_ERRNO;
+	err.msg = err_msg;
+	return &err;
+}
+
+const struct got_error *
 got_error_set_errno(int code)
 {
 	errno = code;
-	return got_error_from_errno();
+	return got_error_prefix_errno("");
 }
 
 const struct got_error *
 got_ferror(FILE *f, int code)
 {
 	if (ferror(f))
-		return got_error_from_errno();
+		return got_error_prefix_errno("");
 	return got_error(code);
 }
 

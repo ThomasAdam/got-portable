@@ -267,11 +267,11 @@ open_repo(struct got_repository *repo, const char *path)
 	/* bare git repository? */
 	repo->path_git_dir = strdup(path);
 	if (repo->path_git_dir == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("strdup");
 	if (is_git_repo(repo)) {
 		repo->path = strdup(repo->path_git_dir);
 		if (repo->path == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 		return NULL;
@@ -280,13 +280,13 @@ open_repo(struct got_repository *repo, const char *path)
 	/* git repository with working tree? */
 	free(repo->path_git_dir);
 	if (asprintf(&repo->path_git_dir, "%s/%s", path, GOT_GIT_DIR) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 	if (is_git_repo(repo)) {
 		repo->path = strdup(path);
 		if (repo->path == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 		return NULL;
@@ -322,7 +322,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -371,7 +371,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 		}
 		path = dirname(path);
 		if (path == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("dirname", path);
 	} while (path);
 done:
 	if (err)
@@ -421,7 +421,7 @@ got_repo_close(struct got_repository *repo)
 			err = child_err;
 		if (close(repo->privsep_children[i].imsg_fd) != 0 &&
 		    err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("close");
 	}
 	free(repo);
 
@@ -441,11 +441,11 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("getcwd");
 
 	canonpath = strdup(input_path);
 	if (canonpath == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 	err = got_canonpath(input_path, canonpath, strlen(canonpath) + 1);
@@ -457,7 +457,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 	if (!check_disk) {
 		path = strdup(canonpath);
 		if (path == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 	} else {
@@ -466,7 +466,8 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 		path = realpath(canonpath, NULL);
 		if (path == NULL) {
 			if (errno != ENOENT) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno2("realpath",
+				    canonpath);
 				goto done;
 			}
 			/*
@@ -475,7 +476,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			 */
 			path = strdup(canonpath);
 			if (path == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("strdup");
 				goto done;
 			}
 		}
@@ -493,7 +494,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			free(path);
 			path = strdup("");
 			if (path == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("strdup");
 				goto done;
 			}
 		} else if (is_repo_child && is_cwd_child) {
@@ -543,7 +544,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 	if (path[0] != '/') {
 		char *abspath;
 		if (asprintf(&abspath, "/%s", path) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("asprintf");
 			goto done;
 		}
 		free(path);
@@ -629,11 +630,11 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_repo_get_path_objects_pack");
 
 	packdir = opendir(path_packdir);
 	if (packdir == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("opendir", path_packdir);
 		goto done;
 	}
 
@@ -643,7 +644,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 		if (asprintf(&path_packidx, "%s/%s", path_packdir,
 		    dent->d_name) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("asprintf");
 			goto done;
 		}
 
@@ -669,7 +670,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 done:
 	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("closedir");
 	return err;
 }
 
@@ -683,7 +684,7 @@ read_packfile_hdr(int fd, struct got_packidx *packidx)
 
 	n = read(fd, &hdr, sizeof(hdr));
 	if (n < 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("read");
 	if (n != sizeof(hdr))
 		return got_error(GOT_ERR_BAD_PACKFILE);
 
@@ -702,7 +703,7 @@ open_packfile(int *fd, const char *path_packfile, struct got_packidx *packidx)
 
 	*fd = open(path_packfile, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("open", path_packfile);
 
 	if (packidx) {
 		err = read_packfile_hdr(*fd, packidx);
@@ -747,7 +748,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 
 	pack->path_packfile = strdup(path_packfile);
 	if (pack->path_packfile == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
@@ -766,7 +767,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	    pack->fd, 0);
 	if (pack->map == MAP_FAILED) {
 		if (errno != ENOMEM) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("mmap");
 			goto done;
 		}
 		pack->map = NULL; /* fall back to read(2) */

@@ -187,7 +187,7 @@ static const struct got_error *
 copy_from_base(FILE *base_file, off_t offset, size_t size, FILE *outfile)
 {
 	if (fseeko(base_file, offset, SEEK_SET) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fseeko");
 
 	while (size > 0) {
 		uint8_t data[2048];
@@ -391,7 +391,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 
 	if (memstream != NULL) {
 		if (fclose(memstream) != 0)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 		if (err == NULL) {
 			size_t n;
 			n = fwrite(memstream_buf, 1, memstream_size, outfile);

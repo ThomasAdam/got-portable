@@ -185,7 +185,7 @@ diff_output(BUF *diffbuf, const char *fmt, ...)
 	i = vasprintf(&str, fmt, vap);
 	va_end(vap);
 	if (i == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("vasprintf");
 	buf_append(&newsize, diffbuf, str, strlen(str));
 	free(str);
 	return NULL;
@@ -205,12 +205,12 @@ diffreg(BUF **d, const char *path1, const char *path2)
 
 	f1 = fopen(path1, "r");
 	if (f1 == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", path1);
 		goto done;
 	}
 	f2 = fopen(path2, "r");
 	if (f1 == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", path2);
 		goto done;
 	}
 
@@ -221,11 +221,11 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	memset(&ds, 0, sizeof(ds));
 	/* XXX should stat buffers be passed in args instead of ds? */
 	if (stat(path1, &ds.stb1) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("stat", path1);
 		goto done;
 	}
 	if (stat(path2, &ds.stb2) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("stat", path2);
 		goto done;
 	}
 
@@ -241,24 +241,24 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		goto done;
 
 	if (fflush(outfile) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fflush", outpath);
 		goto done;
 	}
 
 	*d = buf_load(outpath);
 	if (*d == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("buf_load");
 done:
 	if (outpath) {
 		unlink(outpath);
 		free(outpath);
 	}
 	if (outfile && fclose(outfile) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (f1 && fclose(f1) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (f2 && fclose(f2) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	return err;
 }
 
@@ -284,7 +284,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 
 	d3s = calloc(1, sizeof(*d3s));
 	if (d3s == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 	d3s->eflag = 3; /* default -E for compatibility with former RCS */
 	d3s->oflag = 1; /* default -E for compatibility with former RCS */
 
@@ -302,15 +302,15 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	diffb = buf_alloc(128);
 
 	if (asprintf(&path1, "/tmp/got-diff1.XXXXXXXX") == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto out;
 	}
 	if (asprintf(&path2, "/tmp/got-diff2.XXXXXXXX") == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto out;
 	}
 	if (asprintf(&path3, "/tmp/got-diff3.XXXXXXXX") == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto out;
 	}
 
@@ -342,7 +342,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	}
 
 	if (asprintf(&dp13, "/tmp/got-d13.XXXXXXXXXX") == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto out;
 	}
 	err = buf_write_stmp(d1, dp13, &temp_files);
@@ -353,7 +353,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	d1 = NULL;
 
 	if (asprintf(&dp23, "/tmp/got-d23.XXXXXXXXXX") == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto out;
 	}
 	err = buf_write_stmp(d2, dp23, &temp_files);
@@ -402,11 +402,11 @@ out:
 
 	for (i = 0; i < nitems(d3s->fp); i++) {
 		if (d3s->fp[i] && fclose(d3s->fp[i]) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 	}
 	if (err == NULL && diffb) {
 		if (buf_write_fd(diffb, outfd) < 0)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("buf_write_fd");
 		*overlapcnt = d3s->overlapcnt;
 	}
 	free(d3s);
@@ -445,14 +445,14 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 		return err;
 
 	if ((d3s->fp[0] = fopen(path1, "r")) == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("fopen", path1);
 	if ((d3s->fp[1] = fopen(path2, "r")) == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("fopen", path2);
 	if ((d3s->fp[2] = fopen(path3, "r")) == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("fopen", path3);
 
 	if (merge(m, n, d3s) < 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("merge");
 	return NULL;
 }
 
@@ -585,7 +585,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 
 	d3s->fp[0] = fopen(name, "r");
 	if (d3s->fp[0] == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("fopen", name);
 	for (i = 0; (p = getchange(d3s->fp[0], d3s)); i++) {
 		if (i >= d3s->szchanges - 1) {
 			err = increase(d3s);
@@ -621,7 +621,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 	}
 
 	if (fclose(d3s->fp[0]) != 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 
 	*n = i;
 	return err;
@@ -982,25 +982,25 @@ increase(struct diff3_state *d3s)
 
 	d = reallocarray(d3s->d13, newsz, sizeof(*d3s->d13));
 	if (d == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("reallocarray");
 	d3s->d13 = d;
 	memset(d3s->d13 + d3s->szchanges, 0, incr * sizeof(*d3s->d13));
 
 	d = reallocarray(d3s->d23, newsz, sizeof(*d3s->d23));
 	if (d == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("reallocarray");
 	d3s->d23 = d;
 	memset(d3s->d23 + d3s->szchanges, 0, incr * sizeof(*d3s->d23));
 
 	d = reallocarray(d3s->de, newsz, sizeof(*d3s->de));
 	if (d == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("reallocarray");
 	d3s->de = d;
 	memset(d3s->de + d3s->szchanges, 0, incr * sizeof(*d3s->de));
 
 	s = reallocarray(d3s->overlap, newsz, sizeof(*d3s->overlap));
 	if (s == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("reallocarray");
 	d3s->overlap = s;
 	memset(d3s->overlap + d3s->szchanges, 0, incr * sizeof(*d3s->overlap));
 	d3s->szchanges = newsz;

@@ -73,21 +73,21 @@ create_meta_file(const char *path_got, const char *name, const char *content)
 	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
-		err = got_error_prefix_errno(path);
+		err = got_error_prefix_errno2("open", path);
 		goto done;
 	}
 
 	if (content) {
 		int len = dprintf(fd, "%s\n", content);
 		if (len != strlen(content) + 1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("dprintf");
 			goto done;
 		}
 	}
 
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	free(path);
 	return err;
 }
@@ -113,21 +113,21 @@ update_meta_file(const char *path_got, const char *name, const char *content)
 	if (content) {
 		int len = fprintf(tmpfile, "%s\n", content);
 		if (len != strlen(content) + 1) {
-			err = got_error_prefix_errno(tmppath);
+			err = got_error_prefix_errno2("fprintf", tmppath);
 			goto done;
 		}
 	}
 
 	if (rename(tmppath, path) != 0) {
-		err = got_error_prefix_errno(tmppath);
+		err = got_error_prefix_errno3("rename", tmppath, path);
 		unlink(tmppath);
 		goto done;
 	}
 
 done:
-	free(tmppath);
 	if (fclose(tmpfile) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_prefix_errno2("fclose", tmppath);
+	free(tmppath);
 	return err;
 }
 
@@ -153,17 +153,17 @@ read_meta_file(char **content, const char *path_got, const char *name)
 		if (errno == ENOENT)
 			err = got_error(GOT_ERR_WORKTREE_META);
 		else
-			err = got_error_prefix_errno(path);
+			err = got_error_prefix_errno2("open", path);
 		goto done;
 	}
 	if (flock(fd, LOCK_SH | LOCK_NB) == -1) {
 		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
-		    : got_error_prefix_errno("flock"));
+		    : got_error_prefix_errno2("flock", path));
 		goto done;
 	}
 
 	if (lstat(path, &sb) != 0) {
-		err = got_error_prefix_errno(path);
+		err = got_error_prefix_errno2("lstat", path);
 		goto done;
 	}
 	*content = calloc(1, sb.st_size);
@@ -174,7 +174,7 @@ read_meta_file(char **content, const char *path_got, const char *name)
 
 	n = read(fd, *content, sb.st_size);
 	if (n != sb.st_size) {
-		err = (n == -1 ? got_error_prefix_errno(path) :
+		err = (n == -1 ? got_error_prefix_errno2("read", path) :
 		    got_error(GOT_ERR_WORKTREE_META));
 		goto done;
 	}
@@ -186,7 +186,7 @@ read_meta_file(char **content, const char *path_got, const char *name)
 
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
-		err = got_error_prefix_errno(path_got);
+		err = got_error_prefix_errno2("close", path_got);
 	free(path);
 	if (err) {
 		free(*content);
@@ -227,12 +227,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 
 	if (!got_path_is_absolute(prefix)) {
 		if (asprintf(&absprefix, "/%s", prefix) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 	}
 
 	/* Create top-level directory (may already exist). */
 	if (mkdir(path, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
-		err = got_error_prefix_errno(path);
+		err = got_error_prefix_errno2("mkdir", path);
 		goto done;
 	}
 
@@ -242,7 +242,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 	}
 	if (mkdir(path_got, GOT_DEFAULT_DIR_MODE) == -1 && errno != EEXIST) {
-		err = got_error_prefix_errno(path_got);
+		err = got_error_prefix_errno2("mkdir", path_got);
 		goto done;
 	}
 
@@ -259,7 +259,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	/* Write the HEAD reference. */
 	refstr = got_ref_to_str(head_ref);
 	if (refstr == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_ref_to_str");
 		goto done;
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_HEAD_REF, refstr);
@@ -352,7 +352,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	fd = open(path_lock, O_RDWR | O_EXLOCK | O_NONBLOCK);
 	if (fd == -1) {
 		err = (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
-		    : got_error_prefix_errno(path_lock));
+		    : got_error_prefix_errno2("open", path_lock));
 		goto done;
 	}
 
@@ -450,7 +450,7 @@ got_worktree_open(struct got_worktree **worktree, const char *path)
 			return NULL;
 		path = dirname(path);
 		if (path == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno2("dirname", path);
 	} while (!((path[0] == '.' || path[0] == '/') && path[1] == '\0'));
 
 	return got_error(GOT_ERR_NOT_WORKTREE);
@@ -467,7 +467,8 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->head_ref_name);
 	if (worktree->lockfd != -1)
 		if (close(worktree->lockfd) != 0)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("close",
+			    got_worktree_get_root_path(worktree));
 	free(worktree);
 	return err;
 }
@@ -570,7 +571,8 @@ lock_worktree(struct got_worktree *worktree, int operation)
 {
 	if (flock(worktree->lockfd, operation | LOCK_NB) == -1)
 		return (errno == EWOULDBLOCK ? got_error(GOT_ERR_WORKTREE_BUSY)
-		    : got_error_prefix_errno("flock"));
+		    : got_error_prefix_errno2("flock",
+		    got_worktree_get_root_path(worktree)));
 	return NULL;
 }
 
@@ -588,7 +590,7 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 		struct stat sb;
 		err = NULL;
 		if (lstat(abspath, &sb) == -1) {
-			err = got_error_prefix_errno("lstat");
+			err = got_error_prefix_errno2("lstat", abspath);
 		} else if (!S_ISDIR(sb.st_mode)) {
 			/* TODO directory is obstructed; do something */
 			err = got_error(GOT_ERR_FILE_OBSTRUCTED);
@@ -608,15 +610,15 @@ check_file_contents_equal(int *same, FILE *f1, FILE *f2)
 
 	*same = 1;
 
-	while (1) {
+	for (;;) {
 		flen1 = fread(fbuf1, 1, sizeof(fbuf1), f1);
 		if (flen1 == 0 && ferror(f1)) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fread");
 			break;
 		}
 		flen2 = fread(fbuf2, 1, sizeof(fbuf2), f2);
 		if (flen2 == 0 && ferror(f2)) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fread");
 			break;
 		}
 		if (flen1 == 0) {
@@ -652,13 +654,13 @@ check_files_equal(int *same, const char *f1_path, const char *f2_path)
 	*same = 1;
 
 	if (lstat(f1_path, &sb) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("lstat", f1_path);
 		goto done;
 	}
 	size1 = sb.st_size;
 
 	if (lstat(f2_path, &sb) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("lstat", f2_path);
 		goto done;
 	}
 	size2 = sb.st_size;
@@ -670,20 +672,20 @@ check_files_equal(int *same, const char *f1_path, const char *f2_path)
 
 	f1 = fopen(f1_path, "r");
 	if (f1 == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("open", f1_path);
 
 	f2 = fopen(f2_path, "r");
 	if (f2 == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("open", f2_path);
 		goto done;
 	}
 
 	err = check_file_contents_equal(same, f1, f2);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (f2 && fclose(f2) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 
 	return err;
 }
@@ -713,10 +715,10 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	parent = dirname(ondisk_path);
 	if (parent == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("dirname", ondisk_path);
 
 	if (asprintf(&base_path, "%s/got-merged", parent) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	err = got_opentemp_named_fd(&merged_path, &merged_fd, base_path);
 	if (err)
@@ -724,7 +726,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	free(base_path);
 	if (asprintf(&base_path, "%s/got-merge-blob1", parent) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		base_path = NULL;
 		goto done;
 	}
@@ -738,7 +740,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	free(base_path);
 	if (asprintf(&base_path, "%s/got-merge-blob2", parent) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		base_path = NULL;
 		goto done;
 	}
@@ -767,7 +769,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		goto done;
 	if (asprintf(&label1, "commit %s", id_str) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 
@@ -779,9 +781,8 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	(*progress_cb)(progress_arg,
 	    overlapcnt > 0 ? GOT_STATUS_CONFLICT : GOT_STATUS_MERGE, path);
 
-
 	if (fsync(merged_fd) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fsync");
 		goto done;
 	}
 
@@ -794,12 +795,13 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	}
 
 	if (chmod(merged_path, st_mode) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("chmod", merged_path);
 		goto done;
 	}
 
 	if (rename(merged_path, ondisk_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", merged_path,
+		    ondisk_path);
 		unlink(merged_path);
 		goto done;
 	}
@@ -812,11 +814,11 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	    blob1->id.sha1, worktree->base_commit_id->sha1, update_timestamps);
 done:
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	if (f1 && fclose(f1) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (f2 && fclose(f2) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (blob2)
 		got_object_blob_close(blob2);
 	free(merged_path);
@@ -877,7 +879,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 		if (errno == ENOENT) {
 			char *parent = dirname(path);
 			if (parent == NULL)
-				return got_error_from_errno();
+				return got_error_prefix_errno2("dirname", path);
 			err = add_dir_on_disk(worktree, parent);
 			if (err)
 				return err;
@@ -885,7 +887,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			    O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 			    GOT_DEFAULT_FILE_MODE);
 			if (fd == -1)
-				return got_error_from_errno();
+				return got_error_prefix_errno2("open",
+				    ondisk_path);
 		} else if (errno == EEXIST) {
 			if (!S_ISREG(st_mode)) {
 				/* TODO file is obstructed; do something */
@@ -899,7 +902,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				update = 1;
 			}
 		} else
-			return got_error_from_errno();
+			return got_error_prefix_errno2("open", ondisk_path);
 	}
 
 	if (restoring_missing_file)
@@ -920,7 +923,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			/* Skip blob object header first time around. */
 			ssize_t outlen = write(fd, buf + hdrlen, len - hdrlen);
 			if (outlen == -1) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("write");
 				goto done;
 			} else if (outlen != len - hdrlen) {
 				err = got_error(GOT_ERR_IO);
@@ -931,13 +934,14 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	} while (len != 0);
 
 	if (fsync(fd) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fsync");
 		goto done;
 	}
 
 	if (update) {
 		if (rename(tmppath, ondisk_path) != 0) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno3("rename", tmppath,
+			    ondisk_path);
 			unlink(tmppath);
 			goto done;
 		}
@@ -945,19 +949,19 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 
 	if (te_mode & S_IXUSR) {
 		if (chmod(ondisk_path, st_mode | S_IXUSR) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("chmod", ondisk_path);
 			goto done;
 		}
 	} else {
 		if (chmod(ondisk_path, st_mode & ~S_IXUSR) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("chmod", ondisk_path);
 			goto done;
 		}
 	}
 
 done:
 	if (fd != -1 && close(fd) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	free(tmppath);
 	return err;
 }
@@ -1026,7 +1030,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 				sb->st_mode = GOT_DEFAULT_FILE_MODE;
 			return NULL;
 		}
-		return got_error_from_errno();
+		return got_error_prefix_errno2("lstat", abspath);
 	}
 
 	if (!S_ISREG(sb->st_mode)) {
@@ -1060,7 +1064,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	f = fopen(abspath, "r");
 	if (f == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", abspath);
 		goto done;
 	}
 	hdrlen = got_object_blob_get_hdrlen(blob);
@@ -1072,7 +1076,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 		/* Skip length of blob object header first time around. */
 		flen = fread(fbuf, 1, sizeof(fbuf) - hdrlen, f);
 		if (flen == 0 && ferror(f)) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fread");
 			goto done;
 		}
 		if (blen == 0) {
@@ -1122,7 +1126,7 @@ update_blob(struct got_worktree *worktree,
 	struct stat sb;
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
@@ -1185,17 +1189,18 @@ remove_ondisk_file(const char *root_path, const char *path)
 	char *ondisk_path = NULL;
 
 	if (asprintf(&ondisk_path, "%s/%s", root_path, path) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	if (unlink(ondisk_path) == -1) {
 		if (errno != ENOENT)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("unlink", ondisk_path);
 	} else {
 		char *parent = dirname(ondisk_path);
 		while (parent && strcmp(parent, root_path) != 0) {
 			if (rmdir(parent) == -1) {
 				if (errno != ENOTEMPTY)
-					err = got_error_from_errno();
+					err = got_error_prefix_errno2("rmdir",
+					    parent);
 				break;
 			}
 			parent = dirname(parent);
@@ -1218,7 +1223,7 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, ie->path)
 	    == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
@@ -1296,7 +1301,7 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	if (asprintf(&path, "%s%s%s", parent_path,
 	    parent_path[0] ? "/" : "", te->name)
 	    == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	if (S_ISDIR(te->mode))
 		err = add_dir_on_disk(a->worktree, path);
@@ -1323,7 +1328,7 @@ got_worktree_get_base_ref_name(char **refname, struct got_worktree *worktree)
 
 	if (asprintf(refname, "%s-%s", GOT_WORKTREE_BASE_REF_PREFIX, uuidstr)
 	    == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		*refname = NULL;
 	}
 	free(uuidstr);
@@ -1367,11 +1372,11 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 	*fileindex_path = NULL;
 	*fileindex = got_fileindex_alloc();
 	if (*fileindex == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_fileindex_alloc");
 
 	if (asprintf(fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		*fileindex_path = NULL;
 		goto done;
 	}
@@ -1379,11 +1384,11 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 	index = fopen(*fileindex_path, "rb");
 	if (index == NULL) {
 		if (errno != ENOENT)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("fopen", *fileindex_path);
 	} else {
 		err = got_fileindex_read(*fileindex, index);
 		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 	}
 done:
 	if (err) {
@@ -1443,13 +1448,13 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 		int obj_type;
 		relpath = strdup(path);
 		if (relpath == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 		if (asprintf(&tree_path, "%s%s%s", worktree->path_prefix,
 		    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
 		    path) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("asprintf");
 			goto done;
 		}
 		err = got_object_id_by_path(&tree_id, repo,
@@ -1465,12 +1470,12 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 			if (strchr(path, '/')  == NULL) {
 				relpath = strdup("");
 				if (relpath == NULL) {
-					err = got_error_from_errno();
+					err = got_error_prefix_errno("strdup");
 					goto done;
 				}
 				tree_path = strdup(worktree->path_prefix);
 				if (tree_path == NULL) {
-					err = got_error_from_errno();
+					err = got_error_prefix_errno("strdup");
 					goto done;
 				}
 			} else {
@@ -1482,7 +1487,7 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 				    got_path_is_root_dir(
 				    worktree->path_prefix) ? "" : "/",
 				    relpath) == -1) {
-					err = got_error_from_errno();
+					err = got_error_prefix_errno("asprintf");
 					goto done;
 				}
 			}
@@ -1493,14 +1498,14 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 				goto done;
 			entry_name = basename(path);
 			if (entry_name == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno2("basename", path);
 				goto done;
 			}
 		}
 	} else {
 		relpath = strdup("");
 		if (relpath == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 		err = got_object_id_by_path(&tree_id, repo,
@@ -1538,7 +1543,8 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 		goto done;
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", new_fileindex_path,
+		    fileindex_path);
 		unlink(new_fileindex_path);
 		goto done;
 	}
@@ -1615,11 +1621,11 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	if (parent_path[0]) {
 		if (asprintf(&abspath, "%s/%s/%s", a->worktree->root_path,
 		    parent_path, de->d_name) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 	} else {
 		if (asprintf(&abspath, "%s/%s", a->worktree->root_path,
 		    de->d_name) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 	}
 
 	err = report_file_status(ie, abspath, a->status_cb, a->status_arg,
@@ -1671,7 +1677,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 	} else {
 		path = de->d_name;
 	}
@@ -1699,13 +1705,13 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_fileindex_alloc");
 		goto done;
 	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		fileindex_path = NULL;
 		goto done;
 	}
@@ -1713,7 +1719,7 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 	index = fopen(fileindex_path, "rb");
 	if (index == NULL) {
 		if (errno != ENOENT) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("fopen", fileindex_path);
 			goto done;
 		}
 	} else {
@@ -1725,7 +1731,7 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 	workdir = opendir(ondisk_path);
@@ -1741,7 +1747,7 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 			    status_cb, status_arg, repo);
 			goto done;
 		} else {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("opendir", ondisk_path);
 			goto done;
 		}
 	}
@@ -1780,7 +1786,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 
 	resolved = realpath(arg, NULL);
 	if (resolved == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("realpath", arg);
 
 	if (strncmp(got_worktree_get_root_path(worktree), resolved,
 	    strlen(got_worktree_get_root_path(worktree)))) {
@@ -1791,7 +1797,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 	path = strdup(resolved +
 	    strlen(got_worktree_get_root_path(worktree)) + 1 /* skip '/' */);
 	if (path == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
@@ -1833,20 +1839,20 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_fileindex_alloc");
 		goto done;
 	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		fileindex_path = NULL;
 		goto done;
 	}
 
 	index = fopen(fileindex_path, "rb");
 	if (index == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", fileindex_path);
 		goto done;
 	}
 
@@ -1878,7 +1884,8 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 		goto done;
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", new_fileindex_path,
+		    fileindex_path);
 		goto done;
 	}
 
@@ -1889,11 +1896,12 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 	}
 	if (new_fileindex_path) {
 		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("unlink",
+			    new_fileindex_path);
 		free(new_fileindex_path);
 	}
 	if (ie && !ie_added)
@@ -1932,20 +1940,20 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_fileindex_alloc");
 		goto done;
 	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		fileindex_path = NULL;
 		goto done;
 	}
 
 	index = fopen(fileindex_path, "rb");
 	if (index == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", fileindex_path);
 		goto done;
 	}
 
@@ -1979,7 +1987,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	}
 
 	if (unlink(ondisk_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("unlink", ondisk_path);
 		goto done;
 	}
 
@@ -1995,7 +2003,8 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 		goto done;
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", new_fileindex_path,
+		    fileindex_path);
 		goto done;
 	}
 
@@ -2007,11 +2016,12 @@ done:
 	free(relpath);
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 	}
 	if (new_fileindex_path) {
 		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("unlink",
+			    new_fileindex_path);
 		free(new_fileindex_path);
 	}
 	if (fileindex)
@@ -2052,20 +2062,20 @@ got_worktree_revert(struct got_worktree *worktree,
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_fileindex_alloc");
 		goto done;
 	}
 
 	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
 	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		fileindex_path = NULL;
 		goto done;
 	}
 
 	index = fopen(fileindex_path, "rb");
 	if (index == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fopen", fileindex_path);
 		goto done;
 	}
 
@@ -2089,20 +2099,20 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (got_path_is_root_dir(worktree->path_prefix)) {
 		tree_path = strdup(parent_path);
 		if (tree_path == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("strdup");
 			goto done;
 		}
 	} else {
 		if (got_path_is_root_dir(parent_path)) {
 			tree_path = strdup(worktree->path_prefix);
 			if (tree_path == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("strdup");
 				goto done;
 			}
 		} else {
 			if (asprintf(&tree_path, "%s/%s",
 			    worktree->path_prefix, parent_path) == -1) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("asprintf");
 				goto done;
 			}
 		}
@@ -2119,7 +2129,7 @@ got_worktree_revert(struct got_worktree *worktree,
 
 	te_name = basename(ie->path);
 	if (te_name == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("basename", ie->path);
 		goto done;
 	}
 
@@ -2172,7 +2182,8 @@ got_worktree_revert(struct got_worktree *worktree,
 		goto done;
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", new_fileindex_path,
+		    fileindex_path);
 		goto done;
 	}
 
@@ -2188,11 +2199,12 @@ done:
 	free(tree_id);
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fclose");
 	}
 	if (new_fileindex_path) {
 		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("unlink",
+			    new_fileindex_path);
 		free(new_fileindex_path);
 	}
 	if (fileindex)
@@ -2249,13 +2261,13 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 		return NULL;
 
 	if (asprintf(&path, "/%s", relpath) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 	if (strcmp(path, "/") == 0) {
 		parent_path = strdup("");
 		if (parent_path == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno("strdup");
 	} else {
 		err = got_path_dirname(&parent_path, path);
 		if (err)
@@ -2264,20 +2276,20 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 
 	ct = calloc(1, sizeof(*ct));
 	if (ct == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
 	if (asprintf(&ct->ondisk_path, "%s/%s", a->worktree->root_path,
 	    relpath) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 	if (status == GOT_STATUS_DELETE) {
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	} else {
 		if (lstat(ct->ondisk_path, &sb) != 0) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("lstat", ct->ondisk_path);
 			goto done;
 		}
 		ct->mode = sb.st_mode;
@@ -2286,7 +2298,7 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	if (asprintf(&ct->in_repo_path, "%s%s%s", a->worktree->path_prefix,
 	    got_path_is_root_dir(a->worktree->path_prefix) ? "" : "/",
 	    relpath) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 
@@ -2295,13 +2307,13 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	if (ct->status != GOT_STATUS_ADD) {
 		ct->base_id = got_object_id_dup(id);
 		if (ct->base_id == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("got_object_id_dup");
 			goto done;
 		}
 	}
 	ct->path = strdup(path);
 	if (ct->path == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
@@ -2331,7 +2343,7 @@ write_subtree(struct got_object_id **new_subtree_id,
 
 	if (asprintf(&subpath, "%s%s%s", parent_path,
 	    got_path_is_root_dir(parent_path) ? "" : "/", te->name) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	err = got_object_open_as_tree(&subtree, repo, te->id);
 	if (err)
@@ -2388,7 +2400,7 @@ alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
 	free((*new_te)->id);
 	(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_id_dup");
 		goto done;
 	}
 done:
@@ -2410,16 +2422,16 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 
 	*new_te = calloc(1, sizeof(**new_te));
 	if (*new_te == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	ct_name = basename(ct->path);
 	if (ct_name == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("basename", ct->path);
 		goto done;
 	}
 	(*new_te)->name = strdup(ct_name);
 	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
@@ -2427,7 +2439,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 
 	(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_id_dup");
 		goto done;
 	}
 done:
@@ -2476,7 +2488,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 	if (asprintf(&te_path, "%s%s%s", base_tree_path,
 	    got_path_is_root_dir(base_tree_path) ? "" : "/",
 	    te->name) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("asprintf");
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct commitable *ct = pe->data;
@@ -2520,7 +2532,7 @@ match_deleted_or_modified_ct(struct commitable **ctp,
 
 		ct_name = basename(pe->path);
 		if (ct_name == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno2("basename", pe->path);
 
 		if (strcmp(te->name, ct_name) != 0)
 			continue;
@@ -2584,7 +2596,7 @@ write_tree(struct got_object_id **new_tree_id,
 			if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
 			    got_path_is_root_dir(path_base_tree) ? "" : "/",
 			    child_path) == -1) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("asprintf");
 				goto done;
 			}
 			TAILQ_FOREACH(pe2, &paths, entry) {
@@ -2602,7 +2614,7 @@ write_tree(struct got_object_id **new_tree_id,
 			new_te->mode = S_IFDIR;
 			new_te->name = strdup(child_path);
 			if (new_te->name == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("strdup");
 				got_object_tree_entry_close(new_te);
 				new_te = NULL;
 				goto done;
@@ -2741,7 +2753,8 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 		goto done;
 
 	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno3("rename", new_fileindex_path,
+		    fileindex_path);
 		unlink(new_fileindex_path);
 		goto done;
 	}
@@ -2875,7 +2888,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 		if (asprintf(&ondisk_path, "%s/%s",
 		    worktree->root_path, pe->path) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("asprintf");
 			goto done;
 		}
 		err = got_object_blob_create(&ct->blob_id, ondisk_path, repo);
@@ -2904,7 +2917,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	/* XXX ideally we'd lock the reference file here to avoid a race */
 	head_ref_name = got_worktree_get_head_ref_name(worktree);
 	if (head_ref_name == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_worktree_get_head_ref_name");
 		goto done;
 	}
 	err = got_ref_open(&head_ref2, repo, head_ref_name);

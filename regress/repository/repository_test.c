@@ -109,7 +109,7 @@ print_tree_object(struct got_object_id *id, char *parent,
 		free(hex);
 
 		if (asprintf(&next_parent, "%s/%s", parent, te->name) == -1) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("asprintf");
 			break;
 		}
 
@@ -339,7 +339,7 @@ repo_diff_blob(const char *repo_path)
 		i++;
 	}
 	if (fclose(outfile) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	test_printf("\n");
 	if (i != nitems(expected_output) + 1) {
 		test_printf("number of lines expected: %d; actual: %d\n",
@@ -422,26 +422,26 @@ apply_unveil(const char *repo_path)
 	if (repo_path) {
 		normpath = got_path_normalize(repo_path);
 		if (normpath == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno("got_path_normalize");
 		if (unveil(normpath, "r") != 0) {
 			free(normpath);
-			return got_error_from_errno();
+			return got_error_prefix_errno2("unveil", normpath);
 		}
 		free(normpath);
 	}
 
 	if (unveil("/tmp", "rwc") != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("unveil", "/tmp");
 
 	if (unveil("/dev/null", "rwc") != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno2("unveil", "/dev/null");
 
 	error = got_privsep_unveil_exec_helpers();
 	if (error != NULL)
 		return error;
 
 	if (unveil(NULL, NULL) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("unveil");
 
 	return NULL;
 }

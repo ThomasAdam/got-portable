@@ -146,7 +146,7 @@ open_loose_object(int *fd, struct got_object_id *id,
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1) {
-		err = got_error_prefix_errno(path);
+		err = got_error_prefix_errno2("open", path);
 		goto done;
 	}
 done:
@@ -263,7 +263,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	pack->privsep_child->imsg_fd = imsg_fds[0];
 	pack->privsep_child->pid = pid;
 	imsg_init(ibuf, imsg_fds[0]);
@@ -383,7 +383,7 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].pid = pid;
@@ -425,7 +425,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		if (errno == ENOENT)
 			err = got_error_no_obj(id);
 		else
-			err = got_error_prefix_errno(path);
+			err = got_error_prefix_errno2("open", path);
 		goto done;
 	} else {
 		err = read_object_header_privsep(obj, repo, fd);
@@ -548,7 +548,7 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].pid = pid;
@@ -726,7 +726,7 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].pid = pid;
@@ -946,7 +946,7 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].pid = pid;
@@ -1019,7 +1019,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 
 	if (outbuf) {
 		if (close(outfd) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("close");
 		outfd = -1;
 		(*blob)->f = fmemopen(outbuf, size, "rb");
 		if ((*blob)->f == NULL) {
@@ -1084,7 +1084,7 @@ got_object_blob_close(struct got_blob_object *blob)
 	const struct got_error *err = NULL;
 	free(blob->read_buf);
 	if (blob->f && fclose(blob->f) != 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	free(blob->data);
 	free(blob);
 	return err;
@@ -1239,7 +1239,7 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 	}
 
 	if (close(imsg_fds[1]) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("close");
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].pid = pid;

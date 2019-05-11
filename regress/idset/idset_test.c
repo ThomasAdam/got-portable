@@ -72,7 +72,7 @@ idset_add_remove_iter(void)
 
 	set = got_object_idset_alloc();
 	if (set == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_idset_alloc");
 		goto done;
 	}
 	if (got_object_idset_num_elements(set) != 0) {

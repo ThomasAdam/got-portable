@@ -38,17 +38,17 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 
 	*lf = calloc(1, sizeof(**lf));
 	if (*lf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 	(*lf)->fd = -1;
 
 	(*lf)->locked_path = strdup(path);
 	if ((*lf)->locked_path == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
 	if (asprintf(&(*lf)->path, "%s%s", path, GOT_LOCKFILE_SUFFIX) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
 
@@ -59,7 +59,7 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 		if ((*lf)->fd != -1)
 			break;
 		if (errno != EEXIST) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno2("open", (*lf)->path);
 			goto done;
 		}
 		sleep(1);
@@ -81,9 +81,9 @@ got_lockfile_unlock(struct got_lockfile *lf)
 	const struct got_error *err = NULL;
 
 	if (lf->path && lf->fd != -1 && unlink(lf->path) != 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("unlink");
 	if (lf->fd != -1 && close(lf->fd) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	free(lf->path);
 	free(lf->locked_path);
 	free(lf);

@@ -343,7 +343,7 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 
 	node = calloc(1, sizeof(*node));
 	if (node == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	node->timestamp = commit->committer_time;
@@ -405,7 +405,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	*graph = alloc_graph(path);
 	if (*graph == NULL) {
 		got_object_commit_close(commit);
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_object_commit_close");
 	}
 
 	if (first_parent_traversal)
@@ -485,7 +485,7 @@ fetch_commits_from_open_branches(int *nfetched,
 		tips = recallocarray(graph->tips, graph->ntips, ntips,
 		    sizeof(*tips));
 		if (tips == NULL)
-			return got_error_from_errno();
+			return got_error_prefix_errno("recallocarray");
 		graph->tips = tips;
 		graph->ntips = ntips;
 	}

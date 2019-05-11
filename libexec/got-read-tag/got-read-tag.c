@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
@@ -129,7 +129,7 @@ main(int argc, char *argv[])
 		/* Always assume file offset zero. */
 		f = fdopen(imsg.fd, "rb");
 		if (f == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("fdopen");
 			goto done;
 		}
 
@@ -141,10 +141,10 @@ main(int argc, char *argv[])
 done:
 		if (f) {
 			if (fclose(f) != 0 && err == NULL)
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("fclose");
 		} else if (imsg.fd != -1) {
 			if (close(imsg.fd) != 0 && err == NULL)
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("close");
 		}
 		imsg_free(&imsg);
 		if (err)
@@ -159,6 +159,6 @@ done:
 		}
 	}
 	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	return err ? 1 : 0;
 }

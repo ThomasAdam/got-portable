@@ -185,16 +185,25 @@ const struct got_error *got_error_msg(int, const char *);
 
 /*
  * Get a statically allocated error object with code GOT_ERR_ERRNO
- * and an error message obtained from strerror(3).
- */
-const struct got_error *got_error_from_errno(void);
-
-/*
- * Get a statically allocated error object with code GOT_ERR_ERRNO
  * and an error message obtained from strerror(3), prefixed with a
  * string.
  */
 const struct got_error *got_error_prefix_errno(const char *);
+
+/*
+ * Get a statically allocated error object with code GOT_ERR_ERRNO
+ * and an error message obtained from strerror(3), prefixed with two
+ * strings.
+ */
+const struct got_error *got_error_prefix_errno2(const char *, const char *);
+
+/*
+ * Get a statically allocated error object with code GOT_ERR_ERRNO
+ * and an error message obtained from strerror(3), prefixed with three
+ * strings.
+ */
+const struct got_error *got_error_prefix_errno3(const char *, const char *,
+    const char *);
 
 /*
  * Set errno to the specified error code and return a statically
@@ -205,7 +214,7 @@ const struct got_error *got_error_set_errno(int);
 
 /*
  * If ferror(3) indicates an error status for the FILE, obtain an error
- * from got_error_from_errno(). Else, obtain the error via got_error()
+ * from got_error_prefix_errno(). Else, obtain the error via got_error()
  * with the error code provided in the second argument.
  */
 const struct got_error *got_ferror(FILE *, int);

@@ -47,10 +47,10 @@ got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	zerr = inflateInit(&zb->z);
 	if (zerr != Z_OK) {
 		if  (zerr == Z_ERRNO)
-			return got_error_from_errno();
+			return got_error_prefix_errno("inflateInit");
 		if  (zerr == Z_MEM_ERROR) {
 			errno = ENOMEM;
-			return got_error_from_errno();
+			return got_error_prefix_errno("inflateInit");
 		}
 		return got_error(GOT_ERR_DECOMPRESSION);
 	}
@@ -59,7 +59,7 @@ got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 
 	zb->inbuf = calloc(1, zb->inlen);
 	if (zb->inbuf == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -67,7 +67,7 @@ got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	if (outbuf == NULL) {
 		zb->outbuf = calloc(1, zb->outlen);
 		if (zb->outbuf == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("calloc");
 			goto done;
 		}
 		zb->flags |= GOT_INFLATE_F_OWN_OUTBUF;
@@ -134,7 +134,7 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp)
 		if (z->avail_in == 0) {
 			ssize_t n = read(fd, zb->inbuf, zb->inlen);
 			if (n < 0)
-				return got_error_from_errno();
+				return got_error_prefix_errno("read");
 			else if (n == 0) {
 				/* EOF */
 				ret = Z_STREAM_END;
@@ -220,7 +220,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	*outbuf = calloc(1, GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err)
 		return err;
@@ -237,7 +237,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
 			   GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("recallocarray");
 				free(*outbuf);
 				*outbuf = NULL;
 				*outlen = 0;
@@ -265,7 +265,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 
 	*outbuf = calloc(1, GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err)
 		goto done;
@@ -282,7 +282,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("recallocarray");
 				free(*outbuf);
 				*outbuf = NULL;
 				*outlen = 0;
@@ -311,7 +311,7 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 
 	*outbuf = calloc(1, GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err) {
 		free(*outbuf);
@@ -336,7 +336,7 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("recallocarray");
 				free(*outbuf);
 				*outbuf = NULL;
 				*outlen = 0;
@@ -373,7 +373,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 			ssize_t n;
 			n = write(outfd, zb.outbuf, avail);
 			if (n != avail) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("write");
 				goto done;
 			}
 			*outlen += avail;
@@ -383,7 +383,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 done:
 	if (err == NULL) {
 		if (lseek(outfd, SEEK_SET, 0) == -1)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("lseek");
 	}
 	got_inflate_end(&zb);
 	return err;

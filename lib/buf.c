@@ -297,20 +297,20 @@ buf_write(BUF *b, const char *path, mode_t mode)
 		if (errno == EACCES && unlink(path) != -1)
 			goto open;
 		else
-			return got_error_from_errno();
+			return got_error_prefix_errno2("open", path);
 	}
 
 	if (buf_write_fd(b, fd) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("buf_write_fd");
 		(void)unlink(path);
 		return err;
 	}
 
 	if (fchmod(fd, mode) < 0)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("fchmod", path);
 
 	if (close(fd) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno2("close", path);
 
 	return err;
 }
@@ -327,17 +327,17 @@ buf_write_stmp(BUF *b, char *template, struct wklhead *temp_files)
 	int fd;
 
 	if ((fd = mkstemp(template)) == -1)
-		return got_error_from_errno();
+		return got_error_prefix_errno("mkstemp");
 
 	worklist_add(template, temp_files);
 
 	if (buf_write_fd(b, fd) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("buf_write_fd");
 		(void)unlink(template);
 	}
 
 	if (close(fd) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 
 	return err;
 }
@@ -352,7 +352,7 @@ buf_grow(BUF *b, size_t len)
 	u_char *buf;
 	buf = reallocarray(b->cb_buf, 1, b->cb_size + len);
 	if (buf == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("reallocarray");
 	b->cb_buf = buf;
 	b->cb_size += len;
 	return NULL;

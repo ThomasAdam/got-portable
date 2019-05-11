@@ -203,7 +203,7 @@ receive_file(FILE **f, struct imsgbuf *ibuf, int imsg_code)
 
 	*f = fdopen(imsg.fd, "w+");
 	if (*f == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fdopen");
 		close(imsg.fd);
 		goto done;
 	}
@@ -265,11 +265,11 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 done:
 	free(buf);
 	if (outfile && fclose(outfile) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (basefile && fclose(basefile) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (accumfile && fclose(accumfile) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("fclose");
 	if (obj)
 		got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
@@ -342,7 +342,7 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 
 	p = calloc(1, sizeof(*p));
 	if (p == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -366,11 +366,11 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	p->len = ipackidx.len;
 	p->fd = dup(imsg.fd);
 	if (p->fd == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("dup");
 		goto done;
 	}
 	if (lseek(p->fd, 0, SEEK_SET) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("lseek");
 		goto done;
 	}
 
@@ -408,7 +408,7 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 
 	pack = calloc(1, sizeof(*pack));
 	if (pack == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -432,16 +432,16 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 	pack->filesize = ipack.filesize;
 	pack->fd = dup(imsg.fd);
 	if (pack->fd == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("dup");
 		goto done;
 	}
 	if (lseek(pack->fd, 0, SEEK_SET) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("lseek");
 		goto done;
 	}
 	pack->path_packfile = strdup(ipack.path_packfile);
 	if (pack->path_packfile == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("strdup");
 		goto done;
 	}
 
@@ -481,7 +481,7 @@ main(int argc, char *argv[])
 
 	err = got_object_cache_init(&objcache, GOT_OBJECT_CACHE_TYPE_OBJ);
 	if (err) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("got_object_cache_init");
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
@@ -489,7 +489,7 @@ main(int argc, char *argv[])
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
@@ -552,7 +552,7 @@ main(int argc, char *argv[])
 		}
 
 		if (imsg.fd != -1 && close(imsg.fd) != 0 && err == NULL)
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("close");
 		imsg_free(&imsg);
 		if (err)
 			break;
@@ -571,6 +571,6 @@ main(int argc, char *argv[])
 		}
 	}
 	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("close");
 	return err ? 1 : 0;
 }

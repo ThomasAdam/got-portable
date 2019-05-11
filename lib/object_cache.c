@@ -45,7 +45,7 @@ got_object_cache_init(struct got_object_cache *cache,
 
 	cache->idset = got_object_idset_alloc();
 	if (cache->idset == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("got_object_idset_alloc");
 
 	cache->type = type;
 	switch (type) {
@@ -98,7 +98,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 
 	ce = malloc(sizeof(*ce));
 	if (ce == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("malloc");
 	memcpy(&ce->id, id, sizeof(ce->id));
 	switch (cache->type) {
 	case GOT_OBJECT_CACHE_TYPE_OBJ:

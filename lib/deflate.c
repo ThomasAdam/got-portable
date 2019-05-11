@@ -47,10 +47,10 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	zerr = deflateInit(&zb->z, Z_DEFAULT_COMPRESSION);
 	if (zerr != Z_OK) {
 		if  (zerr == Z_ERRNO)
-			return got_error_from_errno();
+			return got_error_prefix_errno("deflateInit");
 		if  (zerr == Z_MEM_ERROR) {
 			errno = ENOMEM;
-			return got_error_from_errno();
+			return got_error_prefix_errno("deflateInit");
 		}
 		return got_error(GOT_ERR_COMPRESSION);
 	}
@@ -59,7 +59,7 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 
 	zb->inbuf = calloc(1, zb->inlen);
 	if (zb->inbuf == NULL) {
-		err = got_error_from_errno();
+		err = got_error_prefix_errno("calloc");
 		goto done;
 	}
 
@@ -67,7 +67,7 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	if (outbuf == NULL) {
 		zb->outbuf = calloc(1, zb->outlen);
 		if (zb->outbuf == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("calloc");
 			goto done;
 		}
 		zb->flags |= GOT_DEFLATE_F_OWN_OUTBUF;

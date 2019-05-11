@@ -36,7 +36,7 @@ got_mbsavis(char** outp, int *widthp, const char *mbs)
 
 	len = strlen(mbs);
 	if ((*outp = malloc(len + 1)) == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("malloc");
 
 	if (MB_CUR_MAX == 1) {
 		memcpy(*outp, mbs, len + 1);

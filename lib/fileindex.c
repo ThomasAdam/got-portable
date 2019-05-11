@@ -59,7 +59,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 
 	if (lstat(ondisk_path, &sb) != 0) {
 		if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
-			return got_error_from_errno();
+			return got_error_prefix_errno2("lstat", ondisk_path);
 	} else
 		entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
 
@@ -111,11 +111,11 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 
 	*entry = calloc(1, sizeof(**entry));
 	if (*entry == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	(*entry)->path = strdup(relpath);
 	if ((*entry)->path == NULL) {
-		const struct got_error *err = got_error_from_errno();
+		const struct got_error *err = got_error_prefix_errno("strdup");
 		free(*entry);
 		*entry = NULL;
 		return err;
@@ -389,7 +389,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 		return got_ferror(outfile, GOT_ERR_IO);
 
 	if (fflush(outfile) != 0)
-		return got_error_from_errno();
+		return got_error_prefix_errno("fflush");
 
 	return NULL;
 }
@@ -442,7 +442,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 
 	*path = malloc(totlen);
 	if (*path == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("malloc");
 
 	do {
 		n = fread(buf, 1, sizeof(buf), infile);
@@ -451,7 +451,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 		if (len + sizeof(buf) > totlen) {
 			char *p = reallocarray(*path, totlen + sizeof(buf), 1);
 			if (p == NULL) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("reallocarray");
 				break;
 			}
 			totlen += sizeof(buf);
@@ -481,7 +481,7 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 
 	entry = calloc(1, sizeof(*entry));
 	if (entry == NULL)
-		return got_error_from_errno();
+		return got_error_prefix_errno("calloc");
 
 	err = read_fileindex_val64(&entry->ctime_sec, ctx, infile);
 	if (err)
@@ -635,7 +635,7 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 
 		if (asprintf(&subpath, "%s%s%s", path,
 		    path[0] == '\0' ? "" : "/", te->name) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 
 		err = got_object_open_as_tree(&subtree, repo, te->id);
 		if (err) {
@@ -674,7 +674,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			char *te_path;
 			int cmp;
 			if (asprintf(&te_path, "%s/%s", path, te->name) == -1) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("asprintf");
 				break;
 			}
 			cmp = got_path_cmp((*ie)->path, te_path);
@@ -776,18 +776,18 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 		if (asprintf(&subpath, "%s%s%s", path,
 		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 
 		if (asprintf(&subdirpath, "%s/%s", rootpath, subpath) == -1) {
 			free(subpath);
-			return got_error_from_errno();
+			return got_error_prefix_errno("asprintf");
 		}
 
 		subdir = opendir(subdirpath);
 		if (subdir == NULL) {
 			free(subpath);
 			free(subdirpath);
-			return got_error_from_errno();
+			return got_error_prefix_errno2("opendir", subdirpath);
 		}
 
 		err = diff_fileindex_dir(fileindex, ie, subdir, rootpath,
@@ -824,12 +824,12 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 
 		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
 		if (de == NULL) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("malloc");
 			goto done;
 		}
 
 		if (readdir_r(dir, de, &dep) != 0) {
-			err = got_error_from_errno();
+			err = got_error_prefix_errno("readdir_r");
 			free(de);
 			goto done;
 		}
@@ -866,7 +866,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			de = dle->data;
 			if (asprintf(&de_path, "%s/%s", path,
 			    de->d_name) == -1) {
-				err = got_error_from_errno();
+				err = got_error_prefix_errno("asprintf");
 				break;
 			}
 			cmp = got_path_cmp((*ie)->path, de_path);
