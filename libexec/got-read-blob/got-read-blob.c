@@ -67,13 +67,13 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	while (1) {
+	for (;;) {
 		struct imsg imsg, imsg_outfd;
 		FILE *f = NULL;
 		size_t size;
 		struct got_object *obj = NULL;
 		uint8_t *buf = NULL;
-	
+
 		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
 		memset(&imsg_outfd, 0, sizeof(imsg_outfd));

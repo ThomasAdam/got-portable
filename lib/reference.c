@@ -625,7 +625,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 	if (d == NULL)
 		goto done;
 
-	while (1) {
+	for (;;) {
 		struct dirent *dent;
 		struct got_reference *ref;
 		char *child;
@@ -723,7 +723,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 		char *line;
 		size_t len;
 		const char delim[3] = {'\0', '\0', '\0'};
-		while (1) {
+		for (;;) {
 			line = fparseln(f, &len, NULL, delim, 0);
 			if (line == NULL) {
 				if (feof(f))
@@ -933,7 +933,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		err = got_error_prefix_errno2("fopen", packed_refs_path);
 		goto done;
 	}
-	while (1) {
+	for (;;) {
 		char *line;
 		size_t len;
 		const char delim[3] = {'\0', '\0', '\0'};

@@ -152,7 +152,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		err = got_ferror(blobfile, GOT_ERR_IO);
 		goto done;
 	}
-	while (1) {
+	for (;;) {
 		char buf[8192];
 		ssize_t inlen;
 

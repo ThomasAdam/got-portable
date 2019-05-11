@@ -757,7 +757,7 @@ get_more:
 	if (err)
 		goto done;
 
-	while (1) {
+	for (;;) {
 		struct imsg imsg;
 		size_t n;
 		size_t datalen;

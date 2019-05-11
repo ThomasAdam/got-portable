@@ -277,7 +277,7 @@ check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
 	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
 	if (err)
 		goto done;
-	while (1) {
+	for (;;) {
 		struct got_object_id *id;
 
 		if (sigint_received || sigpipe_received)
@@ -759,7 +759,7 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 	err = got_commit_graph_iter_start(graph, root_id, repo);
 	if (err)
 		goto done;
-	while (1) {
+	for (;;) {
 		struct got_commit_object *commit;
 		struct got_object_id *id;
 

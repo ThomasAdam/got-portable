@@ -1068,7 +1068,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 		goto done;
 	}
 	hdrlen = got_object_blob_get_hdrlen(blob);
-	while (1) {
+	for (;;) {
 		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
 		err = got_object_blob_read_block(&blen, blob);
 		if (err)

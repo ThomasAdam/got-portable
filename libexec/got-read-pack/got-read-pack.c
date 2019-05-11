@@ -507,7 +507,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	while (1) {
+	for (;;) {
 		imsg.fd = -1;
 
 		if (sigint_received) {

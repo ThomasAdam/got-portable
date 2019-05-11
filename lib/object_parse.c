@@ -903,7 +903,7 @@ got_read_file_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	remain = blocksize;
 	total = 0;
-	while (1) {
+	for (;;) {
 		if (remain == 0) {
 			uint8_t *newbuf;
 			newbuf = reallocarray(buf, 1, total + blocksize);

@@ -101,7 +101,7 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	while (1) {
+	for (;;) {
 		struct imsg imsg;
 		FILE *f = NULL;
 		struct got_commit_object *commit = NULL;

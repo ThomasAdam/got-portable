@@ -78,7 +78,7 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	while (1) {
+	for (;;) {
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
 			break;

@@ -348,7 +348,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 
 	id = NULL;
-	while (1) {
+	for (;;) {
 		struct got_object_id *next_id;
 
 		err = got_commit_graph_iter_next(&next_id, graph);

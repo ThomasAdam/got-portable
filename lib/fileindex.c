@@ -818,7 +818,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 
 	TAILQ_INIT(&dirlist);
 
-	while (1) {
+	for (;;) {
 		struct got_pathlist_entry *new = NULL;
 		struct dirent *dep = NULL;
 
