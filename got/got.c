@@ -389,6 +389,7 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
+	got_path_strip_trailing_slashes(repo_path);
 	got_path_strip_trailing_slashes(worktree_path);
 
 	error = got_repo_open(&repo, repo_path);
@@ -847,6 +848,7 @@ cmd_log(int argc, char *argv[])
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
 			break;
 		default:
 			usage_log();
@@ -1103,6 +1105,7 @@ cmd_diff(int argc, char *argv[])
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
 			break;
 		default:
 			usage_diff();
@@ -1277,6 +1280,7 @@ cmd_blame(int argc, char *argv[])
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
 			break;
 		default:
 			usage_blame();
@@ -1496,6 +1500,7 @@ cmd_tree(int argc, char *argv[])
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'i':
 			show_ids = 1;
@@ -1783,6 +1788,7 @@ cmd_ref(int argc, char *argv[])
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'l':
 			do_list = 1;
@@ -1904,6 +1910,7 @@ cmd_add(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
+	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -1976,6 +1983,7 @@ cmd_rm(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
+	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -2052,6 +2060,7 @@ cmd_revert(int argc, char *argv[])
 		error = got_error_from_errno();
 		goto done;
 	}
+	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -2124,6 +2133,7 @@ cmd_commit(int argc, char *argv[])
 			error = got_error_from_errno();
 			goto done;
 		}
+		got_path_strip_trailing_slashes(path);
 	} else if (argc != 0)
 		usage_commit();
 
