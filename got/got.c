@@ -381,7 +381,7 @@ cmd_checkout(int argc, char *argv[])
 	} else
 		usage_checkout();
 
-	if (worktree_path[x = strlen(worktree_path) - 1] == '/')
+	while (worktree_path[x = strlen(worktree_path) - 1] == '/')
 		worktree_path[x] = '\0';
 
 	error = got_repo_open(&repo, repo_path);
