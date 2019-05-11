@@ -2,6 +2,7 @@ lib:
 - handle checkout of trees which contain submodules by identifying and
   ignoring such tree entries; requires a .ini config parser (from isakmpd?)
 - allow removing multiple paths at once for 'got rm'
+- allow adding directory paths with 'got add'
 - recursive addition: got add -R
 - recursive removal: got rm -R
 

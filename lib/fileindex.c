@@ -18,6 +18,7 @@
 #include <sys/tree.h>
 #include <sys/stat.h>
 
+#include <errno.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,8 +61,12 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 	if (lstat(ondisk_path, &sb) != 0) {
 		if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
 			return got_error_prefix_errno2("lstat", ondisk_path);
-	} else
+	} else {
+		if (sb.st_mode & S_IFDIR)
+			return got_error_set_errno(EISDIR, ondisk_path);
 		entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
+	}
+
 
 	if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
 		if (update_timestamps) {
