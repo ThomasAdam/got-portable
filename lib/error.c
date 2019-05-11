@@ -67,7 +67,7 @@ got_error_msg(int code, const char *msg)
 }
 
 const struct got_error *
-got_error_from_errno()
+got_error_from_errno(void)
 {
 	static struct got_error err;
 
