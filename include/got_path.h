@@ -90,6 +90,9 @@ void got_pathlist_free(struct got_pathlist_head *);
 /* Attempt to create a directory at a given path. */
 const struct got_error *got_path_mkdir(const char *);
 
+/* Determine whether a directory has no files or directories in it. */
+int got_dir_is_empty(const char *);
+
 /* dirname(3) with error handling and dynamically allocated result. */
 const struct got_error *got_path_dirname(char **, const char *);
 

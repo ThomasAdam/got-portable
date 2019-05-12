@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 
 #include "got_error.h"
 #include "got_path.h"
@@ -323,6 +324,29 @@ got_path_mkdir(const char *abspath)
 
 done:
 	return err;
+}
+
+int
+got_dir_is_empty(const char *dir)
+{
+	DIR *d;
+	struct dirent *dent;
+	int empty = 1;
+
+	d = opendir(dir);
+	if (d == NULL)
+		return 1;
+
+	while ((dent = readdir(d)) != NULL) {
+		if (strcmp(dent->d_name, ".") == 0 ||
+		    strcmp(dent->d_name, "..") == 0)
+			continue;
+
+		empty = 0;
+		break;
+	}
+
+	return empty;
 }
 
 const struct got_error *

@@ -19,6 +19,7 @@
 #include <sys/limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 
 #include <err.h>
 #include <errno.h>
@@ -197,10 +198,25 @@ apply_unveil(const char *repo_path, int repo_read_only,
     const char *worktree_path, int create_worktree)
 {
 	const struct got_error *error;
+	static char err_msg[MAXPATHLEN + 36];
 
 	if (create_worktree) {
 		/* Pre-create work tree path to avoid unveiling its parents. */
 		error = got_path_mkdir(worktree_path);
+
+		if (errno == EEXIST) {
+			if (got_dir_is_empty(worktree_path)) {
+				errno = 0;
+				error = NULL;
+			} else {
+				snprintf(err_msg, sizeof(err_msg),
+				    "%s: directory exists but is not empty",
+				    worktree_path);
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    err_msg);
+			}
+		}
+
 		if (error && (error->code != GOT_ERR_ERRNO || errno != EISDIR))
 			return error;
 	}
