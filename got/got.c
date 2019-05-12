@@ -115,7 +115,7 @@ static struct cmd got_commands[] = {
 	{ "ref",	cmd_ref,	usage_ref,
 	    "manage references in repository" },
 	{ "add",	cmd_add,	usage_add,
-	    "add a new file to version control" },
+	    "add new files to version control" },
 	{ "rm",		cmd_rm,		usage_rm,
 	    "remove a versioned file" },
 	{ "revert",	cmd_revert,	usage_revert,
