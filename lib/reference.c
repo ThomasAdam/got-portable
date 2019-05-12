@@ -413,7 +413,9 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		goto done;
 	}
 
-	if (!well_known) {
+	if (well_known) {
+		err = open_ref(ref, path_refs, "", refname, lock);
+	} else {
 		char *packed_refs_path;
 		FILE *f;
 
@@ -448,10 +450,6 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 				goto done;
 		}
 	}
-
-	err = open_ref(ref, path_refs, "", refname, lock);
-	if (err)
-		goto done;
 done:
 	if (!err && *ref == NULL)
 		err = got_error_not_ref(refname);
