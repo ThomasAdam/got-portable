@@ -99,7 +99,7 @@ remove_worktree_base_ref(struct got_worktree *worktree,
 		err = got_error_prefix_errno("asprintf");
 		goto done;
 	}
-	err = got_ref_open(&base_ref, repo, absrefname);
+	err = got_ref_open(&base_ref, repo, absrefname, 0);
 	if (err)
 		goto done;
 
@@ -194,7 +194,7 @@ worktree_init(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		goto done;
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (err != NULL || head_ref == NULL)
 		goto done;
 
@@ -271,7 +271,7 @@ obstruct_meta_file_and_init(int *ok, struct got_repository *repo,
 	if (!obstruct_meta_file(&path, worktree_path, GOT_WORKTREE_FILE_INDEX))
 		return 0;
 
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (err != NULL || head_ref == NULL)
 		return 0;
 
@@ -362,7 +362,7 @@ worktree_checkout(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		goto done;
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (err != NULL || head_ref == NULL)
 		goto done;
 

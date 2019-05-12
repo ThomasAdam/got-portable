@@ -187,7 +187,7 @@ repo_read_log(const char *repo_path)
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
 		return 0;
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (err != NULL || head_ref == NULL)
 		return 0;
 	err = got_ref_resolve(&id, repo, head_ref);

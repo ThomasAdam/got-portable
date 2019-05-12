@@ -1123,7 +1123,7 @@ get_head_commit_id(struct got_object_id **head_id, struct got_repository *repo)
 
 	*head_id = NULL;
 
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (err)
 		return err;
 
@@ -3285,7 +3285,7 @@ cmd_blame(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);

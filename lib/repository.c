@@ -160,7 +160,7 @@ is_git_repo(struct got_repository *repo)
 		goto done;
 
 	/* Check if the HEAD reference can be opened. */
-	if (got_ref_open(&head_ref, repo, GOT_REF_HEAD) != NULL)
+	if (got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0) != NULL)
 		goto done;
 	got_ref_close(head_ref);
 

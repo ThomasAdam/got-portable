@@ -28,10 +28,13 @@ struct got_object_id;
 
 /*
  * Attempt to open the reference with the provided name in a repository.
- * The caller must dispose of it with got_ref_close().
+ * The caller must dispose of the reference with got_ref_close().
+ * Optionally, the underlying reference file can be locked before it is opened
+ * to prevent concurrent modification of the reference, in which case the file
+ * must be unlocked with got_ref_unlock() before got_ref_close() is called.
  */
 const struct got_error *got_ref_open(struct got_reference **,
-    struct got_repository *, const char *);
+    struct got_repository *, const char *, int);
 
 /*
  * Allocate a new reference for a given object ID.
@@ -96,3 +99,6 @@ const struct got_error *got_ref_write(struct got_reference *,
 /* Delete a reference from its on-disk path in the repository. */
 const struct got_error *got_ref_delete(struct got_reference *,
     struct got_repository *);
+
+/* Unlock a reference which was opened in locked state. */
+const struct got_error *got_ref_unlock(struct got_reference *);

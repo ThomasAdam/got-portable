@@ -261,7 +261,7 @@ check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
 	struct got_commit_graph *graph = NULL;
 
 	err = got_ref_open(&head_ref, repo,
-	    got_worktree_get_head_ref_name(worktree));
+	    got_worktree_get_head_ref_name(worktree), 0);
 	if (err)
 		return err;
 
@@ -407,7 +407,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (error != NULL)
 		goto done;
 
@@ -547,7 +547,7 @@ cmd_update(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
@@ -919,7 +919,7 @@ cmd_log(int argc, char *argv[])
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 		if (error != NULL)
 			return error;
 		error = got_ref_resolve(&id, repo, head_ref);
@@ -929,7 +929,7 @@ cmd_log(int argc, char *argv[])
 		error = got_object_open_as_commit(&commit, repo, id);
 	} else {
 		struct got_reference *ref;
-		error = got_ref_open(&ref, repo, start_commit);
+		error = got_ref_open(&ref, repo, start_commit, 0);
 		if (error == NULL) {
 			int obj_type;
 			error = got_ref_resolve(&id, repo, ref);
@@ -1360,7 +1360,7 @@ cmd_blame(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
@@ -1592,7 +1592,7 @@ cmd_tree(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD);
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
@@ -1744,7 +1744,7 @@ delete_ref(struct got_repository *repo, const char *refname)
 	const struct got_error *err = NULL;
 	struct got_reference *ref;
 
-	err = got_ref_open(&ref, repo, refname);
+	err = got_ref_open(&ref, repo, refname, 0);
 	if (err)
 		return err;
 

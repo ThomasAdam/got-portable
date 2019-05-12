@@ -2854,7 +2854,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = got_ref_open(&head_ref, repo, worktree->head_ref_name);
+	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
 	if (err)
 		goto done;
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
@@ -2923,13 +2923,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	/* Check if a concurrent commit to our branch has occurred. */
-	/* XXX ideally we'd lock the reference file here to avoid a race */
 	head_ref_name = got_worktree_get_head_ref_name(worktree);
 	if (head_ref_name == NULL) {
 		err = got_error_prefix_errno("got_worktree_get_head_ref_name");
 		goto done;
 	}
-	err = got_ref_open(&head_ref2, repo, head_ref_name);
+	/* Lock the reference here to prevent concurrent modification. */
+	err = got_ref_open(&head_ref2, repo, head_ref_name, 1);
 	if (err)
 		goto done;
 	err = got_ref_resolve(&head_commit_id2, repo, head_ref2);
@@ -2940,13 +2940,12 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 	}
 	/* Update branch head in repository. */
-	err = got_ref_change_ref(head_ref, *new_commit_id);
+	err = got_ref_change_ref(head_ref2, *new_commit_id);
 	if (err)
 		goto done;
-	err = got_ref_write(head_ref, repo);
+	err = got_ref_write(head_ref2, repo);
 	if (err)
 		goto done;
-	/* XXX race has ended here */
 
 	err = got_worktree_set_base_commit_id(worktree, repo, *new_commit_id);
 	if (err)
@@ -2978,7 +2977,11 @@ done:
 	free(head_commit_id2);
 	if (head_ref)
 		got_ref_close(head_ref);
-	if (head_ref2)
+	if (head_ref2) {
+		unlockerr = got_ref_unlock(head_ref2);
+		if (unlockerr && err == NULL)
+			err = unlockerr;
 		got_ref_close(head_ref2);
+	}
 	return err;
 }

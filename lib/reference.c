@@ -80,6 +80,8 @@ struct got_reference {
 		struct got_ref ref;
 		struct got_symref symref;
 	} ref;
+
+	struct got_lockfile *lf;
 };
 
 static const struct got_error *
@@ -156,13 +158,20 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 
 static const struct got_error *
 parse_ref_file(struct got_reference **ref, const char *name,
-    const char *abspath)
+    const char *abspath, int lock)
 {
 	const struct got_error *err = NULL;
 	FILE *f;
 	char *line;
 	size_t len;
 	const char delim[3] = {'\0', '\0', '\0'};
+	struct got_lockfile *lf = NULL;
+
+	if (lock) {
+		err = got_lockfile_lock(&lf, abspath);
+		if (err)
+			return (err);
+	}
 
 	f = fopen(abspath, "rb");
 	if (f == NULL)
@@ -175,10 +184,19 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	}
 
 	err = parse_ref_line(ref, name, line);
+	if (err == NULL && lf)
+		(*ref)->lf = lf;
 done:
 	free(line);
-	if (fclose(f) != 0 && err == NULL)
+	if (fclose(f) != 0 && err == NULL) {
 		err = got_error_prefix_errno("fclose");
+		if (lf)
+			got_lockfile_unlock(lf);
+		if (*ref) {
+			got_ref_close(*ref);
+			*ref = NULL;
+		}
+	}
 	return err;
 }
 
@@ -334,7 +352,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 
 static const struct got_error *
 open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
-    const char *name)
+    const char *name, int lock)
 {
 	const struct got_error *err = NULL;
 	char *path = NULL;
@@ -367,7 +385,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 		goto done;
 	}
 
-	err = parse_ref_file(ref, absname, normpath);
+	err = parse_ref_file(ref, absname, normpath, lock);
 done:
 	if (!ref_is_absolute && !ref_is_well_known)
 		free(absname);
@@ -378,7 +396,7 @@ done:
 
 const struct got_error *
 got_ref_open(struct got_reference **ref, struct got_repository *repo,
-   const char *refname)
+   const char *refname, int lock)
 {
 	const struct got_error *err = NULL;
 	char *path_refs = NULL;
@@ -401,7 +419,8 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 
 		/* Search on-disk refs before packed refs! */
 		for (i = 0; i < nitems(subdirs); i++) {
-			err = open_ref(ref, path_refs, subdirs[i], refname);
+			err = open_ref(ref, path_refs, subdirs[i], refname,
+			    lock);
 			if (err || *ref)
 				goto done;
 		}
@@ -413,6 +432,11 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 			goto done;
 		}
 
+		if (lock) {
+			err = got_lockfile_lock(&(*ref)->lf, packed_refs_path);
+			if (err)
+				goto done;
+		}
 		f = fopen(packed_refs_path, "rb");
 		free(packed_refs_path);
 		if (f != NULL) {
@@ -425,7 +449,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		}
 	}
 
-	err = open_ref(ref, path_refs, "", refname);
+	err = open_ref(ref, path_refs, "", refname, lock);
 	if (err)
 		goto done;
 done:
@@ -488,7 +512,7 @@ resolve_symbolic_ref(struct got_reference **resolved,
 	struct got_reference *nextref;
 	const struct got_error *err;
 
-	err = got_ref_open(&nextref, repo, ref->ref.symref.ref);
+	err = got_ref_open(&nextref, repo, ref->ref.symref.ref, 0);
 	if (err)
 		return err;
 
@@ -640,7 +664,8 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 
 		switch (dent->d_type) {
 		case DT_REG:
-			err = open_ref(&ref, path_refs, subdir, dent->d_name);
+			err = open_ref(&ref, path_refs, subdir, dent->d_name,
+			    0);
 			if (err)
 				goto done;
 			if (ref) {
@@ -687,7 +712,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 		err = got_error_prefix_errno("get_refs_dir_path");
 		goto done;
 	}
-	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD);
+	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
 	if (err)
 		goto done;
 	err = insert_ref(&new, refs, ref, repo);
@@ -858,9 +883,11 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		}
 	}
 
-	err = got_lockfile_lock(&lf, path);
-	if (err)
-		goto done;
+	if (ref->lf == NULL) {
+		err = got_lockfile_lock(&lf, path);
+		if (err)
+			goto done;
+	}
 
 	/* XXX: check if old content matches our expectations? */
 
@@ -884,7 +911,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		goto done;
 	}
 done:
-	if (lf)
+	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
 		if (fclose(f) != 0 && err == NULL)
@@ -924,9 +951,11 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	if (err)
 		goto done;
 
-	err = got_lockfile_lock(&lf, packed_refs_path);
-	if (err)
-		goto done;
+	if (delref->lf == NULL) {
+		err = got_lockfile_lock(&lf, packed_refs_path);
+		if (err)
+			goto done;
+	}
 
 	f = fopen(packed_refs_path, "r");
 	if (f == NULL) {
@@ -1027,7 +1056,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 	}
 done:
-	if (lf)
+	if (delref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
 		if (fclose(f) != 0 && err == NULL)
@@ -1066,19 +1095,30 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 		goto done;
 	}
 
-	err = got_lockfile_lock(&lf, path);
-	if (err)
-		goto done;
+	if (ref->lf == NULL) {
+		err = got_lockfile_lock(&lf, path);
+		if (err)
+			goto done;
+	}
 
 	/* XXX: check if old content matches our expectations? */
 
 	if (unlink(path) != 0)
 		err = got_error_prefix_errno2("unlink", path);
 done:
-	if (lf)
+	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
 
 	free(path_refs);
 	free(path);
 	return err ? err : unlock_err;
+}
+
+const struct got_error *
+got_ref_unlock(struct got_reference *ref)
+{
+	const struct got_error *err;
+	err = got_lockfile_unlock(ref->lf);
+	ref->lf = NULL;
+	return err;
 }
