@@ -346,6 +346,7 @@ got_path_dir_is_empty(const char *dir)
 		break;
 	}
 
+	closedir(d);
 	return empty;
 }
 
