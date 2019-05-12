@@ -3730,9 +3730,9 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		break;
 	case KEY_ENTER:
 	case '\r':
-		if (s->selected_entry == NULL) {
-			struct tog_parent_tree *parent;
 	case KEY_BACKSPACE:
+		if (s->selected_entry == NULL || ch == KEY_BACKSPACE) {
+			struct tog_parent_tree *parent;
 			/* user selected '..' */
 			if (s->tree == s->root)
 				break;
