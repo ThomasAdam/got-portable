@@ -491,19 +491,6 @@ view_is_splitscreen(struct tog_view *view)
 	return view->begin_x > 0;
 }
 
-/*
- * Erase all content of the view. Can be used to "flash" the view because
- * the view loop will redraw it quickly, providing a more subtle visual
- * effect than curs_flash(3) would provide.
- */
-static void
-view_flash(struct tog_view *view)
-{
-	werase(view->window);
-	update_panels();
-	doupdate();
-}
-
 static void
 tog_resizeterm(void)
 {
@@ -1278,10 +1265,8 @@ scroll_up(struct tog_view *view,
 	int nscrolled = 0;
 
 	entry = TAILQ_FIRST(&commits->head);
-	if (*first_displayed_entry == entry) {
-		view_flash(view);
+	if (*first_displayed_entry == entry)
 		return;
-	}
 
 	entry = *first_displayed_entry;
 	while (entry && nscrolled < maxscroll) {
@@ -1364,11 +1349,8 @@ scroll_down(struct tog_view *view,
 
 	do {
 		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
-		if (pentry == NULL) {
-			if (*log_complete)
-				view_flash(view);
+		if (pentry == NULL)
 			break;
-		}
 
 		*last_displayed_entry = pentry;
 
@@ -1655,10 +1637,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		if (TAILQ_FIRST(&s->commits.head) ==
 		    s->first_displayed_entry) {
-			if (s->selected == 0) {
-				view_flash(view);
-				break;
-			}
 			s->selected = 0;
 			break;
 		}
@@ -2343,14 +2321,10 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case KEY_UP:
 		if (s->first_displayed_line > 1)
 			s->first_displayed_line--;
-		else
-			view_flash(view);
 		break;
 	case KEY_PPAGE:
-		if (s->first_displayed_line == 1) {
-			view_flash(view);
+		if (s->first_displayed_line == 1)
 			break;
-		}
 		i = 0;
 		while (i++ < view->nlines - 1 &&
 		    s->first_displayed_line > 1)
@@ -2360,15 +2334,11 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case KEY_DOWN:
 		if (!s->eof)
 			s->first_displayed_line++;
-		else
-			view_flash(view);
 		break;
 	case KEY_NPAGE:
 	case ' ':
-		if (s->eof) {
-			view_flash(view);
+		if (s->eof)
 			break;
-		}
 		i = 0;
 		while (!s->eof && i++ < view->nlines - 1) {
 			char *line;
@@ -2987,15 +2957,9 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		else if (s->selected_line == 1 &&
 		    s->first_displayed_line > 1)
 			s->first_displayed_line--;
-		else
-			view_flash(view);
 		break;
 	case KEY_PPAGE:
 		if (s->first_displayed_line == 1) {
-			if (s->selected_line == 1) {
-				view_flash(view);
-				break;
-			}
 			s->selected_line = 1;
 			break;
 		}
@@ -3014,8 +2978,6 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		else if (s->last_displayed_line <
 		    s->blame.nlines)
 			s->first_displayed_line++;
-		else
-			view_flash(view);
 		break;
 	case 'b':
 	case 'p': {
@@ -3155,8 +3117,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case ' ':
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
-			view->nlines - 2)) {
-			view_flash(view);
+		    view->nlines - 2)) {
 			break;
 		}
 		if (s->last_displayed_line >= s->blame.nlines &&
@@ -3447,14 +3408,11 @@ tree_scroll_up(struct tog_view *view,
 	struct got_tree_entry *te, *prev;
 	int i;
 
-	if (*first_displayed_entry == NULL) {
-		view_flash(view);
+	if (*first_displayed_entry == NULL)
 		return;
-	}
 
 	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == te) {
-		view_flash(view);
 		if (!isroot)
 			*first_displayed_entry = NULL;
 		return;
@@ -3743,12 +3701,9 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected++;
 			break;
 		}
-		if (SIMPLEQ_NEXT(s->last_displayed_entry, entry)
-		    == NULL) {
+		if (SIMPLEQ_NEXT(s->last_displayed_entry, entry) == NULL)
 			/* can't scroll any further */
-			view_flash(view);
 			break;
-		}
 		tree_scroll_down(&s->first_displayed_entry, 1,
 		    s->last_displayed_entry, s->entries);
 		break;
@@ -3758,8 +3713,6 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
 				s->selected = s->ndisplayed - 1;
-			else
-				view_flash(view);
 			break;
 		}
 		nscrolled = tree_scroll_down(&s->first_displayed_entry,
