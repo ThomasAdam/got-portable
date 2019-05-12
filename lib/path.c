@@ -327,7 +327,7 @@ done:
 }
 
 int
-got_dir_is_empty(const char *dir)
+got_path_dir_is_empty(const char *dir)
 {
 	DIR *d;
 	struct dirent *dent;

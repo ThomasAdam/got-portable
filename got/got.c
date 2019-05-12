@@ -205,7 +205,7 @@ apply_unveil(const char *repo_path, int repo_read_only,
 		error = got_path_mkdir(worktree_path);
 
 		if (errno == EEXIST) {
-			if (got_dir_is_empty(worktree_path)) {
+			if (got_path_dir_is_empty(worktree_path)) {
 				errno = 0;
 				error = NULL;
 			} else {
