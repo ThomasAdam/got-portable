@@ -404,6 +404,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	    GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
 	};
 	int i, well_known = is_well_known_ref(refname);
+	struct got_lockfile *lf = NULL;
 
 	*ref = NULL;
 
@@ -435,7 +436,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		}
 
 		if (lock) {
-			err = got_lockfile_lock(&(*ref)->lf, packed_refs_path);
+			err = got_lockfile_lock(&lf, packed_refs_path);
 			if (err)
 				goto done;
 		}
@@ -444,15 +445,21 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		if (f != NULL) {
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
 			    refname);
-			if (fclose(f) != 0 && err == NULL)
-				err = got_error_prefix_errno("fclose");
-			if (err || *ref)
-				goto done;
+			if (!err) {
+				if (fclose(f) != 0) {
+					err = got_error_prefix_errno("fclose");
+					got_ref_close(*ref);
+					*ref = NULL;
+				} else
+					(*ref)->lf = lf;
+			}
 		}
 	}
 done:
 	if (!err && *ref == NULL)
 		err = got_error_not_ref(refname);
+	if (err && lf)
+		got_lockfile_unlock(lf);
 	free(path_refs);
 	return err;
 }
