@@ -314,8 +314,28 @@ If the file was deleted with
 .Cm got rm
 it will be restored.
 .It Cm commit [ Fl m Ar msg ] [ file-path ]
-Create a new commit in the repository from local changes in a work tree.
-This command requires the
+Create a new commit in the repository from local changes in a work tree
+and use this commit as the new base commit for the work tree.
+.Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It M Ta modified file
+.It D Ta file was deleted
+.It A Ta new file was added
+.El
+.Pp
+Files without local changes will retain their previously recorded base
+commit.
+Some
+.Nm
+commands may refuse to run while the work tree contains files from
+multiple base commits.
+The base commit of such a work tree can be made consistent by running
+another update operation across the entire work tree.
+.Pp
+The
+.Cm got commit
+command requires the
 .Ev GOT_AUTHOR
 environment variable to be set.
 .Pp
