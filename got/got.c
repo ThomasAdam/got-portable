@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/wait.h>
 
 #include <err.h>
 #include <errno.h>
@@ -31,6 +32,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <time.h>
+#include <paths.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -2146,6 +2148,160 @@ usage_commit(void)
 	exit(1);
 }
 
+int
+spawn_editor(const char *file)
+{
+	char *argp[] = { "sh", "-c", NULL, NULL };
+	char *editor, *editp;
+	pid_t pid;
+	sig_t sighup, sigint, sigquit;
+	int st = -1;
+
+	editor = getenv("VISUAL");
+	if (editor == NULL)
+		editor = getenv("EDITOR");
+	if (editor == NULL)
+		editor = "ed";
+
+	if (asprintf(&editp, "%s %s", editor, file) == -1)
+		return -1;
+
+	argp[2] = editp;
+
+	sighup = signal(SIGHUP, SIG_IGN);
+	sigint = signal(SIGINT, SIG_IGN);
+	sigquit = signal(SIGQUIT, SIG_IGN);
+
+	switch (pid = fork()) {
+	case -1:
+		goto doneediting;
+	case 0:
+		execv(_PATH_BSHELL, argp);
+		_exit(127);
+	}
+
+	free(editp);
+
+	while (waitpid(pid, &st, 0) == -1)
+		if (errno != EINTR)
+			break;
+
+doneediting:
+	(void)signal(SIGHUP, sighup);
+	(void)signal(SIGINT, sigint);
+	(void)signal(SIGQUIT, sigquit);
+
+	if (!WIFEXITED(st)) {
+		errno = EINTR;
+		return -1;
+	}
+
+	return WEXITSTATUS(st);
+}
+
+static const struct got_error *
+collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
+    void *arg)
+{
+	struct got_pathlist_entry *pe;
+	const struct got_error *err = NULL;
+	char *tmppath = NULL;
+	char *tmpfile = NULL;
+	char *cmdline_log = (char *)arg;
+	char buf[1024];
+	struct stat st, st2;
+	FILE *fp;
+	size_t len;
+	int fd;
+
+	/* if a message was specified on the command line, just use it */
+	if (cmdline_log != NULL && strlen(cmdline_log) != 0) {
+		len = strlen(cmdline_log) + 1;
+		*logmsg = malloc(len + 1);
+		strlcpy(*logmsg, cmdline_log, len);
+		return NULL;
+	}
+
+	tmppath = getenv("TMPDIR");
+	if (tmppath == NULL || strlen(tmppath) == 0)
+		tmppath = "/tmp";
+
+	if (asprintf(&tmpfile, "%s/got-XXXXXXXXXX", tmppath) == -1) {
+		err = got_error_prefix_errno("asprintf");
+		return err;
+	}
+
+	fd = mkstemp(tmpfile);
+	if (fd < 0) {
+		err = got_error_prefix_errno("mktemp");
+		free(tmpfile);
+		return err;
+	}
+
+	dprintf(fd, "\n"
+	    "# changes to be committed:\n");
+
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		dprintf(fd, "#  %c  %s\n", ct->status, pe->path);
+	}
+	close(fd);
+
+	if (stat(tmpfile, &st) == -1) {
+		err = got_error_prefix_errno2("stat", tmpfile);
+		goto done;
+	}
+
+	if (spawn_editor(tmpfile) == -1) {
+		err = got_error_prefix_errno("failed spawning editor");
+		goto done;
+	}
+
+	if (stat(tmpfile, &st2) == -1) {
+		err = got_error_prefix_errno("stat");
+		goto done;
+	}
+
+	if (st.st_mtime == st2.st_mtime && st.st_size == st2.st_size) {
+		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "no changes made to commit message, aborting");
+		goto done;
+	}
+
+	/* remove comments */
+	*logmsg = malloc(st2.st_size + 1);
+	len = 0;
+
+	fp = fopen(tmpfile, "r");
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
+			continue;
+		len = strlcat(*logmsg, buf, st2.st_size);
+	}
+	fclose(fp);
+
+	while (len > 0 && (*logmsg)[len - 1] == '\n') {
+		(*logmsg)[len - 1] = '\0';
+		len--;
+	}
+
+	if (len == 0) {
+		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "commit message cannot be empty, aborting");
+		goto done;
+	}
+
+	goto done;
+
+done:
+	if (tmpfile) {
+		unlink(tmpfile);
+		free(tmpfile);
+	}
+
+	return err;
+}
+
 static const struct got_error *
 cmd_commit(int argc, char *argv[])
 {
@@ -2154,7 +2310,7 @@ cmd_commit(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	char *cwd = NULL, *path = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
-	const char *logmsg = "<no log message was specified>";
+	const char *logmsg = NULL;
 	const char *got_author = getenv("GOT_AUTHOR");
 	int ch;
 
@@ -2201,13 +2357,15 @@ cmd_commit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+#if 0
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
+#endif
 
 	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
-	    logmsg, print_status, NULL, repo);
+	    collect_commit_logmsg, (void *)logmsg, print_status, NULL, repo);
 	if (error)
 		goto done;
 

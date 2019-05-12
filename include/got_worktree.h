@@ -30,6 +30,16 @@ struct got_worktree;
 #define GOT_STATUS_OBSTRUCTED	'~'
 #define GOT_STATUS_REVERT	'R'
 
+struct got_commitable {
+	char *path;
+	char *in_repo_path;
+	char *ondisk_path;
+	unsigned char status;
+	struct got_object_id *blob_id;
+	struct got_object_id *base_id;
+	mode_t mode;
+};
+
 /*
  * Attempt to initialize a new work tree on disk.
  * The first argument is the path to a directory where the work tree
@@ -160,6 +170,15 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
     const char *, got_worktree_checkout_cb, void *, struct got_repository *);
 
 /*
+ * A callback function which is invoked when a commit message is requested.
+ * Passes a list of modified paths being committed to, a pointer to the log
+ * message that must be set by the callback and will be freed after committing,
+ * and an argument passed through to the callback.
+ */
+typedef const struct got_error *(*got_worktree_commit_msg_cb)(
+    struct got_pathlist_head *, char **, void *);
+
+/*
  * Create a new commit from changes in the work tree.
  * Return the ID of the newly created commit.
  * The worktree's base commit will be set to this new commit.
@@ -171,4 +190,5 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, const char *, const char *, const char *,
-    const char *, got_worktree_status_cb, void *, struct got_repository *);
+    got_worktree_commit_msg_cb, void *,
+    got_worktree_status_cb, void *, struct got_repository *);

@@ -87,6 +87,9 @@
 #define GOT_ERR_COMMIT_NO_AUTHOR 71
 #define GOT_ERR_COMMIT_HEAD_CHANGED 72
 #define GOT_ERR_COMMIT_OUT_OF_DATE 73
+#define GOT_ERR_COMMIT_MSG_EMPTY 74
+#define GOT_ERR_DIR_NOT_EMPTY	75
+#define GOT_ERR_COMMIT_NO_CHANGES 76
 
 static const struct got_error {
 	int code;
@@ -167,6 +170,8 @@ static const struct got_error {
 	    "while commit was in progress" },
 	{ GOT_ERR_COMMIT_OUT_OF_DATE, "work tree must be updated before these "
 	    "changes can be committed" },
+	{ GOT_ERR_COMMIT_MSG_EMPTY, "commit message cannot be empty" },
+	{ GOT_ERR_COMMIT_NO_CHANGES, "no changes to commit" },
 };
 
 /*

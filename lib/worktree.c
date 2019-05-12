@@ -2224,18 +2224,8 @@ done:
 	return err;
 }
 
-struct commitable {
-	char *path;
-	char *in_repo_path;
-	char *ondisk_path;
-	unsigned char status;
-	struct got_object_id *blob_id;
-	struct got_object_id *base_id;
-	mode_t mode;
-};
-
 static void
-free_commitable(struct commitable *ct)
+free_commitable(struct got_commitable *ct)
 {
 	free(ct->path);
 	free(ct->in_repo_path);
@@ -2257,7 +2247,7 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 {
 	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
-	struct commitable *ct = NULL;
+	struct got_commitable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
 	char *parent_path = NULL, *path = NULL;
 	struct stat sb;
@@ -2366,7 +2356,7 @@ write_subtree(struct got_object_id **new_subtree_id,
 }
 
 static const struct got_error *
-match_ct_parent_path(int *match, struct commitable *ct, const char *path)
+match_ct_parent_path(int *match, struct got_commitable *ct, const char *path)
 {
 	const struct got_error *err = NULL;
 	char *ct_parent_path = NULL;
@@ -2387,14 +2377,14 @@ match_ct_parent_path(int *match, struct commitable *ct, const char *path)
 }
 
 static mode_t
-get_ct_file_mode(struct commitable *ct)
+get_ct_file_mode(struct got_commitable *ct)
 {
 	return S_IFREG | (ct->mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
 }
 
 static const struct got_error *
 alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
-    struct got_tree_entry *te, struct commitable *ct)
+    struct got_tree_entry *te, struct got_commitable *ct)
 {
 	const struct got_error *err = NULL;
 
@@ -2422,7 +2412,7 @@ done:
 
 static const struct got_error *
 alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
-    struct commitable *ct)
+    struct got_commitable *ct)
 {
 	const struct got_error *err = NULL;
 	char *ct_name;
@@ -2475,7 +2465,7 @@ insert_tree_entry(struct got_tree_entry *new_te,
 }
 
 static const struct got_error *
-report_ct_status(struct commitable *ct,
+report_ct_status(struct got_commitable *ct,
     got_worktree_status_cb status_cb, void *status_arg)
 {
 	const char *ct_path = ct->path;
@@ -2500,7 +2490,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 		return got_error_prefix_errno("asprintf");
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		*modified = got_path_is_child(ct->in_repo_path, te_path,
 		    strlen(te_path));
 		 if (*modified)
@@ -2512,7 +2502,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 }
 
 static const struct got_error *
-match_deleted_or_modified_ct(struct commitable **ctp,
+match_deleted_or_modified_ct(struct got_commitable **ctp,
     struct got_tree_entry *te, const char *base_tree_path,
     struct got_pathlist_head *commitable_paths)
 {
@@ -2522,7 +2512,7 @@ match_deleted_or_modified_ct(struct commitable **ctp,
 	*ctp = NULL;
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		char *ct_name = NULL;
 		int path_matches;
 
@@ -2573,7 +2563,7 @@ write_tree(struct got_object_id **new_tree_id,
 
 	/* Insert, and recurse into, newly added entries first. */
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		char *child_path = NULL, *slash;
 
 		if (ct->status != GOT_STATUS_ADD)
@@ -2646,7 +2636,7 @@ write_tree(struct got_object_id **new_tree_id,
 		/* Handle modified and deleted entries. */
 		base_entries = got_object_tree_get_entries(base_tree);
 		SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
-			struct commitable *ct = NULL;
+			struct got_commitable *ct = NULL;
 
 			if (S_ISDIR(te->mode)) {
 				int modified;
@@ -2734,7 +2724,7 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_fileindex_entry *ie;
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 
 		ie = got_fileindex_entry_get(fileindex, pe->path);
 		if (ie) {
@@ -2783,7 +2773,7 @@ done:
 }
 
 static const struct got_error *
-check_ct_out_of_date(struct commitable *ct, struct got_repository *repo,
+check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
 	struct got_object_id *head_commit_id)
 {
 	const struct got_error *err = NULL;
@@ -2818,7 +2808,8 @@ check_ct_out_of_date(struct commitable *ct, struct got_repository *repo,
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, const char *ondisk_path,
-    const char *author, const char *committer, const char *logmsg,
+    const char *author, const char *committer,
+    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -2837,6 +2828,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_object_id *new_tree_id = NULL;
 	struct got_object_id_queue parent_ids;
 	struct got_object_qid *pid = NULL;
+	char *logmsg = NULL;
 
 	*new_commit_id = NULL;
 
@@ -2869,12 +2861,17 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	if (TAILQ_EMPTY(&commitable_paths)) {
+		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
+		goto done;
+	}
+
 	err = got_object_open_as_commit(&head_commit, repo, head_commit_id);
 	if (err)
 		goto done;
 
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		err = check_ct_out_of_date(ct, repo, head_commit_id);
 		if (err)
 			goto done;
@@ -2884,11 +2881,20 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	/* TODO: collect commit message if not specified */
+	if (commit_msg_cb != NULL) {
+		err = commit_msg_cb(&commitable_paths, &logmsg, commit_arg);
+		if (err)
+			goto done;
+	}
+
+	if (logmsg == NULL || strlen(logmsg) == 0) {
+		err = got_error(GOT_ERR_COMMIT_MSG_EMPTY);
+		goto done;
+	}
 
 	/* Create blobs from added and modified files and record their IDs. */
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		char *ondisk_path;
 
 		if (ct->status != GOT_STATUS_ADD &&
@@ -2919,6 +2925,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
 	    1, author, time(NULL), committer, time(NULL), logmsg, repo);
 	got_object_qid_free(pid);
+	if (logmsg != NULL)
+		free(logmsg);
 	if (err)
 		goto done;
 
@@ -2964,7 +2972,7 @@ done:
 	if (unlockerr && err == NULL)
 		err = unlockerr;
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
-		struct commitable *ct = pe->data;
+		struct got_commitable *ct = pe->data;
 		free_commitable(ct);
 	}
 	got_pathlist_free(&commitable_paths);

@@ -100,7 +100,7 @@ enum got_imsg_type {
 	GOT_IMSG_PACK,
 	GOT_IMSG_PACKED_OBJECT_REQUEST,
 
-	/* Message sending file desciprtor to a temporary file. */
+	/* Message sending file descriptor to a temporary file. */
 	GOT_IMSG_TMPFD,
 };
 
