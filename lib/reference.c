@@ -174,25 +174,38 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	}
 
 	f = fopen(abspath, "rb");
-	if (f == NULL)
+	if (f == NULL) {
+		if (lock)
+			got_lockfile_unlock(lf);
 		return NULL;
+	}
 
 	line = fparseln(f, &len, NULL, delim, 0);
 	if (line == NULL) {
 		err = got_error(GOT_ERR_BAD_REF_DATA);
+		if (lock)
+			got_lockfile_unlock(lf);
 		goto done;
 	}
 
 	err = parse_ref_line(ref, name, line);
-	if (err == NULL && lf)
-		(*ref)->lf = lf;
+	if (lock) {
+		if (err)
+			got_lockfile_unlock(lf);
+		else {
+			if (*ref)
+				(*ref)->lf = lf;
+			else
+				got_lockfile_unlock(lf);
+		}
+	}
 done:
 	free(line);
 	if (fclose(f) != 0 && err == NULL) {
 		err = got_error_prefix_errno("fclose");
-		if (lf)
-			got_lockfile_unlock(lf);
 		if (*ref) {
+			if (lock)
+				got_ref_unlock(*ref);
 			got_ref_close(*ref);
 			*ref = NULL;
 		}
