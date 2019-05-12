@@ -58,6 +58,7 @@
 #define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
 #endif
 
+#define CTRL(x)		((x) & 0x1f)
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -1649,6 +1650,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    &s->commits);
 		break;
 	case KEY_PPAGE:
+	case CTRL('b'):
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (TAILQ_FIRST(&s->commits.head) ==
@@ -1680,7 +1682,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    &s->thread_args.commits_needed,
 		    &s->thread_args.need_commits);
 		break;
-	case KEY_NPAGE: {
+	case KEY_NPAGE:
+	case CTRL('f'): {
 		struct commit_queue_entry *first;
 		first = s->first_displayed_entry;
 		if (first == NULL)
