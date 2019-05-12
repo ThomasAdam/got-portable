@@ -1710,6 +1710,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected = s->commits.ncommits - 1;
 		break;
 	case KEY_ENTER:
+	case ' ':
 	case '\r':
 		if (s->selected_entry == NULL)
 			break;
