@@ -453,7 +453,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	if (err)
 		goto done;
 done:
-	if (*ref == NULL)
+	if (!err && *ref == NULL)
 		err = got_error_not_ref(refname);
 	free(path_refs);
 	return err;
