@@ -148,8 +148,7 @@ static const struct got_error {
 	{ GOT_ERR_FILEIDX_CSUM,	"bad file index checksum" },
 	{ GOT_ERR_PATH_PREFIX,	"worktree already contains items from a "
 				"different path prefix" },
-	{ GOT_ERR_ANCESTRY,	"specified commit does not share ancestry with "
-				"the current branch" },
+	{ GOT_ERR_ANCESTRY,	"new branch or rebase required" },
 	{ GOT_ERR_FILEIDX_BAD,	"file index is corrupt" },
 	{ GOT_ERR_BAD_REF_DATA,	"could not parse reference data" },
 	{ GOT_ERR_TREE_DUP_ENTRY,"duplicate entry in tree object" },

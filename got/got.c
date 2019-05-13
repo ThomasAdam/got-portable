@@ -270,62 +270,45 @@ check_cancelled(void *arg)
 }
 
 static const struct got_error *
-check_ancestry(struct got_worktree *worktree, struct got_object_id *commit_id,
-    struct got_repository *repo)
+check_linear_ancestry(struct got_worktree *worktree,
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
-	const struct got_error *err;
-	struct got_reference *head_ref = NULL;
-	struct got_object_id *head_commit_id = NULL;
-	struct got_commit_graph *graph = NULL;
+	const struct got_error *err = NULL;
+	struct got_object_id *yca_id, *base_commit_id;
 
-	err = got_ref_open(&head_ref, repo,
-	    got_worktree_get_head_ref_name(worktree), 0);
+	base_commit_id = got_worktree_get_base_commit_id(worktree);
+	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
+	    commit_id, base_commit_id, repo);
 	if (err)
 		return err;
 
-	/* TODO: Check the reflog. The head ref may have been rebased. */
-	err = got_ref_resolve(&head_commit_id, repo, head_ref);
-	if (err)
-		goto done;
+	if (yca_id == NULL)
+		return got_error(GOT_ERR_ANCESTRY);
 
-	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
-	if (err)
-		goto done;
+	/*
+	 * Require a straight line of history between the target commit
+	 * and the work tree's base commit.
+	 *
+	 * Non-linear situation such as the this require a rebase:
+	 *
+	 * (commit) D       F (base_commit)
+	 *           \     /
+	 *            C   E
+	 *             \ /
+	 *              B (yca)
+	 *              |
+	 *              A
+	 *
+	 * 'got update' only handles linear cases:
+	 * Update forwards in time:  A (base/yca) - B - C - D (commit)
+	 * Update backwards in time: D (base) - C - D - A (commit/yca)
+	 */
+	if (got_object_id_cmp(commit_id, yca_id) != 0 &&
+	    got_object_id_cmp(base_commit_id, yca_id) != 0)
+		return got_error(GOT_ERR_ANCESTRY);
 
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
-	if (err)
-		goto done;
-	for (;;) {
-		struct got_object_id *id;
-
-		if (sigint_received || sigpipe_received)
-			break;
-
-		err = got_commit_graph_iter_next(&id, graph);
-		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED) {
-				err = got_error(GOT_ERR_ANCESTRY);
-				break;
-			}
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
-			if (err)
-				break;
-			else
-				continue;
-		}
-		if (id == NULL)
-			break;
-		if (got_object_id_cmp(id, commit_id) == 0)
-			break;
-	}
-done:
-	if (head_ref)
-		got_ref_close(head_ref);
-	if (graph)
-		got_commit_graph_close(graph);
-	return err;
+	free(yca_id);
+	return NULL;
 }
 
 
@@ -452,7 +435,7 @@ cmd_checkout(int argc, char *argv[])
 		    commit_id_str);
 		if (error != NULL)
 			goto done;
-		error = check_ancestry(worktree, commit_id, repo);
+		error = check_linear_ancestry(worktree, commit_id, repo);
 		if (error != NULL) {
 			free(commit_id);
 			goto done;
@@ -581,7 +564,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	error = check_ancestry(worktree, commit_id, repo);
+	error = check_linear_ancestry(worktree, commit_id, repo);
 	if (error != NULL)
 		goto done;
 

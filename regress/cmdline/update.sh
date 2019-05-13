@@ -1242,6 +1242,49 @@ function test_update_partial_dir {
 
 }
 
+function test_update_moved_branch_ref {
+	local testroot=`test_init update_moved_branch_ref`
+
+	git clone -q --mirror $testroot/repo $testroot/repo2
+
+	echo "modified alpha with git" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha with git"
+
+	got checkout $testroot/repo2 $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha with got" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "modified alpha with got" > /dev/null)
+
+	# + xxxxxxx...yyyyyyy master     -> master  (forced update)
+	(cd $testroot/repo2 && git fetch -q --all)
+
+	echo -n > $testroot/stdout.expected
+	echo "got: new branch or rebase required" >> $testroot/stderr.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
+
+	cmp $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1267,3 +1310,4 @@ run_test test_update_partial
 run_test test_update_partial_add
 run_test test_update_partial_rm
 run_test test_update_partial_dir
+run_test test_update_moved_branch_ref
