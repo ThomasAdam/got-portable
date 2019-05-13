@@ -223,7 +223,7 @@ get_editor(char **abspath)
 
 static const struct got_error *
 apply_unveil(const char *repo_path, int repo_read_only,
-    const char *worktree_path, int create_worktree, char **editor)
+    const char *worktree_path, int create_worktree)
 {
 	const struct got_error *err;
 	static char err_msg[MAXPATHLEN + 36];
@@ -247,18 +247,6 @@ apply_unveil(const char *repo_path, int repo_read_only,
 
 		if (err && (err->code != GOT_ERR_ERRNO || errno != EISDIR))
 			return err;
-	}
-
-	if (editor) {
-		err = get_editor(editor);
-		if (err)
-			return err;
-		if (unveil(*editor, "x") != 0) {
-			err = got_error_from_errno2("unveil", *editor);
-			free(*editor);
-			*editor = NULL;
-			return err;
-		}
 	}
 
 	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
@@ -442,8 +430,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1,
-	    NULL);
+	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1);
 	if (error)
 		goto done;
 
@@ -581,7 +568,7 @@ cmd_update(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0, NULL);
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -953,7 +940,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1215,7 +1202,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1375,7 +1362,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0, NULL);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
 	if (error)
 		goto done;
 
@@ -1603,7 +1590,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0, NULL);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
 	if (error)
 		goto done;
 
@@ -1732,7 +1719,7 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0, NULL);
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -1903,7 +1890,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, NULL);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
 	if (error)
 		goto done;
 
@@ -1982,7 +1969,7 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0, NULL);
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -2068,7 +2055,7 @@ cmd_rm(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0, NULL);
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -2145,7 +2132,7 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0, NULL);
+	    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
@@ -2210,6 +2197,7 @@ struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
 	const char *editor;
 	const char *worktree_path;
+	const char *repo_path;
 	char *logmsg_path;
 
 };
@@ -2311,6 +2299,10 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 done:
 	free(template);
+
+	/* Editor is done; we can now apply unveil(2) */
+	if (err == NULL)
+		err = apply_unveil(a->repo_path, 0, a->worktree_path, 0);
 	return err;
 }
 
@@ -2371,14 +2363,22 @@ cmd_commit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0, &editor);
+	/*
+	 * unveil(2) traverses exec(2); if an editor is used we have
+	 * to apply unveil after the log message has been written.
+	 */
+	if (logmsg == NULL || strlen(logmsg) == 0)
+		error = get_editor(&editor);
+	else
+		error = apply_unveil(got_repo_get_path(repo), 0,
+		    got_worktree_get_root_path(worktree), 0);
 	if (error)
 		goto done;
 
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
+	cl_arg.repo_path = got_repo_get_path(repo);
 	cl_arg.logmsg_path = NULL;
 	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
