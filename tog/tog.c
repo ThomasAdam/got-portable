@@ -2169,8 +2169,7 @@ done:
 static void
 diff_view_indicate_progress(struct tog_view *view)
 {
-	werase(view->window);
-	waddstr(view->window, "diffing...");
+	mvwaddstr(view->window, 0, 0, "diffing...");
 	update_panels();
 	doupdate();
 }
