@@ -2267,9 +2267,6 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		    "commit message cannot be empty, aborting");
 		goto done;
 	}
-
-	goto done;
-
 done:
 	if (tmpfile) {
 		unlink(tmpfile);
