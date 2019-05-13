@@ -260,16 +260,17 @@ Show object IDs of files (blob objects) and directories (tree objects).
 .It Fl R
 Recurse into sub-directories in the repository.
 .El
-.It Cm ref [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name Ar object ]
+.It Cm ref [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name Ar target ]
 Manage references in a repository.
 .Pp
 If no options are passed, expect two arguments and attempt to create,
 or update, the reference with the given
 .Ar name ,
 and make it point at the given
-.Ar object .
-The object argument is a SHA1 hash which corresponds to an existing
-object in the repository.
+.Ar target .
+The target may be a SHA1 hash which corresponds to an existing object ID
+in the repository, or an existing reference which will be resolved to an
+object ID.
 .Pp
 The options for
 .Cm got ref
@@ -373,6 +374,14 @@ Check out a work tree of
 kernel sources from a Git repository at /var/repo/openbsd-src to ~/sys:
 .Pp
 .Dl $ got checkout -p sys /var/repo/openbsd-src ~/sys
+.Pp
+Create a new branch
+.Dq mybranch
+which is forked off the
+.Dq master
+branch:
+.Pp
+.Dl $ got ref mybranch master
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5

@@ -1735,7 +1735,7 @@ __dead static void
 usage_ref(void)
 {
 	fprintf(stderr,
-	    "usage: %s ref [-r repository] -l | -d name | name object\n",
+	    "usage: %s ref [-r repository] -l | -d name | name target\n",
 	    getprogname());
 	exit(1);
 }
@@ -1781,15 +1781,26 @@ delete_ref(struct got_repository *repo, const char *refname)
 }
 
 static const struct got_error *
-add_ref(struct got_repository *repo, const char *refname, const char *id_str)
+add_ref(struct got_repository *repo, const char *refname, const char *target)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id;
 	struct got_reference *ref = NULL;
 
-	err = got_object_resolve_id_str(&id, repo, id_str);
-	if (err)
-		return err;
+	err = got_object_resolve_id_str(&id, repo, target);
+	if (err) {
+		struct got_reference *target_ref;
+
+		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
+			return err;
+		err = got_ref_open(&target_ref, repo, target, 0);
+		if (err)
+			return err;
+		err = got_ref_resolve(&id, repo, target_ref);
+		got_ref_close(target_ref);
+		if (err)
+			return err;
+	}
 
 	err = got_ref_alloc(&ref, refname, id);
 	if (err)
