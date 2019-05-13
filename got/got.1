@@ -347,6 +347,11 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl m Ar msg
 Use the specified log message when creating the new commit.
+Without the
+.Fl m
+option,
+.Cm got commit
+opens a temporary file in an editor where a log message can be written.
 .El
 .El
 .Sh ENVIRONMENT
@@ -356,6 +361,9 @@ The author's name and email address for
 .Cm got commit ,
 for example:
 .An Stefan Sperling Aq Mt stsp@openbsd.org
+.It Ev VISUAL, Ev EDITOR
+The editor spawned by
+.Cm got commit .
 .El
 .Sh EXIT STATUS
 .Ex -std got
