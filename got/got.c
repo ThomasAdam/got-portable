@@ -2199,21 +2199,25 @@ doneediting:
 struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
 	const char *editor;
+	const char *worktree_path;
+	char *logmsg_path;
 
 };
+
 static const struct got_error *
 collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
     void *arg)
 {
+	const char *initial_content = "\n# changes to be committed:\n";
 	struct got_pathlist_entry *pe;
 	const struct got_error *err = NULL;
-	char *tmpfile = NULL;
+	char *template = NULL;
 	struct collect_commit_logmsg_arg *a = arg;
 	char buf[1024];
 	struct stat st, st2;
 	FILE *fp;
 	size_t len;
-	int fd;
+	int fd, content_changed = 0;
 
 	/* if a message was specified on the command line, just use it */
 	if (a->cmdline_log != NULL && strlen(a->cmdline_log) != 0) {
@@ -2225,12 +2229,14 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		return NULL;
 	}
 
-	err = got_opentemp_named_fd(&tmpfile, &fd, "/tmp/got-XXXXXXXXXX");
-	if (err)
-		return err;
+	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
+		return got_error_prefix_errno("asprintf");
 
-	dprintf(fd, "\n"
-	    "# changes to be committed:\n");
+	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
+	if (err)
+		goto done;
+
+	dprintf(fd, initial_content);
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
@@ -2238,22 +2244,25 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 	close(fd);
 
-	if (stat(tmpfile, &st) == -1) {
-		err = got_error_prefix_errno2("stat", tmpfile);
+	if (stat(a->logmsg_path, &st) == -1) {
+		err = got_error_prefix_errno2("stat", a->logmsg_path);
 		goto done;
 	}
 
-	if (spawn_editor(a->editor, tmpfile) == -1) {
+	if (spawn_editor(a->editor, a->logmsg_path) == -1) {
 		err = got_error_prefix_errno("failed spawning editor");
 		goto done;
 	}
 
-	if (stat(tmpfile, &st2) == -1) {
+	if (stat(a->logmsg_path, &st2) == -1) {
 		err = got_error_prefix_errno("stat");
 		goto done;
 	}
 
 	if (st.st_mtime == st2.st_mtime && st.st_size == st2.st_size) {
+		unlink(a->logmsg_path);
+		free(a->logmsg_path);
+		a->logmsg_path = NULL;
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 		goto done;
@@ -2267,8 +2276,10 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 	len = 0;
 
-	fp = fopen(tmpfile, "r");
+	fp = fopen(a->logmsg_path, "r");
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		if (!content_changed && strcmp(buf, initial_content) != 0)
+			content_changed = 1;
 		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
 			continue;
 		len = strlcat(*logmsg, buf, st2.st_size);
@@ -2280,17 +2291,16 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		len--;
 	}
 
-	if (len == 0) {
+	if (len == 0 || !content_changed) {
+		unlink(a->logmsg_path);
+		free(a->logmsg_path);
+		a->logmsg_path = NULL;
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "commit message cannot be empty, aborting");
 		goto done;
 	}
 done:
-	if (tmpfile) {
-		unlink(tmpfile);
-		free(tmpfile);
-	}
-
+	free(template);
 	return err;
 }
 
@@ -2361,10 +2371,19 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
+	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
+	cl_arg.logmsg_path = NULL;
 	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
-	if (error)
+	if (error) {
+		if (cl_arg.logmsg_path)
+			fprintf(stderr, "%s: log message preserved in %s\n",
+			    getprogname(), cl_arg.logmsg_path);
 		goto done;
+	}
+
+	if (cl_arg.logmsg_path)
+		unlink(cl_arg.logmsg_path);
 
 	error = got_object_id_str(&id_str, id);
 	if (error)
