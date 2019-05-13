@@ -403,7 +403,10 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 
 	normpath = got_path_normalize(path);
 	if (normpath == NULL) {
-		err = got_error_from_errno2("got_path_normalize", path);
+		if (errno == ENOENT)
+			err = NULL;
+		else
+			err = got_error_from_errno2("got_path_normalize", path);
 		goto done;
 	}
 
