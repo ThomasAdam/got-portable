@@ -219,39 +219,39 @@ apply_unveil(const char *repo_path, int repo_read_only,
     const char *worktree_path, int create_worktree,
     int unveil_editor)
 {
-	const struct got_error *error;
+	const struct got_error *err;
 	static char err_msg[MAXPATHLEN + 36];
 
 	if (create_worktree) {
 		/* Pre-create work tree path to avoid unveiling its parents. */
-		error = got_path_mkdir(worktree_path);
+		err = got_path_mkdir(worktree_path);
 
 		if (errno == EEXIST) {
 			if (got_path_dir_is_empty(worktree_path)) {
 				errno = 0;
-				error = NULL;
+				err = NULL;
 			} else {
 				snprintf(err_msg, sizeof(err_msg),
 				    "%s: directory exists but is not empty",
 				    worktree_path);
-				error = got_error_msg(GOT_ERR_BAD_PATH,
+				err = got_error_msg(GOT_ERR_BAD_PATH,
 				    err_msg);
 			}
 		}
 
-		if (error && (error->code != GOT_ERR_ERRNO || errno != EISDIR))
-			return error;
+		if (err && (err->code != GOT_ERR_ERRNO || errno != EISDIR))
+			return err;
 	}
 
 	if (unveil_editor) {
 		char *editor;
-		error = get_editor(&editor);
-		if (error)
-			return error;
+		err = get_editor(&editor);
+		if (err)
+			return err;
 		if (unveil(editor, "x") != 0) {
-			error = got_error_from_errno2("unveil", editor);
+			err = got_error_from_errno2("unveil", editor);
 			free(editor);
-			return error;
+			return err;
 		}
 		free(editor);
 	}
@@ -265,9 +265,9 @@ apply_unveil(const char *repo_path, int repo_read_only,
 	if (unveil("/tmp", "rwc") != 0)
 		return got_error_from_errno2("unveil", "/tmp");
 
-	error = got_privsep_unveil_exec_helpers();
-	if (error != NULL)
-		return error;
+	err = got_privsep_unveil_exec_helpers();
+	if (err != NULL)
+		return err;
 
 	if (unveil(NULL, NULL) != 0)
 		return got_error_from_errno("unveil");
