@@ -1053,7 +1053,7 @@ struct print_diff_arg {
 
 static const struct got_error *
 print_diff(void *arg, unsigned char status, const char *path,
-    struct got_object_id *id)
+    struct got_object_id *blob_id, struct got_object_id *commit_id)
 {
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -1073,7 +1073,7 @@ print_diff(void *arg, unsigned char status, const char *path,
 	}
 
 	if (status != GOT_STATUS_ADD) {
-		err = got_object_open_as_blob(&blob1, a->repo, id, 8192);
+		err = got_object_open_as_blob(&blob1, a->repo, blob_id, 8192);
 		if (err)
 			goto done;
 
@@ -1660,7 +1660,7 @@ usage_status(void)
 
 static const struct got_error *
 print_status(void *arg, unsigned char status, const char *path,
-    struct got_object_id *id)
+    struct got_object_id *blob_id, struct got_object_id *commit_id)
 {
 	printf("%c  %s\n", status, path);
 	return NULL;

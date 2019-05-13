@@ -130,7 +130,8 @@ const struct got_error *got_worktree_checkout_files(struct got_worktree *,
 
 /* A callback function which is invoked to report a path's status. */
 typedef const struct got_error *(*got_worktree_status_cb)(void *,
-    unsigned char, const char *, struct got_object_id *);
+    unsigned char, const char *, struct got_object_id *,
+    struct got_object_id *);
 
 /*
  * Report the status of paths in the work tree.

@@ -1594,12 +1594,14 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	const struct got_error *err = NULL;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 	struct stat sb;
-	struct got_object_id id;
+	struct got_object_id blob_id, commit_id;
 
 	err = get_file_status(&status, &sb, ie, abspath, repo);
 	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
-		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		err = (*status_cb)(status_arg, status, ie->path, &id);
+		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+		err = (*status_cb)(status_arg, status, ie->path, &blob_id,
+		    &commit_id);
 	}
 	return err;
 }
@@ -1639,7 +1641,7 @@ static const struct got_error *
 status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 {
 	struct diff_dir_cb_arg *a = arg;
-	struct got_object_id id;
+	struct got_object_id blob_id, commit_id;
 	unsigned char status;
 
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
@@ -1648,12 +1650,14 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
 		return NULL;
 
-	memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
 	if (got_fileindex_entry_has_file_on_disk(ie))
 		status = GOT_STATUS_MISSING;
 	else
 		status = GOT_STATUS_DELETE;
-	return (*a->status_cb)(a->status_arg, status, ie->path, &id);
+	return (*a->status_cb)(a->status_arg, status, ie->path, &blob_id,
+	    &commit_id);
 }
 
 static const struct got_error *
@@ -1684,7 +1688,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	}
 
 	err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED, path,
-	    NULL);
+	    NULL, NULL);
 	if (parent_path[0])
 		free(path);
 	return err;
@@ -2244,7 +2248,7 @@ struct collect_commitables_arg {
 
 static const struct got_error *
 collect_commitables(void *arg, unsigned char status, const char *relpath,
-    struct got_object_id *id)
+    struct got_object_id *blob_id, struct got_object_id *commit_id)
 {
 	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -2305,7 +2309,7 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	ct->status = status;
 	ct->blob_id = NULL; /* will be filled in when blob gets created */
 	if (ct->status != GOT_STATUS_ADD) {
-		ct->base_blob_id = got_object_id_dup(id);
+		ct->base_blob_id = got_object_id_dup(blob_id);
 		if (ct->base_blob_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
@@ -2472,7 +2476,7 @@ report_ct_status(struct got_commitable *ct,
 	const char *ct_path = ct->path;
 	while (ct_path[0] == '/')
 		ct_path++;
-	return (*status_cb)(status_arg, ct->status, ct_path, ct->blob_id);
+	return (*status_cb)(status_arg, ct->status, ct_path, ct->blob_id, NULL);
 }
 
 static const struct got_error *
