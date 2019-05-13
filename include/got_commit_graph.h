@@ -30,3 +30,8 @@ const struct got_error *got_commit_graph_iter_next(struct got_object_id **,
 const struct got_error *got_commit_graph_intersect(struct got_object_id **,
     struct got_commit_graph *, struct got_commit_graph *,
     struct got_repository *);
+
+/* Find the youngest common ancestor of two commits. */
+const struct got_error *got_commit_graph_find_youngest_common_ancestor(
+    struct got_object_id **, struct got_object_id *, struct got_object_id *,
+    struct got_repository *);

@@ -639,3 +639,112 @@ got_commit_graph_iter_next(struct got_object_id **id,
 	graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
 	return NULL;
 }
+
+const struct got_error *
+got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
+    struct got_object_id *commit_id, struct got_object_id *commit_id2,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph *graph = NULL, *graph2 = NULL;
+	int completed = 0, completed2 = 0;
+	struct got_object_idset *commit_ids;
+
+	*yca_id = NULL;
+
+	commit_ids = got_object_idset_alloc();
+	if (commit_ids == NULL)
+		return got_error_prefix_errno("got_object_idset_alloc");
+
+	err = got_commit_graph_open(&graph, commit_id, "/", 1, repo);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_open(&graph2, commit_id2, "/", 1, repo);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_iter_start(graph, commit_id, repo);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_iter_start(graph2, commit_id2, repo);
+	if (err)
+		goto done;
+
+	for (;;) {
+		struct got_object_id *id, *id2;
+
+		if (!completed) {
+			err = got_commit_graph_iter_next(&id, graph);
+			if (err) {
+				if (err->code == GOT_ERR_ITER_COMPLETED)
+					completed = 1;
+				else if (err->code != GOT_ERR_ITER_NEED_MORE)
+					break;
+				err = got_commit_graph_fetch_commits(graph, 1,
+				    repo);
+				if (err)
+					break;
+			}
+		}
+
+		if (!completed2) {
+			err = got_commit_graph_iter_next(&id2, graph2);
+			if (err) {
+				if (err->code == GOT_ERR_ITER_COMPLETED)
+					completed2 = 1;
+				else if (err->code != GOT_ERR_ITER_NEED_MORE)
+					break;
+				err = got_commit_graph_fetch_commits(graph2, 1,
+				    repo);
+				if (err)
+					break;
+			}
+		}
+
+		if (id) {
+			if (got_object_idset_get(commit_ids, id)) {
+				*yca_id = got_object_id_dup(id);
+				if (*yca_id)
+					break;
+				else
+					err = got_error_prefix_errno(
+					    "got_object_id_up");
+				break;
+
+			}
+			err = got_object_idset_add(commit_ids, id, id);
+			if (err)
+				break;
+		}
+		if (id2) {
+			if (got_object_idset_get(commit_ids, id2)) {
+				*yca_id = got_object_id_dup(id2);
+				if (*yca_id)
+					break;
+				else
+					err = got_error_prefix_errno(
+					    "got_object_id_up");
+				break;
+
+			}
+			err = got_object_idset_add(commit_ids, id2, id2);
+			if (err)
+				break;
+		}
+
+		if (completed && completed2) {
+			err = got_error(GOT_ERR_ANCESTRY);
+			break;
+		}
+
+	}
+done:
+	got_object_idset_free(commit_ids);
+	if (graph)
+		got_commit_graph_close(graph);
+	if (graph2)
+		got_commit_graph_close(graph2);
+	return err;
+}
