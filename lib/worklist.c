@@ -48,7 +48,7 @@ worklist_add(const char *path, struct wklhead *worklist)
 
 	wkl = calloc(1, sizeof(*wkl));
 	if (wkl == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	len = strlcpy(wkl->wkl_path, path, sizeof(wkl->wkl_path));
 	if (len >= sizeof(wkl->wkl_path))

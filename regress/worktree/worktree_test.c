@@ -96,7 +96,7 @@ remove_worktree_base_ref(struct got_worktree *worktree,
 		return err;
 
 	if (asprintf(&absrefname, "refs/%s", refname) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 	err = got_ref_open(&base_ref, repo, absrefname, 0);

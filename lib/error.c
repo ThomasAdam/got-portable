@@ -68,7 +68,7 @@ got_error_msg(int code, const char *msg)
 }
 
 const struct got_error *
-got_error_prefix_errno(const char *prefix)
+got_error_from_errno(const char *prefix)
 {
 	static struct got_error err;
 	static char err_msg[MAXPATHLEN + 20];
@@ -82,7 +82,7 @@ got_error_prefix_errno(const char *prefix)
 }
 
 const struct got_error *
-got_error_prefix_errno2(const char *prefix, const char *prefix2)
+got_error_from_errno2(const char *prefix, const char *prefix2)
 {
 	static struct got_error err;
 	static char err_msg[(MAXPATHLEN * 2) + 20];
@@ -96,7 +96,7 @@ got_error_prefix_errno2(const char *prefix, const char *prefix2)
 }
 
 const struct got_error *
-got_error_prefix_errno3(const char *prefix, const char *prefix2,
+got_error_from_errno3(const char *prefix, const char *prefix2,
     const char *prefix3)
 {
 	static struct got_error err;
@@ -114,14 +114,14 @@ const struct got_error *
 got_error_set_errno(int code, const char *prefix)
 {
 	errno = code;
-	return got_error_prefix_errno(prefix);
+	return got_error_from_errno(prefix);
 }
 
 const struct got_error *
 got_ferror(FILE *f, int code)
 {
 	if (ferror(f))
-		return got_error_prefix_errno("");
+		return got_error_from_errno("");
 	return got_error(code);
 }
 

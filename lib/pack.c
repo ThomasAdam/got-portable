@@ -91,16 +91,16 @@ got_pack_get_packfile_size(size_t *size, const char *path)
 			return got_error(GOT_ERR_BAD_PATH);
 		*dot = '\0';
 		if (asprintf(&path_pack, "%s.pack", base_path) == -1)
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 
 		if (stat(path_pack, &sb) != 0)
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 		free(path_pack);
 		if (err)
 			return err;
 	} else if (strcmp(dot, GOT_PACKFILE_SUFFIX) == 0) {
 		if (stat(path, &sb) != 0)
-			return got_error_prefix_errno2("stat", path);
+			return got_error_from_errno2("stat", path);
 	} else
 		return got_error(GOT_ERR_BAD_PATH);
 
@@ -133,12 +133,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->magic = malloc(sizeof(*h->magic));
 		if (h->magic == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->magic, sizeof(*h->magic));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != sizeof(*h->magic)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -163,12 +163,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->version = malloc(sizeof(*h->version));
 		if (h->version == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->version, sizeof(*h->version));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != sizeof(*h->version)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -195,12 +195,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->fanout_table = malloc(len_fanout);
 		if (h->fanout_table == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->fanout_table, len_fanout);
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != len_fanout) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -231,7 +231,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 		}
 		n = read(p->fd, h->sorted_ids, len_ids);
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != len_ids) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -251,12 +251,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->crc32 = malloc(nobj * sizeof(*h->crc32));
 		if (h->crc32 == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->crc32, nobj * sizeof(*h->crc32));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != nobj * sizeof(*h->crc32)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -276,12 +276,12 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->offsets = malloc(nobj * sizeof(*h->offsets));
 		if (h->offsets == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->offsets, nobj * sizeof(*h->offsets));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != nobj * sizeof(*h->offsets)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -306,13 +306,13 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	else {
 		h->offsets = malloc(nobj * sizeof(*h->large_offsets));
 		if (h->offsets == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->large_offsets,
 		    nobj * sizeof(*h->large_offsets));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != nobj * sizeof(*h->large_offsets)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -335,12 +335,12 @@ checksum:
 	else {
 		h->trailer = malloc(sizeof(*h->trailer));
 		if (h->trailer == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->trailer, sizeof(*h->trailer));
 		if (n < 0)
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 		else if (n != sizeof(*h->trailer)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
@@ -367,11 +367,11 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 
 	p = calloc(1, sizeof(*p));
 	if (p == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	p->fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (p->fd == -1)
-		return got_error_prefix_errno2("open", path);
+		return got_error_from_errno2("open", path);
 
 	err = got_pack_get_packfile_size(&p->len, path);
 	if (err) {
@@ -388,7 +388,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 
 	p->path_packidx = strdup(path);
 	if (p->path_packidx == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		goto done;
 	}
 
@@ -396,7 +396,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	p->map = mmap(NULL, p->len, PROT_READ, MAP_PRIVATE, p->fd, 0);
 	if (p->map == MAP_FAILED) {
 		if (errno != ENOMEM) {
-			err = got_error_prefix_errno("mmap");
+			err = got_error_from_errno("mmap");
 			goto done;
 		}
 		p->map = NULL; /* fall back to read(2) */
@@ -421,7 +421,7 @@ got_packidx_close(struct got_packidx *packidx)
 	free(packidx->path_packidx);
 	if (packidx->map) {
 		if (munmap(packidx->map, packidx->len) == -1)
-			err = got_error_prefix_errno("munmap");
+			err = got_error_from_errno("munmap");
 	} else {
 		free(packidx->hdr.magic);
 		free(packidx->hdr.version);
@@ -433,7 +433,7 @@ got_packidx_close(struct got_packidx *packidx)
 		free(packidx->hdr.trailer);
 	}
 	if (close(packidx->fd) != 0 && err == NULL)
-		err = got_error_prefix_errno("close");
+		err = got_error_from_errno("close");
 	free(packidx);
 
 	return err;
@@ -497,7 +497,7 @@ got_pack_stop_privsep_child(struct got_pack *pack)
 		return err;
 	err = got_privsep_wait_for_child(pack->privsep_child->pid);
 	if (close(pack->privsep_child->imsg_fd) != 0 && err == NULL)
-		err = got_error_prefix_errno("close");
+		err = got_error_from_errno("close");
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;
 	return err;
@@ -510,9 +510,9 @@ got_pack_close(struct got_pack *pack)
 
 	err = got_pack_stop_privsep_child(pack);
 	if (pack->map && munmap(pack->map, pack->filesize) == -1 && !err)
-		err = got_error_prefix_errno("munmap");
+		err = got_error_from_errno("munmap");
 	if (pack->fd != -1 && close(pack->fd) != 0 && err == NULL)
-		err = got_error_prefix_errno("close");
+		err = got_error_from_errno("close");
 	pack->fd = -1;
 	free(pack->path_packfile);
 	pack->path_packfile = NULL;
@@ -540,7 +540,7 @@ parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 		mapoff = (size_t)offset;
 	} else {
 		if (lseek(pack->fd, offset, SEEK_SET) == -1)
-			return got_error_prefix_errno("lseek");
+			return got_error_from_errno("lseek");
 	}
 
 	do {
@@ -554,7 +554,7 @@ parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 		} else {
 			ssize_t n = read(pack->fd, &sizeN, sizeof(sizeN));
 			if (n < 0)
-				return got_error_prefix_errno("read");
+				return got_error_from_errno("read");
 			if (n != sizeof(sizeN))
 				return got_error(GOT_ERR_BAD_PACKFILE);
 		}
@@ -582,11 +582,11 @@ open_plain_object(struct got_object **obj, const char *path_packfile,
 {
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	(*obj)->path_packfile = strdup(path_packfile);
 	if ((*obj)->path_packfile == NULL) {
-		const struct got_error *err = got_error_prefix_errno("strdup");
+		const struct got_error *err = got_error_from_errno("strdup");
 		free(*obj);
 		*obj = NULL;
 		return err;
@@ -628,7 +628,7 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 			ssize_t n;
 			n = read(pack->fd, &offN, sizeof(offN));
 			if (n < 0)
-				return got_error_prefix_errno("read");
+				return got_error_from_errno("read");
 			if (n != sizeof(offN))
 				return got_error(GOT_ERR_BAD_PACKFILE);
 		}
@@ -687,7 +687,7 @@ add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
 	    delta_data_offset, delta_buf,
 	    delta_len);
 	if (delta == NULL)
-		return got_error_prefix_errno("got_delta_open");
+		return got_error_from_errno("got_delta_open");
 	/* delta is freed in got_object_close() */
 	deltas->nentries++;
 	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
@@ -721,7 +721,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	if (pack->map == NULL) {
 		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 		if (delta_data_offset == -1)
-			return got_error_prefix_errno("lseek");
+			return got_error_from_errno("lseek");
 	}
 
 	if (pack->map) {
@@ -786,7 +786,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	if (pack->map == NULL) {
 		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 		if (delta_data_offset == -1)
-			return got_error_prefix_errno("lseek");
+			return got_error_from_errno("lseek");
 	}
 
 	if (pack->map) {
@@ -800,7 +800,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	} else {
 		ssize_t n = read(pack->fd, &id, sizeof(id));
 		if (n < 0)
-			return got_error_prefix_errno("read");
+			return got_error_from_errno("read");
 		if (n != sizeof(id))
 			return got_error(GOT_ERR_BAD_PACKFILE);
 		err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
@@ -888,7 +888,7 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	(*obj)->flags = 0;
 	(*obj)->hdrlen = 0;
@@ -898,7 +898,7 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 
 	(*obj)->path_packfile = strdup(pack->path_packfile);
 	if ((*obj)->path_packfile == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		goto done;
 	}
 	(*obj)->flags |= GOT_OBJ_FLAG_PACKED;
@@ -1026,7 +1026,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 		accum_buf = malloc(max_size);
 		if (accum_buf == NULL)
-			return got_error_prefix_errno("malloc");
+			return got_error_from_errno("malloc");
 		base_file = NULL;
 		accum_file = NULL;
 	}
@@ -1054,7 +1054,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			if (pack->map == NULL) {
 				if (lseek(pack->fd, delta_data_offset, SEEK_SET)
 				    == -1) {
-					err = got_error_prefix_errno("lseek");
+					err = got_error_from_errno("lseek");
 					goto done;
 				}
 			}
@@ -1114,7 +1114,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 					uint8_t *p;
 					p = reallocarray(base_buf, 1, max_size);
 					if (p == NULL) {
-						err = got_error_prefix_errno(
+						err = got_error_from_errno(
 						    "reallocarray");
 						goto done;
 					}
@@ -1169,7 +1169,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 		return err;
 	accum_buf = malloc(max_size);
 	if (accum_buf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
@@ -1198,7 +1198,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			} else {
 				if (lseek(pack->fd, delta_data_offset, SEEK_SET)
 				    == -1) {
-					err = got_error_prefix_errno("lseek");
+					err = got_error_from_errno("lseek");
 					goto done;
 				}
 				err = got_inflate_to_mem_fd(&base_buf,
@@ -1229,7 +1229,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 				uint8_t *p;
 				p = reallocarray(base_buf, 1, max_size);
 				if (p == NULL) {
-					err = got_error_prefix_errno(
+					err = got_error_from_errno(
 					    "reallocarray");
 					goto done;
 				}
@@ -1273,7 +1273,7 @@ got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
 			    mapoff, pack->filesize - mapoff, outfile);
 		} else {
 			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
-				return got_error_prefix_errno("lseek");
+				return got_error_from_errno("lseek");
 			err = got_inflate_to_file_fd(&obj->size, pack->fd,
 			    outfile);
 		}
@@ -1302,7 +1302,7 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 			    mapoff, pack->filesize - mapoff);
 		} else {
 			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
-				return got_error_prefix_errno("lseek");
+				return got_error_from_errno("lseek");
 			err = got_inflate_to_mem_fd(buf, len, pack->fd);
 		}
 	} else

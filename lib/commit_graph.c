@@ -343,7 +343,7 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 
 	node = calloc(1, sizeof(*node));
 	if (node == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	node->timestamp = commit->committer_time;
@@ -405,7 +405,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	*graph = alloc_graph(path);
 	if (*graph == NULL) {
 		got_object_commit_close(commit);
-		return got_error_prefix_errno("alloc_graph");
+		return got_error_from_errno("alloc_graph");
 	}
 
 	if (first_parent_traversal)
@@ -485,7 +485,7 @@ fetch_commits_from_open_branches(int *nfetched,
 		tips = recallocarray(graph->tips, graph->ntips, ntips,
 		    sizeof(*tips));
 		if (tips == NULL)
-			return got_error_prefix_errno("recallocarray");
+			return got_error_from_errno("recallocarray");
 		graph->tips = tips;
 		graph->ntips = ntips;
 	}
@@ -654,7 +654,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 
 	commit_ids = got_object_idset_alloc();
 	if (commit_ids == NULL)
-		return got_error_prefix_errno("got_object_idset_alloc");
+		return got_error_from_errno("got_object_idset_alloc");
 
 	err = got_commit_graph_open(&graph, commit_id, "/", 1, repo);
 	if (err)
@@ -709,7 +709,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				if (*yca_id)
 					break;
 				else
-					err = got_error_prefix_errno(
+					err = got_error_from_errno(
 					    "got_object_id_up");
 				break;
 
@@ -724,7 +724,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				if (*yca_id)
 					break;
 				else
-					err = got_error_prefix_errno(
+					err = got_error_from_errno(
 					    "got_object_id_up");
 				break;
 

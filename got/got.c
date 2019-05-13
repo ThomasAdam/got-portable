@@ -209,7 +209,7 @@ get_editor(char **editorp)
 
 	*editorp = realpath(editor, NULL);
 	if (*editorp == NULL)
-		return got_error_prefix_errno("relpath");
+		return got_error_from_errno("relpath");
 
 	return NULL;
 }
@@ -253,20 +253,20 @@ apply_unveil(const char *repo_path, int repo_read_only,
 	}
 
 	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
-		return got_error_prefix_errno2("unveil", repo_path);
+		return got_error_from_errno2("unveil", repo_path);
 
 	if (worktree_path && unveil(worktree_path, "rwc") != 0)
-		return got_error_prefix_errno2("unveil", worktree_path);
+		return got_error_from_errno2("unveil", worktree_path);
 
 	if (unveil("/tmp", "rwc") != 0)
-		return got_error_prefix_errno2("unveil", "/tmp");
+		return got_error_from_errno2("unveil", "/tmp");
 
 	error = got_privsep_unveil_exec_helpers();
 	if (error != NULL)
 		return error;
 
 	if (unveil(NULL, NULL) != 0)
-		return got_error_prefix_errno("unveil");
+		return got_error_from_errno("unveil");
 
 	return NULL;
 }
@@ -359,7 +359,7 @@ cmd_checkout(int argc, char *argv[])
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
-				return got_error_prefix_errno("strdup");
+				return got_error_from_errno("strdup");
 			break;
 		case 'p':
 			path_prefix = optarg;
@@ -382,23 +382,23 @@ cmd_checkout(int argc, char *argv[])
 		char *cwd, *base, *dotgit;
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
-			return got_error_prefix_errno2("realpath", argv[0]);
+			return got_error_from_errno2("realpath", argv[0]);
 		cwd = getcwd(NULL, 0);
 		if (cwd == NULL) {
-			error = got_error_prefix_errno("getcwd");
+			error = got_error_from_errno("getcwd");
 			goto done;
 		}
 		if (path_prefix[0]) {
 			base = basename(path_prefix);
 			if (base == NULL) {
-				error = got_error_prefix_errno2("basename",
+				error = got_error_from_errno2("basename",
 				    path_prefix);
 				goto done;
 			}
 		} else {
 			base = basename(repo_path);
 			if (base == NULL) {
-				error = got_error_prefix_errno2("basename",
+				error = got_error_from_errno2("basename",
 				    repo_path);
 				goto done;
 			}
@@ -407,7 +407,7 @@ cmd_checkout(int argc, char *argv[])
 		if (dotgit)
 			*dotgit = '\0';
 		if (asprintf(&worktree_path, "%s/%s", cwd, base) == -1) {
-			error = got_error_prefix_errno("asprintf");
+			error = got_error_from_errno("asprintf");
 			free(cwd);
 			goto done;
 		}
@@ -415,12 +415,12 @@ cmd_checkout(int argc, char *argv[])
 	} else if (argc == 2) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL) {
-			error = got_error_prefix_errno2("realpath", argv[0]);
+			error = got_error_from_errno2("realpath", argv[0]);
 			goto done;
 		}
 		worktree_path = realpath(argv[1], NULL);
 		if (worktree_path == NULL) {
-			error = got_error_prefix_errno2("realpath", argv[1]);
+			error = got_error_from_errno2("realpath", argv[1]);
 			goto done;
 		}
 	} else
@@ -528,7 +528,7 @@ cmd_update(int argc, char *argv[])
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
-				return got_error_prefix_errno("strdup");
+				return got_error_from_errno("strdup");
 			break;
 		default:
 			usage_update();
@@ -546,7 +546,7 @@ cmd_update(int argc, char *argv[])
 #endif
 	worktree_path = getcwd(NULL, 0);
 	if (worktree_path == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, worktree_path);
@@ -556,7 +556,7 @@ cmd_update(int argc, char *argv[])
 	if (argc == 0) {
 		path = strdup("");
 		if (path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (argc == 1) {
@@ -712,7 +712,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		s = refs_str;
 		if (asprintf(&refs_str, "%s%s%s", s ? s : "", s ? ", " : "",
 		    name) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			free(s);
 			break;
 		}
@@ -753,7 +753,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
 	if (logmsg0 == NULL)
-		return got_error_prefix_errno("strdup");
+		return got_error_from_errno("strdup");
 
 	logmsg = logmsg0;
 	do {
@@ -770,7 +770,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	}
 
 	if (fflush(stdout) != 0 && err == NULL)
-		err = got_error_prefix_errno("fflush");
+		err = got_error_from_errno("fflush");
 	return err;
 }
 
@@ -898,7 +898,7 @@ cmd_log(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 
@@ -910,7 +910,7 @@ cmd_log(int argc, char *argv[])
 	if (argc == 0) {
 		path = strdup("");
 		if (path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (argc == 1) {
@@ -922,7 +922,7 @@ cmd_log(int argc, char *argv[])
 		} else {
 			path = strdup(argv[0]);
 			if (path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -934,7 +934,7 @@ cmd_log(int argc, char *argv[])
 		    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
 	}
 	if (repo_path == NULL) {
-		error = got_error_prefix_errno("strdup");
+		error = got_error_from_errno("strdup");
 		goto done;
 	}
 
@@ -984,7 +984,7 @@ cmd_log(int argc, char *argv[])
 				id = got_object_id_dup(
 				    got_object_tag_get_object_id(tag));
 				if (id == NULL)
-					error = got_error_prefix_errno(
+					error = got_error_from_errno(
 					    "got_object_id_dup");
 				got_object_tag_close(tag);
 				if (error)
@@ -1085,17 +1085,17 @@ print_diff(void *arg, unsigned char status, const char *path,
 	if (status != GOT_STATUS_DELETE) {
 		if (asprintf(&abspath, "%s/%s",
 		    got_worktree_get_root_path(a->worktree), path) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 
 		f2 = fopen(abspath, "r");
 		if (f2 == NULL) {
-			err = got_error_prefix_errno2("fopen", abspath);
+			err = got_error_from_errno2("fopen", abspath);
 			goto done;
 		}
 		if (lstat(abspath, &sb) == -1) {
-			err = got_error_prefix_errno2("lstat", abspath);
+			err = got_error_from_errno2("lstat", abspath);
 			goto done;
 		}
 	} else
@@ -1107,7 +1107,7 @@ done:
 	if (blob1)
 		got_object_blob_close(blob1);
 	if (f2 && fclose(f2) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	free(abspath);
 	return err;
 }
@@ -1156,7 +1156,7 @@ cmd_diff(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
@@ -1172,7 +1172,7 @@ cmd_diff(int argc, char *argv[])
 			    "-r option can't be used when diffing a work tree");
 		repo_path = strdup(got_worktree_get_repo_path(worktree));
 		if (repo_path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 		if (argc == 1) {
@@ -1183,7 +1183,7 @@ cmd_diff(int argc, char *argv[])
 		} else {
 			path = strdup("");
 			if (path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -1196,7 +1196,7 @@ cmd_diff(int argc, char *argv[])
 	if (repo_path == NULL) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
-			return got_error_prefix_errno("getcwd");
+			return got_error_from_errno("getcwd");
 	}
 
 	error = got_repo_open(&repo, repo_path);
@@ -1336,7 +1336,7 @@ cmd_blame(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	if (repo_path == NULL) {
@@ -1349,13 +1349,13 @@ cmd_blame(int argc, char *argv[])
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
 			if (repo_path == NULL)
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 			if (error)
 				goto done;
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -1377,7 +1377,7 @@ cmd_blame(int argc, char *argv[])
 		    prefix, (strcmp(prefix, "/") != 0) ? "/" : "",
 		    worktree_subdir, worktree_subdir[0] ? "/" : "",
 		    path) == -1) {
-			error = got_error_prefix_errno("asprintf");
+			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 		error = got_repo_map_path(&in_repo_path, repo, p, 0);
@@ -1477,7 +1477,7 @@ print_tree(const char *path, struct got_object_id *commit_id,
 			if (err)
 				goto done;
 			if (asprintf(&id, "%s ", id_str) == -1) {
-				err = got_error_prefix_errno("asprintf");
+				err = got_error_from_errno("asprintf");
 				free(id_str);
 				goto done;
 			}
@@ -1491,7 +1491,7 @@ print_tree(const char *path, struct got_object_id *commit_id,
 			if (asprintf(&child_path, "%s%s%s", path,
 			    path[0] == '/' && path[1] == '\0' ? "" : "/",
 			    te->name) == -1) {
-				err = got_error_prefix_errno("asprintf");
+				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 			err = print_tree(child_path, commit_id, show_ids, 1,
@@ -1564,7 +1564,7 @@ cmd_tree(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	if (repo_path == NULL) {
@@ -1577,13 +1577,13 @@ cmd_tree(int argc, char *argv[])
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
 			if (repo_path == NULL)
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 			if (error)
 				goto done;
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -1604,7 +1604,7 @@ cmd_tree(int argc, char *argv[])
 			if (asprintf(&p, "%s/%s",
 			    got_worktree_get_path_prefix(worktree),
 			    worktree_subdir) == -1) {
-				error = got_error_prefix_errno("asprintf");
+				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 			error = got_repo_map_path(&in_repo_path, repo, p, 1);
@@ -1696,7 +1696,7 @@ cmd_status(int argc, char *argv[])
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 
@@ -1707,7 +1707,7 @@ cmd_status(int argc, char *argv[])
 	if (argc == 0) {
 		path = strdup("");
 		if (path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (argc == 1) {
@@ -1759,7 +1759,7 @@ list_refs(struct got_repository *repo)
 		char *refstr;
 		refstr = got_ref_to_str(re->ref);
 		if (refstr == NULL)
-			return got_error_prefix_errno("got_ref_to_str");
+			return got_error_from_errno("got_ref_to_str");
 		printf("%s: %s\n", got_ref_get_name(re->ref), refstr);
 		free(refstr);
 	}
@@ -1862,7 +1862,7 @@ cmd_ref(int argc, char *argv[])
 #endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 
@@ -1876,13 +1876,13 @@ cmd_ref(int argc, char *argv[])
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
 			if (repo_path == NULL)
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 			if (error)
 				goto done;
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -1951,7 +1951,7 @@ cmd_add(int argc, char *argv[])
 	for (x = 0; x < argc; x++) {
 		char *path = realpath(argv[x], NULL);
 		if (path == NULL) {
-			error = got_error_prefix_errno2("realpath", argv[x]);
+			error = got_error_from_errno2("realpath", argv[x]);
 			goto done;
 		}
 		free(path);
@@ -1959,7 +1959,7 @@ cmd_add(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 
@@ -1979,7 +1979,7 @@ cmd_add(int argc, char *argv[])
 	for (x = 0; x < argc; x++) {
 		char *path = realpath(argv[x], NULL);
 		if (path == NULL) {
-			error = got_error_prefix_errno2("realpath", argv[x]);
+			error = got_error_from_errno2("realpath", argv[x]);
 			goto done;
 		}
 
@@ -2039,14 +2039,14 @@ cmd_rm(int argc, char *argv[])
 
 	path = realpath(argv[0], NULL);
 	if (path == NULL) {
-		error = got_error_prefix_errno2("realpath", argv[0]);
+		error = got_error_from_errno2("realpath", argv[0]);
 		goto done;
 	}
 	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
@@ -2116,14 +2116,14 @@ cmd_revert(int argc, char *argv[])
 
 	path = realpath(argv[0], NULL);
 	if (path == NULL) {
-		error = got_error_prefix_errno2("realpath", argv[0]);
+		error = got_error_from_errno2("realpath", argv[0]);
 		goto done;
 	}
 	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
@@ -2224,13 +2224,13 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		len = strlen(a->cmdline_log) + 1;
 		*logmsg = malloc(len + 1);
 		if (*logmsg == NULL)
-			return got_error_prefix_errno("malloc");
+			return got_error_from_errno("malloc");
 		strlcpy(*logmsg, a->cmdline_log, len);
 		return NULL;
 	}
 
 	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
 	if (err)
@@ -2245,17 +2245,17 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	close(fd);
 
 	if (stat(a->logmsg_path, &st) == -1) {
-		err = got_error_prefix_errno2("stat", a->logmsg_path);
+		err = got_error_from_errno2("stat", a->logmsg_path);
 		goto done;
 	}
 
 	if (spawn_editor(a->editor, a->logmsg_path) == -1) {
-		err = got_error_prefix_errno("failed spawning editor");
+		err = got_error_from_errno("failed spawning editor");
 		goto done;
 	}
 
 	if (stat(a->logmsg_path, &st2) == -1) {
-		err = got_error_prefix_errno("stat");
+		err = got_error_from_errno("stat");
 		goto done;
 	}
 
@@ -2271,7 +2271,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	/* remove comments */
 	*logmsg = malloc(st2.st_size + 1);
 	if (*logmsg == NULL) {
-		err = got_error_prefix_errno("malloc");
+		err = got_error_from_errno("malloc");
 		goto done;
 	}
 	len = 0;
@@ -2335,7 +2335,7 @@ cmd_commit(int argc, char *argv[])
 	if (argc == 1) {
 		path = realpath(argv[0], NULL);
 		if (path == NULL) {
-			error = got_error_prefix_errno2("realpath", argv[0]);
+			error = got_error_from_errno2("realpath", argv[0]);
 			goto done;
 		}
 		got_path_strip_trailing_slashes(path);
@@ -2350,7 +2350,7 @@ cmd_commit(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);

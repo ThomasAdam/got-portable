@@ -72,7 +72,7 @@ main(int argc, char *argv[])
 #ifndef PROFILE
 	/* revoke access to most system calls */
 	if (pledge("stdio recvfd", NULL) == -1) {
-		err = got_error_prefix_errno("pledge");
+		err = got_error_from_errno("pledge");
 		got_privsep_send_error(&ibuf, err);
 		return 1;
 	}
@@ -112,7 +112,7 @@ main(int argc, char *argv[])
 		err = got_privsep_send_obj(&ibuf, obj);
 done:
 		if (close(imsg.fd) != 0 && err == NULL)
-			err = got_error_prefix_errno("close");
+			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (obj)
 			got_object_close(obj);
@@ -128,6 +128,6 @@ done:
 		}
 	}
 	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
-		err = got_error_prefix_errno("close");
+		err = got_error_from_errno("close");
 	return err ? 1 : 0;
 }

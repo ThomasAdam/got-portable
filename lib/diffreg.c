@@ -293,7 +293,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	if (flags & D_EMPTY1) {
 		f1 = fopen(_PATH_DEVNULL, "r");
 		if (f1 == NULL) {
-			err = got_error_prefix_errno2("fopen", _PATH_DEVNULL);
+			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
 			goto closem;
 		}
 	}
@@ -305,7 +305,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	if (flags & D_EMPTY2) {
 		f2 = fopen(_PATH_DEVNULL, "r");
 		if (f2 == NULL) {
-			err = got_error_prefix_errno2("fopen", _PATH_DEVNULL);
+			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
 			goto closem;
 		}
 	} else if (f2 == NULL) {
@@ -331,11 +331,11 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		goto closem;
 	}
 	if (prepare(ds, 0, f1, ds->stb1.st_size, flags)) {
-		err = got_error_prefix_errno("prepare");
+		err = got_error_from_errno("prepare");
 		goto closem;
 	}
 	if (prepare(ds, 1, f2, ds->stb2.st_size, flags)) {
-		err = got_error_prefix_errno("prepare");
+		err = got_error_from_errno("prepare");
 		goto closem;
 	}
 
@@ -347,44 +347,44 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	equiv(ds->sfile[0], ds->slen[0], ds->sfile[1], ds->slen[1], ds->member);
 	p = reallocarray(ds->member, ds->slen[1] + 2, sizeof(*ds->member));
 	if (p == NULL) {
-		err = got_error_prefix_errno("reallocarray");
+		err = got_error_from_errno("reallocarray");
 		goto closem;
 	}
 	ds->member = p;
 
 	ds->class = (int *)ds->file[0];
 	if (unsort(ds->sfile[0], ds->slen[0], ds->class)) {
-		err = got_error_prefix_errno("unsort");
+		err = got_error_from_errno("unsort");
 		goto closem;
 	}
 	p = reallocarray(ds->class, ds->slen[0] + 2, sizeof(*ds->class));
 	if (p == NULL) {
-		err = got_error_prefix_errno("reallocarray");
+		err = got_error_from_errno("reallocarray");
 		goto closem;
 	}
 	ds->class = p;
 
 	ds->klist = calloc(ds->slen[0] + 2, sizeof(*ds->klist));
 	if (ds->klist == NULL) {
-		err = got_error_prefix_errno("calloc");
+		err = got_error_from_errno("calloc");
 		goto closem;
 	}
 	ds->clen = 0;
 	ds->clistlen = 100;
 	ds->clist = calloc(ds->clistlen, sizeof(*ds->clist));
 	if (ds->clist == NULL) {
-		err = got_error_prefix_errno("calloc");
+		err = got_error_from_errno("calloc");
 		goto closem;
 	}
 	i = stone(ds, ds->class, ds->slen[0], ds->member, ds->klist, flags);
 	if (i < 0) {
-		err = got_error_prefix_errno("stone");
+		err = got_error_from_errno("stone");
 		goto closem;
 	}
 
 	p = reallocarray(ds->J, ds->len[0] + 2, sizeof(*ds->J));
 	if (p == NULL) {
-		err = got_error_prefix_errno("reallocarray");
+		err = got_error_from_errno("reallocarray");
 		goto closem;
 	}
 	ds->J = p;
@@ -392,20 +392,20 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 
 	lp = reallocarray(ds->ixold, ds->len[0] + 2, sizeof(*ds->ixold));
 	if (lp == NULL) {
-		err = got_error_prefix_errno("reallocarray");
+		err = got_error_from_errno("reallocarray");
 		goto closem;
 	}
 	ds->ixold = lp;
 	lp = reallocarray(ds->ixnew, ds->len[1] + 2, sizeof(*ds->ixnew));
 	if (lp == NULL) {
-		err = got_error_prefix_errno("reallocarray");
+		err = got_error_from_errno("reallocarray");
 		goto closem;
 	}
 	ds->ixnew = lp;
 	check(ds, f1, f2, flags);
 	if (output(outfile, changes, ds, args, args->label[0], f1,
 	    args->label[1], f2, flags))
-		err = got_error_prefix_errno("output");
+		err = got_error_from_errno("output");
 closem:
 	free(ds->J);
 	free(ds->member);

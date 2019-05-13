@@ -73,7 +73,7 @@ delta_apply(void)
 
 		base_file = got_opentemp();
 		if (base_file == NULL) {
-			err = got_error_prefix_errno("got_opentemp");
+			err = got_error_from_errno("got_opentemp");
 			break;
 		}
 
@@ -87,7 +87,7 @@ delta_apply(void)
 		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
 		    result_file, &result_len);
 		if (fclose(base_file) != 0 && err == NULL)
-			err = got_error_prefix_errno("fclose");
+			err = got_error_from_errno("fclose");
 		if (dt->expected == NULL) {
 			/* Invalid delta, expect an error. */
 			if (err == NULL)

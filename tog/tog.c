@@ -387,7 +387,7 @@ view_splitscreen(struct tog_view *view)
 		return err;
 
 	if (mvwin(view->window, view->begin_y, view->begin_x) == ERR)
-		return got_error_prefix_errno("mvwin");
+		return got_error_from_errno("mvwin");
 
 	return NULL;
 }
@@ -408,7 +408,7 @@ view_fullscreen(struct tog_view *view)
 		return err;
 
 	if (mvwin(view->window, view->begin_y, view->begin_x) == ERR)
-		return got_error_prefix_errno("mvwin");
+		return got_error_from_errno("mvwin");
 
 	return NULL;
 }
@@ -435,9 +435,9 @@ view_resize(struct tog_view *view)
 		ncols = view->ncols + (COLS - view->cols);
 
 	if (wresize(view->window, nlines, ncols) == ERR)
-		return got_error_prefix_errno("wresize");
+		return got_error_from_errno("wresize");
 	if (replace_panel(view->panel, view->window) == ERR)
-		return got_error_prefix_errno("replace_panel");
+		return got_error_from_errno("replace_panel");
 	wclear(view->window);
 
 	view->nlines = nlines;
@@ -790,7 +790,7 @@ mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
 	if (*wlen == (size_t)-1) {
 		int vislen;
 		if (errno != EILSEQ)
-			return got_error_prefix_errno("mbstowcs");
+			return got_error_from_errno("mbstowcs");
 
 		/* byte string invalid in current encoding; try to "fix" it */
 		err = got_mbsavis(&vis, &vislen, s);
@@ -798,19 +798,19 @@ mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
 			return err;
 		*wlen = mbstowcs(NULL, vis, 0);
 		if (*wlen == (size_t)-1) {
-			err = got_error_prefix_errno("mbstowcs"); /* give up */
+			err = got_error_from_errno("mbstowcs"); /* give up */
 			goto done;
 		}
 	}
 
 	*ws = calloc(*wlen + 1, sizeof(*ws));
 	if (*ws == NULL) {
-		err = got_error_prefix_errno("calloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 
 	if (mbstowcs(*ws, vis ? vis : s, *wlen) != *wlen)
-		err = got_error_prefix_errno("mbstowcs");
+		err = got_error_from_errno("mbstowcs");
 done:
 	free(vis);
 	if (err) {
@@ -857,7 +857,7 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 			i++;
 			break;
 		default:
-			err = got_error_prefix_errno("wcwidth");
+			err = got_error_from_errno("wcwidth");
 			goto done;
 		}
 	}
@@ -900,7 +900,7 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 		s = *refs_str;
 		if (asprintf(refs_str, "%s%s%s", s ? s : "",
 		    s ? ", " : "", name) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			free(s);
 			*refs_str = NULL;
 			break;
@@ -945,7 +945,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
-		return got_error_prefix_errno("localtime_r");
+		return got_error_from_errno("localtime_r");
 	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &tm)
 	    >= sizeof(datebuf))
 		return got_error(GOT_ERR_NO_SPACE);
@@ -961,7 +961,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 	author = strdup(got_object_commit_get_author(commit));
 	if (author == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		goto done;
 	}
 	err = format_author(&wauthor, &author_width, author, avail - col);
@@ -979,7 +979,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 
 	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
 	if (logmsg0 == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		goto done;
 	}
 	logmsg = logmsg0;
@@ -1079,7 +1079,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			break;
 		entry = alloc_commit_queue_entry(commit, id);
 		if (entry == NULL) {
-			err = got_error_prefix_errno("alloc_commit_queue_entry");
+			err = got_error_from_errno("alloc_commit_queue_entry");
 			break;
 		}
 
@@ -1168,7 +1168,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	    entry ? entry->idx + 1 : 0, commits->ncommits,
 	    commits_needed > 0 ? "loading... " :
 	    (refs_str ? refs_str : "")) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
@@ -1176,14 +1176,14 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (asprintf(&header, "commit %s %s%s",
 		    id_str ? id_str : "........................................",
 		    path, ncommits_str) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			header = NULL;
 			goto done;
 		}
 	} else if (asprintf(&header, "commit %s%s",
 	    id_str ? id_str : "........................................",
 	    ncommits_str) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		header = NULL;
 		goto done;
 	}
@@ -1217,7 +1217,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 			break;
 		author = strdup(got_object_commit_get_author(entry->commit));
 		if (author == NULL) {
-			err = got_error_prefix_errno("strdup");
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 		err = format_author(&wauthor, &width, author, COLS);
@@ -1375,7 +1375,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 
 	diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
 	if (diff_view == NULL)
-		return got_error_prefix_errno("view_open");
+		return got_error_from_errno("view_open");
 
 	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
@@ -1401,7 +1401,7 @@ browse_commit(struct tog_view **new_view, int begin_x,
 
 	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL)
-		return got_error_prefix_errno("view_open");
+		return got_error_from_errno("view_open");
 
 	err = open_tree_view(tree_view, tree, entry->id, refs, repo);
 	if (err)
@@ -1547,7 +1547,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->repo = repo;
 	s->start_id = got_object_id_dup(start_id);
 	if (s->start_id == NULL) {
-		err = got_error_prefix_errno("got_object_id_dup");
+		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
 
@@ -1748,7 +1748,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			lv = view_open(view->nlines, view->ncols,
 			    view->begin_y, view->begin_x, TOG_VIEW_LOG);
 			if (lv == NULL)
-				return got_error_prefix_errno(
+				return got_error_from_errno(
 				    "view_open");
 			err = open_log_view(lv, s->start_id, s->refs,
 			    s->repo, parent_path, 0);
@@ -1776,20 +1776,20 @@ apply_unveil(const char *repo_path, const char *worktree_path)
 	const struct got_error *error;
 
 	if (repo_path && unveil(repo_path, "r") != 0)
-		return got_error_prefix_errno2("unveil", repo_path);
+		return got_error_from_errno2("unveil", repo_path);
 
 	if (worktree_path && unveil(worktree_path, "rwc") != 0)
-		return got_error_prefix_errno2("unveil", worktree_path);
+		return got_error_from_errno2("unveil", worktree_path);
 
 	if (unveil("/tmp", "rwc") != 0)
-		return got_error_prefix_errno2("unveil", "/tmp");
+		return got_error_from_errno2("unveil", "/tmp");
 
 	error = got_privsep_unveil_exec_helpers();
 	if (error != NULL)
 		return error;
 
 	if (unveil(NULL, NULL) != 0)
-		return got_error_prefix_errno("unveil");
+		return got_error_from_errno("unveil");
 
 	return NULL;
 }
@@ -1850,7 +1850,7 @@ cmd_log(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
@@ -1861,7 +1861,7 @@ cmd_log(int argc, char *argv[])
 	if (argc == 0) {
 		path = strdup("");
 		if (path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (argc == 1) {
@@ -1873,7 +1873,7 @@ cmd_log(int argc, char *argv[])
 		} else {
 			path = strdup(argv[0]);
 			if (path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -1883,7 +1883,7 @@ cmd_log(int argc, char *argv[])
 	repo_path = worktree ?
 	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
 	if (repo_path == NULL) {
-		error = got_error_prefix_errno("strdup");
+		error = got_error_from_errno("strdup");
 		goto done;
 	}
 
@@ -1912,7 +1912,7 @@ cmd_log(int argc, char *argv[])
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_LOG);
 	if (view == NULL) {
-		error = got_error_prefix_errno("view_open");
+		error = got_error_from_errno("view_open");
 		goto done;
 	}
 	error = open_log_view(view, start_id, &refs, repo, path, 1);
@@ -2056,36 +2056,36 @@ write_commit_info(struct got_object_id *commit_id,
 
 	err = got_object_id_str(&id_str, commit_id);
 	if (err) {
-		err = got_error_prefix_errno("got_object_id_str");
+		err = got_error_from_errno("got_object_id_str");
 		goto done;
 	}
 
 	if (fprintf(outfile, "commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
 	    refs_str ? refs_str : "", refs_str ? ")" : "") < 0) {
-		err = got_error_prefix_errno("fprintf");
+		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 	if (fprintf(outfile, "from: %s\n",
 	    got_object_commit_get_author(commit)) < 0) {
-		err = got_error_prefix_errno("fprintf");
+		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (fprintf(outfile, "date: %s UTC\n",
 	    get_datestr(&committer_time, datebuf)) < 0) {
-		err = got_error_prefix_errno("fprintf");
+		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 	author = got_object_commit_get_author(commit);
 	committer = got_object_commit_get_committer(commit);
 	if (strcmp(author, committer) != 0 &&
 	    fprintf(outfile, "via: %s\n", committer) < 0) {
-		err = got_error_prefix_errno("fprintf");
+		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 	if (fprintf(outfile, "%s\n",
 	    got_object_commit_get_logmsg(commit)) < 0) {
-		err = got_error_prefix_errno("fprintf");
+		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 done:
@@ -2104,11 +2104,11 @@ create_diff(struct tog_diff_view_state *s)
 
 	f = got_opentemp();
 	if (f == NULL) {
-		err = got_error_prefix_errno("got_opentemp");
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 	if (s->f && fclose(s->f) != 0) {
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 		goto done;
 	}
 	s->f = f;
@@ -2162,7 +2162,7 @@ create_diff(struct tog_diff_view_state *s)
 	}
 done:
 	if (f && fflush(f) != 0 && err == NULL)
-		err = got_error_prefix_errno("fflush");
+		err = got_error_from_errno("fflush");
 	return err;
 }
 
@@ -2198,7 +2198,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	if (id1) {
 		view->state.diff.id1 = got_object_id_dup(id1);
 		if (view->state.diff.id1 == NULL)
-			return got_error_prefix_errno("got_object_id_dup");
+			return got_error_from_errno("got_object_id_dup");
 	} else
 		view->state.diff.id1 = NULL;
 
@@ -2206,7 +2206,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	if (view->state.diff.id2 == NULL) {
 		free(view->state.diff.id1);
 		view->state.diff.id1 = NULL;
-		return got_error_prefix_errno("got_object_id_dup");
+		return got_error_from_errno("got_object_id_dup");
 	}
 	view->state.diff.f = NULL;
 	view->state.diff.first_displayed_line = 1;
@@ -2246,7 +2246,7 @@ close_diff_view(struct tog_view *view)
 	free(view->state.diff.id2);
 	view->state.diff.id2 = NULL;
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -2268,7 +2268,7 @@ show_diff_view(struct tog_view *view)
 
 	if (asprintf(&header, "diff %s %s",
 	    id_str1 ? id_str1 : "/dev/null", id_str2) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		free(id_str1);
 		free(id_str2);
 		return err;
@@ -2293,7 +2293,7 @@ set_selected_commit(struct tog_diff_view_state *s,
 	free(s->id2);
 	s->id2 = got_object_id_dup(entry->id);
 	if (s->id2 == NULL)
-		return got_error_prefix_errno("got_object_id_dup");
+		return got_error_from_errno("got_object_id_dup");
 
 	err = got_object_open_as_commit(&selected_commit, s->repo, entry->id);
 	if (err)
@@ -2470,13 +2470,13 @@ cmd_diff(int argc, char *argv[])
 	} else if (argc == 2) {
 		repo_path = getcwd(NULL, 0);
 		if (repo_path == NULL)
-			return got_error_prefix_errno("getcwd");
+			return got_error_from_errno("getcwd");
 		id_str1 = argv[0];
 		id_str2 = argv[1];
 	} else if (argc == 3) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
-			return got_error_prefix_errno2("realpath", argv[0]);
+			return got_error_from_errno2("realpath", argv[0]);
 		id_str1 = argv[1];
 		id_str2 = argv[2];
 	} else
@@ -2506,7 +2506,7 @@ cmd_diff(int argc, char *argv[])
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_DIFF);
 	if (view == NULL) {
-		error = got_error_prefix_errno("view_open");
+		error = got_error_from_errno("view_open");
 		goto done;
 	}
 	error = open_diff_view(view, id1, id2, NULL, &refs, repo);
@@ -2558,7 +2558,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	werase(view->window);
 
 	if (asprintf(&line, "commit %s", id_str) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		free(id_str);
 		return err;
 	}
@@ -2580,7 +2580,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	    *first_displayed_line - 1 + selected_line, nlines,
 	    blame_complete ? "" : "annotating... ", path) == -1) {
 		free(id_str);
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 	}
 	free(id_str);
 	err = format_line(&wline, &width, line, view->ncols);
@@ -2686,7 +2686,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 
 	line->id = got_object_id_dup(id);
 	if (line->id == NULL) {
-		err = got_error_prefix_errno("got_object_id_dup");
+		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
 	line->annotated = 1;
@@ -2766,7 +2766,7 @@ stop_blame(struct tog_blame *blame)
 	}
 	if (blame->f) {
 		if (fclose(blame->f) != 0 && err == NULL)
-			err = got_error_prefix_errno("fclose");
+			err = got_error_from_errno("fclose");
 		blame->f = NULL;
 	}
 	if (blame->lines) {
@@ -2813,7 +2813,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		goto done;
 	blame->f = got_opentemp();
 	if (blame->f == NULL) {
-		err = got_error_prefix_errno("got_opentemp");
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
@@ -2823,7 +2823,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 
 	blame->lines = calloc(blame->nlines, sizeof(*blame->lines));
 	if (blame->lines == NULL) {
-		err = got_error_prefix_errno("calloc");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 
@@ -2836,7 +2836,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	blame->cb_args.nlines = blame->nlines;
 	blame->cb_args.commit_id = got_object_id_dup(commit_id);
 	if (blame->cb_args.commit_id == NULL) {
-		err = got_error_prefix_errno("got_object_id_dup");
+		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
 	blame->cb_args.quit = done;
@@ -2877,7 +2877,7 @@ open_blame_view(struct tog_view *view, char *path,
 	s->blame_complete = 0;
 	s->path = path;
 	if (s->path == NULL)
-		return got_error_prefix_errno("open_blame_view");
+		return got_error_from_errno("open_blame_view");
 	s->repo = repo;
 	s->refs = refs;
 	s->commit_id = commit_id;
@@ -3086,7 +3086,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		diff_view = view_open(0, 0, 0, begin_x, TOG_VIEW_DIFF);
 		if (diff_view == NULL) {
 			got_object_commit_close(commit);
-			err = got_error_prefix_errno("view_open");
+			err = got_error_from_errno("view_open");
 			break;
 		}
 		err = open_diff_view(diff_view, pid ? pid->id : NULL,
@@ -3194,7 +3194,7 @@ cmd_blame(int argc, char *argv[])
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
-		error = got_error_prefix_errno("getcwd");
+		error = got_error_from_errno("getcwd");
 		goto done;
 	}
 	if (repo_path == NULL) {
@@ -3207,13 +3207,13 @@ cmd_blame(int argc, char *argv[])
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
 			if (repo_path == NULL)
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 			if (error)
 				goto done;
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
-				error = got_error_prefix_errno("strdup");
+				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -3237,7 +3237,7 @@ cmd_blame(int argc, char *argv[])
 		    prefix, (strcmp(prefix, "/") != 0) ? "/" : "",
 		    worktree_subdir, worktree_subdir[0] ? "/" : "",
 		    path) == -1) {
-			error = got_error_prefix_errno("asprintf");
+			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 		error = got_repo_map_path(&in_repo_path, repo, p, 0);
@@ -3268,7 +3268,7 @@ cmd_blame(int argc, char *argv[])
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_BLAME);
 	if (view == NULL) {
-		error = got_error_prefix_errno("view_open");
+		error = got_error_from_errno("view_open");
 		goto done;
 	}
 	error = open_blame_view(view, in_repo_path, commit_id, &refs, repo);
@@ -3361,14 +3361,14 @@ draw_tree_entries(struct tog_view *view,
 		if (show_ids) {
 			err = got_object_id_str(&id_str, te->id);
 			if (err)
-				return got_error_prefix_errno(
+				return got_error_from_errno(
 				    "got_object_id_str");
 		}
 		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
 		    te->name, S_ISDIR(te->mode) ? "/" :
 		    ((te->mode & S_IXUSR) ? "*" : "")) == -1) {
 			free(id_str);
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 		}
 		free(id_str);
 		err = format_line(&wline, &width, line, view->ncols);
@@ -3469,7 +3469,7 @@ tree_entry_path(char **path, struct tog_parent_trees *parents,
 
 	*path = calloc(1, len);
 	if (path == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	(*path)[0] = '/';
 	pt = TAILQ_LAST(parents, tog_parent_trees);
@@ -3514,7 +3514,7 @@ blame_tree_entry(struct tog_view **new_view, int begin_x,
 
 	blame_view = view_open(0, 0, 0, begin_x, TOG_VIEW_BLAME);
 	if (blame_view == NULL)
-		return got_error_prefix_errno("view_open");
+		return got_error_from_errno("view_open");
 
 	err = open_blame_view(blame_view, path, commit_id, refs, repo);
 	if (err) {
@@ -3537,7 +3537,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 
 	log_view = view_open(0, 0, 0, begin_x, TOG_VIEW_LOG);
 	if (log_view == NULL)
-		return got_error_prefix_errno("view_open");
+		return got_error_from_errno("view_open");
 
 	err = tree_entry_path(&path, parents, te);
 	if (err)
@@ -3568,7 +3568,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 		goto done;
 
 	if (asprintf(&s->tree_label, "commit %s", commit_id_str) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
@@ -3577,7 +3577,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->first_displayed_entry = SIMPLEQ_FIRST(&s->entries->head);
 	s->commit_id = got_object_id_dup(commit_id);
 	if (s->commit_id == NULL) {
-		err = got_error_prefix_errno("got_object_id_dup");
+		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
 	s->refs = refs;
@@ -3758,7 +3758,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			parent = calloc(1, sizeof(*parent));
 			if (parent == NULL) {
-				err = got_error_prefix_errno("calloc");
+				err = got_error_from_errno("calloc");
 				break;
 			}
 			parent->tree = s->tree;
@@ -3857,7 +3857,7 @@ cmd_tree(int argc, char *argv[])
 		struct got_worktree *worktree;
 		char *cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
-			return got_error_prefix_errno("getcwd");
+			return got_error_from_errno("getcwd");
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
@@ -3869,13 +3869,13 @@ cmd_tree(int argc, char *argv[])
 		} else
 			repo_path = cwd;
 		if (repo_path == NULL) {
-			error = got_error_prefix_errno("strdup");
+			error = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (argc == 1) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
-			return got_error_prefix_errno2("realpath", argv[0]);
+			return got_error_from_errno2("realpath", argv[0]);
 	} else
 		usage_log();
 
@@ -3912,7 +3912,7 @@ cmd_tree(int argc, char *argv[])
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_TREE);
 	if (view == NULL) {
-		error = got_error_prefix_errno("view_open");
+		error = got_error_from_errno("view_open");
 		goto done;
 	}
 	error = open_tree_view(view, tree, commit_id, &refs, repo);
@@ -4022,7 +4022,7 @@ main(int argc, char *argv[])
 				if (error == NULL)
 					got_repo_close(repo);
 			} else
-				error = got_error_prefix_errno2("realpath",
+				error = got_error_from_errno2("realpath",
 				    argv[0]);
 			if (error) {
 				if (hflag) {

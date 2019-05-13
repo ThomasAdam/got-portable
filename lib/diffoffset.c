@@ -64,11 +64,11 @@ got_diffoffset_alloc(struct got_diffoffset_chunks **chunks)
 
 	first = alloc_chunk(0, 0);
 	if (first == NULL)
-		return got_error_prefix_errno("alloc_chunk");
+		return got_error_from_errno("alloc_chunk");
 
 	*chunks = calloc(1, sizeof(**chunks));
 	if (*chunks == NULL) {
-		err = got_error_prefix_errno("calloc");
+		err = got_error_from_errno("calloc");
 		free(first);
 		return err;
 	}
@@ -100,13 +100,13 @@ got_diffoffset_add(struct got_diffoffset_chunks *chunks,
 
 	chunk1 = alloc_chunk(old_lineno, new_lineno - old_lineno);
 	if (chunk1 == NULL)
-		return got_error_prefix_errno("alloc_chunk");
+		return got_error_from_errno("alloc_chunk");
 
 	chunk2 = alloc_chunk(old_lineno + old_length,
 	    new_lineno - old_lineno + new_length - old_length);
 	if (chunk2 == NULL) {
 		const struct got_error *err =
-		    got_error_prefix_errno("alloc_chunk");
+		    got_error_from_errno("alloc_chunk");
 		free(chunk1);
 		return err;
 	}

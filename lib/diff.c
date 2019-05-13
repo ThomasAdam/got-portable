@@ -54,14 +54,14 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	if (blob1) {
 		f1 = got_opentemp();
 		if (f1 == NULL)
-			return got_error_prefix_errno("got_opentemp");
+			return got_error_from_errno("got_opentemp");
 	} else
 		flags |= D_EMPTY1;
 
 	if (blob2) {
 		f2 = got_opentemp();
 		if (f2 == NULL) {
-			err = got_error_prefix_errno("got_opentemp");
+			err = got_error_from_errno("got_opentemp");
 			fclose(f1);
 			return err;
 		}
@@ -112,9 +112,9 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -143,7 +143,7 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	if (blob1) {
 		f1 = got_opentemp();
 		if (f1 == NULL)
-			return got_error_prefix_errno("got_opentemp");
+			return got_error_from_errno("got_opentemp");
 		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
 		err = got_object_blob_dump_to_file(&size1, NULL, f1, blob1);
 		if (err)
@@ -179,7 +179,7 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, NULL);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -191,7 +191,7 @@ got_diff_blob_lines_changed(struct got_diff_changes **changes,
 
 	*changes = calloc(1, sizeof(**changes));
 	if (*changes == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 	SIMPLEQ_INIT(&(*changes)->entries);
 
 	err = diff_blobs(blob1, blob2, NULL, NULL, 3, NULL, *changes);
@@ -513,7 +513,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		te1 = SIMPLEQ_FIRST(&entries->head);
 		if (te1 && asprintf(&l1, "%s%s%s", label1, label1[0] ? "/" : "",
 		    te1->name) == -1)
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 	}
 	if (tree2) {
 		const struct got_tree_entries *entries;
@@ -521,7 +521,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		te2 = SIMPLEQ_FIRST(&entries->head);
 		if (te2 && asprintf(&l2, "%s%s%s", label2, label2[0] ? "/" : "",
 		    te2->name) == -1)
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 	}
 
 	do {
@@ -535,7 +535,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 				if (te && asprintf(&l2, "%s%s%s", label2,
 				    label2[0] ? "/" : "", te->name) == -1)
 					return
-					    got_error_prefix_errno("asprintf");
+					    got_error_from_errno("asprintf");
 			}
 			err = diff_entry_old_new(te1, te, l1, l2, diff_context,
 			    repo, outfile);
@@ -552,12 +552,12 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 				if (asprintf(&l2, "%s%s%s", label2,
 				    label2[0] ? "/" : "", te->name) == -1)
 					return
-					    got_error_prefix_errno("asprintf");
+					    got_error_from_errno("asprintf");
 			} else {
 				if (asprintf(&l2, "%s%s%s", label2,
 				    label2[0] ? "/" : "", te2->name) == -1)
 					return
-					    got_error_prefix_errno("asprintf");
+					    got_error_from_errno("asprintf");
 			}
 			err = diff_entry_new_old(te2, te, l2, diff_context,
 			    repo, outfile);
@@ -572,7 +572,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			if (te1 &&
 			    asprintf(&l1, "%s%s%s", label1,
 			    label1[0] ? "/" : "", te1->name) == -1)
-				return got_error_prefix_errno("asprintf");
+				return got_error_from_errno("asprintf");
 		}
 		free(l2);
 		l2 = NULL;
@@ -581,7 +581,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 			if (te2 &&
 			    asprintf(&l2, "%s%s%s", label2,
 			        label2[0] ? "/" : "", te2->name) == -1)
-				return got_error_prefix_errno("asprintf");
+				return got_error_from_errno("asprintf");
 		}
 	} while (te1 || te2);
 

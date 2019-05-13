@@ -84,25 +84,25 @@ create_object_file(struct got_object_id *id, FILE *content,
 		goto done;
 
 	if (rename(tmppath, objpath) != 0) {
-		err = got_error_prefix_errno3("rename", tmppath, objpath);
+		err = got_error_from_errno3("rename", tmppath, objpath);
 		goto done;
 	}
 	free(tmppath);
 	tmppath = NULL;
 
 	if (chmod(objpath, GOT_DEFAULT_FILE_MODE) != 0) {
-		err = got_error_prefix_errno2("chmod", objpath);
+		err = got_error_from_errno2("chmod", objpath);
 		goto done;
 	}
 done:
 	free(objpath);
 	if (tmppath) {
 		if (unlink(tmppath) != 0 && err == NULL)
-			err = got_error_prefix_errno2("unlink", tmppath);
+			err = got_error_from_errno2("unlink", tmppath);
 		free(tmppath);
 	}
 	if (tmpfile && fclose(tmpfile) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	if (lf)
 		unlock_err = got_lockfile_unlock(lf);
 	return err ? err : unlock_err;
@@ -126,16 +126,16 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1)
-		return got_error_prefix_errno2("open", ondisk_path);
+		return got_error_from_errno2("open", ondisk_path);
 
 	if (fstat(fd, &sb) == -1) {
-		err = got_error_prefix_errno2("fstat", ondisk_path);
+		err = got_error_from_errno2("fstat", ondisk_path);
 		goto done;
 	}
 
 	if (asprintf(&header, "%s %lld", GOT_OBJ_LABEL_BLOB,
 		sb.st_size) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
@@ -143,7 +143,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 
 	blobfile = got_opentemp();
 	if (blobfile == NULL) {
-		err = got_error_prefix_errno("got_opentemp");
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
@@ -158,7 +158,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 
 		inlen = read(fd, buf, sizeof(buf));
 		if (inlen == -1) {
-			err = got_error_prefix_errno("read");
+			err = got_error_from_errno("read");
 			goto done;
 		}
 		if (inlen == 0)
@@ -173,13 +173,13 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_prefix_errno("malloc");
+		err = got_error_from_errno("malloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
 
 	if (fflush(blobfile) != 0) {
-		err = got_error_prefix_errno("fflush");
+		err = got_error_from_errno("fflush");
 		goto done;
 	}
 	rewind(blobfile);
@@ -188,9 +188,9 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 done:
 	free(header);
 	if (fd != -1 && close(fd) != 0 && err == NULL)
-		err = got_error_prefix_errno("close");
+		err = got_error_from_errno("close");
 	if (blobfile && fclose(blobfile) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);
 		*id = NULL;
@@ -233,7 +233,7 @@ got_object_tree_create(struct got_object_id **id,
 	}
 
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_TREE, len) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
@@ -241,7 +241,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	treefile = got_opentemp();
 	if (treefile == NULL) {
-		err = got_error_prefix_errno("got_opentemp");
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
@@ -282,13 +282,13 @@ got_object_tree_create(struct got_object_id **id,
 
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_prefix_errno("malloc");
+		err = got_error_from_errno("malloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
 
 	if (fflush(treefile) != 0) {
-		err = got_error_prefix_errno("fflush");
+		err = got_error_from_errno("fflush");
 		goto done;
 	}
 	rewind(treefile);
@@ -297,7 +297,7 @@ got_object_tree_create(struct got_object_id **id,
 done:
 	free(header);
 	if (treefile && fclose(treefile) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);
 		*id = NULL;
@@ -327,13 +327,13 @@ got_object_commit_create(struct got_object_id **id,
 
 	if (asprintf(&author_str, "%s%s %lld +0000\n",
 	    GOT_COMMIT_LABEL_AUTHOR, author, author_time) == -1)
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 
 	if (asprintf(&committer_str, "%s%s %lld +0000\n",
 	    GOT_COMMIT_LABEL_COMMITTER, committer ? committer : author,
 	    committer ? committer_time : author_time)
 	    == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
@@ -343,7 +343,7 @@ got_object_commit_create(struct got_object_id **id,
 	    + strlen(author_str) + strlen(committer_str) + 2 + strlen(logmsg);
 
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_COMMIT, len) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
@@ -351,7 +351,7 @@ got_object_commit_create(struct got_object_id **id,
 
 	commitfile = got_opentemp();
 	if (commitfile == NULL) {
-		err = got_error_prefix_errno("got_opentemp");
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
@@ -366,7 +366,7 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	if (asprintf(&tree_str, "%s%s\n", GOT_COMMIT_LABEL_TREE, id_str)
 	    == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 	len = strlen(tree_str);
@@ -387,7 +387,7 @@ got_object_commit_create(struct got_object_id **id,
 			goto done;
 		if (asprintf(&parent_str, "%s%s\n", GOT_COMMIT_LABEL_PARENT,
 		    id_str) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 		len = strlen(parent_str);
@@ -441,13 +441,13 @@ got_object_commit_create(struct got_object_id **id,
 
 	*id = malloc(sizeof(**id));
 	if (*id == NULL) {
-		err = got_error_prefix_errno("malloc");
+		err = got_error_from_errno("malloc");
 		goto done;
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
 
 	if (fflush(commitfile) != 0) {
-		err = got_error_prefix_errno("fflush");
+		err = got_error_from_errno("fflush");
 		goto done;
 	}
 	rewind(commitfile);
@@ -459,7 +459,7 @@ done:
 	free(author_str);
 	free(committer_str);
 	if (commitfile && fclose(commitfile) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);
 		*id = NULL;

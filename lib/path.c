@@ -137,9 +137,9 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 	bufsize = len - len_parent + 1;
 	*child = malloc(bufsize);
 	if (*child == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 	if (strlcpy(*child, abspath + len_parent, bufsize) >= bufsize) {
-		err = got_error_prefix_errno("strlcpy");
+		err = got_error_from_errno("strlcpy");
 		free(*child);
 		*child = NULL;
 		return err;
@@ -236,7 +236,7 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 
 	new = malloc(sizeof(*new));
 	if (new == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 	new->path = path;
 	new->data = data;
 
@@ -295,11 +295,11 @@ make_parent_dirs(const char *abspath)
 			if (err)
 				goto done;
 			if (mkdir(parent, GOT_DEFAULT_DIR_MODE) == -1) {
-				err = got_error_prefix_errno2("mkdir", parent);
+				err = got_error_from_errno2("mkdir", parent);
 				goto done;
 			}
 		} else
-			err = got_error_prefix_errno2("mkdir", parent);
+			err = got_error_from_errno2("mkdir", parent);
 	}
 done:
 	free(parent);
@@ -317,9 +317,9 @@ got_path_mkdir(const char *abspath)
 			if (err)
 				goto done;
 			if (mkdir(abspath, GOT_DEFAULT_DIR_MODE) == -1)
-				err = got_error_prefix_errno2("mkdir", abspath);
+				err = got_error_from_errno2("mkdir", abspath);
 		} else
-			err = got_error_prefix_errno2("mkdir", abspath);
+			err = got_error_from_errno2("mkdir", abspath);
 	}
 
 done:
@@ -357,14 +357,14 @@ got_path_dirname(char **parent, const char *path)
 
 	p = dirname(path);
 	if (p == NULL)
-		return got_error_prefix_errno2("dirname", path);
+		return got_error_from_errno2("dirname", path);
 
 	if (p[0] == '.' && p[1] == '\0')
 		return got_error(GOT_ERR_BAD_PATH);
 
 	*parent = strdup(p);
 	if (*parent == NULL)
-		return got_error_prefix_errno("strdup");
+		return got_error_from_errno("strdup");
 
 	return NULL;
 }

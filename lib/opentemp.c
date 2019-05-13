@@ -66,12 +66,12 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
 		*path = NULL;
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 	}
 
 	fd = mkstemp(*path);
 	if (fd == -1) {
-		err = got_error_prefix_errno("mkstemp");
+		err = got_error_from_errno("mkstemp");
 		free(*path);
 		*path = NULL;
 		return err;
@@ -79,7 +79,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	*outfile = fdopen(fd, "w+");
 	if (*outfile == NULL) {
-		err = got_error_prefix_errno("fdopen");
+		err = got_error_from_errno("fdopen");
 		free(*path);
 		*path = NULL;
 	}
@@ -97,12 +97,12 @@ got_opentemp_named_fd(char **path, int *outfd, const char *basepath)
 
 	if (asprintf(path, "%s-XXXXXX", basepath) == -1) {
 		*path = NULL;
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 	}
 
 	fd = mkstemp(*path);
 	if (fd == -1) {
-		err = got_error_prefix_errno("mkstemp");
+		err = got_error_from_errno("mkstemp");
 		free(*path);
 		*path = NULL;
 		return err;

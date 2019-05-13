@@ -68,11 +68,11 @@ got_object_qid_alloc_partial(struct got_object_qid **qid)
 
 	*qid = malloc(sizeof(**qid));
 	if (*qid == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	(*qid)->id = malloc(sizeof(*((*qid)->id)));
 	if ((*qid)->id == NULL) {
-		err = got_error_prefix_errno("malloc");
+		err = got_error_from_errno("malloc");
 		got_object_qid_free(*qid);
 		*qid = NULL;
 		return err;
@@ -88,7 +88,7 @@ got_object_id_str(char **outbuf, struct got_object_id *id)
 
 	*outbuf = malloc(len);
 	if (*outbuf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	if (got_sha1_digest_to_str(id->sha1, *outbuf, len) == NULL) {
 		free(*outbuf);
@@ -175,7 +175,7 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 	(*obj)->type = type;
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
@@ -196,7 +196,7 @@ got_object_read_header(struct got_object **obj, int fd)
 
 	buf = malloc(zbsize);
 	if (buf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	err = got_inflate_init(&zb, buf, zbsize);
 	if (err)
@@ -215,7 +215,7 @@ got_object_read_header(struct got_object **obj, int fd)
 			nbuf++;
 			newbuf = recallocarray(buf, nbuf - 1, nbuf, zbsize);
 			if (newbuf == NULL) {
-				err = got_error_prefix_errno("recallocarray");
+				err = got_error_from_errno("recallocarray");
 				goto done;
 			}
 			buf = newbuf;
@@ -314,7 +314,7 @@ parse_commit_time(time_t *time, time_t *gmtoff, char *committer)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	tzstr = strdup(space + 1);
 	if (tzstr == NULL)
-		return got_error_prefix_errno("strdup");
+		return got_error_from_errno("strdup");
 	err = parse_gmtoff(gmtoff, tzstr);
 	free(tzstr);
 	if (err)
@@ -434,7 +434,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 
 	*commit = got_object_commit_alloc_partial();
 	if (*commit == NULL)
-		return got_error_prefix_errno("got_object_commit_alloc_partial");
+		return got_error_from_errno("got_object_commit_alloc_partial");
 
 	label_len = strlen(GOT_COMMIT_LABEL_TREE);
 	if (strncmp(s, GOT_COMMIT_LABEL_TREE, label_len) == 0) {
@@ -495,7 +495,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		(*commit)->author = strdup(s);
 		if ((*commit)->author == NULL) {
-			err = got_error_prefix_errno("strdup");
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 		s += slen + 1;
@@ -526,7 +526,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 			goto done;
 		(*commit)->committer = strdup(s);
 		if ((*commit)->committer == NULL) {
-			err = got_error_prefix_errno("strdup");
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 		s += slen + 1;
@@ -535,7 +535,7 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 
 	(*commit)->logmsg = strndup(s, remain);
 	if ((*commit)->logmsg == NULL) {
-		err = got_error_prefix_errno("strndup");
+		err = got_error_from_errno("strndup");
 		goto done;
 	}
 done:
@@ -605,7 +605,7 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 
 	*te = got_alloc_tree_entry_partial();
 	if (*te == NULL)
-		return got_error_prefix_errno("got_alloc_tree_entry_partial");
+		return got_error_from_errno("got_alloc_tree_entry_partial");
 
 	*elen = strnlen(buf, maxlen) + 1;
 	if (*elen > maxlen) {
@@ -661,7 +661,7 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 
 	*tree = calloc(1, sizeof(**tree));
 	if (*tree == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	SIMPLEQ_INIT(&(*tree)->entries.head);
 
@@ -720,7 +720,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 
 	*tag = calloc(1, sizeof(**tag));
 	if (*tag == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	label_len = strlen(GOT_TAG_LABEL_OBJECT);
 	if (strncmp(s, GOT_TAG_LABEL_OBJECT, label_len) == 0) {
@@ -817,7 +817,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		slen = strlen(s);
 		(*tag)->tag = strndup(s, slen);
 		if ((*tag)->tag == NULL) {
-			err = got_error_prefix_errno("strndup");
+			err = got_error_from_errno("strndup");
 			goto done;
 		}
 		s += slen + 1;
@@ -855,7 +855,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 			goto done;
 		(*tag)->tagger = strdup(s);
 		if ((*tag)->tagger == NULL) {
-			err = got_error_prefix_errno("strdup");
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 		s += slen + 1;
@@ -868,14 +868,14 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		/* Some old tags in the Linux git repo have no tagger. */
 		(*tag)->tagger = strdup("");
 		if ((*tag)->tagger == NULL) {
-			err = got_error_prefix_errno("strdup");
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 	}
 
 	(*tag)->tagmsg = strndup(s, remain);
 	if ((*tag)->tagmsg == NULL) {
-		err = got_error_prefix_errno("strndup");
+		err = got_error_from_errno("strndup");
 		goto done;
 	}
 done:
@@ -899,7 +899,7 @@ got_read_file_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	buf = malloc(blocksize);
 	if (buf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	remain = blocksize;
 	total = 0;
@@ -908,7 +908,7 @@ got_read_file_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 			uint8_t *newbuf;
 			newbuf = reallocarray(buf, 1, total + blocksize);
 			if (newbuf == NULL) {
-				err = got_error_prefix_errno("reallocarray");
+				err = got_error_from_errno("reallocarray");
 				goto done;
 			}
 			buf = newbuf;

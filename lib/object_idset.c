@@ -97,7 +97,7 @@ got_object_idset_add(struct got_object_idset *set, struct got_object_id *id,
 
 	new = malloc(sizeof(*new));
 	if (new == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	memcpy(&new->id, id, sizeof(new->id));
 	new->data = data;

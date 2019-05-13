@@ -57,11 +57,11 @@ poll_fd(int fd, int events, int timeout)
 
 	n = poll(pfd, 1, timeout);
 	if (n == -1)
-		return got_error_prefix_errno("poll");
+		return got_error_from_errno("poll");
 	if (n == 0)
 		return got_error(GOT_ERR_TIMEOUT);
 	if (pfd[0].revents & (POLLERR | POLLNVAL))
-		return got_error_prefix_errno("poll error");
+		return got_error_from_errno("poll error");
 	if (pfd[0].revents & (events | POLLHUP))
 		return NULL;
 
@@ -96,7 +96,7 @@ got_privsep_wait_for_child(pid_t pid)
 	int child_status;
 
 	if (waitpid(pid, &child_status, 0) == -1)
-		return got_error_prefix_errno("waitpid");
+		return got_error_from_errno("waitpid");
 
 	if (!WIFEXITED(child_status))
 		return got_error(GOT_ERR_PRIVSEP_DIED);
@@ -135,7 +135,7 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
 
 	n = imsg_get(ibuf, imsg);
 	if (n == -1)
-		return got_error_prefix_errno("imsg_get");
+		return got_error_from_errno("imsg_get");
 
 	while (n == 0) {
 		err = read_imsg(ibuf);
@@ -200,7 +200,7 @@ flush_imsg(struct imsgbuf *ibuf)
 		return err;
 
 	if (imsg_flush(ibuf) == -1)
-		return got_error_prefix_errno("imsg_flush");
+		return got_error_from_errno("imsg_flush");
 
 	return NULL;
 }
@@ -214,7 +214,7 @@ got_privsep_send_stop(int fd)
 	imsg_init(&ibuf, fd);
 
 	if (imsg_compose(&ibuf, GOT_IMSG_STOP, 0, 0, -1, NULL, 0) == -1)
-		return got_error_prefix_errno("imsg_compose STOP");
+		return got_error_from_errno("imsg_compose STOP");
 
 	err = flush_imsg(&ibuf);
 	imsg_clear(&ibuf);
@@ -226,7 +226,7 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
 	    == -1)
-		return got_error_prefix_errno("imsg_compose OBJECT_REQUEST");
+		return got_error_from_errno("imsg_compose OBJECT_REQUEST");
 
 	return flush_imsg(ibuf);
 }
@@ -251,7 +251,7 @@ got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
 
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_REQUEST, 0, 0, fd, iobjp, len)
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose COMMIT_REQUEST");
+		err = got_error_from_errno("imsg_compose COMMIT_REQUEST");
 		close(fd);
 		return err;
 	}
@@ -279,7 +279,7 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 
 	if (imsg_compose(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, fd, iobjp, len)
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose TREE_REQUEST");
+		err = got_error_from_errno("imsg_compose TREE_REQUEST");
 		close(fd);
 		return err;
 	}
@@ -306,7 +306,7 @@ got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
 
 	if (imsg_compose(ibuf, GOT_IMSG_TAG_REQUEST, 0, 0, fd, iobjp, len)
 	    == -1)
-		return got_error_prefix_errno("imsg_compose TAG_REQUEST");
+		return got_error_from_errno("imsg_compose TAG_REQUEST");
 
 	return flush_imsg(ibuf);
 }
@@ -331,7 +331,7 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
 
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, iobjp, len)
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose BLOB_REQUEST");
+		err = got_error_from_errno("imsg_compose BLOB_REQUEST");
 		close(infd);
 		return err;
 	}
@@ -346,7 +346,7 @@ got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
 
 	if (imsg_compose(ibuf, GOT_IMSG_BLOB_OUTFD, 0, 0, outfd, NULL, 0)
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose BLOB_OUTFD");
+		err = got_error_from_errno("imsg_compose BLOB_OUTFD");
 		close(outfd);
 		return err;
 	}
@@ -361,7 +361,7 @@ got_privsep_send_tmpfd(struct imsgbuf *ibuf, int fd)
 
 	if (imsg_compose(ibuf, GOT_IMSG_TMPFD, 0, 0, fd, NULL, 0)
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose TMPFD");
+		err = got_error_from_errno("imsg_compose TMPFD");
 		close(fd);
 		return err;
 	}
@@ -386,7 +386,7 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 
 	if (imsg_compose(ibuf, GOT_IMSG_OBJECT, 0, 0, -1, &iobj, sizeof(iobj))
 	    == -1)
-		return got_error_prefix_errno("imsg_compose OBJECT");
+		return got_error_from_errno("imsg_compose OBJECT");
 
 	return flush_imsg(ibuf);
 }
@@ -405,7 +405,7 @@ got_privsep_get_imsg_obj(struct got_object **obj, struct imsg *imsg,
 
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	memcpy((*obj)->id.sha1, iobj->id, SHA1_DIGEST_LENGTH);
 	(*obj)->type = iobj->type;
@@ -466,7 +466,7 @@ send_commit_logmsg(struct imsgbuf *ibuf, struct got_commit_object *commit,
 
 		if (imsg_compose(ibuf, GOT_IMSG_COMMIT_LOGMSG, 0, 0, -1,
 		    commit->logmsg + offset, n) == -1) {
-			err = got_error_prefix_errno("imsg_compose "
+			err = got_error_from_errno("imsg_compose "
 			    "COMMIT_LOGMSG");
 			break;
 		}
@@ -499,7 +499,7 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 
 	buf = malloc(total);
 	if (buf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	icommit = (struct got_imsg_commit_object *)buf;
 	memcpy(icommit->tree_id, commit->tree_id->sha1,
@@ -524,7 +524,7 @@ got_privsep_send_commit(struct imsgbuf *ibuf, struct got_commit_object *commit)
 	}
 
 	if (imsg_compose(ibuf, GOT_IMSG_COMMIT, 0, 0, -1, buf, len) == -1) {
-		err = got_error_prefix_errno("imsg_compose COMMIT");
+		err = got_error_from_errno("imsg_compose COMMIT");
 		goto done;
 	}
 
@@ -582,7 +582,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 		*commit = got_object_commit_alloc_partial();
 		if (*commit == NULL) {
-			err = got_error_prefix_errno(
+			err = got_error_from_errno(
 			    "got_object_commit_alloc_partial");
 			break;
 		}
@@ -597,13 +597,13 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		if (icommit->author_len == 0) {
 			(*commit)->author = strdup("");
 			if ((*commit)->author == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
 			(*commit)->author = malloc(icommit->author_len + 1);
 			if ((*commit)->author == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			memcpy((*commit)->author, imsg.data + len,
@@ -615,14 +615,14 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		if (icommit->committer_len == 0) {
 			(*commit)->committer = strdup("");
 			if ((*commit)->committer == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
 			(*commit)->committer =
 			    malloc(icommit->committer_len + 1);
 			if ((*commit)->committer == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			memcpy((*commit)->committer, imsg.data + len,
@@ -634,7 +634,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		if (icommit->logmsg_len == 0) {
 			(*commit)->logmsg = strdup("");
 			if ((*commit)->logmsg == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
@@ -642,7 +642,7 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 
 			(*commit)->logmsg = malloc(icommit->logmsg_len + 1);
 			if ((*commit)->logmsg == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			while (remain > 0) {
@@ -700,7 +700,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 	itree.nentries = tree->entries.nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
 	    == -1)
-		return got_error_prefix_errno("imsg_compose TREE");
+		return got_error_from_errno("imsg_compose TREE");
 
 	totlen = sizeof(itree);
 	nimsg = 1;
@@ -722,7 +722,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 
 		buf = malloc(len);
 		if (buf == NULL)
-			return got_error_prefix_errno("malloc");
+			return got_error_from_errno("malloc");
 
 		ite = (struct got_imsg_tree_entry *)buf;
 		memcpy(ite->id, te->id->sha1, sizeof(ite->id));
@@ -731,7 +731,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 
 		if (imsg_compose(ibuf, GOT_IMSG_TREE_ENTRY, 0, 0, -1,
 		    buf, len) == -1)
-			err = got_error_prefix_errno("imsg_compose TREE_ENTRY");
+			err = got_error_from_errno("imsg_compose TREE_ENTRY");
 		free(buf);
 		if (err)
 			return err;
@@ -793,7 +793,7 @@ get_more:
 			itree = imsg.data;
 			*tree = malloc(sizeof(**tree));
 			if (*tree == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			(*tree)->entries.nentries = itree->nentries;
@@ -821,14 +821,14 @@ get_more:
 
 			te = got_alloc_tree_entry_partial();
 			if (te == NULL) {
-				err = got_error_prefix_errno(
+				err = got_error_from_errno(
 				    "got_alloc_tree_entry_partial");
 				break;
 			}
 			te->name = malloc(datalen + 1);
 			if (te->name == NULL) {
 				free(te);
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			memcpy(te->name, imsg.data + sizeof(*ite), datalen);
@@ -874,21 +874,21 @@ got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen,
 
 		buf = malloc(sizeof(iblob) + size);
 		if (buf == NULL)
-			return got_error_prefix_errno("malloc");
+			return got_error_from_errno("malloc");
 
 		memcpy(buf, &iblob, sizeof(iblob));
 		memcpy(buf + sizeof(iblob), data, size);
 		if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, buf,
 		   sizeof(iblob) + size) == -1) {
 			free(buf);
-			return got_error_prefix_errno("imsg_compose BLOB");
+			return got_error_from_errno("imsg_compose BLOB");
 		}
 		free(buf);
 	} else {
 		/* Data has already been written to file descriptor. */
 		if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, &iblob,
 		    sizeof(iblob)) == -1)
-			return got_error_prefix_errno("imsg_compose BLOB");
+			return got_error_from_errno("imsg_compose BLOB");
 	}
 
 
@@ -934,7 +934,7 @@ got_privsep_recv_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 		*outbuf = malloc(*size);
 		if (*outbuf == NULL) {
-			err = got_error_prefix_errno("malloc");
+			err = got_error_from_errno("malloc");
 			break;
 		}
 		memcpy(*outbuf, imsg.data + sizeof(*iblob), *size);
@@ -962,7 +962,7 @@ send_tagmsg(struct imsgbuf *ibuf, struct got_tag_object *tag, size_t tagmsg_len)
 
 		if (imsg_compose(ibuf, GOT_IMSG_TAG_TAGMSG, 0, 0, -1,
 		    tag->tagmsg + offset, n) == -1) {
-			err = got_error_prefix_errno("imsg_compose TAG_TAGMSG");
+			err = got_error_from_errno("imsg_compose TAG_TAGMSG");
 			break;
 		}
 
@@ -992,7 +992,7 @@ got_privsep_send_tag(struct imsgbuf *ibuf, struct got_tag_object *tag)
 
 	buf = malloc(total);
 	if (buf == NULL)
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 
 	itag = (struct got_imsg_tag_object *)buf;
 	memcpy(itag->id, tag->id.sha1, sizeof(itag->id));
@@ -1010,7 +1010,7 @@ got_privsep_send_tag(struct imsgbuf *ibuf, struct got_tag_object *tag)
 	len += tagger_len;
 
 	if (imsg_compose(ibuf, GOT_IMSG_TAG, 0, 0, -1, buf, len) == -1) {
-		err = got_error_prefix_errno("imsg_compose TAG");
+		err = got_error_from_errno("imsg_compose TAG");
 		goto done;
 	}
 
@@ -1062,7 +1062,7 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 
 		*tag = calloc(1, sizeof(**tag));
 		if (*tag == NULL) {
-			err = got_error_prefix_errno("calloc");
+			err = got_error_from_errno("calloc");
 			break;
 		}
 
@@ -1071,13 +1071,13 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 		if (itag->tag_len == 0) {
 			(*tag)->tag = strdup("");
 			if ((*tag)->tag == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
 			(*tag)->tag = malloc(itag->tag_len + 1);
 			if ((*tag)->tag == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			memcpy((*tag)->tag, imsg.data + len,
@@ -1093,13 +1093,13 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 		if (itag->tagger_len == 0) {
 			(*tag)->tagger = strdup("");
 			if ((*tag)->tagger == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
 			(*tag)->tagger = malloc(itag->tagger_len + 1);
 			if ((*tag)->tagger == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			memcpy((*tag)->tagger, imsg.data + len,
@@ -1111,7 +1111,7 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 		if (itag->tagmsg_len == 0) {
 			(*tag)->tagmsg = strdup("");
 			if ((*tag)->tagmsg == NULL) {
-				err = got_error_prefix_errno("strdup");
+				err = got_error_from_errno("strdup");
 				break;
 			}
 		} else {
@@ -1119,7 +1119,7 @@ got_privsep_recv_tag(struct got_tag_object **tag, struct imsgbuf *ibuf)
 
 			(*tag)->tagmsg = malloc(itag->tagmsg_len + 1);
 			if ((*tag)->tagmsg == NULL) {
-				err = got_error_prefix_errno("malloc");
+				err = got_error_from_errno("malloc");
 				break;
 			}
 			while (remain > 0) {
@@ -1166,11 +1166,11 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 	ipackidx.len = packidx->len;
 	fd = dup(packidx->fd);
 	if (fd == -1)
-		return got_error_prefix_errno("dup");
+		return got_error_from_errno("dup");
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKIDX, 0, 0, fd, &ipackidx,
 	    sizeof(ipackidx)) == -1) {
-		err = got_error_prefix_errno("imsg_compose PACKIDX");
+		err = got_error_from_errno("imsg_compose PACKIDX");
 		close(fd);
 		return err;
 	}
@@ -1182,11 +1182,11 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 
 	fd = dup(pack->fd);
 	if (fd == -1)
-		return got_error_prefix_errno("dup");
+		return got_error_from_errno("dup");
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACK, 0, 0, fd, &ipack, sizeof(ipack))
 	    == -1) {
-		err = got_error_prefix_errno("imsg_compose PACK");
+		err = got_error_from_errno("imsg_compose PACK");
 		close(fd);
 		return err;
 	}
@@ -1205,7 +1205,7 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKED_OBJECT_REQUEST, 0, 0, -1,
 	    &iobj, sizeof(iobj)) == -1)
-		return got_error_prefix_errno("imsg_compose "
+		return got_error_from_errno("imsg_compose "
 		    "PACKED_OBJECT_REQUEST");
 
 	return flush_imsg(ibuf);
@@ -1220,7 +1220,7 @@ got_privsep_unveil_exec_helpers(void)
 	    unveil(GOT_PATH_PROG_READ_TREE, "x") != 0 ||
 	    unveil(GOT_PATH_PROG_READ_BLOB, "x") != 0 ||
 	    unveil(GOT_PATH_PROG_READ_TAG, "x") != 0)
-		return got_error_prefix_errno("unveil");
+		return got_error_from_errno("unveil");
 
 	return NULL;
 }

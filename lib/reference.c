@@ -92,13 +92,13 @@ alloc_ref(struct got_reference **ref, const char *name,
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	memcpy((*ref)->ref.ref.sha1, id->sha1, sizeof((*ref)->ref.ref.sha1));
 	(*ref)->flags = flags;
 	(*ref)->ref.ref.name = strdup(name);
 	if ((*ref)->ref.ref.name == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		got_ref_close(*ref);
 		*ref = NULL;
 	}
@@ -113,18 +113,18 @@ alloc_symref(struct got_reference **ref, const char *name,
 
 	*ref = calloc(1, sizeof(**ref));
 	if (*ref == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 
 	(*ref)->flags = GOT_REF_IS_SYMBOLIC | flags;
 	(*ref)->ref.symref.name = strdup(name);
 	if ((*ref)->ref.symref.name == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		got_ref_close(*ref);
 		*ref = NULL;
 	}
 	(*ref)->ref.symref.ref = strdup(target_ref);
 	if ((*ref)->ref.symref.ref == NULL) {
-		err = got_error_prefix_errno("strdup");
+		err = got_error_from_errno("strdup");
 		got_ref_close(*ref);
 		*ref = NULL;
 	}
@@ -202,7 +202,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 done:
 	free(line);
 	if (fclose(f) != 0 && err == NULL) {
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 		if (*ref) {
 			if (lock)
 				got_ref_unlock(*ref);
@@ -348,7 +348,7 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 			if (!ref_is_absolute &&
 			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
 			    refname) == -1)
-				return got_error_prefix_errno("asprintf");
+				return got_error_from_errno("asprintf");
 			err = parse_packed_ref_line(ref, abs_refname, line);
 			if (!ref_is_absolute)
 				free(abs_refname);
@@ -378,23 +378,23 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 
 	if (ref_is_absolute || ref_is_well_known) {
 		if (asprintf(&path, "%s/%s", path_refs, name) == -1)
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 		absname = (char *)name;
 	} else {
 		if (asprintf(&path, "%s/%s%s%s", path_refs, subdir,
 		    subdir[0] ? "/" : "", name) == -1)
-			return got_error_prefix_errno("asprintf");
+			return got_error_from_errno("asprintf");
 
 		if (asprintf(&absname, "refs/%s%s%s",
 		    subdir, subdir[0] ? "/" : "", name) == -1) {
-			err = got_error_prefix_errno("asprintf");
+			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 	}
 
 	normpath = got_path_normalize(path);
 	if (normpath == NULL) {
-		err = got_error_prefix_errno2("got_path_normalize", path);
+		err = got_error_from_errno2("got_path_normalize", path);
 		goto done;
 	}
 
@@ -423,7 +423,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 
 	path_refs = get_refs_dir_path(repo, refname);
 	if (path_refs == NULL) {
-		err = got_error_prefix_errno2("get_refs_dir_path", refname);
+		err = got_error_from_errno2("get_refs_dir_path", refname);
 		goto done;
 	}
 
@@ -443,7 +443,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 
 		packed_refs_path = got_repo_get_path_packed_refs(repo);
 		if (packed_refs_path == NULL) {
-			err = got_error_prefix_errno(
+			err = got_error_from_errno(
 			    "got_repo_get_path_packed_refs");
 			goto done;
 		}
@@ -460,7 +460,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 			    refname);
 			if (!err) {
 				if (fclose(f) != 0) {
-					err = got_error_prefix_errno("fclose");
+					err = got_error_from_errno("fclose");
 					got_ref_close(*ref);
 					*ref = NULL;
 				} else
@@ -561,7 +561,7 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 
 	*id = calloc(1, sizeof(**id));
 	if (*id == NULL)
-		return got_error_prefix_errno("calloc");
+		return got_error_from_errno("calloc");
 	memcpy((*id)->sha1, ref->ref.ref.sha1, sizeof((*id)->sha1));
 	return NULL;
 }
@@ -614,7 +614,7 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 	new = malloc(sizeof(*new));
 	if (new == NULL) {
 		free(id);
-		return got_error_prefix_errno("malloc");
+		return got_error_from_errno("malloc");
 	}
 	new->ref = ref;
 	new->id = id;
@@ -661,7 +661,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 	char *path_subdir;
 
 	if (asprintf(&path_subdir, "%s/%s", path_refs, subdir) == -1)
-		return got_error_prefix_errno("asprintf");
+		return got_error_from_errno("asprintf");
 
 	d = opendir(path_subdir);
 	if (d == NULL)
@@ -698,7 +698,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		case DT_DIR:
 			if (asprintf(&child, "%s%s%s", subdir,
 			    subdir[0] == '\0' ? "" : "/", dent->d_name) == -1) {
-				err = got_error_prefix_errno("asprintf");
+				err = got_error_from_errno("asprintf");
 				break;
 			}
 			err = gather_on_disk_refs(refs, path_refs, child, repo);
@@ -727,7 +727,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	/* HEAD ref should always exist. */
 	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
 	if (path_refs == NULL) {
-		err = got_error_prefix_errno("get_refs_dir_path");
+		err = got_error_from_errno("get_refs_dir_path");
 		goto done;
 	}
 	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
@@ -743,7 +743,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	free(path_refs);
 	path_refs = get_refs_dir_path(repo, "");
 	if (path_refs == NULL) {
-		err = got_error_prefix_errno("get_refs_dir_path");
+		err = got_error_from_errno("get_refs_dir_path");
 		goto done;
 	}
 	err = gather_on_disk_refs(refs, path_refs, "", repo);
@@ -756,7 +756,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	 */
 	packed_refs_path = got_repo_get_path_packed_refs(repo);
 	if (packed_refs_path == NULL) {
-		err = got_error_prefix_errno("got_repo_get_path_packed_refs");
+		err = got_error_from_errno("got_repo_get_path_packed_refs");
 		goto done;
 	}
 
@@ -790,7 +790,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 done:
 	free(path_refs);
 	if (f && fclose(f) != 0 && err == NULL)
-		err = got_error_prefix_errno("fclose");
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -835,7 +835,7 @@ got_ref_change_symref(struct got_reference *ref, char *refname)
 
 	new_name = strdup(refname);
 	if (new_name == NULL)
-		return got_error_prefix_errno("strdup");
+		return got_error_from_errno("strdup");
 
 	free(ref->ref.symref.name);
 	ref->ref.symref.name = new_name;
@@ -855,12 +855,12 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	path_refs = get_refs_dir_path(repo, name);
 	if (path_refs == NULL) {
-		err = got_error_prefix_errno2("get_refs_dir_path", name);
+		err = got_error_from_errno2("get_refs_dir_path", name);
 		goto done;
 	}
 
 	if (asprintf(&path, "%s/%s", path_refs, name) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
@@ -911,21 +911,21 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 
 	if (stat(path, &sb) != 0) {
 		if (errno != ENOENT) {
-			err = got_error_prefix_errno2("stat", path);
+			err = got_error_from_errno2("stat", path);
 			goto done;
 		}
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	}
 
 	if (rename(tmppath, path) != 0) {
-		err = got_error_prefix_errno3("rename", tmppath, path);
+		err = got_error_from_errno3("rename", tmppath, path);
 		goto done;
 	}
 	free(tmppath);
 	tmppath = NULL;
 
 	if (chmod(path, sb.st_mode) != 0) {
-		err = got_error_prefix_errno2("chmod", path);
+		err = got_error_from_errno2("chmod", path);
 		goto done;
 	}
 done:
@@ -933,13 +933,13 @@ done:
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
 		if (fclose(f) != 0 && err == NULL)
-			err = got_error_prefix_errno("fclose");
+			err = got_error_from_errno("fclose");
 	}
 	free(path_refs);
 	free(path);
 	if (tmppath) {
 		if (unlink(tmppath) != 0 && err == NULL)
-			err = got_error_prefix_errno2("unlink", tmppath);
+			err = got_error_from_errno2("unlink", tmppath);
 		free(tmppath);
 	}
 	return err ? err : unlock_err;
@@ -963,7 +963,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 
 	packed_refs_path = got_repo_get_path_packed_refs(repo);
 	if (packed_refs_path == NULL)
-		return got_error_prefix_errno("got_repo_get_path_packed_refs");
+		return got_error_from_errno("got_repo_get_path_packed_refs");
 
 	err = got_opentemp_named(&tmppath, &tmpf, packed_refs_path);
 	if (err)
@@ -977,7 +977,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 
 	f = fopen(packed_refs_path, "r");
 	if (f == NULL) {
-		err = got_error_prefix_errno2("fopen", packed_refs_path);
+		err = got_error_from_errno2("fopen", packed_refs_path);
 		goto done;
 	}
 	for (;;) {
@@ -1048,13 +1048,13 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 
 		if (fflush(tmpf) != 0) {
-			err = got_error_prefix_errno("fflush");
+			err = got_error_from_errno("fflush");
 			goto done;
 		}
 
 		if (stat(packed_refs_path, &sb) != 0) {
 			if (errno != ENOENT) {
-				err = got_error_prefix_errno2("stat",
+				err = got_error_from_errno2("stat",
 				    packed_refs_path);
 				goto done;
 			}
@@ -1062,13 +1062,13 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 
 		if (rename(tmppath, packed_refs_path) != 0) {
-			err = got_error_prefix_errno3("rename", tmppath,
+			err = got_error_from_errno3("rename", tmppath,
 			    packed_refs_path);
 			goto done;
 		}
 
 		if (chmod(packed_refs_path, sb.st_mode) != 0) {
-			err = got_error_prefix_errno2("chmod",
+			err = got_error_from_errno2("chmod",
 			    packed_refs_path);
 			goto done;
 		}
@@ -1078,12 +1078,12 @@ done:
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
 		if (fclose(f) != 0 && err == NULL)
-			err = got_error_prefix_errno("fclose");
+			err = got_error_from_errno("fclose");
 	}
 	if (tmpf) {
 		unlink(tmppath);
 		if (fclose(tmpf) != 0 && err == NULL)
-			err = got_error_prefix_errno("fclose");
+			err = got_error_from_errno("fclose");
 	}
 	free(tmppath);
 	free(packed_refs_path);
@@ -1104,12 +1104,12 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 
 	path_refs = get_refs_dir_path(repo, name);
 	if (path_refs == NULL) {
-		err = got_error_prefix_errno2("get_refs_dir_path", name);
+		err = got_error_from_errno2("get_refs_dir_path", name);
 		goto done;
 	}
 
 	if (asprintf(&path, "%s/%s", path_refs, name) == -1) {
-		err = got_error_prefix_errno("asprintf");
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
@@ -1122,7 +1122,7 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 	/* XXX: check if old content matches our expectations? */
 
 	if (unlink(path) != 0)
-		err = got_error_prefix_errno2("unlink", path);
+		err = got_error_from_errno2("unlink", path);
 done:
 	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
