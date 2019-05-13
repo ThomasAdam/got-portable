@@ -2201,6 +2201,8 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	if (cmdline_log != NULL && strlen(cmdline_log) != 0) {
 		len = strlen(cmdline_log) + 1;
 		*logmsg = malloc(len + 1);
+		if (*logmsg == NULL)
+			return got_error_prefix_errno("malloc");
 		strlcpy(*logmsg, cmdline_log, len);
 		return NULL;
 	}
