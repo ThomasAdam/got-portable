@@ -44,6 +44,7 @@
 #include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
+#include "got_opentemp.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -2188,7 +2189,6 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 {
 	struct got_pathlist_entry *pe;
 	const struct got_error *err = NULL;
-	char *tmppath = NULL;
 	char *tmpfile = NULL;
 	char *cmdline_log = (char *)arg;
 	char buf[1024];
@@ -2207,21 +2207,9 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		return NULL;
 	}
 
-	tmppath = getenv("TMPDIR");
-	if (tmppath == NULL || strlen(tmppath) == 0)
-		tmppath = "/tmp";
-
-	if (asprintf(&tmpfile, "%s/got-XXXXXXXXXX", tmppath) == -1) {
-		err = got_error_prefix_errno("asprintf");
+	err = got_opentemp_named_fd(&tmpfile, &fd, "got-XXXXXXXXXX");
+	if (err)
 		return err;
-	}
-
-	fd = mkstemp(tmpfile);
-	if (fd < 0) {
-		err = got_error_prefix_errno("mktemp");
-		free(tmpfile);
-		return err;
-	}
 
 	dprintf(fd, "\n"
 	    "# changes to be committed:\n");
