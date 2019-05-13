@@ -290,10 +290,19 @@ const struct got_error *
 got_ref_alloc(struct got_reference **ref, const char *name,
     struct got_object_id *id)
 {
-	if (!is_valid_ref_name(name))
-		return got_error(GOT_ERR_BAD_REF_NAME);
+	const struct got_error *err;
+	char *absname = NULL;
 
-	return alloc_ref(ref, name, id, 0);
+	if (!is_valid_ref_name(name)) {
+		if (strchr(name, '/') != NULL)
+			return got_error(GOT_ERR_BAD_REF_NAME);
+		if (asprintf(&absname, "refs/heads/%s", name) == -1)
+			return got_error_from_errno("asprintf");
+	}
+
+	err = alloc_ref(ref, absname ? absname : name, id, 0);
+	free(absname);
+	return err;
 }
 
 static const struct got_error *
