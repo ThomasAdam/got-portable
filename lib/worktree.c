@@ -991,7 +991,8 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 		}
 
 		if (strncmp(line, markers[i], strlen(markers[i])) == 0) {
-			if (markers[i] == GOT_DIFF_CONFLICT_MARKER_END)
+			if (strcmp(markers[i], GOT_DIFF_CONFLICT_MARKER_END)
+			    == 0)
 				*status = GOT_STATUS_CONFLICT;
 			else
 				i++;
