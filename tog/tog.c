@@ -100,6 +100,8 @@ enum tog_view_type {
 	TOG_VIEW_TREE
 };
 
+#define TOG_EOF_STRING	"(END)"
+
 struct commit_queue_entry {
 	TAILQ_ENTRY(commit_queue_entry) entry;
 	struct got_object_id *id;
@@ -1958,7 +1960,7 @@ parse_next_line(FILE *f, size_t *len)
 static const struct got_error *
 draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
     int *last_displayed_line, int *eof, int max_lines,
-    char * header)
+    char *header)
 {
 	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
@@ -2018,6 +2020,22 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 	*last_displayed_line = nlines;
 
 	view_vborder(view);
+
+	if (*eof) {
+		while (nprinted < view->nlines) {
+			waddch(view->window, '\n');
+			nprinted++;
+		}
+
+		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols);
+		if (err) {
+			return err;
+		}
+
+		wstandout(view->window);
+		waddwstr(view->window, wline);
+		wstandend(view->window);
+	}
 
 	return NULL;
 }
