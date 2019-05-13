@@ -2237,6 +2237,7 @@ free_commitable(struct got_commitable *ct)
 	free(ct->ondisk_path);
 	free(ct->blob_id);
 	free(ct->base_blob_id);
+	free(ct->base_commit_id);
 	free(ct);
 }
 
@@ -2311,6 +2312,11 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	if (ct->status != GOT_STATUS_ADD) {
 		ct->base_blob_id = got_object_id_dup(blob_id);
 		if (ct->base_blob_id == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
+		ct->base_commit_id = got_object_id_dup(commit_id);
+		if (ct->base_commit_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
 		}
@@ -2680,7 +2686,8 @@ write_tree(struct got_object_id **new_tree_id,
 					if (err)
 						goto done;
 				}
-				err = report_ct_status(ct, status_cb, status_arg);
+				err = report_ct_status(ct, status_cb,
+				    status_arg);
 				if (err)
 					goto done;
 			} else {
@@ -2785,29 +2792,33 @@ check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
 	struct got_object_id *id_in_head;
 
 	/*
-	 * XXX This should probably be checking each commit from
-	 * worktree's base_commit -> head and verify that the
-	 * same blob exists in each of these commits.
-	 * Removals+additions within this line of history could mean
-	 * that renames have occured in which case we should really
-	 * be forcing the user to run an update...
+	 * Require that modified/deleted files are based on the branch head.
+	 * This requirement could be relaxed to force less update operations
+	 * on users but, for now, we want to play it safe and see how it goes.
+	 *
+	 * If this check is relaxed, it must still ensure that no modifications
+	 * were made to files *and their parents* in commits between the file's
+	 * base commit and the branch head. Otherwise, tree conflicts will not
+	 * be detected reliably.
 	 */
-	err = got_object_id_by_path(&id_in_head, repo,
-	    head_commit_id, ct->in_repo_path);
-	if (err) {
-		if (err->code != GOT_ERR_NO_TREE_ENTRY)
-			return err;
-		if (ct->status != GOT_STATUS_ADD)
+	if (ct->status != GOT_STATUS_ADD) {
+		if (got_object_id_cmp(ct->base_commit_id, head_commit_id) != 0)
 			return got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
-		err = NULL;
-		id_in_head = NULL;
+		return NULL;
 	}
 
-	if (id_in_head && got_object_id_cmp(id_in_head, ct->base_blob_id) != 0)
-		err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+	/* Require that added files don't exist in the branch head. */
+	err = got_object_id_by_path(&id_in_head, repo, head_commit_id,
+	    ct->in_repo_path);
+	if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+		return err;
+	if (id_in_head) {
+		free(id_in_head);
+		return got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+	}
 
 	free(id_in_head);
-	return err;
+	return NULL;
 }
 
 const struct got_error *

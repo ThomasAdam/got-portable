@@ -37,6 +37,7 @@ struct got_commitable {
 	unsigned char status;
 	struct got_object_id *blob_id;
 	struct got_object_id *base_blob_id;
+	struct got_object_id *base_commit_id;
 	mode_t mode;
 };
 
