@@ -2232,7 +2232,7 @@ free_commitable(struct got_commitable *ct)
 	free(ct->in_repo_path);
 	free(ct->ondisk_path);
 	free(ct->blob_id);
-	free(ct->base_id);
+	free(ct->base_blob_id);
 	free(ct);
 }
 
@@ -2305,8 +2305,8 @@ collect_commitables(void *arg, unsigned char status, const char *relpath,
 	ct->status = status;
 	ct->blob_id = NULL; /* will be filled in when blob gets created */
 	if (ct->status != GOT_STATUS_ADD) {
-		ct->base_id = got_object_id_dup(id);
-		if (ct->base_id == NULL) {
+		ct->base_blob_id = got_object_id_dup(id);
+		if (ct->base_blob_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
 		}
@@ -2521,7 +2521,7 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 		    ct->status != GOT_STATUS_DELETE)
 			continue;
 
-		if (got_object_id_cmp(ct->base_id, te->id) != 0)
+		if (got_object_id_cmp(ct->base_blob_id, te->id) != 0)
 			continue;
 
 		 err = match_ct_parent_path(&path_matches, ct, base_tree_path);
@@ -2799,7 +2799,7 @@ check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
 		id_in_head = NULL;
 	}
 
-	if (id_in_head && got_object_id_cmp(id_in_head, ct->base_id) != 0)
+	if (id_in_head && got_object_id_cmp(id_in_head, ct->base_blob_id) != 0)
 		err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
 
 	free(id_in_head);

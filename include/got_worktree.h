@@ -36,7 +36,7 @@ struct got_commitable {
 	char *ondisk_path;
 	unsigned char status;
 	struct got_object_id *blob_id;
-	struct got_object_id *base_id;
+	struct got_object_id *base_blob_id;
 	mode_t mode;
 };
 
