@@ -248,7 +248,11 @@ apply_unveil(const char *repo_path, int repo_read_only,
 		error = get_editor(&editor);
 		if (error)
 			return error;
-		unveil(editor, "x");
+		if (unveil(editor, "x") != 0) {
+			error = got_error_from_errno2("unveil", editor);
+			free(editor);
+			return error;
+		}
 		free(editor);
 	}
 
