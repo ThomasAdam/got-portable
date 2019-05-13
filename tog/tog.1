@@ -90,12 +90,16 @@ are as follows:
 Move the selection cursor down.
 .It Cm Up-arrow, k, Page-up, <, Comma, Ctrl-b
 Move the selection cursor up.
+.It Cm Page-down, Ctrl-f
+Move the selection cursor down one page.
+.It Cm Page-up, Ctrl-b
+Move the selection cursor up one page.
 .It Cm Enter, Space
 Open a
 .Cm diff
 view showing file changes made in the currently selected commit.
 .It Cm t
-Open a 
+Open a
 .Cm tree
 view showing the tree for the currently selected commit.
 .It Cm Backspace
@@ -130,10 +134,14 @@ The key bindings for
 .Cm tog diff
 are as follows:
 .Bl -tag -width Ds
-.It Cm Down-arrow, j, Page-down, Space
+.It Cm Down-arrow, j
 Scroll down.
 .It Cm Up-arrow, k, Page-up
 Scroll up.
+.It Cm Page-down, Space, Ctrl+f
+Scroll down one page.
+.It Cm Page-up, Ctrl+b
+Scroll up one page.
 .It Cm [
 Reduce the amount of diff context lines.
 .It Cm ]

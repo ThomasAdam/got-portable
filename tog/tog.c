@@ -2340,6 +2340,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->first_displayed_line--;
 		break;
 	case KEY_PPAGE:
+	case CTRL('b'):
 		if (s->first_displayed_line == 1)
 			break;
 		i = 0;
@@ -2353,6 +2354,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->first_displayed_line++;
 		break;
 	case KEY_NPAGE:
+	case CTRL('f'):
 	case ' ':
 		if (s->eof)
 			break;
