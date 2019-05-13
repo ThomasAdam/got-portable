@@ -197,8 +197,27 @@ usage(void)
 }
 
 static const struct got_error *
+get_editor(char **editorp)
+{
+	const char *editor;
+
+	editor = getenv("VISUAL");
+	if (editor == NULL)
+		editor = getenv("EDITOR");
+	if (editor == NULL)
+		editor = "/bin/ed";
+
+	*editorp = realpath(editor, NULL);
+	if (*editorp == NULL)
+		return got_error_prefix_errno("relpath");
+
+	return NULL;
+}
+
+static const struct got_error *
 apply_unveil(const char *repo_path, int repo_read_only,
-    const char *worktree_path, int create_worktree)
+    const char *worktree_path, int create_worktree,
+    int unveil_editor)
 {
 	const struct got_error *error;
 	static char err_msg[MAXPATHLEN + 36];
@@ -222,6 +241,15 @@ apply_unveil(const char *repo_path, int repo_read_only,
 
 		if (error && (error->code != GOT_ERR_ERRNO || errno != EISDIR))
 			return error;
+	}
+
+	if (unveil_editor) {
+		char *editor;
+		error = get_editor(&editor);
+		if (error)
+			return error;
+		unveil(editor, "x");
+		free(editor);
 	}
 
 	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
@@ -405,7 +433,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1);
+	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1, 0);
 	if (error)
 		goto done;
 
@@ -543,7 +571,7 @@ cmd_update(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 0);
 	if (error)
 		goto done;
 
@@ -915,7 +943,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, 0);
 	if (error)
 		goto done;
 
@@ -1177,7 +1205,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, 0);
 	if (error)
 		goto done;
 
@@ -1337,7 +1365,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0, 0);
 	if (error)
 		goto done;
 
@@ -1565,7 +1593,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0, 0);
 	if (error)
 		goto done;
 
@@ -1694,7 +1722,7 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 0);
 	if (error)
 		goto done;
 
@@ -1865,7 +1893,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0, 0);
 	if (error)
 		goto done;
 
@@ -1944,7 +1972,7 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 0);
 	if (error)
 		goto done;
 
@@ -2030,7 +2058,7 @@ cmd_rm(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 0);
 	if (error)
 		goto done;
 
@@ -2107,7 +2135,7 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 0);
 	if (error)
 		goto done;
 
@@ -2133,24 +2161,11 @@ usage_commit(void)
 }
 
 int
-spawn_editor(const char *file)
+spawn_editor(const char *editor, const char *file)
 {
-	char *argp[] = { "sh", "-c", NULL, NULL };
-	char *editor, *editp;
 	pid_t pid;
 	sig_t sighup, sigint, sigquit;
 	int st = -1;
-
-	editor = getenv("VISUAL");
-	if (editor == NULL)
-		editor = getenv("EDITOR");
-	if (editor == NULL)
-		editor = "ed";
-
-	if (asprintf(&editp, "%s %s", editor, file) == -1)
-		return -1;
-
-	argp[2] = editp;
 
 	sighup = signal(SIGHUP, SIG_IGN);
 	sigint = signal(SIGINT, SIG_IGN);
@@ -2160,11 +2175,9 @@ spawn_editor(const char *file)
 	case -1:
 		goto doneediting;
 	case 0:
-		execv(_PATH_BSHELL, argp);
+		execl(editor, editor, file, (char *)NULL);
 		_exit(127);
 	}
-
-	free(editp);
 
 	while (waitpid(pid, &st, 0) == -1)
 		if (errno != EINTR)
@@ -2183,6 +2196,11 @@ doneediting:
 	return WEXITSTATUS(st);
 }
 
+struct collect_commit_logmsg_arg {
+	const char *cmdline_log;
+	const char *editor;
+
+};
 static const struct got_error *
 collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
     void *arg)
@@ -2190,7 +2208,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	struct got_pathlist_entry *pe;
 	const struct got_error *err = NULL;
 	char *tmpfile = NULL;
-	char *cmdline_log = (char *)arg;
+	struct collect_commit_logmsg_arg *a = arg;
 	char buf[1024];
 	struct stat st, st2;
 	FILE *fp;
@@ -2198,16 +2216,16 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	int fd;
 
 	/* if a message was specified on the command line, just use it */
-	if (cmdline_log != NULL && strlen(cmdline_log) != 0) {
-		len = strlen(cmdline_log) + 1;
+	if (a->cmdline_log != NULL && strlen(a->cmdline_log) != 0) {
+		len = strlen(a->cmdline_log) + 1;
 		*logmsg = malloc(len + 1);
 		if (*logmsg == NULL)
 			return got_error_prefix_errno("malloc");
-		strlcpy(*logmsg, cmdline_log, len);
+		strlcpy(*logmsg, a->cmdline_log, len);
 		return NULL;
 	}
 
-	err = got_opentemp_named_fd(&tmpfile, &fd, "got-XXXXXXXXXX");
+	err = got_opentemp_named_fd(&tmpfile, &fd, "/tmp/got-XXXXXXXXXX");
 	if (err)
 		return err;
 
@@ -2225,7 +2243,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		goto done;
 	}
 
-	if (spawn_editor(tmpfile) == -1) {
+	if (spawn_editor(a->editor, tmpfile) == -1) {
 		err = got_error_prefix_errno("failed spawning editor");
 		goto done;
 	}
@@ -2286,6 +2304,8 @@ cmd_commit(int argc, char *argv[])
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
 	const char *got_author = getenv("GOT_AUTHOR");
+	struct collect_commit_logmsg_arg cl_arg;
+	char *editor = NULL;
 	int ch;
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
@@ -2331,15 +2351,18 @@ cmd_commit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-#if 0
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree), 0, 1);
 	if (error)
 		goto done;
-#endif
 
+	error = get_editor(&editor);
+	if (error)
+		goto done;
+	cl_arg.editor = editor;
+	cl_arg.cmdline_log = logmsg;
 	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
-	    collect_commit_logmsg, (void *)logmsg, print_status, NULL, repo);
+	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error)
 		goto done;
 
@@ -2355,5 +2378,6 @@ done:
 	free(path);
 	free(cwd);
 	free(id_str);
+	free(editor);
 	return error;
 }
