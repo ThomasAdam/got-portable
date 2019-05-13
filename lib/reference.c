@@ -475,7 +475,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 					err = got_error_from_errno("fclose");
 					got_ref_close(*ref);
 					*ref = NULL;
-				} else
+				} else if (*ref)
 					(*ref)->lf = lf;
 			}
 		}
