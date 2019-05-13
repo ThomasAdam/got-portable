@@ -708,9 +708,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				*yca_id = got_object_id_dup(id);
 				if (*yca_id)
 					break;
-				else
-					err = got_error_from_errno(
-					    "got_object_id_up");
+				err = got_error_from_errno("got_object_id_dup");
 				break;
 
 			}
@@ -723,9 +721,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				*yca_id = got_object_id_dup(id2);
 				if (*yca_id)
 					break;
-				else
-					err = got_error_from_errno(
-					    "got_object_id_up");
+				err = got_error_from_errno("got_object_id_dup");
 				break;
 
 			}
