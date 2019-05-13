@@ -2243,6 +2243,10 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 
 	/* remove comments */
 	*logmsg = malloc(st2.st_size + 1);
+	if (*logmsg == NULL) {
+		err = got_error_prefix_errno("malloc");
+		goto done;
+	}
 	len = 0;
 
 	fp = fopen(tmpfile, "r");
