@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2015 Theo de Raadt <deraadt@openbsd.org>
+ * Copyright (c) 1997 Todd C. Miller <millert@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
+#include <paths.h>
 
 #include "got_error.h"
 #include "got_path.h"
@@ -376,4 +378,58 @@ got_path_strip_trailing_slashes(char *path)
 
 	while (path[x = strlen(path) - 1] == '/')
 		path[x] = '\0';
+}
+
+const struct got_error *
+got_path_find_prog(char **filename, const char *prog)
+{
+	char *p;
+	int len;
+	struct stat sbuf;
+	char *path, *pathcpy;
+
+	*filename = NULL;
+
+	path = getenv("PATH");
+	if (path == NULL)
+		path = _PATH_DEFPATH;
+
+	/* Special case if prog contains '/' */
+	if (strchr(prog, '/')) {
+		if ((stat(prog, &sbuf) == 0) && S_ISREG(sbuf.st_mode) &&
+		    access(prog, X_OK) == 0) {
+			*filename = strdup(prog);
+			if (*filename == NULL)
+				return got_error_from_errno("strdup");
+		}
+		return NULL;
+	}
+
+	if ((path = strdup(path)) == NULL)
+		return got_error_from_errno("strdup");
+	pathcpy = path;
+
+	while ((p = strsep(&pathcpy, ":")) != NULL) {
+		if (*p == '\0')
+			p = ".";
+
+		len = strlen(p);
+		while (len > 0 && p[len-1] == '/')
+			p[--len] = '\0';	/* strip trailing '/' */
+
+		if (asprintf(filename, "%s/%s", p, prog) == -1) {
+			free(path);
+			return got_error_from_errno("asprintf");
+		}
+		if ((stat(*filename, &sbuf) == 0) && S_ISREG(sbuf.st_mode) &&
+		    access(*filename, X_OK) == 0) {
+			free(path);
+			return NULL;
+		}
+		free(*filename);
+		*filename = NULL;
+		continue;
+	}
+	free(path);
+	return NULL;
 }

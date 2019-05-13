@@ -98,3 +98,6 @@ const struct got_error *got_path_dirname(char **, const char *);
 
 /* Strip trailing slashes from a path; path will be modified in-place. */
 void got_path_strip_trailing_slashes(char *);
+
+/* Look up the absolute path of a program in $PATH */
+const struct got_error *got_path_find_prog(char **, const char *);
