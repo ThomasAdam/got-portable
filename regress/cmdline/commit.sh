@@ -39,7 +39,7 @@ function test_commit_basic {
 	echo "D  beta" >> $testroot/stdout.expected
 	echo "created commit $head_rev" >> $testroot/stdout.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -71,7 +71,7 @@ function test_commit_new_subdir {
 	echo "A  d/new2" >> $testroot/stdout.expected
 	echo "created commit $head_rev" >> $testroot/stdout.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -99,7 +99,7 @@ function test_commit_subdir {
 	echo "M  epsilon/zeta" >> $testroot/stdout.expected
 	echo "created commit $head_rev" >> $testroot/stdout.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -127,7 +127,7 @@ function test_commit_single_file {
 	echo "M  epsilon/zeta" >> $testroot/stdout.expected
 	echo "created commit $head_rev" >> $testroot/stdout.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -158,7 +158,7 @@ function test_commit_out_of_date {
 	echo "got: work tree must be updated before these" \
 		"changes can be committed" > $testroot/stderr.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -166,7 +166,7 @@ function test_commit_out_of_date {
 		return 1
 	fi
 
-	cmp $testroot/stderr.expected $testroot/stderr
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr

@@ -29,7 +29,7 @@ function test_rm_basic {
 	echo 'D  beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got rm beta > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -58,7 +58,7 @@ function test_rm_with_local_mods {
 	echo 'got: file contains modifications' > $testroot/stderr.expected
 	(cd $testroot/wt && got rm beta 2>$testroot/stderr)
 
-	cmp $testroot/stderr.expected $testroot/stderr
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
@@ -69,7 +69,7 @@ function test_rm_with_local_mods {
 	echo 'D  beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got rm -f beta > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

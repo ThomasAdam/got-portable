@@ -25,7 +25,7 @@ function test_log_in_repo {
 	for p in "" "." alpha epsilon epsilon/zeta; do
 		(cd $testroot/repo && got log $p | \
 			grep ^commit > $testroot/stdout)
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -37,7 +37,7 @@ function test_log_in_repo {
 	for p in "" "." zeta; do
 		(cd $testroot/repo/epsilon && got log $p | \
 			grep ^commit > $testroot/stdout)
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -58,7 +58,7 @@ function test_log_in_bare_repo {
 	for p in "" "." alpha epsilon epsilon/zeta; do
 		(cd $testroot/repo/.git && got log $p | \
 			grep ^commit > $testroot/stdout)
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -86,7 +86,7 @@ function test_log_in_worktree {
 	for p in "" "." alpha epsilon; do
 		(cd $testroot/wt && got log $p | \
 			grep ^commit > $testroot/stdout)
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -98,7 +98,7 @@ function test_log_in_worktree {
 	for p in "" "." zeta; do
 		(cd $testroot/wt/epsilon && got log $p | \
 			grep ^commit > $testroot/stdout)
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout

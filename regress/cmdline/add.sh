@@ -31,7 +31,7 @@ function test_add_basic {
 	echo 'A  foo' > $testroot/stdout.expected
 	(cd $testroot/wt && got add foo > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -88,7 +88,7 @@ function test_add_multiple {
 	echo "A  baz" >> $testroot/stdout.expected
 	echo "A  foo" >> $testroot/stdout.expected
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

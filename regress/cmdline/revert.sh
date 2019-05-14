@@ -32,7 +32,7 @@ function test_revert_basic {
 
 	(cd $testroot/wt && got revert alpha > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -43,7 +43,7 @@ function test_revert_basic {
 	echo "alpha" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -68,7 +68,7 @@ function test_revert_rm {
 
 	(cd $testroot/wt && got revert beta > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -79,7 +79,7 @@ function test_revert_rm {
 	echo "beta" > $testroot/content.expected
 	cat $testroot/wt/beta > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -104,7 +104,7 @@ function test_revert_add {
 
 	(cd $testroot/wt && got revert new > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -115,7 +115,7 @@ function test_revert_add {
 	echo "new file" > $testroot/content.expected
 	cat $testroot/wt/new > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -127,7 +127,7 @@ function test_revert_add {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

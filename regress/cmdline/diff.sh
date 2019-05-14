@@ -58,7 +58,7 @@ function test_diff_basic {
 	echo '+new file' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -100,7 +100,7 @@ function test_diff_shows_conflict {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -128,7 +128,7 @@ function test_diff_shows_conflict {
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

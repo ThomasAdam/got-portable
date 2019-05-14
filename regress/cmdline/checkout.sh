@@ -32,7 +32,7 @@ function test_checkout_basic {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -47,7 +47,7 @@ function test_checkout_basic {
 	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
 	    $testroot/wt/gamma/delta > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -73,7 +73,7 @@ function test_checkout_sets_xbit {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

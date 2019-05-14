@@ -42,7 +42,7 @@ function test_status_basic {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -76,7 +76,7 @@ function test_status_subdir_no_mods {
 	# ?  Basic/Targets.cpp
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -120,7 +120,7 @@ function test_status_subdir_no_mods2 {
 	# ?  Frontend/Rewrite/CMakeLists.txt
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -145,7 +145,7 @@ function test_status_obstructed {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$?" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -187,7 +187,7 @@ function test_status_shows_local_mods_after_update {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -199,7 +199,7 @@ function test_status_shows_local_mods_after_update {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -247,7 +247,7 @@ function test_status_unversioned_subdirs {
 	# ?  ramdisk_cd/list.local
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -277,7 +277,7 @@ function test_status_ignores_symlink {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -318,7 +318,7 @@ function test_status_shows_no_mods_after_complete_merge {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -330,7 +330,7 @@ function test_status_shows_no_mods_after_complete_merge {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -372,7 +372,7 @@ function test_status_shows_conflict {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -384,7 +384,7 @@ function test_status_shows_conflict {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout

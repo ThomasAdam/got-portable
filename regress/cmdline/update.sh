@@ -36,7 +36,7 @@ function test_update_basic {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -47,7 +47,7 @@ function test_update_basic {
 	echo "modified alpha" > $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -76,7 +76,7 @@ function test_update_adds_file {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -87,7 +87,7 @@ function test_update_adds_file {
 	echo "new" >> $testroot/content.expected
 	cat $testroot/wt/gamma/new > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -115,7 +115,7 @@ function test_update_deletes_file {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -152,7 +152,7 @@ function test_update_deletes_dir {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -192,7 +192,7 @@ function test_update_deletes_dir_with_path_prefix {
 
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -235,7 +235,7 @@ function test_update_deletes_dir_recursively {
 
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$?" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -277,7 +277,7 @@ function test_update_sibling_dirs_with_common_prefix {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -299,7 +299,7 @@ function test_update_sibling_dirs_with_common_prefix {
 	# A  epsilon2/mu <--- not intended
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -307,7 +307,7 @@ function test_update_sibling_dirs_with_common_prefix {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -339,7 +339,7 @@ function test_update_dir_with_dot_sibling {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -357,7 +357,7 @@ function test_update_dir_with_dot_sibling {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -365,7 +365,7 @@ function test_update_dir_with_dot_sibling {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -404,7 +404,7 @@ function test_update_moves_files_upwards {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -459,7 +459,7 @@ function test_update_moves_files_to_new_dir {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -526,7 +526,7 @@ function test_update_creates_missing_parent {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -578,7 +578,7 @@ function test_update_creates_missing_parent_with_subdir {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -618,7 +618,7 @@ function test_update_file_in_subsubdir {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -668,7 +668,7 @@ function test_update_merges_file_edits {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -697,7 +697,7 @@ function test_update_merges_file_edits {
 	cat $testroot/wt/beta >> $testroot/content
 	cat $testroot/wt/numbers >> $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -735,7 +735,7 @@ function test_update_keeps_xbit {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -793,7 +793,7 @@ function test_update_clears_xbit {
 		return 1
 	fi
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -828,7 +828,7 @@ function test_update_restores_missing_file {
 	echo >> $testroot/stdout.expected
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -840,7 +840,7 @@ function test_update_restores_missing_file {
 
 	cat $testroot/wt/alpha > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -871,7 +871,7 @@ function test_update_conflict_wt_add_vs_repo_add {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -889,7 +889,7 @@ function test_update_conflict_wt_add_vs_repo_add {
 
 	cat $testroot/wt/gamma/new > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -901,7 +901,7 @@ function test_update_conflict_wt_add_vs_repo_add {
 	echo "new and also new" > $testroot/wt/gamma/new
 	echo 'M  gamma/new' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -930,7 +930,7 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -942,7 +942,7 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 
 	cat $testroot/wt/beta > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -953,7 +953,7 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 	# beta is now an added file... we don't flag tree conflicts yet
 	echo 'A  beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -982,7 +982,7 @@ function test_update_conflict_wt_rm_vs_repo_edit {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -993,7 +993,7 @@ function test_update_conflict_wt_rm_vs_repo_edit {
 	# beta remains a deleted file... we don't flag tree conflicts yet
 	echo 'D  beta' > $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -1014,7 +1014,7 @@ function test_update_conflict_wt_rm_vs_repo_edit {
 	echo '-modified beta' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -1043,7 +1043,7 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -1054,7 +1054,7 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	# beta is now gone... we don't flag tree conflicts yet
 	echo 'got: bad path' > $testroot/stderr.expected
 	(cd $testroot/wt && got status beta 2> $testroot/stderr)
-	cmp $testroot/stderr.expected $testroot/stderr
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
@@ -1094,7 +1094,7 @@ function test_update_partial {
 
 		(cd $testroot/wt && got update $f > $testroot/stdout)
 
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -1105,7 +1105,7 @@ function test_update_partial {
 		echo "modified $f" > $testroot/content.expected
 		cat $testroot/wt/$f > $testroot/content
 
-		cmp $testroot/content.expected $testroot/content
+		cmp -s $testroot/content.expected $testroot/content
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/content.expected $testroot/content
@@ -1139,7 +1139,7 @@ function test_update_partial_add {
 
 		(cd $testroot/wt && got update $f > $testroot/stdout)
 
-		cmp $testroot/stdout.expected $testroot/stdout
+		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stdout.expected $testroot/stdout
@@ -1150,7 +1150,7 @@ function test_update_partial_add {
 		echo "$f" > $testroot/content.expected
 		cat $testroot/wt/$f > $testroot/content
 
-		cmp $testroot/content.expected $testroot/content
+		cmp -s $testroot/content.expected $testroot/content
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/content.expected $testroot/content
@@ -1187,7 +1187,7 @@ function test_update_partial_rm {
 			return 1
 		fi
 
-		cmp $testroot/stderr.expected $testroot/stderr
+		cmp -s $testroot/stderr.expected $testroot/stderr
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			diff -u $testroot/stderr.expected $testroot/stderr
@@ -1220,7 +1220,7 @@ function test_update_partial_dir {
 
 	(cd $testroot/wt && got update epsilon > $testroot/stdout)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -1231,7 +1231,7 @@ function test_update_partial_dir {
 	echo "modified epsilon/zeta" > $testroot/content.expected
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
-	cmp $testroot/content.expected $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
@@ -1268,7 +1268,7 @@ function test_update_moved_branch_ref {
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
 
-	cmp $testroot/stdout.expected $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
@@ -1276,7 +1276,7 @@ function test_update_moved_branch_ref {
 		return 1
 	fi
 
-	cmp $testroot/stderr.expected $testroot/stderr
+	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
