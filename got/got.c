@@ -954,7 +954,7 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "pc:C:l:fr:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -1044,7 +1044,9 @@ cmd_log(int argc, char *argv[])
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		error = got_ref_open(&head_ref, repo,
+		    worktree ? got_worktree_get_head_ref_name(worktree)
+		    : GOT_REF_HEAD, 0);
 		if (error != NULL)
 			return error;
 		error = got_ref_resolve(&id, repo, head_ref);

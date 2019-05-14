@@ -171,6 +171,8 @@ Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a SHA1 hash which corresponds
 to a commit object.
+If this option is not specified, default to the work tree's current branch
+if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl C Ar number
 Set the number of context lines shown in diffs with
 .Fl p .
