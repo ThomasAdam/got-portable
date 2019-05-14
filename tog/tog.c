@@ -1106,14 +1106,15 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 }
 
 static const struct got_error *
-get_head_commit_id(struct got_object_id **head_id, struct got_repository *repo)
+get_head_commit_id(struct got_object_id **head_id, const char *branch_name,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_reference *head_ref;
 
 	*head_id = NULL;
 
-	err = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+	err = got_ref_open(&head_ref, repo, branch_name, 0);
 	if (err)
 		return err;
 
@@ -1901,7 +1902,9 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	if (start_commit == NULL)
-		error = get_head_commit_id(&start_id, repo);
+		error = get_head_commit_id(&start_id, worktree ?
+		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
+		    repo);
 	else
 		error = got_object_resolve_id_str(&start_id, repo,
 		    start_commit);
@@ -3909,7 +3912,7 @@ cmd_tree(int argc, char *argv[])
 		goto done;
 
 	if (commit_id_arg == NULL)
-		error = get_head_commit_id(&commit_id, repo);
+		error = get_head_commit_id(&commit_id, GOT_REF_HEAD, repo);
 	else
 		error = got_object_resolve_id_str(&commit_id, repo,
 		    commit_id_arg);
