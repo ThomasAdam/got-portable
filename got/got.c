@@ -326,7 +326,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	 *
 	 * 'got update' only handles linear cases:
 	 * Update forwards in time:  A (base/yca) - B - C - D (commit)
-	 * Update backwards in time: D (base) - C - D - A (commit/yca)
+	 * Update backwards in time: D (base) - C - B - A (commit/yca)
 	 */
 	if (got_object_id_cmp(commit_id, yca_id) != 0 &&
 	    got_object_id_cmp(base_commit_id, yca_id) != 0)
