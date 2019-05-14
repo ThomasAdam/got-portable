@@ -95,6 +95,10 @@ function test_done
 	if [ "$result" == "0" ]; then
 		test_cleanup "$testroot"
 		echo "ok"
+	elif echo "$result" | grep -q "^xfail"; then
+		# expected test failure; test reproduces an unfixed bug
+		test_cleanup "$testroot"
+		echo "$result"
 	else
 		echo "test failed; leaving test data in $testroot"
 	fi
