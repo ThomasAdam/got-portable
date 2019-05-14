@@ -314,7 +314,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	 * Require a straight line of history between the target commit
 	 * and the work tree's base commit.
 	 *
-	 * Non-linear situation such as the this require a rebase:
+	 * Non-linear situations such as this require a rebase:
 	 *
 	 * (commit) D       F (base_commit)
 	 *           \     /
