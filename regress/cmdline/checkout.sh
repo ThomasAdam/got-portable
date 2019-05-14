@@ -90,5 +90,44 @@ function test_checkout_sets_xbit {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_commit_from_wrong_branch {
+	local testroot=`test_init checkout_commit_from_wrong_branch`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on new branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha on new branch"
+
+	local head_rev=`git_show_head $testroot/repo`
+	got checkout -b master -c $head_rev $testroot/repo $testroot/wt \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo  "got: target commit is on a different branch" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_checkout_basic
 run_test test_checkout_sets_xbit
+run_test test_checkout_commit_from_wrong_branch

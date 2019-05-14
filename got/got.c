@@ -522,6 +522,9 @@ cmd_checkout(int argc, char *argv[])
 			free(commit_id);
 			goto done;
 		}
+		error = check_same_branch(commit_id, head_ref, repo);
+		if (error)
+			goto done;
 		error = got_worktree_set_base_commit_id(worktree, repo,
 		    commit_id);
 		free(commit_id);
