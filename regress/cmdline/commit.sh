@@ -209,7 +209,7 @@ function test_commit_added_subdirs {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		#diff -u $testroot/stdout.expected $testroot/stdout
-		ret="xfail: $(head -n 1 $testroot/stderr)"
+		ret="xfail ($(head -n 1 $testroot/stderr))"
 	fi
 	test_done "$testroot" "$ret"
 }
