@@ -174,8 +174,49 @@ function test_commit_out_of_date {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_added_subdirs {
+	local testroot=`test_init commit_added_subdirs`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/d
+	echo "new file" > $testroot/wt/d/new
+	echo "new file 2" > $testroot/wt/d/new2
+	mkdir -p $testroot/wt/d/f
+	echo "new file 3" > $testroot/wt/d/f/new3
+	mkdir -p $testroot/wt/d/f/g
+	echo "new file 4" > $testroot/wt/d/f/g/new4
+
+	(cd $testroot/wt && got add $testroot/wt/*/new* \
+		$testroot/wt/*/*/new* $testroot/wt/*/*/*/new* > /dev/null)
+
+	(cd $testroot/wt && got commit -m 'test commit_added_subdirs' \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  d/f/new3" > $testroot/stdout.expected
+	echo "A  d/f/g/new4" >> $testroot/stdout.expected
+	echo "A  d/new" >> $testroot/stdout.expected
+	echo "A  d/new2" >> $testroot/stdout.expected
+	echo "created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		#diff -u $testroot/stdout.expected $testroot/stdout
+		ret="xfail: $(head -n 1 $testroot/stderr)"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
 run_test test_commit_single_file
 run_test test_commit_out_of_date
+run_test test_commit_added_subdirs
