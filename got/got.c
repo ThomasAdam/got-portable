@@ -271,8 +271,8 @@ apply_unveil(const char *repo_path, int repo_read_only,
 __dead static void
 usage_checkout(void)
 {
-	fprintf(stderr, "usage: %s checkout [-p prefix] repository-path "
-	    "[worktree-path]\n", getprogname());
+	fprintf(stderr, "usage: %s checkout [-b branch] [-c commit] "
+	    "[-p prefix] repository-path [worktree-path]\n", getprogname());
 	exit(1);
 }
 
@@ -348,11 +348,15 @@ cmd_checkout(int argc, char *argv[])
 	char *repo_path = NULL;
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
+	const char *branch_name = GOT_REF_HEAD;
 	char *commit_id_str = NULL;
 	int ch, same_path_prefix;
 
-	while ((ch = getopt(argc, argv, "c:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:c:p:")) != -1) {
 		switch (ch) {
+		case 'b':
+			branch_name = optarg;
+			break;
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
@@ -434,7 +438,7 @@ cmd_checkout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+	error = got_ref_open(&head_ref, repo, branch_name, 0);
 	if (error != NULL)
 		goto done;
 

@@ -257,10 +257,18 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Write the HEAD reference. */
-	refstr = got_ref_to_str(head_ref);
-	if (refstr == NULL) {
-		err = got_error_from_errno("got_ref_to_str");
-		goto done;
+	if (got_ref_is_symbolic(head_ref)) {
+		refstr = got_ref_to_str(head_ref);
+		if (refstr == NULL) {
+			err = got_error_from_errno("got_ref_to_str");
+			goto done;
+		}
+	} else {
+		refstr = strdup(got_ref_get_name(head_ref));
+		if (refstr == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_HEAD_REF, refstr);
 	if (err)
