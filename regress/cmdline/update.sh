@@ -1264,7 +1264,9 @@ function test_update_moved_branch_ref {
 	(cd $testroot/repo2 && git fetch -q --all)
 
 	echo -n > $testroot/stdout.expected
-	echo "got: new branch or rebase required" >> $testroot/stderr.expected
+	echo -n "got: work tree's branch reference has moved; " \
+		> $testroot/stderr.expected
+	echo "new branch or rebase required" >> $testroot/stderr.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
 
@@ -1354,6 +1356,47 @@ function test_update_to_another_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_to_commit_on_wrong_branch {
+	local testroot=`test_init update_to_commit_on_wrong_branch`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on new branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha on new branch"
+
+	echo -n "" > $testroot/stdout.expected
+	echo  "got: target commit is on a different branch" \
+		> $testroot/stderr.expected
+
+	local head_rev=`git_show_head $testroot/repo`
+	(cd $testroot/wt && got update -c $head_rev > $testroot/stdout \
+		2> $testroot/stderr)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1381,3 +1424,4 @@ run_test test_update_partial_rm
 run_test test_update_partial_dir
 run_test test_update_moved_branch_ref
 run_test test_update_to_another_branch
+run_test test_update_to_commit_on_wrong_branch

@@ -90,6 +90,7 @@
 #define GOT_ERR_COMMIT_MSG_EMPTY 74
 #define GOT_ERR_DIR_NOT_EMPTY	75
 #define GOT_ERR_COMMIT_NO_CHANGES 76
+#define GOT_ERR_BRANCH_MOVED	77
 
 static const struct got_error {
 	int code;
@@ -148,7 +149,7 @@ static const struct got_error {
 	{ GOT_ERR_FILEIDX_CSUM,	"bad file index checksum" },
 	{ GOT_ERR_PATH_PREFIX,	"worktree already contains items from a "
 				"different path prefix" },
-	{ GOT_ERR_ANCESTRY,	"new branch or rebase required" },
+	{ GOT_ERR_ANCESTRY,	"target commit is on a different branch" },
 	{ GOT_ERR_FILEIDX_BAD,	"file index is corrupt" },
 	{ GOT_ERR_BAD_REF_DATA,	"could not parse reference data" },
 	{ GOT_ERR_TREE_DUP_ENTRY,"duplicate entry in tree object" },
@@ -171,6 +172,8 @@ static const struct got_error {
 	    "changes can be committed" },
 	{ GOT_ERR_COMMIT_MSG_EMPTY, "commit message cannot be empty" },
 	{ GOT_ERR_COMMIT_NO_CHANGES, "no changes to commit" },
+	{ GOT_ERR_BRANCH_MOVED,	"work tree's branch reference has moved; "
+	    "new branch or rebase required" },
 };
 
 /*

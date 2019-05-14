@@ -336,6 +336,58 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	return NULL;
 }
 
+static const struct got_error *
+check_same_branch(struct got_object_id *commit_id,
+    struct got_reference *head_ref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph *graph = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	int is_same_branch = 0;
+
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
+	if (err)
+		goto done;
+
+	for (;;) {
+		struct got_object_id *id;
+		err = got_commit_graph_iter_next(&id, graph);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
+				err = NULL;
+				break;
+			}
+			else if (err->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			err = got_commit_graph_fetch_commits(graph, 1,
+			    repo);
+			if (err)
+				break;
+		}
+
+		if (id) {
+			if (got_object_id_cmp(id, commit_id) == 0) {
+				is_same_branch = 1;
+				break;
+			}
+		}
+	}
+done:
+	if (graph)
+		got_commit_graph_close(graph);
+	free(head_commit_id);
+	if (!err && !is_same_branch)
+		err = got_error(GOT_ERR_ANCESTRY);
+	return err;
+}
 
 static const struct got_error *
 cmd_checkout(int argc, char *argv[])
@@ -615,7 +667,11 @@ cmd_update(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id, head_commit_id, repo);
+		free(head_commit_id);
 		if (error != NULL)
+			goto done;
+		error = check_same_branch(commit_id, head_ref, repo);
+		if (error)
 			goto done;
 		error = got_worktree_set_head_ref(worktree, head_ref);
 		if (error)
@@ -623,7 +679,13 @@ cmd_update(int argc, char *argv[])
 	} else {
 		error = check_linear_ancestry(commit_id,
 		    got_worktree_get_base_commit_id(worktree), repo);
-		if (error != NULL)
+		if (error != NULL) {
+			if (error->code == GOT_ERR_ANCESTRY)
+				error = got_error(GOT_ERR_BRANCH_MOVED);
+			goto done;
+		}
+		error = check_same_branch(commit_id, head_ref, repo);
+		if (error)
 			goto done;
 	}
 
