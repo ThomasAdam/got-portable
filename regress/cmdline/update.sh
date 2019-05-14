@@ -1284,6 +1284,75 @@ function test_update_moved_branch_ref {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_to_another_branch {
+	local testroot=`test_init update_to_another_branch`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'refs/heads/master'> $testroot/head-ref.expected
+	cmp -s $testroot/head-ref.expected $testroot/wt/.got/head-ref
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/head-ref.expected $testroot/wt/.got/head-ref
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on new branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha on new branch"
+
+	echo "modified alpha in work tree" > $testroot/wt/alpha
+
+	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -b newbranch > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "<<<<<<< commit " > $testroot/content.expected
+	git_show_head $testroot/repo >> $testroot/content.expected
+	echo >> $testroot/content.expected
+	echo "modified alpha on new branch" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "modified alpha in work tree" >> $testroot/content.expected
+	echo '>>>>>>> alpha' >> $testroot/content.expected
+
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'refs/heads/newbranch'> $testroot/head-ref.expected
+	cmp -s $testroot/head-ref.expected $testroot/wt/.got/head-ref
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/head-ref.expected $testroot/wt/.got/head-ref
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
 
 run_test test_update_basic
 run_test test_update_adds_file
@@ -1311,3 +1380,4 @@ run_test test_update_partial_add
 run_test test_update_partial_rm
 run_test test_update_partial_dir
 run_test test_update_moved_branch_ref
+run_test test_update_to_another_branch

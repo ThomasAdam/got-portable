@@ -296,13 +296,12 @@ check_cancelled(void *arg)
 }
 
 static const struct got_error *
-check_linear_ancestry(struct got_worktree *worktree,
-    struct got_object_id *commit_id, struct got_repository *repo)
+check_linear_ancestry(struct got_object_id *commit_id,
+    struct got_object_id *base_commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *yca_id, *base_commit_id;
+	struct got_object_id *yca_id;
 
-	base_commit_id = got_worktree_get_base_commit_id(worktree);
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
 	    commit_id, base_commit_id, repo);
 	if (err)
@@ -465,7 +464,8 @@ cmd_checkout(int argc, char *argv[])
 		    commit_id_str);
 		if (error != NULL)
 			goto done;
-		error = check_linear_ancestry(worktree, commit_id, repo);
+		error = check_linear_ancestry(commit_id,
+		    got_worktree_get_base_commit_id(worktree), repo);
 		if (error != NULL) {
 			free(commit_id);
 			goto done;
@@ -494,7 +494,7 @@ done:
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-c commit] [path]\n",
+	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -522,10 +522,15 @@ cmd_update(int argc, char *argv[])
 	char *worktree_path = NULL, *path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
+	const char *branch_name = NULL;
+	struct got_reference *head_ref = NULL;
 	int ch, did_something = 0;
 
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:c:")) != -1) {
 		switch (ch) {
+		case 'b':
+			branch_name = optarg;
+			break;
 		case 'c':
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
@@ -576,11 +581,12 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (branch_name == NULL)
+		branch_name = got_worktree_get_head_ref_name(worktree);
+	error = got_ref_open(&head_ref, repo, branch_name, 0);
+	if (error != NULL)
+		goto done;
 	if (commit_id_str == NULL) {
-		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
-		if (error != NULL)
-			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		if (error != NULL)
 			goto done;
@@ -594,9 +600,32 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	error = check_linear_ancestry(worktree, commit_id, repo);
-	if (error != NULL)
-		goto done;
+	if (strcmp(got_ref_get_name(head_ref),
+	    got_worktree_get_head_ref_name(worktree)) != 0) {
+		struct got_object_id *head_commit_id;
+		if (strlen(path) != 0) {
+			fprintf(stderr, "%s: switching to a different "
+			    "branch requires that the entire work tree "
+			    "gets updated, not just '%s'\n",
+			    getprogname(), path);
+			error = got_error(GOT_ERR_BAD_PATH);
+			goto done;
+		}
+		error = got_ref_resolve(&head_commit_id, repo, head_ref);
+		if (error)
+			goto done;
+		error = check_linear_ancestry(commit_id, head_commit_id, repo);
+		if (error != NULL)
+			goto done;
+		error = got_worktree_set_head_ref(worktree, head_ref);
+		if (error)
+			goto done;
+	} else {
+		error = check_linear_ancestry(commit_id,
+		    got_worktree_get_base_commit_id(worktree), repo);
+		if (error != NULL)
+			goto done;
+	}
 
 	if (got_object_id_cmp(got_worktree_get_base_commit_id(worktree),
 	    commit_id) != 0) {

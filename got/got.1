@@ -91,9 +91,8 @@ Only files beneath the specified
 .Ar path-prefix
 will be checked out.
 .El
-.It Cm update [ Fl c Ar commit ] [ Ar path ]
-Update an existing work tree to another commit on the current branch.
-By default, the latest commit on the current branch is assumed.
+.It Cm update [ Fl b Ar branch ] [ Fl c Ar commit ] [ Ar path ]
+Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
 .It U Ta file was updated and contained no local changes
@@ -118,15 +117,27 @@ multiple base commits.
 The base commit of such a work tree can be made consistent by running
 .Cm got update
 across the entire work tree.
+Specifying a
+.Ar path
+is incompatible with the
+.Fl b
+option.
 .Pp
 The options for
 .Cm got update
 are as follows:
 .Bl -tag -width Ds
+.It Fl b Ar branch
+Switch the work tree's branch reference to the specified
+.Ar branch
+before updating the work tree.
+This option requires that all paths in the work tree are updated.
 .It Fl c Ar commit
 Update the work tree to the specified
 .Ar commit .
 The expected argument is a SHA1 hash which corresponds to a commit object.
+If this option is not specified, the most recent commit on the work tree's
+branch will be used.
 .El
 .It Cm status [ Ar path ]
 Show the current modification status of files in a work tree,

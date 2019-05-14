@@ -195,6 +195,26 @@ done:
 	return err;
 }
 
+static const struct got_error *
+write_head_ref(const char *path_got, struct got_reference *head_ref)
+{
+	const struct got_error *err = NULL;
+	char *refstr = NULL;
+
+	if (got_ref_is_symbolic(head_ref)) {
+		refstr = got_ref_to_str(head_ref);
+		if (refstr == NULL)
+			return got_error_from_errno("got_ref_to_str");
+	} else {
+		refstr = strdup(got_ref_get_name(head_ref));
+		if (refstr == NULL)
+			return got_error_from_errno("strdup");
+	}
+	err = update_meta_file(path_got, GOT_WORKTREE_HEAD_REF, refstr);
+	free(refstr);
+	return err;
+}
+
 const struct got_error *
 got_worktree_init(const char *path, struct got_reference *head_ref,
     const char *prefix, struct got_repository *repo)
@@ -205,7 +225,6 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	uint32_t uuid_status;
 	int obj_type;
 	char *path_got = NULL;
-	char *refstr = NULL;
 	char *formatstr = NULL;
 	char *absprefix = NULL;
 	char *basestr = NULL;
@@ -257,20 +276,7 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 		goto done;
 
 	/* Write the HEAD reference. */
-	if (got_ref_is_symbolic(head_ref)) {
-		refstr = got_ref_to_str(head_ref);
-		if (refstr == NULL) {
-			err = got_error_from_errno("got_ref_to_str");
-			goto done;
-		}
-	} else {
-		refstr = strdup(got_ref_get_name(head_ref));
-		if (refstr == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
-	err = create_meta_file(path_got, GOT_WORKTREE_HEAD_REF, refstr);
+	err = write_head_ref(path_got, head_ref);
 	if (err)
 		goto done;
 
@@ -322,7 +328,6 @@ done:
 	free(commit_id);
 	free(path_got);
 	free(formatstr);
-	free(refstr);
 	free(absprefix);
 	free(basestr);
 	free(uuidstr);
@@ -519,6 +524,39 @@ const char *
 got_worktree_get_head_ref_name(struct got_worktree *worktree)
 {
 	return worktree->head_ref_name;
+}
+
+const struct got_error *
+got_worktree_set_head_ref(struct got_worktree *worktree,
+    struct got_reference *head_ref)
+{
+	const struct got_error *err = NULL;
+	char *path_got = NULL, *head_ref_name = NULL;
+
+	if (asprintf(&path_got, "%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR) == -1) {
+		err = got_error_from_errno("asprintf");
+		path_got = NULL;
+		goto done;
+	}
+
+	head_ref_name = strdup(got_ref_get_name(head_ref));
+	if (head_ref_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	err = write_head_ref(path_got, head_ref);
+	if (err)
+		goto done;
+
+	free(worktree->head_ref_name);
+	worktree->head_ref_name = head_ref_name;
+done:
+	free(path_got);
+	if (err)
+		free(head_ref_name);
+	return err;
 }
 
 struct got_object_id *

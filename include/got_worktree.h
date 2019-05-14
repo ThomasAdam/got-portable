@@ -88,6 +88,12 @@ const struct got_error *got_worktree_match_path_prefix(int *,
 const char *got_worktree_get_head_ref_name(struct got_worktree *);
 
 /*
+ * Set the branch head reference of the work tree.
+ */
+const struct got_error *got_worktree_set_head_ref(struct got_worktree *,
+    struct got_reference *);
+
+/*
  * Get the current base commit ID of a worktree.
  */
 struct got_object_id *got_worktree_get_base_commit_id(struct got_worktree *);
