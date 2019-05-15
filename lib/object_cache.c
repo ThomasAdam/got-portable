@@ -224,6 +224,9 @@ got_object_cache_close(struct got_object_cache *cache)
 	case GOT_OBJECT_CACHE_TYPE_COMMIT:
 		print_cache_stats(cache, "commit");
 		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		print_cache_stats(cache, "tag");
+		break;
 	}
 
 	got_object_idset_for_each(cache->idset, check_refcount, cache);
