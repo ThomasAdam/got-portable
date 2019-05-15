@@ -172,3 +172,23 @@ got_error_uuid(uint32_t uuid_status)
 		return got_error(GOT_ERR_UUID);
 	}
 }
+
+const struct got_error *
+got_error_path(const char *path, int code)
+{
+	static struct got_error err;
+	static char msg[MAXPATHLEN + 128];
+	int i;
+
+	for (i = 0; i < nitems(got_errors); i++) {
+		if (code == got_errors[i].code) {
+			err.code = code;
+			snprintf(msg, sizeof(msg), "%s: %s", path,
+			    got_errors[i].msg);
+			err.msg = msg;
+			return &err;
+		}
+	}
+
+	abort();
+}

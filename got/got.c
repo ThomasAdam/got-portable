@@ -226,7 +226,6 @@ apply_unveil(const char *repo_path, int repo_read_only,
     const char *worktree_path, int create_worktree)
 {
 	const struct got_error *err;
-	static char err_msg[MAXPATHLEN + 36];
 
 	if (create_worktree) {
 		/* Pre-create work tree path to avoid unveiling its parents. */
@@ -237,11 +236,8 @@ apply_unveil(const char *repo_path, int repo_read_only,
 				errno = 0;
 				err = NULL;
 			} else {
-				snprintf(err_msg, sizeof(err_msg),
-				    "%s: directory exists and is not empty",
-				    worktree_path);
-				err = got_error_msg(GOT_ERR_DIR_NOT_EMPTY,
-				    err_msg);
+				err = got_error_path(worktree_path,
+				    GOT_ERR_DIR_NOT_EMPTY);
 			}
 		}
 
