@@ -17,13 +17,13 @@
 #include <sys/queue.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sha1.h>
 #include <zlib.h>
 #include <uuid.h>
-#include <sys/param.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -71,7 +71,7 @@ const struct got_error *
 got_error_from_errno(const char *prefix)
 {
 	static struct got_error err;
-	static char err_msg[MAXPATHLEN + 20];
+	static char err_msg[PATH_MAX + 20];
 
 	snprintf(err_msg, sizeof(err_msg), "%s: %s", prefix,
 	    strerror(errno));
@@ -85,7 +85,7 @@ const struct got_error *
 got_error_from_errno2(const char *prefix, const char *prefix2)
 {
 	static struct got_error err;
-	static char err_msg[(MAXPATHLEN * 2) + 20];
+	static char err_msg[(PATH_MAX * 2) + 20];
 
 	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s", prefix, prefix2,
 	    strerror(errno));
@@ -100,7 +100,7 @@ got_error_from_errno3(const char *prefix, const char *prefix2,
     const char *prefix3)
 {
 	static struct got_error err;
-	static char err_msg[(MAXPATHLEN * 3) + 20];
+	static char err_msg[(PATH_MAX * 3) + 20];
 
 	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s: %s", prefix, prefix2,
 	    prefix3, strerror(errno));
@@ -177,7 +177,7 @@ const struct got_error *
 got_error_path(const char *path, int code)
 {
 	static struct got_error err;
-	static char msg[MAXPATHLEN + 128];
+	static char msg[PATH_MAX + 128];
 	int i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
