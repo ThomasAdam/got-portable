@@ -171,6 +171,7 @@ static const struct got_error {
 	{ GOT_ERR_COMMIT_OUT_OF_DATE, "work tree must be updated before these "
 	    "changes can be committed" },
 	{ GOT_ERR_COMMIT_MSG_EMPTY, "commit message cannot be empty" },
+	{ GOT_ERR_DIR_NOT_EMPTY, "directory exists and is not empty" },
 	{ GOT_ERR_COMMIT_NO_CHANGES, "no changes to commit" },
 	{ GOT_ERR_BRANCH_MOVED,	"work tree's branch reference has moved; "
 	    "new branch or rebase required" },
