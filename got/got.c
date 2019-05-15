@@ -238,7 +238,7 @@ apply_unveil(const char *repo_path, int repo_read_only,
 				err = NULL;
 			} else {
 				snprintf(err_msg, sizeof(err_msg),
-				    "%s: directory exists but is not empty",
+				    "%s: directory exists and is not empty",
 				    worktree_path);
 				err = got_error_msg(GOT_ERR_BAD_PATH,
 				    err_msg);
