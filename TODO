@@ -14,3 +14,4 @@ tog:
 - implement search feature
 - allow moving to prev/next blamed line in diff view if opened from blame view,
   similar to how the diff view can switch commits if opened from log view
+- tog should have a command to list and log/browse references
