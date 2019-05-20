@@ -2623,7 +2623,8 @@ write_tree(struct got_object_id **new_tree_id,
 		struct got_commitable *ct = pe->data;
 		char *child_path = NULL, *slash;
 
-		if (ct->status != GOT_STATUS_ADD)
+		if (ct->status != GOT_STATUS_ADD ||
+		    (ct->flags & GOT_COMMITABLE_ADDED))
 			continue;
 
 		 if (!got_path_is_child(pe->path, path_base_tree,
@@ -2643,10 +2644,9 @@ write_tree(struct got_object_id **new_tree_id,
 			err = report_ct_status(ct, status_cb, status_arg);
 			if (err)
 				goto done;
+			ct->flags |= GOT_COMMITABLE_ADDED;
 		} else {
 			char *subtree_path;
-			struct got_pathlist_entry *pe2;
-			int visited = 0;
 
 			*slash = '\0'; /* trim trailing path components */
 			if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
@@ -2654,16 +2654,6 @@ write_tree(struct got_object_id **new_tree_id,
 			    child_path) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
-			}
-			TAILQ_FOREACH(pe2, &paths, entry) {
-				if (got_path_cmp(subtree_path, pe2->path) != 0)
-					continue;
-				visited = 1;
-				break;
-			}
-			if (visited) {
-				free(subtree_path);
-				continue;
 			}
 
 			new_te = calloc(1, sizeof(*new_te));

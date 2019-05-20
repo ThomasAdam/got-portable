@@ -5,8 +5,6 @@ lib:
 - allow adding directory paths with 'got add'
 - recursive addition: got add -R
 - recursive removal: got rm -R
-- fix bug reproduced by xfail test 'test_commit_added_subdirs'
-  in regress/cmdline/commit.sh
 
 tog:
 - allow loading new commits in 'tog log' after startup (e.g. via Ctrl-L, 'r')

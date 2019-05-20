@@ -30,6 +30,7 @@ struct got_worktree;
 #define GOT_STATUS_OBSTRUCTED	'~'
 #define GOT_STATUS_REVERT	'R'
 
+/* XXX TODO make this opaque */
 struct got_commitable {
 	char *path;
 	char *in_repo_path;
@@ -39,6 +40,8 @@ struct got_commitable {
 	struct got_object_id *base_blob_id;
 	struct got_object_id *base_commit_id;
 	mode_t mode;
+	int flags;
+#define GOT_COMMITABLE_ADDED 0x01
 };
 
 /*
