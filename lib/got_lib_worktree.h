@@ -35,6 +35,19 @@ struct got_worktree {
 	int lockfd;
 };
 
+struct got_commitable {
+	char *path;
+	char *in_repo_path;
+	char *ondisk_path;
+	unsigned char status;
+	struct got_object_id *blob_id;
+	struct got_object_id *base_blob_id;
+	struct got_object_id *base_commit_id;
+	mode_t mode;
+	int flags;
+#define GOT_COMMITABLE_ADDED 0x01
+};
+
 #define GOT_WORKTREE_GOT_DIR		".got"
 #define GOT_WORKTREE_FILE_INDEX		"file-index"
 #define GOT_WORKTREE_REPOSITORY		"repository"

@@ -3045,3 +3045,15 @@ done:
 	}
 	return err;
 }
+
+const char *
+got_commitable_get_path(struct got_commitable *ct)
+{
+	return ct->path;
+}
+
+unsigned int
+got_commitable_get_status(struct got_commitable *ct)
+{
+	return ct->status;
+}

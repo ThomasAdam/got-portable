@@ -2345,7 +2345,9 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
-		dprintf(fd, "#  %c  %s\n", ct->status, pe->path);
+		dprintf(fd, "#  %c  %s\n",
+		    got_commitable_get_status(ct),
+		    got_commitable_get_path(ct));
 	}
 	close(fd);
 

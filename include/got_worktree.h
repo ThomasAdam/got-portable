@@ -15,6 +15,7 @@
  */
 
 struct got_worktree;
+struct got_commitable;
 
 /* status codes */
 #define GOT_STATUS_NO_CHANGE	' '
@@ -29,20 +30,6 @@ struct got_worktree;
 #define GOT_STATUS_UNVERSIONED	'?'
 #define GOT_STATUS_OBSTRUCTED	'~'
 #define GOT_STATUS_REVERT	'R'
-
-/* XXX TODO make this opaque */
-struct got_commitable {
-	char *path;
-	char *in_repo_path;
-	char *ondisk_path;
-	unsigned char status;
-	struct got_object_id *blob_id;
-	struct got_object_id *base_blob_id;
-	struct got_object_id *base_commit_id;
-	mode_t mode;
-	int flags;
-#define GOT_COMMITABLE_ADDED 0x01
-};
 
 /*
  * Attempt to initialize a new work tree on disk.
@@ -182,9 +169,10 @@ const struct got_error *got_worktree_revert(struct got_worktree *,
 
 /*
  * A callback function which is invoked when a commit message is requested.
- * Passes a list of modified paths being committed to, a pointer to the log
- * message that must be set by the callback and will be freed after committing,
- * and an argument passed through to the callback.
+ * Passes a pathlist with a struct got_commitable * in the data pointer of
+ * each element, a pointer to the log message that must be set by the
+ * callback and will be freed after committing, and an argument passed
+ * through to the callback.
  */
 typedef const struct got_error *(*got_worktree_commit_msg_cb)(
     struct got_pathlist_head *, char **, void *);
@@ -203,3 +191,9 @@ const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, const char *, const char *, const char *,
     got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
+
+/* Get the path of a commitable worktree item. */
+const char *got_commitable_get_path(struct got_commitable *);
+
+/* Get the status of a commitable worktree item. */
+unsigned int got_commitable_get_status(struct got_commitable *);
