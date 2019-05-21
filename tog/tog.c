@@ -1421,7 +1421,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	struct got_tree_entry *te;
 	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
-	char *slash, *subpath;
+	char *slash, *subpath = NULL;
 	const char *p;
 
 	err = got_object_open_as_tree(&tree, repo,
@@ -1442,9 +1442,6 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 
 	*new_view = tree_view;
 
-	if (got_path_is_root_dir(path))
-		return NULL;
-
 	/* Walk the path and open corresponding tree objects. */
 	p = path;
 	while (*p) {
@@ -1462,11 +1459,17 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 				s->selected_entry = te;
 				break;
 			}
+			s->selected++;
 		}
 		if (s->selected_entry == NULL) {
 			err = got_error(GOT_ERR_NO_TREE_ENTRY);
 			break;
 		}
+		if (s->tree != s->root)
+			s->selected++; /* skip '..' */
+
+		if (!S_ISDIR(s->selected_entry->mode))
+			break;
 
 		slash = strchr(p, '/');
 		if (slash)
