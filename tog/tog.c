@@ -1389,13 +1389,40 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 }
 
 static const struct got_error *
-browse_commit(struct tog_view **new_view, int begin_x,
-    struct commit_queue_entry *entry, struct got_reflist_head *refs,
-    struct got_repository *repo)
+tree_view_visit_subtree(struct got_tree_object *subtree,
+    struct tog_tree_view_state *s)
+{
+	struct tog_parent_tree *parent;
+
+	parent = calloc(1, sizeof(*parent));
+	if (parent == NULL)
+		return got_error_from_errno("calloc");
+
+	parent->tree = s->tree;
+	parent->first_displayed_entry = s->first_displayed_entry;
+	parent->selected_entry = s->selected_entry;
+	parent->selected = s->selected;
+	TAILQ_INSERT_HEAD(&s->parents, parent, entry);
+	s->tree = subtree;
+	s->entries = got_object_tree_get_entries(s->tree);
+	s->selected = 0;
+	s->first_displayed_entry = NULL;
+	return NULL;
+}
+
+
+static const struct got_error *
+browse_commit_tree(struct tog_view **new_view, int begin_x,
+    struct commit_queue_entry *entry, const char *path,
+    struct got_reflist_head *refs, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
+	struct got_tree_entry *te;
+	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
+	char *slash, *subpath;
+	const char *p;
 
 	err = got_object_open_as_tree(&tree, repo,
 	    got_object_commit_get_tree_id(entry->commit));
@@ -1407,10 +1434,73 @@ browse_commit(struct tog_view **new_view, int begin_x,
 		return got_error_from_errno("view_open");
 
 	err = open_tree_view(tree_view, tree, entry->id, refs, repo);
-	if (err)
+	if (err) {
 		got_object_tree_close(tree);
-	else
-		*new_view = tree_view;
+		return err;
+	}
+	s = &tree_view->state.tree;
+
+	*new_view = tree_view;
+
+	if (got_path_is_root_dir(path))
+		return NULL;
+
+	/* Walk the path and open corresponding tree objects. */
+	p = path;
+	while (*p) {
+		struct got_object_id *tree_id;
+
+		while (p[0] == '/')
+			p++;
+
+		/* Ensure the correct subtree entry is selected. */
+		slash = strchr(p, '/');
+		if (slash == NULL)
+			slash = strchr(p, '\0');
+		SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
+			if (strncmp(p, te->name, slash - p) == 0) {
+				s->selected_entry = te;
+				break;
+			}
+		}
+		if (s->selected_entry == NULL) {
+			err = got_error(GOT_ERR_NO_TREE_ENTRY);
+			break;
+		}
+
+		slash = strchr(p, '/');
+		if (slash)
+			subpath = strndup(path, slash - path);
+		else
+			subpath = strdup(path);
+		if (subpath == NULL) {
+			err = got_error_from_errno("strdup");
+			break;
+		}
+
+		err = got_object_id_by_path(&tree_id, repo, entry->id,
+		    subpath);
+		if (err)
+			break;
+
+		err = got_object_open_as_tree(&tree, repo, tree_id);
+		free(tree_id);
+		if (err)
+			break;
+
+		err = tree_view_visit_subtree(tree, s);
+		if (err) {
+			got_object_tree_close(tree);
+			break;
+		}
+		if (slash == NULL)
+			break;
+		free(subpath);
+		subpath = NULL;
+		p = slash;
+	}
+
+	free(subpath);
 	return err;
 }
 
@@ -1721,8 +1811,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
-		err = browse_commit(&tree_view, begin_x,
-		    s->selected_entry, s->refs, s->repo);
+		err = browse_commit_tree(&tree_view, begin_x,
+		    s->selected_entry, s->in_repo_path, s->refs, s->repo);
 		if (err)
 			break;
 		if (view_is_parent_view(view)) {
@@ -3772,28 +3862,16 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected = parent->selected;
 			free(parent);
 		} else if (S_ISDIR(s->selected_entry->mode)) {
-			struct tog_parent_tree *parent;
-			struct got_tree_object *child;
-			err = got_object_open_as_tree(&child,
+			struct got_tree_object *subtree;
+			err = got_object_open_as_tree(&subtree,
 			    s->repo, s->selected_entry->id);
 			if (err)
 				break;
-			parent = calloc(1, sizeof(*parent));
-			if (parent == NULL) {
-				err = got_error_from_errno("calloc");
+			err = tree_view_visit_subtree(subtree, s);
+			if (err) {
+				got_object_tree_close(subtree);
 				break;
 			}
-			parent->tree = s->tree;
-			parent->first_displayed_entry =
-			   s->first_displayed_entry;
-			parent->selected_entry = s->selected_entry;
-			parent->selected = s->selected;
-			TAILQ_INSERT_HEAD(&s->parents, parent, entry);
-			s->tree = child;
-			s->entries =
-			    got_object_tree_get_entries(s->tree);
-			s->selected = 0;
-			s->first_displayed_entry = NULL;
 		} else if (S_ISREG(s->selected_entry->mode)) {
 			struct tog_view *blame_view;
 			int begin_x = view_is_parent_view(view) ?
