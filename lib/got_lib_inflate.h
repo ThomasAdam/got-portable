@@ -25,7 +25,7 @@ struct got_inflate_buf {
 #define GOT_INFLATE_F_OWN_OUTBUF	0x02
 };
 
-#define GOT_INFLATE_BUFSIZE		8192
+#define GOT_INFLATE_BUFSIZE		32768
 
 const struct got_error *got_inflate_init(struct got_inflate_buf *, uint8_t *,
     size_t);
