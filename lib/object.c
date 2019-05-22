@@ -229,7 +229,7 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	return NULL;
 }
 
-void
+static void
 set_max_datasize(void)
 {
 	struct rlimit rl;
