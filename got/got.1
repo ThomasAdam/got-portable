@@ -167,10 +167,11 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl b
-Show the linear history of the current branch only by restricting
-history traversal to the first parent of each commit.
-Merge commits which affected the current branch will be shown but
-individual commits which originated on other branches will be omitted.
+Show the linear line of history of the current branch.
+This option restricts history traversal to the first parent of each commit.
+Commits which the branch was based on and merge commits which affected the
+branch will be shown, but individual commits created on parallel branches
+will be omitted.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
