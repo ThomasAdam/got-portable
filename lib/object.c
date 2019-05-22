@@ -21,6 +21,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/syslimits.h>
+#include <sys/resource.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -228,6 +229,18 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	return NULL;
 }
 
+void
+set_max_datasize(void)
+{
+	struct rlimit rl;
+
+	if (getrlimit(RLIMIT_DATA, &rl) != 0)
+		return;
+
+	rl.rlim_cur = rl.rlim_max;
+	setrlimit(RLIMIT_DATA, &rl);
+}
+
 static const struct got_error *
 start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 {
@@ -257,6 +270,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		err = got_error_from_errno("fork");
 		goto done;
 	} else if (pid == 0) {
+		set_max_datasize();
 		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
 		    pack->path_packfile);
 		/* not reached */
