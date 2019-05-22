@@ -159,8 +159,33 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	}
 
-	if (size > GOT_OBJECT_CACHE_MAX_ELEM_SIZE)
+	if (size > GOT_OBJECT_CACHE_MAX_ELEM_SIZE) {
+#ifdef GOT_OBJ_CACHE_DEBUG
+		char *id_str;
+		if (got_object_id_str(&id_str, id) != NULL)
+			return got_error_from_errno("got_object_id_str");
+		fprintf(stderr, "%s: not caching ", getprogname());
+		switch (cache->type) {
+		case GOT_OBJECT_CACHE_TYPE_OBJ:
+			fprintf(stderr, "object");
+			break;
+		case GOT_OBJECT_CACHE_TYPE_TREE:
+			fprintf(stderr, "tree");
+			break;
+		case GOT_OBJECT_CACHE_TYPE_COMMIT:
+			fprintf(stderr, "commit");
+			break;
+		case GOT_OBJECT_CACHE_TYPE_TAG:
+			fprintf(stderr, "tag");
+			break;
+		}
+		fprintf(stderr, " %s (%zd bytes; %zd MB)\n", id_str, size,
+		    size/1024/1024);
+		free(id_str);
+#endif
+		cache->cache_toolarge++;
 		return NULL;
+	}
 
 	nelem = got_object_idset_num_elements(cache->idset);
 	if (nelem >= cache->size) {
@@ -245,10 +270,10 @@ static void
 print_cache_stats(struct got_object_cache *cache, const char *name)
 {
 	fprintf(stderr, "%s: %s cache: %d elements, %d searches, %d hits, "
-	    "%d missed, %d evicted\n", getprogname(), name,
+	    "%d missed, %d evicted, %d too large\n", getprogname(), name,
 	    got_object_idset_num_elements(cache->idset),
 	    cache->cache_searches, cache->cache_hit,
-	    cache->cache_miss, cache->cache_evict);
+	    cache->cache_miss, cache->cache_evict, cache->cache_toolarge);
 }
 
 const struct got_error *
