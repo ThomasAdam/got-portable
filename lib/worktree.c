@@ -1447,6 +1447,29 @@ done:
 	return err;
 }
 
+struct bump_base_commit_id_arg {
+	struct got_object_id *base_commit_id;
+	const char *path;
+	size_t path_len;
+	const char *entry_name;
+};
+
+/* Bump base commit ID of all files within an updated part of the work tree. */
+static const struct got_error *
+bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
+{
+	struct bump_base_commit_id_arg *a = arg;
+
+	if (a->entry_name) {
+		if (strcmp(ie->path, a->path) != 0)
+			return NULL;
+	} else if (!got_path_is_child(ie->path, a->path, a->path_len))
+		return NULL;
+
+	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
+	return NULL;
+}
+
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
@@ -1583,6 +1606,18 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	arg.cancel_arg = cancel_arg;
 	checkout_err = got_fileindex_diff_tree(fileindex, tree, relpath,
 	    entry_name, repo, &diff_cb, &arg);
+
+	if (checkout_err == NULL) {
+		struct bump_base_commit_id_arg bbc_arg;
+		bbc_arg.base_commit_id = worktree->base_commit_id;
+		bbc_arg.entry_name = entry_name;
+		bbc_arg.path = path;
+		bbc_arg.path_len = strlen(path);
+		err = got_fileindex_for_each_entry_safe(fileindex,
+		    bump_base_commit_id, &bbc_arg);
+		if (err)
+			goto done;
+	}
 
 	/* Try to sync the fileindex back to disk in any case. */
 	err = got_fileindex_write(fileindex, new_index);

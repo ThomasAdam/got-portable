@@ -1424,6 +1424,72 @@ function test_update_to_commit_on_wrong_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_bumps_base_commit_id {
+	local testroot=`test_init update_to_commit_on_wrong_branch`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "changed alpha" > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "created commit $head_rev" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified beta" > $testroot/wt/beta
+	(cd $testroot/wt && got commit -m "changed beta" > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo -n "" > $testroot/stdout.expected
+	echo "got: work tree must be updated before these changes can be committed"  > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# XXX At present, got requires users to run 'update' after 'commit'.
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "Already up-to-date" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "changed beta" > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  beta" > $testroot/stdout.expected
+	echo "created commit $head_rev" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1452,3 +1518,4 @@ run_test test_update_partial_dir
 run_test test_update_moved_branch_ref
 run_test test_update_to_another_branch
 run_test test_update_to_commit_on_wrong_branch
+run_test test_update_bumps_base_commit_id
