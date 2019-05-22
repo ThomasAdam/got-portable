@@ -672,6 +672,9 @@ cmd_update(int argc, char *argv[])
 		error = check_same_branch(commit_id, head_ref, repo);
 		if (error)
 			goto done;
+		printf("Switching work tree from %s to %s\n",
+		    got_worktree_get_head_ref_name(worktree),
+		    got_ref_get_name(head_ref));
 		error = got_worktree_set_head_ref(worktree, head_ref);
 		if (error)
 			goto done;

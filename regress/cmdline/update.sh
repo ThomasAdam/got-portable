@@ -1338,7 +1338,8 @@ function test_update_to_another_branch {
 
 	echo "modified alpha in work tree" > $testroot/wt/alpha
 
-	echo "C  alpha" > $testroot/stdout.expected
+	echo "Switching work tree from refs/heads/master to refs/heads/newbranch" > $testroot/stdout.expected
+	echo "C  alpha" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
