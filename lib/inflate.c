@@ -220,7 +220,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 
 	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno("calloc");
+		return got_error_from_errno("malloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err)
 		return err;
@@ -264,7 +264,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 
 	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno("calloc");
+		return got_error_from_errno("malloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err)
 		goto done;
@@ -309,7 +309,7 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 
 	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
-		return got_error_from_errno("calloc");
+		return got_error_from_errno("malloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
 	if (err) {
 		free(*outbuf);
