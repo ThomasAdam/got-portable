@@ -1086,7 +1086,7 @@ function test_update_partial {
 	echo "modified epsilon/zeta" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "modified two files"
 
-	for f in alpha beta epsilon/zeta; do
+	for f in alpha beta; do
 		echo "U  $f" > $testroot/stdout.expected
 		echo -n "Updated to commit " >> $testroot/stdout.expected
 		git_show_head $testroot/repo >> $testroot/stdout.expected
@@ -1113,6 +1113,33 @@ function test_update_partial {
 			return 1
 		fi
 	done
+
+	echo "U  epsilon/zeta" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update epsilon > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified epsilon/zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	test_done "$testroot" "$ret"
 }
 
