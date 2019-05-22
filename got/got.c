@@ -2381,6 +2381,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		err = got_error_from_errno("malloc");
 		goto done;
 	}
+	(*logmsg)[0] = '\0';
 	len = 0;
 
 	fp = fopen(a->logmsg_path, "r");
