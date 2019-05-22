@@ -403,9 +403,20 @@ This new commit will become the head commit of the work tree's current branch:
 .Pp
 .Dl $ got commit
 .Pp
+In a work tree or a git repository directory, view changes committed in
+the 3 most recent commits to the repository:
+.Pp
+.Dl $ got log -p -l 3
+.Pp
 In a work tree or a git repository directory, list all branch references:
 .Pp
 .Dl $ got ref -l | grep ^refs/heads
+.Pp
+In a work tree or a git repository directory, view changes committed in
+the 3 most recent commits to the work tree's branch, or the branch resolved
+via the repository's HEAD reference, respectively:
+.Pp
+.Dl $ got log -p -l 3 -f
 .Pp
 In a work tree or a git repository directory, create a new branch
 .Dq unified-buffer-cache
