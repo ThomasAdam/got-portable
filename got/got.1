@@ -389,17 +389,54 @@ The editor spawned by
 .Sh EXAMPLES
 Check out a work tree of
 .Ox
-kernel sources from a Git repository at /var/repo/openbsd-src to ~/sys:
+kernel sources from a Git repository at /var/git/openbsd-src to ~/sys:
 .Pp
-.Dl $ got checkout -p sys /var/repo/openbsd-src ~/sys
+.Dl $ got checkout -p sys /var/git/openbsd-src ~/sys
 .Pp
-Create a new branch
-.Dq mybranch
+View local changes in a work tree directory:
+.Pp
+.Dl $ got status
+.Dl $ got diff | less
+.Pp
+Create a new commit from local changes in a work tree directory.
+This new commit will become the head commit of the work tree's current branch:
+.Pp
+.Dl $ got commit
+.Pp
+In a work tree or a git repository directory, list all branch references:
+.Pp
+.Dl $ got ref -l | grep ^refs/heads
+.Pp
+In a work tree or a git repository directory, create a new branch
+.Dq unified-buffer-cache
 which is forked off the
 .Dq master
 branch:
 .Pp
-.Dl $ got ref refs/heads/mybranch refs/heads/master
+.Dl $ got ref refs/heads/unified-buffer-cache refs/heads/master
+.Pp
+Switch an existing work tree to the branch
+.Dq unified-buffer-cache .
+Local changes in the work tree will be preserved and merged if necessary:
+.Pp
+.Dl $ got update -b unified-buffer-cache
+.Pp
+Add new files and remove obsolete files in a work tree directory:
+.Pp
+.Dl $ got add uvm/uvm_ubc.c
+.Dl $ got rm uvm/uvm_vnode.*
+.Pp
+Create a new commit from local changes in a work tree directory
+with a pre-defined log message.
+.Pp
+.Dl $ got commit -m 'unify the buffer cache'
+.Pp
+Update any work tree checked out from the
+.Dq unified-buffer-cache
+branch to the latest commit on this branch:
+.Pp
+.Dl $ got update
+.Pp
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5
