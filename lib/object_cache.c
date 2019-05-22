@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sha1.h>
 #include <zlib.h>
@@ -32,10 +33,15 @@
 #include "got_lib_object_idset.h"
 #include "got_lib_object_cache.h"
 
+/*
+ * XXX This should be reworked to track cache size and usage in bytes,
+ * rather than tracking N elements capped to a maximum element size.
+ */
 #define GOT_OBJECT_CACHE_SIZE_OBJ	256
 #define GOT_OBJECT_CACHE_SIZE_TREE	256
 #define GOT_OBJECT_CACHE_SIZE_COMMIT	64
 #define GOT_OBJECT_CACHE_SIZE_TAG	32
+#define GOT_OBJECT_CACHE_MAX_ELEM_SIZE	1048576	/* 1 MB */
 
 const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
@@ -65,12 +71,96 @@ got_object_cache_init(struct got_object_cache *cache,
 	return NULL;
 }
 
+size_t
+get_size_obj(struct got_object *obj)
+{
+	size_t size = sizeof(*obj);
+	struct got_delta *delta;
+
+	if (obj->flags & GOT_OBJ_FLAG_PACKED)
+		size += strlen(obj->path_packfile);
+
+	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
+		return size;
+
+	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+		if (SIZE_MAX - (sizeof(*delta) + delta->delta_len) < size)
+			return SIZE_MAX;
+		size += sizeof(*delta) + delta->delta_len;
+	}
+
+	return size;
+}
+
+size_t
+get_size_tree(struct got_tree_object *tree)
+{
+	size_t size = sizeof(*tree);
+	struct got_tree_entry *te;
+
+	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
+		size += sizeof(*te);
+		size += strlen(te->name);
+		size += sizeof(*te->id);
+	}
+
+	return size;
+}
+
+size_t
+get_size_commit(struct got_commit_object *commit)
+{
+	size_t size = sizeof(*commit);
+	struct got_object_qid *qid;
+
+	size += sizeof(*commit->tree_id);
+	size += strlen(commit->author);
+	size += strlen(commit->committer);
+	size += strlen(commit->logmsg);
+
+	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry)
+		size += sizeof(*qid) + sizeof(*qid->id);
+
+	return size;
+}
+
+size_t
+get_size_tag(struct got_tag_object *tag)
+{
+	size_t size = sizeof(*tag);
+
+	size += strlen(tag->tag);
+	size += strlen(tag->tagger);
+	size += strlen(tag->tagmsg);
+
+	return size;
+}
+
 const struct got_error *
 got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 {
 	const struct got_error *err = NULL;
 	struct got_object_cache_entry *ce;
 	int nelem;
+	size_t size;
+
+	switch (cache->type) {
+	case GOT_OBJECT_CACHE_TYPE_OBJ:
+		size = get_size_obj((struct got_object *)item);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TREE:
+		size = get_size_tree((struct got_tree_object *)item);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_COMMIT:
+		size = get_size_commit((struct got_commit_object *)item);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_TAG:
+		size = get_size_tag((struct got_tag_object *)item);
+		break;
+	}
+
+	if (size > GOT_OBJECT_CACHE_MAX_ELEM_SIZE)
+		return NULL;
 
 	nelem = got_object_idset_num_elements(cache->idset);
 	if (nelem >= cache->size) {
