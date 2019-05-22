@@ -2375,7 +2375,6 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		goto done;
 	}
 
-	/* remove comments */
 	*logmsg = malloc(st2.st_size + 1);
 	if (*logmsg == NULL) {
 		err = got_error_from_errno("malloc");
@@ -2393,7 +2392,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		if (!content_changed && strcmp(buf, initial_content) != 0)
 			content_changed = 1;
 		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
-			continue;
+			continue; /* remove comments and leading empty lines */
 		len = strlcat(*logmsg, buf, st2.st_size);
 	}
 	fclose(fp);
