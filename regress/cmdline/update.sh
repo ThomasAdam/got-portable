@@ -1293,7 +1293,7 @@ function test_update_moved_branch_ref {
 	echo -n > $testroot/stdout.expected
 	echo -n "got: work tree's branch reference has moved; " \
 		> $testroot/stderr.expected
-	echo "new branch or rebase required" >> $testroot/stderr.expected
+	echo "new branch reference or rebase required" >> $testroot/stderr.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
 

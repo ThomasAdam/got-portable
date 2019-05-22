@@ -174,7 +174,7 @@ static const struct got_error {
 	{ GOT_ERR_DIR_NOT_EMPTY, "directory exists and is not empty" },
 	{ GOT_ERR_COMMIT_NO_CHANGES, "no changes to commit" },
 	{ GOT_ERR_BRANCH_MOVED,	"work tree's branch reference has moved; "
-	    "new branch or rebase required" },
+	    "new branch reference or rebase required" },
 };
 
 /*
