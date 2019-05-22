@@ -262,7 +262,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 	void *newbuf;
 	int nbuf = 1;
 
-	*outbuf = calloc(1, GOT_INFLATE_BUFSIZE);
+	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
 		return got_error_from_errno("calloc");
 	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
@@ -277,11 +277,10 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 			goto done;
 		*outlen += avail;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
-			nbuf++;
-			newbuf = recallocarray(*outbuf, nbuf - 1, nbuf,
+			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
-				err = got_error_from_errno("recallocarray");
+				err = got_error_from_errno("reallocarray");
 				free(*outbuf);
 				*outbuf = NULL;
 				*outlen = 0;
