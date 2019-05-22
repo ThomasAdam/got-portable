@@ -71,7 +71,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	fd = mkstemp(*path);
 	if (fd == -1) {
-		err = got_error_from_errno("mkstemp");
+		err = got_error_from_errno2("mkstemp", *path);
 		free(*path);
 		*path = NULL;
 		return err;
@@ -79,7 +79,7 @@ got_opentemp_named(char **path, FILE **outfile, const char *basepath)
 
 	*outfile = fdopen(fd, "w+");
 	if (*outfile == NULL) {
-		err = got_error_from_errno("fdopen");
+		err = got_error_from_errno2("fdopen", *path);
 		free(*path);
 		*path = NULL;
 	}
