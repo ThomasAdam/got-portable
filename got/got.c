@@ -2384,6 +2384,10 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	len = 0;
 
 	fp = fopen(a->logmsg_path, "r");
+	if (fp == NULL) {
+		err = got_error_from_errno("fopen");
+		goto done;
+	}
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		if (!content_changed && strcmp(buf, initial_content) != 0)
 			content_changed = 1;
