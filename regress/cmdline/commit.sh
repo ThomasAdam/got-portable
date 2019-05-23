@@ -213,9 +213,66 @@ function test_commit_added_subdirs {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_rejects_conflicted_file {
+	local testroot=`test_init update_rejects_conflicted_file`
+
+	local initial_rev=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
+
+	(cd $testroot/wt && got update -c $initial_rev > /dev/null)
+
+	echo "modified alpha, too" > $testroot/wt/alpha
+
+	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m 'commit it' > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo -n > $testroot/stdout.expected
+	echo "got: cannot commit file in conflicted status" \
+		> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
 run_test test_commit_single_file
 run_test test_commit_out_of_date
 run_test test_commit_added_subdirs
+run_test test_commit_rejects_conflicted_file
