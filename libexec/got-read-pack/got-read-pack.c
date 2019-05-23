@@ -109,9 +109,9 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
-	struct got_object *obj;
+	struct got_object *obj = NULL;
 	struct got_commit_object *commit = NULL;
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 	size_t len;
 	struct got_object_id id;
 	size_t datalen;
@@ -134,18 +134,19 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
-		return err;
+		goto done;
 
 	obj->size = len;
 	err = got_object_parse_commit(&commit, buf, len);
-	free(buf);
-	if (err) {
-		got_object_close(obj);
-		return err;
-	}
+	if (err)
+		goto done;
 
 	err = got_privsep_send_commit(ibuf, commit);
-	got_object_commit_close(commit);
+done:
+	free(buf);
+	got_object_close(obj);
+	if (commit)
+		got_object_commit_close(commit);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -164,7 +165,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
 	struct got_tree_object *tree = NULL;
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 	size_t len;
 	struct got_object_id id;
 	size_t datalen;
@@ -187,16 +188,19 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
-		return err;
+		goto done;
 
 	obj->size = len;
 	err = got_object_parse_tree(&tree, buf, len);
-	free(buf);
+	if (err)
+		goto done;
 
 	err = got_privsep_send_tree(ibuf, tree);
-	if (obj)
-		got_object_close(obj);
-	got_object_tree_close(tree);
+done:
+	free(buf);
+	got_object_close(obj);
+	if (tree)
+		got_object_tree_close(tree);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -308,8 +312,7 @@ done:
 		err = got_error_from_errno("fclose");
 	if (accumfile && fclose(accumfile) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (obj)
-		got_object_close(obj);
+	got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
 		got_privsep_send_error(ibuf, err);
 
@@ -324,7 +327,7 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
 	struct got_tag_object *tag = NULL;
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 	size_t len;
 	struct got_object_id id;
 	size_t datalen;
@@ -347,18 +350,19 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
-		return err;
+		goto done;
 
 	obj->size = len;
 	err = got_object_parse_tag(&tag, buf, len);
-	free(buf);
 	if (err)
-		return err;
+		goto done;
 
 	err = got_privsep_send_tag(ibuf, tag);
-	if (obj)
-		got_object_close(obj);
-	got_object_tag_close(tag);
+done:
+	free(buf);
+	got_object_close(obj);
+	if (tag)
+		got_object_tag_close(tag);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
