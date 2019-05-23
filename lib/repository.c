@@ -180,8 +180,12 @@ got_repo_cache_object(struct got_repository *repo, struct got_object_id *id,
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
 	err = got_object_cache_add(&repo->objcache, id, obj);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
 		return err;
+	}
 	obj->refcnt++;
 #endif
 	return NULL;
@@ -201,8 +205,12 @@ got_repo_cache_tree(struct got_repository *repo, struct got_object_id *id,
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
 	err = got_object_cache_add(&repo->treecache, id, tree);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
 		return err;
+	}
 	tree->refcnt++;
 #endif
 	return NULL;
@@ -223,8 +231,12 @@ got_repo_cache_commit(struct got_repository *repo, struct got_object_id *id,
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
 	err = got_object_cache_add(&repo->commitcache, id, commit);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
 		return err;
+	}
 	commit->refcnt++;
 #endif
 	return NULL;
@@ -245,8 +257,12 @@ got_repo_cache_tag(struct got_repository *repo, struct got_object_id *id,
 #ifndef GOT_NO_OBJ_CACHE
 	const struct got_error *err = NULL;
 	err = got_object_cache_add(&repo->tagcache, id, tag);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
 		return err;
+	}
 	tag->refcnt++;
 #endif
 	return NULL;

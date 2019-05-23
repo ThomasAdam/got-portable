@@ -63,10 +63,13 @@ open_object(struct got_object **obj, struct got_pack *pack,
 	(*obj)->refcnt++;
 
 	err = got_object_cache_add(objcache, id, *obj);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
 		return err;
+	}
 	(*obj)->refcnt++;
-
 	return NULL;
 }
 

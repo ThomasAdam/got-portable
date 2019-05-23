@@ -91,6 +91,7 @@
 #define GOT_ERR_DIR_NOT_EMPTY	75
 #define GOT_ERR_COMMIT_NO_CHANGES 76
 #define GOT_ERR_BRANCH_MOVED	77
+#define GOT_ERR_OBJ_TOO_LARGE	78
 
 static const struct got_error {
 	int code;
@@ -175,6 +176,7 @@ static const struct got_error {
 	{ GOT_ERR_COMMIT_NO_CHANGES, "no changes to commit" },
 	{ GOT_ERR_BRANCH_MOVED,	"work tree's branch reference has moved; "
 	    "new branch reference or rebase required" },
+	{ GOT_ERR_OBJ_TOO_LARGE,	"object too large" },
 };
 
 /*

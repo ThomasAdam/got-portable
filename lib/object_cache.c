@@ -184,7 +184,7 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		free(id_str);
 #endif
 		cache->cache_toolarge++;
-		return NULL;
+		return got_error(GOT_ERR_OBJ_TOO_LARGE);
 	}
 
 	nelem = got_object_idset_num_elements(cache->idset);
@@ -231,12 +231,8 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 	}
 
 	err = got_object_idset_add(cache->idset, id, ce);
-	if (err) {
-		if (err->code == GOT_ERR_OBJ_EXISTS) {
-			free(ce);
-			err = NULL;
-		}
-	}
+	if (err)
+		free(ce);
 	return err;
 }
 
