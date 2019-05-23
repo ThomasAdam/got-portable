@@ -362,6 +362,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *p;
+	struct stat sb;
 
 	*packidx = NULL;
 
@@ -373,12 +374,13 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	if (p->fd == -1)
 		return got_error_from_errno2("open", path);
 
-	err = got_pack_get_packfile_size(&p->len, path);
-	if (err) {
+	if (fstat(p->fd, &sb) != 0) {
+		err = got_error_from_errno2("fstat", path);
 		close(p->fd);
 		free(p);
 		return err;
 	}
+	p->len = sb.st_size;
 	if (p->len < sizeof(p->hdr)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		close(p->fd);
