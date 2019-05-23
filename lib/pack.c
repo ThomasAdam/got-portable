@@ -66,49 +66,6 @@ verify_fanout_table(uint32_t *fanout_table)
 }
 
 const struct got_error *
-got_pack_get_packfile_size(size_t *size, const char *path)
-{
-	struct stat sb;
-	char *dot;
-
-	*size = 0;
-
-	dot = strrchr(path, '.');
-	if (dot == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
-
-	/* Path must point to a pack index or to a pack file. */
-	if (strcmp(dot, GOT_PACKIDX_SUFFIX) == 0) {
-		const struct got_error *err = NULL;
-		char *path_pack;
-		char base_path[PATH_MAX];
-
-		/* Convert pack index path to pack file path. */
-		if (strlcpy(base_path, path, PATH_MAX) > PATH_MAX)
-			return got_error(GOT_ERR_NO_SPACE);
-		dot = strrchr(base_path, '.');
-		if (dot == NULL)
-			return got_error(GOT_ERR_BAD_PATH);
-		*dot = '\0';
-		if (asprintf(&path_pack, "%s.pack", base_path) == -1)
-			return got_error_from_errno("asprintf");
-
-		if (stat(path_pack, &sb) != 0)
-			err = got_error_from_errno("asprintf");
-		free(path_pack);
-		if (err)
-			return err;
-	} else if (strcmp(dot, GOT_PACKFILE_SUFFIX) == 0) {
-		if (stat(path, &sb) != 0)
-			return got_error_from_errno2("stat", path);
-	} else
-		return got_error(GOT_ERR_BAD_PATH);
-
-	*size = sb.st_size;
-	return 0;
-}
-
-const struct got_error *
 got_packidx_init_hdr(struct got_packidx *p, int verify)
 {
 	const struct got_error *err = NULL;

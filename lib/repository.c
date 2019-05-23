@@ -722,6 +722,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	struct got_pack *pack = NULL;
+	struct stat sb;
 	int i;
 
 	if (packp)
@@ -756,9 +757,11 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	if (err)
 		goto done;
 
-	err = got_pack_get_packfile_size(&pack->filesize, path_packfile);
-	if (err)
+	if (fstat(pack->fd, &sb) != 0) {
+		err = got_error_from_errno("fstat");
 		goto done;
+	}
+	pack->filesize = sb.st_size;
 
 	pack->privsep_child = NULL;
 
