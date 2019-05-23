@@ -52,6 +52,26 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
+open_object(struct got_object **obj, struct got_pack *pack,
+    struct got_packidx *packidx, int idx, struct got_object_id *id,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err;
+
+	err = got_packfile_open_object(obj, pack, packidx, idx, id);
+	if (err)
+		return err;
+	(*obj)->refcnt++;
+
+	err = got_object_cache_add(objcache, id, *obj);
+	if (err)
+		return err;
+	(*obj)->refcnt++;
+
+	return NULL;
+}
+
+static const struct got_error *
 object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
@@ -67,15 +87,15 @@ object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
-	if (err)
-		return err;
-	obj->refcnt++;
-
-	err = got_object_cache_add(objcache, &obj->id, obj);
-	if (err)
-		goto done;
-	obj->refcnt++;
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			goto done;
+	}
 
 	err = got_privsep_send_obj(ibuf, obj);
 done:
@@ -102,9 +122,15 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
-	if (err)
-		return err;
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			return err;
+	}
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
@@ -149,9 +175,15 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
-	if (err)
-		return err;
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			return err;
+	}
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
@@ -231,9 +263,15 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
-	if (err)
-		return err;
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			return err;
+	}
 
 	err = receive_file(&outfile, ibuf, GOT_IMSG_BLOB_OUTFD);
 	if (err)
@@ -297,9 +335,15 @@ tag_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	err = got_packfile_open_object(&obj, pack, packidx, iobj.idx, &id);
-	if (err)
-		return err;
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			return err;
+	}
 
 	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
 	if (err)
