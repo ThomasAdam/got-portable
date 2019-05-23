@@ -388,38 +388,29 @@ The editor spawned by
 .Sh EXIT STATUS
 .Ex -std got
 .Sh EXAMPLES
-Check out a work tree of
-.Ox
-kernel sources from a Git repository at /var/git/openbsd-src to ~/sys:
 .Pp
-.Dl $ got checkout -p sys /var/git/openbsd-src ~/sys
+Clone an existing Git repository for use with
+.Nm .
+This step currently requires
+.Xr git 1 :
+.Pp
+.Dl $ cd /var/git/
+.Dl $ git clone --bare https://github.com/openbsd/src.git
+.Pp
+Check out a work tree from this Git repository to /usr/src:
+.Pp
+.Dl $ got checkout /var/git/src.git /usr/src
 .Pp
 View local changes in a work tree directory:
 .Pp
 .Dl $ got status
 .Dl $ got diff | less
 .Pp
-Create a new commit from local changes in a work tree directory.
-This new commit will become the head commit of the work tree's current branch:
-.Pp
-.Dl $ got commit
-.Pp
-In a work tree or a git repository directory, view changes committed in
-the 3 most recent commits to the repository:
-.Pp
-.Dl $ got log -p -l 3
-.Pp
 In a work tree or a git repository directory, list all branch references:
 .Pp
 .Dl $ got ref -l | grep ^refs/heads
 .Pp
-In a work tree or a git repository directory, view changes committed in
-the 3 most recent commits to the work tree's branch, or the branch resolved
-via the repository's HEAD reference, respectively:
-.Pp
-.Dl $ got log -p -l 3 -b
-.Pp
-In a work tree or a git repository directory, create a new branch
+In a work tree or a git repository directory, create a new branch called
 .Dq unified-buffer-cache
 which is forked off the
 .Dq master
@@ -433,10 +424,21 @@ Local changes in the work tree will be preserved and merged if necessary:
 .Pp
 .Dl $ got update -b unified-buffer-cache
 .Pp
+Create a new commit from local changes in a work tree directory.
+This new commit will become the head commit of the work tree's current branch:
+.Pp
+.Dl $ got commit
+.Pp
+In a work tree or a git repository directory, view changes committed in
+the 3 most recent commits to the work tree's branch, or the branch resolved
+via the repository's HEAD reference, respectively:
+.Pp
+.Dl $ got log -p -l 3 -b
+.Pp
 Add new files and remove obsolete files in a work tree directory:
 .Pp
-.Dl $ got add uvm/uvm_ubc.c
-.Dl $ got rm uvm/uvm_vnode.*
+.Dl $ got add sys/uvm/uvm_ubc.c
+.Dl $ got rm sys/uvm/uvm_vnode.c
 .Pp
 Create a new commit from local changes in a work tree directory
 with a pre-defined log message.
@@ -449,6 +451,42 @@ branch to the latest commit on this branch:
 .Pp
 .Dl $ got update
 .Pp
+Fetch new upstream commits into the local repository's master branch:
+.Pp
+.Dl $ cd /var/git/src.git
+.Dl $ git fetch origin master:master
+.Pp
+Rebase the
+.Dq unified-buffer-cache
+branch on top of the new head commit of the
+.Dq master
+branch.
+This step currently requires
+.Xr git 1 :
+.Pp
+.Dl $ git clone /var/git/src.git ~/src-git-wt
+.Dl $ cd ~/src-git-wt
+.Dl $ git checkout unified-buffer-cache
+.Dl $ git rebase master
+.Dl $ git push -f
+.Pp
+Create a new branch reference for a work tree which has lost
+linear ancestry with its recorded branch reference and thus
+can no longer be updated:
+.Pp
+.Dl $ got ref refs/heads/old-branch $(cat .got/base-commit)
+.Dl $ got update
+.Pp
+Update the work tree to the newly rebased
+.Dq unified-buffer-cache
+branch:
+.Pp
+.Dl $ got update -b unified-buffer-cache
+.Pp
+Delete a reference which is no longer needed:
+.Pp
+.Dl $ got ref -d refs/heads/old-branch
+.Pp
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5
@@ -456,3 +494,17 @@ branch to the latest commit on this branch:
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .An Martin Pieuchot Aq Mt mpi@openbsd.org
 .An joshua stein Aq Mt jcs@openbsd.org
+.Sh CAVEATS
+.Nm
+is a work-in-progress and many commands remain to be implemented.
+At present, the user has to fall back on
+.Xr git 1
+to perform many basic tasks.
+.Pp
+When working against a repository created with
+.Dq git clone --bare ,
+local commits to the
+.Dq master
+branch are discouraged, for now, if changes committed to the upstream
+repository need to be tracked.
+See the EXAMPLES section.
