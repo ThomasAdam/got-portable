@@ -1468,8 +1468,12 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 		if (s->tree != s->root)
 			s->selected++; /* skip '..' */
 
-		if (!S_ISDIR(s->selected_entry->mode))
+		if (!S_ISDIR(s->selected_entry->mode)) {
+			/* Jump to this file's entry. */
+			s->first_displayed_entry = s->selected_entry;
+			s->selected = 0;
 			break;
+		}
 
 		slash = strchr(p, '/');
 		if (slash)
