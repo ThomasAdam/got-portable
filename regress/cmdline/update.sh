@@ -1291,9 +1291,10 @@ function test_update_moved_branch_ref {
 	(cd $testroot/repo2 && git fetch -q --all)
 
 	echo -n > $testroot/stdout.expected
-	echo -n "got: work tree's branch reference has moved; " \
+	echo -n "got: work tree's head reference now points to a different " \
 		> $testroot/stderr.expected
-	echo "new branch reference or rebase required" >> $testroot/stderr.expected
+	echo "branch; new head reference and/or update -b required"  \
+		>> $testroot/stderr.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout 2> $testroot/stderr)
 

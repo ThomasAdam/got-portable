@@ -565,6 +565,46 @@ update_progress(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
+switch_head_ref(struct got_reference *head_ref,
+    struct got_object_id *commit_id, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *base_id_str;
+	int ref_has_moved = 0;
+
+	/* Trivial case: switching between two different references. */
+	if (strcmp(got_ref_get_name(head_ref),
+	    got_worktree_get_head_ref_name(worktree)) != 0) {
+		printf("Switching work tree from %s to %s\n",
+		    got_worktree_get_head_ref_name(worktree),
+		    got_ref_get_name(head_ref));
+		return got_worktree_set_head_ref(worktree, head_ref);
+	}
+
+	err = check_linear_ancestry(commit_id,
+	    got_worktree_get_base_commit_id(worktree), repo);
+	if (err) {
+		if (err->code != GOT_ERR_ANCESTRY)
+			return err;
+		ref_has_moved = 1;
+	}
+	if (!ref_has_moved)
+		return NULL;
+
+	/* Switching to a rebased branch with the same reference name. */
+	err = got_object_id_str(&base_id_str,
+	    got_worktree_get_base_commit_id(worktree));
+	if (err)
+		return err;
+	printf("Reference %s now points at a different branch\n",
+	    got_worktree_get_head_ref_name(worktree));
+	printf("Switching work tree from %s to %s\n", base_id_str,
+	    got_worktree_get_head_ref_name(worktree));
+	return NULL;
+}
+
+static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -632,9 +672,8 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (branch_name == NULL)
-		branch_name = got_worktree_get_head_ref_name(worktree);
-	error = got_ref_open(&head_ref, repo, branch_name, 0);
+	error = got_ref_open(&head_ref, repo, branch_name ? branch_name :
+	    got_worktree_get_head_ref_name(worktree), 0);
 	if (error != NULL)
 		goto done;
 	if (commit_id_str == NULL) {
@@ -651,12 +690,11 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	if (strcmp(got_ref_get_name(head_ref),
-	    got_worktree_get_head_ref_name(worktree)) != 0) {
+	if (branch_name) {
 		struct got_object_id *head_commit_id;
 		if (strlen(path) != 0) {
-			fprintf(stderr, "%s: switching to a different "
-			    "branch requires that the entire work tree "
+			fprintf(stderr, "%s: switching between branches "
+			    "requires that the entire work tree "
 			    "gets updated, not just '%s'\n",
 			    getprogname(), path);
 			error = got_error(GOT_ERR_BAD_PATH);
@@ -672,10 +710,7 @@ cmd_update(int argc, char *argv[])
 		error = check_same_branch(commit_id, head_ref, repo);
 		if (error)
 			goto done;
-		printf("Switching work tree from %s to %s\n",
-		    got_worktree_get_head_ref_name(worktree),
-		    got_ref_get_name(head_ref));
-		error = got_worktree_set_head_ref(worktree, head_ref);
+		error = switch_head_ref(head_ref, commit_id, worktree, repo);
 		if (error)
 			goto done;
 	} else {

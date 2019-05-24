@@ -470,23 +470,11 @@ This step currently requires
 .Dl $ git rebase master
 .Dl $ git push -f
 .Pp
-Create a new branch reference for a work tree which has lost
-linear ancestry with its recorded branch reference and thus
-can no longer be updated:
-.Pp
-.Dl $ got ref refs/heads/old-branch $(cat .got/base-commit)
-.Dl $ got update -b old-branch
-.Pp
 Update the work tree to the newly rebased
 .Dq unified-buffer-cache
 branch:
 .Pp
 .Dl $ got update -b unified-buffer-cache
-.Pp
-Delete a reference which is no longer needed:
-.Pp
-.Dl $ got ref -d refs/heads/old-branch
-.Pp
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5
