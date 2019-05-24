@@ -475,7 +475,7 @@ linear ancestry with its recorded branch reference and thus
 can no longer be updated:
 .Pp
 .Dl $ got ref refs/heads/old-branch $(cat .got/base-commit)
-.Dl $ got update
+.Dl $ got update -b old-branch
 .Pp
 Update the work tree to the newly rebased
 .Dq unified-buffer-cache
