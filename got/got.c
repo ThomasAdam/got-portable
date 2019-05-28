@@ -1251,7 +1251,7 @@ cmd_diff(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
-	char *id_str1 = NULL, *id_str2 = NULL;
+	const char *id_str1 = NULL, *id_str2 = NULL;
 	int type1, type2;
 	int diff_context = 3, ch;
 	const char *errstr;
