@@ -1252,6 +1252,7 @@ cmd_diff(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	const char *id_str1 = NULL, *id_str2 = NULL;
+	char *label1 = NULL, *label2 = NULL;
 	int type1, type2;
 	int diff_context = 3, ch;
 	const char *errstr;
@@ -1367,10 +1368,21 @@ cmd_diff(int argc, char *argv[])
 		error = got_ref_open(&ref, repo, id_str1, 0);
 		if (error != NULL)
 			goto done;
+		label1 = strdup(got_ref_get_name(ref));
+		if (label1 == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 		error = got_ref_resolve(&id1, repo, ref);
 		got_ref_close(ref);
 		if (error != NULL)
 			goto done;
+	} else {
+		label1 = strdup(id_str1);
+		if (label1 == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 
 	error = got_object_resolve_id_str(&id2, repo, id_str2);
@@ -1381,10 +1393,21 @@ cmd_diff(int argc, char *argv[])
 		error = got_ref_open(&ref, repo, id_str2, 0);
 		if (error != NULL)
 			goto done;
+		label2 = strdup(got_ref_get_name(ref));
+		if (label2 == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 		error = got_ref_resolve(&id2, repo, ref);
 		got_ref_close(ref);
 		if (error != NULL)
 			goto done;
+	} else {
+		label2 = strdup(id_str2);
+		if (label2 == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 
 	error = got_object_get_type(&type1, repo, id1);
@@ -1410,8 +1433,7 @@ cmd_diff(int argc, char *argv[])
 		    diff_context, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null",
-		    id_str2);
+		printf("diff %s %s\n", label1, label2);
 		error = got_diff_objects_as_commits(id1, id2, diff_context,
 		    repo, stdout);
 		break;
@@ -1420,6 +1442,8 @@ cmd_diff(int argc, char *argv[])
 	}
 
 done:
+	free(label1);
+	free(label2);
 	free(id1);
 	free(id2);
 	free(path);
