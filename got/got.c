@@ -1360,12 +1360,32 @@ cmd_diff(int argc, char *argv[])
 	}
 
 	error = got_object_resolve_id_str(&id1, repo, id_str1);
-	if (error)
-		goto done;
+	if (error) {
+		struct got_reference *ref;
+		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
+			goto done;
+		error = got_ref_open(&ref, repo, id_str1, 0);
+		if (error != NULL)
+			goto done;
+		error = got_ref_resolve(&id1, repo, ref);
+		got_ref_close(ref);
+		if (error != NULL)
+			goto done;
+	}
 
 	error = got_object_resolve_id_str(&id2, repo, id_str2);
-	if (error)
-		goto done;
+	if (error) {
+		struct got_reference *ref;
+		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
+			goto done;
+		error = got_ref_open(&ref, repo, id_str2, 0);
+		if (error != NULL)
+			goto done;
+		error = got_ref_resolve(&id2, repo, ref);
+		got_ref_close(ref);
+		if (error != NULL)
+			goto done;
+	}
 
 	error = got_object_get_type(&type1, repo, id1);
 	if (error)
