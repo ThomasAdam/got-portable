@@ -1880,11 +1880,17 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 		goto done;
 	}
 
-	path = strdup(resolved +
-	    strlen(got_worktree_get_root_path(worktree)) + 1 /* skip '/' */);
-	if (path == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
+	if (strlen(resolved) > strlen(got_worktree_get_root_path(worktree))) {
+		err = got_path_skip_common_ancestor(&path,
+		    got_worktree_get_root_path(worktree), resolved);
+		if (err)
+			goto done;
+	} else {
+		path = strdup("");
+		if (path == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 
 	/* XXX status walk can't deal with trailing slash! */
