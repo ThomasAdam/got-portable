@@ -1384,16 +1384,12 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 
 	*id = NULL;
 
-	/* We are expecting an absolute in-repository path. */
-	if (path[0] != '/')
-		return got_error(GOT_ERR_NOT_ABSPATH);
-
 	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
 		goto done;
 
 	/* Handle opening of root of commit's tree. */
-	if (path[1] == '\0') {
+	if (got_path_is_root_dir(path)) {
 		*id = got_object_id_dup(commit->tree_id);
 		if (*id == NULL)
 			err = got_error_from_errno("got_object_id_dup");
@@ -1405,7 +1401,8 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 		goto done;
 
 	s = path;
-	s++; /* skip leading '/' */
+	while (s[0] == '/')
+		s++;
 	seg = s;
 	seglen = 0;
 	while (*s) {

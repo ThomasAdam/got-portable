@@ -26,11 +26,11 @@ function test_revert_basic {
 		return 1
 	fi
 
-	echo "modified alpha" > $testroot/wt/alpha
+	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
 
-	echo 'R  alpha' > $testroot/stdout.expected
+	echo 'R  epsilon/zeta' > $testroot/stdout.expected
 
-	(cd $testroot/wt && got revert alpha > $testroot/stdout)
+	(cd $testroot/wt && got revert epsilon/zeta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -40,8 +40,8 @@ function test_revert_basic {
 		return 1
 	fi
 
-	echo "alpha" > $testroot/content.expected
-	cat $testroot/wt/alpha > $testroot/content
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
 
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
