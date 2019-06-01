@@ -92,6 +92,10 @@
 #define GOT_ERR_COMMIT_NO_CHANGES 76
 #define GOT_ERR_BRANCH_MOVED	77
 #define GOT_ERR_OBJ_TOO_LARGE	78
+#define GOT_ERR_SAME_BRANCH	79
+#define GOT_ERR_ROOT_COMMIT	80
+#define GOT_ERR_MIXED_COMMITS	81
+#define GOT_ERR_CONFLICTS	82
 
 static const struct got_error {
 	int code;
@@ -177,6 +181,12 @@ static const struct got_error {
 	{ GOT_ERR_BRANCH_MOVED,	"work tree's head reference now points to a "
 	    "different branch; new head reference and/or update -b required" },
 	{ GOT_ERR_OBJ_TOO_LARGE,	"object too large" },
+	{ GOT_ERR_SAME_BRANCH,	"commit is already contained in this branch" },
+	{ GOT_ERR_ROOT_COMMIT,	"specified commit has no parent commit" },
+	{ GOT_ERR_MIXED_COMMITS,"work tree contains files from multiple "
+	    "base commits; the entire work tree must be updated first" },
+	{ GOT_ERR_CONFLICTS,	"work tree contains conflicted files; these "
+	    "conflicts must be resolved first" },
 };
 
 /*

@@ -86,6 +86,7 @@ __dead static void	usage_add(void);
 __dead static void	usage_rm(void);
 __dead static void	usage_revert(void);
 __dead static void	usage_commit(void);
+__dead static void	usage_cherrypick(void);
 
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
@@ -99,6 +100,7 @@ static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_rm(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
 static const struct got_error*		cmd_commit(int, char *[]);
+static const struct got_error*		cmd_cherrypick(int, char *[]);
 
 static struct cmd got_commands[] = {
 	{ "checkout",	cmd_checkout,	usage_checkout,
@@ -125,6 +127,8 @@ static struct cmd got_commands[] = {
 	    "revert uncommitted changes" },
 	{ "commit",	cmd_commit,	usage_commit,
 	    "write changes from work tree to repository" },
+	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick,
+	    "merge a single commit from another branch into a work tree" },
 };
 
 int
@@ -2604,5 +2608,117 @@ done:
 	free(cwd);
 	free(id_str);
 	free(editor);
+	return error;
+}
+
+__dead static void
+usage_cherrypick(void)
+{
+	fprintf(stderr, "usage: %s cherrypick commit-id\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_cherrypick(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL, *commit_id_str = NULL;
+	struct got_object_id *commit_id = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_object_qid *pid;
+	struct got_reference *head_ref = NULL;
+	int ch, did_something = 0;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_cherrypick();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_cherrypick();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    got_worktree_get_root_path(worktree), 0);
+	if (error)
+		goto done;
+
+	error = got_object_resolve_id_str(&commit_id, repo, argv[0]);
+	if (error != NULL) {
+		struct got_reference *ref;
+		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
+			goto done;
+		error = got_ref_open(&ref, repo, argv[0], 0);
+		if (error != NULL)
+			goto done;
+		error = got_ref_resolve(&commit_id, repo, ref);
+		got_ref_close(ref);
+		if (error != NULL)
+			goto done;
+	}
+	error = got_object_id_str(&commit_id_str, commit_id);
+	if (error)
+		goto done;
+
+	error = got_ref_open(&head_ref, repo,
+	    got_worktree_get_head_ref_name(worktree), 0);
+	if (error != NULL)
+		goto done;
+
+	error = check_same_branch(commit_id, head_ref, repo);
+	if (error) {
+		if (error->code != GOT_ERR_ANCESTRY)
+			goto done;
+		error = NULL;
+	} else {
+		error = got_error(GOT_ERR_SAME_BRANCH);
+		goto done;
+	}
+
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		goto done;
+	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (pid == NULL) {
+		error = got_error(GOT_ERR_ROOT_COMMIT);
+		goto done;
+	}
+	error = got_worktree_merge_files(worktree, pid->id, commit_id,
+	    repo, update_progress, &did_something, check_cancelled, NULL);
+	if (error != NULL)
+		goto done;
+
+	if (did_something)
+		printf("merged commit %s\n", commit_id_str);
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	free(commit_id_str);
+	if (head_ref)
+		got_ref_close(head_ref);
+	if (worktree)
+		got_worktree_close(worktree);
+	if (repo)
+		got_repo_close(repo);
 	return error;
 }

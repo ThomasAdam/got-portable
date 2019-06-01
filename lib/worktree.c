@@ -41,6 +41,7 @@
 #include "got_path.h"
 #include "got_worktree.h"
 #include "got_opentemp.h"
+#include "got_diff.h"
 
 #include "got_lib_worktree.h"
 #include "got_lib_sha1.h"
@@ -737,27 +738,28 @@ done:
 }
 
 /*
- * Perform a 3-way merge where the file's version in the file index (blob2)
- * acts as the common ancestor, the incoming blob (blob1) acts as the first
- * derived version, and the file on disk acts as the second derived version.
+ * Perform a 3-way merge where blob2 acts as the common ancestor,
+ * blob1 acts as the first derived version, and the file on disk
+ * acts as the second derived version.
  */
 static const struct got_error *
-merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
-   struct got_fileindex_entry *ie, const char *ondisk_path, const char *path,
-   uint16_t te_mode, uint16_t st_mode, struct got_blob_object *blob1,
-   struct got_repository *repo,
-   got_worktree_checkout_cb progress_cb, void *progress_arg)
+merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
+    struct got_blob_object *blob2, const char *ondisk_path,
+    const char *path, uint16_t st_mode, struct got_blob_object *blob1,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int merged_fd = -1;
-	struct got_blob_object *blob2 = NULL;
 	FILE *f1 = NULL, *f2 = NULL;
 	char *blob1_path = NULL, *blob2_path = NULL;
 	char *merged_path = NULL, *base_path = NULL;
 	char *id_str = NULL;
 	char *label1 = NULL;
-	int overlapcnt = 0, update_timestamps = 0;
+	int overlapcnt = 0;
 	char *parent;
+
+	*local_changes_subsumed = 0;
 
 	parent = dirname(ondisk_path);
 	if (parent == NULL)
@@ -794,12 +796,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	err = got_opentemp_named(&blob2_path, &f2, base_path);
 	if (err)
 		goto done;
-	if (got_fileindex_entry_has_blob(ie)) {
-		struct got_object_id id2;
-		memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
-		if (err)
-			goto done;
+	if (blob2) {
 		err = got_object_blob_dump_to_file(NULL, NULL, f2, blob2);
 		if (err)
 			goto done;
@@ -834,7 +831,7 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	/* Check if a clean merge has subsumed all local changes. */
 	if (overlapcnt == 0) {
-		err = check_files_equal(&update_timestamps, blob1_path,
+		err = check_files_equal(local_changes_subsumed, blob1_path,
 		    merged_path);
 		if (err)
 			goto done;
@@ -852,12 +849,6 @@ merge_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		goto done;
 	}
 
-	/*
-	 * Do not update timestamps of already modified files. Otherwise,
-	 * a future status walk would treat them as unmodified files again.
-	 */
-	err = got_fileindex_entry_update(ie, ondisk_path,
-	    blob1->id.sha1, worktree->base_commit_id->sha1, update_timestamps);
 done:
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
@@ -865,8 +856,6 @@ done:
 		err = got_error_from_errno("fclose");
 	if (f2 && fclose(f2) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (blob2)
-		got_object_blob_close(blob2);
 	free(merged_path);
 	free(base_path);
 	if (blob1_path) {
@@ -1202,11 +1191,30 @@ update_blob(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD)
-		err = merge_blob(worktree, fileindex, ie, ondisk_path, path,
-		    te->mode, sb.st_mode, blob, repo, progress_cb,
-		    progress_arg);
-	else if (status == GOT_STATUS_DELETE) {
+	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD) {
+		int update_timestamps;
+		struct got_blob_object *blob2 = NULL;
+		if (got_fileindex_entry_has_blob(ie)) {
+			struct got_object_id id2;
+			memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+			err = got_object_open_as_blob(&blob2, repo, &id2, 8192);
+			if (err)
+				goto done;
+		}
+		err = merge_blob(&update_timestamps, worktree, blob2,
+		    ondisk_path, path, sb.st_mode, blob, repo,
+		    progress_cb, progress_arg);
+		if (blob2)
+			got_object_blob_close(blob2);
+		/*
+		 * Do not update timestamps of files with local changes.
+		 * Otherwise, a future status walk would treat them as
+		 * unmodified files again.
+		 */
+		err = got_fileindex_entry_update(ie, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1,
+		    update_timestamps);
+	} else if (status == GOT_STATUS_DELETE) {
 		(*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		err = update_blob_fileindex_entry(worktree, fileindex, ie,
 		    ondisk_path, path, blob, 0);
@@ -1259,8 +1267,7 @@ remove_ondisk_file(const char *root_path, const char *path)
 
 static const struct got_error *
 delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_fileindex_entry *ie, const char *parent_path,
-    struct got_repository *repo,
+    struct got_fileindex_entry *ie, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -1331,7 +1338,7 @@ diff_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
 
-	return delete_blob(a->worktree, a->fileindex, ie, parent_path,
+	return delete_blob(a->worktree, a->fileindex, ie,
 	    a->repo, a->progress_cb, a->progress_arg);
 }
 
@@ -1649,6 +1656,224 @@ done:
 	got_fileindex_free(fileindex);
 	if (checkout_err)
 		err = checkout_err;
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+struct merge_file_cb_arg {
+    struct got_worktree *worktree;
+    struct got_fileindex *fileindex;
+    struct got_object_id *commit_id1;
+    struct got_object_id *commit_id2;
+    got_worktree_checkout_cb progress_cb;
+    void *progress_arg;
+    got_worktree_cancel_cb cancel_cb;
+    void *cancel_arg;
+};
+
+static const struct got_error *
+merge_file_cb(void *arg, struct got_blob_object *blob1,
+    struct got_blob_object *blob2, struct got_object_id *id1,
+    struct got_object_id *id2, const char *path1, const char *path2,
+    struct got_repository *repo)
+{
+	static const struct got_error *err = NULL;
+	struct merge_file_cb_arg *a = arg;
+	struct got_fileindex_entry *ie;
+	char *ondisk_path = NULL;
+	struct stat sb;
+	unsigned char status;
+	int local_changes_subsumed;
+
+	if (blob1 && blob2) {
+		ie = got_fileindex_entry_get(a->fileindex, path2);
+		if (ie == NULL) {
+			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MISSING,
+			    path2);
+			return NULL;
+		}
+
+		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+		    path2) == -1)
+			return got_error_from_errno("asprintf");
+
+		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		if (err)
+			goto done;
+
+		if (status == GOT_STATUS_DELETE) {
+			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MERGE,
+			    path2);
+			goto done;
+		}
+		if (status != GOT_STATUS_NO_CHANGE &&
+		    status != GOT_STATUS_MODIFY &&
+		    status != GOT_STATUS_CONFLICT &&
+		    status != GOT_STATUS_ADD) {
+			(*a->progress_cb)(a->progress_arg, status, path2);
+			goto done;
+		}
+
+		err = merge_blob(&local_changes_subsumed, a->worktree, blob1,
+		    ondisk_path, path2, sb.st_mode, blob2, repo,
+		    a->progress_cb, a->progress_arg);
+	} else if (blob1) {
+		ie = got_fileindex_entry_get(a->fileindex, path1);
+		if (ie == NULL) {
+			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MISSING,
+			    path2);
+			return NULL;
+		}
+		err = delete_blob(a->worktree, a->fileindex, ie, repo,
+		    a->progress_cb, a->progress_arg);
+	} else if (blob2) {
+		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+		    path2) == -1)
+			return got_error_from_errno("asprintf");
+		ie = got_fileindex_entry_get(a->fileindex, path2);
+		if (ie) {
+			err = get_file_status(&status, &sb, ie, ondisk_path,
+			    repo);
+			if (err)
+				goto done;
+			if (status != GOT_STATUS_NO_CHANGE &&
+			    status != GOT_STATUS_MODIFY &&
+			    status != GOT_STATUS_CONFLICT &&
+			    status != GOT_STATUS_ADD) {
+				(*a->progress_cb)(a->progress_arg, status,
+				    path2);
+				goto done;
+			}
+			err = merge_blob(&local_changes_subsumed, a->worktree,
+			    NULL, ondisk_path, path2, sb.st_mode, blob2, repo,
+			    a->progress_cb, a->progress_arg);
+			if (status == GOT_STATUS_DELETE) {
+				err = update_blob_fileindex_entry(a->worktree,
+				    a->fileindex, ie, ondisk_path, ie->path,
+				    blob2, 0);
+				if (err)
+					goto done;
+			}
+		} else {
+			sb.st_mode = GOT_DEFAULT_FILE_MODE;
+			err = install_blob(a->worktree, ondisk_path, path2,
+			    /* XXX get this from parent tree! */
+			    GOT_DEFAULT_FILE_MODE,
+			    sb.st_mode, blob2, 0, 0, repo,
+			    a->progress_cb, a->progress_arg);
+			if (err)
+				goto done;
+
+			err = update_blob_fileindex_entry(a->worktree,
+			    a->fileindex, NULL, ondisk_path, path2, blob2, 0);
+			if (err)
+				goto done;
+		}
+	}
+done:
+	free(ondisk_path);
+	return err;
+}
+
+struct check_merge_ok_arg {
+	struct got_worktree *worktree;
+	struct got_repository *repo;
+};
+
+static const struct got_error *
+check_merge_ok(void *arg, struct got_fileindex_entry *ie)
+{
+	const struct got_error *err = NULL;
+	struct check_merge_ok_arg *a = arg;
+	unsigned char status;
+	struct stat sb;
+	char *ondisk_path;
+
+	/* Reject merges into a work tree with mixed base commits. */
+	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
+	    SHA1_DIGEST_LENGTH))
+		return got_error(GOT_ERR_MIXED_COMMITS);
+
+	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, ie->path)
+	    == -1)
+		return got_error_from_errno("asprintf");
+
+	/* Reject merges into a work tree with conflicted files. */
+	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+	if (err)
+		return err;
+	if (status == GOT_STATUS_CONFLICT)
+		return got_error(GOT_ERR_CONFLICTS);
+
+	return NULL;
+}
+
+const struct got_error *
+got_worktree_merge_files(struct got_worktree *worktree,
+    struct got_object_id *commit_id1, struct got_object_id *commit_id2,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL, *unlockerr;
+	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct merge_file_cb_arg arg;
+	char *fileindex_path = NULL;
+	struct got_fileindex *fileindex = NULL;
+	struct check_merge_ok_arg mok_arg;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	mok_arg.worktree = worktree;
+	mok_arg.repo = repo;
+	err = got_fileindex_for_each_entry_safe(fileindex, check_merge_ok,
+	    &mok_arg);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id1, repo, commit_id1,
+	    worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id2, repo, commit_id2,
+	    worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree1, repo, tree_id1);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree2, repo, tree_id2);
+	if (err)
+		goto done;
+
+	arg.worktree = worktree;
+	arg.fileindex = fileindex;
+	arg.commit_id1 = commit_id1;
+	arg.commit_id2 = commit_id2;
+	arg.progress_cb = progress_cb;
+	arg.progress_arg = progress_arg;
+	arg.cancel_cb = cancel_cb;
+	arg.cancel_arg = cancel_arg;
+	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg);
+done:
+	free(fileindex_path);
+	got_fileindex_free(fileindex);
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;

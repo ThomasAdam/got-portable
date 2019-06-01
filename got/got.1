@@ -373,6 +373,43 @@ option,
 .Cm got commit
 opens a temporary file in an editor where a log message can be written.
 .El
+.It Cm cherrypick Ar commit
+Merge changes from a single
+.Ar commit
+into the work tree.
+The specified
+.Ar commit
+must be on a different branch than the work tree's base commit.
+The expected argument is a reference or a SHA1 hash which corresponds to
+a commit object.
+.Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It G Ta file was merged
+.It C Ta file was merged and conflicts occurred during merge
+.It ! Ta changes destined for a missing file were not merged
+.It D Ta file was deleted
+.It A Ta new file was added
+.El
+.Pp
+The merged changes will appear as local changes in the work tree, which
+may be viewed with
+.Cm got diff ,
+amended manually or with further
+.Cm got cherrypick
+comands,
+committed with
+.Cm got commit ,
+or discarded again with
+.Cm got revert .
+.Pp
+.Cm got cherrypick
+will refuse to run if certain preconditions are not met.
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If the work tree already contains files with merge conflicts, these
+conflicts must be resolved first.
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR

@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log add rm diff commit
+REGRESS_TARGETS=checkout update status log add rm diff commit cherrypick
 NOOBJ=Yes
 
 checkout:
@@ -24,5 +24,8 @@ diff:
 
 commit:
 	./commit.sh
+
+cherrypick:
+	./cherrypick.sh
 
 .include <bsd.regress.mk>
