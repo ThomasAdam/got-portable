@@ -214,20 +214,6 @@ got_diff_free_changes(struct got_diff_changes *changes)
 	free(changes);
 }
 
-static struct got_tree_entry *
-match_entry_by_name(struct got_tree_entry *te1, struct got_tree_object *tree2)
-{
-	struct got_tree_entry *te2;
-	const struct got_tree_entries *entries2;
-
-	entries2 = got_object_tree_get_entries(tree2); 
-	SIMPLEQ_FOREACH(te2, &entries2->head, entry) {
-		if (strcmp(te1->name, te2->name) == 0)
-			return te2;
-	}
-	return NULL;
-}
-
 static const struct got_error *
 diff_added_blob(struct got_object_id *id, const char *label,
     int diff_context, struct got_repository *repo, FILE *outfile)
@@ -448,9 +434,9 @@ diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2,
 }
 
 static const struct got_error *
-diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_entry *te2,
-    const char *label1, const char *label2, int diff_context,
-    struct got_repository *repo, FILE *outfile)
+diff_entry_old_new(const struct got_tree_entry *te1,
+    const struct got_tree_entry *te2, const char *label1, const char *label2,
+    int diff_context, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	int id_match;
@@ -483,9 +469,9 @@ diff_entry_old_new(struct got_tree_entry *te1, struct got_tree_entry *te2,
 }
 
 static const struct got_error *
-diff_entry_new_old(struct got_tree_entry *te2, struct got_tree_entry *te1,
-    const char *label2, int diff_context, struct got_repository *repo,
-    FILE *outfile)
+diff_entry_new_old(const struct got_tree_entry *te2,
+    const struct got_tree_entry *te1, const char *label2, int diff_context,
+    struct got_repository *repo, FILE *outfile)
 {
 	if (te1 != NULL) /* handled by diff_entry_old_new() */
 		return NULL;
@@ -526,9 +512,10 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 
 	do {
 		if (te1) {
-			struct got_tree_entry *te = NULL;
+			const struct got_tree_entry *te = NULL;
 			if (tree2)
-				te = match_entry_by_name(te1, tree2);
+				te = got_object_tree_find_entry(tree2,
+				    te1->name);
 			if (te) {
 				free(l2);
 				l2 = NULL;
@@ -544,9 +531,10 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 		}
 
 		if (te2) {
-			struct got_tree_entry *te = NULL;
+			const struct got_tree_entry *te = NULL;
 			if (tree1)
-				te = match_entry_by_name(te2, tree1);
+				te = got_object_tree_find_entry(tree1,
+				    te2->name);
 			free(l2);
 			if (te) {
 				if (asprintf(&l2, "%s%s%s", label2,
