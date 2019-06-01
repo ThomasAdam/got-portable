@@ -365,6 +365,7 @@ repo_diff_tree(const char *repo_path)
 	struct got_tree_object *tree1;
 	struct got_tree_object *tree2;
 	FILE *outfile;
+	struct got_diff_blob_output_unidiff_arg arg;
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -392,7 +393,10 @@ repo_diff_tree(const char *repo_path)
 	} else
 		outfile = stdout;
 	test_printf("\n");
-	got_diff_tree(tree1, tree2, "", "", 3, repo, outfile);
+	arg.diff_context = 3;
+	arg.outfile = outfile;
+	got_diff_tree(tree1, tree2, "", "", repo,
+	    got_diff_blob_output_unidiff, &arg);
 	test_printf("\n");
 
 	got_object_tree_close(tree1);

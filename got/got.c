@@ -759,6 +759,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	struct got_tree_object *tree1 = NULL, *tree2;
 	struct got_object_qid *qid;
 	char *id_str1 = NULL, *id_str2;
+	struct got_diff_blob_output_unidiff_arg arg;
 
 	err = got_object_open_as_tree(&tree2, repo,
 	    got_object_commit_get_tree_id(commit));
@@ -789,7 +790,10 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		goto done;
 
 	printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
-	err = got_diff_tree(tree1, tree2, "", "", diff_context, repo, stdout);
+	arg.diff_context = diff_context;
+	arg.outfile = stdout;
+	err = got_diff_tree(tree1, tree2, "", "", repo,
+	    got_diff_blob_output_unidiff, &arg);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
