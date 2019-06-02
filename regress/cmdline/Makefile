@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log add rm diff commit cherrypick
+REGRESS_TARGETS=checkout update status log add rm diff commit cherrypick backout
 NOOBJ=Yes
 
 checkout:
