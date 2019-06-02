@@ -1669,8 +1669,6 @@ done:
 struct merge_file_cb_arg {
     struct got_worktree *worktree;
     struct got_fileindex *fileindex;
-    struct got_object_id *commit_id1;
-    struct got_object_id *commit_id2;
     got_worktree_checkout_cb progress_cb;
     void *progress_arg;
     got_worktree_cancel_cb cancel_cb;
@@ -1903,8 +1901,6 @@ got_worktree_merge_files(struct got_worktree *worktree,
 
 	arg.worktree = worktree;
 	arg.fileindex = fileindex;
-	arg.commit_id1 = commit_id1;
-	arg.commit_id2 = commit_id2;
 	arg.progress_cb = progress_cb;
 	arg.progress_arg = progress_arg;
 	arg.cancel_cb = cancel_cb;
