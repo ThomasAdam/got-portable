@@ -28,4 +28,7 @@ commit:
 cherrypick:
 	./cherrypick.sh
 
+backout:
+	./backout.sh
+
 .include <bsd.regress.mk>
