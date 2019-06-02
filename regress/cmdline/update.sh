@@ -1441,7 +1441,7 @@ function test_update_bumps_base_commit_id {
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "M  alpha" > $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1480,7 +1480,7 @@ function test_update_bumps_base_commit_id {
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "M  beta" > $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

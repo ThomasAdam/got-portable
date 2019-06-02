@@ -42,7 +42,7 @@ function test_backout_basic {
 	(cd $testroot/wt && got backout $bad_commit > $testroot/stdout)
 
 	echo "G  alpha" > $testroot/stdout.expected
-	echo "backed out commit $bad_commit" >> $testroot/stdout.expected
+	echo "Backed out commit $bad_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

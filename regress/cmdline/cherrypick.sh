@@ -43,7 +43,7 @@ function test_cherrypick_basic {
 	echo "G  alpha" > $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
 	echo "A  epsilon/new" >> $testroot/stdout.expected
-	echo "merged commit $branch_rev" >> $testroot/stdout.expected
+	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -122,7 +122,7 @@ function test_cherrypick_root_commit {
 	(cd $testroot/wt && got cherrypick $root_commit > $testroot/stdout)
 
 	echo "A  epsilon/new" > $testroot/stdout.expected
-	echo "merged commit $root_commit" >> $testroot/stdout.expected
+	echo "Merged commit $root_commit" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

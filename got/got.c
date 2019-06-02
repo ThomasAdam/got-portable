@@ -2625,7 +2625,7 @@ cmd_commit(int argc, char *argv[])
 	error = got_object_id_str(&id_str, id);
 	if (error)
 		goto done;
-	printf("created commit %s\n", id_str);
+	printf("Created commit %s\n", id_str);
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -2733,7 +2733,7 @@ cmd_cherrypick(int argc, char *argv[])
 		goto done;
 
 	if (did_something)
-		printf("merged commit %s\n", commit_id_str);
+		printf("Merged commit %s\n", commit_id_str);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -2840,7 +2840,7 @@ cmd_backout(int argc, char *argv[])
 		goto done;
 
 	if (did_something)
-		printf("backed out commit %s\n", commit_id_str);
+		printf("Backed out commit %s\n", commit_id_str);
 done:
 	if (commit)
 		got_object_commit_close(commit);

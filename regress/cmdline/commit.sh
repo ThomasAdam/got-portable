@@ -37,7 +37,7 @@ function test_commit_basic {
 	echo "A  new" > $testroot/stdout.expected
 	echo "M  alpha" >> $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -69,7 +69,7 @@ function test_commit_new_subdir {
 	local head_rev=`git_show_head $testroot/repo`
 	echo "A  d/new" > $testroot/stdout.expected
 	echo "A  d/new2" >> $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -97,7 +97,7 @@ function test_commit_subdir {
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "M  epsilon/zeta" >> $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -125,7 +125,7 @@ function test_commit_single_file {
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "M  epsilon/zeta" >> $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -203,7 +203,7 @@ function test_commit_added_subdirs {
 	echo "A  d/f/new3" >> $testroot/stdout.expected
 	echo "A  d/new" >> $testroot/stdout.expected
 	echo "A  d/new2" >> $testroot/stdout.expected
-	echo "created commit $head_rev" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
