@@ -444,6 +444,13 @@ committed with
 or discarded again with
 .Cm got revert .
 .Pp
+.Cm got backout
+will refuse to run if certain preconditions are not met.
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If the work tree already contains files with merge conflicts, these
+conflicts must be resolved first.
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
