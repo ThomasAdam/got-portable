@@ -44,6 +44,20 @@ function git_show_head
 	(cd $repo && git show --no-patch --pretty='format:%H')
 }
 
+function git_show_tree
+{
+	local repo="$1"
+	(cd $repo && git show --no-patch --pretty='format:%T')
+}
+
+function git_commit_tree
+{
+	local repo="$1"
+	local msg="$2"
+	local tree="$3"
+	(cd $repo && git commit-tree -m "$msg" "$tree")
+}
+
 function make_test_tree
 {
 	repo="$1"

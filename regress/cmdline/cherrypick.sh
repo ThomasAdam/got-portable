@@ -93,4 +93,67 @@ function test_cherrypick_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_cherrypick_root_commit {
+	local testroot=`test_init cherrypick_root_commit`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	(cd $testroot/repo && git rm -q alpha)
+	(cd $testroot/repo && git rm -q beta)
+	(cd $testroot/repo && git rm -q epsilon/zeta)
+	(cd $testroot/repo && git rm -q gamma/delta)
+	mkdir -p $testroot/repo/epsilon
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing on newbranch"
+
+	echo "modified new file on branch" >> $testroot/repo/epsilon/new
+	git_commit $testroot/repo -m "committing on newbranch again"
+
+	tree=`git_show_tree $testroot/repo`
+	root_commit=`git_commit_tree $testroot/repo "new root commit" $tree`
+
+	(cd $testroot/wt && got cherrypick $root_commit > $testroot/stdout)
+
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "merged commit $root_commit" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file on branch" > $testroot/content.expected
+	echo "modified new file on branch" >> $testroot/content.expected
+	cat $testroot/wt/epsilon/new > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'A  epsilon/new' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cherrypick_basic
+run_test test_cherrypick_root_commit

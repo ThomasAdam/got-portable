@@ -2699,12 +2699,9 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-	if (pid == NULL) {
-		error = got_error(GOT_ERR_ROOT_COMMIT);
-		goto done;
-	}
-	error = got_worktree_merge_files(worktree, pid->id, commit_id,
-	    repo, update_progress, &did_something, check_cancelled, NULL);
+	error = got_worktree_merge_files(worktree, pid ? pid->id : NULL,
+	    commit_id, repo, update_progress, &did_something, check_cancelled,
+	    NULL);
 	if (error != NULL)
 		goto done;
 

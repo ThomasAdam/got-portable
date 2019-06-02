@@ -1881,17 +1881,19 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id1, repo, commit_id1,
-	    worktree->path_prefix);
-	if (err)
-		goto done;
+	if (commit_id1) {
+		err = got_object_id_by_path(&tree_id1, repo, commit_id1,
+		    worktree->path_prefix);
+		if (err)
+			goto done;
+
+		err = got_object_open_as_tree(&tree1, repo, tree_id1);
+		if (err)
+			goto done;
+	}
 
 	err = got_object_id_by_path(&tree_id2, repo, commit_id2,
 	    worktree->path_prefix);
-	if (err)
-		goto done;
-
-	err = got_object_open_as_tree(&tree1, repo, tree_id1);
 	if (err)
 		goto done;
 
