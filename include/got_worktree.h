@@ -160,13 +160,14 @@ const struct got_error *got_worktree_schedule_add(struct got_worktree *,
     struct got_repository *);
 
 /*
- * Remove a file from disk and schedule it to be deleted in the next commit.
+ * Remove files from disk and schedule them to be deleted in the next commit.
  * Don't allow deleting files with uncommitted modifications, unless the
  * parameter 'delete_local_mods' is set.
  */
 const struct got_error *
-got_worktree_schedule_delete(struct got_worktree *, const char *, int,
-   got_worktree_status_cb, void *, struct got_repository *);
+got_worktree_schedule_delete(struct got_worktree *,
+    struct got_pathlist_head *, int, got_worktree_status_cb, void *,
+    struct got_repository *);
 
 /*
  * Revert a file at the specified path such that it matches its

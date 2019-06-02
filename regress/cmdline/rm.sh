@@ -26,22 +26,37 @@ function test_rm_basic {
 		return 1
 	fi
 
-	echo 'D  beta' > $testroot/stdout.expected
-	(cd $testroot/wt && got rm beta > $testroot/stdout)
+	echo 'D  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	(cd $testroot/wt && got rm alpha beta > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
-	fi
-
-	if [ -e $testroot/wt/beta ]; then
-		echo "removed file beta still exists on disk" >&2
-		test_done "$testroot" "1"
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	test_done "$testroot" "$ret"
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for f in alpha beta; do
+		if [ -e $testroot/wt/$f ]; then
+			echo "removed file $f still exists on disk" >&2
+			test_done "$testroot" "1"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
 }
 
 function test_rm_with_local_mods {

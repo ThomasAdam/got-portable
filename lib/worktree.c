@@ -2263,28 +2263,56 @@ done:
 	return err;
 }
 
+static const struct got_error *
+schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
+    const char *relpath, int delete_local_mods,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_fileindex_entry *ie = NULL;
+	unsigned char status;
+	struct stat sb;
+
+	ie = got_fileindex_entry_get(fileindex, relpath);
+	if (ie == NULL)
+		return got_error(GOT_ERR_BAD_PATH);
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		return err;
+
+	if (status != GOT_STATUS_NO_CHANGE) {
+		if (status == GOT_STATUS_DELETE)
+			return got_error_set_errno(ENOENT, ondisk_path);
+		if (status != GOT_STATUS_MODIFY)
+			return got_error(GOT_ERR_FILE_STATUS);
+		if (!delete_local_mods)
+			return got_error(GOT_ERR_FILE_MODIFIED);
+	}
+
+	if (unlink(ondisk_path) != 0)
+		return got_error_from_errno2("unlink", ondisk_path);
+
+	got_fileindex_entry_mark_deleted_from_disk(ie);
+	return report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
+}
+
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *worktree,
-    const char *ondisk_path, int delete_local_mods,
+    struct got_pathlist_head *ondisk_paths, int delete_local_mods,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
-	struct got_fileindex_entry *ie = NULL;
-	char *relpath, *fileindex_path ;
+	char *fileindex_path = NULL;
 	FILE *index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
-	unsigned char status;
-	struct stat sb;
+	struct got_pathlist_entry *pe;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
-
-	err = got_path_skip_common_ancestor(&relpath,
-	    got_worktree_get_root_path(worktree), ondisk_path);
-	if (err)
-		goto done;
 
 	fileindex = got_fileindex_alloc();
 	if (fileindex == NULL) {
@@ -2309,45 +2337,23 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	ie = got_fileindex_entry_get(fileindex, relpath);
-	if (ie == NULL) {
-		err = got_error(GOT_ERR_BAD_PATH);
-		goto done;
-	}
-
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
-	if (err)
-		goto done;
-
-	if (status != GOT_STATUS_NO_CHANGE) {
-		if (status == GOT_STATUS_DELETE) {
-			err = got_error_set_errno(ENOENT, ondisk_path);
+	TAILQ_FOREACH(pe, ondisk_paths, entry) {
+		char *relpath;
+		err = got_path_skip_common_ancestor(&relpath,
+		    got_worktree_get_root_path(worktree), pe->path);
+		if (err)
 			goto done;
-		}
-		if (status != GOT_STATUS_MODIFY) {
-			err = got_error(GOT_ERR_FILE_STATUS);
+		err = schedule_for_deletion(pe->path, fileindex, relpath,
+		    delete_local_mods, status_cb, status_arg, repo);
+		free(relpath);
+		if (err)
 			goto done;
-		}
-		if (!delete_local_mods) {
-			err = got_error(GOT_ERR_FILE_MODIFIED);
-			goto done;
-		}
 	}
-
-	if (unlink(ondisk_path) != 0) {
-		err = got_error_from_errno2("unlink", ondisk_path);
-		goto done;
-	}
-
-	got_fileindex_entry_mark_deleted_from_disk(ie);
 
 	err = sync_fileindex(fileindex, fileindex_path);
 	if (err)
 		goto done;
-
-	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 done:
-	free(relpath);
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");

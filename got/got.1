@@ -310,8 +310,8 @@ Delete the reference with the specified name from the repository.
 .It Cm add Ar file-path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
-.It Cm rm Ar file-path
-Remove a versioned file from a work tree and schedule it for deletion
+.It Cm rm Ar file-path ...
+Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
 .Pp
 The options for
@@ -319,7 +319,7 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl f
-Perform the operation even if the file contains uncommitted modifications.
+Perform the operation even if a file contains uncommitted modifications.
 .El
 .It Cm revert Ar file-path
 Revert any uncommited changes in the file at the specified path.

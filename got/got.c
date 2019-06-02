@@ -2215,8 +2215,12 @@ cmd_rm(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL, *path = NULL;
-	int ch, delete_local_mods = 0;
+	char *cwd = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	int ch, i, delete_local_mods = 0;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "f")) != -1) {
 		switch (ch) {
@@ -2232,15 +2236,18 @@ cmd_rm(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
+	if (argc < 1)
 		usage_rm();
 
-	path = realpath(argv[0], NULL);
-	if (path == NULL) {
-		error = got_error_from_errno2("realpath", argv[0]);
-		goto done;
+	/* make sure each file exists before doing anything halfway */
+	for (i = 0; i < argc; i++) {
+		char *path = realpath(argv[i], NULL);
+		if (path == NULL) {
+			error = got_error_from_errno2("realpath", argv[i]);
+			goto done;
+		}
+		free(path);
 	}
-	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -2260,8 +2267,22 @@ cmd_rm(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_schedule_delete(worktree, path, delete_local_mods,
-	    print_status, NULL, repo);
+	for (i = 0; i < argc; i++) {
+		char *path = realpath(argv[i], NULL);
+		if (path == NULL) {
+			error = got_error_from_errno2("realpath", argv[i]);
+			goto done;
+		}
+
+		got_path_strip_trailing_slashes(path);
+		error = got_pathlist_insert(&pe, &paths, path, NULL);
+		if (error) {
+			free(path);
+			goto done;
+		}
+	}
+	error = got_worktree_schedule_delete(worktree, &paths,
+	    delete_local_mods, print_status, NULL, repo);
 	if (error)
 		goto done;
 done:
@@ -2269,7 +2290,9 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
-	free(path);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
 	free(cwd);
 	return error;
 }
