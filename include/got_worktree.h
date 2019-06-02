@@ -30,6 +30,7 @@ struct got_commitable;
 #define GOT_STATUS_UNVERSIONED	'?'
 #define GOT_STATUS_OBSTRUCTED	'~'
 #define GOT_STATUS_REVERT	'R'
+#define GOT_STATUS_CANNOT_DELETE 'd'
 
 /*
  * Attempt to initialize a new work tree on disk.

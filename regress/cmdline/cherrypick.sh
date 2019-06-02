@@ -79,6 +79,17 @@ function test_cherrypick_basic {
 		return 1
 	fi
 
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'A  epsilon/new' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
 	test_done "$testroot" "$ret"
 }
 

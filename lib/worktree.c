@@ -1730,8 +1730,44 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    path2);
 			return NULL;
 		}
-		err = delete_blob(a->worktree, a->fileindex, ie, repo,
-		    a->progress_cb, a->progress_arg);
+
+		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+		    path1) == -1)
+			return got_error_from_errno("asprintf");
+
+		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		if (err)
+			goto done;
+
+		switch (status) {
+		case GOT_STATUS_NO_CHANGE:
+			(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
+			    path1);
+			err = remove_ondisk_file(a->worktree->root_path, path1);
+			if (err)
+				goto done;
+			if (ie)
+				got_fileindex_entry_mark_deleted_from_disk(ie);
+			break;
+		case GOT_STATUS_DELETE:
+		case GOT_STATUS_MISSING:
+			(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
+			    path1);
+			if (ie)
+				got_fileindex_entry_mark_deleted_from_disk(ie);
+			break;
+		case GOT_STATUS_ADD:
+		case GOT_STATUS_MODIFY:
+		case GOT_STATUS_CONFLICT:
+			(*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_CANNOT_DELETE, path1);
+			break;
+		case GOT_STATUS_OBSTRUCTED:
+			(*a->progress_cb)(a->progress_arg, status, path1);
+			break;
+		default:
+			break;
+		}
 	} else if (blob2) {
 		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
 		    path2) == -1)
@@ -1769,11 +1805,15 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
-
-			err = update_blob_fileindex_entry(a->worktree,
-			    a->fileindex, NULL, ondisk_path, path2, blob2, 0);
+			err = got_fileindex_entry_alloc(&ie,
+			    ondisk_path, path2, NULL, NULL);
 			if (err)
 				goto done;
+			err = got_fileindex_entry_add(a->fileindex, ie);
+			if (err) {
+				got_fileindex_entry_free(ie);
+				goto done;
+			}
 		}
 	}
 done:
