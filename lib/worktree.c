@@ -1477,6 +1477,34 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	return NULL;
 }
 
+static const struct got_error *
+sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
+{
+	const struct got_error *err = NULL;
+	char *new_fileindex_path = NULL;
+	FILE *new_index = NULL;
+
+	err = got_opentemp_named(&new_fileindex_path, &new_index,
+	    fileindex_path);
+	if (err)
+		goto done;
+
+	err = got_fileindex_write(fileindex, new_index);
+	if (err)
+		goto done;
+
+	if (rename(new_fileindex_path, fileindex_path) != 0) {
+		err = got_error_from_errno3("rename", new_fileindex_path,
+		    fileindex_path);
+		unlink(new_fileindex_path);
+	}
+done:
+	if (new_index)
+		fclose(new_index);
+	free(new_fileindex_path);
+	return err;
+}
+
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
@@ -1486,9 +1514,8 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
-	char *fileindex_path = NULL, *new_fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *new_index = NULL;
+	char *fileindex_path = NULL;
 	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
 	char *relpath = NULL, *entry_name = NULL;
@@ -1503,11 +1530,6 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	 * If the on-disk file index is incomplete we will try to complete it.
 	 */
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		goto done;
-
-	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
 	if (err)
 		goto done;
 
@@ -1627,32 +1649,14 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	}
 
 	/* Try to sync the fileindex back to disk in any case. */
-	err = got_fileindex_write(fileindex, new_index);
-	if (err)
-		goto done;
-
-	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno3("rename", new_fileindex_path,
-		    fileindex_path);
-		unlink(new_fileindex_path);
-		goto done;
-	}
-
-	free(new_fileindex_path);
-	new_fileindex_path = NULL;
-
+	err = sync_fileindex(fileindex, fileindex_path);
 done:
+	free(fileindex_path);
 	free(relpath);
 	if (tree)
 		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
-	if (new_fileindex_path)
-		unlink(new_fileindex_path);
-	if (new_index)
-		fclose(new_index);
-	free(new_fileindex_path);
-	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	if (checkout_err)
 		err = checkout_err;
@@ -1866,8 +1870,11 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
 	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg);
+	if (err)
+		goto done;
+
+	err = sync_fileindex(fileindex, fileindex_path);
 done:
-	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	if (tree1)
 		got_object_tree_close(tree1);
@@ -2140,8 +2147,8 @@ got_worktree_schedule_add(struct got_worktree *worktree,
     struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL, *new_fileindex_path = NULL;
-	FILE *index = NULL, *new_index = NULL;
+	char *fileindex_path = NULL;
+	FILE *index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct got_pathlist_entry *pe;
 
@@ -2204,34 +2211,11 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 			goto done;
 	}
 
-	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
-	if (err)
-		goto done;
-
-	err = got_fileindex_write(fileindex, new_index);
-	if (err)
-		goto done;
-
-	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno3("rename", new_fileindex_path,
-		    fileindex_path);
-		goto done;
-	}
-
-	free(new_fileindex_path);
-	new_fileindex_path = NULL;
-
+	err = sync_fileindex(fileindex, fileindex_path);
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");
-	}
-	if (new_fileindex_path) {
-		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno2("unlink",
-			    new_fileindex_path);
-		free(new_fileindex_path);
 	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
@@ -2249,8 +2233,8 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 {
 	struct got_fileindex *fileindex = NULL;
 	struct got_fileindex_entry *ie = NULL;
-	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
-	FILE *index = NULL, *new_index = NULL;
+	char *relpath, *fileindex_path ;
+	FILE *index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	unsigned char status;
 	struct stat sb;
@@ -2319,23 +2303,9 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 
 	got_fileindex_entry_mark_deleted_from_disk(ie);
 
-	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
+	err = sync_fileindex(fileindex, fileindex_path);
 	if (err)
 		goto done;
-
-	err = got_fileindex_write(fileindex, new_index);
-	if (err)
-		goto done;
-
-	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno3("rename", new_fileindex_path,
-		    fileindex_path);
-		goto done;
-	}
-
-	free(new_fileindex_path);
-	new_fileindex_path = NULL;
 
 	err = report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 done:
@@ -2343,12 +2313,6 @@ done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");
-	}
-	if (new_fileindex_path) {
-		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno2("unlink",
-			    new_fileindex_path);
-		free(new_fileindex_path);
 	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
@@ -2366,9 +2330,9 @@ got_worktree_revert(struct got_worktree *worktree,
 {
 	struct got_fileindex *fileindex = NULL;
 	struct got_fileindex_entry *ie = NULL;
-	char *relpath, *fileindex_path = NULL, *new_fileindex_path = NULL;
+	char *relpath, *fileindex_path = NULL;
 	char *tree_path = NULL, *parent_path, *te_name;
-	FILE *index = NULL, *new_index = NULL;
+	FILE *index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct got_tree_object *tree = NULL;
 	struct got_object_id id, *tree_id = NULL;
@@ -2498,23 +2462,9 @@ got_worktree_revert(struct got_worktree *worktree,
 			goto done;
 	}
 
-	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
+	err = sync_fileindex(fileindex, fileindex_path);
 	if (err)
 		goto done;
-
-	err = got_fileindex_write(fileindex, new_index);
-	if (err)
-		goto done;
-
-	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno3("rename", new_fileindex_path,
-		    fileindex_path);
-		goto done;
-	}
-
-	free(new_fileindex_path);
-	new_fileindex_path = NULL;
 done:
 	free(relpath);
 	free(tree_path);
@@ -2526,12 +2476,6 @@ done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");
-	}
-	if (new_fileindex_path) {
-		if (unlink(new_fileindex_path) != 0 && err == NULL)
-			err = got_error_from_errno2("unlink",
-			    new_fileindex_path);
-		free(new_fileindex_path);
 	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
@@ -3022,19 +2966,13 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
     struct got_object_id *new_base_commit_id, struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	char *fileindex_path = NULL, *new_fileindex_path = NULL;
+	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *new_index = NULL;
 	struct got_pathlist_entry *pe;
 
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		return err;
-
-	err = got_opentemp_named(&new_fileindex_path, &new_index,
-	    fileindex_path);
-	if (err)
-		goto done;
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_fileindex_entry *ie;
@@ -3061,26 +2999,8 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 		}
 	}
 
-	err = got_fileindex_write(fileindex, new_index);
-	if (err)
-		goto done;
-
-	if (rename(new_fileindex_path, fileindex_path) != 0) {
-		err = got_error_from_errno3("rename", new_fileindex_path,
-		    fileindex_path);
-		unlink(new_fileindex_path);
-		goto done;
-	}
-
-	free(new_fileindex_path);
-	new_fileindex_path = NULL;
-
+	err = sync_fileindex(fileindex, fileindex_path);
 done:
-	if (new_fileindex_path)
-		unlink(new_fileindex_path);
-	if (new_index)
-		fclose(new_index);
-	free(new_fileindex_path);
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	return err;
