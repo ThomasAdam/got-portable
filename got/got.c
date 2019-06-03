@@ -2421,6 +2421,7 @@ struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
 	const char *editor;
 	const char *worktree_path;
+	const char *branch_name;
 	const char *repo_path;
 	char *logmsg_path;
 
@@ -2430,7 +2431,7 @@ static const struct got_error *
 collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
     void *arg)
 {
-	const char *initial_content = "\n# changes to be committed:\n";
+	char *initial_content = NULL;
 	struct got_pathlist_entry *pe;
 	const struct got_error *err = NULL;
 	char *template = NULL;
@@ -2452,6 +2453,11 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 
 	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (asprintf(&initial_content,
+	    "\n# changes to be committed on branch %s:\n",
+	    a->branch_name) == -1)
 		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
@@ -2528,6 +2534,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		goto done;
 	}
 done:
+	free(initial_content);
 	free(template);
 
 	/* Editor is done; we can now apply unveil(2) */
@@ -2608,6 +2615,11 @@ cmd_commit(int argc, char *argv[])
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
+	cl_arg.branch_name = got_worktree_get_head_ref_name(worktree);
+	if (strncmp(cl_arg.branch_name, "refs/", 5) == 0)
+		cl_arg.branch_name += 5;
+	if (strncmp(cl_arg.branch_name, "heads/", 6) == 0)
+		cl_arg.branch_name += 6;
 	cl_arg.repo_path = got_repo_get_path(repo);
 	cl_arg.logmsg_path = NULL;
 	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
