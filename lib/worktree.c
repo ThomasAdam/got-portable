@@ -738,21 +738,21 @@ done:
 }
 
 /*
- * Perform a 3-way merge where blob2 acts as the common ancestor,
- * blob1 acts as the first derived version, and the file on disk
+ * Perform a 3-way merge where blob_orig acts as the common ancestor,
+ * blob_deriv acts as the first derived version, and the file on disk
  * acts as the second derived version.
  */
 static const struct got_error *
 merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
-    struct got_blob_object *blob2, const char *ondisk_path,
-    const char *path, uint16_t st_mode, struct got_blob_object *blob1,
+    struct got_blob_object *blob_orig, const char *ondisk_path,
+    const char *path, uint16_t st_mode, struct got_blob_object *blob_deriv,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int merged_fd = -1;
-	FILE *f1 = NULL, *f2 = NULL;
-	char *blob1_path = NULL, *blob2_path = NULL;
+	FILE *f_deriv = NULL, *f_orig = NULL;
+	char *blob_deriv_path = NULL, *blob_orig_path = NULL;
 	char *merged_path = NULL, *base_path = NULL;
 	char *id_str = NULL;
 	char *label1 = NULL;
@@ -773,31 +773,32 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 
 	free(base_path);
-	if (asprintf(&base_path, "%s/got-merge-blob1", parent) == -1) {
+	if (asprintf(&base_path, "%s/got-merge-blob-deriv", parent) == -1) {
 		err = got_error_from_errno("asprintf");
 		base_path = NULL;
 		goto done;
 	}
 
-	err = got_opentemp_named(&blob1_path, &f1, base_path);
+	err = got_opentemp_named(&blob_deriv_path, &f_deriv, base_path);
 	if (err)
 		goto done;
-	err = got_object_blob_dump_to_file(NULL, NULL, f1, blob1);
+	err = got_object_blob_dump_to_file(NULL, NULL, f_deriv, blob_deriv);
 	if (err)
 		goto done;
 
 	free(base_path);
-	if (asprintf(&base_path, "%s/got-merge-blob2", parent) == -1) {
+	if (asprintf(&base_path, "%s/got-merge-blob-orig", parent) == -1) {
 		err = got_error_from_errno("asprintf");
 		base_path = NULL;
 		goto done;
 	}
 
-	err = got_opentemp_named(&blob2_path, &f2, base_path);
+	err = got_opentemp_named(&blob_orig_path, &f_orig, base_path);
 	if (err)
 		goto done;
-	if (blob2) {
-		err = got_object_blob_dump_to_file(NULL, NULL, f2, blob2);
+	if (blob_orig) {
+		err = got_object_blob_dump_to_file(NULL, NULL, f_orig,
+		    blob_orig);
 		if (err)
 			goto done;
 	} else {
@@ -816,8 +817,8 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_merge_diff3(&overlapcnt, merged_fd, blob1_path,
-	    blob2_path, ondisk_path, label1, path);
+	err = got_merge_diff3(&overlapcnt, merged_fd, blob_deriv_path,
+	    blob_orig_path, ondisk_path, label1, path);
 	if (err)
 		goto done;
 
@@ -831,7 +832,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 
 	/* Check if a clean merge has subsumed all local changes. */
 	if (overlapcnt == 0) {
-		err = check_files_equal(local_changes_subsumed, blob1_path,
+		err = check_files_equal(local_changes_subsumed, blob_deriv_path,
 		    merged_path);
 		if (err)
 			goto done;
@@ -852,19 +853,19 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 done:
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f_deriv && fclose(f_deriv) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f_orig && fclose(f_orig) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(merged_path);
 	free(base_path);
-	if (blob1_path) {
-		unlink(blob1_path);
-		free(blob1_path);
+	if (blob_deriv_path) {
+		unlink(blob_deriv_path);
+		free(blob_deriv_path);
 	}
-	if (blob2_path) {
-		unlink(blob2_path);
-		free(blob2_path);
+	if (blob_orig_path) {
+		unlink(blob_orig_path);
+		free(blob_orig_path);
 	}
 	free(id_str);
 	free(label1);
