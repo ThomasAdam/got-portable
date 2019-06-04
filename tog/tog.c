@@ -2083,7 +2083,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 		waddwstr(view->window, wline);
 		if (view_needs_focus_indication(view))
 			wstandend(view->window);
-		if (width < view->ncols)
+		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
 
 		if (max_lines <= 1)
@@ -2109,7 +2109,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			return err;
 		}
 		waddwstr(view->window, wline);
-		if (width < view->ncols)
+		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
@@ -2692,7 +2692,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		wstandend(view->window);
 	free(wline);
 	wline = NULL;
-	if (width < view->ncols)
+	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 
 	if (asprintf(&line, "[%d/%d] %s%s",
@@ -2710,7 +2710,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < view->ncols)
+	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 
 	*eof = 0;
@@ -3436,7 +3436,7 @@ draw_tree_entries(struct tog_view *view,
 		wstandend(view->window);
 	free(wline);
 	wline = NULL;
-	if (width < view->ncols)
+	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
@@ -3446,7 +3446,7 @@ draw_tree_entries(struct tog_view *view,
 	waddwstr(view->window, wline);
 	free(wline);
 	wline = NULL;
-	if (width < view->ncols)
+	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
@@ -3501,7 +3501,7 @@ draw_tree_entries(struct tog_view *view,
 			*selected_entry = te;
 		}
 		waddwstr(view->window, wline);
-		if (width < view->ncols)
+		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
 		if (n == selected && view->focussed)
 			wstandend(view->window);
