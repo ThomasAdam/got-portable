@@ -174,7 +174,8 @@ got_worktree_schedule_delete(struct got_worktree *,
  * original state in the worktree's base commit.
  */
 const struct got_error *got_worktree_revert(struct got_worktree *,
-    const char *, got_worktree_checkout_cb, void *, struct got_repository *);
+    struct got_pathlist_head *, got_worktree_checkout_cb, void *,
+    struct got_repository *);
 
 /*
  * A callback function which is invoked when a commit message is requested.

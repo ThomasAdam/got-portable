@@ -2373,54 +2373,25 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_worktree_revert(struct got_worktree *worktree,
+static const struct got_error *
+revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *ondisk_path,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
     struct got_repository *repo)
 {
-	struct got_fileindex *fileindex = NULL;
-	struct got_fileindex_entry *ie = NULL;
-	char *relpath, *fileindex_path = NULL;
-	char *tree_path = NULL, *parent_path, *te_name;
-	FILE *index = NULL;
-	const struct got_error *err = NULL, *unlockerr = NULL;
+	const struct got_error *err = NULL;
+	char *relpath = NULL, *parent_path = NULL;
+	struct got_fileindex_entry *ie;
 	struct got_tree_object *tree = NULL;
-	struct got_object_id id, *tree_id = NULL;
+	struct got_object_id *tree_id = NULL;
 	const struct got_tree_entry *te;
+	char *tree_path = NULL, *te_name;
 	struct got_blob_object *blob = NULL;
 	unsigned char status;
 	struct stat sb;
 
-	err = lock_worktree(worktree, LOCK_EX);
-	if (err)
-		return err;
-
 	err = got_path_skip_common_ancestor(&relpath,
 	    got_worktree_get_root_path(worktree), ondisk_path);
-	if (err)
-		goto done;
-
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno("got_fileindex_alloc");
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		fileindex_path = NULL;
-		goto done;
-	}
-
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		err = got_error_from_errno2("fopen", fileindex_path);
-		goto done;
-	}
-
-	err = got_fileindex_read(fileindex, index);
 	if (err)
 		goto done;
 
@@ -2435,7 +2406,11 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (err) {
 		if (err->code != GOT_ERR_BAD_PATH)
 			goto done;
-		parent_path = "/";
+		parent_path = strdup("/");
+		if (parent_path == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 	if (got_path_is_root_dir(worktree->path_prefix)) {
 		tree_path = strdup(parent_path);
@@ -2492,7 +2467,8 @@ got_worktree_revert(struct got_worktree *worktree,
 	case GOT_STATUS_DELETE:
 	case GOT_STATUS_MODIFY:
 	case GOT_STATUS_CONFLICT:
-	case GOT_STATUS_MISSING:
+	case GOT_STATUS_MISSING: {
+		struct got_object_id id;
 		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 		err = got_object_open_as_blob(&blob, repo, &id, 8192);
 		if (err)
@@ -2509,21 +2485,73 @@ got_worktree_revert(struct got_worktree *worktree,
 				goto done;
 		}
 		break;
+	}
 	default:
 			goto done;
 	}
-
-	err = sync_fileindex(fileindex, fileindex_path);
-	if (err)
-		goto done;
 done:
 	free(relpath);
+	free(parent_path);
 	free(tree_path);
 	if (blob)
 		got_object_blob_close(blob);
 	if (tree)
 		got_object_tree_close(tree);
 	free(tree_id);
+	return err;
+}
+
+const struct got_error *
+got_worktree_revert(struct got_worktree *worktree,
+    struct got_pathlist_head *ondisk_paths,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    struct got_repository *repo)
+{
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	FILE *index = NULL;
+	const struct got_error *err = NULL, *unlockerr = NULL;
+	const struct got_error *sync_err = NULL;
+	struct got_pathlist_entry *pe;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	fileindex = got_fileindex_alloc();
+	if (fileindex == NULL) {
+		err = got_error_from_errno("got_fileindex_alloc");
+		goto done;
+	}
+
+	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno("asprintf");
+		fileindex_path = NULL;
+		goto done;
+	}
+
+	index = fopen(fileindex_path, "rb");
+	if (index == NULL) {
+		err = got_error_from_errno2("fopen", fileindex_path);
+		goto done;
+	}
+
+	err = got_fileindex_read(fileindex, index);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(pe, ondisk_paths, entry) {
+		err = revert_file(worktree, fileindex, pe->path,
+		    progress_cb, progress_arg, repo);
+		if (err)
+			goto done;
+	}
+
+done:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");

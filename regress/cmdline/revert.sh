@@ -135,6 +135,55 @@ function test_revert_add {
 	test_done "$testroot" "$ret"
 }
 
+function test_revert_multiple {
+	local testroot=`test_init revert_multiple`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
+
+	echo 'R  alpha' > $testroot/stdout.expected
+	echo 'R  epsilon/zeta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got revert alpha epsilon/zeta > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
+run_test test_revert_multiple

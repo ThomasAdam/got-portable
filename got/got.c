@@ -2300,7 +2300,7 @@ done:
 __dead static void
 usage_revert(void)
 {
-	fprintf(stderr, "usage: %s revert file-path\n", getprogname());
+	fprintf(stderr, "usage: %s revert file-path ...\n", getprogname());
 	exit(1);
 }
 
@@ -2319,7 +2319,11 @@ cmd_revert(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
 	char *cwd = NULL, *path = NULL;
-	int ch;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	int ch, i;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -2332,15 +2336,23 @@ cmd_revert(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
+	if (argc < 1)
 		usage_revert();
 
-	path = realpath(argv[0], NULL);
-	if (path == NULL) {
-		error = got_error_from_errno2("realpath", argv[0]);
-		goto done;
+	for (i = 0; i < argc; i++) {
+		char *path = realpath(argv[i], NULL);
+		if (path == NULL) {
+			error = got_error_from_errno2("realpath", argv[i]);
+			goto done;
+		}
+
+		got_path_strip_trailing_slashes(path);
+		error = got_pathlist_insert(&pe, &paths, path, NULL);
+		if (error) {
+			free(path);
+			goto done;
+		}
 	}
-	got_path_strip_trailing_slashes(path);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -2360,7 +2372,7 @@ cmd_revert(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_revert(worktree, path,
+	error = got_worktree_revert(worktree, &paths,
 	    revert_progress, NULL, repo);
 	if (error)
 		goto done;
