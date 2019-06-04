@@ -1510,7 +1510,7 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL, *unlockerr, *checkout_err = NULL;
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
@@ -1519,6 +1519,7 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
 	char *relpath = NULL, *entry_name = NULL;
+	struct bump_base_commit_id_arg bbc_arg;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -1633,23 +1634,21 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	arg.progress_arg = progress_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
-	checkout_err = got_fileindex_diff_tree(fileindex, tree, relpath,
+	err = got_fileindex_diff_tree(fileindex, tree, relpath,
 	    entry_name, repo, &diff_cb, &arg);
+	if (err)
+		goto sync;
 
-	if (checkout_err == NULL) {
-		struct bump_base_commit_id_arg bbc_arg;
-		bbc_arg.base_commit_id = worktree->base_commit_id;
-		bbc_arg.entry_name = entry_name;
-		bbc_arg.path = path;
-		bbc_arg.path_len = strlen(path);
-		err = got_fileindex_for_each_entry_safe(fileindex,
-		    bump_base_commit_id, &bbc_arg);
-		if (err)
-			goto done;
-	}
-
-	/* Try to sync the fileindex back to disk in any case. */
-	err = sync_fileindex(fileindex, fileindex_path);
+	bbc_arg.base_commit_id = worktree->base_commit_id;
+	bbc_arg.entry_name = entry_name;
+	bbc_arg.path = path;
+	bbc_arg.path_len = strlen(path);
+	err = got_fileindex_for_each_entry_safe(fileindex,
+	    bump_base_commit_id, &bbc_arg);
+sync:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
 	free(fileindex_path);
 	free(relpath);
@@ -1658,8 +1657,6 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	got_fileindex_free(fileindex);
-	if (checkout_err)
-		err = checkout_err;
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
@@ -1858,7 +1855,7 @@ got_worktree_merge_files(struct got_worktree *worktree,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL, *unlockerr;
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct merge_file_cb_arg arg;
@@ -1908,10 +1905,9 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
 	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg);
-	if (err)
-		goto done;
-
-	err = sync_fileindex(fileindex, fileindex_path);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
 	got_fileindex_free(fileindex);
 	if (tree1)
@@ -2212,7 +2208,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	FILE *index = NULL;
-	const struct got_error *err = NULL, *unlockerr = NULL;
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
 
 	err = lock_worktree(worktree, LOCK_EX);
@@ -2248,15 +2244,16 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 		err = got_path_skip_common_ancestor(&relpath,
 		    got_worktree_get_root_path(worktree), pe->path);
 		if (err)
-			goto done;
+			break;
 		err = schedule_addition(pe->path, fileindex, relpath,
 		    status_cb, status_arg, repo);
 		free(relpath);
 		if (err)
-			goto done;
+			break;
 	}
-
-	err = sync_fileindex(fileindex, fileindex_path);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
@@ -2314,7 +2311,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	FILE *index = NULL;
-	const struct got_error *err = NULL, *unlockerr = NULL;
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
 
 	err = lock_worktree(worktree, LOCK_EX);
@@ -2349,17 +2346,16 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 		err = got_path_skip_common_ancestor(&relpath,
 		    got_worktree_get_root_path(worktree), pe->path);
 		if (err)
-			goto done;
+			break;
 		err = schedule_for_deletion(pe->path, fileindex, relpath,
 		    delete_local_mods, status_cb, status_arg, repo);
 		free(relpath);
 		if (err)
-			goto done;
+			break;
 	}
-
-	err = sync_fileindex(fileindex, fileindex_path);
-	if (err)
-		goto done;
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
@@ -2545,13 +2541,12 @@ got_worktree_revert(struct got_worktree *worktree,
 		err = revert_file(worktree, fileindex, pe->path,
 		    progress_cb, progress_arg, repo);
 		if (err)
-			goto done;
+			break;
 	}
-
-done:
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
+done:
 	if (index) {
 		if (fclose(index) != 0 && err == NULL)
 			err = got_error_from_errno("fclose");
@@ -3044,7 +3039,7 @@ static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
     struct got_object_id *new_base_commit_id, struct got_worktree *worktree)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *sync_err;
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
 	struct got_pathlist_entry *pe;
@@ -3071,15 +3066,15 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 			    ct->ondisk_path, pe->path, ct->blob_id->sha1,
 			    new_base_commit_id->sha1);
 			if (err)
-				goto done;
+				break;
 			err = got_fileindex_entry_add(fileindex, ie);
 			if (err)
-				goto done;
+				break;
 		}
 	}
-
-	err = sync_fileindex(fileindex, fileindex_path);
-done:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	return err;
