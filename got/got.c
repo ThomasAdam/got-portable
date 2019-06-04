@@ -2205,7 +2205,7 @@ done:
 __dead static void
 usage_rm(void)
 {
-	fprintf(stderr, "usage: %s rm [-f] file-path\n", getprogname());
+	fprintf(stderr, "usage: %s rm [-f] file-path ...\n", getprogname());
 	exit(1);
 }
 
