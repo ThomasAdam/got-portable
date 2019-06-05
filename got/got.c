@@ -1334,6 +1334,14 @@ cmd_diff(int argc, char *argv[])
 	} else if (argc == 2) {
 		id_str1 = argv[0];
 		id_str2 = argv[1];
+		if (worktree && repo_path == NULL) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
 	} else
 		usage_diff();
 
@@ -1353,7 +1361,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (worktree) {
+	if (argc <= 1) {
 		struct print_diff_arg arg;
 		char *id_str;
 		error = got_object_id_str(&id_str,
