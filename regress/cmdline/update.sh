@@ -1427,7 +1427,7 @@ function test_update_to_commit_on_wrong_branch {
 }
 
 function test_update_bumps_base_commit_id {
-	local testroot=`test_init update_to_commit_on_wrong_branch`
+	local testroot=`test_init update_bumps_base_commit_id`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
