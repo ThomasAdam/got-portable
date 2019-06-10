@@ -285,6 +285,10 @@ checkout_progress(void *arg, unsigned char status, const char *path)
 {
 	char *worktree_path = arg;
 
+	/* Base commit bump happens silently. */
+	if (status == GOT_STATUS_BUMP_BASE)
+		return;
+
 	while (path[0] == '/')
 		path++;
 
@@ -567,6 +571,11 @@ update_progress(void *arg, unsigned char status, const char *path)
 		return;
 
 	*did_something = 1;
+
+	/* Base commit bump happens silently. */
+	if (status == GOT_STATUS_BUMP_BASE)
+		return;
+
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);

@@ -31,6 +31,7 @@ struct got_commitable;
 #define GOT_STATUS_OBSTRUCTED	'~'
 #define GOT_STATUS_REVERT	'R'
 #define GOT_STATUS_CANNOT_DELETE 'd'
+#define GOT_STATUS_BUMP_BASE	'b'
 
 /*
  * Attempt to initialize a new work tree on disk.

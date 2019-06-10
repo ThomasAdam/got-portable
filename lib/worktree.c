@@ -1460,6 +1460,8 @@ struct bump_base_commit_id_arg {
 	const char *path;
 	size_t path_len;
 	const char *entry_name;
+	got_worktree_checkout_cb progress_cb;
+	void *progress_arg;
 };
 
 /* Bump base commit ID of all files within an updated part of the work tree. */
@@ -1474,6 +1476,7 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	} else if (!got_path_is_child(ie->path, a->path, a->path_len))
 		return NULL;
 
+	(*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE, ie->path);
 	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
 }
@@ -1644,6 +1647,8 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	bbc_arg.entry_name = entry_name;
 	bbc_arg.path = path;
 	bbc_arg.path_len = strlen(path);
+	bbc_arg.progress_cb = progress_cb;
+	bbc_arg.progress_arg = progress_arg;
 	err = got_fileindex_for_each_entry_safe(fileindex,
 	    bump_base_commit_id, &bbc_arg);
 sync:

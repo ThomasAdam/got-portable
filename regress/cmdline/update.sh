@@ -1470,7 +1470,9 @@ function test_update_bumps_base_commit_id {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	echo "Already up-to-date" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
