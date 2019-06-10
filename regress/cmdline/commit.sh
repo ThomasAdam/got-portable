@@ -120,7 +120,7 @@ function test_commit_single_file {
 	echo "modified alpha" > $testroot/wt/alpha
 	echo "modified zeta" > $testroot/wt/epsilon/zeta
 
-	(cd $testroot/wt && got commit -m 'test commit_subdir' epsilon/zeta \
+	(cd $testroot/wt && got commit -m 'changed zeta' epsilon/zeta \
 		> $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
@@ -269,6 +269,38 @@ function test_commit_rejects_conflicted_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_single_file_multiple {
+	local testroot=`test_init commit_single_file_multiple`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for i in 1 2 3 4; do
+		echo "modified alpha" >> $testroot/wt/alpha
+
+		(cd $testroot/wt && \
+			got commit -m "changed alpha" > $testroot/stdout)
+
+		local head_rev=`git_show_head $testroot/repo`
+		echo "M  alpha" > $testroot/stdout.expected
+		echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -276,3 +308,4 @@ run_test test_commit_single_file
 run_test test_commit_out_of_date
 run_test test_commit_added_subdirs
 run_test test_commit_rejects_conflicted_file
+run_test test_commit_single_file_multiple

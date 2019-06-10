@@ -1429,6 +1429,10 @@ function test_update_to_commit_on_wrong_branch {
 function test_update_bumps_base_commit_id {
 	local testroot=`test_init update_bumps_base_commit_id`
 
+	echo "psi" > $testroot/repo/epsilon/psi
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding another file"
+
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1436,11 +1440,11 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
-	echo "modified alpha" > $testroot/wt/alpha
-	(cd $testroot/wt && got commit -m "changed alpha" > $testroot/stdout)
+	echo "modified psi" > $testroot/wt/epsilon/psi
+	(cd $testroot/wt && got commit -m "changed psi" > $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
-	echo "M  alpha" > $testroot/stdout.expected
+	echo "M  epsilon/psi" > $testroot/stdout.expected
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -1450,8 +1454,8 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
-	echo "modified beta" > $testroot/wt/beta
-	(cd $testroot/wt && got commit -m "changed beta" > $testroot/stdout \
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+	(cd $testroot/wt && got commit -m "changed zeta" > $testroot/stdout \
 		2> $testroot/stderr)
 
 	echo -n "" > $testroot/stdout.expected
@@ -1464,7 +1468,6 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
-	# XXX At present, got requires users to run 'update' after 'commit'.
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "Already up-to-date" > $testroot/stdout.expected
@@ -1476,10 +1479,10 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
-	(cd $testroot/wt && got commit -m "changed beta" > $testroot/stdout)
+	(cd $testroot/wt && got commit -m "changed zeta" > $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
-	echo "M  beta" > $testroot/stdout.expected
+	echo "M  epsilon/zeta" > $testroot/stdout.expected
 	echo "Created commit $head_rev" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
