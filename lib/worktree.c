@@ -1476,6 +1476,10 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	} else if (!got_path_is_child(ie->path, a->path, a->path_len))
 		return NULL;
 
+	if (memcmp(ie->commit_sha1, a->base_commit_id->sha1,
+	    SHA1_DIGEST_LENGTH) == 0)
+		return NULL;
+
 	(*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE, ie->path);
 	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
