@@ -306,7 +306,7 @@ cmd_init(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 	if (argc != 1)
-		usage_checkout();
+		usage_init();
 
 	repo_path = strdup(argv[0]);
 	if (repo_path == NULL)
