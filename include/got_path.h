@@ -101,3 +101,6 @@ void got_path_strip_trailing_slashes(char *);
 
 /* Look up the absolute path of a program in $PATH */
 const struct got_error *got_path_find_prog(char **, const char *);
+
+/* Create a new file at a specified path, with optional content. */
+const struct got_error *got_path_create_file(const char *, const char *);

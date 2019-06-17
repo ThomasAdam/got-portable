@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <libgen.h>
 #include <stdlib.h>
@@ -433,4 +434,31 @@ got_path_find_prog(char **filename, const char *prog)
 	}
 	free(path);
 	return NULL;
+}
+
+const struct got_error *
+got_path_create_file(const char *path, const char *content)
+{
+	const struct got_error *err = NULL;
+	int fd = -1;
+
+	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+	    GOT_DEFAULT_FILE_MODE);
+	if (fd == -1) {
+		err = got_error_from_errno2("open", path);
+		goto done;
+	}
+
+	if (content) {
+		int len = dprintf(fd, "%s\n", content);
+		if (len != strlen(content) + 1) {
+			err = got_error_from_errno("dprintf");
+			goto done;
+		}
+	}
+
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
 }

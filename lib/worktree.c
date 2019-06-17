@@ -63,32 +63,11 @@ create_meta_file(const char *path_got, const char *name, const char *content)
 {
 	const struct got_error *err = NULL;
 	char *path;
-	int fd = -1;
 
-	if (asprintf(&path, "%s/%s", path_got, name) == -1) {
-		err = got_error_from_errno("asprintf");
-		path = NULL;
-		goto done;
-	}
+	if (asprintf(&path, "%s/%s", path_got, name) == -1)
+		return got_error_from_errno("asprintf");
 
-	fd = open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
-	    GOT_DEFAULT_FILE_MODE);
-	if (fd == -1) {
-		err = got_error_from_errno2("open", path);
-		goto done;
-	}
-
-	if (content) {
-		int len = dprintf(fd, "%s\n", content);
-		if (len != strlen(content) + 1) {
-			err = got_error_from_errno("dprintf");
-			goto done;
-		}
-	}
-
-done:
-	if (fd != -1 && close(fd) == -1 && err == NULL)
-		err = got_error_from_errno("close");
+	err = got_path_create_file(path, content);
 	free(path);
 	return err;
 }

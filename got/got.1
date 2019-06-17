@@ -60,6 +60,12 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width checkout
+.It Cm init Ar path
+Create a new empty repository at the specified
+.Ar path .
+If
+.Ar path
+already exists, it must be an empty directory.
 .It Cm checkout [ Fl b Ar branch ] [ Fl c Ar commit ] [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
 Copy files from a repository into a new work tree.
 If the

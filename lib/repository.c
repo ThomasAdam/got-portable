@@ -819,3 +819,59 @@ got_repo_get_cached_pack(struct got_repository *repo, const char *path_packfile)
 
 	return NULL;
 }
+
+const struct got_error *
+got_repo_init(const char *repo_path)
+{
+	const struct got_error *err = NULL;
+	const char *dirnames[] = {
+		GOT_OBJECTS_DIR,
+		GOT_OBJECTS_PACK_DIR,
+		GOT_REFS_DIR,
+	};
+	const char *description_str = "Unnamed repository; "
+	    "edit this file 'description' to name the repository.";
+	const char *headref_str = "ref: refs/heads/master";
+	const char *gitconfig_str = "[core]\n"
+	    "\trepositoryformatversion = 0\n"
+	    "\tfilemode = true\n"
+	    "\tbare = true\n";
+	char *path;
+	int i;
+
+	if (!got_path_dir_is_empty(repo_path))
+		return got_error(GOT_ERR_DIR_NOT_EMPTY);
+
+	for (i = 0; i < nitems(dirnames); i++) {
+		if (asprintf(&path, "%s/%s", repo_path, dirnames[i]) == -1) {
+			return got_error_from_errno("asprintf");
+		}
+		err = got_path_mkdir(path);
+		free(path);
+		if (err)
+			return err;
+	}
+
+	if (asprintf(&path, "%s/%s", repo_path, "description") == -1)
+		return got_error_from_errno("asprintf");
+	err = got_path_create_file(path, description_str);
+	free(path);
+	if (err)
+		return err;
+
+	if (asprintf(&path, "%s/%s", repo_path, GOT_HEAD_FILE) == -1)
+		return got_error_from_errno("asprintf");
+	err = got_path_create_file(path, headref_str);
+	free(path);
+	if (err)
+		return err;
+
+	if (asprintf(&path, "%s/%s", repo_path, "config") == -1)
+		return got_error_from_errno("asprintf");
+	err = got_path_create_file(path, gitconfig_str);
+	free(path);
+	if (err)
+		return err;
+
+	return NULL;
+}
