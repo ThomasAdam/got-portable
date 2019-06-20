@@ -36,6 +36,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <libgen.h>
+#include <regex.h>
 
 #include "got_error.h"
 #include "got_object.h"
@@ -158,6 +159,9 @@ struct tog_log_view_state {
 	sig_atomic_t quit;
 	pthread_t thread;
 	struct tog_log_thread_args thread_args;
+
+	regex_t regex;
+	struct commit_queue_entry *matched_entry;
 };
 
 struct tog_blame_cb_args {
@@ -271,6 +275,11 @@ struct tog_view {
 	const struct got_error *(*input)(struct tog_view **,
 	    struct tog_view **, struct tog_view**, struct tog_view *, int);
 	const struct got_error *(*close)(struct tog_view *);
+
+	const struct got_error *(*search_start)(struct tog_view *);
+	const struct got_error *(*search_next)(struct tog_view *);
+	int searching;
+	int search_next_done;
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
@@ -288,6 +297,8 @@ static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_log_view(struct tog_view *);
+static const struct got_error *search_start_log_view(struct tog_view *);
+static const struct got_error *search_next_log_view(struct tog_view *);
 
 static const struct got_error *open_blame_view(struct tog_view *, char *,
     struct got_object_id *, struct got_reflist_head *, struct got_repository *);
@@ -522,6 +533,21 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	*dead = NULL;
 	*focus = NULL;
 
+	if (view->searching && !view->search_next_done) {
+		errcode = pthread_mutex_unlock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
+		pthread_yield();
+		errcode = pthread_mutex_lock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
+		view->search_next(view);
+		nodelay(stdscr, TRUE);
+		return NULL;
+	}
+
 	nodelay(stdscr, FALSE);
 	/* Allow threads to make progress while we are waiting for input. */
 	errcode = pthread_mutex_unlock(&tog_mutex);
@@ -594,6 +620,19 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		}
 		break;
 	case KEY_RESIZE:
+		break;
+	case '/':
+		if (view->search_start)
+			view->search_start(view);
+		else
+			err = view->input(new, dead, focus, view, ch);
+		break;
+	case 'n':
+		if (view->search_next && view->searching) {
+			view->search_next_done = 0;
+			view->search_next(view);
+		} else
+			err = view->input(new, dead, focus, view, ch);
 		break;
 	default:
 		err = view->input(new, dead, focus, view, ch);
@@ -1136,8 +1175,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 {
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *entry;
-	int ncommits, width;
-	int author_cols = 10;
+	int width;
+	int ncommits, author_cols = 10;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
@@ -1153,7 +1192,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		ncommits++;
 	}
 
-	if (*selected) {
+	if (*selected && !(view->searching && view->search_next_done == 0)) {
 		err = got_object_id_str(&id_str, (*selected)->id);
 		if (err)
 			return err;
@@ -1169,7 +1208,9 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 
 	if (asprintf(&ncommits_str, " [%d/%d] %s",
 	    entry ? entry->idx + 1 : 0, commits->ncommits,
-	    commits_needed > 0 ? "loading... " :
+	    commits_needed > 0 ?
+	    (view->searching && view->search_next_done == 0
+	    ? "searching..." : "loading... ") :
 	    (refs_str ? refs_str : "")) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -1244,7 +1285,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (ncommits == selected_idx)
 			wstandend(view->window);
 		if (err)
-			break;
+			goto done;
 		ncommits++;
 		*last = entry;
 		entry = TAILQ_NEXT(entry, entry);
@@ -1625,6 +1666,120 @@ close_log_view(struct tog_view *view)
 }
 
 static const struct got_error *
+search_start_log_view(struct tog_view *view)
+{
+	struct tog_log_view_state *s = &view->state.log;
+	char pattern[1024];
+	int ret;
+
+	if (view->nlines < 1)
+		return NULL;
+
+	mvwaddstr(view->window, view->begin_y + view->nlines - 1,
+	    view->begin_x, "/");
+	wclrtoeol(view->window);
+
+	nocbreak();
+	echo();
+	ret = wgetnstr(view->window, pattern, sizeof(pattern));
+	cbreak();
+	noecho();
+	if (ret == ERR)
+		return NULL;
+
+	if (view->searching) {
+		regfree(&s->regex);
+		view->searching = 0;
+	}
+
+	s->matched_entry = NULL;
+	if (regcomp(&s->regex, pattern, REG_EXTENDED | REG_ICASE) == 0) {
+		view->searching = 1;
+		view->search_next_done = 0;
+		view->search_next(view);
+	}
+
+	return NULL;
+}
+
+static int
+match_commit(struct got_commit_object *commit, regex_t *regex)
+{
+	regmatch_t regmatch;
+
+	if (regexec(regex, got_object_commit_get_author(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, got_object_commit_get_committer(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, got_object_commit_get_logmsg(commit), 1,
+	    &regmatch, 0) == 0)
+		return 1;
+
+	return 0;
+}
+
+static const struct got_error *
+search_next_log_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_log_view_state *s = &view->state.log;
+	struct commit_queue_entry *entry;
+
+	if (!view->searching) {
+		view->search_next_done = 1;
+		return NULL;
+	}
+
+	if (s->matched_entry)
+		entry = TAILQ_NEXT(s->matched_entry, entry);
+	else
+		entry = TAILQ_FIRST(&s->commits.head);
+
+	while (1) {
+		if (entry == NULL) {
+			if (s->thread_args.log_complete) {
+				if (s->matched_entry == NULL) {
+					view->search_next_done = 1;
+					return NULL;
+				} else
+					entry = TAILQ_FIRST(&s->commits.head);
+			} else {
+				s->thread_args.commits_needed = 1;
+				return trigger_log_thread(0,
+				    &s->thread_args.commits_needed,
+				    &s->thread_args.log_complete,
+				    &s->thread_args.need_commits);
+			}
+		}
+
+		if (match_commit(entry->commit, &s->regex)) {
+			view->search_next_done = 1;
+			break;
+		}
+		entry = TAILQ_NEXT(entry, entry);
+	}
+
+	if (entry) {
+		s->matched_entry = entry;
+		/* XXX This walks the whole list one step at a time... FIXME */
+		s->selected = 0;
+		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
+		s->selected_entry = TAILQ_FIRST(&s->commits.head);
+		while (s->selected_entry != s->matched_entry) {
+			err = input_log_view(NULL, NULL, NULL, view, KEY_DOWN);
+			if (err)
+				return err;
+			err = show_log_view(view);
+			if (err)
+				return err;
+		}
+	}
+
+	return NULL;
+}
+
+
+static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_reflist_head *refs, struct got_repository *repo,
     const char *path, int check_disk)
@@ -1654,6 +1809,8 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->show = show_log_view;
 	view->input = input_log_view;
 	view->close = close_log_view;
+	view->search_start = search_start_log_view;
+	view->search_next = search_next_log_view;
 
 	err = got_repo_open(&thread_repo, got_repo_get_path(repo));
 	if (err)
