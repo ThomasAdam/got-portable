@@ -279,6 +279,8 @@ struct tog_view {
 	const struct got_error *(*search_start)(struct tog_view *);
 	const struct got_error *(*search_next)(struct tog_view *);
 	int searching;
+#define TOG_SEARCH_FORWARD	1
+#define TOG_SEARCH_BACKWARD	2
 	int search_next_done;
 };
 
@@ -627,8 +629,11 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		else
 			err = view->input(new, dead, focus, view, ch);
 		break;
+	case 'N':
 	case 'n':
 		if (view->search_next && view->searching) {
+			view->searching = (ch == 'n' ?
+			    TOG_SEARCH_FORWARD : TOG_SEARCH_BACKWARD);
 			view->search_next_done = 0;
 			view->search_next(view);
 		} else
@@ -1694,7 +1699,7 @@ search_start_log_view(struct tog_view *view)
 
 	s->matched_entry = NULL;
 	if (regcomp(&s->regex, pattern, REG_EXTENDED | REG_ICASE) == 0) {
-		view->searching = 1;
+		view->searching = TOG_SEARCH_FORWARD;
 		view->search_next_done = 0;
 		view->search_next(view);
 	}
@@ -1730,9 +1735,13 @@ search_next_log_view(struct tog_view *view)
 		return NULL;
 	}
 
-	if (s->matched_entry)
-		entry = TAILQ_NEXT(s->matched_entry, entry);
-	else
+	if (s->matched_entry) {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			entry = TAILQ_NEXT(s->matched_entry, entry);
+		else
+			entry = TAILQ_PREV(s->matched_entry,
+			    commit_queue_head, entry);
+	} else
 		entry = TAILQ_FIRST(&s->commits.head);
 
 	while (1) {
@@ -1741,8 +1750,12 @@ search_next_log_view(struct tog_view *view)
 				if (s->matched_entry == NULL) {
 					view->search_next_done = 1;
 					return NULL;
-				} else
+				}
+				if (view->searching == TOG_SEARCH_FORWARD)
 					entry = TAILQ_FIRST(&s->commits.head);
+				else
+					entry = TAILQ_LAST(&s->commits.head,
+					    commit_queue_head);
 			} else {
 				s->thread_args.commits_needed = 1;
 				return trigger_log_thread(0,
@@ -1756,7 +1769,10 @@ search_next_log_view(struct tog_view *view)
 			view->search_next_done = 1;
 			break;
 		}
-		entry = TAILQ_NEXT(entry, entry);
+		if (view->searching == TOG_SEARCH_FORWARD)
+			entry = TAILQ_NEXT(entry, entry);
+		else
+			entry = TAILQ_PREV(entry, commit_queue_head, entry);
 	}
 
 	if (entry) {
