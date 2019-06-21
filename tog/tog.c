@@ -1771,6 +1771,7 @@ search_next_log_view(struct tog_view *view)
 
 		if (match_commit(entry->commit, &s->regex)) {
 			view->search_next_done = 1;
+			s->matched_entry = entry;
 			break;
 		}
 		if (view->searching == TOG_SEARCH_FORWARD)
@@ -1779,9 +1780,8 @@ search_next_log_view(struct tog_view *view)
 			entry = TAILQ_PREV(entry, commit_queue_head, entry);
 	}
 
-	if (entry) {
+	if (s->matched_entry) {
 		int cur = s->selected_entry->idx;
-		s->matched_entry = entry;
 		while (cur < s->matched_entry->idx) {
 			err = input_log_view(NULL, NULL, NULL, view, KEY_DOWN);
 			if (err)
