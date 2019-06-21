@@ -546,7 +546,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 			return got_error_set_errno(errcode,
 			    "pthread_mutex_lock");
 		view->search_next(view);
-		nodelay(stdscr, TRUE);
 		return NULL;
 	}
 
