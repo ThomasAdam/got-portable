@@ -1698,7 +1698,8 @@ search_start_log_view(struct tog_view *view)
 	}
 
 	s->matched_entry = NULL;
-	if (regcomp(&s->regex, pattern, REG_EXTENDED | REG_ICASE) == 0) {
+	if (regcomp(&s->regex, pattern,
+	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
 		view->searching = TOG_SEARCH_FORWARD;
 		view->search_next_done = 0;
 		view->search_next(view);
