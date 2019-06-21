@@ -159,7 +159,6 @@ struct tog_log_view_state {
 	sig_atomic_t quit;
 	pthread_t thread;
 	struct tog_log_thread_args thread_args;
-
 	regex_t regex;
 	struct commit_queue_entry *matched_entry;
 };
