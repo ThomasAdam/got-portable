@@ -1760,18 +1760,19 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	if (entry) {
+		int cur = s->selected_entry->idx;
 		s->matched_entry = entry;
-		/* XXX This walks the whole list one step at a time... FIXME */
-		s->selected = 0;
-		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
-		s->selected_entry = TAILQ_FIRST(&s->commits.head);
-		while (s->selected_entry != s->matched_entry) {
+		while (cur < s->matched_entry->idx) {
 			err = input_log_view(NULL, NULL, NULL, view, KEY_DOWN);
 			if (err)
 				return err;
-			err = show_log_view(view);
+			cur++;
+		}
+		while (cur > s->matched_entry->idx) {
+			err = input_log_view(NULL, NULL, NULL, view, KEY_UP);
 			if (err)
 				return err;
+			cur--;
 		}
 	}
 
