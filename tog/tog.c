@@ -1738,9 +1738,9 @@ search_next_log_view(struct tog_view *view)
 
 	if (s->matched_entry) {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			entry = TAILQ_NEXT(s->matched_entry, entry);
+			entry = TAILQ_NEXT(s->selected_entry, entry);
 		else
-			entry = TAILQ_PREV(s->matched_entry,
+			entry = TAILQ_PREV(s->selected_entry,
 			    commit_queue_head, entry);
 	} else {
 		if (view->searching == TOG_SEARCH_FORWARD)
