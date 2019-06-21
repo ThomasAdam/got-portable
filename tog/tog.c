@@ -1904,10 +1904,9 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		if (s->selected > 0)
 			s->selected--;
-		if (s->selected > 0)
-			break;
-		scroll_up(view, &s->first_displayed_entry, 1,
-		    &s->commits);
+		else
+			scroll_up(view, &s->first_displayed_entry, 1,
+			    &s->commits);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
