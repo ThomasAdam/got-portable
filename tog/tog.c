@@ -159,7 +159,6 @@ struct tog_log_view_state {
 	sig_atomic_t quit;
 	pthread_t thread;
 	struct tog_log_thread_args thread_args;
-	regex_t regex;
 	struct commit_queue_entry *matched_entry;
 };
 
@@ -281,6 +280,7 @@ struct tog_view {
 #define TOG_SEARCH_FORWARD	1
 #define TOG_SEARCH_BACKWARD	2
 	int search_next_done;
+	regex_t regex;
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
@@ -1691,12 +1691,12 @@ search_start_log_view(struct tog_view *view)
 		return NULL;
 
 	if (view->searching) {
-		regfree(&s->regex);
+		regfree(&view->regex);
 		view->searching = 0;
 	}
 
 	s->matched_entry = NULL;
-	if (regcomp(&s->regex, pattern,
+	if (regcomp(&view->regex, pattern,
 	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
 		view->searching = TOG_SEARCH_FORWARD;
 		view->search_next_done = 0;
@@ -1768,7 +1768,7 @@ search_next_log_view(struct tog_view *view)
 			}
 		}
 
-		if (match_commit(entry->commit, &s->regex)) {
+		if (match_commit(entry->commit, &view->regex)) {
 			view->search_next_done = 1;
 			s->matched_entry = entry;
 			break;
