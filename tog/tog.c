@@ -522,6 +522,43 @@ tog_resizeterm(void)
 }
 
 static const struct got_error *
+view_search_start(struct tog_view *view)
+{
+	char pattern[1024];
+	int ret;
+
+	if (view->nlines < 1)
+		return NULL;
+
+	mvwaddstr(view->window, view->begin_y + view->nlines - 1,
+	    view->begin_x, "/");
+	wclrtoeol(view->window);
+
+	nocbreak();
+	echo();
+	ret = wgetnstr(view->window, pattern, sizeof(pattern));
+	cbreak();
+	noecho();
+	if (ret == ERR)
+		return NULL;
+
+	if (view->searching) {
+		regfree(&view->regex);
+		view->searching = 0;
+	}
+
+	if (regcomp(&view->regex, pattern,
+	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
+		view->search_start(view);
+		view->searching = TOG_SEARCH_FORWARD;
+		view->search_next_done = 0;
+		view->search_next(view);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 view_input(struct tog_view **new, struct tog_view **dead,
     struct tog_view **focus, int *done, struct tog_view *view,
     struct tog_view_list_head *views)
@@ -623,7 +660,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		break;
 	case '/':
 		if (view->search_start)
-			view->search_start(view);
+			view_search_start(view);
 		else
 			err = view->input(new, dead, focus, view, ch);
 		break;
@@ -1672,37 +1709,8 @@ static const struct got_error *
 search_start_log_view(struct tog_view *view)
 {
 	struct tog_log_view_state *s = &view->state.log;
-	char pattern[1024];
-	int ret;
-
-	if (view->nlines < 1)
-		return NULL;
-
-	mvwaddstr(view->window, view->begin_y + view->nlines - 1,
-	    view->begin_x, "/");
-	wclrtoeol(view->window);
-
-	nocbreak();
-	echo();
-	ret = wgetnstr(view->window, pattern, sizeof(pattern));
-	cbreak();
-	noecho();
-	if (ret == ERR)
-		return NULL;
-
-	if (view->searching) {
-		regfree(&view->regex);
-		view->searching = 0;
-	}
 
 	s->matched_entry = NULL;
-	if (regcomp(&view->regex, pattern,
-	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
-		view->searching = TOG_SEARCH_FORWARD;
-		view->search_next_done = 0;
-		view->search_next(view);
-	}
-
 	return NULL;
 }
 
