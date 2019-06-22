@@ -237,6 +237,16 @@ Move back to the parent directory.
 Show object IDs for all objects displayed in the
 .Cm tree
 view.
+.It Cm /
+Prompt for a search pattern and start searching for matching tree entries.
+The search pattern is an extended regular expression which is matched
+against the tree entry's name.
+Regular expression syntax is documented in
+.Xr re_format 7 .
+.It Cm n
+Find the next tree entry which matches the current search pattern.
+.It Cm N
+Find the previous tree entry which matches the current search pattern.
 .El
 .Pp
 The options for
