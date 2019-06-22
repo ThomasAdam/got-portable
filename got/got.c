@@ -70,7 +70,6 @@ struct cmd {
 	const char	 *cmd_name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void		(*cmd_usage)(void);
-	const char	 *cmd_descr;
 };
 
 __dead static void	usage(void);
@@ -107,36 +106,21 @@ static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 
 static struct cmd got_commands[] = {
-	{ "init",	cmd_init,	usage_init,
-	    "create a new empty repository" },
-	{ "checkout",	cmd_checkout,	usage_checkout,
-	    "check out a new work tree from a repository" },
-	{ "update",	cmd_update,	usage_update,
-	    "update a work tree to a different commit" },
-	{ "log",	cmd_log,	usage_log,
-	    "show repository history" },
-	{ "diff",	cmd_diff,	usage_diff,
-	    "compare files and directories" },
-	{ "blame",	cmd_blame,	usage_blame,
-	    "show when lines in a file were changed" },
-	{ "tree",	cmd_tree,	usage_tree,
-	    "list files and directories in repository" },
-	{ "status",	cmd_status,	usage_status,
-	    "show modification status of files" },
-	{ "ref",	cmd_ref,	usage_ref,
-	    "manage references in repository" },
-	{ "add",	cmd_add,	usage_add,
-	    "add new files to version control" },
-	{ "rm",		cmd_rm,		usage_rm,
-	    "remove a versioned file" },
-	{ "revert",	cmd_revert,	usage_revert,
-	    "revert uncommitted changes" },
-	{ "commit",	cmd_commit,	usage_commit,
-	    "write changes from work tree to repository" },
-	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick,
-	    "merge a single commit from another branch into a work tree" },
-	{ "backout",	cmd_backout,	usage_backout,
-	    "reverse-merge changes from a commit into a work tree" },
+	{ "init",	cmd_init,	usage_init },
+	{ "checkout",	cmd_checkout,	usage_checkout },
+	{ "update",	cmd_update,	usage_update },
+	{ "log",	cmd_log,	usage_log },
+	{ "diff",	cmd_diff,	usage_diff },
+	{ "blame",	cmd_blame,	usage_blame },
+	{ "tree",	cmd_tree,	usage_tree },
+	{ "status",	cmd_status,	usage_status },
+	{ "ref",	cmd_ref,	usage_ref },
+	{ "add",	cmd_add,	usage_add },
+	{ "rm",		cmd_rm,		usage_rm },
+	{ "revert",	cmd_revert,	usage_revert },
+	{ "commit",	cmd_commit,	usage_commit },
+	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick },
+	{ "backout",	cmd_backout,	usage_backout },
 };
 
 int
@@ -197,14 +181,7 @@ main(int argc, char *argv[])
 __dead static void
 usage(void)
 {
-	int i;
-
-	fprintf(stderr, "usage: %s [-h] command [arg ...]\n\n"
-	    "Available commands:\n", getprogname());
-	for (i = 0; i < nitems(got_commands); i++) {
-		struct cmd *cmd = &got_commands[i];
-		fprintf(stderr, "    %s: %s\n", cmd->cmd_name, cmd->cmd_descr);
-	}
+	fprintf(stderr, "usage: %s [-h] command [arg ...]\n", getprogname());
 	exit(1);
 }
 

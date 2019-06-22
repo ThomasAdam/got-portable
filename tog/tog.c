@@ -69,7 +69,6 @@ struct tog_cmd {
 	const char *name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void (*cmd_usage)(void);
-	const char *descr;
 };
 
 __dead static void	usage(void);
@@ -84,14 +83,10 @@ static const struct got_error*	cmd_blame(int, char *[]);
 static const struct got_error*	cmd_tree(int, char *[]);
 
 static struct tog_cmd tog_commands[] = {
-	{ "log",	cmd_log,	usage_log,
-	    "show repository history" },
-	{ "diff",	cmd_diff,	usage_diff,
-	    "compare files and directories" },
-	{ "blame",	cmd_blame,	usage_blame,
-	    "show line-by-line file history" },
-	{ "tree",	cmd_tree,	usage_tree,
-	    "browse trees in repository" },
+	{ "log",	cmd_log,	usage_log },
+	{ "diff",	cmd_diff,	usage_diff },
+	{ "blame",	cmd_blame,	usage_blame },
+	{ "tree",	cmd_tree,	usage_tree },
 };
 
 enum tog_view_type {
@@ -4332,14 +4327,7 @@ done:
 __dead static void
 usage(void)
 {
-	int i;
-
-	fprintf(stderr, "usage: %s [-h] [command] [arg ...]\n\n"
-	    "Available commands:\n", getprogname());
-	for (i = 0; i < nitems(tog_commands); i++) {
-		struct tog_cmd *cmd = &tog_commands[i];
-		fprintf(stderr, "    %s: %s\n", cmd->name, cmd->descr);
-	}
+	fprintf(stderr, "usage: %s [-h] [command] [arg ...]\n", getprogname());
 	exit(1);
 }
 
