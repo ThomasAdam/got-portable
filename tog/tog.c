@@ -228,6 +228,7 @@ struct tog_tree_view_state {
 	struct got_object_id *commit_id;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
+	struct got_tree_entry *matched_entry;
 };
 
 /*
@@ -315,6 +316,8 @@ static const struct got_error *show_tree_view(struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_tree_view(struct tog_view *);
+static const struct got_error *search_start_tree_view(struct tog_view *);
+static const struct got_error *search_next_tree_view(struct tog_view *);
 
 static volatile sig_atomic_t tog_sigwinch_received;
 
@@ -524,6 +527,7 @@ tog_resizeterm(void)
 static const struct got_error *
 view_search_start(struct tog_view *view)
 {
+	const struct got_error *err = NULL;
 	char pattern[1024];
 	int ret;
 
@@ -549,7 +553,11 @@ view_search_start(struct tog_view *view)
 
 	if (regcomp(&view->regex, pattern,
 	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
-		view->search_start(view);
+		err = view->search_start(view);
+		if (err) {
+			regfree(&view->regex);
+			return err;
+		}
 		view->searching = TOG_SEARCH_FORWARD;
 		view->search_next_done = 0;
 		view->search_next(view);
@@ -1805,7 +1813,6 @@ search_next_log_view(struct tog_view *view)
 
 	return NULL;
 }
-
 
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
@@ -3889,6 +3896,8 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	view->show = show_tree_view;
 	view->input = input_tree_view;
 	view->close = close_tree_view;
+	view->search_start = search_start_tree_view;
+	view->search_next = search_next_tree_view;
 done:
 	free(commit_id_str);
 	if (err) {
@@ -3917,6 +3926,103 @@ close_tree_view(struct tog_view *view)
 	if (s->tree != s->root)
 		got_object_tree_close(s->tree);
 	got_object_tree_close(s->root);
+
+	return NULL;
+}
+
+static const struct got_error *
+search_start_tree_view(struct tog_view *view)
+{
+	struct tog_tree_view_state *s = &view->state.tree;
+
+	s->matched_entry = NULL;
+	return NULL;
+}
+
+static int
+match_tree_entry(struct got_tree_entry *te, regex_t *regex)
+{
+	regmatch_t regmatch;
+
+	return regexec(regex, te->name, 1, &regmatch, 0) == 0;
+}
+
+static const struct got_error *
+search_next_tree_view(struct tog_view *view)
+{
+	struct tog_tree_view_state *s = &view->state.tree;
+	struct got_tree_entry *entry, *te;
+
+	if (!view->searching) {
+		view->search_next_done = 1;
+		return NULL;
+	}
+
+	if (s->matched_entry) {
+		if (view->searching == TOG_SEARCH_FORWARD) {
+			if (s->selected_entry)
+				entry = SIMPLEQ_NEXT(s->selected_entry, entry);
+			else
+				entry = SIMPLEQ_FIRST(&s->entries->head);
+		}
+		else {
+			if (s->selected_entry == NULL) {
+				SIMPLEQ_FOREACH(te, &s->entries->head, entry)
+					entry = te;
+			} else {
+				SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
+					entry = te;
+					if (SIMPLEQ_NEXT(te, entry) ==
+					    s->selected_entry)
+						break;
+				}
+			}
+		}
+	} else {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			entry = SIMPLEQ_FIRST(&s->entries->head);
+		else {
+			SIMPLEQ_FOREACH(te, &s->entries->head, entry)
+				entry = te;
+		}
+	}
+
+	while (1) {
+		if (entry == NULL) {
+			if (view->searching == TOG_SEARCH_FORWARD)
+				entry = SIMPLEQ_FIRST(&s->entries->head);
+			else {
+				SIMPLEQ_FOREACH(te, &s->entries->head, entry)
+					entry = te;
+			}
+		}
+
+		if (match_tree_entry(entry, &view->regex)) {
+			view->search_next_done = 1;
+			s->matched_entry = entry;
+			break;
+		}
+
+		if (view->searching == TOG_SEARCH_FORWARD)
+			entry = SIMPLEQ_NEXT(entry, entry);
+		else {
+			if (SIMPLEQ_FIRST(&s->entries->head) == entry)
+				entry = NULL;
+			else {
+				SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
+					if (SIMPLEQ_NEXT(te, entry) == entry) {
+						entry = te;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if (s->matched_entry) {
+		s->first_displayed_entry = s->matched_entry;
+		s->selected = 0;
+	}
 
 	return NULL;
 }
