@@ -40,6 +40,7 @@
 struct got_blame_line {
 	int annotated;
 	struct got_object_id id;
+	off_t offset;
 };
 
 struct got_blame_diff_offsets {
@@ -52,9 +53,11 @@ SLIST_HEAD(got_blame_diff_offsets_list, got_blame_diff_offsets);
 
 struct got_blame {
 	FILE *f;
+	size_t filesize;
 	int nlines;
 	int nannotated;
 	struct got_blame_line *lines; /* one per line */
+	off_t *line_offsets;		/* one per line */
 	int ncommits;
 	struct got_blame_diff_offsets_list diff_offsets_list;
 };
@@ -329,8 +332,8 @@ blame_open(struct got_blame **blamep, const char *path,
 		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-	err = got_object_blob_dump_to_file(NULL, &blame->nlines, blame->f,
-	    blob);
+	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
+	   &blame->line_offsets, blame->f, blob);
 	if (err)
 		goto done;
 

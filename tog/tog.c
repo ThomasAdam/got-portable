@@ -178,6 +178,7 @@ struct tog_blame {
 	size_t filesize;
 	struct tog_blame_line *lines;
 	int nlines;
+	off_t *line_offsets;
 	pthread_t thread;
 	struct tog_blame_thread_args thread_args;
 	struct tog_blame_cb_args cb_args;
@@ -198,6 +199,7 @@ struct tog_blame_view_state {
 	struct got_reflist_head *refs;
 	struct got_object_id *commit_id;
 	struct tog_blame blame;
+	int matched_line;
 };
 
 struct tog_parent_tree {
@@ -303,6 +305,8 @@ static const struct got_error *show_blame_view(struct tog_view *);
 static const struct got_error *input_blame_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error *close_blame_view(struct tog_view *);
+static const struct got_error *search_start_blame_view(struct tog_view *);
+static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
     struct got_tree_object *, struct got_object_id *,
@@ -3122,7 +3126,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		goto done;
 	}
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
-	    blame->f, blob);
+	    &blame->line_offsets, blame->f, blob);
 	if (err)
 		goto done;
 
@@ -3191,6 +3195,8 @@ open_blame_view(struct tog_view *view, char *path,
 	view->show = show_blame_view;
 	view->input = input_blame_view;
 	view->close = close_blame_view;
+	view->search_start = search_start_blame_view;
+	view->search_next = search_next_blame_view;
 
 	return run_blame(&s->blame, view, &s->blame_complete,
 	    &s->first_displayed_line, &s->last_displayed_line,
@@ -3217,6 +3223,109 @@ close_blame_view(struct tog_view *view)
 	free(s->path);
 
 	return err;
+}
+
+static const struct got_error *
+search_start_blame_view(struct tog_view *view)
+{
+	struct tog_blame_view_state *s = &view->state.blame;
+
+	s->matched_line = 0;
+	return NULL;
+}
+
+static int
+match_line(const char *line, regex_t *regex)
+{
+	regmatch_t regmatch;
+
+	return regexec(regex, line, 1, &regmatch, 0) == 0;
+}
+
+
+static const struct got_error *
+search_next_blame_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_blame_view_state *s = &view->state.blame;
+	int lineno;
+
+	if (!view->searching) {
+		view->search_next_done = 1;
+		return NULL;
+	}
+
+	if (s->matched_line) {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno = s->first_displayed_line - 1 + s->selected_line + 1;
+		else
+			lineno = s->first_displayed_line - 1 + s->selected_line - 1;
+	} else {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno = 1;
+		else
+			lineno = s->blame.nlines;
+	}
+
+	while (1) {
+		char *line = NULL;
+		off_t offset;
+		size_t len;
+
+		if (lineno <= 0 || lineno > s->blame.nlines) {
+			if (s->matched_line == 0) {
+				view->search_next_done = 1;
+				free(line);
+				break;
+			}
+			if (view->searching == TOG_SEARCH_FORWARD)
+				lineno = 1;
+			else
+				lineno = s->blame.nlines;
+		}
+
+		offset = s->blame.line_offsets[lineno - 1];
+		if (fseeko(s->blame.f, offset, SEEK_SET) != 0) {
+			free(line);
+			return got_error_from_errno("fseeko");
+		}
+		free(line);
+		line = parse_next_line(s->blame.f, &len);
+		if (line == NULL)
+			break;
+		if (match_line(line, &view->regex)) {
+			view->search_next_done = 1;
+			s->matched_line = lineno;
+			free(line);
+			break;
+		}
+		free(line);
+		line = NULL;
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno++;
+		else
+			lineno--;
+	}
+
+	if (s->matched_line) {
+		int cur = s->first_displayed_line - 1 + s->selected_line;
+		while (cur < s->matched_line) {
+			err = input_blame_view(NULL, NULL, NULL, view, KEY_DOWN);
+			if (err)
+				return err;
+			cur++;
+		}
+		while (cur > s->matched_line) {
+			err = input_blame_view(NULL, NULL, NULL, view, KEY_UP);
+			if (err)
+				return err;
+			cur--;
+		}
+		s->first_displayed_line = s->matched_line;
+		s->selected_line = 1;
+	}
+
+	return NULL;
 }
 
 static const struct got_error *

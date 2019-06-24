@@ -1136,13 +1136,17 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 
 const struct got_error *
 got_object_blob_dump_to_file(size_t *total_len, int *nlines,
-    FILE *outfile, struct got_blob_object *blob)
+    off_t **line_offsets, FILE *outfile, struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
 	size_t n, len, hdrlen;
 	const uint8_t *buf;
 	int i;
+	size_t noffsets = 0;
+	off_t off = 0;
 
+	if (line_offsets)
+		*line_offsets = NULL;
 	if (total_len)
 		*total_len = 0;
 	if (nlines)
@@ -1155,15 +1159,31 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 			return err;
 		if (len == 0)
 			break;
-		if (total_len)
-			*total_len += len;
 		buf = got_object_blob_get_read_buf(blob);
-		if (nlines) {
-			for (i = 0; i < len; i++) {
-				if (buf[i] == '\n')
-					(*nlines)++;
+		for (i = 0; i < len; i++) {
+			if (buf[i] != '\n')
+				continue;
+			if (nlines)
+				(*nlines)++;
+			if (line_offsets && nlines && noffsets < *nlines) {
+				off_t *o = recallocarray(*line_offsets,
+				    noffsets, *nlines, sizeof(**line_offsets));
+				if (o == NULL) {
+					free(*line_offsets);
+					*line_offsets = NULL;
+					return got_error_from_errno(
+					    "recallocarray");
+				}
+				*line_offsets = o;
+				noffsets = *nlines;
+			}
+			if (line_offsets && nlines && total_len) {
+				(*line_offsets)[*nlines - 1] = off;
+				off = *total_len + i + 1;
 			}
 		}
+		if (total_len)
+			*total_len += len;
 		/* Skip blob object header first time around. */
 		n = fwrite(buf + hdrlen, 1, len - hdrlen, outfile);
 		if (n != len - hdrlen)

@@ -761,7 +761,8 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	err = got_opentemp_named(&blob_deriv_path, &f_deriv, base_path);
 	if (err)
 		goto done;
-	err = got_object_blob_dump_to_file(NULL, NULL, f_deriv, blob_deriv);
+	err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_deriv,
+	    blob_deriv);
 	if (err)
 		goto done;
 
@@ -776,7 +777,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (err)
 		goto done;
 	if (blob_orig) {
-		err = got_object_blob_dump_to_file(NULL, NULL, f_orig,
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_orig,
 		    blob_orig);
 		if (err)
 			goto done;
