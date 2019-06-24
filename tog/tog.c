@@ -551,7 +551,7 @@ view_search_start(struct tog_view *view)
 	}
 
 	if (regcomp(&view->regex, pattern,
-	    REG_EXTENDED | REG_ICASE | REG_NOSUB | REG_NEWLINE) == 0) {
+	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE) == 0) {
 		err = view->search_start(view);
 		if (err) {
 			regfree(&view->regex);
