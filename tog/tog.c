@@ -4093,6 +4093,10 @@ search_next_tree_view(struct tog_view *view)
 
 	while (1) {
 		if (entry == NULL) {
+			if (s->matched_entry == NULL) {
+				view->search_next_done = 1;
+				return NULL;
+			}
 			if (view->searching == TOG_SEARCH_FORWARD)
 				entry = SIMPLEQ_FIRST(&s->entries->head);
 			else {
