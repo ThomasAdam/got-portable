@@ -1764,23 +1764,16 @@ search_next_log_view(struct tog_view *view)
 
 	while (1) {
 		if (entry == NULL) {
-			if (s->thread_args.log_complete) {
-				if (s->matched_entry == NULL) {
-					view->search_next_done = 1;
-					return NULL;
-				}
-				if (view->searching == TOG_SEARCH_FORWARD)
-					entry = TAILQ_FIRST(&s->commits.head);
-				else
-					entry = TAILQ_LAST(&s->commits.head,
-					    commit_queue_head);
-			} else {
-				s->thread_args.commits_needed = 1;
-				return trigger_log_thread(0,
-				    &s->thread_args.commits_needed,
-				    &s->thread_args.log_complete,
-				    &s->thread_args.need_commits);
+			if (s->thread_args.log_complete ||
+			    view->searching == TOG_SEARCH_BACKWARD) {
+				view->search_next_done = 1;
+				return NULL;
 			}
+			s->thread_args.commits_needed = 1;
+			return trigger_log_thread(0,
+			    &s->thread_args.commits_needed,
+			    &s->thread_args.log_complete,
+			    &s->thread_args.need_commits);
 		}
 
 		if (match_commit(entry->commit, &view->regex)) {
