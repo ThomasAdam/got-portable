@@ -1160,7 +1160,7 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 		if (len == 0)
 			break;
 		buf = got_object_blob_get_read_buf(blob);
-		for (i = 0; i < len; i++) {
+		for (i = hdrlen; i < len; i++) {
 			if (buf[i] != '\n')
 				continue;
 			if (nlines)
@@ -1179,7 +1179,7 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 			}
 			if (line_offsets && nlines && total_len) {
 				(*line_offsets)[*nlines - 1] = off;
-				off = *total_len + i + 1;
+				off = *total_len + i + 1 - got_object_blob_get_hdrlen(blob);
 			}
 		}
 		if (total_len)

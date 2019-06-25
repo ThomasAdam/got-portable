@@ -3246,7 +3246,6 @@ match_line(const char *line, regex_t *regex)
 static const struct got_error *
 search_next_blame_view(struct tog_view *view)
 {
-	const struct got_error *err = NULL;
 	struct tog_blame_view_state *s = &view->state.blame;
 	int lineno;
 
@@ -3257,9 +3256,9 @@ search_next_blame_view(struct tog_view *view)
 
 	if (s->matched_line) {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			lineno = s->first_displayed_line - 1 + s->selected_line + 1;
+			lineno = s->matched_line + 1;
 		else
-			lineno = s->first_displayed_line - 1 + s->selected_line - 1;
+			lineno = s->matched_line - 1;
 	} else {
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno = 1;
@@ -3278,6 +3277,7 @@ search_next_blame_view(struct tog_view *view)
 				free(line);
 				break;
 			}
+
 			if (view->searching == TOG_SEARCH_FORWARD)
 				lineno = 1;
 			else
@@ -3291,16 +3291,13 @@ search_next_blame_view(struct tog_view *view)
 		}
 		free(line);
 		line = parse_next_line(s->blame.f, &len);
-		if (line == NULL)
-			break;
-		if (match_line(line, &view->regex)) {
+		if (line && match_line(line, &view->regex)) {
 			view->search_next_done = 1;
 			s->matched_line = lineno;
 			free(line);
 			break;
 		}
 		free(line);
-		line = NULL;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
@@ -3308,19 +3305,6 @@ search_next_blame_view(struct tog_view *view)
 	}
 
 	if (s->matched_line) {
-		int cur = s->first_displayed_line - 1 + s->selected_line;
-		while (cur < s->matched_line) {
-			err = input_blame_view(NULL, NULL, NULL, view, KEY_DOWN);
-			if (err)
-				return err;
-			cur++;
-		}
-		while (cur > s->matched_line) {
-			err = input_blame_view(NULL, NULL, NULL, view, KEY_UP);
-			if (err)
-				return err;
-			cur--;
-		}
 		s->first_displayed_line = s->matched_line;
 		s->selected_line = 1;
 	}
