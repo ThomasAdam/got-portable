@@ -148,6 +148,7 @@ struct tog_log_view_state {
 	struct commit_queue_entry *selected_entry;
 	int selected;
 	char *in_repo_path;
+	const char *head_ref_name;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct got_object_id *start_id;
@@ -291,7 +292,7 @@ static const struct got_error* close_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_reflist_head *,
-    struct got_repository *, const char *, int);
+    struct got_repository *, const char *, const char *, int);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -768,7 +769,7 @@ view_loop(struct tog_view *view)
 				TAILQ_REMOVE(&views, dead_view, entry);
 
 			err = view_close(dead_view);
-			if (err || dead_view == main_view)
+			if (err || (dead_view == main_view && new_view == NULL))
 				goto done;
 
 			if (view == dead_view) {
@@ -1809,7 +1810,7 @@ search_next_log_view(struct tog_view *view)
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_reflist_head *refs, struct got_repository *repo,
-    const char *path, int check_disk)
+    const char *head_ref_name, const char *path, int check_disk)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -1827,6 +1828,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 
 	s->refs = refs;
 	s->repo = repo;
+	s->head_ref_name = head_ref_name;
 	s->start_id = got_object_id_dup(start_id);
 	if (s->start_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
@@ -1894,9 +1896,10 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
-	char *parent_path;
-	struct tog_view *diff_view = NULL, *tree_view = NULL;
+	char *parent_path, *in_repo_path = NULL;
+	struct tog_view *diff_view = NULL, *tree_view = NULL, *lv = NULL;
 	int begin_x = 0;
+	struct got_object_id *start_id;
 
 	switch (ch) {
 	case 'q':
@@ -2024,7 +2027,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		parent_path = dirname(s->in_repo_path);
 		if (parent_path && strcmp(parent_path, ".") != 0) {
-			struct tog_view *lv;
 			err = stop_log_thread(s);
 			if (err)
 				return err;
@@ -2034,7 +2036,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				return got_error_from_errno(
 				    "view_open");
 			err = open_log_view(lv, s->start_id, s->refs,
-			    s->repo, parent_path, 0);
+			    s->repo, s->head_ref_name, parent_path, 0);
 			if (err)
 				return err;;
 			if (view_is_parent_view(view))
@@ -2045,6 +2047,30 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			}
 			return NULL;
 		}
+		break;
+	case 'r':
+		err = stop_log_thread(s);
+		if (err)
+			return err;
+		lv = view_open(view->nlines, view->ncols,
+		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
+		if (lv == NULL)
+			return got_error_from_errno("view_open");
+		err = get_head_commit_id(&start_id, s->head_ref_name ?
+		    s->head_ref_name : GOT_REF_HEAD, s->repo);
+		if (err)
+			return err;
+		in_repo_path = strdup(s->in_repo_path);
+		if (in_repo_path == NULL) {
+			free(start_id);
+			return got_error_from_errno("strdup");
+		}
+		err = open_log_view(lv, start_id, s->refs, s->repo,
+		    s->head_ref_name, in_repo_path, 0);
+		if (err)
+			return err;;
+		*dead_view = view;
+		*new_view = lv;
 		break;
 	default:
 		break;
@@ -2200,7 +2226,8 @@ cmd_log(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_log_view(view, start_id, &refs, repo, path, 1);
+	error = open_log_view(view, start_id, &refs, repo, worktree ?
+	    got_worktree_get_head_ref_name(worktree) : NULL, path, 1);
 	if (error)
 		goto done;
 	error = view_loop(view);
@@ -3934,7 +3961,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, refs, repo, path, 0);
+	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0);
 	if (err)
 		view_close(log_view);
 	else

@@ -11,7 +11,6 @@ lib:
   (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
 
 tog:
-- allow loading new commits in 'tog log' after startup (e.g. via Ctrl-L, 'r')
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
 - implement search feature for diff view
