@@ -13,7 +13,8 @@ tog:
 - make diff view generate diffs in a background thread?
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
-- implement search feature
+- implement search feature for diff view
+- implement 'limit' for 'tog log' (like search but display matched commits only)
 - allow moving to prev/next blamed line in diff view if opened from blame view,
   similar to how the diff view can switch commits if opened from log view
 - tog should have a command to list and log/browse references
