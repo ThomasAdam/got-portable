@@ -7,6 +7,8 @@ lib:
 - fix 'got log -l1 -c fb4d85023675bc7da402da96b2bb84fd12905dbf -p';
   this command runs too slow in got-read-pack
   (maybe let got-read-pack cache ref/offset delta objects in object_cache.c?)
+- improve performance of usr.bin/diff and port these changes back to got
+  (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
 
 tog:
 - allow loading new commits in 'tog log' after startup (e.g. via Ctrl-L, 'r')
