@@ -2048,7 +2048,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			return NULL;
 		}
 		break;
-	case 'r':
 	case CTRL('l'):
 		err = stop_log_thread(s);
 		if (err)
