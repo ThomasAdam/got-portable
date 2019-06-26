@@ -96,6 +96,7 @@
 #define GOT_ERR_ROOT_COMMIT	80
 #define GOT_ERR_MIXED_COMMITS	81
 #define GOT_ERR_CONFLICTS	82
+#define GOT_ERR_BRANCH_EXISTS	83
 
 static const struct got_error {
 	int code;
@@ -187,6 +188,7 @@ static const struct got_error {
 	    "base commits; the entire work tree must be updated first" },
 	{ GOT_ERR_CONFLICTS,	"work tree contains conflicted files; these "
 	    "conflicts must be resolved first" },
+	{ GOT_ERR_BRANCH_EXISTS,"specified branch already exists" },
 };
 
 /*

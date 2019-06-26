@@ -310,6 +310,42 @@ List all existing references in the repository.
 .It Fl d Ar name
 Delete the reference with the specified name from the repository.
 .El
+.It Cm branch [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name [ Ar base-branch ] ]
+Manage branches in a repository.
+.Pp
+Branches are managed via references which live in the
+.Dq refs/heads/
+reference namespace.
+The
+.Cm got branch
+command operates on references in this namespace only.
+.Pp
+If no options are passed, expect one or two arguments and attempt to create
+a branch with the given
+.Ar name ,
+and make it point at the given
+.Ar base-branch .
+If no
+.Ar base-branch
+is specified, default to the work tree's current branch if invoked in a
+work tree, or to the repository's HEAD reference.
+.Pp
+The options for
+.Cm got branch
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl l
+List all existing branches in the repository.
+.It Fl d Ar name
+Delete the branch with the specified name from the repository.
+.El
 .It Cm add Ar file-path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
@@ -489,7 +525,7 @@ View local changes in a work tree directory:
 .Pp
 In a work tree or a git repository directory, list all branch references:
 .Pp
-.Dl $ got ref -l | grep ^refs/heads
+.Dl $ got branch -l
 .Pp
 In a work tree or a git repository directory, create a new branch called
 .Dq unified-buffer-cache
@@ -497,7 +533,7 @@ which is forked off the
 .Dq master
 branch:
 .Pp
-.Dl $ got ref refs/heads/unified-buffer-cache refs/heads/master
+.Dl $ got branch unified-buffer-cache master
 .Pp
 Switch an existing work tree to the branch
 .Dq unified-buffer-cache .

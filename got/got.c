@@ -82,6 +82,7 @@ __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
 __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
+__dead static void	usage_branch(void);
 __dead static void	usage_add(void);
 __dead static void	usage_rm(void);
 __dead static void	usage_revert(void);
@@ -98,6 +99,7 @@ static const struct got_error*		cmd_blame(int, char *[]);
 static const struct got_error*		cmd_tree(int, char *[]);
 static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
+static const struct got_error*		cmd_branch(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_rm(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
@@ -115,6 +117,7 @@ static struct cmd got_commands[] = {
 	{ "tree",	cmd_tree,	usage_tree },
 	{ "status",	cmd_status,	usage_status },
 	{ "ref",	cmd_ref,	usage_ref },
+	{ "branch",	cmd_branch,	usage_branch },
 	{ "add",	cmd_add,	usage_add },
 	{ "rm",		cmd_rm,		usage_rm },
 	{ "revert",	cmd_revert,	usage_revert },
@@ -2155,6 +2158,231 @@ cmd_ref(int argc, char *argv[])
 		error = delete_ref(repo, delref);
 	else
 		error = add_ref(repo, argv[0], argv[1]);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(cwd);
+	free(repo_path);
+	return error;
+}
+
+__dead static void
+usage_branch(void)
+{
+	fprintf(stderr,
+	    "usage: %s branch [-r repository] -l | -d name | "
+	    "name [base-branch]\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+list_branches(struct got_repository *repo)
+{
+	static const struct got_error *err = NULL;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
+
+	SIMPLEQ_INIT(&refs);
+	err = got_ref_list(&refs, repo);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(re, &refs, entry) {
+		const char *refname;
+		char *refstr;
+		refname = got_ref_get_name(re->ref);
+		if (strncmp(refname, "refs/heads/", 11) != 0)
+			continue;
+		refname += 11;
+		refstr = got_ref_to_str(re->ref);
+		if (refstr == NULL)
+			return got_error_from_errno("got_ref_to_str");
+		printf("%s: %s\n", refname, refstr);
+		free(refstr);
+	}
+
+	got_ref_list_free(&refs);
+	return NULL;
+}
+
+static const struct got_error *
+delete_branch(struct got_repository *repo, const char *branch_name)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref;
+	char *refname;
+
+	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = got_ref_open(&ref, repo, refname, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_delete(ref, repo);
+	got_ref_close(ref);
+done:
+	free(refname);
+	return err;
+}
+
+static const struct got_error *
+add_branch(struct got_repository *repo, const char *branch_name,
+    const char *base_branch)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id = NULL;
+	struct got_reference *ref = NULL;
+	char *base_refname = NULL, *refname = NULL;
+	struct got_reference *base_ref;
+
+	if (strcmp(GOT_REF_HEAD, base_branch) == 0) {
+		base_refname = strdup(GOT_REF_HEAD);
+		if (base_refname == NULL)
+			return got_error_from_errno("strdup");
+	} else if (asprintf(&base_refname, "refs/heads/%s", base_branch) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = got_ref_open(&base_ref, repo, base_refname, 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(&id, repo, base_ref);
+	got_ref_close(base_ref);
+	if (err)
+		goto done;
+
+	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
+		 err = got_error_from_errno("asprintf");
+		 goto done;
+	}
+
+	err = got_ref_open(&ref, repo, refname, 0);
+	if (err == NULL) {
+		err = got_error(GOT_ERR_BRANCH_EXISTS);
+		goto done;
+	} else if (err->code != GOT_ERR_NOT_REF)
+		goto done;
+
+	err = got_ref_alloc(&ref, refname, id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+done:
+	if (ref)
+		got_ref_close(ref);
+	free(id);
+	free(base_refname);
+	free(refname);
+	return err;
+}
+
+static const struct got_error *
+cmd_branch(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	int ch, do_list = 0;
+	const char *delref = NULL;
+
+	while ((ch = getopt(argc, argv, "d:r:l")) != -1) {
+		switch (ch) {
+		case 'd':
+			delref = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'l':
+			do_list = 1;
+			break;
+		default:
+			usage_branch();
+			/* NOTREACHED */
+		}
+	}
+
+	if (do_list && delref)
+		errx(1, "-l and -d options are mutually exclusive\n");
+
+	argc -= optind;
+	argv += optind;
+
+	if (do_list || delref) {
+		if (argc > 0)
+			usage_branch();
+	} else if (argc < 1 || argc > 2)
+		usage_branch();
+
+#ifndef PROFILE
+	if (do_list) {
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+	} else {
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+	}
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL)
+				error = got_error_from_errno("strdup");
+			if (error)
+				goto done;
+		} else {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), do_list,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	if (error)
+		goto done;
+
+	if (do_list)
+		error = list_branches(repo);
+	else if (delref)
+		error = delete_branch(repo, delref);
+	else {
+		const char *base_branch;
+		if (argc == 1) {
+			base_branch = worktree ?
+			    got_worktree_get_head_ref_name(worktree) :
+			    GOT_REF_HEAD;
+		} else
+			base_branch = argv[1];
+		error = add_branch(repo, argv[0], base_branch);
+	}
 done:
 	if (repo)
 		got_repo_close(repo);
