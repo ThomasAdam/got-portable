@@ -2221,8 +2221,8 @@ cmd_log(int argc, char *argv[])
 		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
 		    repo);
 	else
-		error = got_object_resolve_id_str(&start_id, repo,
-		    start_commit);
+		error = got_repo_match_object_id_prefix(&start_id,
+		    start_commit, repo);
 	if (error != NULL)
 		goto done;
 
@@ -2830,11 +2830,11 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_object_resolve_id_str(&id1, repo, id_str1);
+	error = got_repo_match_object_id_prefix(&id1, id_str1, repo);
 	if (error)
 		goto done;
 
-	error = got_object_resolve_id_str(&id2, repo, id_str2);
+	error = got_repo_match_object_id_prefix(&id2, id_str2, repo);
 	if (error)
 		goto done;
 
@@ -3684,8 +3684,8 @@ cmd_blame(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 	} else {
-		error = got_object_resolve_id_str(&commit_id, repo,
-		    commit_id_str);
+		error = got_repo_match_object_id_prefix(&commit_id,
+		    commit_id_str, repo);
 	}
 	if (error != NULL)
 		goto done;
@@ -4411,8 +4411,8 @@ cmd_tree(int argc, char *argv[])
 	if (commit_id_arg == NULL)
 		error = get_head_commit_id(&commit_id, GOT_REF_HEAD, repo);
 	else
-		error = got_object_resolve_id_str(&commit_id, repo,
-		    commit_id_arg);
+		error = got_repo_match_object_id_prefix(&commit_id,
+		    commit_id_arg, repo);
 	if (error != NULL)
 		goto done;
 

@@ -444,6 +444,27 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 }
 
 const struct got_error *
+got_packidx_for_each_id(struct got_packidx *packidx,
+    got_packidx_for_each_id_cb cb, void *cb_arg)
+{
+	const struct got_error *err = NULL;
+	uint32_t nobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	struct got_packidx_object_id *oid;
+	struct got_object_id id;
+	int i;
+
+	for (i = 0; i < nobj; i++) {
+		oid = &packidx->hdr.sorted_ids[i];
+		memcpy(&id, oid->sha1, SHA1_DIGEST_LENGTH);
+		err = cb(cb_arg, &id);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
+const struct got_error *
 got_pack_stop_privsep_child(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;

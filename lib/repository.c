@@ -21,6 +21,7 @@
 #include <sys/mman.h>
 #include <sys/syslimits.h>
 
+#include <ctype.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <dirent.h>
@@ -48,6 +49,7 @@
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
 #include "got_lib_worktree.h"
+#include "got_lib_sha1.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
 
@@ -874,4 +876,220 @@ got_repo_init(const char *repo_path)
 		return err;
 
 	return NULL;
+}
+
+struct match_packidx_id_args {
+	const char *id_str_prefix;
+	struct got_object_id *unique_id;
+};
+
+static const struct got_error *
+match_packidx_id(void *arg, struct got_object_id *id)
+{
+	const struct got_error *err;
+	struct match_packidx_id_args *a = arg;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	if (strncmp(a->id_str_prefix, id_str, strlen(a->id_str_prefix)) == 0) {
+		if (a->unique_id == NULL) {
+			a->unique_id = got_object_id_dup(id);
+			if (a->unique_id == NULL)
+				err = got_error_from_errno("got_object_id_dup");
+		}
+	}
+
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
+match_packed_object_id_prefix(struct got_object_id **unique_id,
+    struct got_repository *repo, const char *id_str_prefix)
+{
+	const struct got_error *err = NULL;
+	struct match_packidx_id_args args;
+	char *path_packdir;
+	DIR *packdir;
+	struct dirent *dent;
+	char *path_packidx;
+
+	*unique_id = NULL;
+
+	path_packdir = got_repo_get_path_objects_pack(repo);
+	if (path_packdir == NULL)
+		return got_error_from_errno("got_repo_get_path_objects_pack");
+
+	packdir = opendir(path_packdir);
+	if (packdir == NULL) {
+		err = got_error_from_errno2("opendir", path_packdir);
+		goto done;
+	}
+
+	while ((dent = readdir(packdir)) != NULL) {
+		struct got_packidx *packidx;
+		const struct got_error *cb_err;
+
+		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+			continue;
+
+		if (asprintf(&path_packidx, "%s/%s", path_packdir,
+		    dent->d_name) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		err = got_packidx_open(&packidx, path_packidx, 0);
+		free(path_packidx);
+		if (err)
+			goto done;
+
+		args.id_str_prefix = id_str_prefix;
+		args.unique_id = NULL;
+		cb_err = got_packidx_for_each_id(packidx, match_packidx_id,
+		    &args);
+		err = got_packidx_close(packidx);
+		if (err)
+			break;
+		if (cb_err) {
+			err = cb_err;
+			break;
+		}
+
+		if (args.unique_id) {
+			if (*unique_id == NULL)
+				*unique_id = args.unique_id;
+			else {
+				err = got_error(GOT_ERR_AMBIGUOUS_ID);
+				break;
+			}
+		}
+	}
+done:
+	free(path_packdir);
+	if (packdir && closedir(packdir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+	if (err) {
+		free(*unique_id);
+		*unique_id = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+match_object_id(struct got_object_id **unique_id, const char *path_objects,
+    const char *object_dir, const char *id_str_prefix,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path;
+	DIR *dir = NULL;
+	struct dirent *dent;
+	struct got_object_id id;
+	int i;
+
+	for (i = 0; i < strlen(id_str_prefix); i++) {
+		if (isxdigit((unsigned char)id_str_prefix[i]))
+			continue;
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+	}
+
+	/* Search pack index. */
+	err = match_packed_object_id_prefix(unique_id, repo, id_str_prefix);
+	if (err)
+		return err;
+
+	/* Search on-disk directories. */
+	if (asprintf(&path, "%s/%s", path_objects, object_dir) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	dir = opendir(path);
+	if (dir == NULL) {
+		err = got_error_from_errno2("opendir", path);
+		goto done;
+	}
+	while ((dent = readdir(dir)) != NULL) {
+		char *id_str;
+		if (strcmp(dent->d_name, ".") == 0 ||
+		    strcmp(dent->d_name, "..") == 0)
+			continue;
+
+		if (asprintf(&id_str, "%s%s", object_dir, dent->d_name) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if (!got_parse_sha1_digest(id.sha1, id_str))
+			continue;
+
+		if (strncmp(id_str_prefix, id_str,
+		    strlen(id_str_prefix)) != 0) {
+			free(id_str);
+			continue;
+		}
+
+		if (*unique_id == NULL) {
+			*unique_id = got_object_id_dup(&id);
+			if (*unique_id == NULL) {
+				err = got_error_from_errno("got_object_id_dup");
+				free(id_str);
+				goto done;
+			}
+		} else {
+			err = got_error(GOT_ERR_AMBIGUOUS_ID);
+			free(id_str);
+			goto done;
+		}
+	}
+
+	if (err == NULL && *unique_id == NULL)
+		err = got_error(GOT_ERR_NO_OBJ);
+done:
+	if (err) {
+		free(*unique_id);
+		*unique_id = NULL;
+	}
+	if (dir && closedir(dir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+	free(path);
+	return err;
+}
+
+const struct got_error *
+got_repo_match_object_id_prefix(struct got_object_id **id, const char *id_str_prefix,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path_objects = got_repo_get_path_objects(repo);
+	char *object_dir = NULL;
+	size_t len;
+
+	len = strlen(id_str_prefix);
+	if (len >= 2) {
+		object_dir = strndup(id_str_prefix, 2);
+		if (object_dir == NULL)
+			return got_error_from_errno("strdup");
+		err = match_object_id(id, path_objects, object_dir,
+		    id_str_prefix, repo);
+	} else if (len == 1) {
+		int i;
+		for (i = 0; i < 0xf; i++) {
+			if (asprintf(&object_dir, "%s%.1x", id_str_prefix, i)
+			    == -1)
+				return got_error_from_errno("asprintf");
+			err = match_object_id(id, path_objects, object_dir,
+			    id_str_prefix, repo);
+			if (err)
+				break;
+		}
+	} else
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	free(object_dir);
+	return err;
 }

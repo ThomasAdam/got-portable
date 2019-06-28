@@ -24,8 +24,8 @@
 #include <sha1.h>
 #include <zlib.h>
 
-#include "got_repository.h"
 #include "got_object.h"
+#include "got_repository.h"
 #include "got_error.h"
 #include "got_diff.h"
 #include "got_opentemp.h"
