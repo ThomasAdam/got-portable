@@ -126,8 +126,7 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a SHA1 hash which corresponds
-to a commit object.
+The expected argument is the name of a branch or a commit ID SHA1 hash.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl r Ar repository-path
@@ -139,7 +138,7 @@ working directory.
 Display the differences between two objects in the repository.
 Each
 .Ar object
-argument is a SHA1 hash which corresponds to the object.
+argument is an object ID SHA1 hash.
 Both objects must be of the same type (blobs, trees, or commits).
 If the
 .Ar repository path
@@ -214,8 +213,7 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a SHA1 hash which corresponds
-to a commit object.
+The expected argument is the name of a branch or a commit ID SHA1 hash.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -268,8 +266,7 @@ are as follows:
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
-The expected argument is the name of a branch or a SHA1 hash which corresponds
-to a commit object.
+The expected argument is the name of a branch or a commit ID SHA1 hash.
 .El
 .El
 .Sh EXIT STATUS
