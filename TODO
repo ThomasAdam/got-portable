@@ -9,6 +9,7 @@ lib:
   (maybe let got-read-pack cache ref/offset delta objects in object_cache.c?)
 - improve performance of usr.bin/diff and port these changes back to got
   (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
+- disambiguate abbreviated object IDs based on object type
 
 tog:
 - implement horizonal scrolling in all views
