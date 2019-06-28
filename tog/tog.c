@@ -1723,7 +1723,8 @@ search_start_log_view(struct tog_view *view)
 }
 
 static int
-match_commit(struct got_commit_object *commit, regex_t *regex)
+match_commit(struct got_commit_object *commit, const char *id_str,
+    regex_t *regex)
 {
 	regmatch_t regmatch;
 
@@ -1732,7 +1733,8 @@ match_commit(struct got_commit_object *commit, regex_t *regex)
 	    regexec(regex, got_object_commit_get_committer(commit), 1,
 	    &regmatch, 0) == 0 ||
 	    regexec(regex, got_object_commit_get_logmsg(commit), 1,
-	    &regmatch, 0) == 0)
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, id_str, 1, &regmatch, 0) == 0)
 		return 1;
 
 	return 0;
@@ -1764,6 +1766,7 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	while (1) {
+		char *id_str;
 		if (entry == NULL) {
 			if (s->thread_args.log_complete ||
 			    view->searching == TOG_SEARCH_BACKWARD) {
@@ -1777,11 +1780,17 @@ search_next_log_view(struct tog_view *view)
 			    &s->thread_args.need_commits);
 		}
 
-		if (match_commit(entry->commit, &view->regex)) {
+		err = got_object_id_str(&id_str, entry->id);
+		if (err)
+			return err;
+
+		if (match_commit(entry->commit, id_str, &view->regex)) {
 			view->search_next_done = 1;
 			s->matched_entry = entry;
+			free(id_str);
 			break;
 		}
+		free(id_str);
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(entry, entry);
 		else
