@@ -2853,7 +2853,8 @@ cmd_diff(int argc, char *argv[])
 	error = view_loop(view);
 done:
 	free(repo_path);
-	got_repo_close(repo);
+	if (repo)
+		got_repo_close(repo);
 	got_ref_list_free(&refs);
 	return error;
 }
