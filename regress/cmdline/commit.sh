@@ -214,7 +214,7 @@ function test_commit_added_subdirs {
 }
 
 function test_commit_rejects_conflicted_file {
-	local testroot=`test_init update_rejects_conflicted_file`
+	local testroot=`test_init commit_rejects_conflicted_file`
 
 	local initial_rev=`git_show_head $testroot/repo`
 
