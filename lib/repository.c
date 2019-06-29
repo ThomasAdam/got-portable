@@ -1013,12 +1013,12 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 		}
 	}
 done:
+	if (dir && closedir(dir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
 	if (err) {
 		free(*unique_id);
 		*unique_id = NULL;
 	}
-	if (dir && closedir(dir) != 0 && err == NULL)
-		err = got_error_from_errno("closedir");
 	free(path);
 	return err;
 }
