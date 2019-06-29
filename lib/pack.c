@@ -496,14 +496,8 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		oid = &packidx->hdr.sorted_ids[++i];
 	}
 
-	if (err) {
-		while (!SIMPLEQ_EMPTY(matched_ids)) {
-			struct got_object_qid *qid;
-			qid = SIMPLEQ_FIRST(matched_ids);
-			SIMPLEQ_REMOVE_HEAD(matched_ids, entry);
-			got_object_qid_free(qid);
-		}
-	}
+	if (err)
+		got_object_id_queue_free(matched_ids);
 	return err;
 }
 
