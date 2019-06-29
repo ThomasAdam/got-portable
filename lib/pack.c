@@ -41,6 +41,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 
@@ -444,9 +445,10 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 }
 
 const struct got_error *
-got_packidx_match_id_str_prefix(struct got_object_id **unique_id,
+got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
     struct got_packidx *packidx, const char *id_str_prefix)
 {
+	const struct got_error *err = NULL;
 	u_int8_t id0;
 	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
 	char hex[3];
@@ -454,7 +456,7 @@ got_packidx_match_id_str_prefix(struct got_object_id **unique_id,
 	struct got_packidx_object_id *oid;
 	int i;
 
-	*unique_id = NULL;
+	SIMPLEQ_INIT(matched_ids);
 
 	if (prefix_len < 2)
 		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
@@ -472,6 +474,7 @@ got_packidx_match_id_str_prefix(struct got_object_id **unique_id,
 	oid = &packidx->hdr.sorted_ids[i];
 	while (i < totobj && oid->sha1[0] == id0) {
 		char id_str[SHA1_DIGEST_STRING_LENGTH];
+		struct got_object_qid *qid;
 		int cmp;
 
 		if (!got_sha1_digest_to_str(oid->sha1, id_str, sizeof(id_str)))
@@ -484,17 +487,24 @@ got_packidx_match_id_str_prefix(struct got_object_id **unique_id,
 		} else if (cmp > 0)
 			break;
 
-		if (*unique_id != NULL)
-			return got_error(GOT_ERR_AMBIGUOUS_ID);
-		*unique_id = malloc(sizeof(**unique_id));
-		if (*unique_id == NULL)
-			return got_error_from_errno("malloc");
-		memcpy((*unique_id)->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		err = got_object_qid_alloc_partial(&qid);
+		if (err)
+			break;
+		memcpy(qid->id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		SIMPLEQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = &packidx->hdr.sorted_ids[++i];
 	}
 
-	return NULL;
+	if (err) {
+		while (!SIMPLEQ_EMPTY(matched_ids)) {
+			struct got_object_qid *qid;
+			qid = SIMPLEQ_FIRST(matched_ids);
+			SIMPLEQ_REMOVE_HEAD(matched_ids, entry);
+			got_object_qid_free(qid);
+		}
+	}
+	return err;
 }
 
 const struct got_error *

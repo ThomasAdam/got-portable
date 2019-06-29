@@ -60,4 +60,4 @@ const struct got_error *got_repo_init(const char *);
 
 /* Attempt to find a unique object ID for a given ID string prefix. */
 const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
-    const char *, struct got_repository *);
+    const char *, int, struct got_repository *);

@@ -161,8 +161,8 @@ const struct got_error *got_packidx_open(struct got_packidx **,
     const char *, int);
 const struct got_error *got_packidx_close(struct got_packidx *);
 int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
-const struct got_error *got_packidx_match_id_str_prefix(struct got_object_id **,
-    struct got_packidx *, const char *);
+const struct got_error *got_packidx_match_id_str_prefix(
+    struct got_object_id_queue *, struct got_packidx *, const char *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_pack *, struct got_packidx *, int, struct got_object_id *);

@@ -2222,7 +2222,7 @@ cmd_log(int argc, char *argv[])
 		    repo);
 	else
 		error = got_repo_match_object_id_prefix(&start_id,
-		    start_commit, repo);
+		    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
 	if (error != NULL)
 		goto done;
 
@@ -2830,11 +2830,13 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&id1, id_str1, repo);
+	error = got_repo_match_object_id_prefix(&id1, id_str1,
+	    GOT_OBJ_TYPE_ANY, repo);
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&id2, id_str2, repo);
+	error = got_repo_match_object_id_prefix(&id2, id_str2,
+	    GOT_OBJ_TYPE_ANY, repo);
 	if (error)
 		goto done;
 
@@ -3685,7 +3687,7 @@ cmd_blame(int argc, char *argv[])
 		got_ref_close(head_ref);
 	} else {
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 	}
 	if (error != NULL)
 		goto done;
@@ -4412,7 +4414,7 @@ cmd_tree(int argc, char *argv[])
 		error = get_head_commit_id(&commit_id, GOT_REF_HEAD, repo);
 	else
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_arg, repo);
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
 	if (error != NULL)
 		goto done;
 

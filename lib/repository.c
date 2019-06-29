@@ -880,13 +880,16 @@ got_repo_init(const char *repo_path)
 
 static const struct got_error *
 match_packed_object(struct got_object_id **unique_id,
-    struct got_repository *repo, const char *id_str_prefix)
+    struct got_repository *repo, const char *id_str_prefix, int obj_type)
 {
 	const struct got_error *err = NULL;
 	char *path_packdir;
 	DIR *packdir;
 	struct dirent *dent;
 	char *path_packidx;
+	struct got_object_id_queue matched_ids;
+
+	SIMPLEQ_INIT(&matched_ids);
 
 	path_packdir = got_repo_get_path_objects_pack(repo);
 	if (path_packdir == NULL)
@@ -900,7 +903,8 @@ match_packed_object(struct got_object_id **unique_id,
 
 	while ((dent = readdir(packdir)) != NULL) {
 		struct got_packidx *packidx;
-		struct got_object_id *unique_id_in_pack;
+		struct got_object_qid *qid;
+
 
 		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
@@ -916,29 +920,40 @@ match_packed_object(struct got_object_id **unique_id,
 		if (err)
 			break;
 
-		err = got_packidx_match_id_str_prefix(&unique_id_in_pack,
+		err = got_packidx_match_id_str_prefix(&matched_ids,
 		    packidx, id_str_prefix);
 		if (err) {
 			got_packidx_close(packidx);
 			break;
 		}
 		err = got_packidx_close(packidx);
-		if (err) {
-			free(unique_id_in_pack);
+		if (err)
 			break;
-		}
 
-		if (unique_id_in_pack) {
+		SIMPLEQ_FOREACH(qid, &matched_ids, entry) {
+			if (obj_type != GOT_OBJ_TYPE_ANY) {
+				int matched_type;
+				err = got_object_get_type(&matched_type, repo,
+				    qid->id);
+				if (err)
+					goto done;
+				if (matched_type != obj_type)
+					continue;
+			}
 			if (*unique_id == NULL) {
-				*unique_id = unique_id_in_pack;
+				*unique_id = got_object_id_dup(qid->id);
+				if (*unique_id == NULL) {
+					err = got_error_from_errno("malloc");
+					goto done;
+				}
 			} else {
-				free(unique_id_in_pack);
 				err = got_error(GOT_ERR_AMBIGUOUS_ID);
 				break;
 			}
 		}
 	}
 done:
+	got_object_id_queue_free(&matched_ids);
 	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == NULL)
 		err = got_error_from_errno("closedir");
@@ -951,7 +966,7 @@ done:
 
 static const struct got_error *
 match_loose_object(struct got_object_id **unique_id, const char *path_objects,
-    const char *object_dir, const char *id_str_prefix,
+    const char *object_dir, const char *id_str_prefix, int obj_type,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -1000,6 +1015,15 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 		}
 
 		if (*unique_id == NULL) {
+			if (obj_type != GOT_OBJ_TYPE_ANY) {
+				int matched_type;
+				err = got_object_get_type(&matched_type, repo,
+				    &id);
+				if (err)
+					goto done;
+				if (matched_type != obj_type)
+					continue;
+			}
 			*unique_id = got_object_id_dup(&id);
 			if (*unique_id == NULL) {
 				err = got_error_from_errno("got_object_id_dup");
@@ -1025,7 +1049,7 @@ done:
 
 const struct got_error *
 got_repo_match_object_id_prefix(struct got_object_id **id,
-    const char *id_str_prefix, struct got_repository *repo)
+    const char *id_str_prefix, int obj_type, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path_objects = got_repo_get_path_objects(repo);
@@ -1043,7 +1067,7 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 
 	len = strlen(id_str_prefix);
 	if (len >= 2) {
-		err = match_packed_object(id, repo, id_str_prefix);
+		err = match_packed_object(id, repo, id_str_prefix, obj_type);
 		if (err)
 			goto done;
 		object_dir = strndup(id_str_prefix, 2);
@@ -1052,7 +1076,7 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 			goto done;
 		}
 		err = match_loose_object(id, path_objects, object_dir,
-		    id_str_prefix, repo);
+		    id_str_prefix, obj_type, repo);
 	} else if (len == 1) {
 		int i;
 		for (i = 0; i < 0xf; i++) {
@@ -1061,11 +1085,12 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
-			err = match_packed_object(id, repo, object_dir);
+			err = match_packed_object(id, repo, object_dir,
+			    obj_type);
 			if (err)
 				goto done;
 			err = match_loose_object(id, path_objects, object_dir,
-			    id_str_prefix, repo);
+			    id_str_prefix, obj_type, repo);
 			if (err)
 				goto done;
 		}

@@ -128,6 +128,18 @@ got_object_qid_free(struct got_object_qid *qid)
 	free(qid);
 }
 
+void
+got_object_id_queue_free(struct got_object_id_queue *ids)
+{
+	struct got_object_qid *qid;
+
+	while (!SIMPLEQ_EMPTY(ids)) {
+		qid = SIMPLEQ_FIRST(ids);
+		SIMPLEQ_REMOVE_HEAD(ids, entry);
+		got_object_qid_free(qid);
+	}
+}
+
 const struct got_error *
 got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 {
@@ -343,20 +355,13 @@ parse_commit_time(time_t *time, time_t *gmtoff, char *committer)
 void
 got_object_commit_close(struct got_commit_object *commit)
 {
-	struct got_object_qid *qid;
-
 	if (commit->refcnt > 0) {
 		commit->refcnt--;
 		if (commit->refcnt > 0)
 			return;
 	}
 
-	while (!SIMPLEQ_EMPTY(&commit->parent_ids)) {
-		qid = SIMPLEQ_FIRST(&commit->parent_ids);
-		SIMPLEQ_REMOVE_HEAD(&commit->parent_ids, entry);
-		got_object_qid_free(qid);
-	}
-
+	got_object_id_queue_free(&commit->parent_ids);
 	free(commit->tree_id);
 	free(commit->author);
 	free(commit->committer);

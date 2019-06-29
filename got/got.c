@@ -561,7 +561,7 @@ cmd_checkout(int argc, char *argv[])
 	if (commit_id_str) {
 		struct got_object_id *commit_id;
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 		if (error != NULL)
 			goto done;
 		error = check_linear_ancestry(commit_id,
@@ -742,7 +742,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	} else {
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 		if (error != NULL)
 			goto done;
 	}
@@ -1191,7 +1191,7 @@ cmd_log(int argc, char *argv[])
 		}
 		if (commit == NULL) {
 			error = got_repo_match_object_id_prefix(&id,
-			    start_commit, repo);
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
 			if (error != NULL)
 				return error;
 		}
@@ -1429,7 +1429,8 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_match_object_id_prefix(&id1, id_str1, repo);
+	error = got_repo_match_object_id_prefix(&id1, id_str1,
+	    GOT_OBJ_TYPE_ANY, repo);
 	if (error) {
 		struct got_reference *ref;
 		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
@@ -1454,7 +1455,8 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_match_object_id_prefix(&id2, id_str2, repo);
+	error = got_repo_match_object_id_prefix(&id2, id_str2,
+	    GOT_OBJ_TYPE_ANY, repo);
 	if (error) {
 		struct got_reference *ref;
 		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
@@ -1643,7 +1645,7 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 	} else {
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 		if (error != NULL)
 			goto done;
 	}
@@ -1875,7 +1877,7 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	} else {
 		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 		if (error != NULL)
 			goto done;
 	}
@@ -2034,7 +2036,8 @@ add_ref(struct got_repository *repo, const char *refname, const char *target)
 	struct got_object_id *id;
 	struct got_reference *ref = NULL;
 
-	err = got_repo_match_object_id_prefix(&id, target, repo);
+	err = got_repo_match_object_id_prefix(&id, target, GOT_OBJ_TYPE_ANY,
+	    repo);
 	if (err) {
 		struct got_reference *target_ref;
 
@@ -2996,7 +2999,8 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&commit_id, argv[0], repo);
+	error = got_repo_match_object_id_prefix(&commit_id, argv[0],
+	    GOT_OBJ_TYPE_COMMIT, repo);
 	if (error != NULL) {
 		struct got_reference *ref;
 		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
@@ -3105,7 +3109,8 @@ cmd_backout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id_prefix(&commit_id, argv[0], repo);
+	error = got_repo_match_object_id_prefix(&commit_id, argv[0],
+	    GOT_OBJ_TYPE_COMMIT, repo);
 	if (error != NULL) {
 		struct got_reference *ref;
 		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)

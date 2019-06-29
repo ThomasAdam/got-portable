@@ -45,8 +45,10 @@ SIMPLEQ_HEAD(got_object_id_queue, got_object_qid);
 const struct got_error *got_object_qid_alloc(struct got_object_qid **,
     struct got_object_id *);
 void got_object_qid_free(struct got_object_qid *);
+void got_object_id_queue_free(struct got_object_id_queue *);
 
 /* Object types. */
+#define GOT_OBJ_TYPE_ANY		0 /* wildcard value at run-time */
 #define GOT_OBJ_TYPE_COMMIT		1
 #define GOT_OBJ_TYPE_TREE		2
 #define GOT_OBJ_TYPE_BLOB		3
