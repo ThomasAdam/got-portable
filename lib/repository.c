@@ -1045,29 +1045,35 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 	if (len >= 2) {
 		err = match_packed_object(id, repo, id_str_prefix);
 		if (err)
-			return err;
+			goto done;
 		object_dir = strndup(id_str_prefix, 2);
-		if (object_dir == NULL)
-			return got_error_from_errno("strdup");
+		if (object_dir == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
 		err = match_loose_object(id, path_objects, object_dir,
 		    id_str_prefix, repo);
 	} else if (len == 1) {
 		int i;
 		for (i = 0; i < 0xf; i++) {
 			if (asprintf(&object_dir, "%s%.1x", id_str_prefix, i)
-			    == -1)
-				return got_error_from_errno("asprintf");
+			    == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
 			err = match_packed_object(id, repo, object_dir);
 			if (err)
-				return err;
+				goto done;
 			err = match_loose_object(id, path_objects, object_dir,
 			    id_str_prefix, repo);
 			if (err)
-				break;
+				goto done;
 		}
-	} else
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
-
+	} else {
+		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		goto done;
+	}
+done:
 	free(object_dir);
 	if (err) {
 		free(*id);
