@@ -16,5 +16,6 @@
 
 #define GOT_SHA1_STRING_ZERO "0000000000000000000000000000000000000000"
 
+int got_parse_xdigit(uint8_t *, const char *);
 int got_parse_sha1_digest(uint8_t *, const char *);
 char *got_sha1_digest_to_str(const uint8_t *, char *, size_t);

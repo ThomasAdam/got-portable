@@ -444,24 +444,57 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 }
 
 const struct got_error *
-got_packidx_for_each_id(struct got_packidx *packidx,
-    got_packidx_for_each_id_cb cb, void *cb_arg)
+got_packidx_match_id_str_prefix(struct got_object_id **unique_id,
+    struct got_packidx *packidx, const char *id_str_prefix)
 {
-	const struct got_error *err = NULL;
-	uint32_t nobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	u_int8_t id0;
+	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	char hex[3];
+	size_t prefix_len = strlen(id_str_prefix);
 	struct got_packidx_object_id *oid;
-	struct got_object_id id;
 	int i;
 
-	for (i = 0; i < nobj; i++) {
-		oid = &packidx->hdr.sorted_ids[i];
-		memcpy(&id, oid->sha1, SHA1_DIGEST_LENGTH);
-		err = cb(cb_arg, &id);
-		if (err)
+	*unique_id = NULL;
+
+	if (prefix_len < 2)
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	hex[0] = id_str_prefix[0];
+	hex[1] = id_str_prefix[1];
+	hex[2] = '\0';
+	if (!got_parse_xdigit(&id0, hex))
+		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+
+	i = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+	if (i == 0)
+		return NULL;
+
+	oid = &packidx->hdr.sorted_ids[i];
+	while (i < totobj && oid->sha1[0] == id0) {
+		char id_str[SHA1_DIGEST_STRING_LENGTH];
+		int cmp;
+
+		if (!got_sha1_digest_to_str(oid->sha1, id_str, sizeof(id_str)))
+		        return got_error(GOT_ERR_NO_SPACE);
+
+		cmp = strncmp(id_str, id_str_prefix, prefix_len);
+		if (cmp < 0) {
+			oid = &packidx->hdr.sorted_ids[++i];
+			continue;
+		} else if (cmp > 0)
 			break;
+
+		if (*unique_id != NULL)
+			return got_error(GOT_ERR_AMBIGUOUS_ID);
+		*unique_id = malloc(sizeof(**unique_id));
+		if (*unique_id == NULL)
+			return got_error_from_errno("malloc");
+		memcpy((*unique_id)->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+
+		oid = &packidx->hdr.sorted_ids[++i];
 	}
 
-	return err;
+	return NULL;
 }
 
 const struct got_error *

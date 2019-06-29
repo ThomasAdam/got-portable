@@ -159,12 +159,10 @@ struct got_packfile_obj_data {
 const struct got_error *got_packidx_init_hdr(struct got_packidx *, int);
 const struct got_error *got_packidx_open(struct got_packidx **,
     const char *, int);
-const struct got_error* got_packidx_close(struct got_packidx *);
+const struct got_error *got_packidx_close(struct got_packidx *);
 int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
-typedef const struct got_error *(*got_packidx_for_each_id_cb)(void *,
-    struct got_object_id *);
-const struct got_error *got_packidx_for_each_id(struct got_packidx *,
-    got_packidx_for_each_id_cb cb, void *);
+const struct got_error *got_packidx_match_id_str_prefix(struct got_object_id **,
+    struct got_packidx *, const char *);
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_pack *, struct got_packidx *, int, struct got_object_id *);

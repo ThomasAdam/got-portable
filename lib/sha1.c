@@ -23,8 +23,8 @@
 
 #include "got_lib_sha1.h"
 
-static int
-parse_xdigit(uint8_t *val, const char *hex)
+int
+got_parse_xdigit(uint8_t *val, const char *hex)
 {
 	char *ep;
 	long lval;
@@ -54,7 +54,7 @@ got_parse_sha1_digest(uint8_t *digest, const char *line)
 			hex[j] = *line;
 			line++;
 		}
-		if (!parse_xdigit(&b, hex))
+		if (!got_parse_xdigit(&b, hex))
 			return 0;
 		digest[i] = b;
 	}
