@@ -948,7 +948,7 @@ match_packed_object(struct got_object_id **unique_id,
 				}
 			} else {
 				err = got_error(GOT_ERR_AMBIGUOUS_ID);
-				break;
+				goto done;
 			}
 		}
 	}
