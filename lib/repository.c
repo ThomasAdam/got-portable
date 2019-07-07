@@ -1005,13 +1005,14 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 		if (!got_parse_sha1_digest(id.sha1, id_str))
 			continue;
 
+		/*
+		 * Directory entries do not necessarily appear in
+		 * sorted order, so we must iterate over all of them.
+		 */
 		cmp = strncmp(id_str, id_str_prefix, strlen(id_str_prefix));
-		if (cmp < 0) {
+		if (cmp != 0) {
 			free(id_str);
 			continue;
-		} else if (cmp > 0) {
-			free(id_str);
-			break;
 		}
 
 		if (*unique_id == NULL) {
