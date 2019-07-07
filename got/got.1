@@ -139,6 +139,8 @@ This option requires that all paths in the work tree are updated.
 Update the work tree to the specified
 .Ar commit .
 The expected argument is a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
 .El
@@ -179,6 +181,8 @@ will be omitted.
 Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl C Ar number
@@ -207,6 +211,8 @@ is specified, only show changes within this path.
 If two arguments are provided, treat each argument as a reference,
 or an object ID SHA1 hash, and display differences between these objects.
 Both objects must be of the same type (blobs, trees, or commits).
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .Pp
 The options for
 .Cm got diff
@@ -234,6 +240,8 @@ are as follows:
 Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -266,6 +274,8 @@ are as follows:
 List files and directories as they appear in the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -288,6 +298,8 @@ and make it point at the given
 .Ar target .
 The target may be an object ID SHA1 hash or an existing reference which
 will be resolved to an object ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .Pp
 The options for
 .Cm got ref
@@ -415,6 +427,8 @@ The specified
 .Ar commit
 must be on a different branch than the work tree's base commit.
 The expected argument is a reference or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -453,6 +467,8 @@ The specified
 .Ar commit
 must be on the same branch as the work tree's base commit.
 The expected argument is a reference or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description

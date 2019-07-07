@@ -127,6 +127,8 @@ are as follows:
 Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 If this option is not specified, default to the work tree's current branch
 if invoked in a work tree, or to the repository's HEAD reference.
 .It Fl r Ar repository-path
@@ -139,6 +141,8 @@ Display the differences between two objects in the repository.
 Each
 .Ar object
 argument is an object ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 Both objects must be of the same type (blobs, trees, or commits).
 If the
 .Ar repository path
@@ -214,6 +218,8 @@ are as follows:
 Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -267,6 +273,8 @@ are as follows:
 Start traversing history at the specified
 .Ar commit .
 The expected argument is the name of a branch or a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .El
 .El
 .Sh EXIT STATUS
