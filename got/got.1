@@ -86,6 +86,9 @@ reference will be used.
 .It Fl c Ar commit
 Check out files from the specified
 .Ar commit .
+The expected argument is a commit ID SHA1 hash.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the selected
 branch will be used.
 .It Fl p Ar path-prefix
