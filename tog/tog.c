@@ -1786,8 +1786,8 @@ search_next_log_view(struct tog_view *view)
 			 * allowing the main loop to make progress. Search
 			 * will resume at s->search_entry once we come back.
 			 */
-			s->thread_args.commits_needed = 1;
-			return trigger_log_thread(0,
+			s->thread_args.commits_needed++;
+			return trigger_log_thread(1,
 			    &s->thread_args.commits_needed,
 			    &s->thread_args.log_complete,
 			    &s->thread_args.need_commits);
