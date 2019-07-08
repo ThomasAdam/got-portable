@@ -6,9 +6,8 @@ CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 #CFLAGS += -DGOT_OBJ_CACHE_DEBUG
 
 .if defined(PROFILE)
-CC = gcc
 CPPFLAGS += -DPROFILE
-DEBUG = -O0 -pg
+DEBUG = -O0 -pg -g
 .else
 DEBUG = -O0 -g
 .endif
