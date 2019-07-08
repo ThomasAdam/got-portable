@@ -156,6 +156,7 @@ struct tog_log_view_state {
 	pthread_t thread;
 	struct tog_log_thread_args thread_args;
 	struct commit_queue_entry *matched_entry;
+	struct commit_queue_entry *search_entry;
 };
 
 struct tog_blame_cb_args {
@@ -1719,6 +1720,7 @@ search_start_log_view(struct tog_view *view)
 	struct tog_log_view_state *s = &view->state.log;
 
 	s->matched_entry = NULL;
+	s->search_entry = NULL;
 	return NULL;
 }
 
@@ -1752,7 +1754,13 @@ search_next_log_view(struct tog_view *view)
 		return NULL;
 	}
 
-	if (s->matched_entry) {
+	if (s->search_entry) {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			entry = TAILQ_NEXT(s->search_entry, entry);
+		else
+			entry = TAILQ_PREV(s->search_entry,
+			    commit_queue_head, entry);
+	} else if (s->matched_entry) {
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(s->selected_entry, entry);
 		else
@@ -1773,6 +1781,11 @@ search_next_log_view(struct tog_view *view)
 				view->search_next_done = 1;
 				return NULL;
 			}
+			/*
+			 * Poke the log thread for more commits and return,
+			 * allowing the main loop to make progress. Search
+			 * will resume at s->search_entry once we come back.
+			 */
 			s->thread_args.commits_needed = 1;
 			return trigger_log_thread(0,
 			    &s->thread_args.commits_needed,
@@ -1791,6 +1804,7 @@ search_next_log_view(struct tog_view *view)
 			break;
 		}
 		free(id_str);
+		s->search_entry = entry;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(entry, entry);
 		else
@@ -1812,6 +1826,8 @@ search_next_log_view(struct tog_view *view)
 			cur--;
 		}
 	}
+
+	s->search_entry = NULL;
 
 	return NULL;
 }
