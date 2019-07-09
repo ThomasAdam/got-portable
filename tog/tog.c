@@ -4538,46 +4538,23 @@ main(int argc, char *argv[])
 			if (strncmp(tog_commands[i].name, argv[0],
 			    strlen(argv[0])) == 0) {
 				cmd = &tog_commands[i];
-				if (hflag)
-					tog_commands[i].cmd_usage();
 				break;
 			}
 		}
+
 		if (cmd == NULL) {
-			/* Did the user specify a repository? */
-			char *repo_path = realpath(argv[0], NULL);
-			if (repo_path) {
-				struct got_repository *repo;
-				error = got_repo_open(&repo, repo_path);
-				if (error == NULL)
-					got_repo_close(repo);
-			} else
-				error = got_error_from_errno2("realpath",
-				    argv[0]);
-			if (error) {
-				if (hflag) {
-					fprintf(stderr, "%s: '%s' is not a "
-					    "known command\n", getprogname(),
-					    argv[0]);
-					usage();
-				}
-				fprintf(stderr, "%s: '%s' is neither a known "
-				    "command nor a path to a repository\n",
-				    getprogname(), argv[0]);
-				free(repo_path);
-				return 1;
-			}
-			cmd = &tog_commands[0];
-			cmd_argv = make_argv(cmd->name, repo_path);
-			argc = 2;
-			free(repo_path);
+			fprintf(stderr, "%s: unkown command '%s'\n",
+			    getprogname(), argv[0]);
+			usage();
+			return 1;
 		}
 	}
 
-	error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
-	if (error)
-		goto done;
-done:
+	if (hflag)
+		cmd->cmd_usage();
+	else
+		error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
+
 	endwin();
 	free(cmd_argv);
 	if (error)
