@@ -4543,7 +4543,7 @@ main(int argc, char *argv[])
 		}
 
 		if (cmd == NULL) {
-			fprintf(stderr, "%s: unkown command '%s'\n",
+			fprintf(stderr, "%s: unknown command '%s'\n",
 			    getprogname(), argv[0]);
 			usage();
 			return 1;
