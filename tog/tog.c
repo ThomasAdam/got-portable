@@ -71,7 +71,7 @@ struct tog_cmd {
 	void (*cmd_usage)(void);
 };
 
-__dead static void	usage(void);
+__dead static void	usage(int);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
@@ -4469,10 +4469,25 @@ done:
 	return error;
 }
 
+static void
+list_commands(void)
+{
+	int i;
+
+	fprintf(stderr, "commands:");
+	for (i = 0; i < nitems(tog_commands); i++) {
+		struct tog_cmd *cmd = &tog_commands[i];
+		fprintf(stderr, " %s", cmd->name);
+	}
+	fputc('\n', stderr);
+}
+
 __dead static void
-usage(void)
+usage(int hflag)
 {
 	fprintf(stderr, "usage: %s [-h] [command] [arg ...]\n", getprogname());
+	if (hflag)
+		list_commands();
 	exit(1);
 }
 
@@ -4513,7 +4528,7 @@ main(int argc, char *argv[])
 			hflag = 1;
 			break;
 		default:
-			usage();
+			usage(hflag);
 			/* NOTREACHED */
 		}
 	}
@@ -4525,7 +4540,7 @@ main(int argc, char *argv[])
 
 	if (argc == 0) {
 		if (hflag)
-			usage();
+			usage(hflag);
 		/* Build an argument vector which runs a default command. */
 		cmd = &tog_commands[0];
 		cmd_argv = make_argv(cmd->name, NULL);
@@ -4545,7 +4560,7 @@ main(int argc, char *argv[])
 		if (cmd == NULL) {
 			fprintf(stderr, "%s: unknown command '%s'\n",
 			    getprogname(), argv[0]);
-			usage();
+			list_commands();
 			return 1;
 		}
 	}

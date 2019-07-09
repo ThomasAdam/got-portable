@@ -73,7 +73,7 @@ struct got_cmd {
 	const char	*cmd_alias;
 };
 
-__dead static void	usage(void);
+__dead static void	usage(int);
 __dead static void	usage_init(void);
 __dead static void	usage_checkout(void);
 __dead static void	usage_update(void);
@@ -127,6 +127,19 @@ static struct got_cmd got_commands[] = {
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 };
 
+static void
+list_commands(void)
+{
+	int i;
+
+	fprintf(stderr, "commands:");
+	for (i = 0; i < nitems(got_commands); i++) {
+		struct got_cmd *cmd = &got_commands[i];
+		fprintf(stderr, " %s", cmd->cmd_name);
+	}
+	fputc('\n', stderr);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -143,7 +156,7 @@ main(int argc, char *argv[])
 			hflag = 1;
 			break;
 		default:
-			usage();
+			usage(hflag);
 			/* NOTREACHED */
 		}
 	}
@@ -153,7 +166,7 @@ main(int argc, char *argv[])
 	optind = 0;
 
 	if (argc <= 0)
-		usage();
+		usage(hflag);
 
 	signal(SIGINT, catch_sigint);
 	signal(SIGPIPE, catch_sigpipe);
@@ -180,13 +193,16 @@ main(int argc, char *argv[])
 	}
 
 	fprintf(stderr, "%s: unknown command '%s'\n", getprogname(), argv[0]);
+	list_commands();
 	return 1;
 }
 
 __dead static void
-usage(void)
+usage(int hflag)
 {
 	fprintf(stderr, "usage: %s [-h] command [arg ...]\n", getprogname());
+	if (hflag)
+		list_commands();
 	exit(1);
 }
 
