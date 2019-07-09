@@ -97,6 +97,9 @@ Only files beneath the specified
 .Ar path-prefix
 will be checked out.
 .El
+.It Cm co
+Short alias for
+.Cm checkout .
 .It Cm update [ Fl b Ar branch ] [ Fl c Ar commit ] [ Ar path ]
 Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
@@ -147,6 +150,9 @@ automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the work tree's
 branch will be used.
 .El
+.It Cm up
+Short alias for
+.Cm update .
 .It Cm status [ Ar path ]
 Show the current modification status of files in a work tree,
 using the following status codes:
@@ -164,6 +170,9 @@ using the following status codes:
 If a
 .Ar path
 is specified, only show modifications within this path.
+.It Cm st
+Short alias for
+.Cm status .
 .It Cm log [ Fl b ] [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
 If a
@@ -356,6 +365,9 @@ List all existing branches in the repository.
 .It Fl d Ar name
 Delete the branch with the specified name from the repository.
 .El
+.It Cm br
+Short alias for
+.Cm branch .
 .It Cm add Ar file-path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
@@ -383,6 +395,9 @@ it will become an unversioned file again.
 If a file was deleted with
 .Cm got rm
 it will be restored.
+.It Cm rv
+Short alias for
+.Cm revert .
 .It Cm commit [ Fl m Ar message ] [ file-path ]
 Create a new commit in the repository from local changes in a work tree
 and use this commit as the new base commit for the work tree.
@@ -422,6 +437,9 @@ option,
 .Cm got commit
 opens a temporary file in an editor where a log message can be written.
 .El
+.It Cm ci
+Short alias for
+.Cm commit .
 .It Cm cherrypick Ar commit
 Merge changes from a single
 .Ar commit
@@ -462,6 +480,9 @@ to a single base commit with
 .Cm got update .
 If the work tree already contains files with merge conflicts, these
 conflicts must be resolved first.
+.It Cm ch
+Short alias for
+.Cm cherrypick .
 .It Cm backout Ar commit
 Reverse-merge changes from a single
 .Ar commit
@@ -502,6 +523,9 @@ to a single base commit with
 .Cm got update .
 If the work tree already contains files with merge conflicts, these
 conflicts must be resolved first.
+.It Cm bo
+Short alias for
+.Cm backout .
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR

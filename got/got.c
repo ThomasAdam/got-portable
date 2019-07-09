@@ -70,6 +70,7 @@ struct got_cmd {
 	const char	 *cmd_name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void		(*cmd_usage)(void);
+	const char	*cmd_alias;
 };
 
 __dead static void	usage(void);
@@ -108,22 +109,22 @@ static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 
 static struct got_cmd got_commands[] = {
-	{ "init",	cmd_init,	usage_init },
-	{ "checkout",	cmd_checkout,	usage_checkout },
-	{ "update",	cmd_update,	usage_update },
-	{ "log",	cmd_log,	usage_log },
-	{ "diff",	cmd_diff,	usage_diff },
-	{ "blame",	cmd_blame,	usage_blame },
-	{ "tree",	cmd_tree,	usage_tree },
-	{ "status",	cmd_status,	usage_status },
-	{ "ref",	cmd_ref,	usage_ref },
-	{ "branch",	cmd_branch,	usage_branch },
-	{ "add",	cmd_add,	usage_add },
-	{ "rm",		cmd_rm,		usage_rm },
-	{ "revert",	cmd_revert,	usage_revert },
-	{ "commit",	cmd_commit,	usage_commit },
-	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick },
-	{ "backout",	cmd_backout,	usage_backout },
+	{ "init",	cmd_init,	usage_init,	"" },
+	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
+	{ "update",	cmd_update,	usage_update,	"up" },
+	{ "log",	cmd_log,	usage_log,	"" },
+	{ "diff",	cmd_diff,	usage_diff,	"" },
+	{ "blame",	cmd_blame,	usage_blame,	"" },
+	{ "tree",	cmd_tree,	usage_tree,	"" },
+	{ "status",	cmd_status,	usage_status,	"st" },
+	{ "ref",	cmd_ref,	usage_ref,	"" },
+	{ "branch",	cmd_branch,	usage_branch,	"br" },
+	{ "add",	cmd_add,	usage_add,	"" },
+	{ "rm",		cmd_rm,		usage_rm,	"" },
+	{ "revert",	cmd_revert,	usage_revert,	"rv" },
+	{ "commit",	cmd_commit,	usage_commit,	"ci" },
+	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "ch" },
+	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 };
 
 int
@@ -162,7 +163,8 @@ main(int argc, char *argv[])
 
 		cmd = &got_commands[i];
 
-		if (strncmp(cmd->cmd_name, argv[0], strlen(argv[0])))
+		if (strcmp(cmd->cmd_name, argv[0]) != 0 &&
+		    strcmp(cmd->cmd_alias, argv[0]) != 0)
 			continue;
 
 		if (hflag)
