@@ -123,7 +123,7 @@ static struct got_cmd got_commands[] = {
 	{ "remove",	cmd_remove,	usage_remove,	"rm" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
 	{ "commit",	cmd_commit,	usage_commit,	"ci" },
-	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "ch" },
+	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "cy" },
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 };
 
