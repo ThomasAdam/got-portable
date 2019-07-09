@@ -66,7 +66,7 @@ catch_sigpipe(int signo)
 }
 
 
-struct cmd {
+struct got_cmd {
 	const char	 *cmd_name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void		(*cmd_usage)(void);
@@ -107,7 +107,7 @@ static const struct got_error*		cmd_commit(int, char *[]);
 static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 
-static struct cmd got_commands[] = {
+static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init },
 	{ "checkout",	cmd_checkout,	usage_checkout },
 	{ "update",	cmd_update,	usage_update },
@@ -129,7 +129,7 @@ static struct cmd got_commands[] = {
 int
 main(int argc, char *argv[])
 {
-	struct cmd *cmd;
+	struct got_cmd *cmd;
 	unsigned int i;
 	int ch;
 	int hflag = 0;
