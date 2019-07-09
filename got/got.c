@@ -85,7 +85,7 @@ __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
 __dead static void	usage_branch(void);
 __dead static void	usage_add(void);
-__dead static void	usage_rm(void);
+__dead static void	usage_remove(void);
 __dead static void	usage_revert(void);
 __dead static void	usage_commit(void);
 __dead static void	usage_cherrypick(void);
@@ -102,7 +102,7 @@ static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
 static const struct got_error*		cmd_branch(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
-static const struct got_error*		cmd_rm(int, char *[]);
+static const struct got_error*		cmd_remove(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
 static const struct got_error*		cmd_commit(int, char *[]);
 static const struct got_error*		cmd_cherrypick(int, char *[]);
@@ -120,7 +120,7 @@ static struct got_cmd got_commands[] = {
 	{ "ref",	cmd_ref,	usage_ref,	"" },
 	{ "branch",	cmd_branch,	usage_branch,	"br" },
 	{ "add",	cmd_add,	usage_add,	"" },
-	{ "rm",		cmd_rm,		usage_rm,	"" },
+	{ "remove",	cmd_remove,	usage_remove,	"rm" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
 	{ "commit",	cmd_commit,	usage_commit,	"ci" },
 	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "ch" },
@@ -2506,14 +2506,14 @@ done:
 }
 
 __dead static void
-usage_rm(void)
+usage_remove(void)
 {
-	fprintf(stderr, "usage: %s rm [-f] file-path ...\n", getprogname());
+	fprintf(stderr, "usage: %s remove [-f] file-path ...\n", getprogname());
 	exit(1);
 }
 
 static const struct got_error *
-cmd_rm(int argc, char *argv[])
+cmd_remove(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
@@ -2540,7 +2540,7 @@ cmd_rm(int argc, char *argv[])
 	argv += optind;
 
 	if (argc < 1)
-		usage_rm();
+		usage_remove();
 
 	/* make sure each file exists before doing anything halfway */
 	for (i = 0; i < argc; i++) {

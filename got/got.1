@@ -371,7 +371,7 @@ Short alias for
 .It Cm add Ar file-path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
-.It Cm rm Ar file-path ...
+.It Cm remove Ar file-path ...
 Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
 .Pp
@@ -382,6 +382,9 @@ are as follows:
 .It Fl f
 Perform the operation even if a file contains uncommitted modifications.
 .El
+.It Cm rm
+Short alias for
+.Cm remove .
 .It Cm revert Ar file-path ...
 Revert any uncommited changes in files at the specified paths.
 File contents will be overwritten with those contained in the
