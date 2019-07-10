@@ -301,6 +301,40 @@ function test_commit_single_file_multiple {
 	test_done "$testroot" "0"
 }
 
+# This test currently fails because the writing trees during commit does
+# not properly account for trees which contain both added and modified files.
+function test_commit_added_and_modified_in_same_dir {
+	local testroot=`test_init commit_added_and_modified_in_same_dir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+	echo "new file" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new >/dev/null)
+
+	(cd $testroot/wt && got commit \
+		-m 'added and modified in same dir' > $testroot/stdout \
+		2> $testroot/stderr)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "M  epsilon/zeta" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		#diff -u $testroot/stdout.expected $testroot/stdout
+		ret="xfail ($(head -n 1 $testroot/stderr))"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -309,3 +343,4 @@ run_test test_commit_out_of_date
 run_test test_commit_added_subdirs
 run_test test_commit_rejects_conflicted_file
 run_test test_commit_single_file_multiple
+run_test test_commit_added_and_modified_in_same_dir
