@@ -44,10 +44,30 @@ function git_show_head
 	(cd $repo && git show --no-patch --pretty='format:%H')
 }
 
+function git_show_parent_commit
+{
+	local repo="$1"
+	(cd $repo && git show --no-patch --pretty='format:%P')
+}
+
 function git_show_tree
 {
 	local repo="$1"
 	(cd $repo && git show --no-patch --pretty='format:%T')
+}
+
+function trim_obj_id
+{
+	let trimcount=$1
+	id=$2
+
+	pat=""
+	while [ trimcount -gt 0 ]; do
+		pat="[0-9a-f]$pat"
+		let trimcount--
+	done
+
+	echo ${id%$pat}
 }
 
 function git_commit_tree

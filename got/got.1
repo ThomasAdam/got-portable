@@ -529,6 +529,72 @@ conflicts must be resolved first.
 .It Cm bo
 Short alias for
 .Cm backout .
+.It Cm rebase Ar branch
+Rebase commits on the specified
+.Ar branch
+onto the tip of the current branch of the work tree.
+The
+.Ar branch
+must share common ancestry with the work tree's current branch.
+Rebasing begins with the first descendent of the youngest common
+ancestor commit of
+.Ar branch
+and the work tree's current branch, and stops once the tip commit
+of
+.Ar branch
+has been reached.
+.Pp
+Rebased commits are accumulated on a temporary branch and represent
+the same changes and log messages as their counterparts on the original
+.Ar branch ,
+but with different commit IDs.
+Once rebasing has completed successfully, the temporary branch becomes
+the new version of
+.Ar branch
+and the work tree is automatically switched to it.
+.Pp
+While rebasing commits, show the status of each affected file,
+using the following status codes:
+.Bl -column YXZ description
+.It G Ta file was merged
+.It C Ta file was merged and conflicts occurred during merge
+.It ! Ta changes destined for a missing file were not merged
+.It D Ta file was deleted
+.It d Ta file's deletion was obstructed by local modifications
+.It A Ta new file was added
+.It ~ Ta changes destined for a non-regular file were not merged
+.El
+.Pp
+If merge conflicts occur, the rebase operation will be interrupted and
+may be continued once conflicts have been resolved.
+Alternatively, the rebase operation may be aborted which will leave
+.Ar branch
+unmodified and the work tree switched back to its original branch.
+.Pp
+.Cm got rebase
+will refuse to run if certain preconditions are not met.
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If the work tree contains local changes, these changes must be committed
+or reverted first.
+.Pp
+Some
+.Nm
+commands may refuse to run while a rebase operation is in progress.
+.Pp
+The options for
+.Cm got rebase
+are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Abort an interrupted rebase operation.
+.It Fl c
+Continue an interrupted current rebase operation.
+.El
+.It Cm rb
+Short alias for
+.Cm rebase .
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
@@ -619,20 +685,9 @@ Rebase the
 branch on top of the new head commit of the
 .Dq master
 branch.
-This step currently requires
-.Xr git 1 :
 .Pp
-.Dl $ git clone /var/git/src.git ~/src-git-wt
-.Dl $ cd ~/src-git-wt
-.Dl $ git checkout unified-buffer-cache
-.Dl $ git rebase master
-.Dl $ git push -f
-.Pp
-Update the work tree to the newly rebased
-.Dq unified-buffer-cache
-branch:
-.Pp
-.Dl $ got update -b unified-buffer-cache
+.Dl $ got update -b master
+.Dl $ got rebase unified-buffer-cache
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5

@@ -97,6 +97,10 @@
 #define GOT_ERR_MIXED_COMMITS	81
 #define GOT_ERR_CONFLICTS	82
 #define GOT_ERR_BRANCH_EXISTS	83
+#define GOT_ERR_MODIFIED	84
+#define GOT_ERR_NOT_REBASING	85
+#define GOT_ERR_EMPTY_REBASE	86
+#define GOT_ERR_REBASE_COMMITID	87
 
 static const struct got_error {
 	int code;
@@ -189,6 +193,11 @@ static const struct got_error {
 	{ GOT_ERR_CONFLICTS,	"work tree contains conflicted files; these "
 	    "conflicts must be resolved first" },
 	{ GOT_ERR_BRANCH_EXISTS,"specified branch already exists" },
+	{ GOT_ERR_MODIFIED,	"work tree contains local changes; these "
+	    "changes must be committed or reverted first" },
+	{ GOT_ERR_NOT_REBASING,	"rebase operation not in progress" },
+	{ GOT_ERR_EMPTY_REBASE,	"no commits to rebase" },
+	{ GOT_ERR_REBASE_COMMITID,"rebase commit ID mismatch" },
 };
 
 /*

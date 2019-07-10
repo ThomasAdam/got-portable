@@ -65,3 +65,15 @@ struct got_commitable {
 
 const struct got_error *got_worktree_get_base_ref_name(char **,
     struct got_worktree *worktree);
+
+/* Temporary branch which accumulates commits during a rebase operation. */
+#define GOT_WORKTREE_REBASE_TMP_REF_PREFIX "refs/got/worktree/rebase/tmp"
+
+/* Symbolic reference pointing at the name of the new base branch. */
+#define GOT_WORKTREE_NEWBASE_REF_PREFIX "refs/got/worktree/rebase/newbase"
+
+/* Symbolic reference pointing at the name of the branch being rebased. */
+#define GOT_WORKTREE_REBASE_BRANCH_REF_PREFIX "refs/got/worktree/rebase/branch"
+
+/* Reference pointing at the ID of the current commit being rebased. */
+#define GOT_WORKTREE_REBASE_COMMIT_REF_PREFIX "refs/got/worktree/rebase/commit"

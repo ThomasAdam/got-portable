@@ -473,7 +473,8 @@ fetch_commits_from_open_branches(int *nfetched,
 	int i, ntips;
 
 	*nfetched = 0;
-	*changed_id = NULL;
+	if (changed_id)
+		*changed_id = NULL;
 
 	ntips = got_object_idset_num_elements(graph->open_branches);
 	if (ntips == 0)
@@ -517,7 +518,7 @@ fetch_commits_from_open_branches(int *nfetched,
 			    commit, repo);
 		if (err)
 			break;
-		if (changed && *changed_id == NULL)
+		if (changed && changed_id && *changed_id == NULL)
 			*changed_id = commit_id;
 	}
 done:
@@ -578,8 +579,16 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	int changed;
 
 	start_node = got_object_idset_get(graph->node_ids, id);
-	if (start_node == NULL)
-		return got_error_no_obj(id);
+	while (start_node == NULL) {
+		int ncommits;
+		err = fetch_commits_from_open_branches(&ncommits, NULL, graph,
+		    repo);
+		if (err)
+			return err;
+		if (ncommits == 0)
+			return got_error_no_obj(id);
+		start_node = got_object_idset_get(graph->node_ids, id);
+	}
 
 	err = got_object_open_as_commit(&commit, repo, &start_node->id);
 	if (err)

@@ -16,6 +16,7 @@
 
 struct got_worktree;
 struct got_commitable;
+struct got_commit_object;
 
 /* status codes */
 #define GOT_STATUS_NO_CHANGE	' '
@@ -208,3 +209,66 @@ const char *got_commitable_get_path(struct got_commitable *);
 
 /* Get the status of a commitable worktree item. */
 unsigned int got_commitable_get_status(struct got_commitable *);
+
+/*
+ * Prepare for rebasing a branch onto the work tree's current branch.
+ * This function creates references to a temporary branch, the branch
+ * being rebased, and the work tree's current branch, under the
+ * "got/worktree/rebase/" namespace. These references are used to
+ * keep track of rebase operation state and are used as input and/or
+ * output arguments with other rebase-related functions.
+ */
+const struct got_error *got_worktree_rebase_prepare(struct got_reference **,
+    struct got_reference **, struct got_worktree *, struct got_reference *,
+    struct got_repository *);
+
+/*
+ * Continue an interrupted rebase operation.
+ * This function returns existing references created when rebase was prepared,
+ * and the ID of the commit currently being rebased. This should be called
+ * before either resuming or aborting a rebase operation.
+ */
+const struct got_error *got_worktree_rebase_continue(struct got_object_id **,
+    struct got_reference **, struct got_reference **, struct got_reference **,
+    struct got_worktree *, struct got_repository *);
+
+/* Check whether a, potentially interrupted, rebase operation is in progress. */
+const struct got_error *got_worktree_rebase_in_progress(int *,
+    struct got_worktree *);
+
+/*
+ * Merge changes from the commit currently being rebased into the work tree.
+ * Report affected files, including merge conflicts, via the specified
+ * progress callback.
+ */
+const struct got_error *got_worktree_rebase_merge_files(
+    struct got_worktree *, struct got_object_id *, struct got_object_id *,
+    struct got_repository *, got_worktree_checkout_cb, void *,
+    got_worktree_cancel_cb, void *);
+
+/*
+ * Commit merged rebased changes to a temporary branch and return the
+ * ID of the newly created commit.
+ */
+const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
+    struct got_worktree *, struct got_reference *, struct got_commit_object *,
+    struct got_object_id *, struct got_repository *);
+
+/* Postpone the rebase operation. Should be called after a merge conflict. */
+const struct got_error *got_worktree_rebase_postpone(struct got_worktree *);
+
+/*
+ * Complete the current rebase operation. This should be called once all
+ * commits have been rebased successfully.
+ */
+const struct got_error *got_worktree_rebase_complete(struct got_worktree *,
+    struct got_reference *, struct got_reference *, struct got_reference *,
+    struct got_repository *);
+
+/*
+ * Abort the current rebase operation.
+ * Report reverted files via the specified progress callback.
+ */
+const struct got_error *got_worktree_rebase_abort(struct got_worktree *,
+    struct got_repository *, struct got_reference *,
+    got_worktree_checkout_cb, void *);
