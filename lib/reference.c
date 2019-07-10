@@ -296,6 +296,16 @@ got_ref_alloc(struct got_reference **ref, const char *name,
 	return alloc_ref(ref, name, id, 0);
 }
 
+const struct got_error *
+got_ref_alloc_symref(struct got_reference **ref, const char *name,
+	struct got_reference *target_ref)
+{
+	if (!is_valid_ref_name(name))
+		return got_error(GOT_ERR_BAD_REF_NAME);
+
+	return alloc_symref(ref, name, got_ref_get_name(target_ref), 0);
+}
+
 static const struct got_error *
 parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
     const char *line)
@@ -597,6 +607,15 @@ got_ref_get_name(struct got_reference *ref)
 		return ref->ref.symref.name;
 
 	return ref->ref.ref.name;
+}
+
+const char *
+got_ref_get_symref_target(struct got_reference *ref)
+{
+	if (ref->flags & GOT_REF_IS_SYMBOLIC)
+		return ref->ref.symref.ref;
+
+	return NULL;
 }
 
 static const struct got_error *

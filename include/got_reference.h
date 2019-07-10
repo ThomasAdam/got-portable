@@ -43,11 +43,21 @@ const struct got_error *got_ref_open(struct got_reference **,
 const struct got_error *got_ref_alloc(struct got_reference **, const char *,
     struct got_object_id *);
 
+/*
+ * Allocate a new symbolic reference which points at a given reference.
+ * The caller must dispose of it with got_ref_close().
+ */
+const struct got_error *got_ref_alloc_symref(struct got_reference **,
+    const char *, struct got_reference *);
+
 /* Dispose of a reference. */
 void got_ref_close(struct got_reference *);
 
 /* Get the name of the reference. */
 const char *got_ref_get_name(struct got_reference *);
+
+/* Get the name of the reference which a symoblic reference points at. */
+const char *got_ref_get_symref_target(struct got_reference *);
 
 /*
  * Create a duplicate copy of a reference.
