@@ -1429,7 +1429,7 @@ done:
 	if (err) {
 		free(*fileindex_path);
 		*fileindex_path = NULL;
-		free(*fileindex);
+		got_fileindex_free(*fileindex);
 		*fileindex = NULL;
 	}
 	return err;
