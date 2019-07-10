@@ -2875,6 +2875,45 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 }
 
 static const struct got_error *
+make_subtree_for_added_blob(struct got_tree_entry **new_tep,
+    const char *child_path, const char *path_base_tree,
+    struct got_pathlist_head *commitable_paths,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_entry *new_te;
+	char *subtree_path;
+
+	*new_tep = NULL;
+
+	if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
+	    got_path_is_root_dir(path_base_tree) ? "" : "/",
+	    child_path) == -1)
+		return got_error_from_errno("asprintf");
+
+	new_te = calloc(1, sizeof(*new_te));
+	new_te->mode = S_IFDIR;
+	new_te->name = strdup(child_path);
+	if (new_te->name == NULL) {
+		err = got_error_from_errno("strdup");
+		got_object_tree_entry_close(new_te);
+		goto done;
+	}
+	err = write_tree(&new_te->id, NULL, subtree_path,
+	    commitable_paths, status_cb, status_arg, repo);
+	if (err) {
+		got_object_tree_entry_close(new_te);
+		goto done;
+	}
+done:
+	free(subtree_path);
+	if (err == NULL)
+		*new_tep = new_te;
+	return err;
+}
+
+static const struct got_error *
 write_tree(struct got_object_id **new_tree_id,
     struct got_tree_object *base_tree, const char *path_base_tree,
     struct got_pathlist_head *commitable_paths,
@@ -2919,38 +2958,25 @@ write_tree(struct got_object_id **new_tree_id,
 			if (err)
 				goto done;
 			ct->flags |= GOT_COMMITABLE_ADDED;
+			err = insert_tree_entry(new_te, &paths);
+			if (err)
+				goto done;
 		} else {
-			char *subtree_path;
-
 			*slash = '\0'; /* trim trailing path components */
-			if (asprintf(&subtree_path, "%s%s%s", path_base_tree,
-			    got_path_is_root_dir(path_base_tree) ? "" : "/",
-			    child_path) == -1) {
-				err = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			new_te = calloc(1, sizeof(*new_te));
-			new_te->mode = S_IFDIR;
-			new_te->name = strdup(child_path);
-			if (new_te->name == NULL) {
-				err = got_error_from_errno("strdup");
-				got_object_tree_entry_close(new_te);
-				new_te = NULL;
-				goto done;
-			}
-			err = write_tree(&new_te->id, NULL, subtree_path,
-			    commitable_paths, status_cb, status_arg, repo);
-			free(subtree_path);
-			if (err) {
-				got_object_tree_entry_close(new_te);
-				new_te = NULL;
-				goto done;
+			if (base_tree == NULL ||
+			    got_object_tree_find_entry(base_tree, child_path)
+			    == NULL) {
+				err = make_subtree_for_added_blob(&new_te,
+				    child_path, path_base_tree,
+				    commitable_paths, status_cb, status_arg,
+				    repo);
+				if (err)
+					goto done;
+				err = insert_tree_entry(new_te, &paths);
+				if (err)
+					goto done;
 			}
 		}
-		err = insert_tree_entry(new_te, &paths);
-		if (err)
-			goto done;
 	}
 
 	if (base_tree) {

@@ -301,8 +301,6 @@ function test_commit_single_file_multiple {
 	test_done "$testroot" "0"
 }
 
-# This test currently fails because the writing trees during commit does
-# not properly account for trees which contain both added and modified files.
 function test_commit_added_and_modified_in_same_dir {
 	local testroot=`test_init commit_added_and_modified_in_same_dir`
 
@@ -329,8 +327,7 @@ function test_commit_added_and_modified_in_same_dir {
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		#diff -u $testroot/stdout.expected $testroot/stdout
-		ret="xfail ($(head -n 1 $testroot/stderr))"
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
