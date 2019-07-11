@@ -2211,28 +2211,42 @@ usage_branch(void)
 }
 
 static const struct got_error *
-list_branches(struct got_repository *repo)
+list_branches(struct got_repository *repo, struct got_worktree *worktree)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 
 	SIMPLEQ_INIT(&refs);
+
 	err = got_ref_list(&refs, repo);
 	if (err)
 		return err;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
-		const char *refname;
+		const char *refname, *marker = "  ";
 		char *refstr;
 		refname = got_ref_get_name(re->ref);
 		if (strncmp(refname, "refs/heads/", 11) != 0)
 			continue;
+		if (worktree && strcmp(refname,
+		    got_worktree_get_head_ref_name(worktree)) == 0) {
+			struct got_object_id *id = NULL;
+			err = got_ref_resolve(&id, repo, re->ref);
+			if (err)
+				return err;
+			if (got_object_id_cmp(id,
+			    got_worktree_get_base_commit_id(worktree)) == 0)
+				marker = "* ";
+			else
+				marker = "~ ";
+			free(id);
+		}
 		refname += 11;
 		refstr = got_ref_to_str(re->ref);
 		if (refstr == NULL)
 			return got_error_from_errno("got_ref_to_str");
-		printf("%s: %s\n", refname, refstr);
+		printf("%s%s: %s\n", marker, refname, refstr);
 		free(refstr);
 	}
 
@@ -2403,7 +2417,7 @@ cmd_branch(int argc, char *argv[])
 		goto done;
 
 	if (do_list)
-		error = list_branches(repo);
+		error = list_branches(repo, worktree);
 	else if (delref)
 		error = delete_branch(repo, delref);
 	else {
