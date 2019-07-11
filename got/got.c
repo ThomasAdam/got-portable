@@ -3263,7 +3263,7 @@ show_rebase_progress(struct got_commit_object *commit,
 	}
 	logmsg = logmsg0;
 
-	while (isspace(logmsg[0]))
+	while (isspace((unsigned char)logmsg[0]))
 		logmsg++;
 
 	old_id_str[12] = '\0';

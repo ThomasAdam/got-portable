@@ -332,10 +332,10 @@ got_object_commit_create(struct got_object_id **id,
 		return got_error_from_errno("strdup");
 	msg = msg0;
 
-	while (isspace(msg[0]))
+	while (isspace((unsigned char)msg[0]))
 		msg++;
 	len = strlen(msg);
-	while (len > 0 && isspace(msg[len - 1])) {
+	while (len > 0 && isspace((unsigned char)msg[len - 1])) {
 		msg[len - 1] = '\0';
 		len--;
 	}
