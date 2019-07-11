@@ -492,8 +492,8 @@ function test_rebase_no_op_change {
 	test_done "$testroot" "$ret"
 }
 
-#run_test test_rebase_basic
-#run_test test_rebase_ancestry_check
-#run_test test_rebase_continue
-#run_test test_rebase_abort
+run_test test_rebase_basic
+run_test test_rebase_ancestry_check
+run_test test_rebase_continue
+run_test test_rebase_abort
 run_test test_rebase_no_op_change
