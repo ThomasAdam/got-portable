@@ -536,20 +536,21 @@ onto the tip of the current branch of the work tree.
 The
 .Ar branch
 must share common ancestry with the work tree's current branch.
-Rebasing begins with the first descendent of the youngest common
-ancestor commit of
+Rebasing begins with the first descendent commit of the youngest
+common ancestor commit shared by the specified
 .Ar branch
 and the work tree's current branch, and stops once the tip commit
-of
+of the specified
 .Ar branch
-has been reached.
+has been rebased.
 .Pp
 Rebased commits are accumulated on a temporary branch and represent
-the same changes and log messages as their counterparts on the original
+the same changes with the same log messages as their counterparts
+on the original
 .Ar branch ,
 but with different commit IDs.
 Once rebasing has completed successfully, the temporary branch becomes
-the new version of
+the new version of the specified
 .Ar branch
 and the work tree is automatically switched to it.
 .Pp
@@ -565,22 +566,26 @@ using the following status codes:
 .It ~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
-If merge conflicts occur, the rebase operation will be interrupted and
-may be continued once conflicts have been resolved.
+If merge conflicts occur the rebase operation is interrupted and may
+be continued once conflicts have been resolved.
 Alternatively, the rebase operation may be aborted which will leave
 .Ar branch
 unmodified and the work tree switched back to its original branch.
 .Pp
 If a merge conflict is resolved in a way which renders the merged
-change into a no-op change, the corresponding commit will be elided.
+change into a no-op change, the corresponding commit will be elided
+when the rebase operation continues.
 .Pp
 .Cm got rebase
 will refuse to run if certain preconditions are not met.
 If the work tree contains multiple base commits it must first be updated
 to a single base commit with
 .Cm got update .
-If the work tree contains local changes, these changes must be committed
-or reverted first.
+If the work tree contains local changes, these changes must first be
+committed with
+.Cm got commit
+or reverted with
+.Cm got revert .
 If the
 .Ar branch
 contains changes to files outside of the work tree's path prefix,
