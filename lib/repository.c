@@ -472,7 +472,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 
 	repo_abspath = got_repo_get_path(repo);
 
-	if (!check_disk) {
+	if (!check_disk || canonpath[0] == '\0') {
 		path = strdup(canonpath);
 		if (path == NULL) {
 			err = got_error_from_errno("strdup");
