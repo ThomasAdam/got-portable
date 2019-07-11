@@ -582,9 +582,13 @@ to a single base commit with
 If the work tree contains local changes, these changes must be committed
 or reverted first.
 .Pp
-Some
-.Nm
-commands may refuse to run while a rebase operation is in progress.
+The
+.Cm got update
+and
+.Cm got commit
+commands will refuse to run while a rebase operation is in progress.
+Other commands which manipulate the work tree may be used for
+conflict resolution purposes.
 .Pp
 The options for
 .Cm got rebase

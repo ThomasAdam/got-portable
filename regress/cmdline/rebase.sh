@@ -492,8 +492,106 @@ function test_rebase_no_op_change {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_in_progress {
+	local testroot=`test_init rebase_no_op_change`
+	local init_commit=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local orig_commit1=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo "C  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: conflicts must be resolved before rebase can be resumed" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
+	echo "modified alpha on branch" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "modified alpha on master" >> $testroot/content.expected
+	echo '>>>>>>> alpha' >> $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "C  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for cmd in update commit; do
+		(cd $testroot/wt && got $cmd > $testroot/stdout \
+			2> $testroot/stderr)
+
+		echo -n > $testroot/stdout.expected
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+
+		echo -n "got: a rebase operation is in progress in this " \
+			> $testroot/stderr.expected
+		echo "work tree and must be continued or aborted first" \
+			>> $testroot/stderr.expected
+		cmp -s $testroot/stderr.expected $testroot/stderr
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
 run_test test_rebase_abort
 run_test test_rebase_no_op_change
+run_test test_rebase_in_progress
