@@ -3206,7 +3206,8 @@ done:
 __dead static void
 usage_rebase(void)
 {
-	fprintf(stderr, "usage: %s rebase [-a] [-c] | branch\n", getprogname());
+	fprintf(stderr, "usage: %s rebase [-a] | [-c] | branch\n",
+	    getprogname());
 	exit(1);
 }
 
