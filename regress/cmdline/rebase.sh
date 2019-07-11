@@ -634,6 +634,63 @@ function test_rebase_path_prefix {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_preserves_logmsg {
+	local testroot=`test_init rebase_preserves_logmsg`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "modified delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha on newbranch"
+
+	(cd $testroot/repo && got log -c newbranch -l2 | grep -v ^date: \
+		> $testroot/log.expected)
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > /dev/null \
+		2> $testroot/stderr)
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -c newbranch -l2 | grep -v ^date: \
+		> $testroot/log)
+	sed -i -e "s/$orig_commit1/$new_commit1/" $testroot/log.expected
+	sed -i -e "s/$orig_commit2/$new_commit2/" $testroot/log.expected
+	cmp -s $testroot/log.expected $testroot/log
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/log.expected $testroot/log
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -641,3 +698,4 @@ run_test test_rebase_abort
 run_test test_rebase_no_op_change
 run_test test_rebase_in_progress
 run_test test_rebase_path_prefix
+run_test test_rebase_preserves_logmsg

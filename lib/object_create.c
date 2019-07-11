@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -320,10 +321,24 @@ got_object_commit_create(struct got_object_id **id,
 	size_t headerlen, len = 0, n;
 	FILE *commitfile = NULL;
 	struct got_object_qid *qid;
+	char *msg0, *msg;
 
 	*id = NULL;
 
 	SHA1Init(&sha1_ctx);
+
+	msg0 = strdup(logmsg);
+	if (msg0 == NULL)
+		return got_error_from_errno("strdup");
+	msg = msg0;
+
+	while (isspace(msg[0]))
+		msg++;
+	len = strlen(msg);
+	while (len > 0 && isspace(msg[len - 1])) {
+		msg[len - 1] = '\0';
+		len--;
+	}
 
 	if (asprintf(&author_str, "%s%s %lld +0000\n",
 	    GOT_COMMIT_LABEL_AUTHOR, author, author_time) == -1)
@@ -340,7 +355,7 @@ got_object_commit_create(struct got_object_id **id,
 	len = strlen(GOT_COMMIT_LABEL_TREE) + SHA1_DIGEST_STRING_LENGTH +
 	    nparents *
 	    (strlen(GOT_COMMIT_LABEL_PARENT) + SHA1_DIGEST_STRING_LENGTH) +
-	    + strlen(author_str) + strlen(committer_str) + 2 + strlen(logmsg);
+	    + strlen(author_str) + strlen(committer_str) + 2 + strlen(msg);
 
 	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_COMMIT, len) == -1) {
 		err = got_error_from_errno("asprintf");
@@ -424,9 +439,9 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	}
 
-	len = strlen(logmsg);
-	SHA1Update(&sha1_ctx, logmsg, len);
-	n = fwrite(logmsg, 1, len, commitfile);
+	len = strlen(msg);
+	SHA1Update(&sha1_ctx, msg, len);
+	n = fwrite(msg, 1, len, commitfile);
 	if (n != len) {
 		err = got_ferror(commitfile, GOT_ERR_IO);
 		goto done;
@@ -454,6 +469,7 @@ got_object_commit_create(struct got_object_id **id,
 
 	err = create_object_file(*id, commitfile, repo);
 done:
+	free(msg0);
 	free(header);
 	free(tree_str);
 	free(author_str);
