@@ -775,6 +775,10 @@ cmd_update(int argc, char *argv[])
 		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
 		if (error != NULL)
 			goto done;
+		free(commit_id_str);
+		error = got_object_id_str(&commit_id_str, commit_id);
+		if (error)
+			goto done;
 	}
 
 	if (branch_name) {
@@ -1478,7 +1482,7 @@ cmd_diff(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		label1 = strdup(id_str1);
+		error = got_object_id_str(&label1, id1);
 		if (label1 == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
@@ -1504,7 +1508,7 @@ cmd_diff(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		label2 = strdup(id_str2);
+		error = got_object_id_str(&label2, id2);
 		if (label2 == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
