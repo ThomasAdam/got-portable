@@ -3207,9 +3207,11 @@ show_rebase_progress(struct got_commit_object *commit,
 	if (err)
 		goto done;
 
-	err = got_object_id_str(&new_id_str, new_id);
-	if (err)
-		goto done;
+	if (new_id) {
+		err = got_object_id_str(&new_id_str, new_id);
+		if (err)
+			goto done;
+	}
 
 	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
 	if (logmsg0 == NULL) {
@@ -3222,7 +3224,8 @@ show_rebase_progress(struct got_commit_object *commit,
 		logmsg++;
 
 	old_id_str[12] = '\0';
-	new_id_str[12] = '\0';
+	if (new_id_str)
+		new_id_str[12] = '\0';
 	len = strlen(logmsg);
 	if (len > 42)
 		len = 42;
@@ -3230,7 +3233,8 @@ show_rebase_progress(struct got_commit_object *commit,
 	nl = strchr(logmsg, '\n');
 	if (nl)
 		*nl = '\0';
-	printf("%s -> %s: %s\n", old_id_str, new_id_str, logmsg);
+	printf("%s -> %s: %s\n", old_id_str,
+	    new_id_str ? new_id_str : "no-op change", logmsg);
 done:
 	free(old_id_str);
 	free(new_id_str);
@@ -3261,6 +3265,33 @@ rebase_complete(struct got_worktree *worktree, struct got_reference *branch,
 	printf("Switching work tree to %s\n", got_ref_get_name(branch));
 	return got_worktree_rebase_complete(worktree,
 	    new_base_branch, tmp_branch, branch, repo);
+}
+
+static const struct got_error *
+rebase_commit(struct got_worktree *worktree, struct got_reference *tmp_branch,
+   struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *error;
+	struct got_commit_object *commit;
+	struct got_object_id *new_commit_id;
+
+	error = got_object_open_as_commit(&commit, repo, commit_id);
+	if (error)
+		return error;
+
+	error = got_worktree_rebase_commit(&new_commit_id, worktree,
+	    tmp_branch, commit, commit_id, repo);
+	if (error) {
+		if (error->code != GOT_ERR_COMMIT_NO_CHANGES)
+			goto done;
+		error = show_rebase_progress(commit, commit_id, NULL);
+	} else {
+		error = show_rebase_progress(commit, commit_id, new_commit_id);
+		free(new_commit_id);
+	}
+done:
+	got_object_commit_close(commit);
+	return error;
 }
 
 static const struct got_error *
@@ -3353,50 +3384,19 @@ cmd_rebase(int argc, char *argv[])
 	}
 
 	if (continue_rebase) {
-		struct got_object_id *new_commit_id;
-
 		error = got_worktree_rebase_continue(&resume_commit_id,
 		    &new_base_branch, &tmp_branch, &branch, worktree, repo);
 		if (error)
 			goto done;
-		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-		    got_worktree_get_base_commit_id(worktree),
-		    resume_commit_id, repo);
+
+		error = rebase_commit(worktree, tmp_branch, resume_commit_id,
+		    repo);
 		if (error)
 			goto done;
+
+		yca_id = got_object_id_dup(resume_commit_id);
 		if (yca_id == NULL) {
-			error = got_error_msg(GOT_ERR_ANCESTRY,
-			    "cannot determine common ancestor commit for "
-			    "continued rebase operation");
-			goto done;
-		}
-		error = got_object_open_as_commit(&commit, repo,
-		    resume_commit_id);
-		if (error)
-			goto done;
-
-		error = got_worktree_rebase_commit(&new_commit_id, worktree,
-		    tmp_branch, commit, resume_commit_id, repo);
-		if (error)
-			goto done;
-		error = show_rebase_progress(commit, resume_commit_id,
-		    new_commit_id);
-		free(new_commit_id);
-		free(resume_commit_id);
-
-		resume_commit_id = got_object_id_dup(SIMPLEQ_FIRST(
-		    got_object_commit_get_parent_ids(commit))->id);
-		if (resume_commit_id == NULL) {
 			error = got_error_from_errno("got_object_id_dup");
-			goto done;
-		}
-		got_object_commit_close(commit);
-		commit = NULL;
-		commit_id = resume_commit_id;
-		if (got_object_id_cmp(resume_commit_id, yca_id) == 0) {
-			error = rebase_complete(worktree, branch,
-			    new_base_branch, tmp_branch, repo);
-			/* YCA has been reached; we are done. */
 			goto done;
 		}
 	} else {
@@ -3416,10 +3416,13 @@ cmd_rebase(int argc, char *argv[])
 			    "is already contained in work tree's branch");
 			goto done;
 		}
+	}
 
-		error = got_ref_resolve(&branch_head_commit_id, repo, branch);
-		if (error)
-			goto done;
+	error = got_ref_resolve(&branch_head_commit_id, repo, branch);
+	if (error)
+		goto done;
+
+	if (!continue_rebase) {
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
 		    got_worktree_get_base_commit_id(worktree),
 		    branch_head_commit_id, repo);
@@ -3436,9 +3439,9 @@ cmd_rebase(int argc, char *argv[])
 		    &tmp_branch, worktree, branch, repo);
 		if (error)
 			goto done;
-		commit_id = branch_head_commit_id;
 	}
 
+	commit_id = branch_head_commit_id;
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
@@ -3477,14 +3480,16 @@ cmd_rebase(int argc, char *argv[])
 	}
 
 	if (SIMPLEQ_EMPTY(&commits)) {
-		error = got_error(GOT_ERR_EMPTY_REBASE);
+		if (continue_rebase)
+			error = rebase_complete(worktree, branch,
+			    new_base_branch, tmp_branch, repo);
+		else
+			error = got_error(GOT_ERR_EMPTY_REBASE);
 		goto done;
 	}
 
 	pid = NULL;
 	SIMPLEQ_FOREACH(qid, &commits, entry) {
-		struct got_object_id *new_commit_id;
-
 		commit_id = qid->id;
 		parent_id = pid ? pid->id : yca_id;
 		pid = qid;
@@ -3498,20 +3503,9 @@ cmd_rebase(int argc, char *argv[])
 		if (rebase_status == GOT_STATUS_CONFLICT)
 			break;
 
-		error = got_object_open_as_commit(&commit, repo, commit_id);
+		error = rebase_commit(worktree, tmp_branch, commit_id, repo);
 		if (error)
 			goto done;
-		error = got_worktree_rebase_commit(&new_commit_id, worktree,
-		    tmp_branch, commit, commit_id, repo);
-		if (error)
-			goto done;
-		error = show_rebase_progress(commit, commit_id, new_commit_id);
-		free(new_commit_id);
-		got_object_commit_close(commit);
-		commit = NULL;
-		if (error)
-			goto done;
-
 	}
 
 	if (rebase_status == GOT_STATUS_CONFLICT) {

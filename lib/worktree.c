@@ -3803,8 +3803,16 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	    got_object_commit_get_committer(orig_commit),
 	    collect_rebase_commit_msg, orig_commit,
 	    rebase_status, NULL, repo);
-	if (err)
+	if (err) {
+		if (err->code == GOT_ERR_COMMIT_NO_CHANGES) {
+			/* No-op change; commit will be elided. */
+			err = got_ref_delete(commit_ref, repo);
+			if (err)
+				goto done;
+			err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
+		}
 		goto done;
+	}
 
 	err = got_ref_delete(commit_ref, repo);
 	if (err)

@@ -571,6 +571,9 @@ Alternatively, the rebase operation may be aborted which will leave
 .Ar branch
 unmodified and the work tree switched back to its original branch.
 .Pp
+If a merge conflict is resolved in a way which renders the merged
+change into a no-op change, the corresponding commit will be elided.
+.Pp
 .Cm got rebase
 will refuse to run if certain preconditions are not met.
 If the work tree contains multiple base commits it must first be updated
