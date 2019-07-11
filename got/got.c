@@ -2285,6 +2285,14 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	char *base_refname = NULL, *refname = NULL;
 	struct got_reference *base_ref;
 
+	/*
+	 * Don't let the user create a branch named '-'.
+	 * While technically a valid reference name, this case is usually
+	 * an unintended typo.
+	 */
+	if (branch_name[0] == '-' && branch_name[1] == '\0')
+		return got_error(GOT_ERR_BAD_REF_NAME);
+
 	if (strcmp(GOT_REF_HEAD, base_branch) == 0) {
 		base_refname = strdup(GOT_REF_HEAD);
 		if (base_refname == NULL)
