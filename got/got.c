@@ -3367,7 +3367,6 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
 		goto done;
