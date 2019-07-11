@@ -376,7 +376,7 @@ Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
 .Pp
 The options for
-.Cm got rm
+.Cm got remove
 are as follows:
 .Bl -tag -width Ds
 .It Fl f
@@ -396,7 +396,7 @@ If a file was added with
 .Cm got add
 it will become an unversioned file again.
 If a file was deleted with
-.Cm got rm
+.Cm got remove
 it will be restored.
 .It Cm rv
 Short alias for
@@ -676,7 +676,7 @@ via the repository's HEAD reference, respectively:
 Add new files and remove obsolete files in a work tree directory:
 .Pp
 .Dl $ got add sys/uvm/uvm_ubc.c
-.Dl $ got rm sys/uvm/uvm_vnode.c
+.Dl $ got remove sys/uvm/uvm_vnode.c
 .Pp
 Create a new commit from local changes in a work tree directory
 with a pre-defined log message.
