@@ -102,6 +102,7 @@
 #define GOT_ERR_EMPTY_REBASE	86
 #define GOT_ERR_REBASE_COMMITID	87
 #define GOT_ERR_REBASING	88
+#define GOT_ERR_REBASE_PATH	89
 
 static const struct got_error {
 	int code;
@@ -201,6 +202,8 @@ static const struct got_error {
 	{ GOT_ERR_REBASE_COMMITID,"rebase commit ID mismatch" },
 	{ GOT_ERR_REBASING,	"a rebase operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
+	{ GOT_ERR_REBASE_PATH,	"cannot rebase branch which contains "
+	    "changes outside of this work tree's path prefix" },
 };
 
 /*

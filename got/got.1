@@ -581,6 +581,10 @@ to a single base commit with
 .Cm got update .
 If the work tree contains local changes, these changes must be committed
 or reverted first.
+If the
+.Ar branch
+contains changes to files outside of the work tree's path prefix,
+the work tree cannot be used to rebase this branch.
 .Pp
 The
 .Cm got update

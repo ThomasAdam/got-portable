@@ -3311,6 +3311,73 @@ done:
 	return error;
 }
 
+struct check_path_prefix_arg {
+	const char *path_prefix;
+	size_t len;
+};
+
+static const struct got_error *
+check_path_prefix(void *arg, struct got_blob_object *blob1,
+    struct got_blob_object *blob2, struct got_object_id *id1,
+    struct got_object_id *id2, const char *path1, const char *path2,
+    struct got_repository *repo)
+{
+	struct check_path_prefix_arg *a = arg;
+
+	if ((path1 && !got_path_is_child(path1, a->path_prefix, a->len)) ||
+	    (path2 && !got_path_is_child(path2, a->path_prefix, a->len)))
+		return got_error(GOT_ERR_REBASE_PATH);
+
+	return NULL;
+}
+
+static const struct got_error *
+rebase_check_path_prefix(struct got_object_id *parent_id,
+    struct got_object_id *commit_id, const char *path_prefix,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_commit_object *commit = NULL, *parent_commit = NULL;
+	struct check_path_prefix_arg cpp_arg;
+
+	if (got_path_is_root_dir(path_prefix))
+		return NULL;
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_commit(&parent_commit, repo, parent_id);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree1, repo,
+	    got_object_commit_get_tree_id(parent_commit));
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree2, repo,
+	    got_object_commit_get_tree_id(commit));
+	if (err)
+		goto done;
+
+	cpp_arg.path_prefix = path_prefix;
+	cpp_arg.len = strlen(path_prefix);
+	err = got_diff_tree(tree1, tree2, "", "", repo, check_path_prefix,
+	    &cpp_arg);
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	if (commit)
+		got_object_commit_close(commit);
+	if (parent_commit)
+		got_object_commit_close(parent_commit);
+	return err;
+}
+
 static const struct got_error *
 cmd_rebase(int argc, char *argv[])
 {
@@ -3487,6 +3554,11 @@ cmd_rebase(int argc, char *argv[])
 			if (error)
 				goto done;
 		} else {
+			error = rebase_check_path_prefix(parent_id, commit_id,
+			    got_worktree_get_path_prefix(worktree), repo);
+			if (error)
+				goto done;
+
 			error = got_object_qid_alloc(&qid, commit_id);
 			if (error)
 				goto done;
