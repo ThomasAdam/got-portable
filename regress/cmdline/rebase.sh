@@ -493,7 +493,7 @@ function test_rebase_no_op_change {
 }
 
 function test_rebase_in_progress {
-	local testroot=`test_init rebase_no_op_change`
+	local testroot=`test_init rebase_in_progress`
 	local init_commit=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
