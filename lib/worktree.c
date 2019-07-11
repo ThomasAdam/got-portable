@@ -3874,6 +3874,67 @@ got_worktree_rebase_postpone(struct got_worktree *worktree)
 	return lock_worktree(worktree, LOCK_SH);
 }
 
+static const struct got_error *
+delete_ref(const char *name, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *ref;
+
+	err = got_ref_open(&ref, repo, name, 0);
+	if (err) {
+		if (err->code == GOT_ERR_NOT_REF)
+			return NULL;
+		return err;
+	}
+
+	err = got_ref_delete(ref, repo);
+	got_ref_close(ref);
+	return err;
+}
+
+static const struct got_error *
+delete_rebase_refs(struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *tmp_branch_name = NULL, *new_base_branch_ref_name = NULL;
+	char *branch_ref_name = NULL, *commit_ref_name = NULL;
+
+	err = get_rebase_tmp_ref_name(&tmp_branch_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(tmp_branch_name, repo);
+	if (err)
+		goto done;
+
+	err = get_newbase_symref_name(&new_base_branch_ref_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(new_base_branch_ref_name, repo);
+	if (err)
+		goto done;
+
+	err = get_rebase_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(branch_ref_name, repo);
+	if (err)
+		goto done;
+
+	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(commit_ref_name, repo);
+	if (err)
+		goto done;
+
+done:
+	free(tmp_branch_name);
+	free(new_base_branch_ref_name);
+	free(branch_ref_name);
+	free(commit_ref_name);
+	return err;
+}
+
 const struct got_error *
 got_worktree_rebase_complete(struct got_worktree *worktree,
     struct got_reference *new_base_branch, struct got_reference *tmp_branch,
@@ -3899,13 +3960,7 @@ got_worktree_rebase_complete(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_ref_delete(tmp_branch, repo);
-	if (err)
-		goto done;
-
-	err = got_ref_delete(new_base_branch, repo);
-	if (err)
-		goto done;
+	err = delete_rebase_refs(worktree, repo);
 done:
 	free(new_head_commit_id);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
@@ -4006,8 +4061,10 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 		err = revert_file(worktree, fileindex, pe->path,
 		    progress_cb, progress_arg, repo);
 		if (err)
-			break;
+			goto done;
 	}
+
+	err = delete_rebase_refs(worktree, repo);
 done:
 	got_ref_close(resolved);
 	free(commit_id);
