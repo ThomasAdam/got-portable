@@ -1496,7 +1496,9 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	    SHA1_DIGEST_LENGTH) == 0)
 		return NULL;
 
-	(*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE, ie->path);
+	if (a->progress_cb)
+		(*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE,
+		    ie->path);
 	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
 }
@@ -3771,6 +3773,37 @@ done:
 	return err;
 }
 
+static const struct got_error *
+bump_all_base_commit_ids(struct got_worktree *worktree,
+    struct got_object_id *base_commit_id)
+{
+	const struct got_error *err = NULL, *sync_err;
+	struct got_fileindex *fileindex;
+	char *fileindex_path;
+	struct bump_base_commit_id_arg bbc_arg;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		return err;
+
+	bbc_arg.base_commit_id = base_commit_id;
+	bbc_arg.entry_name = NULL;
+	bbc_arg.path = "";
+	bbc_arg.path_len = 0;
+	bbc_arg.progress_cb = NULL;
+	bbc_arg.progress_arg = NULL;
+	err = got_fileindex_for_each_entry_safe(fileindex,
+	    bump_base_commit_id, &bbc_arg);
+
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
+	return err;
+}
+
 const struct got_error *
 got_worktree_rebase_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_reference *tmp_branch,
@@ -3813,6 +3846,11 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 		}
 		goto done;
 	}
+
+	/* Prevent out-of-date errors during rebase of subsequent commits. */
+	err = bump_all_base_commit_ids(worktree, *new_commit_id);
+	if (err)
+		goto done;
 
 	err = got_ref_delete(commit_ref, repo);
 	if (err)
