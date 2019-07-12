@@ -4021,15 +4021,6 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_object_id_by_path(&tree_id, repo,
-	    worktree->base_commit_id, worktree->path_prefix);
-	if (err)
-		goto done;
-	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
-	    repo, progress_cb, progress_arg, NULL, NULL);
-	if (err)
-		goto done;
-
 	crp_arg.revertible_paths = &revertible_paths;
 	crp_arg.worktree = worktree;
 	err = got_worktree_status(worktree, "", repo,
@@ -4043,6 +4034,15 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 		if (err)
 			goto done;
 	}
+
+	err = got_object_id_by_path(&tree_id, repo,
+	    worktree->base_commit_id, worktree->path_prefix);
+	if (err)
+		goto done;
+	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
+	    repo, progress_cb, progress_arg, NULL, NULL);
+	if (err)
+		goto done;
 
 	err = delete_rebase_refs(worktree, repo);
 done:
