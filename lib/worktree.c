@@ -3782,53 +3782,30 @@ done:
 	return err;
 }
 
-static const struct got_error *
-bump_all_base_commit_ids(struct got_worktree *worktree,
-    struct got_object_id *base_commit_id)
-{
-	const struct got_error *err = NULL, *sync_err;
-	struct got_fileindex *fileindex;
-	char *fileindex_path;
-	struct bump_base_commit_id_arg bbc_arg;
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		return err;
-
-	bbc_arg.base_commit_id = base_commit_id;
-	bbc_arg.entry_name = NULL;
-	bbc_arg.path = "";
-	bbc_arg.path_len = 0;
-	bbc_arg.progress_cb = NULL;
-	bbc_arg.progress_arg = NULL;
-	err = got_fileindex_for_each_entry_safe(fileindex,
-	    bump_base_commit_id, &bbc_arg);
-
-	sync_err = sync_fileindex(fileindex, fileindex_path);
-	if (sync_err && err == NULL)
-		err = sync_err;
-
-	got_fileindex_free(fileindex);
-	free(fileindex_path);
-	return err;
-}
-
 const struct got_error *
 got_worktree_rebase_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_reference *tmp_branch,
     struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, struct got_repository *repo)
 {
-	const struct got_error *err;
-	char *commit_ref_name = NULL;
+	const struct got_error *err, *sync_err;
+	struct got_pathlist_head commitable_paths;
+	struct collect_commitables_arg cc_arg;
+	struct bump_base_commit_id_arg bbc_arg;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL, *commit_ref_name = NULL;
+	struct got_reference *head_ref = NULL;
+	struct got_object_id *head_commit_id = NULL;
 	struct got_reference *commit_ref = NULL;
 	struct got_object_id *commit_id = NULL;
+
+	TAILQ_INIT(&commitable_paths);
 
 	/* Work tree is locked/unlocked during rebase prepartion/teardown. */
 
 	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
 	if (err)
-		goto done;
+		return err;
 	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
 	if (err)
 		goto done;
@@ -3840,24 +3817,44 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 		goto done;
 	}
 
-	err = got_worktree_commit(new_commit_id, worktree, NULL,
-	    got_object_commit_get_author(orig_commit),
-	    got_object_commit_get_committer(orig_commit),
-	    collect_rebase_commit_msg, orig_commit,
-	    rebase_status, NULL, repo);
-	if (err) {
-		if (err->code == GOT_ERR_COMMIT_NO_CHANGES) {
-			/* No-op change; commit will be elided. */
-			err = got_ref_delete(commit_ref, repo);
-			if (err)
-				goto done;
-			err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
-		}
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	cc_arg.commitable_paths = &commitable_paths;
+	cc_arg.worktree = worktree;
+	cc_arg.repo = repo;
+	err = worktree_status(worktree, "", fileindex, repo,
+	    collect_commitables, &cc_arg, NULL, NULL);
+	if (err)
+		goto done;
+
+	if (TAILQ_EMPTY(&commitable_paths)) {
+		/* No-op change; commit will be elided. */
+		err = got_ref_delete(commit_ref, repo);
+		if (err)
+			goto done;
+		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
 		goto done;
 	}
 
-	/* Prevent out-of-date errors during rebase of subsequent commits. */
-	err = bump_all_base_commit_ids(worktree, *new_commit_id);
+	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
+	    worktree, NULL, got_object_commit_get_author(orig_commit),
+	    got_object_commit_get_committer(orig_commit),
+	    collect_rebase_commit_msg, orig_commit,
+	    rebase_status, NULL, repo);
+	if (err)
+		goto done;
+
+	err = got_ref_change_ref(tmp_branch, *new_commit_id);
 	if (err)
 		goto done;
 
@@ -3865,11 +3862,33 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = got_ref_change_ref(tmp_branch, *new_commit_id);
+	err = update_fileindex_after_commit(&commitable_paths,
+	    *new_commit_id, fileindex, worktree);
+	if (err == NULL) {
+		/* Prevent out-of-date error when rebasing more commits. */
+		bbc_arg.base_commit_id = *new_commit_id;
+		bbc_arg.entry_name = NULL;
+		bbc_arg.path = "";
+		bbc_arg.path_len = 0;
+		bbc_arg.progress_cb = NULL;
+		bbc_arg.progress_arg = NULL;
+		err = got_fileindex_for_each_entry_safe(fileindex,
+		    bump_base_commit_id, &bbc_arg);
+	}
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+
 done:
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	free(fileindex_path);
 	free(commit_ref_name);
 	if (commit_ref)
 		got_ref_close(commit_ref);
+	free(head_commit_id);
+	if (head_ref)
+		got_ref_close(head_ref);
 	if (err) {
 		free(*new_commit_id);
 		*new_commit_id = NULL;
