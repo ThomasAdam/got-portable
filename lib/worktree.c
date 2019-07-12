@@ -3995,10 +3995,6 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		goto done;
-
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(new_base_branch), 0);
 	if (err)
@@ -4034,6 +4030,10 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	crp_arg.worktree = worktree;
 	err = got_worktree_status(worktree, "", repo,
 	    collect_revertible_paths, &crp_arg, NULL, NULL);
+	if (err)
+		goto done;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
