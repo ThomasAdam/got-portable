@@ -2259,6 +2259,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	free(fileindex_path);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
@@ -2337,6 +2338,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	free(fileindex_path);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
@@ -2503,6 +2505,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	free(fileindex_path);
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
