@@ -3260,13 +3260,6 @@ commit_worktree(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
-		struct got_commitable *ct = pe->data;
-		err = check_ct_out_of_date(ct, repo, head_commit_id);
-		if (err)
-			goto done;
-	}
-
 	err = got_object_open_as_tree(&head_tree, repo, head_commit->tree_id);
 	if (err)
 		goto done;
@@ -3422,6 +3415,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (TAILQ_EMPTY(&commitable_paths)) {
 		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
 		goto done;
+	}
+
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		err = check_ct_out_of_date(ct, repo, head_commit_id);
+		if (err)
+			goto done;
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
@@ -3787,7 +3787,6 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	const struct got_error *err, *sync_err;
 	struct got_pathlist_head commitable_paths;
 	struct collect_commitables_arg cc_arg;
-	struct bump_base_commit_id_arg bbc_arg;
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL, *commit_ref_name = NULL;
 	struct got_reference *head_ref = NULL;
@@ -3860,21 +3859,9 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 
 	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
 	    fileindex);
-	if (err == NULL) {
-		/* Prevent out-of-date error when rebasing more commits. */
-		bbc_arg.base_commit_id = *new_commit_id;
-		bbc_arg.entry_name = NULL;
-		bbc_arg.path = "";
-		bbc_arg.path_len = 0;
-		bbc_arg.progress_cb = NULL;
-		bbc_arg.progress_arg = NULL;
-		err = got_fileindex_for_each_entry_safe(fileindex,
-		    bump_base_commit_id, &bbc_arg);
-	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
-
 done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
