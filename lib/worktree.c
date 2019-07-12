@@ -1684,7 +1684,8 @@ done:
 		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
-	got_fileindex_free(fileindex);
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
@@ -3975,7 +3976,8 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 done:
 	got_ref_close(resolved);
 	free(commit_id);
-	got_fileindex_free(fileindex);
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	free(fileindex_path);
 	TAILQ_FOREACH(pe, &revertible_paths, entry)
 		free((char *)pe->path);
