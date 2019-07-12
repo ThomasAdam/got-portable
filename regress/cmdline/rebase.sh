@@ -206,7 +206,7 @@ function test_rebase_continue {
 		return 1
 	fi
 
-	echo "got: conflicts must be resolved before rebase can be resumed" \
+	echo "got: conflicts must be resolved before rebasing can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -312,7 +312,7 @@ function test_rebase_abort {
 		return 1
 	fi
 
-	echo "got: conflicts must be resolved before rebase can be resumed" \
+	echo "got: conflicts must be resolved before rebasing can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -420,7 +420,7 @@ function test_rebase_no_op_change {
 		return 1
 	fi
 
-	echo "got: conflicts must be resolved before rebase can be resumed" \
+	echo "got: conflicts must be resolved before rebasing can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -525,7 +525,7 @@ function test_rebase_in_progress {
 		return 1
 	fi
 
-	echo "got: conflicts must be resolved before rebase can be resumed" \
+	echo "got: conflicts must be resolved before rebasing can continue" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"

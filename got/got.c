@@ -3638,7 +3638,7 @@ cmd_rebase(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = got_error_msg(GOT_ERR_CONFLICTS,
-		    "conflicts must be resolved before rebase can be resumed");
+		    "conflicts must be resolved before rebasing can continue");
 	} else
 		error = rebase_complete(worktree, branch, new_base_branch,
 		    tmp_branch, repo);
