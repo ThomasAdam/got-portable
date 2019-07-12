@@ -3979,7 +3979,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
     struct got_repository *repo, struct got_reference *new_base_branch,
      got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
-	const struct got_error *err, *unlockerr;
+	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_fileindex *fileindex = NULL;
@@ -4021,6 +4021,15 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	err = got_object_id_by_path(&tree_id, repo,
+	    worktree->base_commit_id, worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = delete_rebase_refs(worktree, repo);
+	if (err)
+		goto done;
+
 	crp_arg.revertible_paths = &revertible_paths;
 	crp_arg.worktree = worktree;
 	err = got_worktree_status(worktree, "", repo,
@@ -4032,19 +4041,15 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 		err = revert_file(worktree, fileindex, pe->path,
 		    progress_cb, progress_arg, repo);
 		if (err)
-			goto done;
+			goto sync;
 	}
 
-	err = got_object_id_by_path(&tree_id, repo,
-	    worktree->base_commit_id, worktree->path_prefix);
-	if (err)
-		goto done;
 	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
 	    repo, progress_cb, progress_arg, NULL, NULL);
-	if (err)
-		goto done;
-
-	err = delete_rebase_refs(worktree, repo);
+sync:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
 	got_ref_close(resolved);
 	free(tree_id);
