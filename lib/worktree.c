@@ -3987,6 +3987,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	struct got_pathlist_head revertible_paths;
 	struct got_pathlist_entry *pe;
 	struct collect_revertible_paths_arg crp_arg;
+	struct got_object_id *tree_id = NULL;
 
 	TAILQ_INIT(&revertible_paths);
 
@@ -4020,8 +4021,12 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = got_worktree_checkout_files(worktree, "", repo, progress_cb,
-	    progress_arg, NULL, NULL);
+	err = got_object_id_by_path(&tree_id, repo,
+	    worktree->base_commit_id, worktree->path_prefix);
+	if (err)
+		goto done;
+	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
+	    repo, progress_cb, progress_arg, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -4042,6 +4047,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	err = delete_rebase_refs(worktree, repo);
 done:
 	got_ref_close(resolved);
+	free(tree_id);
 	free(commit_id);
 	if (fileindex)
 		got_fileindex_free(fileindex);
