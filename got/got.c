@@ -3315,7 +3315,8 @@ rebase_complete(struct got_worktree *worktree, struct got_reference *branch,
 }
 
 static const struct got_error *
-rebase_commit(struct got_worktree *worktree, struct got_reference *tmp_branch,
+rebase_commit(struct got_pathlist_head *merged_paths,
+    struct got_worktree *worktree, struct got_reference *tmp_branch,
    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *error;
@@ -3326,8 +3327,8 @@ rebase_commit(struct got_worktree *worktree, struct got_reference *tmp_branch,
 	if (error)
 		return error;
 
-	error = got_worktree_rebase_commit(&new_commit_id, worktree,
-	    tmp_branch, commit, commit_id, repo);
+	error = got_worktree_rebase_commit(&new_commit_id, merged_paths,
+	    worktree, tmp_branch, commit, commit_id, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -3425,10 +3426,12 @@ cmd_rebase(int argc, char *argv[])
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
+	struct got_pathlist_head merged_paths;
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid, *pid;
 
 	SIMPLEQ_INIT(&commits);
+	TAILQ_INIT(&merged_paths);
 
 	while ((ch = getopt(argc, argv, "ac")) != -1) {
 		switch (ch) {
@@ -3502,8 +3505,8 @@ cmd_rebase(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		error = rebase_commit(worktree, tmp_branch, resume_commit_id,
-		    repo);
+		error = rebase_commit(NULL, worktree, tmp_branch,
+		    resume_commit_id, repo);
 		if (error)
 			goto done;
 
@@ -3612,16 +3615,20 @@ cmd_rebase(int argc, char *argv[])
 		parent_id = pid ? pid->id : yca_id;
 		pid = qid;
 
-		error = got_worktree_rebase_merge_files(worktree, parent_id,
-		    commit_id, repo, rebase_progress, &rebase_status,
-		    check_cancelled, NULL);
+		error = got_worktree_rebase_merge_files(&merged_paths,
+		    worktree, parent_id, commit_id, repo, rebase_progress,
+		    &rebase_status, check_cancelled, NULL);
 		if (error)
 			goto done;
 
-		if (rebase_status == GOT_STATUS_CONFLICT)
+		if (rebase_status == GOT_STATUS_CONFLICT) {
+			got_worktree_rebase_pathlist_free(&merged_paths);
 			break;
+		}
 
-		error = rebase_commit(worktree, tmp_branch, commit_id, repo);
+		error = rebase_commit(&merged_paths, worktree, tmp_branch,
+		    commit_id, repo);
+		got_worktree_rebase_pathlist_free(&merged_paths);
 		if (error)
 			goto done;
 	}

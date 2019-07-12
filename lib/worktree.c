@@ -3742,16 +3742,63 @@ rebase_status(void *arg, unsigned char status, const char *path,
 	return NULL;
 }
 
+struct collect_merged_paths_arg {
+	got_worktree_checkout_cb progress_cb;
+	void *progress_arg;
+	struct got_pathlist_head *merged_paths;
+};
+
+static const struct got_error *
+collect_merged_paths(void *arg, unsigned char status, const char *path)
+{
+	const struct got_error *err;
+	struct collect_merged_paths_arg *a = arg;
+	char *p;
+	struct got_pathlist_entry *new;
+
+	err = (*a->progress_cb)(a->progress_arg, status, path);
+	if (err)
+		return err;
+
+	if (status != GOT_STATUS_MERGE &&
+	    status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_DELETE &&
+	    status != GOT_STATUS_CONFLICT)
+		return NULL;
+
+	p = strdup(path);
+	if (p == NULL)
+		return got_error_from_errno("strdup");
+
+	err = got_pathlist_insert(&new, a->merged_paths, p, NULL);
+	if (err || new == NULL)
+		free(p);
+	return err;
+}
+
+void
+got_worktree_rebase_pathlist_free(struct got_pathlist_head *merged_paths)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, merged_paths, entry)
+		free((char *)pe->path);
+
+	got_pathlist_free(merged_paths);
+}
+
 const struct got_error *
-got_worktree_rebase_merge_files(struct got_worktree *worktree,
-    struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
-    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
+    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
+    struct got_object_id *commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_fileindex *fileindex;
 	char *fileindex_path, *commit_ref_name = NULL;
 	struct got_reference *commit_ref = NULL;
+	struct collect_merged_paths_arg cmp_arg;
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
@@ -3787,9 +3834,12 @@ got_worktree_rebase_merge_files(struct got_worktree *worktree,
 		}
 	}
 
+	cmp_arg.progress_cb = progress_cb;
+	cmp_arg.progress_arg = progress_arg;
+	cmp_arg.merged_paths = merged_paths;
 	err = merge_files(worktree, fileindex, fileindex_path,
-	    parent_commit_id, commit_id, repo, progress_cb, progress_arg,
-	    cancel_cb, cancel_arg);
+	    parent_commit_id, commit_id, repo, collect_merged_paths,
+	    &cmp_arg, cancel_cb, cancel_arg);
 done:
 	got_fileindex_free(fileindex);
 	free(fileindex_path);
@@ -3800,8 +3850,8 @@ done:
 
 const struct got_error *
 got_worktree_rebase_commit(struct got_object_id **new_commit_id,
-    struct got_worktree *worktree, struct got_reference *tmp_branch,
-    struct got_commit_object *orig_commit,
+    struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
+    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, struct got_repository *repo)
 {
 	const struct got_error *err, *sync_err;
@@ -3840,10 +3890,26 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
-	err = worktree_status(worktree, "", fileindex, repo,
-	    collect_commitables, &cc_arg, NULL, NULL);
-	if (err)
-		goto done;
+	/*
+	 * If possible get the status of individual files directly to
+	 * avoid crawling the entire work tree once per rebased commit.
+	 * TODO: Ideally, merged_paths would contain a list of commitables
+	 * we could use so we could skip worktree_status() entirely.
+	 */
+	if (merged_paths) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, merged_paths, entry) {
+			err = worktree_status(worktree, pe->path, fileindex,
+			    repo, collect_commitables, &cc_arg, NULL, NULL);
+			if (err)
+				goto done;
+		}
+	} else {
+		err = worktree_status(worktree, "", fileindex, repo,
+		    collect_commitables, &cc_arg, NULL, NULL);
+		if (err)
+			goto done;
+	}
 
 	if (TAILQ_EMPTY(&commitable_paths)) {
 		/* No-op change; commit will be elided. */

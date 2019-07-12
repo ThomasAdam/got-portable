@@ -240,20 +240,29 @@ const struct got_error *got_worktree_rebase_in_progress(int *,
 /*
  * Merge changes from the commit currently being rebased into the work tree.
  * Report affected files, including merge conflicts, via the specified
- * progress callback.
+ * progress callback. Also populate a list of affected paths which should
+ * be passed to got_worktree_rebase_commit() after a conflict-free merge.
+ * This list must be initialized with TAILQ_INIT() and disposed of with
+ * got_worktree_rebase_pathlist_free().
  */
 const struct got_error *got_worktree_rebase_merge_files(
-    struct got_worktree *, struct got_object_id *, struct got_object_id *,
-    struct got_repository *, got_worktree_checkout_cb, void *,
-    got_worktree_cancel_cb, void *);
+    struct got_pathlist_head *, struct got_worktree *,
+    struct got_object_id *, struct got_object_id *, struct got_repository *,
+    got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
 
 /*
- * Commit merged rebased changes to a temporary branch and return the
- * ID of the newly created commit.
+ * Commit changes merged by got_worktree_rebase_merge_files() to a temporary
+ * branch and return the ID of the newly created commit. An optional list of
+ * merged paths can be provided; otherwise this function will perform a status
+ * crawl across the entire work tree to find paths to commit.
  */
 const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
-    struct got_worktree *, struct got_reference *, struct got_commit_object *,
+    struct got_pathlist_head *, struct got_worktree *,
+    struct got_reference *, struct got_commit_object *,
     struct got_object_id *, struct got_repository *);
+
+/* Free a list of merged paths from got_worktree_merge_files. */
+void got_worktree_rebase_pathlist_free(struct got_pathlist_head *);
 
 /* Postpone the rebase operation. Should be called after a merge conflict. */
 const struct got_error *got_worktree_rebase_postpone(struct got_worktree *);
