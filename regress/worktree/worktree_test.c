@@ -337,9 +337,10 @@ done:
 	return (ok == 7);
 }
 
-static void
+static const struct got_error *
 progress_cb(void *arg, unsigned char status, const char *path)
 {
+	return NULL;
 }
 
 static int

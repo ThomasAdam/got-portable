@@ -803,8 +803,10 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	(*progress_cb)(progress_arg,
+	err = (*progress_cb)(progress_arg,
 	    overlapcnt > 0 ? GOT_STATUS_CONFLICT : GOT_STATUS_MERGE, path);
+	if (err)
+		goto done;
 
 	if (fsync(merged_fd) != 0) {
 		err = got_error_from_errno("fsync");
@@ -923,12 +925,14 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	}
 
 	if (restoring_missing_file)
-		(*progress_cb)(progress_arg, GOT_STATUS_MISSING, path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_MISSING, path);
 	else if (reverting_versioned_file)
-		(*progress_cb)(progress_arg, GOT_STATUS_REVERT, path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_REVERT, path);
 	else
-		(*progress_cb)(progress_arg,
+		err = (*progress_cb)(progress_arg,
 		    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
+	if (err)
+		goto done;
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -1151,7 +1155,7 @@ update_blob(struct got_worktree *worktree,
 		goto done;
 
 	if (status == GOT_STATUS_OBSTRUCTED) {
-		(*progress_cb)(progress_arg, status, path);
+		err = (*progress_cb)(progress_arg, status, path);
 		goto done;
 	}
 
@@ -1159,7 +1163,7 @@ update_blob(struct got_worktree *worktree,
 		if (got_fileindex_entry_has_commit(ie) &&
 		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
-			(*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
+			err = (*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
 			    path);
 			goto done;
 		}
@@ -1198,7 +1202,9 @@ update_blob(struct got_worktree *worktree,
 		    blob->id.sha1, worktree->base_commit_id->sha1,
 		    update_timestamps);
 	} else if (status == GOT_STATUS_DELETE) {
-		(*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+		if (err)
+			goto done;
 		err = update_blob_fileindex_entry(worktree, fileindex, ie,
 		    ondisk_path, path, blob, 0);
 		if (err)
@@ -1268,7 +1274,9 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_CONFLICT ||
 	    status == GOT_STATUS_ADD) {
-		(*progress_cb)(progress_arg, GOT_STATUS_MERGE, ie->path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, ie->path);
+		if (err)
+			return err;
 		/*
 		 * Preserve the working file and change the deleted blob's
 		 * entry into a schedule-add entry.
@@ -1278,7 +1286,9 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		if (err)
 			return err;
 	} else {
-		(*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
+		if (err)
+			return err;
 		if (status == GOT_STATUS_NO_CHANGE) {
 			err = remove_ondisk_file(worktree->root_path, ie->path);
 			if (err)
@@ -1484,6 +1494,7 @@ struct bump_base_commit_id_arg {
 static const struct got_error *
 bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 {
+	const struct got_error *err;
 	struct bump_base_commit_id_arg *a = arg;
 
 	if (a->entry_name) {
@@ -1496,9 +1507,12 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 	    SHA1_DIGEST_LENGTH) == 0)
 		return NULL;
 
-	if (a->progress_cb)
-		(*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE,
+	if (a->progress_cb) {
+		err = (*a->progress_cb)(a->progress_arg, GOT_STATUS_BUMP_BASE,
 		    ie->path);
+		if (err)
+			return err;
+	}
 	memcpy(ie->commit_sha1, a->base_commit_id->sha1, SHA1_DIGEST_LENGTH);
 	return NULL;
 }
@@ -1782,11 +1796,9 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 
 	if (blob1 && blob2) {
 		ie = got_fileindex_entry_get(a->fileindex, path2);
-		if (ie == NULL) {
-			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MISSING,
-			    path2);
-			return NULL;
-		}
+		if (ie == NULL)
+			return (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_MISSING, path2);
 
 		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
 		    path2) == -1)
@@ -1797,15 +1809,15 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			goto done;
 
 		if (status == GOT_STATUS_DELETE) {
-			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MERGE,
-			    path2);
+			err = (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_MERGE, path2);
 			goto done;
 		}
 		if (status != GOT_STATUS_NO_CHANGE &&
 		    status != GOT_STATUS_MODIFY &&
 		    status != GOT_STATUS_CONFLICT &&
 		    status != GOT_STATUS_ADD) {
-			(*a->progress_cb)(a->progress_arg, status, path2);
+			err = (*a->progress_cb)(a->progress_arg, status, path2);
 			goto done;
 		}
 
@@ -1814,11 +1826,9 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    a->progress_cb, a->progress_arg);
 	} else if (blob1) {
 		ie = got_fileindex_entry_get(a->fileindex, path1);
-		if (ie == NULL) {
-			(*a->progress_cb)(a->progress_arg, GOT_STATUS_MISSING,
-			    path2);
-			return NULL;
-		}
+		if (ie == NULL)
+			return (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_MISSING, path2);
 
 		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
 		    path1) == -1)
@@ -1830,8 +1840,10 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 
 		switch (status) {
 		case GOT_STATUS_NO_CHANGE:
-			(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
-			    path1);
+			err = (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_DELETE, path1);
+			if (err)
+				goto done;
 			err = remove_ondisk_file(a->worktree->root_path, path1);
 			if (err)
 				goto done;
@@ -1840,19 +1852,25 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			break;
 		case GOT_STATUS_DELETE:
 		case GOT_STATUS_MISSING:
-			(*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
-			    path1);
+			err = (*a->progress_cb)(a->progress_arg,
+			    GOT_STATUS_DELETE, path1);
+			if (err)
+				goto done;
 			if (ie)
 				got_fileindex_entry_mark_deleted_from_disk(ie);
 			break;
 		case GOT_STATUS_ADD:
 		case GOT_STATUS_MODIFY:
 		case GOT_STATUS_CONFLICT:
-			(*a->progress_cb)(a->progress_arg,
+			err = (*a->progress_cb)(a->progress_arg,
 			    GOT_STATUS_CANNOT_DELETE, path1);
+			if (err)
+				goto done;
 			break;
 		case GOT_STATUS_OBSTRUCTED:
-			(*a->progress_cb)(a->progress_arg, status, path1);
+			err = (*a->progress_cb)(a->progress_arg, status, path1);
+			if (err)
+				goto done;
 			break;
 		default:
 			break;
@@ -1871,8 +1889,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    status != GOT_STATUS_MODIFY &&
 			    status != GOT_STATUS_CONFLICT &&
 			    status != GOT_STATUS_ADD) {
-				(*a->progress_cb)(a->progress_arg, status,
-				    path2);
+				err = (*a->progress_cb)(a->progress_arg,
+				    status, path2);
 				goto done;
 			}
 			err = merge_blob(&local_changes_subsumed, a->worktree,
@@ -2512,7 +2530,9 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	switch (status) {
 	case GOT_STATUS_ADD:
-		(*progress_cb)(progress_arg, GOT_STATUS_REVERT, ie->path);
+		err = (*progress_cb)(progress_arg, GOT_STATUS_REVERT, ie->path);
+		if (err)
+			goto done;
 		got_fileindex_entry_remove(fileindex, ie);
 		break;
 	case GOT_STATUS_DELETE:

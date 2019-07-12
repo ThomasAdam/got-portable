@@ -98,7 +98,8 @@ const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
     struct got_repository *, struct got_object_id *);
 
 /* A callback function which is invoked when a path is checked out. */
-typedef void (*got_worktree_checkout_cb)(void *, unsigned char, const char *);
+typedef const struct got_error *(*got_worktree_checkout_cb)(void *,
+    unsigned char, const char *);
 
 /* A callback function which is invoked at cancellation points.
  * May return GOT_ERR_CANCELLED to abort the runing operation. */

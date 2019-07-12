@@ -342,19 +342,20 @@ usage_checkout(void)
 	exit(1);
 }
 
-static void
+static const struct got_error *
 checkout_progress(void *arg, unsigned char status, const char *path)
 {
 	char *worktree_path = arg;
 
 	/* Base commit bump happens silently. */
 	if (status == GOT_STATUS_BUMP_BASE)
-		return;
+		return NULL;
 
 	while (path[0] == '/')
 		path++;
 
 	printf("%c  %s/%s\n", status, worktree_path, path);
+	return NULL;
 }
 
 static const struct got_error *
@@ -624,23 +625,24 @@ usage_update(void)
 	exit(1);
 }
 
-static void
+static const struct got_error *
 update_progress(void *arg, unsigned char status, const char *path)
 {
 	int *did_something = arg;
 
 	if (status == GOT_STATUS_EXISTS)
-		return;
+		return NULL;
 
 	*did_something = 1;
 
 	/* Base commit bump happens silently. */
 	if (status == GOT_STATUS_BUMP_BASE)
-		return;
+		return NULL;
 
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);
+	return NULL;
 }
 
 static const struct got_error *
@@ -2645,12 +2647,13 @@ usage_revert(void)
 	exit(1);
 }
 
-static void
+static const struct got_error *
 revert_progress(void *arg, unsigned char status, const char *path)
 {
 	while (path[0] == '/')
 		path++;
 	printf("%c  %s\n", status, path);
+	return NULL;
 }
 
 static const struct got_error *
@@ -3285,7 +3288,7 @@ done:
 	return err;
 }
 
-static void
+static const struct got_error *
 rebase_progress(void *arg, unsigned char status, const char *path)
 {
 	unsigned char *rebase_status = arg;
@@ -3295,9 +3298,10 @@ rebase_progress(void *arg, unsigned char status, const char *path)
 	printf("%c  %s\n", status, path);
 
 	if (*rebase_status == GOT_STATUS_CONFLICT)
-		return;
+		return NULL;
 	if (status == GOT_STATUS_CONFLICT || status == GOT_STATUS_MERGE)
 		*rebase_status = status;
+	return NULL;
 }
 
 static const struct got_error *
