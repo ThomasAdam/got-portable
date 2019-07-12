@@ -1697,7 +1697,6 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	char *relpath = NULL, *entry_name = NULL;
-	struct bump_base_commit_id_arg bbc_arg;
 	int entry_type;
 
 	err = lock_worktree(worktree, LOCK_EX);
@@ -1728,18 +1727,17 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 
 	err = checkout_files(worktree, fileindex, relpath, tree_id, entry_name,
 	    repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
-	if (err)
-		goto sync;
-
-	bbc_arg.base_commit_id = worktree->base_commit_id;
-	bbc_arg.entry_name = entry_name;
-	bbc_arg.path = path;
-	bbc_arg.path_len = strlen(path);
-	bbc_arg.progress_cb = progress_cb;
-	bbc_arg.progress_arg = progress_arg;
-	err = got_fileindex_for_each_entry_safe(fileindex,
-	    bump_base_commit_id, &bbc_arg);
-sync:
+	if (err == NULL) {
+		struct bump_base_commit_id_arg bbc_arg;
+		bbc_arg.base_commit_id = worktree->base_commit_id;
+		bbc_arg.entry_name = entry_name;
+		bbc_arg.path = path;
+		bbc_arg.path_len = strlen(path);
+		bbc_arg.progress_cb = progress_cb;
+		bbc_arg.progress_arg = progress_arg;
+		err = got_fileindex_for_each_entry_safe(fileindex,
+		    bump_base_commit_id, &bbc_arg);
+	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
