@@ -1572,11 +1572,6 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	if (path[0]) {
 		char *tree_path;
 		int obj_type;
-		relpath = strdup(path);
-		if (relpath == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
 		if (asprintf(&tree_path, "%s%s%s", worktree->path_prefix,
 		    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
 		    path) == -1) {
@@ -1625,6 +1620,12 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 			entry_name = basename(path);
 			if (entry_name == NULL) {
 				err = got_error_from_errno2("basename", path);
+				goto done;
+			}
+		} else {
+			relpath = strdup(path);
+			if (relpath == NULL) {
+				err = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
