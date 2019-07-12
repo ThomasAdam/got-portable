@@ -3095,8 +3095,7 @@ done:
 
 static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
-    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
-    struct got_worktree *worktree)
+    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
@@ -3431,8 +3430,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = update_fileindex_after_commit(&commitable_paths,
-	    *new_commit_id, fileindex, worktree);
+	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
+	    fileindex);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
@@ -3859,8 +3858,8 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = update_fileindex_after_commit(&commitable_paths,
-	    *new_commit_id, fileindex, worktree);
+	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
+	    fileindex);
 	if (err == NULL) {
 		/* Prevent out-of-date error when rebasing more commits. */
 		bbc_arg.base_commit_id = *new_commit_id;
