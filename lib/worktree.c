@@ -3244,7 +3244,6 @@ commit_worktree(struct got_object_id **new_commit_id,
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct got_pathlist_entry *pe;
 	const char *head_ref_name = NULL;
-	struct got_reference *head_ref = NULL;
 	struct got_commit_object *head_commit = NULL;
 	struct got_reference *head_ref2 = NULL;
 	struct got_object_id *head_commit_id2 = NULL;
@@ -3360,8 +3359,6 @@ done:
 	if (head_commit)
 		got_object_commit_close(head_commit);
 	free(head_commit_id2);
-	if (head_ref)
-		got_ref_close(head_ref);
 	if (head_ref2) {
 		unlockerr = got_ref_unlock(head_ref2);
 		if (unlockerr && err == NULL)
