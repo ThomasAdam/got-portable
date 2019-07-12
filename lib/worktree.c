@@ -2097,36 +2097,13 @@ got_worktree_status(struct got_worktree *worktree, const char *path,
 	DIR *workdir = NULL;
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	FILE *index = NULL;
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
 
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno("got_fileindex_alloc");
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		fileindex_path = NULL;
-		goto done;
-	}
-
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno2("fopen", fileindex_path);
-			goto done;
-		}
-	} else {
-		err = got_fileindex_read(fileindex, index);
-		fclose(index);
-		if (err)
-			goto done;
-	}
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		return err;
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1) {
@@ -2254,7 +2231,6 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
-	FILE *index = NULL;
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
 
@@ -2262,27 +2238,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno("got_fileindex_alloc");
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		fileindex_path = NULL;
-		goto done;
-	}
-
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		err = got_error_from_errno2("fopen", fileindex_path);
-		goto done;
-	}
-
-	err = got_fileindex_read(fileindex, index);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -2302,10 +2258,6 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	if (index) {
-		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
@@ -2357,7 +2309,6 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
-	FILE *index = NULL;
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
 
@@ -2365,26 +2316,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno("got_fileindex_alloc");
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		fileindex_path = NULL;
-		goto done;
-	}
-
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		err = got_error_from_errno2("fopen", fileindex_path);
-		goto done;
-	}
-
-	err = got_fileindex_read(fileindex, index);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -2404,10 +2336,6 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	if (index) {
-		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
@@ -2552,7 +2480,6 @@ got_worktree_revert(struct got_worktree *worktree,
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
-	FILE *index = NULL;
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	const struct got_error *sync_err = NULL;
 	struct got_pathlist_entry *pe;
@@ -2561,26 +2488,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	fileindex = got_fileindex_alloc();
-	if (fileindex == NULL) {
-		err = got_error_from_errno("got_fileindex_alloc");
-		goto done;
-	}
-
-	if (asprintf(&fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		fileindex_path = NULL;
-		goto done;
-	}
-
-	index = fopen(fileindex_path, "rb");
-	if (index == NULL) {
-		err = got_error_from_errno2("fopen", fileindex_path);
-		goto done;
-	}
-
-	err = got_fileindex_read(fileindex, index);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -2594,10 +2502,6 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	if (index) {
-		if (fclose(index) != 0 && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
