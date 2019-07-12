@@ -3733,7 +3733,7 @@ got_worktree_rebase_merge_files(struct got_worktree *worktree,
 	char *fileindex_path, *commit_ref_name = NULL;
 	struct got_reference *commit_ref = NULL;
 
-	/* Work tree is locked/unlocked during rebase prepartion/teardown. */
+	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
@@ -3797,7 +3797,7 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 
 	TAILQ_INIT(&commitable_paths);
 
-	/* Work tree is locked/unlocked during rebase prepartion/teardown. */
+	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
 	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
 	if (err)
