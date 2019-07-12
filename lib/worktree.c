@@ -1634,48 +1634,17 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
+static const struct got_error *
+checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
+    const char *relpath, struct got_object_id *tree_id, const char *entry_name,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
     void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
-	const struct got_error *err = NULL, *sync_err, *unlockerr;
+	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
-	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
-	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL;
 	struct got_fileindex_diff_tree_cb diff_cb;
 	struct diff_cb_arg arg;
-	char *relpath = NULL, *entry_name = NULL;
-	struct bump_base_commit_id_arg bbc_arg;
-	int entry_type;
-
-	err = lock_worktree(worktree, LOCK_EX);
-	if (err)
-		return err;
-
-	err = find_tree_entry_for_checkout(&entry_type, &relpath, &tree_id,
-	    path, worktree, repo);
-	if (err)
-		goto done;
-
-	if (entry_type == GOT_OBJ_TYPE_BLOB) {
-		entry_name = basename(path);
-		if (entry_name == NULL) {
-			err = got_error_from_errno2("basename", path);
-			goto done;
-		}
-	}
-
-	/*
-	 * Read the file index.
-	 * Checking out files is supposed to be an idempotent operation.
-	 * If the on-disk file index is incomplete we will try to complete it.
-	 */
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		goto done;
 
 	err = ref_base_commit(worktree, repo);
 	if (err)
@@ -1708,6 +1677,57 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	arg.cancel_arg = cancel_arg;
 	err = got_fileindex_diff_tree(fileindex, tree, relpath,
 	    entry_name, repo, &diff_cb, &arg);
+done:
+	if (tree)
+		got_object_tree_close(tree);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
+const struct got_error *
+got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id *tree_id = NULL;
+	struct got_tree_object *tree = NULL;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	char *relpath = NULL, *entry_name = NULL;
+	struct bump_base_commit_id_arg bbc_arg;
+	int entry_type;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = find_tree_entry_for_checkout(&entry_type, &relpath, &tree_id,
+	    path, worktree, repo);
+	if (err)
+		goto done;
+
+	if (entry_type == GOT_OBJ_TYPE_BLOB) {
+		entry_name = basename(path);
+		if (entry_name == NULL) {
+			err = got_error_from_errno2("basename", path);
+			goto done;
+		}
+	}
+
+	/*
+	 * Read the file index.
+	 * Checking out files is supposed to be an idempotent operation.
+	 * If the on-disk file index is incomplete we will try to complete it.
+	 */
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	err = checkout_files(worktree, fileindex, relpath, tree_id, entry_name,
+	    repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto sync;
 
