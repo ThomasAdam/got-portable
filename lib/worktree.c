@@ -3110,16 +3110,11 @@ done:
 
 static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
-    struct got_object_id *new_base_commit_id, struct got_worktree *worktree)
+    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
+    struct got_worktree *worktree)
 {
-	const struct got_error *err = NULL, *sync_err;
-	char *fileindex_path = NULL;
-	struct got_fileindex *fileindex = NULL;
+	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		return err;
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_fileindex_entry *ie;
@@ -3145,11 +3140,6 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				break;
 		}
 	}
-	sync_err = sync_fileindex(fileindex, fileindex_path);
-	if (sync_err && err == NULL)
-		err = sync_err;
-	free(fileindex_path);
-	got_fileindex_free(fileindex);
 	return err;
 }
 
@@ -3265,7 +3255,9 @@ got_worktree_commit(struct got_object_id **new_commit_id,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
-	const struct got_error *err = NULL, *unlockerr = NULL;
+	const struct got_error *err = NULL, *unlockerr = NULL, *sync_err;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
 	struct collect_commitables_arg cc_arg;
 	struct got_pathlist_head commitable_paths;
 	struct got_pathlist_entry *pe;
@@ -3415,11 +3407,22 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
 	err = update_fileindex_after_commit(&commitable_paths,
-	    *new_commit_id, worktree);
+	    *new_commit_id, fileindex, worktree);
 	if (err)
 		goto done;
 done:
+	if (fileindex) {
+		sync_err = sync_fileindex(fileindex, fileindex_path);
+		if (sync_err && err == NULL)
+			err = sync_err;
+		got_fileindex_free(fileindex);
+	}
+	free(fileindex_path);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
