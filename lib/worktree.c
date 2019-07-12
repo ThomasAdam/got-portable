@@ -1531,6 +1531,109 @@ done:
 	return err;
 }
 
+static const struct got_error *
+find_tree_entry_for_checkout(int *entry_type, char **tree_relpath,
+    struct got_object_id **tree_id, const char *wt_relpath,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id = NULL;
+	char *in_repo_path = NULL;
+	int is_root_wt = got_path_is_root_dir(worktree->path_prefix);
+
+	*entry_type = GOT_OBJ_TYPE_ANY;
+	*tree_relpath = NULL;
+	*tree_id = NULL;
+
+	if (wt_relpath[0] == '\0') {
+		/* Check out all files within the work tree. */
+		*entry_type = GOT_OBJ_TYPE_TREE;
+		*tree_relpath = strdup("");
+		if (*tree_relpath == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		err = got_object_id_by_path(tree_id, repo,
+		    worktree->base_commit_id, worktree->path_prefix);
+		if (err)
+			goto done;
+		return NULL;
+	}
+
+	/* Check out a subset of files in the work tree. */
+
+	if (asprintf(&in_repo_path, "%s%s%s", worktree->path_prefix,
+	    is_root_wt ? "" : "/", wt_relpath) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_object_id_by_path(&id, repo, worktree->base_commit_id,
+	    in_repo_path);
+	if (err)
+		goto done;
+
+	free(in_repo_path);
+	in_repo_path = NULL;
+
+	err = got_object_get_type(entry_type, repo, id);
+	if (err)
+		goto done;
+
+	if (*entry_type == GOT_OBJ_TYPE_BLOB) {
+		/* Check out a single file. */
+		if (strchr(wt_relpath, '/')  == NULL) {
+			/* Check out a single file in work tree's root dir. */
+			in_repo_path = strdup(worktree->path_prefix);
+			if (in_repo_path == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+			*tree_relpath = strdup("");
+			if (*tree_relpath == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		} else {
+			/* Check out a single file in a subdirectory. */
+			err = got_path_dirname(tree_relpath, wt_relpath);
+			if (err)
+				return err;
+			if (asprintf(&in_repo_path, "%s%s%s",
+			    worktree->path_prefix, is_root_wt ? "" : "/",
+			    *tree_relpath) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		}
+		err = got_object_id_by_path(tree_id, repo,
+		    worktree->base_commit_id, in_repo_path);
+	} else {
+		/* Check out all files within a subdirectory. */
+		*tree_id = got_object_id_dup(id);
+		if (*tree_id == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
+		*tree_relpath = strdup(wt_relpath);
+		if (*tree_relpath == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+done:
+	free(id);
+	free(in_repo_path);
+	if (err) {
+		*entry_type = GOT_OBJ_TYPE_ANY;
+		free(*tree_relpath);
+		*tree_relpath = NULL;
+		free(*tree_id);
+		*tree_id = NULL;
+	}
+	return err;
+}
+
 const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
@@ -1546,10 +1649,24 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	struct diff_cb_arg arg;
 	char *relpath = NULL, *entry_name = NULL;
 	struct bump_base_commit_id_arg bbc_arg;
+	int entry_type;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
+
+	err = find_tree_entry_for_checkout(&entry_type, &relpath, &tree_id,
+	    path, worktree, repo);
+	if (err)
+		goto done;
+
+	if (entry_type == GOT_OBJ_TYPE_BLOB) {
+		entry_name = basename(path);
+		if (entry_name == NULL) {
+			err = got_error_from_errno2("basename", path);
+			goto done;
+		}
+	}
 
 	/*
 	 * Read the file index.
@@ -1568,78 +1685,6 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	   worktree->base_commit_id);
 	if (err)
 		goto done;
-
-	if (path[0]) {
-		char *tree_path;
-		int obj_type;
-		if (asprintf(&tree_path, "%s%s%s", worktree->path_prefix,
-		    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
-		    path) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		err = got_object_id_by_path(&tree_id, repo,
-		    worktree->base_commit_id, tree_path);
-		free(tree_path);
-		if (err)
-			goto done;
-		err = got_object_get_type(&obj_type, repo, tree_id);
-		if (err)
-			goto done;
-		if (obj_type == GOT_OBJ_TYPE_BLOB) {
-			/* Split provided path into parent dir + entry name. */
-			if (strchr(path, '/')  == NULL) {
-				relpath = strdup("");
-				if (relpath == NULL) {
-					err = got_error_from_errno("strdup");
-					goto done;
-				}
-				tree_path = strdup(worktree->path_prefix);
-				if (tree_path == NULL) {
-					err = got_error_from_errno("strdup");
-					goto done;
-				}
-			} else {
-				err = got_path_dirname(&relpath, path);
-				if (err)
-					goto done;
-				if (asprintf(&tree_path, "%s%s%s",
-				    worktree->path_prefix,
-				    got_path_is_root_dir(
-				    worktree->path_prefix) ? "" : "/",
-				    relpath) == -1) {
-					err = got_error_from_errno("asprintf");
-					goto done;
-				}
-			}
-			err = got_object_id_by_path(&tree_id, repo,
-			    worktree->base_commit_id, tree_path);
-			free(tree_path);
-			if (err)
-				goto done;
-			entry_name = basename(path);
-			if (entry_name == NULL) {
-				err = got_error_from_errno2("basename", path);
-				goto done;
-			}
-		} else {
-			relpath = strdup(path);
-			if (relpath == NULL) {
-				err = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
-	} else {
-		relpath = strdup("");
-		if (relpath == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		err = got_object_id_by_path(&tree_id, repo,
-		    worktree->base_commit_id, worktree->path_prefix);
-		if (err)
-			goto done;
-	}
 
 	err = got_object_open_as_tree(&tree, repo, tree_id);
 	if (err)
