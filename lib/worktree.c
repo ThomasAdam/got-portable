@@ -2153,22 +2153,17 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	return err;
 }
 
-const struct got_error *
-got_worktree_status(struct got_worktree *worktree, const char *path,
-    struct got_repository *repo, got_worktree_status_cb status_cb,
-    void *status_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+static const struct got_error *
+worktree_status(struct got_worktree *worktree, const char *path,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	DIR *workdir = NULL;
-	char *fileindex_path = NULL;
-	struct got_fileindex *fileindex = NULL;
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		return err;
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1) {
@@ -2210,6 +2205,24 @@ done:
 	if (workdir)
 		closedir(workdir);
 	free(ondisk_path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_status(struct got_worktree *worktree, const char *path,
+    struct got_repository *repo, got_worktree_status_cb status_cb,
+    void *status_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL;
+	char *fileindex_path = NULL;
+	struct got_fileindex *fileindex = NULL;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		return err;
+
+	err = worktree_status(worktree, path, fileindex, repo,
+	    status_cb, status_arg, cancel_cb, cancel_arg);
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	return err;
@@ -3262,6 +3275,10 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
 	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
 	if (err)
 		goto done;
@@ -3272,8 +3289,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
-	err = got_worktree_status(worktree, relpath ? relpath : "",
-	    repo, collect_commitables, &cc_arg, NULL, NULL);
+	err = worktree_status(worktree, relpath ? relpath : "",
+	    fileindex, repo, collect_commitables, &cc_arg, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -3376,10 +3393,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	err = ref_base_commit(worktree, repo);
-	if (err)
-		goto done;
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -4026,14 +4039,14 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	crp_arg.revertible_paths = &revertible_paths;
-	crp_arg.worktree = worktree;
-	err = got_worktree_status(worktree, "", repo,
-	    collect_revertible_paths, &crp_arg, NULL, NULL);
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	crp_arg.revertible_paths = &revertible_paths;
+	crp_arg.worktree = worktree;
+	err = worktree_status(worktree, "", fileindex, repo,
+	    collect_revertible_paths, &crp_arg, NULL, NULL);
 	if (err)
 		goto done;
 
