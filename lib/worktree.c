@@ -3795,6 +3795,7 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	struct got_object_id *commit_id = NULL;
 
 	TAILQ_INIT(&commitable_paths);
+	*new_commit_id = NULL;
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
