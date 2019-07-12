@@ -3359,7 +3359,6 @@ done:
 		got_object_tree_close(head_tree);
 	if (head_commit)
 		got_object_commit_close(head_commit);
-	free(head_commit_id);
 	free(head_commit_id2);
 	if (head_ref)
 		got_ref_close(head_ref);
