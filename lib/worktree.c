@@ -3233,24 +3233,19 @@ done:
 }
 
 const struct got_error *
-got_worktree_commit(struct got_object_id **new_commit_id,
-    struct got_worktree *worktree, const char *ondisk_path,
-    const char *author, const char *committer,
+commit_worktree(struct got_object_id **new_commit_id,
+    struct got_pathlist_head *commitable_paths,
+    struct got_object_id *head_commit_id, struct got_worktree *worktree,
+    const char *ondisk_path, const char *author, const char *committer,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
-	const struct got_error *err = NULL, *unlockerr = NULL, *sync_err;
-	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL;
-	struct collect_commitables_arg cc_arg;
-	struct got_pathlist_head commitable_paths;
+	const struct got_error *err = NULL, *unlockerr = NULL;
 	struct got_pathlist_entry *pe;
-	char *relpath = NULL;
 	const char *head_ref_name = NULL;
 	struct got_reference *head_ref = NULL;
 	struct got_commit_object *head_commit = NULL;
-	struct got_object_id *head_commit_id = NULL;
 	struct got_reference *head_ref2 = NULL;
 	struct got_object_id *head_commit_id2 = NULL;
 	struct got_tree_object *head_tree = NULL;
@@ -3261,49 +3256,13 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	*new_commit_id = NULL;
 
-	TAILQ_INIT(&commitable_paths);
 	SIMPLEQ_INIT(&parent_ids);
-
-	if (ondisk_path) {
-		err = got_path_skip_common_ancestor(&relpath,
-		    worktree->root_path, ondisk_path);
-		if (err)
-			return err;
-	}
-
-	err = lock_worktree(worktree, LOCK_EX);
-	if (err)
-		goto done;
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		goto done;
-
-	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
-	if (err)
-		goto done;
-	err = got_ref_resolve(&head_commit_id, repo, head_ref);
-	if (err)
-		goto done;
-
-	cc_arg.commitable_paths = &commitable_paths;
-	cc_arg.worktree = worktree;
-	cc_arg.repo = repo;
-	err = worktree_status(worktree, relpath ? relpath : "",
-	    fileindex, repo, collect_commitables, &cc_arg, NULL, NULL);
-	if (err)
-		goto done;
-
-	if (TAILQ_EMPTY(&commitable_paths)) {
-		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
-		goto done;
-	}
 
 	err = got_object_open_as_commit(&head_commit, repo, head_commit_id);
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
 		err = check_ct_out_of_date(ct, repo, head_commit_id);
 		if (err)
@@ -3315,7 +3274,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	if (commit_msg_cb != NULL) {
-		err = commit_msg_cb(&commitable_paths, &logmsg, commit_arg);
+		err = commit_msg_cb(commitable_paths, &logmsg, commit_arg);
 		if (err)
 			goto done;
 	}
@@ -3326,7 +3285,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	/* Create blobs from added and modified files and record their IDs. */
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
 		char *ondisk_path;
 
@@ -3346,7 +3305,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	/* Recursively write new tree objects. */
-	err = write_tree(&new_tree_id, head_tree, "/", &commitable_paths,
+	err = write_tree(&new_tree_id, head_tree, "/", commitable_paths,
 	    status_cb, status_arg, repo);
 	if (err)
 		goto done;
@@ -3395,32 +3354,11 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	err = ref_base_commit(worktree, repo);
 	if (err)
 		goto done;
-
-	err = update_fileindex_after_commit(&commitable_paths,
-	    *new_commit_id, fileindex, worktree);
-	if (err)
-		goto done;
 done:
-	if (fileindex) {
-		sync_err = sync_fileindex(fileindex, fileindex_path);
-		if (sync_err && err == NULL)
-			err = sync_err;
-		got_fileindex_free(fileindex);
-	}
-	free(fileindex_path);
-	unlockerr = lock_worktree(worktree, LOCK_SH);
-	if (unlockerr && err == NULL)
-		err = unlockerr;
-	TAILQ_FOREACH(pe, &commitable_paths, entry) {
-		struct got_commitable *ct = pe->data;
-		free_commitable(ct);
-	}
-	got_pathlist_free(&commitable_paths);
 	if (head_tree)
 		got_object_tree_close(head_tree);
 	if (head_commit)
 		got_object_commit_close(head_commit);
-	free(relpath);
 	free(head_commit_id);
 	free(head_commit_id2);
 	if (head_ref)
@@ -3431,6 +3369,90 @@ done:
 			err = unlockerr;
 		got_ref_close(head_ref2);
 	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_commit(struct got_object_id **new_commit_id,
+    struct got_worktree *worktree, const char *ondisk_path,
+    const char *author, const char *committer,
+    got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
+    got_worktree_status_cb status_cb, void *status_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlockerr = NULL, *sync_err;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL, *relpath = NULL;
+	struct got_pathlist_head commitable_paths;
+	struct collect_commitables_arg cc_arg;
+	struct got_pathlist_entry *pe;
+	struct got_reference *head_ref = NULL;
+	struct got_object_id *head_commit_id = NULL;
+
+	*new_commit_id = NULL;
+
+	TAILQ_INIT(&commitable_paths);
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	if (ondisk_path) {
+		err = got_path_skip_common_ancestor(&relpath,
+		    worktree->root_path, ondisk_path);
+		if (err)
+			return err;
+	}
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	cc_arg.commitable_paths = &commitable_paths;
+	cc_arg.worktree = worktree;
+	cc_arg.repo = repo;
+	err = worktree_status(worktree, relpath ? relpath : "",
+	    fileindex, repo, collect_commitables, &cc_arg, NULL, NULL);
+	if (err)
+		goto done;
+
+	if (TAILQ_EMPTY(&commitable_paths)) {
+		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
+		goto done;
+	}
+
+	err = commit_worktree(new_commit_id, &commitable_paths,
+	    head_commit_id, worktree, ondisk_path, author, committer,
+	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
+	if (err)
+		goto done;
+
+	err = update_fileindex_after_commit(&commitable_paths,
+	    *new_commit_id, fileindex, worktree);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	free(fileindex_path);
+	free(relpath);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		free_commitable(ct);
+	}
+	got_pathlist_free(&commitable_paths);
 	return err;
 }
 
