@@ -1074,7 +1074,6 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (ie->ctime_sec == sb->st_ctime &&
 	    ie->ctime_nsec == sb->st_ctimensec &&
 	    ie->mtime_sec == sb->st_mtime &&
-	    ie->mtime_sec == sb->st_mtime &&
 	    ie->mtime_nsec == sb->st_mtimensec &&
 	    ie->size == (sb->st_size & 0xffffffff))
 		return NULL;
