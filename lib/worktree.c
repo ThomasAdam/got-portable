@@ -1023,6 +1023,16 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 	return err;
 }
 
+static int
+stat_info_differs(struct got_fileindex_entry *ie, struct stat *sb)
+{
+	return !(ie->ctime_sec == sb->st_ctime &&
+	    ie->ctime_nsec == sb->st_ctimensec &&
+	    ie->mtime_sec == sb->st_mtime &&
+	    ie->mtime_nsec == sb->st_mtimensec &&
+	    ie->size == (sb->st_size & 0xffffffff));
+}
+
 static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
@@ -1071,11 +1081,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 		return NULL;
 	}
 
-	if (ie->ctime_sec == sb->st_ctime &&
-	    ie->ctime_nsec == sb->st_ctimensec &&
-	    ie->mtime_sec == sb->st_mtime &&
-	    ie->mtime_nsec == sb->st_mtimensec &&
-	    ie->size == (sb->st_size & 0xffffffff))
+	if (!stat_info_differs(ie, sb))
 		return NULL;
 
 	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
@@ -1133,6 +1139,21 @@ done:
 	return err;
 }
 
+/*
+ * Update timestamps in the file index if a file is unmodified and
+ * we had to run a full content comparison to find out.
+ */
+static const struct got_error *
+sync_timestamps(char *ondisk_path, unsigned char status,
+    struct got_fileindex_entry *ie, struct stat *sb)
+{
+	if (status == GOT_STATUS_NO_CHANGE && stat_info_differs(ie, sb))
+		return got_fileindex_entry_update(ie, ondisk_path,
+		    ie->blob_sha1, ie->commit_sha1, 1);
+
+	return NULL;
+}
+
 static const struct got_error *
 update_blob(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
@@ -1162,14 +1183,19 @@ update_blob(struct got_worktree *worktree,
 		if (got_fileindex_entry_has_commit(ie) &&
 		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
+			err = sync_timestamps(ondisk_path, status, ie, &sb);
+			if (err)
+				goto done;
 			err = (*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
 			    path);
 			goto done;
 		}
 		if (got_fileindex_entry_has_blob(ie) &&
 		    memcmp(ie->blob_sha1, te->id->sha1,
-		    SHA1_DIGEST_LENGTH) == 0)
+		    SHA1_DIGEST_LENGTH) == 0) {
+			err = sync_timestamps(ondisk_path, status, ie, &sb);
 			goto done;
+		}
 	}
 
 	err = got_object_open_as_blob(&blob, repo, te->id, 8192);
