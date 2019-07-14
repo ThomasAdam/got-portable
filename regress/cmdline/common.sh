@@ -112,6 +112,17 @@ function test_init
 function test_cleanup
 {
 	local testroot="$1"
+
+	(cd $testroot/repo && git fsck --strict \
+		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo -n "git fsck: "
+		cat $testroot/fsck.stderr
+		echo "git fsck failed; leaving test data in $testroot"
+		return 1
+	fi
+
 	rm -rf "$testroot"
 }
 
@@ -127,11 +138,11 @@ function test_done
 	local testroot="$1"
 	local result="$2"
 	if [ "$result" == "0" ]; then
-		test_cleanup "$testroot"
+		test_cleanup "$testroot" || return 1
 		echo "ok"
 	elif echo "$result" | grep -q "^xfail"; then
 		# expected test failure; test reproduces an unfixed bug
-		test_cleanup "$testroot"
+		test_cleanup "$testroot" || return 1
 		echo "$result"
 	else
 		echo "test failed; leaving test data in $testroot"
