@@ -715,6 +715,12 @@ branch.
 .Pp
 .Dl $ got update -b master
 .Dl $ got rebase unified-buffer-cache
+.Pp
+Create a patch from all changes on the unified-buffer-cache branch.
+The patch can be mailed out for review and applied to OpenBSD's CVS tree:
+.Pp
+.Dl $ got diff master unified-buffer-cache > /tmp/ubc.diff
+.Pp
 .Sh SEE ALSO
 .Xr git-repository 5
 .Xr got-worktree 5
