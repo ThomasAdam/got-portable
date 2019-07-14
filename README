@@ -3,7 +3,7 @@ simplicity over flexibility.
 
 Got is being developed exclusively on OpenBSD. It is not a drop-in
 replacement for other version control systems and it does not attempt
-to compete with anything else than the use of any other version control
+to compete with anything else than the use of other version control
 systems in the context of the OpenBSD project.
 Got's target audience are OpenBSD developers, and its focus is directed
 at the particular needs and use cases of the OpenBSD project.
