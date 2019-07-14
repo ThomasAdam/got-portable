@@ -540,7 +540,7 @@ conflicts must be resolved first.
 .It Cm bo
 Short alias for
 .Cm backout .
-.It Cm rebase Ar branch
+.It Cm rebase [ Fl a ] [ Fl c] [ Ar branch ]
 Rebase commits on the specified
 .Ar branch
 onto the tip of the current branch of the work tree.
@@ -616,8 +616,10 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Abort an interrupted rebase operation.
+If this option is used, no further command-line arguments are allowed.
 .It Fl c
 Continue an interrupted rebase operation.
+If this option is used, no further command-line arguments are allowed.
 .El
 .It Cm rb
 Short alias for
