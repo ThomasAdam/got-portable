@@ -34,6 +34,8 @@ Man pages are not installed yet but can be viewed with mandoc:
  $ mandoc got/got-worktree.5 | less
  $ mandoc tog/tog.1 | less
 
+EXAMPLES in got.1 contains a quick-start guide for OpenBSD developers.
+
 
 Guidelines for reporting problems:
 
