@@ -54,6 +54,11 @@ in writing a regression test saves time wasted on back-and-forth discussion
 about how the problem can be reproduced. A regression test will need to be
 written in any case to verify a fix and prevent the problem from resurfacing.
 
+It is also possible to write test cases in C. Various examples of this
+exist in the regress/ directory. Most such tests are unit tests written
+before got's command line interface was available; it is unlikely that a
+problem found during regular usage will require a test to be written in C.
+
 Some areas of code, such as the tog UI, are not covered by automated tests.
 Please try to find a way to trigger your problem via the command line before
 reporting the problem without including a written test case. If writing an
