@@ -142,8 +142,8 @@ function test_done
 		echo "ok"
 	elif echo "$result" | grep -q "^xfail"; then
 		# expected test failure; test reproduces an unfixed bug
-		test_cleanup "$testroot" || return 1
 		echo "$result"
+		test_cleanup "$testroot" || return 1
 	else
 		echo "test failed; leaving test data in $testroot"
 	fi
