@@ -1,5 +1,5 @@
-Got is a version control system which prioritizes ease of use and
-simplicity over flexibility.
+Game of Trees (Got) is a version control system which prioritizes ease
+of use and simplicity over flexibility.
 
 Got is being developed exclusively on OpenBSD. It is not a drop-in
 replacement for other version control systems and it does not attempt
