@@ -2493,6 +2493,11 @@ cmd_add(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc < 1)
 		usage_add();
 
@@ -2587,6 +2592,11 @@ cmd_remove(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc < 1)
 		usage_remove();
 
@@ -2688,6 +2698,11 @@ cmd_revert(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc < 1)
 		usage_revert();
 
@@ -2935,6 +2950,11 @@ cmd_commit(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc == 1) {
 		path = realpath(argv[0], NULL);
 		if (path == NULL) {
@@ -3053,6 +3073,11 @@ cmd_cherrypick(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc != 1)
 		usage_cherrypick();
 
@@ -3163,6 +3188,11 @@ cmd_backout(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (argc != 1)
 		usage_backout();
 
@@ -3458,6 +3488,11 @@ cmd_rebase(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
 	if (abort_rebase && continue_rebase)
 		usage_rebase();
 	else if (abort_rebase || continue_rebase) {
