@@ -2072,6 +2072,14 @@ add_ref(struct got_repository *repo, const char *refname, const char *target)
 	struct got_object_id *id;
 	struct got_reference *ref = NULL;
 
+	/*
+	 * Don't let the user create a reference named '-'.
+	 * While technically a valid reference name, this case is usually
+	 * an unintended typo.
+	 */
+	if (refname[0] == '-' && refname[1] == '\0')
+		return got_error(GOT_ERR_BAD_REF_NAME);
+
 	err = got_repo_match_object_id_prefix(&id, target, GOT_OBJ_TYPE_ANY,
 	    repo);
 	if (err) {
