@@ -23,6 +23,7 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <limits.h>
 #include <dirent.h>
 #include <stdlib.h>
@@ -46,6 +47,8 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_parse.h"
+#include "got_lib_object_create.h"
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
 #include "got_lib_worktree.h"
@@ -1107,5 +1110,225 @@ done:
 	} else if (*id == NULL)
 		err = got_error(GOT_ERR_NO_OBJ);
 
+	return err;
+}
+
+static const struct got_error *
+alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
+    const char *name, mode_t mode, struct got_object_id *blob_id)
+{
+	const struct got_error *err = NULL;
+
+	 *new_te = NULL;
+
+	*new_te = calloc(1, sizeof(**new_te));
+	if (*new_te == NULL)
+		return got_error_from_errno("calloc");
+
+	(*new_te)->name = strdup(name);
+	if ((*new_te)->name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	(*new_te)->mode = S_IFREG | (mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
+	(*new_te)->id = blob_id;
+done:
+	if (err && *new_te) {
+		got_object_tree_entry_close(*new_te);
+		*new_te = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+import_file(struct got_tree_entry **new_te, struct dirent *de,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_object_id *blob_id = NULL;
+	char *filepath;
+	struct stat sb;
+
+	if (asprintf(&filepath, "%s%s%s", path,
+	    path[0] == '\0' ? "" : "/", de->d_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (lstat(filepath, &sb) != 0) {
+		err = got_error_from_errno2("lstat", path);
+		goto done;
+	}
+
+	err = got_object_blob_create(&blob_id, filepath, repo);
+	if (err)
+		goto done;
+
+	err = alloc_added_blob_tree_entry(new_te, de->d_name, sb.st_mode,
+	    blob_id);
+done:
+	free(filepath);
+	if (err)
+		free(blob_id);
+	return err;
+}
+
+static const struct got_error *
+insert_tree_entry(struct got_tree_entry *new_te,
+    struct got_pathlist_head *paths)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *new_pe;
+
+	err = got_pathlist_insert(&new_pe, paths, new_te->name, new_te);
+	if (err)
+		return err;
+	if (new_pe == NULL)
+		return got_error(GOT_ERR_TREE_DUP_ENTRY);
+	return NULL;
+}
+
+static const struct got_error *write_tree(struct got_object_id **,
+    const char *, struct got_pathlist_head *, struct got_repository *,
+    got_repo_import_cb progress_cb, void *progress_arg);
+
+static const struct got_error *
+import_subdir(struct got_tree_entry **new_te, struct dirent *de,
+    const char *path, struct got_pathlist_head *ignores,
+    struct got_repository *repo,
+    got_repo_import_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err;
+	char *subdirpath;
+
+	if (asprintf(&subdirpath, "%s%s%s", path,
+	    path[0] == '\0' ? "" : "/", de->d_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	(*new_te) = calloc(1, sizeof(**new_te));
+	(*new_te)->mode = S_IFDIR;
+	(*new_te)->name = strdup(de->d_name);
+	if ((*new_te)->name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	err = write_tree(&(*new_te)->id, subdirpath, ignores,  repo,
+	    progress_cb, progress_arg);
+done:
+	free(subdirpath);
+	if (err) {
+		got_object_tree_entry_close(*new_te);
+		*new_te = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+write_tree(struct got_object_id **new_tree_id, const char *path_dir,
+    struct got_pathlist_head *ignores, struct got_repository *repo,
+    got_repo_import_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	DIR *dir;
+	struct dirent *de;
+	struct got_tree_entries new_tree_entries;
+	struct got_tree_entry *new_te = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	char *name;
+
+	*new_tree_id = NULL;
+
+	TAILQ_INIT(&paths);
+	new_tree_entries.nentries = 0;
+	SIMPLEQ_INIT(&new_tree_entries.head);
+
+	dir = opendir(path_dir);
+	if (dir == NULL) {
+		err = got_error_from_errno2("opendir", path_dir);
+		goto done;
+	}
+
+	while ((de = readdir(dir)) != NULL) {
+		int ignore = 0;
+
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0)
+			continue;
+
+		TAILQ_FOREACH(pe, ignores, entry) {
+			if (fnmatch(pe->path, de->d_name, 0) == 0) {
+				ignore = 1;
+				break;
+			}
+		}
+		if (ignore)
+			continue;
+		if (de->d_type == DT_DIR) {
+			err = import_subdir(&new_te, de, path_dir,
+			    ignores, repo, progress_cb, progress_arg);
+			if (err)
+				goto done;
+		} else if (de->d_type == DT_REG) {
+			err = import_file(&new_te, de, path_dir, repo);
+			if (err)
+				goto done;
+		} else
+			continue;
+
+		err = insert_tree_entry(new_te, &paths);
+		if (err)
+			goto done;
+	}
+
+	TAILQ_FOREACH(pe, &paths, entry) {
+		struct got_tree_entry *te = pe->data;
+		char *path;
+		new_tree_entries.nentries++;
+		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
+		if (!S_ISREG(te->mode))
+			continue;
+		if (asprintf(&path, "%s/%s", path_dir, pe->path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		err = (*progress_cb)(progress_arg, path);
+		free(path);
+		if (err)
+			goto done;
+	}
+
+	name = basename(path_dir);
+	if (name == NULL) {
+		err = got_error_from_errno("basename");
+		goto done;
+	}
+
+	err = got_object_tree_create(new_tree_id, &new_tree_entries, repo);
+done:
+	if (dir)
+		closedir(dir);
+	got_object_tree_entries_close(&new_tree_entries);
+	got_pathlist_free(&paths);
+	return err;
+}
+
+const struct got_error *
+got_repo_import(struct got_object_id **new_commit_id, const char *path_dir,
+    const char *logmsg, const char *author, struct got_pathlist_head *ignores,
+    struct got_repository *repo, got_repo_import_cb progress_cb,
+    void *progress_arg)
+{
+	const struct got_error *err;
+	struct got_object_id *new_tree_id;
+
+	err = write_tree(&new_tree_id, path_dir, ignores, repo,
+	    progress_cb, progress_arg);
+	if (err)
+		return err;
+
+	err = got_object_commit_create(new_commit_id, new_tree_id, NULL, 0,
+	    author, time(NULL), author, time(NULL), logmsg, repo);
+	free(new_tree_id);
 	return err;
 }

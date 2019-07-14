@@ -88,7 +88,15 @@ function make_test_tree
 	echo delta > $repo/gamma/delta
 	mkdir $repo/epsilon
 	echo zeta > $repo/epsilon/zeta
-	(cd $repo && git add .)
+}
+
+function get_blob_id
+{
+	repo="$1"
+	tree_path="$2"
+	filename="$3"
+
+	got tree -r $repo -i $tree_path | grep ${filename}$ | cut -d' ' -f 1
 }
 
 function test_init
@@ -104,6 +112,7 @@ function test_init
 	git_init $testroot/repo
 	if [ -z "$no_tree" ]; then
 		make_test_tree $testroot/repo
+		(cd $repo && git add .)
 		git_commit $testroot/repo -m "adding the test tree"
 	fi
 	echo "$testroot"

@@ -63,6 +63,58 @@ are as follows:
 .It Cm init Ar path
 Create a new empty repository at the specified
 .Ar path .
+.Pp
+After
+.Cm got init ,
+the
+.Cm got import
+command must be used to populate the empty repository before
+.Cm got checkout
+can be used.
+.Pp
+.It Cm import [ Fl b Ar branch ] [ Fl m Ar message ] [ Fl r Ar repository-path ] [ Fl I Ar pattern ] directory
+Create an initial commit in a repository from the file hierarchy
+within the specified
+.Ar directory .
+The created commit will not have any parent commits, i.e. it will be a
+root commit.
+Also create a new reference which provides a branch name for the newly
+created commit.
+.Pp
+Show the path of each added file to indicate progress.
+.Pp
+The options for
+.Cm got import
+are as follows:
+.Bl -tag -width Ds
+.It Fl b Ar branch
+Create the specified
+.Ar branch
+instead of creating the default branch
+.Dq master .
+Use of this option is required if the
+.Dq master
+branch already exists.
+.It Fl m Ar message
+Use the specified log message when creating the new commit.
+Without the
+.Fl m
+option,
+.Cm got import
+opens a temporary file in an editor where a log message can be written.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+.It Fl I Ar pattern
+Ignore files or directories with a name which matches the specified
+.Ar pattern .
+This option may be specified multiple times to build a list of ignore patterns.
+The
+.Ar pattern
+follows the globbing rules documented in
+.Xr glob 7 .
+.El
 .It Cm checkout [ Fl b Ar branch ] [ Fl c Ar commit ] [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
 Copy files from a repository into a new work tree.
 If the
@@ -639,7 +691,6 @@ The editor spawned by
 .Sh EXIT STATUS
 .Ex -std got
 .Sh EXAMPLES
-.Pp
 Clone an existing Git repository for use with
 .Nm .
 This step currently requires
@@ -648,7 +699,16 @@ This step currently requires
 .Dl $ cd /var/git/
 .Dl $ git clone --bare https://github.com/openbsd/src.git
 .Pp
-Check out a work tree from this Git repository to /usr/src:
+Alternatively, for quick and dirty local testing of
+.Nm
+a new Git repository could be created and populated with files,
+e.g. from a temporary CVS checkout located at
+.Pa /tmp/src :
+.Pp
+.Dl $ got init /var/git/src.git
+.Dl $ got import -r /var/src.git -I CVS -I obj /tmp/src
+.Pp
+Check out a work tree from the Git repository to /usr/src:
 .Pp
 .Dl $ got checkout /var/git/src.git /usr/src
 .Pp

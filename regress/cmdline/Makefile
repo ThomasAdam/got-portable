@@ -1,5 +1,5 @@
 REGRESS_TARGETS=checkout update status log add rm diff commit \
-	cherrypick backout rebase
+	cherrypick backout rebase import
 NOOBJ=Yes
 
 checkout:
@@ -34,5 +34,8 @@ backout:
 
 rebase:
 	./rebase.sh
+
+import:
+	./import.sh
 
 .include <bsd.regress.mk>

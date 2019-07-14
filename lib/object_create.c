@@ -392,28 +392,30 @@ got_object_commit_create(struct got_object_id **id,
 		goto done;
 	}
 
-	SIMPLEQ_FOREACH(qid, parent_ids, entry) {
-		char *parent_str = NULL;
+	if (parent_ids) {
+		SIMPLEQ_FOREACH(qid, parent_ids, entry) {
+			char *parent_str = NULL;
 
-		free(id_str);
+			free(id_str);
 
-		err = got_object_id_str(&id_str, qid->id);
-		if (err)
-			goto done;
-		if (asprintf(&parent_str, "%s%s\n", GOT_COMMIT_LABEL_PARENT,
-		    id_str) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		len = strlen(parent_str);
-		SHA1Update(&sha1_ctx, parent_str, len);
-		n = fwrite(parent_str, 1, len, commitfile);
-		if (n != len) {
-			err = got_ferror(commitfile, GOT_ERR_IO);
+			err = got_object_id_str(&id_str, qid->id);
+			if (err)
+				goto done;
+			if (asprintf(&parent_str, "%s%s\n",
+			    GOT_COMMIT_LABEL_PARENT, id_str) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			len = strlen(parent_str);
+			SHA1Update(&sha1_ctx, parent_str, len);
+			n = fwrite(parent_str, 1, len, commitfile);
+			if (n != len) {
+				err = got_ferror(commitfile, GOT_ERR_IO);
+				free(parent_str);
+				goto done;
+			}
 			free(parent_str);
-			goto done;
 		}
-		free(parent_str);
 	}
 
 	len = strlen(author_str);

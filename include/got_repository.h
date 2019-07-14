@@ -15,6 +15,7 @@
  */
 
 struct got_repository;
+struct got_pathlist_head;
 
 /* Open and close repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *);
@@ -61,3 +62,14 @@ const struct got_error *got_repo_init(const char *);
 /* Attempt to find a unique object ID for a given ID string prefix. */
 const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
     const char *, int, struct got_repository *);
+
+/* A callback function which is invoked when a path is imported. */
+typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);
+
+/*
+ * Import an unversioned directory tree into the repository.
+ * Creates a root commit, i.e. a commit with zero parents.
+ */
+const struct got_error *got_repo_import(struct got_object_id **, const char *,
+    const char *, const char *, struct got_pathlist_head *,
+    struct got_repository *, got_repo_import_cb, void *);

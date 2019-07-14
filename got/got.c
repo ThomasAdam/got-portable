@@ -76,6 +76,7 @@ struct got_cmd {
 
 __dead static void	usage(int);
 __dead static void	usage_init(void);
+__dead static void	usage_import(void);
 __dead static void	usage_checkout(void);
 __dead static void	usage_update(void);
 __dead static void	usage_log(void);
@@ -94,6 +95,7 @@ __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
+static const struct got_error*		cmd_import(int, char *[]);
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
 static const struct got_error*		cmd_log(int, char *[]);
@@ -113,6 +115,7 @@ static const struct got_error*		cmd_rebase(int, char *[]);
 
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
+	{ "import",	cmd_import,	usage_import,	"" },
 	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
 	{ "update",	cmd_update,	usage_update,	"up" },
 	{ "log",	cmd_log,	usage_log,	"" },
@@ -331,6 +334,313 @@ cmd_init(int argc, char *argv[])
 
 done:
 	free(repo_path);
+	return error;
+}
+
+__dead static void
+usage_import(void)
+{
+	fprintf(stderr, "usage: %s import [-b branch] [-m message] "
+	    "[-r repository-path] [-I pattern] path\n", getprogname());
+	exit(1);
+}
+
+int
+spawn_editor(const char *editor, const char *file)
+{
+	pid_t pid;
+	sig_t sighup, sigint, sigquit;
+	int st = -1;
+
+	sighup = signal(SIGHUP, SIG_IGN);
+	sigint = signal(SIGINT, SIG_IGN);
+	sigquit = signal(SIGQUIT, SIG_IGN);
+
+	switch (pid = fork()) {
+	case -1:
+		goto doneediting;
+	case 0:
+		execl(editor, editor, file, (char *)NULL);
+		_exit(127);
+	}
+
+	while (waitpid(pid, &st, 0) == -1)
+		if (errno != EINTR)
+			break;
+
+doneediting:
+	(void)signal(SIGHUP, sighup);
+	(void)signal(SIGINT, sigint);
+	(void)signal(SIGQUIT, sigquit);
+
+	if (!WIFEXITED(st)) {
+		errno = EINTR;
+		return -1;
+	}
+
+	return WEXITSTATUS(st);
+}
+
+static const struct got_error *
+edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
+    const char *initial_content)
+{
+	const struct got_error *err = NULL;
+	char buf[1024];
+	struct stat st, st2;
+	FILE *fp;
+	int content_changed = 0;
+	size_t len;
+
+	*logmsg = NULL;
+
+	if (stat(logmsg_path, &st) == -1)
+		return got_error_from_errno2("stat", logmsg_path);
+
+	if (spawn_editor(editor, logmsg_path) == -1)
+		return got_error_from_errno("failed spawning editor");
+
+	if (stat(logmsg_path, &st2) == -1)
+		return got_error_from_errno("stat");
+
+	if (st.st_mtime == st2.st_mtime && st.st_size == st2.st_size)
+		return got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "no changes made to commit message, aborting");
+
+	*logmsg = malloc(st2.st_size + 1);
+	if (*logmsg == NULL)
+		return got_error_from_errno("malloc");
+	(*logmsg)[0] = '\0';
+	len = 0;
+
+	fp = fopen(logmsg_path, "r");
+	if (fp == NULL) {
+		err = got_error_from_errno("fopen");
+		goto done;
+	}
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		if (!content_changed && strcmp(buf, initial_content) != 0)
+			content_changed = 1;
+		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
+			continue; /* remove comments and leading empty lines */
+		len = strlcat(*logmsg, buf, st2.st_size);
+	}
+	fclose(fp);
+
+	while (len > 0 && (*logmsg)[len - 1] == '\n') {
+		(*logmsg)[len - 1] = '\0';
+		len--;
+	}
+
+	if (len == 0 || !content_changed)
+		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "commit message cannot be empty, aborting");
+done:
+	if (err) {
+		free(*logmsg);
+		*logmsg = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+collect_import_msg(char **logmsg, const char *editor, const char *path_dir,
+    const char *branch_name)
+{
+	char *initial_content = NULL, *logmsg_path = NULL;
+	const struct got_error *err = NULL;
+	int fd;
+
+	if (asprintf(&initial_content,
+	    "\n# %s to be imported to branch %s\n", path_dir,
+	    branch_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = got_opentemp_named_fd(&logmsg_path, &fd, "/tmp/got-importmsg");
+	if (err)
+		goto done;
+
+	dprintf(fd, initial_content);
+	close(fd);
+
+	err = edit_logmsg(logmsg, editor, logmsg_path, initial_content);
+done:
+	free(initial_content);
+	free(logmsg_path);
+	return err;
+}
+
+static const struct got_error *
+import_progress(void *arg, const char *path)
+{
+	printf("A  %s\n", path);
+	return NULL;
+}
+
+static const struct got_error *
+cmd_import(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
+	char *editor = NULL;
+	const char *got_author = getenv("GOT_AUTHOR");
+	const char *branch_name = "master";
+	char *refname = NULL, *id_str = NULL;
+	struct got_repository *repo = NULL;
+	struct got_reference *branch_ref = NULL, *head_ref = NULL;
+	struct got_object_id *new_commit_id = NULL;
+	int ch;
+	struct got_pathlist_head ignores;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&ignores);
+
+	while ((ch = getopt(argc, argv, "b:m:r:I:")) != -1) {
+		switch (ch) {
+		case 'b':
+			branch_name = optarg;
+			break;
+		case 'm':
+			logmsg = strdup(optarg);
+			if (logmsg == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("realpath");
+				goto done;
+			}
+			break;
+		case 'I':
+			if (optarg[0] == '\0')
+				break;
+			error = got_pathlist_insert(&pe, &ignores, optarg,
+			    NULL);
+			if (error)
+				goto done;
+			break;
+		default:
+			usage_init();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+	if (argc != 1)
+		usage_import();
+
+	if (got_author == NULL) {
+		/* TODO: Look current user up in password database */
+		error = got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+		goto done;
+	}
+
+	if (repo_path == NULL) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno("getcwd");
+	}
+	got_path_strip_trailing_slashes(repo_path);
+	error = got_repo_open(&repo, repo_path);
+	if (error)
+		goto done;
+
+	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	error = got_ref_open(&branch_ref, repo, refname, 0);
+	if (error) {
+		if (error->code != GOT_ERR_NOT_REF)
+			goto done;
+	} else {
+		error = got_error_msg(GOT_ERR_BRANCH_EXISTS,
+		    "import target branch already exists");
+		goto done;
+	}
+
+	path_dir = realpath(argv[0], NULL);
+	if (path_dir == NULL) {
+		error = got_error_from_errno("realpath");
+		goto done;
+	}
+	got_path_strip_trailing_slashes(path_dir);
+
+	/*
+	 * unveil(2) traverses exec(2); if an editor is used we have
+	 * to apply unveil after the log message has been written.
+	 */
+	if (logmsg == NULL || strlen(logmsg) == 0) {
+		error = get_editor(&editor);
+		if (error)
+			goto done;
+		error = collect_import_msg(&logmsg, editor, path_dir, refname);
+		if (error)
+			goto done;
+	}
+
+	if (unveil(path_dir, "r") != 0)
+		return got_error_from_errno2("unveil", path_dir);
+
+	error = apply_unveil(got_repo_get_path(repo), 0, NULL, 0);
+	if (error)
+		goto done;
+
+	error = got_repo_import(&new_commit_id, path_dir, logmsg,
+	    got_author, &ignores, repo, import_progress, NULL);
+	if (error)
+		goto done;
+
+	error = got_ref_alloc(&branch_ref, refname, new_commit_id);
+	if (error)
+		goto done;
+
+	error = got_ref_write(branch_ref, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_str(&id_str, new_commit_id);
+	if (error)
+		goto done;
+
+	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+	if (error) {
+		if (error->code != GOT_ERR_NOT_REF)
+			goto done;
+
+		error = got_ref_alloc_symref(&head_ref, GOT_REF_HEAD,
+		    branch_ref);
+		if (error)
+			goto done;
+
+		error = got_ref_write(head_ref, repo);
+		if (error)
+			goto done;
+	}
+
+	printf("Created branch %s with commit %s\n",
+	    got_ref_get_name(branch_ref), id_str);
+done:
+	free(repo_path);
+	free(editor);
+	free(refname);
+	free(new_commit_id);
+	free(id_str);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (head_ref)
+		got_ref_close(head_ref);
 	return error;
 }
 
@@ -2760,42 +3070,6 @@ usage_commit(void)
 	exit(1);
 }
 
-int
-spawn_editor(const char *editor, const char *file)
-{
-	pid_t pid;
-	sig_t sighup, sigint, sigquit;
-	int st = -1;
-
-	sighup = signal(SIGHUP, SIG_IGN);
-	sigint = signal(SIGINT, SIG_IGN);
-	sigquit = signal(SIGQUIT, SIG_IGN);
-
-	switch (pid = fork()) {
-	case -1:
-		goto doneediting;
-	case 0:
-		execl(editor, editor, file, (char *)NULL);
-		_exit(127);
-	}
-
-	while (waitpid(pid, &st, 0) == -1)
-		if (errno != EINTR)
-			break;
-
-doneediting:
-	(void)signal(SIGHUP, sighup);
-	(void)signal(SIGINT, sigint);
-	(void)signal(SIGQUIT, sigquit);
-
-	if (!WIFEXITED(st)) {
-		errno = EINTR;
-		return -1;
-	}
-
-	return WEXITSTATUS(st);
-}
-
 struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
 	const char *editor;
@@ -2815,11 +3089,8 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	const struct got_error *err = NULL;
 	char *template = NULL;
 	struct collect_commit_logmsg_arg *a = arg;
-	char buf[1024];
-	struct stat st, st2;
-	FILE *fp;
+	int fd;
 	size_t len;
-	int fd, content_changed = 0;
 
 	/* if a message was specified on the command line, just use it */
 	if (a->cmdline_log != NULL && strlen(a->cmdline_log) != 0) {
@@ -2853,72 +3124,21 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 	close(fd);
 
-	if (stat(a->logmsg_path, &st) == -1) {
-		err = got_error_from_errno2("stat", a->logmsg_path);
-		goto done;
-	}
-
-	if (spawn_editor(a->editor, a->logmsg_path) == -1) {
-		err = got_error_from_errno("failed spawning editor");
-		goto done;
-	}
-
-	if (stat(a->logmsg_path, &st2) == -1) {
-		err = got_error_from_errno("stat");
-		goto done;
-	}
-
-	if (st.st_mtime == st2.st_mtime && st.st_size == st2.st_size) {
-		unlink(a->logmsg_path);
-		free(a->logmsg_path);
-		a->logmsg_path = NULL;
-		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
-		    "no changes made to commit message, aborting");
-		goto done;
-	}
-
-	*logmsg = malloc(st2.st_size + 1);
-	if (*logmsg == NULL) {
-		err = got_error_from_errno("malloc");
-		goto done;
-	}
-	(*logmsg)[0] = '\0';
-	len = 0;
-
-	fp = fopen(a->logmsg_path, "r");
-	if (fp == NULL) {
-		err = got_error_from_errno("fopen");
-		goto done;
-	}
-	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		if (!content_changed && strcmp(buf, initial_content) != 0)
-			content_changed = 1;
-		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
-			continue; /* remove comments and leading empty lines */
-		len = strlcat(*logmsg, buf, st2.st_size);
-	}
-	fclose(fp);
-
-	while (len > 0 && (*logmsg)[len - 1] == '\n') {
-		(*logmsg)[len - 1] = '\0';
-		len--;
-	}
-
-	if (len == 0 || !content_changed) {
-		unlink(a->logmsg_path);
-		free(a->logmsg_path);
-		a->logmsg_path = NULL;
-		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
-		    "commit message cannot be empty, aborting");
-		goto done;
-	}
+	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content);
 done:
+	unlink(a->logmsg_path);
+	free(a->logmsg_path);
 	free(initial_content);
 	free(template);
 
 	/* Editor is done; we can now apply unveil(2) */
-	if (err == NULL)
+	if (err == NULL) {
 		err = apply_unveil(a->repo_path, 0, a->worktree_path, 0);
+		if (err) {
+			free(*logmsg);
+			*logmsg = NULL;
+		}
+	}
 	return err;
 }
 
