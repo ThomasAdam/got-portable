@@ -33,3 +33,44 @@ Man pages are not installed yet but can be viewed with mandoc:
  $ mandoc got/git-repository.5 | less
  $ mandoc got/got-worktree.5 | less
  $ mandoc tog/tog.1 | less
+
+
+Guidelines for reporting problems:
+
+All problem/bug reports should include a reproduction recipe in form of a
+shell script which starts out with an empty repository and runs a series of
+got and/or git commands to trigger the problem, be it a crash or some other
+undesirable behaviour.
+
+The regress/cmdline directory contains plenty of example scripts.
+An ideal reproduction recipe is written as an xfail ("expected failure")
+regression test. For a real-world example of an xfail test, see commits
+4866d0842a2b34812818685aaa31d3e0a966412d and
+2b496619daecc1f25b1bc0c53e01685030dc2c74 in got's history.
+
+Please take this request very seriously; Ask for help with writing your
+regression test before asking for your problem to be fixed. Time invested
+in writing a regression test saves time wasted on back-and-forth discussion
+about how the problem can be reproduced. A regression test will need to be
+written in any case to verify a fix and prevent the problem from resurfacing.
+
+Some areas of code, such as the tog UI, are not covered by automated tests.
+Please try to find a way to trigger your problem via the command line before
+reporting the problem without including a written test case. If writing an
+automated test really turns out to be impossible, please explain in very
+clear terms how to reproduce the problem.
+
+Mail problem reports to: Stefan Sperling <stsp@stsp.name>
+
+
+Guidelines for submitting patches:
+
+Please keep the intended target audience in mind when contributing to got.
+Patches related to non-OpenBSD systems will not be integrated before an
+official portable version of got has been announced, if ever.
+
+Please refrain from sending long series of patches without prior discussion.
+
+Mail patches to: Stefan Sperling <stsp@stsp.name>
+
+Pull requests via any Git hosting sites will likely be overlooked or ignored.
