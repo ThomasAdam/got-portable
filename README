@@ -39,14 +39,14 @@ Guidelines for reporting problems:
 
 All problem/bug reports should include a reproduction recipe in form of a
 shell script which starts out with an empty repository and runs a series of
-got and/or git commands to trigger the problem, be it a crash or some other
+Got and/or Git commands to trigger the problem, be it a crash or some other
 undesirable behaviour.
 
 The regress/cmdline directory contains plenty of example scripts.
 An ideal reproduction recipe is written as an xfail ("expected failure")
 regression test. For a real-world example of an xfail test, see commits
 4866d0842a2b34812818685aaa31d3e0a966412d and
-2b496619daecc1f25b1bc0c53e01685030dc2c74 in got's history.
+2b496619daecc1f25b1bc0c53e01685030dc2c74 in Got's history.
 
 Please take this request very seriously; Ask for help with writing your
 regression test before asking for your problem to be fixed. Time invested
@@ -56,7 +56,7 @@ written in any case to verify a fix and prevent the problem from resurfacing.
 
 It is also possible to write test cases in C. Various examples of this
 exist in the regress/ directory. Most such tests are unit tests written
-before got's command line interface was available; it is unlikely that a
+before Got's command line interface was available; it is unlikely that a
 problem found during regular usage will require a test to be written in C.
 
 Some areas of code, such as the tog UI, are not covered by automated tests.
@@ -70,9 +70,9 @@ Mail problem reports to: Stefan Sperling <stsp@stsp.name>
 
 Guidelines for submitting patches:
 
-Please keep the intended target audience in mind when contributing to got.
+Please keep the intended target audience in mind when contributing to Got.
 Patches related to non-OpenBSD systems will not be integrated before an
-official portable version of got is being worked on, if ever.
+official portable version of Got is being worked on, if ever.
 
 Please refrain from sending long series of patches without prior discussion.
 
