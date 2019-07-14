@@ -72,7 +72,7 @@ Guidelines for submitting patches:
 
 Please keep the intended target audience in mind when contributing to got.
 Patches related to non-OpenBSD systems will not be integrated before an
-official portable version of got has been announced, if ever.
+official portable version of got is being worked on, if ever.
 
 Please refrain from sending long series of patches without prior discussion.
 
