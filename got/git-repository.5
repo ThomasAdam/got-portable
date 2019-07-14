@@ -96,6 +96,49 @@ Each pack file is accompanied by a corresponding
 .Em pack index
 file, which lists the IDs and offsets of all objects contained in the
 pack file.
+.Sh REFERENCES
+A reference associates a name with an object ID.
+A prominent use of references is providing names to branches in the
+repository by pointing at commit objects which represent the current
+tip commit of a branch.
+Because references may point to arbitrary object IDs their use
+is not limited to branches.
+.Pp
+The name is a UTF-8 string with the following disallowed characters:
+.Sq \ 
+(space),
+~ (tilde),
+^ (caret),
+: (colon),
+? (question mark),
+* (asterisk),
+[ (opening square bracket),
+\\ (backslash).
+Additionally, the name may not contain the two-character sequences
+//, .. , and @{.
+.Pp
+Reference names may optionally have multiple components separated by
+the / (slash) character, forming a hierarchy of reference namespaces.
+Got reserves the
+.Pa got/
+reference namespace for internal use.
+.Pp
+A symbolic reference associates a name with the name of another reference.
+The most prominent example is the
+.Pa HEAD
+reference which points at the name of the repository's default branch
+reference.
+.Pp
+References are stored either as a plain file within the repository,
+typically under the
+.Pa refs/
+directory, or in the
+.Pa packed-refs
+file which contains one reference definition per line.
+.Pp
+Any object which is not reachable via a reference is subject to deletion
+by Git's garbage collector; see
+.Xr git-gc 1 .
 .Sh FILES
 .Bl -tag -width packed-refs -compact
 .It Pa HEAD
@@ -156,3 +199,11 @@ was bare.
 The Git repository format was initially designed by Linus Torvalds in 2005
 and has since been extended by various people involved in the development
 of the Git version control system.
+.Sh CAVEATS
+The particular set of disallowed characters in reference names is a
+consequence of design choices made for the command-line interface of
+.Xr git 1 .
+The same characters are disallowed by Got for compatibility purposes.
+Got additionaly prevents users from creating reference names with
+a leading - (dash) character, because this is rarely intended and
+not considered useful.
