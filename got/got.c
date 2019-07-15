@@ -749,8 +749,7 @@ check_same_branch(struct got_object_id *commit_id,
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				err = NULL;
 				break;
-			}
-			else if (err->code != GOT_ERR_ITER_NEED_MORE)
+			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
 			err = got_commit_graph_fetch_commits(graph, 1,
 			    repo);
