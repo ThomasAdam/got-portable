@@ -1366,7 +1366,7 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] [-p] "
+	fprintf(stderr, "usage: %s log [-c commit] [-C number] [-f] [ -l N ] [-p] "
 	    "[-r repository-path] [path]\n", getprogname());
 	exit(1);
 }
@@ -1395,11 +1395,8 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "bpc:C:l:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:")) != -1) {
 		switch (ch) {
-		case 'b':
-			first_parent_traversal = 1;
-			break;
 		case 'p':
 			show_patch = 1;
 			break;
@@ -1416,6 +1413,9 @@ cmd_log(int argc, char *argv[])
 			limit = strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr != NULL)
 				err(1, "-l option %s", errstr);
+			break;
+		case 'f':
+			first_parent_traversal = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);

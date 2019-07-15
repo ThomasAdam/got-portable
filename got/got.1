@@ -253,6 +253,11 @@ if invoked in a work tree, or to the repository's HEAD reference.
 Set the number of context lines shown in diffs with
 .Fl p .
 By default, 3 lines of context are shown.
+.It Fl f
+Restrict history traversal to the first parent of each commit.
+This shows the linear history of the current branch only.
+Merge commits which affected the current branch will be shown but
+individual commits which originated on other branches will be omitted.
 .It Fl l Ar N
 Limit history traversal to a given number of commits.
 .It Fl p
@@ -744,7 +749,7 @@ In a work tree or a git repository directory, view changes committed in
 the 3 most recent commits to the work tree's branch, or the branch resolved
 via the repository's HEAD reference, respectively:
 .Pp
-.Dl $ got log -p -l 3 -b
+.Dl $ got log -p -l 3 -f
 .Pp
 Add new files and remove obsolete files in a work tree directory:
 .Pp
