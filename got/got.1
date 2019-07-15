@@ -80,8 +80,13 @@ The created commit will not have any parent commits, i.e. it will be a
 root commit.
 Also create a new reference which provides a branch name for the newly
 created commit.
+Show the path of each imported file to indicate progress.
 .Pp
-Show the path of each added file to indicate progress.
+The
+.Cm got import
+command requires the
+.Ev GOT_AUTHOR
+environment variable to be set.
 .Pp
 The options for
 .Cm got import
@@ -680,7 +685,9 @@ Short alias for
 .Bl -tag -width GOT_AUTHOR
 .It Ev GOT_AUTHOR
 The author's name and email address for
-.Cm got commit ,
+.Cm got commit
+and
+.Cm got import ,
 for example:
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .It Ev VISUAL, Ev EDITOR
