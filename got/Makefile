@@ -10,7 +10,12 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
 	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
+
+.if defined(PROFILE)
+LDADD = -lutil_p -lz_p -lc_p
+.else
 LDADD = -lutil -lz
+.endif
 DPADD = ${LIBZ} ${LIBUTIL}
 
 # For now, default to installing binary in ~/bin
