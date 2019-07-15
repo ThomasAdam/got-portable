@@ -2240,9 +2240,15 @@ cmd_log(int argc, char *argv[])
 		error = get_head_commit_id(&start_id, worktree ?
 		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
 		    repo);
-	else
-		error = got_repo_match_object_id_prefix(&start_id,
-		    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+	else {
+		error = get_head_commit_id(&start_id, start_commit, repo);
+		if (error) {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&start_id,
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+	}
 	if (error != NULL)
 		goto done;
 
@@ -3706,8 +3712,13 @@ cmd_blame(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 	} else {
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		error = get_head_commit_id(&commit_id, commit_id_str, repo);
+		if (error) {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		}
 	}
 	if (error != NULL)
 		goto done;
@@ -4432,9 +4443,15 @@ cmd_tree(int argc, char *argv[])
 
 	if (commit_id_arg == NULL)
 		error = get_head_commit_id(&commit_id, GOT_REF_HEAD, repo);
-	else
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
+	else {
+		error = get_head_commit_id(&commit_id, commit_id_arg, repo);
+		if (error) {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+	}
 	if (error != NULL)
 		goto done;
 
