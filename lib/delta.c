@@ -58,13 +58,6 @@ got_delta_open(off_t offset, size_t tslen, int type, size_t size,
 	return delta;
 }
 
-void
-got_delta_close(struct got_delta *delta)
-{
-	free(delta->delta_buf);
-	free(delta);
-}
-
 const struct got_error *
 got_delta_chain_get_base_type(int *type, struct got_delta_chain *deltas)
 {

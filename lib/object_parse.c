@@ -113,7 +113,8 @@ got_object_close(struct got_object *obj)
 		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
 			delta = SIMPLEQ_FIRST(&obj->deltas.entries);
 			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
-			got_delta_close(delta);
+			free(delta->delta_buf);
+			free(delta);
 		}
 	}
 	if (obj->flags & GOT_OBJ_FLAG_PACKED)

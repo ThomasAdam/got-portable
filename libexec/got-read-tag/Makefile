@@ -1,7 +1,7 @@
 .PATH:${.CURDIR}/../../lib
 
 PROG=		got-read-tag
-SRCS=		got-read-tag.c delta.c error.c inflate.c object_parse.c \
+SRCS=		got-read-tag.c error.c inflate.c object_parse.c \
 		path.c privsep.c sha1.c
 
 CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
