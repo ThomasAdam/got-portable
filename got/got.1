@@ -762,6 +762,15 @@ with a pre-defined log message.
 .Pp
 .Dl $ got commit -m 'unify the buffer cache'
 .Pp
+Roll the unified-buffer-cache branch back by one commit, and then
+fetch the rolled-back change into the work tree as a local change
+to be amended and perhaps committed again:
+.Pp
+.Dl $ got backout unified-buffer-cache
+.Dl $ got commit -m 'roll back previous'
+.Dl # now back out the previous backout :-)
+.Dl $ got backout unified-buffer-cache
+.Pp
 Update any work tree checked out from the
 .Dq unified-buffer-cache
 branch to the latest commit on this branch:
