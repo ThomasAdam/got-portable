@@ -225,7 +225,7 @@ is specified, only show modifications within this path.
 .It Cm st
 Short alias for
 .Cm status .
-.It Cm log [ Fl b ] [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
+.It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
 Display history of a repository.
 If a
 .Ar path
@@ -235,12 +235,6 @@ The options for
 .Cm got log
 are as follows:
 .Bl -tag -width Ds
-.It Fl b
-Show the linear line of history of the current branch.
-This option restricts history traversal to the first parent of each commit.
-Commits which the branch was based on and merge commits which affected the
-branch will be shown, but individual commits created on parallel branches
-will be omitted.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
