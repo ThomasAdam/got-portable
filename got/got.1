@@ -762,6 +762,12 @@ with a pre-defined log message.
 .Pp
 .Dl $ got commit -m 'unify the buffer cache'
 .Pp
+Update any work tree checked out from the
+.Dq unified-buffer-cache
+branch to the latest commit on this branch:
+.Pp
+.Dl $ got update
+.Pp
 Roll the unified-buffer-cache branch back by one commit, and then
 fetch the rolled-back change into the work tree as a local change
 to be amended and perhaps committed again:
@@ -770,12 +776,6 @@ to be amended and perhaps committed again:
 .Dl $ got commit -m 'roll back previous'
 .Dl # now back out the previous backout :-)
 .Dl $ got backout unified-buffer-cache
-.Pp
-Update any work tree checked out from the
-.Dq unified-buffer-cache
-branch to the latest commit on this branch:
-.Pp
-.Dl $ got update
 .Pp
 Fetch new upstream commits into the local repository's master branch.
 This step currently requires
