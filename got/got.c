@@ -3862,6 +3862,8 @@ cmd_rebase(int argc, char *argv[])
 			commit_id = parent_id;
 		}
 	}
+	got_commit_graph_close(graph);
+	graph = NULL;
 
 	if (SIMPLEQ_EMPTY(&commits)) {
 		if (continue_rebase)
