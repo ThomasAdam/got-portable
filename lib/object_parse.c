@@ -276,8 +276,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 
 	if (!got_parse_sha1_digest(qid->id->sha1, id_str)) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		free(qid->id);
-		free(qid);
+		got_object_qid_free(qid);
 		return err;
 	}
 
