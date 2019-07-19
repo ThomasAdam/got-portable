@@ -3671,6 +3671,57 @@ done:
 }
 
 static const struct got_error *
+collect_commits_to_rebase(struct got_object_id_queue *commits,
+    struct got_object_id *initial_commit_id,
+    struct got_object_id *iter_start_id, struct got_object_id *iter_stop_id,
+    const char *path_prefix, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph *graph = NULL;
+	struct got_object_id *parent_id = NULL;
+	struct got_object_qid *qid;
+        struct got_object_id *commit_id = initial_commit_id;
+
+	err = got_commit_graph_open(&graph, initial_commit_id, "/", 1, repo);
+	if (err)
+		return err;
+
+	err = got_commit_graph_iter_start(graph, iter_start_id, repo);
+	if (err)
+		goto done;
+	while (got_object_id_cmp(commit_id, iter_stop_id) != 0) {
+		err = got_commit_graph_iter_next(&parent_id, graph);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
+				err = got_error_msg(GOT_ERR_ANCESTRY,
+				    "ran out of commits to rebase before "
+				    "youngest common ancestor commit has "
+				    "been reached?!?");
+				goto done;
+			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
+				goto done;
+			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			if (err)
+				goto done;
+		} else {
+			err = rebase_check_path_prefix(parent_id, commit_id,
+			    path_prefix, repo);
+			if (err)
+				goto done;
+
+			err = got_object_qid_alloc(&qid, commit_id);
+			if (err)
+				goto done;
+			SIMPLEQ_INSERT_HEAD(commits, qid, entry);
+			commit_id = parent_id;
+		}
+	}
+done:
+	got_commit_graph_close(graph);
+	return err;
+}
+
+static const struct got_error *
 cmd_rebase(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -3682,7 +3733,6 @@ cmd_rebase(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL, *parent_id = NULL;
 	struct got_object_id *resume_commit_id = NULL;
 	struct got_object_id *branch_head_commit_id = NULL, *yca_id = NULL;
-	struct got_commit_graph *graph = NULL;
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
@@ -3828,45 +3878,14 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_commit_graph_open(&graph, commit_id, "/", 1, repo);
-	if (error)
-		goto done;
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	pid = SIMPLEQ_FIRST(parent_ids);
-	error = got_commit_graph_iter_start(graph, pid->id, repo);
+	error = collect_commits_to_rebase(&commits, commit_id, pid->id,
+	    yca_id, got_worktree_get_path_prefix(worktree), repo);
 	got_object_commit_close(commit);
 	commit = NULL;
 	if (error)
 		goto done;
-	while (got_object_id_cmp(commit_id, yca_id) != 0) {
-		error = got_commit_graph_iter_next(&parent_id, graph);
-		if (error) {
-			if (error->code == GOT_ERR_ITER_COMPLETED) {
-				error = got_error_msg(GOT_ERR_ANCESTRY,
-				    "ran out of commits to rebase before "
-				    "youngest common ancestor commit has "
-				    "been reached?!?");
-				goto done;
-			} else if (error->code != GOT_ERR_ITER_NEED_MORE)
-				goto done;
-			error = got_commit_graph_fetch_commits(graph, 1, repo);
-			if (error)
-				goto done;
-		} else {
-			error = rebase_check_path_prefix(parent_id, commit_id,
-			    got_worktree_get_path_prefix(worktree), repo);
-			if (error)
-				goto done;
-
-			error = got_object_qid_alloc(&qid, commit_id);
-			if (error)
-				goto done;
-			SIMPLEQ_INSERT_HEAD(&commits, qid, entry);
-			commit_id = parent_id;
-		}
-	}
-	got_commit_graph_close(graph);
-	graph = NULL;
 
 	if (SIMPLEQ_EMPTY(&commits)) {
 		if (continue_rebase)
@@ -3915,8 +3934,6 @@ done:
 	free(branch_head_commit_id);
 	free(resume_commit_id);
 	free(yca_id);
-	if (graph)
-		got_commit_graph_close(graph);
 	if (commit)
 		got_object_commit_close(commit);
 	if (branch)
