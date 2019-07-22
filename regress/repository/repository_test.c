@@ -421,17 +421,10 @@ static const struct got_error *
 apply_unveil(const char *repo_path)
 {
 	const struct got_error *error;
-	char *normpath = NULL;
 
 	if (repo_path) {
-		normpath = got_path_normalize(repo_path);
-		if (normpath == NULL)
-			return got_error_from_errno("got_path_normalize");
-		if (unveil(normpath, "r") != 0) {
-			free(normpath);
-			return got_error_from_errno2("unveil", normpath);
-		}
-		free(normpath);
+		if (unveil(repo_path, "r") != 0)
+			return got_error_from_errno2("unveil", repo_path);
 	}
 
 	if (unveil("/tmp", "rwc") != 0)
