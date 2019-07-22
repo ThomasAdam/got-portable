@@ -856,8 +856,16 @@ cmd_checkout(int argc, char *argv[])
 		}
 		worktree_path = realpath(argv[1], NULL);
 		if (worktree_path == NULL) {
-			error = got_error_from_errno2("realpath", argv[1]);
-			goto done;
+			if (errno != ENOENT) {
+				error = got_error_from_errno2("realpath",
+				    argv[1]);
+				goto done;
+			}
+			worktree_path = strdup(argv[1]);
+			if (worktree_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
 	} else
 		usage_checkout();
