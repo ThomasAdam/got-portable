@@ -2911,16 +2911,6 @@ cmd_remove(int argc, char *argv[])
 	if (argc < 1)
 		usage_remove();
 
-	/* make sure each file exists before doing anything halfway */
-	for (i = 0; i < argc; i++) {
-		char *path = realpath(argv[i], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[i]);
-			goto done;
-		}
-		free(path);
-	}
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
