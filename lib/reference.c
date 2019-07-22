@@ -379,7 +379,6 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 {
 	const struct got_error *err = NULL;
 	char *path = NULL;
-	char *normpath = NULL;
 	char *absname = NULL;
 	int ref_is_absolute = (strncmp(name, "refs/", 5) == 0);
 	int ref_is_well_known = is_well_known_ref(name);
@@ -402,21 +401,11 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 		}
 	}
 
-	normpath = got_path_normalize(path);
-	if (normpath == NULL) {
-		if (errno == ENOENT)
-			err = NULL;
-		else
-			err = got_error_from_errno2("got_path_normalize", path);
-		goto done;
-	}
-
-	err = parse_ref_file(ref, absname, normpath, lock);
+	err = parse_ref_file(ref, absname, path, lock);
 done:
 	if (!ref_is_absolute && !ref_is_well_known)
 		free(absname);
 	free(path);
-	free(normpath);
 	return err;
 }
 
