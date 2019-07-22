@@ -2276,14 +2276,23 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
     const char *arg)
 {
 	const struct got_error *err = NULL;
-	char *resolved, *path = NULL;
+	char *resolved, *cwd = NULL, *path = NULL;
 	size_t len;
 
 	*wt_path = NULL;
 
 	resolved = realpath(arg, NULL);
-	if (resolved == NULL)
-		return got_error_from_errno2("realpath", arg);
+	if (resolved == NULL) {
+		if (errno != ENOENT)
+			return got_error_from_errno2("realpath", arg);
+		cwd = getcwd(NULL, 0);
+		if (cwd == NULL)
+			return got_error_from_errno("getcwd");
+		if (asprintf(&resolved, "%s/%s", cwd, arg) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	}
 
 	if (strncmp(got_worktree_get_root_path(worktree), resolved,
 	    strlen(got_worktree_get_root_path(worktree)))) {
@@ -2312,6 +2321,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 	}
 done:
 	free(resolved);
+	free(cwd);
 	if (err == NULL)
 		*wt_path = path;
 	else
