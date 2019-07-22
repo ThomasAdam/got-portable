@@ -2822,16 +2822,6 @@ cmd_add(int argc, char *argv[])
 	if (argc < 1)
 		usage_add();
 
-	/* make sure each file exists before doing anything halfway */
-	for (x = 0; x < argc; x++) {
-		char *path = realpath(argv[x], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[x]);
-			goto done;
-		}
-		free(path);
-	}
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
