@@ -28,12 +28,6 @@ int got_path_is_absolute(const char *);
  */
 char *got_path_get_absolute(const char *);
 
-/* 
- * Normalize a path for internal processing.
- * The result is allocated with malloc(3).
- */
-char *got_path_normalize(const char *);
-
 /*
  * Canonicalize absolute paths by removing redundant path separators
  * and resolving references to parent directories ("/../").

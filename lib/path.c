@@ -58,24 +58,6 @@ got_path_get_absolute(const char *relpath)
 	return abspath;
 }
 
-char *
-got_path_normalize(const char *path)
-{
-	char *resolved;
-
-	resolved = realpath(path, NULL);
-	if (resolved == NULL)
-		return NULL;
-	
-	if (!got_path_is_absolute(resolved)) {
-		char *abspath = got_path_get_absolute(resolved);
-		free(resolved);
-		resolved = abspath;
-	}
-
-	return resolved;
-}
-
 /* based on canonpath() from kern_pledge.c */
 const struct got_error *
 got_canonpath(const char *input, char *buf, size_t bufsize)
