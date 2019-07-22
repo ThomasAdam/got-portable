@@ -329,7 +329,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath, *normpath = NULL;
+	char *abspath;
 	int i, tried_root = 0;
 
 	*repop = NULL;
@@ -370,13 +370,12 @@ got_repo_open(struct got_repository **repop, const char *path)
 	if (err)
 		goto done;
 
-	normpath = got_path_normalize(abspath);
-	if (normpath == NULL) {
-		err = got_error(GOT_ERR_BAD_PATH);
+	path = realpath(abspath, NULL);
+	if (path == NULL) {
+		err = got_error_from_errno2("realpath", path);
 		goto done;
 	}
 
-	path = normpath;
 	do {
 		err = open_repo(repo, path);
 		if (err == NULL)
@@ -400,7 +399,6 @@ done:
 	else
 		*repop = repo;
 	free(abspath);
-	free(normpath);
 	return err;
 }
 
