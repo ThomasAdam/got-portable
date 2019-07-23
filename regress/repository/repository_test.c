@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/queue.h>
 
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <util.h>
@@ -447,7 +448,7 @@ int
 main(int argc, char *argv[])
 {
 	int test_ok = 0, failure = 0;
-	const char *repo_path;
+	char *repo_path;
 	int ch;
 	const struct got_error *error;
 
@@ -470,18 +471,26 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0)
-		repo_path = GOT_REPO_PATH;
-	else if (argc == 1)
-		repo_path = argv[0];
-	else {
+	switch (argc) {
+	case 0:
+		repo_path = realpath(GOT_REPO_PATH, NULL);
+		break;
+	case 1:
+		repo_path = realpath(argv[0], NULL);
+		break;
+	default:
 		usage();
+		return 1;
+	}
+	if (repo_path == NULL) {
+		fprintf(stderr, "realpath: %s\n", strerror(errno));
 		return 1;
 	}
 
 	error = apply_unveil(repo_path);
 	if (error) {
-		fprintf(stderr, "unveil: %s", error->msg);
+		fprintf(stderr, "unveil: %s\n", error->msg);
+		free(repo_path);
 		return 1;
 	}
 
@@ -491,5 +500,6 @@ main(int argc, char *argv[])
 	RUN_TEST(repo_diff_blob(repo_path), "diff_blob");
 	RUN_TEST(repo_diff_tree(repo_path), "diff_tree");
 
+	free(repo_path);
 	return failure ? 1 : 0;
 }
