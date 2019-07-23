@@ -3778,8 +3778,12 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (rebase_in_progress && abort_rebase) {
+	if (abort_rebase) {
 		int did_something;
+		if (!rebase_in_progress) {
+			error = got_error(GOT_ERR_NOT_REBASING);
+			goto done;
+		}
 		error = got_worktree_rebase_continue(&resume_commit_id,
 		    &new_base_branch, &tmp_branch, &branch, worktree, repo);
 		if (error)
@@ -3792,12 +3796,13 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		printf("Rebase of %s aborted\n", got_ref_get_name(branch));
 		goto done; /* nothing else to do */
-	} else if (abort_rebase) {
-		error = got_error(GOT_ERR_NOT_REBASING);
-		goto done;
 	}
 
 	if (continue_rebase) {
+		if (!rebase_in_progress) {
+			error = got_error(GOT_ERR_NOT_REBASING);
+			goto done;
+		}
 		error = got_worktree_rebase_continue(&resume_commit_id,
 		    &new_base_branch, &tmp_branch, &branch, worktree, repo);
 		if (error)
