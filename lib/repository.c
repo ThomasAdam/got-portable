@@ -372,7 +372,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 
 	path = realpath(abspath, NULL);
 	if (path == NULL) {
-		err = got_error_from_errno2("realpath", path);
+		err = got_error_from_errno2("realpath", abspath);
 		goto done;
 	}
 
