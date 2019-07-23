@@ -1,5 +1,5 @@
 REGRESS_TARGETS=checkout update status log add rm diff commit \
-	cherrypick backout rebase import
+	cherrypick backout rebase import histedit
 NOOBJ=Yes
 
 checkout:
@@ -37,5 +37,8 @@ rebase:
 
 import:
 	./import.sh
+
+histedit:
+	./histedit.sh
 
 .include <bsd.regress.mk>

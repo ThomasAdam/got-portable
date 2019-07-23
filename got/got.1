@@ -679,6 +679,100 @@ If this option is used, no further command-line arguments are allowed.
 .It Cm rb
 Short alias for
 .Cm rebase .
+.It Cm histedit [ Fl a ] [ Fl c] [ Fl F Ar histedit-script ]
+Edit commit history between the work tree's current base commit and
+the tip commit of the work tree's current branch.
+.Pp
+Editing of commit history is controlled via a
+.Ar histedit script
+which can be edited interactively or passed on the command line.
+The format of the histedit script is line-based.
+Each line in the script begins with a command name, followed by
+whitespace and an argument.
+For most commands, the expected argument is a commit ID SHA1 hash.
+Any remaining text on the line is ignored.
+Lines which begin with the
+.Sq #
+character are ignored entirely.
+.Pp
+The available commands are as follows:
+.Bl -column YXZ pick-commit
+.It pick Ar commit Ta Use the specified commit as it is.
+.It edit Ar commit Ta Use the specfified commit but once changes have been
+merged into the work tree interrupt the histedit operation for amending.
+.It fold Ar commit Ta Combine the specified commit with the next commit
+listed further below that will be used.
+.It drop Ar commit Ta Remove this commit from the edited history.
+.It mesg Ar log-message Ta Use the specified single-line log message for
+the commit on the previous line.
+If the log message argument is left empty, open an editor where a new
+log message can be written.
+.El
+.Pp
+Every commit in the history being edited must be mentioned in histedit script.
+Lines may be re-ordered to change the order of commits in the edited history.
+.Pp
+Edited commits are accumulated on a temporary branch.
+Once history editing has completed successfully, the temporary branch becomes
+the new version of the work tree's base branch and the work tree is
+automatically switched to it.
+.Pp
+While merging commits, show the status of each affected file,
+using the following status codes:
+.Bl -column YXZ description
+.It G Ta file was merged
+.It C Ta file was merged and conflicts occurred during merge
+.It ! Ta changes destined for a missing file were not merged
+.It D Ta file was deleted
+.It d Ta file's deletion was obstructed by local modifications
+.It A Ta new file was added
+.It ~ Ta changes destined for a non-regular file were not merged
+.El
+.Pp
+If merge conflicts occur the histedit operation is interrupted and may
+be continued once conflicts have been resolved.
+Alternatively, the histedit operation may be aborted which will leave
+the work tree switched back to its original branch.
+.Pp
+If a merge conflict is resolved in a way which renders the merged
+change into a no-op change, the corresponding commit will be elided
+when the histedit operation continues.
+.Pp
+.Cm got histedit
+will refuse to run if certain preconditions are not met.
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If the work tree contains local changes, these changes must first be
+committed with
+.Cm got commit
+or reverted with
+.Cm got revert .
+If the edited history contains changes to files outside of the work tree's
+path prefix, the work tree cannot be used to edit the history of this branch.
+.Pp
+The
+.Cm got update
+and
+.Cm got commit
+commands will refuse to run while a histedit operation is in progress.
+Other commands which manipulate the work tree may be used for
+conflict resolution purposes.
+.Pp
+The options for
+.Cm got histedit
+are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Abort an interrupted histedit operation.
+If this option is used, no further command-line arguments are allowed.
+.It Fl c
+Continue an interrupted histedit operation.
+If this option is used, no further command-line arguments are allowed.
+.El
+.It Cm he
+Short alias for
+.Cm histedit .
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
@@ -796,6 +890,14 @@ Create a patch from all changes on the unified-buffer-cache branch.
 The patch can be mailed out for review and applied to OpenBSD's CVS tree:
 .Pp
 .Dl $ got diff master unified-buffer-cache > /tmp/ubc.diff
+.Pp
+Edit the entire commit history of the
+.Dq unified-buffer-cache
+branch:
+.Pp
+.Dl $ got update -b unified-buffer-cache
+.Dl $ got update -c master
+.Dl $ got histedit
 .Pp
 .Sh SEE ALSO
 .Xr tog 1 ,

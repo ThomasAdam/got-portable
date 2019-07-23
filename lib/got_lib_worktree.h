@@ -57,6 +57,7 @@ struct got_commitable {
 #define GOT_WORKTREE_LOCK		"lock"
 #define GOT_WORKTREE_FORMAT		"format"
 #define GOT_WORKTREE_UUID		"uuid"
+#define GOT_WORKTREE_HISTEDIT_LIST	"histedit-list"
 
 #define GOT_WORKTREE_FORMAT_VERSION	1
 #define GOT_WORKTREE_INVALID_COMMIT_ID	GOT_SHA1_STRING_ZERO
@@ -77,3 +78,18 @@ const struct got_error *got_worktree_get_base_ref_name(char **,
 
 /* Reference pointing at the ID of the current commit being rebased. */
 #define GOT_WORKTREE_REBASE_COMMIT_REF_PREFIX "refs/got/worktree/rebase/commit"
+
+/* Temporary branch which accumulates commits during a histedit operation. */
+#define GOT_WORKTREE_HISTEDIT_TMP_REF_PREFIX "refs/got/worktree/histedit/tmp"
+
+/* Symbolic reference pointing at the name of the branch being edited. */
+#define GOT_WORKTREE_HISTEDIT_BRANCH_REF_PREFIX \
+	"refs/got/worktree/histedit/branch"
+
+/* Reference pointing at the ID of the work tree's pre-edit base commit. */
+#define GOT_WORKTREE_HISTEDIT_BASE_COMMIT_REF_PREFIX \
+	"refs/got/worktree/histedit/base-commit"
+
+/* Reference pointing at the ID of the current commit being edited. */
+#define GOT_WORKTREE_HISTEDIT_COMMIT_REF_PREFIX \
+	"refs/got/worktree/histedit/commit"

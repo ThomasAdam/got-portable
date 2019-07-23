@@ -282,3 +282,85 @@ const struct got_error *got_worktree_rebase_complete(struct got_worktree *,
 const struct got_error *got_worktree_rebase_abort(struct got_worktree *,
     struct got_repository *, struct got_reference *,
     got_worktree_checkout_cb, void *);
+
+/*
+ * Prepare for editing the history of the work tree's current branch.
+ * This function creates references to a temporary branch, and the
+ * work tree's current branch, under the "got/worktree/histedit/" namespace.
+ * These references are used to keep track of histedit operation state and
+ * are used as input and/or output arguments with other histedit-related
+ * functions.
+ */
+const struct got_error *got_worktree_histedit_prepare(struct got_reference **,
+    struct got_reference **, struct got_object_id **, struct got_worktree *,
+    struct got_repository *);
+
+/*
+ * Continue an interrupted histedit operation.
+ * This function returns existing references created when histedit was
+ * prepared and the ID of the commit currently being edited.
+ * It should be called before resuming or aborting a histedit operation.
+ */
+const struct got_error *got_worktree_histedit_continue(struct got_object_id **,
+    struct got_reference **, struct got_reference **, struct got_object_id **,
+    struct got_worktree *, struct got_repository *);
+
+/* Check whether a histedit operation is in progress. */
+const struct got_error *got_worktree_histedit_in_progress(int *,
+    struct got_worktree *);
+
+/*
+ * Merge changes from the commit currently being edited into the work tree.
+ * Report affected files, including merge conflicts, via the specified
+ * progress callback. Also populate a list of affected paths which should
+ * be passed to got_worktree_histedit_commit() after a conflict-free merge.
+ * This list must be initialized with TAILQ_INIT() and disposed of with
+ * got_worktree_rebase_pathlist_free().
+ */
+const struct got_error *got_worktree_histedit_merge_files(
+    struct got_pathlist_head *, struct got_worktree *,
+    struct got_object_id *, struct got_object_id *, struct got_repository *,
+    got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
+
+/*
+ * Commit changes merged by got_worktree_histedit_merge_files() to a temporary
+ * branch and return the ID of the newly created commit. An optional list of
+ * merged paths can be provided; otherwise this function will perform a status
+ * crawl across the entire work tree to find paths to commit.
+ * An optional log message can be provided which will be used instead of the
+ * commit's original message.
+ */
+const struct got_error *got_worktree_histedit_commit(struct got_object_id **,
+    struct got_pathlist_head *, struct got_worktree *,
+    struct got_reference *, struct got_commit_object *,
+    struct got_object_id *, const char *, struct got_repository *);
+
+/*
+ * Record the specified commit as skipped during histedit.
+ * This should be called for commits which get dropped or get folded into
+ * a subsequent commit.
+ */
+const struct got_error *got_worktree_histedit_skip_commit(struct got_worktree *,
+    struct got_object_id *, struct got_repository *);
+
+/* Postpone the histedit operation. */
+const struct got_error *got_worktree_histedit_postpone(struct got_worktree *);
+
+/*
+ * Complete the current histedit operation. This should be called once all
+ * commits have been edited successfully.
+ */
+const struct got_error *got_worktree_histedit_complete(struct got_worktree *,
+    struct got_reference *, struct got_reference *, struct got_repository *);
+
+/*
+ * Abort the current histedit operation.
+ * Report reverted files via the specified progress callback.
+ */
+const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
+    struct got_repository *, struct got_reference *, struct got_object_id *,
+    got_worktree_checkout_cb, void *);
+
+/* Get the path to this work tree's histedit command list file. */
+const struct got_error *got_worktree_get_histedit_list_path(char **,
+    struct got_worktree *);

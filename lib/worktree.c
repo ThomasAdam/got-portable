@@ -1440,6 +1440,44 @@ get_rebase_commit_ref_name(char **refname, struct got_worktree *worktree)
 	    GOT_WORKTREE_REBASE_COMMIT_REF_PREFIX);
 }
 
+static const struct got_error *
+get_histedit_tmp_ref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_HISTEDIT_TMP_REF_PREFIX);
+}
+
+static const struct got_error *
+get_histedit_branch_symref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_HISTEDIT_BRANCH_REF_PREFIX);
+}
+
+static const struct got_error *
+get_histedit_base_commit_ref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_HISTEDIT_BASE_COMMIT_REF_PREFIX);
+}
+
+static const struct got_error *
+get_histedit_commit_ref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_HISTEDIT_COMMIT_REF_PREFIX);
+}
+
+const struct got_error *
+got_worktree_get_histedit_list_path(char **path, struct got_worktree *worktree)
+{
+	if (asprintf(path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_HISTEDIT_LIST) == -1) {
+		*path = NULL;
+		return got_error_from_errno("asprintf");
+	}
+	return NULL;
+}
 
 /*
  * Prevent Git's garbage collector from deleting our base commit by
@@ -3761,12 +3799,7 @@ static const struct got_error *
 collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
     char **logmsg, void *arg)
 {
-	struct got_commit_object *commit = arg;
-
-	*logmsg = strdup(got_object_commit_get_logmsg(commit));
-	if (*logmsg == NULL)
-		return got_error_from_errno("strdup");
-
+	*logmsg = arg;
 	return NULL;
 }
 
@@ -3822,28 +3855,13 @@ got_worktree_rebase_pathlist_free(struct got_pathlist_head *merged_paths)
 	got_pathlist_free(merged_paths);
 }
 
-const struct got_error *
-got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
-    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
-    struct got_object_id *commit_id, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+static const struct got_error *
+store_commit_id(const char *commit_ref_name, struct got_object_id *commit_id,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct got_fileindex *fileindex;
-	char *fileindex_path, *commit_ref_name = NULL;
 	struct got_reference *commit_ref = NULL;
-	struct collect_merged_paths_arg cmp_arg;
 
-	/* Work tree is locked/unlocked during rebase preparation/teardown. */
-
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
-	if (err)
-		return err;
-
-	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
-	if (err)
-		goto done;
 	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
 	if (err) {
 		if (err->code != GOT_ERR_NOT_REF)
@@ -3868,6 +3886,30 @@ got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
 			goto done;
 		}
 	}
+done:
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	return err;
+}
+
+static const struct got_error *
+rebase_merge_files(struct got_pathlist_head *merged_paths,
+    const char *commit_ref_name, struct got_worktree *worktree,
+    struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	struct got_fileindex *fileindex;
+	char *fileindex_path;
+	struct got_reference *commit_ref = NULL;
+	struct collect_merged_paths_arg cmp_arg;
+
+	/* Work tree is locked/unlocked during rebase preparation/teardown. */
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		return err;
 
 	cmp_arg.progress_cb = progress_cb;
 	cmp_arg.progress_arg = progress_arg;
@@ -3875,7 +3917,6 @@ got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
 	err = merge_files(worktree, fileindex, fileindex_path,
 	    parent_commit_id, commit_id, repo, collect_merged_paths,
 	    &cmp_arg, cancel_cb, cancel_arg);
-done:
 	got_fileindex_free(fileindex);
 	free(fileindex_path);
 	if (commit_ref)
@@ -3884,39 +3925,77 @@ done:
 }
 
 const struct got_error *
-got_worktree_rebase_commit(struct got_object_id **new_commit_id,
-    struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
-    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
-    struct got_object_id *orig_commit_id, struct got_repository *repo)
+got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
+    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
+    struct got_object_id *commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	char *commit_ref_name;
+
+	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		return err;
+
+	err = store_commit_id(commit_ref_name, commit_id, repo);
+	if (err)
+		goto done;
+
+	err = rebase_merge_files(merged_paths, commit_ref_name, worktree,
+	    parent_commit_id, commit_id, repo, progress_cb, progress_arg,
+	    cancel_cb, cancel_arg);
+done:
+	free(commit_ref_name);
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_merge_files(struct got_pathlist_head *merged_paths,
+    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
+    struct got_object_id *commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	char *commit_ref_name;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		return err;
+
+	err = store_commit_id(commit_ref_name, commit_id, repo);
+	if (err)
+		goto done;
+
+	err = rebase_merge_files(merged_paths, commit_ref_name, worktree,
+	    parent_commit_id, commit_id, repo, progress_cb, progress_arg,
+	    cancel_cb, cancel_arg);
+done:
+	free(commit_ref_name);
+	return err;
+}
+
+static const struct got_error *
+rebase_commit(struct got_object_id **new_commit_id,
+    struct got_pathlist_head *merged_paths, struct got_reference *commit_ref,
+    struct got_worktree *worktree, struct got_reference *tmp_branch,
+    struct got_commit_object *orig_commit, const char *new_logmsg,
+    struct got_repository *repo)
 {
 	const struct got_error *err, *sync_err;
 	struct got_pathlist_head commitable_paths;
 	struct collect_commitables_arg cc_arg;
 	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL, *commit_ref_name = NULL;
+	char *fileindex_path = NULL;
 	struct got_reference *head_ref = NULL;
 	struct got_object_id *head_commit_id = NULL;
-	struct got_reference *commit_ref = NULL;
-	struct got_object_id *commit_id = NULL;
+	char *logmsg = NULL;
 
 	TAILQ_INIT(&commitable_paths);
 	*new_commit_id = NULL;
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
-
-	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
-	if (err)
-		return err;
-	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
-	if (err)
-		goto done;
-	err = got_ref_resolve(&commit_id, repo, commit_ref);
-	if (err)
-		goto done;
-	if (got_object_id_cmp(commit_id, orig_commit_id) != 0) {
-		err = got_error(GOT_ERR_REBASE_COMMITID);
-		goto done;
-	}
 
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
@@ -3963,11 +4042,17 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	if (new_logmsg)
+		logmsg = strdup(new_logmsg);
+	else
+		logmsg = strdup(got_object_commit_get_logmsg(orig_commit));
+	if (logmsg == NULL)
+		return got_error_from_errno("strdup");
+
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    worktree, NULL, got_object_commit_get_author(orig_commit),
 	    got_object_commit_get_committer(orig_commit),
-	    collect_rebase_commit_msg, orig_commit,
-	    rebase_status, NULL, repo);
+	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
 	if (err)
 		goto done;
 
@@ -3988,9 +4073,6 @@ done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
-	free(commit_ref_name);
-	if (commit_ref)
-		got_ref_close(commit_ref);
 	free(head_commit_id);
 	if (head_ref)
 		got_ref_close(head_ref);
@@ -3998,6 +4080,79 @@ done:
 		free(*new_commit_id);
 		*new_commit_id = NULL;
 	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_rebase_commit(struct got_object_id **new_commit_id,
+    struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
+    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
+    struct got_object_id *orig_commit_id, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *commit_ref_name;
+	struct got_reference *commit_ref = NULL;
+	struct got_object_id *commit_id = NULL;
+
+	err = get_rebase_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		return err;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(&commit_id, repo, commit_ref);
+	if (err)
+		goto done;
+	if (got_object_id_cmp(commit_id, orig_commit_id) != 0) {
+		err = got_error(GOT_ERR_REBASE_COMMITID);
+		goto done;
+	}
+
+	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
+	    worktree, tmp_branch, orig_commit, NULL, repo);
+done:
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	free(commit_ref_name);
+	free(commit_id);
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_commit(struct got_object_id **new_commit_id,
+    struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
+    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
+    struct got_object_id *orig_commit_id, const char *new_logmsg,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *commit_ref_name;
+	struct got_reference *commit_ref = NULL;
+	struct got_object_id *commit_id = NULL;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		return err;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(&commit_id, repo, commit_ref);
+	if (err)
+		goto done;
+	if (got_object_id_cmp(commit_id, orig_commit_id) != 0) {
+		err = got_error(GOT_ERR_HISTEDIT_COMMITID);
+		goto done;
+	}
+
+	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
+	    worktree, tmp_branch, orig_commit, new_logmsg, repo);
+done:
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	free(commit_ref_name);
+	free(commit_id);
 	return err;
 }
 
@@ -4222,5 +4377,396 @@ done:
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_prepare(struct got_reference **tmp_branch,
+    struct got_reference **branch_ref, struct got_object_id **base_commit_id,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *tmp_branch_name = NULL;
+	char *branch_ref_name = NULL;
+	char *base_commit_ref_name = NULL;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	struct check_rebase_ok_arg ok_arg;
+	struct got_reference *wt_branch = NULL;
+	struct got_reference *base_commit_ref = NULL;
+
+	*tmp_branch = NULL;
+	*branch_ref = NULL;
+	*base_commit_id = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	ok_arg.worktree = worktree;
+	ok_arg.repo = repo;
+	ok_arg.rebase_in_progress = 0;
+	err = got_fileindex_for_each_entry_safe(fileindex, check_rebase_ok,
+	    &ok_arg);
+	if (err)
+		goto done;
+
+	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
+	if (err)
+		goto done;
+
+	err = get_histedit_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = get_histedit_base_commit_ref_name(&base_commit_ref_name,
+	    worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&wt_branch, repo, worktree->head_ref_name,
+	    0);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc_symref(branch_ref, branch_ref_name, wt_branch);
+	if (err)
+		goto done;
+
+	err = got_ref_write(*branch_ref, repo);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc(&base_commit_ref, base_commit_ref_name,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+	err = got_ref_write(base_commit_ref, repo);
+	if (err)
+		goto done;
+	*base_commit_id = got_object_id_dup(worktree->base_commit_id);
+	if (*base_commit_id == NULL) {
+		err = got_error_from_errno("got_object_id_dup");
+		goto done;
+	}
+
+	err = got_ref_alloc(tmp_branch, tmp_branch_name,
+	    worktree->base_commit_id);
+	if (err)
+		goto done;
+	err = got_ref_write(*tmp_branch, repo);
+	if (err)
+		goto done;
+
+	err = got_worktree_set_head_ref(worktree, *tmp_branch);
+	if (err)
+		goto done;
+done:
+	free(fileindex_path);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	free(tmp_branch_name);
+	free(branch_ref_name);
+	free(base_commit_ref_name);
+	if (wt_branch)
+		got_ref_close(wt_branch);
+	if (err) {
+		if (*branch_ref) {
+			got_ref_close(*branch_ref);
+			*branch_ref = NULL;
+		}
+		if (*tmp_branch) {
+			got_ref_close(*tmp_branch);
+			*tmp_branch = NULL;
+		}
+		free(*base_commit_id);
+		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_postpone(struct got_worktree *worktree)
+{
+	return lock_worktree(worktree, LOCK_SH);
+}
+
+const struct got_error *
+got_worktree_histedit_in_progress(int *in_progress,
+    struct got_worktree *worktree)
+{
+	const struct got_error *err;
+	char *tmp_branch_name = NULL;
+
+	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
+	if (err)
+		return err;
+
+	*in_progress = (strcmp(tmp_branch_name, worktree->head_ref_name) == 0);
+	free(tmp_branch_name);
+	return NULL;
+}
+
+const struct got_error *
+got_worktree_histedit_continue(struct got_object_id **commit_id,
+    struct got_reference **tmp_branch, struct got_reference **branch_ref,
+    struct got_object_id **base_commit_id,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *commit_ref_name = NULL, *base_commit_ref_name = NULL;
+	char *tmp_branch_name = NULL, *branch_ref_name = NULL;
+	struct got_reference *commit_ref = NULL;
+	struct got_reference *base_commit_ref = NULL;
+
+	*commit_id = NULL;
+	*tmp_branch = NULL;
+	*base_commit_id = NULL;
+
+	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
+	if (err)
+		return err;
+
+	err = get_histedit_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+
+	err = get_histedit_base_commit_ref_name(&base_commit_ref_name,
+	    worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(branch_ref, repo, branch_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(commit_id, repo, commit_ref);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&base_commit_ref, repo, base_commit_ref_name, 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(base_commit_id, repo, base_commit_ref);
+	if (err)
+		goto done;
+
+	err = got_ref_open(tmp_branch, repo, tmp_branch_name, 0);
+	if (err)
+		goto done;
+done:
+	free(commit_ref_name);
+	free(branch_ref_name);
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	if (base_commit_ref)
+		got_ref_close(base_commit_ref);
+	if (err) {
+		free(*commit_id);
+		*commit_id = NULL;
+		free(*base_commit_id);
+		*base_commit_id = NULL;
+		if (*tmp_branch) {
+			got_ref_close(*tmp_branch);
+			*tmp_branch = NULL;
+		}
+	}
+	return err;
+}
+
+static const struct got_error *
+delete_histedit_refs(struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *tmp_branch_name = NULL, *base_commit_ref_name = NULL;
+	char *branch_ref_name = NULL, *commit_ref_name = NULL;
+
+	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(tmp_branch_name, repo);
+	if (err)
+		goto done;
+
+	err = get_histedit_base_commit_ref_name(&base_commit_ref_name,
+	    worktree);
+	if (err)
+		goto done;
+	err = delete_ref(base_commit_ref_name, repo);
+	if (err)
+		goto done;
+
+	err = get_histedit_branch_symref_name(&branch_ref_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(branch_ref_name, repo);
+	if (err)
+		goto done;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(commit_ref_name, repo);
+	if (err)
+		goto done;
+done:
+	free(tmp_branch_name);
+	free(base_commit_ref_name);
+	free(branch_ref_name);
+	free(commit_ref_name);
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_abort(struct got_worktree *worktree,
+    struct got_repository *repo, struct got_reference *branch,
+    struct got_object_id *base_commit_id,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err, *unlockerr, *sync_err;
+	struct got_reference *resolved = NULL;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	struct got_pathlist_head revertible_paths;
+	struct got_pathlist_entry *pe;
+	struct collect_revertible_paths_arg crp_arg;
+	struct got_object_id *tree_id = NULL;
+
+	TAILQ_INIT(&revertible_paths);
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = got_ref_open(&resolved, repo,
+	    got_ref_get_symref_target(branch), 0);
+	if (err)
+		goto done;
+
+	err = got_worktree_set_head_ref(worktree, resolved);
+	if (err)
+		goto done;
+
+	err = got_worktree_set_base_commit_id(worktree, repo, base_commit_id);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id, repo, base_commit_id,
+	    worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = delete_histedit_refs(worktree, repo);
+	if (err)
+		goto done;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	crp_arg.revertible_paths = &revertible_paths;
+	crp_arg.worktree = worktree;
+	err = worktree_status(worktree, "", fileindex, repo,
+	    collect_revertible_paths, &crp_arg, NULL, NULL);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(pe, &revertible_paths, entry) {
+		err = revert_file(worktree, fileindex, pe->path,
+		    progress_cb, progress_arg, repo);
+		if (err)
+			goto sync;
+	}
+
+	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
+	    repo, progress_cb, progress_arg, NULL, NULL);
+sync:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	got_ref_close(resolved);
+	free(tree_id);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	free(fileindex_path);
+	TAILQ_FOREACH(pe, &revertible_paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&revertible_paths);
+
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_complete(struct got_worktree *worktree,
+    struct got_reference *tmp_branch, struct got_reference *edited_branch,
+    struct got_repository *repo)
+{
+	const struct got_error *err, *unlockerr;
+	struct got_object_id *new_head_commit_id = NULL;
+	struct got_reference *resolved = NULL;
+
+	err = got_ref_resolve(&new_head_commit_id, repo, tmp_branch);
+	if (err)
+		return err;
+
+	err = got_ref_open(&resolved, repo,
+	    got_ref_get_symref_target(edited_branch), 0);
+	if (err)
+		goto done;
+
+	err = got_ref_change_ref(resolved, new_head_commit_id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(resolved, repo);
+	if (err)
+		goto done;
+
+	err = got_worktree_set_head_ref(worktree, resolved);
+	if (err)
+		goto done;
+
+	err = delete_histedit_refs(worktree, repo);
+done:
+	free(new_head_commit_id);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_histedit_skip_commit(struct got_worktree *worktree,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *commit_ref_name;
+
+	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
+	if (err)
+		return err;
+
+	err = store_commit_id(commit_ref_name, commit_id, repo);
+	if (err)
+		goto done;
+
+	err = delete_ref(commit_ref_name, repo);
+done:
+	free(commit_ref_name);
 	return err;
 }

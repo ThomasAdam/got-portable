@@ -93,6 +93,7 @@ __dead static void	usage_commit(void);
 __dead static void	usage_cherrypick(void);
 __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
+__dead static void	usage_histedit(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
@@ -112,6 +113,7 @@ static const struct got_error*		cmd_commit(int, char *[]);
 static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
+static const struct got_error*		cmd_histedit(int, char *[]);
 
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
@@ -132,6 +134,7 @@ static struct got_cmd got_commands[] = {
 	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "cy" },
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
+	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
 };
 
 static void
@@ -1001,6 +1004,27 @@ switch_head_ref(struct got_reference *head_ref,
 }
 
 static const struct got_error *
+check_rebase_or_histedit_in_progress(struct got_worktree *worktree)
+{
+	const struct got_error *err;
+	int in_progress;
+
+	err = got_worktree_rebase_in_progress(&in_progress, worktree);
+	if (err)
+		return err;
+	if (in_progress)
+		return got_error(GOT_ERR_REBASING);
+
+	err = got_worktree_histedit_in_progress(&in_progress, worktree);
+	if (err)
+		return err;
+	if (in_progress)
+		return got_error(GOT_ERR_HISTEDIT_BUSY);
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1011,7 +1035,7 @@ cmd_update(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	const char *branch_name = NULL;
 	struct got_reference *head_ref = NULL;
-	int ch, did_something = 0, rebase_in_progress;
+	int ch, did_something = 0;
 
 	while ((ch = getopt(argc, argv, "b:c:")) != -1) {
 		switch (ch) {
@@ -1046,13 +1070,9 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
+	error = check_rebase_or_histedit_in_progress(worktree);
 	if (error)
 		goto done;
-	if (rebase_in_progress) {
-		error = got_error(GOT_ERR_REBASING);
-		goto done;
-	}
 
 	if (argc == 0) {
 		path = strdup("");
@@ -3139,7 +3159,7 @@ cmd_commit(int argc, char *argv[])
 	const char *got_author = getenv("GOT_AUTHOR");
 	struct collect_commit_logmsg_arg cl_arg;
 	char *editor = NULL;
-	int ch, rebase_in_progress;
+	int ch;
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
 		switch (ch) {
@@ -3185,13 +3205,9 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
+	error = check_rebase_or_histedit_in_progress(worktree);
 	if (error)
 		goto done;
-	if (rebase_in_progress) {
-		error = got_error(GOT_ERR_REBASING);
-		goto done;
-	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -3483,14 +3499,45 @@ usage_rebase(void)
 	exit(1);
 }
 
+void
+trim_logmsg(char *logmsg, int limit)
+{
+	char *nl;
+	size_t len;
+
+	len = strlen(logmsg);
+	if (len > limit)
+		len = limit;
+	logmsg[len] = '\0';
+	nl = strchr(logmsg, '\n');
+	if (nl)
+		*nl = '\0';
+}
+
+static const struct got_error *
+get_short_logmsg(char **logmsg, int limit, struct got_commit_object *commit)
+{
+	const char *logmsg0 = NULL;
+
+	logmsg0 = got_object_commit_get_logmsg(commit);
+
+	while (isspace((unsigned char)logmsg0[0]))
+		logmsg0++;
+
+	*logmsg = strdup(logmsg0);
+	if (*logmsg == NULL)
+		return got_error_from_errno("strdup");
+
+	trim_logmsg(*logmsg, limit);
+	return NULL;
+}
+
 static const struct got_error *
 show_rebase_progress(struct got_commit_object *commit,
     struct got_object_id *old_id, struct got_object_id *new_id)
 {
 	const struct got_error *err;
-	char *old_id_str = NULL, *new_id_str = NULL;
-	char *logmsg0 = NULL, *logmsg, *nl;
-	size_t len;
+	char *old_id_str = NULL, *new_id_str = NULL, *logmsg = NULL;
 
 	err = got_object_id_str(&old_id_str, old_id);
 	if (err)
@@ -3502,32 +3549,19 @@ show_rebase_progress(struct got_commit_object *commit,
 			goto done;
 	}
 
-	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
-	if (logmsg0 == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
-	}
-	logmsg = logmsg0;
-
-	while (isspace((unsigned char)logmsg[0]))
-		logmsg++;
-
 	old_id_str[12] = '\0';
 	if (new_id_str)
 		new_id_str[12] = '\0';
-	len = strlen(logmsg);
-	if (len > 42)
-		len = 42;
-	logmsg[len] = '\0';
-	nl = strchr(logmsg, '\n');
-	if (nl)
-		*nl = '\0';
+
+	err = get_short_logmsg(&logmsg, 42, commit);
+	if (err)
+		goto done;
+
 	printf("%s -> %s: %s\n", old_id_str,
 	    new_id_str ? new_id_str : "no-op change", logmsg);
 done:
 	free(old_id_str);
 	free(new_id_str);
-	free(logmsg0);
 	return err;
 }
 
@@ -3560,7 +3594,7 @@ rebase_complete(struct got_worktree *worktree, struct got_reference *branch,
 static const struct got_error *
 rebase_commit(struct got_pathlist_head *merged_paths,
     struct got_worktree *worktree, struct got_reference *tmp_branch,
-   struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *error;
 	struct got_commit_object *commit;
@@ -3927,6 +3961,993 @@ done:
 		got_ref_close(branch);
 	if (new_base_branch)
 		got_ref_close(new_base_branch);
+	if (tmp_branch)
+		got_ref_close(tmp_branch);
+	if (worktree)
+		got_worktree_close(worktree);
+	if (repo)
+		got_repo_close(repo);
+	return error;
+}
+
+__dead static void
+usage_histedit(void)
+{
+	fprintf(stderr, "usage: %s histedit [-a] [-c] [-F path]\n",
+	    getprogname());
+	exit(1);
+}
+
+#define GOT_HISTEDIT_PICK 'p'
+#define GOT_HISTEDIT_EDIT 'e'
+#define GOT_HISTEDIT_FOLD 'f'
+#define GOT_HISTEDIT_DROP 'd'
+#define GOT_HISTEDIT_MESG 'm'
+
+static struct got_histedit_cmd {
+	unsigned char code;
+	const char *name;
+	const char *desc;
+} got_histedit_cmds[] = {
+	{ GOT_HISTEDIT_PICK, "pick", "use commit" },
+	{ GOT_HISTEDIT_EDIT, "edit", "use commit but stop for amending" },
+	{ GOT_HISTEDIT_FOLD, "fold", "combine with commit below" },
+	{ GOT_HISTEDIT_DROP, "drop", "remove commit from history" },
+	{ GOT_HISTEDIT_MESG, "mesg",
+	    "single-line log message for commit above (open editor if empty)" },
+};
+
+struct got_histedit_list_entry {
+	TAILQ_ENTRY(got_histedit_list_entry) entry;
+	struct got_object_id *commit_id;
+	const struct got_histedit_cmd *cmd;
+	char *logmsg;
+};
+TAILQ_HEAD(got_histedit_list, got_histedit_list_entry);
+
+static const struct got_error *
+histedit_write_commit(struct got_object_id *commit_id, const char *cmdname,
+    FILE *f, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *logmsg = NULL, *id_str = NULL;
+	struct got_commit_object *commit = NULL;
+	size_t n;
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	err = get_short_logmsg(&logmsg, 34, commit);
+	if (err)
+		goto done;
+
+	err = got_object_id_str(&id_str, commit_id);
+	if (err)
+		goto done;
+
+	n = fprintf(f, "%s %s %s\n", cmdname, id_str, logmsg);
+	if (n < 0)
+		err = got_ferror(f, GOT_ERR_IO);
+done:
+	if (commit)
+		got_object_commit_close(commit);
+	free(id_str);
+	free(logmsg);
+	return err;
+}
+
+static const struct got_error *
+histedit_write_commit_list(struct got_object_id_queue *commits, FILE *f,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_qid *qid;
+
+	if (SIMPLEQ_EMPTY(commits))
+		return got_error(GOT_ERR_EMPTY_HISTEDIT);
+
+	SIMPLEQ_FOREACH(qid, commits, entry) {
+		err = histedit_write_commit(qid->id, got_histedit_cmds[0].name,
+		    f, repo);
+		if (err)
+			break;
+	}
+
+	return err;
+}
+
+static const struct got_error *
+write_cmd_list(FILE *f)
+{
+	const struct got_error *err = NULL;
+	int n, i;
+
+	n = fprintf(f, "# Available histedit commands:\n");
+	if (n < 0)
+		return got_ferror(f, GOT_ERR_IO);
+
+	for (i = 0; i < nitems(got_histedit_cmds); i++) {
+		struct got_histedit_cmd *cmd = &got_histedit_cmds[i];
+		n = fprintf(f, "#   %s (%c): %s\n", cmd->name, cmd->code,
+		    cmd->desc);
+		if (n < 0) {
+			err = got_ferror(f, GOT_ERR_IO);
+			break;
+		}
+	}
+	n = fprintf(f, "# Commits will be processed in order from top to "
+	    "bottom of this file.\n");
+	if (n < 0)
+		return got_ferror(f, GOT_ERR_IO);
+	return err;
+}
+
+static const struct got_error *
+histedit_syntax_error(int lineno)
+{
+	static char msg[42];
+	int ret;
+
+	ret = snprintf(msg, sizeof(msg), "histedit syntax error on line %d",
+	    lineno);
+	if (ret == -1 || ret >= sizeof(msg))
+		return got_error(GOT_ERR_HISTEDIT_SYNTAX);
+
+	return got_error_msg(GOT_ERR_HISTEDIT_SYNTAX, msg);
+}
+
+static const struct got_error *
+append_folded_commit_msg(char **new_msg, struct got_histedit_list_entry *hle,
+    char *logmsg, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_commit_object *folded_commit = NULL;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, hle->commit_id);
+	if (err)
+		return err;
+
+	err = got_object_open_as_commit(&folded_commit, repo, hle->commit_id);
+	if (err)
+		goto done;
+
+	if (asprintf(new_msg, "%s%s# log message of folded commit %s: %s",
+	    logmsg ? logmsg : "", logmsg ? "\n" : "", id_str,
+	    got_object_commit_get_logmsg(folded_commit)) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+done:
+	if (folded_commit)
+		got_object_commit_close(folded_commit);
+	free(id_str);
+	return err;
+}
+
+static struct got_histedit_list_entry *
+get_folded_commits(struct got_histedit_list_entry *hle)
+{
+	struct got_histedit_list_entry *prev, *folded = NULL;
+
+	prev = TAILQ_PREV(hle, got_histedit_list, entry);
+	while (prev && prev->cmd->code == GOT_HISTEDIT_FOLD) {
+		folded = prev;
+		prev = TAILQ_PREV(prev, got_histedit_list, entry);
+	}
+
+	return folded;
+}
+
+static const struct got_error *
+histedit_edit_logmsg(struct got_histedit_list_entry *hle,
+    struct got_repository *repo)
+{
+	char *logmsg_path = NULL, *id_str = NULL;
+	char *logmsg = NULL, *new_msg = NULL, *editor = NULL;
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	int fd;
+	struct got_histedit_list_entry *folded = NULL;
+
+	err = got_object_open_as_commit(&commit, repo, hle->commit_id);
+	if (err)
+		return err;
+
+	folded = get_folded_commits(hle);
+	if (folded) {
+		while (folded != hle) {
+			err = append_folded_commit_msg(&new_msg, folded,
+			    logmsg, repo);
+			if (err)
+				goto done;
+			free(logmsg);
+			logmsg = new_msg;
+			folded = TAILQ_NEXT(folded, entry);
+		}
+	}
+
+	err = got_object_id_str(&id_str, hle->commit_id);
+	if (err)
+		goto done;
+	if (asprintf(&new_msg,
+	    "%s\n# original log message of commit %s: %s",
+	    logmsg ? logmsg : "", id_str,
+	    got_object_commit_get_logmsg(commit)) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	free(logmsg);
+	logmsg = new_msg;
+
+	err = got_object_id_str(&id_str, hle->commit_id);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named_fd(&logmsg_path, &fd, "/tmp/got-logmsg");
+	if (err)
+		goto done;
+
+	dprintf(fd, logmsg);
+	close(fd);
+
+	err = get_editor(&editor);
+	if (err)
+		goto done;
+
+	err = edit_logmsg(&hle->logmsg, editor, logmsg_path, logmsg);
+	if (err) {
+		if (err->code != GOT_ERR_COMMIT_MSG_EMPTY)
+			goto done;
+		err = NULL;
+		hle->logmsg = strdup(got_object_commit_get_logmsg(commit));
+		if (hle->logmsg == NULL)
+			err = got_error_from_errno("strdup");
+	}
+done:
+	if (logmsg_path && unlink(logmsg_path) != 0 && err == NULL)
+		err = got_error_from_errno2("unlink", logmsg_path);
+	free(logmsg_path);
+	free(logmsg);
+	free(editor);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
+static const struct got_error *
+histedit_parse_list(struct got_histedit_list *histedit_cmds,
+    FILE *f, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *line = NULL, *p, *end;
+	size_t size;
+	ssize_t len;
+	int lineno = 0, i;
+	const struct got_histedit_cmd *cmd;
+	struct got_object_id *commit_id = NULL;
+	struct got_histedit_list_entry *hle = NULL;
+
+	for (;;) {
+		len = getline(&line, &size, f);
+		if (len == -1) {
+			const struct got_error *getline_err;
+			if (feof(f))
+				break;
+			getline_err = got_error_from_errno("getline");
+			err = got_ferror(f, getline_err->code);
+			break;
+		}
+		lineno++;
+		p = line;
+		while (isspace((unsigned char)p[0]))
+			p++;
+		if (p[0] == '#' || p[0] == '\0') {
+			free(line);
+			line = NULL;
+			continue;
+		}
+		cmd = NULL;
+		for (i = 0; i < nitems(got_histedit_cmds); i++) {
+			cmd = &got_histedit_cmds[i];
+			if (strncmp(cmd->name, p, strlen(cmd->name)) == 0 &&
+			    isspace((unsigned char)p[strlen(cmd->name)])) {
+				p += strlen(cmd->name);
+				break;
+			}
+			if (p[0] == cmd->code && isspace((unsigned char)p[1])) {
+				p++;
+				break;
+			}
+		}
+		if (cmd == NULL) {
+			err = histedit_syntax_error(lineno);
+			break;
+		}
+		while (isspace((unsigned char)p[0]))
+			p++;
+		if (cmd->code == GOT_HISTEDIT_MESG) {
+			if (hle == NULL || hle->logmsg != NULL) {
+				err = got_error(GOT_ERR_HISTEDIT_CMD);
+				break;
+			}
+			if (p[0] == '\0') {
+				err = histedit_edit_logmsg(hle, repo);
+				if (err)
+					break;
+			} else {
+				hle->logmsg = strdup(p);
+				if (hle->logmsg == NULL) {
+					err = got_error_from_errno("strdup");
+					break;
+				}
+			}
+			free(line);
+			line = NULL;
+			continue;
+		} else {
+			end = p;
+			while (end[0] && !isspace((unsigned char)end[0]))
+				end++;
+			*end = '\0';
+
+			err = got_object_resolve_id_str(&commit_id, repo, p);
+			if (err) {
+				/* override error code */
+				err = histedit_syntax_error(lineno);
+				break;
+			}
+		}
+		hle = malloc(sizeof(*hle));
+		if (hle == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		hle->cmd = cmd;
+		hle->commit_id = commit_id;
+		hle->logmsg = NULL;
+		commit_id = NULL;
+		free(line);
+		line = NULL;
+		TAILQ_INSERT_TAIL(histedit_cmds, hle, entry);
+	}
+
+	free(line);
+	free(commit_id);
+	return err;
+}
+
+static const struct got_error *
+histedit_run_editor(struct got_histedit_list *histedit_cmds,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *editor;
+	FILE *f = NULL;
+
+	err = get_editor(&editor);
+	if (err)
+		return err;
+
+	if (spawn_editor(editor, path) == -1) {
+		err = got_error_from_errno("failed spawning editor");
+		goto done;
+	}
+
+	f = fopen(path, "r");
+	if (f == NULL) {
+		err = got_error_from_errno("fopen");
+		goto done;
+	}
+	err = histedit_parse_list(histedit_cmds, f, repo);
+done:
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(editor);
+	return err;
+}
+
+static const struct got_error *
+histedit_edit_list_retry(struct got_histedit_list *, const char *,
+    struct got_object_id_queue *, const char *, struct got_repository *);
+
+static const struct got_error *
+histedit_edit_script(struct got_histedit_list *histedit_cmds,
+    struct got_object_id_queue *commits, struct got_repository *repo)
+{
+	const struct got_error *err;
+	FILE *f = NULL;
+	char *path = NULL;
+
+	err = got_opentemp_named(&path, &f, "got-histedit");
+	if (err)
+		return err;
+
+	err = write_cmd_list(f);
+	if (err)
+		goto done;
+
+	err = histedit_write_commit_list(commits, f, repo);
+	if (err)
+		goto done;
+
+	if (fclose(f) != 0) {
+		err = got_error_from_errno("fclose");
+		goto done;
+	}
+	f = NULL;
+
+	err = histedit_run_editor(histedit_cmds, path, repo);
+	if (err) {
+		const char *errmsg = err->msg;
+		if (err->code != GOT_ERR_HISTEDIT_SYNTAX)
+			goto done;
+		err = histedit_edit_list_retry(histedit_cmds, errmsg,
+		    commits, path, repo);
+	}
+done:
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (path && unlink(path) != 0 && err == NULL)
+		err = got_error_from_errno2("unlink", path);
+	free(path);
+	return err;
+}
+
+static const struct got_error *
+histedit_save_list(struct got_histedit_list *histedit_cmds,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path = NULL;
+	FILE *f = NULL;
+	struct got_histedit_list_entry *hle;
+	struct got_commit_object *commit = NULL;
+
+	err = got_worktree_get_histedit_list_path(&path, worktree);
+	if (err)
+		return err;
+
+	f = fopen(path, "w");
+	if (f == NULL) {
+		err = got_error_from_errno2("fopen", path);
+		goto done;
+	}
+	TAILQ_FOREACH(hle, histedit_cmds, entry) {
+		err = histedit_write_commit(hle->commit_id, hle->cmd->name, f,
+		    repo);
+		if (err)
+			break;
+
+		if (hle->logmsg) {
+			int n = fprintf(f, "%c %s\n",
+			    GOT_HISTEDIT_MESG, hle->logmsg);
+			if (n < 0) {
+				err = got_ferror(f, GOT_ERR_IO);
+				break;
+			}
+		}
+	}
+done:
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(path);
+	if (commit)
+		got_object_commit_close(commit);
+	return err;
+}
+
+static const struct got_error *
+histedit_load_list(struct got_histedit_list *histedit_cmds,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	FILE *f = NULL;
+
+	f = fopen(path, "r");
+	if (f == NULL) {
+		err = got_error_from_errno2("fopen", path);
+		goto done;
+	}
+
+	err = histedit_parse_list(histedit_cmds, f, repo);
+done:
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	return err;
+}
+
+static const struct got_error *
+histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
+    const char *errmsg, struct got_object_id_queue *commits,
+    const char *path, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	int resp = ' ';
+
+	while (resp != 'c' && resp != 'r' && resp != 'q') {
+		printf("%s: %s\n(c)ontinue editing, (r)estart editing, "
+		    "or (a)bort: ", getprogname(), errmsg);
+		resp = getchar();
+		switch (resp) {
+		case 'c':
+			err = histedit_run_editor(histedit_cmds, path, repo);
+			break;
+		case 'r':
+			err = histedit_edit_script(histedit_cmds,
+			    commits, repo);
+			break;
+		case 'a':
+			err = got_error(GOT_ERR_HISTEDIT_CANCEL);
+			break;
+		default:
+			printf("invalid response '%c'\n", resp);
+			break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
+histedit_complete(struct got_worktree *worktree,
+    struct got_reference *tmp_branch, struct got_reference *branch,
+    struct got_repository *repo)
+{
+	printf("Switching work tree to %s\n",
+	    got_ref_get_symref_target(branch));
+	return got_worktree_histedit_complete(worktree, tmp_branch, branch,
+	    repo);
+}
+
+static const struct got_error *
+show_histedit_progress(struct got_commit_object *commit,
+    struct got_histedit_list_entry *hle, struct got_object_id *new_id)
+{
+	const struct got_error *err;
+	char *old_id_str = NULL, *new_id_str = NULL, *logmsg = NULL;
+
+	err = got_object_id_str(&old_id_str, hle->commit_id);
+	if (err)
+		goto done;
+
+	if (new_id) {
+		err = got_object_id_str(&new_id_str, new_id);
+		if (err)
+			goto done;
+	}
+
+	old_id_str[12] = '\0';
+	if (new_id_str)
+		new_id_str[12] = '\0';
+
+	if (hle->logmsg) {
+		logmsg = strdup(hle->logmsg);
+		if (logmsg == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		trim_logmsg(logmsg, 42);
+	} else {
+		err = get_short_logmsg(&logmsg, 42, commit);
+		if (err)
+			goto done;
+	}
+
+	switch (hle->cmd->code) {
+	case GOT_HISTEDIT_PICK:
+	case GOT_HISTEDIT_EDIT:
+		printf("%s -> %s: %s\n", old_id_str,
+		    new_id_str ? new_id_str : "no-op change", logmsg);
+		break;
+	case GOT_HISTEDIT_DROP:
+	case GOT_HISTEDIT_FOLD:
+		printf("%s ->  %s commit: %s\n", old_id_str, hle->cmd->name,
+		    logmsg);
+		break;
+	default:
+		break;
+	}
+
+done:
+	free(old_id_str);
+	free(new_id_str);
+	return err;
+}
+
+static const struct got_error *
+histedit_commit(struct got_pathlist_head *merged_paths,
+    struct got_worktree *worktree, struct got_reference *tmp_branch,
+    struct got_histedit_list_entry *hle, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_commit_object *commit;
+	struct got_object_id *new_commit_id;
+
+	if ((hle->cmd->code == GOT_HISTEDIT_EDIT || get_folded_commits(hle))
+	    && hle->logmsg == NULL) {
+		err = histedit_edit_logmsg(hle, repo);
+		if (err)
+			return err;
+	}
+
+	err = got_object_open_as_commit(&commit, repo, hle->commit_id);
+	if (err)
+		return err;
+
+	err = got_worktree_histedit_commit(&new_commit_id, merged_paths,
+	    worktree, tmp_branch, commit, hle->commit_id, hle->logmsg, repo);
+	if (err) {
+		if (err->code != GOT_ERR_COMMIT_NO_CHANGES)
+			goto done;
+		err = show_histedit_progress(commit, hle, NULL);
+	} else {
+		err = show_histedit_progress(commit, hle, new_commit_id);
+		free(new_commit_id);
+	}
+done:
+	got_object_commit_close(commit);
+	return err;
+}
+
+static const struct got_error *
+histedit_skip_commit(struct got_histedit_list_entry *hle,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *error;
+	struct got_commit_object *commit;
+
+	error = got_worktree_histedit_skip_commit(worktree, hle->commit_id,
+	    repo);
+	if (error)
+		return error;
+
+	error = got_object_open_as_commit(&commit, repo, hle->commit_id);
+	if (error)
+		return error;
+
+	error = show_histedit_progress(commit, hle, NULL);
+	got_object_commit_close(commit);
+	return error;
+}
+
+static const struct got_error *
+histedit_check_script(struct got_histedit_list *histedit_cmds,
+    struct got_object_id_queue *commits, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_qid *qid;
+	struct got_histedit_list_entry *hle;
+	static char msg[80];
+	char *id_str;
+
+	if (TAILQ_EMPTY(histedit_cmds))
+		return got_error(GOT_ERR_EMPTY_HISTEDIT);
+
+	SIMPLEQ_FOREACH(qid, commits, entry) {
+		TAILQ_FOREACH(hle, histedit_cmds, entry) {
+			if (got_object_id_cmp(qid->id, hle->commit_id) == 0)
+				break;
+		}
+		if (hle == NULL) {
+			err = got_object_id_str(&id_str, qid->id);
+			if (err)
+				return err;
+			snprintf(msg, sizeof(msg),
+			    "commit %s missing from histedit script", id_str);
+			free(id_str);
+			return got_error_msg(GOT_ERR_HISTEDIT_CMD, msg);
+		}
+	}
+
+	if (hle->cmd->code == GOT_HISTEDIT_FOLD)
+		return got_error_msg(GOT_ERR_HISTEDIT_CMD,
+		    "last commit in histedit script cannot be folded");
+
+	return NULL;
+}
+
+static const struct got_error *
+cmd_histedit(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	char *cwd = NULL;
+	struct got_reference *branch = NULL;
+	struct got_reference *tmp_branch = NULL;
+	struct got_object_id *resume_commit_id = NULL;
+	struct got_object_id *base_commit_id = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	struct got_commit_object *commit = NULL;
+	int ch, rebase_in_progress = 0;
+	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
+	const char *edit_script_path = NULL;
+	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
+	struct got_object_id_queue commits;
+	struct got_pathlist_head merged_paths;
+	const struct got_object_id_queue *parent_ids;
+	struct got_object_qid *pid;
+	struct got_histedit_list histedit_cmds;
+	struct got_histedit_list_entry *hle;
+
+	SIMPLEQ_INIT(&commits);
+	TAILQ_INIT(&histedit_cmds);
+	TAILQ_INIT(&merged_paths);
+
+	while ((ch = getopt(argc, argv, "acF:")) != -1) {
+		switch (ch) {
+		case 'a':
+			abort_edit = 1;
+			break;
+		case 'c':
+			continue_edit = 1;
+			break;
+		case 'F':
+			edit_script_path = optarg;
+			break;
+		default:
+			usage_histedit();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	if (abort_edit && continue_edit)
+		usage_histedit();
+	if (argc != 0)
+		usage_histedit();
+
+	/*
+	 * This command cannot apply unveil(2) in all cases because the
+	 * user may choose to run an editor to edit the histedit script
+	 * and to edit individual commit log messages.
+	 * unveil(2) traverses exec(2); if an editor is used we have to
+	 * apply unveil after edit script and log messages have been written.
+	 * XXX TODO: Make use of unveil(2) where possible.
+	 */
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
+	if (error)
+		goto done;
+	if (rebase_in_progress) {
+		error = got_error(GOT_ERR_REBASING);
+		goto done;
+	}
+
+	error = got_worktree_histedit_in_progress(&edit_in_progress, worktree);
+	if (error)
+		goto done;
+
+	if (edit_in_progress && abort_edit) {
+		int did_something;
+		error = got_worktree_histedit_continue(&resume_commit_id,
+		    &tmp_branch, &branch, &base_commit_id, worktree, repo);
+		if (error)
+			goto done;
+		printf("Switching work tree to %s\n",
+		    got_ref_get_symref_target(branch));
+		error = got_worktree_histedit_abort(worktree, repo,
+		    branch, base_commit_id, update_progress, &did_something);
+		if (error)
+			goto done;
+		printf("Histedit of %s aborted\n",
+		    got_ref_get_symref_target(branch));
+		goto done; /* nothing else to do */
+	} else if (abort_edit) {
+		error = got_error(GOT_ERR_NOT_HISTEDIT);
+		goto done;
+	}
+
+	if (continue_edit) {
+		char *path;
+
+		if (!edit_in_progress) {
+			error = got_error(GOT_ERR_NOT_HISTEDIT);
+			goto done;
+		}
+
+		error = got_worktree_get_histedit_list_path(&path, worktree);
+		if (error)
+			goto done;
+
+		error = histedit_load_list(&histedit_cmds, path, repo);
+		free(path);
+		if (error)
+			goto done;
+
+		error = got_worktree_histedit_continue(&resume_commit_id,
+		    &tmp_branch, &branch, &base_commit_id, worktree, repo);
+		if (error)
+			goto done;
+
+		error = got_ref_resolve(&head_commit_id, repo, branch);
+		if (error)
+			goto done;
+
+		error = got_object_open_as_commit(&commit, repo,
+		    head_commit_id);
+		if (error)
+			goto done;
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		pid = SIMPLEQ_FIRST(parent_ids);
+		error = collect_commits_to_rebase(&commits, head_commit_id,
+		    pid->id, base_commit_id,
+		    got_worktree_get_path_prefix(worktree), repo);
+		got_object_commit_close(commit);
+		commit = NULL;
+		if (error)
+			goto done;
+	} else {
+		if (edit_in_progress) {
+			error = got_error(GOT_ERR_HISTEDIT_BUSY);
+			goto done;
+		}
+
+		error = got_ref_open(&branch, repo,
+		    got_worktree_get_head_ref_name(worktree), 0);
+		if (error != NULL)
+			goto done;
+
+		error = got_ref_resolve(&head_commit_id, repo, branch);
+		if (error)
+			goto done;
+
+		error = got_object_open_as_commit(&commit, repo,
+		    head_commit_id);
+		if (error)
+			goto done;
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		pid = SIMPLEQ_FIRST(parent_ids);
+		error = collect_commits_to_rebase(&commits, head_commit_id,
+		    pid->id, got_worktree_get_base_commit_id(worktree),
+		    got_worktree_get_path_prefix(worktree), repo);
+		got_object_commit_close(commit);
+		commit = NULL;
+		if (error)
+			goto done;
+
+		if (edit_script_path) {
+			error = histedit_load_list(&histedit_cmds,
+			    edit_script_path, repo);
+			if (error)
+				goto done;
+		} else {
+			error = histedit_edit_script(&histedit_cmds, &commits,
+			    repo);
+			if (error)
+				goto done;
+
+		}
+
+		error = histedit_save_list(&histedit_cmds, worktree,
+		    repo);
+		if (error)
+			goto done;
+
+		error = got_worktree_histedit_prepare(&tmp_branch, &branch,
+		    &base_commit_id, worktree, repo);
+		if (error)
+			goto done;
+
+	}
+
+	 error = histedit_check_script(&histedit_cmds, &commits, repo);
+	 if (error)
+		goto done;
+
+	TAILQ_FOREACH(hle, &histedit_cmds, entry) {
+		if (resume_commit_id) {
+			if (got_object_id_cmp(hle->commit_id,
+			    resume_commit_id) != 0)
+				continue;
+
+			resume_commit_id = NULL;
+			if (hle->cmd->code == GOT_HISTEDIT_DROP ||
+			    hle->cmd->code == GOT_HISTEDIT_FOLD) {
+				error = histedit_skip_commit(hle, worktree,
+				   repo);
+			} else {
+				error = histedit_commit(NULL, worktree,
+				    tmp_branch, hle, repo);
+			}
+			if (error)
+				goto done;
+			continue;
+		}
+
+		if (hle->cmd->code == GOT_HISTEDIT_DROP) {
+			error = histedit_skip_commit(hle, worktree, repo);
+			if (error)
+				goto done;
+			continue;
+		}
+
+		error = got_object_open_as_commit(&commit, repo,
+		    hle->commit_id);
+		if (error)
+			goto done;
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		pid = SIMPLEQ_FIRST(parent_ids);
+
+		error = got_worktree_histedit_merge_files(&merged_paths,
+		    worktree, pid->id, hle->commit_id, repo, rebase_progress,
+		    &rebase_status, check_cancelled, NULL);
+		if (error)
+			goto done;
+		got_object_commit_close(commit);
+		commit = NULL;
+
+		if (rebase_status == GOT_STATUS_CONFLICT) {
+			got_worktree_rebase_pathlist_free(&merged_paths);
+			break;
+		}
+
+		if (hle->cmd->code == GOT_HISTEDIT_EDIT) {
+			char *id_str;
+			error = got_object_id_str(&id_str, hle->commit_id);
+			if (error)
+				goto done;
+			printf("Stopping histedit for amending commit %s\n",
+			    id_str);
+			free(id_str);
+			got_worktree_rebase_pathlist_free(&merged_paths);
+			error = got_worktree_histedit_postpone(worktree);
+			goto done;
+		}
+
+		if (hle->cmd->code == GOT_HISTEDIT_FOLD) {
+			error = histedit_skip_commit(hle, worktree, repo);
+			if (error)
+				goto done;
+			continue;
+		}
+
+		error = histedit_commit(&merged_paths, worktree, tmp_branch,
+		    hle, repo);
+		got_worktree_rebase_pathlist_free(&merged_paths);
+		if (error)
+			goto done;
+	}
+
+	if (rebase_status == GOT_STATUS_CONFLICT) {
+		error = got_worktree_histedit_postpone(worktree);
+		if (error)
+			goto done;
+		error = got_error_msg(GOT_ERR_CONFLICTS,
+		    "conflicts must be resolved before rebasing can continue");
+	} else
+		error = histedit_complete(worktree, tmp_branch, branch, repo);
+done:
+	got_object_id_queue_free(&commits);
+	free(head_commit_id);
+	free(base_commit_id);
+	free(resume_commit_id);
+	if (commit)
+		got_object_commit_close(commit);
+	if (branch)
+		got_ref_close(branch);
 	if (tmp_branch)
 		got_ref_close(tmp_branch);
 	if (worktree)

@@ -103,6 +103,14 @@
 #define GOT_ERR_REBASE_COMMITID	87
 #define GOT_ERR_REBASING	88
 #define GOT_ERR_REBASE_PATH	89
+#define GOT_ERR_NOT_HISTEDIT	90
+#define GOT_ERR_EMPTY_HISTEDIT	91
+#define GOT_ERR_NO_HISTEDIT_CMD	92
+#define GOT_ERR_HISTEDIT_SYNTAX	93
+#define GOT_ERR_HISTEDIT_CANCEL	94
+#define GOT_ERR_HISTEDIT_COMMITID 95
+#define GOT_ERR_HISTEDIT_BUSY	96
+#define GOT_ERR_HISTEDIT_CMD	97
 
 static const struct got_error {
 	int code;
@@ -204,6 +212,15 @@ static const struct got_error {
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_REBASE_PATH,	"cannot rebase branch which contains "
 	    "changes outside of this work tree's path prefix" },
+	{ GOT_ERR_NOT_HISTEDIT,	"histedit operation not in progress" },
+	{ GOT_ERR_EMPTY_HISTEDIT,"no commits to edit" },
+	{ GOT_ERR_NO_HISTEDIT_CMD,"no histedit commands provided" },
+	{ GOT_ERR_HISTEDIT_SYNTAX,"syntax error in histedit command list" },
+	{ GOT_ERR_HISTEDIT_CANCEL,"histedit operation cancelled" },
+	{ GOT_ERR_HISTEDIT_COMMITID,"histedit commit ID mismatch" },
+	{ GOT_ERR_HISTEDIT_BUSY,"histedit operation is in progress in this "
+	    "work tree and must be continued or aborted first" },
+	{ GOT_ERR_HISTEDIT_CMD, "bad histedit command" },
 };
 
 /*
