@@ -240,7 +240,7 @@ get_editor(char **abspath)
 
 static const struct got_error *
 apply_unveil(const char *repo_path, int repo_read_only,
-    const char *worktree_path, int create_worktree)
+    const char *worktree_path)
 {
 	const struct got_error *err;
 
@@ -248,24 +248,6 @@ apply_unveil(const char *repo_path, int repo_read_only,
 	if (unveil("gmon.out", "rwc") != 0)
 		return got_error_from_errno2("unveil", "gmon.out");
 #endif
-	if (create_worktree) {
-		/* Pre-create work tree path to avoid unveiling its parents. */
-		err = got_path_mkdir(worktree_path);
-
-		if (errno == EEXIST) {
-			if (got_path_dir_is_empty(worktree_path)) {
-				errno = 0;
-				err = NULL;
-			} else {
-				err = got_error_path(worktree_path,
-				    GOT_ERR_DIR_NOT_EMPTY);
-			}
-		}
-
-		if (err && (err->code != GOT_ERR_ERRNO || errno != EISDIR))
-			return err;
-	}
-
 	if (repo_path && unveil(repo_path, repo_read_only ? "r" : "rwc") != 0)
 		return got_error_from_errno2("unveil", repo_path);
 
@@ -328,7 +310,7 @@ cmd_init(int argc, char *argv[])
 	    !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
 		goto done;
 
-	error = apply_unveil(repo_path, 0, NULL, 0);
+	error = apply_unveil(repo_path, 0, NULL);
 	if (error)
 		goto done;
 
@@ -597,7 +579,7 @@ cmd_import(int argc, char *argv[])
 	if (unveil(path_dir, "r") != 0)
 		return got_error_from_errno2("unveil", path_dir);
 
-	error = apply_unveil(got_repo_get_path(repo), 0, NULL, 0);
+	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 	if (error)
 		goto done;
 
@@ -877,7 +859,19 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path, 1);
+	/* Pre-create work tree path for unveil(2) */
+	error = got_path_mkdir(worktree_path);
+	if (error) {
+		if (!(error->code == GOT_ERR_ERRNO && errno == EISDIR))
+			goto done;
+		if (!got_path_dir_is_empty(worktree_path)) {
+			error = got_error_path(worktree_path,
+			    GOT_ERR_DIR_NOT_EMPTY);
+			goto done;
+		}
+	}
+
+	error = apply_unveil(got_repo_get_path(repo), 0, worktree_path);
 	if (error)
 		goto done;
 
@@ -1078,7 +1072,7 @@ cmd_update(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -1490,7 +1484,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -1763,7 +1757,7 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -1968,7 +1962,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 	if (error)
 		goto done;
 
@@ -2196,7 +2190,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL, 0);
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 	if (error)
 		goto done;
 
@@ -2325,7 +2319,7 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -2516,7 +2510,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -2755,7 +2749,7 @@ cmd_branch(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), do_list,
-	    worktree ? got_worktree_get_root_path(worktree) : NULL, 0);
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
@@ -2837,7 +2831,7 @@ cmd_add(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -2925,7 +2919,7 @@ cmd_remove(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -3036,7 +3030,7 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -3124,7 +3118,7 @@ done:
 
 	/* Editor is done; we can now apply unveil(2) */
 	if (err == NULL) {
-		err = apply_unveil(a->repo_path, 0, a->worktree_path, 0);
+		err = apply_unveil(a->repo_path, 0, a->worktree_path);
 		if (err) {
 			free(*logmsg);
 			*logmsg = NULL;
@@ -3211,7 +3205,7 @@ cmd_commit(int argc, char *argv[])
 		error = get_editor(&editor);
 	else
 		error = apply_unveil(got_repo_get_path(repo), 0,
-		    got_worktree_get_root_path(worktree), 0);
+		    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -3306,7 +3300,7 @@ cmd_cherrypick(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -3421,7 +3415,7 @@ cmd_backout(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
@@ -3776,7 +3770,7 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree), 0);
+	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
 
