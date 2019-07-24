@@ -4132,8 +4132,10 @@ get_folded_commits(struct got_histedit_list_entry *hle)
 	struct got_histedit_list_entry *prev, *folded = NULL;
 
 	prev = TAILQ_PREV(hle, got_histedit_list, entry);
-	while (prev && prev->cmd->code == GOT_HISTEDIT_FOLD) {
-		folded = prev;
+	while (prev && (prev->cmd->code == GOT_HISTEDIT_FOLD ||
+	    prev->cmd->code == GOT_HISTEDIT_DROP)) {
+		if (prev->cmd->code == GOT_HISTEDIT_FOLD)
+			folded = prev;
 		prev = TAILQ_PREV(prev, got_histedit_list, entry);
 	}
 
@@ -4158,6 +4160,10 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	folded = get_folded_commits(hle);
 	if (folded) {
 		while (folded != hle) {
+			if (folded->cmd->code == GOT_HISTEDIT_DROP) {
+				folded = TAILQ_NEXT(folded, entry);
+				continue;
+			}
 			err = append_folded_commit_msg(&new_msg, folded,
 			    logmsg, repo);
 			if (err)

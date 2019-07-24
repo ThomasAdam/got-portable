@@ -338,6 +338,10 @@ function test_histedit_fold {
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local old_commit2=`git_show_head $testroot/repo`
 
+	echo "modified delta on master" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on master"
+	local old_commit3=`git_show_head $testroot/repo`
+
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -346,7 +350,8 @@ function test_histedit_fold {
 	fi
 
 	echo "fold $old_commit1" > $testroot/histedit-script
-	echo "pick $old_commit2" >> $testroot/histedit-script
+	echo "drop $old_commit2" >> $testroot/histedit-script
+	echo "pick $old_commit3" >> $testroot/histedit-script
 	echo "mesg committing folded changes" >> $testroot/histedit-script
 
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
@@ -357,6 +362,7 @@ function test_histedit_fold {
 
 	local short_old_commit1=`trim_obj_id 28 $old_commit1`
 	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit3=`trim_obj_id 28 $old_commit3`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 	local short_new_commit2=`trim_obj_id 28 $new_commit2`
 
@@ -365,8 +371,11 @@ function test_histedit_fold {
 	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "$short_old_commit1 ->  fold commit: committing changes" \
 		>> $testroot/stdout.expected
-	echo "G  epsilon/zeta" >> $testroot/stdout.expected
-	echo -n "$short_old_commit2 -> $short_new_commit2: " \
+	echo -n "$short_old_commit2 ->  " >> $testroot/stdout.expected
+	echo "drop commit: committing to zeta on master" \
+		>> $testroot/stdout.expected
+	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo -n "$short_old_commit3 -> $short_new_commit2: " \
 		>> $testroot/stdout.expected
 	echo "committing folded changes" >> $testroot/stdout.expected
 	echo "Switching work tree to refs/heads/master" \
