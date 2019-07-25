@@ -4012,6 +4012,10 @@ rebase_commit(struct got_object_id **new_commit_id,
 	 */
 	if (merged_paths) {
 		struct got_pathlist_entry *pe;
+		if (TAILQ_EMPTY(merged_paths)) {
+			err = got_error(GOT_ERR_NO_MERGED_PATHS);
+			goto done;
+		}
 		TAILQ_FOREACH(pe, merged_paths, entry) {
 			err = worktree_status(worktree, pe->path, fileindex,
 			    repo, collect_commitables, &cc_arg, NULL, NULL);

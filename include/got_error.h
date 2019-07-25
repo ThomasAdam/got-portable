@@ -112,6 +112,7 @@
 #define GOT_ERR_HISTEDIT_BUSY	96
 #define GOT_ERR_HISTEDIT_CMD	97
 #define GOT_ERR_HISTEDIT_PATH	98
+#define GOT_ERR_NO_MERGED_PATHS 99
 
 static const struct got_error {
 	int code;
@@ -224,6 +225,7 @@ static const struct got_error {
 	{ GOT_ERR_HISTEDIT_CMD, "bad histedit command" },
 	{ GOT_ERR_HISTEDIT_PATH, "cannot edit branch history which contains "
 	    "changes outside of this work tree's path prefix" },
+	{ GOT_ERR_NO_MERGED_PATHS, "empty list of merged paths" },
 };
 
 /*
