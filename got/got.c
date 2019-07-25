@@ -3638,10 +3638,11 @@ done:
 struct check_path_prefix_arg {
 	const char *path_prefix;
 	size_t len;
+	int errcode;
 };
 
 static const struct got_error *
-check_path_prefix(void *arg, struct got_blob_object *blob1,
+check_path_prefix_in_diff(void *arg, struct got_blob_object *blob1,
     struct got_blob_object *blob2, struct got_object_id *id1,
     struct got_object_id *id2, const char *path1, const char *path2,
     struct got_repository *repo)
@@ -3650,15 +3651,15 @@ check_path_prefix(void *arg, struct got_blob_object *blob1,
 
 	if ((path1 && !got_path_is_child(path1, a->path_prefix, a->len)) ||
 	    (path2 && !got_path_is_child(path2, a->path_prefix, a->len)))
-		return got_error(GOT_ERR_REBASE_PATH);
+		return got_error(a->errcode);
 
 	return NULL;
 }
 
 static const struct got_error *
-rebase_check_path_prefix(struct got_object_id *parent_id,
+check_path_prefix(struct got_object_id *parent_id,
     struct got_object_id *commit_id, const char *path_prefix,
-    struct got_repository *repo)
+    int errcode, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -3690,8 +3691,9 @@ rebase_check_path_prefix(struct got_object_id *parent_id,
 	while (cpp_arg.path_prefix[0] == '/')
 		cpp_arg.path_prefix++;
 	cpp_arg.len = strlen(cpp_arg.path_prefix);
-	err = got_diff_tree(tree1, tree2, "", "", repo, check_path_prefix,
-	    &cpp_arg);
+	cpp_arg.errcode = errcode;
+	err = got_diff_tree(tree1, tree2, "", "", repo,
+	    check_path_prefix_in_diff, &cpp_arg);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
@@ -3705,10 +3707,11 @@ done:
 }
 
 static const struct got_error *
-collect_commits_to_rebase(struct got_object_id_queue *commits,
+collect_commits(struct got_object_id_queue *commits,
     struct got_object_id *initial_commit_id,
     struct got_object_id *iter_start_id, struct got_object_id *iter_stop_id,
-    const char *path_prefix, struct got_repository *repo)
+    const char *path_prefix, int path_prefix_errcode,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL;
@@ -3738,8 +3741,8 @@ collect_commits_to_rebase(struct got_object_id_queue *commits,
 			if (err)
 				goto done;
 		} else {
-			err = rebase_check_path_prefix(parent_id, commit_id,
-			    path_prefix, repo);
+			err = check_path_prefix(parent_id, commit_id,
+			    path_prefix, path_prefix_errcode, repo);
 			if (err)
 				goto done;
 
@@ -3919,8 +3922,9 @@ cmd_rebase(int argc, char *argv[])
 
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	pid = SIMPLEQ_FIRST(parent_ids);
-	error = collect_commits_to_rebase(&commits, commit_id, pid->id,
-	    yca_id, got_worktree_get_path_prefix(worktree), repo);
+	error = collect_commits(&commits, commit_id, pid->id,
+	    yca_id, got_worktree_get_path_prefix(worktree),
+	    GOT_ERR_REBASE_PATH, repo);
 	got_object_commit_close(commit);
 	commit = NULL;
 	if (error)
@@ -4820,9 +4824,9 @@ cmd_histedit(int argc, char *argv[])
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
 		}
-		error = collect_commits_to_rebase(&commits, head_commit_id,
-		    pid->id, base_commit_id,
-		    got_worktree_get_path_prefix(worktree), repo);
+		error = collect_commits(&commits, head_commit_id, pid->id,
+		    base_commit_id, got_worktree_get_path_prefix(worktree),
+		    GOT_ERR_HISTEDIT_PATH, repo);
 		got_object_commit_close(commit);
 		commit = NULL;
 		if (error)
@@ -4852,9 +4856,10 @@ cmd_histedit(int argc, char *argv[])
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
 		}
-		error = collect_commits_to_rebase(&commits, head_commit_id,
-		    pid->id, got_worktree_get_base_commit_id(worktree),
-		    got_worktree_get_path_prefix(worktree), repo);
+		error = collect_commits(&commits, head_commit_id, pid->id,
+		    got_worktree_get_base_commit_id(worktree),
+		    got_worktree_get_path_prefix(worktree),
+		    GOT_ERR_HISTEDIT_PATH, repo);
 		got_object_commit_close(commit);
 		commit = NULL;
 		if (error)

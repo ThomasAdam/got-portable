@@ -111,6 +111,7 @@
 #define GOT_ERR_HISTEDIT_COMMITID 95
 #define GOT_ERR_HISTEDIT_BUSY	96
 #define GOT_ERR_HISTEDIT_CMD	97
+#define GOT_ERR_HISTEDIT_PATH	98
 
 static const struct got_error {
 	int code;
@@ -221,6 +222,8 @@ static const struct got_error {
 	{ GOT_ERR_HISTEDIT_BUSY,"histedit operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_HISTEDIT_CMD, "bad histedit command" },
+	{ GOT_ERR_HISTEDIT_PATH, "cannot edit branch history which contains "
+	    "changes outside of this work tree's path prefix" },
 };
 
 /*
