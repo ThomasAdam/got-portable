@@ -747,9 +747,6 @@ function test_histedit_abort {
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
-
 	echo "Switching work tree to refs/heads/master" \
 		> $testroot/stdout.expected
 	echo "R  alpha" >> $testroot/stdout.expected
@@ -863,13 +860,8 @@ function test_histedit_path_prefix {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local new_commit1=`git_show_parent_commit $testroot/repo`
-	local new_commit2=`git_show_head $testroot/repo`
-
 	local short_old_commit1=`trim_obj_id 28 $old_commit1`
 	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
-	local short_new_commit2=`trim_obj_id 28 $new_commit2`
 
 	echo "$short_old_commit1 ->  drop commit: changing zeta" \
 		> $testroot/stdout.expected
