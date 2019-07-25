@@ -3687,7 +3687,9 @@ rebase_check_path_prefix(struct got_object_id *parent_id,
 		goto done;
 
 	cpp_arg.path_prefix = path_prefix;
-	cpp_arg.len = strlen(path_prefix);
+	while (cpp_arg.path_prefix[0] == '/')
+		cpp_arg.path_prefix++;
+	cpp_arg.len = strlen(cpp_arg.path_prefix);
 	err = got_diff_tree(tree1, tree2, "", "", repo, check_path_prefix,
 	    &cpp_arg);
 done:
