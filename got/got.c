@@ -4293,7 +4293,7 @@ histedit_parse_list(struct got_histedit_list *histedit_cmds,
 				break;
 			}
 		}
-		if (cmd == NULL) {
+		if (i == nitems(got_histedit_cmds)) {
 			err = histedit_syntax_error(lineno);
 			break;
 		}
