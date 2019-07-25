@@ -332,6 +332,55 @@ function test_commit_added_and_modified_in_same_dir {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_path_prefix {
+	local testroot=`test_init commit_path_prefix`
+	local commit1=`git_show_head $testroot/repo`
+
+	got checkout -p gamma $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified delta" > $testroot/wt/delta
+
+	(cd $testroot/wt && got commit -m 'changed gamma/delta' > $testroot/stdout)
+
+	local commit2=`git_show_head $testroot/repo`
+	echo "M  delta" > $testroot/stdout.expected
+	echo "Created commit $commit2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $commit1 $commit2" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit1 -i gamma | grep 'delta$' \
+		| cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit2 -i gamma | grep 'delta$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo '--- gamma/delta' >> $testroot/stdout.expected
+	echo '+++ gamma/delta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-delta' >> $testroot/stdout.expected
+	echo '+modified delta' >> $testroot/stdout.expected
+
+	got diff -r $testroot/repo $commit1 $commit2 > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -341,3 +390,4 @@ run_test test_commit_added_subdirs
 run_test test_commit_rejects_conflicted_file
 run_test test_commit_single_file_multiple
 run_test test_commit_added_and_modified_in_same_dir
+run_test test_commit_path_prefix

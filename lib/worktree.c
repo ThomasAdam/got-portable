@@ -2829,12 +2829,12 @@ match_ct_parent_path(int *match, struct got_commitable *ct, const char *path)
 
 	*match = 0;
 
-	if (strchr(ct->path, '/') == NULL) {
+	if (strchr(ct->in_repo_path, '/') == NULL) {
 		*match = got_path_is_root_dir(path);
 		return NULL;
 	}
 
-	err = got_path_dirname(&ct_parent_path, ct->path);
+	err = got_path_dirname(&ct_parent_path, ct->in_repo_path);
 	if (err)
 		return err;
 	*match = (strcmp(path, ct_parent_path) == 0);
