@@ -4669,7 +4669,8 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 	char *id_str;
 
 	if (TAILQ_EMPTY(histedit_cmds))
-		return got_error(GOT_ERR_EMPTY_HISTEDIT);
+		return got_error_msg(GOT_ERR_EMPTY_HISTEDIT,
+		    "histedit script contains no commands");
 
 	SIMPLEQ_FOREACH(qid, commits, entry) {
 		TAILQ_FOREACH(hle, histedit_cmds, entry) {

@@ -215,7 +215,8 @@ static const struct got_error {
 	{ GOT_ERR_REBASE_PATH,	"cannot rebase branch which contains "
 	    "changes outside of this work tree's path prefix" },
 	{ GOT_ERR_NOT_HISTEDIT,	"histedit operation not in progress" },
-	{ GOT_ERR_EMPTY_HISTEDIT,"no commits to edit" },
+	{ GOT_ERR_EMPTY_HISTEDIT,"no commits to edit; perhaps the work tree "
+	    "must be updated to an older commit first" },
 	{ GOT_ERR_NO_HISTEDIT_CMD,"no histedit commands provided" },
 	{ GOT_ERR_HISTEDIT_SYNTAX,"syntax error in histedit command list" },
 	{ GOT_ERR_HISTEDIT_CANCEL,"histedit operation cancelled" },
