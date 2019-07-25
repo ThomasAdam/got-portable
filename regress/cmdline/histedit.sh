@@ -908,6 +908,137 @@ function test_histedit_path_prefix_drop {
 	test_done "$testroot" "$ret"
 }
 
+function test_histedit_path_prefix_edit {
+	local testroot=`test_init histedit_path_prefix_edit`
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified zeta" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "changing zeta"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	got diff -r $testroot/repo $orig_commit $old_commit1 \
+		> $testroot/diff.expected
+
+	got checkout -c $orig_commit -p gamma $testroot/repo \
+		$testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edit $old_commit1" > $testroot/histedit-script
+	echo "mesg modified zeta" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "got: cannot edit branch history which contains changes " \
+		> $testroot/stderr.expected
+	echo "outside of this work tree's path prefix" \
+		>> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm -rf $testroot/wt
+	got checkout -c $orig_commit -p epsilon $testroot/repo \
+		$testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+
+	echo "G  zeta" > $testroot/stdout.expected
+	echo "Stopping histedit for amending commit $old_commit1" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified zeta" > $testroot/content.expected
+	cat $testroot/wt/zeta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "M  zeta"> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -c > $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo -n "$short_old_commit1 -> $short_new_commit1: " \
+		> $testroot/stdout.expected
+	echo "modified zeta" >> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
+	echo "commit $orig_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got diff -r $testroot/repo $orig_commit $new_commit1 \
+		> $testroot/diff
+	sed -i -e "s/$old_commit1/$new_commit1/" $testroot/diff.expected
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/diff.expected $testroot/diff
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -917,3 +1048,4 @@ run_test test_histedit_fold_last_commit
 run_test test_histedit_missing_commit
 run_test test_histedit_abort
 run_test test_histedit_path_prefix_drop
+run_test test_histedit_path_prefix_edit
