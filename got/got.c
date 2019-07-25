@@ -4816,6 +4816,10 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 		parent_ids = got_object_commit_get_parent_ids(commit);
 		pid = SIMPLEQ_FIRST(parent_ids);
+		if (pid == NULL) {
+			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
+			goto done;
+		}
 		error = collect_commits_to_rebase(&commits, head_commit_id,
 		    pid->id, base_commit_id,
 		    got_worktree_get_path_prefix(worktree), repo);
@@ -4844,6 +4848,10 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 		parent_ids = got_object_commit_get_parent_ids(commit);
 		pid = SIMPLEQ_FIRST(parent_ids);
+		if (pid == NULL) {
+			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
+			goto done;
+		}
 		error = collect_commits_to_rebase(&commits, head_commit_id,
 		    pid->id, got_worktree_get_base_commit_id(worktree),
 		    got_worktree_get_path_prefix(worktree), repo);
