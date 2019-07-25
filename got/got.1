@@ -703,7 +703,7 @@ character are ignored entirely.
 The available commands are as follows:
 .Bl -column YXZ pick-commit
 .It pick Ar commit Ta Use the specified commit as it is.
-.It edit Ar commit Ta Use the specfified commit but once changes have been
+.It edit Ar commit Ta Use the specified commit but once changes have been
 merged into the work tree interrupt the histedit operation for amending.
 .It fold Ar commit Ta Combine the specified commit with the next commit
 listed further below that will be used.
@@ -758,11 +758,11 @@ path prefix, the work tree cannot be used to edit the history of this branch.
 .Pp
 The
 .Cm got update
-and
+command will refuse to run while a histedit operation is in progress.
+Other commands which manipulate the work tree may be used, and the
 .Cm got commit
-commands will refuse to run while a histedit operation is in progress.
-Other commands which manipulate the work tree may be used for
-conflict resolution purposes.
+command may be used to commit arbitrary changes to the temporary branch
+while the histedit operation is interrupted.
 .Pp
 The options for
 .Cm got histedit

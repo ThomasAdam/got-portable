@@ -3176,7 +3176,7 @@ cmd_commit(int argc, char *argv[])
 	const char *got_author = getenv("GOT_AUTHOR");
 	struct collect_commit_logmsg_arg cl_arg;
 	char *editor = NULL;
-	int ch;
+	int ch, rebase_in_progress;
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
 		switch (ch) {
@@ -3222,9 +3222,13 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = check_rebase_or_histedit_in_progress(worktree);
+	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
 	if (error)
 		goto done;
+	if (rebase_in_progress) {
+		error = got_error(GOT_ERR_REBASING);
+		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
