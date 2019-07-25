@@ -32,6 +32,9 @@ function test_histedit_no_op {
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local old_commit2=`git_show_head $testroot/repo`
 
+	got diff -r $testroot/repo $orig_commit $old_commit2 \
+		> $testroot/diff.expected
+
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -118,6 +121,17 @@ function test_histedit_no_op {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got diff -r $testroot/repo $orig_commit $new_commit2 \
+		> $testroot/diff
+	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -137,6 +151,9 @@ function test_histedit_swap {
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local old_commit2=`git_show_head $testroot/repo`
+
+	got diff -r $testroot/repo $orig_commit $old_commit2 \
+		> $testroot/diff.expected
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -224,13 +241,23 @@ function test_histedit_swap {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got diff -r $testroot/repo $orig_commit $new_commit1 \
+		> $testroot/diff
+	sed -i -e "s/$old_commit2/$new_commit1/" $testroot/diff.expected
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
 }
 
 function test_histedit_drop {
 	local testroot=`test_init histedit_drop`
-
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -243,6 +270,9 @@ function test_histedit_drop {
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local old_commit2=`git_show_head $testroot/repo`
+
+	got diff -r $testroot/repo $old_commit1 $old_commit2 \
+		> $testroot/diff.expected
 
 	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -257,12 +287,10 @@ function test_histedit_drop {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout)
 
-	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
 
 	local short_old_commit1=`trim_obj_id 28 $old_commit1`
 	local short_old_commit2=`trim_obj_id 28 $old_commit2`
-	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 	local short_new_commit2=`trim_obj_id 28 $new_commit2`
 
 	echo "$short_old_commit1 ->  drop commit: committing changes" \
@@ -318,6 +346,18 @@ function test_histedit_drop {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got diff -r $testroot/repo $orig_commit $new_commit2 \
+		> $testroot/diff
+	sed -i -e "s/$old_commit1/$orig_commit/" $testroot/diff.expected
+	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/diff.expected $testroot/diff
 	fi
 	test_done "$testroot" "$ret"
 }
