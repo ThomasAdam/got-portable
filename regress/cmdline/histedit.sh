@@ -771,6 +771,111 @@ function test_histedit_abort {
 	test_done "$testroot" "$ret"
 }
 
+function test_histedit_path_prefix {
+	local testroot=`test_init histedit_path_prefix`
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified zeta" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "changing zeta"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit -p gamma $testroot/repo \
+		$testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "drop $old_commit1" > $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "histedit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "got: cannot edit branch history which contains changes " \
+		> $testroot/stderr.expected
+	echo "outside of this work tree's path prefix" \
+		>> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm -rf $testroot/wt
+	got checkout -c $orig_commit -p epsilon $testroot/repo \
+		$testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "$short_old_commit1 ->  drop commit: changing zeta" \
+		> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/zeta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $orig_commit (master)" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -779,3 +884,4 @@ run_test test_histedit_edit
 run_test test_histedit_fold_last_commit
 run_test test_histedit_missing_commit
 run_test test_histedit_abort
+run_test test_histedit_path_prefix
