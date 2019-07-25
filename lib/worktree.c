@@ -2198,7 +2198,7 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
 
-	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
+	if (!got_path_is_child(ie->path, a->status_path, a->status_path_len))
 		return NULL;
 
 	memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
@@ -2228,9 +2228,6 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	if (de->d_type == DT_LNK)
 		return NULL;
 
-	if (!got_path_is_child(parent_path, a->status_path, a->status_path_len))
-		return NULL;
-
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
 			return got_error_from_errno("asprintf");
@@ -2238,8 +2235,9 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 		path = de->d_name;
 	}
 
-	err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED, path,
-	    NULL, NULL);
+	if (got_path_is_child(path, a->status_path, a->status_path_len))
+		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
+		    path, NULL, NULL);
 	if (parent_path[0])
 		free(path);
 	return err;

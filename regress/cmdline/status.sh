@@ -392,6 +392,56 @@ function test_status_shows_conflict {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_empty_dir {
+	local testroot=`test_init status_empty_dir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/wt/epsilon/zeta
+
+	echo '!  epsilon/zeta' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status epsilon > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_status_empty_dir_unversioned_file {
+	local testroot=`test_init status_empty_dir_unversioned_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/wt/epsilon/zeta
+	touch $testroot/wt/epsilon/unversioned
+
+	echo '?  epsilon/unversioned' > $testroot/stdout.expected
+	echo '!  epsilon/zeta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status epsilon > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -401,3 +451,5 @@ run_test test_status_unversioned_subdirs
 run_test test_status_ignores_symlink
 run_test test_status_shows_no_mods_after_complete_merge
 run_test test_status_shows_conflict
+run_test test_status_empty_dir
+run_test test_status_empty_dir_unversioned_file

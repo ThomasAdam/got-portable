@@ -759,8 +759,66 @@ got_fileindex_diff_tree(struct got_fileindex *fileindex,
 
 static const struct got_error *
 diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **, DIR *,
-    const char *, const char *, struct got_repository *,
-    struct got_fileindex_diff_dir_cb *, void *);
+    struct got_pathlist_head *, const char *, const char *,
+    struct got_repository *, struct got_fileindex_diff_dir_cb *, void *);
+
+static const struct got_error *
+read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *new = NULL;
+	struct dirent *dep = NULL;
+	struct dirent *de = NULL;
+
+	for (;;) {
+		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
+		if (de == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+
+		if (readdir_r(dir, de, &dep) != 0) {
+			err = got_error_from_errno("readdir_r");
+			free(de);
+			break;
+		}
+		if (dep == NULL) {
+			free(de);
+			break;
+		}
+
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0 ||
+		    (path[0] == '\0' &&
+		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
+			free(de);
+			continue;
+		}
+
+		err = got_pathlist_insert(&new, dirlist, de->d_name, de);
+		if (err) {
+			free(de);
+			break;
+		}
+		if (new == NULL) {
+			err = got_error(GOT_ERR_DIR_DUP_ENTRY);
+			free(de);
+			break;
+		}
+	}
+
+	return err;
+}
+
+void
+free_dirlist(struct got_pathlist_head *dirlist)
+{
+	struct got_pathlist_entry *dle;
+
+	TAILQ_FOREACH(dle, dirlist, entry)
+		free(dle->data);
+	got_pathlist_free(dirlist);
+}
 
 static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
@@ -778,6 +836,9 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 		char *subpath;
 		char *subdirpath;
 		DIR *subdir;
+		struct got_pathlist_head subdirlist;
+
+		TAILQ_INIT(&subdirlist);
 
 		if (asprintf(&subpath, "%s%s%s", path,
 		    path[0] == '\0' ? "" : "/", de->d_name) == -1)
@@ -795,11 +856,19 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 			return got_error_from_errno2("opendir", subdirpath);
 		}
 
-		err = diff_fileindex_dir(fileindex, ie, subdir, rootpath,
-		    subpath, repo, cb, cb_arg);
+		err = read_dirlist(&subdirlist, subdir, subdirpath);
+		if (err) {
+			free(subpath);
+			free(subdirpath);
+			closedir(subdir);
+			return err;
+		}
+		err = diff_fileindex_dir(fileindex, ie, subdir, &subdirlist,
+		    rootpath, subpath, repo, cb, cb_arg);
 		free(subpath);
 		free(subdirpath);
 		closedir(subdir);
+		free_dirlist(&subdirlist);
 		if (err)
 			return err;
 	}
@@ -810,60 +879,17 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 static const struct got_error *
 diff_fileindex_dir(struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, DIR *dir, const char *rootpath,
-    const char *path, struct got_repository *repo,
-    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
+    struct got_fileindex_entry **ie, DIR *dir,
+    struct got_pathlist_head *dirlist, const char *rootpath, const char *path,
+    struct got_repository *repo, struct got_fileindex_diff_dir_cb *cb,
+    void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = NULL;
 	size_t path_len = strlen(path);
-	struct got_fileindex_entry *next;
-	struct got_pathlist_head dirlist;
 	struct got_pathlist_entry *dle;
 
-	TAILQ_INIT(&dirlist);
-
-	for (;;) {
-		struct got_pathlist_entry *new = NULL;
-		struct dirent *dep = NULL;
-
-		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
-		if (de == NULL) {
-			err = got_error_from_errno("malloc");
-			goto done;
-		}
-
-		if (readdir_r(dir, de, &dep) != 0) {
-			err = got_error_from_errno("readdir_r");
-			free(de);
-			goto done;
-		}
-		if (dep == NULL) {
-			free(de);
-			break;
-		}
-
-		if (strcmp(de->d_name, ".") == 0 ||
-		    strcmp(de->d_name, "..") == 0 ||
-		    (path[0] == '\0' &&
-		    strcmp(de->d_name, GOT_WORKTREE_GOT_DIR) == 0)) {
-			free(de);
-			continue;
-		}
-
-		err = got_pathlist_insert(&new, &dirlist, de->d_name, de);
-		if (err) {
-			free(de);
-			goto done;
-		}
-		if (new == NULL) {
-			err = got_error(GOT_ERR_DIR_DUP_ENTRY);
-			free(de);
-			goto done;
-		}
-	}
-
-	dle = TAILQ_FIRST(&dirlist);
+	dle = TAILQ_FIRST(dirlist);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
 		if (dle && *ie) {
 			char *de_path;
@@ -884,11 +910,10 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				err = walk_dir(&dle, fileindex, ie, dle, path,
 				    dir, rootpath, repo, cb, cb_arg);
 			} else if (cmp < 0 ) {
-				next = walk_fileindex(fileindex, *ie);
 				err = cb->diff_old(cb_arg, *ie, path);
 				if (err)
 					break;
-				*ie = next;
+				*ie = walk_fileindex(fileindex, *ie);
 			} else {
 				err = cb->diff_new(cb_arg, de, path);
 				if (err)
@@ -899,11 +924,10 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			if (err)
 				break;
 		} else if (*ie) {
-			next = walk_fileindex(fileindex, *ie);
 			err = cb->diff_old(cb_arg, *ie, path);
 			if (err)
 				break;
-			*ie = next;
+			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
 			de = dle->data;
 			err = cb->diff_new(cb_arg, de, path);
@@ -915,10 +939,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 		}
 	}
-done:
-	TAILQ_FOREACH(dle, &dirlist, entry)
-		free(dle->data);
-	got_pathlist_free(&dirlist);
+
 	return err;
 }
 
@@ -927,10 +948,21 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, DIR *rootdir,
     const char *rootpath, const char *path, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
-	struct got_fileindex_entry *min;
-	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
-	return diff_fileindex_dir(fileindex, &min, rootdir, rootpath, path,
-	    repo, cb, cb_arg);
+	const struct got_error *err;
+	struct got_fileindex_entry *ie;
+	struct got_pathlist_head dirlist;
+
+	TAILQ_INIT(&dirlist);
+	err = read_dirlist(&dirlist, rootdir, path);
+	if (err)
+		return err;
+	ie = RB_MIN(got_fileindex_tree, &fileindex->entries);
+	while (ie && !got_path_is_child(ie->path, path, strlen(path)))
+		ie = walk_fileindex(fileindex, ie);
+	err = diff_fileindex_dir(fileindex, &ie, rootdir, &dirlist, rootpath,
+	    path, repo, cb, cb_arg);
+	free_dirlist(&dirlist);
+	return err;
 }
 
 RB_GENERATE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);
