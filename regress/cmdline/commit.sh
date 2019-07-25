@@ -381,6 +381,44 @@ function test_commit_path_prefix {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_dir_path {
+	local testroot=`test_init commit_dir_path`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+
+	(cd $testroot/wt && got commit -m 'changed zeta' epsilon \
+		> $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  epsilon/zeta" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "M  alpha" > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -391,3 +429,4 @@ run_test test_commit_rejects_conflicted_file
 run_test test_commit_single_file_multiple
 run_test test_commit_added_and_modified_in_same_dir
 run_test test_commit_path_prefix
+run_test test_commit_dir_path

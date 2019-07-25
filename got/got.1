@@ -472,9 +472,12 @@ it will be restored.
 .It Cm rv
 Short alias for
 .Cm revert .
-.It Cm commit [ Fl m Ar message ] [ file-path ]
+.It Cm commit [ Fl m Ar message ] [ path ]
 Create a new commit in the repository from local changes in a work tree
 and use this commit as the new base commit for the work tree.
+If a
+.Ar path
+is specified, only commit local changes at or within this path.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description

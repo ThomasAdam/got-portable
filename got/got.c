@@ -3088,7 +3088,7 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-m msg] file-path\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-m msg] [path]\n", getprogname());
 	exit(1);
 }
 

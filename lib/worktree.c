@@ -3498,10 +3498,18 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	if (ondisk_path) {
-		err = got_path_skip_common_ancestor(&relpath,
-		    worktree->root_path, ondisk_path);
-		if (err)
-			return err;
+		if (strcmp(ondisk_path, worktree->root_path) == 0) {
+			relpath = strdup("");
+			if (relpath == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		} else {
+			err = got_path_skip_common_ancestor(&relpath,
+			    worktree->root_path, ondisk_path);
+			if (err)
+				return err;
+		}
 	}
 
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
