@@ -808,8 +808,8 @@ function test_histedit_abort {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_path_prefix {
-	local testroot=`test_init histedit_path_prefix`
+function test_histedit_path_prefix_drop {
+	local testroot=`test_init histedit_path_prefix_drop`
 	local orig_commit=`git_show_head $testroot/repo`
 
 	echo "modified zeta" > $testroot/repo/epsilon/zeta
@@ -916,4 +916,4 @@ run_test test_histedit_edit
 run_test test_histedit_fold_last_commit
 run_test test_histedit_missing_commit
 run_test test_histedit_abort
-run_test test_histedit_path_prefix
+run_test test_histedit_path_prefix_drop
