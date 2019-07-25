@@ -4502,21 +4502,28 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 		printf("%s: %s\n(c)ontinue editing, (r)estart editing, "
 		    "or (a)bort: ", getprogname(), errmsg);
 		resp = getchar();
-		switch (resp) {
-		case 'c':
+		if (resp == 'c') {
 			err = histedit_run_editor(histedit_cmds, path, repo);
-			break;
-		case 'r':
+			if (err) {
+				if (err->code != GOT_ERR_HISTEDIT_SYNTAX)
+					break;
+				resp = ' ';
+				continue;
+			}
+		} else if (resp == 'r') {
 			err = histedit_edit_script(histedit_cmds,
 			    commits, repo);
-			break;
-		case 'a':
+			if (err) {
+				if (err->code != GOT_ERR_HISTEDIT_SYNTAX)
+					break;
+				resp = ' ';
+				continue;
+			}
+		} else if (resp == 'a') {
 			err = got_error(GOT_ERR_HISTEDIT_CANCEL);
 			break;
-		default:
+		} else
 			printf("invalid response '%c'\n", resp);
-			break;
-		}
 	}
 
 	return err;
