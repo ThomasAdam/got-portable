@@ -1507,6 +1507,20 @@ done:
 }
 
 static const struct got_error *
+get_fileindex_path(char **fileindex_path, struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+
+	if (asprintf(fileindex_path, "%s/%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
+		err = got_error_from_errno("asprintf");
+		*fileindex_path = NULL;
+	}
+	return err;
+}
+
+
+static const struct got_error *
 open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
    struct got_worktree *worktree)
 {
@@ -1518,12 +1532,9 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 	if (*fileindex == NULL)
 		return got_error_from_errno("got_fileindex_alloc");
 
-	if (asprintf(fileindex_path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_FILE_INDEX) == -1) {
-		err = got_error_from_errno("asprintf");
-		*fileindex_path = NULL;
+	err = get_fileindex_path(fileindex_path, worktree);
+	if (err)
 		goto done;
-	}
 
 	index = fopen(*fileindex_path, "rb");
 	if (index == NULL) {
@@ -3599,32 +3610,33 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
-    struct got_reference **tmp_branch, struct got_worktree *worktree,
-    struct got_reference *branch, struct got_repository *repo)
+    struct got_reference **tmp_branch, struct got_fileindex **fileindex,
+    struct got_worktree *worktree, struct got_reference *branch,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *tmp_branch_name = NULL, *new_base_branch_ref_name = NULL;
 	char *branch_ref_name = NULL;
-	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	struct check_rebase_ok_arg ok_arg;
 	struct got_reference *wt_branch = NULL, *branch_ref = NULL;
 
 	*new_base_branch_ref = NULL;
 	*tmp_branch = NULL;
+	*fileindex = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
 	ok_arg.worktree = worktree;
 	ok_arg.repo = repo;
 	ok_arg.rebase_in_progress = 0;
-	err = got_fileindex_for_each_entry_safe(fileindex, check_rebase_ok,
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
 	    &ok_arg);
 	if (err)
 		goto done;
@@ -3677,8 +3689,6 @@ got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
 		goto done;
 done:
 	free(fileindex_path);
-	if (fileindex)
-		got_fileindex_free(fileindex);
 	free(tmp_branch_name);
 	free(new_base_branch_ref_name);
 	free(branch_ref_name);
@@ -3695,6 +3705,10 @@ done:
 			got_ref_close(*tmp_branch);
 			*tmp_branch = NULL;
 		}
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
 		lock_worktree(worktree, LOCK_SH);
 	}
 	return err;
@@ -3703,15 +3717,28 @@ done:
 const struct got_error *
 got_worktree_rebase_continue(struct got_object_id **commit_id,
     struct got_reference **new_base_branch, struct got_reference **tmp_branch,
-    struct got_reference **branch, struct got_worktree *worktree,
-    struct got_repository *repo)
+    struct got_reference **branch, struct got_fileindex **fileindex,
+    struct got_worktree *worktree, struct got_repository *repo)
 {
 	const struct got_error *err;
 	char *commit_ref_name = NULL, *new_base_branch_ref_name = NULL;
 	char *tmp_branch_name = NULL, *branch_ref_name = NULL;
 	struct got_reference *commit_ref = NULL, *branch_ref = NULL;
+	char *fileindex_path = NULL;
 
 	*commit_id = NULL;
+	*new_base_branch = NULL;
+	*tmp_branch = NULL;
+	*branch = NULL;
+	*fileindex = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
 
 	err = get_rebase_tmp_ref_name(&tmp_branch_name, worktree);
 	if (err)
@@ -3757,6 +3784,7 @@ got_worktree_rebase_continue(struct got_object_id **commit_id,
 done:
 	free(commit_ref_name);
 	free(branch_ref_name);
+	free(fileindex_path);
 	if (commit_ref)
 		got_ref_close(commit_ref);
 	if (branch_ref)
@@ -3776,6 +3804,11 @@ done:
 			got_ref_close(*branch);
 			*branch = NULL;
 		}
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_SH);
 	}
 	return err;
 }
@@ -3895,19 +3928,19 @@ done:
 static const struct got_error *
 rebase_merge_files(struct got_pathlist_head *merged_paths,
     const char *commit_ref_name, struct got_worktree *worktree,
-    struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
-    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_fileindex *fileindex, struct got_object_id *parent_commit_id,
+    struct got_object_id *commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
-	struct got_fileindex *fileindex;
-	char *fileindex_path;
 	struct got_reference *commit_ref = NULL;
 	struct collect_merged_paths_arg cmp_arg;
+	char *fileindex_path;
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
 		return err;
 
@@ -3917,8 +3950,6 @@ rebase_merge_files(struct got_pathlist_head *merged_paths,
 	err = merge_files(worktree, fileindex, fileindex_path,
 	    parent_commit_id, commit_id, repo, collect_merged_paths,
 	    &cmp_arg, cancel_cb, cancel_arg);
-	got_fileindex_free(fileindex);
-	free(fileindex_path);
 	if (commit_ref)
 		got_ref_close(commit_ref);
 	return err;
@@ -3926,8 +3957,9 @@ rebase_merge_files(struct got_pathlist_head *merged_paths,
 
 const struct got_error *
 got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
-    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
-    struct got_object_id *commit_id, struct got_repository *repo,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
     got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -3943,8 +3975,8 @@ got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
 		goto done;
 
 	err = rebase_merge_files(merged_paths, commit_ref_name, worktree,
-	    parent_commit_id, commit_id, repo, progress_cb, progress_arg,
-	    cancel_cb, cancel_arg);
+	    fileindex, parent_commit_id, commit_id, repo, progress_cb,
+	    progress_arg, cancel_cb, cancel_arg);
 done:
 	free(commit_ref_name);
 	return err;
@@ -3952,8 +3984,9 @@ done:
 
 const struct got_error *
 got_worktree_histedit_merge_files(struct got_pathlist_head *merged_paths,
-    struct got_worktree *worktree, struct got_object_id *parent_commit_id,
-    struct got_object_id *commit_id, struct got_repository *repo,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
     got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -3969,8 +4002,8 @@ got_worktree_histedit_merge_files(struct got_pathlist_head *merged_paths,
 		goto done;
 
 	err = rebase_merge_files(merged_paths, commit_ref_name, worktree,
-	    parent_commit_id, commit_id, repo, progress_cb, progress_arg,
-	    cancel_cb, cancel_arg);
+	    fileindex, parent_commit_id, commit_id, repo, progress_cb,
+	    progress_arg, cancel_cb, cancel_arg);
 done:
 	free(commit_ref_name);
 	return err;
@@ -3979,14 +4012,13 @@ done:
 static const struct got_error *
 rebase_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_reference *commit_ref,
-    struct got_worktree *worktree, struct got_reference *tmp_branch,
-    struct got_commit_object *orig_commit, const char *new_logmsg,
-    struct got_repository *repo)
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
+    const char *new_logmsg, struct got_repository *repo)
 {
 	const struct got_error *err, *sync_err;
 	struct got_pathlist_head commitable_paths;
 	struct collect_commitables_arg cc_arg;
-	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	struct got_reference *head_ref = NULL;
 	struct got_object_id *head_commit_id = NULL;
@@ -3997,9 +4029,9 @@ rebase_commit(struct got_object_id **new_commit_id,
 
 	/* Work tree is locked/unlocked during rebase preparation/teardown. */
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
-		goto done;
+		return err;
 
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
@@ -4074,8 +4106,6 @@ rebase_commit(struct got_object_id **new_commit_id,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
-	if (fileindex)
-		got_fileindex_free(fileindex);
 	free(fileindex_path);
 	free(head_commit_id);
 	if (head_ref)
@@ -4090,7 +4120,8 @@ done:
 const struct got_error *
 got_worktree_rebase_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
-    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
+    struct got_fileindex *fileindex, struct got_reference *tmp_branch,
+    struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -4114,7 +4145,7 @@ got_worktree_rebase_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
-	    worktree, tmp_branch, orig_commit, NULL, repo);
+	    worktree, fileindex, tmp_branch, orig_commit, NULL, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
@@ -4126,7 +4157,8 @@ done:
 const struct got_error *
 got_worktree_histedit_commit(struct got_object_id **new_commit_id,
     struct got_pathlist_head *merged_paths, struct got_worktree *worktree,
-    struct got_reference *tmp_branch, struct got_commit_object *orig_commit,
+    struct got_fileindex *fileindex, struct got_reference *tmp_branch,
+    struct got_commit_object *orig_commit,
     struct got_object_id *orig_commit_id, const char *new_logmsg,
     struct got_repository *repo)
 {
@@ -4151,7 +4183,7 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
-	    worktree, tmp_branch, orig_commit, new_logmsg, repo);
+	    worktree, fileindex, tmp_branch, orig_commit, new_logmsg, repo);
 done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
@@ -4161,8 +4193,11 @@ done:
 }
 
 const struct got_error *
-got_worktree_rebase_postpone(struct got_worktree *worktree)
+got_worktree_rebase_postpone(struct got_worktree *worktree,
+    struct got_fileindex *fileindex)
 {
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	return lock_worktree(worktree, LOCK_SH);
 }
 
@@ -4229,8 +4264,8 @@ done:
 
 const struct got_error *
 got_worktree_rebase_complete(struct got_worktree *worktree,
-    struct got_reference *new_base_branch, struct got_reference *tmp_branch,
-    struct got_reference *rebased_branch,
+    struct got_fileindex *fileindex, struct got_reference *new_base_branch,
+    struct got_reference *tmp_branch, struct got_reference *rebased_branch,
     struct got_repository *repo)
 {
 	const struct got_error *err, *unlockerr;
@@ -4254,6 +4289,8 @@ got_worktree_rebase_complete(struct got_worktree *worktree,
 
 	err = delete_rebase_refs(worktree, repo);
 done:
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	free(new_head_commit_id);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -4293,13 +4330,13 @@ collect_revertible_paths(void *arg, unsigned char status, const char *relpath,
 
 const struct got_error *
 got_worktree_rebase_abort(struct got_worktree *worktree,
-    struct got_repository *repo, struct got_reference *new_base_branch,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    struct got_reference *new_base_branch,
      got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	struct got_object_id *commit_id = NULL;
-	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	struct got_pathlist_head revertible_paths;
 	struct got_pathlist_entry *pe;
@@ -4343,7 +4380,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -4387,13 +4424,13 @@ done:
 const struct got_error *
 got_worktree_histedit_prepare(struct got_reference **tmp_branch,
     struct got_reference **branch_ref, struct got_object_id **base_commit_id,
-    struct got_worktree *worktree, struct got_repository *repo)
+    struct got_fileindex **fileindex, struct got_worktree *worktree,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *tmp_branch_name = NULL;
 	char *branch_ref_name = NULL;
 	char *base_commit_ref_name = NULL;
-	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	struct check_rebase_ok_arg ok_arg;
 	struct got_reference *wt_branch = NULL;
@@ -4402,19 +4439,20 @@ got_worktree_histedit_prepare(struct got_reference **tmp_branch,
 	*tmp_branch = NULL;
 	*branch_ref = NULL;
 	*base_commit_id = NULL;
+	*fileindex = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
 
 	ok_arg.worktree = worktree;
 	ok_arg.repo = repo;
 	ok_arg.rebase_in_progress = 0;
-	err = got_fileindex_for_each_entry_safe(fileindex, check_rebase_ok,
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
 	    &ok_arg);
 	if (err)
 		goto done;
@@ -4471,8 +4509,6 @@ got_worktree_histedit_prepare(struct got_reference **tmp_branch,
 		goto done;
 done:
 	free(fileindex_path);
-	if (fileindex)
-		got_fileindex_free(fileindex);
 	free(tmp_branch_name);
 	free(branch_ref_name);
 	free(base_commit_ref_name);
@@ -4488,14 +4524,21 @@ done:
 			*tmp_branch = NULL;
 		}
 		free(*base_commit_id);
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
 		lock_worktree(worktree, LOCK_SH);
 	}
 	return err;
 }
 
 const struct got_error *
-got_worktree_histedit_postpone(struct got_worktree *worktree)
+got_worktree_histedit_postpone(struct got_worktree *worktree,
+    struct got_fileindex *fileindex)
 {
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	return lock_worktree(worktree, LOCK_SH);
 }
 
@@ -4518,7 +4561,7 @@ got_worktree_histedit_in_progress(int *in_progress,
 const struct got_error *
 got_worktree_histedit_continue(struct got_object_id **commit_id,
     struct got_reference **tmp_branch, struct got_reference **branch_ref,
-    struct got_object_id **base_commit_id,
+    struct got_object_id **base_commit_id, struct got_fileindex **fileindex,
     struct got_worktree *worktree, struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -4526,10 +4569,20 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 	char *tmp_branch_name = NULL, *branch_ref_name = NULL;
 	struct got_reference *commit_ref = NULL;
 	struct got_reference *base_commit_ref = NULL;
+	char *fileindex_path = NULL;
 
 	*commit_id = NULL;
 	*tmp_branch = NULL;
 	*base_commit_id = NULL;
+	*fileindex = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
 
 	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
 	if (err)
@@ -4572,6 +4625,7 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 done:
 	free(commit_ref_name);
 	free(branch_ref_name);
+	free(fileindex_path);
 	if (commit_ref)
 		got_ref_close(commit_ref);
 	if (base_commit_ref)
@@ -4585,6 +4639,11 @@ done:
 			got_ref_close(*tmp_branch);
 			*tmp_branch = NULL;
 		}
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_EX);
 	}
 	return err;
 }
@@ -4634,13 +4693,12 @@ done:
 
 const struct got_error *
 got_worktree_histedit_abort(struct got_worktree *worktree,
-    struct got_repository *repo, struct got_reference *branch,
-    struct got_object_id *base_commit_id,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    struct got_reference *branch, struct got_object_id *base_commit_id,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
-	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	struct got_pathlist_head revertible_paths;
 	struct got_pathlist_entry *pe;
@@ -4675,7 +4733,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	err = get_fileindex_path(&fileindex_path, worktree);
 	if (err)
 		goto done;
 
@@ -4702,8 +4760,6 @@ sync:
 done:
 	got_ref_close(resolved);
 	free(tree_id);
-	if (fileindex)
-		got_fileindex_free(fileindex);
 	free(fileindex_path);
 	TAILQ_FOREACH(pe, &revertible_paths, entry)
 		free((char *)pe->path);
@@ -4717,8 +4773,8 @@ done:
 
 const struct got_error *
 got_worktree_histedit_complete(struct got_worktree *worktree,
-    struct got_reference *tmp_branch, struct got_reference *edited_branch,
-    struct got_repository *repo)
+    struct got_fileindex *fileindex, struct got_reference *tmp_branch,
+    struct got_reference *edited_branch, struct got_repository *repo)
 {
 	const struct got_error *err, *unlockerr;
 	struct got_object_id *new_head_commit_id = NULL;
@@ -4747,6 +4803,8 @@ got_worktree_histedit_complete(struct got_worktree *worktree,
 
 	err = delete_histedit_refs(worktree, repo);
 done:
+	if (fileindex)
+		got_fileindex_free(fileindex);
 	free(new_head_commit_id);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)

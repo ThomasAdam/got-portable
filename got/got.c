@@ -3598,18 +3598,19 @@ rebase_progress(void *arg, unsigned char status, const char *path)
 }
 
 static const struct got_error *
-rebase_complete(struct got_worktree *worktree, struct got_reference *branch,
-    struct got_reference *new_base_branch, struct got_reference *tmp_branch,
-    struct got_repository *repo)
+rebase_complete(struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_reference *branch, struct got_reference *new_base_branch,
+    struct got_reference *tmp_branch, struct got_repository *repo)
 {
 	printf("Switching work tree to %s\n", got_ref_get_name(branch));
-	return got_worktree_rebase_complete(worktree,
+	return got_worktree_rebase_complete(worktree, fileindex,
 	    new_base_branch, tmp_branch, branch, repo);
 }
 
 static const struct got_error *
 rebase_commit(struct got_pathlist_head *merged_paths,
-    struct got_worktree *worktree, struct got_reference *tmp_branch,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_reference *tmp_branch,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *error;
@@ -3621,7 +3622,7 @@ rebase_commit(struct got_pathlist_head *merged_paths,
 		return error;
 
 	error = got_worktree_rebase_commit(&new_commit_id, merged_paths,
-	    worktree, tmp_branch, commit, commit_id, repo);
+	    worktree, fileindex, tmp_branch, commit, commit_id, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -3764,6 +3765,7 @@ cmd_rebase(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
+	struct got_fileindex *fileindex = NULL;
 	char *cwd = NULL;
 	struct got_reference *branch = NULL;
 	struct got_reference *new_base_branch = NULL, *tmp_branch = NULL;
@@ -3840,12 +3842,13 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		}
 		error = got_worktree_rebase_continue(&resume_commit_id,
-		    &new_base_branch, &tmp_branch, &branch, worktree, repo);
+		    &new_base_branch, &tmp_branch, &branch, &fileindex,
+		    worktree, repo);
 		if (error)
 			goto done;
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(new_base_branch));
-		error = got_worktree_rebase_abort(worktree, repo,
+		error = got_worktree_rebase_abort(worktree, fileindex, repo,
 		    new_base_branch, update_progress, &did_something);
 		if (error)
 			goto done;
@@ -3859,11 +3862,12 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		}
 		error = got_worktree_rebase_continue(&resume_commit_id,
-		    &new_base_branch, &tmp_branch, &branch, worktree, repo);
+		    &new_base_branch, &tmp_branch, &branch, &fileindex,
+		    worktree, repo);
 		if (error)
 			goto done;
 
-		error = rebase_commit(NULL, worktree, tmp_branch,
+		error = rebase_commit(NULL, worktree, fileindex, tmp_branch,
 		    resume_commit_id, repo);
 		if (error)
 			goto done;
@@ -3910,7 +3914,7 @@ cmd_rebase(int argc, char *argv[])
 		}
 
 		error = got_worktree_rebase_prepare(&new_base_branch,
-		    &tmp_branch, worktree, branch, repo);
+		    &tmp_branch, &fileindex, worktree, branch, repo);
 		if (error)
 			goto done;
 	}
@@ -3932,8 +3936,8 @@ cmd_rebase(int argc, char *argv[])
 
 	if (SIMPLEQ_EMPTY(&commits)) {
 		if (continue_rebase)
-			error = rebase_complete(worktree, branch,
-			    new_base_branch, tmp_branch, repo);
+			error = rebase_complete(worktree, fileindex,
+			    branch, new_base_branch, tmp_branch, repo);
 		else
 			error = got_error(GOT_ERR_EMPTY_REBASE);
 		goto done;
@@ -3946,8 +3950,8 @@ cmd_rebase(int argc, char *argv[])
 		pid = qid;
 
 		error = got_worktree_rebase_merge_files(&merged_paths,
-		    worktree, parent_id, commit_id, repo, rebase_progress,
-		    &rebase_status, check_cancelled, NULL);
+		    worktree, fileindex, parent_id, commit_id, repo,
+		    rebase_progress, &rebase_status, check_cancelled, NULL);
 		if (error)
 			goto done;
 
@@ -3956,22 +3960,22 @@ cmd_rebase(int argc, char *argv[])
 			break;
 		}
 
-		error = rebase_commit(&merged_paths, worktree, tmp_branch,
-		    commit_id, repo);
+		error = rebase_commit(&merged_paths, worktree, fileindex,
+		    tmp_branch, commit_id, repo);
 		got_worktree_rebase_pathlist_free(&merged_paths);
 		if (error)
 			goto done;
 	}
 
 	if (rebase_status == GOT_STATUS_CONFLICT) {
-		error = got_worktree_rebase_postpone(worktree);
+		error = got_worktree_rebase_postpone(worktree, fileindex);
 		if (error)
 			goto done;
 		error = got_error_msg(GOT_ERR_CONFLICTS,
 		    "conflicts must be resolved before rebasing can continue");
 	} else
-		error = rebase_complete(worktree, branch, new_base_branch,
-		    tmp_branch, repo);
+		error = rebase_complete(worktree, fileindex, branch,
+		    new_base_branch, tmp_branch, repo);
 done:
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
@@ -4520,13 +4524,13 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 
 static const struct got_error *
 histedit_complete(struct got_worktree *worktree,
-    struct got_reference *tmp_branch, struct got_reference *branch,
-    struct got_repository *repo)
+    struct got_fileindex *fileindex, struct got_reference *tmp_branch,
+    struct got_reference *branch, struct got_repository *repo)
 {
 	printf("Switching work tree to %s\n",
 	    got_ref_get_symref_target(branch));
-	return got_worktree_histedit_complete(worktree, tmp_branch, branch,
-	    repo);
+	return got_worktree_histedit_complete(worktree, fileindex, tmp_branch,
+	    branch, repo);
 }
 
 static const struct got_error *
@@ -4586,8 +4590,9 @@ done:
 
 static const struct got_error *
 histedit_commit(struct got_pathlist_head *merged_paths,
-    struct got_worktree *worktree, struct got_reference *tmp_branch,
-    struct got_histedit_list_entry *hle, struct got_repository *repo)
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_reference *tmp_branch, struct got_histedit_list_entry *hle,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_commit_object *commit;
@@ -4605,7 +4610,8 @@ histedit_commit(struct got_pathlist_head *merged_paths,
 		return err;
 
 	err = got_worktree_histedit_commit(&new_commit_id, merged_paths,
-	    worktree, tmp_branch, commit, hle->commit_id, hle->logmsg, repo);
+	    worktree, fileindex, tmp_branch, commit, hle->commit_id,
+	    hle->logmsg, repo);
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_NO_CHANGES)
 			goto done;
@@ -4681,6 +4687,7 @@ cmd_histedit(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
+	struct got_fileindex *fileindex = NULL;
 	struct got_repository *repo = NULL;
 	char *cwd = NULL;
 	struct got_reference *branch = NULL;
@@ -4771,12 +4778,13 @@ cmd_histedit(int argc, char *argv[])
 	if (edit_in_progress && abort_edit) {
 		int did_something;
 		error = got_worktree_histedit_continue(&resume_commit_id,
-		    &tmp_branch, &branch, &base_commit_id, worktree, repo);
+		    &tmp_branch, &branch, &base_commit_id, &fileindex,
+		    worktree, repo);
 		if (error)
 			goto done;
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(branch));
-		error = got_worktree_histedit_abort(worktree, repo,
+		error = got_worktree_histedit_abort(worktree, fileindex, repo,
 		    branch, base_commit_id, update_progress, &did_something);
 		if (error)
 			goto done;
@@ -4806,7 +4814,8 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 
 		error = got_worktree_histedit_continue(&resume_commit_id,
-		    &tmp_branch, &branch, &base_commit_id, worktree, repo);
+		    &tmp_branch, &branch, &base_commit_id, &fileindex,
+		    worktree, repo);
 		if (error)
 			goto done;
 
@@ -4884,7 +4893,7 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 
 		error = got_worktree_histedit_prepare(&tmp_branch, &branch,
-		    &base_commit_id, worktree, repo);
+		    &base_commit_id, &fileindex, worktree, repo);
 		if (error)
 			goto done;
 
@@ -4907,7 +4916,7 @@ cmd_histedit(int argc, char *argv[])
 				   repo);
 			} else {
 				error = histedit_commit(NULL, worktree,
-				    tmp_branch, hle, repo);
+				    fileindex, tmp_branch, hle, repo);
 			}
 			if (error)
 				goto done;
@@ -4929,8 +4938,8 @@ cmd_histedit(int argc, char *argv[])
 		pid = SIMPLEQ_FIRST(parent_ids);
 
 		error = got_worktree_histedit_merge_files(&merged_paths,
-		    worktree, pid->id, hle->commit_id, repo, rebase_progress,
-		    &rebase_status, check_cancelled, NULL);
+		    worktree, fileindex, pid->id, hle->commit_id, repo,
+		    rebase_progress, &rebase_status, check_cancelled, NULL);
 		if (error)
 			goto done;
 		got_object_commit_close(commit);
@@ -4950,7 +4959,8 @@ cmd_histedit(int argc, char *argv[])
 			    id_str);
 			free(id_str);
 			got_worktree_rebase_pathlist_free(&merged_paths);
-			error = got_worktree_histedit_postpone(worktree);
+			error = got_worktree_histedit_postpone(worktree,
+			    fileindex);
 			goto done;
 		}
 
@@ -4961,21 +4971,22 @@ cmd_histedit(int argc, char *argv[])
 			continue;
 		}
 
-		error = histedit_commit(&merged_paths, worktree, tmp_branch,
-		    hle, repo);
+		error = histedit_commit(&merged_paths, worktree, fileindex,
+		    tmp_branch, hle, repo);
 		got_worktree_rebase_pathlist_free(&merged_paths);
 		if (error)
 			goto done;
 	}
 
 	if (rebase_status == GOT_STATUS_CONFLICT) {
-		error = got_worktree_histedit_postpone(worktree);
+		error = got_worktree_histedit_postpone(worktree, fileindex);
 		if (error)
 			goto done;
 		error = got_error_msg(GOT_ERR_CONFLICTS,
 		    "conflicts must be resolved before rebasing can continue");
 	} else
-		error = histedit_complete(worktree, tmp_branch, branch, repo);
+		error = histedit_complete(worktree, fileindex, tmp_branch,
+		    branch, repo);
 done:
 	got_object_id_queue_free(&commits);
 	free(head_commit_id);

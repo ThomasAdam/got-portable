@@ -17,6 +17,7 @@
 struct got_worktree;
 struct got_commitable;
 struct got_commit_object;
+struct got_fileindex;
 
 /* status codes */
 #define GOT_STATUS_NO_CHANGE	' '
@@ -218,20 +219,24 @@ unsigned int got_commitable_get_status(struct got_commitable *);
  * "got/worktree/rebase/" namespace. These references are used to
  * keep track of rebase operation state and are used as input and/or
  * output arguments with other rebase-related functions.
+ * The function also returns a pointer to a fileindex which must be
+ * passed back to other rebase-related functions.
  */
 const struct got_error *got_worktree_rebase_prepare(struct got_reference **,
-    struct got_reference **, struct got_worktree *, struct got_reference *,
-    struct got_repository *);
+    struct got_reference **, struct got_fileindex **, struct got_worktree *,
+    struct got_reference *, struct got_repository *);
 
 /*
  * Continue an interrupted rebase operation.
  * This function returns existing references created when rebase was prepared,
  * and the ID of the commit currently being rebased. This should be called
  * before either resuming or aborting a rebase operation.
+ * The function also returns a pointer to a fileindex which must be
+ * passed back to other rebase-related functions.
  */
 const struct got_error *got_worktree_rebase_continue(struct got_object_id **,
     struct got_reference **, struct got_reference **, struct got_reference **,
-    struct got_worktree *, struct got_repository *);
+    struct got_fileindex **, struct got_worktree *, struct got_repository *);
 
 /* Check whether a, potentially interrupted, rebase operation is in progress. */
 const struct got_error *got_worktree_rebase_in_progress(int *,
@@ -246,7 +251,7 @@ const struct got_error *got_worktree_rebase_in_progress(int *,
  * got_worktree_rebase_pathlist_free().
  */
 const struct got_error *got_worktree_rebase_merge_files(
-    struct got_pathlist_head *, struct got_worktree *,
+    struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_object_id *, struct got_object_id *, struct got_repository *,
     got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
 
@@ -257,7 +262,7 @@ const struct got_error *got_worktree_rebase_merge_files(
  * crawl across the entire work tree to find paths to commit.
  */
 const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
-    struct got_pathlist_head *, struct got_worktree *,
+    struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_reference *, struct got_commit_object *,
     struct got_object_id *, struct got_repository *);
 
@@ -265,22 +270,23 @@ const struct got_error *got_worktree_rebase_commit(struct got_object_id **,
 void got_worktree_rebase_pathlist_free(struct got_pathlist_head *);
 
 /* Postpone the rebase operation. Should be called after a merge conflict. */
-const struct got_error *got_worktree_rebase_postpone(struct got_worktree *);
+const struct got_error *got_worktree_rebase_postpone(struct got_worktree *,
+    struct got_fileindex *);
 
 /*
  * Complete the current rebase operation. This should be called once all
  * commits have been rebased successfully.
  */
 const struct got_error *got_worktree_rebase_complete(struct got_worktree *,
-    struct got_reference *, struct got_reference *, struct got_reference *,
-    struct got_repository *);
+    struct got_fileindex *, struct got_reference *, struct got_reference *,
+    struct got_reference *, struct got_repository *);
 
 /*
  * Abort the current rebase operation.
  * Report reverted files via the specified progress callback.
  */
 const struct got_error *got_worktree_rebase_abort(struct got_worktree *,
-    struct got_repository *, struct got_reference *,
+    struct got_fileindex *, struct got_repository *, struct got_reference *,
     got_worktree_checkout_cb, void *);
 
 /*
@@ -292,8 +298,8 @@ const struct got_error *got_worktree_rebase_abort(struct got_worktree *,
  * functions.
  */
 const struct got_error *got_worktree_histedit_prepare(struct got_reference **,
-    struct got_reference **, struct got_object_id **, struct got_worktree *,
-    struct got_repository *);
+    struct got_reference **, struct got_object_id **, struct got_fileindex **,
+    struct got_worktree *, struct got_repository *);
 
 /*
  * Continue an interrupted histedit operation.
@@ -303,7 +309,7 @@ const struct got_error *got_worktree_histedit_prepare(struct got_reference **,
  */
 const struct got_error *got_worktree_histedit_continue(struct got_object_id **,
     struct got_reference **, struct got_reference **, struct got_object_id **,
-    struct got_worktree *, struct got_repository *);
+    struct got_fileindex **, struct got_worktree *, struct got_repository *);
 
 /* Check whether a histedit operation is in progress. */
 const struct got_error *got_worktree_histedit_in_progress(int *,
@@ -318,7 +324,7 @@ const struct got_error *got_worktree_histedit_in_progress(int *,
  * got_worktree_rebase_pathlist_free().
  */
 const struct got_error *got_worktree_histedit_merge_files(
-    struct got_pathlist_head *, struct got_worktree *,
+    struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_object_id *, struct got_object_id *, struct got_repository *,
     got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
 
@@ -331,7 +337,7 @@ const struct got_error *got_worktree_histedit_merge_files(
  * commit's original message.
  */
 const struct got_error *got_worktree_histedit_commit(struct got_object_id **,
-    struct got_pathlist_head *, struct got_worktree *,
+    struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_reference *, struct got_commit_object *,
     struct got_object_id *, const char *, struct got_repository *);
 
@@ -344,22 +350,24 @@ const struct got_error *got_worktree_histedit_skip_commit(struct got_worktree *,
     struct got_object_id *, struct got_repository *);
 
 /* Postpone the histedit operation. */
-const struct got_error *got_worktree_histedit_postpone(struct got_worktree *);
+const struct got_error *got_worktree_histedit_postpone(struct got_worktree *,
+    struct got_fileindex *);
 
 /*
  * Complete the current histedit operation. This should be called once all
  * commits have been edited successfully.
  */
 const struct got_error *got_worktree_histedit_complete(struct got_worktree *,
-    struct got_reference *, struct got_reference *, struct got_repository *);
+    struct got_fileindex *, struct got_reference *, struct got_reference *,
+    struct got_repository *);
 
 /*
  * Abort the current histedit operation.
  * Report reverted files via the specified progress callback.
  */
 const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
-    struct got_repository *, struct got_reference *, struct got_object_id *,
-    got_worktree_checkout_cb, void *);
+    struct got_fileindex *, struct got_repository *, struct got_reference *,
+    struct got_object_id *, got_worktree_checkout_cb, void *);
 
 /* Get the path to this work tree's histedit command list file. */
 const struct got_error *got_worktree_get_histedit_list_path(char **,
