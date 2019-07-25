@@ -900,10 +900,19 @@ cmd_checkout(int argc, char *argv[])
 	}
 
 	if (commit_id_str) {
-		struct got_object_id *commit_id;
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
-		if (error != NULL)
+		struct got_object_id *commit_id = NULL;
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, commit_id_str, 0);
+		if (error == NULL) {
+			error = got_ref_resolve(&commit_id, repo, ref);
+			got_ref_close(ref);
+		} else {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id,
 		    got_worktree_get_base_commit_id(worktree), repo);
@@ -1108,9 +1117,19 @@ cmd_update(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
-		if (error != NULL)
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, commit_id_str, 0);
+		if (error == NULL) {
+			error = got_ref_resolve(&commit_id, repo, ref);
+			got_ref_close(ref);
+		}
+		else {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+		if (error)
 			goto done;
 		free(commit_id_str);
 		error = got_object_id_str(&commit_id_str, commit_id);
@@ -2015,9 +2034,18 @@ cmd_blame(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
-		if (error != NULL)
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, commit_id_str, 0);
+		if (error == NULL) {
+			error = got_ref_resolve(&commit_id, repo, ref);
+			got_ref_close(ref);
+		} else {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+		if (error)
 			goto done;
 	}
 
@@ -2247,9 +2275,18 @@ cmd_tree(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_match_object_id_prefix(&commit_id,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
-		if (error != NULL)
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, commit_id_str, 0);
+		if (error == NULL) {
+			error = got_ref_resolve(&commit_id, repo, ref);
+			got_ref_close(ref);
+		} else {
+			if (error->code != GOT_ERR_NOT_REF)
+				goto done;
+			error = got_repo_match_object_id_prefix(&commit_id,
+			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
+		}
+		if (error)
 			goto done;
 	}
 
