@@ -1129,6 +1129,7 @@ cmd_update(int argc, char *argv[])
 	} else {
 		error = resolve_commit_arg(&commit_id, commit_id_str, repo);
 		free(commit_id_str);
+		commit_id_str = NULL;
 		if (error)
 			goto done;
 		error = got_object_id_str(&commit_id_str, commit_id);
