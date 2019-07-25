@@ -4498,7 +4498,7 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 	const struct got_error *err = NULL;
 	int resp = ' ';
 
-	while (resp != 'c' && resp != 'r' && resp != 'q') {
+	while (resp != 'c' && resp != 'r' && resp != 'a') {
 		printf("%s: %s\n(c)ontinue editing, (r)estart editing, "
 		    "or (a)bort: ", getprogname(), errmsg);
 		resp = getchar();
