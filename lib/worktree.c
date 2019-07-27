@@ -1050,14 +1050,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	if (lstat(abspath, sb) == -1) {
 		if (errno == ENOENT) {
-			if (ie) {
-				if (got_fileindex_entry_has_file_on_disk(ie))
-					*status = GOT_STATUS_MISSING;
-				else
-					*status = GOT_STATUS_DELETE;
-				sb->st_mode = got_fileindex_perms_to_st(ie);
-			} else
-				sb->st_mode = GOT_DEFAULT_FILE_MODE;
+			if (got_fileindex_entry_has_file_on_disk(ie))
+				*status = GOT_STATUS_MISSING;
+			else
+				*status = GOT_STATUS_DELETE;
 			return NULL;
 		}
 		return got_error_from_errno2("lstat", abspath);
@@ -1067,9 +1063,6 @@ get_file_status(unsigned char *status, struct stat *sb,
 		*status = GOT_STATUS_OBSTRUCTED;
 		return NULL;
 	}
-
-	if (ie == NULL)
-		return NULL;
 
 	if (!got_fileindex_entry_has_file_on_disk(ie)) {
 		*status = GOT_STATUS_DELETE;
@@ -1168,9 +1161,14 @@ update_blob(struct got_worktree *worktree,
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
-	if (err)
-		goto done;
+	if (ie) {
+		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		if (err)
+			goto done;
+		if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
+			sb.st_mode = got_fileindex_perms_to_st(ie);
+	} else
+		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 
 	if (status == GOT_STATUS_OBSTRUCTED) {
 		err = (*progress_cb)(progress_arg, status, path);
@@ -2283,6 +2281,32 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 }
 
 static const struct got_error *
+report_single_file_status(const char *path, const char *ondisk_path,
+struct got_fileindex *fileindex, got_worktree_status_cb status_cb,
+void *status_arg, struct got_repository *repo)
+{
+	struct got_fileindex_entry *ie;
+	struct stat sb;
+
+	ie = got_fileindex_entry_get(fileindex, path);
+	if (ie)
+		return report_file_status(ie, ondisk_path, status_cb,
+		    status_arg, repo);
+
+	if (lstat(ondisk_path, &sb) == -1) {
+		if (errno != ENOENT)
+			return got_error_from_errno2("lstat", ondisk_path);
+		return NULL;
+	}
+
+	if (S_ISREG(sb.st_mode))
+		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED, path,
+		    NULL, NULL);
+
+	return NULL;
+}
+
+static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -2301,30 +2325,27 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	}
 	workdir = opendir(ondisk_path);
 	if (workdir == NULL) {
-		if (errno == ENOTDIR || errno == ENOENT) {
-			err = report_file_status(
-			    got_fileindex_entry_get(fileindex, path),
-			    ondisk_path, status_cb, status_arg, repo);
-			goto done;
-		} else {
+		if (errno != ENOTDIR && errno != ENOENT)
 			err = got_error_from_errno2("opendir", ondisk_path);
-			goto done;
-		}
+		else
+			err = report_single_file_status(path, ondisk_path,
+			    fileindex, status_cb, status_arg, repo);
+	} else {
+		fdiff_cb.diff_old_new = status_old_new;
+		fdiff_cb.diff_old = status_old;
+		fdiff_cb.diff_new = status_new;
+		arg.fileindex = fileindex;
+		arg.worktree = worktree;
+		arg.status_path = path;
+		arg.status_path_len = strlen(path);
+		arg.repo = repo;
+		arg.status_cb = status_cb;
+		arg.status_arg = status_arg;
+		arg.cancel_cb = cancel_cb;
+		arg.cancel_arg = cancel_arg;
+		err = got_fileindex_diff_dir(fileindex, workdir,
+		    worktree->root_path, path, repo, &fdiff_cb, &arg);
 	}
-	fdiff_cb.diff_old_new = status_old_new;
-	fdiff_cb.diff_old = status_old;
-	fdiff_cb.diff_new = status_new;
-	arg.fileindex = fileindex;
-	arg.worktree = worktree;
-	arg.status_path = path;
-	arg.status_path_len = strlen(path);
-	arg.repo = repo;
-	arg.status_cb = status_cb;
-	arg.status_arg = status_arg;
-	arg.cancel_cb = cancel_cb;
-	arg.cancel_arg = cancel_arg;
-	err = got_fileindex_diff_dir(fileindex, workdir, worktree->root_path,
-	    path, repo, &fdiff_cb, &arg);
 done:
 	if (workdir)
 		closedir(workdir);
