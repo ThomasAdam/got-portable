@@ -2319,10 +2319,9 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	char *ondisk_path = NULL;
 
 	if (asprintf(&ondisk_path, "%s%s%s",
-	    worktree->root_path, path[0] ? "/" : "", path) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
+	    worktree->root_path, path[0] ? "/" : "", path) == -1)
+		return got_error_from_errno("asprintf");
+
 	workdir = opendir(ondisk_path);
 	if (workdir == NULL) {
 		if (errno != ENOTDIR && errno != ENOENT)
@@ -2346,7 +2345,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		err = got_fileindex_diff_dir(fileindex, workdir,
 		    worktree->root_path, path, repo, &fdiff_cb, &arg);
 	}
-done:
+
 	if (workdir)
 		closedir(workdir);
 	free(ondisk_path);
