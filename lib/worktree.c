@@ -142,8 +142,8 @@ read_meta_file(char **content, const char *path_got, const char *name)
 		goto done;
 	}
 
-	if (lstat(path, &sb) != 0) {
-		err = got_error_from_errno2("lstat", path);
+	if (fstat(fd, &sb) != 0) {
+		err = got_error_from_errno2("fstat", path);
 		goto done;
 	}
 	*content = calloc(1, sb.st_size);
