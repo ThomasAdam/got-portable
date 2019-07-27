@@ -1055,9 +1055,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 					*status = GOT_STATUS_MISSING;
 				else
 					*status = GOT_STATUS_DELETE;
-				sb->st_mode =
-				    ((ie->mode >> GOT_FILEIDX_MODE_PERMS_SHIFT)
-				    & (S_IRWXU | S_IRWXG | S_IRWXO));
+				sb->st_mode = got_fileindex_perms_to_st(ie);
 			} else
 				sb->st_mode = GOT_DEFAULT_FILE_MODE;
 			return NULL;

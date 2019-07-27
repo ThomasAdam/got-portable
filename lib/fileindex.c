@@ -51,6 +51,20 @@ struct got_fileindex {
 #define GOT_FILEIDX_MAX_ENTRIES INT_MAX
 };
 
+uint16_t
+got_fileindex_perms_from_st(struct stat *sb)
+{
+	uint16_t perms = (sb->st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+	return (perms << GOT_FILEIDX_MODE_PERMS_SHIFT);
+}
+
+mode_t
+got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
+{
+	mode_t perms = (ie->mode >> GOT_FILEIDX_MODE_PERMS_SHIFT);
+	return (perms & (S_IRWXU | S_IRWXG | S_IRWXO));
+}
+
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *entry,
     const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1,
@@ -82,8 +96,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *entry,
 			entry->mode = GOT_FILEIDX_MODE_SYMLINK;
 		else
 			entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
-		entry->mode |= ((sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) <<
-		    GOT_FILEIDX_MODE_PERMS_SHIFT);
+		entry->mode |= got_fileindex_perms_from_st(&sb);
 	}
 
 	if (blob_sha1) {
