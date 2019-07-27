@@ -2263,18 +2263,9 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	workdir = opendir(ondisk_path);
 	if (workdir == NULL) {
 		if (errno == ENOTDIR || errno == ENOENT) {
-			struct got_fileindex_entry *ie;
-			ie = got_fileindex_entry_get(fileindex, path);
-			if (ie == NULL)
-				err = (*status_cb)(status_arg,
-				    GOT_STATUS_UNVERSIONED, path, NULL, NULL);
-			else
-				err = report_file_status(ie, ondisk_path,
-				    status_cb, status_arg, repo);
-			if (err)
-				goto done;
-			err = report_file_status(ie, ondisk_path,
-			    status_cb, status_arg, repo);
+			err = report_file_status(
+			    got_fileindex_entry_get(fileindex, path),
+			    ondisk_path, status_cb, status_arg, repo);
 			goto done;
 		} else {
 			err = got_error_from_errno2("opendir", ondisk_path);

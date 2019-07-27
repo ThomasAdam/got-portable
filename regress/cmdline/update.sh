@@ -1052,8 +1052,17 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	fi
 
 	# beta is now gone... we don't flag tree conflicts yet
-	echo 'got: bad path' > $testroot/stderr.expected
-	(cd $testroot/wt && got status beta 2> $testroot/stderr)
+	echo -n > $testroot/stdout.expected
+	echo -n > $testroot/stderr.expected
+	(cd $testroot/wt && got status beta > $testroot/stdout \
+		2> $testroot/stderr)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
