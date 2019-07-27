@@ -4785,7 +4785,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_object_id *base_commit_id = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_commit_object *commit = NULL;
-	int ch, rebase_in_progress = 0;
+	int ch, rebase_in_progress = 0, did_something;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	const char *edit_script_path = NULL;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
@@ -4865,7 +4865,6 @@ cmd_histedit(int argc, char *argv[])
 		goto done;
 
 	if (edit_in_progress && abort_edit) {
-		int did_something;
 		error = got_worktree_histedit_continue(&resume_commit_id,
 		    &tmp_branch, &branch, &base_commit_id, &fileindex,
 		    worktree, repo);
@@ -4973,20 +4972,32 @@ cmd_histedit(int argc, char *argv[])
 		if (edit_script_path) {
 			error = histedit_load_list(&histedit_cmds,
 			    edit_script_path, repo);
-			if (error)
+			if (error) {
+				got_worktree_histedit_abort(worktree, fileindex,
+				    repo, branch, base_commit_id,
+				    update_progress, &did_something);
 				goto done;
+			}
 		} else {
 			error = histedit_edit_script(&histedit_cmds, &commits,
 			    repo);
-			if (error)
+			if (error) {
+				got_worktree_histedit_abort(worktree, fileindex,
+				    repo, branch, base_commit_id,
+				    update_progress, &did_something);
 				goto done;
+			}
 
 		}
 
 		error = histedit_save_list(&histedit_cmds, worktree,
 		    repo);
-		if (error)
+		if (error) {
+			got_worktree_histedit_abort(worktree, fileindex,
+			    repo, branch, base_commit_id,
+			    update_progress, &did_something);
 			goto done;
+		}
 
 	}
 
