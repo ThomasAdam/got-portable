@@ -4535,7 +4535,7 @@ histedit_save_list(struct got_histedit_list *histedit_cmds,
 	struct got_histedit_list_entry *hle;
 	struct got_commit_object *commit = NULL;
 
-	err = got_worktree_get_histedit_list_path(&path, worktree);
+	err = got_worktree_get_histedit_script_path(&path, worktree);
 	if (err)
 		return err;
 
@@ -4892,7 +4892,7 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 		}
 
-		error = got_worktree_get_histedit_list_path(&path, worktree);
+		error = got_worktree_get_histedit_script_path(&path, worktree);
 		if (error)
 			goto done;
 

@@ -1465,10 +1465,11 @@ get_histedit_commit_ref_name(char **refname, struct got_worktree *worktree)
 }
 
 const struct got_error *
-got_worktree_get_histedit_list_path(char **path, struct got_worktree *worktree)
+got_worktree_get_histedit_script_path(char **path,
+    struct got_worktree *worktree)
 {
 	if (asprintf(path, "%s/%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_HISTEDIT_LIST) == -1) {
+	    GOT_WORKTREE_GOT_DIR, GOT_WORKTREE_HISTEDIT_SCRIPT) == -1) {
 		*path = NULL;
 		return got_error_from_errno("asprintf");
 	}

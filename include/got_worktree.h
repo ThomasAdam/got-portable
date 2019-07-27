@@ -369,6 +369,6 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
     struct got_fileindex *, struct got_repository *, struct got_reference *,
     struct got_object_id *, got_worktree_checkout_cb, void *);
 
-/* Get the path to this work tree's histedit command list file. */
-const struct got_error *got_worktree_get_histedit_list_path(char **,
+/* Get the path to this work tree's histedit script file. */
+const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
