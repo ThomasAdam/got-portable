@@ -1273,7 +1273,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	arg.diff_context = diff_context;
 	arg.outfile = stdout;
 	err = got_diff_tree(tree1, tree2, "", "", repo,
-	    got_diff_blob_output_unidiff, &arg);
+	    got_diff_blob_output_unidiff, &arg, 1);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
@@ -3738,7 +3738,7 @@ check_path_prefix(struct got_object_id *parent_id,
 	cpp_arg.len = strlen(cpp_arg.path_prefix);
 	cpp_arg.errcode = errcode;
 	err = got_diff_tree(tree1, tree2, "", "", repo,
-	    check_path_prefix_in_diff, &cpp_arg);
+	    check_path_prefix_in_diff, &cpp_arg, 0);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);

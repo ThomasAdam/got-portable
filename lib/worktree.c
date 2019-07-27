@@ -2112,7 +2112,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
 	arg.commit_id2 = commit_id2;
-	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg);
+	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg, 1);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;

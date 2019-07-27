@@ -325,7 +325,8 @@ done:
 
 static const struct got_error *
 diff_added_tree(struct got_object_id *id, const char *label,
-    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg)
+    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg,
+    int diff_content)
 {
 	const struct got_error *err = NULL;
 	struct got_object *treeobj = NULL;
@@ -344,7 +345,8 @@ diff_added_tree(struct got_object_id *id, const char *label,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(NULL, tree, NULL, label, repo, cb, cb_arg);
+	err = got_diff_tree(NULL, tree, NULL, label, repo, cb, cb_arg,
+	    diff_content);
 done:
 	if (tree)
 		got_object_tree_close(tree);
@@ -356,7 +358,7 @@ done:
 static const struct got_error *
 diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2, struct got_repository *repo,
-    got_diff_blob_cb cb, void *cb_arg)
+    got_diff_blob_cb cb, void *cb_arg, int diff_content)
 {
 	const struct got_error *err;
 	struct got_object *treeobj1 = NULL;
@@ -390,7 +392,8 @@ diff_modified_tree(struct got_object_id *id1, struct got_object_id *id2,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree1, tree2, label1, label2, repo, cb, cb_arg);
+	err = got_diff_tree(tree1, tree2, label1, label2, repo, cb, cb_arg,
+	    diff_content);
 
 done:
 	if (tree1)
@@ -406,7 +409,8 @@ done:
 
 static const struct got_error *
 diff_deleted_tree(struct got_object_id *id, const char *label,
-    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg)
+    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg,
+    int diff_content)
 {
 	const struct got_error *err;
 	struct got_object *treeobj = NULL;
@@ -425,7 +429,8 @@ diff_deleted_tree(struct got_object_id *id, const char *label,
 	if (err)
 		goto done;
 
-	err = got_diff_tree(tree, NULL, label, NULL, repo, cb, cb_arg);
+	err = got_diff_tree(tree, NULL, label, NULL, repo, cb, cb_arg,
+	    diff_content);
 done:
 	if (tree)
 		got_object_tree_close(tree);
@@ -446,7 +451,8 @@ diff_kind_mismatch(struct got_object_id *id1, struct got_object_id *id2,
 static const struct got_error *
 diff_entry_old_new(const struct got_tree_entry *te1,
     const struct got_tree_entry *te2, const char *label1, const char *label2,
-    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg)
+    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg,
+    int diff_content)
 {
 	const struct got_error *err = NULL;
 	int id_match;
@@ -454,10 +460,15 @@ diff_entry_old_new(const struct got_tree_entry *te1,
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
 			err = diff_deleted_tree(te1->id, label1, repo,
-			    cb, cb_arg);
-		else
-			err = diff_deleted_blob(te1->id, label1, repo,
-			    cb, cb_arg);
+			    cb, cb_arg, diff_content);
+		else {
+			if (diff_content)
+				err = diff_deleted_blob(te1->id, label1, repo,
+				    cb, cb_arg);
+			else
+				err = cb(cb_arg, NULL, NULL, te1->id, NULL,
+				    label1, NULL, repo);
+		}
 		return err;
 	}
 
@@ -465,11 +476,16 @@ diff_entry_old_new(const struct got_tree_entry *te1,
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
 		if (!id_match)
 			return diff_modified_tree(te1->id, te2->id,
-			    label1, label2, repo, cb, cb_arg);
+			    label1, label2, repo, cb, cb_arg, diff_content);
 	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
-		if (!id_match)
-			return diff_modified_blob(te1->id, te2->id,
-			    label1, label2, repo, cb, cb_arg);
+		if (!id_match) {
+			if (diff_content)
+				return diff_modified_blob(te1->id, te2->id,
+				    label1, label2, repo, cb, cb_arg);
+			else
+				return cb(cb_arg, NULL, NULL, te1->id,
+				    te2->id, label1, label2, repo);
+		}
 	}
 
 	if (id_match)
@@ -482,21 +498,26 @@ diff_entry_old_new(const struct got_tree_entry *te1,
 static const struct got_error *
 diff_entry_new_old(const struct got_tree_entry *te2,
     const struct got_tree_entry *te1, const char *label2,
-    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg)
+    struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg,
+    int diff_content)
 {
 	if (te1 != NULL) /* handled by diff_entry_old_new() */
 		return NULL;
 
 	if (S_ISDIR(te2->mode))
-		return diff_added_tree(te2->id, label2, repo, cb, cb_arg);
+		return diff_added_tree(te2->id, label2, repo, cb, cb_arg,
+		    diff_content);
 
-	return diff_added_blob(te2->id, label2, repo, cb, cb_arg);
+	if (diff_content)
+		return diff_added_blob(te2->id, label2, repo, cb, cb_arg);
+
+	return cb(cb_arg, NULL, NULL, NULL, te2->id, NULL, label2, repo);
 }
 
 const struct got_error *
 got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
     const char *label1, const char *label2, struct got_repository *repo,
-    got_diff_blob_cb cb, void *cb_arg)
+    got_diff_blob_cb cb, void *cb_arg, int diff_content)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te1 = NULL;
@@ -535,7 +556,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 					    got_error_from_errno("asprintf");
 			}
 			err = diff_entry_old_new(te1, te, l1, l2, repo, cb,
-			    cb_arg);
+			    cb_arg, diff_content);
 			if (err)
 				break;
 		}
@@ -557,7 +578,8 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 					return
 					    got_error_from_errno("asprintf");
 			}
-			err = diff_entry_new_old(te2, te, l2, repo, cb, cb_arg);
+			err = diff_entry_new_old(te2, te, l2, repo,
+			    cb, cb_arg, diff_content);
 			if (err)
 				break;
 		}
@@ -641,7 +663,7 @@ got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
 	arg.diff_context = diff_context;
 	arg.outfile = outfile;
 	err = got_diff_tree(tree1, tree2, label1, label2, repo,
-	    got_diff_blob_output_unidiff, &arg);
+	    got_diff_blob_output_unidiff, &arg, 1);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);

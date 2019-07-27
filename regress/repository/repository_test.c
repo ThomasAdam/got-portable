@@ -397,7 +397,7 @@ repo_diff_tree(const char *repo_path)
 	arg.diff_context = 3;
 	arg.outfile = outfile;
 	got_diff_tree(tree1, tree2, "", "", repo,
-	    got_diff_blob_output_unidiff, &arg);
+	    got_diff_blob_output_unidiff, &arg, 1);
 	test_printf("\n");
 
 	got_object_tree_close(tree1);

@@ -64,10 +64,13 @@ const struct got_error *got_diff_blob_output_unidiff(void *,
 /*
  * Compute the differences between two trees and invoke the provided
  * got_diff_blob_cb() callback when content differs.
+ * Diffing of blob content can be suppressed by passing zero for the
+ * 'diff_content' parameter. The callback will then only receive blob
+ * object IDs and diff labels, but NULL pointers instead of blob objects.
  */
 const struct got_error *got_diff_tree(struct got_tree_object *,
     struct got_tree_object *, const char *, const char *,
-    struct got_repository *, got_diff_blob_cb cb, void *cb_arg);
+    struct got_repository *, got_diff_blob_cb cb, void *cb_arg, int);
 
 /*
  * Diff two objects, assuming both objects are blobs. Two const char * diff
