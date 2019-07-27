@@ -1064,27 +1064,31 @@ get_file_status(unsigned char *status, struct stat *sb,
 				sb->st_mode = GOT_DEFAULT_FILE_MODE;
 			return NULL;
 		}
-		return got_error_from_errno2("fopen", abspath);
+		return got_error_from_errno2("open", abspath);
 	}
+
+	if (ie == NULL)
+		goto done;
 
 	if (fstat(fd, sb) == -1) {
 		err = got_error_from_errno2("fstat", abspath);
 		goto done;
 	}
 
-	if (!S_ISREG(sb->st_mode)) {
-		*status = GOT_STATUS_OBSTRUCTED;
-		goto done;
-	}
-
-	if (ie == NULL)
-		goto done;
-
 	if (!got_fileindex_entry_has_file_on_disk(ie)) {
-		*status = GOT_STATUS_DELETE;
+		if (S_ISREG(sb->st_mode))
+			*status = GOT_STATUS_DELETE;
+		else
+			*status = GOT_STATUS_OBSTRUCTED;
 		goto done;
 	} else if (!got_fileindex_entry_has_blob(ie)) {
-		*status = GOT_STATUS_ADD;
+		if (S_ISREG(sb->st_mode))
+			*status = GOT_STATUS_ADD;
+		else
+			*status = GOT_STATUS_OBSTRUCTED;
+		goto done;
+	} else if (!S_ISREG(sb->st_mode)) {
+		*status = GOT_STATUS_OBSTRUCTED;
 		goto done;
 	}
 
