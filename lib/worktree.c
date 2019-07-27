@@ -3618,7 +3618,6 @@ got_commitable_get_status(struct got_commitable *ct)
 struct check_rebase_ok_arg {
 	struct got_worktree *worktree;
 	struct got_repository *repo;
-	int rebase_in_progress;
 };
 
 static const struct got_error *
@@ -3630,12 +3629,10 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 	struct stat sb;
 	char *ondisk_path;
 
-	if (!a->rebase_in_progress) {
-		/* Reject rebase of a work tree with mixed base commits. */
-		if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
-		    SHA1_DIGEST_LENGTH))
-			return got_error(GOT_ERR_MIXED_COMMITS);
-	}
+	/* Reject rebase of a work tree with mixed base commits. */
+	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
+	    SHA1_DIGEST_LENGTH))
+		return got_error(GOT_ERR_MIXED_COMMITS);
 
 	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, ie->path)
 	    == -1)
@@ -3647,10 +3644,7 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 	if (err)
 		return err;
 
-	if (a->rebase_in_progress) {
-		if (status == GOT_STATUS_CONFLICT)
-			return got_error(GOT_ERR_CONFLICTS);
-	} else if (status != GOT_STATUS_NO_CHANGE)
+	if (status != GOT_STATUS_NO_CHANGE)
 		return got_error(GOT_ERR_MODIFIED);
 
 	return NULL;
@@ -3683,7 +3677,6 @@ got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
 
 	ok_arg.worktree = worktree;
 	ok_arg.repo = repo;
-	ok_arg.rebase_in_progress = 0;
 	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
 	    &ok_arg);
 	if (err)
@@ -4499,7 +4492,6 @@ got_worktree_histedit_prepare(struct got_reference **tmp_branch,
 
 	ok_arg.worktree = worktree;
 	ok_arg.repo = repo;
-	ok_arg.rebase_in_progress = 0;
 	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
 	    &ok_arg);
 	if (err)
