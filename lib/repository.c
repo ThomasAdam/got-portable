@@ -653,7 +653,10 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 	packdir = opendir(path_packdir);
 	if (packdir == NULL) {
-		err = got_error_from_errno2("opendir", path_packdir);
+		if (errno == ENOENT)
+			err = got_error_no_obj(id);
+		else
+			err = got_error_from_errno2("opendir", path_packdir);
 		goto done;
 	}
 
