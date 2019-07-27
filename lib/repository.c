@@ -901,7 +901,8 @@ match_packed_object(struct got_object_id **unique_id,
 
 	packdir = opendir(path_packdir);
 	if (packdir == NULL) {
-		err = got_error_from_errno2("opendir", path_packdir);
+		if (errno != ENOENT)
+			err = got_error_from_errno2("opendir", path_packdir);
 		goto done;
 	}
 
