@@ -791,6 +791,9 @@ cmd_checkout(int argc, char *argv[])
 	const char *branch_name = GOT_REF_HEAD;
 	char *commit_id_str = NULL;
 	int ch, same_path_prefix;
+	struct got_pathlist_head paths;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "b:c:p:")) != -1) {
 		switch (ch) {
@@ -940,7 +943,10 @@ cmd_checkout(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_worktree_checkout_files(worktree, "", repo,
+	error = got_pathlist_append(NULL, &paths, "", NULL);
+	if (error)
+		goto done;
+	error = got_worktree_checkout_files(worktree, &paths, repo,
 	    checkout_progress, worktree_path, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
@@ -948,6 +954,7 @@ cmd_checkout(int argc, char *argv[])
 	printf("Now shut up and hack\n");
 
 done:
+	got_pathlist_free(&paths);
 	free(commit_id_str);
 	free(repo_path);
 	free(worktree_path);
@@ -957,7 +964,7 @@ done:
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [path]\n",
+	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -1078,12 +1085,16 @@ cmd_update(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *worktree_path = NULL, *path = NULL;
+	char *worktree_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	const char *branch_name = NULL;
 	struct got_reference *head_ref = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
 	int ch, did_something = 0;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "b:c:")) != -1) {
 		switch (ch) {
@@ -1122,18 +1133,9 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (argc == 0) {
-		path = strdup("");
-		if (path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else if (argc == 1) {
-		error = got_worktree_resolve_path(&path, worktree, argv[0]);
-		if (error)
-			goto done;
-	} else
-		usage_update();
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -1168,12 +1170,12 @@ cmd_update(int argc, char *argv[])
 
 	if (branch_name) {
 		struct got_object_id *head_commit_id;
-		if (strlen(path) != 0) {
-			fprintf(stderr, "%s: switching between branches "
-			    "requires that the entire work tree "
-			    "gets updated, not just '%s'\n",
-			    getprogname(), path);
-			error = got_error(GOT_ERR_BAD_PATH);
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (strlen(pe->path) == 0)
+				continue;
+			error = got_error_msg(GOT_ERR_BAD_PATH,
+			    "switching between branches requires that "
+			    "the entire work tree gets updated");
 			goto done;
 		}
 		error = got_ref_resolve(&head_commit_id, repo, head_ref);
@@ -1210,7 +1212,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_worktree_checkout_files(worktree, path, repo,
+	error = got_worktree_checkout_files(worktree, &paths, repo,
 	    update_progress, &did_something, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
@@ -1221,7 +1223,9 @@ cmd_update(int argc, char *argv[])
 		printf("Already up-to-date\n");
 done:
 	free(worktree_path);
-	free(path);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
 	free(commit_id);
 	free(commit_id_str);
 	return error;

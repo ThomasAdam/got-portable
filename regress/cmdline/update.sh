@@ -1095,33 +1095,33 @@ function test_update_partial {
 	echo "modified epsilon/zeta" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "modified two files"
 
-	for f in alpha beta; do
-		echo "U  $f" > $testroot/stdout.expected
-		echo -n "Updated to commit " >> $testroot/stdout.expected
-		git_show_head $testroot/repo >> $testroot/stdout.expected
-		echo >> $testroot/stdout.expected
+	echo "U  alpha" > $testroot/stdout.expected
+	echo "U  beta" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 
-		(cd $testroot/wt && got update $f > $testroot/stdout)
+	(cd $testroot/wt && got update alpha beta > $testroot/stdout)
 
-		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
-			diff -u $testroot/stdout.expected $testroot/stdout
-			test_done "$testroot" "$ret"
-			return 1
-		fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
-		echo "modified $f" > $testroot/content.expected
-		cat $testroot/wt/$f > $testroot/content
+	echo "modified alpha" > $testroot/content.expected
+	echo "modified beta" >> $testroot/content.expected
 
-		cmp -s $testroot/content.expected $testroot/content
-		ret="$?"
-		if [ "$ret" != "0" ]; then
-			diff -u $testroot/content.expected $testroot/content
-			test_done "$testroot" "$ret"
-			return 1
-		fi
-	done
+	cat $testroot/wt/alpha $testroot/wt/beta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
@@ -1167,33 +1167,32 @@ function test_update_partial_add {
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "added two files"
 
-	for f in new epsilon/new2; do
-		echo "A  $f" > $testroot/stdout.expected
-		echo -n "Updated to commit " >> $testroot/stdout.expected
-		git_show_head $testroot/repo >> $testroot/stdout.expected
-		echo >> $testroot/stdout.expected
+	echo "A  new" > $testroot/stdout.expected
+	echo "A  epsilon/new2" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 
-		(cd $testroot/wt && got update $f > $testroot/stdout)
+	(cd $testroot/wt && got update new epsilon/new2 > $testroot/stdout)
 
-		cmp -s $testroot/stdout.expected $testroot/stdout
-		ret="$?"
-		if [ "$ret" != "0" ]; then
-			diff -u $testroot/stdout.expected $testroot/stdout
-			test_done "$testroot" "$ret"
-			return 1
-		fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
-		echo "$f" > $testroot/content.expected
-		cat $testroot/wt/$f > $testroot/content
+	echo "new" > $testroot/content.expected
+	echo "epsilon/new2" >> $testroot/content.expected
 
-		cmp -s $testroot/content.expected $testroot/content
-		ret="$?"
-		if [ "$ret" != "0" ]; then
-			diff -u $testroot/content.expected $testroot/content
-			test_done "$testroot" "$ret"
-			return 1
-		fi
-	done
+	cat $testroot/wt/new $testroot/wt/epsilon/new2 > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
 	test_done "$testroot" "$ret"
 }
 
@@ -1207,30 +1206,27 @@ function test_update_partial_rm {
 		return 1
 	fi
 
-	(cd $testroot/repo && git rm -q alpha)
-	(cd $testroot/repo && git rm -q epsilon/zeta)
+	(cd $testroot/repo && git rm -q alpha epsilon/zeta)
 	git_commit $testroot/repo -m "removed two files"
 
-	for f in alpha epsilon/zeta; do
-		echo "got: no such entry found in tree" \
-			> $testroot/stderr.expected
+	echo "got: no such entry found in tree" \
+		> $testroot/stderr.expected
 
-		(cd $testroot/wt && got update $f 2> $testroot/stderr)
-		ret="$?"
-		if [ "$ret" == "0" ]; then
-			echo "update succeeded unexpectedly" >&2
-			test_done "$testroot" "1"
-			return 1
-		fi
+	(cd $testroot/wt && got update alpha epsilon/zeta 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "update succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 
-		cmp -s $testroot/stderr.expected $testroot/stderr
-		ret="$?"
-		if [ "$ret" != "0" ]; then
-			diff -u $testroot/stderr.expected $testroot/stderr
-			test_done "$testroot" "$ret"
-			return 1
-		fi
-	done
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 	test_done "$testroot" "$ret"
 }
 

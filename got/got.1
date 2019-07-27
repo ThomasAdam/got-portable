@@ -158,7 +158,7 @@ will be checked out.
 .It Cm co
 Short alias for
 .Cm checkout .
-.It Cm update [ Fl b Ar branch ] [ Fl c Ar commit ] [ Ar path ]
+.It Cm update [ Fl b Ar branch ] [ Fl c Ar commit ] [ Ar path ... ]
 Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -171,12 +171,14 @@ Show the status of each affected file, using the following status codes:
 .It ! Ta a missing versioned file was restored
 .El
 .Pp
-If a
+If no
 .Ar path
-is specified, restrict the update operation to files at or within this path.
-The path is required to exist in the update operation's target commit.
-Files in the work tree outside this path will remain unchanged and will
-retain their previously recorded base commit.
+is specified, update the entire work tree.
+Otherwise, restrict the update operation to files at or within the
+specified paths.
+Each path is required to exist in the update operation's target commit.
+Files in the work tree outside specified paths will remain unchanged and
+will retain their previously recorded base commit.
 Some
 .Nm
 commands may refuse to run while the work tree contains files from

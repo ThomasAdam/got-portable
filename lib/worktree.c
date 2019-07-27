@@ -1774,34 +1774,59 @@ done:
 }
 
 const struct got_error *
-got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
-    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+got_worktree_checkout_files(struct got_worktree *worktree,
+    struct got_pathlist_head *paths, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_commit_object *commit = NULL;
-	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
-	char *relpath = NULL, *entry_name = NULL;
-	int entry_type;
+	struct got_pathlist_entry *pe;
+	struct tree_path_data {
+		SIMPLEQ_ENTRY(tree_path_data) entry;
+		struct got_object_id *tree_id;
+		int entry_type;
+		char *relpath;
+		char *entry_name;
+	} *tpd = NULL;
+	SIMPLEQ_HEAD(tree_paths, tree_path_data) tree_paths;
+
+	SIMPLEQ_INIT(&tree_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
-	err = find_tree_entry_for_checkout(&entry_type, &relpath, &tree_id,
-	    path, worktree, repo);
-	if (err)
-		goto done;
-
-	if (entry_type == GOT_OBJ_TYPE_BLOB) {
-		entry_name = basename(path);
-		if (entry_name == NULL) {
-			err = got_error_from_errno2("basename", path);
+	/* Map all specified paths to in-repository trees. */
+	TAILQ_FOREACH(pe, paths, entry) {
+		tpd = malloc(sizeof(*tpd));
+		if (tpd == NULL) {
+			err = got_error_from_errno("malloc");
 			goto done;
 		}
+
+		err = find_tree_entry_for_checkout(&tpd->entry_type,
+		    &tpd->relpath, &tpd->tree_id, pe->path, worktree, repo);
+		if (err) {
+			free(tpd);
+			goto done;
+		}
+
+		if (tpd->entry_type == GOT_OBJ_TYPE_BLOB) {
+			err = got_path_basename(&tpd->entry_name, pe->path);
+			if (err) {
+				free(tpd->relpath);
+				free(tpd->tree_id);
+				free(tpd);
+				goto done;
+			}
+		} else
+			tpd->entry_name = NULL;
+
+		SIMPLEQ_INSERT_TAIL(&tree_paths, tpd, entry);
 	}
 
 	/*
@@ -1813,31 +1838,47 @@ got_worktree_checkout_files(struct got_worktree *worktree, const char *path,
 	if (err)
 		goto done;
 
-	err = checkout_files(worktree, fileindex, relpath, tree_id, entry_name,
-	    repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
-	if (err == NULL) {
+	tpd = SIMPLEQ_FIRST(&tree_paths);
+	TAILQ_FOREACH(pe, paths, entry) {
 		struct bump_base_commit_id_arg bbc_arg;
+
+		err = checkout_files(worktree, fileindex, tpd->relpath,
+		    tpd->tree_id, tpd->entry_name, repo,
+		    progress_cb, progress_arg, cancel_cb, cancel_arg);
+		if (err)
+			break;
+
 		bbc_arg.base_commit_id = worktree->base_commit_id;
-		bbc_arg.entry_name = entry_name;
-		bbc_arg.path = path;
-		bbc_arg.path_len = strlen(path);
+		bbc_arg.entry_name = tpd->entry_name;
+		bbc_arg.path = pe->path;
+		bbc_arg.path_len = strlen(pe->path);
 		bbc_arg.progress_cb = progress_cb;
 		bbc_arg.progress_arg = progress_arg;
 		err = got_fileindex_for_each_entry_safe(fileindex,
 		    bump_base_commit_id, &bbc_arg);
+		if (err)
+			break;
+
+		tpd = SIMPLEQ_NEXT(tpd, entry);
 	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
 	free(fileindex_path);
-	free(relpath);
 	if (tree)
 		got_object_tree_close(tree);
 	if (commit)
 		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
+	while (!SIMPLEQ_EMPTY(&tree_paths)) {
+		tpd = SIMPLEQ_FIRST(&tree_paths);
+		SIMPLEQ_REMOVE_HEAD(&tree_paths, entry);
+		free(tpd->relpath);
+		free(tpd->tree_id);
+		free(tpd);
+	}
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;

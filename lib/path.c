@@ -371,6 +371,22 @@ got_path_dirname(char **parent, const char *path)
 	return NULL;
 }
 
+const struct got_error *
+got_path_basename(char **s, const char *path)
+{
+	char *base;
+
+	base = basename(path);
+	if (base == NULL)
+		return got_error_from_errno2("basename", path);
+
+	*s = strdup(base);
+	if (*s == NULL)
+		return got_error_from_errno("strdup");
+
+	return NULL;
+}
+
 void
 got_path_strip_trailing_slashes(char *path)
 {

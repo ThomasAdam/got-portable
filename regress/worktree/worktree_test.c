@@ -354,6 +354,9 @@ worktree_checkout(const char *repo_path)
 	char worktree_path[PATH_MAX];
 	int ok = 0;
 	struct stat sb;
+	struct got_pathlist_head paths;
+
+	TAILQ_INIT(&paths);
 
 	err = got_repo_open(&repo, repo_path);
 	if (err != NULL || repo == NULL)
@@ -375,8 +378,11 @@ worktree_checkout(const char *repo_path)
 	if (err != NULL)
 		goto done;
 
-	err = got_worktree_checkout_files(worktree, "", repo, progress_cb, NULL,
-	    NULL, NULL);
+	err = got_pathlist_append(NULL, &paths, "", NULL);
+	if (err)
+		goto done;
+	err = got_worktree_checkout_files(worktree, &paths, repo, progress_cb,
+	    NULL, NULL, NULL);
 	if (err != NULL)
 		goto done;
 
@@ -410,6 +416,7 @@ done:
 		got_ref_close(head_ref);
 	if (repo)
 		got_repo_close(repo);
+	got_pathlist_free(&paths);
 	free(makefile_path);
 	free(cfile_path);
 	return ok;
