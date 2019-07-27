@@ -2645,29 +2645,32 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 	}
 
-	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
-	    tree_path);
-	if (err)
-		goto done;
-
-	err = got_object_open_as_tree(&tree, repo, tree_id);
-	if (err)
-		goto done;
-
-	te_name = basename(ie->path);
-	if (te_name == NULL) {
-		err = got_error_from_errno2("basename", ie->path);
-		goto done;
-	}
-
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
 		goto done;
 
-	te = got_object_tree_find_entry(tree, te_name);
-	if (te == NULL && status != GOT_STATUS_ADD) {
-		err = got_error(GOT_ERR_NO_TREE_ENTRY);
-		goto done;
+	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
+	    tree_path);
+	if (err) {
+		if (!(err->code == GOT_ERR_NO_TREE_ENTRY &&
+		    status == GOT_STATUS_ADD))
+			goto done;
+	} else {
+		err = got_object_open_as_tree(&tree, repo, tree_id);
+		if (err)
+			goto done;
+
+		te_name = basename(ie->path);
+		if (te_name == NULL) {
+			err = got_error_from_errno2("basename", ie->path);
+			goto done;
+		}
+
+		te = got_object_tree_find_entry(tree, te_name);
+		if (te == NULL && status != GOT_STATUS_ADD) {
+			err = got_error(GOT_ERR_NO_TREE_ENTRY);
+			goto done;
+		}
 	}
 
 	switch (status) {

@@ -96,6 +96,31 @@ function test_add_multiple {
 	test_done "$testroot" "$ret"
 }
 
+function test_add_file_in_new_subdir {
+	local testroot=`test_init add_file_in_new_subdir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/new
+	echo "new file" > $testroot/wt/new/foo
+
+	echo 'A  new/foo' > $testroot/stdout.expected
+	(cd $testroot/wt && got add new/foo > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple
+run_test test_add_file_in_new_subdir

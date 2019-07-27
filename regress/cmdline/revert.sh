@@ -183,7 +183,46 @@ function test_revert_multiple {
 	test_done "$testroot" "$ret"
 }
 
+function test_revert_file_in_new_subdir {
+	local testroot=`test_init revert_file_in_new_subdir`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+
+	mkdir -p $testroot/wt/newdir
+	echo new > $testroot/wt/newdir/new
+	(cd $testroot/wt && got add newdir/new > /dev/null)
+
+	(cd $testroot/wt && got revert newdir/new > $testroot/stdout)
+
+	echo "R  newdir/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "?  newdir/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
 run_test test_revert_multiple
+run_test test_revert_file_in_new_subdir
