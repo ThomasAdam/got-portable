@@ -273,7 +273,7 @@ apply_unveil(const char *repo_path, int repo_read_only,
 __dead static void
 usage_init(void)
 {
-	fprintf(stderr, "usage: %s init path\n", getprogname());
+	fprintf(stderr, "usage: %s init repository-path\n", getprogname());
 	exit(1);
 }
 
