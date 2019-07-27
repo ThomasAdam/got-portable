@@ -2362,7 +2362,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 
 	/* XXX status walk can't deal with trailing slash! */
 	len = strlen(path);
-	while (path[len - 1] == '/') {
+	while (len > 0 && path[len - 1] == '/') {
 		path[len - 1] = '\0';
 		len--;
 	}
