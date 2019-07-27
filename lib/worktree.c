@@ -2459,7 +2459,7 @@ schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
 		return err;
 	}
 
-	return report_file_status(ie, relpath, status_cb, status_arg, repo);
+	return report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
 }
 
 const struct got_error *
