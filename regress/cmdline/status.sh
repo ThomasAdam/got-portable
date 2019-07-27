@@ -147,7 +147,7 @@ function test_status_obstructed {
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
-	if [ "$?" != "0" ]; then
+	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
