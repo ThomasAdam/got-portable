@@ -1044,6 +1044,35 @@ check_rebase_or_histedit_in_progress(struct got_worktree *worktree)
 }
 
 static const struct got_error *
+get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
+    char *argv[], struct got_worktree *worktree)
+{
+	const struct got_error *err;
+	char *path;
+	int i;
+
+	if (argc == 0) {
+		path = strdup("");
+		if (path == NULL)
+			return got_error_from_errno("strdup");
+		return got_pathlist_append(NULL, paths, path, NULL);
+	}
+
+	for (i = 0; i < argc; i++) {
+		err = got_worktree_resolve_path(&path, worktree, argv[i]);
+		if (err)
+			break;
+		err = got_pathlist_append(NULL, paths, path, NULL);
+		if (err) {
+			free(path);
+			break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -2320,7 +2349,8 @@ cmd_status(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
-	int ch, i;
+	struct got_pathlist_entry *pe;
+	int ch;
 
 	TAILQ_INIT(&paths);
 
@@ -2350,25 +2380,9 @@ cmd_status(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (argc == 0) {
-		error = got_pathlist_append(NULL, &paths, "", NULL);
-		if (error)
-			goto done;
-	} else if (argc >= 1) {
-		for (i = 0; i < argc; i++) {
-			char *path;
-			error = got_worktree_resolve_path(&path, worktree,
-			    argv[i]);
-			if (error)
-				goto done;
-			error = got_pathlist_append(NULL, &paths, path, NULL);
-			if (error) {
-				free(path);
-				goto done;
-			}
-		}
-	} else
-		usage_status();
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -2382,11 +2396,8 @@ cmd_status(int argc, char *argv[])
 	error = got_worktree_status(worktree, &paths, repo, print_status, NULL,
 	    check_cancelled, NULL);
 done:
-	if (argc >= 1) {
-		struct got_pathlist_entry *pe;
-		TAILQ_FOREACH(pe, &paths, entry)
-			free((char *)pe->path);
-	}
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
 	got_pathlist_free(&paths);
 	free(cwd);
 	return error;
