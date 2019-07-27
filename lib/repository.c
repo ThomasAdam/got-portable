@@ -1236,7 +1236,6 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	struct got_tree_entry *new_te = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	char *name;
 
 	*new_tree_id = NULL;
 
@@ -1297,12 +1296,6 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		free(path);
 		if (err)
 			goto done;
-	}
-
-	name = basename(path_dir);
-	if (name == NULL) {
-		err = got_error_from_errno("basename");
-		goto done;
 	}
 
 	err = got_object_tree_create(new_tree_id, &new_tree_entries, repo);
