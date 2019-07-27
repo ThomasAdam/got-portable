@@ -147,7 +147,10 @@ open_loose_object(int *fd, struct got_object_id *id,
 		return err;
 	*fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1) {
-		err = got_error_from_errno2("open", path);
+		if (errno == ENOENT)
+			err = got_error_no_obj(id);
+		else
+			err = got_error_from_errno2("open", path);
 		goto done;
 	}
 done:
@@ -422,25 +425,17 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return NULL;
 	}
 
-	err = open_packed_object(obj, id, repo);
-	if (err && err->code != GOT_ERR_NO_OBJ)
-		return err;
-	if (*obj) {
-		(*obj)->refcnt++;
-		return got_repo_cache_object(repo, id, *obj);
-	}
-
 	err = got_object_get_path(&path, id, repo);
 	if (err)
 		return err;
 
 	fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
-		if (errno == ENOENT)
-			err = got_error_no_obj(id);
-		else
+		if (errno != ENOENT) {
 			err = got_error_from_errno2("open", path);
-		goto done;
+			goto done;
+		}
+		err = open_packed_object(obj, id, repo);
 	} else {
 		err = read_object_header_privsep(obj, repo, fd);
 		if (err)
@@ -579,7 +574,7 @@ open_commit(struct got_commit_object **commit,
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
-	int idx;
+	int idx, fd;
 	char *path_packfile;
 
 	if (check_cache) {
@@ -591,9 +586,16 @@ open_commit(struct got_commit_object **commit,
 	} else
 		*commit = NULL;
 
-	err = got_repo_search_packidx(&packidx, &idx, repo, id);
-	if (err == NULL) {
+	err = open_loose_object(&fd, id, repo);
+	if (err) {
 		struct got_pack *pack = NULL;
+
+		if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+
+		err = got_repo_search_packidx(&packidx, &idx, repo, id);
+		if (err)
+			return err;
 
 		err = get_packfile_path(&path_packfile, packidx);
 		if (err)
@@ -608,14 +610,8 @@ open_commit(struct got_commit_object **commit,
 		}
 		err = read_packed_commit_privsep(commit, pack,
 		    packidx, idx, id);
-	} else if (err->code == GOT_ERR_NO_OBJ) {
-		int fd;
-
-		err = open_loose_object(&fd, id, repo);
-		if (err)
-			return err;
+	} else
 		err = read_commit_privsep(commit, fd, repo);
-	}
 
 	if (err == NULL) {
 		(*commit)->refcnt++;
@@ -757,7 +753,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
-	int idx;
+	int fd, idx;
 	char *path_packfile;
 
 	if (check_cache) {
@@ -769,9 +765,16 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 	} else
 		*tree = NULL;
 
-	err = got_repo_search_packidx(&packidx, &idx, repo, id);
-	if (err == NULL) {
+	err = open_loose_object(&fd, id, repo);
+	if (err) {
 		struct got_pack *pack = NULL;
+
+		if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+
+		err = got_repo_search_packidx(&packidx, &idx, repo, id);
+		if (err)
+			return err;
 
 		err = get_packfile_path(&path_packfile, packidx);
 		if (err)
@@ -779,21 +782,15 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 
 		pack = got_repo_get_cached_pack(repo, path_packfile);
 		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo, path_packfile,
-			    packidx);
+			err = got_repo_cache_pack(&pack, repo,
+			    path_packfile, packidx);
 			if (err)
 				return err;
 		}
 		err = read_packed_tree_privsep(tree, pack,
 		    packidx, idx, id);
-	} else if (err->code == GOT_ERR_NO_OBJ) {
-		int fd;
-
-		err = open_loose_object(&fd, id, repo);
-		if (err)
-			return err;
+	} else
 		err = read_tree_privsep(tree, fd, repo);
-	}
 
 	if (err == NULL) {
 		(*tree)->refcnt++;
@@ -979,7 +976,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	int idx;
 	char *path_packfile;
 	uint8_t *outbuf;
-	int outfd;
+	int infd, outfd;
 	size_t size, hdrlen;
 	struct stat sb;
 
@@ -997,9 +994,16 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		goto done;
 	}
 
-	err = got_repo_search_packidx(&packidx, &idx, repo, id);
-	if (err == NULL) {
+	err = open_loose_object(&infd, id, repo);
+	if (err) {
 		struct got_pack *pack = NULL;
+
+		if (err->code != GOT_ERR_NO_OBJ)
+			goto done;
+
+		err = got_repo_search_packidx(&packidx, &idx, repo, id);
+		if (err)
+			goto done;
 
 		err = get_packfile_path(&path_packfile, packidx);
 		if (err)
@@ -1014,15 +1018,9 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		}
 		err = read_packed_blob_privsep(&outbuf, &size, &hdrlen, outfd,
 		    pack, packidx, idx, id);
-	} else if (err->code == GOT_ERR_NO_OBJ) {
-		int infd;
-
-		err = open_loose_object(&infd, id, repo);
-		if (err)
-			goto done;
+	} else
 		err = read_blob_privsep(&outbuf, &size, &hdrlen, outfd, infd,
 		    repo);
-	}
 	if (err)
 		goto done;
 
@@ -1289,7 +1287,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
-	int idx;
+	int fd, idx;
 	char *path_packfile;
 
 	if (check_cache) {
@@ -1301,9 +1299,16 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	} else
 		*tag = NULL;
 
-	err = got_repo_search_packidx(&packidx, &idx, repo, id);
-	if (err == NULL) {
+	err = open_loose_object(&fd, id, repo);
+	if (err) {
 		struct got_pack *pack = NULL;
+
+		if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+
+		err = got_repo_search_packidx(&packidx, &idx, repo, id);
+		if (err)
+			return err;
 
 		err = get_packfile_path(&path_packfile, packidx);
 		if (err)
@@ -1311,27 +1316,19 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 
 		pack = got_repo_get_cached_pack(repo, path_packfile);
 		if (pack == NULL) {
-			err = got_repo_cache_pack(&pack, repo, path_packfile,
-			    packidx);
+			err = got_repo_cache_pack(&pack, repo,
+			    path_packfile, packidx);
 			if (err)
 				return err;
 		}
-		err = read_packed_tag_privsep(tag, pack,
-		    packidx, idx, id);
-	} else if (err->code == GOT_ERR_NO_OBJ) {
-		int fd;
-
-		err = open_loose_object(&fd, id, repo);
-		if (err)
-			return err;
+		err = read_packed_tag_privsep(tag, pack, packidx, idx, id);
+	} else
 		err = read_tag_privsep(tag, fd, repo);
-	}
 
 	if (err == NULL) {
 		(*tag)->refcnt++;
 		err = got_repo_cache_tag(repo, id, *tag);
 	}
-
 	return err;
 }
 
