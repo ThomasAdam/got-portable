@@ -131,7 +131,7 @@ read_meta_file(char **content, const char *path_got, const char *name)
 	fd = open(path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
 		if (errno == ENOENT)
-			err = got_error(GOT_ERR_WORKTREE_META);
+			err = got_error_path(path, GOT_ERR_WORKTREE_META);
 		else
 			err = got_error_from_errno2("open", path);
 		goto done;
@@ -155,11 +155,11 @@ read_meta_file(char **content, const char *path_got, const char *name)
 	n = read(fd, *content, sb.st_size);
 	if (n != sb.st_size) {
 		err = (n == -1 ? got_error_from_errno2("read", path) :
-		    got_error(GOT_ERR_WORKTREE_META));
+		    got_error_path(path, GOT_ERR_WORKTREE_META));
 		goto done;
 	}
 	if ((*content)[sb.st_size - 1] != '\n') {
-		err = got_error(GOT_ERR_WORKTREE_META);
+		err = got_error_path(path, GOT_ERR_WORKTREE_META);
 		goto done;
 	}
 	(*content)[sb.st_size - 1] = '\0';
@@ -355,7 +355,8 @@ open_worktree(struct got_worktree **worktree, const char *path)
 
 	version = strtonum(formatstr, 1, INT_MAX, &errstr);
 	if (errstr) {
-		err = got_error(GOT_ERR_WORKTREE_META);
+		err = got_error_msg(GOT_ERR_WORKTREE_META,
+		    "could not parse work tree format version number");
 		goto done;
 	}
 	if (version != GOT_WORKTREE_FORMAT_VERSION) {
