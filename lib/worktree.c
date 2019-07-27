@@ -1033,6 +1033,7 @@ stat_info_differs(struct got_fileindex_entry *ie, struct stat *sb)
 	    ie->size == (sb->st_size & 0xffffffff));
 }
 
+/* Report file status and initialize sb->st_mode. */
 static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
@@ -1067,8 +1068,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 		return got_error_from_errno2("open", abspath);
 	}
 
-	if (ie == NULL)
+	if (ie == NULL) {
+		sb->st_mode = GOT_DEFAULT_FILE_MODE;
 		goto done;
+	}
 
 	if (fstat(fd, sb) == -1) {
 		err = got_error_from_errno2("fstat", abspath);
