@@ -442,6 +442,44 @@ function test_status_empty_dir_unversioned_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_many_paths {
+	local testroot=`test_init status_many_paths`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "unversioned file" > $testroot/wt/foo
+	rm $testroot/wt/epsilon/zeta
+	touch $testroot/wt/beta
+	echo "new file" > $testroot/wt/new
+	mkdir $testroot/wt/newdir
+	(cd $testroot/wt && got add new >/dev/null)
+
+	(cd $testroot/wt && got status newdir > $testroot/stdout.expected)
+	(cd $testroot/wt && got status alpha >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status epsilon >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status foo >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status new >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status beta >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status . >> $testroot/stdout.expected)
+
+	(cd $testroot/wt && got status newdir alpha epsilon foo new beta . \
+		> $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -453,3 +491,4 @@ run_test test_status_shows_no_mods_after_complete_merge
 run_test test_status_shows_conflict
 run_test test_status_empty_dir
 run_test test_status_empty_dir_unversioned_file
+run_test test_status_many_paths

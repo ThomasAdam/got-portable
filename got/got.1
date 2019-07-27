@@ -212,7 +212,7 @@ branch will be used.
 .It Cm up
 Short alias for
 .Cm update .
-.It Cm status [ Ar path ]
+.It Cm status [ Ar path ... ]
 Show the current modification status of files in a work tree,
 using the following status codes:
 .Bl -column YXZ description
@@ -226,9 +226,10 @@ using the following status codes:
 .Nm
 .El
 .Pp
-If a
+If no
 .Ar path
-is specified, only show modifications within this path.
+is specified, show modifications in the entire work tree.
+Otherwise, show modifications at or within the specified paths.
 .It Cm st
 Short alias for
 .Cm status .

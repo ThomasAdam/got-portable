@@ -148,8 +148,8 @@ typedef const struct got_error *(*got_worktree_status_cb)(void *,
  * a path, and a corresponding status code.
  */
 const struct got_error *got_worktree_status(struct got_worktree *,
-    const char *, struct got_repository *, got_worktree_status_cb, void *,
-    got_worktree_cancel_cb cancel_cb, void *);
+    struct got_pathlist_head *, struct got_repository *,
+    got_worktree_status_cb, void *, got_worktree_cancel_cb cancel_cb, void *);
 
 /*
  * Try to resolve a user-provided path to an on-disk path in the work tree.

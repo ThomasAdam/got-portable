@@ -2265,10 +2265,14 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		if (errno == ENOTDIR || errno == ENOENT) {
 			struct got_fileindex_entry *ie;
 			ie = got_fileindex_entry_get(fileindex, path);
-			if (ie == NULL) {
-				err = got_error(GOT_ERR_BAD_PATH);
+			if (ie == NULL)
+				err = (*status_cb)(status_arg,
+				    GOT_STATUS_UNVERSIONED, path, NULL, NULL);
+			else
+				err = report_file_status(ie, ondisk_path,
+				    status_cb, status_arg, repo);
+			if (err)
 				goto done;
-			}
 			err = report_file_status(ie, ondisk_path,
 			    status_cb, status_arg, repo);
 			goto done;
@@ -2299,20 +2303,26 @@ done:
 }
 
 const struct got_error *
-got_worktree_status(struct got_worktree *worktree, const char *path,
-    struct got_repository *repo, got_worktree_status_cb status_cb,
-    void *status_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+got_worktree_status(struct got_worktree *worktree,
+    struct got_pathlist_head *paths, struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
+	struct got_pathlist_entry *pe;
 
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		return err;
 
-	err = worktree_status(worktree, path, fileindex, repo,
-	    status_cb, status_arg, cancel_cb, cancel_arg);
+	TAILQ_FOREACH(pe, paths, entry) {
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+			status_cb, status_arg, cancel_cb, cancel_arg);
+		if (err)
+			break;
+	}
 	free(fileindex_path);
 	got_fileindex_free(fileindex);
 	return err;

@@ -1802,7 +1802,11 @@ cmd_diff(int argc, char *argv[])
 
 	if (argc <= 1) {
 		struct print_diff_arg arg;
+		struct got_pathlist_head paths;
 		char *id_str;
+
+		TAILQ_INIT(&paths);
+
 		error = got_object_id_str(&id_str,
 		    got_worktree_get_base_commit_id(worktree));
 		if (error)
@@ -1813,9 +1817,14 @@ cmd_diff(int argc, char *argv[])
 		arg.id_str = id_str;
 		arg.header_shown = 0;
 
-		error = got_worktree_status(worktree, path, repo, print_diff,
+		error = got_pathlist_append(NULL, &paths, path, NULL);
+		if (error)
+			goto done;
+
+		error = got_worktree_status(worktree, &paths, repo, print_diff,
 		    &arg, check_cancelled, NULL);
 		free(id_str);
+		got_pathlist_free(&paths);
 		goto done;
 	}
 
@@ -2291,7 +2300,7 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [path]\n", getprogname());
+	fprintf(stderr, "usage: %s status [path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -2310,7 +2319,10 @@ cmd_status(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *path = NULL;
-	int ch;
+	struct got_pathlist_head paths;
+	int ch, i;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -2339,15 +2351,21 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	if (argc == 0) {
-		path = strdup("");
-		if (path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else if (argc == 1) {
-		error = got_worktree_resolve_path(&path, worktree, argv[0]);
+		error = got_pathlist_append(NULL, &paths, "", NULL);
 		if (error)
 			goto done;
+	} else if (argc >= 1) {
+		for (i = 0; i < argc; i++) {
+			error = got_worktree_resolve_path(&path, worktree,
+			    argv[i]);
+			if (error)
+				goto done;
+			error = got_pathlist_append(NULL, &paths, path, NULL);
+			if (error) {
+				free(path);
+				goto done;
+			}
+		}
 	} else
 		usage_status();
 
@@ -2360,9 +2378,10 @@ cmd_status(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_status(worktree, path, repo, print_status, NULL,
+	error = got_worktree_status(worktree, &paths, repo, print_status, NULL,
 	    check_cancelled, NULL);
 done:
+	got_pathlist_free(&paths);
 	free(cwd);
 	free(path);
 	return error;
