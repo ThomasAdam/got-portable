@@ -2318,7 +2318,7 @@ cmd_status(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *cwd = NULL, *path = NULL;
+	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	int ch, i;
 
@@ -2356,6 +2356,7 @@ cmd_status(int argc, char *argv[])
 			goto done;
 	} else if (argc >= 1) {
 		for (i = 0; i < argc; i++) {
+			char *path;
 			error = got_worktree_resolve_path(&path, worktree,
 			    argv[i]);
 			if (error)
@@ -2381,9 +2382,13 @@ cmd_status(int argc, char *argv[])
 	error = got_worktree_status(worktree, &paths, repo, print_status, NULL,
 	    check_cancelled, NULL);
 done:
+	if (argc >= 1) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, &paths, entry)
+			free((char *)pe->path);
+	}
 	got_pathlist_free(&paths);
 	free(cwd);
-	free(path);
 	return error;
 }
 
