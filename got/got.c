@@ -708,7 +708,8 @@ check_linear_ancestry(struct got_object_id *commit_id,
 
 static const struct got_error *
 check_same_branch(struct got_object_id *commit_id,
-    struct got_reference *head_ref, struct got_repository *repo)
+    struct got_reference *head_ref, struct got_object_id *yca_id,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL;
@@ -718,6 +719,15 @@ check_same_branch(struct got_object_id *commit_id,
 	err = got_ref_resolve(&head_commit_id, repo, head_ref);
 	if (err)
 		goto done;
+
+	if (got_object_id_cmp(head_commit_id, commit_id) == 0) {
+		is_same_branch = 1;
+		goto done;
+	}
+	if (yca_id && got_object_id_cmp(commit_id, yca_id) == 0) {
+		is_same_branch = 1;
+		goto done;
+	}
 
 	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
 	if (err)
@@ -743,6 +753,8 @@ check_same_branch(struct got_object_id *commit_id,
 		}
 
 		if (id) {
+			if (yca_id && got_object_id_cmp(id, yca_id) == 0)
+				break;
 			if (got_object_id_cmp(id, commit_id) == 0) {
 				is_same_branch = 1;
 				break;
@@ -933,7 +945,7 @@ cmd_checkout(int argc, char *argv[])
 			free(commit_id);
 			goto done;
 		}
-		error = check_same_branch(commit_id, head_ref, repo);
+		error = check_same_branch(commit_id, head_ref, NULL, repo);
 		if (error)
 			goto done;
 		error = got_worktree_set_base_commit_id(worktree, repo,
@@ -1185,7 +1197,7 @@ cmd_update(int argc, char *argv[])
 		free(head_commit_id);
 		if (error != NULL)
 			goto done;
-		error = check_same_branch(commit_id, head_ref, repo);
+		error = check_same_branch(commit_id, head_ref, NULL, repo);
 		if (error)
 			goto done;
 		error = switch_head_ref(head_ref, commit_id, worktree, repo);
@@ -1199,7 +1211,7 @@ cmd_update(int argc, char *argv[])
 				error = got_error(GOT_ERR_BRANCH_MOVED);
 			goto done;
 		}
-		error = check_same_branch(commit_id, head_ref, repo);
+		error = check_same_branch(commit_id, head_ref, NULL, repo);
 		if (error)
 			goto done;
 	}
@@ -3403,7 +3415,7 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = check_same_branch(commit_id, head_ref, repo);
+	error = check_same_branch(commit_id, head_ref, NULL, repo);
 	if (error) {
 		if (error->code != GOT_ERR_ANCESTRY)
 			goto done;
@@ -3518,7 +3530,7 @@ cmd_backout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = check_same_branch(commit_id, head_ref, repo);
+	error = check_same_branch(commit_id, head_ref, NULL, repo);
 	if (error)
 		goto done;
 
@@ -3925,9 +3937,28 @@ cmd_rebase(int argc, char *argv[])
 		error = got_ref_open(&branch, repo, argv[0], 0);
 		if (error != NULL)
 			goto done;
+	}
 
-		error = check_same_branch(
-		    got_worktree_get_base_commit_id(worktree), branch, repo);
+	error = got_ref_resolve(&branch_head_commit_id, repo, branch);
+	if (error)
+		goto done;
+
+	if (!continue_rebase) {
+		struct got_object_id *base_commit_id;
+
+		base_commit_id = got_worktree_get_base_commit_id(worktree);
+		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
+		    base_commit_id, branch_head_commit_id, repo);
+		if (error)
+			goto done;
+		if (yca_id == NULL) {
+			error = got_error_msg(GOT_ERR_ANCESTRY,
+			    "specified branch shares no common ancestry "
+			    "with work tree's branch");
+			goto done;
+		}
+
+		error = check_same_branch(base_commit_id, branch, yca_id, repo);
 		if (error) {
 			if (error->code != GOT_ERR_ANCESTRY)
 				goto done;
@@ -3938,25 +3969,6 @@ cmd_rebase(int argc, char *argv[])
 			    "is already contained in work tree's branch");
 			goto done;
 		}
-	}
-
-	error = got_ref_resolve(&branch_head_commit_id, repo, branch);
-	if (error)
-		goto done;
-
-	if (!continue_rebase) {
-		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-		    got_worktree_get_base_commit_id(worktree),
-		    branch_head_commit_id, repo);
-		if (error)
-			goto done;
-		if (yca_id == NULL) {
-			error = got_error_msg(GOT_ERR_ANCESTRY,
-			    "specified branch shares no common ancestry "
-			    "with work tree's branch");
-			goto done;
-		}
-
 		error = got_worktree_rebase_prepare(&new_base_branch,
 		    &tmp_branch, &fileindex, worktree, branch, repo);
 		if (error)
