@@ -623,7 +623,7 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 
 static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *, struct got_fileindex_entry **,
-    struct got_tree_object *, const char *, const char *,
+    const struct got_tree_entries *, const char *, const char *,
     struct got_repository *, struct got_fileindex_diff_tree_cb *, void *);
 
 static const struct got_error *
@@ -648,8 +648,9 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 			return err;
 		}
 
-		err = diff_fileindex_tree(fileindex, ie, subtree,
-		    subpath, entry_name, repo, cb, cb_arg);
+		err = diff_fileindex_tree(fileindex, ie,
+		    got_object_tree_get_entries(subtree), subpath, entry_name,
+		    repo, cb, cb_arg);
 		free(subpath);
 		got_object_tree_close(subtree);
 		if (err)
@@ -662,17 +663,15 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 
 static const struct got_error *
 diff_fileindex_tree(struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, struct got_tree_object *tree,
+    struct got_fileindex_entry **ie, const struct got_tree_entries *entries,
     const char *path, const char *entry_name, struct got_repository *repo,
     struct got_fileindex_diff_tree_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te = NULL;
 	size_t path_len = strlen(path);
-	const struct got_tree_entries *entries;
 	struct got_fileindex_entry *next;
 
-	entries = got_object_tree_get_entries(tree);
 	te = SIMPLEQ_FIRST(&entries->head);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || te) {
 		if (te && *ie) {
@@ -751,10 +750,13 @@ got_fileindex_diff_tree(struct got_fileindex *fileindex,
     struct got_repository *repo,
     struct got_fileindex_diff_tree_cb *cb, void *cb_arg)
 {
-	struct got_fileindex_entry *min;
-	min = RB_MIN(got_fileindex_tree, &fileindex->entries);
-	return diff_fileindex_tree(fileindex, &min, tree, path, entry_name,
-	    repo, cb, cb_arg);
+	struct got_fileindex_entry *ie;
+	ie = RB_MIN(got_fileindex_tree, &fileindex->entries);
+	while (ie && !got_path_is_child(ie->path, path, strlen(path)))
+		ie = walk_fileindex(fileindex, ie);
+	return diff_fileindex_tree(fileindex, &ie,
+	    got_object_tree_get_entries(tree), path, entry_name, repo,
+	    cb, cb_arg);
 }
 
 static const struct got_error *
