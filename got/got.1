@@ -632,9 +632,10 @@ of the specified
 .Ar branch
 has been rebased.
 .Pp
-Rebased commits are accumulated on a temporary branch and represent
-the same changes with the same log messages as their counterparts
-on the original
+Rebased commits are accumulated on a temporary branch which the work tree
+will remain switched to throughout the entire rebase operation.
+Commits on this branch represent the same changes with the same log
+messages as their counterparts on the original
 .Ar branch ,
 but with different commit IDs.
 Once rebasing has completed successfully, the temporary branch becomes
@@ -734,7 +735,8 @@ log message can be written.
 Every commit in the history being edited must be mentioned in the script.
 Lines may be re-ordered to change the order of commits in the edited history.
 .Pp
-Edited commits are accumulated on a temporary branch.
+Edited commits are accumulated on a temporary branch which the work tree
+will remain switched to throughout the entire histedit operation.
 Once history editing has completed successfully, the temporary branch becomes
 the new version of the work tree's branch and the work tree is automatically
 switched to it.
