@@ -419,6 +419,58 @@ function test_commit_dir_path {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_selected_paths {
+	local testroot=`test_init commit_selected_paths`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	echo "modified delta" > $testroot/wt/gamma/delta
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+
+	(cd $testroot/wt && got commit -m 'many paths' nonexistent alpha \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "commit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: nonexistent: bad path" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m 'many paths' \
+		beta new gamma > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  new" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "M  gamma/delta" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -430,3 +482,4 @@ run_test test_commit_single_file_multiple
 run_test test_commit_added_and_modified_in_same_dir
 run_test test_commit_path_prefix
 run_test test_commit_dir_path
+run_test test_commit_selected_paths

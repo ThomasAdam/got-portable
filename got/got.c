@@ -3139,7 +3139,8 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-m msg] [path]\n", getprogname());
+	fprintf(stderr, "usage: %s commit [-m msg] [path ...]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -3221,13 +3222,16 @@ cmd_commit(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
-	char *cwd = NULL, *path = NULL, *id_str = NULL;
+	char *cwd = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
 	const char *got_author = getenv("GOT_AUTHOR");
 	struct collect_commit_logmsg_arg cl_arg;
 	char *editor = NULL;
 	int ch, rebase_in_progress;
+	struct got_pathlist_head paths;
+
+	TAILQ_INIT(&paths);
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
 		switch (ch) {
@@ -3248,16 +3252,6 @@ cmd_commit(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc == 1) {
-		path = realpath(argv[0], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[0]);
-			goto done;
-		}
-		got_path_strip_trailing_slashes(path);
-	} else if (argc != 0)
-		usage_commit();
-
 	if (got_author == NULL) {
 		/* TODO: Look current user up in password database */
 		error = got_error(GOT_ERR_COMMIT_NO_AUTHOR);
@@ -3280,6 +3274,10 @@ cmd_commit(int argc, char *argv[])
 		error = got_error(GOT_ERR_REBASING);
 		goto done;
 	}
+
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
@@ -3307,7 +3305,7 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 6;
 	cl_arg.repo_path = got_repo_get_path(repo);
 	cl_arg.logmsg_path = NULL;
-	error = got_worktree_commit(&id, worktree, path, got_author, NULL,
+	error = got_worktree_commit(&id, worktree, &paths, got_author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
 		if (cl_arg.logmsg_path)
@@ -3328,7 +3326,6 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
-	free(path);
 	free(cwd);
 	free(id_str);
 	free(editor);

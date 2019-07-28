@@ -3340,7 +3340,7 @@ const struct got_error *
 commit_worktree(struct got_object_id **new_commit_id,
     struct got_pathlist_head *commitable_paths,
     struct got_object_id *head_commit_id, struct got_worktree *worktree,
-    const char *ondisk_path, const char *author, const char *committer,
+    const char *author, const char *committer,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
@@ -3465,9 +3465,34 @@ done:
 	return err;
 }
 
+static const struct got_error *
+check_path_is_commitable(const char *path,
+    struct got_pathlist_head *commitable_paths)
+{
+	struct got_pathlist_entry *cpe = NULL;
+	size_t path_len = strlen(path);
+
+	TAILQ_FOREACH(cpe, commitable_paths, entry) {
+		struct got_commitable *ct = cpe->data;
+		const char *ct_path = ct->path;
+
+		while (ct_path[0] == '/')
+			ct_path++;
+
+		if (strcmp(path, ct_path) == 0 ||
+		    got_path_is_child(ct_path, path, path_len))
+			break;
+	}
+
+	if (cpe == NULL)
+		return got_error_path(path, GOT_ERR_BAD_PATH);
+
+	return NULL;
+}
+
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
-    struct got_worktree *worktree, const char *ondisk_path,
+    struct got_worktree *worktree, struct got_pathlist_head *paths,
     const char *author, const char *committer,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -3475,7 +3500,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 {
 	const struct got_error *err = NULL, *unlockerr = NULL, *sync_err;
 	struct got_fileindex *fileindex = NULL;
-	char *fileindex_path = NULL, *relpath = NULL;
+	char *fileindex_path = NULL;
 	struct got_pathlist_head commitable_paths;
 	struct collect_commitables_arg cc_arg;
 	struct got_pathlist_entry *pe;
@@ -3498,21 +3523,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	if (ondisk_path) {
-		if (strcmp(ondisk_path, worktree->root_path) == 0) {
-			relpath = strdup("");
-			if (relpath == NULL) {
-				err = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else {
-			err = got_path_skip_common_ancestor(&relpath,
-			    worktree->root_path, ondisk_path);
-			if (err)
-				return err;
-		}
-	}
-
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
@@ -3520,14 +3530,22 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
-	err = worktree_status(worktree, relpath ? relpath : "",
-	    fileindex, repo, collect_commitables, &cc_arg, NULL, NULL);
-	if (err)
-		goto done;
+	TAILQ_FOREACH(pe, paths, entry) {
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+		    collect_commitables, &cc_arg, NULL, NULL);
+		if (err)
+			goto done;
+	}
 
 	if (TAILQ_EMPTY(&commitable_paths)) {
 		err = got_error(GOT_ERR_COMMIT_NO_CHANGES);
 		goto done;
+	}
+
+	TAILQ_FOREACH(pe, paths, entry) {
+		err = check_path_is_commitable(pe->path, &commitable_paths);
+		if (err)
+			goto done;
 	}
 
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
@@ -3538,7 +3556,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, worktree, ondisk_path, author, committer,
+	    head_commit_id, worktree, author, committer,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
@@ -3552,7 +3570,6 @@ done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
-	free(relpath);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
@@ -4088,7 +4105,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 		return got_error_from_errno("strdup");
 
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
-	    worktree, NULL, got_object_commit_get_author(orig_commit),
+	    worktree, got_object_commit_get_author(orig_commit),
 	    got_object_commit_get_committer(orig_commit),
 	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
 	if (err)

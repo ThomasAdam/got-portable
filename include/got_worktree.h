@@ -199,11 +199,10 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  * current base commit.
  * An author and a non-empty log message must be specified.
  * The name of the committer is optional (may be NULL).
- * If an on-disk path is specified, only commit changes at or within this path.
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
-    struct got_worktree *, const char *, const char *, const char *,
-    got_worktree_commit_msg_cb, void *,
+    struct got_worktree *, struct got_pathlist_head *, const char *,
+    const char *, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
 /* Get the path of a commitable worktree item. */
