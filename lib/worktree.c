@@ -3299,102 +3299,40 @@ check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
 	struct got_object_id *head_commit_id)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *id_in_head = NULL, *id = NULL;
+	struct got_object_id *id = NULL;
 	struct got_commit_object *commit = NULL;
-	char *path = NULL;
 	const char *ct_path = ct->in_repo_path;
 
 	while (ct_path[0] == '/')
 		ct_path++;
 
-	/*
-	 * Ensure that no modifications were made to files *and their parents*
-	 * in commits between the file's base commit and the branch head.
-	 *
-	 * Checking the parents is important for detecting conflicting tree
-	 * configurations (files or parent folders might have been moved,
-	 * deleted, added again, etc.). Such changes need to be merged with
-	 * local changes before a commit can occur.
-	 *
-	 * The implication is that the file's (parent) entry in the root
-	 * directory must have the same ID in all relevant commits.
-	 */
 	if (ct->status != GOT_STATUS_ADD) {
-		struct got_object_qid *pid;
-		char *slash;
-		struct got_object_id *root_entry_id = NULL;
-
 		/* Trivial case: base commit == head commit */
 		if (got_object_id_cmp(ct->base_commit_id, head_commit_id) == 0)
 			return NULL;
-
-		/* Compute the path to the root directory's entry. */
-		path = strdup(ct_path);
-		if (path == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		slash = strchr(path, '/');
-		if (slash)
-			*slash = '\0';
-
-		err = got_object_open_as_commit(&commit, repo, head_commit_id);
-		if (err)
-			goto done;
-
-		err = got_object_id_by_path(&root_entry_id, repo,
-		    head_commit_id, path);
-		if (err)
-			goto done;
-
-		pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-		while (pid) {
-			struct got_commit_object *pcommit;
-
-			err = got_object_id_by_path(&id, repo, pid->id, path);
-			if (err) {
-				if (err->code != GOT_ERR_NO_TREE_ENTRY)
-					goto done;
-				err = NULL;
-				break;
-			}
-
-			err = got_object_id_by_path(&id, repo, pid->id, path);
-			if (err)
+		/*
+		 * Ensure file content which local changes were based
+		 * on matches file content in the branch head.
+		 */
+		err = got_object_id_by_path(&id, repo, head_commit_id, ct_path);
+		if (err) {
+			if (err->code != GOT_ERR_NO_TREE_ENTRY)
 				goto done;
-
-			if (got_object_id_cmp(id, root_entry_id) != 0) {
-				err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
-				break;
-			}
-
-			if (got_object_id_cmp(pid->id, ct->base_commit_id) == 0)
-				break; /* all relevant commits scanned */
-
-			err = got_object_open_as_commit(&pcommit, repo,
-			    pid->id);
-			if (err)
-				goto done;
-
-			got_object_commit_close(commit);
-			commit = pcommit;
-			pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(
-			    commit));
-		}
+			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+			goto done;
+		} else if (got_object_id_cmp(id, ct->base_blob_id) != 0)
+			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
 	} else {
 		/* Require that added files don't exist in the branch head. */
-		err = got_object_id_by_path(&id_in_head, repo, head_commit_id,
-		    ct_path);
+		err = got_object_id_by_path(&id, repo, head_commit_id, ct_path);
 		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
-		err = id_in_head ? got_error(GOT_ERR_COMMIT_OUT_OF_DATE) : NULL;
+		err = id ? got_error(GOT_ERR_COMMIT_OUT_OF_DATE) : NULL;
 	}
 done:
 	if (commit)
 		got_object_commit_close(commit);
-	free(id_in_head);
 	free(id);
-	free(path);
 	return err;
 }
 

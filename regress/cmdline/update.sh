@@ -1459,6 +1459,10 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
+	echo "psi changed zeta with git" > $testroot/repo/epsilon/zeta
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "changing zeta with git"
+
 	echo "modified zeta" > $testroot/wt/epsilon/zeta
 	(cd $testroot/wt && got commit -m "changed zeta" > $testroot/stdout \
 		2> $testroot/stderr)
@@ -1475,6 +1479,8 @@ function test_update_bumps_base_commit_id {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
+	echo "U  epsilon/psi" > $testroot/stdout.expected
+	echo "C  epsilon/zeta" >> $testroot/stdout.expected
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
@@ -1485,6 +1491,9 @@ function test_update_bumps_base_commit_id {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	# resolve conflict
+	echo "modified zeta with got and git" > $testroot/wt/epsilon/zeta
 
 	(cd $testroot/wt && got commit -m "changed zeta" > $testroot/stdout)
 
