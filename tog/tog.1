@@ -103,7 +103,10 @@ Open a
 .Cm tree
 view showing the tree for the currently selected commit.
 .It Cm Backspace
-Show log entries for the parent directory of the currently selected path.
+Show log entries for the parent directory of the currently selected path,
+unless an active search is in progress in which case
+.Cm Backspace
+aborts the search.
 .It Cm /
 Prompt for a search pattern and start searching for matching commits.
 The search pattern is an extended regular expression which is matched
@@ -113,8 +116,14 @@ Regular expression syntax is documented in
 .Xr re_format 7 .
 .It Cm n
 Find the next commit which matches the current search pattern.
+Searching continues until either a match is found or the
+.Cm Backspace
+key is pressed.
 .It Cm N
 Find the previous commit which matches the current search pattern.
+Searching continues until either a match is found or the
+.Cm Backspace
+key is pressed.
 .It Cm Ctrl+l
 Reload the log view with new commits found in the repository.
 .El

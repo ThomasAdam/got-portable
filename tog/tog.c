@@ -1755,6 +1755,10 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	if (s->search_entry) {
+		if (wgetch(view->window) == KEY_BACKSPACE) {
+			view->search_next_done = 1;
+			return NULL;
+		}
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(s->search_entry, entry);
 		else
