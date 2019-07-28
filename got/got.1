@@ -519,6 +519,15 @@ option,
 .Cm got commit
 opens a temporary file in an editor where a log message can be written.
 .El
+.Pp
+.Cm got commit
+will refuse to run if certain preconditions are not met.
+Local changes may only be committed if they are based on file content
+found in the most recent commit on the work tree's branch.
+If a path is found to be out of date,
+.Cm got update
+must be used first in order to merge local changes with changes made
+in the repository.
 .It Cm ci
 Short alias for
 .Cm commit .
