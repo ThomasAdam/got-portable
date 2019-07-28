@@ -955,7 +955,7 @@ cmd_checkout(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_pathlist_append(NULL, &paths, "", NULL);
+	error = got_pathlist_append(&paths, "", NULL);
 	if (error)
 		goto done;
 	error = got_worktree_checkout_files(worktree, &paths, repo,
@@ -1074,14 +1074,14 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 		path = strdup("");
 		if (path == NULL)
 			return got_error_from_errno("strdup");
-		return got_pathlist_append(NULL, paths, path, NULL);
+		return got_pathlist_append(paths, path, NULL);
 	}
 
 	for (i = 0; i < argc; i++) {
 		err = got_worktree_resolve_path(&path, worktree, argv[i]);
 		if (err)
 			break;
-		err = got_pathlist_append(NULL, paths, path, NULL);
+		err = got_pathlist_append(paths, path, NULL);
 		if (err) {
 			free(path);
 			break;
@@ -1862,7 +1862,7 @@ cmd_diff(int argc, char *argv[])
 		arg.id_str = id_str;
 		arg.header_shown = 0;
 
-		error = got_pathlist_append(NULL, &paths, path, NULL);
+		error = got_pathlist_append(&paths, path, NULL);
 		if (error)
 			goto done;
 

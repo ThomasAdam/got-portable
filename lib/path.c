@@ -254,8 +254,8 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 }
 
 const struct got_error *
-got_pathlist_append(struct got_pathlist_entry **pe,
-    struct got_pathlist_head *pathlist, const char *path, void *data)
+got_pathlist_append(struct got_pathlist_head *pathlist,
+    const char *path, void *data)
 {
 	struct got_pathlist_entry *new;
 
@@ -265,8 +265,6 @@ got_pathlist_append(struct got_pathlist_entry **pe,
 	new->path = path;
 	new->data = data;
 	TAILQ_INSERT_TAIL(pathlist, new, entry);
-	if (pe)
-		*pe = new;
 	return NULL;
 }
 

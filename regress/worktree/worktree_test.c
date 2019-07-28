@@ -378,7 +378,7 @@ worktree_checkout(const char *repo_path)
 	if (err != NULL)
 		goto done;
 
-	err = got_pathlist_append(NULL, &paths, "", NULL);
+	err = got_pathlist_append(&paths, "", NULL);
 	if (err)
 		goto done;
 	err = got_worktree_checkout_files(worktree, &paths, repo, progress_cb,
