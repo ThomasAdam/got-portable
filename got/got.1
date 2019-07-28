@@ -923,8 +923,11 @@ branch:
 .Dl $ got update -c master
 .Dl $ got histedit
 .Pp
-Additional steps are required if local changes need to be pushed back
-to the remote repository.
+Additional steps are necessary if local changes need to be pushed back
+to the remote repository, which currently requires
+.Cm git fetch
+and
+.Cm git push .
 Before working against existing branches in a repository cloned with
 .Dq git clone --bare ,
 a Git
