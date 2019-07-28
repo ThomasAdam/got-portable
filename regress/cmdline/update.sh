@@ -1459,7 +1459,7 @@ function test_update_bumps_base_commit_id {
 		return 1
 	fi
 
-	echo "psi changed zeta with git" > $testroot/repo/epsilon/zeta
+	echo "changed zeta with git" > $testroot/repo/epsilon/zeta
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "changing zeta with git"
 
