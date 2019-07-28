@@ -923,6 +923,74 @@ branch:
 .Dl $ got update -c master
 .Dl $ got histedit
 .Pp
+Additional steps are required if local changes need to be pushed back
+to the remote repository.
+Before working against existing branches in a repository cloned with
+.Dq git clone --bare ,
+a Git
+.Dq refspec
+must be configured to map all references in the remote repository
+into the
+.Dq refs/remotes
+namespace of the local repository.
+This can achieved by setting Git's
+.Pa remote.origin.fetch
+configuration variable to the value
+.Dq +refs/heads/*:refs/remotes/origin/*
+with the
+.Cm git config
+command:
+.Pp
+.Dl $ cd /var/git/repo
+.Dl $ git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+.Pp
+Alternatively, the following
+.Pa fetch
+configuration item can be added manually to the Git repository's
+.Pa config
+file:
+.Pp
+.Dl [remote "origin"]
+.Dl url = ...
+.Dl fetch = +refs/heads/*:refs/remotes/origin/*
+.Pp
+This configuration leaves the entire
+.Dq refs/heads
+namespace free for use by local branches checked out with
+.Cm got checkout
+and, if needed, created with
+.Cm got branch .
+.Pp
+Branches in the
+.Dq remotes/origin
+namespace can be updated with incoming changes from the remote
+repository with
+.Cm git fetch :
+.Pp
+.Dl $ cd /var/git/repo
+.Dl $ git fetch
+.Pp
+Before outgoing changes on the local
+.Dq master
+branch can be pushed to the remote repository, the local
+.Dq master
+branch must be rebased onto the
+.Dq origin/master
+branch:
+.Pp
+.Dl $ got update -b origin/master
+.Dl $ got rebase master
+.Pp
+Changes on the local
+.Dq master
+branch can then be pushed to the remote
+repository with
+.Cm git push :
+.Pp
+.Dl $ cd /var/git/repo
+.Dl $ git push origin master
+.Pp
+.Pp
 .Sh SEE ALSO
 .Xr tog 1 ,
 .Xr git-repository 5 ,
@@ -936,18 +1004,5 @@ branch:
 is a work-in-progress and many commands remain to be implemented.
 At present, the user has to fall back on
 .Xr git 1
-to perform tasks related to repository administration and tasks
-which require a network connection.
-.Pp
-When working against a repository created with
-.Dq git clone --bare ,
-local commits to the
-.Dq master
-branch are discouraged, for now, if changes committed to the upstream
-repository need to be tracked.
-See the EXAMPLES section.
-Future built-in
-.Cm clone
-and
-.Cm fetch
-commands should alleviate this problem.
+to perform many tasks, in particular tasks related to repository
+administration and tasks which require a network connection.
