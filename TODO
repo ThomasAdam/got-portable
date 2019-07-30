@@ -17,6 +17,8 @@ got:
 - recursive removal: got rm -R
 - recursive revert: got revert -R
 - add 'got stage' command with 'git add -p' style functionality
+- add 'got unstage' command to undo effects of 'got stage'
+- add 'git checkout -p' style functionality to 'got revert' and 'got unstage'
 
 tog:
 - implement horizonal scrolling in all views
