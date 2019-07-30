@@ -2861,6 +2861,8 @@ cmd_branch(int argc, char *argv[])
 			base_branch = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
+			if (strncmp(base_branch, "refs/heads/", 11) == 0)
+				base_branch += 11;
 		} else
 			base_branch = argv[1];
 		error = add_branch(repo, argv[0], base_branch);

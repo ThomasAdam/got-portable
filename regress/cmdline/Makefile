@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log add rm diff blame commit \
+REGRESS_TARGETS=checkout update status log add rm diff blame branch commit \
 	cherrypick backout rebase import histedit
 NOOBJ=Yes
 
@@ -25,6 +25,9 @@ diff:
 
 blame:
 	./blame.sh
+
+branch:
+	./branch.sh
 
 commit:
 	./commit.sh
