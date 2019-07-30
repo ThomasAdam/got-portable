@@ -1039,6 +1039,62 @@ function test_histedit_path_prefix_edit {
 	test_done "$testroot" "$ret"
 }
 
+function test_histedit_outside_refs_heads {
+	local testroot=`test_init histedit_outside_refs_heads`
+	local commit1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -m 'change alpha' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local commit2=`git_show_head $testroot/repo`
+
+	got ref -r $testroot/repo refs/remotes/origin/master master
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got ref failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update -b origin/master -c $commit1 >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edit $commit2" > $testroot/histedit-script
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		2> $testroot/stderr)
+
+	echo -n "got: will not edit commit history of a branch outside the " \
+		> $testroot/stderr.expected
+	echo '"refs/heads/" reference namespace' \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -1049,3 +1105,4 @@ run_test test_histedit_missing_commit
 run_test test_histedit_abort
 run_test test_histedit_path_prefix_drop
 run_test test_histedit_path_prefix_edit
+run_test test_histedit_outside_refs_heads

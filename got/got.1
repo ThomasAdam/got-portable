@@ -769,6 +769,9 @@ when the histedit operation continues.
 .Pp
 .Cm got histedit
 will refuse to run if certain preconditions are not met.
+If the work tree's current branch is not in the
+.Dq refs/heads/
+reference namespace, the history of the branch may not be edited.
 If the work tree contains multiple base commits it must first be updated
 to a single base commit with
 .Cm got update .

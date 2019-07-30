@@ -4956,6 +4956,13 @@ cmd_histedit(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 
+		if (strncmp(got_ref_get_name(branch), "refs/heads/", 11) != 0) {
+			error = got_error_msg(GOT_ERR_COMMIT_BRANCH,
+			    "will not edit commit history of a branch outside "
+			    "the \"refs/heads/\" reference namespace");
+			goto done;
+		}
+
 		error = got_ref_resolve(&head_commit_id, repo, branch);
 		got_ref_close(branch);
 		branch = NULL;
