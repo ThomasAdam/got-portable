@@ -1,5 +1,7 @@
 .PATH:${.CURDIR}/../lib
 
+.include "../got-version.mk"
+
 PROG=		tog
 SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
@@ -7,9 +9,10 @@ SRCS=		tog.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
 		utf8.c inflate.c buf.c worklist.c rcsutil.c diff3.c \
 		lockfile.c deflate.c object_create.c
+MAN =		${PROG}.1
 
-CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
-	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
+CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
+
 .if defined(PROFILE)
 LDADD = -lpanel_p -lncursesw_p -lutil_p -lz_p -lpthread_p -lc_p
 .else
@@ -17,13 +20,12 @@ LDADD = -lpanel -lncursesw -lutil -lz -lpthread
 .endif
 DPADD = ${LIBZ} ${LIBUTIL}
 
-# For now, default to installing binary in ~/bin
-GROUP!=id -g -n
-install:
-	${INSTALL} ${INSTALL_COPY} -o ${USER} -g ${GROUP} \
-	-m ${BINMODE} ${PROG} ${HOME}/bin/${PROG}
-
-# Don't install man pages yet
+.if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
+.endif
+
+realinstall:
+	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
+	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}
 
 .include <bsd.prog.mk>

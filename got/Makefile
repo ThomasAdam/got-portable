@@ -1,5 +1,7 @@
 .PATH:${.CURDIR}/../lib
 
+.include "../got-version.mk"
+
 PROG=		got
 SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		diffreg.c error.c fileindex.c object.c object_cache.c \
@@ -7,9 +9,9 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c diffoffset.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
 		inflate.c buf.c worklist.c rcsutil.c diff3.c lockfile.c \
 		deflate.c object_create.c
+MAN =		${PROG}.1 got-worktree.5 git-repository.5
 
-CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib \
-	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
+CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 
 .if defined(PROFILE)
 LDADD = -lutil_p -lz_p -lc_p
@@ -18,13 +20,16 @@ LDADD = -lutil -lz
 .endif
 DPADD = ${LIBZ} ${LIBUTIL}
 
-# For now, default to installing binary in ~/bin
-GROUP!=id -g -n
-install:
-	${INSTALL} ${INSTALL_COPY} -o ${USER} -g ${GROUP} \
-	-m ${BINMODE} ${PROG} ${HOME}/bin/${PROG}
-
-# Don't install man pages yet
+.if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
+.endif
+
+realinstall:
+	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
+	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}
+
+dist:
+	mkdir ../got-${GOT_VERSION}/got
+	cp ${SRCS} ${MAN} ../got-${GOT_VERSION}/got
 
 .include <bsd.prog.mk>

@@ -38,6 +38,7 @@
 #include <libgen.h>
 #include <regex.h>
 
+#include "got_version.h"
 #include "got_error.h"
 #include "got_object.h"
 #include "got_reference.h"
@@ -4510,7 +4511,8 @@ list_commands(void)
 __dead static void
 usage(int hflag)
 {
-	fprintf(stderr, "usage: %s [-h] [command] [arg ...]\n", getprogname());
+	fprintf(stderr, "usage: %s [-h] [-V] [command] [arg ...]\n",
+	    getprogname());
 	if (hflag)
 		list_commands();
 	exit(1);
@@ -4542,15 +4544,18 @@ main(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct tog_cmd *cmd = NULL;
-	int ch, hflag = 0;
+	int ch, hflag = 0, Vflag = 0;
 	char **cmd_argv = NULL;
 
 	setlocale(LC_CTYPE, "");
 
-	while ((ch = getopt(argc, argv, "h")) != -1) {
+	while ((ch = getopt(argc, argv, "hV")) != -1) {
 		switch (ch) {
 		case 'h':
 			hflag = 1;
+			break;
+		case 'V':
+			Vflag = 1;
 			break;
 		default:
 			usage(hflag);
@@ -4562,6 +4567,11 @@ main(int argc, char *argv[])
 	argv += optind;
 	optind = 0;
 	optreset = 1;
+
+	if (Vflag) {
+		got_version_print_str();
+		return 1;
+	}
 
 	if (argc == 0) {
 		if (hflag)

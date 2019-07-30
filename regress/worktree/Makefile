@@ -7,8 +7,7 @@ SRCS = worktree.c repository.c object.c object_cache.c object_idset.c \
 	buf.c worklist.c rcsutil.c diff.c diffreg.c diff3.c lockfile.c \
 	deflate.c object_create.c worktree_test.c
 
-CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib \
-	-DGOT_LIBEXECDIR=${GOT_LIBEXECDIR}
+CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
 LDADD = -lutil -lz
 
 NOMAN = yes

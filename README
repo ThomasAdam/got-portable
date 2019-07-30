@@ -12,14 +12,17 @@ To compile the Got tool suite on OpenBSD, run:
 
  $ make obj
  $ make
- $ mkdir ~/bin
  $ make install
 
-This will install the following commands to ~/bin:
+This will install the following commands:
 
- got (command line interface)
- tog (ncurses interface)
- and several helper programs from the libexec directory
+ got, the command line interface
+ tog, an ncurses-based interactive Git repository browser
+ several helper programs from the libexec directory
+ man pages (only installed if building sources from a Got release tarball)
+
+A Got release tarball will install files under /usr/local by default.
+A build started in Got's Git repository will install files under ~/bin.
 
 Tests will pass only after 'make install' because they rely on installed
 binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
@@ -27,7 +30,7 @@ binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
  $ doas pkg_add git
  $ make regress
 
-Man pages are not installed yet but can be viewed with mandoc:
+Man page files in the Got source tree can be viewed with 'man -l':
 
  $ man -l got/got.1
  $ man -l got/git-repository.5
