@@ -13,7 +13,6 @@ lib:
 
 got:
 - 'histedit -c' prompts for log message even if there are no changes to commit
-- allow adding directory paths with 'got add'
 - recursive addition: got add -R
 - recursive removal: got rm -R
 - recursive revert: got revert -R
