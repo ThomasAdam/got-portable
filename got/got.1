@@ -522,6 +522,9 @@ opens a temporary file in an editor where a log message can be written.
 .Pp
 .Cm got commit
 will refuse to run if certain preconditions are not met.
+If the work tree's current branch is not in the
+.Dq refs/heads/
+reference namespace, new commits may not be created on this branch.
 Local changes may only be committed if they are based on file content
 found in the most recent commit on the work tree's branch.
 If a path is found to be out of date,

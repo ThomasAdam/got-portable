@@ -113,6 +113,7 @@
 #define GOT_ERR_HISTEDIT_CMD	97
 #define GOT_ERR_HISTEDIT_PATH	98
 #define GOT_ERR_NO_MERGED_PATHS 99
+#define GOT_ERR_COMMIT_BRANCH	100
 
 static const struct got_error {
 	int code;
@@ -227,6 +228,8 @@ static const struct got_error {
 	{ GOT_ERR_HISTEDIT_PATH, "cannot edit branch history which contains "
 	    "changes outside of this work tree's path prefix" },
 	{ GOT_ERR_NO_MERGED_PATHS, "empty list of merged paths" },
+	{ GOT_ERR_COMMIT_BRANCH, "will not commit to a branch outside the "
+	    "\"refs/heads/\" reference namespace" },
 };
 
 /*

@@ -3228,7 +3228,7 @@ cmd_commit(int argc, char *argv[])
 	const char *got_author = getenv("GOT_AUTHOR");
 	struct collect_commit_logmsg_arg cl_arg;
 	char *editor = NULL;
-	int ch, rebase_in_progress;
+	int ch, rebase_in_progress, histedit_in_progress;
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
@@ -3275,6 +3275,11 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_worktree_histedit_in_progress(&histedit_in_progress,
+	    worktree);
+	if (error)
+		goto done;
+
 	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
@@ -3299,10 +3304,13 @@ cmd_commit(int argc, char *argv[])
 	cl_arg.cmdline_log = logmsg;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
 	cl_arg.branch_name = got_worktree_get_head_ref_name(worktree);
-	if (strncmp(cl_arg.branch_name, "refs/", 5) == 0)
-		cl_arg.branch_name += 5;
-	if (strncmp(cl_arg.branch_name, "heads/", 6) == 0)
-		cl_arg.branch_name += 6;
+	if (!histedit_in_progress) {
+		if (strncmp(cl_arg.branch_name, "refs/heads/", 11) != 0) {
+			error = got_error(GOT_ERR_COMMIT_BRANCH);
+			goto done;
+		}
+		cl_arg.branch_name += 11;
+	}
 	cl_arg.repo_path = got_repo_get_path(repo);
 	cl_arg.logmsg_path = NULL;
 	error = got_worktree_commit(&id, worktree, &paths, got_author, NULL,

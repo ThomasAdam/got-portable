@@ -471,6 +471,52 @@ function test_commit_selected_paths {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_outside_refs_heads {
+	local testroot=`test_init commit_outside_refs_heads`
+
+	got ref -r $testroot/repo refs/remotes/origin/master master
+
+	got checkout -b refs/remotes/origin/master \
+	    $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -m 'change alpha' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "commit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: will not commit to a branch outside the " \
+		> $testroot/stderr.expected
+	echo '"refs/heads/" reference namespace' \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -483,3 +529,4 @@ run_test test_commit_added_and_modified_in_same_dir
 run_test test_commit_path_prefix
 run_test test_commit_dir_path
 run_test test_commit_selected_paths
+run_test test_commit_outside_refs_heads
