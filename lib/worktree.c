@@ -2207,7 +2207,8 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
 
-	if (got_path_cmp(parent_path, a->status_path) != 0 &&
+	if (got_path_cmp(parent_path, a->status_path,
+	    strlen(parent_path), a->status_path_len) != 0 &&
 	    !got_path_is_child(parent_path, a->status_path, a->status_path_len))
 		return NULL;
 

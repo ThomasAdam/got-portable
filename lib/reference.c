@@ -639,8 +639,10 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 	 */
 	re = SIMPLEQ_FIRST(refs);
 	while (re) {
-		cmp = got_path_cmp(got_ref_get_name(re->ref),
-		    got_ref_get_name(new->ref));
+		const char *name = got_ref_get_name(re->ref);
+		const char *new_name = got_ref_get_name(new->ref);
+		cmp = got_path_cmp(name, new_name, strlen(name),
+		    strlen(new_name));
 		if (cmp == 0) {
 			/* duplicate */
 			free(new->id);

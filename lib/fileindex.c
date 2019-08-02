@@ -548,6 +548,8 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 		goto done;
 
 	err = read_fileindex_path(&entry->path, ctx, infile);
+	if (err == NULL)
+		entry->path_len = strlen(entry->path);
 done:
 	if (err)
 		got_fileindex_entry_free(entry);
@@ -695,7 +697,8 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 				err = got_error_from_errno("asprintf");
 				break;
 			}
-			cmp = got_path_cmp((*ie)->path, te_path);
+			cmp = got_path_cmp((*ie)->path, te_path,
+			    (*ie)->path_len, strlen(te_path));
 			free(te_path);
 			if (cmp == 0) {
 				if (got_path_is_child((*ie)->path, path,
@@ -914,7 +917,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				err = got_error_from_errno("asprintf");
 				break;
 			}
-			cmp = got_path_cmp((*ie)->path, de_path);
+			cmp = got_path_cmp((*ie)->path, de_path,
+			    (*ie)->path_len, strlen(path) + 1 + de->d_namlen);
 			free(de_path);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, de, path);

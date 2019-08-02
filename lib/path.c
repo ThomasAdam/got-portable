@@ -159,10 +159,8 @@ got_path_is_child(const char *child, const char *parent, size_t parent_len)
 }
 
 int
-got_path_cmp(const char *path1, const char *path2)
+got_path_cmp(const char *path1, const char *path2, size_t len1, size_t len2)
 {
-	size_t len1 = strlen(path1);
-	size_t len2 = strlen(path2);
 	size_t min_len = MIN(len1, len2);
 	size_t i = 0;
 
@@ -234,7 +232,8 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	 */
 	pe = TAILQ_LAST(pathlist, got_pathlist_head);
 	while (pe) {
-		int cmp = got_path_cmp(pe->path, path);
+		int cmp = got_path_cmp(pe->path, path,
+		    strlen(pe->path), strlen(path));
 		if (cmp == 0) {
 			free(new); /* duplicate */
 			return NULL;

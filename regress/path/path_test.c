@@ -84,7 +84,8 @@ path_cmp(void)
 		const char *path1 = test_data[i].path1;
 		const char *path2 = test_data[i].path2;
 		int expected = test_data[i].expected;
-		int cmp = got_path_cmp(path1, path2);
+		int cmp = got_path_cmp(path1, path2,
+		    strlen(path1), strlen(path2));
 
 		if (cmp != expected) {
 			test_printf("%d: '%s' vs '%s' == %d; expected %d\n",

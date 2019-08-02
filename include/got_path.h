@@ -51,9 +51,9 @@ int got_path_is_child(const char *, const char *, size_t);
 
 /*
  * Like strcmp() but orders children in subdirectories directly after
- * their parents.
+ * their parents. String lengths must also be passed in.
  */
-int got_path_cmp(const char *, const char *);
+int got_path_cmp(const char *, const char *, size_t, size_t);
 
 /*
  * Path lists allow for predictable concurrent iteration over multiple lists

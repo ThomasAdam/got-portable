@@ -55,6 +55,7 @@ struct got_fileindex_entry {
 	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
 	char *path;
+	size_t path_len; /* strlen(path) -- kept in memory only! */
 
 	/* More data could be here if F_EXTENDED is set; To be determined... */
 };
@@ -73,7 +74,7 @@ static inline int
 got_fileindex_cmp(const struct got_fileindex_entry *e1,
     const struct got_fileindex_entry *e2)
 {
-	return got_path_cmp(e1->path, e2->path);
+	return got_path_cmp(e1->path, e2->path, e1->path_len, e2->path_len);
 }
 
 RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);
