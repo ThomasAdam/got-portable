@@ -549,7 +549,7 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 	err = read_fileindex_path(&entry->path, ctx, infile);
 done:
 	if (err)
-		free(entry);
+		got_fileindex_entry_free(entry);
 	else
 		*entryp = entry;
 	return err;
