@@ -161,17 +161,19 @@ got_path_is_child(const char *child, const char *parent, size_t parent_len)
 int
 got_path_cmp(const char *path1, const char *path2, size_t len1, size_t len2)
 {
-	size_t min_len = MIN(len1, len2);
+	size_t min_len;
 	size_t i = 0;
 
 	/* Leading directory separators are insignificant. */
-	while (path1[0] == '/')
+	while (path1[0] == '/') {
 		path1++;
-	while (path2[0] == '/')
+		len1--;
+	}
+	while (path2[0] == '/') {
 		path2++;
+		len2--;
+	}
 
-	len1 = strlen(path1);
-	len2 = strlen(path2);
 	min_len = MIN(len1, len2);
 
 	/* Skip over common prefix. */
