@@ -455,30 +455,31 @@ static const struct got_error *
 read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 {
 	const struct got_error *err = NULL;
-	uint8_t buf[8];
-	size_t n, len = 0, totlen = sizeof(buf);
+	const size_t chunk_size = 8;
+	size_t n, len = 0, totlen = chunk_size;
 
 	*path = malloc(totlen);
 	if (*path == NULL)
 		return got_error_from_errno("malloc");
 
 	do {
-		n = fread(buf, 1, sizeof(buf), infile);
-		if (n != sizeof(buf))
-			return got_ferror(infile, GOT_ERR_FILEIDX_BAD);
-		if (len + sizeof(buf) > totlen) {
-			char *p = reallocarray(*path, totlen + sizeof(buf), 1);
+		if (len + chunk_size > totlen) {
+			char *p = reallocarray(*path, totlen + chunk_size, 1);
 			if (p == NULL) {
 				err = got_error_from_errno("reallocarray");
 				break;
 			}
-			totlen += sizeof(buf);
+			totlen += chunk_size;
 			*path = p;
 		}
-		SHA1Update(ctx, buf, sizeof(buf));
-		memcpy(*path + len, buf, sizeof(buf));
-		len += sizeof(buf);
-	} while (memchr(buf, '\0', sizeof(buf)) == NULL);
+		n = fread(*path + len, 1, chunk_size, infile);
+		if (n != chunk_size) {
+			err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+			break;
+		}
+		SHA1Update(ctx, *path + len, chunk_size);
+		len += chunk_size;
+	} while (memchr(*path + len - chunk_size, '\0', chunk_size) == NULL);
 
 	if (err) {
 		free(*path);
