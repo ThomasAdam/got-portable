@@ -1849,7 +1849,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		bbc_arg.base_commit_id = worktree->base_commit_id;
 		bbc_arg.entry_name = tpd->entry_name;
 		bbc_arg.path = pe->path;
-		bbc_arg.path_len = strlen(pe->path);
+		bbc_arg.path_len = pe->path_len;
 		bbc_arg.progress_cb = progress_cb;
 		bbc_arg.progress_arg = progress_arg;
 		err = got_fileindex_for_each_entry_safe(fileindex,

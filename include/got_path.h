@@ -63,6 +63,7 @@ int got_path_cmp(const char *, const char *, size_t, size_t);
 struct got_pathlist_entry {
 	TAILQ_ENTRY(got_pathlist_entry) entry;
 	const char *path;
+	size_t path_len;
 	void *data; /* data pointer provided to got_pathlist_insert() */
 };
 TAILQ_HEAD(got_pathlist_head, got_pathlist_entry);

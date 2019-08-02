@@ -1193,7 +1193,7 @@ cmd_update(int argc, char *argv[])
 	if (branch_name) {
 		struct got_object_id *head_commit_id;
 		TAILQ_FOREACH(pe, &paths, entry) {
-			if (strlen(pe->path) == 0)
+			if (pe->path_len == 0)
 				continue;
 			error = got_error_msg(GOT_ERR_BAD_PATH,
 			    "switching between branches requires that "

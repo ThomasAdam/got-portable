@@ -221,6 +221,7 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	if (new == NULL)
 		return got_error_from_errno("malloc");
 	new->path = path;
+	new->path_len = strlen(path);
 	new->data = data;
 
 	/*
@@ -232,8 +233,8 @@ got_pathlist_insert(struct got_pathlist_entry **inserted,
 	 */
 	pe = TAILQ_LAST(pathlist, got_pathlist_head);
 	while (pe) {
-		int cmp = got_path_cmp(pe->path, path,
-		    strlen(pe->path), strlen(path));
+		int cmp = got_path_cmp(pe->path, new->path,
+		    pe->path_len, new->path_len);
 		if (cmp == 0) {
 			free(new); /* duplicate */
 			return NULL;
@@ -262,6 +263,7 @@ got_pathlist_append(struct got_pathlist_head *pathlist,
 	if (new == NULL)
 		return got_error_from_errno("malloc");
 	new->path = path;
+	new->path_len = strlen(path);
 	new->data = data;
 	TAILQ_INSERT_TAIL(pathlist, new, entry);
 	return NULL;
