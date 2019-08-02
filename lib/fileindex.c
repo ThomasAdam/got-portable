@@ -204,12 +204,13 @@ got_fileindex_entry_remove(struct got_fileindex *fileindex,
 }
 
 struct got_fileindex_entry *
-got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
+got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path,
+    size_t path_len)
 {
 	struct got_fileindex_entry key;
 	memset(&key, 0, sizeof(key));
 	key.path = (char *)path;
-	key.path_len = strlen(path);
+	key.path_len = path_len;
 	return RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
 }
 

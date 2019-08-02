@@ -106,7 +106,7 @@ const struct got_error *got_fileindex_entry_add(struct got_fileindex *,
 void got_fileindex_entry_remove(struct got_fileindex *,
     struct got_fileindex_entry *);
 struct got_fileindex_entry *got_fileindex_entry_get(struct got_fileindex *,
-    const char *);
+    const char *, size_t);
 const struct got_error *got_fileindex_read(struct got_fileindex *, FILE *);
 typedef const struct got_error *(*got_fileindex_cb)(void *,
     struct got_fileindex_entry *);

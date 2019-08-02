@@ -865,7 +865,7 @@ update_blob_fileindex_entry(struct got_worktree *worktree,
 	const struct got_error *err = NULL;
 
 	if (ie == NULL)
-		ie = got_fileindex_entry_get(fileindex, path);
+		ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
 		err = got_fileindex_entry_update(ie, ondisk_path,
 		    blob->id.sha1, worktree->base_commit_id->sha1,
@@ -1908,7 +1908,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 	int local_changes_subsumed;
 
 	if (blob1 && blob2) {
-		ie = got_fileindex_entry_get(a->fileindex, path2);
+		ie = got_fileindex_entry_get(a->fileindex, path2,
+		    strlen(path2));
 		if (ie == NULL)
 			return (*a->progress_cb)(a->progress_arg,
 			    GOT_STATUS_MISSING, path2);
@@ -1938,7 +1939,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    ondisk_path, path2, sb.st_mode, blob2, a->commit_id2, repo,
 		    a->progress_cb, a->progress_arg);
 	} else if (blob1) {
-		ie = got_fileindex_entry_get(a->fileindex, path1);
+		ie = got_fileindex_entry_get(a->fileindex, path1,
+		    strlen(path1));
 		if (ie == NULL)
 			return (*a->progress_cb)(a->progress_arg,
 			    GOT_STATUS_MISSING, path2);
@@ -1992,7 +1994,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
 		    path2) == -1)
 			return got_error_from_errno("asprintf");
-		ie = got_fileindex_entry_get(a->fileindex, path2);
+		ie = got_fileindex_entry_get(a->fileindex, path2,
+		    strlen(path2));
 		if (ie) {
 			err = get_file_status(&status, &sb, ie, ondisk_path,
 			    repo);
@@ -2291,7 +2294,7 @@ void *status_arg, struct got_repository *repo)
 	struct got_fileindex_entry *ie;
 	struct stat sb;
 
-	ie = got_fileindex_entry_get(fileindex, path);
+	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
 		return report_file_status(ie, ondisk_path, status_cb,
 		    status_arg, repo);
@@ -2448,7 +2451,7 @@ schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
 	struct got_fileindex_entry *ie;
 
 	/* Re-adding an existing entry is a no-op. */
-	if (got_fileindex_entry_get(fileindex, relpath) != NULL)
+	if (got_fileindex_entry_get(fileindex, relpath, strlen(relpath)))
 		return NULL;
 
 	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
@@ -2519,7 +2522,7 @@ schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
 	unsigned char status;
 	struct stat sb;
 
-	ie = got_fileindex_entry_get(fileindex, relpath);
+	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
@@ -2609,7 +2612,7 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		goto done;
 
-	ie = got_fileindex_entry_get(fileindex, relpath);
+	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
 	if (ie == NULL) {
 		err = got_error(GOT_ERR_BAD_PATH);
 		goto done;
@@ -3272,7 +3275,7 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 		struct got_fileindex_entry *ie;
 		struct got_commitable *ct = pe->data;
 
-		ie = got_fileindex_entry_get(fileindex, pe->path);
+		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
 		if (ie) {
 			if (ct->status == GOT_STATUS_DELETE) {
 				got_fileindex_entry_remove(fileindex, ie);
