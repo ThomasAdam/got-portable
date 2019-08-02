@@ -139,7 +139,8 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 		return err;
 	}
 
-	len = strlen(relpath);
+	(*entry)->path_len = strlen(relpath);
+	len = (*entry)->path_len;
 	if (len > GOT_FILEIDX_F_PATH_LEN)
 		len = GOT_FILEIDX_F_PATH_LEN;
 	(*entry)->flags |= len;
@@ -208,6 +209,7 @@ got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path)
 	struct got_fileindex_entry key;
 	memset(&key, 0, sizeof(key));
 	key.path = (char *)path;
+	key.path_len = strlen(path);
 	return RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
 }
 
