@@ -95,6 +95,7 @@ __dead static void	usage_cherrypick(void);
 __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
 __dead static void	usage_histedit(void);
+__dead static void	usage_stage(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
@@ -115,6 +116,7 @@ static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
 static const struct got_error*		cmd_histedit(int, char *[]);
+static const struct got_error*		cmd_stage(int, char *[]);
 
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
@@ -136,6 +138,7 @@ static struct got_cmd got_commands[] = {
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
 	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
+	{ "stage",	cmd_stage,	usage_stage,	"sg" },
 };
 
 static void
@@ -5148,5 +5151,110 @@ done:
 		got_worktree_close(worktree);
 	if (repo)
 		got_repo_close(repo);
+	return error;
+}
+
+__dead static void
+usage_stage(void)
+{
+	fprintf(stderr, "usage: %s stage file-path ...\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_stage(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	const char *worktree_path;
+	int ch, x;
+
+	TAILQ_INIT(&paths);
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_stage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	if (argc < 1)
+		usage_stage();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	worktree_path = got_worktree_get_root_path(worktree);
+	for (x = 0; x < argc; x++) {
+		char *path = realpath(argv[x], NULL);
+		if (path == NULL) {
+			if (errno != ENOENT) {
+				error = got_error_from_errno2("realpath",
+				    argv[x]);
+				goto done;
+			}
+			if (got_path_is_child(argv[x], worktree_path,
+			    strlen(worktree_path))) {
+				path = strdup(argv[x]);
+				if (path == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
+
+			} else if (asprintf(&path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			    argv[x]) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+		}
+
+		got_path_strip_trailing_slashes(path);
+		error = got_pathlist_insert(&pe, &paths, path, NULL);
+		if (error) {
+			free(path);
+			goto done;
+		}
+	}
+	error = got_worktree_stage(worktree, &paths, print_status, NULL, repo);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
+	free(cwd);
 	return error;
 }
