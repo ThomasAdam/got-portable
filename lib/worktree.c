@@ -2843,6 +2843,7 @@ free_commitable(struct got_commitable *ct)
 	free(ct->ondisk_path);
 	free(ct->blob_id);
 	free(ct->base_blob_id);
+	free(ct->staged_blob_id);
 	free(ct->base_commit_id);
 	free(ct);
 }
@@ -2925,6 +2926,15 @@ collect_commitables(void *arg, unsigned char status,
 		}
 		ct->base_commit_id = got_object_id_dup(commit_id);
 		if (ct->base_commit_id == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
+	}
+	ct->staged_status = staged_status;
+	if (ct->staged_status == GOT_STATUS_ADD ||
+	    ct->staged_status == GOT_STATUS_MODIFY) {
+		ct->staged_blob_id = got_object_id_dup(staged_blob_id);
+		if (ct->staged_blob_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
 			goto done;
 		}
@@ -3414,20 +3424,6 @@ done:
 	return err;
 }
 
-static const struct got_error *
-check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
-	struct got_object_id *head_commit_id)
-{
-	const char *ct_path = ct->in_repo_path;
-
-	while (ct_path[0] == '/')
-		ct_path++;
-
-	return check_out_of_date(ct_path, ct->status, ct->base_commit_id,
-	    ct->base_commit_id, head_commit_id, repo,
-	    GOT_ERR_COMMIT_OUT_OF_DATE);
-}
-
 const struct got_error *
 commit_worktree(struct got_object_id **new_commit_id,
     struct got_pathlist_head *commitable_paths,
@@ -3582,6 +3578,19 @@ check_path_is_commitable(const char *path,
 	return NULL;
 }
 
+static const struct got_error *
+check_staged_file(void *arg, struct got_fileindex_entry *ie)
+{
+	int *have_staged_files = arg;
+
+	if (got_fileindex_entry_stage_get(ie) != GOT_FILEIDX_STAGE_NONE) {
+		*have_staged_files = 1;
+		return got_error(GOT_ERR_CANCELLED);
+	}
+
+	return NULL;
+}
+
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
@@ -3598,6 +3607,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	struct got_pathlist_entry *pe;
 	struct got_reference *head_ref = NULL;
 	struct got_object_id *head_commit_id = NULL;
+	int have_staged_files = 0;
 
 	*new_commit_id = NULL;
 
@@ -3640,11 +3650,28 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
+	err = got_fileindex_for_each_entry_safe(fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
-		err = check_ct_out_of_date(ct, repo, head_commit_id);
+		const char *ct_path = ct->in_repo_path;
+
+		while (ct_path[0] == '/')
+			ct_path++;
+		err = check_out_of_date(ct_path, ct->status,
+		    ct->base_blob_id, ct->base_commit_id, head_commit_id,
+		    repo, GOT_ERR_COMMIT_OUT_OF_DATE);
 		if (err)
 			goto done;
+		if (have_staged_files &&
+		    ct->staged_status == GOT_STATUS_NO_CHANGE) {
+			err = got_error_path(ct_path, GOT_ERR_FILE_NOT_STAGED);
+			goto done;
+		}
+
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,

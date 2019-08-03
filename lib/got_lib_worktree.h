@@ -40,8 +40,10 @@ struct got_commitable {
 	char *in_repo_path;
 	char *ondisk_path;
 	unsigned char status;
+	unsigned char staged_status;
 	struct got_object_id *blob_id;
 	struct got_object_id *base_blob_id;
+	struct got_object_id *staged_blob_id;
 	struct got_object_id *base_commit_id;
 	mode_t mode;
 	int flags;

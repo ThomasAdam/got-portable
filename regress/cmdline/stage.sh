@@ -895,6 +895,50 @@ function test_stage_update {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_commit_non_staged {
+	local testroot=`test_init stage_commit_non_staged`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	echo "modified file" > $testroot/wt/gamma/delta
+	(cd $testroot/wt && got commit -m "change delta" gamma/delta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got commit command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo "got: gamma/delta: file is not staged" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
 run_test test_stage_conflict
 run_test test_stage_out_of_date
@@ -907,3 +951,4 @@ run_test test_stage_diff
 run_test test_stage_histedit
 run_test test_stage_rebase
 run_test test_stage_update
+run_test test_stage_commit_non_staged

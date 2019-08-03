@@ -137,6 +137,7 @@ function test_commit_single_file {
 
 function test_commit_out_of_date {
 	local testroot=`test_init commit_out_of_date`
+	local first_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -153,7 +154,6 @@ function test_commit_out_of_date {
 	(cd $testroot/wt && got commit -m 'test commit_out_of_date' \
 		> $testroot/stdout 2> $testroot/stderr)
 
-	local head_rev=`git_show_head $testroot/repo`
 	echo -n > $testroot/stdout.expected
 	echo "got: work tree must be updated before these" \
 		"changes can be committed" > $testroot/stderr.expected
@@ -170,6 +170,31 @@ function test_commit_out_of_date {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "reset alpha contents"
+	(cd $testroot/wt && got update -c $first_commit > /dev/null)
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -m 'changed alpha ' > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
