@@ -2209,15 +2209,22 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	unsigned char status = GOT_STATUS_NO_CHANGE;
 	unsigned char staged_status = get_staged_status(ie);
 	struct stat sb;
-	struct got_object_id blob_id, commit_id;
+	struct got_object_id blob_id, commit_id, staged_blob_id;
 
 	err = get_file_status(&status, &sb, ie, abspath, repo);
 	if (err == NULL && (status != GOT_STATUS_NO_CHANGE ||
 	    staged_status != GOT_STATUS_NO_CHANGE)) {
 		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		err = (*status_cb)(status_arg, status, staged_status,
-		    ie->path, &blob_id, &commit_id);
+		if (staged_status == GOT_STATUS_ADD ||
+		    staged_status == GOT_STATUS_MODIFY) {
+			memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
+			    SHA1_DIGEST_LENGTH);
+			err = (*status_cb)(status_arg, status, staged_status,
+			    ie->path, &blob_id, &staged_blob_id, &commit_id);
+		} else
+			err = (*status_cb)(status_arg, status, staged_status,
+			    ie->path, &blob_id, NULL, &commit_id);
 	}
 	return err;
 }
@@ -2274,7 +2281,7 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	else
 		status = GOT_STATUS_DELETE;
 	return (*a->status_cb)(a->status_arg, status, get_staged_status(ie),
-	    ie->path, &blob_id, &commit_id);
+	    ie->path, &blob_id, NULL, &commit_id);
 }
 
 static const struct got_error *
@@ -2303,7 +2310,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 
 	if (got_path_is_child(path, a->status_path, a->status_path_len))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
-		    GOT_STATUS_NO_CHANGE, path, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
 	if (parent_path[0])
 		free(path);
 	return err;
@@ -2330,7 +2337,7 @@ void *status_arg, struct got_repository *repo)
 
 	if (S_ISREG(sb.st_mode))
 		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED,
-		    GOT_STATUS_NO_CHANGE, path, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
 
 	return NULL;
 }
@@ -2808,7 +2815,8 @@ struct collect_commitables_arg {
 static const struct got_error *
 collect_commitables(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
-    struct got_object_id *blob_id, struct got_object_id *commit_id)
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
 {
 	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -3042,7 +3050,7 @@ report_ct_status(struct got_commitable *ct,
 	while (ct_path[0] == '/')
 		ct_path++;
 	return (*status_cb)(status_arg, ct->status, GOT_STATUS_NO_CHANGE,
-	    ct_path, ct->blob_id, NULL);
+	    ct_path, ct->blob_id, NULL, NULL);
 }
 
 static const struct got_error *
@@ -3889,7 +3897,7 @@ collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
 static const struct got_error *
 rebase_status(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
 {
 	return NULL;
 }
@@ -4357,7 +4365,8 @@ struct collect_revertible_paths_arg {
 static const struct got_error *
 collect_revertible_paths(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
-    struct got_object_id *blob_id, struct got_object_id *commit_id)
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
 {
 	struct collect_revertible_paths_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -4894,7 +4903,7 @@ stage_path(const char *relpath, const char *ondisk_path,
 	struct got_fileindex_entry *ie;
 	unsigned char status;
 	struct stat sb;
-	struct got_object_id *blob_id = NULL;
+	struct got_object_id blob_id, *staged_blob_id = NULL;
 	uint32_t stage;
 
 	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
@@ -4910,30 +4919,34 @@ stage_path(const char *relpath, const char *ondisk_path,
 	switch (status) {
 	case GOT_STATUS_ADD:
 	case GOT_STATUS_MODIFY:
-		err = got_object_blob_create(&blob_id,
+		err = got_object_blob_create(&staged_blob_id,
 		    path_content ? path_content : ondisk_path, repo);
 		if (err)
 			goto done;
-		memcpy(ie->staged_blob_sha1, blob_id->sha1,
+		memcpy(&blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		memcpy(ie->staged_blob_sha1, staged_blob_id->sha1,
 		    SHA1_DIGEST_LENGTH);
 		if (status == GOT_STATUS_ADD)
 			stage = GOT_FILEIDX_STAGE_ADD;
 		else
 			stage = GOT_FILEIDX_STAGE_MODIFY;
+		got_fileindex_entry_stage_set(ie, stage);
+		err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
+		    get_staged_status(ie), relpath, &blob_id,
+		    staged_blob_id, NULL);
 		break;
 	case GOT_STATUS_DELETE:
 		stage = GOT_FILEIDX_STAGE_DELETE;
+		got_fileindex_entry_stage_set(ie, stage);
+		err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
+		    get_staged_status(ie), relpath, NULL, NULL, NULL);
 		break;
 	default:
 		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
-		goto done;
+		break;
 	}
-
-	got_fileindex_entry_stage_set(ie, stage);
-	err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
-	    get_staged_status(ie), relpath, blob_id, NULL);
 done:
-	free(blob_id);
+	free(staged_blob_id);
 	return err;
 }
 

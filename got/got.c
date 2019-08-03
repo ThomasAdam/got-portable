@@ -1697,7 +1697,7 @@ struct print_diff_arg {
 static const struct got_error *
 print_diff(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
 {
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -2366,7 +2366,7 @@ usage_status(void)
 static const struct got_error *
 print_status(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
 {
 	if (status == staged_status &&
 	    (status == GOT_STATUS_ADD || status == GOT_STATUS_DELETE))
