@@ -161,9 +161,17 @@ got_fileindex_entry_path_len(const struct got_fileindex_entry *ie)
 }
 
 uint32_t
-got_fileindex_entry_stage(const struct got_fileindex_entry *ie)
+got_fileindex_entry_stage_get(const struct got_fileindex_entry *ie)
 {
 	return ((ie->flags & GOT_FILEIDX_F_STAGE) >> GOT_FILEIDX_F_STAGE_SHIFT);
+}
+
+void
+got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t stage)
+{
+	ie->flags &= ~GOT_FILEIDX_F_STAGE;
+	ie->flags |= ((stage << GOT_FILEIDX_F_STAGE_SHIFT) &
+	    GOT_FILEIDX_F_STAGE);
 }
 
 int
@@ -379,7 +387,7 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
 	if (err)
 		return err;
 
-	stage = got_fileindex_entry_stage(ie);
+	stage = got_fileindex_entry_stage_get(ie);
 	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 	    stage == GOT_FILEIDX_STAGE_ADD) {
 		SHA1Update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
@@ -579,7 +587,7 @@ read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
 		goto done;
 
 	if (version >= 2) {
-		uint32_t stage = got_fileindex_entry_stage(ie);
+		uint32_t stage = got_fileindex_entry_stage_get(ie);
 		if (stage == GOT_FILEIDX_STAGE_MODIFY ||
 		    stage == GOT_FILEIDX_STAGE_ADD) {
 			n = fread(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,

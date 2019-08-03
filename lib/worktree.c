@@ -4856,3 +4856,105 @@ done:
 	free(commit_ref_name);
 	return err;
 }
+
+static const struct got_error *
+stage_path(const char *path, size_t path_len, struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg)
+{
+	const struct got_error *err = NULL;
+	char *ondisk_path;
+	struct got_fileindex_entry *ie;
+	unsigned char status;
+	struct stat sb;
+	struct got_object_id *blob_id = NULL;
+	uint32_t stage;
+
+	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
+		return got_error_from_errno("asprintf");
+
+	ie = got_fileindex_entry_get(fileindex, path, path_len);
+	if (ie == NULL) {
+		err = got_error_path(path, GOT_ERR_FILE_STATUS);
+		goto done;
+	}
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		goto done;
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+	case GOT_STATUS_MODIFY:
+		err = got_object_blob_create(&blob_id, ondisk_path,
+		    repo);
+		if (err)
+			goto done;
+		memcpy(ie->staged_blob_sha1, blob_id->sha1,
+		    SHA1_DIGEST_LENGTH);
+		if (status == GOT_STATUS_ADD)
+			stage = GOT_FILEIDX_STAGE_ADD;
+		else
+			stage = GOT_FILEIDX_STAGE_MODIFY;
+		break;
+	case GOT_STATUS_DELETE:
+		stage = GOT_FILEIDX_STAGE_DELETE;
+		break;
+	default:
+		err = got_error_path(path, GOT_ERR_FILE_STATUS);
+		goto done;
+	}
+
+	got_fileindex_entry_stage_set(ie, stage);
+
+	/* XXX TODO pass 'staged' status separately */
+	err = (*status_cb)(status_arg, status, path, blob_id, NULL);
+done:
+	free(blob_id);
+	free(ondisk_path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_stage_paths(struct got_worktree *worktree,
+    struct got_pathlist_head *paths, struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg,
+    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
+	struct got_pathlist_entry *pe;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(pe, paths, entry) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+		err = stage_path(pe->path, pe->path_len, worktree, fileindex,
+		    repo, status_cb, status_arg);
+		if (err)
+			break;
+	}
+
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	free(fileindex_path);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}

@@ -371,3 +371,9 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
 /* Get the path to this work tree's histedit script file. */
 const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
+
+/* Stage the specified paths for commit. */
+const struct got_error *got_worktree_stage_paths(struct got_worktree *,
+    struct got_pathlist_head *, struct got_repository *,
+    got_worktree_status_cb, void *,
+    got_worktree_cancel_cb , void *);
