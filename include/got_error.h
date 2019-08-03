@@ -116,6 +116,7 @@
 #define GOT_ERR_COMMIT_BRANCH	100
 #define GOT_ERR_FILE_STAGED	101
 #define GOT_ERR_STAGE_NO_CHANGE	102
+#define GOT_ERR_STAGE_CONFLICT	103
 
 static const struct got_error {
 	int code;
@@ -234,6 +235,7 @@ static const struct got_error {
 	    "\"refs/heads/\" reference namespace" },
 	{ GOT_ERR_FILE_STAGED, "file is staged" },
 	{ GOT_ERR_STAGE_NO_CHANGE, "no changes to stage" },
+	{ GOT_ERR_STAGE_CONFLICT, "cannot stage file in conflicted status" },
 };
 
 /*

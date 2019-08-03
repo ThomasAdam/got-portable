@@ -4979,6 +4979,9 @@ stage_path(const char *relpath, const char *ondisk_path,
 	case GOT_STATUS_NO_CHANGE:
 		err = got_error_path(relpath, GOT_ERR_STAGE_NO_CHANGE);
 		break;
+	case GOT_STATUS_CONFLICT:
+		err = got_error_path(relpath, GOT_ERR_STAGE_CONFLICT);
+		break;
 	default:
 		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
 		break;
