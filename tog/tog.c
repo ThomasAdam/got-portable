@@ -2088,17 +2088,23 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			return got_error_from_errno("view_open");
 		err = get_head_commit_id(&start_id, s->head_ref_name ?
 		    s->head_ref_name : GOT_REF_HEAD, s->repo);
-		if (err)
+		if (err) {
+			view_close(lv);
 			return err;
+		}
 		in_repo_path = strdup(s->in_repo_path);
 		if (in_repo_path == NULL) {
 			free(start_id);
+			view_close(lv);
 			return got_error_from_errno("strdup");
 		}
 		err = open_log_view(lv, start_id, s->refs, s->repo,
 		    s->head_ref_name, in_repo_path, 0);
-		if (err)
+		if (err) {
+			free(start_id);
+			view_close(lv);
 			return err;;
+		}
 		*dead_view = view;
 		*new_view = lv;
 		break;
