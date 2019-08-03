@@ -1084,7 +1084,8 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (!got_fileindex_entry_has_file_on_disk(ie)) {
 		*status = GOT_STATUS_DELETE;
 		return NULL;
-	} else if (!got_fileindex_entry_has_blob(ie)) {
+	} else if (!got_fileindex_entry_has_blob(ie) &&
+	    staged_status != GOT_STATUS_ADD) {
 		*status = GOT_STATUS_ADD;
 		return NULL;
 	}

@@ -76,8 +76,52 @@ function test_stage_status {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file again" >> $testroot/wt/alpha
+	echo "modified added file again" >> $testroot/wt/foo
+
+	echo 'MM alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo 'A  epsilon/new' >> $testroot/stdout.expected
+	echo 'M  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'MA foo' >> $testroot/stdout.expected
+	echo 'D  gamma/delta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test no-op change of added file with new stat(2) timestamp
+	echo "new file" > $testroot/wt/foo
+	echo ' A foo' > $testroot/stdout.expected
+	(cd $testroot/wt && got status foo > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test staged deleted file which is restored on disk
+	echo "new file" > $testroot/wt/beta
+	echo ' D beta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status beta > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
+
 }
 
 run_test test_stage_basic
