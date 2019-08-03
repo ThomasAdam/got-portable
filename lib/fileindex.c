@@ -136,8 +136,7 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
 		return err;
 	}
 
-	(*entry)->path_len = strlen(relpath);
-	len = (*entry)->path_len;
+	len = strlen(relpath);
 	if (len > GOT_FILEIDX_F_PATH_LEN)
 		len = GOT_FILEIDX_F_PATH_LEN;
 	(*entry)->flags |= len;
@@ -151,6 +150,12 @@ got_fileindex_entry_free(struct got_fileindex_entry *entry)
 {
 	free(entry->path);
 	free(entry);
+}
+
+size_t
+got_fileindex_entry_path_len(const struct got_fileindex_entry *ie)
+{
+	return (size_t)(ie->flags & GOT_FILEIDX_F_PATH_LEN);
 }
 
 int
@@ -207,7 +212,7 @@ got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path,
 	struct got_fileindex_entry key;
 	memset(&key, 0, sizeof(key));
 	key.path = (char *)path;
-	key.path_len = path_len;
+	key.flags = (path_len & GOT_FILEIDX_F_PATH_LEN);
 	return RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
 }
 
@@ -548,8 +553,6 @@ read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
 		goto done;
 
 	err = read_fileindex_path(&entry->path, ctx, infile);
-	if (err == NULL)
-		entry->path_len = strlen(entry->path);
 done:
 	if (err)
 		got_fileindex_entry_free(entry);
@@ -698,7 +701,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 				break;
 			}
 			cmp = got_path_cmp((*ie)->path, te_path,
-			    (*ie)->path_len, strlen(te_path));
+			    got_fileindex_entry_path_len(*ie), strlen(te_path));
 			free(te_path);
 			if (cmp == 0) {
 				if (got_path_is_child((*ie)->path, path,
@@ -918,7 +921,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 			}
 			cmp = got_path_cmp((*ie)->path, de_path,
-			    (*ie)->path_len, strlen(path) + 1 + de->d_namlen);
+			    got_fileindex_entry_path_len(*ie),
+			    strlen(path) + 1 + de->d_namlen);
 			free(de_path);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, de, path);

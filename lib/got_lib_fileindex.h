@@ -55,18 +55,21 @@ struct got_fileindex_entry {
 	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
 	char *path;
-	size_t path_len; /* strlen(path) -- kept in memory only! */
 };
 
 struct got_fileindex;
 
 RB_HEAD(got_fileindex_tree, got_fileindex_entry);
 
+size_t got_fileindex_entry_path_len(const struct got_fileindex_entry *);
+
 static inline int
 got_fileindex_cmp(const struct got_fileindex_entry *e1,
     const struct got_fileindex_entry *e2)
 {
-	return got_path_cmp(e1->path, e2->path, e1->path_len, e2->path_len);
+	return got_path_cmp(e1->path, e2->path,
+	    got_fileindex_entry_path_len(e1),
+	    got_fileindex_entry_path_len(e2));
 }
 
 RB_PROTOTYPE(got_fileindex_tree, got_fileindex_entry, entry, got_fileindex_cmp);
@@ -90,6 +93,7 @@ const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *, const char *, uint8_t *, uint8_t *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);
+
 struct got_fileindex *got_fileindex_alloc(void);
 void got_fileindex_free(struct got_fileindex *);
 const struct got_error *got_fileindex_write(struct got_fileindex *, FILE *);
