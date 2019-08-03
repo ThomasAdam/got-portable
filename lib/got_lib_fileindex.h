@@ -55,6 +55,14 @@ struct got_fileindex_entry {
 	 * Variable length, and NUL-padded to a multiple of 8 on disk.
 	 */
 	char *path;
+
+	/*
+	 * (since GOT_FILE_INDEX_VERSION 2)
+	 * SHA1 of staged blob in repository if stage equals either
+	 * GOT_FILEIDX_STAGE_MODIFY or GOT_FILEIDX_STAGE_ADD.
+	 * Otherwise, this field is not written to disk.
+	 */
+	uint8_t staged_blob_sha1[SHA1_DIGEST_LENGTH];
 };
 
 /* Modifications explicitly staged for commit. */
@@ -85,7 +93,7 @@ struct got_fileindex_hdr {
 	uint32_t signature;	/* big-endian */
 #define GOT_FILE_INDEX_SIGNATURE	0x676f7449 /* 'g', 'o', 't', 'I' */
 	uint32_t version;	/* big-endian */
-#define GOT_FILE_INDEX_VERSION	1
+#define GOT_FILE_INDEX_VERSION	2
 	uint32_t nentries;	/* big-endian */
 	/* list of concatenated fileindex entries */
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */

@@ -38,6 +38,7 @@
 /* got_fileindex_entry flags */
 #define GOT_FILEIDX_F_PATH_LEN		0x00000fff
 #define GOT_FILEIDX_F_STAGE		0x0000f000
+#define GOT_FILEIDX_F_STAGE_SHIFT	24
 #define GOT_FILEIDX_F_NOT_FLUSHED	0x00010000
 #define GOT_FILEIDX_F_NO_BLOB		0x00020000
 #define GOT_FILEIDX_F_NO_COMMIT		0x00040000
@@ -157,6 +158,12 @@ size_t
 got_fileindex_entry_path_len(const struct got_fileindex_entry *ie)
 {
 	return (size_t)(ie->flags & GOT_FILEIDX_F_PATH_LEN);
+}
+
+uint32_t
+got_fileindex_entry_stage(const struct got_fileindex_entry *ie)
+{
+	return ((ie->flags & GOT_FILEIDX_F_STAGE) >> GOT_FILEIDX_F_STAGE_SHIFT);
 }
 
 int
@@ -325,6 +332,7 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
 {
 	const struct got_error *err;
 	size_t n;
+	uint32_t stage;
 
 	err = write_fileindex_val64(ctx, ie->ctime_sec, outfile);
 	if (err)
@@ -368,7 +376,20 @@ write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
 		return err;
 
 	err = write_fileindex_path(ctx, ie->path, outfile);
-	return err;
+	if (err)
+		return err;
+
+	stage = got_fileindex_entry_stage(ie);
+	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
+	    stage == GOT_FILEIDX_STAGE_ADD) {
+		SHA1Update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
+		n = fwrite(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,
+		    outfile);
+		if (n != SHA1_DIGEST_LENGTH)
+			return got_ferror(outfile, GOT_ERR_IO);
+	}
+
+	return NULL;
 }
 
 const struct got_error *
@@ -496,7 +517,7 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 
 static const struct got_error *
 read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
-    FILE *infile)
+    FILE *infile, uint32_t version)
 {
 	const struct got_error *err;
 	struct got_fileindex_entry *ie;
@@ -554,6 +575,26 @@ read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
 		goto done;
 
 	err = read_fileindex_path(&ie->path, ctx, infile);
+	if (err)
+		goto done;
+
+	if (version >= 2) {
+		uint32_t stage = got_fileindex_entry_stage(ie);
+		if (stage == GOT_FILEIDX_STAGE_MODIFY ||
+		    stage == GOT_FILEIDX_STAGE_ADD) {
+			n = fread(ie->staged_blob_sha1, 1, SHA1_DIGEST_LENGTH,
+			    infile);
+			if (n != SHA1_DIGEST_LENGTH) {
+				err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
+				goto done;
+			}
+			SHA1Update(ctx, ie->staged_blob_sha1, SHA1_DIGEST_LENGTH);
+		}
+	} else {
+		/* GOT_FILE_INDEX_VERSION 1 does not support staging. */
+		ie->flags &= ~GOT_FILEIDX_F_STAGE;
+	}
+
 done:
 	if (err)
 		got_fileindex_entry_free(ie);
@@ -605,11 +646,11 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 
 	if (hdr.signature != GOT_FILE_INDEX_SIGNATURE)
 		return got_error(GOT_ERR_FILEIDX_SIG);
-	if (hdr.version != GOT_FILE_INDEX_VERSION)
+	if (hdr.version > GOT_FILE_INDEX_VERSION)
 		return got_error(GOT_ERR_FILEIDX_VER);
 
 	for (i = 0; i < hdr.nentries; i++) {
-		err = read_fileindex_entry(&ie, &ctx, infile);
+		err = read_fileindex_entry(&ie, &ctx, infile, hdr.version);
 		if (err)
 			return err;
 		err = add_entry(fileindex, ie);
