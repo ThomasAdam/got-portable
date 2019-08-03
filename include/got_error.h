@@ -231,7 +231,7 @@ static const struct got_error {
 	{ GOT_ERR_NO_MERGED_PATHS, "empty list of merged paths" },
 	{ GOT_ERR_COMMIT_BRANCH, "will not commit to a branch outside the "
 	    "\"refs/heads/\" reference namespace" },
-	{ GOT_ERR_FILE_STAGED, "file has staged changes" },
+	{ GOT_ERR_FILE_STAGED, "file is staged" },
 };
 
 /*

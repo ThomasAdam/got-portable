@@ -227,8 +227,7 @@ function test_stage_rm_already_staged_file {
 	fi
 
 	for f in alpha foo; do
-		echo "got: $f: file has staged changes" \
-			> $testroot/stderr.expected
+		echo "got: $f: file is staged" > $testroot/stderr.expected
 		(cd $testroot/wt && got rm $f \
 			> $testroot/stdout 2> $testroot/stderr)
 		ret="$?"
@@ -259,7 +258,189 @@ function test_stage_rm_already_staged_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_revert {
+	local testroot=`test_init stage_revert`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	echo "modified file again" >> $testroot/wt/alpha
+	echo "modified added file again" >> $testroot/wt/foo
+
+	(cd $testroot/wt && got revert alpha > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "R  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo 'MA foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert alpha > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert beta > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "revert command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: beta: file is staged" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert foo > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "R  foo" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/content.expected
+	cat $testroot/wt/foo > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got revert foo > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/content.expected
+	cat $testroot/wt/foo > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
 run_test test_stage_status
 run_test test_stage_add_already_staged_file
 run_test test_stage_rm_already_staged_file
+run_test test_stage_revert

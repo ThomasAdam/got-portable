@@ -2639,10 +2639,10 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct got_fileindex_entry *ie;
 	struct got_tree_object *tree = NULL;
 	struct got_object_id *tree_id = NULL;
-	const struct got_tree_entry *te;
+	const struct got_tree_entry *te = NULL;
 	char *tree_path = NULL, *te_name;
 	struct got_blob_object *blob = NULL;
-	unsigned char status;
+	unsigned char status, staged_status;
 	struct stat sb;
 
 	err = got_path_skip_common_ancestor(&relpath,
@@ -2695,11 +2695,19 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
 		sb.st_mode = got_fileindex_perms_to_st(ie);
 
+	staged_status = get_staged_status(ie);
+	if (status == GOT_STATUS_DELETE &&
+	    staged_status != GOT_STATUS_NO_CHANGE) {
+		err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
+		goto done;
+	}
+
 	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
 	    tree_path);
 	if (err) {
 		if (!(err->code == GOT_ERR_NO_TREE_ENTRY &&
-		    status == GOT_STATUS_ADD))
+		    (status == GOT_STATUS_ADD ||
+		    staged_status == GOT_STATUS_ADD)))
 			goto done;
 	} else {
 		err = got_object_open_as_tree(&tree, repo, tree_id);
@@ -2713,7 +2721,8 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 
 		te = got_object_tree_find_entry(tree, te_name);
-		if (te == NULL && status != GOT_STATUS_ADD) {
+		if (te == NULL && status != GOT_STATUS_ADD &&
+		    staged_status != GOT_STATUS_ADD) {
 			err = got_error(GOT_ERR_NO_TREE_ENTRY);
 			goto done;
 		}
@@ -2731,13 +2740,19 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	case GOT_STATUS_CONFLICT:
 	case GOT_STATUS_MISSING: {
 		struct got_object_id id;
-		memcpy(id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		if (staged_status == GOT_STATUS_ADD ||
+		    staged_status == GOT_STATUS_MODIFY) {
+			memcpy(id.sha1, ie->staged_blob_sha1,
+			    SHA1_DIGEST_LENGTH);
+		} else
+			memcpy(id.sha1, ie->blob_sha1,
+			    SHA1_DIGEST_LENGTH);
 		err = got_object_open_as_blob(&blob, repo, &id, 8192);
 		if (err)
 			goto done;
 		err = install_blob(worktree, ondisk_path, ie->path,
-		    te->mode, sb.st_mode, blob, 0, 1, repo, progress_cb,
-		    progress_arg);
+		    te ? te->mode : GOT_DEFAULT_FILE_MODE, sb.st_mode,
+		    blob, 0, 1, repo, progress_cb, progress_arg);
 		if (err)
 			goto done;
 		if (status == GOT_STATUS_DELETE) {
