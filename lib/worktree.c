@@ -1034,6 +1034,21 @@ stat_info_differs(struct got_fileindex_entry *ie, struct stat *sb)
 	    ie->size == (sb->st_size & 0xffffffff));
 }
 
+static unsigned char
+get_staged_status(struct got_fileindex_entry *ie)
+{
+	switch (got_fileindex_entry_stage_get(ie)) {
+	case GOT_FILEIDX_STAGE_ADD:
+		return GOT_STATUS_ADD;
+	case GOT_FILEIDX_STAGE_DELETE:
+		return GOT_STATUS_DELETE;
+	case GOT_FILEIDX_STAGE_MODIFY:
+		return GOT_STATUS_MODIFY;
+	default:
+		return GOT_STATUS_NO_CHANGE;
+	}
+}
+
 static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
@@ -1046,6 +1061,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
 	size_t flen, blen;
+	unsigned char staged_status = get_staged_status(ie);
 
 	*status = GOT_STATUS_NO_CHANGE;
 
@@ -1076,7 +1092,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (!stat_info_differs(ie, sb))
 		return NULL;
 
-	memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
+	if (staged_status == GOT_STATUS_MODIFY ||
+	    staged_status == GOT_STATUS_ADD)
+		memcpy(id.sha1, ie->staged_blob_sha1, sizeof(id.sha1));
+	else
+		memcpy(id.sha1, ie->blob_sha1, sizeof(id.sha1));
+
 	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
 	if (err)
 		return err;
@@ -2179,21 +2200,6 @@ struct diff_dir_cb_arg {
     void *cancel_arg;
 };
 
-static unsigned char
-get_staged_status(struct got_fileindex_entry *ie)
-{
-	switch (got_fileindex_entry_stage_get(ie)) {
-	case GOT_FILEIDX_STAGE_ADD:
-		return GOT_STATUS_ADD;
-	case GOT_FILEIDX_STAGE_DELETE:
-		return GOT_STATUS_DELETE;
-	case GOT_FILEIDX_STAGE_MODIFY:
-		return GOT_STATUS_MODIFY;
-	default:
-		return GOT_STATUS_NO_CHANGE;
-	}
-}
-
 static const struct got_error *
 report_file_status(struct got_fileindex_entry *ie, const char *abspath,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -2201,14 +2207,16 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 {
 	const struct got_error *err = NULL;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
+	unsigned char staged_status = get_staged_status(ie);
 	struct stat sb;
 	struct got_object_id blob_id, commit_id;
 
 	err = get_file_status(&status, &sb, ie, abspath, repo);
-	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
+	if (err == NULL && (status != GOT_STATUS_NO_CHANGE ||
+	    staged_status != GOT_STATUS_NO_CHANGE)) {
 		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		err = (*status_cb)(status_arg, status, get_staged_status(ie),
+		err = (*status_cb)(status_arg, status, staged_status,
 		    ie->path, &blob_id, &commit_id);
 	}
 	return err;

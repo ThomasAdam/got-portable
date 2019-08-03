@@ -2368,6 +2368,9 @@ print_status(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
     struct got_object_id *commit_id)
 {
+	if (status == staged_status &&
+	    (status == GOT_STATUS_ADD || status == GOT_STATUS_DELETE))
+		status = GOT_STATUS_NO_CHANGE;
 	printf("%c%c %s\n", status, staged_status, path);
 	return NULL;
 }

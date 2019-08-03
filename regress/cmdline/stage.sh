@@ -44,4 +44,41 @@ function test_stage_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_status {
+	local testroot=`test_init stage_status`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	echo "new file" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new > /dev/null)
+	echo "modified file" > $testroot/wt/epsilon/zeta
+	(cd $testroot/wt && got rm gamma/delta > /dev/null)
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo 'A  epsilon/new' >> $testroot/stdout.expected
+	echo 'M  epsilon/zeta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	echo 'D  gamma/delta' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
+run_test test_stage_status
