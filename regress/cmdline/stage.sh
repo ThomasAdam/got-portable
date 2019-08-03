@@ -516,9 +516,75 @@ function test_stage_revert {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_diff {
+	local testroot=`test_init stage_diff`
+	local head_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file again" > $testroot/wt/alpha
+	echo "new file changed" > $testroot/wt/foo
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+
+	echo "diff $head_commit $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-modified file' >> $testroot/stdout.expected
+	echo '+modified file again' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + foo' >> $testroot/stdout.expected
+	echo '--- foo' >> $testroot/stdout.expected
+	echo '+++ foo' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-new file' >> $testroot/stdout.expected
+	echo '+new file changed' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_stage_basic
 run_test test_double_stage
 run_test test_stage_status
 run_test test_stage_add_already_staged_file
 run_test test_stage_rm_already_staged_file
 run_test test_stage_revert
+run_test test_stage_diff

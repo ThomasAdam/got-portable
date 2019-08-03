@@ -1706,6 +1706,9 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	char *abspath = NULL;
 	struct stat sb;
 
+	if (staged_status == GOT_STATUS_DELETE)
+		return NULL;
+
 	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
 	    status != GOT_STATUS_DELETE && status != GOT_STATUS_CONFLICT)
 		return NULL;
@@ -1716,12 +1719,14 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		a->header_shown = 1;
 	}
 
-	if (status != GOT_STATUS_ADD) {
+	if (staged_status == GOT_STATUS_ADD ||
+	    staged_status == GOT_STATUS_MODIFY)
+		err = got_object_open_as_blob(&blob1, a->repo, staged_blob_id,
+		    8192);
+	else if (status != GOT_STATUS_ADD)
 		err = got_object_open_as_blob(&blob1, a->repo, blob_id, 8192);
-		if (err)
-			goto done;
-
-	}
+	if (err)
+		goto done;
 
 	if (status != GOT_STATUS_DELETE) {
 		if (asprintf(&abspath, "%s/%s",
@@ -5161,9 +5166,35 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage file-path ...\n",
+	fprintf(stderr, "usage: %s stage [-l] | file-path ...\n",
 	    getprogname());
 	exit(1);
+}
+
+static const struct got_error *
+print_stage(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+{
+	const struct got_error *err = NULL;
+	char *id_str = NULL;
+
+	if (staged_status != GOT_STATUS_ADD &&
+	    staged_status != GOT_STATUS_MODIFY &&
+	    staged_status != GOT_STATUS_DELETE)
+		return NULL;
+
+	if (staged_status == GOT_STATUS_ADD ||
+	    staged_status == GOT_STATUS_MODIFY)
+		err = got_object_id_str(&id_str, staged_blob_id);
+	else
+		err = got_object_id_str(&id_str, blob_id);
+	if (err)
+		return err;
+
+	printf("%s %c %s\n", id_str, staged_status, path);
+	free(id_str);
+	return NULL;
 }
 
 static const struct got_error *
@@ -5176,12 +5207,15 @@ cmd_stage(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	const char *worktree_path;
-	int ch, x;
+	int ch, x, list_stage = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "l")) != -1) {
 		switch (ch) {
+		case 'l':
+			list_stage = 1;
+			break;
 		default:
 			usage_stage();
 			/* NOTREACHED */
@@ -5196,7 +5230,7 @@ cmd_stage(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (argc < 1)
+	if (!list_stage && argc < 1)
 		usage_stage();
 
 	cwd = getcwd(NULL, 0);
@@ -5220,7 +5254,14 @@ cmd_stage(int argc, char *argv[])
 
 	worktree_path = got_worktree_get_root_path(worktree);
 	for (x = 0; x < argc; x++) {
-		char *path = realpath(argv[x], NULL);
+		char *path;
+		if (list_stage) {
+			error = got_worktree_resolve_path(&path, worktree,
+			    argv[x]);
+			if (error)
+				break;
+		} else
+			path = realpath(argv[x], NULL);
 		if (path == NULL) {
 			if (errno != ENOENT) {
 				error = got_error_from_errno2("realpath",
@@ -5250,7 +5291,23 @@ cmd_stage(int argc, char *argv[])
 			goto done;
 		}
 	}
-	error = got_worktree_stage(worktree, &paths, print_status, NULL, repo);
+
+	if (list_stage) {
+		if (TAILQ_EMPTY(&paths)) {
+			char *s = strdup("");
+			if (s == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+			error = got_pathlist_append(&paths, s, NULL);
+			if (error)
+				goto done;
+		}
+		error = got_worktree_status(worktree, &paths, repo,
+		    print_stage, NULL, check_cancelled, NULL);
+	} else
+		error = got_worktree_stage(worktree, &paths, print_status,
+		    NULL, repo);
 done:
 	if (repo)
 		got_repo_close(repo);
