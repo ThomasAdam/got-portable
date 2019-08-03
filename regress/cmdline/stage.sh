@@ -177,6 +177,7 @@ function test_double_stage {
 	fi
 
 	(cd $testroot/wt && got stage beta > $testroot/stdout)
+	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got stage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
