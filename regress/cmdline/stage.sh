@@ -794,6 +794,65 @@ function test_stage_histedit {
 
 }
 
+function test_stage_rebase {
+	local testroot=`test_init stage_rebase`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha > /dev/null)
+
+	(cd $testroot/wt && got rebase newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rebase command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo "got: alpha: file is staged" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 run_test test_stage_basic
 run_test test_stage_conflict
 run_test test_stage_out_of_date
@@ -804,3 +863,4 @@ run_test test_stage_rm_already_staged_file
 run_test test_stage_revert
 run_test test_stage_diff
 run_test test_stage_histedit
+run_test test_stage_rebase
