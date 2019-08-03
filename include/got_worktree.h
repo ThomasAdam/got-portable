@@ -379,7 +379,6 @@ const struct got_error *got_worktree_get_histedit_script_path(char **,
  * pointer is expected to point at a const char * path of a file which
  * contains alternative content to be staged instead.
 */
-const struct got_error *got_worktree_stage_paths(struct got_worktree *,
-    struct got_pathlist_head *, struct got_repository *,
-    got_worktree_status_cb, void *,
-    got_worktree_cancel_cb , void *);
+const struct got_error *got_worktree_stage(struct got_worktree *,
+    struct got_pathlist_head *, got_worktree_status_cb, void *,
+    struct got_repository *);

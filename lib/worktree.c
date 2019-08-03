@@ -4917,10 +4917,10 @@ done:
 }
 
 const struct got_error *
-got_worktree_stage_paths(struct got_worktree *worktree,
-    struct got_pathlist_head *paths, struct got_repository *repo,
+got_worktree_stage(struct got_worktree *worktree,
+    struct got_pathlist_head *paths,
     got_worktree_status_cb status_cb, void *status_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
@@ -4936,11 +4936,6 @@ got_worktree_stage_paths(struct got_worktree *worktree,
 		goto done;
 
 	TAILQ_FOREACH(pe, paths, entry) {
-		if (cancel_cb) {
-			err = (*cancel_cb)(cancel_arg);
-			if (err)
-				break;
-		}
 		err = stage_path(pe->path, pe->path_len, (const char *)pe->data,
 		    worktree, fileindex, repo, status_cb, status_arg);
 		if (err)
