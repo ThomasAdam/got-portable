@@ -2852,6 +2852,7 @@ struct collect_commitables_arg {
 	struct got_pathlist_head *commitable_paths;
 	struct got_repository *repo;
 	struct got_worktree *worktree;
+	int have_staged_files;
 };
 
 static const struct got_error *
@@ -2867,12 +2868,20 @@ collect_commitables(void *arg, unsigned char status,
 	char *parent_path = NULL, *path = NULL;
 	struct stat sb;
 
-	if (status == GOT_STATUS_CONFLICT)
-		return got_error(GOT_ERR_COMMIT_CONFLICT);
+	if (a->have_staged_files) {
+		if (staged_status != GOT_STATUS_MODIFY &&
+		    staged_status != GOT_STATUS_ADD &&
+		    staged_status != GOT_STATUS_DELETE)
+			return NULL;
+	} else {
+		if (status == GOT_STATUS_CONFLICT)
+			return got_error(GOT_ERR_COMMIT_CONFLICT);
 
-	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_DELETE)
-		return NULL;
+		if (status != GOT_STATUS_MODIFY &&
+		    status != GOT_STATUS_ADD &&
+		    status != GOT_STATUS_DELETE)
+			return NULL;
+	}
 
 	if (asprintf(&path, "/%s", relpath) == -1) {
 		err = got_error_from_errno("asprintf");
@@ -2899,7 +2908,7 @@ collect_commitables(void *arg, unsigned char status,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	if (status == GOT_STATUS_DELETE) {
+	if (status == GOT_STATUS_DELETE || staged_status == GOT_STATUS_DELETE) {
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	} else {
 		if (lstat(ct->ondisk_path, &sb) != 0) {
@@ -2917,8 +2926,10 @@ collect_commitables(void *arg, unsigned char status,
 	}
 
 	ct->status = status;
+	ct->staged_status = staged_status;
 	ct->blob_id = NULL; /* will be filled in when blob gets created */
-	if (ct->status != GOT_STATUS_ADD) {
+	if (ct->status != GOT_STATUS_ADD &&
+	    ct->staged_status != GOT_STATUS_ADD) {
 		ct->base_blob_id = got_object_id_dup(blob_id);
 		if (ct->base_blob_id == NULL) {
 			err = got_error_from_errno("got_object_id_dup");
@@ -2930,7 +2941,6 @@ collect_commitables(void *arg, unsigned char status,
 			goto done;
 		}
 	}
-	ct->staged_status = staged_status;
 	if (ct->staged_status == GOT_STATUS_ADD ||
 	    ct->staged_status == GOT_STATUS_MODIFY) {
 		ct->staged_blob_id = got_object_id_dup(staged_blob_id);
@@ -3026,7 +3036,10 @@ alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
 	(*new_te)->mode = get_ct_file_mode(ct);
 
 	free((*new_te)->id);
-	(*new_te)->id = got_object_id_dup(ct->blob_id);
+	if (ct->staged_status == GOT_STATUS_MODIFY)
+		(*new_te)->id = got_object_id_dup(ct->staged_blob_id);
+	else
+		(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
@@ -3065,7 +3078,10 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 
 	(*new_te)->mode = get_ct_file_mode(ct);
 
-	(*new_te)->id = got_object_id_dup(ct->blob_id);
+	if (ct->staged_status == GOT_STATUS_ADD)
+		(*new_te)->id = got_object_id_dup(ct->staged_blob_id);
+	else
+		(*new_te)->id = got_object_id_dup(ct->blob_id);
 	if ((*new_te)->id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
@@ -3098,9 +3114,17 @@ report_ct_status(struct got_commitable *ct,
     got_worktree_status_cb status_cb, void *status_arg)
 {
 	const char *ct_path = ct->path;
+	unsigned char status;
+
 	while (ct_path[0] == '/')
 		ct_path++;
-	return (*status_cb)(status_arg, ct->status, GOT_STATUS_NO_CHANGE,
+
+	if (ct->staged_status != GOT_STATUS_NO_CHANGE)
+		status = ct->staged_status;
+	else
+		status = ct->status;
+
+	return (*status_cb)(status_arg, status, GOT_STATUS_NO_CHANGE,
 	    ct_path, ct->blob_id, NULL, NULL);
 }
 
@@ -3146,9 +3170,15 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 		char *ct_name = NULL;
 		int path_matches;
 
-		if (ct->status != GOT_STATUS_MODIFY &&
-		    ct->status != GOT_STATUS_DELETE)
-			continue;
+		if (ct->staged_status == GOT_STATUS_NO_CHANGE) {
+			if (ct->status != GOT_STATUS_MODIFY &&
+			    ct->status != GOT_STATUS_DELETE)
+				continue;
+		} else {
+			if (ct->staged_status != GOT_STATUS_MODIFY &&
+			    ct->staged_status != GOT_STATUS_DELETE)
+				continue;
+		}
 
 		if (got_object_id_cmp(ct->base_blob_id, te->id) != 0)
 			continue;
@@ -3235,7 +3265,8 @@ write_tree(struct got_object_id **new_tree_id,
 		struct got_commitable *ct = pe->data;
 		char *child_path = NULL, *slash;
 
-		if (ct->status != GOT_STATUS_ADD ||
+		if ((ct->status != GOT_STATUS_ADD &&
+		    ct->staged_status != GOT_STATUS_ADD) ||
 		    (ct->flags & GOT_COMMITABLE_ADDED))
 			continue;
 
@@ -3312,7 +3343,8 @@ write_tree(struct got_object_id **new_tree_id,
 			    path_base_tree, commitable_paths);
 			if (ct) {
 				/* NB: Deleted entries get dropped here. */
-				if (ct->status == GOT_STATUS_MODIFY) {
+				if (ct->status == GOT_STATUS_MODIFY ||
+				    ct->staged_status == GOT_STATUS_MODIFY) {
 					err = alloc_modified_blob_tree_entry(
 					    &new_te, te, ct);
 					if (err)
@@ -3363,9 +3395,17 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 
 		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
 		if (ie) {
-			if (ct->status == GOT_STATUS_DELETE) {
+			if (ct->status == GOT_STATUS_DELETE ||
+			    ct->staged_status == GOT_STATUS_DELETE) {
 				got_fileindex_entry_remove(fileindex, ie);
 				got_fileindex_entry_free(ie);
+			} else if (ct->staged_status == GOT_STATUS_ADD ||
+			    ct->staged_status == GOT_STATUS_MODIFY) {
+				got_fileindex_entry_stage_set(ie,
+				    GOT_FILEIDX_STAGE_NONE);
+				err = got_fileindex_entry_update(ie,
+				    ct->ondisk_path, ct->staged_blob_id->sha1,
+				    new_base_commit_id->sha1, 1);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    ct->ondisk_path, ct->blob_id->sha1,
@@ -3387,14 +3427,15 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 
 static const struct got_error *
 check_out_of_date(const char *in_repo_path, unsigned char status,
-    struct got_object_id *base_blob_id, struct got_object_id *base_commit_id,
+    unsigned char staged_status, struct got_object_id *base_blob_id,
+    struct got_object_id *base_commit_id,
     struct got_object_id *head_commit_id, struct got_repository *repo,
     int ood_errcode)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id = NULL;
 
-	if (status != GOT_STATUS_ADD) {
+	if (status != GOT_STATUS_ADD && staged_status != GOT_STATUS_ADD) {
 		/* Trivial case: base commit == head commit */
 		if (got_object_id_cmp(base_commit_id, head_commit_id) == 0)
 			return NULL;
@@ -3472,6 +3513,11 @@ commit_worktree(struct got_object_id **new_commit_id,
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
 		char *ondisk_path;
+
+		/* Blobs for staged files already exist. */
+		if (ct->staged_status == GOT_STATUS_ADD ||
+		    ct->staged_status == GOT_STATUS_MODIFY)
+			continue;
 
 		if (ct->status != GOT_STATUS_ADD &&
 		    ct->status != GOT_STATUS_MODIFY)
@@ -3591,6 +3637,27 @@ check_staged_file(void *arg, struct got_fileindex_entry *ie)
 	return NULL;
 }
 
+static const struct got_error *
+check_non_staged_files(struct got_fileindex *fileindex,
+    struct got_pathlist_head *paths)
+{
+	struct got_pathlist_entry *pe;
+	struct got_fileindex_entry *ie;
+
+	TAILQ_FOREACH(pe, paths, entry) {
+		if (pe->path[0] == '\0')
+			continue;
+		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
+		if (ie == NULL)
+			return got_error_path(pe->path, GOT_ERR_BAD_PATH);
+		if (got_fileindex_entry_stage_get(ie) == GOT_FILEIDX_STAGE_NONE)
+			return got_error_path(pe->path,
+			    GOT_ERR_FILE_NOT_STAGED);
+	}
+
+	return NULL;
+}
+
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
@@ -3629,9 +3696,20 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
+	err = got_fileindex_for_each_entry_safe(fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+	if (have_staged_files) {
+		err = check_non_staged_files(fileindex, paths);
+		if (err)
+			goto done;
+	}
+
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
+	cc_arg.have_staged_files = have_staged_files;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    collect_commitables, &cc_arg, NULL, NULL);
@@ -3650,11 +3728,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 			goto done;
 	}
 
-	err = got_fileindex_for_each_entry_safe(fileindex, check_staged_file,
-	    &have_staged_files);
-	if (err && err->code != GOT_ERR_CANCELLED)
-		goto done;
-
 	TAILQ_FOREACH(pe, &commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
 		const char *ct_path = ct->in_repo_path;
@@ -3662,15 +3735,10 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		while (ct_path[0] == '/')
 			ct_path++;
 		err = check_out_of_date(ct_path, ct->status,
-		    ct->base_blob_id, ct->base_commit_id, head_commit_id,
-		    repo, GOT_ERR_COMMIT_OUT_OF_DATE);
+		    ct->staged_status, ct->base_blob_id, ct->base_commit_id,
+		    head_commit_id, repo, GOT_ERR_COMMIT_OUT_OF_DATE);
 		if (err)
 			goto done;
-		if (have_staged_files &&
-		    ct->staged_status == GOT_STATUS_NO_CHANGE) {
-			err = got_error_path(ct_path, GOT_ERR_FILE_NOT_STAGED);
-			goto done;
-		}
 
 	}
 
@@ -4177,6 +4245,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
 	cc_arg.repo = repo;
+	cc_arg.have_staged_files = 0;
 	/*
 	 * If possible get the status of individual files directly to
 	 * avoid crawling the entire work tree once per rebased commit.
@@ -5017,8 +5086,9 @@ stage_check_out_of_date(const char *relpath, const char *ondisk_path,
 	p = in_repo_path;
 	while (p[0] == '/')
 		p++;
-	err = check_out_of_date(p, status, blob_idp, base_commit_idp,
-	    head_commit_id, repo, GOT_ERR_STAGE_OUT_OF_DATE);
+	err = check_out_of_date(p, status, GOT_STATUS_NO_CHANGE,
+	    blob_idp, base_commit_idp, head_commit_id, repo,
+	    GOT_ERR_STAGE_OUT_OF_DATE);
 done:
 	free(in_repo_path);
 	return err;

@@ -939,6 +939,113 @@ function test_stage_commit_non_staged {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_commit {
+	local testroot=`test_init stage_commit`
+	local first_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	echo "modified file again" > $testroot/wt/alpha
+	echo "new file changed" > $testroot/wt/foo
+	echo "non-staged change" > $testroot/wt/gamma/delta
+	echo "non-staged new file" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new > /dev/null)
+	(cd $testroot/wt && got rm epsilon/zeta > /dev/null)
+
+	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 \
+		> $testroot/blob_id_alpha
+	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 \
+		> $testroot/blob_id_foo
+
+	(cd $testroot/wt && got commit -m "staged changes" \
+		> $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	local head_commit=`git_show_head $testroot/repo`
+	echo "A  foo" > $testroot/stdout.expected
+	echo "M  alpha" >> $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "Created commit $head_commit" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got diff -r $testroot/repo $first_commit $head_commit \
+		> $testroot/stdout
+
+	echo "diff $first_commit $head_commit" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $first_commit | \
+		grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	cat $testroot/blob_id_alpha >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $first_commit \
+		| grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	cat $testroot/blob_id_foo >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ foo' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'A  epsilon/new' > $testroot/stdout.expected
+	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'M  gamma/delta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
 run_test test_stage_conflict
 run_test test_stage_out_of_date
@@ -952,3 +1059,4 @@ run_test test_stage_histedit
 run_test test_stage_rebase
 run_test test_stage_update
 run_test test_stage_commit_non_staged
+run_test test_stage_commit
