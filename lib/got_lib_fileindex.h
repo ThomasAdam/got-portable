@@ -57,6 +57,12 @@ struct got_fileindex_entry {
 	char *path;
 };
 
+/* Modifications explicitly staged for commit. */
+#define GOT_FILEIDX_STAGE_NONE		0
+#define GOT_FILEIDX_STAGE_MODIFY	1
+#define GOT_FILEIDX_STAGE_ADD		2
+#define GOT_FILEIDX_STAGE_DELETE	3
+
 struct got_fileindex;
 
 RB_HEAD(got_fileindex_tree, got_fileindex_entry);
