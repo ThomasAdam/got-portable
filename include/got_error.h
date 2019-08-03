@@ -117,6 +117,7 @@
 #define GOT_ERR_FILE_STAGED	101
 #define GOT_ERR_STAGE_NO_CHANGE	102
 #define GOT_ERR_STAGE_CONFLICT	103
+#define GOT_ERR_STAGE_OUT_OF_DATE 104
 
 static const struct got_error {
 	int code;
@@ -236,6 +237,8 @@ static const struct got_error {
 	{ GOT_ERR_FILE_STAGED, "file is staged" },
 	{ GOT_ERR_STAGE_NO_CHANGE, "no changes to stage" },
 	{ GOT_ERR_STAGE_CONFLICT, "cannot stage file in conflicted status" },
+	{ GOT_ERR_STAGE_OUT_OF_DATE, "work tree must be updated before "
+	    "changes can be staged" },
 };
 
 /*

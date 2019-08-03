@@ -3367,46 +3367,58 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 	return err;
 }
 
+
 static const struct got_error *
-check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
-	struct got_object_id *head_commit_id)
+check_out_of_date(const char *in_repo_path, unsigned char status,
+    struct got_object_id *base_blob_id, struct got_object_id *base_commit_id,
+    struct got_object_id *head_commit_id, struct got_repository *repo,
+    int ood_errcode)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id = NULL;
-	struct got_commit_object *commit = NULL;
-	const char *ct_path = ct->in_repo_path;
 
-	while (ct_path[0] == '/')
-		ct_path++;
-
-	if (ct->status != GOT_STATUS_ADD) {
+	if (status != GOT_STATUS_ADD) {
 		/* Trivial case: base commit == head commit */
-		if (got_object_id_cmp(ct->base_commit_id, head_commit_id) == 0)
+		if (got_object_id_cmp(base_commit_id, head_commit_id) == 0)
 			return NULL;
 		/*
 		 * Ensure file content which local changes were based
 		 * on matches file content in the branch head.
 		 */
-		err = got_object_id_by_path(&id, repo, head_commit_id, ct_path);
+		err = got_object_id_by_path(&id, repo, head_commit_id,
+		    in_repo_path);
 		if (err) {
 			if (err->code != GOT_ERR_NO_TREE_ENTRY)
 				goto done;
-			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+			err = got_error(ood_errcode);
 			goto done;
-		} else if (got_object_id_cmp(id, ct->base_blob_id) != 0)
-			err = got_error(GOT_ERR_COMMIT_OUT_OF_DATE);
+		} else if (got_object_id_cmp(id, base_blob_id) != 0)
+			err = got_error(ood_errcode);
 	} else {
 		/* Require that added files don't exist in the branch head. */
-		err = got_object_id_by_path(&id, repo, head_commit_id, ct_path);
+		err = got_object_id_by_path(&id, repo, head_commit_id,
+		    in_repo_path);
 		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
-		err = id ? got_error(GOT_ERR_COMMIT_OUT_OF_DATE) : NULL;
+		err = id ? got_error(ood_errcode) : NULL;
 	}
 done:
-	if (commit)
-		got_object_commit_close(commit);
 	free(id);
 	return err;
+}
+
+static const struct got_error *
+check_ct_out_of_date(struct got_commitable *ct, struct got_repository *repo,
+	struct got_object_id *head_commit_id)
+{
+	const char *ct_path = ct->in_repo_path;
+
+	while (ct_path[0] == '/')
+		ct_path++;
+
+	return check_out_of_date(ct_path, ct->status, ct->base_commit_id,
+	    ct->base_commit_id, head_commit_id, repo,
+	    GOT_ERR_COMMIT_OUT_OF_DATE);
 }
 
 const struct got_error *
@@ -4928,6 +4940,55 @@ done:
 }
 
 static const struct got_error *
+stage_check_out_of_date(const char *relpath, const char *ondisk_path,
+    struct got_object_id *head_commit_id, struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_fileindex_entry *ie;
+	unsigned char status;
+	struct stat sb;
+	struct got_object_id blob_id, base_commit_id;
+	struct got_object_id *blob_idp = NULL, *base_commit_idp = NULL;
+	char *in_repo_path = NULL, *p;
+
+	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	if (ie == NULL)
+		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
+
+	if (get_staged_status(ie) != GOT_STATUS_NO_CHANGE)
+		return NULL;
+
+	if (asprintf(&in_repo_path, "%s%s%s", worktree->path_prefix,
+	    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
+	    relpath) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (got_fileindex_entry_has_blob(ie)) {
+		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		blob_idp = &blob_id;
+	}
+	if (got_fileindex_entry_has_commit(ie)) {
+		memcpy(base_commit_id.sha1, ie->commit_sha1,
+		    SHA1_DIGEST_LENGTH);
+		base_commit_idp = &base_commit_id;
+	}
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (err)
+		goto done;
+
+	p = in_repo_path;
+	while (p[0] == '/')
+		p++;
+	err = check_out_of_date(p, status, blob_idp, base_commit_idp,
+	    head_commit_id, repo, GOT_ERR_STAGE_OUT_OF_DATE);
+done:
+	free(in_repo_path);
+	return err;
+}
+
+static const struct got_error *
 stage_path(const char *relpath, const char *ondisk_path,
     const char *path_content, struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
@@ -5001,14 +5062,37 @@ got_worktree_stage(struct got_worktree *worktree,
 	struct got_pathlist_entry *pe;
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
+	struct got_reference *head_ref = NULL;
+	struct got_object_id *head_commit_id = NULL;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
 		return err;
 
+	err = got_ref_open(&head_ref, repo,
+	    got_worktree_get_head_ref_name(worktree), 0);
+	if (err)
+		goto done;
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
 	err = open_fileindex(&fileindex, &fileindex_path, worktree);
 	if (err)
 		goto done;
+
+	/* Check out-of-dateness before staging anything. */
+	TAILQ_FOREACH(pe, paths, entry) {
+		char *relpath;
+		err = got_path_skip_common_ancestor(&relpath,
+		    got_worktree_get_root_path(worktree), pe->path);
+		if (err)
+			goto done;
+		err = stage_check_out_of_date(relpath, pe->path,
+		    head_commit_id, worktree, fileindex, repo);
+		free(relpath);
+		if (err)
+			goto done;
+	}
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		char *relpath;
@@ -5028,6 +5112,9 @@ got_worktree_stage(struct got_worktree *worktree,
 	if (sync_err && err == NULL)
 		err = sync_err;
 done:
+	if (head_ref)
+		got_ref_close(head_ref);
+	free(head_commit_id);
 	free(fileindex_path);
 	if (fileindex)
 		got_fileindex_free(fileindex);

@@ -105,6 +105,51 @@ function test_stage_conflict {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_out_of_date {
+	local testroot=`test_init stage_out_of_date`
+	local initial_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "modified alpha" >/dev/null)
+
+	(cd $testroot/wt && got update -c $initial_commit > /dev/null)
+
+	echo "modified alpha again" > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo "got: work tree must be updated before changes can be staged" \
+		> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 
 function test_double_stage {
 	local testroot=`test_init double_stage`
@@ -695,6 +740,7 @@ function test_stage_diff {
 
 run_test test_stage_basic
 run_test test_stage_conflict
+run_test test_stage_out_of_date
 run_test test_double_stage
 run_test test_stage_status
 run_test test_stage_add_already_staged_file
