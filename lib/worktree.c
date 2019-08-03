@@ -3701,7 +3701,7 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 	    == -1)
 		return got_error_from_errno("asprintf");
 
-	/* Reject rebase of a work tree with modified or conflicted files. */
+	/* Reject rebase of a work tree with modified or staged files. */
 	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
 	free(ondisk_path);
 	if (err)
@@ -3709,6 +3709,8 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 
 	if (status != GOT_STATUS_NO_CHANGE)
 		return got_error(GOT_ERR_MODIFIED);
+	if (get_staged_status(ie) != GOT_STATUS_NO_CHANGE)
+		return got_error_path(ie->path, GOT_ERR_FILE_STAGED);
 
 	return NULL;
 }
