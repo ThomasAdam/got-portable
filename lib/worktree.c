@@ -4858,25 +4858,21 @@ done:
 }
 
 static const struct got_error *
-stage_path(const char *path, size_t path_len, const char *path_content,
-    struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_repository *repo,
+stage_path(const char *relpath, const char *ondisk_path,
+    const char *path_content, struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg)
 {
 	const struct got_error *err = NULL;
-	char *ondisk_path;
 	struct got_fileindex_entry *ie;
 	unsigned char status;
 	struct stat sb;
 	struct got_object_id *blob_id = NULL;
 	uint32_t stage;
 
-	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, path) == -1)
-		return got_error_from_errno("asprintf");
-
-	ie = got_fileindex_entry_get(fileindex, path, path_len);
+	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
 	if (ie == NULL) {
-		err = got_error_path(path, GOT_ERR_FILE_STATUS);
+		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
 		goto done;
 	}
 
@@ -4902,17 +4898,16 @@ stage_path(const char *path, size_t path_len, const char *path_content,
 		stage = GOT_FILEIDX_STAGE_DELETE;
 		break;
 	default:
-		err = got_error_path(path, GOT_ERR_FILE_STATUS);
+		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
 		goto done;
 	}
 
 	got_fileindex_entry_stage_set(ie, stage);
 
 	/* XXX TODO pass 'staged' status separately */
-	err = (*status_cb)(status_arg, status, path, blob_id, NULL);
+	err = (*status_cb)(status_arg, status, relpath, blob_id, NULL);
 done:
 	free(blob_id);
-	free(ondisk_path);
 	return err;
 }
 
@@ -4936,8 +4931,15 @@ got_worktree_stage(struct got_worktree *worktree,
 		goto done;
 
 	TAILQ_FOREACH(pe, paths, entry) {
-		err = stage_path(pe->path, pe->path_len, (const char *)pe->data,
-		    worktree, fileindex, repo, status_cb, status_arg);
+		char *relpath;
+		err = got_path_skip_common_ancestor(&relpath,
+		    got_worktree_get_root_path(worktree), pe->path);
+		if (err)
+			break;
+		err = stage_path(relpath, pe->path,
+		    (const char *)pe->data, worktree, fileindex, repo,
+		    status_cb, status_arg);
+		free(relpath);
 		if (err)
 			break;
 	}
