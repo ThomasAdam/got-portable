@@ -2532,7 +2532,7 @@ schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
 
 	if (status != GOT_STATUS_NO_CHANGE) {
 		if (status == GOT_STATUS_DELETE)
-			return got_error_set_errno(ENOENT, ondisk_path);
+			return NULL;
 		if (status != GOT_STATUS_MODIFY)
 			return got_error(GOT_ERR_FILE_STATUS);
 		if (!delete_local_mods)
