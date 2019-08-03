@@ -63,93 +63,93 @@ got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 }
 
 const struct got_error *
-got_fileindex_entry_update(struct got_fileindex_entry *entry,
+got_fileindex_entry_update(struct got_fileindex_entry *ie,
     const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1,
     int update_timestamps)
 {
 	struct stat sb;
 
 	if (lstat(ondisk_path, &sb) != 0) {
-		if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
+		if ((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
 			return got_error_from_errno2("lstat", ondisk_path);
 	} else {
 		if (sb.st_mode & S_IFDIR)
 			return got_error_set_errno(EISDIR, ondisk_path);
-		entry->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
+		ie->flags &= ~GOT_FILEIDX_F_NO_FILE_ON_DISK;
 	}
 
 
-	if ((entry->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
+	if ((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
 		if (update_timestamps) {
-			entry->ctime_sec = sb.st_ctime;
-			entry->ctime_nsec = sb.st_ctimensec;
-			entry->mtime_sec = sb.st_mtime;
-			entry->mtime_nsec = sb.st_mtimensec;
+			ie->ctime_sec = sb.st_ctime;
+			ie->ctime_nsec = sb.st_ctimensec;
+			ie->mtime_sec = sb.st_mtime;
+			ie->mtime_nsec = sb.st_mtimensec;
 		}
-		entry->uid = sb.st_uid;
-		entry->gid = sb.st_gid;
-		entry->size = (sb.st_size & 0xffffffff);
+		ie->uid = sb.st_uid;
+		ie->gid = sb.st_gid;
+		ie->size = (sb.st_size & 0xffffffff);
 		if (sb.st_mode & S_IFLNK)
-			entry->mode = GOT_FILEIDX_MODE_SYMLINK;
+			ie->mode = GOT_FILEIDX_MODE_SYMLINK;
 		else
-			entry->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
-		entry->mode |= got_fileindex_perms_from_st(&sb);
+			ie->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
+		ie->mode |= got_fileindex_perms_from_st(&sb);
 	}
 
 	if (blob_sha1) {
-		memcpy(entry->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
-		entry->flags &= ~GOT_FILEIDX_F_NO_BLOB;
+		memcpy(ie->blob_sha1, blob_sha1, SHA1_DIGEST_LENGTH);
+		ie->flags &= ~GOT_FILEIDX_F_NO_BLOB;
 	} else
-		entry->flags |= GOT_FILEIDX_F_NO_BLOB;
+		ie->flags |= GOT_FILEIDX_F_NO_BLOB;
 
 	if (commit_sha1) {
-		memcpy(entry->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
-		entry->flags &= ~GOT_FILEIDX_F_NO_COMMIT;
+		memcpy(ie->commit_sha1, commit_sha1, SHA1_DIGEST_LENGTH);
+		ie->flags &= ~GOT_FILEIDX_F_NO_COMMIT;
 	} else
-		entry->flags |= GOT_FILEIDX_F_NO_COMMIT;
+		ie->flags |= GOT_FILEIDX_F_NO_COMMIT;
 
 	return NULL;
 }
 
 void
-got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *entry)
+got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *ie)
 {
-	entry->flags |= GOT_FILEIDX_F_NO_FILE_ON_DISK;
+	ie->flags |= GOT_FILEIDX_F_NO_FILE_ON_DISK;
 }
 
 const struct got_error *
-got_fileindex_entry_alloc(struct got_fileindex_entry **entry,
+got_fileindex_entry_alloc(struct got_fileindex_entry **ie,
     const char *ondisk_path, const char *relpath, uint8_t *blob_sha1,
     uint8_t *commit_sha1)
 {
 	size_t len;
 
-	*entry = calloc(1, sizeof(**entry));
-	if (*entry == NULL)
+	*ie = calloc(1, sizeof(**ie));
+	if (*ie == NULL)
 		return got_error_from_errno("calloc");
 
-	(*entry)->path = strdup(relpath);
-	if ((*entry)->path == NULL) {
+	(*ie)->path = strdup(relpath);
+	if ((*ie)->path == NULL) {
 		const struct got_error *err = got_error_from_errno("strdup");
-		free(*entry);
-		*entry = NULL;
+		free(*ie);
+		*ie = NULL;
 		return err;
 	}
 
 	len = strlen(relpath);
 	if (len > GOT_FILEIDX_F_PATH_LEN)
 		len = GOT_FILEIDX_F_PATH_LEN;
-	(*entry)->flags |= len;
+	(*ie)->flags |= len;
 
-	return got_fileindex_entry_update(*entry, ondisk_path, blob_sha1,
+	return got_fileindex_entry_update(*ie, ondisk_path, blob_sha1,
 	    commit_sha1, 1);
 }
 
 void
-got_fileindex_entry_free(struct got_fileindex_entry *entry)
+got_fileindex_entry_free(struct got_fileindex_entry *ie)
 {
-	free(entry->path);
-	free(entry);
+	free(ie->path);
+	free(ie);
 }
 
 size_t
@@ -177,31 +177,31 @@ got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *ie)
 }
 
 static const struct got_error *
-add_entry(struct got_fileindex *fileindex, struct got_fileindex_entry *entry)
+add_entry(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 {
 	if (fileindex->nentries >= GOT_FILEIDX_MAX_ENTRIES)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	RB_INSERT(got_fileindex_tree, &fileindex->entries, entry);
+	RB_INSERT(got_fileindex_tree, &fileindex->entries, ie);
 	fileindex->nentries++;
 	return NULL;
 }
 
 const struct got_error *
 got_fileindex_entry_add(struct got_fileindex *fileindex,
-    struct got_fileindex_entry *entry)
+    struct got_fileindex_entry *ie)
 {
 	/* Flag this entry until it gets written out to disk. */
-	entry->flags |= GOT_FILEIDX_F_NOT_FLUSHED;
+	ie->flags |= GOT_FILEIDX_F_NOT_FLUSHED;
 
-	return add_entry(fileindex, entry);
+	return add_entry(fileindex, ie);
 }
 
 void
 got_fileindex_entry_remove(struct got_fileindex *fileindex,
-    struct got_fileindex_entry *entry)
+    struct got_fileindex_entry *ie)
 {
-	RB_REMOVE(got_fileindex_tree, &fileindex->entries, entry);
+	RB_REMOVE(got_fileindex_tree, &fileindex->entries, ie);
 	fileindex->nentries--;
 }
 
@@ -221,10 +221,10 @@ got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
     got_fileindex_cb cb, void *cb_arg)
 {
 	const struct got_error *err;
-	struct got_fileindex_entry *entry, *tmp;
+	struct got_fileindex_entry *ie, *tmp;
 
-	RB_FOREACH_SAFE(entry, got_fileindex_tree, &fileindex->entries, tmp) {
-		err = (*cb)(cb_arg, entry);
+	RB_FOREACH_SAFE(ie, got_fileindex_tree, &fileindex->entries, tmp) {
+		err = (*cb)(cb_arg, ie);
 		if (err)
 			return err;
 	}
@@ -247,11 +247,11 @@ got_fileindex_alloc(void)
 void
 got_fileindex_free(struct got_fileindex *fileindex)
 {
-	struct got_fileindex_entry *entry;
+	struct got_fileindex_entry *ie;
 
-	while ((entry = RB_MIN(got_fileindex_tree, &fileindex->entries))) {
-		RB_REMOVE(got_fileindex_tree, &fileindex->entries, entry);
-		got_fileindex_entry_free(entry);
+	while ((ie = RB_MIN(got_fileindex_tree, &fileindex->entries))) {
+		RB_REMOVE(got_fileindex_tree, &fileindex->entries, ie);
+		got_fileindex_entry_free(ie);
 	}
 	free(fileindex);
 }
@@ -319,54 +319,54 @@ write_fileindex_path(SHA1_CTX *ctx, const char *path, FILE *outfile)
 }
 
 static const struct got_error *
-write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *entry,
+write_fileindex_entry(SHA1_CTX *ctx, struct got_fileindex_entry *ie,
     FILE *outfile)
 {
 	const struct got_error *err;
 	size_t n;
 
-	err = write_fileindex_val64(ctx, entry->ctime_sec, outfile);
+	err = write_fileindex_val64(ctx, ie->ctime_sec, outfile);
 	if (err)
 		return err;
-	err = write_fileindex_val64(ctx, entry->ctime_nsec, outfile);
+	err = write_fileindex_val64(ctx, ie->ctime_nsec, outfile);
 	if (err)
 		return err;
-	err = write_fileindex_val64(ctx, entry->mtime_sec, outfile);
+	err = write_fileindex_val64(ctx, ie->mtime_sec, outfile);
 	if (err)
 		return err;
-	err = write_fileindex_val64(ctx, entry->mtime_nsec, outfile);
-	if (err)
-		return err;
-
-	err = write_fileindex_val32(ctx, entry->uid, outfile);
-	if (err)
-		return err;
-	err = write_fileindex_val32(ctx, entry->gid, outfile);
-	if (err)
-		return err;
-	err = write_fileindex_val32(ctx, entry->size, outfile);
+	err = write_fileindex_val64(ctx, ie->mtime_nsec, outfile);
 	if (err)
 		return err;
 
-	err = write_fileindex_val16(ctx, entry->mode, outfile);
+	err = write_fileindex_val32(ctx, ie->uid, outfile);
+	if (err)
+		return err;
+	err = write_fileindex_val32(ctx, ie->gid, outfile);
+	if (err)
+		return err;
+	err = write_fileindex_val32(ctx, ie->size, outfile);
 	if (err)
 		return err;
 
-	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
-	n = fwrite(entry->blob_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
+	err = write_fileindex_val16(ctx, ie->mode, outfile);
+	if (err)
+		return err;
+
+	SHA1Update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+	n = fwrite(ie->blob_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
 	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	SHA1Update(ctx, entry->commit_sha1, SHA1_DIGEST_LENGTH);
-	n = fwrite(entry->commit_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
+	SHA1Update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+	n = fwrite(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, outfile);
 	if (n != SHA1_DIGEST_LENGTH)
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	err = write_fileindex_val32(ctx, entry->flags, outfile);
+	err = write_fileindex_val32(ctx, ie->flags, outfile);
 	if (err)
 		return err;
 
-	err = write_fileindex_path(ctx, entry->path, outfile);
+	err = write_fileindex_path(ctx, ie->path, outfile);
 	return err;
 }
 
@@ -378,7 +378,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
-	struct got_fileindex_entry *entry;
+	struct got_fileindex_entry *ie;
 
 	SHA1Init(&ctx);
 
@@ -399,9 +399,9 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != sizeof(hdr.nentries))
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	RB_FOREACH(entry, got_fileindex_tree, &fileindex->entries) {
-		entry->flags &= ~GOT_FILEIDX_F_NOT_FLUSHED;
-		err = write_fileindex_entry(&ctx, entry, outfile);
+	RB_FOREACH(ie, got_fileindex_tree, &fileindex->entries) {
+		ie->flags &= ~GOT_FILEIDX_F_NOT_FLUSHED;
+		err = write_fileindex_entry(&ctx, ie, outfile);
 		if (err)
 			return err;
 	}
@@ -494,70 +494,70 @@ read_fileindex_path(char **path, SHA1_CTX *ctx, FILE *infile)
 }
 
 static const struct got_error *
-read_fileindex_entry(struct got_fileindex_entry **entryp, SHA1_CTX *ctx,
+read_fileindex_entry(struct got_fileindex_entry **iep, SHA1_CTX *ctx,
     FILE *infile)
 {
 	const struct got_error *err;
-	struct got_fileindex_entry *entry;
+	struct got_fileindex_entry *ie;
 	size_t n;
 
-	*entryp = NULL;
+	*iep = NULL;
 
-	entry = calloc(1, sizeof(*entry));
-	if (entry == NULL)
+	ie = calloc(1, sizeof(*ie));
+	if (ie == NULL)
 		return got_error_from_errno("calloc");
 
-	err = read_fileindex_val64(&entry->ctime_sec, ctx, infile);
+	err = read_fileindex_val64(&ie->ctime_sec, ctx, infile);
 	if (err)
 		goto done;
-	err = read_fileindex_val64(&entry->ctime_nsec, ctx, infile);
+	err = read_fileindex_val64(&ie->ctime_nsec, ctx, infile);
 	if (err)
 		goto done;
-	err = read_fileindex_val64(&entry->mtime_sec, ctx, infile);
+	err = read_fileindex_val64(&ie->mtime_sec, ctx, infile);
 	if (err)
 		goto done;
-	err = read_fileindex_val64(&entry->mtime_nsec, ctx, infile);
-	if (err)
-		goto done;
-
-	err = read_fileindex_val32(&entry->uid, ctx, infile);
-	if (err)
-		goto done;
-	err = read_fileindex_val32(&entry->gid, ctx, infile);
-	if (err)
-		goto done;
-	err = read_fileindex_val32(&entry->size, ctx, infile);
+	err = read_fileindex_val64(&ie->mtime_nsec, ctx, infile);
 	if (err)
 		goto done;
 
-	err = read_fileindex_val16(&entry->mode, ctx, infile);
+	err = read_fileindex_val32(&ie->uid, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val32(&ie->gid, ctx, infile);
+	if (err)
+		goto done;
+	err = read_fileindex_val32(&ie->size, ctx, infile);
 	if (err)
 		goto done;
 
-	n = fread(entry->blob_sha1, 1, SHA1_DIGEST_LENGTH, infile);
+	err = read_fileindex_val16(&ie->mode, ctx, infile);
+	if (err)
+		goto done;
+
+	n = fread(ie->blob_sha1, 1, SHA1_DIGEST_LENGTH, infile);
 	if (n != SHA1_DIGEST_LENGTH) {
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	SHA1Update(ctx, entry->blob_sha1, SHA1_DIGEST_LENGTH);
+	SHA1Update(ctx, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 
-	n = fread(entry->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
+	n = fread(ie->commit_sha1, 1, SHA1_DIGEST_LENGTH, infile);
 	if (n != SHA1_DIGEST_LENGTH) {
 		err = got_ferror(infile, GOT_ERR_FILEIDX_BAD);
 		goto done;
 	}
-	SHA1Update(ctx, entry->commit_sha1, SHA1_DIGEST_LENGTH);
+	SHA1Update(ctx, ie->commit_sha1, SHA1_DIGEST_LENGTH);
 
-	err = read_fileindex_val32(&entry->flags, ctx, infile);
+	err = read_fileindex_val32(&ie->flags, ctx, infile);
 	if (err)
 		goto done;
 
-	err = read_fileindex_path(&entry->path, ctx, infile);
+	err = read_fileindex_path(&ie->path, ctx, infile);
 done:
 	if (err)
-		got_fileindex_entry_free(entry);
+		got_fileindex_entry_free(ie);
 	else
-		*entryp = entry;
+		*iep = ie;
 	return err;
 }
 
@@ -567,7 +567,7 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 	const struct got_error *err = NULL;
 	struct got_fileindex_hdr hdr;
 	SHA1_CTX ctx;
-	struct got_fileindex_entry *entry;
+	struct got_fileindex_entry *ie;
 	uint8_t sha1_expected[SHA1_DIGEST_LENGTH];
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
@@ -608,10 +608,10 @@ got_fileindex_read(struct got_fileindex *fileindex, FILE *infile)
 		return got_error(GOT_ERR_FILEIDX_VER);
 
 	for (i = 0; i < hdr.nentries; i++) {
-		err = read_fileindex_entry(&entry, &ctx, infile);
+		err = read_fileindex_entry(&ie, &ctx, infile);
 		if (err)
 			return err;
-		err = add_entry(fileindex, entry);
+		err = add_entry(fileindex, ie);
 		if (err)
 			return err;
 	}
