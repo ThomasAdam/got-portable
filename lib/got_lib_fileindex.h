@@ -56,15 +56,7 @@ struct got_fileindex_entry {
 	 */
 	char *path;
 	size_t path_len; /* strlen(path) -- kept in memory only! */
-
-	/* More data could be here if F_EXTENDED is set; To be determined... */
 };
-
-/* "Stages" of a file afflicted by a 3-way merge conflict. */
-#define GOT_FILEIDX_STAGE_MERGED	0
-#define GOT_FILEIDX_STAGE_ANCESTOR	1
-#define GOT_FILEIDX_STAGE_OURS		2
-#define GOT_FILEIDX_STAGE_THEIRS	3
 
 struct got_fileindex;
 
