@@ -3078,6 +3078,7 @@ cmd_revert(int argc, char *argv[])
 	char *cwd = NULL, *path = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
+	const char *worktree_path;
 	int ch, i;
 
 	TAILQ_INIT(&paths);
@@ -3101,21 +3102,6 @@ cmd_revert(int argc, char *argv[])
 	if (argc < 1)
 		usage_revert();
 
-	for (i = 0; i < argc; i++) {
-		char *path = realpath(argv[i], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[i]);
-			goto done;
-		}
-
-		got_path_strip_trailing_slashes(path);
-		error = got_pathlist_insert(&pe, &paths, path, NULL);
-		if (error) {
-			free(path);
-			goto done;
-		}
-	}
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -3133,6 +3119,39 @@ cmd_revert(int argc, char *argv[])
 	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
+
+	worktree_path = got_worktree_get_root_path(worktree);
+	for (i = 0; i < argc; i++) {
+		char *path = realpath(argv[i], NULL);
+		if (path == NULL) {
+			if (errno != ENOENT) {
+				error = got_error_from_errno2("realpath",
+				    argv[i]);
+				goto done;
+			}
+			if (got_path_is_child(argv[i], worktree_path,
+			    strlen(worktree_path))) {
+				path = strdup(argv[i]);
+				if (path == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
+
+			} else if (asprintf(&path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			    argv[i]) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+		}
+
+		got_path_strip_trailing_slashes(path);
+		error = got_pathlist_insert(&pe, &paths, path, NULL);
+		if (error) {
+			free(path);
+			goto done;
+		}
+	}
 
 	error = got_worktree_revert(worktree, &paths,
 	    revert_progress, NULL, repo);
