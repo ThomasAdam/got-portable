@@ -852,6 +852,48 @@ function test_stage_rebase {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_update {
+	local testroot=`test_init stage_update`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got stage alpha > /dev/null)
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+
+	(cd $testroot/wt && got update > $testroot/stdout  \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got update command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo "got: alpha: file is staged" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
 
 run_test test_stage_basic
 run_test test_stage_conflict
@@ -864,3 +906,4 @@ run_test test_stage_revert
 run_test test_stage_diff
 run_test test_stage_histedit
 run_test test_stage_rebase
+run_test test_stage_update

@@ -1185,6 +1185,10 @@ update_blob(struct got_worktree *worktree,
 		return got_error_from_errno("asprintf");
 
 	if (ie) {
+		if (get_staged_status(ie) != GOT_STATUS_NO_CHANGE) {
+			err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
+			goto done;
+		}
 		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 		if (err)
 			goto done;
@@ -1307,6 +1311,9 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	unsigned char status;
 	struct stat sb;
 	char *ondisk_path;
+
+	if (get_staged_status(ie) != GOT_STATUS_NO_CHANGE)
+		return got_error_path(ie->path, GOT_ERR_FILE_STAGED);
 
 	if (asprintf(&ondisk_path, "%s/%s", worktree->root_path, ie->path)
 	    == -1)
