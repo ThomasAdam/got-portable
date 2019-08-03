@@ -2654,6 +2654,8 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
 		goto done;
+	if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
+		sb.st_mode = got_fileindex_perms_to_st(ie);
 
 	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
 	    tree_path);
