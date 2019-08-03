@@ -115,6 +115,7 @@
 #define GOT_ERR_NO_MERGED_PATHS 99
 #define GOT_ERR_COMMIT_BRANCH	100
 #define GOT_ERR_FILE_STAGED	101
+#define GOT_ERR_STAGE_NO_CHANGE	102
 
 static const struct got_error {
 	int code;
@@ -232,6 +233,7 @@ static const struct got_error {
 	{ GOT_ERR_COMMIT_BRANCH, "will not commit to a branch outside the "
 	    "\"refs/heads/\" reference namespace" },
 	{ GOT_ERR_FILE_STAGED, "file is staged" },
+	{ GOT_ERR_STAGE_NO_CHANGE, "no changes to stage" },
 };
 
 /*

@@ -44,6 +44,83 @@ function test_stage_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_double_stage {
+	local testroot=`test_init double_stage`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	echo "got: alpha: no changes to stage" > $testroot/stderr.expected
+	(cd $testroot/wt && got stage alpha 2> $testroot/stderr)
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage beta > $testroot/stdout)
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: foo: no changes to stage" > $testroot/stderr.expected
+	(cd $testroot/wt && got stage foo 2> $testroot/stderr)
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file again" > $testroot/wt/alpha
+	echo "modified new file" > $testroot/wt/foo
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_stage_status {
 	local testroot=`test_init stage_status`
 
@@ -440,6 +517,7 @@ function test_stage_revert {
 }
 
 run_test test_stage_basic
+run_test test_double_stage
 run_test test_stage_status
 run_test test_stage_add_already_staged_file
 run_test test_stage_rm_already_staged_file

@@ -4924,20 +4924,19 @@ stage_path(const char *relpath, const char *ondisk_path,
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
-	unsigned char status;
+	unsigned char status, staged_status;
 	struct stat sb;
 	struct got_object_id blob_id, *staged_blob_id = NULL;
 	uint32_t stage;
 
 	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
-	if (ie == NULL) {
-		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
-		goto done;
-	}
+	if (ie == NULL)
+		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
-		goto done;
+		return err;
+	staged_status = get_staged_status(ie);
 
 	switch (status) {
 	case GOT_STATUS_ADD:
@@ -4949,7 +4948,7 @@ stage_path(const char *relpath, const char *ondisk_path,
 		memcpy(&blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 		memcpy(ie->staged_blob_sha1, staged_blob_id->sha1,
 		    SHA1_DIGEST_LENGTH);
-		if (status == GOT_STATUS_ADD)
+		if (status == GOT_STATUS_ADD || staged_status == GOT_STATUS_ADD)
 			stage = GOT_FILEIDX_STAGE_ADD;
 		else
 			stage = GOT_FILEIDX_STAGE_MODIFY;
@@ -4959,10 +4958,15 @@ stage_path(const char *relpath, const char *ondisk_path,
 		    staged_blob_id, NULL);
 		break;
 	case GOT_STATUS_DELETE:
+		if (staged_status == GOT_STATUS_DELETE)
+			break;
 		stage = GOT_FILEIDX_STAGE_DELETE;
 		got_fileindex_entry_stage_set(ie, stage);
 		err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, NULL, NULL, NULL);
+		break;
+	case GOT_STATUS_NO_CHANGE:
+		err = got_error_path(relpath, GOT_ERR_STAGE_NO_CHANGE);
 		break;
 	default:
 		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
