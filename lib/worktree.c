@@ -5250,10 +5250,15 @@ unstage_path(void *arg, unsigned char status,
 	struct got_blob_object *blob_base = NULL, *blob_staged = NULL;
 	char *ondisk_path = NULL;
 	int local_changes_subsumed;
+	struct stat sb;
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error_path(relpath, GOT_ERR_BAD_PATH);
+
+	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, relpath)
+	    == -1)
+		return got_error_from_errno("asprintf");
 
 	switch (staged_status) {
 	case GOT_STATUS_MODIFY:
@@ -5268,11 +5273,6 @@ unstage_path(void *arg, unsigned char status,
 		if (err)
 			break;
 
-		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
-		    relpath) == -1) {
-			err= got_error_from_errno("asprintf");
-			break;
-		}
 
 		err = merge_blob(&local_changes_subsumed, a->worktree,
 		    blob_base, ondisk_path, relpath,
@@ -5285,8 +5285,10 @@ unstage_path(void *arg, unsigned char status,
 		break;
 	case GOT_STATUS_DELETE:
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
-		err = (*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
-		    relpath);
+		err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+		if (err)
+			break;
+		err = (*a->progress_cb)(a->progress_arg, status, relpath);
 		break;
 	}
 
