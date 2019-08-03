@@ -31,9 +31,9 @@ function test_stage_basic {
 	echo "new file" > $testroot/wt/foo
 	(cd $testroot/wt && got add foo > /dev/null)
 
-	echo 'M  alpha' > $testroot/stdout.expected
-	echo 'D  beta' >> $testroot/stdout.expected
-	echo 'A  foo' >> $testroot/stdout.expected
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout

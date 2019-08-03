@@ -1695,8 +1695,9 @@ struct print_diff_arg {
 };
 
 static const struct got_error *
-print_diff(void *arg, unsigned char status, const char *path,
-    struct got_object_id *blob_id, struct got_object_id *commit_id)
+print_diff(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *commit_id)
 {
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -2363,10 +2364,11 @@ usage_status(void)
 }
 
 static const struct got_error *
-print_status(void *arg, unsigned char status, const char *path,
-    struct got_object_id *blob_id, struct got_object_id *commit_id)
+print_status(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *commit_id)
 {
-	printf("%c  %s\n", status, path);
+	printf("%c%c %s\n", status, staged_status, path);
 	return NULL;
 }
 

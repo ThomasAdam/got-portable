@@ -2179,6 +2179,21 @@ struct diff_dir_cb_arg {
     void *cancel_arg;
 };
 
+static unsigned char
+get_staged_status(struct got_fileindex_entry *ie)
+{
+	switch (got_fileindex_entry_stage_get(ie)) {
+	case GOT_FILEIDX_STAGE_ADD:
+		return GOT_STATUS_ADD;
+	case GOT_FILEIDX_STAGE_DELETE:
+		return GOT_STATUS_DELETE;
+	case GOT_FILEIDX_STAGE_MODIFY:
+		return GOT_STATUS_MODIFY;
+	default:
+		return GOT_STATUS_NO_CHANGE;
+	}
+}
+
 static const struct got_error *
 report_file_status(struct got_fileindex_entry *ie, const char *abspath,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -2193,8 +2208,8 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	if (err == NULL && status != GOT_STATUS_NO_CHANGE) {
 		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
 		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		err = (*status_cb)(status_arg, status, ie->path, &blob_id,
-		    &commit_id);
+		err = (*status_cb)(status_arg, status, get_staged_status(ie),
+		    ie->path, &blob_id, &commit_id);
 	}
 	return err;
 }
@@ -2250,8 +2265,8 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 		status = GOT_STATUS_MISSING;
 	else
 		status = GOT_STATUS_DELETE;
-	return (*a->status_cb)(a->status_arg, status, ie->path, &blob_id,
-	    &commit_id);
+	return (*a->status_cb)(a->status_arg, status, get_staged_status(ie),
+	    ie->path, &blob_id, &commit_id);
 }
 
 static const struct got_error *
@@ -2280,7 +2295,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 
 	if (got_path_is_child(path, a->status_path, a->status_path_len))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
-		    path, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL);
 	if (parent_path[0])
 		free(path);
 	return err;
@@ -2306,8 +2321,8 @@ void *status_arg, struct got_repository *repo)
 	}
 
 	if (S_ISREG(sb.st_mode))
-		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED, path,
-		    NULL, NULL);
+		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED,
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL);
 
 	return NULL;
 }
@@ -2783,7 +2798,8 @@ struct collect_commitables_arg {
 };
 
 static const struct got_error *
-collect_commitables(void *arg, unsigned char status, const char *relpath,
+collect_commitables(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *commit_id)
 {
 	struct collect_commitables_arg *a = arg;
@@ -3017,7 +3033,8 @@ report_ct_status(struct got_commitable *ct,
 	const char *ct_path = ct->path;
 	while (ct_path[0] == '/')
 		ct_path++;
-	return (*status_cb)(status_arg, ct->status, ct_path, ct->blob_id, NULL);
+	return (*status_cb)(status_arg, ct->status, GOT_STATUS_NO_CHANGE,
+	    ct_path, ct->blob_id, NULL);
 }
 
 static const struct got_error *
@@ -3862,8 +3879,9 @@ collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
 }
 
 static const struct got_error *
-rebase_status(void *arg, unsigned char status, const char *path,
-    struct got_object_id *blob_id, struct got_object_id *commit_id)
+rebase_status(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *commit_id)
 {
 	return NULL;
 }
@@ -4329,7 +4347,8 @@ struct collect_revertible_paths_arg {
 };
 
 static const struct got_error *
-collect_revertible_paths(void *arg, unsigned char status, const char *relpath,
+collect_revertible_paths(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *commit_id)
 {
 	struct collect_revertible_paths_arg *a = arg;
@@ -4903,9 +4922,8 @@ stage_path(const char *relpath, const char *ondisk_path,
 	}
 
 	got_fileindex_entry_stage_set(ie, stage);
-
-	/* XXX TODO pass 'staged' status separately */
-	err = (*status_cb)(status_arg, status, relpath, blob_id, NULL);
+	err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
+	    get_staged_status(ie), relpath, blob_id, NULL);
 done:
 	free(blob_id);
 	return err;
