@@ -532,6 +532,16 @@ function test_stage_diff {
 	echo "new file" > $testroot/wt/foo
 	(cd $testroot/wt && got add foo > /dev/null)
 
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
 	echo ' A foo' >> $testroot/stdout.expected
@@ -571,6 +581,46 @@ function test_stage_diff {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-new file' >> $testroot/stdout.expected
 	echo '+new file changed' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $head_commit $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ foo' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

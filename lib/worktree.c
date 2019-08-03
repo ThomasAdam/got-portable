@@ -2211,23 +2211,34 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	unsigned char staged_status = get_staged_status(ie);
 	struct stat sb;
 	struct got_object_id blob_id, commit_id, staged_blob_id;
+	struct got_object_id *blob_idp = NULL, *commit_idp = NULL;
+	struct got_object_id *staged_blob_idp = NULL;
 
 	err = get_file_status(&status, &sb, ie, abspath, repo);
-	if (err == NULL && (status != GOT_STATUS_NO_CHANGE ||
-	    staged_status != GOT_STATUS_NO_CHANGE)) {
+	if (err)
+		return err;
+
+	if (status == GOT_STATUS_NO_CHANGE &&
+	    staged_status == GOT_STATUS_NO_CHANGE)
+		return NULL;
+
+	if (got_fileindex_entry_has_blob(ie)) {
 		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
-		if (staged_status == GOT_STATUS_ADD ||
-		    staged_status == GOT_STATUS_MODIFY) {
-			memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
-			    SHA1_DIGEST_LENGTH);
-			err = (*status_cb)(status_arg, status, staged_status,
-			    ie->path, &blob_id, &staged_blob_id, &commit_id);
-		} else
-			err = (*status_cb)(status_arg, status, staged_status,
-			    ie->path, &blob_id, NULL, &commit_id);
+		blob_idp = &blob_id;
 	}
-	return err;
+	if (got_fileindex_entry_has_commit(ie)) {
+		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+		commit_idp = &commit_id;
+	}
+	if (staged_status == GOT_STATUS_ADD ||
+	    staged_status == GOT_STATUS_MODIFY) {
+		memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
+		    SHA1_DIGEST_LENGTH);
+		staged_blob_idp = &staged_blob_id;
+	}
+
+	return (*status_cb)(status_arg, status, staged_status,
+	    ie->path, blob_idp, staged_blob_idp, commit_idp);
 }
 
 static const struct got_error *

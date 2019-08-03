@@ -1681,7 +1681,7 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-C number] [-r repository-path] "
+	fprintf(stderr, "usage: %s diff [-C number] [-r repository-path] [-s] "
 	    "[object1 object2 | path]\n", getprogname());
 	exit(1);
 }
@@ -1692,6 +1692,7 @@ struct print_diff_arg {
 	int diff_context;
 	const char *id_str;
 	int header_shown;
+	int diff_staged;
 };
 
 static const struct got_error *
@@ -1706,17 +1707,46 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	char *abspath = NULL;
 	struct stat sb;
 
-	if (staged_status == GOT_STATUS_DELETE)
-		return NULL;
-
-	if (status != GOT_STATUS_MODIFY && status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_DELETE && status != GOT_STATUS_CONFLICT)
-		return NULL;
+	if (a->diff_staged) {
+		if (staged_status != GOT_STATUS_MODIFY &&
+		    staged_status != GOT_STATUS_ADD &&
+		    staged_status != GOT_STATUS_DELETE)
+			return NULL;
+	} else {
+		if (staged_status == GOT_STATUS_DELETE)
+			return NULL;
+		if (status != GOT_STATUS_MODIFY &&
+		    status != GOT_STATUS_ADD &&
+		    status != GOT_STATUS_DELETE &&
+		    status != GOT_STATUS_CONFLICT)
+			return NULL;
+	}
 
 	if (!a->header_shown) {
-		printf("diff %s %s\n", a->id_str,
-		    got_worktree_get_root_path(a->worktree));
+		printf("diff %s %s%s\n", a->id_str,
+		    got_worktree_get_root_path(a->worktree),
+		    a->diff_staged ? " (staged changes)" : "");
 		a->header_shown = 1;
+	}
+
+	if (a->diff_staged) {
+		const char *label1 = NULL, *label2 = NULL;
+		switch (staged_status) {
+		case GOT_STATUS_MODIFY:
+			label1 = path;
+			label2 = path;
+			break;
+		case GOT_STATUS_ADD:
+			label2 = path;
+			break;
+		case GOT_STATUS_DELETE:
+			label1 = path;
+			break;
+		default:
+			return got_error(GOT_ERR_FILE_STATUS);
+		}
+		return got_diff_objects_as_blobs(blob_id, staged_blob_id,
+		    label1, label2, a->diff_context, a->repo, stdout);
 	}
 
 	if (staged_status == GOT_STATUS_ADD ||
@@ -1769,7 +1799,7 @@ cmd_diff(int argc, char *argv[])
 	const char *id_str1 = NULL, *id_str2 = NULL;
 	char *label1 = NULL, *label2 = NULL;
 	int type1, type2;
-	int diff_context = 3, ch;
+	int diff_context = 3, diff_staged = 0, ch;
 	const char *errstr;
 	char *path = NULL;
 
@@ -1779,7 +1809,7 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "C:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "C:r:s")) != -1) {
 		switch (ch) {
 		case 'C':
 			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
@@ -1791,6 +1821,9 @@ cmd_diff(int argc, char *argv[])
 			if (repo_path == NULL)
 				err(1, "-r option");
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 's':
+			diff_staged = 1;
 			break;
 		default:
 			usage_diff();
@@ -1835,6 +1868,9 @@ cmd_diff(int argc, char *argv[])
 			}
 		}
 	} else if (argc == 2) {
+		if (diff_staged)
+			errx(1, "-s option can't be used when diffing "
+			    "objects in repository");
 		id_str1 = argv[0];
 		id_str2 = argv[1];
 		if (worktree && repo_path == NULL) {
@@ -1880,6 +1916,7 @@ cmd_diff(int argc, char *argv[])
 		arg.diff_context = diff_context;
 		arg.id_str = id_str;
 		arg.header_shown = 0;
+		arg.diff_staged = diff_staged;
 
 		error = got_pathlist_append(&paths, path, NULL);
 		if (error)
