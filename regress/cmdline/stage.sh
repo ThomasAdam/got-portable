@@ -191,6 +191,75 @@ function test_stage_add_already_staged_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_rm_already_staged_file {
+	local testroot=`test_init stage_rm_already_staged_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
+
+	(cd $testroot/wt && got rm beta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got rm command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: realpath: beta: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for f in alpha foo; do
+		echo "got: $f: file has staged changes" \
+			> $testroot/stderr.expected
+		(cd $testroot/wt && got rm $f \
+			> $testroot/stdout 2> $testroot/stderr)
+		ret="$?"
+		if [ "$ret" == "0" ]; then
+			echo "got rm command succeeded unexpectedly" >&2
+			test_done "$testroot" "1"
+			return 1
+		fi
+		cmp -s $testroot/stderr.expected $testroot/stderr
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
 run_test test_stage_status
 run_test test_stage_add_already_staged_file
+run_test test_stage_rm_already_staged_file

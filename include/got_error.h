@@ -114,6 +114,7 @@
 #define GOT_ERR_HISTEDIT_PATH	98
 #define GOT_ERR_NO_MERGED_PATHS 99
 #define GOT_ERR_COMMIT_BRANCH	100
+#define GOT_ERR_FILE_STAGED	101
 
 static const struct got_error {
 	int code;
@@ -230,6 +231,7 @@ static const struct got_error {
 	{ GOT_ERR_NO_MERGED_PATHS, "empty list of merged paths" },
 	{ GOT_ERR_COMMIT_BRANCH, "will not commit to a branch outside the "
 	    "\"refs/heads/\" reference namespace" },
+	{ GOT_ERR_FILE_STAGED, "file has staged changes" },
 };
 
 /*

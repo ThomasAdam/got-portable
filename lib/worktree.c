@@ -2550,12 +2550,19 @@ schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie = NULL;
-	unsigned char status;
+	unsigned char status, staged_status;
 	struct stat sb;
 
 	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
+
+	staged_status = get_staged_status(ie);
+	if (staged_status != GOT_STATUS_NO_CHANGE) {
+		if (staged_status == GOT_STATUS_DELETE)
+			return NULL;
+		return got_error_path(relpath, GOT_ERR_FILE_STAGED);
+	}
 
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
