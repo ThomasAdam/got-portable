@@ -372,7 +372,13 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
 const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
 
-/* Stage the specified paths for commit. */
+/*
+ * Stage the specified paths for commit.
+ * If the 'data' pointer of a pathlist element on the path list is NULL then
+ * stage the content of the entire file at this path. Otherwise, the 'data'
+ * pointer is expected to point at a const char * path of a file which
+ * contains alternative content to be staged instead.
+*/
 const struct got_error *got_worktree_stage_paths(struct got_worktree *,
     struct got_pathlist_head *, struct got_repository *,
     got_worktree_status_cb, void *,

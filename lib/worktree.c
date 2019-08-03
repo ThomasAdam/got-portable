@@ -4858,8 +4858,9 @@ done:
 }
 
 static const struct got_error *
-stage_path(const char *path, size_t path_len, struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_repository *repo,
+stage_path(const char *path, size_t path_len, const char *path_content,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg)
 {
 	const struct got_error *err = NULL;
@@ -4886,8 +4887,8 @@ stage_path(const char *path, size_t path_len, struct got_worktree *worktree,
 	switch (status) {
 	case GOT_STATUS_ADD:
 	case GOT_STATUS_MODIFY:
-		err = got_object_blob_create(&blob_id, ondisk_path,
-		    repo);
+		err = got_object_blob_create(&blob_id,
+		    path_content ? path_content : ondisk_path, repo);
 		if (err)
 			goto done;
 		memcpy(ie->staged_blob_sha1, blob_id->sha1,
@@ -4940,8 +4941,8 @@ got_worktree_stage_paths(struct got_worktree *worktree,
 			if (err)
 				break;
 		}
-		err = stage_path(pe->path, pe->path_len, worktree, fileindex,
-		    repo, status_cb, status_arg);
+		err = stage_path(pe->path, pe->path_len, (const char *)pe->data,
+		    worktree, fileindex, repo, status_cb, status_arg);
 		if (err)
 			break;
 	}
