@@ -96,6 +96,7 @@ __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
 __dead static void	usage_histedit(void);
 __dead static void	usage_stage(void);
+__dead static void	usage_unstage(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
@@ -117,6 +118,7 @@ static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
 static const struct got_error*		cmd_histedit(int, char *[]);
 static const struct got_error*		cmd_stage(int, char *[]);
+static const struct got_error*		cmd_unstage(int, char *[]);
 
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"" },
@@ -139,6 +141,7 @@ static struct got_cmd got_commands[] = {
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
 	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
 	{ "stage",	cmd_stage,	usage_stage,	"sg" },
+	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
 };
 
 static void
@@ -5345,6 +5348,81 @@ cmd_stage(int argc, char *argv[])
 	} else
 		error = got_worktree_stage(worktree, &paths, print_status,
 		    NULL, repo);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
+	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_unstage(void)
+{
+	fprintf(stderr, "usage: %s unstage [file-path ...]\n",
+	    getprogname());
+	exit(1);
+}
+
+
+static const struct got_error *
+cmd_unstage(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	int ch, did_something = 0;
+
+	TAILQ_INIT(&paths);
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_unstage();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
+
+	error = got_worktree_unstage(worktree, &paths, update_progress,
+	    &did_something, repo);
 done:
 	if (repo)
 		got_repo_close(repo);

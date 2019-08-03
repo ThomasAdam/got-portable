@@ -382,3 +382,11 @@ const struct got_error *got_worktree_get_histedit_script_path(char **,
 const struct got_error *got_worktree_stage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_status_cb, void *,
     struct got_repository *);
+
+/*
+ * Merge staged changes for the specified paths back into the work tree
+ * and mark the paths as non-staged again.
+ */
+const struct got_error *got_worktree_unstage(struct got_worktree *,
+    struct got_pathlist_head *, got_worktree_checkout_cb, void *,
+    struct got_repository *);

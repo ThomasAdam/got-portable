@@ -5229,3 +5229,116 @@ done:
 		err = unlockerr;
 	return err;
 }
+
+struct unstage_path_arg {
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	struct got_repository *repo;
+	got_worktree_checkout_cb progress_cb;
+	void *progress_arg;
+};
+
+static const struct got_error *
+unstage_path(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
+{
+	const struct got_error *err = NULL;
+	struct unstage_path_arg *a = arg;
+	struct got_fileindex_entry *ie;
+	struct got_blob_object *blob_base = NULL, *blob_staged = NULL;
+	char *ondisk_path = NULL;
+	int local_changes_subsumed;
+
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
+	if (ie == NULL)
+		return got_error_path(relpath, GOT_ERR_BAD_PATH);
+
+	switch (staged_status) {
+	case GOT_STATUS_MODIFY:
+		err = got_object_open_as_blob(&blob_base, a->repo,
+		    blob_id, 8192);
+		if (err)
+			break;
+		/* fall through */
+	case GOT_STATUS_ADD:
+		err = got_object_open_as_blob(&blob_staged, a->repo,
+		    staged_blob_id, 8192);
+		if (err)
+			break;
+
+		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+		    relpath) == -1) {
+			err= got_error_from_errno("asprintf");
+			break;
+		}
+
+		err = merge_blob(&local_changes_subsumed, a->worktree,
+		    blob_base, ondisk_path, relpath,
+		    got_fileindex_perms_to_st(ie), blob_staged,
+		    commit_id ? commit_id : a->worktree->base_commit_id,
+		    a->repo, a->progress_cb, a->progress_arg);
+		if (err == NULL)
+			got_fileindex_entry_stage_set(ie,
+			    GOT_FILEIDX_STAGE_NONE);
+		break;
+	case GOT_STATUS_DELETE:
+		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
+		err = (*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
+		    relpath);
+		break;
+	}
+
+	free(ondisk_path);
+	if (blob_base)
+		got_object_blob_close(blob_base);
+	if (blob_staged)
+		got_object_blob_close(blob_staged);
+	return err;
+}
+
+const struct got_error *
+got_worktree_unstage(struct got_worktree *worktree,
+    struct got_pathlist_head *paths,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
+	struct got_pathlist_entry *pe;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	struct unstage_path_arg upa;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	upa.worktree = worktree;
+	upa.fileindex = fileindex;
+	upa.repo = repo;
+	upa.progress_cb = progress_cb;
+	upa.progress_arg = progress_arg;
+	TAILQ_FOREACH(pe, paths, entry) {
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+		    unstage_path, &upa, NULL, NULL);
+		if (err)
+			goto done;
+	}
+
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	free(fileindex_path);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
