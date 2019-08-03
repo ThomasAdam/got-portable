@@ -1,5 +1,5 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch commit \
-	cherrypick backout rebase import histedit
+	revert cherrypick backout rebase import histedit
 NOOBJ=Yes
 
 checkout:
@@ -31,6 +31,9 @@ branch:
 
 commit:
 	./commit.sh
+
+revert:
+	./revert.sh
 
 cherrypick:
 	./cherrypick.sh
