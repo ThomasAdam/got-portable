@@ -121,14 +121,14 @@ static const struct got_error*		cmd_stage(int, char *[]);
 static const struct got_error*		cmd_unstage(int, char *[]);
 
 static struct got_cmd got_commands[] = {
-	{ "init",	cmd_init,	usage_init,	"" },
-	{ "import",	cmd_import,	usage_import,	"" },
+	{ "init",	cmd_init,	usage_init,	"in" },
+	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
 	{ "update",	cmd_update,	usage_update,	"up" },
 	{ "log",	cmd_log,	usage_log,	"" },
-	{ "diff",	cmd_diff,	usage_diff,	"" },
-	{ "blame",	cmd_blame,	usage_blame,	"" },
-	{ "tree",	cmd_tree,	usage_tree,	"" },
+	{ "diff",	cmd_diff,	usage_diff,	"di" },
+	{ "blame",	cmd_blame,	usage_blame,	"bl" },
+	{ "tree",	cmd_tree,	usage_tree,	"tr" },
 	{ "status",	cmd_status,	usage_status,	"st" },
 	{ "ref",	cmd_ref,	usage_ref,	"" },
 	{ "branch",	cmd_branch,	usage_branch,	"br" },
