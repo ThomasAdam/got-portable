@@ -571,11 +571,6 @@ If a path is found to be out of date,
 .Cm got update
 must be used first in order to merge local changes with changes made
 in the repository.
-If changes have been staged with
-.Cm got stage ,
-the
-.Cm got commit
-command will refuse to commit any paths which do not have staged changes.
 .It Cm ci
 Short alias for
 .Cm commit .
@@ -865,7 +860,7 @@ Stage local changes at the specified paths for inclusion in the next commit.
 Paths may be staged if they are added, modified, or deleted according to
 .Cm got status .
 .Pp
-Staged changes affect the behaviour of the
+Staged changes affect the behaviour of
 .Cm got commit ,
 .Cm got status ,
 and
