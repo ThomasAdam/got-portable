@@ -112,19 +112,23 @@ function test_double_rm {
 	(cd $testroot/wt && got rm beta > /dev/null)
 
 	for fflag in "" "-f"; do
-		(cd $testroot/wt && got rm $fflag beta 2> $testroot/stderr)
-		ret="$?"
-		if [ "$ret" == "0" ]; then
-			echo "got rm command succeeded unexpectedly" >&2
-			test_done "$testroot" 1
-		fi
-
-		grep "No such file or directory" $testroot/stderr > \
-			$testroot/stderr.actual
+		echo -n > $testroot/stderr.expected
+		(cd $testroot/wt && got rm $fflag beta > $testroot/stdout \
+			2> $testroot/stderr)
 		ret="$?"
 		if [ "$ret" != "0" ]; then
-			cat $testroot/stderr
+			echo "got rm command failed unexpectedly" >&2
+			diff -u $testroot/stderr.expected $testroot/stderr
 			test_done "$testroot" "$ret"
+			return 1
+		fi
+		echo -n > $testroot/stdout.expected
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
 		fi
 	done
 	test_done "$testroot" "0"

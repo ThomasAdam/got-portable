@@ -2945,7 +2945,7 @@ cmd_add(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, x;
+	int ch;
 
 	TAILQ_INIT(&paths);
 
@@ -2987,20 +2987,10 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	for (x = 0; x < argc; x++) {
-		char *path = realpath(argv[x], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[x]);
-			goto done;
-		}
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
-		got_path_strip_trailing_slashes(path);
-		error = got_pathlist_insert(&pe, &paths, path, NULL);
-		if (error) {
-			free(path);
-			goto done;
-		}
-	}
 	error = got_worktree_schedule_add(worktree, &paths, print_status,
 	    NULL, repo);
 done:
@@ -3031,7 +3021,7 @@ cmd_remove(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, i, delete_local_mods = 0;
+	int ch, delete_local_mods = 0;
 
 	TAILQ_INIT(&paths);
 
@@ -3075,20 +3065,10 @@ cmd_remove(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	for (i = 0; i < argc; i++) {
-		char *path = realpath(argv[i], NULL);
-		if (path == NULL) {
-			error = got_error_from_errno2("realpath", argv[i]);
-			goto done;
-		}
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
-		got_path_strip_trailing_slashes(path);
-		error = got_pathlist_insert(&pe, &paths, path, NULL);
-		if (error) {
-			free(path);
-			goto done;
-		}
-	}
 	error = got_worktree_schedule_delete(worktree, &paths,
 	    delete_local_mods, print_status, NULL, repo);
 	if (error)
@@ -3129,9 +3109,7 @@ cmd_revert(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	char *cwd = NULL, *path = NULL;
 	struct got_pathlist_head paths;
-	struct got_pathlist_entry *pe;
-	const char *worktree_path;
-	int ch, i;
+	int ch;
 
 	TAILQ_INIT(&paths);
 
@@ -3172,38 +3150,9 @@ cmd_revert(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	worktree_path = got_worktree_get_root_path(worktree);
-	for (i = 0; i < argc; i++) {
-		char *path = realpath(argv[i], NULL);
-		if (path == NULL) {
-			if (errno != ENOENT) {
-				error = got_error_from_errno2("realpath",
-				    argv[i]);
-				goto done;
-			}
-			if (got_path_is_child(argv[i], worktree_path,
-			    strlen(worktree_path))) {
-				path = strdup(argv[i]);
-				if (path == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-
-			} else if (asprintf(&path, "%s/%s",
-			    got_worktree_get_root_path(worktree),
-			    argv[i]) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-		}
-
-		got_path_strip_trailing_slashes(path);
-		error = got_pathlist_insert(&pe, &paths, path, NULL);
-		if (error) {
-			free(path);
-			goto done;
-		}
-	}
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
 	error = got_worktree_revert(worktree, &paths,
 	    revert_progress, NULL, repo);
@@ -5246,8 +5195,7 @@ cmd_stage(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	const char *worktree_path;
-	int ch, x, list_stage = 0;
+	int ch, list_stage = 0;
 
 	TAILQ_INIT(&paths);
 
@@ -5292,60 +5240,14 @@ cmd_stage(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	worktree_path = got_worktree_get_root_path(worktree);
-	for (x = 0; x < argc; x++) {
-		char *path;
-		if (list_stage) {
-			error = got_worktree_resolve_path(&path, worktree,
-			    argv[x]);
-			if (error)
-				break;
-		} else
-			path = realpath(argv[x], NULL);
-		if (path == NULL) {
-			if (errno != ENOENT) {
-				error = got_error_from_errno2("realpath",
-				    argv[x]);
-				goto done;
-			}
-			if (got_path_is_child(argv[x], worktree_path,
-			    strlen(worktree_path))) {
-				path = strdup(argv[x]);
-				if (path == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
+	if (error)
+		goto done;
 
-			} else if (asprintf(&path, "%s/%s",
-			    got_worktree_get_root_path(worktree),
-			    argv[x]) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-		}
-
-		got_path_strip_trailing_slashes(path);
-		error = got_pathlist_insert(&pe, &paths, path, NULL);
-		if (error) {
-			free(path);
-			goto done;
-		}
-	}
-
-	if (list_stage) {
-		if (TAILQ_EMPTY(&paths)) {
-			char *s = strdup("");
-			if (s == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			error = got_pathlist_append(&paths, s, NULL);
-			if (error)
-				goto done;
-		}
+	if (list_stage)
 		error = got_worktree_status(worktree, &paths, repo,
 		    print_stage, NULL, check_cancelled, NULL);
-	} else
+	else
 		error = got_worktree_stage(worktree, &paths, print_status,
 		    NULL, repo);
 done:

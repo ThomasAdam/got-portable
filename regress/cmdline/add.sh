@@ -84,9 +84,9 @@ function test_add_multiple {
 		return 1
 	fi
 
-	echo "A  bar" > $testroot/stdout.expected
+	echo "A  foo" > $testroot/stdout.expected
+	echo "A  bar" >> $testroot/stdout.expected
 	echo "A  baz" >> $testroot/stdout.expected
-	echo "A  foo" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -120,7 +120,39 @@ function test_add_file_in_new_subdir {
 	test_done "$testroot" "$ret"
 }
 
+function test_add_deleted {
+	local testroot=`test_init add_deleted`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got add beta > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got add command succeeded unexpectedly" >&2
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: beta: file has unexpected status" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple
 run_test test_add_file_in_new_subdir
+run_test test_add_deleted

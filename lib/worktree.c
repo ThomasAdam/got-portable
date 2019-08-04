@@ -2498,10 +2498,19 @@ schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
+	unsigned char status;
+	struct stat sb;
 
-	/* Re-adding an existing entry is a no-op. */
-	if (got_fileindex_entry_get(fileindex, relpath, strlen(relpath)))
-		return NULL;
+	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	if (ie) {
+		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		if (err)
+			return err;
+		/* Re-adding an existing entry is a no-op. */
+		if (status == GOT_STATUS_ADD)
+			return NULL;
+		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
+	}
 
 	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
 	if (err)
@@ -2518,7 +2527,7 @@ schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
 
 const struct got_error *
 got_worktree_schedule_add(struct got_worktree *worktree,
-    struct got_pathlist_head *ondisk_paths,
+    struct got_pathlist_head *paths,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -2535,15 +2544,14 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, ondisk_paths, entry) {
-		char *relpath;
-		err = got_path_skip_common_ancestor(&relpath,
-		    got_worktree_get_root_path(worktree), pe->path);
-		if (err)
-			break;
-		err = schedule_addition(pe->path, fileindex, relpath,
+	TAILQ_FOREACH(pe, paths, entry) {
+		char *ondisk_path;
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    pe->path) == -1)
+			return got_error_from_errno("asprintf");
+		err = schedule_addition(ondisk_path, fileindex, pe->path,
 		    status_cb, status_arg, repo);
-		free(relpath);
+		free(ondisk_path);
 		if (err)
 			break;
 	}
@@ -2604,7 +2612,7 @@ schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
 
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *worktree,
-    struct got_pathlist_head *ondisk_paths, int delete_local_mods,
+    struct got_pathlist_head *paths, int delete_local_mods,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
 {
@@ -2621,15 +2629,14 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	TAILQ_FOREACH(pe, ondisk_paths, entry) {
-		char *relpath;
-		err = got_path_skip_common_ancestor(&relpath,
-		    got_worktree_get_root_path(worktree), pe->path);
-		if (err)
-			break;
-		err = schedule_for_deletion(pe->path, fileindex, relpath,
+	TAILQ_FOREACH(pe, paths, entry) {
+		char *ondisk_path;
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    pe->path) == -1)
+			return got_error_from_errno("asprintf");
+		err = schedule_for_deletion(ondisk_path, fileindex, pe->path,
 		    delete_local_mods, status_cb, status_arg, repo);
-		free(relpath);
+		free(ondisk_path);
 		if (err)
 			break;
 	}
@@ -2817,8 +2824,13 @@ got_worktree_revert(struct got_worktree *worktree,
 		goto done;
 
 	TAILQ_FOREACH(pe, ondisk_paths, entry) {
-		err = revert_file(worktree, fileindex, pe->path,
+		char *ondisk_path;
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    pe->path) == -1)
+			return got_error_from_errno("asprintf");
+		err = revert_file(worktree, fileindex, ondisk_path,
 		    progress_cb, progress_arg, repo);
+		free(ondisk_path);
 		if (err)
 			break;
 	}
@@ -5188,28 +5200,26 @@ got_worktree_stage(struct got_worktree *worktree,
 
 	/* Check out-of-dateness before staging anything. */
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *relpath;
-		err = got_path_skip_common_ancestor(&relpath,
-		    got_worktree_get_root_path(worktree), pe->path);
-		if (err)
-			goto done;
-		err = stage_check_out_of_date(relpath, pe->path,
+		char *ondisk_path;
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    pe->path) == -1)
+			return got_error_from_errno("asprintf");
+		err = stage_check_out_of_date(pe->path, ondisk_path,
 		    head_commit_id, worktree, fileindex, repo);
-		free(relpath);
+		free(ondisk_path);
 		if (err)
 			goto done;
 	}
 
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *relpath;
-		err = got_path_skip_common_ancestor(&relpath,
-		    got_worktree_get_root_path(worktree), pe->path);
-		if (err)
-			break;
-		err = stage_path(relpath, pe->path,
+		char *ondisk_path;
+		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
+		    pe->path) == -1)
+			return got_error_from_errno("asprintf");
+		err = stage_path(pe->path, ondisk_path,
 		    (const char *)pe->data, worktree, fileindex, repo,
 		    status_cb, status_arg);
-		free(relpath);
+		free(ondisk_path);
 		if (err)
 			break;
 	}

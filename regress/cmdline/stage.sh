@@ -326,32 +326,17 @@ function test_stage_add_already_staged_file {
 
 	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
 
-	(cd $testroot/wt && got add beta \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "got add command succeeded unexpectedly" >&2
-		test_done "$testroot" "1"
-		return 1
-	fi
-	echo "got: realpath: beta: No such file or directory" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
 	echo -n > $testroot/stdout.expected
-	for f in alpha foo; do
+	for f in alpha beta foo; do
 		(cd $testroot/wt && got add $f \
 			> $testroot/stdout 2> $testroot/stderr)
+		echo "got: $f: file has unexpected status" \
+			> $testroot/stderr.expected
+		cmp -s $testroot/stderr.expected $testroot/stderr
 		ret="$?"
 		if [ "$ret" != "0" ]; then
-			echo "got add command failed unexpectedly" >&2
-			test_done "$testroot" "1"
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
 			return 1
 		fi
 		cmp -s $testroot/stdout.expected $testroot/stdout
@@ -396,13 +381,20 @@ function test_stage_rm_already_staged_file {
 	(cd $testroot/wt && got rm beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "got rm command succeeded unexpectedly" >&2
+	if [ "$ret" != "0" ]; then
+		echo "got rm command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "got: realpath: beta: No such file or directory" \
-		> $testroot/stderr.expected
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
