@@ -875,6 +875,17 @@ Stage local changes at the specified paths for inclusion in the next commit.
 Paths may be staged if they are added, modified, or deleted according to
 .Cm got status .
 .Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It A Ta file addition has been staged
+.It M Ta file modification has been staged
+.It D Ta file deletion has been staged
+.El
+.Pp
+Staged file contents are saved in newly created blob objects in the repository.
+These blobs will be referred to by tree objects once staged changes are
+committed.
+.Pp
 Staged changes affect the behaviour of
 .Cm got commit ,
 .Cm got status ,
@@ -903,13 +914,9 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl l
 Instead of staging new changes, list paths which are already staged,
-along with the IDs of corresponding blob objects.
-Indicate staged status using the following status codes:
-.Bl -column YXZ description
-.It A Ta file addition is staged
-.It M Ta file modification is staged
-.It D Ta file deletion is staged
-.El
+along with the IDs of staged blob objects and stage status codes.
+If paths were provided in the command line show the staged paths
+among the specified paths. Otherwise, show all staged paths.
 .El
 .Pp
 .Cm got stage
