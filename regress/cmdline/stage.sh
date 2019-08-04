@@ -44,6 +44,70 @@ function test_stage_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_list {
+	local testroot=`test_init stage_list`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	(cd $testroot/wt && got stage -l > $testroot/stdout)
+	(cd $testroot/wt && got diff -s alpha | grep '^blob +' | \
+		cut -d' ' -f3 | tr -d '\n' > $testroot/stdout.expected)
+	echo " M alpha" >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff -s beta | grep '^blob -' | \
+		cut -d' ' -f3 | tr -d '\n' >> $testroot/stdout.expected)
+	echo " D beta" >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff -s foo | grep '^blob +' | \
+		cut -d' ' -f3 | tr -d '\n' >> $testroot/stdout.expected)
+	echo " A foo" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -l epsilon nonexistent \
+		> $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -l alpha > $testroot/stdout)
+
+	(cd $testroot/wt && got diff -s alpha | grep '^blob +' | \
+		cut -d' ' -f3 | tr -d '\n' > $testroot/stdout.expected)
+	echo " M alpha" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 function test_stage_conflict {
 	local testroot=`test_init stage_conflict`
 	local initial_commit=`git_show_head $testroot/repo`
@@ -1040,6 +1104,7 @@ function test_stage_commit {
 }
 
 run_test test_stage_basic
+run_test test_stage_list
 run_test test_stage_conflict
 run_test test_stage_out_of_date
 run_test test_double_stage
