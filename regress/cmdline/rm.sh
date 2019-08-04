@@ -70,7 +70,8 @@ function test_rm_with_local_mods {
 	fi
 
 	echo "modified beta" > $testroot/wt/beta
-	echo 'got: file contains modifications' > $testroot/stderr.expected
+	echo 'got: beta: file contains modifications' \
+		> $testroot/stderr.expected
 	(cd $testroot/wt && got rm beta 2>$testroot/stderr)
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
@@ -134,6 +135,65 @@ function test_double_rm {
 	test_done "$testroot" "0"
 }
 
+function test_rm_and_add_elsewhere {
+	local testroot=`test_init rm_and_add_elsewhere`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && mv alpha epsilon/)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo '!  alpha' > $testroot/stdout.expected
+	echo '?  epsilon/alpha' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'D  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got rm alpha > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'A  epsilon/alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got add epsilon/alpha > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo 'D  alpha' > $testroot/stdout.expected
+	echo 'A  epsilon/alpha' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rm_basic
 run_test test_rm_with_local_mods
 run_test test_double_rm
+run_test test_rm_and_add_elsewhere
