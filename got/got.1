@@ -195,6 +195,15 @@ is incompatible with the
 .Fl b
 option.
 .Pp
+.Cm got update
+cannot update paths with staged changes.
+If changes have been staged with
+.Cm got stage ,
+these changes must first be comitted with
+.Cm got commit
+or unstaged with
+.Cm got unstage .
+.Pp
 The options for
 .Cm got update
 are as follows:
@@ -235,6 +244,23 @@ If no
 .Ar path
 is specified, show modifications in the entire work tree.
 Otherwise, show modifications at or within the specified paths.
+.Pp
+If changes have been staged with
+.Cm got stage ,
+staged changes are shown in the second output column, using the following
+status codes:
+.Bl -column YXZ description
+.It M Ta file modification is staged
+.It A Ta file addition is staged
+.It D Ta file deletion is staged
+.El
+.Pp
+If a path has staged changes, modification status of local changes shown
+in the first output column is relative to the staged changes:
+.Bl -column YXZ description
+.It MM Ta modified file was modified again after being staged
+.It MA Ta added file was modified after being staged
+.El
 .It Cm st
 Short alias for
 .Cm status .
@@ -278,7 +304,7 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Ar object1 Ar object2 | Ar path ]
+.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Fl s ] [ Ar object1 Ar object2 | Ar path ]
 When invoked within a work tree with less than two arguments, display
 uncommitted changes in the work tree.
 If a
@@ -305,6 +331,13 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
+.It Fl s
+Show changes staged with
+.Cm got stage
+instead of showing local changes.
+This option is only valid when
+.Cm got diff
+is invoked in a work tree.
 .El
 .It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
 Display line-by-line history of a file at the specified path.
@@ -479,12 +512,17 @@ it will be restored.
 Short alias for
 .Cm revert .
 .It Cm commit [ Fl m Ar message ] [ path ... ]
-Create a new commit in the repository from local changes in a work tree
+Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
 If no
 .Ar path
-is specified, commit all local changes in the work tree.
-Otherwise, commit local changes at or within the specified paths.
+is specified, commit all changes in the work tree.
+Otherwise, commit changes at or within the specified paths.
+.Pp
+If changes have been explicitly staged for commit with
+.Cm got stage,
+only commit staged changes and reject any specified paths which
+have not been staged.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -533,6 +571,11 @@ If a path is found to be out of date,
 .Cm got update
 must be used first in order to merge local changes with changes made
 in the repository.
+If changes have been staged with
+.Cm got stage ,
+the
+.Cm got commit
+command will refuse to commit any paths which do not have staged changes.
 .It Cm ci
 Short alias for
 .Cm commit .
@@ -675,6 +718,12 @@ will refuse to run if certain preconditions are not met.
 If the work tree contains multiple base commits it must first be updated
 to a single base commit with
 .Cm got update .
+If changes have been staged with
+.Cm got stage ,
+these changes must first be comitted with
+.Cm got commit
+or unstaged with
+.Cm got unstage .
 If the work tree contains local changes, these changes must first be
 committed with
 .Cm got commit
@@ -775,6 +824,12 @@ reference namespace, the history of the branch may not be edited.
 If the work tree contains multiple base commits it must first be updated
 to a single base commit with
 .Cm got update .
+If changes have been staged with
+.Cm got stage ,
+these changes must first be comitted with
+.Cm got commit
+or unstaged with
+.Cm got unstage .
 If the work tree contains local changes, these changes must first be
 committed with
 .Cm got commit
@@ -805,6 +860,91 @@ If this option is used, no further command-line arguments are allowed.
 .It Cm he
 Short alias for
 .Cm histedit .
+.It Cm stage [ Fl l ] Ar file-path ...
+Stage local changes at the specified paths for inclusion in the next commit.
+Paths may be staged if they are added, modified, or deleted according to
+.Cm got status .
+.Pp
+Staged changes affect the behaviour of the
+.Cm got commit ,
+.Cm got status ,
+and
+.Cm got diff .
+While paths with staged changes exist, the
+.Cm got commit
+command will refuse to commit any paths which do not have staged changes.
+Local changes created on top of staged changes can only be committed if
+the path is staged again, or if the staged changes are committed first.
+The
+.Cm got status
+command will show both local changes and staged changes.
+The
+.Cm got diff
+is able to display local changes relative to staged changes, and to
+display staged changes relative to the repository.
+The
+.Cm got revert
+command cannot revert staged changes but may be used to revert
+local changes relative to staged changes.
+.Pp
+The options for
+.Cm got stage
+are as follows:
+.Bl -tag -width Ds
+.It Fl l
+Instead of staging new changes, list paths which are already staged,
+along with the IDs of corresponding blob objects.
+Indicate staged status using the following status codes:
+.Bl -column YXZ description
+.It A Ta file addition is staged
+.It M Ta file modification is staged
+.It D Ta file deletion is staged
+.El
+.El
+.Pp
+.Cm got stage
+will refuse to run if certain preconditions are not met.
+If a file contains merge conflicts, these conflicts must be resolved first.
+If a file is found to be out of date relative to the head commit on the
+work tree's current branch, the file must be updated with
+.Cm got update
+before it can be staged (however, this does not prevent the file from
+becoming out-of-date at some point after having been staged).
+.Pp
+The
+.Cm got update ,
+.Cm got rebase ,
+and
+.Cm got histedit
+commands will refuse to run while staged changes exist.
+If staged changes cannot be committed because a staged path
+is out of date, the path must be unstaged with
+.Cm got unstage
+before it can be updated with
+.Cm got update ,
+and may then be staged again if necessary.
+.It Cm sg
+Short alias for
+.Cm stage .
+.It Cm unstage [ Ar path ... ]
+Merge staged changes back into the work tree and put affected paths
+back into non-staged status.
+If no
+.Ar path
+is specified, unstage all staged changes across the entire work tree.
+.Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It G Ta file was unstaged
+.It C Ta file was unstaged and conflicts occurred during merge
+.It ! Ta changes destined for a missing file were not merged
+.It D Ta file was staged as deleted and still is deleted
+.It d Ta file's deletion was obstructed by local modifications
+.It ~ Ta changes destined for a non-regular file were not merged
+.El
+.It Cm ug
+Short alias for
+.Cm unstage .
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
