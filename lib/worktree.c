@@ -3945,6 +3945,7 @@ got_worktree_rebase_continue(struct got_object_id **commit_id,
 	char *tmp_branch_name = NULL, *branch_ref_name = NULL;
 	struct got_reference *commit_ref = NULL, *branch_ref = NULL;
 	char *fileindex_path = NULL;
+	int have_staged_files = 0;
 
 	*commit_id = NULL;
 	*new_base_branch = NULL;
@@ -3960,9 +3961,18 @@ got_worktree_rebase_continue(struct got_object_id **commit_id,
 	if (err)
 		goto done;
 
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+	if (have_staged_files) {
+		err = got_error(GOT_ERR_STAGED_PATHS);
+		goto done;
+	}
+
 	err = get_rebase_tmp_ref_name(&tmp_branch_name, worktree);
 	if (err)
-		return err;
+		goto done;
 
 	err = get_rebase_branch_symref_name(&branch_ref_name, worktree);
 	if (err)
@@ -4793,6 +4803,7 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 	struct got_reference *commit_ref = NULL;
 	struct got_reference *base_commit_ref = NULL;
 	char *fileindex_path = NULL;
+	int have_staged_files = 0;
 
 	*commit_id = NULL;
 	*tmp_branch = NULL;
@@ -4807,9 +4818,18 @@ got_worktree_histedit_continue(struct got_object_id **commit_id,
 	if (err)
 		goto done;
 
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+	if (have_staged_files) {
+		err = got_error(GOT_ERR_STAGED_PATHS);
+		goto done;
+	}
+
 	err = get_histedit_tmp_ref_name(&tmp_branch_name, worktree);
 	if (err)
-		return err;
+		goto done;
 
 	err = get_histedit_branch_symref_name(&branch_ref_name, worktree);
 	if (err)

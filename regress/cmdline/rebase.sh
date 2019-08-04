@@ -244,6 +244,29 @@ function test_rebase_continue {
 	# resolve the conflict
 	echo "modified alpha on branch and master" > $testroot/wt/alpha
 
+	# test interaction of 'got stage' and rebase -c
+	(cd $testroot/wt && got stage alpha > /dev/null)
+	(cd $testroot/wt && got rebase -c > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "rebase succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n "got: work tree contains files with staged changes; " \
+		> $testroot/stderr.expected
+	echo "these changes must be committed or unstaged first" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage alpha > /dev/null)
 	(cd $testroot/wt && got rebase -c > $testroot/stdout)
 
 	(cd $testroot/repo && git checkout -q newbranch)
