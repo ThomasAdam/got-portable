@@ -1161,16 +1161,16 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
 
@@ -2458,16 +2458,16 @@ cmd_status(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
 
@@ -3312,10 +3312,6 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
-	if (error)
-		goto done;
-
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
 		goto done;
@@ -3329,6 +3325,10 @@ cmd_commit(int argc, char *argv[])
 	else
 		error = apply_unveil(got_repo_get_path(repo), 0,
 		    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
 
