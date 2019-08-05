@@ -3459,9 +3459,8 @@ check_out_of_date(const char *in_repo_path, unsigned char status,
 		err = got_object_id_by_path(&id, repo, head_commit_id,
 		    in_repo_path);
 		if (err) {
-			if (err->code != GOT_ERR_NO_TREE_ENTRY)
-				goto done;
-			err = got_error(ood_errcode);
+			if (err->code == GOT_ERR_NO_TREE_ENTRY)
+				err = got_error(ood_errcode);
 			goto done;
 		} else if (got_object_id_cmp(id, base_blob_id) != 0)
 			err = got_error(ood_errcode);
