@@ -5077,7 +5077,7 @@ done:
 }
 
 static const struct got_error *
-stage_check_out_of_date(const char *relpath, const char *ondisk_path,
+check_stage_ok(const char *relpath, const char *ondisk_path,
     struct got_object_id *head_commit_id, struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo)
 {
@@ -5114,6 +5114,18 @@ stage_check_out_of_date(const char *relpath, const char *ondisk_path,
 	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
 	if (err)
 		goto done;
+	if (status == GOT_STATUS_NO_CHANGE) {
+		err = got_error_path(ie->path, GOT_ERR_STAGE_NO_CHANGE);
+		goto done;
+	} else if (status == GOT_STATUS_CONFLICT) {
+		err = got_error_path(ie->path, GOT_ERR_STAGE_CONFLICT);
+		goto done;
+	} else if (status != GOT_STATUS_ADD &&
+	    status != GOT_STATUS_MODIFY &&
+	    status != GOT_STATUS_DELETE) {
+		err = got_error_path(ie->path, GOT_ERR_FILE_STATUS);
+		goto done;
+	}
 
 	p = in_repo_path;
 	while (p[0] == '/')
@@ -5218,13 +5230,13 @@ got_worktree_stage(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	/* Check out-of-dateness before staging anything. */
+	/* Check pre-conditions before staging anything. */
 	TAILQ_FOREACH(pe, paths, entry) {
 		char *ondisk_path;
 		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 		    pe->path) == -1)
 			return got_error_from_errno("asprintf");
-		err = stage_check_out_of_date(pe->path, ondisk_path,
+		err = check_stage_ok(pe->path, ondisk_path,
 		    head_commit_id, worktree, fileindex, repo);
 		free(ondisk_path);
 		if (err)
