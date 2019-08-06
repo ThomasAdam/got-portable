@@ -44,6 +44,44 @@ function test_stage_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_no_changes {
+	local testroot=`test_init stage_no_changes`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage alpha beta > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: alpha: no changes to stage" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_stage_list {
 	local testroot=`test_init stage_list`
 
@@ -1104,6 +1142,7 @@ function test_stage_commit {
 }
 
 run_test test_stage_basic
+run_test test_stage_no_changes
 run_test test_stage_list
 run_test test_stage_conflict
 run_test test_stage_out_of_date
