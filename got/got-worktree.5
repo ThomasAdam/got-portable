@@ -68,6 +68,12 @@ A flags field (intentionally not documented).
 .It Path data
 The path of the entry, relative to the work tree root.
 Path data is of variable length and NUL-padded to a multiple of 8 bytes.
+.It Staged blob object ID
+The SHA1 hash of a blob object containing file content which has been
+staged for commit.
+The hash is stored as binary data.
+Only present if the path has been staged with
+.Cm got stage .
 .El
 .Pp
 A corrupt or missing file index can be recreated on demand with
