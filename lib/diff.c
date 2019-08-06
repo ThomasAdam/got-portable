@@ -140,8 +140,19 @@ got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	    NULL);
 }
 
-const struct got_error *
-got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
+static const struct got_error *
+alloc_changes(struct got_diff_changes **changes)
+{
+	*changes = calloc(1, sizeof(**changes));
+	if (*changes == NULL)
+		return got_error_from_errno("calloc");
+	SIMPLEQ_INIT(&(*changes)->entries);
+	return NULL;
+}
+
+static const struct got_error *
+diff_blob_file(struct got_diff_changes **changes,
+    struct got_blob_object *blob1, FILE *f2, size_t size2,
     const char *label2, int diff_context, FILE *outfile)
 {
 	struct got_diff_state ds;
@@ -152,6 +163,9 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	char *idstr1 = NULL;
 	size_t size1;
 	int res, flags = 0;
+
+	if (changes)
+		*changes = NULL;
 
 	size1 = 0;
 	if (blob1) {
@@ -189,13 +203,39 @@ got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
 	args.diff_context = diff_context;
 	flags |= D_PROTOTYPE;
 
-	fprintf(outfile, "blob - %s\n", idstr1);
-	fprintf(outfile, "file + %s\n", f2 == NULL ? "/dev/null" : label2);
-	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, NULL);
+	if (outfile) {
+		fprintf(outfile, "blob - %s\n", idstr1);
+		fprintf(outfile, "file + %s\n",
+		    f2 == NULL ? "/dev/null" : label2);
+	}
+	if (changes) {
+		err = alloc_changes(changes);
+		if (err)
+			return err;
+	}
+	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile,
+	    changes ? *changes : NULL);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
+}
+
+const struct got_error *
+got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
+    const char *label2, int diff_context, FILE *outfile)
+{
+	return diff_blob_file(NULL, blob1, f2, size2, label2, diff_context,
+	    outfile);
+}
+
+const struct got_error *
+got_diff_blob_file_lines_changed(struct got_diff_changes **changes,
+    struct got_blob_object *blob1, FILE *f2, size_t size2,
+    const char *label2, int diff_context)
+{
+	return diff_blob_file(changes, blob1, f2, size2, label2, diff_context,
+	    NULL);
 }
 
 const struct got_error *
@@ -204,10 +244,9 @@ got_diff_blob_lines_changed(struct got_diff_changes **changes,
 {
 	const struct got_error *err = NULL;
 
-	*changes = calloc(1, sizeof(**changes));
-	if (*changes == NULL)
-		return got_error_from_errno("calloc");
-	SIMPLEQ_INIT(&(*changes)->entries);
+	err = alloc_changes(changes);
+	if (err)
+		return err;
 
 	err = diff_blobs(blob1, blob2, NULL, NULL, 3, NULL, *changes);
 	if (err) {
