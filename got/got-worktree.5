@@ -64,7 +64,55 @@ This data is used to detect past incomplete update operations.
 Entries which do not match the work tree's base commit may still need
 to be updated to match file content stored in the base commit.
 .It Flags
-A flags field (intentionally not documented).
+This field contains the length, according to
+.Xr strlen 3 ,
+of path data which follows, and the following flags:
+.Bl -tag -width Ds
+.It STAGE
+Reflects the added, modified, or deleted staged state of a path staged with
+.Cm got stage .
+.It NOT_FLUSHED
+The entry was added to the file index in memory and does not exist in file
+index data read from disk.
+This happens to files which are added to the work tree while operations
+such as
+.Cm got checkout ,
+.Cm got update ,
+.Cm got cherrypick,
+.Cm got backout,
+.Cm got rebase,
+and
+.Cm got histedit
+are in progress.
+This flag is always cleared before the entry is written to disk.
+.It NO_BLOB
+The entry's on-disk file's content in the work tree is not based on
+a blob in the repository.
+The blob object ID of this entry must be considered invalid.
+This happens when unversioned files are added with
+.Cm got add
+and when files are added to the work tree by operations such as
+.Cm got cherrypick,
+.Cm got backout,
+.Cm got rebase,
+and
+.Cm got histedit .
+.It NO_COMMIT
+The entry is not based on a commit in the repository.
+The commit object ID of this entry must be considered invalid.
+This happens when unversioned files are added with
+.Cm got add
+and when files are added to the work tree by operations such as
+.Cm got cherrypick,
+.Cm got backout,
+.Cm got rebase,
+and
+.Cm got histedit .
+.It NO_FILE_ON_DISK
+The entry has no corresponding on-disk file in the work tree.
+This happens when files are removed with
+.Cm got remove .
+.El
 .It Path data
 The path of the entry, relative to the work tree root.
 Path data is of variable length and NUL-padded to a multiple of 8 bytes.
@@ -72,7 +120,7 @@ Path data is of variable length and NUL-padded to a multiple of 8 bytes.
 The SHA1 hash of a blob object containing file content which has been
 staged for commit.
 The hash is stored as binary data.
-Only present if the path has been staged with
+Only present if a file addition or modification has been staged with
 .Cm got stage .
 .El
 .Pp
