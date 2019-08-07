@@ -934,7 +934,6 @@ change(FILE *outfile, struct got_diff_changes *changes,
 			ptrdiff_t offset;
 			offset = ds->context_vec_ptr - ds->context_vec_start;
 			ds->max_context <<= 1;
-			ds->context_vec_start =
 			cvp = reallocarray(ds->context_vec_start,
 			    ds->max_context, sizeof(*ds->context_vec_start));
 			if (cvp == NULL) {
