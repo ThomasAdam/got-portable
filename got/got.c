@@ -4651,6 +4651,8 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 		printf("%s: %s\n(c)ontinue editing, (r)estart editing, "
 		    "or (a)bort: ", getprogname(), prev_err->msg);
 		resp = getchar();
+		if (resp == '\n')
+			resp = getchar();
 		if (resp == 'c') {
 			histedit_free_list(histedit_cmds);
 			err = histedit_run_editor(histedit_cmds, path, commits,
