@@ -4095,7 +4095,7 @@ done:
 __dead static void
 usage_histedit(void)
 {
-	fprintf(stderr, "usage: %s histedit [-a] [-c] [-F path]\n",
+	fprintf(stderr, "usage: %s histedit [-a] [-c] [-F histedit-script]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5160,7 +5160,8 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F] [file-path ...]\n",
+	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F response-script] "
+	    "[file-path ...]\n",
 	    getprogname());
 	exit(1);
 }
