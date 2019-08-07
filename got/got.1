@@ -870,7 +870,7 @@ If this option is used, no further command-line arguments are allowed.
 .It Cm he
 Short alias for
 .Cm histedit .
-.It Cm stage [ Fl l ] [ Fl p ] [ Fl F ] [ Ar path ... ]
+.It Cm stage [ Fl l ] [ Fl p ] [ Fl F Ar response-script ] [ Ar path ... ]
 Stage local changes for inclusion in the next commit.
 If no
 .Ar path
@@ -933,12 +933,16 @@ select or reject changes for staging based on
 If a file is in modified status, individual patches derived from the
 modified file content can be staged.
 Files in added or deleted status may be staged or rejected in their entirety.
-.It Fl F Ar path
+.It Fl F Ar response-script
 With the
 .Fl p
-option, read responses line-by-line from a script file at the specified
-.Ar path
-instead of prompting interactively.
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from a script file instead of prompting
+interactively.
 .El
 .Pp
 .Cm got stage
