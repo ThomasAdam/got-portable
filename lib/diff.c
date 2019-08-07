@@ -112,6 +112,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 		fprintf(outfile, "blob + %s\n", idstr2);
 	}
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
+	got_diff_state_free(&ds);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -215,6 +216,7 @@ diff_blob_file(struct got_diff_changes **changes,
 	}
 	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile,
 	    changes ? *changes : NULL);
+	got_diff_state_free(&ds);
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -741,5 +743,84 @@ done:
 		got_object_commit_close(commit1);
 	if (commit2)
 		got_object_commit_close(commit2);
+	return err;
+}
+
+const struct got_error *
+got_diff_files(struct got_diff_changes **changes,
+    struct got_diff_state **ds,
+    struct got_diff_args **args,
+    int *flags,
+    FILE *f1, size_t size1, const char *label1,
+    FILE *f2, size_t size2, const char *label2,
+    int diff_context, FILE *outfile)
+{
+	const struct got_error *err = NULL;
+	int res;
+
+	*flags = 0;
+	*ds = calloc(1, sizeof(**ds));
+	if (*ds == NULL)
+		return got_error_from_errno("calloc");
+	*args = calloc(1, sizeof(**args));
+	if (*args == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	if (changes)
+		*changes = NULL;
+
+	if (f1 == NULL)
+		*flags |= D_EMPTY1;
+
+	if (f2 == NULL)
+		*flags |= D_EMPTY2;
+
+	/* XXX should stat buffers be passed in args instead of ds? */
+	(*ds)->stb1.st_mode = S_IFREG;
+	(*ds)->stb1.st_size = size1;
+	(*ds)->stb1.st_mtime = 0; /* XXX */
+
+	(*ds)->stb2.st_mode = S_IFREG;
+	(*ds)->stb2.st_size = size2;
+	(*ds)->stb2.st_mtime = 0; /* XXX */
+
+	(*args)->diff_format = D_UNIFIED;
+	(*args)->label[0] = label1;
+	(*args)->label[1] = label2;
+	(*args)->diff_context = diff_context;
+	*flags |= D_PROTOTYPE;
+
+	if (outfile) {
+		fprintf(outfile, "file - %s\n",
+		    f1 == NULL ? "/dev/null" : label1);
+		fprintf(outfile, "file + %s\n",
+		    f2 == NULL ? "/dev/null" : label2);
+	}
+	if (changes) {
+		err = alloc_changes(changes);
+		if (err)
+			goto done;
+	}
+	err = got_diffreg(&res, f1, f2, *flags, *args, *ds, outfile,
+	    changes ? *changes : NULL);
+done:
+	if (err) {
+		if (*ds) {
+			got_diff_state_free(*ds);
+			free(*ds);
+			*ds = NULL;
+		}
+		if (*args) {
+			free(*args);
+			*args = NULL;
+		}
+		if (changes) {
+			if (*changes)
+				got_diff_free_changes(*changes);
+			*changes = NULL;
+		}
+	}
 	return err;
 }

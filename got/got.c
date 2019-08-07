@@ -1322,6 +1322,8 @@ get_datestr(time_t *time, char *datebuf)
 	return s;
 }
 
+#define GOT_COMMIT_SEP_STR "-----------------------------------------------\n"
+
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, int show_patch, int diff_context,
@@ -1364,7 +1366,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	if (err)
 		return err;
 
-	printf("-----------------------------------------------\n");
+	printf(GOT_COMMIT_SEP_STR);
 	printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
 	    refs_str ? refs_str : "", refs_str ? ")" : "");
 	free(id_str);
@@ -5156,7 +5158,7 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage [-l] | file-path ...\n",
+	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F] file-path ...\n",
 	    getprogname());
 	exit(1);
 }
@@ -5188,6 +5190,96 @@ print_stage(void *arg, unsigned char status, unsigned char staged_status,
 }
 
 static const struct got_error *
+show_change(unsigned char status, const char *path, FILE *patch_file)
+{
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+		printf("A  %s\nstage this addition? [y/n] ", path);
+		break;
+	case GOT_STATUS_DELETE:
+		printf("D  %s\nstage deletion? [y/n] ", path);
+		break;
+	case GOT_STATUS_MODIFY:
+		if (fseek(patch_file, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("fseek");
+		printf(GOT_COMMIT_SEP_STR);
+		while ((linelen = getline(&line, &linesize, patch_file) != -1))
+			printf("%s", line);
+		if (ferror(patch_file))
+			return got_error_from_errno("getline");
+		printf(GOT_COMMIT_SEP_STR);
+		printf("M  %s\nstage this change? [y/n] ", path);
+		break;
+	default:
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+choose_patch(int *choice, void *arg, unsigned char status, const char *path,
+    FILE *patch_file)
+{
+	const struct got_error *err = NULL;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
+	int resp = ' ';
+	FILE *patch_script_file = arg;
+
+	*choice = GOT_PATCH_CHOICE_NONE;
+
+	if (patch_script_file) {
+		char *nl;
+		linelen = getline(&line, &linesize, patch_script_file);
+		if (linelen == -1) {
+			if (ferror(patch_script_file))
+				return got_error_from_errno("getline");
+			return NULL;
+		}
+		nl = strchr(line, '\n');
+		if (nl)
+			*nl = '\0';
+		err = show_change(status, path, patch_file);
+		if (err)
+			return err;
+		if (strcmp(line, "y") == 0) {
+			*choice = GOT_PATCH_CHOICE_YES;
+			printf("y\n");
+		}
+		if (strcmp(line, "n") == 0) {
+			*choice = GOT_PATCH_CHOICE_NO;
+			printf("n\n");
+		}
+		free(line);
+		return NULL;
+	}
+
+	while (resp != 'y' && resp != 'n') {
+		err = show_change(status, path, patch_file);
+		if (err)
+			return err;
+		resp = getchar();
+		if (resp == '\n')
+			resp = getchar();
+		if (resp != 'y' && resp != 'n')
+			printf("invalid response '%c'\n", resp);
+	}
+
+	if (resp == 'y')
+		*choice = GOT_PATCH_CHOICE_YES;
+	else if (resp == 'n')
+		*choice = GOT_PATCH_CHOICE_NO;
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_stage(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -5196,14 +5288,22 @@ cmd_stage(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, list_stage = 0;
+	int ch, list_stage = 0, pflag = 0;
+	const char *patch_script_path = NULL;
+	FILE *patch_script_file = NULL;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "l")) != -1) {
+	while ((ch = getopt(argc, argv, "lpF:")) != -1) {
 		switch (ch) {
 		case 'l':
 			list_stage = 1;
+			break;
+		case 'p':
+			pflag = 1;
+			break;
+		case 'F':
+			patch_script_path = optarg;
 			break;
 		default:
 			usage_stage();
@@ -5219,8 +5319,10 @@ cmd_stage(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (!list_stage && argc < 1)
+	if ((list_stage && pflag) || (!list_stage && argc < 1))
 		usage_stage();
+	if (patch_script_path && !pflag)
+		errx(1, "-F option can only be used together with -p option");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -5236,6 +5338,14 @@ cmd_stage(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (patch_script_path) {
+		patch_script_file = fopen(patch_script_path, "r");
+		if (patch_script_file == NULL) {
+			error = got_error_from_errno2("fopen",
+			    patch_script_path);
+			goto done;
+		}
+	}
 	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
 	if (error)
@@ -5249,8 +5359,9 @@ cmd_stage(int argc, char *argv[])
 		error = got_worktree_status(worktree, &paths, repo,
 		    print_stage, NULL, check_cancelled, NULL);
 	else
-		error = got_worktree_stage(worktree, &paths, print_status,
-		    NULL, repo);
+		error = got_worktree_stage(worktree, &paths,
+		    pflag ? NULL : print_status, NULL,
+		    pflag ? choose_patch : NULL, patch_script_file, repo);
 done:
 	if (repo)
 		got_repo_close(repo);

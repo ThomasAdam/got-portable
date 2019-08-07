@@ -267,6 +267,18 @@ diff_output(FILE *outfile, const char *fmt, ...)
 	va_end(ap);
 }
 
+void
+got_diff_state_free(struct got_diff_state *ds)
+{
+	free(ds->J);
+	free(ds->member);
+	free(ds->class);
+	free(ds->clist);
+	free(ds->klist);
+	free(ds->ixold);
+	free(ds->ixnew);
+}
+
 const struct got_error *
 got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
     struct got_diff_args *args, struct got_diff_state *ds, FILE *outfile,
@@ -407,13 +419,6 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	    args->label[1], f2, flags))
 		err = got_error_from_errno("output");
 closem:
-	free(ds->J);
-	free(ds->member);
-	free(ds->class);
-	free(ds->clist);
-	free(ds->klist);
-	free(ds->ixold);
-	free(ds->ixnew);
 	if (ds->anychange) {
 		args->status |= 1;
 		if (*rval == D_SAME)
@@ -1232,6 +1237,19 @@ dump_unified_vec(FILE *outfile, struct got_diff_changes *changes,
 	fetch(outfile, ds, args, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
 
 	ds->context_vec_ptr = ds->context_vec_start - 1;
+}
+
+void
+got_diff_dump_change(FILE *outfile, struct got_diff_change *change,
+    struct got_diff_state *ds, struct got_diff_args *args,
+    FILE *f1, FILE *f2, int diff_flags)
+{
+	ds->context_vec_ptr = &change->cv;
+	ds->context_vec_start = &change->cv;
+	ds->context_vec_end = &change->cv;
+
+	/* XXX TODO needs error checking */
+	dump_unified_vec(outfile, NULL, ds, args, f1, f2, diff_flags);
 }
 
 static void

@@ -125,6 +125,8 @@ struct got_diff_state {
 	size_t max_context;
 };
 
+void got_diff_state_free(struct got_diff_state *);
+
 struct got_diff_args {
 	int	 Tflag;
 	int	 diff_format, diff_context, status;
@@ -148,3 +150,10 @@ void got_diff_free_changes(struct got_diff_changes *);
 
 const struct got_error *got_merge_diff3(int *, int, const char *, const char *,
     const char *, const char *, const char *);
+
+const struct got_error *got_diff_files(struct got_diff_changes **,
+    struct got_diff_state **, struct got_diff_args **, int *, FILE *, size_t,
+    const char *, FILE *, size_t, const char *, int, FILE *);
+
+void got_diff_dump_change(FILE *, struct got_diff_change *,
+    struct got_diff_state *, struct got_diff_args *, FILE *, FILE *, int);

@@ -372,16 +372,24 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
 const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
 
+
+/* A callback function which is used to select or reject a patch. */
+typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
+    unsigned char, const char *, FILE *);
+
+/* Values for result output parameter of got_wortree_patch_cb. */
+#define GOT_PATCH_CHOICE_NONE	0
+#define GOT_PATCH_CHOICE_YES	1
+#define GOT_PATCH_CHOICE_NO	2
+
 /*
  * Stage the specified paths for commit.
- * If the 'data' pointer of a pathlist element on the path list is NULL then
- * stage the content of the entire file at this path. Otherwise, the 'data'
- * pointer is expected to point at a const char * path of a file which
- * contains alternative content to be staged instead.
+ * If the patch callback is not NULL, call it to select patch hunks for
+ * staging. Otherwise, stage the full file content found at each path.
 */
 const struct got_error *got_worktree_stage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_status_cb, void *,
-    struct got_repository *);
+    got_worktree_patch_cb, void *, struct got_repository *);
 
 /*
  * Merge staged changes for the specified paths back into the work tree

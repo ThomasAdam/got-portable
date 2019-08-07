@@ -1141,6 +1141,398 @@ function test_stage_commit {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_patch {
+	local testroot=`test_init stage_patch`
+
+	jot 16 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+
+	# don't stage any hunks
+	printf "n\nn\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# stage middle hunk
+	printf "n\ny\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] y
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "MM numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo "--- numbers" >> $testroot/stdout.expected
+	echo "+++ numbers" >> $testroot/stdout.expected
+	echo "@@ -4,7 +4,7 @@" >> $testroot/stdout.expected
+	echo " 4" >> $testroot/stdout.expected
+	echo " 5" >> $testroot/stdout.expected
+	echo " 6" >> $testroot/stdout.expected
+	echo "-7" >> $testroot/stdout.expected
+	echo "+b" >> $testroot/stdout.expected
+	echo " 8" >> $testroot/stdout.expected
+	echo " 9" >> $testroot/stdout.expected
+	echo " 10" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# stage last hunk
+	printf "n\nn\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers
+stage this change? [y/n] y
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "MM numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo "--- numbers" >> $testroot/stdout.expected
+	echo "+++ numbers" >> $testroot/stdout.expected
+	echo "@@ -13,4 +13,4 @@" >> $testroot/stdout.expected
+	echo " 13" >> $testroot/stdout.expected
+	echo " 14" >> $testroot/stdout.expected
+	echo " 15" >> $testroot/stdout.expected
+	echo "-16" >> $testroot/stdout.expected
+	echo "+c" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_stage_patch_added {
+	local testroot=`test_init stage_patch_added`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new > /dev/null)
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		epsilon/new > $testroot/stdout)
+
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " A epsilon/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l epsilon/new) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
+	echo "+++ epsilon/new" >> $testroot/stdout.expected
+	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
+	echo "+new" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_stage_patch_removed {
+	local testroot=`test_init stage_patch_removed`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		beta > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo "stage deletion? [y/n] y" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " D beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l beta) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo "--- beta" >> $testroot/stdout.expected
+	echo "+++ /dev/null" >> $testroot/stdout.expected
+	echo "@@ -1 +0,0 @@" >> $testroot/stdout.expected
+	echo "-beta" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_list
@@ -1157,3 +1549,6 @@ run_test test_stage_rebase
 run_test test_stage_update
 run_test test_stage_commit_non_staged
 run_test test_stage_commit
+run_test test_stage_patch
+run_test test_stage_patch_added
+run_test test_stage_patch_removed
