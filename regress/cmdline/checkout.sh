@@ -172,41 +172,6 @@ function test_checkout_sets_xbit {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_sets_xbit {
-	local testroot=`test_init checkout_sets_xbit 1`
-
-	touch $testroot/repo/xfile
-	chmod +x $testroot/repo/xfile
-	(cd $testroot/repo && git add .)
-	git_commit $testroot/repo -m "adding executable file"
-
-	echo "A  $testroot/wt/xfile" > $testroot/stdout.expected
-	echo "Now shut up and hack" >> $testroot/stdout.expected
-
-	got checkout $testroot/repo $testroot/wt > $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	ls -l $testroot/wt/xfile | grep -q '^-rwx'
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		echo "file is not executable" >&2
-		ls -l $testroot/wt/xfile >&2
-	fi
-	test_done "$testroot" "$ret"
-}
-
 function test_checkout_commit_from_wrong_branch {
 	local testroot=`test_init checkout_commit_from_wrong_branch`
 
