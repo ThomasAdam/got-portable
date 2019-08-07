@@ -870,8 +870,12 @@ If this option is used, no further command-line arguments are allowed.
 .It Cm he
 Short alias for
 .Cm histedit .
-.It Cm stage [ Fl l ] [ Fl p ] [ Fl F ] Ar file-path ...
-Stage local changes at the specified paths for inclusion in the next commit.
+.It Cm stage [ Fl l ] [ Fl p ] [ Fl F ] [ Ar path ... ]
+Stage local changes for inclusion in the next commit.
+If no
+.Ar path
+is specified, stage all changes in the work tree.
+Otherwise, stage changes at or within the specified paths.
 Paths may be staged if they are added, modified, or deleted according to
 .Cm got status .
 .Pp
@@ -967,6 +971,7 @@ back into non-staged status.
 If no
 .Ar path
 is specified, unstage all staged changes across the entire work tree.
+Otherwise, unstage changes at or within the specified paths.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description

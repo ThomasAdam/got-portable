@@ -5076,44 +5076,42 @@ done:
 	return err;
 }
 
-static const struct got_error *
-check_stage_ok(const char *relpath, const char *ondisk_path,
-    struct got_object_id *head_commit_id, struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_repository *repo)
+struct check_stage_ok_arg {
+	struct got_object_id *head_commit_id;
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	struct got_repository *repo;
+	int have_changes;
+};
+
+const struct got_error *
+check_stage_ok(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
 {
+	struct check_stage_ok_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
-	unsigned char status;
-	struct stat sb;
-	struct got_object_id blob_id, base_commit_id;
-	struct got_object_id *blob_idp = NULL, *base_commit_idp = NULL;
+	struct got_object_id base_commit_id;
+	struct got_object_id *base_commit_idp = NULL;
 	char *in_repo_path = NULL, *p;
 
-	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 
-	if (get_staged_status(ie) != GOT_STATUS_NO_CHANGE)
-		return NULL;
-
-	if (asprintf(&in_repo_path, "%s%s%s", worktree->path_prefix,
-	    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
+	if (asprintf(&in_repo_path, "%s%s%s", a->worktree->path_prefix,
+	    got_path_is_root_dir(a->worktree->path_prefix) ? "" : "/",
 	    relpath) == -1)
 		return got_error_from_errno("asprintf");
 
-	if (got_fileindex_entry_has_blob(ie)) {
-		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		blob_idp = &blob_id;
-	}
 	if (got_fileindex_entry_has_commit(ie)) {
 		memcpy(base_commit_id.sha1, ie->commit_sha1,
 		    SHA1_DIGEST_LENGTH);
 		base_commit_idp = &base_commit_id;
 	}
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
-	if (err)
-		goto done;
 	if (status == GOT_STATUS_NO_CHANGE) {
 		err = got_error_path(ie->path, GOT_ERR_STAGE_NO_CHANGE);
 		goto done;
@@ -5127,11 +5125,13 @@ check_stage_ok(const char *relpath, const char *ondisk_path,
 		goto done;
 	}
 
+	a->have_changes = 1;
+
 	p = in_repo_path;
 	while (p[0] == '/')
 		p++;
-	err = check_out_of_date(p, status, GOT_STATUS_NO_CHANGE,
-	    blob_idp, base_commit_idp, head_commit_id, repo,
+	err = check_out_of_date(p, status, staged_status,
+	    blob_id, base_commit_idp, a->head_commit_id, a->repo,
 	    GOT_ERR_STAGE_OUT_OF_DATE);
 done:
 	free(in_repo_path);
@@ -5396,53 +5396,58 @@ done:
 	return err;
 }
 
+struct stage_path_arg {
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	struct got_repository *repo;
+	got_worktree_status_cb status_cb;
+	void *status_arg;
+	got_worktree_patch_cb patch_cb;
+	void *patch_arg;
+};
+
 static const struct got_error *
-stage_path(const char *relpath, const char *ondisk_path,
-    struct got_worktree *worktree, struct got_fileindex *fileindex,
-    struct got_repository *repo,
-    got_worktree_status_cb status_cb, void *status_arg,
-    got_worktree_patch_cb patch_cb, void *patch_arg)
+stage_path(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
 {
+	struct stage_path_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
-	char *path_content = NULL;
-	unsigned char status, staged_status;
-	struct stat sb;
-	struct got_object_id blob_id, *staged_blob_id = NULL;
+	char *ondisk_path = NULL, *path_content = NULL;
 	uint32_t stage;
 
-	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
-	if (err)
-		return err;
-	staged_status = get_staged_status(ie);
+	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+	    relpath)== -1)
+		return got_error_from_errno("asprintf");
 
 	switch (status) {
 	case GOT_STATUS_ADD:
 	case GOT_STATUS_MODIFY:
-		memcpy(&blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
-		if (patch_cb) {
+		if (a->patch_cb) {
 			if (status == GOT_STATUS_ADD) {
 				int choice = GOT_PATCH_CHOICE_NONE;
-				err = (*patch_cb)(&choice, patch_arg, status,
-				    ie->path, NULL);
+				err = (*a->patch_cb)(&choice, a->patch_arg,
+				    status, ie->path, NULL);
 				if (err)
 					break;
 				if (choice != GOT_PATCH_CHOICE_YES)
 					break;
 			} else {
 				err = create_staged_content(&path_content,
-				    &blob_id, ondisk_path, ie->path, repo,
-				    patch_cb, patch_arg);
+				    blob_id, ondisk_path, ie->path, a->repo,
+				    a->patch_cb, a->patch_arg);
 				if (err || path_content == NULL)
 					break;
 			}
 		}
 		err = got_object_blob_create(&staged_blob_id,
-		    path_content ? path_content : ondisk_path, repo);
+		    path_content ? path_content : ondisk_path, a->repo);
 		if (err)
 			break;
 		memcpy(ie->staged_blob_sha1, staged_blob_id->sha1,
@@ -5452,18 +5457,18 @@ stage_path(const char *relpath, const char *ondisk_path,
 		else
 			stage = GOT_FILEIDX_STAGE_MODIFY;
 		got_fileindex_entry_stage_set(ie, stage);
-		if (status_cb == NULL)
+		if (a->status_cb == NULL)
 			break;
-		err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
-		    get_staged_status(ie), relpath, &blob_id,
+		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
+		    get_staged_status(ie), relpath, blob_id,
 		    staged_blob_id, NULL);
 		break;
 	case GOT_STATUS_DELETE:
 		if (staged_status == GOT_STATUS_DELETE)
 			break;
-		if (patch_cb) {
+		if (a->patch_cb) {
 			int choice = GOT_PATCH_CHOICE_NONE;
-			err = (*patch_cb)(&choice, patch_arg, status,
+			err = (*a->patch_cb)(&choice, a->patch_arg, status,
 			    ie->path, NULL);
 			if (err)
 				break;
@@ -5472,9 +5477,9 @@ stage_path(const char *relpath, const char *ondisk_path,
 		}
 		stage = GOT_FILEIDX_STAGE_DELETE;
 		got_fileindex_entry_stage_set(ie, stage);
-		if (status_cb == NULL)
+		if (a->status_cb == NULL)
 			break;
-		err = (*status_cb)(status_arg, GOT_STATUS_NO_CHANGE,
+		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, NULL, NULL, NULL);
 		break;
 	case GOT_STATUS_NO_CHANGE:
@@ -5491,7 +5496,7 @@ stage_path(const char *relpath, const char *ondisk_path,
 	if (path_content && unlink(path_content) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", path_content);
 	free(path_content);
-	free(staged_blob_id);
+	free(ondisk_path);
 	return err;
 }
 
@@ -5508,6 +5513,8 @@ got_worktree_stage(struct got_worktree *worktree,
 	char *fileindex_path = NULL;
 	struct got_reference *head_ref = NULL;
 	struct got_object_id *head_commit_id = NULL;
+	struct check_stage_ok_arg oka;
+	struct stage_path_arg spa;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -5525,29 +5532,34 @@ got_worktree_stage(struct got_worktree *worktree,
 		goto done;
 
 	/* Check pre-conditions before staging anything. */
+	oka.head_commit_id = head_commit_id;
+	oka.worktree = worktree;
+	oka.fileindex = fileindex;
+	oka.repo = repo;
+	oka.have_changes = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *ondisk_path;
-		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-		    pe->path) == -1)
-			return got_error_from_errno("asprintf");
-		err = check_stage_ok(pe->path, ondisk_path,
-		    head_commit_id, worktree, fileindex, repo);
-		free(ondisk_path);
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+		    check_stage_ok, &oka, NULL, NULL);
 		if (err)
 			goto done;
 	}
+	if (!oka.have_changes) {
+		err = got_error(GOT_ERR_STAGE_NO_CHANGE);
+		goto done;
+	}
 
+	spa.worktree = worktree;
+	spa.fileindex = fileindex;
+	spa.repo = repo;
+	spa.patch_cb = patch_cb;
+	spa.patch_arg = patch_arg;
+	spa.status_cb = status_cb;
+	spa.status_arg = status_arg;
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *ondisk_path;
-		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-		    pe->path) == -1)
-			return got_error_from_errno("asprintf");
-		err = stage_path(pe->path, ondisk_path,
-		    worktree, fileindex, repo, status_cb, status_arg,
-		    patch_cb, patch_arg);
-		free(ondisk_path);
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+		    stage_path, &spa, NULL, NULL);
 		if (err)
-			break;
+			goto done;
 	}
 
 	sync_err = sync_fileindex(fileindex, fileindex_path);

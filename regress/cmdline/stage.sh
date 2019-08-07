@@ -63,7 +63,7 @@ function test_stage_no_changes {
 		return 1
 	fi
 
-	echo "got: alpha: no changes to stage" > $testroot/stderr.expected
+	echo "got: no changes to stage" > $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -1552,10 +1552,10 @@ function test_stage_patch_quit {
 	sed -i -e 's/^7$/b/' $testroot/wt/numbers
 	sed -i -e 's/^16$/c/' $testroot/wt/numbers
 
-	# stage first hunk and quit
+	# stage first hunk and quit; and don't pass a path argument
 	printf "y\nq\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
-		numbers > $testroot/stdout)
+		> $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got stage command failed unexpectedly" >&2

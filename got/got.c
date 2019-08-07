@@ -5160,7 +5160,7 @@ done:
 __dead static void
 usage_stage(void)
 {
-	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F] file-path ...\n",
+	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F] [file-path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5327,8 +5327,8 @@ cmd_stage(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if ((list_stage && pflag) || (!list_stage && argc < 1))
-		usage_stage();
+	if (list_stage && (pflag || patch_script_path))
+		errx(1, "-l option cannot be used with other options");
 	if (patch_script_path && !pflag)
 		errx(1, "-F option can only be used together with -p option");
 
