@@ -1181,7 +1181,7 @@ function test_stage_patch {
  5
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
  4
@@ -1194,7 +1194,7 @@ stage this change? [y/n] n
  10
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -13,4 +13,4 @@
  13
@@ -1204,7 +1204,7 @@ stage this change? [y/n] n
 +c
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -1240,7 +1240,7 @@ EOF
  5
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
  4
@@ -1253,7 +1253,7 @@ stage this change? [y/n] n
  10
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] y
+stage this change? [y/n/q] y
 -----------------------------------------------
 @@ -13,4 +13,4 @@
  13
@@ -1263,7 +1263,7 @@ stage this change? [y/n] y
 +c
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -1346,7 +1346,7 @@ EOF
  5
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
  4
@@ -1359,7 +1359,7 @@ stage this change? [y/n] n
  10
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] n
+stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -13,4 +13,4 @@
  13
@@ -1369,7 +1369,7 @@ stage this change? [y/n] n
 +c
 -----------------------------------------------
 M  numbers
-stage this change? [y/n] y
+stage this change? [y/n/q] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -1435,7 +1435,7 @@ function test_stage_patch_added {
 		epsilon/new > $testroot/stdout)
 
 	echo "A  epsilon/new" > $testroot/stdout.expected
-	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
+	echo "stage this addition? [y/n/q] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1494,7 +1494,7 @@ function test_stage_patch_removed {
 	echo -n > $testroot/stdout.expected
 
 	echo "D  beta" > $testroot/stdout.expected
-	echo "stage deletion? [y/n] y" >> $testroot/stdout.expected
+	echo "stage deletion? [y/n/q] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1533,6 +1533,108 @@ function test_stage_patch_removed {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_patch_quit {
+	local testroot=`test_init stage_patch_quit`
+
+	jot 16 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+
+	# stage first hunk and quit
+	printf "y\nq\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers
+stage this change? [y/n/q] y
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers
+stage this change? [y/n/q] q
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "MM numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo "--- numbers" >> $testroot/stdout.expected
+	echo "+++ numbers" >> $testroot/stdout.expected
+	echo "@@ -1,5 +1,5 @@" >> $testroot/stdout.expected
+	echo " 1" >> $testroot/stdout.expected
+	echo "-2" >> $testroot/stdout.expected
+	echo "+a" >> $testroot/stdout.expected
+	echo " 3" >> $testroot/stdout.expected
+	echo " 4" >> $testroot/stdout.expected
+	echo " 5" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_list
@@ -1552,3 +1654,4 @@ run_test test_stage_commit
 run_test test_stage_patch
 run_test test_stage_patch_added
 run_test test_stage_patch_removed
+run_test test_stage_patch_quit

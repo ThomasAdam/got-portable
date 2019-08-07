@@ -381,6 +381,7 @@ typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
 #define GOT_PATCH_CHOICE_NONE	0
 #define GOT_PATCH_CHOICE_YES	1
 #define GOT_PATCH_CHOICE_NO	2
+#define GOT_PATCH_CHOICE_QUIT	3
 
 /*
  * Stage the specified paths for commit.

@@ -5274,6 +5274,15 @@ apply_or_reject_change(int *choice, struct got_diff_change *change,
 			(*line_cur2)++;
 		}
 		break;
+	case GOT_PATCH_CHOICE_QUIT:
+		/* Copy old file's lines until EOF. */
+		while (!feof(f1)) {
+			err = copy_one_line(f1, outfile);
+			if (err)
+				goto done;
+			(*line_cur1)++;
+		}
+		break;
 	default:
 		err = got_error(GOT_ERR_PATCH_CHOICE);
 		break;
@@ -5355,6 +5364,8 @@ create_staged_content(char **path_outfile, struct got_object_id *blob_id,
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
 			have_content = 1;
+		else if (choice == GOT_PATCH_CHOICE_QUIT)
+			break;
 	}
 done:
 	free(id_str);
