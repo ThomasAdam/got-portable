@@ -916,7 +916,8 @@ cmd_checkout(int argc, char *argv[])
 	/* Pre-create work tree path for unveil(2) */
 	error = got_path_mkdir(worktree_path);
 	if (error) {
-		if (!(error->code == GOT_ERR_ERRNO && errno == EISDIR))
+		if (!(error->code == GOT_ERR_ERRNO && errno == EISDIR) &&
+		    !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
 			goto done;
 		if (!got_path_dir_is_empty(worktree_path)) {
 			error = got_error_path(worktree_path,

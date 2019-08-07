@@ -55,6 +55,123 @@ function test_checkout_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_dir_exists {
+	local testroot=`test_init checkout_dir_exists`
+
+	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	mkdir $testroot/wt
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_checkout_dir_not_empty {
+	local testroot=`test_init checkout_dir_not_empty`
+
+	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	mkdir $testroot/wt
+	touch $testroot/wt/foo
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "checkout succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: $testroot/wt: directory exists and is not empty" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
+function test_checkout_sets_xbit {
+	local testroot=`test_init checkout_sets_xbit 1`
+
+	touch $testroot/repo/xfile
+	chmod +x $testroot/repo/xfile
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding executable file"
+
+	echo "A  $testroot/wt/xfile" > $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ls -l $testroot/wt/xfile | grep -q '^-rwx'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is not executable" >&2
+		ls -l $testroot/wt/xfile >&2
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_checkout_sets_xbit {
 	local testroot=`test_init checkout_sets_xbit 1`
 
@@ -129,5 +246,7 @@ function test_checkout_commit_from_wrong_branch {
 }
 
 run_test test_checkout_basic
+run_test test_checkout_dir_exists
+run_test test_checkout_dir_not_empty
 run_test test_checkout_sets_xbit
 run_test test_checkout_commit_from_wrong_branch
