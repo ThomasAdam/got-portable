@@ -5205,7 +5205,7 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 		printf("A  %s\nstage this addition? [y/n] ", path);
 		break;
 	case GOT_STATUS_DELETE:
-		printf("D  %s\nstage deletion? [y/n] ", path);
+		printf("D  %s\nstage this deletion? [y/n] ", path);
 		break;
 	case GOT_STATUS_MODIFY:
 		if (fseek(patch_file, 0L, SEEK_SET) == -1)

@@ -1494,7 +1494,7 @@ function test_stage_patch_removed {
 	echo -n > $testroot/stdout.expected
 
 	echo "D  beta" > $testroot/stdout.expected
-	echo "stage deletion? [y/n] y" >> $testroot/stdout.expected
+	echo "stage this deletion? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1591,7 +1591,7 @@ stage this change? [y/n/q] y
 M  numbers (change 2 of 3)
 stage this change? [y/n/q] q
 D  zzz
-stage deletion? [y/n] n
+stage this deletion? [y/n] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
