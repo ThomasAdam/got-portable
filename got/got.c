@@ -3419,8 +3419,11 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content);
 done:
-	unlink(a->logmsg_path);
-	free(a->logmsg_path);
+	if (err == NULL || err->code == GOT_ERR_COMMIT_MSG_EMPTY) {
+		unlink(a->logmsg_path);
+		free(a->logmsg_path);
+		a->logmsg_path = NULL;
+	}
 	free(initial_content);
 	free(template);
 
