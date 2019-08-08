@@ -2683,31 +2683,43 @@ done:
 	return err;
 }
 
+struct revert_file_args {
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	got_worktree_checkout_cb progress_cb;
+	void *progress_arg;
+	struct got_repository *repo;
+};
+
 static const struct got_error *
-revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
-    const char *ondisk_path,
-    got_worktree_checkout_cb progress_cb, void *progress_arg,
-    struct got_repository *repo)
+revert_file(void *arg, unsigned char status, unsigned char staged_status,
+    const char *relpath, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
 {
+	struct revert_file_args *a = arg;
 	const struct got_error *err = NULL;
-	char *relpath = NULL, *parent_path = NULL;
+	char *parent_path = NULL;
 	struct got_fileindex_entry *ie;
 	struct got_tree_object *tree = NULL;
 	struct got_object_id *tree_id = NULL;
 	const struct got_tree_entry *te = NULL;
 	char *tree_path = NULL, *te_name;
+	char *ondisk_path = NULL;
 	struct got_blob_object *blob = NULL;
-	unsigned char status, staged_status;
-	struct stat sb;
 
-	err = got_path_skip_common_ancestor(&relpath,
-	    got_worktree_get_root_path(worktree), ondisk_path);
-	if (err)
-		goto done;
+	if (asprintf(&ondisk_path, "%s/%s",
+	    got_worktree_get_root_path(a->worktree), relpath) == -1)
+		return got_error_from_errno("asprintf");
 
-	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL) {
 		err = got_error(GOT_ERR_BAD_PATH);
+		goto done;
+	}
+
+	if (status == GOT_STATUS_DELETE &&
+	    staged_status != GOT_STATUS_NO_CHANGE) {
+		err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
 		goto done;
 	}
 
@@ -2722,7 +2734,7 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 			goto done;
 		}
 	}
-	if (got_path_is_root_dir(worktree->path_prefix)) {
+	if (got_path_is_root_dir(a->worktree->path_prefix)) {
 		tree_path = strdup(parent_path);
 		if (tree_path == NULL) {
 			err = got_error_from_errno("strdup");
@@ -2730,42 +2742,29 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		}
 	} else {
 		if (got_path_is_root_dir(parent_path)) {
-			tree_path = strdup(worktree->path_prefix);
+			tree_path = strdup(a->worktree->path_prefix);
 			if (tree_path == NULL) {
 				err = got_error_from_errno("strdup");
 				goto done;
 			}
 		} else {
 			if (asprintf(&tree_path, "%s/%s",
-			    worktree->path_prefix, parent_path) == -1) {
+			    a->worktree->path_prefix, parent_path) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 		}
 	}
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
-	if (err)
-		goto done;
-	if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
-		sb.st_mode = got_fileindex_perms_to_st(ie);
-
-	staged_status = get_staged_status(ie);
-	if (status == GOT_STATUS_DELETE &&
-	    staged_status != GOT_STATUS_NO_CHANGE) {
-		err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
-		goto done;
-	}
-
-	err = got_object_id_by_path(&tree_id, repo, worktree->base_commit_id,
-	    tree_path);
+	err = got_object_id_by_path(&tree_id, a->repo,
+	    a->worktree->base_commit_id, tree_path);
 	if (err) {
 		if (!(err->code == GOT_ERR_NO_TREE_ENTRY &&
 		    (status == GOT_STATUS_ADD ||
 		    staged_status == GOT_STATUS_ADD)))
 			goto done;
 	} else {
-		err = got_object_open_as_tree(&tree, repo, tree_id);
+		err = got_object_open_as_tree(&tree, a->repo, tree_id);
 		if (err)
 			goto done;
 
@@ -2785,10 +2784,11 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	switch (status) {
 	case GOT_STATUS_ADD:
-		err = (*progress_cb)(progress_arg, GOT_STATUS_REVERT, ie->path);
+		err = (*a->progress_cb)(a->progress_arg, GOT_STATUS_REVERT,
+		    ie->path);
 		if (err)
 			goto done;
-		got_fileindex_entry_remove(fileindex, ie);
+		got_fileindex_entry_remove(a->fileindex, ie);
 		break;
 	case GOT_STATUS_DELETE:
 	case GOT_STATUS_MODIFY:
@@ -2802,27 +2802,28 @@ revert_file(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		} else
 			memcpy(id.sha1, ie->blob_sha1,
 			    SHA1_DIGEST_LENGTH);
-		err = got_object_open_as_blob(&blob, repo, &id, 8192);
+		err = got_object_open_as_blob(&blob, a->repo, &id, 8192);
 		if (err)
 			goto done;
-		err = install_blob(worktree, ondisk_path, ie->path,
-		    te ? te->mode : GOT_DEFAULT_FILE_MODE, sb.st_mode,
-		    blob, 0, 1, repo, progress_cb, progress_arg);
+		err = install_blob(a->worktree, ondisk_path, ie->path,
+		    te ? te->mode : GOT_DEFAULT_FILE_MODE,
+		    got_fileindex_perms_to_st(ie), blob, 0, 1,
+		    a->repo, a->progress_cb, a->progress_arg);
 		if (err)
 			goto done;
 		if (status == GOT_STATUS_DELETE) {
-			err = update_blob_fileindex_entry(worktree,
-			    fileindex, ie, ondisk_path, ie->path, blob, 1);
+			err = update_blob_fileindex_entry(a->worktree,
+			    a->fileindex, ie, ondisk_path, ie->path, blob, 1);
 			if (err)
 				goto done;
 		}
 		break;
 	}
 	default:
-			goto done;
+		break;
 	}
 done:
-	free(relpath);
+	free(ondisk_path);
 	free(parent_path);
 	free(tree_path);
 	if (blob)
@@ -2844,6 +2845,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	const struct got_error *err = NULL, *unlockerr = NULL;
 	const struct got_error *sync_err = NULL;
 	struct got_pathlist_entry *pe;
+	struct revert_file_args rfa;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -2853,14 +2855,14 @@ got_worktree_revert(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	rfa.worktree = worktree;
+	rfa.fileindex = fileindex;
+	rfa.progress_cb = progress_cb;
+	rfa.progress_arg = progress_arg;
+	rfa.repo = repo;
 	TAILQ_FOREACH(pe, ondisk_paths, entry) {
-		char *ondisk_path;
-		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-		    pe->path) == -1)
-			return got_error_from_errno("asprintf");
-		err = revert_file(worktree, fileindex, ondisk_path,
-		    progress_cb, progress_arg, repo);
-		free(ondisk_path);
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+		    revert_file, &rfa, NULL, NULL);
 		if (err)
 			break;
 	}
@@ -4559,38 +4561,6 @@ done:
 	return err;
 }
 
-struct collect_revertible_paths_arg {
-	struct got_pathlist_head *revertible_paths;
-	struct got_worktree *worktree;
-};
-
-static const struct got_error *
-collect_revertible_paths(void *arg, unsigned char status,
-    unsigned char staged_status, const char *relpath,
-    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
-{
-	struct collect_revertible_paths_arg *a = arg;
-	const struct got_error *err = NULL;
-	struct got_pathlist_entry *new = NULL;
-	char *path = NULL;
-
-	if (status != GOT_STATUS_ADD &&
-	    status != GOT_STATUS_DELETE &&
-	    status != GOT_STATUS_MODIFY &&
-	    status != GOT_STATUS_CONFLICT &&
-	    status != GOT_STATUS_MISSING)
-		return NULL;
-
-	if (asprintf(&path, "%s/%s", a->worktree->root_path, relpath) == -1)
-		return got_error_from_errno("asprintf");
-
-	err = got_pathlist_insert(&new, a->revertible_paths, path, NULL);
-	if (err || new == NULL)
-		free(path);
-	return err;
-}
-
 const struct got_error *
 got_worktree_rebase_abort(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
@@ -4601,12 +4571,8 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	struct got_reference *resolved = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *fileindex_path = NULL;
-	struct got_pathlist_head revertible_paths;
-	struct got_pathlist_entry *pe;
-	struct collect_revertible_paths_arg crp_arg;
+	struct revert_file_args rfa;
 	struct got_object_id *tree_id = NULL;
-
-	TAILQ_INIT(&revertible_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -4647,19 +4613,15 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	crp_arg.revertible_paths = &revertible_paths;
-	crp_arg.worktree = worktree;
+	rfa.worktree = worktree;
+	rfa.fileindex = fileindex;
+	rfa.progress_cb = progress_cb;
+	rfa.progress_arg = progress_arg;
+	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    collect_revertible_paths, &crp_arg, NULL, NULL);
+	    revert_file, &rfa, NULL, NULL);
 	if (err)
-		goto done;
-
-	TAILQ_FOREACH(pe, &revertible_paths, entry) {
-		err = revert_file(worktree, fileindex, pe->path,
-		    progress_cb, progress_arg, repo);
-		if (err)
-			goto sync;
-	}
+		goto sync;
 
 	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
 	    repo, progress_cb, progress_arg, NULL, NULL);
@@ -4674,9 +4636,6 @@ done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	free(fileindex_path);
-	TAILQ_FOREACH(pe, &revertible_paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&revertible_paths);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -4972,12 +4931,8 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;
 	char *fileindex_path = NULL;
-	struct got_pathlist_head revertible_paths;
-	struct got_pathlist_entry *pe;
-	struct collect_revertible_paths_arg crp_arg;
 	struct got_object_id *tree_id = NULL;
-
-	TAILQ_INIT(&revertible_paths);
+	struct revert_file_args rfa;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -5009,19 +4964,15 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	crp_arg.revertible_paths = &revertible_paths;
-	crp_arg.worktree = worktree;
+	rfa.worktree = worktree;
+	rfa.fileindex = fileindex;
+	rfa.progress_cb = progress_cb;
+	rfa.progress_arg = progress_arg;
+	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    collect_revertible_paths, &crp_arg, NULL, NULL);
+	    revert_file, &rfa, NULL, NULL);
 	if (err)
-		goto done;
-
-	TAILQ_FOREACH(pe, &revertible_paths, entry) {
-		err = revert_file(worktree, fileindex, pe->path,
-		    progress_cb, progress_arg, repo);
-		if (err)
-			goto sync;
-	}
+		goto sync;
 
 	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
 	    repo, progress_cb, progress_arg, NULL, NULL);
@@ -5033,9 +4984,6 @@ done:
 	got_ref_close(resolved);
 	free(tree_id);
 	free(fileindex_path);
-	TAILQ_FOREACH(pe, &revertible_paths, entry)
-		free((char *)pe->path);
-	got_pathlist_free(&revertible_paths);
 
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)

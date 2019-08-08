@@ -221,8 +221,47 @@ function test_revert_file_in_new_subdir {
 
 }
 
+function test_revert_no_arguments {
+	local testroot=`test_init revert_no_arguments`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
+
+	(cd $testroot/wt && got revert > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "revert command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "usage: got revert file-path ..." > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
 run_test test_revert_multiple
 run_test test_revert_file_in_new_subdir
+run_test test_revert_no_arguments
