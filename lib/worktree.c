@@ -2707,15 +2707,9 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	char *ondisk_path = NULL;
 	struct got_blob_object *blob = NULL;
 
-	if (asprintf(&ondisk_path, "%s/%s",
-	    got_worktree_get_root_path(a->worktree), relpath) == -1)
-		return got_error_from_errno("asprintf");
-
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
-	if (ie == NULL) {
-		err = got_error(GOT_ERR_BAD_PATH);
-		goto done;
-	}
+	if (ie == NULL)
+		return got_error(GOT_ERR_BAD_PATH);
 
 	if (status == GOT_STATUS_DELETE &&
 	    staged_status != GOT_STATUS_NO_CHANGE) {
@@ -2805,6 +2799,13 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		err = got_object_open_as_blob(&blob, a->repo, &id, 8192);
 		if (err)
 			goto done;
+
+		if (asprintf(&ondisk_path, "%s/%s",
+		    got_worktree_get_root_path(a->worktree), relpath) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+
 		err = install_blob(a->worktree, ondisk_path, ie->path,
 		    te ? te->mode : GOT_DEFAULT_FILE_MODE,
 		    got_fileindex_perms_to_st(ie), blob, 0, 1,
