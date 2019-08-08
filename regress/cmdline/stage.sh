@@ -1617,6 +1617,195 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_patch_twice {
+	local testroot=`test_init stage_patch_twice`
+
+	jot 16 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+
+	# stage middle hunk
+	printf "n\ny\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 3)
+stage this change? [y/n/q] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers (change 2 of 3)
+stage this change? [y/n/q] y
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 3 of 3)
+stage this change? [y/n/q] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "MM numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# stage last hunk
+	printf "n\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@ b
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 2)
+stage this change? [y/n/q] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@ b
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 2 of 2)
+stage this change? [y/n/q] y
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "MM numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo "--- numbers" >> $testroot/stdout.expected
+	echo "+++ numbers" >> $testroot/stdout.expected
+	cat >> $testroot/stdout.expected <<EOF
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
+		tr -d '\n' >> $testroot/stdout.expected
+	echo " (staged)" >> $testroot/stdout.expected
+	echo 'file + numbers' >> $testroot/stdout.expected
+	echo "--- numbers" >> $testroot/stdout.expected
+	echo "+++ numbers" >> $testroot/stdout.expected
+	cat >> $testroot/stdout.expected <<EOF
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_stage_patch_added {
 	local testroot=`test_init stage_patch_added`
 	local commit_id=`git_show_head $testroot/repo`
@@ -1956,6 +2145,7 @@ run_test test_stage_commit_non_staged
 run_test test_stage_commit_out_of_date
 run_test test_stage_commit
 run_test test_stage_patch
+run_test test_stage_patch_twice
 run_test test_stage_patch_added
 run_test test_stage_patch_removed
 run_test test_stage_patch_quit

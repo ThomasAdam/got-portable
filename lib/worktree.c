@@ -5479,6 +5479,7 @@ stage_path(void *arg, unsigned char status,
 	struct got_fileindex_entry *ie;
 	char *ondisk_path = NULL, *path_content = NULL;
 	uint32_t stage;
+	struct got_object_id *new_staged_blob_id = NULL;
 
 	if (status == GOT_STATUS_UNVERSIONED)
 		return NULL;
@@ -5505,17 +5506,18 @@ stage_path(void *arg, unsigned char status,
 					break;
 			} else {
 				err = create_staged_content(&path_content,
-				    blob_id, ondisk_path, ie->path, a->repo,
+				    staged_blob_id ? staged_blob_id : blob_id,
+				    ondisk_path, ie->path, a->repo,
 				    a->patch_cb, a->patch_arg);
 				if (err || path_content == NULL)
 					break;
 			}
 		}
-		err = got_object_blob_create(&staged_blob_id,
+		err = got_object_blob_create(&new_staged_blob_id,
 		    path_content ? path_content : ondisk_path, a->repo);
 		if (err)
 			break;
-		memcpy(ie->staged_blob_sha1, staged_blob_id->sha1,
+		memcpy(ie->staged_blob_sha1, new_staged_blob_id->sha1,
 		    SHA1_DIGEST_LENGTH);
 		if (status == GOT_STATUS_ADD || staged_status == GOT_STATUS_ADD)
 			stage = GOT_FILEIDX_STAGE_ADD;
@@ -5526,7 +5528,7 @@ stage_path(void *arg, unsigned char status,
 			break;
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, blob_id,
-		    staged_blob_id, NULL);
+		    new_staged_blob_id, NULL);
 		break;
 	case GOT_STATUS_DELETE:
 		if (staged_status == GOT_STATUS_DELETE)
@@ -5566,6 +5568,7 @@ stage_path(void *arg, unsigned char status,
 		err = got_error_from_errno2("unlink", path_content);
 	free(path_content);
 	free(ondisk_path);
+	free(new_staged_blob_id);
 	return err;
 }
 
