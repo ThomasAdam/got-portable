@@ -375,7 +375,7 @@ const struct got_error *got_worktree_get_histedit_script_path(char **,
 
 /* A callback function which is used to select or reject a patch. */
 typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
-    unsigned char, const char *, FILE *);
+    unsigned char, const char *, FILE *, int, int);
 
 /* Values for result output parameter of got_wortree_patch_cb. */
 #define GOT_PATCH_CHOICE_NONE	0

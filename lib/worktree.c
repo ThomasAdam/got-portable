@@ -5177,10 +5177,11 @@ skip_one_line(FILE *f)
 }
 
 static const struct got_error *
-apply_or_reject_change(int *choice, struct got_diff_change *change,
-    struct got_diff_state *ds, struct got_diff_args *args, int diff_flags,
-    const char *relpath, FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
-    FILE *outfile, got_worktree_patch_cb patch_cb, void *patch_arg)
+apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
+    int nchanges, struct got_diff_state *ds, struct got_diff_args *args,
+    int diff_flags, const char *relpath, FILE *f1, FILE *f2, int *line_cur1,
+    int *line_cur2, FILE *outfile, got_worktree_patch_cb patch_cb,
+    void *patch_arg)
 {
 	const struct got_error *err = NULL;
 	int start_old = change->cv.a;
@@ -5216,7 +5217,7 @@ apply_or_reject_change(int *choice, struct got_diff_change *change,
 	}
 
 	err = (*patch_cb)(choice, patch_arg, GOT_STATUS_MODIFY, relpath,
-	    hunkfile);
+	    hunkfile, n, nchanges);
 	if (err)
 		goto done;
 
@@ -5308,6 +5309,7 @@ create_staged_content(char **path_outfile, struct got_object_id *blob_id,
 	struct got_diff_args *args = NULL;
 	struct got_diff_change *change;
 	int diff_flags = 0, line_cur1 = 1, line_cur2 = 1, have_content = 0;
+	int n = 0;
 
 	*path_outfile = NULL;
 
@@ -5357,8 +5359,9 @@ create_staged_content(char **path_outfile, struct got_object_id *blob_id,
 		return got_ferror(f2, GOT_ERR_IO);
 	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
 		int choice;
-		err = apply_or_reject_change(&choice, change, ds, args,
-		    diff_flags, relpath, f1, f2, &line_cur1, &line_cur2,
+		err = apply_or_reject_change(&choice, change, ++n,
+		    changes->nchanges, ds, args, diff_flags, relpath,
+		    f1, f2, &line_cur1, &line_cur2,
 		    outfile, patch_cb, patch_arg);
 		if (err)
 			goto done;
@@ -5433,7 +5436,7 @@ stage_path(void *arg, unsigned char status,
 			if (status == GOT_STATUS_ADD) {
 				int choice = GOT_PATCH_CHOICE_NONE;
 				err = (*a->patch_cb)(&choice, a->patch_arg,
-				    status, ie->path, NULL);
+				    status, ie->path, NULL, 1, 1);
 				if (err)
 					break;
 				if (choice != GOT_PATCH_CHOICE_YES)
@@ -5469,7 +5472,7 @@ stage_path(void *arg, unsigned char status,
 		if (a->patch_cb) {
 			int choice = GOT_PATCH_CHOICE_NONE;
 			err = (*a->patch_cb)(&choice, a->patch_arg, status,
-			    ie->path, NULL);
+			    ie->path, NULL, 1, 1);
 			if (err)
 				break;
 			if (choice != GOT_PATCH_CHOICE_YES)

@@ -5193,7 +5193,8 @@ print_stage(void *arg, unsigned char status, unsigned char staged_status,
 }
 
 static const struct got_error *
-show_change(unsigned char status, const char *path, FILE *patch_file)
+show_change(unsigned char status, const char *path, FILE *patch_file, int n,
+    int nchanges)
 {
 	char *line = NULL;
 	size_t linesize = 0;
@@ -5215,7 +5216,8 @@ show_change(unsigned char status, const char *path, FILE *patch_file)
 		if (ferror(patch_file))
 			return got_error_from_errno("getline");
 		printf(GOT_COMMIT_SEP_STR);
-		printf("M  %s\nstage this change? [y/n/q] ", path);
+		printf("M  %s (change %d of %d)\nstage this change? [y/n/q] ",
+		    path, n, nchanges);
 		break;
 	default:
 		return got_error_path(path, GOT_ERR_FILE_STATUS);
@@ -5226,7 +5228,7 @@ show_change(unsigned char status, const char *path, FILE *patch_file)
 
 static const struct got_error *
 choose_patch(int *choice, void *arg, unsigned char status, const char *path,
-    FILE *patch_file)
+    FILE *patch_file, int n, int nchanges)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -5248,7 +5250,7 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		err = show_change(status, path, patch_file);
+		err = show_change(status, path, patch_file, n, nchanges);
 		if (err)
 			return err;
 		if (strcmp(line, "y") == 0) {
@@ -5268,7 +5270,7 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 	}
 
 	while (resp != 'y' && resp != 'n' && resp != 'q') {
-		err = show_change(status, path, patch_file);
+		err = show_change(status, path, patch_file, n, nchanges);
 		if (err)
 			return err;
 		resp = getchar();

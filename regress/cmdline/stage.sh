@@ -1180,7 +1180,7 @@ function test_stage_patch {
  4
  5
 -----------------------------------------------
-M  numbers
+M  numbers (change 1 of 3)
 stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
@@ -1193,7 +1193,7 @@ stage this change? [y/n/q] n
  9
  10
 -----------------------------------------------
-M  numbers
+M  numbers (change 2 of 3)
 stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -13,4 +13,4 @@
@@ -1203,7 +1203,7 @@ stage this change? [y/n/q] n
 -16
 +c
 -----------------------------------------------
-M  numbers
+M  numbers (change 3 of 3)
 stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1239,7 +1239,7 @@ EOF
  4
  5
 -----------------------------------------------
-M  numbers
+M  numbers (change 1 of 3)
 stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
@@ -1252,7 +1252,7 @@ stage this change? [y/n/q] n
  9
  10
 -----------------------------------------------
-M  numbers
+M  numbers (change 2 of 3)
 stage this change? [y/n/q] y
 -----------------------------------------------
 @@ -13,4 +13,4 @@
@@ -1262,7 +1262,7 @@ stage this change? [y/n/q] y
 -16
 +c
 -----------------------------------------------
-M  numbers
+M  numbers (change 3 of 3)
 stage this change? [y/n/q] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1345,7 +1345,7 @@ EOF
  4
  5
 -----------------------------------------------
-M  numbers
+M  numbers (change 1 of 3)
 stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -4,7 +4,7 @@
@@ -1358,7 +1358,7 @@ stage this change? [y/n/q] n
  9
  10
 -----------------------------------------------
-M  numbers
+M  numbers (change 2 of 3)
 stage this change? [y/n/q] n
 -----------------------------------------------
 @@ -13,4 +13,4 @@
@@ -1368,7 +1368,7 @@ stage this change? [y/n/q] n
 -16
 +c
 -----------------------------------------------
-M  numbers
+M  numbers (change 3 of 3)
 stage this change? [y/n/q] y
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1572,7 +1572,7 @@ function test_stage_patch_quit {
  4
  5
 -----------------------------------------------
-M  numbers
+M  numbers (change 1 of 3)
 stage this change? [y/n/q] y
 -----------------------------------------------
 @@ -4,7 +4,7 @@
@@ -1585,7 +1585,7 @@ stage this change? [y/n/q] y
  9
  10
 -----------------------------------------------
-M  numbers
+M  numbers (change 2 of 3)
 stage this change? [y/n/q] q
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout

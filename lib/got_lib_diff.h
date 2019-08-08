@@ -93,7 +93,7 @@ struct got_diff_change {
 };
 
 struct got_diff_changes {
-	size_t nchanges;
+	int nchanges;
 	SIMPLEQ_HEAD(, got_diff_change) entries;
 };
 
