@@ -2877,8 +2877,9 @@ struct revert_file_args {
 };
 
 static const struct got_error *
-create_reverted_content(char **path_outfile, struct got_object_id *blob_id,
-    const char *path2, const char *relpath, struct got_repository *repo,
+create_patched_content(char **path_outfile, int reverse_patch,
+    struct got_object_id *blob_id, const char *path2,
+    const char *relpath, struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
 	const struct got_error *err;
@@ -2909,7 +2910,7 @@ create_reverted_content(char **path_outfile, struct got_object_id *blob_id,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(&path1, &f1, "got-stage-blob");
+	err = got_opentemp_named(&path1, &f1, "got-patched-blob");
 	if (err)
 		goto done;
 
@@ -2931,7 +2932,7 @@ create_reverted_content(char **path_outfile, struct got_object_id *blob_id,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named(path_outfile, &outfile, "got-stage-content");
+	err = got_opentemp_named(path_outfile, &outfile, "got-patched-content");
 	if (err)
 		goto done;
 
@@ -2944,7 +2945,9 @@ create_reverted_content(char **path_outfile, struct got_object_id *blob_id,
 		err = apply_or_reject_change(&choice, change, ++n,
 		    changes->nchanges, ds, args, diff_flags, relpath,
 		    f1, f2, &line_cur1, &line_cur2,
-		    NULL, outfile, patch_cb, patch_arg);
+		    reverse_patch ? NULL : outfile,
+		    reverse_patch ? outfile : NULL,
+		    patch_cb, patch_arg);
 		if (err)
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
@@ -3116,7 +3119,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 
 		if (a->patch_cb && (status == GOT_STATUS_MODIFY ||
 		    status == GOT_STATUS_CONFLICT)) {
-			err = create_reverted_content(&path_content, &id,
+			err = create_patched_content(&path_content, 1, &id,
 			    ondisk_path, ie->path, a->repo,
 			    a->patch_cb, a->patch_arg);
 			if (err || path_content == NULL)
@@ -5450,111 +5453,6 @@ done:
 	return err;
 }
 
-static const struct got_error *
-create_staged_content(char **path_outfile, struct got_object_id *blob_id,
-    const char *path2, const char *relpath, struct got_repository *repo,
-    got_worktree_patch_cb patch_cb, void *patch_arg)
-{
-	const struct got_error *err;
-	struct got_blob_object *blob = NULL;
-	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
-	char *path1 = NULL, *id_str = NULL;
-	struct stat sb1, sb2;
-	struct got_diff_changes *changes = NULL;
-	struct got_diff_state *ds = NULL;
-	struct got_diff_args *args = NULL;
-	struct got_diff_change *change;
-	int diff_flags = 0, line_cur1 = 1, line_cur2 = 1, have_content = 0;
-	int n = 0;
-
-	*path_outfile = NULL;
-
-	err = got_object_id_str(&id_str, blob_id);
-	if (err)
-		return err;
-
-	f2 = fopen(path2, "r");
-	if (f2 == NULL) {
-		err = got_error_from_errno2("fopen", path2);
-		goto done;
-	}
-
-	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
-	if (err)
-		goto done;
-
-	err = got_opentemp_named(&path1, &f1, "got-stage-blob");
-	if (err)
-		goto done;
-
-	err = got_object_blob_dump_to_file(NULL, NULL, NULL, f1, blob);
-	if (err)
-		goto done;
-
-	if (stat(path1, &sb1) == -1) {
-		err = got_error_from_errno2("stat", path1);
-		goto done;
-	}
-	if (stat(path2, &sb2) == -1) {
-		err = got_error_from_errno2("stat", path2);
-		goto done;
-	}
-
-	err = got_diff_files(&changes, &ds, &args, &diff_flags,
-	    f1, sb1.st_size, id_str, f2, sb2.st_size, path2, 3, NULL);
-	if (err)
-		goto done;
-
-	err = got_opentemp_named(path_outfile, &outfile, "got-stage-content");
-	if (err)
-		goto done;
-
-	if (fseek(f1, 0L, SEEK_SET) == -1)
-		return got_ferror(f1, GOT_ERR_IO);
-	if (fseek(f2, 0L, SEEK_SET) == -1)
-		return got_ferror(f2, GOT_ERR_IO);
-	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
-		int choice;
-		err = apply_or_reject_change(&choice, change, ++n,
-		    changes->nchanges, ds, args, diff_flags, relpath,
-		    f1, f2, &line_cur1, &line_cur2,
-		    outfile, NULL, patch_cb, patch_arg);
-		if (err)
-			goto done;
-		if (choice == GOT_PATCH_CHOICE_YES)
-			have_content = 1;
-		else if (choice == GOT_PATCH_CHOICE_QUIT)
-			break;
-	}
-done:
-	free(id_str);
-	if (blob)
-		got_object_blob_close(blob);
-	if (f1 && fclose(f1) == EOF && err == NULL)
-		err = got_error_from_errno2("fclose", path1);
-	if (f2 && fclose(f2) == EOF && err == NULL)
-		err = got_error_from_errno2("fclose", path2);
-	if (outfile && fclose(outfile) == EOF && err == NULL)
-		err = got_error_from_errno2("fclose", *path_outfile);
-	if (path1 && unlink(path1) == -1 && err == NULL)
-		err = got_error_from_errno2("unlink", path1);
-	if (err || !have_content) {
-		if (*path_outfile && unlink(*path_outfile) == -1 && err == NULL)
-			err = got_error_from_errno2("unlink", *path_outfile);
-		free(*path_outfile);
-		*path_outfile = NULL;
-	}
-	free(args);
-	if (ds) {
-		got_diff_state_free(ds);
-		free(ds);
-	}
-	if (changes)
-		got_diff_free_changes(changes);
-	free(path1);
-	return err;
-}
-
 struct stage_path_arg {
 	struct got_worktree *worktree;
 	struct got_fileindex *fileindex;
@@ -5602,7 +5500,7 @@ stage_path(void *arg, unsigned char status,
 				if (choice != GOT_PATCH_CHOICE_YES)
 					break;
 			} else {
-				err = create_staged_content(&path_content,
+				err = create_patched_content(&path_content, 0,
 				    staged_blob_id ? staged_blob_id : blob_id,
 				    ondisk_path, ie->path, a->repo,
 				    a->patch_cb, a->patch_arg);
