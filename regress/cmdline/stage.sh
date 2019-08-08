@@ -1435,7 +1435,7 @@ function test_stage_patch_added {
 		epsilon/new > $testroot/stdout)
 
 	echo "A  epsilon/new" > $testroot/stdout.expected
-	echo "stage this addition? [y/n/q] y" >> $testroot/stdout.expected
+	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1494,7 +1494,7 @@ function test_stage_patch_removed {
 	echo -n > $testroot/stdout.expected
 
 	echo "D  beta" > $testroot/stdout.expected
-	echo "stage deletion? [y/n/q] y" >> $testroot/stdout.expected
+	echo "stage deletion? [y/n] y" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

@@ -5201,10 +5201,10 @@ show_change(unsigned char status, const char *path, FILE *patch_file)
 
 	switch (status) {
 	case GOT_STATUS_ADD:
-		printf("A  %s\nstage this addition? [y/n/q] ", path);
+		printf("A  %s\nstage this addition? [y/n] ", path);
 		break;
 	case GOT_STATUS_DELETE:
-		printf("D  %s\nstage deletion? [y/n/q] ", path);
+		printf("D  %s\nstage deletion? [y/n] ", path);
 		break;
 	case GOT_STATUS_MODIFY:
 		if (fseek(patch_file, 0L, SEEK_SET) == -1)
@@ -5254,15 +5254,15 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 		if (strcmp(line, "y") == 0) {
 			*choice = GOT_PATCH_CHOICE_YES;
 			printf("y\n");
-		}
-		if (strcmp(line, "n") == 0) {
+		} else if (strcmp(line, "n") == 0) {
 			*choice = GOT_PATCH_CHOICE_NO;
 			printf("n\n");
-		}
-		if (strcmp(line, "q") == 0) {
+		} else if (strcmp(line, "q") == 0 &&
+		    status == GOT_STATUS_MODIFY) {
 			*choice = GOT_PATCH_CHOICE_QUIT;
 			printf("q\n");
-		}
+		} else
+			printf("invalid response '%s'\n", line);
 		free(line);
 		return NULL;
 	}
@@ -5274,15 +5274,22 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 		resp = getchar();
 		if (resp == '\n')
 			resp = getchar();
-		if (resp != 'y' && resp != 'n' && resp != 'q')
-			printf("invalid response '%c'\n", resp);
+		if (status == GOT_STATUS_MODIFY) {
+			if (resp != 'y' && resp != 'n' && resp != 'q') {
+				printf("invalid response '%c'\n", resp);
+				resp = ' ';
+			}
+		} else if (resp != 'y' && resp != 'n') {
+				printf("invalid response '%c'\n", resp);
+				resp = ' ';
+		}
 	}
 
 	if (resp == 'y')
 		*choice = GOT_PATCH_CHOICE_YES;
 	else if (resp == 'n')
 		*choice = GOT_PATCH_CHOICE_NO;
-	else if (resp == 'q')
+	else if (resp == 'q' && status == GOT_STATUS_MODIFY)
 		*choice = GOT_PATCH_CHOICE_QUIT;
 
 	return NULL;
