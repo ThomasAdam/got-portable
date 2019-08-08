@@ -14,8 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-name=$(getent passwd $USER | cut -d: -f5)
-export GOT_AUTHOR="$name <$(whoami)@$(hostname)>"
+export GOT_AUTHOR="Flan Hacker <flan_hacker@openbsd.org>"
 
 export MALLOC_OPTIONS=S
 
