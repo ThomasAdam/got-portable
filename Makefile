@@ -1,7 +1,7 @@
 SUBDIR = libexec got tog
 .PHONY=release dist
 
-.if make(regress) || make(obj) || make(clean)
+.if make(regress) || make(obj) || make(clean) || make(release)
 SUBDIR += regress
 .endif
 
