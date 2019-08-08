@@ -2433,15 +2433,16 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 }
 
 static const struct got_error *
-add_ignores(struct got_pathlist_head *ignores, const char *path)
+add_ignores(struct got_pathlist_head *ignores, const char *root_path,
+    const char *path)
 {
 	const struct got_error *err = NULL;
 	char *ignorespath;
 	FILE *ignoresfile = NULL;
 
 	/* TODO: read .gitignores as well... */
-	if (asprintf(&ignorespath, "%s%s.cvsignore", path, path[0] ? "/" : "")
-	    == -1)
+	if (asprintf(&ignorespath, "%s/%s%s.cvsignore", root_path, path,
+	    path[0] ? "/" : "") == -1)
 		return got_error_from_errno("asprintf");
 
 	ignoresfile = fopen(ignorespath, "r");
@@ -2480,7 +2481,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 	}
 
 	if (de->d_type == DT_DIR)
-		err = add_ignores(&a->ignores, path);
+		err = add_ignores(&a->ignores, a->worktree->root_path, path);
 	else if (got_path_is_child(path, a->status_path, a->status_path_len)
 	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
@@ -2553,7 +2554,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
 		TAILQ_INIT(&arg.ignores);
-		err = add_ignores(&arg.ignores, "");
+		err = add_ignores(&arg.ignores, worktree->root_path, path);
 		if (err == NULL)
 			err = got_fileindex_diff_dir(fileindex, workdir,
 			    worktree->root_path, path, repo, &fdiff_cb, &arg);

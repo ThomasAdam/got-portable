@@ -509,6 +509,20 @@ function test_status_cvsignore {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo '?  .cvsignore' > $testroot/stdout.expected
+	echo '?  epsilon/.cvsignore' >> $testroot/stdout.expected
+	echo '?  epsilon/boo' >> $testroot/stdout.expected
+	echo '?  foop' >> $testroot/stdout.expected
+	(cd $testroot/wt/gamma && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
