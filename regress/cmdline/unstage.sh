@@ -39,7 +39,7 @@ function test_unstage_basic {
 	(cd $testroot/wt && got unstage > $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo "got stage command succeeded unexpectedly" >&2
+		echo "got unstage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -178,7 +178,7 @@ function test_unstage_patch {
 		numbers > $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo "got stage command failed unexpectedly" >&2
+		echo "got unstage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -793,7 +793,7 @@ function test_unstage_patch_quit {
 		> $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo "got stage command failed unexpectedly" >&2
+		echo "got unstage command failed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
