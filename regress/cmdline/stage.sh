@@ -1537,8 +1537,9 @@ function test_stage_patch_quit {
 	local testroot=`test_init stage_patch_quit`
 
 	jot 16 > $testroot/repo/numbers
-	(cd $testroot/repo && git add numbers)
-	git_commit $testroot/repo -m "added numbers file"
+	echo zzz > $testroot/repo/zzz
+	(cd $testroot/repo && git add numbers zzz)
+	git_commit $testroot/repo -m "added files"
 	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1551,9 +1552,11 @@ function test_stage_patch_quit {
 	sed -i -e 's/^2$/a/' $testroot/wt/numbers
 	sed -i -e 's/^7$/b/' $testroot/wt/numbers
 	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+	(cd $testroot/wt && got rm zzz > /dev/null)
 
-	# stage first hunk and quit; and don't pass a path argument
-	printf "y\nq\n" > $testroot/patchscript
+	# stage first hunk and quit; and don't pass a path argument to
+	# ensure that we don't skip asking about the 'zzz' file after 'quit'
+	printf "y\nq\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout)
 	ret="$?"
@@ -1587,6 +1590,8 @@ stage this change? [y/n/q] y
 -----------------------------------------------
 M  numbers (change 2 of 3)
 stage this change? [y/n/q] q
+D  zzz
+stage deletion? [y/n] n
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -1598,6 +1603,7 @@ EOF
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "MM numbers" > $testroot/stdout.expected
+	echo "D  zzz" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

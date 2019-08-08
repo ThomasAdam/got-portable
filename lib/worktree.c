@@ -5475,8 +5475,12 @@ stage_path(void *arg, unsigned char status,
 			    ie->path, NULL, 1, 1);
 			if (err)
 				break;
-			if (choice != GOT_PATCH_CHOICE_YES)
+			if (choice == GOT_PATCH_CHOICE_NO)
 				break;
+			if (choice != GOT_PATCH_CHOICE_YES) {
+				err = got_error(GOT_ERR_PATCH_CHOICE);
+				break;
+			}
 		}
 		stage = GOT_FILEIDX_STAGE_DELETE;
 		got_fileindex_entry_stage_set(ie, stage);
