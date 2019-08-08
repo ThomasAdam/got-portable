@@ -1080,7 +1080,13 @@ The author's name and email address for
 and
 .Cm got import ,
 for example:
-.An Flan Hacker Aq Mt flan_hacker@openbsd.org
+.An Flan Hacker Aq Mt flan_hacker@openbsd.org .
+.Xr git 1
+may fail to parse commits created with
+.Nm
+if the
+.Ev GOT_AUTHOR
+environment variable does not contain an email address.
 .It Ev VISUAL, Ev EDITOR
 The editor spawned by
 .Cm got commit .
