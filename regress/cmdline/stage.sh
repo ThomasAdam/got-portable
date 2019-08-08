@@ -144,6 +144,27 @@ function test_stage_unversioned {
 
 }
 
+function test_stage_nonexistent {
+	local testroot=`test_init stage_nonexistent`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage nonexistent-file \
+		> $testroot/stdout 2> $testroot/stderr)
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_stage_list {
 	local testroot=`test_init stage_list`
 
@@ -1802,6 +1823,7 @@ EOF
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_unversioned
+run_test test_stage_nonexistent
 run_test test_stage_list
 run_test test_stage_conflict
 run_test test_stage_out_of_date

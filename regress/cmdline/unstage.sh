@@ -145,6 +145,44 @@ function test_unstage_unversioned {
 	test_done "$testroot" "$ret"
 }
 
+function test_unstage_nonexistent {
+	local testroot=`test_init unstage_nonexistent`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage > /dev/null)
+
+	# unstaging a non-existent file is a no-op
+	(cd $testroot/wt && got unstage nonexistent-file > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_unstage_patch {
 	local testroot=`test_init unstage_patch`
 
@@ -917,6 +955,7 @@ EOF
 
 run_test test_unstage_basic
 run_test test_unstage_unversioned
+run_test test_unstage_nonexistent
 run_test test_unstage_patch
 run_test test_unstage_patch_added
 run_test test_unstage_patch_removed
