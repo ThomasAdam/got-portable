@@ -106,6 +106,7 @@
 /regress/cmdline/add.sh
 /regress/cmdline/backout.sh
 /regress/cmdline/blame.sh
+/regress/cmdline/branch.sh
 /regress/cmdline/checkout.sh
 /regress/cmdline/cherrypick.sh
 /regress/cmdline/commit.sh
@@ -117,7 +118,9 @@
 /regress/cmdline/rebase.sh
 /regress/cmdline/revert.sh
 /regress/cmdline/rm.sh
+/regress/cmdline/stage.sh
 /regress/cmdline/status.sh
+/regress/cmdline/unstage.sh
 /regress/cmdline/update.sh
 /regress/delta
 /regress/delta/Makefile
