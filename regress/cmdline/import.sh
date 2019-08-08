@@ -17,6 +17,7 @@
 . ./common.sh
 
 function test_import_basic {
+	local testname=import_basic
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
 	got init $testroot/repo
@@ -166,6 +167,7 @@ function test_import_requires_new_branch {
 }
 
 function test_import_ignores {
+	local testname=import_ignores
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
 	got init $testroot/repo
