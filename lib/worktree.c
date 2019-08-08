@@ -2707,15 +2707,14 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	char *ondisk_path = NULL;
 	struct got_blob_object *blob = NULL;
 
+	/* Reverting a staged deletion is a no-op. */
+	if (status == GOT_STATUS_DELETE &&
+	    staged_status != GOT_STATUS_NO_CHANGE)
+		return NULL;
+
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
-
-	if (status == GOT_STATUS_DELETE &&
-	    staged_status != GOT_STATUS_NO_CHANGE) {
-		err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
-		goto done;
-	}
 
 	/* Construct in-repository path of tree which contains this blob. */
 	err = got_path_dirname(&parent_path, ie->path);

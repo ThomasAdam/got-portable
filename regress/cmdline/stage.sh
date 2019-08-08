@@ -708,13 +708,22 @@ function test_stage_revert {
 	(cd $testroot/wt && got revert beta > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "revert command succeeded unexpectedly" >&2
-		test_done "$testroot" "1"
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	echo "got: beta: file is staged" > $testroot/stderr.expected
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -807,13 +816,14 @@ function test_stage_revert {
 	(cd $testroot/wt && got revert -R . > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "revert command succeeded unexpectedly" >&2
+	if [ "$ret" != "0" ]; then
+		echo "revert command failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	echo "R  alpha" > $testroot/stdout.expected
+	echo "R  foo" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -822,7 +832,7 @@ function test_stage_revert {
 		return 1
 	fi
 
-	echo "got: beta: file is staged" > $testroot/stderr.expected
+	echo -n > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -833,7 +843,7 @@ function test_stage_revert {
 
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
-	echo 'MA foo' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
