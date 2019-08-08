@@ -257,8 +257,9 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1  | \
+		tr -d '\n' >> $testroot/stdout.expected
+	echo " (staged)" >> $testroot/stdout.expected
 	echo "file + numbers" >> $testroot/stdout.expected
 	cat >> $testroot/stdout.expected <<EOF
 --- numbers
@@ -398,8 +399,9 @@ EOF
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
+		tr -d '\n' >> $testroot/stdout.expected
+	echo " (staged)" >> $testroot/stdout.expected
 	echo "file + numbers" >> $testroot/stdout.expected
 	cat >> $testroot/stdout.expected <<EOF
 --- numbers
@@ -769,8 +771,9 @@ EOF
 
 	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l numbers) | cut -d' ' -f 1 | \
+		tr -d '\n' >> $testroot/stdout.expected
+	echo " (staged)" >> $testroot/stdout.expected
 	echo "file + numbers" >> $testroot/stdout.expected
 	echo "--- numbers" >> $testroot/stdout.expected
 	echo "+++ numbers" >> $testroot/stdout.expected

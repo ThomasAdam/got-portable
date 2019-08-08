@@ -766,8 +766,9 @@ function test_stage_diff {
 
 	echo "diff $head_commit $testroot/wt" > $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 \
+	(cd $testroot/wt && got stage -l alpha) | cut -d' ' -f 1 | tr -d '\n' \
 		>> $testroot/stdout.expected
+	echo ' (staged)' >> $testroot/stdout.expected
 	echo 'file + alpha' >> $testroot/stdout.expected
 	echo '--- alpha' >> $testroot/stdout.expected
 	echo '+++ alpha' >> $testroot/stdout.expected
@@ -775,8 +776,9 @@ function test_stage_diff {
 	echo '-modified file' >> $testroot/stdout.expected
 	echo '+modified file again' >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 \
+	(cd $testroot/wt && got stage -l foo) | cut -d' ' -f 1 | tr -d '\n' \
 		>> $testroot/stdout.expected
+	echo " (staged)" >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
 	echo '--- foo' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected

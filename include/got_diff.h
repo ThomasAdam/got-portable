@@ -28,10 +28,11 @@ const struct got_error *got_diff_blob(struct got_blob_object *,
  * Compute the differences between a blob and a file and write unified diff
  * text to the provided output file. The file's size must be provided, as
  * well as a const char * diff header label which identifies the file.
+ * An optional const char * diff header label for the blob may be provided, too.
  * The number of context lines to show in the diff must be specified as well.
  */
-const struct got_error *got_diff_blob_file(struct got_blob_object *, FILE *,
-    size_t, const char *, int, FILE *);
+const struct got_error *got_diff_blob_file(struct got_blob_object *,
+    const char *, FILE *, size_t, const char *, int, FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs

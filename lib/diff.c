@@ -153,7 +153,7 @@ alloc_changes(struct got_diff_changes **changes)
 
 static const struct got_error *
 diff_blob_file(struct got_diff_changes **changes,
-    struct got_blob_object *blob1, FILE *f2, size_t size2,
+    struct got_blob_object *blob1, const char *label1, FILE *f2, size_t size2,
     const char *label2, int diff_context, FILE *outfile)
 {
 	struct got_diff_state ds;
@@ -205,7 +205,7 @@ diff_blob_file(struct got_diff_changes **changes,
 	flags |= D_PROTOTYPE;
 
 	if (outfile) {
-		fprintf(outfile, "blob - %s\n", idstr1);
+		fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
 		fprintf(outfile, "file + %s\n",
 		    f2 == NULL ? "/dev/null" : label2);
 	}
@@ -224,11 +224,12 @@ done:
 }
 
 const struct got_error *
-got_diff_blob_file(struct got_blob_object *blob1, FILE *f2, size_t size2,
-    const char *label2, int diff_context, FILE *outfile)
+got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
+    FILE *f2, size_t size2, const char *label2, int diff_context,
+    FILE *outfile)
 {
-	return diff_blob_file(NULL, blob1, f2, size2, label2, diff_context,
-	    outfile);
+	return diff_blob_file(NULL, blob1, label1, f2, size2, label2,
+	    diff_context, outfile);
 }
 
 const struct got_error *

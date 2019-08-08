@@ -1710,7 +1710,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
 	FILE *f2 = NULL;
-	char *abspath = NULL;
+	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
 
 	if (a->diff_staged) {
@@ -1756,13 +1756,26 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	if (staged_status == GOT_STATUS_ADD ||
-	    staged_status == GOT_STATUS_MODIFY)
+	    staged_status == GOT_STATUS_MODIFY) {
+		char *id_str;
 		err = got_object_open_as_blob(&blob1, a->repo, staged_blob_id,
 		    8192);
-	else if (status != GOT_STATUS_ADD)
+		if (err)
+			goto done;
+		err = got_object_id_str(&id_str, staged_blob_id);
+		if (err)
+			goto done;
+		if (asprintf(&label1, "%s (staged)", id_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(id_str);
+			goto done;
+		}
+		free(id_str);
+	} else if (status != GOT_STATUS_ADD) {
 		err = got_object_open_as_blob(&blob1, a->repo, blob_id, 8192);
-	if (err)
-		goto done;
+		if (err)
+			goto done;
+	}
 
 	if (status != GOT_STATUS_DELETE) {
 		if (asprintf(&abspath, "%s/%s",
@@ -1783,8 +1796,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	} else
 		sb.st_size = 0;
 
-	err = got_diff_blob_file(blob1, f2, sb.st_size, path, a->diff_context,
-	    stdout);
+	err = got_diff_blob_file(blob1, label1, f2, sb.st_size, path,
+	    a->diff_context, stdout);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
