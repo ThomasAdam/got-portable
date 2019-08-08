@@ -142,8 +142,6 @@ const struct got_error *got_diffreg(int *, FILE *,
     FILE *, int, struct got_diff_args *, struct got_diff_state *, FILE *,
     struct got_diff_changes *);
 
-const struct got_error *got_diff_blob_file_lines_changed(struct got_diff_changes **,
-    struct got_blob_object *, FILE *, size_t, const char *, int);
 const struct got_error *got_diff_blob_lines_changed(struct got_diff_changes **,
     struct got_blob_object *, struct got_blob_object *);
 void got_diff_free_changes(struct got_diff_changes *);
