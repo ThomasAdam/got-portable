@@ -2235,6 +2235,8 @@ struct diff_dir_cb_arg {
     void *status_arg;
     got_worktree_cancel_cb cancel_cb;
     void *cancel_arg;
+    /* A pathlist containing per-directory pathlists of ignore patterns. */
+    struct got_pathlist_head ignores;
 };
 
 static const struct got_error *
@@ -2332,6 +2334,130 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	    ie->path, &blob_id, NULL, &commit_id);
 }
 
+void
+free_ignorelist(struct got_pathlist_head *ignorelist)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, ignorelist, entry)
+		free((char *)pe->path);
+	got_pathlist_free(ignorelist);
+}
+
+void
+free_ignores(struct got_pathlist_head *ignores)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, ignores, entry) {
+		struct got_pathlist_head *ignorelist = pe->data;
+		free_ignorelist(ignorelist);
+		free((char *)pe->path);
+	}
+	got_pathlist_free(ignores);
+}
+
+static const struct got_error *
+read_ignores(struct got_pathlist_head *ignores, const char *path, FILE *f)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe = NULL;
+	struct got_pathlist_head *ignorelist;
+	char *line = NULL, *pattern, *dirpath;
+	size_t linesize = 0;
+	ssize_t linelen;
+
+	ignorelist = calloc(1, sizeof(*ignorelist));
+	if (ignorelist == NULL)
+		return got_error_from_errno("calloc");
+	TAILQ_INIT(ignorelist);
+
+	while ((linelen = getline(&line, &linesize, f)) != -1) {
+		if (linelen > 0 && line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
+		if (asprintf(&pattern, "%s%s%s", path, path[0] ? "/" : "",
+		    line) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		err = got_pathlist_insert(NULL, ignorelist, pattern, NULL);
+		if (err)
+			goto done;
+	}
+	if (ferror(f)) {
+		err = got_error_from_errno("getline");
+		goto done;
+	}
+
+	dirpath = strdup(path);
+	if (dirpath == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	err = got_pathlist_insert(&pe, ignores, dirpath, ignorelist);
+done:
+	free(line);
+	if (err || pe == NULL) {
+		free(dirpath);
+		free_ignorelist(ignorelist);
+	}
+	return err;
+}
+
+int
+match_ignores(struct got_pathlist_head *ignores, const char *path)
+{
+	struct got_pathlist_entry *pe;
+
+	/*
+	 * The ignores pathlist contains ignore lists from children before
+	 * parents, so we can find the most specific ignorelist by walking
+	 * ignores backwards.
+	 */
+	pe = TAILQ_LAST(ignores, got_pathlist_head);
+	while (pe) {
+		if (got_path_is_child(path, pe->path, pe->path_len)) {
+			struct got_pathlist_head *ignorelist = pe->data;
+			struct got_pathlist_entry *pi;
+			TAILQ_FOREACH(pi, ignorelist, entry) {
+				if (fnmatch(pi->path, path,
+				    FNM_PATHNAME | FNM_LEADING_DIR))
+					continue;
+				return 1;
+			}
+		}
+		pe = TAILQ_PREV(pe, got_pathlist_head, entry);
+	}
+
+	return 0;
+}
+
+static const struct got_error *
+add_ignores(struct got_pathlist_head *ignores, const char *path)
+{
+	const struct got_error *err = NULL;
+	char *ignorespath;
+	FILE *ignoresfile = NULL;
+
+	/* TODO: read .gitignores as well... */
+	if (asprintf(&ignorespath, "%s%s.cvsignore", path, path[0] ? "/" : "")
+	    == -1)
+		return got_error_from_errno("asprintf");
+
+	ignoresfile = fopen(ignorespath, "r");
+	if (ignoresfile == NULL) {
+		if (errno != ENOENT)
+			err = got_error_from_errno2("fopen",
+			    ignorespath);
+	} else
+		err = read_ignores(ignores, path, ignoresfile);
+
+	if (ignoresfile && fclose(ignoresfile) == EOF && err == NULL)
+		err = got_error_from_errno2("flose", path);
+	free(ignorespath);
+	return err;
+}
+
 static const struct got_error *
 status_new(void *arg, struct dirent *de, const char *parent_path)
 {
@@ -2341,9 +2467,6 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
-
-	if (de->d_type == DT_DIR)
-		return NULL;
 
 	/* XXX ignore symlinks for now */
 	if (de->d_type == DT_LNK)
@@ -2356,7 +2479,10 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 		path = de->d_name;
 	}
 
-	if (got_path_is_child(path, a->status_path, a->status_path_len))
+	if (de->d_type == DT_DIR)
+		err = add_ignores(&a->ignores, path);
+	else if (got_path_is_child(path, a->status_path, a->status_path_len)
+	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
 	if (parent_path[0])
@@ -2426,8 +2552,12 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.status_arg = status_arg;
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
-		err = got_fileindex_diff_dir(fileindex, workdir,
-		    worktree->root_path, path, repo, &fdiff_cb, &arg);
+		TAILQ_INIT(&arg.ignores);
+		err = add_ignores(&arg.ignores, "");
+		if (err == NULL)
+			err = got_fileindex_diff_dir(fileindex, workdir,
+			    worktree->root_path, path, repo, &fdiff_cb, &arg);
+		free_ignores(&arg.ignores);
 	}
 
 	if (workdir)

@@ -480,6 +480,39 @@ function test_status_many_paths {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_cvsignore {
+	local testroot=`test_init status_cvsignore`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	echo "unversioned file" > $testroot/wt/foop
+	echo "unversioned file" > $testroot/wt/epsilon/bar
+	echo "unversioned file" > $testroot/wt/epsilon/boo
+	echo "unversioned file" > $testroot/wt/epsilon/moo
+	echo "foo" > $testroot/wt/.cvsignore
+	echo "bar" > $testroot/wt/epsilon/.cvsignore
+	echo "moo" >> $testroot/wt/epsilon/.cvsignore
+
+	echo '?  .cvsignore' > $testroot/stdout.expected
+	echo '?  epsilon/.cvsignore' >> $testroot/stdout.expected
+	echo '?  epsilon/boo' >> $testroot/stdout.expected
+	echo '?  foop' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -492,3 +525,4 @@ run_test test_status_shows_conflict
 run_test test_status_empty_dir
 run_test test_status_empty_dir_unversioned_file
 run_test test_status_many_paths
+run_test test_status_cvsignore

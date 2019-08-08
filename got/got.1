@@ -266,6 +266,22 @@ Changes created on top of staged changes are indicated in the first column:
 .It MM Ta file was modified after earlier changes have been staged
 .It MA Ta file was modified after having been staged for addition
 .El
+.Pp
+For compatibility with
+.Xr cvs 1 ,
+.Cm got status
+parses
+.Pa .cvsignore
+files in each traversed directory and will not display unversioned files
+which match
+.Xr glob 7
+ignore patterns contained in
+.Pa .cvsignore
+files.
+Unlike
+.Xr cvs 1 ,
+.Cm got status
+only supports a single ignore pattern per line.
 .It Cm st
 Short alias for
 .Cm status .
