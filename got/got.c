@@ -3104,7 +3104,7 @@ done:
 __dead static void
 usage_revert(void)
 {
-	fprintf(stderr, "usage: %s revert file-path ...\n", getprogname());
+	fprintf(stderr, "usage: %s revert [-R] path ...\n", getprogname());
 	exit(1);
 }
 
@@ -3125,12 +3125,16 @@ cmd_revert(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	char *cwd = NULL, *path = NULL;
 	struct got_pathlist_head paths;
-	int ch;
+	struct got_pathlist_entry *pe;
+	int ch, can_recurse = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "R")) != -1) {
 		switch (ch) {
+		case 'R':
+			can_recurse = 1;
+			break;
 		default:
 			usage_revert();
 			/* NOTREACHED */
@@ -3169,6 +3173,35 @@ cmd_revert(int argc, char *argv[])
 	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
+
+	if (!can_recurse) {
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			       pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "reverting directories requires -R option");
+				goto done;
+			}
+		}
+	}
 
 	error = got_worktree_revert(worktree, &paths,
 	    revert_progress, NULL, repo);

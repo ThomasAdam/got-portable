@@ -509,7 +509,7 @@ Perform the operation even if a file contains uncommitted modifications.
 .It Cm rm
 Short alias for
 .Cm remove .
-.It Cm revert Ar file-path ...
+.It Cm revert [ Fl R ] Ar path ...
 Revert any uncommited changes in files at the specified paths.
 File contents will be overwritten with those contained in the
 work tree's base commit. There is no way to bring discarded
@@ -522,6 +522,19 @@ it will become an unversioned file again.
 If a file was deleted with
 .Cm got remove
 it will be restored.
+.Pp
+The options for
+.Cm got revert
+are as follows:
+.Bl -tag -width Ds
+.It Fl R
+Permit recursion into directories.
+If this option is not specified,
+.Cm got revert
+will refuse to run if a specified
+.Ar path
+is a directory.
+.El
 .It Cm rv
 Short alias for
 .Cm revert .
