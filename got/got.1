@@ -925,14 +925,15 @@ among the specified paths. Otherwise, show all staged paths.
 Instead of staging the entire content of a changed file, interactively
 select or reject changes for staging based on
 .Dq y
-(select),
+(stage change),
 .Dq n
-(reject), and
+(reject change), and
 .Dq q
-(quit) responses.
+(quit staging this file) responses.
 If a file is in modified status, individual patches derived from the
 modified file content can be staged.
-Files in added or deleted status may be staged or rejected in their entirety.
+Files in added or deleted status may only be staged or rejected in
+their entirety.
 .It Fl F Ar response-script
 With the
 .Fl p
