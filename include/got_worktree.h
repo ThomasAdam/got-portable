@@ -398,4 +398,4 @@ const struct got_error *got_worktree_stage(struct got_worktree *,
  */
 const struct got_error *got_worktree_unstage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_checkout_cb, void *,
-    struct got_repository *);
+    got_worktree_patch_cb, void *, struct got_repository *);

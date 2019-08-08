@@ -5194,7 +5194,7 @@ print_stage(void *arg, unsigned char status, unsigned char staged_status,
 
 static const struct got_error *
 show_change(unsigned char status, const char *path, FILE *patch_file, int n,
-    int nchanges)
+    int nchanges, const char *action)
 {
 	char *line = NULL;
 	size_t linesize = 0;
@@ -5202,10 +5202,10 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 
 	switch (status) {
 	case GOT_STATUS_ADD:
-		printf("A  %s\nstage this addition? [y/n] ", path);
+		printf("A  %s\n%s this addition? [y/n] ", path, action);
 		break;
 	case GOT_STATUS_DELETE:
-		printf("D  %s\nstage this deletion? [y/n] ", path);
+		printf("D  %s\n%s this deletion? [y/n] ", path, action);
 		break;
 	case GOT_STATUS_MODIFY:
 		if (fseek(patch_file, 0L, SEEK_SET) == -1)
@@ -5216,8 +5216,8 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 		if (ferror(patch_file))
 			return got_error_from_errno("getline");
 		printf(GOT_COMMIT_SEP_STR);
-		printf("M  %s (change %d of %d)\nstage this change? [y/n/q] ",
-		    path, n, nchanges);
+		printf("M  %s (change %d of %d)\n%s this change? [y/n/q] ",
+		    path, n, nchanges, action);
 		break;
 	default:
 		return got_error_path(path, GOT_ERR_FILE_STATUS);
@@ -5225,6 +5225,11 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 
 	return NULL;
 }
+
+struct choose_patch_arg {
+	FILE *patch_script_file;
+	const char *action;
+};
 
 static const struct got_error *
 choose_patch(int *choice, void *arg, unsigned char status, const char *path,
@@ -5235,18 +5240,19 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 	size_t linesize = 0;
 	ssize_t linelen;
 	int resp = ' ';
-	FILE *patch_script_file = arg;
+	struct choose_patch_arg *a = arg;
 
 	*choice = GOT_PATCH_CHOICE_NONE;
 
-	if (patch_script_file) {
+	if (a->patch_script_file) {
 		char *nl;
-		err = show_change(status, path, patch_file, n, nchanges);
+		err = show_change(status, path, patch_file, n, nchanges,
+		    a->action);
 		if (err)
 			return err;
-		linelen = getline(&line, &linesize, patch_script_file);
+		linelen = getline(&line, &linesize, a->patch_script_file);
 		if (linelen == -1) {
-			if (ferror(patch_script_file))
+			if (ferror(a->patch_script_file))
 				return got_error_from_errno("getline");
 			return NULL;
 		}
@@ -5270,7 +5276,8 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 	}
 
 	while (resp != 'y' && resp != 'n' && resp != 'q') {
-		err = show_change(status, path, patch_file, n, nchanges);
+		err = show_change(status, path, patch_file, n, nchanges,
+		    a->action);
 		if (err)
 			return err;
 		resp = getchar();
@@ -5307,8 +5314,9 @@ cmd_stage(int argc, char *argv[])
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	int ch, list_stage = 0, pflag = 0;
-	const char *patch_script_path = NULL;
 	FILE *patch_script_file = NULL;
+	const char *patch_script_path = NULL;
+	struct choose_patch_arg cpa;
 
 	TAILQ_INIT(&paths);
 
@@ -5376,11 +5384,17 @@ cmd_stage(int argc, char *argv[])
 	if (list_stage)
 		error = got_worktree_status(worktree, &paths, repo,
 		    print_stage, NULL, check_cancelled, NULL);
-	else
+	else {
+		cpa.patch_script_file = patch_script_file;
+		cpa.action = "stage";
 		error = got_worktree_stage(worktree, &paths,
 		    pflag ? NULL : print_status, NULL,
-		    pflag ? choose_patch : NULL, patch_script_file, repo);
+		    pflag ? choose_patch : NULL, &cpa, repo);
+	}
 done:
+	if (patch_script_file && fclose(patch_script_file) == EOF &&
+	    error == NULL)
+		error = got_error_from_errno2("fclose", patch_script_path);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
@@ -5395,7 +5409,8 @@ done:
 __dead static void
 usage_unstage(void)
 {
-	fprintf(stderr, "usage: %s unstage [file-path ...]\n",
+	fprintf(stderr, "usage: %s unstage [-p] [-F response-script] "
+	    "[file-path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5410,12 +5425,21 @@ cmd_unstage(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, did_something = 0;
+	int ch, did_something = 0, pflag = 0;
+	FILE *patch_script_file = NULL;
+	const char *patch_script_path = NULL;
+	struct choose_patch_arg cpa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "pF:")) != -1) {
 		switch (ch) {
+		case 'p':
+			pflag = 1;
+			break;
+		case 'F':
+			patch_script_path = optarg;
+			break;
 		default:
 			usage_unstage();
 			/* NOTREACHED */
@@ -5430,6 +5454,9 @@ cmd_unstage(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
+	if (patch_script_path && !pflag)
+		errx(1, "-F option can only be used together with -p option");
+
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -5444,6 +5471,15 @@ cmd_unstage(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (patch_script_path) {
+		patch_script_file = fopen(patch_script_path, "r");
+		if (patch_script_file == NULL) {
+			error = got_error_from_errno2("fopen",
+			    patch_script_path);
+			goto done;
+		}
+	}
+
 	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
 	if (error)
@@ -5453,9 +5489,14 @@ cmd_unstage(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	cpa.patch_script_file = patch_script_file;
+	cpa.action = "unstage";
 	error = got_worktree_unstage(worktree, &paths, update_progress,
-	    &did_something, repo);
+	    &did_something, pflag ? choose_patch : NULL, &cpa, repo);
 done:
+	if (patch_script_file && fclose(patch_script_file) == EOF &&
+	    error == NULL)
+		error = got_error_from_errno2("fclose", patch_script_path);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)

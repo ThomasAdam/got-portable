@@ -5168,7 +5168,7 @@ done:
 }
 
 static const struct got_error *
-copy_one_line(FILE *infile, FILE *outfile)
+copy_one_line(FILE *infile, FILE *outfile, FILE *rejectfile)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -5183,9 +5183,18 @@ copy_one_line(FILE *infile, FILE *outfile)
 		}
 		return NULL;
 	}
-	n = fwrite(line, 1, linelen, outfile);
-	if (n != linelen)
-		err = got_ferror(outfile, GOT_ERR_IO);
+	if (outfile) {
+		n = fwrite(line, 1, linelen, outfile);
+		if (n != linelen) {
+			err = got_ferror(outfile, GOT_ERR_IO);
+			goto done;
+		}
+	}
+	if (rejectfile) {
+		n = fwrite(line, 1, linelen, rejectfile);
+		if (n != linelen)
+			err = got_ferror(outfile, GOT_ERR_IO);
+	}
 done:
 	free(line);
 	return err;
@@ -5206,11 +5215,63 @@ skip_one_line(FILE *f)
 }
 
 static const struct got_error *
+copy_change(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
+    int start_old, int end_old, int start_new, int end_new,
+    FILE *outfile, FILE *rejectfile)
+ {
+	const struct got_error *err;
+
+	/* Copy old file's lines leading up to patch. */
+	while (!feof(f1) && *line_cur1 < start_old) {
+		err = copy_one_line(f1, outfile, NULL);
+		if (err)
+			return err;
+		(*line_cur1)++;
+	}
+	/* Skip new file's lines leading up to patch. */
+	while (!feof(f2) && *line_cur2 < start_new) {
+		if (rejectfile)
+			err = copy_one_line(f2, NULL, rejectfile);
+		else
+			err = skip_one_line(f2);
+		if (err)
+			return err;
+		(*line_cur2)++;
+	}
+	/* Copy patched lines. */
+	while (!feof(f2) && *line_cur2 <= end_new) {
+		err = copy_one_line(f2, outfile, NULL);
+		if (err)
+			return err;
+		(*line_cur2)++;
+	}
+	/* Skip over old file's replaced lines. */
+	while (!feof(f1) && *line_cur1 <= end_new) {
+		if (rejectfile)
+			err = copy_one_line(f1, NULL, rejectfile);
+		else
+			err = skip_one_line(f1);
+		if (err)
+			return err;
+		(*line_cur1)++;
+	}
+	/* Copy old file's lines after patch. */
+	while (!feof(f1) && *line_cur1 <= end_old) {
+		err = copy_one_line(f1, outfile, rejectfile);
+		if (err)
+			return err;
+		(*line_cur1)++;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
     int nchanges, struct got_diff_state *ds, struct got_diff_args *args,
     int diff_flags, const char *relpath, FILE *f1, FILE *f2, int *line_cur1,
-    int *line_cur2, FILE *outfile, got_worktree_patch_cb patch_cb,
-    void *patch_arg)
+    int *line_cur2, FILE *outfile, FILE *rejectfile,
+    got_worktree_patch_cb patch_cb, void *patch_arg)
 {
 	const struct got_error *err = NULL;
 	int start_old = change->cv.a;
@@ -5252,62 +5313,17 @@ apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
 
 	switch (*choice) {
 	case GOT_PATCH_CHOICE_YES:
-		/* Copy old file's lines leading up to patch. */
-		while (!feof(f1) && *line_cur1 < start_old) {
-			err = copy_one_line(f1, outfile);
-			if (err)
-				goto done;
-			(*line_cur1)++;
-		}
-		/* Skip new file's lines leading up to patch. */
-		while (!feof(f2) && *line_cur2 < start_new) {
-			err = skip_one_line(f2);
-			if (err)
-				goto done;
-			(*line_cur2)++;
-		}
-		/* Copy patched lines. */
-		while (!feof(f2) && *line_cur2 <= end_new) {
-			err = copy_one_line(f2, outfile);
-			if (err)
-				goto done;
-			(*line_cur2)++;
-		}
-		/* Skip over old file's replaced lines. */
-		while (!feof(f1) && *line_cur1 <= end_new) {
-			err = skip_one_line(f1);
-			if (err)
-				goto done;
-			(*line_cur1)++;
-		}
-		/* Copy old file's lines after patch. */
-		while (!feof(f1) && *line_cur1 <= end_old) {
-			err = skip_one_line(f1);
-			if (err)
-				goto done;
-			(*line_cur1)++;
-		}
+		err = copy_change(f1, f2, line_cur1, line_cur2, start_old,
+		    end_old, start_new, end_new, outfile, rejectfile);
 		break;
 	case GOT_PATCH_CHOICE_NO:
-		/* Copy old file's lines. */
-		while (!feof(f1) && *line_cur1 <= end_old) {
-			err = copy_one_line(f1, outfile);
-			if (err)
-				goto done;
-			(*line_cur1)++;
-		}
-		/* Skip over new file's lines. */
-		while (!feof(f2) && *line_cur2 <= end_new) {
-			err = skip_one_line(f2);
-			if (err)
-				goto done;
-			(*line_cur2)++;
-		}
+		err = copy_change(f1, f2, line_cur1, line_cur2, start_old,
+		    end_old, start_new, end_new, rejectfile, outfile);
 		break;
 	case GOT_PATCH_CHOICE_QUIT:
 		/* Copy old file's lines until EOF. */
 		while (!feof(f1)) {
-			err = copy_one_line(f1, outfile);
+			err = copy_one_line(f1, outfile, rejectfile);
 			if (err)
 				goto done;
 			(*line_cur1)++;
@@ -5391,7 +5407,7 @@ create_staged_content(char **path_outfile, struct got_object_id *blob_id,
 		err = apply_or_reject_change(&choice, change, ++n,
 		    changes->nchanges, ds, args, diff_flags, relpath,
 		    f1, f2, &line_cur1, &line_cur2,
-		    outfile, patch_cb, patch_arg);
+		    outfile, NULL, patch_cb, patch_arg);
 		if (err)
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
@@ -5620,7 +5636,151 @@ struct unstage_path_arg {
 	struct got_repository *repo;
 	got_worktree_checkout_cb progress_cb;
 	void *progress_arg;
+	got_worktree_patch_cb patch_cb;
+	void *patch_arg;
 };
+
+static const struct got_error *
+create_unstaged_content(char **path_unstaged_content,
+    char **path_new_staged_content, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, const char *relpath,
+    struct got_repository *repo,
+    got_worktree_patch_cb patch_cb, void *patch_arg)
+{
+	const struct got_error *err;
+	struct got_blob_object *blob = NULL, *staged_blob = NULL;
+	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL, *rejectfile = NULL;
+	char *path1 = NULL, *path2 = NULL, *label1 = NULL;
+	struct stat sb1, sb2;
+	struct got_diff_changes *changes = NULL;
+	struct got_diff_state *ds = NULL;
+	struct got_diff_args *args = NULL;
+	struct got_diff_change *change;
+	int diff_flags = 0, line_cur1 = 1, line_cur2 = 1, n = 0;
+	int have_content = 0, have_rejected_content = 0;
+
+	*path_unstaged_content = NULL;
+	*path_new_staged_content = NULL;
+
+	err = got_object_id_str(&label1, blob_id);
+	if (err)
+		return err;
+	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named(&path1, &f1, "got-unstage-blob-base");
+	if (err)
+		goto done;
+
+	err = got_object_blob_dump_to_file(NULL, NULL, NULL, f1, blob);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_blob(&staged_blob, repo, staged_blob_id, 8192);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named(&path2, &f2, "got-unstage-blob-staged");
+	if (err)
+		goto done;
+
+	err = got_object_blob_dump_to_file(NULL, NULL, NULL, f2, staged_blob);
+	if (err)
+		goto done;
+
+	if (stat(path1, &sb1) == -1) {
+		err = got_error_from_errno2("stat", path1);
+		goto done;
+	}
+
+	if (stat(path2, &sb2) == -1) {
+		err = got_error_from_errno2("stat", path2);
+		goto done;
+	}
+
+	err = got_diff_files(&changes, &ds, &args, &diff_flags,
+	    f1, sb1.st_size, label1, f2, sb2.st_size, path2, 3, NULL);
+	if (err)
+		goto done;
+
+	err = got_opentemp_named(path_unstaged_content, &outfile,
+	    "got-unstaged-content");
+	if (err)
+		goto done;
+	err = got_opentemp_named(path_new_staged_content, &rejectfile,
+	    "got-new-staged-content");
+	if (err)
+		goto done;
+
+	if (fseek(f1, 0L, SEEK_SET) == -1) {
+		err = got_ferror(f1, GOT_ERR_IO);
+		goto done;
+	}
+	if (fseek(f2, 0L, SEEK_SET) == -1) {
+		err = got_ferror(f2, GOT_ERR_IO);
+		goto done;
+	}
+	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
+		int choice;
+		err = apply_or_reject_change(&choice, change, ++n,
+		    changes->nchanges, ds, args, diff_flags, relpath,
+		    f1, f2, &line_cur1, &line_cur2,
+		    outfile, rejectfile, patch_cb, patch_arg);
+		if (err)
+			goto done;
+		if (choice == GOT_PATCH_CHOICE_YES)
+			have_content = 1;
+		if (choice == GOT_PATCH_CHOICE_NO)
+			have_rejected_content = 1;
+		if (choice == GOT_PATCH_CHOICE_QUIT)
+			break;
+	}
+done:
+	free(label1);
+	if (blob)
+		got_object_blob_close(blob);
+	if (staged_blob)
+		got_object_blob_close(staged_blob);
+	if (f1 && fclose(f1) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path1);
+	if (f2 && fclose(f2) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path2);
+	if (outfile && fclose(outfile) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", *path_unstaged_content);
+	if (rejectfile && fclose(rejectfile) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", *path_new_staged_content);
+	if (path1 && unlink(path1) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path1);
+	if (path2 && unlink(path2) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path2);
+	if (err || !have_content) {
+		if (*path_unstaged_content &&
+		    unlink(*path_unstaged_content) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink",
+			    *path_unstaged_content);
+		free(*path_unstaged_content);
+		*path_unstaged_content = NULL;
+	}
+	if (err || !have_rejected_content) {
+		if (*path_new_staged_content &&
+		    unlink(*path_new_staged_content) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink",
+			    *path_new_staged_content);
+		free(*path_new_staged_content);
+		*path_new_staged_content = NULL;
+	}
+	free(args);
+	if (ds) {
+		got_diff_state_free(ds);
+		free(ds);
+	}
+	if (changes)
+		got_diff_free_changes(changes);
+	free(path1);
+	free(path2);
+	return err;
+}
 
 static const struct got_error *
 unstage_path(void *arg, unsigned char status,
@@ -5632,9 +5792,15 @@ unstage_path(void *arg, unsigned char status,
 	struct unstage_path_arg *a = arg;
 	struct got_fileindex_entry *ie;
 	struct got_blob_object *blob_base = NULL, *blob_staged = NULL;
-	char *ondisk_path = NULL;
+	char *ondisk_path = NULL, *path_unstaged_content = NULL;
+	char *path_new_staged_content = NULL;
 	int local_changes_subsumed;
 	struct stat sb;
+
+	if (staged_status != GOT_STATUS_ADD &&
+	    staged_status != GOT_STATUS_MODIFY &&
+	    staged_status != GOT_STATUS_DELETE)
+		return NULL;
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
@@ -5652,12 +5818,50 @@ unstage_path(void *arg, unsigned char status,
 			break;
 		/* fall through */
 	case GOT_STATUS_ADD:
+		if (a->patch_cb) {
+			if (staged_status == GOT_STATUS_ADD) {
+				int choice = GOT_PATCH_CHOICE_NONE;
+				err = (*a->patch_cb)(&choice, a->patch_arg,
+				    staged_status, ie->path, NULL, 1, 1);
+				if (err)
+					break;
+				if (choice != GOT_PATCH_CHOICE_YES)
+					break;
+			} else {
+				err = create_unstaged_content(
+				    &path_unstaged_content,
+				    &path_new_staged_content, blob_id,
+				    staged_blob_id, ie->path, a->repo,
+				    a->patch_cb, a->patch_arg);
+				if (err || path_unstaged_content == NULL)
+					break;
+				if (path_new_staged_content) {
+					err = got_object_blob_create(
+					    &staged_blob_id,
+					    path_new_staged_content,
+					    a->repo);
+					if (err)
+						break;
+					memcpy(ie->staged_blob_sha1,
+					    staged_blob_id->sha1,
+					    SHA1_DIGEST_LENGTH);
+				}
+				err = merge_file(&local_changes_subsumed,
+				    a->worktree, blob_base, ondisk_path,
+				    relpath, got_fileindex_perms_to_st(ie),
+				    path_unstaged_content, "unstaged",
+				    a->repo, a->progress_cb, a->progress_arg);
+				if (err == NULL &&
+				    path_new_staged_content == NULL)
+					got_fileindex_entry_stage_set(ie,
+					    GOT_FILEIDX_STAGE_NONE);
+				break; /* Done with this file. */
+			}
+		}
 		err = got_object_open_as_blob(&blob_staged, a->repo,
 		    staged_blob_id, 8192);
 		if (err)
 			break;
-
-
 		err = merge_blob(&local_changes_subsumed, a->worktree,
 		    blob_base, ondisk_path, relpath,
 		    got_fileindex_perms_to_st(ie), blob_staged,
@@ -5668,6 +5872,19 @@ unstage_path(void *arg, unsigned char status,
 			    GOT_FILEIDX_STAGE_NONE);
 		break;
 	case GOT_STATUS_DELETE:
+		if (a->patch_cb) {
+			int choice = GOT_PATCH_CHOICE_NONE;
+			err = (*a->patch_cb)(&choice, a->patch_arg,
+			    staged_status, ie->path, NULL, 1, 1);
+			if (err)
+				break;
+			if (choice == GOT_PATCH_CHOICE_NO)
+				break;
+			if (choice != GOT_PATCH_CHOICE_YES) {
+				err = got_error(GOT_ERR_PATCH_CHOICE);
+				break;
+			}
+		}
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
 		err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
 		if (err)
@@ -5677,6 +5894,14 @@ unstage_path(void *arg, unsigned char status,
 	}
 
 	free(ondisk_path);
+	if (path_unstaged_content &&
+	    unlink(path_unstaged_content) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path_unstaged_content);
+	if (path_new_staged_content &&
+	    unlink(path_new_staged_content) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path_new_staged_content);
+	free(path_unstaged_content);
+	free(path_new_staged_content);
 	if (blob_base)
 		got_object_blob_close(blob_base);
 	if (blob_staged)
@@ -5688,6 +5913,7 @@ const struct got_error *
 got_worktree_unstage(struct got_worktree *worktree,
     struct got_pathlist_head *paths,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_worktree_patch_cb patch_cb, void *patch_arg,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
@@ -5709,6 +5935,8 @@ got_worktree_unstage(struct got_worktree *worktree,
 	upa.repo = repo;
 	upa.progress_cb = progress_cb;
 	upa.progress_arg = progress_arg;
+	upa.patch_cb = patch_cb;
+	upa.patch_arg = patch_arg;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    unstage_path, &upa, NULL, NULL);

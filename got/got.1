@@ -971,7 +971,7 @@ and may then be staged again if necessary.
 .It Cm sg
 Short alias for
 .Cm stage .
-.It Cm unstage [ Ar path ... ]
+.It Cm unstage [ Fl p ] [ Fl F Ar response-script ] [ Ar path ... ]
 Merge staged changes back into the work tree and put affected paths
 back into non-staged status.
 If no
@@ -987,6 +987,35 @@ Show the status of each affected file, using the following status codes:
 .It D Ta file was staged as deleted and still is deleted
 .It d Ta file's deletion was obstructed by local modifications
 .It ~ Ta changes destined for a non-regular file were not merged
+.El
+.Pp
+The options for
+.Cm got unstage
+are as follows:
+.Bl -tag -width Ds
+.It Fl p
+Instead of unstaging the entire content of a changed file, interactively
+select or reject changes for unstaging based on
+.Dq y
+(unstage change),
+.Dq n
+(keep change staged), and
+.Dq q
+(quit unstaging this file) responses.
+If a file is staged in modified status, individual patches derived from the
+staged file content can be unstaged.
+Files staged in added or deleted status may only be unstaged in their entirety.
+.It Fl F Ar response-script
+With the
+.Fl p
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from the specified
+.Ar response-script
+file instead of prompting interactively.
 .El
 .It Cm ug
 Short alias for
