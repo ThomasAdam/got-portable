@@ -1864,6 +1864,71 @@ function test_stage_patch_added {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_patch_added_twice {
+	local testroot=`test_init stage_patch_added_twice`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new > /dev/null)
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		epsilon/new > $testroot/stdout)
+
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "stage this addition? [y/n] y" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " A epsilon/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		epsilon/new > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: epsilon/new: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_stage_patch_removed {
 	local testroot=`test_init stage_patch_removed`
 	local commit_id=`git_show_head $testroot/repo`
@@ -1915,6 +1980,72 @@ function test_stage_patch_removed {
 	echo "+++ /dev/null" >> $testroot/stdout.expected
 	echo "@@ -1 +0,0 @@" >> $testroot/stdout.expected
 	echo "-beta" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_stage_patch_removed_twice {
+	local testroot=`test_init stage_patch_removed_twice`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		beta > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo "stage this deletion? [y/n] y" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo " D beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p beta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -2147,6 +2278,8 @@ run_test test_stage_commit
 run_test test_stage_patch
 run_test test_stage_patch_twice
 run_test test_stage_patch_added
+run_test test_stage_patch_added_twice
 run_test test_stage_patch_removed
+run_test test_stage_patch_removed_twice
 run_test test_stage_patch_quit
 run_test test_stage_patch_incomplete_script
