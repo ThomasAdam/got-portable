@@ -1119,6 +1119,122 @@ function test_stage_commit_non_staged {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_commit_out_of_date {
+	local testroot=`test_init stage_commit_out_of_date`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
+
+	echo "changed file" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "changed alpha in repo"
+
+	(cd $testroot/wt && got commit -m "try to commit" > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got commit command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo -n "got: work tree must be updated before these changes " \
+		> $testroot/stderr.expected
+	echo "can be committed" >> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update > $testroot/stdout \
+		2> $testroot/stderr)
+	echo -n > $testroot/stdout.expected
+	echo "got: alpha: file is staged" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage > /dev/null)
+	(cd $testroot/wt && got update > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "C  alpha" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  foo" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# resolve conflict
+	echo "resolved file" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got stage > /dev/null)
+
+	(cd $testroot/wt && got commit -m "try again" > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	echo "A  foo" > $testroot/stdout.expected
+	echo "M  alpha" >> $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "Created commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 function test_stage_commit {
 	local testroot=`test_init stage_commit`
 	local first_commit=`git_show_head $testroot/repo`
@@ -1837,6 +1953,7 @@ run_test test_stage_histedit
 run_test test_stage_rebase
 run_test test_stage_update
 run_test test_stage_commit_non_staged
+run_test test_stage_commit_out_of_date
 run_test test_stage_commit
 run_test test_stage_patch
 run_test test_stage_patch_added
