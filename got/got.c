@@ -3454,6 +3454,7 @@ cmd_commit(int argc, char *argv[])
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
+	cl_arg.logmsg_path = NULL;
 
 	while ((ch = getopt(argc, argv, "m:")) != -1) {
 		switch (ch) {
@@ -3534,7 +3535,6 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 11;
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	cl_arg.logmsg_path = NULL;
 	error = got_worktree_commit(&id, worktree, &paths, got_author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
@@ -3552,6 +3552,7 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 	printf("Created commit %s\n", id_str);
 done:
+	free(cl_arg.logmsg_path);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
