@@ -261,11 +261,10 @@ status codes:
 .It D Ta file deletion is staged
 .El
 .Pp
-If a path has staged changes, modification status of files shown
-in the first output column is relative to the staged changes:
+Changes created on top of staged changes are indicated in the first column:
 .Bl -column YXZ description
-.It MM Ta modified file was modified again after being staged
-.It MA Ta added file was modified after being staged
+.It MM Ta file was modified after earlier changes have been staged
+.It MA Ta file was modified after having been staged for addition
 .El
 .It Cm st
 Short alias for
