@@ -173,12 +173,25 @@ got_worktree_schedule_delete(struct got_worktree *,
     struct got_pathlist_head *, int, got_worktree_status_cb, void *,
     struct got_repository *);
 
+/* A callback function which is used to select or reject a patch. */
+typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
+    unsigned char, const char *, FILE *, int, int);
+
+/* Values for result output parameter of got_wortree_patch_cb. */
+#define GOT_PATCH_CHOICE_NONE	0
+#define GOT_PATCH_CHOICE_YES	1
+#define GOT_PATCH_CHOICE_NO	2
+#define GOT_PATCH_CHOICE_QUIT	3
+
 /*
  * Revert a file at the specified path such that it matches its
  * original state in the worktree's base commit.
+ * If the patch callback is not NULL, call it to select patch hunks to
+ * revert. Otherwise, revert the whole file found at each path.
  */
 const struct got_error *got_worktree_revert(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_checkout_cb, void *,
+    got_worktree_patch_cb patch_cb, void *patch_arg,
     struct got_repository *);
 
 /*
@@ -372,16 +385,6 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
 const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
 
-
-/* A callback function which is used to select or reject a patch. */
-typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
-    unsigned char, const char *, FILE *, int, int);
-
-/* Values for result output parameter of got_wortree_patch_cb. */
-#define GOT_PATCH_CHOICE_NONE	0
-#define GOT_PATCH_CHOICE_YES	1
-#define GOT_PATCH_CHOICE_NO	2
-#define GOT_PATCH_CHOICE_QUIT	3
 
 /*
  * Stage the specified paths for commit.

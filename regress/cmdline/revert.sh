@@ -250,7 +250,8 @@ function test_revert_no_arguments {
 		return 1
 	fi
 
-	echo "usage: got revert [-R] path ..." > $testroot/stderr.expected
+	echo "usage: got revert [-p] [-F response-script] [-R] path ..." \
+		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -320,6 +321,378 @@ function test_revert_directory {
 
 }
 
+function test_revert_patch {
+	local testroot=`test_init revert_patch`
+
+	jot 16 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+
+	(cd $testroot/wt && got diff > $testroot/numbers.diff)
+
+	# don't revert any hunks
+	printf "n\nn\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 3)
+revert this change? [y/n/q] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers (change 2 of 3)
+revert this change? [y/n/q] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 3 of 3)
+revert this change? [y/n/q] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/numbers.diff $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/numbers.diff $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# revert middle hunk
+	printf "n\ny\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 3)
+revert this change? [y/n/q] n
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers (change 2 of 3)
+revert this change? [y/n/q] y
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 3 of 3)
+revert this change? [y/n/q] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + numbers' >> $testroot/stdout.expected
+	cat >> $testroot/stdout.expected <<EOF
+--- numbers
++++ numbers
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# revert last hunk
+	printf "n\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 2)
+revert this change? [y/n/q] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 2 of 2)
+revert this change? [y/n/q] y
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+
+	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + numbers' >> $testroot/stdout.expected
+	cat >> $testroot/stdout.expected <<EOF
+--- numbers
++++ numbers
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_revert_patch_added {
+	local testroot=`test_init revert_patch_added`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new > /dev/null)
+
+	printf "n\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		epsilon/new > $testroot/stdout)
+
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "revert this addition? [y/n] n" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		epsilon/new > $testroot/stdout)
+
+	echo "A  epsilon/new" > $testroot/stdout.expected
+	echo "revert this addition? [y/n] y" >> $testroot/stdout.expected
+	echo "R  epsilon/new" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "?  epsilon/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_revert_patch_removed {
+	local testroot=`test_init revert_patch_removed`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm beta > /dev/null)
+
+	printf "n\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		beta > $testroot/stdout)
+	echo "D  beta" > $testroot/stdout.expected
+	echo "revert this deletion? [y/n] n" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "D  beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		beta > $testroot/stdout)
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo "revert this deletion? [y/n] y" >> $testroot/stdout.expected
+	echo "R  beta" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
@@ -327,3 +700,6 @@ run_test test_revert_multiple
 run_test test_revert_file_in_new_subdir
 run_test test_revert_no_arguments
 run_test test_revert_directory
+run_test test_revert_patch
+run_test test_revert_patch_added
+run_test test_revert_patch_removed

@@ -3104,7 +3104,8 @@ done:
 __dead static void
 usage_revert(void)
 {
-	fprintf(stderr, "usage: %s revert [-R] path ...\n", getprogname());
+	fprintf(stderr, "usage: %s revert [-p] [-F response-script] [-R] "
+	    "path ...\n", getprogname());
 	exit(1);
 }
 
@@ -3117,6 +3118,119 @@ revert_progress(void *arg, unsigned char status, const char *path)
 	return NULL;
 }
 
+struct choose_patch_arg {
+	FILE *patch_script_file;
+	const char *action;
+};
+
+static const struct got_error *
+show_change(unsigned char status, const char *path, FILE *patch_file, int n,
+    int nchanges, const char *action)
+{
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+		printf("A  %s\n%s this addition? [y/n] ", path, action);
+		break;
+	case GOT_STATUS_DELETE:
+		printf("D  %s\n%s this deletion? [y/n] ", path, action);
+		break;
+	case GOT_STATUS_MODIFY:
+		if (fseek(patch_file, 0L, SEEK_SET) == -1)
+			return got_error_from_errno("fseek");
+		printf(GOT_COMMIT_SEP_STR);
+		while ((linelen = getline(&line, &linesize, patch_file) != -1))
+			printf("%s", line);
+		if (ferror(patch_file))
+			return got_error_from_errno("getline");
+		printf(GOT_COMMIT_SEP_STR);
+		printf("M  %s (change %d of %d)\n%s this change? [y/n/q] ",
+		    path, n, nchanges, action);
+		break;
+	default:
+		return got_error_path(path, GOT_ERR_FILE_STATUS);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+choose_patch(int *choice, void *arg, unsigned char status, const char *path,
+    FILE *patch_file, int n, int nchanges)
+{
+	const struct got_error *err = NULL;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
+	int resp = ' ';
+	struct choose_patch_arg *a = arg;
+
+	*choice = GOT_PATCH_CHOICE_NONE;
+
+	if (a->patch_script_file) {
+		char *nl;
+		err = show_change(status, path, patch_file, n, nchanges,
+		    a->action);
+		if (err)
+			return err;
+		linelen = getline(&line, &linesize, a->patch_script_file);
+		if (linelen == -1) {
+			if (ferror(a->patch_script_file))
+				return got_error_from_errno("getline");
+			return NULL;
+		}
+		nl = strchr(line, '\n');
+		if (nl)
+			*nl = '\0';
+		if (strcmp(line, "y") == 0) {
+			*choice = GOT_PATCH_CHOICE_YES;
+			printf("y\n");
+		} else if (strcmp(line, "n") == 0) {
+			*choice = GOT_PATCH_CHOICE_NO;
+			printf("n\n");
+		} else if (strcmp(line, "q") == 0 &&
+		    status == GOT_STATUS_MODIFY) {
+			*choice = GOT_PATCH_CHOICE_QUIT;
+			printf("q\n");
+		} else
+			printf("invalid response '%s'\n", line);
+		free(line);
+		return NULL;
+	}
+
+	while (resp != 'y' && resp != 'n' && resp != 'q') {
+		err = show_change(status, path, patch_file, n, nchanges,
+		    a->action);
+		if (err)
+			return err;
+		resp = getchar();
+		if (resp == '\n')
+			resp = getchar();
+		if (status == GOT_STATUS_MODIFY) {
+			if (resp != 'y' && resp != 'n' && resp != 'q') {
+				printf("invalid response '%c'\n", resp);
+				resp = ' ';
+			}
+		} else if (resp != 'y' && resp != 'n') {
+				printf("invalid response '%c'\n", resp);
+				resp = ' ';
+		}
+	}
+
+	if (resp == 'y')
+		*choice = GOT_PATCH_CHOICE_YES;
+	else if (resp == 'n')
+		*choice = GOT_PATCH_CHOICE_NO;
+	else if (resp == 'q' && status == GOT_STATUS_MODIFY)
+		*choice = GOT_PATCH_CHOICE_QUIT;
+
+	return NULL;
+}
+
+
 static const struct got_error *
 cmd_revert(int argc, char *argv[])
 {
@@ -3126,12 +3240,21 @@ cmd_revert(int argc, char *argv[])
 	char *cwd = NULL, *path = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, can_recurse = 0;
+	int ch, can_recurse = 0, pflag = 0;
+	FILE *patch_script_file = NULL;
+	const char *patch_script_path = NULL;
+	struct choose_patch_arg cpa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "R")) != -1) {
+	while ((ch = getopt(argc, argv, "pF:R")) != -1) {
 		switch (ch) {
+		case 'p':
+			pflag = 1;
+			break;
+		case 'F':
+			patch_script_path = optarg;
+			break;
 		case 'R':
 			can_recurse = 1;
 			break;
@@ -3151,6 +3274,8 @@ cmd_revert(int argc, char *argv[])
 #endif
 	if (argc < 1)
 		usage_revert();
+	if (patch_script_path && !pflag)
+		errx(1, "-F option can only be used together with -p option");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -3165,6 +3290,14 @@ cmd_revert(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (patch_script_path) {
+		patch_script_file = fopen(patch_script_path, "r");
+		if (patch_script_file == NULL) {
+			error = got_error_from_errno2("fopen",
+			    patch_script_path);
+			goto done;
+		}
+	}
 	error = apply_unveil(got_repo_get_path(repo), 1,
 	    got_worktree_get_root_path(worktree));
 	if (error)
@@ -3203,11 +3336,16 @@ cmd_revert(int argc, char *argv[])
 		}
 	}
 
-	error = got_worktree_revert(worktree, &paths,
-	    revert_progress, NULL, repo);
+	cpa.patch_script_file = patch_script_file;
+	cpa.action = "revert";
+	error = got_worktree_revert(worktree, &paths, revert_progress, NULL,
+	    pflag ? choose_patch : NULL, &cpa, repo);
 	if (error)
 		goto done;
 done:
+	if (patch_script_file && fclose(patch_script_file) == EOF &&
+	    error == NULL)
+		error = got_error_from_errno2("fclose", patch_script_path);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
@@ -5235,118 +5373,6 @@ print_stage(void *arg, unsigned char status, unsigned char staged_status,
 
 	printf("%s %c %s\n", id_str, staged_status, path);
 	free(id_str);
-	return NULL;
-}
-
-static const struct got_error *
-show_change(unsigned char status, const char *path, FILE *patch_file, int n,
-    int nchanges, const char *action)
-{
-	char *line = NULL;
-	size_t linesize = 0;
-	ssize_t linelen;
-
-	switch (status) {
-	case GOT_STATUS_ADD:
-		printf("A  %s\n%s this addition? [y/n] ", path, action);
-		break;
-	case GOT_STATUS_DELETE:
-		printf("D  %s\n%s this deletion? [y/n] ", path, action);
-		break;
-	case GOT_STATUS_MODIFY:
-		if (fseek(patch_file, 0L, SEEK_SET) == -1)
-			return got_error_from_errno("fseek");
-		printf(GOT_COMMIT_SEP_STR);
-		while ((linelen = getline(&line, &linesize, patch_file) != -1))
-			printf("%s", line);
-		if (ferror(patch_file))
-			return got_error_from_errno("getline");
-		printf(GOT_COMMIT_SEP_STR);
-		printf("M  %s (change %d of %d)\n%s this change? [y/n/q] ",
-		    path, n, nchanges, action);
-		break;
-	default:
-		return got_error_path(path, GOT_ERR_FILE_STATUS);
-	}
-
-	return NULL;
-}
-
-struct choose_patch_arg {
-	FILE *patch_script_file;
-	const char *action;
-};
-
-static const struct got_error *
-choose_patch(int *choice, void *arg, unsigned char status, const char *path,
-    FILE *patch_file, int n, int nchanges)
-{
-	const struct got_error *err = NULL;
-	char *line = NULL;
-	size_t linesize = 0;
-	ssize_t linelen;
-	int resp = ' ';
-	struct choose_patch_arg *a = arg;
-
-	*choice = GOT_PATCH_CHOICE_NONE;
-
-	if (a->patch_script_file) {
-		char *nl;
-		err = show_change(status, path, patch_file, n, nchanges,
-		    a->action);
-		if (err)
-			return err;
-		linelen = getline(&line, &linesize, a->patch_script_file);
-		if (linelen == -1) {
-			if (ferror(a->patch_script_file))
-				return got_error_from_errno("getline");
-			return NULL;
-		}
-		nl = strchr(line, '\n');
-		if (nl)
-			*nl = '\0';
-		if (strcmp(line, "y") == 0) {
-			*choice = GOT_PATCH_CHOICE_YES;
-			printf("y\n");
-		} else if (strcmp(line, "n") == 0) {
-			*choice = GOT_PATCH_CHOICE_NO;
-			printf("n\n");
-		} else if (strcmp(line, "q") == 0 &&
-		    status == GOT_STATUS_MODIFY) {
-			*choice = GOT_PATCH_CHOICE_QUIT;
-			printf("q\n");
-		} else
-			printf("invalid response '%s'\n", line);
-		free(line);
-		return NULL;
-	}
-
-	while (resp != 'y' && resp != 'n' && resp != 'q') {
-		err = show_change(status, path, patch_file, n, nchanges,
-		    a->action);
-		if (err)
-			return err;
-		resp = getchar();
-		if (resp == '\n')
-			resp = getchar();
-		if (status == GOT_STATUS_MODIFY) {
-			if (resp != 'y' && resp != 'n' && resp != 'q') {
-				printf("invalid response '%c'\n", resp);
-				resp = ' ';
-			}
-		} else if (resp != 'y' && resp != 'n') {
-				printf("invalid response '%c'\n", resp);
-				resp = ' ';
-		}
-	}
-
-	if (resp == 'y')
-		*choice = GOT_PATCH_CHOICE_YES;
-	else if (resp == 'n')
-		*choice = GOT_PATCH_CHOICE_NO;
-	else if (resp == 'q' && status == GOT_STATUS_MODIFY)
-		*choice = GOT_PATCH_CHOICE_QUIT;
-
 	return NULL;
 }
 

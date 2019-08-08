@@ -509,7 +509,7 @@ Perform the operation even if a file contains uncommitted modifications.
 .It Cm rm
 Short alias for
 .Cm remove .
-.It Cm revert [ Fl R ] Ar path ...
+.It Cm revert [ Fl p ] [ Fl F Ar response-script ] [ Fl R ] Ar path ...
 Revert any uncommited changes in files at the specified paths.
 File contents will be overwritten with those contained in the
 work tree's base commit. There is no way to bring discarded
@@ -527,6 +527,29 @@ The options for
 .Cm got revert
 are as follows:
 .Bl -tag -width Ds
+.It Fl p
+Instead of reverting all changes in files, interactively select or reject
+changes to revert based on
+.Dq y
+(revert change),
+.Dq n
+(keep change), and
+.Dq q
+(quit reverting this file) responses.
+If a file is in modified status, individual patches derived from the
+modified file content can be reverted.
+Files in added or deleted status may only be reverted in their entirety.
+.It Fl F Ar response-script
+With the
+.Fl p
+option, read
+.Dq y ,
+.Dq n ,
+and
+.Dq q
+responses line-by-line from the specified
+.Ar response-script
+file instead of prompting interactively.
 .It Fl R
 Permit recursion into directories.
 If this option is not specified,
@@ -1074,6 +1097,10 @@ View local changes in a work tree directory:
 .Pp
 .Dl $ got status
 .Dl $ got diff | less
+.Pp
+Interactively revert selected local changes in a work tree directory:
+.Pp
+.Dl $ got revert -p -R\ .
 .Pp
 In a work tree or a git repository directory, list all branch references:
 .Pp
