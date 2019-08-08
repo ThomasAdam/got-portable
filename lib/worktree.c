@@ -2836,7 +2836,7 @@ done:
 
 const struct got_error *
 got_worktree_revert(struct got_worktree *worktree,
-    struct got_pathlist_head *ondisk_paths,
+    struct got_pathlist_head *paths,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
     struct got_repository *repo)
 {
@@ -2860,7 +2860,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.progress_cb = progress_cb;
 	rfa.progress_arg = progress_arg;
 	rfa.repo = repo;
-	TAILQ_FOREACH(pe, ondisk_paths, entry) {
+	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    revert_file, &rfa, NULL, NULL);
 		if (err)
