@@ -20,7 +20,7 @@ dist: clean
 	tar -C /tmp -zcf got-${GOT_VERSION}.tar.gz got-${GOT_VERSION}
 	rm -rf /tmp/got-${GOT_VERSION}
 	tar -ztf got-${GOT_VERSION}.tar.gz | sed -e 's/^got-${GOT_VERSION}//' \
-		> got-dist.txt.new
+		| sort > got-dist.txt.new
 	diff -u got-dist.txt got-dist.txt.new
 	rm got-dist.txt.new
 
