@@ -5321,12 +5321,23 @@ apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
 		    end_old, start_new, end_new, rejectfile, outfile);
 		break;
 	case GOT_PATCH_CHOICE_QUIT:
-		/* Copy old file's lines until EOF. */
-		while (!feof(f1)) {
-			err = copy_one_line(f1, outfile, rejectfile);
-			if (err)
-				goto done;
-			(*line_cur1)++;
+		if (outfile) {
+			/* Copy old file's lines until EOF. */
+			while (!feof(f1)) {
+				err = copy_one_line(f1, outfile, NULL);
+				if (err)
+					goto done;
+				(*line_cur1)++;
+			}
+		}
+		if (rejectfile) {
+			/* Copy new file's lines until EOF. */
+			while (!feof(f2)) {
+				err = copy_one_line(f2, NULL, rejectfile);
+				if (err)
+					goto done;
+				(*line_cur2)++;
+			}
 		}
 		break;
 	default:
@@ -5731,7 +5742,7 @@ create_unstaged_content(char **path_unstaged_content,
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
 			have_content = 1;
-		if (choice == GOT_PATCH_CHOICE_NO)
+		else
 			have_rejected_content = 1;
 		if (choice == GOT_PATCH_CHOICE_QUIT)
 			break;
