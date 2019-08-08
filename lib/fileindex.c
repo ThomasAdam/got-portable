@@ -61,7 +61,7 @@ mode_t
 got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 {
 	mode_t perms = (ie->mode >> GOT_FILEIDX_MODE_PERMS_SHIFT);
-	return (perms & (S_IRWXU | S_IRWXG | S_IRWXO));
+	return (S_IFREG | (perms & (S_IRWXU | S_IRWXG | S_IRWXO)));
 }
 
 const struct got_error *
