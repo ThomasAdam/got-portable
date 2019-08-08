@@ -15,9 +15,6 @@ got:
 - 'histedit -c' prompts for log message even if there are no changes to commit
 - recursive addition: got add -R
 - recursive removal: got rm -R
-- add 'got stage' command with 'git add -p' style functionality
-- add 'got unstage' command to undo effects of 'got stage'
-- add 'git checkout -p' style functionality to 'got revert' and 'got unstage'
 
 tog:
 - implement horizonal scrolling in all views
