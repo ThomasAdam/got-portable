@@ -82,6 +82,68 @@ function test_stage_no_changes {
 	test_done "$testroot" "$ret"
 }
 
+function test_stage_unversioned {
+	local testroot=`test_init stage_unversioned`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	touch $testroot/wt/unversioned-file
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got stage command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo " M alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file again" > $testroot/wt/alpha
+
+	(cd $testroot/wt && got stage unversioned-file > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 function test_stage_list {
 	local testroot=`test_init stage_list`
 
@@ -1739,6 +1801,7 @@ EOF
 
 run_test test_stage_basic
 run_test test_stage_no_changes
+run_test test_stage_unversioned
 run_test test_stage_list
 run_test test_stage_conflict
 run_test test_stage_out_of_date

@@ -5126,6 +5126,9 @@ check_stage_ok(void *arg, unsigned char status,
 	struct got_object_id *base_commit_idp = NULL;
 	char *in_repo_path = NULL, *p;
 
+	if (status == GOT_STATUS_UNVERSIONED)
+		return NULL;
+
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
@@ -5477,6 +5480,9 @@ stage_path(void *arg, unsigned char status,
 	char *ondisk_path = NULL, *path_content = NULL;
 	uint32_t stage;
 
+	if (status == GOT_STATUS_UNVERSIONED)
+		return NULL;
+
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
@@ -5815,7 +5821,7 @@ unstage_path(void *arg, unsigned char status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
-		return got_error_path(relpath, GOT_ERR_BAD_PATH);
+		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 
 	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, relpath)
 	    == -1)

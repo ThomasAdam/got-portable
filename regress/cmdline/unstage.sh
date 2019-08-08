@@ -67,6 +67,84 @@ function test_unstage_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_unstage_unversioned {
+	local testroot=`test_init unstage_unversioned`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified file" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta > /dev/null)
+	echo "new file" > $testroot/wt/foo
+	(cd $testroot/wt && got add foo > /dev/null)
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage > /dev/null)
+
+	touch $testroot/wt/unversioned-file
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo 'G  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'G  foo' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage > /dev/null)
+
+	# unstaging an unversioned path is a no-op
+	(cd $testroot/wt && got unstage unversioned > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo ' M alpha' > $testroot/stdout.expected
+	echo ' D beta' >> $testroot/stdout.expected
+	echo ' A foo' >> $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_unstage_patch {
 	local testroot=`test_init unstage_patch`
 
@@ -838,6 +916,7 @@ EOF
 }
 
 run_test test_unstage_basic
+run_test test_unstage_unversioned
 run_test test_unstage_patch
 run_test test_unstage_patch_added
 run_test test_unstage_patch_removed
