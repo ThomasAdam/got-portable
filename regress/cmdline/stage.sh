@@ -34,7 +34,7 @@ function test_stage_basic {
 	echo ' M alpha' > $testroot/stdout.expected
 	echo ' D beta' >> $testroot/stdout.expected
 	echo ' A foo' >> $testroot/stdout.expected
-	(cd $testroot/wt && got stage alpha beta foo > $testroot/stdout)
+	(cd $testroot/wt && got stage > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
