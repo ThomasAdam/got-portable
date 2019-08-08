@@ -5241,6 +5241,9 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 
 	if (patch_script_file) {
 		char *nl;
+		err = show_change(status, path, patch_file, n, nchanges);
+		if (err)
+			return err;
 		linelen = getline(&line, &linesize, patch_script_file);
 		if (linelen == -1) {
 			if (ferror(patch_script_file))
@@ -5250,9 +5253,6 @@ choose_patch(int *choice, void *arg, unsigned char status, const char *path,
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		err = show_change(status, path, patch_file, n, nchanges);
-		if (err)
-			return err;
 		if (strcmp(line, "y") == 0) {
 			*choice = GOT_PATCH_CHOICE_YES;
 			printf("y\n");

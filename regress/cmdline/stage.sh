@@ -1641,6 +1641,100 @@ EOF
 
 }
 
+function test_stage_patch_incomplete_script {
+	local testroot=`test_init stage_incomplete_script`
+
+	jot 16 > $testroot/repo/numbers
+	echo zzz > $testroot/repo/zzz
+	(cd $testroot/repo && git add numbers zzz)
+	git_commit $testroot/repo -m "added files"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+
+	# stage first hunk and then stop responding; got should error out
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 3)
+stage this change? [y/n/q] y
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers (change 2 of 3)
+EOF
+	echo -n "stage this change? [y/n/q] " >> $testroot/stdout.expected
+	echo "got: invalid patch choice" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_list
@@ -1661,3 +1755,4 @@ run_test test_stage_patch
 run_test test_stage_patch_added
 run_test test_stage_patch_removed
 run_test test_stage_patch_quit
+run_test test_stage_patch_incomplete_script
