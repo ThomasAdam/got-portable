@@ -121,6 +121,7 @@
 #define GOT_ERR_FILE_NOT_STAGED 105
 #define GOT_ERR_STAGED_PATHS	106
 #define GOT_ERR_PATCH_CHOICE	107
+#define GOT_ERR_COMMIT_NO_EMAIL	108
 
 static const struct got_error {
 	int code;
@@ -246,6 +247,9 @@ static const struct got_error {
 	{ GOT_ERR_STAGED_PATHS, "work tree contains files with staged "
 	    "changes; these changes must be committed or unstaged first" },
 	{ GOT_ERR_PATCH_CHOICE, "invalid patch choice" },
+	{ GOT_ERR_COMMIT_NO_EMAIL,"GOT_AUTHOR environment variable contains "
+	    "no email address; an email address is required for compatibility "
+	    "with Git" },
 };
 
 /*

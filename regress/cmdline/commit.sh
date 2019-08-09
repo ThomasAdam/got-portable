@@ -541,6 +541,44 @@ function test_commit_outside_refs_heads {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_no_email {
+	local testroot=`test_init commit_no_email`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && env GOT_AUTHOR=":flan_hacker:" \
+		got commit -m 'test no email' > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo -n "got: GOT_AUTHOR environment variable contains no email " \
+		> $testroot/stderr.expected
+	echo -n "address; an email address is required for compatibility "\
+		>> $testroot/stderr.expected
+	echo "with Git" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -555,3 +593,4 @@ run_test test_commit_path_prefix
 run_test test_commit_dir_path
 run_test test_commit_selected_paths
 run_test test_commit_outside_refs_heads
+run_test test_commit_no_email

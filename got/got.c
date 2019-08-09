@@ -483,12 +483,47 @@ import_progress(void *arg, const char *path)
 }
 
 static const struct got_error *
+get_author(const char **author)
+{
+	const char *got_author;
+
+	*author = NULL;
+
+	got_author = getenv("GOT_AUTHOR");
+	if (got_author == NULL) {
+		/* TODO: Look up user in password database? */
+		return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+	}
+
+	*author = got_author;
+
+	/*
+	 * Really dumb email address check; we're only doing this to
+	 * avoid git's object parser breaking on commits we create.
+	 */
+	while (*got_author && *got_author != '<')
+		got_author++;
+	if (*got_author != '<')
+		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
+	while (*got_author && *got_author != '@')
+		got_author++;
+	if (*got_author != '@')
+		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
+	while (*got_author && *got_author != '>')
+		got_author++;
+	if (*got_author != '>')
+		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_import(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
 	char *editor = NULL;
-	const char *got_author = getenv("GOT_AUTHOR");
+	const char *author;
 	const char *branch_name = "master";
 	char *refname = NULL, *id_str = NULL;
 	struct got_repository *repo = NULL;
@@ -544,11 +579,9 @@ cmd_import(int argc, char *argv[])
 	if (argc != 1)
 		usage_import();
 
-	if (got_author == NULL) {
-		/* TODO: Look current user up in password database */
-		error = got_error(GOT_ERR_COMMIT_NO_AUTHOR);
-		goto done;
-	}
+	error = get_author(&author);
+	if (error)
+		return error;
 
 	if (repo_path == NULL) {
 		repo_path = getcwd(NULL, 0);
@@ -603,7 +636,7 @@ cmd_import(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_import(&new_commit_id, path_dir, logmsg,
-	    got_author, &ignores, repo, import_progress, NULL);
+	    author, &ignores, repo, import_progress, NULL);
 	if (error)
 		goto done;
 
@@ -3447,7 +3480,7 @@ cmd_commit(int argc, char *argv[])
 	char *cwd = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
-	const char *got_author = getenv("GOT_AUTHOR");
+	const char *author;
 	struct collect_commit_logmsg_arg cl_arg;
 	char *editor = NULL;
 	int ch, rebase_in_progress, histedit_in_progress;
@@ -3475,11 +3508,9 @@ cmd_commit(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (got_author == NULL) {
-		/* TODO: Look current user up in password database */
-		error = got_error(GOT_ERR_COMMIT_NO_AUTHOR);
-		goto done;
-	}
+	error = get_author(&author);
+	if (error)
+		return error;
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -3535,7 +3566,7 @@ cmd_commit(int argc, char *argv[])
 		cl_arg.branch_name += 11;
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
-	error = got_worktree_commit(&id, worktree, &paths, got_author, NULL,
+	error = got_worktree_commit(&id, worktree, &paths, author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
 		if (cl_arg.logmsg_path)
