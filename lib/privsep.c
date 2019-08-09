@@ -46,6 +46,10 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 static const struct got_error *
 poll_fd(int fd, int events, int timeout)
 {
@@ -1214,13 +1218,21 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 const struct got_error *
 got_privsep_unveil_exec_helpers(void)
 {
-	if (unveil(GOT_PATH_PROG_READ_PACK, "x") != 0 ||
-	    unveil(GOT_PATH_PROG_READ_OBJECT, "x") != 0 ||
-	    unveil(GOT_PATH_PROG_READ_COMMIT, "x") != 0 ||
-	    unveil(GOT_PATH_PROG_READ_TREE, "x") != 0 ||
-	    unveil(GOT_PATH_PROG_READ_BLOB, "x") != 0 ||
-	    unveil(GOT_PATH_PROG_READ_TAG, "x") != 0)
-		return got_error_from_errno("unveil");
+	const char *helpers[] = {
+	    GOT_PATH_PROG_READ_PACK,
+	    GOT_PATH_PROG_READ_OBJECT,
+	    GOT_PATH_PROG_READ_COMMIT,
+	    GOT_PATH_PROG_READ_TREE,
+	    GOT_PATH_PROG_READ_BLOB,
+	    GOT_PATH_PROG_READ_TAG,
+	};
+	int i;
+
+	for (i = 0; i < nitems(helpers); i++) {
+		if (unveil(helpers[i], "x") == 0)
+			continue;
+		return got_error_from_errno2("unveil", helpers[i]);
+	}
 
 	return NULL;
 }
