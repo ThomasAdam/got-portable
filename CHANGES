@@ -1,2 +1,9 @@
+* got 0.2; 2019-08-09
+  - improve error message if helper binaries fail to unveil(2)
+  - add support for tags to -c options of some got commands
+  - attempt to reject GOT_AUTHOR values without an email address because git
+    is unable to parse resulting commit objects
+  - fix build on OpenBSD/sparc64 (gcc)
+
 * got 0.1; 2019-08-09
   initial release; see git repository history for changes up to this point
