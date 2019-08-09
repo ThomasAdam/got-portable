@@ -110,6 +110,33 @@ function test_log_in_worktree {
 	test_done "$testroot" "0"
 }
 
+function test_log_tag {
+	local testroot=`test_init log_tag`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag="1.0.0"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git tag -a -m "test" $tag)
+
+	echo "commit $commit_id (master)" > $testroot/stdout.expected
+	(cd $testroot/wt && got log -l1 -c $tag | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
+run_test test_log_tag

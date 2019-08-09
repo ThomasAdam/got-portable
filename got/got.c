@@ -825,6 +825,19 @@ resolve_commit_arg(struct got_object_id **commit_id,
 {
 	const struct got_error *err;
 	struct got_reference *ref;
+	struct got_tag_object *tag;
+
+	err = got_repo_object_match_tag(&tag, commit_id_arg,
+	    GOT_OBJ_TYPE_COMMIT, repo);
+	if (err == NULL) {
+		*commit_id = got_object_id_dup(
+		    got_object_tag_get_object_id(tag));
+		if (*commit_id == NULL)
+			err = got_error_from_errno("got_object_id_dup");
+		got_object_tag_close(tag);
+		return err;
+	} else if (err->code != GOT_ERR_NO_OBJ)
+		return err;
 
 	err = got_ref_open(&ref, repo, commit_id_arg, 0);
 	if (err == NULL) {

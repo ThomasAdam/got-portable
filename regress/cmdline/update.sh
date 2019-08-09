@@ -1511,6 +1511,47 @@ function test_update_bumps_base_commit_id {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_tag {
+	local testroot=`test_init update_tag`
+	local tag="1.0.0"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	(cd $testroot/repo && git tag -m "test" -a $tag)
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $tag > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1540,3 +1581,4 @@ run_test test_update_moved_branch_ref
 run_test test_update_to_another_branch
 run_test test_update_to_commit_on_wrong_branch
 run_test test_update_bumps_base_commit_id
+run_test test_update_tag

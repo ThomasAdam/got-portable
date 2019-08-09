@@ -16,6 +16,7 @@
 
 struct got_repository;
 struct got_pathlist_head;
+struct got_tag_object;
 
 /* Open and close repositories. */
 const struct got_error *got_repo_open(struct got_repository**, const char *);
@@ -61,6 +62,13 @@ const struct got_error *got_repo_init(const char *);
 
 /* Attempt to find a unique object ID for a given ID string prefix. */
 const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
+    const char *, int, struct got_repository *);
+
+/*
+ * Attempt to find a tag object with a given name and target object type.
+ * Return GOT_ERR_NO_OBJ if no matching tag can be found.
+ */
+const struct got_error *got_repo_object_match_tag(struct got_tag_object **,
     const char *, int, struct got_repository *);
 
 /* A callback function which is invoked when a path is imported. */

@@ -210,8 +210,51 @@ function test_checkout_commit_from_wrong_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_tag {
+	local testroot=`test_init checkout_tag`
+	local tag="1.0.0"
+
+	(cd $testroot/repo && git tag -a -m "test" $tag)
+
+	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout -c $tag $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty
 run_test test_checkout_sets_xbit
 run_test test_checkout_commit_from_wrong_branch
+run_test test_checkout_tag

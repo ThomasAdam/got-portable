@@ -1115,6 +1115,50 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
+    int obj_type, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
+	struct got_object_id *tag_id;
+
+	SIMPLEQ_INIT(&refs);
+	*tag = NULL;
+
+	err = got_ref_list(&refs, repo);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(re, &refs, entry) {
+		const char *refname;
+		refname = got_ref_get_name(re->ref);
+		if (got_ref_is_symbolic(re->ref) ||
+		    strncmp("refs/tags/", refname, 10) != 0)
+			continue;
+		refname += 10;
+		if (strcmp(refname, name) != 0)
+			continue;
+		err = got_ref_resolve(&tag_id, repo, re->ref);
+		if (err)
+			break;
+		err = got_object_open_as_tag(tag, repo, tag_id);
+		free(tag_id);
+		if (err)
+			break;
+		if (got_object_tag_get_object_type(*tag) == obj_type)
+			break;
+		got_object_tag_close(*tag);
+		*tag = NULL;
+	}
+
+	got_ref_list_free(&refs);
+	if (err == NULL && *tag == NULL)
+		err = got_error(GOT_ERR_NO_OBJ);
+	return err;
+}
+
 static const struct got_error *
 alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
     const char *name, mode_t mode, struct got_object_id *blob_id)

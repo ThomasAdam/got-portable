@@ -57,4 +57,45 @@ function test_blame_basic {
 	test_done "$testroot" "$ret"
 }
 
+function test_blame_tag {
+	local testroot=`test_init blame_tag`
+	local tag=1.0.0
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo 1 > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
+	local commit1=`git_show_head $testroot/repo`
+
+	echo 2 >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
+	local commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git tag -a -m "test" $tag)
+
+	echo 3 >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
+	local commit3=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got blame -c $tag alpha > $testroot/stdout)
+
+	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit2=`trim_obj_id 32 $commit2`
+
+	echo "$short_commit1 1" > $testroot/stdout.expected
+	echo "$short_commit2 2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_blame_basic
+run_test test_blame_tag
