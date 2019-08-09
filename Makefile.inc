@@ -8,7 +8,7 @@ CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 PREFIX ?= /usr/local
 BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${PREFIX}/libexec
-MANDIR ?= ${LOCALBASE}/man/man
+MANDIR ?= ${PREFIX}/man/man
 .else
 PREFIX ?= ${HOME}
 BINDIR ?= ${HOME}/bin
