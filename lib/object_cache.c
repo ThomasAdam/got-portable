@@ -157,6 +157,8 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 	case GOT_OBJECT_CACHE_TYPE_TAG:
 		size = get_size_tag((struct got_tag_object *)item);
 		break;
+	default:
+		return got_error(GOT_ERR_OBJ_TYPE);
 	}
 
 	if (size > GOT_OBJECT_CACHE_MAX_ELEM_SIZE) {

@@ -413,8 +413,10 @@ done:
 static const struct got_error *
 blame_line(struct got_object_id **id, struct got_blame *blame, int lineno)
 {
-	if (lineno < 1 || lineno > blame->nlines)
+	if (lineno < 1 || lineno > blame->nlines) {
+		*id = NULL;
 		return got_error(GOT_ERR_RANGE);
+	}
 	*id = &blame->lines[lineno - 1].id;
 	return NULL;
 }
@@ -452,7 +454,7 @@ got_blame(const char *path, struct got_object_id *start_commit_id,
 	}
 
 	for (lineno = 1; lineno <= blame->nlines; lineno++) {
-		struct got_object_id *id;
+		struct got_object_id *id = NULL;
 		char *line, *id_str;
 
 		line = parse_next_line(blame->f, NULL);

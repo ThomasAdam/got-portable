@@ -3980,6 +3980,8 @@ blame_tree_entry(struct tog_view **new_view, int begin_x,
 	char *path;
 	struct tog_view *blame_view;
 
+	*new_view = NULL;
+
 	err = tree_entry_path(&path, parents, te);
 	if (err)
 		return err;
@@ -4006,6 +4008,8 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	struct tog_view *log_view;
 	const struct got_error *err = NULL;
 	char *path;
+
+	*new_view = NULL;
 
 	log_view = view_open(0, 0, 0, begin_x, TOG_VIEW_LOG);
 	if (log_view == NULL)
@@ -4113,7 +4117,7 @@ static const struct got_error *
 search_next_tree_view(struct tog_view *view)
 {
 	struct tog_tree_view_state *s = &view->state.tree;
-	struct got_tree_entry *entry, *te;
+	struct got_tree_entry *entry = NULL, *te;
 
 	if (!view->searching) {
 		view->search_next_done = 1;

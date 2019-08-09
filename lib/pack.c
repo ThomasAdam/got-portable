@@ -628,6 +628,7 @@ parse_negative_offset(int64_t *offset, size_t *len, struct got_pack *pack,
 	uint8_t offN;
 	int i = 0;
 
+	*offset = 0;
 	*len = 0;
 
 	do {

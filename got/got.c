@@ -1083,7 +1083,7 @@ static const struct got_error *
 get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
     char *argv[], struct got_worktree *worktree)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	char *path;
 	int i;
 
@@ -4647,6 +4647,8 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 	if (TAILQ_EMPTY(histedit_cmds))
 		return got_error_msg(GOT_ERR_EMPTY_HISTEDIT,
 		    "histedit script contains no commands");
+	if (SIMPLEQ_EMPTY(commits))
+		return got_error(GOT_ERR_EMPTY_HISTEDIT);
 
 	SIMPLEQ_FOREACH(qid, commits, entry) {
 		TAILQ_FOREACH(hle, histedit_cmds, entry) {

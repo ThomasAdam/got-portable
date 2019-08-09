@@ -608,6 +608,8 @@ parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
 	char *p, *space;
 	const struct got_error *err = NULL;
 
+	*elen = 0;
+
 	*te = got_alloc_tree_entry_partial();
 	if (*te == NULL)
 		return got_error_from_errno("got_alloc_tree_entry_partial");
