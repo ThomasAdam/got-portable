@@ -541,7 +541,9 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 				if (lp == NULL)
 					return -1;
 
-				if (lp->l_len == 2 && lp->l_line[0] == '.')
+				if (lp->l_len == 2 &&
+				    lp->l_line[0] == '.' &&
+				    lp->l_line[1] == '\n')
 					break;
 
 				TAILQ_REMOVE(&(plines->l_lines), lp, l_list);
