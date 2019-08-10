@@ -2893,7 +2893,7 @@ copy_change(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
 		(*line_cur2)++;
 	}
 	/* Skip over old file's replaced lines. */
-	while (!feof(f1) && *line_cur1 <= end_new) {
+	while (!feof(f1) && *line_cur1 <= end_old) {
 		if (rejectfile)
 			err = copy_one_line(f1, NULL, rejectfile);
 		else
@@ -2902,12 +2902,33 @@ copy_change(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
 			return err;
 		(*line_cur1)++;
 	}
-	/* Copy old file's lines after patch. */
-	while (!feof(f1) && *line_cur1 <= end_old) {
-		err = copy_one_line(f1, outfile, rejectfile);
-		if (err)
-			return err;
-		(*line_cur1)++;
+
+	return NULL;
+}
+
+static const struct got_error *
+copy_remaining_content(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
+    FILE *outfile, FILE *rejectfile)
+{
+	const struct got_error *err;
+
+	if (outfile) {
+		/* Copy old file's lines until EOF. */
+		while (!feof(f1)) {
+			err = copy_one_line(f1, outfile, NULL);
+			if (err)
+				return err;
+			(*line_cur1)++;
+		}
+	}
+	if (rejectfile) {
+		/* Copy new file's lines until EOF. */
+		while (!feof(f2)) {
+			err = copy_one_line(f2, NULL, rejectfile);
+			if (err)
+				return err;
+			(*line_cur2)++;
+		}
 	}
 
 	return NULL;
@@ -2968,24 +2989,6 @@ apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
 		    end_old, start_new, end_new, rejectfile, outfile);
 		break;
 	case GOT_PATCH_CHOICE_QUIT:
-		if (outfile) {
-			/* Copy old file's lines until EOF. */
-			while (!feof(f1)) {
-				err = copy_one_line(f1, outfile, NULL);
-				if (err)
-					goto done;
-				(*line_cur1)++;
-			}
-		}
-		if (rejectfile) {
-			/* Copy new file's lines until EOF. */
-			while (!feof(f2)) {
-				err = copy_one_line(f2, NULL, rejectfile);
-				if (err)
-					goto done;
-				(*line_cur2)++;
-			}
-		}
 		break;
 	default:
 		err = got_error(GOT_ERR_PATCH_CHOICE);
@@ -3086,6 +3089,10 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		else if (choice == GOT_PATCH_CHOICE_QUIT)
 			break;
 	}
+	if (have_content)
+		err = copy_remaining_content(f1, f2, &line_cur1, &line_cur2,
+		    reverse_patch ? NULL : outfile,
+		    reverse_patch ? outfile : NULL);
 done:
 	free(id_str);
 	if (blob)
@@ -5882,6 +5889,9 @@ create_unstaged_content(char **path_unstaged_content,
 		if (choice == GOT_PATCH_CHOICE_QUIT)
 			break;
 	}
+	if (have_content || have_rejected_content)
+		err = copy_remaining_content(f1, f2, &line_cur1, &line_cur2,
+		    outfile, rejectfile);
 done:
 	free(label1);
 	if (blob)

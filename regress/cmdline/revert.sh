@@ -794,6 +794,74 @@ function test_revert_patch_removed {
 	test_done "$testroot" "$ret"
 }
 
+function test_revert_patch_one_change {
+	local testroot=`test_init revert_patch_one_change`
+
+	jot 16 > $testroot/repo/numbers
+	(cd $testroot/repo && git add numbers)
+	git_commit $testroot/repo -m "added numbers file"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+
+	# revert change with -p
+	printf "y\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 1)
+revert this change? [y/n/q] y
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
@@ -804,3 +872,4 @@ run_test test_revert_directory
 run_test test_revert_patch
 run_test test_revert_patch_added
 run_test test_revert_patch_removed
+run_test test_revert_patch_one_change
