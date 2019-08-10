@@ -1,3 +1,8 @@
+* got 0.3; 2019-08-10
+- fix bug where 'revert -p' would delete all lines following a reverted change
+- fix merge bug inherited from OpenRCS, affecting lines with leading .
+- fix man page installation during manual 'make install' from plain tarball
+
 * got 0.2; 2019-08-09
   - improve error message if helper binaries fail to unveil(2)
   - add support for tags to -c options of some got commands
