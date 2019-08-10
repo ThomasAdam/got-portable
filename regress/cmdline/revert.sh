@@ -415,6 +415,107 @@ EOF
 		return 1
 	fi
 
+	# revert first hunk
+	printf "y\nn\nn\n" > $testroot/patchscript
+	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
+		numbers > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1,5 +1,5 @@
+ 1
+-2
++a
+ 3
+ 4
+ 5
+-----------------------------------------------
+M  numbers (change 1 of 3)
+revert this change? [y/n/q] y
+-----------------------------------------------
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+-----------------------------------------------
+M  numbers (change 2 of 3)
+revert this change? [y/n/q] n
+-----------------------------------------------
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+-----------------------------------------------
+M  numbers (change 3 of 3)
+revert this change? [y/n/q] n
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  numbers" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id \
+		| grep 'numbers$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + numbers' >> $testroot/stdout.expected
+	cat >> $testroot/stdout.expected <<EOF
+--- numbers
++++ numbers
+@@ -4,7 +4,7 @@
+ 4
+ 5
+ 6
+-7
++b
+ 8
+ 9
+ 10
+@@ -13,4 +13,4 @@
+ 13
+ 14
+ 15
+-16
++c
+EOF
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# put first hunk back
+	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+
 	# revert middle hunk
 	printf "n\ny\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got revert -F $testroot/patchscript -p \
