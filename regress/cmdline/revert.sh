@@ -809,7 +809,10 @@ function test_revert_patch_one_change {
 		return 1
 	fi
 
-	sed -i -e 's/^2$/a/' $testroot/wt/numbers
+	# Ensure file size is changed. Avoids race condition causing test
+	# failures where 'got revert' does not see changes to revert if
+	# timestamps and size in stat info remain unchanged.
+	sed -i -e 's/^2$/aa/' $testroot/wt/numbers
 
 	# revert change with -p
 	printf "y\n" > $testroot/patchscript
@@ -826,7 +829,7 @@ function test_revert_patch_one_change {
 @@ -1,5 +1,5 @@
  1
 -2
-+a
++aa
  3
  4
  5
@@ -834,6 +837,13 @@ function test_revert_patch_one_change {
 M  numbers (change 1 of 1)
 revert this change? [y/n/q] y
 EOF
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got revert command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
