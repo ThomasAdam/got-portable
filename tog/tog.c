@@ -2229,8 +2229,12 @@ cmd_log(int argc, char *argv[])
 	} else
 		usage_log();
 
-	repo_path = worktree ?
-	    strdup(got_worktree_get_repo_path(worktree)) : strdup(cwd);
+	if (repo_path == NULL) {
+		if (worktree)
+			repo_path = strdup(got_worktree_get_repo_path(worktree));
+		else
+			repo_path = strdup(cwd);
+	}
 	if (repo_path == NULL) {
 		error = got_error_from_errno("strdup");
 		goto done;
