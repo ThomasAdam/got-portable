@@ -72,7 +72,8 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 	struct stat sb;
 
 	if (lstat(ondisk_path, &sb) != 0) {
-		if ((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0)
+		if (!((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) &&
+		    errno == ENOENT))
 			return got_error_from_errno2("lstat", ondisk_path);
 	} else {
 		if (sb.st_mode & S_IFDIR)
