@@ -4366,7 +4366,7 @@ histedit_write_commit(struct got_object_id *commit_id, const char *cmdname,
 	const struct got_error *err = NULL;
 	char *logmsg = NULL, *id_str = NULL;
 	struct got_commit_object *commit = NULL;
-	size_t n;
+	int n;
 
 	err = got_object_open_as_commit(&commit, repo, commit_id);
 	if (err)
