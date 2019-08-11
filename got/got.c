@@ -3188,7 +3188,7 @@ show_change(unsigned char status, const char *path, FILE *patch_file, int n,
 		if (fseek(patch_file, 0L, SEEK_SET) == -1)
 			return got_error_from_errno("fseek");
 		printf(GOT_COMMIT_SEP_STR);
-		while ((linelen = getline(&line, &linesize, patch_file) != -1))
+		while ((linelen = getline(&line, &linesize, patch_file)) != -1)
 			printf("%s", line);
 		if (ferror(patch_file))
 			return got_error_from_errno("getline");
