@@ -294,10 +294,11 @@ buf_write(BUF *b, const char *path, mode_t mode)
 	int fd;
  open:
 	if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, mode)) == -1) {
+		err = got_error_from_errno2("open", path);
 		if (errno == EACCES && unlink(path) != -1)
 			goto open;
 		else
-			return got_error_from_errno2("open", path);
+			return err;
 	}
 
 	if (buf_write_fd(b, fd) == -1) {

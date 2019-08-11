@@ -401,6 +401,7 @@ got_path_strip_trailing_slashes(char *path)
 const struct got_error *
 got_path_find_prog(char **filename, const char *prog)
 {
+	const struct got_error *err = NULL;
 	char *p;
 	int len;
 	struct stat sbuf;
@@ -436,8 +437,9 @@ got_path_find_prog(char **filename, const char *prog)
 			p[--len] = '\0';	/* strip trailing '/' */
 
 		if (asprintf(filename, "%s/%s", p, prog) == -1) {
+			err = got_error_from_errno("asprintf");
 			free(path);
-			return got_error_from_errno("asprintf");
+			return err;
 		}
 		if ((stat(*filename, &sbuf) == 0) && S_ISREG(sbuf.st_mode) &&
 		    access(*filename, X_OK) == 0) {
