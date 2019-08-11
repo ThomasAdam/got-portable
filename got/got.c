@@ -1870,7 +1870,7 @@ match_object_id(struct got_object_id **id, char **label,
 		if (*id == NULL)
 			err = got_error_from_errno("got_object_id_dup");
 		if (asprintf(label, "refs/tags/%s",
-		    strdup(got_object_tag_get_name(tag))) == -1)
+		    got_object_tag_get_name(tag)) == -1)
 			err = got_error_from_errno("asprintf");
 		got_object_tag_close(tag);
 		return err;
