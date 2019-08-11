@@ -922,9 +922,10 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 		subdir = opendir(subdirpath);
 		if (subdir == NULL) {
+			err = got_error_from_errno2("opendir", subdirpath);
 			free(subpath);
 			free(subdirpath);
-			return got_error_from_errno2("opendir", subdirpath);
+			return err;
 		}
 
 		err = read_dirlist(&subdirlist, subdir, subdirpath);
