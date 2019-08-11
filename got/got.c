@@ -1854,6 +1854,43 @@ done:
 }
 
 static const struct got_error *
+match_object_id(struct got_object_id **id, char **label,
+    const char *id_str, int obj_type, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *ref = NULL;
+
+	*id = NULL;
+	*label = NULL;
+
+	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
+	if (err) {
+		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
+			return err;
+		err = got_ref_open(&ref, repo, id_str, 0);
+		if (err != NULL)
+			goto done;
+		*label = strdup(got_ref_get_name(ref));
+		if (*label == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		err = got_ref_resolve(id, repo, ref);
+	} else {
+		err = got_object_id_str(label, *id);
+		if (*label == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+done:
+	if (ref)
+		got_ref_close(ref);
+	return err;
+}
+
+
+static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -1994,57 +2031,13 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_match_object_id_prefix(&id1, id_str1,
-	    GOT_OBJ_TYPE_ANY, repo);
-	if (error) {
-		struct got_reference *ref;
-		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
-			goto done;
-		error = got_ref_open(&ref, repo, id_str1, 0);
-		if (error != NULL)
-			goto done;
-		label1 = strdup(got_ref_get_name(ref));
-		if (label1 == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-		error = got_ref_resolve(&id1, repo, ref);
-		got_ref_close(ref);
-		if (error != NULL)
-			goto done;
-	} else {
-		error = got_object_id_str(&label1, id1);
-		if (label1 == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = match_object_id(&id1, &label1, id_str1, GOT_OBJ_TYPE_ANY, repo);
+	if (error)
+		goto done;
 
-	error = got_repo_match_object_id_prefix(&id2, id_str2,
-	    GOT_OBJ_TYPE_ANY, repo);
-	if (error) {
-		struct got_reference *ref;
-		if (error->code != GOT_ERR_BAD_OBJ_ID_STR)
-			goto done;
-		error = got_ref_open(&ref, repo, id_str2, 0);
-		if (error != NULL)
-			goto done;
-		label2 = strdup(got_ref_get_name(ref));
-		if (label2 == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-		error = got_ref_resolve(&id2, repo, ref);
-		got_ref_close(ref);
-		if (error != NULL)
-			goto done;
-	} else {
-		error = got_object_id_str(&label2, id2);
-		if (label2 == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = match_object_id(&id2, &label2, id_str2, GOT_OBJ_TYPE_ANY, repo);
+	if (error)
+		goto done;
 
 	error = got_object_get_type(&type1, repo, id1);
 	if (error)
