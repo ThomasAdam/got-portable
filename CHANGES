@@ -4,6 +4,7 @@
 - fix use of potentially out-of-date errno values (patch by Hiltjo Posthuma)
 - fix getline(3) return value check (patch by Hiltjo Posthuma)
 - use Oo/Oc/Op instead of plain brackets in man pages (patch by bentley@)
+- fix spurious failures of test_revert_patch_one_change due to race condition
 
 * got 0.3; 2019-08-10
 - fix bug where 'revert -p' would delete all lines following a reverted change
