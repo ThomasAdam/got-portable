@@ -438,14 +438,11 @@ got_path_find_prog(char **filename, const char *prog)
 
 		if (asprintf(filename, "%s/%s", p, prog) == -1) {
 			err = got_error_from_errno("asprintf");
-			free(path);
-			return err;
+			break;
 		}
 		if ((stat(*filename, &sbuf) == 0) && S_ISREG(sbuf.st_mode) &&
-		    access(*filename, X_OK) == 0) {
-			free(path);
-			return NULL;
-		}
+		    access(*filename, X_OK) == 0)
+			break;
 		free(*filename);
 		*filename = NULL;
 		continue;
