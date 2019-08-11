@@ -48,8 +48,8 @@ A commit which precedes another commit is referred to as that other commit's
 A commit with multiple parents unites disparate lines of history and is
 known as a
 .Em merge commit .
-.Pp
 .El
+.Pp
 Each object is identified by a SHA1 hash calculated over both the object's
 header and the data stored in the object.
 .Sh OBJECT STORAGE
@@ -105,10 +105,10 @@ Because references may point to arbitrary object IDs their use
 is not limited to branches.
 .Pp
 The name is a UTF-8 string with the following disallowed characters:
-.Sq \ 
+.Sq \ \&
 (space),
-~ (tilde),
-^ (caret),
+\(a~ (tilde),
+\(a^ (caret),
 : (colon),
 ? (question mark),
 * (asterisk),
@@ -151,7 +151,8 @@ Reference to a branch tip commit most recently fetched from another repository.
 .It Pa branches/
 Legacy directory used by the deprecated Gogito Git interface.
 .It Pa config
-Git configuration file. See
+Git configuration file.
+See
 .Xr git-config 1 .
 .It Pa description
 A human-readable description of the repository.

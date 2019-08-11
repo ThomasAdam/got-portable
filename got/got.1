@@ -73,7 +73,6 @@ the
 command must be used to populate the empty repository before
 .Cm got checkout
 can be used.
-.Pp
 .It Cm in
 Short alias for
 .Cm init .
@@ -176,7 +175,7 @@ Show the status of each affected file, using the following status codes:
 .It C Ta file was updated and conflicts occurred during merge
 .It D Ta file was deleted
 .It A Ta new file was added
-.It ~ Ta versioned file is obstructed by a non-regular file
+.It \(a~ Ta versioned file is obstructed by a non-regular file
 .It ! Ta a missing versioned file was restored
 .El
 .Pp
@@ -241,7 +240,7 @@ using the following status codes:
 .It D Ta file scheduled for deletion in next commit
 .It C Ta modified or added file which contains merge conflicts
 .It ! Ta versioned file was expected on disk but is missing
-.It ~ Ta versioned file is obstructed by a non-regular file
+.It \(a~ Ta versioned file is obstructed by a non-regular file
 .It ? Ta unversioned item not tracked by
 .Nm
 .El
@@ -497,7 +496,7 @@ If invoked in a work tree, the work tree's current branch is shown
 with one the following annotations:
 .Bl -column YXZ description
 .It * Ta work tree's base commit matches the branch tip
-.It ~ Ta work tree's base commit is out-of-date
+.It \(a~ Ta work tree's base commit is out-of-date
 .El
 .It Fl d Ar name
 Delete the branch with the specified name from the repository.
@@ -529,8 +528,8 @@ Short alias for
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
 Revert any uncommited changes in files at the specified paths.
 File contents will be overwritten with those contained in the
-work tree's base commit. There is no way to bring discarded
-changes back after
+work tree's base commit.
+There is no way to bring discarded changes back after
 .Cm got revert !
 .Pp
 If a file was added with
@@ -587,7 +586,7 @@ is specified, commit all changes in the work tree.
 Otherwise, commit changes at or within the specified paths.
 .Pp
 If changes have been explicitly staged for commit with
-.Cm got stage,
+.Cm got stage ,
 only commit staged changes and reject any specified paths which
 have not been staged.
 .Pp
@@ -660,7 +659,7 @@ Show the status of each affected file, using the following status codes:
 .It D Ta file was deleted
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
-.It ~ Ta changes destined for a non-regular file were not merged
+.It \(a~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
 The merged changes will appear as local changes in the work tree, which
@@ -703,7 +702,7 @@ Show the status of each affected file, using the following status codes:
 .It D Ta file was deleted
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
-.It ~ Ta changes destined for a non-regular file were not merged
+.It \(a~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
 The reverse-merged changes will appear as local changes in the work tree,
@@ -762,7 +761,7 @@ using the following status codes:
 .It D Ta file was deleted
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
-.It ~ Ta changes destined for a non-regular file were not merged
+.It \(a~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
 If merge conflicts occur the rebase operation is interrupted and may
@@ -866,7 +865,7 @@ using the following status codes:
 .It D Ta file was deleted
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
-.It ~ Ta changes destined for a non-regular file were not merged
+.It \(a~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
 If merge conflicts occur the histedit operation is interrupted and may
@@ -972,7 +971,8 @@ are as follows:
 Instead of staging new changes, list paths which are already staged,
 along with the IDs of staged blob objects and stage status codes.
 If paths were provided in the command line show the staged paths
-among the specified paths. Otherwise, show all staged paths.
+among the specified paths.
+Otherwise, show all staged paths.
 .It Fl p
 Instead of staging the entire content of a changed file, interactively
 select or reject changes for staging based on
@@ -1038,7 +1038,7 @@ Show the status of each affected file, using the following status codes:
 .It ! Ta changes destined for a missing file were not merged
 .It D Ta file was staged as deleted and still is deleted
 .It d Ta file's deletion was obstructed by local modifications
-.It ~ Ta changes destined for a non-regular file were not merged
+.It \(a~ Ta changes destined for a non-regular file were not merged
 .El
 .Pp
 The options for
@@ -1089,7 +1089,7 @@ may fail to parse commits without an email address in author data,
 attempts to reject
 .Ev GOT_AUTHOR
 environment variables with a missing email address.
-.It Ev VISUAL, Ev EDITOR
+.It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit .
 .El
@@ -1197,7 +1197,9 @@ branch.
 .Dl $ got rebase unified-buffer-cache
 .Pp
 Create a patch from all changes on the unified-buffer-cache branch.
-The patch can be mailed out for review and applied to OpenBSD's CVS tree:
+The patch can be mailed out for review and applied to
+.Ox Ns 's
+CVS tree:
 .Pp
 .Dl $ got diff master unified-buffer-cache > /tmp/ubc.diff
 .Pp
@@ -1278,7 +1280,6 @@ repository with
 .Pp
 .Dl $ cd /var/git/repo
 .Dl $ git push origin master
-.Pp
 .Sh SEE ALSO
 .Xr tog 1 ,
 .Xr git-repository 5 ,
