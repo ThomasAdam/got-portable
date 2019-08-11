@@ -114,10 +114,11 @@ got_object_get_path(char **path, struct got_object_id *id,
 {
 	const struct got_error *err = NULL;
 	char *hex = NULL;
-	char *path_objects = got_repo_get_path_objects(repo);
+	char *path_objects;
 
 	*path = NULL;
 
+	path_objects = got_repo_get_path_objects(repo);
 	if (path_objects == NULL)
 		return got_error_from_errno("got_repo_get_path_objects");
 
