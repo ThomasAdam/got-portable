@@ -76,7 +76,7 @@ The commands for
 .Nm
 are as follows:
 .Bl -tag -width blame
-.It Cm log [ Fl c Ar commit ] [ Fl r Ar repository-path ] [ path ]
+.It Cm log Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -147,7 +147,7 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
-.It Cm diff [ Ar repository-path ] Ar object1 Ar object2
+.It Cm diff Oo Ar repository-path Oc Ar object1 object2
 Display the differences between two objects in the repository.
 Each
 .Ar object
@@ -171,9 +171,9 @@ Scroll up.
 Scroll down one page.
 .It Cm Page-up, Ctrl+b
 Scroll up one page.
-.It Cm [
+.It Cm \&[
 Reduce the amount of diff context lines.
-.It Cm ]
+.It Cm \&]
 Increase the amount of diff context lines.
 .It Cm <, Comma
 If the diff view was opened via the log view, move to the previous (younger)
@@ -181,7 +181,7 @@ commit.
 .It Cm >, Full stop
 If the diff view was opened via the log view, move to the next (older) commit.
 .El
-.It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
+.It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.
 .Pp
 The key bindings for
@@ -236,7 +236,7 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
-.It Cm tree [ Fl c Ar commit ] [ Ar repository-path ]
+.It Cm tree Oo Fl c Ar commit Oc Op Ar repository-path
 Display the repository tree.
 If the
 .Ar repository path

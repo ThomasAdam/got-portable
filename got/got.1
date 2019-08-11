@@ -77,7 +77,7 @@ can be used.
 .It Cm in
 Short alias for
 .Cm init .
-.It Cm import [ Fl b Ar branch ] [ Fl m Ar message ] [ Fl r Ar repository-path ] [ Fl I Ar pattern ] directory
+.It Cm import Oo Fl b Ar branch Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl I Ar pattern Oc Ar directory
 Create an initial commit in a repository from the file hierarchy
 within the specified
 .Ar directory .
@@ -128,7 +128,7 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
-.It Cm checkout [ Fl b Ar branch ] [ Fl c Ar commit ] [ Fl p Ar path-prefix ] repository-path [ work-tree-path ]
+.It Cm checkout Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
 Copy files from a repository into a new work tree.
 If the
 .Ar work tree path
@@ -167,7 +167,7 @@ will be checked out.
 .It Cm co
 Short alias for
 .Cm checkout .
-.It Cm update [ Fl b Ar branch ] [ Fl c Ar commit ] [ Ar path ... ]
+.It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
 Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -232,7 +232,7 @@ branch will be used.
 .It Cm up
 Short alias for
 .Cm update .
-.It Cm status [ Ar path ... ]
+.It Cm status Op Ar path ...
 Show the current modification status of files in a work tree,
 using the following status codes:
 .Bl -column YXZ description
@@ -285,7 +285,7 @@ only supports a single ignore pattern per line.
 .It Cm st
 Short alias for
 .Cm status .
-.It Cm log [ Fl c Ar commit ] [ Fl C Ar number ] [ Fl f ] [ Fl l Ar N ] [ Fl p ] [ Fl r Ar repository-path ] [ path ]
+.It Cm log Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl f Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl r Ar repository-path Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -325,7 +325,7 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff [ Fl C Ar number ] [ Fl r Ar repository-path ] [ Fl s ] [ Ar object1 Ar object2 | Ar path ]
+.It Cm diff Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Op Ar object1 Ar object2 | Ar path
 When invoked within a work tree with less than two arguments, display
 uncommitted changes in the work tree.
 If a
@@ -363,7 +363,7 @@ is invoked in a work tree.
 .It Cm di
 Short alias for
 .Cm diff .
-.It Cm blame [ Fl c Ar commit ] [ Fl r Ar repository-path ] Ar path
+.It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.
 .Pp
 The options for
@@ -388,7 +388,7 @@ work tree, use the repository path associated with this work tree.
 .It Cm bl
 Short alias for
 .Cm blame .
-.It Cm tree [ Fl c Ar commit ] [ Fl r Ar repository-path ] [ Fl i ] [ Fl R] [ Ar path ]
+.It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl i Oc Oo Fl R Oc Op Ar path
 Display a listing of files and directories at the specified
 directory path in the repository.
 Entries shown in this listing may carry one of the following trailing
@@ -430,7 +430,7 @@ Recurse into sub-directories in the repository.
 .It Cm tr
 Short alias for
 .Cm tree .
-.It Cm ref [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name Ar target ]
+.It Cm ref Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name Ar target
 Manage references in a repository.
 .Pp
 If no options are passed, expect two arguments and attempt to create,
@@ -459,7 +459,7 @@ List all existing references in the repository.
 .It Fl d Ar name
 Delete the reference with the specified name from the repository.
 .El
-.It Cm branch [ Fl r Ar repository-path ] [ Fl l ] [ Fl d Ar name ] [ Ar name [ Ar base-branch ] ]
+.It Cm branch Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name Op Ar base-branch
 Manage branches in a repository.
 .Pp
 Branches are managed via references which live in the
@@ -525,7 +525,7 @@ Perform the operation even if a file contains uncommitted modifications.
 .It Cm rm
 Short alias for
 .Cm remove .
-.It Cm revert [ Fl p ] [ Fl F Ar response-script ] [ Fl R ] Ar path ...
+.It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
 Revert any uncommited changes in files at the specified paths.
 File contents will be overwritten with those contained in the
 work tree's base commit. There is no way to bring discarded
@@ -577,7 +577,7 @@ is a directory.
 .It Cm rv
 Short alias for
 .Cm revert .
-.It Cm commit [ Fl m Ar message ] [ path ... ]
+.It Cm commit Oo Fl m Ar message Oc Op Ar path ...
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
 If no
@@ -726,7 +726,7 @@ conflicts must be resolved first.
 .It Cm bo
 Short alias for
 .Cm backout .
-.It Cm rebase [ Fl a ] [ Fl c] [ Ar branch ]
+.It Cm rebase Oo Fl a Oc Oo Fl c Oc Op Ar branch
 Rebase commits on the specified
 .Ar branch
 onto the tip of the current branch of the work tree.
@@ -817,7 +817,7 @@ If this option is used, no other command-line arguments are allowed.
 .It Cm rb
 Short alias for
 .Cm rebase .
-.It Cm histedit [ Fl a ] [ Fl c] [ Fl F Ar histedit-script ]
+.It Cm histedit Oo Fl a Oc Oo Fl c Oc Op Fl F Ar histedit-script
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
@@ -921,7 +921,7 @@ If this option is used, no other command-line arguments are allowed.
 .It Cm he
 Short alias for
 .Cm histedit .
-.It Cm stage [ Fl l ] [ Fl p ] [ Fl F Ar response-script ] [ Ar path ... ]
+.It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
 Stage local changes for inclusion in the next commit.
 If no
 .Ar path
@@ -1022,7 +1022,7 @@ and may then be staged again if necessary.
 .It Cm sg
 Short alias for
 .Cm stage .
-.It Cm unstage [ Fl p ] [ Fl F Ar response-script ] [ Ar path ... ]
+.It Cm unstage Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
 Merge staged changes back into the work tree and put affected paths
 back into non-staged status.
 If no
