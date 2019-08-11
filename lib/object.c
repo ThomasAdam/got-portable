@@ -1356,6 +1356,12 @@ got_object_tag_open(struct got_tag_object **tag,
 	return open_tag(tag, repo, got_object_get_id(obj), 1);
 }
 
+const char *
+got_object_tag_get_name(struct got_tag_object *tag)
+{
+	return tag->tag;
+}
+
 int
 got_object_tag_get_object_type(struct got_tag_object *tag)
 {

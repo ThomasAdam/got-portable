@@ -1858,10 +1858,24 @@ match_object_id(struct got_object_id **id, char **label,
     const char *id_str, int obj_type, struct got_repository *repo)
 {
 	const struct got_error *err;
+	struct got_tag_object *tag;
 	struct got_reference *ref = NULL;
 
 	*id = NULL;
 	*label = NULL;
+
+	err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY, repo);
+	if (err == NULL) {
+		*id = got_object_id_dup(got_object_tag_get_object_id(tag));
+		if (*id == NULL)
+			err = got_error_from_errno("got_object_id_dup");
+		if (asprintf(label, "refs/tags/%s",
+		    strdup(got_object_tag_get_name(tag))) == -1)
+			err = got_error_from_errno("asprintf");
+		got_object_tag_close(tag);
+		return err;
+	} else if (err->code != GOT_ERR_NO_OBJ)
+		return err;
 
 	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
 	if (err) {

@@ -1147,7 +1147,8 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 		free(tag_id);
 		if (err)
 			break;
-		if (got_object_tag_get_object_type(*tag) == obj_type)
+		if (obj_type == GOT_OBJ_TYPE_ANY ||
+		    got_object_tag_get_object_type(*tag) == obj_type)
 			break;
 		got_object_tag_close(*tag);
 		*tag = NULL;

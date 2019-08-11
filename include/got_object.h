@@ -221,6 +221,9 @@ const struct got_error *got_object_open_as_tag(struct got_tag_object **,
 /* Dispose of a tag object. */
 void got_object_tag_close(struct got_tag_object *);
 
+/* Get the name of a tag. */
+const char *got_object_tag_get_name(struct got_tag_object *);
+
 /* Get type of the object a tag points to. */
 int got_object_tag_get_object_type(struct got_tag_object *);
 
