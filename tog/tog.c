@@ -2231,7 +2231,8 @@ cmd_log(int argc, char *argv[])
 
 	if (repo_path == NULL) {
 		if (worktree)
-			repo_path = strdup(got_worktree_get_repo_path(worktree));
+			repo_path = strdup(
+			    got_worktree_get_repo_path(worktree));
 		else
 			repo_path = strdup(cwd);
 	}
