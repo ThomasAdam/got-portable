@@ -1,3 +1,10 @@
+* got 0.4; 2019-08-11
+- add support for tag objects to 'got diff'
+- fix tog log -r option (patch by semarie@)
+- fix use of potentially out-of-date errno values (patch by Hiltjo Posthuma)
+- fix getline(3) return value check (patch by Hiltjo Posthuma)
+- use Oo/Oc/Op instead of plain brackets in man pages (patch by bentley@)
+
 * got 0.3; 2019-08-10
 - fix bug where 'revert -p' would delete all lines following a reverted change
 - fix merge bug inherited from OpenRCS, affecting lines with leading .
