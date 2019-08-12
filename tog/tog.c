@@ -322,11 +322,18 @@ static const struct got_error *search_start_tree_view(struct tog_view *);
 static const struct got_error *search_next_tree_view(struct tog_view *);
 
 static volatile sig_atomic_t tog_sigwinch_received;
+static volatile sig_atomic_t tog_sigpipe_received;
 
 static void
 tog_sigwinch(int signo)
 {
 	tog_sigwinch_received = 1;
+}
+
+static void
+tog_sigpipe(int signo)
+{
+	tog_sigpipe_received = 1;
 }
 
 static const struct got_error *
@@ -747,7 +754,7 @@ view_loop(struct tog_view *view)
 		return err;
 	update_panels();
 	doupdate();
-	while (!TAILQ_EMPTY(&views) && !done) {
+	while (!TAILQ_EMPTY(&views) && !done && !tog_sigpipe_received) {
 		/* Refresh fast during initialization, then become slower. */
 		if (fast_refresh && fast_refresh-- == 0)
 			halfdelay(10); /* switch to once per second */
@@ -2155,6 +2162,7 @@ init_curses(void)
 	keypad(stdscr, TRUE);
 	curs_set(0);
 	signal(SIGWINCH, tog_sigwinch);
+	signal(SIGPIPE, tog_sigpipe);
 }
 
 static const struct got_error *
