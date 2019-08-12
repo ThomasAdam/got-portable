@@ -3257,18 +3257,21 @@ open_blame_view(struct tog_view *view, char *path,
 
 	SIMPLEQ_INIT(&s->blamed_commits);
 
+	s->path = strdup(path);
+	if (s->path == NULL)
+		return got_error_from_errno("strdup");
+
 	err = got_object_qid_alloc(&s->blamed_commit, commit_id);
-	if (err)
+	if (err) {
+		free(s->path);
 		return err;
+	}
 
 	SIMPLEQ_INSERT_HEAD(&s->blamed_commits, s->blamed_commit, entry);
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
 	s->selected_line = 1;
 	s->blame_complete = 0;
-	s->path = path;
-	if (s->path == NULL)
-		return got_error_from_errno("open_blame_view");
 	s->repo = repo;
 	s->refs = refs;
 	s->commit_id = commit_id;
