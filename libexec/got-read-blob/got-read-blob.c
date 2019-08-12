@@ -18,11 +18,11 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
-#include <sys/limits.h>
 #include <sys/syslimits.h>
 
 #include <stdint.h>
 #include <imsg.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

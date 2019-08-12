@@ -15,11 +15,11 @@
  */
 
 #include <sys/stat.h>
-#include <sys/limits.h>
 #include <sys/queue.h>
 #include <sys/tree.h>
 
 #include <dirent.h>
+#include <limits.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
