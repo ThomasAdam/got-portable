@@ -860,8 +860,8 @@ done:
 	}
 
 	errcode = pthread_mutex_unlock(&tog_mutex);
-	if (errcode)
-		return got_error_set_errno(errcode, "pthread_mutex_unlock");
+	if (errcode && err == NULL)
+		err = got_error_set_errno(errcode, "pthread_mutex_unlock");
 
 	return err;
 }
