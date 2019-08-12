@@ -714,6 +714,55 @@ function test_rebase_preserves_logmsg {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_no_commits_to_rebase {
+	local testroot=`test_init rebase_no_commits_to_rebase`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch newbranch)
+
+	echo "modified alpha on master" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test rebase_no_commits_to_rebase' \
+		> /dev/null)
+	(cd $testroot/wt && got update > /dev/null)
+
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo "got: no commits to rebase" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Rebase of refs/heads/newbranch aborted" \
+		> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+	echo "Already up-to-date" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -722,3 +771,4 @@ run_test test_rebase_no_op_change
 run_test test_rebase_in_progress
 run_test test_rebase_path_prefix
 run_test test_rebase_preserves_logmsg
+run_test test_rebase_no_commits_to_rebase

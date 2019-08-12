@@ -4268,6 +4268,20 @@ cmd_rebase(int argc, char *argv[])
 
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	pid = SIMPLEQ_FIRST(parent_ids);
+	if (pid == NULL) {
+		if (!continue_rebase) {
+			int did_something;
+			error = got_worktree_rebase_abort(worktree, fileindex,
+			    repo, new_base_branch, update_progress,
+			    &did_something);
+			if (error)
+				goto done;
+			printf("Rebase of %s aborted\n",
+			    got_ref_get_name(branch));
+		}
+		error = got_error(GOT_ERR_EMPTY_REBASE);
+		goto done;
+	}
 	error = collect_commits(&commits, commit_id, pid->id,
 	    yca_id, got_worktree_get_path_prefix(worktree),
 	    GOT_ERR_REBASE_PATH, repo);
