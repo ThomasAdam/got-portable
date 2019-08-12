@@ -75,6 +75,26 @@ function test_ref_create {
 	if [ "$ret" != "0" ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Attempt to create a symbolic ref pointing at a non-reference
+	(cd $testroot/wt && got ref -s refs/heads/symbolicref $commit_id \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "git ref command succeeded unexpectedly"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: reference $commit_id not found" > $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	got ref -r $testroot/repo -l > $testroot/stdout
