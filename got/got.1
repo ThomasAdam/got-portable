@@ -459,6 +459,12 @@ work tree, use the repository path associated with this work tree.
 List all existing references in the repository.
 .It Fl d Ar name
 Delete the reference with the specified name from the repository.
+.It Fl s
+Create a symbolic reference pointing at the specified
+.Ar target ,
+which must be an existing reference.
+Care should be taken not to create loops between references when
+this option is used.
 .El
 .It Cm branch Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name Op Ar base-branch
 Manage branches in a repository.

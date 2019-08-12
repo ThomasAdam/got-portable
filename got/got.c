@@ -2561,7 +2561,7 @@ __dead static void
 usage_ref(void)
 {
 	fprintf(stderr,
-	    "usage: %s ref [-r repository] -l | -d name | name target\n",
+	    "usage: %s ref [-r repository] -l | -d name | [-s] name target\n",
 	    getprogname());
 	exit(1);
 }
@@ -2650,17 +2650,49 @@ done:
 }
 
 static const struct got_error *
+add_symref(struct got_repository *repo, const char *refname, const char *target)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref = NULL;
+	struct got_reference *target_ref = NULL;
+
+	/*
+	 * Don't let the user create a reference named '-'.
+	 * While technically a valid reference name, this case is usually
+	 * an unintended typo.
+	 */
+	if (refname[0] == '-' && refname[1] == '\0')
+		return got_error(GOT_ERR_BAD_REF_NAME);
+
+	err = got_ref_open(&target_ref, repo, target, 0);
+	if (err)
+		return err;
+
+	err = got_ref_alloc_symref(&ref, refname, target_ref);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+done:
+	if (target_ref)
+		got_ref_close(target_ref);
+	if (ref)
+		got_ref_close(ref);
+	return err;
+}
+
+static const struct got_error *
 cmd_ref(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0;
+	int ch, do_list = 0, create_symref = 0;
 	const char *delref = NULL;
 
 	/* TODO: Add -s option for adding symbolic references. */
-	while ((ch = getopt(argc, argv, "d:r:l")) != -1) {
+	while ((ch = getopt(argc, argv, "d:r:ls")) != -1) {
 		switch (ch) {
 		case 'd':
 			delref = optarg;
@@ -2673,6 +2705,9 @@ cmd_ref(int argc, char *argv[])
 			break;
 		case 'l':
 			do_list = 1;
+			break;
+		case 's':
+			create_symref = 1;
 			break;
 		default:
 			usage_ref();
@@ -2687,6 +2722,9 @@ cmd_ref(int argc, char *argv[])
 	argv += optind;
 
 	if (do_list || delref) {
+		if (create_symref)
+			errx(1, "-s option cannot be used together with the "
+			    "-l or -d options");
 		if (argc > 0)
 			usage_ref();
 	} else if (argc != 2)
@@ -2744,6 +2782,8 @@ cmd_ref(int argc, char *argv[])
 		error = list_refs(repo);
 	else if (delref)
 		error = delete_ref(repo, delref);
+	else if (create_symref)
+		error = add_symref(repo, argv[0], argv[1]);
 	else
 		error = add_ref(repo, argv[0], argv[1]);
 done:

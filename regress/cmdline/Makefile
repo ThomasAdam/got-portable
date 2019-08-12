@@ -1,4 +1,4 @@
-REGRESS_TARGETS=checkout update status log add rm diff blame branch commit \
+REGRESS_TARGETS=checkout update status log add rm diff blame branch ref commit \
 	revert cherrypick backout rebase import histedit stage unstage
 NOOBJ=Yes
 
@@ -28,6 +28,9 @@ blame:
 
 branch:
 	./branch.sh
+
+ref:
+	./ref.sh
 
 commit:
 	./commit.sh
