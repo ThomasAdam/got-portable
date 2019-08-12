@@ -211,40 +211,42 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		goto done;
 	}
 
-	err = got_object_id_by_path(&pobj_id, repo, pid, path);
-	if (err) {
-		if (err->code == GOT_ERR_NO_TREE_ENTRY) {
-			/* Blob's history began in previous commit. */
-			err = got_error(GOT_ERR_ITER_COMPLETED);
+	if (pid) {
+		err = got_object_id_by_path(&pobj_id, repo, pid, path);
+		if (err) {
+			if (err->code == GOT_ERR_NO_TREE_ENTRY) {
+				/* Blob's history began in previous commit. */
+				err = got_error(GOT_ERR_ITER_COMPLETED);
+			}
+			goto done;
 		}
-		goto done;
-	}
 
-	/* If IDs match then don't bother with diffing. */
-	if (got_object_id_cmp(obj_id, pobj_id) == 0) {
-		if (cb)
-			err = cb(arg, blame->nlines, -1, id);
-		goto done;
-	}
+		/* If IDs match then don't bother with diffing. */
+		if (got_object_id_cmp(obj_id, pobj_id) == 0) {
+			if (cb)
+				err = cb(arg, blame->nlines, -1, id);
+			goto done;
+		}
 
-	err = got_object_open(&pobj, repo, pobj_id);
-	if (err)
-		goto done;
+		err = got_object_open(&pobj, repo, pobj_id);
+		if (err)
+			goto done;
 
-	if (pobj->type != GOT_OBJ_TYPE_BLOB) {
-		/*
-		 * Encountered a non-blob at the path (probably a tree).
-		 * Blob's history began in previous commit.
-		 */
-		err = got_error(GOT_ERR_ITER_COMPLETED);
-		goto done;
+		if (pobj->type != GOT_OBJ_TYPE_BLOB) {
+			/*
+			 * Encountered a non-blob at the path (probably a tree).
+			 * Blob's history began in previous commit.
+			 */
+			err = got_error(GOT_ERR_ITER_COMPLETED);
+			goto done;
+		}
+
+		err = got_object_blob_open(&pblob, repo, pobj, 8192);
+		if (err)
+			goto done;
 	}
 
 	err = got_object_blob_open(&blob, repo, obj, 8192);
-	if (err)
-		goto done;
-
-	err = got_object_blob_open(&pblob, repo, pobj, 8192);
 	if (err)
 		goto done;
 
@@ -300,7 +302,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_object_id *id = NULL;
+	struct got_object_id *id = NULL, *parent_id = NULL;
 	int lineno;
 	struct got_commit_graph *graph = NULL;
 
@@ -352,12 +354,14 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	id = NULL;
 	for (;;) {
-		struct got_object_id *next_id;
-
-		err = got_commit_graph_iter_next(&next_id, graph);
+		err = got_commit_graph_iter_next(&parent_id, graph);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
-				err = NULL;
+				if (id)
+					err = blame_commit(blame, id,
+					    parent_id, path, repo, cb, arg);
+				else
+					err = NULL;
 				break;
 			}
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
@@ -365,13 +369,10 @@ blame_open(struct got_blame **blamep, const char *path,
 			err = got_commit_graph_fetch_commits(graph, 1, repo);
 			if (err)
 				break;
-			else
-				continue;
+			continue;
 		}
-		if (next_id == NULL)
-			break;
 		if (id) {
-			err = blame_commit(blame, id, next_id, path, repo,
+			err = blame_commit(blame, id, parent_id, path, repo,
 			    cb, arg);
 			if (err) {
 				if (err->code == GOT_ERR_ITER_COMPLETED)
@@ -381,7 +382,7 @@ blame_open(struct got_blame **blamep, const char *path,
 			if (blame->nannotated == blame->nlines)
 				break;
 		}
-		id = next_id;
+		id = parent_id;
 	}
 
 	if (id && blame->nannotated < blame->nlines) {

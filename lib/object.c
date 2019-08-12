@@ -1161,34 +1161,46 @@ got_object_blob_dump_to_file(size_t *total_len, int *nlines,
 		if (len == 0)
 			break;
 		buf = got_object_blob_get_read_buf(blob);
-		for (i = hdrlen; i < len; i++) {
-			if (buf[i] != '\n')
-				continue;
-			if (nlines)
-				(*nlines)++;
-			if (line_offsets && nlines && noffsets < *nlines) {
-				off_t *o = recallocarray(*line_offsets,
-				    noffsets, *nlines, sizeof(**line_offsets));
-				if (o == NULL) {
-					free(*line_offsets);
-					*line_offsets = NULL;
-					return got_error_from_errno(
-					    "recallocarray");
-				}
-				*line_offsets = o;
-				noffsets = *nlines;
+		if (line_offsets && nlines) {
+			if (*line_offsets == NULL) {
+				/* Have some data but perhaps no '\n'. */
+				noffsets = 1;
+				*nlines = 1;
+				*line_offsets = malloc(sizeof(**line_offsets));
+				if (*line_offsets == NULL)
+					return got_error_from_errno("malloc");
+				(*line_offsets)[0] = 0;
 			}
-			if (line_offsets && nlines && total_len) {
-				(*line_offsets)[*nlines - 1] = off;
-				off = *total_len + i + 1 - got_object_blob_get_hdrlen(blob);
+			/* Scan '\n' offsets in this chunk of data. */
+			for (i = hdrlen; i < len; i++) {
+				if (i > hdrlen && buf[i] == '\n')
+					(*nlines)++;
+				if (noffsets < *nlines) {
+					off_t *o = recallocarray(*line_offsets,
+					    noffsets, *nlines,
+					    sizeof(**line_offsets));
+					if (o == NULL) {
+						free(*line_offsets);
+						*line_offsets = NULL;
+						return got_error_from_errno(
+						    "recallocarray");
+					}
+					*line_offsets = o;
+					noffsets = *nlines;
+				}
+				if (total_len) {
+					(*line_offsets)[*nlines - 1] = off;
+					off = *total_len + i -
+					    got_object_blob_get_hdrlen(blob);
+				}
 			}
 		}
-		if (total_len)
-			*total_len += len;
 		/* Skip blob object header first time around. */
 		n = fwrite(buf + hdrlen, 1, len - hdrlen, outfile);
 		if (n != len - hdrlen)
 			return got_ferror(outfile, GOT_ERR_IO);
+		if (total_len)
+			*total_len += len - hdrlen;
 		hdrlen = 0;
 	} while (len != 0);
 
