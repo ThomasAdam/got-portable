@@ -242,6 +242,13 @@ If the
 .Ar repository path
 is omitted, assume the repository is located in the current working directory.
 .Pp
+Displayed tree entries may carry one of the following trailing annotations:
+.Bl -column YXZ description
+.It @ Ta entry is a symbolic link
+.It / Ta entry is a directory
+.It * Ta entry is an executable file
+.El
+.Pp
 The key bindings for
 .Cm tog tree
 are as follows:

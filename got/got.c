@@ -2252,14 +2252,21 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
     const char *root_path)
 {
 	int is_root_path = (strcmp(path, root_path) == 0);
+	const char *modestr = "";
 
 	path += strlen(root_path);
 	while (path[0] == '/')
 		path++;
 
+	if (S_ISLNK(te->mode))
+		modestr = "@";
+	else if (S_ISDIR(te->mode))
+		modestr = "/";
+	else if (te->mode & S_IXUSR)
+		modestr = "*";
+
 	printf("%s%s%s%s%s\n", id ? id : "", path,
-	    is_root_path ? "" : "/", te->name,
-	    S_ISDIR(te->mode) ? "/" : ((te->mode & S_IXUSR) ? "*" : ""));
+	    is_root_path ? "" : "/", te->name, modestr);
 }
 
 static const struct got_error *

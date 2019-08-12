@@ -3852,6 +3852,7 @@ draw_tree_entries(struct tog_view *view,
 
 	while (te) {
 		char *line = NULL, *id_str = NULL;
+		const char *modestr = "";
 
 		if (show_ids) {
 			err = got_object_id_str(&id_str, te->id);
@@ -3859,9 +3860,14 @@ draw_tree_entries(struct tog_view *view,
 				return got_error_from_errno(
 				    "got_object_id_str");
 		}
+		if (S_ISLNK(te->mode))
+			modestr = "@";
+		else if (S_ISDIR(te->mode))
+			modestr = "/";
+		else if (te->mode & S_IXUSR)
+			modestr = "*";
 		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
-		    te->name, S_ISDIR(te->mode) ? "/" :
-		    ((te->mode & S_IXUSR) ? "*" : "")) == -1) {
+		    te->name, modestr) == -1) {
 			free(id_str);
 			return got_error_from_errno("asprintf");
 		}
