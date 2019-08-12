@@ -4003,15 +4003,18 @@ blame_tree_entry(struct tog_view **new_view, int begin_x,
 		return err;
 
 	blame_view = view_open(0, 0, 0, begin_x, TOG_VIEW_BLAME);
-	if (blame_view == NULL)
-		return got_error_from_errno("view_open");
+	if (blame_view == NULL) {
+		err = got_error_from_errno("view_open");
+		goto done;
+	}
 
 	err = open_blame_view(blame_view, path, commit_id, refs, repo);
 	if (err) {
 		view_close(blame_view);
-		free(path);
 	} else
 		*new_view = blame_view;
+done:
+	free(path);
 	return err;
 }
 
