@@ -64,6 +64,8 @@ struct got_symref {
 	char *ref;
 };
 
+#define GOT_REF_RECURSE_MAX	20
+
 /* A non-symbolic reference (there is no better designation). */
 struct got_ref {
 	char *name;
@@ -545,17 +547,21 @@ resolve_symbolic_ref(struct got_reference **resolved,
 	return err;
 }
 
-const struct got_error *
-got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
-    struct got_reference *ref)
+static const struct got_error *
+ref_resolve(struct got_object_id **id, struct got_repository *repo,
+    struct got_reference *ref, int recursion)
 {
 	const struct got_error *err;
+
+	if (recursion <= 0)
+		return got_error_msg(GOT_ERR_RECURSION,
+		    "reference recursion limit reached");
 
 	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
 		struct got_reference *resolved = NULL;
 		err = resolve_symbolic_ref(&resolved, repo, ref);
 		if (err == NULL)
-			err = got_ref_resolve(id, repo, resolved);
+			err = ref_resolve(id, repo, resolved, --recursion);
 		if (resolved)
 			got_ref_close(resolved);
 		return err;
@@ -566,6 +572,13 @@ got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
 		return got_error_from_errno("calloc");
 	memcpy((*id)->sha1, ref->ref.ref.sha1, sizeof((*id)->sha1));
 	return NULL;
+}
+
+const struct got_error *
+got_ref_resolve(struct got_object_id **id, struct got_repository *repo,
+    struct got_reference *ref)
+{
+	return ref_resolve(id, repo, ref, GOT_REF_RECURSE_MAX);
 }
 
 char *
