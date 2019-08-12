@@ -1,3 +1,8 @@
+* got 0.5; 2019-08-12
+- fix blame with single-commit history and with files without \n
+- fix crashes in tog when blame returns no results on a file (found by otto@)
+- man page improvements (bentley@)
+
 * got 0.4; 2019-08-11
 - add support for tag objects to 'got diff'
 - fix tog log -r option (patch by semarie@)
