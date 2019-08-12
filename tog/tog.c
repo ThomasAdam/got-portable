@@ -1542,11 +1542,10 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 
 	/* Walk the path and open corresponding tree objects. */
 	p = path;
+	while (p[0] == '/')
+		p++;
 	while (*p) {
 		struct got_object_id *tree_id;
-
-		while (p[0] == '/')
-			p++;
 
 		/* Ensure the correct subtree entry is selected. */
 		slash = strchr(p, '/');
@@ -3007,21 +3006,26 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		if (view->focussed && nprinted == selected_line - 1)
 			wstandout(view->window);
 
-		blame_line = &lines[lineno - 1];
-		if (blame_line->annotated && prev_id &&
-		    got_object_id_cmp(prev_id, blame_line->id) == 0)
-			waddstr(view->window, "         ");
-		else if (blame_line->annotated) {
-			char *id_str;
-			err = got_object_id_str(&id_str, blame_line->id);
-			if (err) {
-				free(line);
-				free(wline);
-				return err;
+		if (nlines > 0) {
+			blame_line = &lines[lineno - 1];
+			if (blame_line->annotated && prev_id &&
+			    got_object_id_cmp(prev_id, blame_line->id) == 0)
+				waddstr(view->window, "         ");
+			else if (blame_line->annotated) {
+				char *id_str;
+				err = got_object_id_str(&id_str, blame_line->id);
+				if (err) {
+					free(line);
+					free(wline);
+					return err;
+				}
+				wprintw(view->window, "%.8s ", id_str);
+				free(id_str);
+				prev_id = blame_line->id;
+			} else {
+				waddstr(view->window, "........ ");
+				prev_id = NULL;
 			}
-			wprintw(view->window, "%.8s ", id_str);
-			free(id_str);
-			prev_id = blame_line->id;
 		} else {
 			waddstr(view->window, "........ ");
 			prev_id = NULL;
@@ -3116,10 +3120,13 @@ blame_thread(void *arg)
 }
 
 static struct got_object_id *
-get_selected_commit_id(struct tog_blame_line *lines, int first_displayed_line,
-    int selected_line)
+get_selected_commit_id(struct tog_blame_line *lines, int nlines,
+    int first_displayed_line, int selected_line)
 {
 	struct tog_blame_line *line;
+
+	if (nlines <= 0)
+		return NULL;
 
 	line = &lines[first_displayed_line - 1 + selected_line - 1];
 	if (!line->annotated)
@@ -3465,7 +3472,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case 'b':
 	case 'p': {
 		struct got_object_id *id = NULL;
-		id = get_selected_commit_id(s->blame.lines,
+		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
 		    s->first_displayed_line, s->selected_line);
 		if (id == NULL)
 			break;
@@ -3555,7 +3562,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		struct got_object_id *id = NULL;
 		struct got_object_qid *pid;
 		struct got_commit_object *commit = NULL;
-		id = get_selected_commit_id(s->blame.lines,
+		id = get_selected_commit_id(s->blame.lines, s->blame.nlines,
 		    s->first_displayed_line, s->selected_line);
 		if (id == NULL)
 			break;
@@ -4070,6 +4077,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->root = s->tree = root;
 	s->entries = got_object_tree_get_entries(root);
 	s->first_displayed_entry = SIMPLEQ_FIRST(&s->entries->head);
+	s->selected_entry = SIMPLEQ_FIRST(&s->entries->head);
 	s->commit_id = got_object_id_dup(commit_id);
 	if (s->commit_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
