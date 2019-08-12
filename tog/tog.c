@@ -1621,7 +1621,7 @@ log_thread(void *arg)
 	if (err)
 		return (void *)err;
 
-	while (!done && !err) {
+	while (!done && !err && !tog_sigpipe_received) {
 		err = queue_commits(a->graph, a->commits, 1, a->repo,
 		    a->in_repo_path);
 		if (err) {
