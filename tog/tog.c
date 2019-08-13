@@ -998,8 +998,13 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			name += 8;
 		if (strncmp(name, "tags/", 5) == 0) {
 			err = got_object_open_as_tag(&tag, repo, re->id);
-			if (err)
-				break;
+			if (err) {
+				if (err->code != GOT_ERR_OBJ_TYPE)
+					break;
+				/* Ref points at something other than a tag. */
+				err = NULL;
+				tag = NULL;
+			}
 		}
 		cmp = got_object_id_cmp(tag ?
 		    got_object_tag_get_object_id(tag) : re->id, id);

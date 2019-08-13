@@ -1307,6 +1307,8 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	struct got_packidx *packidx = NULL;
 	int idx;
 	char *path_packfile = NULL;
+	struct got_object *obj = NULL;
+	int obj_type = GOT_OBJ_TYPE_ANY;
 
 	if (check_cache) {
 		*tag = got_repo_get_cached_tag(repo, id);
@@ -1332,10 +1334,32 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 			if (err)
 				goto done;
 		}
-		err = read_packed_tag_privsep(tag, pack,
-		    packidx, idx, id);
+
+		/* Beware of "leightweight" tags: Check object type first. */
+		err = read_packed_object_privsep(&obj, repo, pack, packidx,
+		    idx, id);
+		if (err)
+			goto done;
+		obj_type = obj->type;
+		got_object_close(obj);
+		if (obj_type != GOT_OBJ_TYPE_TAG) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+		err = read_packed_tag_privsep(tag, pack, packidx, idx, id);
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
+
+		err = open_loose_object(&fd, id, repo);
+		if (err)
+			return err;
+		err = read_object_header_privsep(&obj, repo, fd);
+		if (err)
+			return err;
+		obj_type = obj->type;
+		got_object_close(obj);
+		if (obj_type != GOT_OBJ_TYPE_TAG)
+			return got_error(GOT_ERR_OBJ_TYPE);
 
 		err = open_loose_object(&fd, id, repo);
 		if (err)
