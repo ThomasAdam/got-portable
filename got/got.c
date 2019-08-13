@@ -1403,7 +1403,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		if (strncmp(name, "tags/", 5) == 0) {
 			err = got_object_open_as_tag(&tag, repo, re->id);
 			if (err)
-				break;
+				return err;
 		}
 		cmp = got_object_id_cmp(tag ?
 		    got_object_tag_get_object_id(tag) : re->id, id);
@@ -1416,7 +1416,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		    name) == -1) {
 			err = got_error_from_errno("asprintf");
 			free(s);
-			break;
+			return err;
 		}
 		free(s);
 	}
