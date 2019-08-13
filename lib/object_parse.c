@@ -338,13 +338,10 @@ parse_commit_time(time_t *time, time_t *gmtoff, char *committer)
 	if (space == NULL)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
-	/* Timestamp parsed here is expressed in comitter's local time. */
+	/* Timestamp parsed here is expressed as UNIX timestamp (UTC). */
 	*time = strtonum(space + 1, 0, INT64_MAX, &errstr);
 	if (errstr)
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
-
-	/* Express the time stamp in UTC. */
-	*time -= *gmtoff;
 
 	/* Strip off parsed time information, leaving just author and email. */
 	*space = '\0';

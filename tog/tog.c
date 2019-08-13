@@ -2432,7 +2432,15 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 static char *
 get_datestr(time_t *time, char *datebuf)
 {
-	char *p, *s = ctime_r(time, datebuf);
+	struct tm mytm, *tm;
+	char *p, *s;
+
+	tm = gmtime_r(time, &mytm);
+	if (tm == NULL)
+		return NULL;
+	s = asctime_r(tm, datebuf);
+	if (s == NULL)
+		return NULL;
 	p = strchr(s, '\n');
 	if (p)
 		*p = '\0';
@@ -2444,7 +2452,7 @@ write_commit_info(struct got_object_id *commit_id,
     struct got_reflist_head *refs, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	char datebuf[26];
+	char datebuf[26], *datestr;
 	struct got_commit_object *commit;
 	char *id_str = NULL, *logmsg = NULL;
 	time_t committer_time;
@@ -2478,8 +2486,8 @@ write_commit_info(struct got_object_id *commit_id,
 		goto done;
 	}
 	committer_time = got_object_commit_get_committer_time(commit);
-	if (fprintf(outfile, "date: %s UTC\n",
-	    get_datestr(&committer_time, datebuf)) < 0) {
+	datestr = get_datestr(&committer_time, datebuf);
+	if (datestr && fprintf(outfile, "date: %s UTC\n", datestr) < 0) {
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}

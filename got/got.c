@@ -1361,7 +1361,15 @@ done:
 static char *
 get_datestr(time_t *time, char *datebuf)
 {
-	char *p, *s = ctime_r(time, datebuf);
+	struct tm mytm, *tm;
+	char *p, *s;
+
+	tm = gmtime_r(time, &mytm);
+	if (tm == NULL)
+		return NULL;
+	s = asctime_r(tm, datebuf);
+	if (s == NULL)
+		return NULL;
 	p = strchr(s, '\n');
 	if (p)
 		*p = '\0';
@@ -1439,7 +1447,8 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	printf("from: %s\n", got_object_commit_get_author(commit));
 	committer_time = got_object_commit_get_committer_time(commit);
 	datestr = get_datestr(&committer_time, datebuf);
-	printf("date: %s UTC\n", datestr);
+	if (datestr)
+		printf("date: %s UTC\n", datestr);
 	author = got_object_commit_get_author(commit);
 	committer = got_object_commit_get_committer(commit);
 	if (strcmp(author, committer) != 0)
