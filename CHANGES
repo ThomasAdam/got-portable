@@ -1,3 +1,8 @@
+* got 0.7; 2019-08-13
+- properly parse timestamps in commit objects as UTC (patch by Hiltjo Posthuma)
+- strip Git GPG signatures from log messages
+- fix regression: don't try to parse "leightweight" tags as real tag objects
+
 * got 0.6; 2019-08-13
 - 'got log' and 'tog log' now display tags in addition to branch references
 - 'got ref' can now be used to create symbolic references
