@@ -116,6 +116,7 @@
 /regress/cmdline/import.sh
 /regress/cmdline/log.sh
 /regress/cmdline/rebase.sh
+/regress/cmdline/ref.sh
 /regress/cmdline/revert.sh
 /regress/cmdline/rm.sh
 /regress/cmdline/stage.sh
