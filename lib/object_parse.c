@@ -711,6 +711,12 @@ done:
 void
 got_object_tag_close(struct got_tag_object *tag)
 {
+	if (tag->refcnt > 0) {
+		tag->refcnt--;
+		if (tag->refcnt > 0)
+			return;
+	}
+
 	free(tag->tag);
 	free(tag->tagger);
 	free(tag->tagmsg);
