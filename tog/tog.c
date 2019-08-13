@@ -972,7 +972,7 @@ done:
 
 static const struct got_error*
 build_refs_str(char **refs_str, struct got_reflist_head *refs,
-    struct got_object_id *id)
+    struct got_object_id *id, struct got_repository *repo)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_entry *re;
@@ -982,8 +982,9 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 	*refs_str = NULL;
 
 	SIMPLEQ_FOREACH(re, refs, entry) {
-		if (got_object_id_cmp(re->id, id) != 0)
-			continue;
+		struct got_tag_object *tag = NULL;
+		int cmp;
+
 		name = got_ref_get_name(re->ref);
 		if (strcmp(name, GOT_REF_HEAD) == 0)
 			continue;
@@ -995,6 +996,17 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0)
 			name += 8;
+		if (strncmp(name, "tags/", 5) == 0) {
+			err = got_object_open_as_tag(&tag, repo, re->id);
+			if (err)
+				break;
+		}
+		cmp = got_object_id_cmp(tag ?
+		    got_object_tag_get_object_id(tag) : re->id, id);
+		if (tag)
+			got_object_tag_close(tag);
+		if (cmp != 0)
+			continue;
 		s = *refs_str;
 		if (asprintf(refs_str, "%s%s%s", s ? s : "",
 		    s ? ", " : "", name) == -1) {
@@ -1231,6 +1243,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
     struct got_reflist_head *refs, const char *path, int commits_needed)
 {
 	const struct got_error *err = NULL;
+	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
 	int width;
 	int ncommits, author_cols = 10;
@@ -1254,7 +1267,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (err)
 			return err;
 		if (refs) {
-			err = build_refs_str(&refs_str, refs, (*selected)->id);
+			err = build_refs_str(&refs_str, refs, (*selected)->id,
+			    s->repo);
 			if (err)
 				goto done;
 		}
@@ -2431,7 +2445,7 @@ write_commit_info(struct got_object_id *commit_id,
 	char *refs_str = NULL;
 
 	if (refs) {
-		err = build_refs_str(&refs_str, refs, commit_id);
+		err = build_refs_str(&refs_str, refs, commit_id, repo);
 		if (err)
 			return err;
 	}
