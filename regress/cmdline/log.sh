@@ -124,7 +124,7 @@ function test_log_tag {
 
 	(cd $testroot/repo && git tag -a -m "test" $tag)
 
-	echo "commit $commit_id (master)" > $testroot/stdout.expected
+	echo "commit $commit_id (master, tags/$tag)" > $testroot/stdout.expected
 	(cd $testroot/wt && got log -l1 -c $tag | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout

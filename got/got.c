@@ -1386,8 +1386,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	SIMPLEQ_FOREACH(re, refs, entry) {
 		char *s;
 		const char *name;
-		if (got_object_id_cmp(re->id, id) != 0)
-			continue;
+		struct got_tag_object *tag = NULL;
+		int cmp;
+
 		name = got_ref_get_name(re->ref);
 		if (strcmp(name, GOT_REF_HEAD) == 0)
 			continue;
@@ -1399,6 +1400,17 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0)
 			name += 8;
+		if (strncmp(name, "tags/", 5) == 0) {
+			err = got_object_open_as_tag(&tag, repo, re->id);
+			if (err)
+				break;
+		}
+		cmp = got_object_id_cmp(tag ?
+		    got_object_tag_get_object_id(tag) : re->id, id);
+		if (tag)
+			got_object_tag_close(tag);
+		if (cmp != 0)
+			continue;
 		s = refs_str;
 		if (asprintf(&refs_str, "%s%s%s", s ? s : "", s ? ", " : "",
 		    name) == -1) {
