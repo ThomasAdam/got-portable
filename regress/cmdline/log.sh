@@ -114,6 +114,7 @@ function test_log_tag {
 	local testroot=`test_init log_tag`
 	local commit_id=`git_show_head $testroot/repo`
 	local tag="1.0.0"
+	local tag2="2.0.0"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -126,6 +127,21 @@ function test_log_tag {
 
 	echo "commit $commit_id (master, tags/$tag)" > $testroot/stdout.expected
 	(cd $testroot/wt && got log -l1 -c $tag | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# test a "leightweight" tag
+	(cd $testroot/repo && git tag $tag2)
+
+	echo "commit $commit_id (master, tags/$tag, tags/$tag2)" \
+		> $testroot/stdout.expected
+	(cd $testroot/wt && got log -l1 -c $tag2 | grep ^commit \
 		> $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
