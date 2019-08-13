@@ -581,7 +581,7 @@ open_commit(struct got_commit_object **commit,
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
-	char *path_packfile;
+	char *path_packfile = NULL;
 
 	if (check_cache) {
 		*commit = got_repo_get_cached_commit(repo, id);
@@ -605,7 +605,7 @@ open_commit(struct got_commit_object **commit,
 			err = got_repo_cache_pack(&pack, repo, path_packfile,
 			    packidx);
 			if (err)
-				return err;
+				goto done;
 		}
 		err = read_packed_commit_privsep(commit, pack,
 		    packidx, idx, id);
@@ -622,7 +622,8 @@ open_commit(struct got_commit_object **commit,
 		(*commit)->refcnt++;
 		err = got_repo_cache_commit(repo, id, *commit);
 	}
-
+done:
+	free(path_packfile);
 	return err;
 }
 
@@ -759,7 +760,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
-	char *path_packfile;
+	char *path_packfile = NULL;
 
 	if (check_cache) {
 		*tree = got_repo_get_cached_tree(repo, id);
@@ -783,7 +784,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 			err = got_repo_cache_pack(&pack, repo, path_packfile,
 			    packidx);
 			if (err)
-				return err;
+				goto done;
 		}
 		err = read_packed_tree_privsep(tree, pack,
 		    packidx, idx, id);
@@ -800,7 +801,8 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 		(*tree)->refcnt++;
 		err = got_repo_cache_tree(repo, id, *tree);
 	}
-
+done:
+	free(path_packfile);
 	return err;
 }
 
@@ -978,7 +980,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
-	char *path_packfile;
+	char *path_packfile = NULL;
 	uint8_t *outbuf;
 	int outfd;
 	size_t size, hdrlen;
@@ -1068,6 +1070,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	memcpy(&(*blob)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 
 done:
+	free(path_packfile);
 	if (err) {
 		if (*blob) {
 			got_object_blob_close(*blob);
@@ -1303,7 +1306,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
-	char *path_packfile;
+	char *path_packfile = NULL;
 
 	if (check_cache) {
 		*tag = got_repo_get_cached_tag(repo, id);
@@ -1327,7 +1330,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 			err = got_repo_cache_pack(&pack, repo, path_packfile,
 			    packidx);
 			if (err)
-				return err;
+				goto done;
 		}
 		err = read_packed_tag_privsep(tag, pack,
 		    packidx, idx, id);
@@ -1344,7 +1347,8 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		(*tag)->refcnt++;
 		err = got_repo_cache_tag(repo, id, *tag);
 	}
-
+done:
+	free(path_packfile);
 	return err;
 }
 
