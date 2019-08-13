@@ -1,3 +1,10 @@
+* got 0.6; 2019-08-13
+- 'got log' and 'tog log' now display tags in addition to branch references
+- 'got ref' can now be used to create symbolic references
+- use <limits.h> instead of <sys/limits.h> (patch by Thomas Klausner)
+- fix crash if 'got rebase' has no commits to rebase (with semarie@)
+- annotate symlinks with @ in 'got tree' and 'tog tree'
+
 * got 0.5; 2019-08-12
 - fix blame with single-commit history and with files without \n
 - fix crashes in tog when blame returns no results on a file (found by otto@)
