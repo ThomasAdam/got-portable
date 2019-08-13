@@ -314,6 +314,11 @@ Merge commits which affected the current branch will be shown but
 individual commits which originated on other branches will be omitted.
 .It Fl l Ar N
 Limit history traversal to a given number of commits.
+If this option is not specified, a default limit value of zero is used,
+which is treated as an unbounded limit.
+The
+.Ev GOT_LOG_DEFAULT_LIMIT
+environment variable may be set to change this default value.
 .It Fl p
 Display the patch of modifications made in each commit.
 .It Fl r Ar repository-path
@@ -1099,6 +1104,11 @@ environment variables with a missing email address.
 .It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit .
+.It Ev GOT_LOG_DEFAULT_LIMIT
+The default limit on the number of commits traversed by
+.Cm got log .
+If set to zero, the limit is unbounded.
+This variable will be silently ignored if it is set to a non-numeric value.
 .El
 .Sh EXIT STATUS
 .Ex -std got

@@ -1551,6 +1551,22 @@ usage_log(void)
 	exit(1);
 }
 
+static int
+get_default_log_limit(void)
+{
+	const char *got_default_log_limit;
+	long long n;
+	const char *errstr;
+
+	got_default_log_limit = getenv("GOT_LOG_DEFAULT_LIMIT");
+	if (got_default_log_limit == NULL)
+		return 0;
+	n = strtonum(got_default_log_limit, 0, INT_MAX, &errstr);
+	if (errstr != NULL)
+		return 0;
+	return n;
+}
+
 static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
@@ -1575,6 +1591,8 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
+	limit = get_default_log_limit();
+
 	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:")) != -1) {
 		switch (ch) {
 		case 'p':
@@ -1590,7 +1608,7 @@ cmd_log(int argc, char *argv[])
 				err(1, "-C option %s", errstr);
 			break;
 		case 'l':
-			limit = strtonum(optarg, 1, INT_MAX, &errstr);
+			limit = strtonum(optarg, 0, INT_MAX, &errstr);
 			if (errstr != NULL)
 				err(1, "-l option %s", errstr);
 			break;

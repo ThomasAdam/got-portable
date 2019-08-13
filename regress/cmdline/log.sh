@@ -151,8 +151,86 @@ function test_log_tag {
 	test_done "$testroot" "$ret"
 }
 
+function test_log_limit {
+	local testroot=`test_init log_limit`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got rm beta >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo`
+
+	# -l1 should print the first commit only
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	(cd $testroot/wt && got log -l1 | grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# env var can be used to set a log limit without -l option
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	(cd $testroot/wt && env GOT_LOG_DEFAULT_LIMIT=2 got log | \
+		grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# non-numeric env var is ignored
+	(cd $testroot/wt && env GOT_LOG_DEFAULT_LIMIT=foobar got log | \
+		grep ^commit > $testroot/stdout)
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	echo "commit $commit_id0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -l option takes precedence over env var
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	echo "commit $commit_id0" >> $testroot/stdout.expected
+	(cd $testroot/wt && env GOT_LOG_DEFAULT_LIMIT=1 got log -l0 | \
+		grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "0"
+}
 
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
 run_test test_log_tag
+run_test test_log_limit

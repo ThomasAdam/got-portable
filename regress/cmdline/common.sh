@@ -15,6 +15,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 export GOT_AUTHOR="Flan Hacker <flan_hacker@openbsd.org>"
+export GOT_LOG_DEFAULT_LIMIT=0
 
 export MALLOC_OPTIONS=S
 
