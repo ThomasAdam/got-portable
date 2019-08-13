@@ -422,10 +422,65 @@ got_object_commit_get_committer_gmtoff(struct got_commit_object *commit)
 	return commit->committer_gmtoff;
 }
 
-const char *
-got_object_commit_get_logmsg(struct got_commit_object *commit)
+#define GOT_GPG_BEGIN_STR "gpgsig -----BEGIN PGP SIGNATURE-----"
+#define GOT_GPG_END_STR " -----END PGP SIGNATURE-----"
+
+const struct got_error *
+got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 {
-	return commit->logmsg;
+	const struct got_error *err = NULL;
+	int gpgsig = 0;
+	char *msg0, *msg, *line, *s;
+	size_t len;
+
+	*logmsg = NULL;
+
+	msg0 = strdup(commit->logmsg);
+	if (msg0 == NULL)
+		return got_error_from_errno("strdup");
+
+	/* Copy log message line by line to strip out GPG sigs... */
+	msg = msg0;
+	do {
+		line = strsep(&msg, "\n");
+
+		if (line) {
+			/* Skip over GPG signatures. */
+			if (gpgsig) {
+				if (strcmp(line, GOT_GPG_END_STR) == 0) {
+					gpgsig = 0;
+					/* Skip empty line after sig. */
+					line = strsep(&msg, "\n");
+				}
+				continue;
+			} else if (strcmp(line, GOT_GPG_BEGIN_STR) == 0) {
+				gpgsig = 1;
+				continue;
+			}
+			if (asprintf(&s, "%s%s\n",
+			    *logmsg ? *logmsg : "", line) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(*logmsg);
+			*logmsg = s;
+		}
+	} while (line);
+
+	/* Trim redundant trailing whitespace. */
+	len = strlen(*logmsg);
+	while (len > 1 && isspace((unsigned char)(*logmsg)[len - 2]) &&
+	    isspace((unsigned char)(*logmsg)[len - 1])) {
+		(*logmsg)[len - 1] = '\0';
+		len--;
+	}
+done:
+	free(msg0);
+	if (err) {
+		free(*logmsg);
+		*logmsg = NULL;
+	}
+	return err;
 }
 
 const struct got_error *

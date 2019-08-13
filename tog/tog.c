@@ -1092,11 +1092,9 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (col > avail)
 		goto done;
 
-	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
-	if (logmsg0 == NULL) {
-		err = got_error_from_errno("strdup");
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
 		goto done;
-	}
 	logmsg = logmsg0;
 	while (*logmsg == '\n')
 		logmsg++;
@@ -1752,7 +1750,7 @@ search_start_log_view(struct tog_view *view)
 
 static int
 match_commit(struct got_commit_object *commit, const char *id_str,
-    regex_t *regex)
+    const char *logmsg, regex_t *regex)
 {
 	regmatch_t regmatch;
 
@@ -1760,9 +1758,8 @@ match_commit(struct got_commit_object *commit, const char *id_str,
 	    &regmatch, 0) == 0 ||
 	    regexec(regex, got_object_commit_get_committer(commit), 1,
 	    &regmatch, 0) == 0 ||
-	    regexec(regex, got_object_commit_get_logmsg(commit), 1,
-	    &regmatch, 0) == 0 ||
-	    regexec(regex, id_str, 1, &regmatch, 0) == 0)
+	    regexec(regex, id_str, 1, &regmatch, 0) == 0 ||
+	    regexec(regex, logmsg, 1, &regmatch, 0) == 0)
 		return 1;
 
 	return 0;
@@ -1804,7 +1801,7 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	while (1) {
-		char *id_str;
+		char *id_str, *logmsg;
 		if (entry == NULL) {
 			if (s->thread_args.log_complete ||
 			    view->searching == TOG_SEARCH_BACKWARD) {
@@ -1827,12 +1824,17 @@ search_next_log_view(struct tog_view *view)
 		if (err)
 			return err;
 
-		if (match_commit(entry->commit, id_str, &view->regex)) {
+		err = got_object_commit_get_logmsg(&logmsg, entry->commit);
+		if (err)
+			return err;
+		if (match_commit(entry->commit, id_str, logmsg, &view->regex)) {
+			free(logmsg);
 			view->search_next_done = 1;
 			s->matched_entry = entry;
 			free(id_str);
 			break;
 		}
+		free(logmsg);
 		free(id_str);
 		s->search_entry = entry;
 		if (view->searching == TOG_SEARCH_FORWARD)
@@ -2444,7 +2446,7 @@ write_commit_info(struct got_object_id *commit_id,
 	const struct got_error *err = NULL;
 	char datebuf[26];
 	struct got_commit_object *commit;
-	char *id_str = NULL;
+	char *id_str = NULL, *logmsg = NULL;
 	time_t committer_time;
 	const char *author, *committer;
 	char *refs_str = NULL;
@@ -2488,13 +2490,16 @@ write_commit_info(struct got_object_id *commit_id,
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}
-	if (fprintf(outfile, "%s\n",
-	    got_object_commit_get_logmsg(commit)) < 0) {
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	if (err)
+		goto done;
+	if (fprintf(outfile, "%s\n", logmsg) < 0) {
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}
 done:
 	free(id_str);
+	free(logmsg);
 	free(refs_str);
 	got_object_commit_close(commit);
 	return err;

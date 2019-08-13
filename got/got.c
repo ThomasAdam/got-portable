@@ -1458,9 +1458,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		}
 	}
 
-	logmsg0 = strdup(got_object_commit_get_logmsg(commit));
-	if (logmsg0 == NULL)
-		return got_error_from_errno("strdup");
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		return err;
 
 	logmsg = logmsg0;
 	do {
@@ -3932,19 +3932,28 @@ trim_logmsg(char *logmsg, int limit)
 static const struct got_error *
 get_short_logmsg(char **logmsg, int limit, struct got_commit_object *commit)
 {
-	const char *logmsg0 = NULL;
+	const struct got_error *err;
+	char *logmsg0 = NULL;
+	const char *s;
 
-	logmsg0 = got_object_commit_get_logmsg(commit);
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		return err;
 
-	while (isspace((unsigned char)logmsg0[0]))
-		logmsg0++;
+	s = logmsg0;
+	while (isspace((unsigned char)s[0]))
+		s++;
 
-	*logmsg = strdup(logmsg0);
-	if (*logmsg == NULL)
-		return got_error_from_errno("strdup");
+	*logmsg = strdup(s);
+	if (*logmsg == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
 
 	trim_logmsg(*logmsg, limit);
-	return NULL;
+done:
+	free(logmsg0);
+	return err;
 }
 
 static const struct got_error *
@@ -4542,7 +4551,7 @@ append_folded_commit_msg(char **new_msg, struct got_histedit_list_entry *hle,
 {
 	const struct got_error *err;
 	struct got_commit_object *folded_commit = NULL;
-	char *id_str;
+	char *id_str, *folded_logmsg = NULL;
 
 	err = got_object_id_str(&id_str, hle->commit_id);
 	if (err)
@@ -4552,9 +4561,12 @@ append_folded_commit_msg(char **new_msg, struct got_histedit_list_entry *hle,
 	if (err)
 		goto done;
 
+	err = got_object_commit_get_logmsg(&folded_logmsg, folded_commit);
+	if (err)
+		goto done;
 	if (asprintf(new_msg, "%s%s# log message of folded commit %s: %s",
 	    logmsg ? logmsg : "", logmsg ? "\n" : "", id_str,
-	    got_object_commit_get_logmsg(folded_commit)) == -1) {
+	    folded_logmsg) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -4562,6 +4574,7 @@ done:
 	if (folded_commit)
 		got_object_commit_close(folded_commit);
 	free(id_str);
+	free(folded_logmsg);
 	return err;
 }
 
@@ -4585,7 +4598,7 @@ static const struct got_error *
 histedit_edit_logmsg(struct got_histedit_list_entry *hle,
     struct got_repository *repo)
 {
-	char *logmsg_path = NULL, *id_str = NULL;
+	char *logmsg_path = NULL, *id_str = NULL, *orig_logmsg = NULL;
 	char *logmsg = NULL, *new_msg = NULL, *editor = NULL;
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
@@ -4616,10 +4629,12 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	err = got_object_id_str(&id_str, hle->commit_id);
 	if (err)
 		goto done;
+	err = got_object_commit_get_logmsg(&orig_logmsg, commit);
+	if (err)
+		goto done;
 	if (asprintf(&new_msg,
 	    "%s\n# original log message of commit %s: %s",
-	    logmsg ? logmsg : "", id_str,
-	    got_object_commit_get_logmsg(commit)) == -1) {
+	    logmsg ? logmsg : "", id_str, orig_logmsg) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -4645,16 +4660,14 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_MSG_EMPTY)
 			goto done;
-		err = NULL;
-		hle->logmsg = strdup(got_object_commit_get_logmsg(commit));
-		if (hle->logmsg == NULL)
-			err = got_error_from_errno("strdup");
+		err = got_object_commit_get_logmsg(&hle->logmsg, commit);
 	}
 done:
 	if (logmsg_path && unlink(logmsg_path) != 0 && err == NULL)
 		err = got_error_from_errno2("unlink", logmsg_path);
 	free(logmsg_path);
 	free(logmsg);
+	free(orig_logmsg);
 	free(editor);
 	if (commit)
 		got_object_commit_close(commit);

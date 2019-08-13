@@ -4810,13 +4810,19 @@ rebase_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	if (new_logmsg)
+	if (new_logmsg) {
 		logmsg = strdup(new_logmsg);
-	else
-		logmsg = strdup(got_object_commit_get_logmsg(orig_commit));
-	if (logmsg == NULL)
-		return got_error_from_errno("strdup");
+		if (logmsg == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		err = got_object_commit_get_logmsg(&logmsg, orig_commit);
+		if (err)
+			goto done;
+	}
 
+	/* NB: commit_worktree will call free(logmsg) */
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
 	    worktree, got_object_commit_get_author(orig_commit),
 	    got_object_commit_get_committer(orig_commit),
