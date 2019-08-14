@@ -2154,6 +2154,74 @@ usage_blame(void)
 	exit(1);
 }
 
+struct blame_line {
+	int annotated;
+	char *id_str;
+};
+
+struct blame_cb_args {
+	struct blame_line *lines;
+	int nlines;
+	int lineno_cur;
+	off_t *line_offsets;
+	FILE *f;
+};
+
+static const struct got_error *
+blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	struct blame_cb_args *a = arg;
+	struct blame_line *bline;
+	char *line = NULL, *nl;
+	size_t linesize = 0;
+	off_t offset;
+
+	if (nlines != a->nlines ||
+	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
+		return got_error(GOT_ERR_RANGE);
+
+	if (sigint_received)
+		return got_error(GOT_ERR_ITER_COMPLETED);
+
+	/* Annotate this line. */
+	bline = &a->lines[lineno - 1];
+	if (bline->annotated)
+		return NULL;
+	err = got_object_id_str(&bline->id_str, id);
+	if (err)
+		return err;
+	bline->annotated = 1;
+
+	/* Print lines annotated so far. */
+	bline = &a->lines[a->lineno_cur - 1];
+	if (!bline->annotated)
+		return NULL;
+
+	offset = a->line_offsets[a->lineno_cur - 1];
+	if (fseeko(a->f, offset, SEEK_SET) == -1)
+		return got_error_from_errno("fseeko");
+
+	while (bline->annotated) {
+		if (getline(&line, &linesize, a->f) == (ssize_t)-1) {
+			if (ferror(a->f))
+				err = got_error_from_errno("getline");
+			break;
+		}
+
+		nl = strchr(line, '\n');
+		if (nl)
+			*nl = '\0';
+		printf("%.8s %s\n", bline->id_str, line);
+
+		a->lineno_cur++;
+		bline = &a->lines[a->lineno_cur - 1];
+	}
+
+	free(line);
+	return err;
+}
+
 static const struct got_error *
 cmd_blame(int argc, char *argv[])
 {
@@ -2161,9 +2229,12 @@ cmd_blame(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
+	struct got_blob_object *blob = NULL;
 	char *commit_id_str = NULL;
-	int ch;
+	struct blame_cb_args bca;
+	int ch, obj_type, i;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -2265,12 +2336,56 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_blame(in_repo_path, commit_id, repo, stdout);
+	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
+	if (error)
+		goto done;
+	if (obj_id == NULL) {
+		error = got_error(GOT_ERR_NO_OBJ);
+		goto done;
+	}
+
+	error = got_object_get_type(&obj_type, repo, obj_id);
+	if (error)
+		goto done;
+
+	if (obj_type != GOT_OBJ_TYPE_BLOB) {
+		error = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	error = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	if (error)
+		goto done;
+	bca.f = got_opentemp();
+	if (bca.f == NULL) {
+		error = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+	error = got_object_blob_dump_to_file(NULL, &bca.nlines,
+	    &bca.line_offsets, bca.f, blob);
+	if (error)
+		goto done;
+
+	bca.lines = calloc(bca.nlines, sizeof(*bca.lines));
+	if (bca.lines == NULL) {
+		error = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	bca.lineno_cur = 1;
+
+	error = got_blame_incremental(in_repo_path, commit_id, repo,
+	    blame_cb, &bca);
+	if (error)
+		goto done;
 done:
 	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
+	free(obj_id);
+	if (blob)
+		got_object_blob_close(blob);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -2279,6 +2394,14 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	for (i = 0; i < bca.nlines; i++) {
+		struct blame_line *bline = &bca.lines[i];
+		free(bline->id_str);
+	}
+	free(bca.lines);
+	free(bca.line_offsets);
+	if (bca.f && fclose(bca.f) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	return error;
 }
 
