@@ -15,14 +15,7 @@
  */
 
 /*
- * Write an annotated version of a file at a given in-repository path,
- * as found in the commit specified by ID, to the specified output file.
- */
-const struct got_error *got_blame(const char *, struct got_object_id *,
-    struct got_repository *, FILE *);
-
-/*
- * Like got_blame() but instead of generating an output file invoke
+ * Blame the blob at the specified path in the specified commit and invoke
  * a callback whenever an annotation has been computed for a line.
  *
  * The callback receives the provided void * argument, the total number
