@@ -412,7 +412,7 @@ done:
 }
 
 const struct got_error *
-got_blame_incremental(const char *path, struct got_object_id *commit_id,
+got_blame(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)

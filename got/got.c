@@ -2425,8 +2425,7 @@ cmd_blame(int argc, char *argv[])
 	}
 	bca.repo = repo;
 
-	error = got_blame_incremental(in_repo_path, commit_id, repo,
-	    blame_cb, &bca);
+	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca);
 	if (error)
 		goto done;
 done:

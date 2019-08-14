@@ -31,7 +31,7 @@
  * If the callback returns any other error, the blame operation will be
  * aborted and the callback's error is returned from this function.
  */
-const struct got_error *got_blame_incremental(const char *,
+const struct got_error *got_blame(const char *,
     struct got_object_id *, struct got_repository *,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *);

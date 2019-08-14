@@ -3132,7 +3132,7 @@ blame_thread(void *arg)
 	struct tog_blame_cb_args *a = ta->cb_args;
 	int errcode;
 
-	err = got_blame_incremental(ta->path, a->commit_id, ta->repo,
+	err = got_blame(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->cb_args);
 
 	errcode = pthread_mutex_lock(&tog_mutex);
