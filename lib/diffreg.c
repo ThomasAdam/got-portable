@@ -186,7 +186,7 @@ static int	 change(FILE *, struct got_diff_changes *, struct got_diff_state *, s
 static void	 sort(struct line *, int);
 static void	 print_header(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 asciifile(FILE *);
-static int	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int, int);
+static int	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int);
 static int	 newcand(struct got_diff_state *, int, int, int, int *);
 static int	 search(struct got_diff_state *, int *, int, int);
 static int	 skipline(FILE *);
@@ -981,18 +981,18 @@ change(FILE *outfile, struct got_diff_changes *changes,
 		diff_output(outfile, "%c", a > b ? 'a' : c > d ? 'd' : 'c');
 		range(outfile, c, d, ",");
 		diff_output(outfile, "\n");
-		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', 1, *pflags);
+		fetch(outfile, ds, args, ds->ixold, a, b, f1, '<', *pflags);
 		if (a <= b && c <= d)
 			diff_output(outfile, "---\n");
 	}
 	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2,
-	    args->diff_format == D_NORMAL ? '>' : '\0', 0, *pflags);
+	    args->diff_format == D_NORMAL ? '>' : '\0', *pflags);
 	return (0);
 }
 
 static int
 fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
-    long *f, int a, int b, FILE *lb, int ch, int oldfile, int flags)
+    long *f, int a, int b, FILE *lb, int ch, int flags)
 {
 	int i, j, c, lastc, col, nc;
 
@@ -1218,23 +1218,23 @@ dump_unified_vec(FILE *outfile, struct got_diff_changes *changes,
 
 		switch (ch) {
 		case 'c':
-			fetch(outfile, ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(outfile, ds, args, ds->ixold, a, b, f1, '-', 0, flags);
-			fetch(outfile, ds, args, ds->ixnew, c, d, f2, '+', 0, flags);
+			fetch(outfile, ds, args, ds->ixold, lowa, a - 1, f1, ' ', flags);
+			fetch(outfile, ds, args, ds->ixold, a, b, f1, '-', flags);
+			fetch(outfile, ds, args, ds->ixnew, c, d, f2, '+', flags);
 			break;
 		case 'd':
-			fetch(outfile, ds, args, ds->ixold, lowa, a - 1, f1, ' ', 0, flags);
-			fetch(outfile, ds, args, ds->ixold, a, b, f1, '-', 0, flags);
+			fetch(outfile, ds, args, ds->ixold, lowa, a - 1, f1, ' ', flags);
+			fetch(outfile, ds, args, ds->ixold, a, b, f1, '-', flags);
 			break;
 		case 'a':
-			fetch(outfile, ds, args, ds->ixnew, lowc, c - 1, f2, ' ', 0, flags);
-			fetch(outfile, ds, args, ds->ixnew, c, d, f2, '+', 0, flags);
+			fetch(outfile, ds, args, ds->ixnew, lowc, c - 1, f2, ' ', flags);
+			fetch(outfile, ds, args, ds->ixnew, c, d, f2, '+', flags);
 			break;
 		}
 		lowa = b + 1;
 		lowc = d + 1;
 	}
-	fetch(outfile, ds, args, ds->ixnew, d + 1, upd, f2, ' ', 0, flags);
+	fetch(outfile, ds, args, ds->ixnew, d + 1, upd, f2, ' ', flags);
 
 	ds->context_vec_ptr = ds->context_vec_start - 1;
 }
