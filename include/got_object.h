@@ -206,7 +206,7 @@ const struct got_error *got_object_blob_read_block(size_t *,
  * Read the entire content of a blob and write it to the specified file.
  * Flush and rewind the file as well. Indicate the amount of bytes
  * written in the size_t output argument, and the number of lines in the
- * file in the int argument, and line offsets in the the off_t argument
+ * file in the int argument, and line offsets in the off_t argument
  * (NULL can be passed for any output argument).
  */
 const struct got_error *got_object_blob_dump_to_file(size_t *, int *,
