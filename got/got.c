@@ -2157,6 +2157,7 @@ usage_blame(void)
 struct blame_line {
 	int annotated;
 	char *id_str;
+	char *committer;
 };
 
 struct blame_cb_args {
@@ -2166,6 +2167,7 @@ struct blame_cb_args {
 	int lineno_cur;
 	off_t *line_offsets;
 	FILE *f;
+	struct got_repository *repo;
 };
 
 static const struct got_error *
@@ -2174,8 +2176,9 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	const struct got_error *err = NULL;
 	struct blame_cb_args *a = arg;
 	struct blame_line *bline;
-	char *line = NULL, *nl;
+	char *line = NULL;
 	size_t linesize = 0;
+	struct got_commit_object *commit = NULL;
 	off_t offset;
 
 	if (nlines != a->nlines ||
@@ -2192,34 +2195,62 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	err = got_object_id_str(&bline->id_str, id);
 	if (err)
 		return err;
+
+	err = got_object_open_as_commit(&commit, a->repo, id);
+	if (err)
+		goto done;
+
+	bline->committer = strdup(got_object_commit_get_committer(commit));
+	if (bline->committer == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
 	bline->annotated = 1;
 
 	/* Print lines annotated so far. */
 	bline = &a->lines[a->lineno_cur - 1];
 	if (!bline->annotated)
-		return NULL;
+		goto done;
 
 	offset = a->line_offsets[a->lineno_cur - 1];
-	if (fseeko(a->f, offset, SEEK_SET) == -1)
-		return got_error_from_errno("fseeko");
+	if (fseeko(a->f, offset, SEEK_SET) == -1) {
+		err = got_error_from_errno("fseeko");
+		goto done;
+	}
 
 	while (bline->annotated) {
+		char *smallerthan, *at, *nl, *committer;
+		size_t len;
+
 		if (getline(&line, &linesize, a->f) == (ssize_t)-1) {
 			if (ferror(a->f))
 				err = got_error_from_errno("getline");
 			break;
 		}
 
+		committer = bline->committer;
+		smallerthan = strchr(committer, '<');
+		if (smallerthan && smallerthan[1] != '\0')
+			committer = smallerthan + 1;
+		at = strchr(committer, '@');
+		if (at)
+			*at = '\0';
+		len = strlen(committer);
+		if (len >= 9)
+			committer[8] = '\0';
+
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		printf("%.*d) %.8s %s\n", a->nlines_prec, a->lineno_cur,
-		    bline->id_str, line);
+		printf("%.*d) %.8s %-8s %s\n", a->nlines_prec, a->lineno_cur,
+		    bline->id_str, committer, line);
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
 	}
-
+done:
+	if (commit)
+		got_object_commit_close(commit);
 	free(line);
 	return err;
 }
@@ -2373,15 +2404,14 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno("calloc");
 		goto done;
 	}
-
 	bca.lineno_cur = 1;
-
 	bca.nlines_prec = 0;
 	i = bca.nlines;
 	while (i > 0) {
 		i /= 10;
 		bca.nlines_prec++;
 	}
+	bca.repo = repo;
 
 	error = got_blame_incremental(in_repo_path, commit_id, repo,
 	    blame_cb, &bca);
@@ -2406,6 +2436,7 @@ done:
 	for (i = 0; i < bca.nlines; i++) {
 		struct blame_line *bline = &bca.lines[i];
 		free(bline->id_str);
+		free(bline->committer);
 	}
 	free(bca.lines);
 	free(bca.line_offsets);

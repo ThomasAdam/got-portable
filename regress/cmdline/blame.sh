@@ -44,9 +44,9 @@ function test_blame_basic {
 	local short_commit2=`trim_obj_id 32 $commit2`
 	local short_commit3=`trim_obj_id 32 $commit3`
 
-	echo "1) $short_commit1 1" > $testroot/stdout.expected
-	echo "2) $short_commit2 2" >> $testroot/stdout.expected
-	echo "3) $short_commit3 3" >> $testroot/stdout.expected
+	echo "1) $short_commit1 $GOT_AUTHOR_8 1" > $testroot/stdout.expected
+	echo "2) $short_commit2 $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
+	echo "3) $short_commit3 $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -86,8 +86,8 @@ function test_blame_tag {
 	local short_commit1=`trim_obj_id 32 $commit1`
 	local short_commit2=`trim_obj_id 32 $commit2`
 
-	echo "1) $short_commit1 1" > $testroot/stdout.expected
-	echo "2) $short_commit2 2" >> $testroot/stdout.expected
+	echo "1) $short_commit1 $GOT_AUTHOR_8 1" > $testroot/stdout.expected
+	echo "2) $short_commit2 $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -115,7 +115,7 @@ function test_blame_file_single_line {
 
 	local short_commit1=`trim_obj_id 32 $commit1`
 
-	echo "1) $short_commit1 1" > $testroot/stdout.expected
+	echo "1) $short_commit1 $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -143,7 +143,7 @@ function test_blame_file_single_line_no_newline {
 
 	local short_commit1=`trim_obj_id 32 $commit1`
 
-	echo "1) $short_commit1 1" > $testroot/stdout.expected
+	echo "1) $short_commit1 $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
