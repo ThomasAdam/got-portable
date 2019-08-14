@@ -2158,6 +2158,7 @@ struct blame_line {
 	int annotated;
 	char *id_str;
 	char *committer;
+	char datebuf[9]; /* YY-MM-DD + NUL */
 };
 
 struct blame_cb_args {
@@ -2180,6 +2181,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	size_t linesize = 0;
 	struct got_commit_object *commit = NULL;
 	off_t offset;
+	struct tm tm;
+	time_t committer_time;
 
 	if (nlines != a->nlines ||
 	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
@@ -2203,6 +2206,15 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	bline->committer = strdup(got_object_commit_get_committer(commit));
 	if (bline->committer == NULL) {
 		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	committer_time = got_object_commit_get_committer_time(commit);
+	if (localtime_r(&committer_time, &tm) == NULL)
+		return got_error_from_errno("localtime_r");
+	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%g/%m/%d",
+	    &tm) >= sizeof(bline->datebuf)) {
+		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
 	bline->annotated = 1;
@@ -2242,8 +2254,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		printf("%.*d) %.8s %-8s %s\n", a->nlines_prec, a->lineno_cur,
-		    bline->id_str, committer, line);
+		printf("%.*d) %.8s %s %-8s %s\n", a->nlines_prec, a->lineno_cur,
+		    bline->id_str, bline->datebuf, committer, line);
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];

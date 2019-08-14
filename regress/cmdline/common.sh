@@ -45,6 +45,12 @@ function git_show_head
 	(cd $repo && git show --no-patch --pretty='format:%H')
 }
 
+function git_show_author_time
+{
+	local repo="$1"
+	(cd $repo && git show --no-patch --pretty='format:%at')
+}
+
 function git_show_parent_commit
 {
 	local repo="$1"
