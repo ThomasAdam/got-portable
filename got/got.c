@@ -2162,6 +2162,7 @@ struct blame_line {
 struct blame_cb_args {
 	struct blame_line *lines;
 	int nlines;
+	int nlines_prec;
 	int lineno_cur;
 	off_t *line_offsets;
 	FILE *f;
@@ -2212,7 +2213,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		printf("%.8s %s\n", bline->id_str, line);
+		printf("%.*d) %.8s %s\n", a->nlines_prec, a->lineno_cur,
+		    bline->id_str, line);
 
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
@@ -2363,7 +2365,7 @@ cmd_blame(int argc, char *argv[])
 	}
 	error = got_object_blob_dump_to_file(NULL, &bca.nlines,
 	    &bca.line_offsets, bca.f, blob);
-	if (error)
+	if (error || bca.nlines == 0)
 		goto done;
 
 	bca.lines = calloc(bca.nlines, sizeof(*bca.lines));
@@ -2373,6 +2375,13 @@ cmd_blame(int argc, char *argv[])
 	}
 
 	bca.lineno_cur = 1;
+
+	bca.nlines_prec = 0;
+	i = bca.nlines;
+	while (i > 0) {
+		i /= 10;
+		bca.nlines_prec++;
+	}
 
 	error = got_blame_incremental(in_repo_path, commit_id, repo,
 	    blame_cb, &bca);
