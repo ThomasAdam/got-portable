@@ -2191,6 +2191,9 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	if (sigint_received)
 		return got_error(GOT_ERR_ITER_COMPLETED);
 
+	if (lineno == -1)
+		return NULL; /* no change in this commit */
+
 	/* Annotate this line. */
 	bline = &a->lines[lineno - 1];
 	if (bline->annotated)
