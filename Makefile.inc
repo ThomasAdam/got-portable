@@ -11,7 +11,7 @@ LIBEXECDIR ?= ${PREFIX}/libexec
 MANDIR ?= ${PREFIX}/man/man
 .else
 PREFIX ?= ${HOME}
-BINDIR ?= ${HOME}/bin
+BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${BINDIR}
 
 BINOWN ?= ${USER}
