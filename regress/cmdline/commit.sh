@@ -578,7 +578,34 @@ function test_commit_no_email {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_tree_entry_sorting {
+	local testroot=`test_init commit_tree_entry_sorting`
 
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Git's index gets corrupted when tree entries are written in the
+	# order defined by got_path_cmp() rather than Git's own ordering.
+	# Create a new tree where a directory "got" and a file "got-version"
+	# would sort in the wrong order according to Git's opinion.
+	mkdir $testroot/wt/got
+	touch $testroot/wt/got/foo
+	echo foo > $testroot/wt/got-version
+	echo zzz > $testroot/wt/zzz
+	(cd $testroot/wt && got add got-version got/foo zzz > /dev/null)
+
+	(cd $testroot/wt && got commit -m 'test' > /dev/null)
+
+	# Let git-fsck verify the newly written tree to make sure Git is happy
+	(cd $testroot/repo && git fsck --strict  \
+		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	ret="$?"
+	test_done "$testroot" "$ret"
+}
 
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -594,3 +621,4 @@ run_test test_commit_dir_path
 run_test test_commit_selected_paths
 run_test test_commit_outside_refs_heads
 run_test test_commit_no_email
+run_test test_commit_tree_entry_sorting
