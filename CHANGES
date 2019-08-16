@@ -1,3 +1,8 @@
+* got 0.8; 2019-08-16
+- write tree entries the way git likes it to prevent git index corruption
+- make 'got blame' show line numbers, dates, and author names
+- add GOT_LOG_DEFAULT_LIMIT env var for setting a got log -l default
+
 * got 0.7; 2019-08-13
 - properly parse timestamps in commit objects as UTC (patch by Hiltjo Posthuma)
 - strip Git GPG signatures from log messages
