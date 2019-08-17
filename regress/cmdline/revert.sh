@@ -318,7 +318,56 @@ function test_revert_directory {
 		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
+}
 
+function test_revert_directory_unknown {
+	local testroot=`test_init revert_directory_unknown`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	echo "new untracked file" > $testroot/wt/epsilon/new_file
+	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta	
+
+	(cd $testroot/wt && got revert -R . > $testroot/stdout)
+
+	echo 'R  alpha' > $testroot/stdout.expected
+	echo '?  epsilon/new_file' >> $testroot/stdout.expected
+	echo 'R  epsilon/zeta' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new untracked file" > $testroot/content.expected
+	cat $testroot/wt/epsilon/new_file > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+
+	test_done "$testroot" "$ret"
 }
 
 function test_revert_patch {
@@ -879,6 +928,7 @@ run_test test_revert_multiple
 run_test test_revert_file_in_new_subdir
 run_test test_revert_no_arguments
 run_test test_revert_directory
+run_test test_revert_directory_unknown
 run_test test_revert_patch
 run_test test_revert_patch_added
 run_test test_revert_patch_removed

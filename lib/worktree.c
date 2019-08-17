@@ -3143,6 +3143,10 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 	    staged_status != GOT_STATUS_NO_CHANGE)
 		return NULL;
 
+	if (status == GOT_STATUS_UNVERSIONED)
+		return (*a->progress_cb)(a->progress_arg,
+		    GOT_STATUS_UNVERSIONED, relpath);
+
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
