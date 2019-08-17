@@ -304,8 +304,10 @@ sort_tree_entries_the_way_git_likes_it(struct got_tree_entries **sorted,
 		if (err)
 			break;
 		err = insert_tree_entry(*sorted, new);
-		if (err)
+		if (err) {
+			got_object_tree_entry_close(new);
 			break;
+		}
 	}
 
 	if (err) {
