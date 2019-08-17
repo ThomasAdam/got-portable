@@ -40,7 +40,6 @@
 struct got_blame_line {
 	int annotated;
 	struct got_object_id id;
-	off_t offset;
 };
 
 struct got_blame_diff_offsets {
@@ -188,15 +187,21 @@ blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
 
 static const struct got_error *
 blame_commit(struct got_blame *blame, struct got_object_id *id,
-    struct got_object_id *pid, const char *path, struct got_repository *repo,
+    const char *path, struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL, *pobj = NULL;
 	struct got_object_id *obj_id = NULL, *pobj_id = NULL;
+	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL, *pblob = NULL;
 	struct got_diff_changes *changes = NULL;
+	struct got_object_qid *pid = NULL;
+
+	err = got_object_open_as_commit(&commit, repo, id);
+	if (err)
+		return err;
 
 	err = got_object_id_by_path(&obj_id, repo, id, path);
 	if (err)
@@ -211,8 +216,9 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		goto done;
 	}
 
+	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (pid) {
-		err = got_object_id_by_path(&pobj_id, repo, pid, path);
+		err = got_object_id_by_path(&pobj_id, repo, pid->id, path);
 		if (err) {
 			if (err->code == GOT_ERR_NO_TREE_ENTRY) {
 				/* Blob's history began in previous commit. */
@@ -260,6 +266,8 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
+	if (commit)
+		got_object_commit_close(commit);
 	free(obj_id);
 	free(pobj_id);
 	if (obj)
@@ -302,7 +310,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_object_id *id = NULL, *parent_id = NULL;
+	struct got_object_id *id = NULL, *next_id = NULL;
 	int lineno;
 	struct got_commit_graph *graph = NULL;
 
@@ -345,7 +353,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 
-	err = got_commit_graph_open(&graph, start_commit_id, path, 0, repo);
+	err = got_commit_graph_open(&graph, start_commit_id, path, 1, repo);
 	if (err)
 		return err;
 	err = got_commit_graph_iter_start(graph, start_commit_id, repo);
@@ -354,12 +362,12 @@ blame_open(struct got_blame **blamep, const char *path,
 
 	id = NULL;
 	for (;;) {
-		err = got_commit_graph_iter_next(&parent_id, graph);
+		err = got_commit_graph_iter_next(&next_id, graph);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				if (id)
 					err = blame_commit(blame, id,
-					    parent_id, path, repo, cb, arg);
+					    path, repo, cb, arg);
 				else
 					err = NULL;
 				break;
@@ -372,7 +380,7 @@ blame_open(struct got_blame **blamep, const char *path,
 			continue;
 		}
 		if (id) {
-			err = blame_commit(blame, id, parent_id, path, repo,
+			err = blame_commit(blame, id, path, repo,
 			    cb, arg);
 			if (err) {
 				if (err->code == GOT_ERR_ITER_COMPLETED)
@@ -382,7 +390,7 @@ blame_open(struct got_blame **blamep, const char *path,
 			if (blame->nannotated == blame->nlines)
 				break;
 		}
-		id = parent_id;
+		id = next_id;
 	}
 
 	if (id && blame->nannotated < blame->nlines) {
