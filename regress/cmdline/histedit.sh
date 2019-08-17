@@ -1118,6 +1118,71 @@ function test_histedit_outside_refs_heads {
 	test_done "$testroot" "$ret"
 }
 
+function test_histedit_fold_last_commit_swap {
+	local testroot=`test_init histedit_fold_last_commit_swap`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# fold commit2 into commit1 (requires swapping commits)
+	echo "fold $old_commit2" > $testroot/histedit-script
+	echo "pick $old_commit1" >> $testroot/histedit-script
+	echo "mesg committing folded changes" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "histedit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local new_commit=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_new_commit=`trim_obj_id 28 $new_commit`
+
+	echo "G  epsilon/zeta" >> $testroot/stdout.expected
+	echo -n "$short_old_commit2 ->  fold commit: committing to zeta " \
+		>> $testroot/stdout.expected
+	echo "on master" >> $testroot/stdout.expected
+	echo "G  alpha" >> $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
+	echo -n "$short_old_commit1 -> $short_new_commit: " \
+		>> $testroot/stdout.expected
+	echo "committing folded changes" >> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -1129,3 +1194,4 @@ run_test test_histedit_abort
 run_test test_histedit_path_prefix_drop
 run_test test_histedit_path_prefix_edit
 run_test test_histedit_outside_refs_heads
+run_test test_histedit_fold_last_commit_swap

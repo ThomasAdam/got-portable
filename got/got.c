@@ -5009,7 +5009,8 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 		}
 	}
 
-	if (hle->cmd->code == GOT_HISTEDIT_FOLD)
+	hle = TAILQ_LAST(histedit_cmds, got_histedit_list);
+	if (hle && hle->cmd->code == GOT_HISTEDIT_FOLD)
 		return got_error_msg(GOT_ERR_HISTEDIT_CMD,
 		    "last commit in histedit script cannot be folded");
 
