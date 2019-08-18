@@ -238,6 +238,8 @@ get_editor(char **abspath)
 	const struct got_error *err = NULL;
 	const char *editor;
 
+	*abspath = NULL;
+
 	editor = getenv("VISUAL");
 	if (editor == NULL)
 		editor = getenv("EDITOR");
