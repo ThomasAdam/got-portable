@@ -14,7 +14,11 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-export GOT_AUTHOR="Flan Hacker <flan_hacker@openbsd.org>"
+export GIT_AUTHOR_NAME="Flan Hacker"
+export GIT_AUTHOR_EMAIL="flan_hacker@openbsd.org"
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GOT_AUTHOR="$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL>"
 export GOT_AUTHOR_8="flan_hac"
 export GOT_LOG_DEFAULT_LIMIT=0
 
@@ -22,14 +26,14 @@ export MALLOC_OPTIONS=S
 
 function git_init
 {
-	git init -q "$@"
+	git init -q "$1"
 }
 
 function git_commit
 {
 	local repo="$1"
 	shift
-	(cd $repo && git commit -q -a "$@")
+	(cd $repo && git commit --author="$GOT_AUTHOR" -q -a "$@")
 }
 
 function git_rm
