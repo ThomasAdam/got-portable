@@ -93,27 +93,38 @@ got_diffoffset_free(struct got_diffoffset_chunks *chunks)
 }
 
 const struct got_error *
+add_chunk(struct got_diffoffset_chunks *chunks, int lineno, int offset)
+{
+	struct got_diffoffset_chunk *chunk;
+
+	chunk = alloc_chunk(lineno, offset);
+	if (chunk == NULL)
+		return got_error_from_errno("alloc_chunk");
+
+	SIMPLEQ_INSERT_TAIL(chunks, chunk, entry);
+	return NULL;
+}
+
+
+const struct got_error *
 got_diffoffset_add(struct got_diffoffset_chunks *chunks,
     int old_lineno, int old_length, int new_lineno, int new_length)
 {
-	struct got_diffoffset_chunk *chunk1, *chunk2;
+	const struct got_error *err = NULL;
+	int offset;
 
-	chunk1 = alloc_chunk(old_lineno, new_lineno - old_lineno);
-	if (chunk1 == NULL)
-		return got_error_from_errno("alloc_chunk");
-
-	chunk2 = alloc_chunk(old_lineno + old_length,
-	    new_lineno - old_lineno + new_length - old_length);
-	if (chunk2 == NULL) {
-		const struct got_error *err =
-		    got_error_from_errno("alloc_chunk");
-		free(chunk1);
-		return err;
+	offset = new_lineno - old_lineno;
+	if (offset != 0) {
+		err = add_chunk(chunks, old_lineno, offset);
+		if (err)
+			return err;
 	}
 
-	SIMPLEQ_INSERT_TAIL(chunks, chunk1, entry);
-	SIMPLEQ_INSERT_TAIL(chunks, chunk2, entry);
-	return NULL;
+	offset = new_lineno - old_lineno + new_length - old_length;
+	if (offset != 0)
+		err = add_chunk(chunks, old_lineno + old_length, offset);
+
+	return err;
 }
 
 int
