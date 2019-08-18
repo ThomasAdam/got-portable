@@ -50,7 +50,7 @@ The on-disk format of this work tree is described in
 .Pp
 .Nm
 provides global and command-specific options.
-Global options must preceed the command name, and are as follows:
+Global options must precede the command name, and are as follows:
 .Bl -tag -width tenletters
 .It Fl h
 Display usage information and exit immediately.
@@ -204,7 +204,7 @@ option.
 cannot update paths with staged changes.
 If changes have been staged with
 .Cm got stage ,
-these changes must first be comitted with
+these changes must first be committed with
 .Cm got commit
 or unstaged with
 .Cm got unstage .
@@ -538,7 +538,7 @@ Perform the operation even if a file contains uncommitted modifications.
 Short alias for
 .Cm remove .
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
-Revert any uncommited changes in files at the specified paths.
+Revert any uncommitted changes in files at the specified paths.
 File contents will be overwritten with those contained in the
 work tree's base commit.
 There is no way to bring discarded changes back after
@@ -679,7 +679,7 @@ may be viewed with
 .Cm got diff ,
 amended manually or with further
 .Cm got cherrypick
-comands,
+commands,
 committed with
 .Cm got commit ,
 or discarded again with
@@ -722,7 +722,7 @@ which may be viewed with
 .Cm got diff ,
 amended manually or with further
 .Cm got backout
-comands,
+commands,
 committed with
 .Cm got commit ,
 or discarded again with
@@ -745,7 +745,7 @@ onto the tip of the current branch of the work tree.
 The
 .Ar branch
 must share common ancestry with the work tree's current branch.
-Rebasing begins with the first descendent commit of the youngest
+Rebasing begins with the first descendant commit of the youngest
 common ancestor commit shared by the specified
 .Ar branch
 and the work tree's current branch, and stops once the tip commit
@@ -793,7 +793,7 @@ to a single base commit with
 .Cm got update .
 If changes have been staged with
 .Cm got stage ,
-these changes must first be comitted with
+these changes must first be committed with
 .Cm got commit
 or unstaged with
 .Cm got unstage .
@@ -899,7 +899,7 @@ to a single base commit with
 .Cm got update .
 If changes have been staged with
 .Cm got stage ,
-these changes must first be comitted with
+these changes must first be committed with
 .Cm got commit
 or unstaged with
 .Cm got unstage .
@@ -1304,7 +1304,7 @@ repository with
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .An Martin Pieuchot Aq Mt mpi@openbsd.org
-.An joshua stein Aq Mt jcs@openbsd.org
+.An Joshua Stein Aq Mt jcs@openbsd.org
 .Sh CAVEATS
 .Nm
 is a work-in-progress and many commands remain to be implemented.
