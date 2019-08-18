@@ -60,22 +60,14 @@ const struct got_error *
 got_diffoffset_alloc(struct got_diffoffset_chunks **chunks)
 {
 	const struct got_error *err = NULL;
-	struct got_diffoffset_chunk *first;
-
-	first = alloc_chunk(0, 0);
-	if (first == NULL)
-		return got_error_from_errno("alloc_chunk");
 
 	*chunks = calloc(1, sizeof(**chunks));
 	if (*chunks == NULL) {
 		err = got_error_from_errno("calloc");
-		free(first);
 		return err;
 	}
 
 	SIMPLEQ_INIT(*chunks);
-	SIMPLEQ_INSERT_HEAD(*chunks, first, entry);
-
 	return NULL;
 }
 
