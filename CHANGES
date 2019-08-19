@@ -1,3 +1,10 @@
+* got 0.9; 2019-08-19
+- fix blame bug where lines were annotated with wrong commit
+- man page spelling fixes (patch by Hiltjo Posthuma)
+- fix uninitialized 'editor' variable (found by Hiltjo Posthuma)
+- make 'got revert' ignore unversioned files instead of aborting (semarie@)
+- fix "last commit cannot be folded" histedit check with reordered commits
+
 * got 0.8; 2019-08-16
 - write tree entries the way git likes it to prevent git index corruption
 - make 'got blame' show line numbers, dates, and author names
