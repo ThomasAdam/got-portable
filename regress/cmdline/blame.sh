@@ -485,8 +485,8 @@ EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		#diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "xfail: line 3 has wrong annotation"
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
 		return 1
 	fi
 	test_done "$testroot" "$ret"

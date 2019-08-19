@@ -105,16 +105,27 @@ got_diffoffset_add(struct got_diffoffset_chunks *chunks,
 	const struct got_error *err = NULL;
 	int offset;
 
-	offset = new_lineno - old_lineno;
-	if (offset != 0) {
-		err = add_chunk(chunks, old_lineno, offset);
-		if (err)
-			return err;
+	if (old_length != 0) {
+		offset = new_lineno - old_lineno;
+		if (offset != 0) {
+			err = add_chunk(chunks, old_lineno, offset);
+			if (err)
+				return err;
+		}
+	} else {
+		offset = new_length;
+		if (offset != 0) {
+			err = add_chunk(chunks, old_lineno, offset);
+			if (err)
+				return err;
+		}
+		if (old_lineno == new_lineno)
+			return NULL;
 	}
 
 	offset = new_lineno - old_lineno + new_length - old_length;
 	if (offset != 0)
-		err = add_chunk(chunks, old_lineno + old_length, offset);
+		err = add_chunk(chunks, old_lineno + new_length, offset);
 
 	return err;
 }
@@ -122,14 +133,14 @@ got_diffoffset_add(struct got_diffoffset_chunks *chunks,
 int
 got_diffoffset_get(struct got_diffoffset_chunks *chunks, int lineno)
 {
-	struct got_diffoffset_chunk *chunk, *prev;
+	struct got_diffoffset_chunk *chunk;
+	int offset = 0;
 
-	prev = SIMPLEQ_FIRST(chunks);
 	SIMPLEQ_FOREACH(chunk, chunks, entry) {
 		if (chunk->lineno > lineno)
 			break;
-		prev = chunk;
+		offset += chunk->offset;
 	}
 
-	return lineno + prev->offset;
+	return lineno + offset;
 }
