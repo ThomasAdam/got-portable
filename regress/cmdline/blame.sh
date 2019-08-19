@@ -19,6 +19,7 @@
 function blame_cmp {
 	local testroot="$1"
 	local file="$2"
+	local xfail="$3"
 
 	(cd $testroot/wt && got blame "$file" | cut -d ' ' -f 2 \
 		> $testroot/${file}.blame.got)
@@ -28,11 +29,11 @@ function blame_cmp {
 
 	cmp -s $testroot/${file}.blame.git $testroot/${file}.blame.got
 	ret="$?"
-	if [ "$ret" != "0" ]; then
+	if [ "$ret" != "0" -a "$xfail" == "" ]; then
 		diff -u $testroot/${file}.blame.git $testroot/${file}.blame.got
 		return 1
 	fi
-	return 0
+	return "$ret"
 }
 
 function test_blame_basic {
@@ -536,6 +537,154 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+function test_blame_blame_h {
+	local testroot=`test_init blame_blame_h`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/wt/got_blame.h <<EOF
+/*
+ * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+const struct got_error *got_blame(const char *, struct got_object_id *,
+    struct got_repository *, FILE *);
+EOF
+	(cd $testroot/wt && got add got_blame.h > /dev/null)
+	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
+
+	cat > $testroot/wt/blame-2.patch <<EOF
+diff 63581804340e880bf611c6a4a59eda26c503799f 84451b3ef755f3226d0d79af367632e5f3a830e7
+blob - b53ca469a18871cc2f6af334dab25028599c6488
+blob + c787aadf05e2afab61bd34976f7349912252e6da
+--- got_blame.h
++++ got_blame.h
+@@ -14,5 +14,22 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++/*
++ * Write an annotated version of a file at a given in-repository path,
++ * as found in the commit specified by ID, to the specified output file.
++ */
+ const struct got_error *got_blame(const char *, struct got_object_id *,
+     struct got_repository *, FILE *);
++
++/*
++ * Like got_blame() but instead of generating an output file invoke
++ * a callback whenever an annotation has been computed for a line.
++ *
++ * The callback receives the provided void * argument, the total number
++ * of lines of the annotated file, a line number, and the ID of the commit
++ * which last changed this line.
++ */
++const struct got_error *got_blame_incremental(const char *,
++    struct got_object_id *, struct got_repository *,
++    const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
++    void *);
+EOF
+	(cd $testroot/wt && patch < blame-2.patch > /dev/null)
+	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
+
+	cat > $testroot/wt/blame-3.patch <<EOF
+diff 75b7a700d9d14ef8eb902961255212acbedef164 d68a0a7de13af722c55099582019c03240e13320
+blob - c787aadf05e2afab61bd34976f7349912252e6da
+blob + 5255d076c915accf159940978b821d06803ff2f8
+--- got_blame.h
++++ got_blame.h
+@@ -28,6 +28,15 @@ const struct got_error *got_blame(const char *, struct
+  * The callback receives the provided void * argument, the total number
+  * of lines of the annotated file, a line number, and the ID of the commit
+  * which last changed this line.
++ *
++ * The callback is invoked for each commit as history is traversed.
++ * If no changes to the file were made in a commit, line number -1 and
++ * commit ID NULL will be reported.
++ *
++ * If the callback returns GOT_ERR_ITER_COMPLETED, the blame operation
++ * will be aborted and this function returns NULL.
++ * If the callback returns any other error, the blame operation will be
++ * aborted and the callback's error is returned from this function.
+  */
+ const struct got_error *got_blame_incremental(const char *,
+     struct got_object_id *, struct got_repository *,
+EOF
+	(cd $testroot/wt && patch < blame-3.patch > /dev/null)
+	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
+
+	cat > $testroot/wt/blame-4.patch <<EOF
+diff 3f60a8ef49086101685260fcb829f578cdf6d320 3bf198ba335fa30c8d16efb5c8e496200ac99c05
+blob - 5255d076c915accf159940978b821d06803ff2f8
+blob + 39623c468e733ee08abb50eafe29202b2b0a04ef
+--- got_blame.h
++++ got_blame.h
+@@ -30,8 +30,8 @@ const struct got_error *got_blame(const char *, struct
+  * which last changed this line.
+  *
+  * The callback is invoked for each commit as history is traversed.
+- * If no changes to the file were made in a commit, line number -1 and
+- * commit ID NULL will be reported.
++ * If no changes to the file were made in a commit, line number -1 will
++ * be reported.
+  *
+  * If the callback returns GOT_ERR_ITER_COMPLETED, the blame operation
+  * will be aborted and this function returns NULL.
+EOF
+	(cd $testroot/wt && patch < blame-4.patch > /dev/null)
+	(cd $testroot/wt && got commit -m "change 4" > /dev/null)
+
+	cat > $testroot/wt/blame-5.patch <<EOF
+diff 28315671b93d195163b0468fcb3879e29b25759c e27a7222faaa171dcb086ea0b566dc7bebb74a0b
+blob - 39623c468e733ee08abb50eafe29202b2b0a04ef
+blob + 6075cadbd177e1802679c7353515bf4ceebb51d0
+--- got_blame.h
++++ got_blame.h
+@@ -15,14 +15,7 @@
+  */
+ 
+ /*
+- * Write an annotated version of a file at a given in-repository path,
+- * as found in the commit specified by ID, to the specified output file.
+- */
+-const struct got_error *got_blame(const char *, struct got_object_id *,
+-    struct got_repository *, FILE *);
+-
+-/*
+- * Like got_blame() but instead of generating an output file invoke
++ * Blame the blob at the specified path in the specified commit and invoke
+  * a callback whenever an annotation has been computed for a line.
+  *
+  * The callback receives the provided void * argument, the total number
+EOF
+	(cd $testroot/wt && patch < blame-5.patch > /dev/null)
+	(cd $testroot/wt && got commit -m "change 5" > /dev/null)
+
+	blame_cmp "$testroot" "got_blame.h" xfail
+	ret="$?"
+	if [ "$ret" != 0 ]; then
+		test_done "$testroot" "xfail: lines 12, 13, 16 wrongly annotated"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_blame_basic
 run_test test_blame_tag
 run_test test_blame_file_single_line
@@ -544,3 +693,4 @@ run_test test_blame_all_lines_replaced
 run_test test_blame_lines_shifted_up
 run_test test_blame_lines_shifted_down
 run_test test_blame_commit_subsumed
+run_test test_blame_blame_h
