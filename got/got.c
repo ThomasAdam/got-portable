@@ -2285,6 +2285,7 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
 	int ch, obj_type, i;
+	size_t filesize;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -2411,10 +2412,14 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-	error = got_object_blob_dump_to_file(NULL, &bca.nlines,
+	error = got_object_blob_dump_to_file(&filesize, &bca.nlines,
 	    &bca.line_offsets, bca.f, blob);
 	if (error || bca.nlines == 0)
 		goto done;
+
+	/* Don't include \n at EOF in the blame line count. */
+	if (bca.line_offsets[bca.nlines - 1] == filesize)
+		bca.nlines--;
 
 	bca.lines = calloc(bca.nlines, sizeof(*bca.lines));
 	if (bca.lines == NULL) {

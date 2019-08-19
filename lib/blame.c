@@ -344,8 +344,12 @@ blame_open(struct got_blame **blamep, const char *path,
 	}
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
 	   &blame->line_offsets, blame->f, blob);
-	if (err)
+	if (err || blame->nlines == 0)
 		goto done;
+
+	/* Don't include \n at EOF in the blame line count. */
+	if (blame->line_offsets[blame->nlines - 1] == blame->filesize)
+		blame->nlines--;
 
 	blame->lines = calloc(blame->nlines, sizeof(*blame->lines));
 	if (blame->lines == NULL) {

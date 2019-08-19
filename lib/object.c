@@ -1164,6 +1164,7 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 		if (len == 0)
 			break;
 		buf = got_object_blob_get_read_buf(blob);
+		i = hdrlen;
 		if (line_offsets && nlines) {
 			if (*line_offsets == NULL) {
 				/* Have some data but perhaps no '\n'. */
@@ -1172,11 +1173,20 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 				*line_offsets = calloc(1, sizeof(**line_offsets));
 				if (*line_offsets == NULL)
 					return got_error_from_errno("malloc");
+
+				/* Skip forward over end of first line. */
+				while (i < len) {
+					if (buf[i] == '\n')
+						break;
+					i++;
+				}
 			}
-			/* Scan '\n' offsets in this chunk of data. */
-			for (i = hdrlen; i < len; i++) {
-				if (buf[i] != '\n')
+			/* Scan '\n' offsets in remaining chunk of data. */
+			while (i < len) {
+				if (buf[i] != '\n') {
+					i++;
 					continue;
+				}
 				(*nlines)++;
 				if (noffsets < *nlines) {
 					off_t *o = recallocarray(*line_offsets,
@@ -1193,6 +1203,7 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 				}
 				off = total_len + i - hdrlen + 1;
 				(*line_offsets)[*nlines - 1] = off;
+				i++;
 			}
 		}
 		/* Skip blob object header first time around. */
