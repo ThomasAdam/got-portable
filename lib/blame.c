@@ -125,12 +125,11 @@ get_blamed_line(struct got_blame_diff_offsets_list *diff_offsets_list,
     int lineno)
 {
 	struct got_blame_diff_offsets *diff_offsets;
-	int offset = 0;
 
 	SLIST_FOREACH(diff_offsets, diff_offsets_list, entry)
 		lineno = got_diffoffset_get(diff_offsets->chunks, lineno);
 
-	return lineno + offset;
+	return lineno;
 }
 
 static const struct got_error *
