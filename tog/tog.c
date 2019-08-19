@@ -3452,7 +3452,12 @@ show_blame_view(struct tog_view *view)
 		    &s->blame.thread_args);
 		if (errcode)
 			return got_error_set_errno(errcode, "pthread_create");
+
+		halfdelay(1); /* fast refresh while annotating  */
 	}
+
+	if (s->blame_complete)
+		halfdelay(10); /* disable fast refresh */
 
 	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
 	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
