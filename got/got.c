@@ -2287,6 +2287,8 @@ cmd_blame(int argc, char *argv[])
 	int ch, obj_type, i;
 	size_t filesize;
 
+	memset(&bca, 0, sizeof(bca));
+
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
 	    NULL) == -1)
