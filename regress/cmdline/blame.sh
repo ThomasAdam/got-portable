@@ -16,6 +16,25 @@
 
 . ./common.sh
 
+function blame_cmp {
+	local testroot="$1"
+	local file="$2"
+
+	(cd $testroot/wt && got blame "$file" | cut -d ' ' -f 2 \
+		> $testroot/${file}.blame.got)
+	(cd $testroot/repo && git reset --hard master > /dev/null)
+	(cd $testroot/repo && git blame "$file" | cut -d ' ' -f 1 \
+		> $testroot/${file}.blame.git)
+
+	cmp -s $testroot/${file}.blame.git $testroot/${file}.blame.got
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/${file}.blame.git $testroot/${file}.blame.got
+		return 1
+	fi
+	return 0
+}
+
 function test_blame_basic {
 	local testroot=`test_init blame_basic`
 
@@ -54,8 +73,12 @@ function test_blame_basic {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -97,7 +120,12 @@ function test_blame_tag {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -127,7 +155,12 @@ function test_blame_file_single_line {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -245,8 +278,12 @@ function test_blame_lines_shifted_up {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -311,8 +348,12 @@ function test_blame_lines_shifted_down {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -489,6 +530,9 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	blame_cmp "$testroot" "alpha"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
