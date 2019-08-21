@@ -35,14 +35,12 @@
 /lib/delta.c
 /lib/diff.c
 /lib/diff3.c
-/lib/diffoffset.c
 /lib/diffreg.c
 /lib/error.c
 /lib/fileindex.c
 /lib/got_lib_deflate.h
 /lib/got_lib_delta.h
 /lib/got_lib_diff.h
-/lib/got_lib_diffoffset.h
 /lib/got_lib_fileindex.h
 /lib/got_lib_inflate.h
 /lib/got_lib_lockfile.h
