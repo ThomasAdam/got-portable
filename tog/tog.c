@@ -539,12 +539,15 @@ view_search_start(struct tog_view *view)
 	const struct got_error *err = NULL;
 	char pattern[1024];
 	int ret;
+	int begin_x = 0;
 
 	if (view->nlines < 1)
 		return NULL;
 
+	if (!view_is_parent_view(view))
+		begin_x = view_split_begin_x(view->begin_x);
 	mvwaddstr(view->window, view->begin_y + view->nlines - 1,
-	    view->begin_x, "/");
+	    begin_x, "/");
 	wclrtoeol(view->window);
 
 	nocbreak();
