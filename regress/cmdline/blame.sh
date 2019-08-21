@@ -676,12 +676,8 @@ EOF
 	(cd $testroot/wt && patch < blame-5.patch > /dev/null)
 	(cd $testroot/wt && got commit -m "change 5" > /dev/null)
 
-	blame_cmp "$testroot" "got_blame.h" xfail
+	blame_cmp "$testroot" "got_blame.h"
 	ret="$?"
-	if [ "$ret" != 0 ]; then
-		test_done "$testroot" "xfail: lines 12, 13, 16 wrongly annotated"
-		return 1
-	fi
 	test_done "$testroot" "$ret"
 }
 

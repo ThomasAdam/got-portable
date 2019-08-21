@@ -233,6 +233,14 @@ got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
 }
 
 const struct got_error *
+got_diff_blob_file_lines_changed(struct got_diff_changes **changes,
+    struct got_blob_object *blob1, FILE *f2, size_t size2)
+{
+	return diff_blob_file(changes, blob1, NULL, f2, size2, NULL,
+	    0, NULL);
+}
+
+const struct got_error *
 got_diff_blob_lines_changed(struct got_diff_changes **changes,
     struct got_blob_object *blob1, struct got_blob_object *blob2)
 {

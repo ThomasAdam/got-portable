@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,21 +34,12 @@
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_diff.h"
-#include "got_lib_diffoffset.h"
 #include "got_commit_graph.h"
 
 struct got_blame_line {
 	int annotated;
 	struct got_object_id id;
 };
-
-struct got_blame_diff_offsets {
-	struct got_diffoffset_chunks *chunks;
-	struct got_object_id *commit_id;
-	SLIST_ENTRY(got_blame_diff_offsets) entry;
-};
-
-SLIST_HEAD(got_blame_diff_offsets_list, got_blame_diff_offsets);
 
 struct got_blame {
 	FILE *f;
@@ -58,44 +49,7 @@ struct got_blame {
 	struct got_blame_line *lines; /* one per line */
 	off_t *line_offsets;		/* one per line */
 	int ncommits;
-	struct got_blame_diff_offsets_list diff_offsets_list;
 };
-
-static void
-free_diff_offsets(struct got_blame_diff_offsets *diff_offsets)
-{
-	if (diff_offsets->chunks)
-		got_diffoffset_free(diff_offsets->chunks);
-	free(diff_offsets->commit_id);
-	free(diff_offsets);
-}
-
-static const struct got_error *
-alloc_diff_offsets(struct got_blame_diff_offsets **diff_offsets,
-    struct got_object_id *commit_id)
-{
-	const struct got_error *err = NULL;
-
-	*diff_offsets = calloc(1, sizeof(**diff_offsets));
-	if (*diff_offsets == NULL)
-		return got_error_from_errno("calloc");
-
-	(*diff_offsets)->commit_id = got_object_id_dup(commit_id);
-	if ((*diff_offsets)->commit_id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		free_diff_offsets(*diff_offsets);
-		*diff_offsets = NULL;
-		return err;
-	}
-
-	err = got_diffoffset_alloc(&(*diff_offsets)->chunks);
-	if (err) {
-		free_diff_offsets(*diff_offsets);
-		return err;
-	}
-
-	return NULL;
-}
 
 static const struct got_error *
 annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
@@ -120,18 +74,6 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	return err;
 }
 
-static int
-get_blamed_line(struct got_blame_diff_offsets_list *diff_offsets_list,
-    int lineno)
-{
-	struct got_blame_diff_offsets *diff_offsets;
-
-	SLIST_FOREACH(diff_offsets, diff_offsets_list, entry)
-		lineno = got_diffoffset_get(diff_offsets->chunks, lineno);
-
-	return lineno;
-}
-
 static const struct got_error *
 blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
     struct got_object_id *commit_id,
@@ -140,72 +82,49 @@ blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
 {
 	const struct got_error *err = NULL;
 	struct got_diff_change *change;
-	struct got_blame_diff_offsets *diff_offsets;
 
 	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
 		int c = change->cv.c;
 		int d = change->cv.d;
-		int new_lineno = c;
+		int new_lineno = (c < d ? c : d);
 		int new_length = (c < d ? d - c + 1 : (c == d ? 1 : 0));
 		int ln;
 
 		for (ln = new_lineno; ln < new_lineno + new_length; ln++) {
-			err = annotate_line(blame,
-			    get_blamed_line(&blame->diff_offsets_list, ln),
-			    commit_id, cb, arg);
+			err = annotate_line(blame, ln, commit_id, cb, arg);
 			if (err)
 				return err;
 			if (blame->nlines == blame->nannotated)
-				return NULL;
+				break;
 		}
 	}
-
-	err = alloc_diff_offsets(&diff_offsets, commit_id);
-	if (err)
-		return err;
-	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
-		int a = change->cv.a;
-		int b = change->cv.b;
-		int c = change->cv.c;
-		int d = change->cv.d;
-		int old_lineno = a;
-		int old_length = (a < b ? b - a + 1 : (a == b ? 1 : 0));
-		int new_lineno = c;
-		int new_length = (c < d ? d - c + 1 : (c == d ? 1 : 0));
-
-		err = got_diffoffset_add(diff_offsets->chunks,
-		    old_lineno, old_length, new_lineno, new_length);
-		if (err) {
-			free_diff_offsets(diff_offsets);
-			return err;
-		}
-	}
-	SLIST_INSERT_HEAD(&blame->diff_offsets_list, diff_offsets, entry);
 
 	return NULL;
 }
 
 static const struct got_error *
-blame_commit(struct got_blame *blame, struct got_object_id *id,
-    const char *path, struct got_repository *repo,
+blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
+    struct got_object_id *id, const char *path, struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL, *pobj = NULL;
-	struct got_object_id *obj_id = NULL, *pobj_id = NULL;
+	struct got_object_id *obj_id = NULL;
 	struct got_commit_object *commit = NULL;
-	struct got_blob_object *blob = NULL, *pblob = NULL;
+	struct got_blob_object *blob = NULL;
 	struct got_diff_changes *changes = NULL;
-	struct got_object_qid *pid = NULL;
 
-	err = got_object_open_as_commit(&commit, repo, id);
+	err = got_object_open_as_commit(&commit, repo, parent_id);
 	if (err)
 		return err;
 
-	err = got_object_id_by_path(&obj_id, repo, id, path);
-	if (err)
+	err = got_object_id_by_path(&obj_id, repo, parent_id, path);
+	if (err) {
+		if (err->code == GOT_ERR_NO_TREE_ENTRY)
+			err = NULL;
 		goto done;
+	}
 
 	err = got_object_open(&obj, repo, obj_id);
 	if (err)
@@ -216,47 +135,17 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 		goto done;
 	}
 
-	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-	if (pid) {
-		err = got_object_id_by_path(&pobj_id, repo, pid->id, path);
-		if (err) {
-			if (err->code == GOT_ERR_NO_TREE_ENTRY) {
-				/* Blob's history began in previous commit. */
-				err = got_error(GOT_ERR_ITER_COMPLETED);
-			}
-			goto done;
-		}
-
-		/* If IDs match then don't bother with diffing. */
-		if (got_object_id_cmp(obj_id, pobj_id) == 0) {
-			if (cb)
-				err = cb(arg, blame->nlines, -1, id);
-			goto done;
-		}
-
-		err = got_object_open(&pobj, repo, pobj_id);
-		if (err)
-			goto done;
-
-		if (pobj->type != GOT_OBJ_TYPE_BLOB) {
-			/*
-			 * Encountered a non-blob at the path (probably a tree).
-			 * Blob's history began in previous commit.
-			 */
-			err = got_error(GOT_ERR_ITER_COMPLETED);
-			goto done;
-		}
-
-		err = got_object_blob_open(&pblob, repo, pobj, 8192);
-		if (err)
-			goto done;
-	}
-
 	err = got_object_blob_open(&blob, repo, obj, 8192);
 	if (err)
 		goto done;
 
-	err = got_diff_blob_lines_changed(&changes, pblob, blob);
+	if (fseek(blame->f, 0L, SEEK_SET) == -1) {
+		err = got_ferror(blame->f, GOT_ERR_IO);
+		goto done;
+	}
+
+	err = got_diff_blob_file_lines_changed(&changes, blob, blame->f,
+	    blame->filesize);
 	if (err)
 		goto done;
 
@@ -269,15 +158,12 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	free(obj_id);
-	free(pobj_id);
 	if (obj)
 		got_object_close(obj);
 	if (pobj)
 		got_object_close(pobj);
 	if (blob)
 		got_object_blob_close(blob);
-	if (pblob)
-		got_object_blob_close(pblob);
 	return err;
 }
 
@@ -285,16 +171,10 @@ static const struct got_error *
 blame_close(struct got_blame *blame)
 {
 	const struct got_error *err = NULL;
-	struct got_blame_diff_offsets *diff_offsets;
 
 	if (blame->f && fclose(blame->f) != 0)
 		err = got_error_from_errno("fclose");
 	free(blame->lines);
-	while (!SLIST_EMPTY(&blame->diff_offsets_list)) {
-		diff_offsets = SLIST_FIRST(&blame->diff_offsets_list);
-		SLIST_REMOVE_HEAD(&blame->diff_offsets_list, entry);
-		free_diff_offsets(diff_offsets);
-	}
 	free(blame);
 	return err;
 }
@@ -310,7 +190,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_object_id *id = NULL, *next_id = NULL;
+	struct got_object_id *id = NULL, *pid = NULL;
 	int lineno;
 	struct got_commit_graph *graph = NULL;
 
@@ -363,17 +243,12 @@ blame_open(struct got_blame **blamep, const char *path,
 	err = got_commit_graph_iter_start(graph, start_commit_id, repo);
 	if (err)
 		goto done;
-
-	id = NULL;
+	id = start_commit_id;
 	for (;;) {
-		err = got_commit_graph_iter_next(&next_id, graph);
+		err = got_commit_graph_iter_next(&pid, graph);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
-				if (id)
-					err = blame_commit(blame, id,
-					    path, repo, cb, arg);
-				else
-					err = NULL;
+				err = NULL;
 				break;
 			}
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
@@ -383,9 +258,8 @@ blame_open(struct got_blame **blamep, const char *path,
 				break;
 			continue;
 		}
-		if (id) {
-			err = blame_commit(blame, id, path, repo,
-			    cb, arg);
+		if (pid) {
+			err = blame_commit(blame, pid, id, path, repo, cb, arg);
 			if (err) {
 				if (err->code == GOT_ERR_ITER_COMPLETED)
 					err = NULL;
@@ -394,7 +268,7 @@ blame_open(struct got_blame **blamep, const char *path,
 			if (blame->nannotated == blame->nlines)
 				break;
 		}
-		id = next_id;
+		id = pid;
 	}
 
 	if (id && blame->nannotated < blame->nlines) {
