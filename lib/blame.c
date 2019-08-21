@@ -109,7 +109,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
     void *arg)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj = NULL, *pobj = NULL;
+	struct got_object *obj = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
@@ -160,8 +160,6 @@ done:
 	free(obj_id);
 	if (obj)
 		got_object_close(obj);
-	if (pobj)
-		got_object_close(pobj);
 	if (blob)
 		got_object_blob_close(blob);
 	return err;
