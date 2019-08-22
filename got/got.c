@@ -41,6 +41,7 @@
 #include "got_reference.h"
 #include "got_repository.h"
 #include "got_path.h"
+#include "got_cancel.h"
 #include "got_worktree.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"

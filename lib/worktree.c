@@ -39,6 +39,7 @@
 #include "got_reference.h"
 #include "got_object.h"
 #include "got_path.h"
+#include "got_cancel.h"
 #include "got_worktree.h"
 #include "got_opentemp.h"
 #include "got_diff.h"
@@ -1386,7 +1387,7 @@ struct diff_cb_arg {
     struct got_repository *repo;
     got_worktree_checkout_cb progress_cb;
     void *progress_arg;
-    got_worktree_cancel_cb cancel_cb;
+    got_cancel_cb cancel_cb;
     void *cancel_arg;
 };
 
@@ -1782,7 +1783,7 @@ static const struct got_error *
 checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *relpath, struct got_object_id *tree_id, const char *entry_name,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
@@ -1833,7 +1834,7 @@ const struct got_error *
 got_worktree_checkout_files(struct got_worktree *worktree,
     struct got_pathlist_head *paths, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_commit_object *commit = NULL;
@@ -1946,7 +1947,7 @@ struct merge_file_cb_arg {
     struct got_fileindex *fileindex;
     got_worktree_checkout_cb progress_cb;
     void *progress_arg;
-    got_worktree_cancel_cb cancel_cb;
+    got_cancel_cb cancel_cb;
     void *cancel_arg;
     struct got_object_id *commit_id2;
 };
@@ -2141,7 +2142,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *fileindex_path, struct got_object_id *commit_id1,
     struct got_object_id *commit_id2, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL, *sync_err;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
@@ -2191,7 +2192,7 @@ const struct got_error *
 got_worktree_merge_files(struct got_worktree *worktree,
     struct got_object_id *commit_id1, struct got_object_id *commit_id2,
     struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg, got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err, *unlockerr;
 	char *fileindex_path = NULL;
@@ -2233,7 +2234,7 @@ struct diff_dir_cb_arg {
     struct got_repository *repo;
     got_worktree_status_cb status_cb;
     void *status_arg;
-    got_worktree_cancel_cb cancel_cb;
+    got_cancel_cb cancel_cb;
     void *cancel_arg;
     /* A pathlist containing per-directory pathlists of ignore patterns. */
     struct got_pathlist_head ignores;
@@ -2521,7 +2522,7 @@ static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	DIR *workdir = NULL;
@@ -2571,7 +2572,7 @@ const struct got_error *
 got_worktree_status(struct got_worktree *worktree,
     struct got_pathlist_head *paths, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	char *fileindex_path = NULL;
@@ -4666,7 +4667,7 @@ rebase_merge_files(struct got_pathlist_head *merged_paths,
     struct got_fileindex *fileindex, struct got_object_id *parent_commit_id,
     struct got_object_id *commit_id, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct got_reference *commit_ref = NULL;
@@ -4696,7 +4697,7 @@ got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
     struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	char *commit_ref_name;
@@ -4723,7 +4724,7 @@ got_worktree_histedit_merge_files(struct got_pathlist_head *merged_paths,
     struct got_object_id *parent_commit_id, struct got_object_id *commit_id,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    got_worktree_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	char *commit_ref_name;

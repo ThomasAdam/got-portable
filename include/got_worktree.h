@@ -102,10 +102,6 @@ const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
 typedef const struct got_error *(*got_worktree_checkout_cb)(void *,
     unsigned char, const char *);
 
-/* A callback function which is invoked at cancellation points.
- * May return GOT_ERR_CANCELLED to abort the runing operation. */
-typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
-
 /*
  * Attempt to check out files into a work tree from its associated repository
  * and path prefix, and update the work tree's file index accordingly.
@@ -128,14 +124,14 @@ typedef const struct got_error *(*got_worktree_cancel_cb)(void *);
  */
 const struct got_error *got_worktree_checkout_files(struct got_worktree *,
     struct got_pathlist_head *, struct got_repository *,
-    got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
+    got_worktree_checkout_cb, void *, got_cancel_cb, void *);
 
 /* Merge the differences between two commits into a work tree. */
 const struct got_error *
 got_worktree_merge_files(struct got_worktree *,
     struct got_object_id *, struct got_object_id *,
     struct got_repository *, got_worktree_checkout_cb, void *,
-    got_worktree_cancel_cb, void *);
+    got_cancel_cb, void *);
 
 /* A callback function which is invoked to report a path's status. */
 typedef const struct got_error *(*got_worktree_status_cb)(void *,
@@ -149,7 +145,7 @@ typedef const struct got_error *(*got_worktree_status_cb)(void *,
  */
 const struct got_error *got_worktree_status(struct got_worktree *,
     struct got_pathlist_head *, struct got_repository *,
-    got_worktree_status_cb, void *, got_worktree_cancel_cb cancel_cb, void *);
+    got_worktree_status_cb, void *, got_cancel_cb cancel_cb, void *);
 
 /*
  * Try to resolve a user-provided path to an on-disk path in the work tree.
@@ -265,7 +261,7 @@ const struct got_error *got_worktree_rebase_in_progress(int *,
 const struct got_error *got_worktree_rebase_merge_files(
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_object_id *, struct got_object_id *, struct got_repository *,
-    got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
+    got_worktree_checkout_cb, void *, got_cancel_cb, void *);
 
 /*
  * Commit changes merged by got_worktree_rebase_merge_files() to a temporary
@@ -338,7 +334,7 @@ const struct got_error *got_worktree_histedit_in_progress(int *,
 const struct got_error *got_worktree_histedit_merge_files(
     struct got_pathlist_head *, struct got_worktree *, struct got_fileindex *,
     struct got_object_id *, struct got_object_id *, struct got_repository *,
-    got_worktree_checkout_cb, void *, got_worktree_cancel_cb, void *);
+    got_worktree_checkout_cb, void *, got_cancel_cb, void *);
 
 /*
  * Commit changes merged by got_worktree_histedit_merge_files() to a temporary
