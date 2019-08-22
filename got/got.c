@@ -572,7 +572,7 @@ cmd_import(int argc, char *argv[])
 				goto done;
 			break;
 		default:
-			usage_init();
+			usage_import();
 			/* NOTREACHED */
 		}
 	}
