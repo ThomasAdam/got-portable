@@ -3301,7 +3301,7 @@ __dead static void
 usage_tag(void)
 {
 	fprintf(stderr,
-	    "usage: %s tag [-r repository] -l | -d name | "
+	    "usage: %s tag [-r repository] | -l | "
 	        "[-m message] name [commit]\n", getprogname());
 	exit(1);
 }
