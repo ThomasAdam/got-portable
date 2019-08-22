@@ -1424,6 +1424,30 @@ got_object_tag_get_object_id(struct got_tag_object *tag)
 	return &tag->id;
 }
 
+time_t
+got_object_tag_get_tagger_time(struct got_tag_object *tag)
+{
+	return tag->tagger_time;
+}
+
+time_t
+got_object_tag_get_tagger_gmtoff(struct got_tag_object *tag)
+{
+	return tag->tagger_gmtoff;
+}
+
+const char *
+got_object_tag_get_tagger(struct got_tag_object *tag)
+{
+	return tag->tagger;
+}
+
+const char *
+got_object_tag_get_message(struct got_tag_object *tag)
+{
+	return tag->tagmsg;
+}
+
 static struct got_tree_entry *
 find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {

@@ -214,7 +214,7 @@ const struct got_error *got_object_blob_dump_to_file(size_t *, int *,
 
 /*
  * Attempt to open a tag object in a repository.
- * The caller must dispose of the tree with got_object_tag_close().
+ * The caller must dispose of the tree with got_tag_object_close().
  */
 const struct got_error *got_object_open_as_tag(struct got_tag_object **,
     struct got_repository *, struct got_object_id *);
@@ -233,6 +233,19 @@ int got_object_tag_get_object_type(struct got_tag_object *);
  * This must not be freed by the caller. Use got_object_id_dup() if needed.
  */
 struct got_object_id *got_object_tag_get_object_id(struct got_tag_object *);
+
+
+/* Get the timestamp of the tag. */
+time_t got_object_tag_get_tagger_time(struct got_tag_object *);
+
+/* Get the tag's timestamp's GMT offset.  */
+time_t got_object_tag_get_tagger_gmtoff(struct got_tag_object *);
+
+/* Get the author of the tag. */
+const char *got_object_tag_get_tagger(struct got_tag_object *);
+
+/* Get the tag message associated with the tag. */
+const char *got_object_tag_get_message(struct got_tag_object *);
 
 const struct got_error *got_object_commit_add_parent(struct got_commit_object *,
     const char *);

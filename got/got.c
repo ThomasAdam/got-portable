@@ -98,6 +98,7 @@ __dead static void	usage_rebase(void);
 __dead static void	usage_histedit(void);
 __dead static void	usage_stage(void);
 __dead static void	usage_unstage(void);
+__dead static void	usage_cat(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
@@ -120,6 +121,7 @@ static const struct got_error*		cmd_rebase(int, char *[]);
 static const struct got_error*		cmd_histedit(int, char *[]);
 static const struct got_error*		cmd_stage(int, char *[]);
 static const struct got_error*		cmd_unstage(int, char *[]);
+static const struct got_error*		cmd_cat(int, char *[]);
 
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"in" },
@@ -143,6 +145,7 @@ static struct got_cmd got_commands[] = {
 	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
 	{ "stage",	cmd_stage,	usage_stage,	"sg" },
 	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
+	{ "cat",	cmd_cat,	usage_cat,	"" },
 };
 
 static void
@@ -1905,7 +1908,8 @@ done:
 
 static const struct got_error *
 match_object_id(struct got_object_id **id, char **label,
-    const char *id_str, int obj_type, struct got_repository *repo)
+    const char *id_str, int obj_type, int resolve_tags,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_tag_object *tag;
@@ -1914,18 +1918,25 @@ match_object_id(struct got_object_id **id, char **label,
 	*id = NULL;
 	*label = NULL;
 
-	err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY, repo);
-	if (err == NULL) {
-		*id = got_object_id_dup(got_object_tag_get_object_id(tag));
-		if (*id == NULL)
-			err = got_error_from_errno("got_object_id_dup");
-		if (asprintf(label, "refs/tags/%s",
-		    got_object_tag_get_name(tag)) == -1)
-			err = got_error_from_errno("asprintf");
-		got_object_tag_close(tag);
-		return err;
-	} else if (err->code != GOT_ERR_NO_OBJ)
-		return err;
+	if (resolve_tags) {
+		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
+		    repo);
+		if (err == NULL) {
+			*id = got_object_id_dup(
+			    got_object_tag_get_object_id(tag));
+			if (*id == NULL)
+				err = got_error_from_errno("got_object_id_dup");
+			else if (asprintf(label, "refs/tags/%s",
+			    got_object_tag_get_name(tag)) == -1) {
+				err = got_error_from_errno("asprintf");
+				free(id);
+				*id = NULL;
+			}
+			got_object_tag_close(tag);
+			return err;
+		} else if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+	}
 
 	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
 	if (err) {
@@ -2095,11 +2106,13 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
-	error = match_object_id(&id1, &label1, id_str1, GOT_OBJ_TYPE_ANY, repo);
+	error = match_object_id(&id1, &label1, id_str1, GOT_OBJ_TYPE_ANY, 1,
+	    repo);
 	if (error)
 		goto done;
 
-	error = match_object_id(&id2, &label2, id_str2, GOT_OBJ_TYPE_ANY, repo);
+	error = match_object_id(&id2, &label2, id_str2, GOT_OBJ_TYPE_ANY, 1,
+	    repo);
 	if (error)
 		goto done;
 
@@ -5947,5 +5960,276 @@ done:
 		free((char *)pe->path);
 	got_pathlist_free(&paths);
 	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_cat(void)
+{
+	fprintf(stderr, "usage: %s cat [-r repository ] object1 "
+	    "[object2 ...]\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cat_blob(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
+{
+	const struct got_error *err;
+	struct got_blob_object *blob;
+
+	err = got_object_open_as_blob(&blob, repo, id, 8192);
+	if (err)
+		return err;
+
+	err = got_object_blob_dump_to_file(NULL, NULL, NULL, outfile, blob);
+	got_object_blob_close(blob);
+	return err;
+}
+
+static const struct got_error *
+cat_tree(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
+{
+	const struct got_error *err;
+	struct got_tree_object *tree;
+	const struct got_tree_entries *entries;
+	struct got_tree_entry *te;
+
+	err = got_object_open_as_tree(&tree, repo, id);
+	if (err)
+		return err;
+
+	entries = got_object_tree_get_entries(tree);
+	te = SIMPLEQ_FIRST(&entries->head);
+	while (te) {
+		char *id_str;
+		if (sigint_received || sigpipe_received)
+			break;
+		err = got_object_id_str(&id_str, te->id);
+		if (err)
+			break;
+		fprintf(outfile, "%s %.7o %s\n", id_str, te->mode, te->name);
+		free(id_str);
+		te = SIMPLEQ_NEXT(te, entry);
+	}
+
+	got_object_tree_close(tree);
+	return err;
+}
+
+static const struct got_error *
+cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
+{
+	const struct got_error *err;
+	struct got_commit_object *commit;
+	const struct got_object_id_queue *parent_ids;
+	struct got_object_qid *pid;
+	char *id_str = NULL;
+	char *logmsg = NULL;
+	int i;
+
+	err = got_object_open_as_commit(&commit, repo, id);
+	if (err)
+		return err;
+
+	err = got_object_id_str(&id_str, got_object_commit_get_tree_id(commit));
+	if (err)
+		goto done;
+
+	fprintf(outfile, "tree: %s\n", id_str);
+	parent_ids = got_object_commit_get_parent_ids(commit);
+	fprintf(outfile, "parents: %d\n",
+	    got_object_commit_get_nparents(commit));
+	i = 1;
+	SIMPLEQ_FOREACH(pid, parent_ids, entry) {
+		char *pid_str;
+		err = got_object_id_str(&pid_str, pid->id);
+		if (err)
+			goto done;
+		fprintf(outfile, "parent %d: %s\n", i++, pid_str);
+		free(pid_str);
+	}
+	fprintf(outfile, "author: %s\n",
+	    got_object_commit_get_author(commit));
+	fprintf(outfile, "author-time: %lld\n",
+	    got_object_commit_get_author_time(commit));
+
+	fprintf(outfile, "committer: %s\n",
+	    got_object_commit_get_author(commit));
+	fprintf(outfile, "committer-time: %lld\n",
+	    got_object_commit_get_committer_time(commit));
+
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	fprintf(outfile, "log-message: %zd bytes\n", strlen(logmsg));
+	fprintf(outfile, "%s", logmsg);
+done:
+	free(id_str);
+	free(logmsg);
+	got_object_commit_close(commit);
+	return err;
+}
+
+static const struct got_error *
+cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
+{
+	const struct got_error *err;
+	struct got_tag_object *tag;
+	char *id_str = NULL;
+	const char *tagmsg = NULL;
+
+	err = got_object_open_as_tag(&tag, repo, id);
+	if (err)
+		return err;
+
+	err = got_object_id_str(&id_str, got_object_tag_get_object_id(tag));
+	if (err)
+		goto done;
+
+	fprintf(outfile, "tag-name: %s\n", got_object_tag_get_name(tag));
+	switch (got_object_tag_get_object_type(tag)) {
+	case GOT_OBJ_TYPE_BLOB:
+		fprintf(outfile, "tagged-object-type: blob\n");
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		fprintf(outfile, "tagged-object-type: tree\n");
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		fprintf(outfile, "tagged-object-type: commit\n");
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		fprintf(outfile, "tagged-object-type: tag\n");
+		break;
+	default:
+		break;
+	}
+	fprintf(outfile, "tagged-object: %s\n", id_str);
+
+	fprintf(outfile, "tagger: %s\n",
+	    got_object_tag_get_tagger(tag));
+	fprintf(outfile, "tagger-time: %lld %lld\n",
+	    got_object_tag_get_tagger_time(tag),
+	    got_object_tag_get_tagger_gmtoff(tag));
+
+	tagmsg = got_object_tag_get_message(tag);
+	fprintf(outfile, "tag-message: %zd bytes\n", strlen(tagmsg));
+	fprintf(outfile, "%s", tagmsg);
+done:
+	free(id_str);
+	got_object_tag_close(tag);
+	return err;
+}
+
+static const struct got_error *
+cmd_cat(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL, *label = NULL;
+	struct got_object_id *id = NULL;
+	int ch, obj_type, i;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "r:")) != -1) {
+		switch (ch) {
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		default:
+			usage_cat();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+	if (worktree) {
+		if (repo_path == NULL) {
+			repo_path = strdup(
+			    got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	if (repo_path == NULL) {
+		repo_path = getcwd(NULL, 0);
+		if (repo_path == NULL)
+			return got_error_from_errno("getcwd");
+	}
+
+	error = got_repo_open(&repo, repo_path);
+	free(repo_path);
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+	if (error)
+		goto done;
+
+	for (i = 0; i < argc; i++) {
+		error = match_object_id(&id, &label, argv[i],
+		    GOT_OBJ_TYPE_ANY, 0, repo);
+		if (error)
+			break;
+
+		error = got_object_get_type(&obj_type, repo, id);
+		if (error)
+			break;
+
+		switch (obj_type) {
+		case GOT_OBJ_TYPE_BLOB:
+			error = cat_blob(id, repo, stdout);
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			error = cat_tree(id, repo, stdout);
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			error = cat_commit(id, repo, stdout);
+			break;
+		case GOT_OBJ_TYPE_TAG:
+			error = cat_tag(id, repo, stdout);
+			break;
+		default:
+			error = got_error(GOT_ERR_OBJ_TYPE);
+			break;
+		}
+		if (error)
+			break;
+		free(label);
+		label = NULL;
+		free(id);
+		id = NULL;
+	}
+
+done:
+	free(label);
+	free(id);
+	if (worktree)
+		got_worktree_close(worktree);
+	if (repo) {
+		const struct got_error *repo_error;
+		repo_error = got_repo_close(repo);
+		if (error == NULL)
+			error = repo_error;
+	}
 	return error;
 }

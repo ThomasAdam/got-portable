@@ -1084,6 +1084,27 @@ file instead of prompting interactively.
 .It Cm ug
 Short alias for
 .Cm unstage .
+.It Cm cat Oo Fl r Ar repository-path Oc Ar object ...
+Parse and print contents of specified objects to standard output
+in a line-based text format.
+Treat each argument as a reference, a tag name, or an object ID SHA1 hash.
+References will be resolved to an object ID.
+Tag names will resolved to a tag object.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
+.Pp
+The options for
+.Cm got cat
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.El
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
