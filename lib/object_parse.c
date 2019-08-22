@@ -480,6 +480,12 @@ done:
 	return err;
 }
 
+const char *
+got_object_commit_get_logmsg_raw(struct got_commit_object *commit)
+{
+	return commit->logmsg;
+}
+
 const struct got_error *
 got_object_parse_commit(struct got_commit_object **commit, char *buf,
     size_t len)

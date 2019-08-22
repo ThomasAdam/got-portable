@@ -138,9 +138,16 @@ time_t got_object_commit_get_committer_time(struct got_commit_object *);
 /* Get a committer's timezone offset. */
 time_t got_object_commit_get_committer_gmtoff(struct got_commit_object *);
 
-/* Get the commit log message. The caller must dispose of it with free(3). */
+/*
+ * Get the commit log message.
+ * PGP-signatures contained in the log message will be stripped.
+ * The caller must dispose of it with free(3).
+ */
 const struct got_error *got_object_commit_get_logmsg(char **,
     struct got_commit_object *);
+
+/* Get the raw commit log message.*/
+const char *got_object_commit_get_logmsg_raw(struct got_commit_object *);
 
 /*
  * Attempt to open a tree object in a repository.

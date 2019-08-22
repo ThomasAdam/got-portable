@@ -6024,7 +6024,7 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *pid;
 	char *id_str = NULL;
-	char *logmsg = NULL;
+	const char *logmsg = NULL;
 	int i;
 
 	err = got_object_open_as_commit(&commit, repo, id);
@@ -6058,12 +6058,11 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	fprintf(outfile, "committer-time: %lld\n",
 	    got_object_commit_get_committer_time(commit));
 
-	err = got_object_commit_get_logmsg(&logmsg, commit);
+	logmsg = got_object_commit_get_logmsg_raw(commit);
 	fprintf(outfile, "log-message: %zd bytes\n", strlen(logmsg));
 	fprintf(outfile, "%s", logmsg);
 done:
 	free(id_str);
-	free(logmsg);
 	got_object_commit_close(commit);
 	return err;
 }
