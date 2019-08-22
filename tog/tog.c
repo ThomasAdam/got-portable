@@ -45,12 +45,12 @@
 #include "got_repository.h"
 #include "got_diff.h"
 #include "got_opentemp.h"
-#include "got_commit_graph.h"
 #include "got_utf8.h"
+#include "got_cancel.h"
+#include "got_commit_graph.h"
 #include "got_blame.h"
 #include "got_privsep.h"
 #include "got_path.h"
-#include "got_cancel.h"
 #include "got_worktree.h"
 
 #ifndef MIN
@@ -1182,7 +1182,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
 			err = got_commit_graph_fetch_commits(graph,
-			    minqueue, repo);
+			    minqueue, repo, NULL, NULL);
 			if (err)
 				return err;
 			continue;
@@ -1637,7 +1637,8 @@ log_thread(void *arg)
 	struct tog_log_thread_args *a = arg;
 	int done = 0;
 
-	err = got_commit_graph_iter_start(a->graph, a->start_id, a->repo);
+	err = got_commit_graph_iter_start(a->graph, a->start_id, a->repo,
+	    NULL, NULL);
 	if (err)
 		return (void *)err;
 
@@ -3137,7 +3138,7 @@ blame_thread(void *arg)
 	int errcode;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->cb_args);
+	    blame_cb, ta->cb_args, NULL, NULL);
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)

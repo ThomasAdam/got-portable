@@ -28,6 +28,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_cancel.h"
 #include "got_commit_graph.h"
 #include "got_path.h"
 
@@ -467,7 +468,7 @@ add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 static const struct got_error *
 fetch_commits_from_open_branches(int *nfetched,
     struct got_object_id **changed_id, struct got_commit_graph *graph,
-    struct got_repository *repo)
+    struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct add_branch_tip_arg arg;
@@ -506,6 +507,12 @@ fetch_commits_from_open_branches(int *nfetched,
 		struct got_commit_graph_node *new_node;
 		int branch_done, changed;
 
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
+
 		commit_id = arg.tips[i].commit_id;
 		commit = arg.tips[i].commit;
 		new_node = arg.tips[i].new_node;
@@ -531,15 +538,20 @@ done:
 
 const struct got_error *
 got_commit_graph_fetch_commits(struct got_commit_graph *graph, int limit,
-    struct got_repository *repo)
+    struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	int nfetched = 0, ncommits;
 	struct got_object_id *changed_id = NULL;
 
 	while (nfetched < limit) {
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				return err;
+		}
 		err = fetch_commits_from_open_branches(&ncommits,
-		    &changed_id, graph, repo);
+		    &changed_id, graph, repo, cancel_cb, cancel_arg);
 		if (err)
 			return err;
 		if (ncommits == 0)
@@ -572,7 +584,8 @@ got_commit_graph_close(struct got_commit_graph *graph)
 
 const struct got_error *
 got_commit_graph_iter_start(struct got_commit_graph *graph,
-    struct got_object_id *id, struct got_repository *repo)
+    struct got_object_id *id, struct got_repository *repo,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *start_node;
@@ -583,7 +596,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	while (start_node == NULL) {
 		int ncommits;
 		err = fetch_commits_from_open_branches(&ncommits, NULL, graph,
-		    repo);
+		    repo, cancel_cb, cancel_arg);
 		if (err)
 			return err;
 		if (ncommits == 0)
@@ -608,7 +621,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 		while (changed_id == NULL) {
 			int ncommits;
 			err = fetch_commits_from_open_branches(&ncommits,
-			    &changed_id, graph, repo);
+			    &changed_id, graph, repo, cancel_cb, cancel_arg);
 			if (err) {
 				got_object_commit_close(commit);
 				return err;
@@ -653,7 +666,7 @@ got_commit_graph_iter_next(struct got_object_id **id,
 const struct got_error *
 got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
     struct got_object_id *commit_id, struct got_object_id *commit_id2,
-    struct got_repository *repo)
+    struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph *graph = NULL, *graph2 = NULL;
@@ -674,16 +687,24 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, commit_id, repo);
+	err = got_commit_graph_iter_start(graph, commit_id, repo,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph2, commit_id2, repo);
+	err = got_commit_graph_iter_start(graph2, commit_id2, repo,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
 	for (;;) {
 		struct got_object_id *id, *id2;
+
+		if (cancel_cb) {
+			err = (*cancel_cb)(cancel_arg);
+			if (err)
+				break;
+		}
 
 		if (!completed) {
 			err = got_commit_graph_iter_next(&id, graph);
@@ -693,7 +714,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				else if (err->code != GOT_ERR_ITER_NEED_MORE)
 					break;
 				err = got_commit_graph_fetch_commits(graph, 1,
-				    repo);
+				    repo, cancel_cb, cancel_arg);
 				if (err)
 					break;
 			}
@@ -707,7 +728,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				else if (err->code != GOT_ERR_ITER_NEED_MORE)
 					break;
 				err = got_commit_graph_fetch_commits(graph2, 1,
-				    repo);
+				    repo, cancel_cb, cancel_arg);
 				if (err)
 					break;
 			}

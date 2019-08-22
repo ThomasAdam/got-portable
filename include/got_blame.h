@@ -34,4 +34,4 @@
 const struct got_error *got_blame(const char *,
     struct got_object_id *, struct got_repository *,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *);
+    void *, got_cancel_cb, void *);

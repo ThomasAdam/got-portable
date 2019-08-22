@@ -725,7 +725,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	struct got_object_id *yca_id;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    commit_id, base_commit_id, repo);
+	    commit_id, base_commit_id, repo, check_cancelled, NULL);
 	if (err)
 		return err;
 
@@ -785,7 +785,8 @@ check_same_branch(struct got_object_id *commit_id,
 	if (err)
 		goto done;
 
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo);
+	err = got_commit_graph_iter_start(graph, head_commit_id, repo,
+	    check_cancelled, NULL);
 	if (err)
 		goto done;
 
@@ -799,7 +800,7 @@ check_same_branch(struct got_object_id *commit_id,
 			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
 			err = got_commit_graph_fetch_commits(graph, 1,
-			    repo);
+			    repo, check_cancelled, NULL);
 			if (err)
 				break;
 		}
@@ -1505,7 +1506,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 	    first_parent_traversal, repo);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, root_id, repo);
+	err = got_commit_graph_iter_start(graph, root_id, repo,
+	    check_cancelled, NULL);
 	if (err)
 		goto done;
 	for (;;) {
@@ -1523,7 +1525,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 			}
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			err = got_commit_graph_fetch_commits(graph, 1, repo,
+			    check_cancelled, NULL);
 			if (err)
 				break;
 			else
@@ -2438,7 +2441,8 @@ cmd_blame(int argc, char *argv[])
 	}
 	bca.repo = repo;
 
-	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca);
+	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca,
+	    check_cancelled, NULL);
 	if (error)
 		goto done;
 done:
@@ -4346,7 +4350,8 @@ collect_commits(struct got_object_id_queue *commits,
 	if (err)
 		return err;
 
-	err = got_commit_graph_iter_start(graph, iter_start_id, repo);
+	err = got_commit_graph_iter_start(graph, iter_start_id, repo,
+	    check_cancelled, NULL);
 	if (err)
 		goto done;
 	while (got_object_id_cmp(commit_id, iter_stop_id) != 0) {
@@ -4360,7 +4365,8 @@ collect_commits(struct got_object_id_queue *commits,
 				goto done;
 			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
 				goto done;
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			err = got_commit_graph_fetch_commits(graph, 1, repo,
+			    check_cancelled, NULL);
 			if (err)
 				goto done;
 		} else {
@@ -4514,7 +4520,8 @@ cmd_rebase(int argc, char *argv[])
 
 		base_commit_id = got_worktree_get_base_commit_id(worktree);
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-		    base_commit_id, branch_head_commit_id, repo);
+		    base_commit_id, branch_head_commit_id, repo,
+		    check_cancelled, NULL);
 		if (error)
 			goto done;
 		if (yca_id == NULL) {

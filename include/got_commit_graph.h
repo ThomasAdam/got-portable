@@ -22,9 +22,11 @@ const struct got_error *got_commit_graph_open(struct got_commit_graph **,
 void got_commit_graph_close(struct got_commit_graph *);
 
 const struct got_error *got_commit_graph_fetch_commits(
-    struct got_commit_graph *, int, struct got_repository *);
+    struct got_commit_graph *, int, struct got_repository *,
+    got_cancel_cb, void *);
 const struct got_error *got_commit_graph_iter_start(
-    struct got_commit_graph *, struct got_object_id *, struct got_repository *);
+    struct got_commit_graph *, struct got_object_id *, struct got_repository *,
+    got_cancel_cb, void *);
 const struct got_error *got_commit_graph_iter_next(struct got_object_id **,
     struct got_commit_graph *);
 const struct got_error *got_commit_graph_intersect(struct got_object_id **,
@@ -34,4 +36,4 @@ const struct got_error *got_commit_graph_intersect(struct got_object_id **,
 /* Find the youngest common ancestor of two commits. */
 const struct got_error *got_commit_graph_find_youngest_common_ancestor(
     struct got_object_id **, struct got_object_id *, struct got_object_id *,
-    struct got_repository *);
+    struct got_repository *, got_cancel_cb, void *);

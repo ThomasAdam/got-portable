@@ -27,14 +27,15 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_cancel.h"
 #include "got_blame.h"
+#include "got_commit_graph.h"
 #include "got_opentemp.h"
 
 #include "got_lib_inflate.h"
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
 #include "got_lib_diff.h"
-#include "got_commit_graph.h"
 
 struct got_blame_line {
 	int annotated;
@@ -181,7 +182,7 @@ static const struct got_error *
 blame_open(struct got_blame **blamep, const char *path,
     struct got_object_id *start_commit_id, struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg)
+    void *arg, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj = NULL;
@@ -238,7 +239,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	err = got_commit_graph_open(&graph, start_commit_id, path, 1, repo);
 	if (err)
 		return err;
-	err = got_commit_graph_iter_start(graph, start_commit_id, repo);
+	err = got_commit_graph_iter_start(graph, start_commit_id, repo,
+	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 	id = start_commit_id;
@@ -251,7 +253,8 @@ blame_open(struct got_blame **blamep, const char *path,
 			}
 			if (err->code != GOT_ERR_ITER_NEED_MORE)
 				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo);
+			err = got_commit_graph_fetch_commits(graph, 1, repo,
+			    cancel_cb, cancel_arg);
 			if (err)
 				break;
 			continue;
@@ -299,7 +302,7 @@ const struct got_error *
 got_blame(const char *path, struct got_object_id *commit_id,
     struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
-    void *arg)
+    void *arg, got_cancel_cb cancel_cb, void* cancel_arg)
 {
 	const struct got_error *err = NULL, *close_err = NULL;
 	struct got_blame *blame;
@@ -308,7 +311,8 @@ got_blame(const char *path, struct got_object_id *commit_id,
 	if (asprintf(&abspath, "%s%s", path[0] == '/' ? "" : "/", path) == -1)
 		return got_error_from_errno2("asprintf", path);
 
-	err = blame_open(&blame, abspath, commit_id, repo, cb, arg);
+	err = blame_open(&blame, abspath, commit_id, repo, cb, arg,
+	    cancel_cb, cancel_arg);
 	free(abspath);
 	if (blame)
 		close_err = blame_close(blame);
