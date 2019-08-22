@@ -57,6 +57,25 @@ void got_object_id_queue_free(struct got_object_id_queue *);
 #define GOT_OBJ_TYPE_OFFSET_DELTA	6
 #define GOT_OBJ_TYPE_REF_DELTA		7
 
+/*
+ * Labels used in object data.
+ */
+
+#define GOT_OBJ_LABEL_COMMIT	"commit"
+#define GOT_OBJ_LABEL_TREE	"tree"
+#define GOT_OBJ_LABEL_BLOB	"blob"
+#define GOT_OBJ_LABEL_TAG	"tag"
+
+#define GOT_COMMIT_LABEL_TREE		"tree "
+#define GOT_COMMIT_LABEL_PARENT		"parent "
+#define GOT_COMMIT_LABEL_AUTHOR		"author "
+#define GOT_COMMIT_LABEL_COMMITTER	"committer "
+
+#define GOT_TAG_LABEL_OBJECT		"object "
+#define GOT_TAG_LABEL_TYPE		"type "
+#define GOT_TAG_LABEL_TAG		"tag "
+#define GOT_TAG_LABEL_TAGGER		"tagger "
+
 struct got_repository;
 
 /*

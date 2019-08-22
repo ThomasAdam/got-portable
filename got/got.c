@@ -6025,7 +6025,6 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	struct got_object_qid *pid;
 	char *id_str = NULL;
 	const char *logmsg = NULL;
-	int i;
 
 	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
@@ -6035,31 +6034,28 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	if (err)
 		goto done;
 
-	fprintf(outfile, "tree: %s\n", id_str);
+	fprintf(outfile, "%s%s\n", GOT_COMMIT_LABEL_TREE, id_str);
 	parent_ids = got_object_commit_get_parent_ids(commit);
-	fprintf(outfile, "parents: %d\n",
+	fprintf(outfile, "numparents %d\n",
 	    got_object_commit_get_nparents(commit));
-	i = 1;
 	SIMPLEQ_FOREACH(pid, parent_ids, entry) {
 		char *pid_str;
 		err = got_object_id_str(&pid_str, pid->id);
 		if (err)
 			goto done;
-		fprintf(outfile, "parent %d: %s\n", i++, pid_str);
+		fprintf(outfile, "%s%s\n", GOT_COMMIT_LABEL_PARENT, pid_str);
 		free(pid_str);
 	}
-	fprintf(outfile, "author: %s\n",
-	    got_object_commit_get_author(commit));
-	fprintf(outfile, "author-time: %lld\n",
+	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_AUTHOR,
+	    got_object_commit_get_author(commit),
 	    got_object_commit_get_author_time(commit));
 
-	fprintf(outfile, "committer: %s\n",
-	    got_object_commit_get_author(commit));
-	fprintf(outfile, "committer-time: %lld\n",
+	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_COMMITTER,
+	    got_object_commit_get_author(commit),
 	    got_object_commit_get_committer_time(commit));
 
 	logmsg = got_object_commit_get_logmsg_raw(commit);
-	fprintf(outfile, "log-message: %zd bytes\n", strlen(logmsg));
+	fprintf(outfile, "messagelen %zd\n", strlen(logmsg));
 	fprintf(outfile, "%s", logmsg);
 done:
 	free(id_str);
@@ -6083,33 +6079,36 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	if (err)
 		goto done;
 
-	fprintf(outfile, "tag-name: %s\n", got_object_tag_get_name(tag));
+	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TAG,
+	    got_object_tag_get_name(tag));
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_BLOB:
-		fprintf(outfile, "tagged-object-type: blob\n");
+		fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TYPE,
+		    GOT_OBJ_LABEL_BLOB);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		fprintf(outfile, "tagged-object-type: tree\n");
+		fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TYPE,
+		    GOT_OBJ_LABEL_TREE);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		fprintf(outfile, "tagged-object-type: commit\n");
+		fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TYPE,
+		    GOT_OBJ_LABEL_COMMIT);
 		break;
 	case GOT_OBJ_TYPE_TAG:
-		fprintf(outfile, "tagged-object-type: tag\n");
+		fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TYPE,
+		    GOT_OBJ_LABEL_TAG);
 		break;
 	default:
 		break;
 	}
-	fprintf(outfile, "tagged-object: %s\n", id_str);
+	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_OBJECT, id_str);
 
-	fprintf(outfile, "tagger: %s\n",
-	    got_object_tag_get_tagger(tag));
-	fprintf(outfile, "tagger-time: %lld %lld\n",
-	    got_object_tag_get_tagger_time(tag),
-	    got_object_tag_get_tagger_gmtoff(tag));
+	fprintf(outfile, "%s%s %lld +0000\n", GOT_TAG_LABEL_TAGGER,
+	    got_object_tag_get_tagger(tag),
+	    got_object_tag_get_tagger_time(tag));
 
 	tagmsg = got_object_tag_get_message(tag);
-	fprintf(outfile, "tag-message: %zd bytes\n", strlen(tagmsg));
+	fprintf(outfile, "messagelen %zd\n", strlen(tagmsg));
 	fprintf(outfile, "%s", tagmsg);
 done:
 	free(id_str);

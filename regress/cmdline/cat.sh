@@ -47,15 +47,13 @@ function test_cat_basic {
 	fi
 
 	# cat commit
-	echo -n "tree: " > $testroot/stdout.expected
+	echo -n "tree " > $testroot/stdout.expected
 	git_show_tree $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	echo "parents: 0" >> $testroot/stdout.expected
-	echo "author: $GOT_AUTHOR" >> $testroot/stdout.expected
-	echo "author-time: $author_time" >> $testroot/stdout.expected
-	echo "committer: Flan Hacker <flan_hacker@openbsd.org>" >> $testroot/stdout.expected
-	echo "committer-time: $author_time" >> $testroot/stdout.expected
-	echo "log-message: 22 bytes" >> $testroot/stdout.expected
+	echo "numparents 0" >> $testroot/stdout.expected
+	echo "author $GOT_AUTHOR $author_time +0000" >> $testroot/stdout.expected
+	echo "committer Flan Hacker <flan_hacker@openbsd.org> $author_time +0000" >> $testroot/stdout.expected
+	echo "messagelen 22" >> $testroot/stdout.expected
 	printf "\nadding the test tree\n" >> $testroot/stdout.expected
 
 	got cat -r $testroot/repo $commit_id > $testroot/stdout
