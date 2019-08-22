@@ -6079,8 +6079,8 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	if (err)
 		goto done;
 
-	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TAG,
-	    got_object_tag_get_name(tag));
+	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_OBJECT, id_str);
+
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_BLOB:
 		fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TYPE,
@@ -6101,7 +6101,9 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	default:
 		break;
 	}
-	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_OBJECT, id_str);
+
+	fprintf(outfile, "%s%s\n", GOT_TAG_LABEL_TAG,
+	    got_object_tag_get_name(tag));
 
 	fprintf(outfile, "%s%s %lld +0000\n", GOT_TAG_LABEL_TAGGER,
 	    got_object_tag_get_tagger(tag),
