@@ -88,6 +88,7 @@ __dead static void	usage_tree(void);
 __dead static void	usage_status(void);
 __dead static void	usage_ref(void);
 __dead static void	usage_branch(void);
+__dead static void	usage_tag(void);
 __dead static void	usage_add(void);
 __dead static void	usage_remove(void);
 __dead static void	usage_revert(void);
@@ -111,6 +112,7 @@ static const struct got_error*		cmd_tree(int, char *[]);
 static const struct got_error*		cmd_status(int, char *[]);
 static const struct got_error*		cmd_ref(int, char *[]);
 static const struct got_error*		cmd_branch(int, char *[]);
+static const struct got_error*		cmd_tag(int, char *[]);
 static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_remove(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
@@ -135,6 +137,7 @@ static struct got_cmd got_commands[] = {
 	{ "status",	cmd_status,	usage_status,	"st" },
 	{ "ref",	cmd_ref,	usage_ref,	"" },
 	{ "branch",	cmd_branch,	usage_branch,	"br" },
+	{ "tag",	cmd_tag,	usage_tag,	"" },
 	{ "add",	cmd_add,	usage_add,	"" },
 	{ "remove",	cmd_remove,	usage_remove,	"rm" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
@@ -3290,6 +3293,372 @@ done:
 		got_worktree_close(worktree);
 	free(cwd);
 	free(repo_path);
+	return error;
+}
+
+
+__dead static void
+usage_tag(void)
+{
+	fprintf(stderr,
+	    "usage: %s tag [-r repository] -l | -d name | "
+	        "[-m message] name [commit]\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+list_tags(struct got_repository *repo, struct got_worktree *worktree)
+{
+	static const struct got_error *err = NULL;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
+
+	SIMPLEQ_INIT(&refs);
+
+	err = got_ref_list(&refs, repo);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(re, &refs, entry) {
+		const char *refname;
+		char *refstr, *tagmsg0, *tagmsg, *line, *id_str, *datestr;
+		char datebuf[26];
+		time_t tagger_time;
+		struct got_object_id *id;
+		struct got_tag_object *tag;
+
+		refname = got_ref_get_name(re->ref);
+		if (strncmp(refname, "refs/tags/", 10) != 0)
+			continue;
+		refname += 10;
+		refstr = got_ref_to_str(re->ref);
+		if (refstr == NULL) {
+			err = got_error_from_errno("got_ref_to_str");
+			break;
+		}
+		printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr);
+		free(refstr);
+
+		err = got_ref_resolve(&id, repo, re->ref);
+		if (err)
+			break;
+		err = got_object_open_as_tag(&tag, repo, id);
+		free(id);
+		if (err)
+			break;
+		err = got_object_id_str(&id_str,
+		    got_object_tag_get_object_id(tag));
+		if (err)
+			break;
+		switch (got_object_tag_get_object_type(tag)) {
+		case GOT_OBJ_TYPE_BLOB:
+			printf("%s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			printf("%s %s\n", GOT_OBJ_LABEL_TREE, id_str);
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			printf("%s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+			break;
+		case GOT_OBJ_TYPE_TAG:
+			printf("%s %s\n", GOT_OBJ_LABEL_TAG, id_str);
+			break;
+		default:
+			break;
+		}
+		free(id_str);
+		printf("from: %s\n", got_object_tag_get_tagger(tag));
+		tagger_time = got_object_tag_get_tagger_time(tag);
+		datestr = get_datestr(&tagger_time, datebuf);
+		if (datestr)
+			printf("date: %s UTC\n", datestr);
+		tagmsg0 = strdup(got_object_tag_get_message(tag));
+		got_object_tag_close(tag);
+		if (tagmsg0 == NULL) {
+			err = got_error_from_errno("strdup");
+			break;
+		}
+
+		tagmsg = tagmsg0;
+		do {
+			line = strsep(&tagmsg, "\n");
+			if (line)
+				printf(" %s\n", line);
+		} while (line);
+		free(tagmsg0);
+	}
+
+	got_ref_list_free(&refs);
+	return NULL;
+}
+
+static const struct got_error *
+get_tag_message(char **tagmsg, const char *commit_id_str, const char *repo_path)
+{
+	const struct got_error *err = NULL;
+	char *template = NULL, *initial_content = NULL;
+	char *tagmsg_path = NULL, *editor = NULL;
+	int fd = -1;
+
+	if (asprintf(&template, "/tmp/got-tagmsg") == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (asprintf(&initial_content, "\n# tagging commit %s\n",
+	    commit_id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_opentemp_named_fd(&tagmsg_path, &fd, template);
+	if (err)
+		goto done;
+
+	dprintf(fd, initial_content);
+	close(fd);
+
+	err = get_editor(&editor);
+	if (err)
+		goto done;
+	err = edit_logmsg(tagmsg, editor, tagmsg_path, initial_content);
+done:
+	if (err == NULL || err->code == GOT_ERR_COMMIT_MSG_EMPTY) {
+		unlink(tagmsg_path);
+		free(tagmsg_path);
+		tagmsg_path = NULL;
+	}
+	free(initial_content);
+	free(template);
+	free(editor);
+
+	/* Editor is done; we can now apply unveil(2) */
+	if (err == NULL) {
+		err = apply_unveil(repo_path, 0, NULL);
+		if (err) {
+			free(*tagmsg);
+			*tagmsg = NULL;
+		}
+	}
+	return err;
+}
+
+static const struct got_error *
+add_tag(struct got_repository *repo, const char *tag_name,
+    const char *commit_arg, const char *tagmsg_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *commit_id = NULL, *tag_id = NULL;
+	char *label = NULL, *commit_id_str = NULL;
+	struct got_reference *ref = NULL;
+	char *refname = NULL, *tagmsg = NULL;
+	const char *tagger;
+
+	/*
+	 * Don't let the user create a tag named '-'.
+	 * While technically a valid reference name, this case is usually
+	 * an unintended typo.
+	 */
+	if (tag_name[0] == '-' && tag_name[1] == '\0')
+		return got_error(GOT_ERR_BAD_REF_NAME);
+
+	err = get_author(&tagger);
+	if (err)
+		return err;
+
+	err = match_object_id(&commit_id, &label, commit_arg,
+	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	if (err)
+		goto done;
+
+	err = got_object_id_str(&commit_id_str, commit_id);
+	if (err)
+		goto done;
+
+	if (strncmp("refs/tags/", tag_name, 10) == 0) {
+		refname = strdup(tag_name);
+		if (refname == NULL) {
+			 err = got_error_from_errno("strdup");
+			 goto done;
+		}
+		tag_name += 10;
+	} else if (asprintf(&refname, "refs/tags/%s", tag_name) == -1) {
+		 err = got_error_from_errno("asprintf");
+		 goto done;
+	}
+
+	err = got_ref_open(&ref, repo, refname, 0);
+	if (err == NULL) {
+		err = got_error(GOT_ERR_TAG_EXISTS);
+		goto done;
+	} else if (err->code != GOT_ERR_NOT_REF)
+		goto done;
+
+	if (tagmsg_arg == NULL) {
+		err = get_tag_message(&tagmsg, commit_id_str,
+		    got_repo_get_path(repo));
+		if (err)
+			goto done;
+	}
+
+	err = got_object_tag_create(&tag_id, tag_name, commit_id,
+	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, repo);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc(&ref, refname, tag_id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+
+	if (err == NULL) {
+		char *tag_id_str;
+		err = got_object_id_str(&tag_id_str, tag_id);
+		printf("Created tag %s\n", tag_id_str);
+		free(tag_id_str);
+	}
+done:
+	if (ref)
+		got_ref_close(ref);
+	free(commit_id);
+	free(commit_id_str);
+	free(refname);
+	free(tagmsg);
+	return err;
+}
+
+static const struct got_error *
+cmd_tag(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
+	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
+	int ch, do_list = 0;
+
+	while ((ch = getopt(argc, argv, "m:r:l")) != -1) {
+		switch (ch) {
+		case 'm':
+			tagmsg = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				err(1, "-r option");
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'l':
+			do_list = 1;
+			break;
+		default:
+			usage_tag();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (do_list) {
+		if (tagmsg)
+			errx(1, "-l and -m options are mutually exclusive\n");
+		if (argc > 0)
+			usage_tag();
+	} else if (argc < 1 || argc > 2)
+		usage_tag();
+	else {
+		tag_name = argv[0];
+		if (argc > 1)
+			commit_id_arg = argv[1];
+	}
+
+#ifndef PROFILE
+	if (do_list) {
+		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+		    NULL) == -1)
+			err(1, "pledge");
+	} else {
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+	}
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL)
+				error = got_error_from_errno("strdup");
+			if (error)
+				goto done;
+		} else {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	error = got_repo_open(&repo, repo_path);
+	if (error != NULL)
+		goto done;
+
+
+	if (do_list) {
+		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+		if (error)
+			goto done;
+		error = list_tags(repo, worktree);
+	} else {
+		if (tagmsg) {
+			error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+			if (error)
+				goto done;
+		}
+
+		if (commit_id_arg == NULL) {
+			struct got_reference *head_ref;
+			struct got_object_id *commit_id;
+			error = got_ref_open(&head_ref, repo,
+			    worktree ? got_worktree_get_head_ref_name(worktree)
+			    : GOT_REF_HEAD, 0);
+			if (error)
+				goto done;
+			error = got_ref_resolve(&commit_id, repo, head_ref);
+			got_ref_close(head_ref);
+			if (error)
+				goto done;
+			error = got_object_id_str(&commit_id_str, commit_id);
+			free(commit_id);
+			if (error)
+				goto done;
+		}
+
+		error = add_tag(repo, tag_name,
+		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg);
+	}
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(cwd);
+	free(repo_path);
+	free(commit_id_str);
 	return error;
 }
 

@@ -56,6 +56,14 @@ function git_show_author_time
 	(cd $repo && git show --no-patch --pretty='format:%at' $object)
 }
 
+function git_show_tagger_time
+{
+	local repo="$1"
+	local tag="$2"
+	(cd $repo && git cat-file tag $tag | grep ^tagger | \
+		sed -e "s/^tagger $GOT_AUTHOR//" | cut -d' ' -f2)
+}
+
 function git_show_parent_commit
 {
 	local repo="$1"

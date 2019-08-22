@@ -122,6 +122,7 @@
 #define GOT_ERR_STAGED_PATHS	106
 #define GOT_ERR_PATCH_CHOICE	107
 #define GOT_ERR_COMMIT_NO_EMAIL	108
+#define GOT_ERR_TAG_EXISTS	109
 
 static const struct got_error {
 	int code;
@@ -250,6 +251,7 @@ static const struct got_error {
 	{ GOT_ERR_COMMIT_NO_EMAIL,"GOT_AUTHOR environment variable contains "
 	    "no email address; an email address is required for compatibility "
 	    "with Git" },
+	{ GOT_ERR_TAG_EXISTS,"specified tag already exists" },
 };
 
 /*

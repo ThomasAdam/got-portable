@@ -600,3 +600,181 @@ done:
 	}
 	return err;
 }
+
+const struct got_error *
+got_object_tag_create(struct got_object_id **id,
+    const char *tag_name, struct got_object_id *object_id, const char *tagger,
+    time_t tagger_time, const char *tagmsg, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	SHA1_CTX sha1_ctx;
+	char *header = NULL;
+	char *tag_str = NULL, *tagger_str = NULL;
+	char *id_str = NULL, *obj_str = NULL, *type_str = NULL;
+	size_t headerlen, len = 0, n;
+	FILE *tagfile = NULL;
+	char *msg0 = NULL, *msg;
+	const char *obj_type_str;
+	int obj_type;
+
+	*id = NULL;
+
+	SHA1Init(&sha1_ctx);
+
+	err = got_object_id_str(&id_str, object_id);
+	if (err)
+		goto done;
+	if (asprintf(&obj_str, "%s%s\n", GOT_TAG_LABEL_OBJECT, id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_object_get_type(&obj_type, repo, object_id);
+	if (err)
+		goto done;
+
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_BLOB:
+		obj_type_str = GOT_OBJ_LABEL_BLOB;
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		obj_type_str = GOT_OBJ_LABEL_TREE;
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		obj_type_str = GOT_OBJ_LABEL_COMMIT;
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		obj_type_str = GOT_OBJ_LABEL_TAG;
+		break;
+	default:
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+
+	if (asprintf(&type_str, "%s%s\n", GOT_TAG_LABEL_TYPE,
+	    obj_type_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (asprintf(&tag_str, "%s%s\n", GOT_TAG_LABEL_TAG, tag_name) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (asprintf(&tagger_str, "%s%s %lld +0000\n",
+	    GOT_COMMIT_LABEL_AUTHOR, tagger, tagger_time) == -1)
+		return got_error_from_errno("asprintf");
+
+	msg0 = strdup(tagmsg);
+	if (msg0 == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	msg = msg0;
+
+	while (isspace((unsigned char)msg[0]))
+		msg++;
+
+	len = strlen(obj_str) + strlen(type_str) + strlen(tag_str) +
+	    strlen(tagger_str) + 1 + strlen(msg) + 1;
+
+	if (asprintf(&header, "%s %zd", GOT_OBJ_LABEL_TAG, len) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	headerlen = strlen(header) + 1;
+	SHA1Update(&sha1_ctx, header, headerlen);
+
+	tagfile = got_opentemp();
+	if (tagfile == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
+	n = fwrite(header, 1, headerlen, tagfile);
+	if (n != headerlen) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+	len = strlen(obj_str);
+	SHA1Update(&sha1_ctx, obj_str, len);
+	n = fwrite(obj_str, 1, len, tagfile);
+	if (n != len) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+	len = strlen(type_str);
+	SHA1Update(&sha1_ctx, type_str, len);
+	n = fwrite(type_str, 1, len, tagfile);
+	if (n != len) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	len = strlen(tag_str);
+	SHA1Update(&sha1_ctx, tag_str, len);
+	n = fwrite(tag_str, 1, len, tagfile);
+	if (n != len) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	len = strlen(tagger_str);
+	SHA1Update(&sha1_ctx, tagger_str, len);
+	n = fwrite(tagger_str, 1, len, tagfile);
+	if (n != len) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SHA1Update(&sha1_ctx, "\n", 1);
+	n = fwrite("\n", 1, 1, tagfile);
+	if (n != 1) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	len = strlen(msg);
+	SHA1Update(&sha1_ctx, msg, len);
+	n = fwrite(msg, 1, len, tagfile);
+	if (n != len) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	SHA1Update(&sha1_ctx, "\n", 1);
+	n = fwrite("\n", 1, 1, tagfile);
+	if (n != 1) {
+		err = got_ferror(tagfile, GOT_ERR_IO);
+		goto done;
+	}
+
+	*id = malloc(sizeof(**id));
+	if (*id == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	SHA1Final((*id)->sha1, &sha1_ctx);
+
+	if (fflush(tagfile) != 0) {
+		err = got_error_from_errno("fflush");
+		goto done;
+	}
+	rewind(tagfile);
+
+	err = create_object_file(*id, tagfile, repo);
+done:
+	free(msg0);
+	free(header);
+	free(obj_str);
+	free(tagger_str);
+	if (tagfile && fclose(tagfile) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (err) {
+		free(*id);
+		*id = NULL;
+	}
+	return err;
+}

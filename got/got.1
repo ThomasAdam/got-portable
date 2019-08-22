@@ -520,6 +520,59 @@ Git's garbage collector.
 .It Cm br
 Short alias for
 .Cm branch .
+.It Cm tag Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Ar name Op Ar commit Oc
+Manage tags in a repository.
+.Pp
+Tags are managed via references which live in the
+.Dq refs/tags/
+reference namespace.
+The
+.Cm got tag
+command operates on references in this namespace only.
+.Pp
+Expect one or two arguments and attempt to create a tag with the given
+.Ar name ,
+and make this tag point at the given
+.Ar commit .
+If no commit is specified, default to the latest commit on the work tree's
+current branch if invoked in a work tree, and to a commit resolved via
+the repository's HEAD reference otherwise.
+Otherwise, the expected argument is a commit ID SHA1 hash or an existing
+reference or tag name which will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
+.Pp
+The options for
+.Cm got tag
+are as follows:
+.Bl -tag -width Ds
+.It Fl m Ar message
+Use the specified tag message when creating the new tag
+Without the
+.Fl m
+option,
+.Cm got import
+opens a temporary file in an editor where a tag message can be written.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl l
+List all existing tags in the repository instead of creating a new tag.
+If this option is used, no other command-line arguments are allowed.
+.El
+.Pp
+By design, the
+.Cm got tag
+command will not delete tags or change existing tags.
+If a tag must be deleted, the
+.Cm got ref
+command may be used to delete a tag's reference.
+This should only be done if the tag has not already been copied to
+another repository.
 .It Cm add Ar file-path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
@@ -1124,7 +1177,10 @@ attempts to reject
 environment variables with a missing email address.
 .It Ev VISUAL , EDITOR
 The editor spawned by
-.Cm got commit .
+.Cm got commit ,
+.Cm got import ,
+or
+.Cm got tag .
 .It Ev GOT_LOG_DEFAULT_LIMIT
 The default limit on the number of commits traversed by
 .Cm got log .
