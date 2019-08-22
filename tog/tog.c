@@ -175,6 +175,8 @@ struct tog_blame_thread_args {
 	struct got_repository *repo;
 	struct tog_blame_cb_args *cb_args;
 	int *complete;
+	got_cancel_cb cancel_cb;
+	void *cancel_arg;
 };
 
 struct tog_blame {
@@ -3138,7 +3140,9 @@ blame_thread(void *arg)
 	int errcode;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
-	    blame_cb, ta->cb_args, NULL, NULL);
+	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg);
+	if (err && err->code == GOT_ERR_CANCELLED)
+		err = NULL;
 
 	errcode = pthread_mutex_lock(&tog_mutex);
 	if (errcode)
@@ -3217,6 +3221,29 @@ stop_blame(struct tog_blame *blame)
 }
 
 static const struct got_error *
+cancel_blame_view(void *arg)
+{
+	const struct got_error *err = NULL;
+	int *done = arg;
+	int errcode;
+
+	errcode = pthread_mutex_lock(&tog_mutex);
+	if (errcode)
+		return got_error_set_errno(errcode,
+		    "pthread_mutex_unlock");
+
+	if (*done)
+		err = got_error(GOT_ERR_CANCELLED);
+
+	errcode = pthread_mutex_unlock(&tog_mutex);
+	if (errcode)
+		return got_error_set_errno(errcode,
+		    "pthread_mutex_lock");
+
+	return err;
+}
+
+static const struct got_error *
 run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
     int *first_displayed_line, int *last_displayed_line, int *selected_line,
     int *done, int *eof, const char *path, struct got_object_id *commit_id,
@@ -3284,6 +3311,8 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	blame->thread_args.repo = thread_repo;
 	blame->thread_args.cb_args = &blame->cb_args;
 	blame->thread_args.complete = blame_complete;
+	blame->thread_args.cancel_cb = cancel_blame_view;
+	blame->thread_args.cancel_arg = done;
 	*blame_complete = 0;
 
 done:
@@ -4069,6 +4098,8 @@ blame_tree_entry(struct tog_view **new_view, int begin_x,
 
 	err = open_blame_view(blame_view, path, commit_id, refs, repo);
 	if (err) {
+		if (err->code == GOT_ERR_CANCELLED)
+			err = NULL;
 		view_close(blame_view);
 	} else
 		*new_view = blame_view;
@@ -4696,7 +4727,7 @@ main(int argc, char *argv[])
 
 	endwin();
 	free(cmd_argv);
-	if (error)
+	if (error && error->code != GOT_ERR_CANCELLED)
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 	return 0;
 }
