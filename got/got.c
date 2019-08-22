@@ -3352,16 +3352,16 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 			break;
 		switch (got_object_tag_get_object_type(tag)) {
 		case GOT_OBJ_TYPE_BLOB:
-			printf("%s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
+			printf("%s: %s\n", GOT_OBJ_LABEL_BLOB, id_str);
 			break;
 		case GOT_OBJ_TYPE_TREE:
-			printf("%s %s\n", GOT_OBJ_LABEL_TREE, id_str);
+			printf("%s: %s\n", GOT_OBJ_LABEL_TREE, id_str);
 			break;
 		case GOT_OBJ_TYPE_COMMIT:
-			printf("%s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+			printf("%s: %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
 			break;
 		case GOT_OBJ_TYPE_TAG:
-			printf("%s %s\n", GOT_OBJ_LABEL_TAG, id_str);
+			printf("%s: %s\n", GOT_OBJ_LABEL_TAG, id_str);
 			break;
 		default:
 			break;
