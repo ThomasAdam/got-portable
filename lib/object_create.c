@@ -663,7 +663,7 @@ got_object_tag_create(struct got_object_id **id,
 	}
 
 	if (asprintf(&tagger_str, "%s%s %lld +0000\n",
-	    GOT_COMMIT_LABEL_AUTHOR, tagger, tagger_time) == -1)
+	    GOT_TAG_LABEL_TAGGER, tagger, tagger_time) == -1)
 		return got_error_from_errno("asprintf");
 
 	msg0 = strdup(tagmsg);
