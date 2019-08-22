@@ -3393,7 +3393,8 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 }
 
 static const struct got_error *
-get_tag_message(char **tagmsg, const char *commit_id_str, const char *repo_path)
+get_tag_message(char **tagmsg, const char *commit_id_str,
+    const char *tag_name, const char *repo_path)
 {
 	const struct got_error *err = NULL;
 	char *template = NULL, *initial_content = NULL;
@@ -3405,8 +3406,8 @@ get_tag_message(char **tagmsg, const char *commit_id_str, const char *repo_path)
 		goto done;
 	}
 
-	if (asprintf(&initial_content, "\n# tagging commit %s\n",
-	    commit_id_str) == -1) {
+	if (asprintf(&initial_content, "\n# tagging commit %s as %s\n",
+	    commit_id_str, tag_name) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -3496,7 +3497,7 @@ add_tag(struct got_repository *repo, const char *tag_name,
 
 	if (tagmsg_arg == NULL) {
 		err = get_tag_message(&tagmsg, commit_id_str,
-		    got_repo_get_path(repo));
+		    tag_name, got_repo_get_path(repo));
 		if (err)
 			goto done;
 	}
