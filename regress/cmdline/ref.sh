@@ -38,7 +38,7 @@ function test_ref_create {
 		return 1
 	fi
 
-	# Ensure Git recognizes the new ref
+	# Ensure Got recognizes the new ref
 	got checkout -b newref $testroot/repo $testroot/wt >/dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
