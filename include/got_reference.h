@@ -83,9 +83,13 @@ struct got_reflist_entry {
 };
 SIMPLEQ_HEAD(got_reflist_head, got_reflist_entry);
 
-/* Append all known references to a caller-provided ref list head. */
+/*
+ * Append all known references to a caller-provided ref list head.
+ * Optionally limit references returned to those within a given
+ * reference namespace.
+ */
 const struct got_error *got_ref_list(struct got_reflist_head *,
-    struct got_repository *);
+    struct got_repository *, const char *);
 
 /* Free all references on a ref list. */
 void got_ref_list_free(struct got_reflist_head *);

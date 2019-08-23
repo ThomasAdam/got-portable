@@ -1128,17 +1128,16 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	SIMPLEQ_INIT(&refs);
 	*tag = NULL;
 
-	err = got_ref_list(&refs, repo);
+	err = got_ref_list(&refs, repo, "refs/tags");
 	if (err)
 		return err;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		const char *refname;
 		refname = got_ref_get_name(re->ref);
-		if (got_ref_is_symbolic(re->ref) ||
-		    strncmp("refs/tags/", refname, 10) != 0)
+		if (got_ref_is_symbolic(re->ref))
 			continue;
-		refname += 10;
+		refname += strlen("refs/tags/");
 		if (strcmp(refname, name) != 0)
 			continue;
 		err = got_ref_resolve(&tag_id, repo, re->ref);

@@ -742,7 +742,8 @@ done:
 }
 
 const struct got_error *
-got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
+got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
+    const char *ref_namespace)
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
@@ -750,20 +751,25 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 	struct got_reference *ref;
 	struct got_reflist_entry *new;
 
-	/* HEAD ref should always exist. */
-	path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
-	if (path_refs == NULL) {
-		err = got_error_from_errno("get_refs_dir_path");
-		goto done;
+	if (ref_namespace == NULL || ref_namespace[0] == '\0') {
+		/* HEAD ref should always exist. */
+		path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
+		if (path_refs == NULL) {
+			err = got_error_from_errno("get_refs_dir_path");
+			goto done;
+		}
+		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
+		if (err)
+			goto done;
+		err = insert_ref(&new, refs, ref, repo);
+		if (err || new == NULL /* duplicate */)
+			got_ref_close(ref);
+		if (err)
+			goto done;
 	}
-	err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
-	if (err)
-		goto done;
-	err = insert_ref(&new, refs, ref, repo);
-	if (err || new == NULL /* duplicate */)
-		got_ref_close(ref);
-	if (err)
-		goto done;
+
+	if (ref_namespace && strncmp(ref_namespace, "refs/", 5) == 0)
+		ref_namespace += 5;
 
 	/* Gather on-disk refs before parsing packed-refs. */
 	free(path_refs);
@@ -772,7 +778,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 		err = got_error_from_errno("get_refs_dir_path");
 		goto done;
 	}
-	err = gather_on_disk_refs(refs, path_refs, "", repo);
+	err = gather_on_disk_refs(refs, path_refs,
+	    ref_namespace ? ref_namespace : "", repo);
 	if (err)
 		goto done;
 
@@ -805,6 +812,15 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo)
 			if (err)
 				goto done;
 			if (ref) {
+				if (ref_namespace) {
+					const char *name;
+					name = got_ref_get_name(ref);
+					if (strncmp(name, ref_namespace,
+					    strlen(ref_namespace)) != 0) {
+						got_ref_close(ref);
+						continue;
+					}
+				}
 				err = insert_ref(&new, refs, ref, repo);
 				if (err || new == NULL /* duplicate */)
 					got_ref_close(ref);

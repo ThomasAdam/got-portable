@@ -1763,7 +1763,7 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
-	error = got_ref_list(&refs, repo);
+	error = got_ref_list(&refs, repo, NULL);
 	if (error)
 		goto done;
 
@@ -2825,7 +2825,7 @@ list_refs(struct got_repository *repo)
 	struct got_reflist_entry *re;
 
 	SIMPLEQ_INIT(&refs);
-	err = got_ref_list(&refs, repo);
+	err = got_ref_list(&refs, repo, NULL);
 	if (err)
 		return err;
 
@@ -3065,7 +3065,7 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo);
+	err = got_ref_list(&refs, repo, "refs/heads");
 	if (err)
 		return err;
 
@@ -3073,8 +3073,6 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 		const char *refname, *marker = "  ";
 		char *refstr;
 		refname = got_ref_get_name(re->ref);
-		if (strncmp(refname, "refs/heads/", 11) != 0)
-			continue;
 		if (worktree && strcmp(refname,
 		    got_worktree_get_head_ref_name(worktree)) == 0) {
 			struct got_object_id *id = NULL;
@@ -3088,7 +3086,7 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 				marker = "~ ";
 			free(id);
 		}
-		refname += 11;
+		refname += strlen("refs/heads/");
 		refstr = got_ref_to_str(re->ref);
 		if (refstr == NULL)
 			return got_error_from_errno("got_ref_to_str");
@@ -3315,7 +3313,7 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo);
+	err = got_ref_list(&refs, repo, "refs/tags");
 	if (err)
 		return err;
 
