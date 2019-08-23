@@ -14,6 +14,7 @@
 /got/got.c
 /include
 /include/got_blame.h
+/include/got_cancel.h
 /include/got_commit_graph.h
 /include/got_diff.h
 /include/got_error.h
@@ -105,6 +106,7 @@
 /regress/cmdline/backout.sh
 /regress/cmdline/blame.sh
 /regress/cmdline/branch.sh
+/regress/cmdline/cat.sh
 /regress/cmdline/checkout.sh
 /regress/cmdline/cherrypick.sh
 /regress/cmdline/commit.sh
@@ -119,6 +121,7 @@
 /regress/cmdline/rm.sh
 /regress/cmdline/stage.sh
 /regress/cmdline/status.sh
+/regress/cmdline/tag.sh
 /regress/cmdline/unstage.sh
 /regress/cmdline/update.sh
 /regress/delta
