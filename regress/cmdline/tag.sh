@@ -128,8 +128,10 @@ function test_tag_list {
 	local tag=1.0.0
 	local tag2=2.0.0
 
+	# create tag with Git
 	(cd $testroot/repo && git tag -a -m 'test' $tag)
-	(cd $testroot/repo && git tag -a -m 'test' $tag2)
+	# create tag with Got
+	(cd $testroot/repo && got tag -m 'test' $tag2 > /dev/null)
 
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
