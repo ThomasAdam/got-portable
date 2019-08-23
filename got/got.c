@@ -3346,32 +3346,32 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 		free(id);
 		if (err)
 			break;
+		printf("from: %s\n", got_object_tag_get_tagger(tag));
+		tagger_time = got_object_tag_get_tagger_time(tag);
+		datestr = get_datestr(&tagger_time, datebuf);
+		if (datestr)
+			printf("date: %s UTC\n", datestr);
 		err = got_object_id_str(&id_str,
 		    got_object_tag_get_object_id(tag));
 		if (err)
 			break;
 		switch (got_object_tag_get_object_type(tag)) {
 		case GOT_OBJ_TYPE_BLOB:
-			printf("%s: %s\n", GOT_OBJ_LABEL_BLOB, id_str);
+			printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
 			break;
 		case GOT_OBJ_TYPE_TREE:
-			printf("%s: %s\n", GOT_OBJ_LABEL_TREE, id_str);
+			printf("object: %s %s\n", GOT_OBJ_LABEL_TREE, id_str);
 			break;
 		case GOT_OBJ_TYPE_COMMIT:
-			printf("%s: %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
+			printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
 			break;
 		case GOT_OBJ_TYPE_TAG:
-			printf("%s: %s\n", GOT_OBJ_LABEL_TAG, id_str);
+			printf("object: %s %s\n", GOT_OBJ_LABEL_TAG, id_str);
 			break;
 		default:
 			break;
 		}
 		free(id_str);
-		printf("from: %s\n", got_object_tag_get_tagger(tag));
-		tagger_time = got_object_tag_get_tagger_time(tag);
-		datestr = get_datestr(&tagger_time, datebuf);
-		if (datestr)
-			printf("date: %s UTC\n", datestr);
 		tagmsg0 = strdup(got_object_tag_get_message(tag));
 		got_object_tag_close(tag);
 		if (tagmsg0 == NULL) {
