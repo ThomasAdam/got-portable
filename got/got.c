@@ -1763,7 +1763,7 @@ cmd_log(int argc, char *argv[])
 		path = in_repo_path;
 	}
 
-	error = got_ref_list(&refs, repo, NULL);
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
@@ -2825,7 +2825,7 @@ list_refs(struct got_repository *repo)
 	struct got_reflist_entry *re;
 
 	SIMPLEQ_INIT(&refs);
-	err = got_ref_list(&refs, repo, NULL);
+	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 
@@ -3065,7 +3065,8 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo, "refs/heads");
+	err = got_ref_list(&refs, repo, "refs/heads",
+	    got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 
@@ -3304,6 +3305,109 @@ usage_tag(void)
 	exit(1);
 }
 
+#if 0
+static const struct got_error *
+sort_tags(struct got_reflist_head *sorted, struct got_reflist_head *tags)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_entry *re, *se, *new;
+	struct got_object_id *re_id, *se_id;
+	struct got_tag_object *re_tag, *se_tag;
+	time_t re_time, se_time;
+
+	SIMPLEQ_FOREACH(re, tags, entry) {
+		se = SIMPLEQ_FIRST(sorted);
+		if (se == NULL) {
+			err = got_reflist_entry_dup(&new, re);
+			if (err)
+				return err;
+			SIMPLEQ_INSERT_HEAD(sorted, new, entry);
+			continue;
+		} else {
+			err = got_ref_resolve(&re_id, repo, re->ref);
+			if (err)
+				break;
+			err = got_object_open_as_tag(&re_tag, repo, re_id);
+			free(re_id);
+			if (err)
+				break;
+			re_time = got_object_tag_get_tagger_time(re_tag);
+			got_object_tag_close(re_tag);
+		}
+
+		while (se) {
+			err = got_ref_resolve(&se_id, repo, re->ref);
+			if (err)
+				break;
+			err = got_object_open_as_tag(&se_tag, repo, se_id);
+			free(se_id);
+			if (err)
+				break;
+			se_time = got_object_tag_get_tagger_time(se_tag);
+			got_object_tag_close(se_tag);
+
+			if (se_time > re_time) {
+				err = got_reflist_entry_dup(&new, re);
+				if (err)
+					return err;
+				SIMPLEQ_INSERT_AFTER(sorted, se, new, entry);
+				break;
+			}
+			se = SIMPLEQ_NEXT(se, entry);
+			continue;
+		}
+	}
+done:
+	return err;
+}
+#endif
+
+static const struct got_error *
+cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
+    struct got_reference *ref2)
+{
+	const struct got_error *err = NULL;
+	struct got_repository *repo = arg;
+	struct got_object_id *id1, *id2 = NULL;
+	struct got_tag_object *tag1 = NULL, *tag2 = NULL;
+	time_t time1, time2;
+
+	*cmp = 0;
+
+	err = got_ref_resolve(&id1, repo, ref1);
+	if (err)
+		return err;
+	err = got_object_open_as_tag(&tag1, repo, id1);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&id2, repo, ref2);
+	if (err)
+		goto done;
+	err = got_object_open_as_tag(&tag2, repo, id2);
+	if (err)
+		goto done;
+
+	time1 = got_object_tag_get_tagger_time(tag1);
+	time2 = got_object_tag_get_tagger_time(tag2);
+
+	/* Put latest tags first. */
+	if (time1 < time2)
+		*cmp = 1;
+	else if (time1 > time2)
+		*cmp = -1;
+	else
+		err = got_ref_cmp_by_name(NULL, cmp, ref2, ref1);
+done:
+	free(id1);
+	free(id2);
+	if (tag1)
+		got_object_tag_close(tag1);
+	if (tag2)
+		got_object_tag_close(tag2);
+	return err;
+}
+
 static const struct got_error *
 list_tags(struct got_repository *repo, struct got_worktree *worktree)
 {
@@ -3313,7 +3417,7 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo, "refs/tags");
+	err = got_ref_list(&refs, repo, "refs/tags", cmp_tags, repo);
 	if (err)
 		return err;
 

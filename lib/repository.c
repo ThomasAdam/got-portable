@@ -1128,7 +1128,7 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	SIMPLEQ_INIT(&refs);
 	*tag = NULL;
 
-	err = got_ref_list(&refs, repo, "refs/tags");
+	err = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 

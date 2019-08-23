@@ -146,7 +146,7 @@ function test_tag_list {
 
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
-	echo "tag $tag $tag_id" >> $testroot/stdout.expected
+	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $d1" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected
@@ -155,7 +155,7 @@ function test_tag_list {
 	echo " " >> $testroot/stdout.expected
 	echo "-----------------------------------------------" \
 		>> $testroot/stdout.expected
-	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
+	echo "tag $tag $tag_id" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo "date: $d2" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected

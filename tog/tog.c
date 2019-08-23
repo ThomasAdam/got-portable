@@ -2303,7 +2303,7 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL);
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
@@ -2928,7 +2928,7 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL);
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
@@ -3832,7 +3832,7 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL);
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
@@ -4589,7 +4589,7 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL);
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 

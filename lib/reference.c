@@ -527,6 +527,38 @@ got_ref_dup(struct got_reference *ref)
 	return ret;
 }
 
+const struct got_error *
+got_reflist_entry_dup(struct got_reflist_entry **newp,
+    struct got_reflist_entry *re)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_entry *new;
+
+	*newp = NULL;
+
+	new = malloc(sizeof(*new));
+	if (new == NULL)
+		return got_error_from_errno("malloc");
+
+	new->ref = got_ref_dup(re->ref);
+	if (new->ref == NULL) {
+		err = got_error_from_errno("got_ref_dup");
+		free(new);
+		return err;
+	}
+
+	new->id = got_object_id_dup(re->id);
+	if (new->id == NULL) {
+		err = got_error_from_errno("got_ref_dup");
+		free(new->id);
+		free(new);
+		return err;
+	}
+
+	*newp = new;
+	return NULL;
+}
+
 static const struct got_error *
 resolve_symbolic_ref(struct got_reference **resolved,
     struct got_repository *repo, struct got_reference *ref)
@@ -620,9 +652,21 @@ got_ref_get_symref_target(struct got_reference *ref)
 	return NULL;
 }
 
+const struct got_error *
+got_ref_cmp_by_name(void *arg, int *cmp, struct got_reference *re1,
+    struct got_reference* re2)
+{
+	const char *name1 = got_ref_get_name(re1);
+	const char *name2 = got_ref_get_name(re2);
+
+	*cmp = got_path_cmp(name1, name2, strlen(name1), strlen(name2));
+	return NULL;
+}
+
 static const struct got_error *
 insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
-    struct got_reference *ref, struct got_repository *repo)
+    struct got_reference *ref, struct got_repository *repo,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
 	struct got_object_id *id;
@@ -652,10 +696,9 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 	 */
 	re = SIMPLEQ_FIRST(refs);
 	while (re) {
-		const char *name = got_ref_get_name(re->ref);
-		const char *new_name = got_ref_get_name(new->ref);
-		cmp = got_path_cmp(name, new_name, strlen(name),
-		    strlen(new_name));
+		err = (*cmp_cb)(cmp_arg, &cmp, re->ref, new->ref);
+		if (err)
+			return err;
 		if (cmp == 0) {
 			/* duplicate */
 			free(new->id);
@@ -680,7 +723,8 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 
 static const struct got_error *
 gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
-    const char *subdir, struct got_repository *repo)
+    const char *subdir, struct got_repository *repo,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err = NULL;
 	DIR *d = NULL;
@@ -714,7 +758,8 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 				goto done;
 			if (ref) {
 				struct got_reflist_entry *new;
-				err = insert_ref(&new, refs, ref, repo);
+				err = insert_ref(&new, refs, ref, repo,
+				    cmp_cb, cmp_arg);
 				if (err || new == NULL /* duplicate */)
 					got_ref_close(ref);
 				if (err)
@@ -727,7 +772,8 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 				err = got_error_from_errno("asprintf");
 				break;
 			}
-			err = gather_on_disk_refs(refs, path_refs, child, repo);
+			err = gather_on_disk_refs(refs, path_refs, child, repo,
+			    cmp_cb, cmp_arg);
 			free(child);
 			break;
 		default:
@@ -743,7 +789,7 @@ done:
 
 const struct got_error *
 got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
-    const char *ref_namespace)
+    const char *ref_namespace, got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
@@ -761,7 +807,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
 		if (err)
 			goto done;
-		err = insert_ref(&new, refs, ref, repo);
+		err = insert_ref(&new, refs, ref, repo, cmp_cb, cmp_arg);
 		if (err || new == NULL /* duplicate */)
 			got_ref_close(ref);
 		if (err)
@@ -779,7 +825,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		goto done;
 	}
 	err = gather_on_disk_refs(refs, path_refs,
-	    ref_namespace ? ref_namespace : "", repo);
+	    ref_namespace ? ref_namespace : "", repo, cmp_cb, cmp_arg);
 	if (err)
 		goto done;
 
@@ -821,7 +867,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 						continue;
 					}
 				}
-				err = insert_ref(&new, refs, ref, repo);
+				err = insert_ref(&new, refs, ref, repo,
+				    cmp_cb, cmp_arg);
 				if (err || new == NULL /* duplicate */)
 					got_ref_close(ref);
 				if (err)
@@ -1051,7 +1098,8 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			continue;
 		}
 
-		err = insert_ref(&new, &refs, ref, repo);
+		err = insert_ref(&new, &refs, ref, repo,
+		    got_ref_cmp_by_name, NULL);
 		if (err || new == NULL /* duplicate */)
 			got_ref_close(ref);
 		if (err)

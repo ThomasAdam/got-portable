@@ -83,13 +83,26 @@ struct got_reflist_entry {
 };
 SIMPLEQ_HEAD(got_reflist_head, got_reflist_entry);
 
+/* Duplicate a reference list entry. Caller must dispose of it with free(3). */
+const struct got_error *got_reflist_entry_dup(struct got_reflist_entry **,
+    struct got_reflist_entry *);
+
+/* A function which compares two references. Used with got_ref_list(). */
+typedef const struct got_error *(*got_ref_cmp_cb)(void *, int *,
+    struct got_reference *, struct got_reference *);
+
+/* An implementation of got_ref_cmp_cb which compares two references by name. */
+const struct got_error *got_ref_cmp_by_name(void *, int *,
+    struct got_reference *, struct got_reference *);
+
 /*
  * Append all known references to a caller-provided ref list head.
  * Optionally limit references returned to those within a given
- * reference namespace.
+ * reference namespace. Sort the list with the provided reference comparison
+ * function, usually got_ref_cmp_by_name().
  */
 const struct got_error *got_ref_list(struct got_reflist_head *,
-    struct got_repository *, const char *);
+    struct got_repository *, const char *, got_ref_cmp_cb, void *);
 
 /* Free all references on a ref list. */
 void got_ref_list_free(struct got_reflist_head *);
