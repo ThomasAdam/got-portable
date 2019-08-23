@@ -3569,11 +3569,9 @@ cmd_tag(int argc, char *argv[])
 			usage_tag();
 	} else if (argc < 1 || argc > 2)
 		usage_tag();
-	else {
-		tag_name = argv[0];
-		if (argc > 1)
-			commit_id_arg = argv[1];
-	}
+	else if (argc > 1)
+		commit_id_arg = argv[1];
+	tag_name = argv[0];
 
 #ifndef PROFILE
 	if (do_list) {
