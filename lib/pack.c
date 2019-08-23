@@ -262,8 +262,8 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	if (p->map)
 		h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
 	else {
-		h->offsets = malloc(nobj * sizeof(*h->large_offsets));
-		if (h->offsets == NULL) {
+		h->large_offsets = malloc(nobj * sizeof(*h->large_offsets));
+		if (h->large_offsets == NULL) {
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
