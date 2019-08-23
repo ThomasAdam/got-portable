@@ -1,3 +1,9 @@
+* got 0.11; 2019-08-23
+- add 'got tag' command
+- add 'got cat' command
+- support quick cancellation in 'tog blame' view
+- fix search prompt location in split-screen tog views
+
 * got 0.10; 2019-08-21
 - fix and simplify blame algorithm
 
