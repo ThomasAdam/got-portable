@@ -56,6 +56,7 @@
 #include "got_lib_sha1.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
+#include "got_lib_gitconfig.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -67,6 +68,7 @@
 #define GOT_OBJECTS_DIR		"objects"
 #define GOT_REFS_DIR		"refs"
 #define GOT_HEAD_FILE		"HEAD"
+#define GOT_GITCONFIG		"config"
 
 /* Other files and directories inside the git directory. */
 #define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
@@ -132,6 +134,15 @@ static char *
 get_path_head(struct got_repository *repo)
 {
 	return get_path_git_child(repo, GOT_HEAD_FILE);
+}
+
+static const struct got_error *
+get_path_gitconfig(char **p, struct got_repository *repo)
+{
+	*p = get_path_git_child(repo, GOT_GITCONFIG);
+	if (*p == NULL)
+		return got_error_from_errno("asprintf");
+	return NULL;
 }
 
 static int
@@ -330,7 +341,7 @@ got_repo_open(struct got_repository **repop, const char *path)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath;
+	char *abspath, *gitconfig_path = NULL;
 	int i, tried_root = 0;
 
 	*repop = NULL;
@@ -394,12 +405,25 @@ got_repo_open(struct got_repository **repop, const char *path)
 		if (path == NULL)
 			err = got_error_from_errno2("dirname", path);
 	} while (path);
+
+	err = get_path_gitconfig(&gitconfig_path, repo);
+	if (err)
+		goto done;
+
+#ifdef notyet
+	err = got_gitconfig_open(&repo->gitconfig, gitconfig_path);
+	if (err)
+		goto done;
+#else
+	repo->gitconfig = NULL;
+#endif
 done:
 	if (err)
 		got_repo_close(repo);
 	else
 		*repop = repo;
 	free(abspath);
+	free(gitconfig_path);
 	return err;
 }
 
@@ -443,6 +467,8 @@ got_repo_close(struct got_repository *repo)
 		    err == NULL)
 			err = got_error_from_errno("close");
 	}
+	if (repo->gitconfig)
+		got_gitconfig_close(repo->gitconfig);
 	free(repo);
 
 	return err;
