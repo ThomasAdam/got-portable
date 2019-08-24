@@ -3935,7 +3935,9 @@ draw_tree_entries(struct tog_view *view,
 				return got_error_from_errno(
 				    "got_object_id_str");
 		}
-		if (S_ISLNK(te->mode))
+		if (got_object_tree_entry_is_submodule(te))
+			modestr = "$";
+		else if (S_ISLNK(te->mode))
 			modestr = "@";
 		else if (S_ISDIR(te->mode))
 			modestr = "/";

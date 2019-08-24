@@ -1677,3 +1677,9 @@ done:
 	}
 	return err;
 }
+
+int
+got_object_tree_entry_is_submodule(const struct got_tree_entry *te)
+{
+	return (te->mode & S_IFMT) == (S_IFDIR | S_IFLNK);
+}

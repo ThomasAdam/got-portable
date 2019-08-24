@@ -2511,7 +2511,9 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 	while (path[0] == '/')
 		path++;
 
-	if (S_ISLNK(te->mode))
+	if (got_object_tree_entry_is_submodule(te))
+		modestr = "$";
+	else if (S_ISLNK(te->mode))
 		modestr = "@";
 	else if (S_ISDIR(te->mode))
 		modestr = "/";

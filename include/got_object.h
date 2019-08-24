@@ -186,6 +186,9 @@ const struct got_tree_entries *got_object_tree_get_entries(
 const struct got_tree_entry *got_object_tree_find_entry(
     struct got_tree_object *, const char *);
 
+/* Return non-zero if the specified tree entry is a Git submodule. */
+int got_object_tree_entry_is_submodule(const struct got_tree_entry *);
+
 /*
  * Compare two trees and indicate whether the entry at the specified path
  * differs between them. The path must not be the root path "/"; the function

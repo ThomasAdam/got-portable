@@ -704,7 +704,7 @@ walk_tree(struct got_tree_entry **next, struct got_fileindex *fileindex,
 {
 	const struct got_error *err = NULL;
 
-	if (S_ISDIR(te->mode)) {
+	if (!got_object_tree_entry_is_submodule(te) && S_ISDIR(te->mode)) {
 		char *subpath;
 		struct got_tree_object *subtree;
 
@@ -756,7 +756,9 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			free(te_path);
 			if (cmp == 0) {
 				if (got_path_is_child((*ie)->path, path,
-				    path_len) && (entry_name == NULL ||
+				    path_len) &&
+				    !got_object_tree_entry_is_submodule(te) &&
+				    (entry_name == NULL ||
 				    strcmp(te->name, entry_name) == 0)) {
 					err = cb->diff_old_new(cb_arg, *ie, te,
 					    path);
@@ -799,8 +801,9 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			}
 			*ie = next;
 		} else if (te) {
-			if (entry_name == NULL ||
-			    strcmp(te->name, entry_name) == 0) {
+			if (!got_object_tree_entry_is_submodule(te) &&
+			    (entry_name == NULL ||
+			    strcmp(te->name, entry_name) == 0)) {
 				err = cb->diff_new(cb_arg, te, path);
 				if (err || entry_name)
 					break;

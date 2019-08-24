@@ -498,6 +498,9 @@ diff_entry_old_new(const struct got_tree_entry *te1,
 	const struct got_error *err = NULL;
 	int id_match;
 
+	if (got_object_tree_entry_is_submodule(te1))
+		return NULL;
+
 	if (te2 == NULL) {
 		if (S_ISDIR(te1->mode))
 			err = diff_deleted_tree(te1->id, label1, repo,
@@ -511,7 +514,8 @@ diff_entry_old_new(const struct got_tree_entry *te1,
 				    label1, NULL, repo);
 		}
 		return err;
-	}
+	} else if (got_object_tree_entry_is_submodule(te2))
+		return NULL;
 
 	id_match = (got_object_id_cmp(te1->id, te2->id) == 0);
 	if (S_ISDIR(te1->mode) && S_ISDIR(te2->mode)) {
@@ -543,6 +547,9 @@ diff_entry_new_old(const struct got_tree_entry *te2,
     int diff_content)
 {
 	if (te1 != NULL) /* handled by diff_entry_old_new() */
+		return NULL;
+
+	if (got_object_tree_entry_is_submodule(te2))
 		return NULL;
 
 	if (S_ISDIR(te2->mode))

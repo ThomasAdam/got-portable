@@ -1426,6 +1426,9 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
 
+	if (got_object_tree_entry_is_submodule(te))
+		return NULL;
+
 	if (asprintf(&path, "%s%s%s", parent_path,
 	    parent_path[0] ? "/" : "", te->name)
 	    == -1)
@@ -3834,6 +3837,17 @@ write_tree(struct got_object_id **new_tree_id,
 		base_entries = got_object_tree_get_entries(base_tree);
 		SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
 			struct got_commitable *ct = NULL;
+
+			if (got_object_tree_entry_is_submodule(te)) {
+				/* Entry is a submodule; just copy it. */
+				err = got_object_tree_entry_dup(&new_te, te);
+				if (err)
+					goto done;
+				err = insert_tree_entry(new_te, &paths);
+				if (err)
+					goto done;
+				continue;
+			}
 
 			if (S_ISDIR(te->mode)) {
 				int modified;
