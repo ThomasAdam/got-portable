@@ -1,6 +1,4 @@
 lib:
-- handle checkout of trees which contain submodules by identifying and
-  ignoring such tree entries; requires a .ini config parser (from isakmpd?)
 - fix 'got log -l1 -c fb4d85023675bc7da402da96b2bb84fd12905dbf -p';
   this command runs too slow in got-read-pack
   (maybe let got-read-pack cache ref/offset delta objects in object_cache.c?)
