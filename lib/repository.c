@@ -397,13 +397,15 @@ got_repo_open(struct got_repository **repop, const char *path)
 		if (path[0] == '/' && path[1] == '\0') {
 			if (tried_root) {
 				err = got_error(GOT_ERR_NOT_GIT_REPO);
-				break;
+				goto done;
 			}
 			tried_root = 1;
 		}
 		path = dirname(path);
-		if (path == NULL)
+		if (path == NULL) {
 			err = got_error_from_errno2("dirname", path);
+			goto done;
+		}
 	} while (path);
 
 	err = get_path_gitconfig(&gitconfig_path, repo);
