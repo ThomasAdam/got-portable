@@ -2508,6 +2508,8 @@ void *status_arg, struct got_repository *repo)
 	if (lstat(ondisk_path, &sb) == -1) {
 		if (errno != ENOENT)
 			return got_error_from_errno2("lstat", ondisk_path);
+		return (*status_cb)(status_arg, GOT_STATUS_NONEXISTENT,
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
 		return NULL;
 	}
 
@@ -5560,6 +5562,8 @@ check_stage_ok(void *arg, unsigned char status,
 
 	if (status == GOT_STATUS_UNVERSIONED)
 		return NULL;
+	if (status == GOT_STATUS_NONEXISTENT)
+		return got_error_set_errno(ENOENT, relpath);
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
@@ -5702,6 +5706,9 @@ stage_path(void *arg, unsigned char status,
 		break;
 	case GOT_STATUS_CONFLICT:
 		err = got_error_path(relpath, GOT_ERR_STAGE_CONFLICT);
+		break;
+	case GOT_STATUS_NONEXISTENT:
+		err = got_error_set_errno(ENOENT, relpath);
 		break;
 	default:
 		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);

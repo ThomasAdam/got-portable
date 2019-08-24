@@ -31,6 +31,7 @@ struct got_fileindex;
 #define GOT_STATUS_MISSING	'!'
 #define GOT_STATUS_UNVERSIONED	'?'
 #define GOT_STATUS_OBSTRUCTED	'~'
+#define GOT_STATUS_NONEXISTENT	'N'
 #define GOT_STATUS_REVERT	'R'
 #define GOT_STATUS_CANNOT_DELETE 'd'
 #define GOT_STATUS_BUMP_BASE	'b'

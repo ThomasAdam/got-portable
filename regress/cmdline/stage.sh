@@ -156,7 +156,8 @@ function test_stage_nonexistent {
 
 	(cd $testroot/wt && got stage nonexistent-file \
 		> $testroot/stdout 2> $testroot/stderr)
-	echo "got: no changes to stage" > $testroot/stderr.expected
+	echo "got: nonexistent-file: No such file or directory" \
+		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

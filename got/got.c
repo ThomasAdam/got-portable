@@ -1823,6 +1823,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 	} else {
 		if (staged_status == GOT_STATUS_DELETE)
 			return NULL;
+		if (status == GOT_STATUS_NONEXISTENT)
+			return got_error_set_errno(ENOENT, path);
 		if (status != GOT_STATUS_MODIFY &&
 		    status != GOT_STATUS_ADD &&
 		    status != GOT_STATUS_DELETE &&
@@ -3847,6 +3849,20 @@ usage_remove(void)
 }
 
 static const struct got_error *
+print_remove_status(void *arg, unsigned char status,
+    unsigned char staged_status, const char *path,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
+{
+	if (status == GOT_STATUS_NONEXISTENT)
+		return NULL;
+	if (status == staged_status && (status == GOT_STATUS_DELETE))
+		status = GOT_STATUS_NO_CHANGE;
+	printf("%c%c %s\n", status, staged_status, path);
+	return NULL;
+}
+
+static const struct got_error *
 cmd_remove(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -3904,7 +3920,7 @@ cmd_remove(int argc, char *argv[])
 		goto done;
 
 	error = got_worktree_schedule_delete(worktree, &paths,
-	    delete_local_mods, print_status, NULL, repo);
+	    delete_local_mods, print_remove_status, NULL, repo);
 	if (error)
 		goto done;
 done:

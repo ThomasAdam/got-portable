@@ -1052,7 +1052,7 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	fi
 
 	# beta is now gone... we don't flag tree conflicts yet
-	echo -n > $testroot/stdout.expected
+	echo "N  beta" > $testroot/stdout.expected
 	echo -n > $testroot/stderr.expected
 	(cd $testroot/wt && got status beta > $testroot/stdout \
 		2> $testroot/stderr)
