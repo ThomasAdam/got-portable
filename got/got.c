@@ -1317,54 +1317,144 @@ done:
 }
 
 static const struct got_error *
-print_patch(struct got_commit_object *commit, struct got_object_id *id,
-    int diff_context, struct got_repository *repo)
+diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
+    const char *path, int diff_context, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_tree_object *tree1 = NULL, *tree2;
-	struct got_object_qid *qid;
-	char *id_str1 = NULL, *id_str2;
-	struct got_diff_blob_output_unidiff_arg arg;
+	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
 
-	err = got_object_open_as_tree(&tree2, repo,
-	    got_object_commit_get_tree_id(commit));
-	if (err)
-		return err;
-
-	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
-	if (qid != NULL) {
-		struct got_commit_object *pcommit;
-
-		err = got_object_open_as_commit(&pcommit, repo, qid->id);
+	if (blob_id1) {
+		err = got_object_open_as_blob(&blob1, repo, blob_id1, 8192);
 		if (err)
-			return err;
-
-		err = got_object_open_as_tree(&tree1, repo,
-		    got_object_commit_get_tree_id(pcommit));
-		got_object_commit_close(pcommit);
-		if (err)
-			return err;
-
-		err = got_object_id_str(&id_str1, qid->id);
-		if (err)
-			return err;
+			goto done;
 	}
 
-	err = got_object_id_str(&id_str2, id);
+	err = got_object_open_as_blob(&blob2, repo, blob_id2, 8192);
 	if (err)
 		goto done;
 
-	printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+	while (path[0] == '/')
+		path++;
+	err = got_diff_blob(blob1, blob2, path, path, diff_context,
+	    stdout);
+done:
+	if (blob1)
+		got_object_blob_close(blob1);
+	got_object_blob_close(blob2);
+	return err;
+}
+
+static const struct got_error *
+diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
+    const char *path, int diff_context, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_diff_blob_output_unidiff_arg arg;
+
+	if (tree_id1) {
+		err = got_object_open_as_tree(&tree1, repo, tree_id1);
+		if (err)
+			goto done;
+	}
+
+	err = got_object_open_as_tree(&tree2, repo, tree_id2);
+	if (err)
+		goto done;
+
 	arg.diff_context = diff_context;
 	arg.outfile = stdout;
-	err = got_diff_tree(tree1, tree2, "", "", repo,
+	while (path[0] == '/')
+		path++;
+	err = got_diff_tree(tree1, tree2, path, path, repo,
 	    got_diff_blob_output_unidiff, &arg, 1);
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
 	got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
+print_patch(struct got_commit_object *commit, struct got_object_id *id,
+    const char *path, int diff_context, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *pcommit = NULL;
+	char *id_str1 = NULL, *id_str2 = NULL;
+	struct got_object_id *obj_id1 = NULL, *obj_id2 = NULL;
+	struct got_object_qid *qid;
+
+	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (qid != NULL) {
+		err = got_object_open_as_commit(&pcommit, repo,
+		    qid->id);
+		if (err)
+			return err;
+	}
+
+	if (path && path[0] != '\0') {
+		int obj_type;
+		err = got_object_id_by_path(&obj_id2, repo, id, path);
+		if (err)
+			goto done;
+		err = got_object_id_str(&id_str2, obj_id2);
+		if (err) {
+			free(obj_id2);
+			goto done;
+		}
+		if (pcommit) {
+			err = got_object_id_by_path(&obj_id1, repo,
+			    qid->id, path);
+			if (err) {
+				free(obj_id2);
+				goto done;
+			}
+			err = got_object_id_str(&id_str1, obj_id1);
+			if (err) {
+				free(obj_id2);
+				goto done;
+			}
+		}
+		err = got_object_get_type(&obj_type, repo, obj_id2);
+		if (err) {
+			free(obj_id2);
+			goto done;
+		}
+		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+		switch (obj_type) {
+		case GOT_OBJ_TYPE_BLOB:
+			err = diff_blobs(obj_id1, obj_id2, path, diff_context,
+			    repo);
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			err = diff_trees(obj_id1, obj_id2, path, diff_context,
+			    repo);
+			break;
+		default:
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			break;
+		}
+		free(obj_id1);
+		free(obj_id2);
+	} else {
+		obj_id2 = got_object_commit_get_tree_id(commit);
+		err = got_object_id_str(&id_str2, obj_id2);
+		if (err)
+			goto done;
+		obj_id1 = got_object_commit_get_tree_id(pcommit);
+		err = got_object_id_str(&id_str1, obj_id1);
+		if (err)
+			goto done;
+		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
+		err = diff_trees(obj_id1, obj_id2, "", diff_context, repo);
+	}
+
+done:
 	free(id_str1);
 	free(id_str2);
+	if (pcommit)
+		got_object_commit_close(pcommit);
 	return err;
 }
 
@@ -1390,8 +1480,8 @@ get_datestr(time_t *time, char *datebuf)
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, int show_patch, int diff_context,
-    struct got_reflist_head *refs)
+    struct got_repository *repo, const char *path, int show_patch,
+    int diff_context, struct got_reflist_head *refs)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
@@ -1490,7 +1580,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	free(logmsg0);
 
 	if (show_patch) {
-		err = print_patch(commit, id, diff_context, repo);
+		err = print_patch(commit, id, path, diff_context, repo);
 		if (err == 0)
 			printf("\n");
 	}
@@ -1544,8 +1634,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
-		err = print_commit(commit, id, repo, show_patch, diff_context,
-		    refs);
+		err = print_commit(commit, id, repo, path, show_patch,
+		    diff_context, refs);
 		got_object_commit_close(commit);
 		if (err || (limit && --limit == 0))
 			break;

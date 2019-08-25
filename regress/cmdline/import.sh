@@ -55,6 +55,8 @@ function test_import_basic {
 	id_beta=`get_blob_id $testroot/repo "" beta`
 	id_zeta=`get_blob_id $testroot/repo epsilon zeta`
 	id_delta=`get_blob_id $testroot/repo gamma delta`
+	tree_id=`(cd $testroot/repo && got cat $head_commit | \
+		grep ^tree | cut -d ' ' -f 2)`
 
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
@@ -63,7 +65,7 @@ function test_import_basic {
 	echo " " >> $testroot/stdout.expected
 	echo " init" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
-	echo "diff /dev/null $head_commit" >> $testroot/stdout.expected
+	echo "diff /dev/null $tree_id" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
 	echo "blob + $id_alpha" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
