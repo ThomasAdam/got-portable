@@ -249,7 +249,32 @@ function test_branch_delete {
 	test_done "$testroot" "$ret"
 }
 
+function test_branch_delete_current_branch {
+	local testroot=`test_init branch_delete_current_branch`
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt >/dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch -d master > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo "got: will not delete this work tree's current branch" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
 
 run_test test_branch_create
 run_test test_branch_list
 run_test test_branch_delete
+run_test test_branch_delete_current_branch

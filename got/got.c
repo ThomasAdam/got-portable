@@ -3104,10 +3104,11 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 }
 
 static const struct got_error *
-delete_branch(struct got_repository *repo, const char *branch_name)
+delete_branch(struct got_repository *repo, struct got_worktree *worktree,
+    const char *branch_name)
 {
 	const struct got_error *err = NULL;
-	struct got_reference *ref;
+	struct got_reference *ref = NULL;
 	char *refname;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1)
@@ -3117,9 +3118,18 @@ delete_branch(struct got_repository *repo, const char *branch_name)
 	if (err)
 		goto done;
 
+	if (worktree &&
+	    strcmp(got_worktree_get_head_ref_name(worktree),
+	    got_ref_get_name(ref)) == 0) {
+		err = got_error_msg(GOT_ERR_SAME_BRANCH,
+		    "will not delete this work tree's current branch");
+		goto done;
+	}
+
 	err = got_ref_delete(ref, repo);
-	got_ref_close(ref);
 done:
+	if (ref)
+		got_ref_close(ref);
 	free(refname);
 	return err;
 }
@@ -3276,7 +3286,7 @@ cmd_branch(int argc, char *argv[])
 	if (do_list)
 		error = list_branches(repo, worktree);
 	else if (delref)
-		error = delete_branch(repo, delref);
+		error = delete_branch(repo, worktree, delref);
 	else {
 		const char *base_branch;
 		if (argc == 1) {
