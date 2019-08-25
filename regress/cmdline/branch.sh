@@ -85,6 +85,24 @@ function test_branch_create {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "git checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a branch based on a specific commit
+	local commit_id=`git_show_head $testroot/repo`
+	got branch -r $testroot/repo commitbranch $commit_id
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got branch command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q commitbranch)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "git checkout command failed unexpectedly"
 	fi
 	test_done "$testroot" "$ret"
 }

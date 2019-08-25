@@ -475,7 +475,7 @@ which must be an existing reference.
 Care should be taken not to create loops between references when
 this option is used.
 .El
-.It Cm branch Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name Op Ar base-branch
+.It Cm branch Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name Op Ar commit
 Manage branches in a repository.
 .Pp
 Branches are managed via references which live in the
@@ -486,14 +486,19 @@ The
 command operates on references in this namespace only.
 .Pp
 If no options are passed, expect one or two arguments and attempt to create
-a branch with the given
+a branch reference with the given
 .Ar name ,
 and make it point at the given
-.Ar base-branch .
+.Ar commit .
+The expected
+.Ar commit
+argument is a commit ID SHA1 hash or an existing reference
+or tag name which will be resolved to a commit ID.
 If no
-.Ar base-branch
-is specified, default to the work tree's current branch if invoked in a
-work tree, or to the repository's HEAD reference.
+.Ar commit
+is specified, default to the latest commit on the work tree's current
+branch if invoked in a work tree, or to a commit resolved via the
+repository's HEAD reference.
 .Pp
 The options for
 .Cm got branch

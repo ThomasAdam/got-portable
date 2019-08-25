@@ -3056,7 +3056,7 @@ usage_branch(void)
 {
 	fprintf(stderr,
 	    "usage: %s branch [-r repository] -l | -d name | "
-	    "name [base-branch]\n", getprogname());
+	    "name [commit]\n", getprogname());
 	exit(1);
 }
 
@@ -3140,9 +3140,9 @@ add_branch(struct got_repository *repo, const char *branch_name,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *id = NULL;
+	char *label;
 	struct got_reference *ref = NULL;
 	char *base_refname = NULL, *refname = NULL;
-	struct got_reference *base_ref;
 
 	/*
 	 * Don't let the user create a branch named '-'.
@@ -3152,20 +3152,10 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	if (branch_name[0] == '-' && branch_name[1] == '\0')
 		return got_error(GOT_ERR_BAD_REF_NAME);
 
-	if (strcmp(GOT_REF_HEAD, base_branch) == 0) {
-		base_refname = strdup(GOT_REF_HEAD);
-		if (base_refname == NULL)
-			return got_error_from_errno("strdup");
-	} else if (asprintf(&base_refname, "refs/heads/%s", base_branch) == -1)
-		return got_error_from_errno("asprintf");
-
-	err = got_ref_open(&base_ref, repo, base_refname, 0);
+	err = match_object_id(&id, &label, base_branch,
+	    GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (err)
-		goto done;
-	err = got_ref_resolve(&id, repo, base_ref);
-	got_ref_close(base_ref);
-	if (err)
-		goto done;
+		return err;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		 err = got_error_from_errno("asprintf");
