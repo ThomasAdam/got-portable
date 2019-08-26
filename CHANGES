@@ -1,3 +1,14 @@
+* got 0.12; 2019-08-26
+- add support for path arguments to 'got cat'
+- make 'got log -p path' display patches for the specified path only
+- allow creating branches based on commit IDs
+- prevent deletion of the work tree's current branch
+- detect and ignore Git submodules
+- indicate non-existent path arguments in 'got status'
+- make 'got diff' error for non-existent path arguments
+- make 'got tag -l' list tags by time stamp in descending order
+- fix reading pack index files with large offsets (patch by Hiltjo Posthuma)
+
 * got 0.11; 2019-08-23
 - add 'got tag' command
 - add 'got cat' command
