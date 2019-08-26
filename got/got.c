@@ -6544,8 +6544,8 @@ done:
 __dead static void
 usage_cat(void)
 {
-	fprintf(stderr, "usage: %s cat [-r repository ] object1 "
-	    "[object2 ...]\n", getprogname());
+	fprintf(stderr, "usage: %s cat [-r repository ] [ -c commit ] [ -P ] "
+	    "arg1 [arg2 ...]\n", getprogname());
 	exit(1);
 }
 
@@ -6703,8 +6703,9 @@ cmd_cat(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *label = NULL;
-	struct got_object_id *id = NULL;
-	int ch, obj_type, i;
+	const char *commit_id_str = NULL;
+	struct got_object_id *id = NULL, *commit_id = NULL;
+	int ch, obj_type, i, force_path = 0;
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -6712,13 +6713,19 @@ cmd_cat(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "r:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:r:P")) != -1) {
 		switch (ch) {
+		case 'c':
+			commit_id_str = optarg;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
 				err(1, "-r option");
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'P':
+			force_path = 1;
 			break;
 		default:
 			usage_cat();
@@ -6763,11 +6770,31 @@ cmd_cat(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (commit_id_str == NULL)
+		commit_id_str = GOT_REF_HEAD;
+	error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+	if (error)
+		goto done;
+
 	for (i = 0; i < argc; i++) {
-		error = match_object_id(&id, &label, argv[i],
-		    GOT_OBJ_TYPE_ANY, 0, repo);
-		if (error)
-			break;
+		if (force_path) {
+			error = got_object_id_by_path(&id, repo, commit_id,
+			    argv[i]);
+			if (error)
+				break;
+		} else {
+			error = match_object_id(&id, &label, argv[i],
+			    GOT_OBJ_TYPE_ANY, 0, repo);
+			if (error) {
+				if (error->code != GOT_ERR_BAD_OBJ_ID_STR &&
+				    error->code != GOT_ERR_NOT_REF)
+					break;
+				error = got_object_id_by_path(&id, repo,
+				    commit_id, argv[i]);
+				if (error)
+					break;
+			}
+		}
 
 		error = got_object_get_type(&obj_type, repo, id);
 		if (error)
@@ -6801,6 +6828,7 @@ cmd_cat(int argc, char *argv[])
 done:
 	free(label);
 	free(id);
+	free(commit_id);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {

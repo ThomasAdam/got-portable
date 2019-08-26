@@ -1151,19 +1151,38 @@ file instead of prompting interactively.
 .It Cm ug
 Short alias for
 .Cm unstage .
-.It Cm cat Oo Fl r Ar repository-path Oc Ar object ...
-Parse and print contents of specified objects to standard output
-in a line-based text format.
-Treat each argument as a reference, a tag name, or an object ID SHA1 hash.
+.It Cm cat Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar arg ...
+Parse and print contents of objects to standard output in a line-based
+text format.
+Content of commit, tree, and tag objects is printed in a way similar
+to the actual content stored in such objects.
+Blob object contents are printed as they would appear in files on disk.
+.Pp
+Attempt to interpret each argument as a reference, a tag name, or
+an object ID SHA1 hash.
 References will be resolved to an object ID.
 Tag names will resolved to a tag object.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 .Pp
+If none of the above interpretations produce a valid result, or if the
+.Fl P
+option is used, attempt to interpret the argument as a path which will
+be resolved to the ID of an object found at this path in the repository.
+.Pp
 The options for
 .Cm got cat
 are as follows:
 .Bl -tag -width Ds
+.It Fl c Ar commit
+Look up paths in the specified
+.Ar commit .
+If this option is not used, paths are looked up in the commit resolved
+via the repository's HEAD reference.
+The expected argument is a commit ID SHA1 hash or an existing reference
+or tag name which will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -1171,6 +1190,10 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
+.It Fl P
+Interpret all arguments as paths only.
+This option can be used to resolve ambiguity in cases where paths
+look like tag names, reference names, or object IDs.
 .El
 .El
 .Sh ENVIRONMENT
