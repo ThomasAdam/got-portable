@@ -39,10 +39,12 @@
 /lib/diffreg.c
 /lib/error.c
 /lib/fileindex.c
+/lib/gitconfig.c
 /lib/got_lib_deflate.h
 /lib/got_lib_delta.h
 /lib/got_lib_diff.h
 /lib/got_lib_fileindex.h
+/lib/got_lib_gitconfig.h
 /lib/got_lib_inflate.h
 /lib/got_lib_lockfile.h
 /lib/got_lib_object.h
