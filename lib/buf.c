@@ -69,8 +69,10 @@ buf_alloc(size_t len)
 	/* Postpone creation of zero-sized buffers */
 	if (len > 0) {
 		b->cb_buf = calloc(1, len);
-		if (b->cb_buf == NULL)
+		if (b->cb_buf == NULL) {
+			free(b);
 			return NULL;
+		}
 	} else
 		b->cb_buf = NULL;
 
