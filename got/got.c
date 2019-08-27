@@ -1845,7 +1845,18 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, path, 1);
+	if (worktree) {
+		const char *prefix = got_worktree_get_path_prefix(worktree);
+		char *p;
+		if (asprintf(&p, "%s%s%s", prefix,
+		    (strcmp(prefix, "/") != 0) ? "/" : "", path) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		error = got_repo_map_path(&in_repo_path, repo, p, 1);
+		free(p);
+	} else
+		error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error != NULL)
 		goto done;
 	if (in_repo_path) {
