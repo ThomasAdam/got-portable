@@ -2035,7 +2035,7 @@ match_object_id(struct got_object_id **id, char **label,
 			else if (asprintf(label, "refs/tags/%s",
 			    got_object_tag_get_name(tag)) == -1) {
 				err = got_error_from_errno("asprintf");
-				free(id);
+				free(*id);
 				*id = NULL;
 			}
 			got_object_tag_close(tag);
