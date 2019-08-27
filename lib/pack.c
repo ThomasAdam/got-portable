@@ -329,8 +329,11 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		return got_error_from_errno("calloc");
 
 	p->fd = open(path, O_RDONLY | O_NOFOLLOW);
-	if (p->fd == -1)
-		return got_error_from_errno2("open", path);
+	if (p->fd == -1) {
+		err = got_error_from_errno2("open", path);
+		free(p);
+		return err;
+	}
 
 	if (fstat(p->fd, &sb) != 0) {
 		err = got_error_from_errno2("fstat", path);
