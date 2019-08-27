@@ -110,6 +110,42 @@ function test_log_in_worktree {
 	test_done "$testroot" "0"
 }
 
+function test_log_in_prefixed_worktree {
+	local testroot=`test_init log_in_prefixed_worktree`
+	local head_rev=`git_show_head $testroot/repo`
+
+	echo "modified zeta" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "modified zeta"
+	local zeta_rev=`git_show_head $testroot/repo`
+
+	echo "modified delta" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "modified delta"
+
+	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "commit $zeta_rev" > $testroot/stdout.expected
+	echo "commit $head_rev" >> $testroot/stdout.expected
+
+	for p in "" "." zeta; do
+		(cd $testroot/wt && got log $p | \
+			grep ^commit > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
+}
+
 function test_log_tag {
 	local testroot=`test_init log_tag`
 	local commit_id=`git_show_head $testroot/repo`
@@ -232,5 +268,6 @@ function test_log_limit {
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
+run_test test_log_in_prefixed_worktree
 run_test test_log_tag
 run_test test_log_limit
