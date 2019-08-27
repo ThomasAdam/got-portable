@@ -6206,8 +6206,8 @@ cmd_histedit(int argc, char *argv[])
 
 	}
 
-	 error = histedit_check_script(&histedit_cmds, &commits, repo);
-	 if (error)
+	error = histedit_check_script(&histedit_cmds, &commits, repo);
+	if (error)
 		goto done;
 
 	TAILQ_FOREACH(hle, &histedit_cmds, entry) {
