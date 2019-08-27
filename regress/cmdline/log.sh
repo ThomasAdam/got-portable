@@ -110,7 +110,7 @@ function test_log_in_worktree {
 	test_done "$testroot" "0"
 }
 
-function test_log_in_prefixed_worktree {
+function test_log_in_worktree_with_path_prefix {
 	local testroot=`test_init log_in_prefixed_worktree`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -268,6 +268,6 @@ function test_log_limit {
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
-run_test test_log_in_prefixed_worktree
+run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
