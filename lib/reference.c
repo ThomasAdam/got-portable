@@ -793,6 +793,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
+	const char *ondisk_ref_namespace = NULL;
 	FILE *f = NULL;
 	struct got_reference *ref;
 	struct got_reflist_entry *new;
@@ -814,8 +815,9 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			goto done;
 	}
 
+	ondisk_ref_namespace = ref_namespace;
 	if (ref_namespace && strncmp(ref_namespace, "refs/", 5) == 0)
-		ref_namespace += 5;
+		ondisk_ref_namespace += 5;
 
 	/* Gather on-disk refs before parsing packed-refs. */
 	free(path_refs);
@@ -825,7 +827,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		goto done;
 	}
 	err = gather_on_disk_refs(refs, path_refs,
-	    ref_namespace ? ref_namespace : "", repo, cmp_cb, cmp_arg);
+	    ondisk_ref_namespace ? ondisk_ref_namespace : "", repo,
+	    cmp_cb, cmp_arg);
 	if (err)
 		goto done;
 

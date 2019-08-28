@@ -248,6 +248,19 @@ function test_branch_delete {
 		return 1
 	fi
 
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/branch1: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	got branch -d bogus_branch_name -r $testroot/repo \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
@@ -292,7 +305,76 @@ function test_branch_delete_current_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_branch_delete_packed {
+	local testroot=`test_init branch_delete_packed`
+	local commit_id=`git_show_head $testroot/repo`
+
+	for b in branch1 branch2 branch3; do
+		got branch -r $testroot/repo $b
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			echo "got branch command failed unexpectedly"
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	(cd $testroot/repo && git pack-refs --all)
+
+	got branch -d branch2 -r $testroot/repo > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got branch -l -r $testroot/repo > $testroot/stdout
+	echo "  branch1: $commit_id" > $testroot/stdout.expected
+	echo "  branch3: $commit_id" >> $testroot/stdout.expected
+	echo "  master: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/branch1: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got branch -d bogus_branch_name -r $testroot/repo \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got update succeeded unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: reference refs/heads/bogus_branch_name not found" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_branch_create
 run_test test_branch_list
 run_test test_branch_delete
 run_test test_branch_delete_current_branch
+run_test test_branch_delete_packed
