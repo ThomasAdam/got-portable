@@ -907,7 +907,7 @@ mbs2ws(wchar_t **ws, size_t *wlen, const char *s)
 		}
 	}
 
-	*ws = calloc(*wlen + 1, sizeof(*ws));
+	*ws = calloc(*wlen + 1, sizeof(**ws));
 	if (*ws == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
