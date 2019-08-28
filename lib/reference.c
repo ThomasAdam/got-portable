@@ -123,6 +123,7 @@ alloc_symref(struct got_reference **ref, const char *name,
 		err = got_error_from_errno("strdup");
 		got_ref_close(*ref);
 		*ref = NULL;
+		return err;
 	}
 	(*ref)->ref.symref.ref = strdup(target_ref);
 	if ((*ref)->ref.symref.ref == NULL) {
