@@ -455,7 +455,6 @@ const struct got_error *
 got_worktree_close(struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	free(worktree->root_path);
 	free(worktree->repo_path);
 	free(worktree->path_prefix);
 	free(worktree->base_commit_id);
@@ -464,6 +463,7 @@ got_worktree_close(struct got_worktree *worktree)
 		if (close(worktree->lockfd) != 0)
 			err = got_error_from_errno2("close",
 			    got_worktree_get_root_path(worktree));
+	free(worktree->root_path);
 	free(worktree);
 	return err;
 }
