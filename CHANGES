@@ -1,3 +1,9 @@
+* got 0.13; 2019-08-30
+- fix several possible leaks, use after frees, and NULL derefs (hiltjo)
+- tog: mbs2ws: fix sizeof of element for memory allocation (hiltjo)
+- fix deletion of branches stored in packed-refs
+- fix 'got log path' in a work tree with a path prefix (with Evan Silberman)
+
 * got 0.12; 2019-08-26
 - add support for path arguments to 'got cat'
 - make 'got log -p path' display patches for the specified path only
