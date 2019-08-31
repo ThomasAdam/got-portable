@@ -3858,6 +3858,11 @@ cmd_blame(int argc, char *argv[])
 	error = open_blame_view(view, in_repo_path, commit_id, &refs, repo);
 	if (error)
 		goto done;
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
 	error = view_loop(view);
 done:
 	free(repo_path);
