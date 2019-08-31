@@ -2201,7 +2201,7 @@ cmd_log(int argc, char *argv[])
 	struct got_reflist_head refs;
 	struct got_object_id *start_id = NULL;
 	char *path = NULL, *repo_path = NULL, *cwd = NULL;
-	char *start_commit = NULL;
+	char *start_commit = NULL, *head_ref_name = NULL;
 	int ch;
 	struct tog_view *view;
 
@@ -2312,16 +2312,30 @@ cmd_log(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_log_view(view, start_id, &refs, repo, worktree ?
-	    got_worktree_get_head_ref_name(worktree) : NULL, path, 1);
+	if (worktree) {
+		head_ref_name = strdup(
+		    got_worktree_get_head_ref_name(worktree));
+		if (head_ref_name == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+	error = open_log_view(view, start_id, &refs, repo, head_ref_name,
+	    path, 1);
 	if (error)
 		goto done;
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
 	error = view_loop(view);
 done:
 	free(repo_path);
 	free(cwd);
 	free(path);
 	free(start_id);
+	free(head_ref_name);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
