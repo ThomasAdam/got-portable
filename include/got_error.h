@@ -323,7 +323,7 @@ const struct got_error *got_error_no_obj(struct got_object_id *);
 const struct got_error *got_error_not_ref(const char *);
 
 /* Return an error based on a uuid(3) status code. */
-const struct got_error *got_error_uuid(uint32_t);
+const struct got_error *got_error_uuid(uint32_t, const char *);
 
 /* Return an error with a path prefixed to the error message. */
 const struct got_error *got_error_path(const char *, int);

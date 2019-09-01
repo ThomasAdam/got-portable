@@ -157,7 +157,7 @@ got_error_not_ref(const char *refname)
 }
 
 const struct got_error *
-got_error_uuid(uint32_t uuid_status)
+got_error_uuid(uint32_t uuid_status, const char *prefix)
 {
 	switch (uuid_status) {
 	case uuid_s_ok:
@@ -167,7 +167,7 @@ got_error_uuid(uint32_t uuid_status)
 	case uuid_s_invalid_string_uuid:
 		return got_error(GOT_ERR_UUID_INVALID);
 	case uuid_s_no_memory:
-		return got_error_set_errno(ENOMEM, NULL);
+		return got_error_set_errno(ENOMEM, prefix);
 	default:
 		return got_error(GOT_ERR_UUID);
 	}

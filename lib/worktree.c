@@ -284,12 +284,12 @@ got_worktree_init(const char *path, struct got_reference *head_ref,
 	/* Generate UUID. */
 	uuid_create(&uuid, &uuid_status);
 	if (uuid_status != uuid_s_ok) {
-		err = got_error_uuid(uuid_status);
+		err = got_error_uuid(uuid_status, "uuid_create");
 		goto done;
 	}
 	uuid_to_string(&uuid, &uuidstr, &uuid_status);
 	if (uuid_status != uuid_s_ok) {
-		err = got_error_uuid(uuid_status);
+		err = got_error_uuid(uuid_status, "uuid_to_string");
 		goto done;
 	}
 	err = create_meta_file(path_got, GOT_WORKTREE_UUID, uuidstr);
@@ -397,7 +397,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		goto done;
 	uuid_from_string(uuidstr, &(*worktree)->uuid, &uuid_status);
 	if (uuid_status != uuid_s_ok) {
-		err = got_error_uuid(uuid_status);
+		err = got_error_uuid(uuid_status, "uuid_from_string");
 		goto done;
 	}
 
@@ -1455,7 +1455,7 @@ get_ref_name(char **refname, struct got_worktree *worktree, const char *prefix)
 
 	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
 	if (uuid_status != uuid_s_ok)
-		return got_error_uuid(uuid_status);
+		return got_error_uuid(uuid_status, "uuid_to_string");
 
 	if (asprintf(refname, "%s-%s", prefix, uuidstr)
 	    == -1) {
