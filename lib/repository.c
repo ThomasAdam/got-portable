@@ -312,6 +312,7 @@ open_repo(struct got_repository *repo, const char *path)
 
 	/* git repository with working tree? */
 	free(repo->path_git_dir);
+	repo->path_git_dir = NULL;
 	if (asprintf(&repo->path_git_dir, "%s/%s", path, GOT_GIT_DIR) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
