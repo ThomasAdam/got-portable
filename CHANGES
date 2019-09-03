@@ -1,3 +1,10 @@
+* got 0.14; 2019-09-03
+- fix tag_list test failure on single-day-digit dates (patch by Evan Silberman)
+- prevent theoretical double-free with non-OpenBSD asprintf (found by jasper@)
+- fix NULL deref in got_error_from_errno via got_error_uuid (found by jasper@)
+- make tog release its work tree lock before going into main loop
+- 'got stage' writes to repository, fix unveil(2) call accordingly
+
 * got 0.13; 2019-08-30
 - fix several possible leaks, use after frees, and NULL derefs (hiltjo)
 - tog: mbs2ws: fix sizeof of element for memory allocation (hiltjo)
