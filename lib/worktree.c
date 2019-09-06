@@ -3918,7 +3918,8 @@ done:
 
 static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
-    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex)
+    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
+    int have_staged_files)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
@@ -3939,11 +3940,13 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				    GOT_FILEIDX_STAGE_NONE);
 				err = got_fileindex_entry_update(ie,
 				    ct->ondisk_path, ct->staged_blob_id->sha1,
-				    new_base_commit_id->sha1, 1);
+				    new_base_commit_id->sha1,
+				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
 				    ct->ondisk_path, ct->blob_id->sha1,
-				    new_base_commit_id->sha1, 1);
+				    new_base_commit_id->sha1,
+				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie,
 			    ct->ondisk_path, pe->path, ct->blob_id->sha1,
@@ -4282,7 +4285,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
-	    fileindex);
+	    fileindex, have_staged_files);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
@@ -4860,7 +4863,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 		goto done;
 
 	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
-	    fileindex);
+	    fileindex, 0);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;

@@ -1382,8 +1382,10 @@ function test_stage_commit {
 		return 1
 	fi
 
-	echo 'A  epsilon/new' > $testroot/stdout.expected
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'A  epsilon/new' >> $testroot/stdout.expected
 	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'M  foo' >> $testroot/stdout.expected
 	echo 'M  gamma/delta' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got status > $testroot/stdout)
