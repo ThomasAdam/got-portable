@@ -2451,7 +2451,7 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 
 	ignoresfile = fopen(ignorespath, "r");
 	if (ignoresfile == NULL) {
-		if (errno != ENOENT)
+		if (errno != ENOENT && errno != EACCES)
 			err = got_error_from_errno2("fopen",
 			    ignorespath);
 	} else
@@ -2541,7 +2541,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 
 	workdir = opendir(ondisk_path);
 	if (workdir == NULL) {
-		if (errno != ENOTDIR && errno != ENOENT)
+		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES)
 			err = got_error_from_errno2("opendir", ondisk_path);
 		else
 			err = report_single_file_status(path, ondisk_path,

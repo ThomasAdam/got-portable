@@ -926,6 +926,10 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 
 		subdir = opendir(subdirpath);
 		if (subdir == NULL) {
+			if (errno == EACCES) {
+				*next = TAILQ_NEXT(dle, entry);
+				return NULL;
+			}
 			err = got_error_from_errno2("opendir", subdirpath);
 			free(subpath);
 			free(subdirpath);

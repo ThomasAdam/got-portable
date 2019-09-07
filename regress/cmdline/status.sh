@@ -33,6 +33,7 @@ function test_status_basic {
 	touch $testroot/wt/beta
 	echo "new file" > $testroot/wt/new
 	(cd $testroot/wt && got add new >/dev/null)
+	mkdir -m 0000 $testroot/wt/bar
 
 	echo 'M  alpha' > $testroot/stdout.expected
 	echo 'D  beta' >> $testroot/stdout.expected
@@ -47,6 +48,8 @@ function test_status_basic {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
+	chmod 700 $testroot/wt/bar
+	rmdir $testroot/wt/bar
 	test_done "$testroot" "$ret"
 }
 
