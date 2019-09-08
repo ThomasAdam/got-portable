@@ -97,7 +97,9 @@ and
 .Dv user.email configuration settings can be
 obtained from the repository's
 .Pa .git/config
-file.
+file or from Git's global
+.Pa ~/.gitconfig
+configuration file.
 .Pp
 The options for
 .Cm got import
@@ -704,7 +706,9 @@ and
 .Dv user.email configuration settings can be
 obtained from the repository's
 .Pa .git/config
-file.
+file or from Git's global
+.Pa ~/.gitconfig
+configuration file.
 .Pp
 The options for
 .Cm got commit
@@ -1226,13 +1230,25 @@ may fail to parse commits without an email address in author data,
 attempts to reject
 .Ev GOT_AUTHOR
 environment variables with a missing email address.
-Git's
+.Pp
+If present, Git's
 .Dv user.name
 and
 .Dv user.email configuration settings in the repository's
 .Pa .git/config
 file will override the value of
 .Ev GOT_AUTHOR .
+However, the
+.Dv user.name
+and
+.Dv user.email
+configuration settings contained in Git's global
+.Pa ~/.gitconfig
+configuration file will be used only if the
+.Ev GOT_AUTHOR
+environment variable is
+.Em not
+set.
 .It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit ,

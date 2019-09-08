@@ -19,7 +19,8 @@ struct got_pathlist_head;
 struct got_tag_object;
 
 /* Open and close repositories. */
-const struct got_error *got_repo_open(struct got_repository**, const char *);
+const struct got_error *got_repo_open(struct got_repository**, const char *,
+    const char *);
 const struct got_error *got_repo_close(struct got_repository*);
 
 /* Obtain the on-disk path to the repository. */
@@ -36,6 +37,12 @@ const char *got_repo_get_gitconfig_author_name(struct got_repository *);
 
 /* Obtain the commit author email if parsed from gitconfig, else NULL. */
 const char *got_repo_get_gitconfig_author_email(struct got_repository *);
+
+/* Obtain global commit author name parsed ~/.gitconfig, else NULL. */
+const char *got_repo_get_global_gitconfig_author_name(struct got_repository *);
+
+/* Obtain global commit author email parsed ~/.gitconfig, else NULL. */
+const char *got_repo_get_global_gitconfig_author_email(struct got_repository *);
 
 /*
  * Obtain paths to various directories within a repository.

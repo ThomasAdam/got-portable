@@ -401,7 +401,7 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 
-	err = got_repo_open(&repo, (*worktree)->repo_path);
+	err = got_repo_open(&repo, (*worktree)->repo_path, NULL);
 	if (err)
 		goto done;
 

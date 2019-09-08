@@ -495,21 +495,27 @@ static const struct got_error *
 get_author(char **author, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	const char *got_author, *gitconfig_name, *gitconfig_email;
+	const char *got_author, *name, *email;
 
 	*author = NULL;
 
-	gitconfig_name = got_repo_get_gitconfig_author_name(repo);
-	gitconfig_email = got_repo_get_gitconfig_author_email(repo);
-	if (gitconfig_name && gitconfig_email) {
-		if (asprintf(author, "%s <%s>",
-		    gitconfig_name, gitconfig_email) == -1)
+	name = got_repo_get_gitconfig_author_name(repo);
+	email = got_repo_get_gitconfig_author_email(repo);
+	if (name && email) {
+		if (asprintf(author, "%s <%s>", name, email) == -1)
 			return got_error_from_errno("asprintf");
 		return NULL;
 	}
 
 	got_author = getenv("GOT_AUTHOR");
 	if (got_author == NULL) {
+		name = got_repo_get_global_gitconfig_author_name(repo);
+		email = got_repo_get_global_gitconfig_author_email(repo);
+		if (name && email) {
+			if (asprintf(author, "%s <%s>", name, email) == -1)
+				return got_error_from_errno("asprintf");
+			return NULL;
+		}
 		/* TODO: Look up user in password database? */
 		return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
 	}
@@ -547,11 +553,25 @@ done:
 }
 
 static const struct got_error *
+get_gitconfig_path(char **gitconfig_path)
+{
+	const char *homedir = getenv("HOME");
+
+	*gitconfig_path = NULL;
+	if (homedir) {
+		if (asprintf(gitconfig_path, "%s/.gitconfig", homedir) == -1)
+			return got_error_from_errno("asprintf");
+
+	}
+	return NULL;
+}
+
+static const struct got_error *
 cmd_import(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
-	char *editor = NULL, *author = NULL;
+	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	const char *branch_name = "master";
 	char *refname = NULL, *id_str = NULL;
 	struct got_repository *repo = NULL;
@@ -614,7 +634,10 @@ cmd_import(int argc, char *argv[])
 			return got_error_from_errno("getcwd");
 	}
 	got_path_strip_trailing_slashes(repo_path);
-	error = got_repo_open(&repo, repo_path);
+	error = get_gitconfig_path(&gitconfig_path);
+	if (error)
+		goto done;
+	error = got_repo_open(&repo, repo_path, gitconfig_path);
 	if (error)
 		goto done;
 
@@ -705,6 +728,7 @@ done:
 	free(new_commit_id);
 	free(id_str);
 	free(author);
+	free(gitconfig_path);
 	if (branch_ref)
 		got_ref_close(branch_ref);
 	if (head_ref)
@@ -986,7 +1010,7 @@ cmd_checkout(int argc, char *argv[])
 	got_path_strip_trailing_slashes(repo_path);
 	got_path_strip_trailing_slashes(worktree_path);
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -1239,7 +1263,8 @@ cmd_update(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -1795,7 +1820,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -2194,7 +2219,7 @@ cmd_diff(int argc, char *argv[])
 			return got_error_from_errno("getcwd");
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	free(repo_path);
 	if (error != NULL)
 		goto done;
@@ -2491,7 +2516,7 @@ cmd_blame(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -2790,7 +2815,7 @@ cmd_tree(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -2911,7 +2936,8 @@ cmd_status(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -3146,7 +3172,7 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -3386,7 +3412,7 @@ cmd_branch(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -3764,6 +3790,7 @@ cmd_tag(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *commit_id_str = NULL;
+	char *gitconfig_path = NULL;
 	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0;
 
@@ -3840,17 +3867,22 @@ cmd_tag(int argc, char *argv[])
 		}
 	}
 
-	error = got_repo_open(&repo, repo_path);
-	if (error != NULL)
-		goto done;
-
-
 	if (do_list) {
+		error = got_repo_open(&repo, repo_path, NULL);
+		if (error != NULL)
+			goto done;
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
 		error = list_tags(repo, worktree);
 	} else {
+		error = get_gitconfig_path(&gitconfig_path);
+		if (error)
+			goto done;
+		error = got_repo_open(&repo, repo_path, gitconfig_path);
+		if (error != NULL)
+			goto done;
+
 		if (tagmsg) {
 			error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 			if (error)
@@ -3885,6 +3917,7 @@ done:
 		got_worktree_close(worktree);
 	free(cwd);
 	free(repo_path);
+	free(gitconfig_path);
 	free(commit_id_str);
 	return error;
 }
@@ -3938,7 +3971,8 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -4030,7 +4064,8 @@ cmd_remove(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error)
 		goto done;
 
@@ -4244,7 +4279,8 @@ cmd_revert(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -4406,7 +4442,7 @@ cmd_commit(int argc, char *argv[])
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
 	struct collect_commit_logmsg_arg cl_arg;
-	char *editor = NULL, *author = NULL;
+	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	int ch, rebase_in_progress, histedit_in_progress;
 	struct got_pathlist_head paths;
 
@@ -4454,7 +4490,11 @@ cmd_commit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = get_gitconfig_path(&gitconfig_path);
+	if (error)
+		goto done;
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    gitconfig_path);
 	if (error != NULL)
 		goto done;
 
@@ -4514,6 +4554,7 @@ done:
 		got_worktree_close(worktree);
 	free(cwd);
 	free(id_str);
+	free(gitconfig_path);
 	free(editor);
 	free(author);
 	return error;
@@ -4567,7 +4608,8 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -4682,7 +4724,8 @@ cmd_backout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -5073,7 +5116,8 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -6067,7 +6111,8 @@ cmd_histedit(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -6425,7 +6470,8 @@ cmd_stage(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -6532,7 +6578,8 @@ cmd_unstage(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
 	if (error != NULL)
 		goto done;
 
@@ -6793,7 +6840,7 @@ cmd_cat(int argc, char *argv[])
 			return got_error_from_errno("getcwd");
 	}
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	free(repo_path);
 	if (error != NULL)
 		goto done;

@@ -1905,7 +1905,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	view->search_start = search_start_log_view;
 	view->search_next = search_next_log_view;
 
-	err = got_repo_open(&thread_repo, got_repo_get_path(repo));
+	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
 	if (err)
 		goto done;
 	err = got_commit_graph_open(&thread_graph, start_id, s->in_repo_path,
@@ -2278,7 +2278,7 @@ cmd_log(int argc, char *argv[])
 
 	init_curses();
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -2924,7 +2924,7 @@ cmd_diff(int argc, char *argv[])
 
 	init_curses();
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
 
@@ -3307,7 +3307,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		goto done;
 	}
 
-	err = got_repo_open(&thread_repo, got_repo_get_path(repo));
+	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
 	if (err)
 		goto done;
 
@@ -3800,7 +3800,7 @@ cmd_blame(int argc, char *argv[])
 
 	init_curses();
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -4579,7 +4579,7 @@ cmd_tree(int argc, char *argv[])
 
 	init_curses();
 
-	error = got_repo_open(&repo, repo_path);
+	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
