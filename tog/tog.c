@@ -2393,7 +2393,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 		waddwstr(view->window, wline);
 		if (view_needs_focus_indication(view))
 			wstandend(view->window);
-		if (width < view->ncols - 1)
+		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 
 		if (max_lines <= 1)
@@ -2419,7 +2419,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			return err;
 		}
 		waddwstr(view->window, wline);
-		if (width < view->ncols - 1)
+		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = nlines;
