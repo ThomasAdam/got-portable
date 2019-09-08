@@ -912,10 +912,10 @@ update_blob_fileindex_entry(struct got_worktree *worktree,
 
 static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
-   const char *path, uint16_t te_mode, uint16_t st_mode,
-   struct got_blob_object *blob, int restoring_missing_file,
-   int reverting_versioned_file, struct got_repository *repo,
-   got_worktree_checkout_cb progress_cb, void *progress_arg)
+    const char *path, uint16_t te_mode, uint16_t st_mode,
+    struct got_blob_object *blob, int restoring_missing_file,
+    int reverting_versioned_file, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
@@ -1582,7 +1582,7 @@ get_fileindex_path(char **fileindex_path, struct got_worktree *worktree)
 
 static const struct got_error *
 open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
-   struct got_worktree *worktree)
+    struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
 	FILE *index = NULL;
