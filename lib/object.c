@@ -181,30 +181,6 @@ get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 	return NULL;
 }
 
-static void
-exec_privsep_child(int imsg_fds[2], const char *path, const char *repo_path)
-{
-	if (close(imsg_fds[0]) != 0) {
-		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
-		_exit(1);
-	}
-
-	if (dup2(imsg_fds[1], GOT_IMSG_FD_CHILD) == -1) {
-		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
-		_exit(1);
-	}
-	if (closefrom(GOT_IMSG_FD_CHILD + 1) == -1) {
-		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
-		_exit(1);
-	}
-
-	if (execl(path, path, repo_path, (char *)NULL) == -1) {
-		fprintf(stderr, "%s: %s: %s\n", getprogname(), path,
-		    strerror(errno));
-		_exit(1);
-	}
-}
-
 static const struct got_error *
 request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
     struct got_object_id *id)
@@ -272,7 +248,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		goto done;
 	} else if (pid == 0) {
 		set_max_datasize();
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_PACK,
 		    pack->path_packfile);
 		/* not reached */
 	}
@@ -392,7 +368,7 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 	if (pid == -1)
 		return got_error_from_errno("fork");
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_OBJECT,
 		    repo->path);
 		/* not reached */
 	}
@@ -557,7 +533,7 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 	if (pid == -1)
 		return got_error_from_errno("fork");
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_COMMIT,
 		    repo->path);
 		/* not reached */
 	}
@@ -736,7 +712,7 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 	if (pid == -1)
 		return got_error_from_errno("fork");
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_TREE,
 		    repo->path);
 		/* not reached */
 	}
@@ -957,7 +933,7 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 	if (pid == -1)
 		return got_error_from_errno("fork");
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_BLOB,
 		    repo->path);
 		/* not reached */
 	}
@@ -1293,7 +1269,7 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 	if (pid == -1)
 		return got_error_from_errno("fork");
 	else if (pid == 0) {
-		exec_privsep_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_TAG,
 		    repo->path);
 		/* not reached */
 	}

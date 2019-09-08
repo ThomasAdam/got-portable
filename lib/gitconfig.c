@@ -307,7 +307,7 @@ conf_parse(struct got_gitconfig *conf, int trans, char *buf, size_t sz)
 }
 
 const struct got_error *
-got_gitconfig_open(struct got_gitconfig **conf, const char *gitconfig_path)
+got_gitconfig_open(struct got_gitconfig **conf, int fd)
 {
 	unsigned int i;
 
@@ -318,7 +318,7 @@ got_gitconfig_open(struct got_gitconfig **conf, const char *gitconfig_path)
 	for (i = 0; i < nitems((*conf)->bindings); i++)
 		LIST_INIT(&(*conf)->bindings[i]);
 	TAILQ_INIT(&(*conf)->trans_queue);
-	return got_gitconfig_reinit(*conf, gitconfig_path);
+	return got_gitconfig_reinit(*conf, fd);
 }
 
 static void
@@ -390,23 +390,16 @@ conf_begin(struct got_gitconfig *conf)
 
 /* Open the config file and map it into our address space, then parse it.  */
 const struct got_error *
-got_gitconfig_reinit(struct got_gitconfig *conf, const char *gitconfig_path)
+got_gitconfig_reinit(struct got_gitconfig *conf, int fd)
 {
 	const struct got_error *err = NULL;
-	int	 fd, trans;
+	int	 trans;
 	size_t	 sz;
 	char	*new_conf_addr = 0;
 	struct stat st;
 
-	fd = open(gitconfig_path, O_RDONLY, 0);
-	if (fd == -1) {
-		if (errno != ENOENT)
-			return got_error_from_errno2("open", gitconfig_path);
-		return NULL;
-	}
-
 	if (fstat(fd, &st)) {
-		err = got_error_from_errno2("fstat", gitconfig_path);
+		err = got_error_from_errno("fstat");
 		goto fail;
 	}
 
@@ -421,8 +414,6 @@ got_gitconfig_reinit(struct got_gitconfig *conf, const char *gitconfig_path)
 		err = got_error_from_errno("read");
 		goto fail;
 	}
-	close(fd);
-	fd = -1;
 
 	trans = conf_begin(conf);
 
@@ -438,8 +429,6 @@ got_gitconfig_reinit(struct got_gitconfig *conf, const char *gitconfig_path)
 
 fail:
 	free(new_conf_addr);
-	if (fd != -1)
-		close(fd);
 	return err;
 }
 

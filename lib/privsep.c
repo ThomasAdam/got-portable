@@ -1216,6 +1216,147 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 }
 
 const struct got_error *
+got_privsep_send_gitconfig_parse_req(struct imsgbuf *ibuf, int fd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_PARSE_REQUEST, 0, 0, fd,
+	    NULL, 0) == -1) {
+		err = got_error_from_errno("imsg_compose "
+		    "GITCONFIG_PARSE_REQUEST");
+		close(fd);
+		return err;
+	}
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_repository_format_version_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST, 0, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_author_name_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_AUTHOR_NAME_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_AUTHOR_NAME_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_author_email_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_AUTHOR_EMAIL_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_AUTHOR_EMAIL_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
+{
+	size_t len = value ? strlen(value) + 1 : 0;
+
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_STR_VAL, 0, 0, -1,
+	    value, len) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_STR_VAL");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	const size_t min_datalen = 0;
+
+	*str = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_GITCONFIG_STR_VAL:
+		if (datalen == 0)
+			break;
+		*str = malloc(datalen);
+		if (*str == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		if (strlcpy(*str, imsg.data, datalen) >= datalen)
+			err = got_error(GOT_ERR_NO_SPACE);
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_int(struct imsgbuf *ibuf, int value)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_INT_VAL, 0, 0, -1,
+	    &value, sizeof(value)) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_INT_VAL");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error), sizeof(int));
+
+	*val = 0;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_GITCONFIG_INT_VAL:
+		if (datalen != sizeof(*val)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		memcpy(val, imsg.data, sizeof(*val));
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
 got_privsep_unveil_exec_helpers(void)
 {
 	const char *helpers[] = {
@@ -1225,6 +1366,7 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_READ_TREE,
 	    GOT_PATH_PROG_READ_BLOB,
 	    GOT_PATH_PROG_READ_TAG,
+	    GOT_PATH_PROG_READ_GITCONFIG,
 	};
 	int i;
 
@@ -1235,4 +1377,28 @@ got_privsep_unveil_exec_helpers(void)
 	}
 
 	return NULL;
+}
+
+void
+got_privsep_exec_child(int imsg_fds[2], const char *path, const char *repo_path)
+{
+	if (close(imsg_fds[0]) != 0) {
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
+		_exit(1);
+	}
+
+	if (dup2(imsg_fds[1], GOT_IMSG_FD_CHILD) == -1) {
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
+		_exit(1);
+	}
+	if (closefrom(GOT_IMSG_FD_CHILD + 1) == -1) {
+		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
+		_exit(1);
+	}
+
+	if (execl(path, path, repo_path, (char *)NULL) == -1) {
+		fprintf(stderr, "%s: %s: %s\n", getprogname(), path,
+		    strerror(errno));
+		_exit(1);
+	}
 }

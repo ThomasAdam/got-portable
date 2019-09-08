@@ -39,15 +39,17 @@ struct got_gitconfig_list {
 struct got_gitconfig;
 
 void     got_gitconfig_free_list(struct got_gitconfig_list *);
-struct got_gitconfig_list *got_gitconfig_get_list(struct got_gitconfig *, char *, char *);
+struct got_gitconfig_list *got_gitconfig_get_list(struct got_gitconfig *,
+    char *, char *);
 struct got_gitconfig_list *got_gitconfig_get_tag_list(struct got_gitconfig *, char *);
-int got_gitconfig_get_num(struct got_gitconfig *, char *, char *, int);
-char *got_gitconfig_get_str(struct got_gitconfig *, char *, char *);
-const struct got_error *got_gitconfig_open(struct got_gitconfig **,
-    const char *);
+int got_gitconfig_get_num(struct got_gitconfig *, char *, char *,
+    int);
+char *got_gitconfig_get_str(struct got_gitconfig *, char *,
+    char *);
+const struct got_error *got_gitconfig_open(struct got_gitconfig **, int);
 void got_gitconfig_close(struct got_gitconfig *);
 int      got_gitconfig_match_num(struct got_gitconfig *, char *, char *, int);
-const struct got_error *got_gitconfig_reinit(struct got_gitconfig *, const char *);
+const struct got_error *got_gitconfig_reinit(struct got_gitconfig *, int);
 int      got_gitconfig_remove(struct got_gitconfig *, int, char *, char *);
 int      got_gitconfig_remove_section(struct got_gitconfig *, int, char *);
 int      got_gitconfig_set(struct got_gitconfig *, int, char *, char *, char *, int, int);

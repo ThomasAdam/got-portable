@@ -607,6 +607,44 @@ function test_commit_tree_entry_sorting {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_gitconfig_author {
+	local testroot=`test_init commit_gitconfig_author`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git config user.name 'Flan Luck')
+	(cd $testroot/repo && git config user.email 'flan_luck@openbsd.org')
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test gitconfig author' > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "from: Flan Luck <flan_luck@openbsd.org>" \
+		> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -622,3 +660,4 @@ run_test test_commit_selected_paths
 run_test test_commit_outside_refs_heads
 run_test test_commit_no_email
 run_test test_commit_tree_entry_sorting
+run_test test_commit_gitconfig_author

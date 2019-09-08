@@ -42,7 +42,9 @@ struct got_repository {
 	struct got_object_cache tagcache;
 
 	/* Settings read from Git configuration files. */
-	struct got_gitconfig *gitconfig;
+	int gitconfig_repository_format_version;
+	char *gitconfig_author_name;
+	char *gitconfig_author_email;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,

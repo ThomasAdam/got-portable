@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/syslimits.h>
@@ -56,7 +57,6 @@
 #include "got_lib_sha1.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
-#include "got_lib_gitconfig.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -86,6 +86,19 @@ const char *
 got_repo_get_path_git_dir(struct got_repository *repo)
 {
 	return repo->path_git_dir;
+}
+
+const char *
+got_repo_get_gitconfig_author_name(struct got_repository *repo)
+{
+	return repo->gitconfig_author_name;
+}
+
+/* Obtain the commit author email address parsed from gitconfig. */
+const char *
+got_repo_get_gitconfig_author_email(struct got_repository *repo)
+{
+	return repo->gitconfig_author_email;
 }
 
 int
@@ -337,12 +350,117 @@ done:
 	return err;
 }
 
+static const struct got_error *
+read_gitconfig(struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *child_err = NULL;
+	char *gitconfig_path = NULL;
+	int fd = -1;
+	int imsg_fds[2] = { -1, -1 };
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	/* TODO: Read settings from ~/.gitconfig as well? */
+
+	/* Read repository's .git/config file. */
+	err = get_path_gitconfig(&gitconfig_path, repo);
+	if (err)
+		return err;
+
+	fd = open(gitconfig_path, O_RDONLY);
+	if (fd == -1) {
+		if (errno == ENOENT) {
+			free(gitconfig_path);
+			return NULL;
+		}
+		err = got_error_from_errno2("open", gitconfig_path);
+		free(gitconfig_path);
+		return err;
+	}
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
+		err = got_error_from_errno("socketpair");
+		goto done;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno("fork");
+		goto done;
+	} else if (pid == 0) {
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_GITCONFIG,
+		    repo->path);
+		/* not reached */
+	}
+
+	if (close(imsg_fds[1]) == -1) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
+	imsg_fds[1] = -1;
+	imsg_init(ibuf, imsg_fds[0]);
+
+	err = got_privsep_send_gitconfig_parse_req(ibuf, fd);
+	if (err)
+		goto done;
+	fd = -1;
+
+	err = got_privsep_send_gitconfig_repository_format_version_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gitconfig_int(
+	    &repo->gitconfig_repository_format_version, ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_gitconfig_author_name_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gitconfig_str(&repo->gitconfig_author_name,
+	    ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_gitconfig_author_email_req(ibuf);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_gitconfig_str(&repo->gitconfig_author_email,
+	    ibuf);
+	if (err)
+		goto done;
+
+	imsg_clear(ibuf);
+	err = got_privsep_send_stop(imsg_fds[0]);
+	child_err = got_privsep_wait_for_child(pid);
+	if (child_err && err == NULL)
+		err = child_err;
+done:
+	if (imsg_fds[0] != -1 && close(imsg_fds[0]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", gitconfig_path);
+	free(gitconfig_path);
+	free(ibuf);
+	return err;
+}
+
 const struct got_error *
 got_repo_open(struct got_repository **repop, const char *path)
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath, *gitconfig_path = NULL;
+	char *abspath;
 	int i, tried_root = 0;
 
 	*repop = NULL;
@@ -409,24 +527,17 @@ got_repo_open(struct got_repository **repop, const char *path)
 		}
 	} while (path);
 
-	err = get_path_gitconfig(&gitconfig_path, repo);
+	err = read_gitconfig(repo);
 	if (err)
 		goto done;
-
-#ifdef notyet
-	err = got_gitconfig_open(&repo->gitconfig, gitconfig_path);
-	if (err)
-		goto done;
-#else
-	repo->gitconfig = NULL;
-#endif
+	if (repo->gitconfig_repository_format_version != 0)
+		err = got_error_path(path, GOT_ERR_GIT_REPO_FORMAT);
 done:
 	if (err)
 		got_repo_close(repo);
 	else
 		*repop = repo;
 	free(abspath);
-	free(gitconfig_path);
 	return err;
 }
 
@@ -470,8 +581,9 @@ got_repo_close(struct got_repository *repo)
 		    err == NULL)
 			err = got_error_from_errno("close");
 	}
-	if (repo->gitconfig)
-		got_gitconfig_close(repo->gitconfig);
+
+	free(repo->gitconfig_author_name);
+	free(repo->gitconfig_author_email);
 	free(repo);
 
 	return err;

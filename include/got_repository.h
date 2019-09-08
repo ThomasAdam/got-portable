@@ -31,6 +31,12 @@ const char *got_repo_get_path(struct got_repository *);
  */
 const char *got_repo_get_path_git_dir(struct got_repository *);
 
+/* Obtain the commit author name if parsed from gitconfig, else NULL. */
+const char *got_repo_get_gitconfig_author_name(struct got_repository *);
+
+/* Obtain the commit author email if parsed from gitconfig, else NULL. */
+const char *got_repo_get_gitconfig_author_email(struct got_repository *);
+
 /*
  * Obtain paths to various directories within a repository.
  * The caller must dispose of a path with free(3).

@@ -90,7 +90,14 @@ The
 .Cm got import
 command requires the
 .Ev GOT_AUTHOR
-environment variable to be set.
+environment variable to be set,
+unless Git's
+.Dv user.name
+and
+.Dv user.email configuration settings can be
+obtained from the repository's
+.Pa .git/config
+file.
 .Pp
 The options for
 .Cm got import
@@ -690,7 +697,14 @@ The
 .Cm got commit
 command requires the
 .Ev GOT_AUTHOR
-environment variable to be set.
+environment variable to be set,
+unless Git's
+.Dv user.name
+and
+.Dv user.email configuration settings can be
+obtained from the repository's
+.Pa .git/config
+file.
 .Pp
 The options for
 .Cm got commit
@@ -1204,7 +1218,7 @@ The author's name and email address for
 and
 .Cm got import ,
 for example:
-.An Flan Hacker Aq Mt flan_hacker@openbsd.org .
+.Dq An Flan Hacker Aq Mt flan_hacker@openbsd.org .
 Because
 .Xr git 1
 may fail to parse commits without an email address in author data,
@@ -1212,6 +1226,13 @@ may fail to parse commits without an email address in author data,
 attempts to reject
 .Ev GOT_AUTHOR
 environment variables with a missing email address.
+Git's
+.Dv user.name
+and
+.Dv user.email configuration settings in the repository's
+.Pa .git/config
+file will override the value of
+.Ev GOT_AUTHOR .
 .It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit ,

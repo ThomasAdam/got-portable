@@ -492,11 +492,21 @@ import_progress(void *arg, const char *path)
 }
 
 static const struct got_error *
-get_author(const char **author)
+get_author(char **author, struct got_repository *repo)
 {
-	const char *got_author;
+	const struct got_error *err = NULL;
+	const char *got_author, *gitconfig_name, *gitconfig_email;
 
 	*author = NULL;
+
+	gitconfig_name = got_repo_get_gitconfig_author_name(repo);
+	gitconfig_email = got_repo_get_gitconfig_author_email(repo);
+	if (gitconfig_name && gitconfig_email) {
+		if (asprintf(author, "%s <%s>",
+		    gitconfig_name, gitconfig_email) == -1)
+			return got_error_from_errno("asprintf");
+		return NULL;
+	}
 
 	got_author = getenv("GOT_AUTHOR");
 	if (got_author == NULL) {
@@ -504,7 +514,9 @@ get_author(const char **author)
 		return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
 	}
 
-	*author = got_author;
+	*author = strdup(got_author);
+	if (*author == NULL)
+		return got_error_from_errno("strdup");
 
 	/*
 	 * Really dumb email address check; we're only doing this to
@@ -512,18 +524,26 @@ get_author(const char **author)
 	 */
 	while (*got_author && *got_author != '<')
 		got_author++;
-	if (*got_author != '<')
-		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
+	if (*got_author != '<') {
+		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
+		goto done;
+	}
 	while (*got_author && *got_author != '@')
 		got_author++;
-	if (*got_author != '@')
-		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
+	if (*got_author != '@') {
+		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
+		goto done;
+	}
 	while (*got_author && *got_author != '>')
 		got_author++;
 	if (*got_author != '>')
-		return got_error(GOT_ERR_COMMIT_NO_EMAIL);
-
-	return NULL;
+		err = got_error(GOT_ERR_COMMIT_NO_EMAIL);
+done:
+	if (err) {
+		free(*author);
+		*author = NULL;
+	}
+	return err;
 }
 
 static const struct got_error *
@@ -531,8 +551,7 @@ cmd_import(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
-	char *editor = NULL;
-	const char *author;
+	char *editor = NULL, *author = NULL;
 	const char *branch_name = "master";
 	char *refname = NULL, *id_str = NULL;
 	struct got_repository *repo = NULL;
@@ -581,16 +600,13 @@ cmd_import(int argc, char *argv[])
 	argv += optind;
 
 #ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath fattr flock proc exec unveil",
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil",
 	    NULL) == -1)
 		err(1, "pledge");
 #endif
 	if (argc != 1)
 		usage_import();
-
-	error = get_author(&author);
-	if (error)
-		return error;
 
 	if (repo_path == NULL) {
 		repo_path = getcwd(NULL, 0);
@@ -601,6 +617,10 @@ cmd_import(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path);
 	if (error)
 		goto done;
+
+	error = get_author(&author, repo);
+	if (error)
+		return error;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		error = got_error_from_errno("asprintf");
@@ -684,6 +704,7 @@ done:
 	free(refname);
 	free(new_commit_id);
 	free(id_str);
+	free(author);
 	if (branch_ref)
 		got_ref_close(branch_ref);
 	if (head_ref)
@@ -3659,8 +3680,7 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
 	char *label = NULL, *commit_id_str = NULL;
 	struct got_reference *ref = NULL;
-	char *refname = NULL, *tagmsg = NULL;
-	const char *tagger;
+	char *refname = NULL, *tagmsg = NULL, *tagger = NULL;
 
 	/*
 	 * Don't let the user create a tag named '-'.
@@ -3670,7 +3690,7 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	if (tag_name[0] == '-' && tag_name[1] == '\0')
 		return got_error(GOT_ERR_BAD_REF_NAME);
 
-	err = get_author(&tagger);
+	err = get_author(&tagger, repo);
 	if (err)
 		return err;
 
@@ -3733,6 +3753,7 @@ done:
 	free(commit_id_str);
 	free(refname);
 	free(tagmsg);
+	free(tagger);
 	return err;
 }
 
@@ -4384,9 +4405,8 @@ cmd_commit(int argc, char *argv[])
 	char *cwd = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
-	const char *author;
 	struct collect_commit_logmsg_arg cl_arg;
-	char *editor = NULL;
+	char *editor = NULL, *author = NULL;
 	int ch, rebase_in_progress, histedit_in_progress;
 	struct got_pathlist_head paths;
 
@@ -4412,10 +4432,6 @@ cmd_commit(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	error = get_author(&author);
-	if (error)
-		return error;
-
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -4441,6 +4457,10 @@ cmd_commit(int argc, char *argv[])
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree));
 	if (error != NULL)
 		goto done;
+
+	error = get_author(&author, repo);
+	if (error)
+		return error;
 
 	/*
 	 * unveil(2) traverses exec(2); if an editor is used we have
@@ -4495,6 +4515,7 @@ done:
 	free(cwd);
 	free(id_str);
 	free(editor);
+	free(author);
 	return error;
 }
 

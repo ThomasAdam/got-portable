@@ -41,6 +41,7 @@
 #define GOT_PROG_READ_BLOB	got-read-blob
 #define GOT_PROG_READ_TAG	got-read-tag
 #define GOT_PROG_READ_PACK	got-read-pack
+#define GOT_PROG_READ_GITCONFIG	got-read-gitconfig
 
 #define GOT_STRINGIFY(x) #x
 #define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
@@ -58,6 +59,8 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_TAG)
 #define GOT_PATH_PROG_READ_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PACK)
+#define GOT_PATH_PROG_READ_GITCONFIG \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GITCONFIG)
 
 struct got_privsep_child {
 	int imsg_fd;
@@ -102,6 +105,14 @@ enum got_imsg_type {
 
 	/* Message sending file descriptor to a temporary file. */
 	GOT_IMSG_TMPFD,
+
+	/* Messages related to gitconfig files. */
+	GOT_IMSG_GITCONFIG_PARSE_REQUEST,
+	GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST,
+	GOT_IMSG_GITCONFIG_AUTHOR_NAME_REQUEST,
+	GOT_IMSG_GITCONFIG_AUTHOR_EMAIL_REQUEST,
+	GOT_IMSG_GITCONFIG_INT_VAL,
+	GOT_IMSG_GITCONFIG_STR_VAL,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -264,3 +275,20 @@ const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
 const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int,
     struct got_object_id *);
 const struct got_error *got_privsep_send_pack_child_ready(struct imsgbuf *);
+
+const struct got_error *got_privsep_send_gitconfig_parse_req(struct imsgbuf *,
+    int);
+const struct got_error *
+    got_privsep_send_gitconfig_repository_format_version_req(struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_author_name_req(
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_author_email_req(
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_str(struct imsgbuf *,
+    const char *);
+const struct got_error *got_privsep_recv_gitconfig_str(char **,
+    struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_int(struct imsgbuf *, int);
+const struct got_error *got_privsep_recv_gitconfig_int(int *, struct imsgbuf *);
+
+void got_privsep_exec_child(int[2], const char *, const char *);
