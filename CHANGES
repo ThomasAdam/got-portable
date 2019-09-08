@@ -1,3 +1,11 @@
+* got 0.15; 2019-09-08
+- use author name/email from ~/.gitconfig if GOT_AUTHOR is not set
+- obtain repo format version and commit author name/email from .git/config
+- fix line-wrap for lines spanning the terminal in tog diff view
+- make 'got status' ignore inaccessible directories (reported by semarie)
+- unstage may need to write to repository; fix unveil(2) call accordingly
+- fix modified files not shown by 'got status' after committing staged changes
+
 * got 0.14; 2019-09-03
 - fix tag_list test failure on single-day-digit dates (patch by Evan Silberman)
 - prevent theoretical double-free with non-OpenBSD asprintf (found by jasper@)
