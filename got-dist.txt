@@ -87,6 +87,9 @@
 /libexec/got-read-commit
 /libexec/got-read-commit/Makefile
 /libexec/got-read-commit/got-read-commit.c
+/libexec/got-read-gitconfig
+/libexec/got-read-gitconfig/Makefile
+/libexec/got-read-gitconfig/got-read-gitconfig.c
 /libexec/got-read-object
 /libexec/got-read-object/Makefile
 /libexec/got-read-object/got-read-object.c
