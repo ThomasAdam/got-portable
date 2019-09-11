@@ -15,7 +15,6 @@ got:
 - recursive removal: got rm -R
 
 tog:
-- cosmetic display issues involving \n and TABs should be fixed
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
 - implement search feature for diff view

@@ -927,7 +927,8 @@ done:
 
 /* Format a line for display, ensuring that it won't overflow a width limit. */
 static const struct got_error *
-format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
+format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
+    int col_tab_align)
 {
 	const struct got_error *err = NULL;
 	int cols = 0;
@@ -943,24 +944,29 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit)
 		return err;
 
 	i = 0;
-	while (i < wlen && cols < wlimit) {
+	while (i < wlen) {
 		int width = wcwidth(wline[i]);
-		switch (width) {
-		case 0:
+
+		if (width == 0) {
 			i++;
-			break;
-		case 1:
-		case 2:
-			if (cols + width <= wlimit)
+			continue;
+		}
+
+		if (width == 1 || width == 2) {
+			if (cols + width > wlimit)
+				break;
+			cols += width;
+			i++;
+		} else if (width == -1) {
+			if (wline[i] == L'\t') {
+				width = TABSIZE -
+				    ((cols + col_tab_align) % TABSIZE);
+				if (cols + width > wlimit)
+					break;
 				cols += width;
+			}
 			i++;
-			break;
-		case -1:
-			if (wline[i] == L'\t')
-				cols += TABSIZE - ((cols + 1) % TABSIZE);
-			i++;
-			break;
-		default:
+		} else {
 			err = got_error_from_errno("wcwidth");
 			goto done;
 		}
@@ -1033,7 +1039,8 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 }
 
 static const struct got_error *
-format_author(wchar_t **wauthor, int *author_width, char *author, int limit)
+format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
+    int col_tab_align)
 {
 	char *smallerthan, *at;
 
@@ -1043,13 +1050,13 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit)
 	at = strchr(author, '@');
 	if (at)
 		*at = '\0';
-	return format_line(wauthor, author_width, author, limit);
+	return format_line(wauthor, author_width, author, limit, col_tab_align);
 }
 
 static const struct got_error *
 draw_commit(struct tog_view *view, struct got_commit_object *commit,
     struct got_object_id *id, struct got_reflist_head *refs,
-    int author_display_cols)
+    const size_t date_display_cols, int author_display_cols)
 {
 	const struct got_error *err = NULL;
 	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
@@ -1059,7 +1066,6 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	int author_width, logmsg_width;
 	char *newline, *line = NULL;
 	int col, limit;
-	static const size_t date_display_cols = 9;
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
@@ -1071,12 +1077,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	    >= sizeof(datebuf))
 		return got_error(GOT_ERR_NO_SPACE);
 
-	if (avail < date_display_cols)
+	if (avail <= date_display_cols)
 		limit = MIN(sizeof(datebuf) - 1, avail);
 	else
 		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
 	waddnstr(view->window, datebuf, limit);
-	col = limit + 1;
+	col = limit;
 	if (col > avail)
 		goto done;
 
@@ -1085,12 +1091,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
-	err = format_author(&wauthor, &author_width, author, avail - col);
+	err = format_author(&wauthor, &author_width, author, avail - col, col);
 	if (err)
 		goto done;
 	waddwstr(view->window, wauthor);
 	col += author_width;
-	while (col <= avail && author_width < author_display_cols + 2) {
+	while (col < avail && author_width < author_display_cols + 2) {
 		waddch(view->window, ' ');
 		col++;
 		author_width++;
@@ -1108,12 +1114,12 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (newline)
 		*newline = '\0';
 	limit = avail - col;
-	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit);
+	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, 0);
 	if (err)
 		goto done;
 	waddwstr(view->window, wlogmsg);
 	col += logmsg_width;
-	while (col <= avail) {
+	while (col < avail) {
 		waddch(view->window, ' ');
 		col++;
 	}
@@ -1259,6 +1265,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
+	static const size_t date_display_cols = 9;
 
 	entry = first;
 	ncommits = 0;
@@ -1311,7 +1318,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		header = NULL;
 		goto done;
 	}
-	err = format_line(&wline, &width, header, view->ncols);
+	err = format_line(&wline, &width, header, view->ncols, 0);
 	if (err)
 		goto done;
 
@@ -1344,7 +1351,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		err = format_author(&wauthor, &width, author, COLS);
+		err = format_author(&wauthor, &width, author, COLS,
+		    date_display_cols);
 		if (author_cols < width)
 			author_cols = width;
 		free(wauthor);
@@ -1361,7 +1369,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (ncommits == selected_idx)
 			wstandout(view->window);
 		err = draw_commit(view, entry->commit, entry->id, refs,
-		    author_cols);
+		    date_display_cols, author_cols);
 		if (ncommits == selected_idx)
 			wstandend(view->window);
 		if (err)
@@ -2383,7 +2391,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 	werase(view->window);
 
 	if (header) {
-		err = format_line(&wline, &width, header, view->ncols);
+		err = format_line(&wline, &width, header, view->ncols, 0);
 		if (err) {
 			return err;
 		}
@@ -2413,7 +2421,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			continue;
 		}
 
-		err = format_line(&wline, &width, line, view->ncols);
+		err = format_line(&wline, &width, line, view->ncols, 0);
 		if (err) {
 			free(line);
 			return err;
@@ -2437,7 +2445,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			nprinted++;
 		}
 
-		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols);
+		err = format_line(&wline, &width, TOG_EOF_STRING, view->ncols, 0);
 		if (err) {
 			return err;
 		}
@@ -2988,7 +2996,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	char *line;
 	size_t len;
 	wchar_t *wline;
-	int width, wlimit;
+	int width;
 	struct tog_blame_line *blame_line;
 	struct got_object_id *prev_id = NULL;
 	char *id_str;
@@ -3006,7 +3014,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		return err;
 	}
 
-	err = format_line(&wline, &width, line, view->ncols);
+	err = format_line(&wline, &width, line, view->ncols, 0);
 	free(line);
 	line = NULL;
 	if (view_needs_focus_indication(view))
@@ -3026,7 +3034,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		return got_error_from_errno("asprintf");
 	}
 	free(id_str);
-	err = format_line(&wline, &width, line, view->ncols);
+	err = format_line(&wline, &width, line, view->ncols, 0);
 	free(line);
 	line = NULL;
 	if (err)
@@ -3049,8 +3057,16 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 			continue;
 		}
 
-		wlimit = view->ncols < 9 ? 0 : view->ncols - 9;
-		err = format_line(&wline, &width, line, wlimit);
+		if (view->ncols <= 9) {
+			width = 9;
+			wline = wcsdup(L"");
+			if (wline == NULL)
+				err = got_error_from_errno("wcsdup");
+		} else {
+			err = format_line(&wline, &width, line,
+			    view->ncols - 9, 9);
+			width += 9;
+		}
 		if (err) {
 			free(line);
 			return err;
@@ -3062,9 +3078,11 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		if (nlines > 0) {
 			blame_line = &lines[lineno - 1];
 			if (blame_line->annotated && prev_id &&
-			    got_object_id_cmp(prev_id, blame_line->id) == 0)
-				waddstr(view->window, "         ");
-			else if (blame_line->annotated) {
+			    got_object_id_cmp(prev_id, blame_line->id) == 0 &&
+			    !(view->focussed &&
+			    nprinted == selected_line - 1)) {
+				waddstr(view->window, "        ");
+			} else if (blame_line->annotated) {
 				char *id_str;
 				err = got_object_id_str(&id_str, blame_line->id);
 				if (err) {
@@ -3072,25 +3090,25 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 					free(wline);
 					return err;
 				}
-				wprintw(view->window, "%.8s ", id_str);
+				wprintw(view->window, "%.8s", id_str);
 				free(id_str);
 				prev_id = blame_line->id;
 			} else {
-				waddstr(view->window, "........ ");
+				waddstr(view->window, "........");
 				prev_id = NULL;
 			}
 		} else {
-			waddstr(view->window, "........ ");
+			waddstr(view->window, "........");
 			prev_id = NULL;
 		}
 
-		waddwstr(view->window, wline);
-		while (width < wlimit) {
-			waddch(view->window, ' ');
-			width++;
-		}
 		if (view->focussed && nprinted == selected_line - 1)
 			wstandend(view->window);
+		waddstr(view->window, " ");
+
+		waddwstr(view->window, wline);
+		if (width <= view->ncols - 1)
+			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = lineno;
 		free(line);
@@ -3896,7 +3914,7 @@ draw_tree_entries(struct tog_view *view,
 	if (limit == 0)
 		return NULL;
 
-	err = format_line(&wline, &width, label, view->ncols);
+	err = format_line(&wline, &width, label, view->ncols, 0);
 	if (err)
 		return err;
 	if (view_needs_focus_indication(view))
@@ -3910,7 +3928,7 @@ draw_tree_entries(struct tog_view *view,
 		waddch(view->window, '\n');
 	if (--limit <= 0)
 		return NULL;
-	err = format_line(&wline, &width, parent_path, view->ncols);
+	err = format_line(&wline, &width, parent_path, view->ncols, 0);
 	if (err)
 		return err;
 	waddwstr(view->window, wline);
@@ -3968,7 +3986,7 @@ draw_tree_entries(struct tog_view *view,
 			return got_error_from_errno("asprintf");
 		}
 		free(id_str);
-		err = format_line(&wline, &width, line, view->ncols);
+		err = format_line(&wline, &width, line, view->ncols, 0);
 		if (err) {
 			free(line);
 			break;
