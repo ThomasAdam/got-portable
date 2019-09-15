@@ -1428,6 +1428,8 @@ import_subdir(struct got_tree_entry **new_te, struct dirent *de,
 		return got_error_from_errno("asprintf");
 
 	(*new_te) = calloc(1, sizeof(**new_te));
+	if (*new_te == NULL)
+		return got_error_from_errno("calloc");
 	(*new_te)->mode = S_IFDIR;
 	(*new_te)->name = strdup(de->d_name);
 	if ((*new_te)->name == NULL) {
