@@ -51,8 +51,10 @@ worklist_add(const char *path, struct wklhead *worklist)
 		return got_error_from_errno("calloc");
 
 	len = strlcpy(wkl->wkl_path, path, sizeof(wkl->wkl_path));
-	if (len >= sizeof(wkl->wkl_path))
+	if (len >= sizeof(wkl->wkl_path)) {
+		free(wkl);
 		return got_error(GOT_ERR_NO_SPACE);
+	}
 
 	sigfillset(&new);
 	sigprocmask(SIG_BLOCK, &new, &old);
