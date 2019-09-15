@@ -4688,11 +4688,11 @@ make_argv(const char *arg0, const char *arg1)
 		err(1, "calloc");
 	argv[0] = strdup(arg0);
 	if (argv[0] == NULL)
-		err(1, "calloc");
+		err(1, "strdup");
 	if (arg1) {
 		argv[1] = strdup(arg1);
 		if (argv[1] == NULL)
-			err(1, "calloc");
+			err(1, "strdup");
 	}
 
 	return argv;
