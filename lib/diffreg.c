@@ -64,6 +64,7 @@
  *	@(#)diffreg.c   8.1 (Berkeley) 6/6/93
  */
 
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/queue.h>
@@ -79,6 +80,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <limits.h>
 #include <sha1.h>
