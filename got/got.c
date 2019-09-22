@@ -675,6 +675,7 @@ cmd_import(int argc, char *argv[])
 		error = get_editor(&editor);
 		if (error)
 			goto done;
+		free(logmsg);
 		error = collect_import_msg(&logmsg, editor, path_dir, refname);
 		if (error)
 			goto done;
@@ -722,6 +723,7 @@ cmd_import(int argc, char *argv[])
 	printf("Created branch %s with commit %s\n",
 	    got_ref_get_name(branch_ref), id_str);
 done:
+	free(logmsg);
 	free(repo_path);
 	free(editor);
 	free(refname);
