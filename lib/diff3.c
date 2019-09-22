@@ -146,7 +146,6 @@ struct diff3_state {
 	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
 
 	char *buf;
-	size_t bufsize;
 
 	BUF *diffbuf;
 };
@@ -657,31 +656,35 @@ getchange(FILE *b, struct diff3_state *d3s)
 static char *
 get_line(FILE *b, size_t *n, struct diff3_state *d3s)
 {
-	char *cp;
-	size_t len;
+	char *cp = NULL;
+	size_t size, len;
 	char *new;
+	char *ret = NULL;
 
-	if ((cp = fgetln(b, &len)) == NULL)
-		return (NULL);
+	len = getline(&cp, &size, b);
+	if (len == -1)
+		goto done;
 
-	if (cp[len - 1] != '\n')
+	if (cp[len - 1] != '\n') {
 		len++;
-	if (len + 1 > d3s->bufsize) {
-		do {
-			d3s->bufsize += 1024;
-		} while (len + 1 > d3s->bufsize);
-		new = reallocarray(d3s->buf, 1, d3s->bufsize);
-		if (new == NULL)
-			return NULL;
-		d3s->buf = new;
+		if (len + 1 > size) {
+			new = realloc(cp, len + 1);
+			if (new == NULL)
+				goto done;
+			cp = new;
+		}
+		cp[len - 1] = '\n';
+		cp[len] = '\0';
 	}
-	memcpy(d3s->buf, cp, len - 1);
-	d3s->buf[len - 1] = '\n';
-	d3s->buf[len] = '\0';
+
+	free(d3s->buf);
+	ret = d3s->buf = cp;
+	cp = NULL;
 	if (n != NULL)
 		*n = len;
-
-	return (d3s->buf);
+done:
+	free(cp);
+	return (ret);
 }
 
 static int
