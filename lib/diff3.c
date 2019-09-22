@@ -141,7 +141,6 @@ struct diff3_state {
 	 */
 	int last[4];
 	int eflag;
-	int oflag;
 	int debug;
 	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
 
@@ -285,7 +284,6 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	if (d3s == NULL)
 		return got_error_from_errno("calloc");
 	d3s->eflag = 3; /* default -E for compatibility with former RCS */
-	d3s->oflag = 1; /* default -E for compatibility with former RCS */
 
 	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
@@ -947,7 +945,7 @@ edscript(int n, struct diff3_state *d3s)
 	char block[BUFSIZ+1];
 
 	for (; n > 0; n--) {
-		if (!d3s->oflag || !d3s->overlap[n])
+		if (!d3s->overlap[n])
 			prange(&d3s->de[n].old, d3s);
 		else
 			diff_output(d3s->diffbuf, "%da\n%s\n",
@@ -962,7 +960,7 @@ edscript(int n, struct diff3_state *d3s)
 			diff_output(d3s->diffbuf, "%s", block);
 		}
 
-		if (!d3s->oflag || !d3s->overlap[n])
+		if (!d3s->overlap[n])
 			diff_output(d3s->diffbuf, ".\n");
 		else {
 			diff_output(d3s->diffbuf, "%s\n.\n", d3s->f3mark);
