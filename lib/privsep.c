@@ -430,7 +430,6 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	size_t datalen;
 	const size_t min_datalen =
 	    MIN(sizeof(struct got_imsg_error), sizeof(struct got_imsg_object));
 
@@ -439,8 +438,6 @@ got_privsep_recv_obj(struct got_object **obj, struct imsgbuf *ibuf)
 	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
 	if (err)
 		return err;
-
-	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_OBJECT:
