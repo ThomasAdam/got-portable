@@ -448,7 +448,7 @@ got_path_find_prog(char **filename, const char *prog)
 		continue;
 	}
 	free(path);
-	return NULL;
+	return err;
 }
 
 const struct got_error *
