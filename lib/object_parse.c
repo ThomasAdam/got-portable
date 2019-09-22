@@ -495,6 +495,9 @@ got_object_parse_commit(struct got_commit_object **commit, char *buf,
 	size_t label_len;
 	ssize_t remain = (ssize_t)len;
 
+	if (remain == 0)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
 	*commit = got_object_commit_alloc_partial();
 	if (*commit == NULL)
 		return got_error_from_errno("got_object_commit_alloc_partial");
@@ -724,6 +727,9 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 
 	TAILQ_INIT(&pathlist);
 
+	if (remain == 0)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
+
 	*tree = calloc(1, sizeof(**tree));
 	if (*tree == NULL)
 		return got_error_from_errno("calloc");
@@ -788,6 +794,9 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 	size_t remain = len;
 	char *s = buf;
 	size_t label_len;
+
+	if (remain == 0)
+		return got_error(GOT_ERR_BAD_OBJ_DATA);
 
 	*tag = calloc(1, sizeof(**tag));
 	if (*tag == NULL)
