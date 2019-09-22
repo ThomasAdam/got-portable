@@ -186,7 +186,7 @@ static int	 change(FILE *, struct got_diff_changes *, struct got_diff_state *, s
 static void	 sort(struct line *, int);
 static void	 print_header(FILE *, struct got_diff_state *, struct got_diff_args *, const char *, const char *);
 static int	 asciifile(FILE *);
-static int	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int);
+static void	 fetch(FILE *, struct got_diff_state *, struct got_diff_args *, long *, int, int, FILE *, int, int);
 static int	 newcand(struct got_diff_state *, int, int, int, int *);
 static int	 search(struct got_diff_state *, int *, int, int);
 static int	 skipline(FILE *);
@@ -921,8 +921,6 @@ change(FILE *outfile, struct got_diff_changes *changes,
     const char *file1, FILE *f1, const char *file2, FILE *f2,
     int a, int b, int c, int d, int *pflags)
 {
-	int i;
-
 	if (a > b && c > d)
 		return (0);
 
@@ -985,19 +983,19 @@ change(FILE *outfile, struct got_diff_changes *changes,
 		if (a <= b && c <= d)
 			diff_output(outfile, "---\n");
 	}
-	i = fetch(outfile, ds, args, ds->ixnew, c, d, f2,
+	fetch(outfile, ds, args, ds->ixnew, c, d, f2,
 	    args->diff_format == D_NORMAL ? '>' : '\0', *pflags);
 	return (0);
 }
 
-static int
+static void
 fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     long *f, int a, int b, FILE *lb, int ch, int flags)
 {
 	int i, j, c, col, nc;
 
 	if (a > b)
-		return (0);
+		return;
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
 		nc = f[i] - f[i - 1];
@@ -1014,7 +1012,7 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 			if ((c = getc(lb)) == EOF) {
 				diff_output(outfile, "\n\\ No newline at end of "
 				    "file\n");
-				return (0);
+				return;
 			}
 			if (c == '\t' && (flags & D_EXPANDTABS)) {
 				do {
@@ -1026,7 +1024,6 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 			}
 		}
 	}
-	return (0);
 }
 
 /*
