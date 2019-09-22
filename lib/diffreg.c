@@ -994,7 +994,7 @@ static int
 fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
     long *f, int a, int b, FILE *lb, int ch, int flags)
 {
-	int i, j, c, lastc, col, nc;
+	int i, j, c, col, nc;
 
 	if (a > b)
 		return (0);
@@ -1010,7 +1010,7 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 				diff_output(outfile, " ");
 		}
 		col = 0;
-		for (j = 0, lastc = '\0'; j < nc; j++, lastc = c) {
+		for (j = 0; j < nc; j++) {
 			if ((c = getc(lb)) == EOF) {
 				diff_output(outfile, "\n\\ No newline at end of "
 				    "file\n");
