@@ -3879,6 +3879,8 @@ write_tree(struct got_object_id **new_tree_id,
 
 			err = match_deleted_or_modified_ct(&ct, te,
 			    path_base_tree, commitable_paths);
+			if (err)
+				goto done;
 			if (ct) {
 				/* NB: Deleted entries get dropped here. */
 				if (ct->status == GOT_STATUS_MODIFY ||
