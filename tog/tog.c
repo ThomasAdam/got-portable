@@ -2029,6 +2029,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    &s->commits, &s->thread_args.log_complete,
 		    &s->thread_args.commits_needed,
 		    &s->thread_args.need_commits);
+		if (err)
+			break;
 		if (first == s->first_displayed_entry &&
 		    s->selected < MIN(view->nlines - 2,
 		    s->commits.ncommits - 1)) {
@@ -3017,6 +3019,8 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	err = format_line(&wline, &width, line, view->ncols, 0);
 	free(line);
 	line = NULL;
+	if (err)
+		return err;
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
 	waddwstr(view->window, wline);
