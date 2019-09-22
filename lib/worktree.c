@@ -1271,6 +1271,8 @@ update_blob(struct got_worktree *worktree,
 		    progress_cb, progress_arg);
 		if (blob2)
 			got_object_blob_close(blob2);
+		if (err)
+			goto done;
 		/*
 		 * Do not update timestamps of files with local changes.
 		 * Otherwise, a future status walk would treat them as
