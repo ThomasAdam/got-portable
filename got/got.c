@@ -2626,12 +2626,14 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
-	for (i = 0; i < bca.nlines; i++) {
-		struct blame_line *bline = &bca.lines[i];
-		free(bline->id_str);
-		free(bline->committer);
+	if (bca.lines) {
+		for (i = 0; i < bca.nlines; i++) {
+			struct blame_line *bline = &bca.lines[i];
+			free(bline->id_str);
+			free(bline->committer);
+		}
+		free(bca.lines);
 	}
-	free(bca.lines);
 	free(bca.line_offsets);
 	if (bca.f && fclose(bca.f) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
