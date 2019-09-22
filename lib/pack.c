@@ -95,9 +95,10 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->magic, sizeof(*h->magic));
-		if (n < 0)
+		if (n < 0) {
 			err = got_error_from_errno("read");
-		else if (n != sizeof(*h->magic)) {
+			goto done;
+		} else if (n != sizeof(*h->magic)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
