@@ -794,7 +794,7 @@ diff_fileindex_tree(struct got_fileindex *fileindex,
 			next = walk_fileindex(fileindex, *ie);
 			if (got_path_is_child((*ie)->path, path, path_len) &&
 			    (entry_name == NULL ||
-			    strcmp(te->name, entry_name) == 0)) {
+			    (te && strcmp(te->name, entry_name) == 0))) {
 				err = cb->diff_old(cb_arg, *ie, path);
 				if (err || entry_name)
 					break;
