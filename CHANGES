@@ -1,3 +1,11 @@
+* got 0.16; 2019-09-23
+- replace fgetln(3) with getline(3) for portability (patch by Steven McDonald)
+- fix implicit time.h includes (patch by Steven McDonald)
+- fix tiny memory leaks and other minor bugs found by jj@ with scan-build
+- fix missing error checks (found by jj@ with scan-build and by Steven McDonald)
+- avoid a couple of potential NULL derefs (found by jj@ with scan-build)
+- fix cosmetic display issues involving \n and TABs in tog(1)
+
 * got 0.15; 2019-09-08
 - use author name/email from ~/.gitconfig if GOT_AUTHOR is not set
 - obtain repo format version and commit author name/email from .git/config
