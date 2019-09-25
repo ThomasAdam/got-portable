@@ -2410,7 +2410,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		char *smallerthan, *at, *nl, *committer;
 		size_t len;
 
-		if (getline(&line, &linesize, a->f) == (ssize_t)-1) {
+		if (getline(&line, &linesize, a->f) == -1) {
 			if (ferror(a->f))
 				err = got_error_from_errno("getline");
 			break;

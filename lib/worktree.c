@@ -2864,9 +2864,12 @@ skip_one_line(FILE *f)
 	ssize_t linelen;
 
 	linelen = getline(&line, &linesize, f);
+	if (linelen == -1) {
+		if (ferror(f))
+			return got_error_from_errno("getline");
+		return NULL;
+	}
 	free(line);
-	if (linelen == -1 && ferror(f))
-		return got_error_from_errno("getline");
 	return NULL;
 }
 

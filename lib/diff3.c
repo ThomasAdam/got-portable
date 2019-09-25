@@ -655,7 +655,8 @@ static char *
 get_line(FILE *b, size_t *n, struct diff3_state *d3s)
 {
 	char *cp = NULL;
-	size_t size, len;
+	size_t size;
+	ssize_t len;
 	char *new;
 	char *ret = NULL;
 
