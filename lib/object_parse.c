@@ -419,16 +419,13 @@ got_object_commit_get_committer_gmtoff(struct got_commit_object *commit)
 	return commit->committer_gmtoff;
 }
 
-#define GOT_GPG_BEGIN_STR "gpgsig -----BEGIN PGP SIGNATURE-----"
-#define GOT_GPG_END_STR " -----END PGP SIGNATURE-----"
-
 const struct got_error *
 got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 {
 	const struct got_error *err = NULL;
-	int gpgsig = 0;
 	char *msg0, *msg, *line, *s;
 	size_t len;
+	int headers = 1;
 
 	*logmsg = NULL;
 
@@ -436,32 +433,36 @@ got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 	if (msg0 == NULL)
 		return got_error_from_errno("strdup");
 
-	/* Copy log message line by line to strip out GPG sigs... */
+	/* Copy log message line by line to strip out unusual headers... */
 	msg = msg0;
 	do {
-		line = strsep(&msg, "\n");
+		if ((line = strsep(&msg, "\n")) == NULL)
+			break;
 
-		if (line) {
-			/* Skip over GPG signatures. */
-			if (gpgsig) {
-				if (strcmp(line, GOT_GPG_END_STR) == 0) {
-					gpgsig = 0;
-					/* Skip empty line after sig. */
-					line = strsep(&msg, "\n");
-				}
+		if (headers == 1) {
+			if (line[0] != '\0' &&
+			    strncmp(line, GOT_COMMIT_LABEL_TREE,
+			        strlen(GOT_COMMIT_LABEL_TREE)) != 0 &&
+			    strncmp(line, GOT_COMMIT_LABEL_AUTHOR,
+			        strlen(GOT_COMMIT_LABEL_AUTHOR)) != 0 &&
+			    strncmp(line, GOT_COMMIT_LABEL_PARENT,
+			        strlen(GOT_COMMIT_LABEL_PARENT)) != 0 &&
+			    strncmp(line, GOT_COMMIT_LABEL_COMMITTER,
+			        strlen(GOT_COMMIT_LABEL_COMMITTER)) != 0)
 				continue;
-			} else if (strcmp(line, GOT_GPG_BEGIN_STR) == 0) {
-				gpgsig = 1;
-				continue;
-			}
-			if (asprintf(&s, "%s%s\n",
-			    *logmsg ? *logmsg : "", line) == -1) {
-				err = got_error_from_errno("asprintf");
-				goto done;
-			}
-			free(*logmsg);
-			*logmsg = s;
+
+			if (line[0] == '\0')
+				headers = 0;
 		}
+
+		if (asprintf(&s, "%s%s\n",
+		    *logmsg ? *logmsg : "", line) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		free(*logmsg);
+		*logmsg = s;
+
 	} while (line);
 
 	/* Trim redundant trailing whitespace. */
