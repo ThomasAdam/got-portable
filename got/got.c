@@ -3213,43 +3213,82 @@ usage_branch(void)
 }
 
 static const struct got_error *
+list_branch(struct got_repository *repo, struct got_worktree *worktree,
+    struct got_reference *ref)
+{
+	const struct got_error *err = NULL;
+	const char *refname, *marker = "  ";
+	char *refstr;
+
+	refname = got_ref_get_name(ref);
+	if (worktree && strcmp(refname,
+	    got_worktree_get_head_ref_name(worktree)) == 0) {
+		struct got_object_id *id = NULL;
+
+		err = got_ref_resolve(&id, repo, ref);
+		if (err)
+			return err;
+		if (got_object_id_cmp(id,
+		    got_worktree_get_base_commit_id(worktree)) == 0)
+			marker = "* ";
+		else
+			marker = "~ ";
+		free(id);
+	}
+
+	if (strncmp(refname, "refs/heads/", 11) == 0)
+		refname += 11;
+	if (strncmp(refname, "refs/got/worktree/", 18) == 0)
+		refname += 18;
+
+	refstr = got_ref_to_str(ref);
+	if (refstr == NULL)
+		return got_error_from_errno("got_ref_to_str");
+
+	printf("%s%s: %s\n", marker, refname, refstr);
+	free(refstr);
+	return NULL;
+}
+
+static const struct got_error *
 list_branches(struct got_repository *repo, struct got_worktree *worktree)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
+	struct got_reference *temp_ref = NULL;
+	int rebase_in_progress, histedit_in_progress;
 
 	SIMPLEQ_INIT(&refs);
+
+	if (worktree) {
+		err = got_worktree_rebase_in_progress(&rebase_in_progress,
+		    worktree);
+		if (err)
+			return err;
+
+		err = got_worktree_histedit_in_progress(&histedit_in_progress,
+		    worktree);
+		if (err)
+			return err;
+
+		if (rebase_in_progress || histedit_in_progress) {
+			err = got_ref_open(&temp_ref, repo,
+			    got_worktree_get_head_ref_name(worktree), 0);
+			if (err)
+				return err;
+			list_branch(repo, worktree, temp_ref);
+			got_ref_close(temp_ref);
+		}
+	}
 
 	err = got_ref_list(&refs, repo, "refs/heads",
 	    got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 
-	SIMPLEQ_FOREACH(re, &refs, entry) {
-		const char *refname, *marker = "  ";
-		char *refstr;
-		refname = got_ref_get_name(re->ref);
-		if (worktree && strcmp(refname,
-		    got_worktree_get_head_ref_name(worktree)) == 0) {
-			struct got_object_id *id = NULL;
-			err = got_ref_resolve(&id, repo, re->ref);
-			if (err)
-				return err;
-			if (got_object_id_cmp(id,
-			    got_worktree_get_base_commit_id(worktree)) == 0)
-				marker = "* ";
-			else
-				marker = "~ ";
-			free(id);
-		}
-		refname += strlen("refs/heads/");
-		refstr = got_ref_to_str(re->ref);
-		if (refstr == NULL)
-			return got_error_from_errno("got_ref_to_str");
-		printf("%s%s: %s\n", marker, refname, refstr);
-		free(refstr);
-	}
+	SIMPLEQ_FOREACH(re, &refs, entry)
+		list_branch(repo, worktree, re->ref);
 
 	got_ref_list_free(&refs);
 	return NULL;
