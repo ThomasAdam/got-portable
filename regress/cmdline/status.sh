@@ -530,6 +530,55 @@ function test_status_cvsignore {
 	test_done "$testroot" "$ret"
 }
 
+function test_status_gitignore {
+	local testroot=`test_init status_gitignore`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "unversioned file" > $testroot/wt/foo
+	echo "unversioned file" > $testroot/wt/foop
+	echo "unversioned file" > $testroot/wt/barp
+	echo "unversioned file" > $testroot/wt/epsilon/bar
+	echo "unversioned file" > $testroot/wt/epsilon/boo
+	echo "unversioned file" > $testroot/wt/epsilon/moo
+	mkdir -p $testroot/wt/a/b/c/
+	echo "unversioned file" > $testroot/wt/a/b/c/foo
+	echo "unversioned file" > $testroot/wt/a/b/c/zoo
+	echo "foo" > $testroot/wt/.gitignore
+	echo "bar*" >> $testroot/wt/.gitignore
+	echo "epsilon/**" >> $testroot/wt/.gitignore
+	echo "a/**/foo" >> $testroot/wt/.gitignore
+	echo "**/zoo" >> $testroot/wt/.gitignore
+
+	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  foop' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo '?  .gitignore' > $testroot/stdout.expected
+	echo '?  foop' >> $testroot/stdout.expected
+	(cd $testroot/wt/gamma && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2
@@ -543,3 +592,4 @@ run_test test_status_empty_dir
 run_test test_status_empty_dir_unversioned_file
 run_test test_status_many_paths
 run_test test_status_cvsignore
+run_test test_status_gitignore

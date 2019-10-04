@@ -2382,6 +2382,15 @@ read_ignores(struct got_pathlist_head *ignores, const char *path, FILE *f)
 	while ((linelen = getline(&line, &linesize, f)) != -1) {
 		if (linelen > 0 && line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
+
+		/* Git's ignores may contain comments. */
+		if (line[0] == '#')
+			continue;
+
+		/* Git's negated patterns are not (yet?) supported. */
+		if (line[0] == '!')
+			continue;
+
 		if (asprintf(&pattern, "%s%s%s", path, path[0] ? "/" : "",
 		    line) == -1) {
 			err = got_error_from_errno("asprintf");
@@ -2416,6 +2425,33 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 {
 	struct got_pathlist_entry *pe;
 
+	/* Handle patterns which match in all directories. */
+	TAILQ_FOREACH(pe, ignores, entry) {
+		struct got_pathlist_head *ignorelist = pe->data;
+		struct got_pathlist_entry *pi;
+
+		TAILQ_FOREACH(pi, ignorelist, entry) {
+			const char *p, *pattern = pi->path;
+
+			if (strncmp(pattern, "**/", 3) != 0)
+				continue;
+			pattern += 3;
+			p = path;
+			while (*p) {
+				if (fnmatch(pattern, p,
+				    FNM_PATHNAME | FNM_LEADING_DIR)) {
+					/* Retry in next directory. */
+					while (*p && *p != '/')
+						p++;
+					while (*p == '/')
+						p++;
+					continue;
+				}
+				return 1;
+			}
+		}
+	}
+
 	/*
 	 * The ignores pathlist contains ignore lists from children before
 	 * parents, so we can find the most specific ignorelist by walking
@@ -2427,8 +2463,11 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 			struct got_pathlist_head *ignorelist = pe->data;
 			struct got_pathlist_entry *pi;
 			TAILQ_FOREACH(pi, ignorelist, entry) {
-				if (fnmatch(pi->path, path,
-				    FNM_PATHNAME | FNM_LEADING_DIR))
+				const char *pattern = pi->path;
+				int flags = FNM_LEADING_DIR;
+				if (strstr(pattern, "/**/") == NULL)
+					flags |= FNM_PATHNAME;
+				if (fnmatch(pattern, path, flags))
 					continue;
 				return 1;
 			}
@@ -2441,15 +2480,14 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 
 static const struct got_error *
 add_ignores(struct got_pathlist_head *ignores, const char *root_path,
-    const char *path)
+    const char *path, const char *ignores_filename)
 {
 	const struct got_error *err = NULL;
 	char *ignorespath;
 	FILE *ignoresfile = NULL;
 
-	/* TODO: read .gitignores as well... */
-	if (asprintf(&ignorespath, "%s/%s%s.cvsignore", root_path, path,
-	    path[0] ? "/" : "") == -1)
+	if (asprintf(&ignorespath, "%s/%s%s%s", root_path, path,
+	    path[0] ? "/" : "", ignores_filename) == -1)
 		return got_error_from_errno("asprintf");
 
 	ignoresfile = fopen(ignorespath, "r");
@@ -2487,8 +2525,13 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 		path = de->d_name;
 	}
 
-	if (de->d_type == DT_DIR)
-		err = add_ignores(&a->ignores, a->worktree->root_path, path);
+	if (de->d_type == DT_DIR) {
+		err = add_ignores(&a->ignores, a->worktree->root_path, path,
+		    ".cvsignore");
+		if (err == NULL)
+			err = add_ignores(&a->ignores, a->worktree->root_path,
+			    path, ".gitignore");
+	}
 	else if (got_path_is_child(path, a->status_path, a->status_path_len)
 	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
@@ -2563,7 +2606,11 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
 		TAILQ_INIT(&arg.ignores);
-		err = add_ignores(&arg.ignores, worktree->root_path, path);
+		err = add_ignores(&arg.ignores, worktree->root_path, path,
+		    ".cvsignore");
+		if (err == NULL)
+			err = add_ignores(&arg.ignores, worktree->root_path,
+			    path, ".gitignore");
 		if (err == NULL)
 			err = got_fileindex_diff_dir(fileindex, workdir,
 			    worktree->root_path, path, repo, &fdiff_cb, &arg);
