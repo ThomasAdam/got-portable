@@ -2142,6 +2142,14 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			view_close(lv);
 			return got_error_from_errno("strdup");
 		}
+		got_ref_list_free(s->refs);
+		err = got_ref_list(s->refs, s->repo, NULL,
+		    got_ref_cmp_by_name, NULL);
+		if (err) {
+			free(start_id);
+			view_close(lv);
+			return got_error_from_errno("strdup");
+		}
 		err = open_log_view(lv, start_id, s->refs, s->repo,
 		    s->head_ref_name, in_repo_path, 0);
 		if (err) {
