@@ -1492,8 +1492,12 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		if (de->d_type == DT_DIR) {
 			err = import_subdir(&new_te, de, path_dir,
 			    ignores, repo, progress_cb, progress_arg);
-			if (err)
-				goto done;
+			if (err) {
+				if (err->code != GOT_ERR_NO_TREE_ENTRY)
+					goto done;
+				err = NULL;
+				continue;
+			}
 		} else if (de->d_type == DT_REG) {
 			err = import_file(&new_te, de, path_dir, repo);
 			if (err)
@@ -1504,6 +1508,11 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		err = insert_tree_entry(new_te, &paths);
 		if (err)
 			goto done;
+	}
+
+	if (TAILQ_EMPTY(&paths)) {
+		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		goto done;
 	}
 
 	TAILQ_FOREACH(pe, &paths, entry) {

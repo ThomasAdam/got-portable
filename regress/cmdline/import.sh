@@ -196,10 +196,52 @@ function test_import_ignores {
 		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
+}
 
+function test_import_empty_dir {
+	local testname=import_empty_dir
+	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
+	got init $testroot/repo
+
+	mkdir $testroot/tree
+	mkdir -p $testroot/tree/empty $testroot/tree/notempty
+	echo "alpha" > $testroot/tree/notempty/alpha
+
+	got import -m 'init' -r $testroot/repo $testroot/tree > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local head_commit=`git_show_head $testroot/repo`
+	echo "A  $testroot/tree/notempty/alpha" >> $testroot/stdout.expected
+	echo "Created branch refs/heads/master with commit $head_commit" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Verify that Got did not import the empty directory
+	echo "notempty/" > $testroot/stdout.expected
+	echo "notempty/alpha" >> $testroot/stdout.expected
+
+	got tree -r $testroot/repo -R > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
 }
 
 run_test test_import_basic
 run_test test_import_requires_new_branch
 run_test test_import_ignores
+run_test test_import_empty_dir
