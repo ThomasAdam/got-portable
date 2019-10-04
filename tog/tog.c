@@ -2148,7 +2148,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (err) {
 			free(start_id);
 			view_close(lv);
-			return got_error_from_errno("strdup");
+			return err;
 		}
 		err = open_log_view(lv, start_id, s->refs, s->repo,
 		    s->head_ref_name, in_repo_path, 0);
