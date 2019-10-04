@@ -3207,8 +3207,8 @@ __dead static void
 usage_branch(void)
 {
 	fprintf(stderr,
-	    "usage: %s branch [-r repository] -l | -d name | "
-	    "name [commit]\n", getprogname());
+	    "usage: %s branch [-r repository] [-l] | -d name | "
+	    "[name [commit]]\n", getprogname());
 	exit(1);
 }
 
@@ -3247,6 +3247,26 @@ list_branch(struct got_repository *repo, struct got_worktree *worktree,
 
 	printf("%s%s: %s\n", marker, refname, refstr);
 	free(refstr);
+	return NULL;
+}
+
+static const struct got_error *
+show_current_branch(struct got_repository *repo, struct got_worktree *worktree)
+{
+	const char *refname;
+
+	if (worktree == NULL)
+		return got_error(GOT_ERR_NOT_WORKTREE);
+
+	refname = got_worktree_get_head_ref_name(worktree);
+
+	if (strncmp(refname, "refs/heads/", 11) == 0)
+		refname += 11;
+	if (strncmp(refname, "refs/got/worktree/", 18) == 0)
+		refname += 18;
+
+	printf("%s\n", refname);
+
 	return NULL;
 }
 
@@ -3381,7 +3401,7 @@ cmd_branch(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0;
+	int ch, do_list = 0, do_show = 0;
 	const char *delref = NULL;
 
 	while ((ch = getopt(argc, argv, "d:r:l")) != -1) {
@@ -3410,14 +3430,17 @@ cmd_branch(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (!do_list && !delref && argc == 0)
+		do_show = 1;
+
 	if (do_list || delref) {
 		if (argc > 0)
 			usage_branch();
-	} else if (argc < 1 || argc > 2)
+	} else if (!do_show && (argc < 1 || argc > 2))
 		usage_branch();
 
 #ifndef PROFILE
-	if (do_list) {
+	if (do_list || do_show) {
 		if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
 		    NULL) == -1)
 			err(1, "pledge");
@@ -3464,7 +3487,9 @@ cmd_branch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (do_list)
+	if (do_show)
+		error = show_current_branch(repo, worktree);
+	else if (do_list)
 		error = list_branches(repo, worktree);
 	else if (delref)
 		error = delete_branch(repo, worktree, delref);

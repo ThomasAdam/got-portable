@@ -373,8 +373,60 @@ function test_branch_delete_packed {
 	test_done "$testroot" "$ret"
 }
 
+function test_branch_show {
+	local testroot=`test_init branch_show`
+	local commit_id=`git_show_head $testroot/repo`
+
+	for b in branch1 branch2 branch3; do
+		got branch -r $testroot/repo $b
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			echo "got branch command failed unexpectedly"
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	got checkout $testroot/repo $testroot/wt >/dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch > $testroot/stdout)
+	echo "master" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update -b branch1 > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch > $testroot/stdout)
+	echo "branch1" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_branch_create
 run_test test_branch_list
 run_test test_branch_delete
 run_test test_branch_delete_current_branch
 run_test test_branch_delete_packed
+run_test test_branch_show

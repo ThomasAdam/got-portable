@@ -514,8 +514,10 @@ The
 .Cm got branch
 command operates on references in this namespace only.
 .Pp
-If no options are passed, expect one or two arguments and attempt to create
-a branch reference with the given
+If invoked in a work tree without any arguments, print the name of the
+work tree's current branch.
+Otherwise, if no options are passed, expect one or two arguments and attempt
+to create a branch reference with the given
 .Ar name ,
 and make it point at the given
 .Ar commit .
