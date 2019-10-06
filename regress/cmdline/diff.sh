@@ -219,6 +219,36 @@ function test_diff_tag {
 	test_done "$testroot" "$ret"
 }
 
+function test_diff_ignore_whitespace {
+	local testroot=`test_init diff_ignore_whitespace`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha   " > $testroot/wt/alpha
+
+	(cd $testroot/wt && got diff -w > $testroot/stdout)
+
+	echo "diff $commit_id0 $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_diff_basic
 run_test test_diff_shows_conflict
 run_test test_diff_tag
+run_test test_diff_ignore_whitespace

@@ -20,9 +20,10 @@
  * be provided which will be used to identify each blob in the diff output.
  * If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in the diff must be specified as well.
+ * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob(struct got_blob_object *,
-    struct got_blob_object *, const char *, const char *, int, FILE *);
+    struct got_blob_object *, const char *, const char *, int, int, FILE *);
 
 /*
  * Compute the differences between a blob and a file and write unified diff
@@ -30,9 +31,10 @@ const struct got_error *got_diff_blob(struct got_blob_object *,
  * well as a const char * diff header label which identifies the file.
  * An optional const char * diff header label for the blob may be provided, too.
  * The number of context lines to show in the diff must be specified as well.
+ * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob_file(struct got_blob_object *,
-    const char *, FILE *, size_t, const char *, int, FILE *);
+    const char *, FILE *, size_t, const char *, int, int, FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs
@@ -56,6 +58,7 @@ typedef const struct got_error *(*got_diff_blob_cb)(void *,
 struct got_diff_blob_output_unidiff_arg {
 	FILE *outfile;		/* Unidiff text will be written here. */
 	int diff_context;	/* Sets the number of context lines. */
+	int ignore_whitespace;	/* Ignore whitespace differences. */
 };
 const struct got_error *got_diff_blob_output_unidiff(void *,
     struct got_blob_object *, struct got_blob_object *,
@@ -81,7 +84,7 @@ const struct got_error *got_diff_tree(struct got_tree_object *,
  * Write unified diff text to the provided output FILE.
  */
 const struct got_error *got_diff_objects_as_blobs(struct got_object_id *,
-    struct got_object_id *, const char *, const char *, int,
+    struct got_object_id *, const char *, const char *, int, int,
     struct got_repository *, FILE *);
 
 /*
@@ -92,7 +95,8 @@ const struct got_error *got_diff_objects_as_blobs(struct got_object_id *,
  * Write unified diff text to the provided output FILE.
  */
 const struct got_error *got_diff_objects_as_trees(struct got_object_id *,
-    struct got_object_id *, char *, char *, int, struct got_repository *, FILE *);
+    struct got_object_id *, char *, char *, int, int,
+    struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
@@ -100,6 +104,6 @@ const struct got_error *got_diff_objects_as_trees(struct got_object_id *,
  * Write unified diff text to the provided output FILE.
  */
 const struct got_error *got_diff_objects_as_commits(struct got_object_id *,
-    struct got_object_id *, int, struct got_repository *, FILE *);
+    struct got_object_id *, int, int, struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

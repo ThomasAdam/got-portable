@@ -38,8 +38,8 @@
 
 static const struct got_error *
 diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    const char *label1, const char *label2, int diff_context, FILE *outfile,
-    struct got_diff_changes *changes)
+    const char *label1, const char *label2, int diff_context,
+    int ignore_whitespace, FILE *outfile, struct got_diff_changes *changes)
 {
 	struct got_diff_state ds;
 	struct got_diff_args args;
@@ -106,6 +106,8 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 	args.label[1] = label2 ? label2 : idstr2;
 	args.diff_context = diff_context;
 	flags |= D_PROTOTYPE;
+	if (ignore_whitespace)
+		flags |= D_IGNOREBLANKS;
 
 	if (outfile) {
 		fprintf(outfile, "blob - %s\n", idstr1);
@@ -130,15 +132,16 @@ got_diff_blob_output_unidiff(void *arg, struct got_blob_object *blob1,
 	struct got_diff_blob_output_unidiff_arg *a = arg;
 
 	return diff_blobs(blob1, blob2, label1, label2, a->diff_context,
-	    a->outfile, NULL);
+	    a->ignore_whitespace, a->outfile, NULL);
 }
 
 const struct got_error *
 got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    const char *label1, const char *label2, int diff_context, FILE *outfile)
+    const char *label1, const char *label2, int diff_context,
+    int ignore_whitespace, FILE *outfile)
 {
-	return diff_blobs(blob1, blob2, label1, label2, diff_context, outfile,
-	    NULL);
+	return diff_blobs(blob1, blob2, label1, label2, diff_context,
+	    ignore_whitespace, outfile, NULL);
 }
 
 static const struct got_error *
@@ -154,7 +157,7 @@ alloc_changes(struct got_diff_changes **changes)
 static const struct got_error *
 diff_blob_file(struct got_diff_changes **changes,
     struct got_blob_object *blob1, const char *label1, FILE *f2, size_t size2,
-    const char *label2, int diff_context, FILE *outfile)
+    const char *label2, int diff_context, int ignore_whitespace, FILE *outfile)
 {
 	struct got_diff_state ds;
 	struct got_diff_args args;
@@ -203,6 +206,8 @@ diff_blob_file(struct got_diff_changes **changes,
 	args.label[1] = label2;
 	args.diff_context = diff_context;
 	flags |= D_PROTOTYPE;
+	if (ignore_whitespace)
+		flags |= D_IGNOREBLANKS;
 
 	if (outfile) {
 		fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
@@ -226,10 +231,10 @@ done:
 const struct got_error *
 got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
     FILE *f2, size_t size2, const char *label2, int diff_context,
-    FILE *outfile)
+    int ignore_whitespace, FILE *outfile)
 {
 	return diff_blob_file(NULL, blob1, label1, f2, size2, label2,
-	    diff_context, outfile);
+	    diff_context, ignore_whitespace, outfile);
 }
 
 const struct got_error *
@@ -237,7 +242,7 @@ got_diff_blob_file_lines_changed(struct got_diff_changes **changes,
     struct got_blob_object *blob1, FILE *f2, size_t size2)
 {
 	return diff_blob_file(changes, blob1, NULL, f2, size2, NULL,
-	    0, NULL);
+	    0, 0, NULL);
 }
 
 const struct got_error *
@@ -250,7 +255,7 @@ got_diff_blob_lines_changed(struct got_diff_changes **changes,
 	if (err)
 		return err;
 
-	err = diff_blobs(blob1, blob2, NULL, NULL, 3, NULL, *changes);
+	err = diff_blobs(blob1, blob2, NULL, NULL, 3, 0, NULL, *changes);
 	if (err) {
 		got_diff_free_changes(*changes);
 		*changes = NULL;
@@ -658,7 +663,7 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 const struct got_error *
 got_diff_objects_as_blobs(struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2, int diff_context,
-    struct got_repository *repo, FILE *outfile)
+    int ignore_whitespace, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -677,7 +682,7 @@ got_diff_objects_as_blobs(struct got_object_id *id1, struct got_object_id *id2,
 			goto done;
 	}
 	err = got_diff_blob(blob1, blob2, label1, label2, diff_context,
-	    outfile);
+	    ignore_whitespace, outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -688,8 +693,8 @@ done:
 
 const struct got_error *
 got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
-    char *label1, char *label2, int diff_context, struct got_repository *repo,
-    FILE *outfile)
+    char *label1, char *label2, int diff_context, int ignore_whitespace,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -709,6 +714,7 @@ got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
 			goto done;
 	}
 	arg.diff_context = diff_context;
+	arg.ignore_whitespace = ignore_whitespace;
 	arg.outfile = outfile;
 	err = got_diff_tree(tree1, tree2, label1, label2, repo,
 	    got_diff_blob_output_unidiff, &arg, 1);
@@ -722,7 +728,7 @@ done:
 
 const struct got_error *
 got_diff_objects_as_commits(struct got_object_id *id1,
-    struct got_object_id *id2, int diff_context,
+    struct got_object_id *id2, int diff_context, int ignore_whitespace,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
@@ -743,8 +749,8 @@ got_diff_objects_as_commits(struct got_object_id *id1,
 
 	err = got_diff_objects_as_trees(
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
-	    got_object_commit_get_tree_id(commit2), "", "", diff_context, repo,
-	    outfile);
+	    got_object_commit_get_tree_id(commit2), "", "", diff_context,
+	    ignore_whitespace, repo, outfile);
 done:
 	if (commit1)
 		got_object_commit_close(commit1);

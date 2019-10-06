@@ -2580,11 +2580,11 @@ create_diff(struct tog_diff_view_state *s)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(s->id1, s->id2, NULL, NULL,
-		    s->diff_context, s->repo, f);
+		    s->diff_context, 0, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(s->id1, s->id2, "", "",
-		    s->diff_context, s->repo, f);
+		    s->diff_context, 0, s->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -2610,7 +2610,7 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(s->id1, s->id2,
-		    s->diff_context, s->repo, f);
+		    s->diff_context, 0, s->repo, f);
 		break;
 	}
 	default:

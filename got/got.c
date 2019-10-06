@@ -1366,7 +1366,8 @@ done:
 
 static const struct got_error *
 diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
-    const char *path, int diff_context, struct got_repository *repo)
+    const char *path, int diff_context, int ignore_whitespace,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -1384,7 +1385,7 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 	while (path[0] == '/')
 		path++;
 	err = got_diff_blob(blob1, blob2, path, path, diff_context,
-	    stdout);
+	    ignore_whitespace, stdout);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -1394,7 +1395,8 @@ done:
 
 static const struct got_error *
 diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
-    const char *path, int diff_context, struct got_repository *repo)
+    const char *path, int diff_context, int ignore_whitespace,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -1411,6 +1413,7 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 		goto done;
 
 	arg.diff_context = diff_context;
+	arg.ignore_whitespace = ignore_whitespace;
 	arg.outfile = stdout;
 	while (path[0] == '/')
 		path++;
@@ -1473,11 +1476,11 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		switch (obj_type) {
 		case GOT_OBJ_TYPE_BLOB:
 			err = diff_blobs(obj_id1, obj_id2, path, diff_context,
-			    repo);
+			    0, repo);
 			break;
 		case GOT_OBJ_TYPE_TREE:
 			err = diff_trees(obj_id1, obj_id2, path, diff_context,
-			    repo);
+			    0, repo);
 			break;
 		default:
 			err = got_error(GOT_ERR_OBJ_TYPE);
@@ -1495,7 +1498,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		if (err)
 			goto done;
 		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
-		err = diff_trees(obj_id1, obj_id2, "", diff_context, repo);
+		err = diff_trees(obj_id1, obj_id2, "", diff_context, 0, repo);
 	}
 
 done:
@@ -1939,7 +1942,7 @@ __dead static void
 usage_diff(void)
 {
 	fprintf(stderr, "usage: %s diff [-C number] [-r repository-path] [-s] "
-	    "[object1 object2 | path]\n", getprogname());
+	    "[-w] [object1 object2 | path]\n", getprogname());
 	exit(1);
 }
 
@@ -1950,6 +1953,7 @@ struct print_diff_arg {
 	const char *id_str;
 	int header_shown;
 	int diff_staged;
+	int ignore_whitespace;
 };
 
 static const struct got_error *
@@ -2005,7 +2009,8 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			return got_error(GOT_ERR_FILE_STATUS);
 		}
 		return got_diff_objects_as_blobs(blob_id, staged_blob_id,
-		    label1, label2, a->diff_context, a->repo, stdout);
+		    label1, label2, a->diff_context, a->ignore_whitespace,
+		    a->repo, stdout);
 	}
 
 	if (staged_status == GOT_STATUS_ADD ||
@@ -2050,7 +2055,7 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		sb.st_size = 0;
 
 	err = got_diff_blob_file(blob1, label1, f2, sb.st_size, path,
-	    a->diff_context, stdout);
+	    a->diff_context, a->ignore_whitespace, stdout);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -2130,7 +2135,7 @@ cmd_diff(int argc, char *argv[])
 	const char *id_str1 = NULL, *id_str2 = NULL;
 	char *label1 = NULL, *label2 = NULL;
 	int type1, type2;
-	int diff_context = 3, diff_staged = 0, ch;
+	int diff_context = 3, diff_staged = 0, ignore_whitespace = 0, ch;
 	const char *errstr;
 	char *path = NULL;
 
@@ -2140,7 +2145,7 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "C:r:s")) != -1) {
+	while ((ch = getopt(argc, argv, "C:r:sw")) != -1) {
 		switch (ch) {
 		case 'C':
 			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
@@ -2155,6 +2160,9 @@ cmd_diff(int argc, char *argv[])
 			break;
 		case 's':
 			diff_staged = 1;
+			break;
+		case 'w':
+			ignore_whitespace = 1;
 			break;
 		default:
 			usage_diff();
@@ -2248,6 +2256,7 @@ cmd_diff(int argc, char *argv[])
 		arg.id_str = id_str;
 		arg.header_shown = 0;
 		arg.diff_staged = diff_staged;
+		arg.ignore_whitespace = ignore_whitespace;
 
 		error = got_pathlist_append(&paths, path, NULL);
 		if (error)
@@ -2286,16 +2295,16 @@ cmd_diff(int argc, char *argv[])
 	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL,
-		    diff_context, repo, stdout);
+		    diff_context, ignore_whitespace, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(id1, id2, "", "",
-		    diff_context, repo, stdout);
+		    diff_context, ignore_whitespace, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", label1, label2);
 		error = got_diff_objects_as_commits(id1, id2, diff_context,
-		    repo, stdout);
+		    ignore_whitespace, repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
