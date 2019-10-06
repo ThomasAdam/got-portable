@@ -165,7 +165,7 @@ static const struct got_error *merge(size_t, size_t, struct diff3_state *);
 static void change(int, struct range *, int, struct diff3_state *);
 static void keep(int, struct range *, struct diff3_state *);
 static void prange(struct range *, struct diff3_state *);
-static void repos(int, struct diff3_state *);
+static const struct got_error *repos(int, struct diff3_state *);
 static void separate(const char *, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
@@ -882,6 +882,7 @@ skip(int i, int from, char *pr, struct diff3_state *d3s)
 static const struct got_error *
 duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	int c,d;
 	int nchar;
 	int nline;
@@ -903,24 +904,28 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 			if (d == EOF)
 				return got_ferror(d3s->fp[1], GOT_ERR_EOF);
 			nchar++;
-			if (c != d) {
-				repos(nchar, d3s);
-				return NULL;
-			}
+			if (c != d)
+				return repos(nchar, d3s);
 		} while (c != '\n');
 	}
-	repos(nchar, d3s);
+	err = repos(nchar, d3s);
+	if (err)
+		return err;
 	*dpl = 1;
 	return NULL;
 }
 
-static void
+static const struct got_error *
 repos(int nchar, struct diff3_state *d3s)
 {
 	int i;
 
-	for (i = 0; i < 2; i++)
-		(void)fseek(d3s->fp[i], (long)-nchar, SEEK_CUR);
+	for (i = 0; i < 2; i++) {
+		if (fseek(d3s->fp[i], (long)-nchar, SEEK_CUR) == -1)
+			return got_ferror(d3s->fp[i], GOT_ERR_IO);
+	}
+
+	return NULL;
 }
 
 /*
