@@ -152,18 +152,22 @@ struct diff3_state {
 
 static const struct got_error *duplicate(int *, struct range *, struct range *,
     struct diff3_state *);
-static int edit(struct diff *, int, int, struct diff3_state *);
-static char *getchange(FILE *, struct diff3_state *);
-static char *get_line(FILE *, size_t *, struct diff3_state *);
+static const struct got_error *edit(struct diff *, int, int *,
+    struct diff3_state *);
+static const struct got_error *getchange(char **, FILE *, struct diff3_state *);
+static const struct got_error *get_line(char **, FILE *, size_t *,
+    struct diff3_state *);
 static int number(char **);
 static const struct got_error *readin(size_t *, char *, struct diff **,
     struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
-static int skip(int, int, char *, struct diff3_state *);
+static const struct got_error *skip(int *, int, int, char *,
+    struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
-static void change(int, struct range *, int, struct diff3_state *);
-static void keep(int, struct range *, struct diff3_state *);
+static const struct got_error *change(int, struct range *, int,
+    struct diff3_state *);
+static const struct got_error *keep(int, struct range *, struct diff3_state *);
 static void prange(struct range *, struct diff3_state *);
 static const struct got_error *repos(int, struct diff3_state *);
 static void separate(const char *, struct diff3_state *);
@@ -584,7 +588,10 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 	d3s->fp[0] = fopen(name, "r");
 	if (d3s->fp[0] == NULL)
 		return got_error_from_errno2("fopen", name);
-	for (i = 0; (p = getchange(d3s->fp[0], d3s)); i++) {
+	err = getchange(&p, d3s->fp[0], d3s);
+	if (err)
+		return err;
+	for (i = 0; p; i++) {
 		if (i >= d3s->szchanges - 1) {
 			err = increase(d3s);
 			if (err)
@@ -611,6 +618,10 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		(*dd)[i].old.to = b;
 		(*dd)[i].new.from = c;
 		(*dd)[i].new.to = d;
+
+		err = getchange(&p, d3s->fp[0], d3s);
+		if (err)
+			return err;
 	}
 
 	if (i) {
@@ -637,38 +648,49 @@ number(char **lc)
 	return (nn);
 }
 
-static char *
-getchange(FILE *b, struct diff3_state *d3s)
+static const struct got_error *
+getchange(char **line, FILE *b, struct diff3_state *d3s)
 {
-	char *line;
+	const struct got_error *err = NULL;
 
-	while ((line = get_line(b, NULL, d3s))) {
-		if (isdigit((unsigned char)line[0]))
-			return (line);
-	}
+	*line = NULL;
+	do {
+		if (*line && isdigit((unsigned char)(*line)[0]))
+			return NULL;
+		err = get_line(line, b, NULL, d3s);
+		if (err)
+			return err;
+	} while (*line);
 
-	return (NULL);
+	return NULL;
 }
 
-static char *
-get_line(FILE *b, size_t *n, struct diff3_state *d3s)
+static const struct got_error *
+get_line(char **ret, FILE *b, size_t *n, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	char *cp = NULL;
 	size_t size;
 	ssize_t len;
 	char *new;
-	char *ret = NULL;
+
+	*ret = NULL;
 
 	len = getline(&cp, &size, b);
-	if (len == -1)
+	if (len == -1) {
+		if (ferror(b))
+			err = got_error_from_errno("getline");
 		goto done;
+	}
 
 	if (cp[len - 1] != '\n') {
 		len++;
 		if (len + 1 > size) {
 			new = realloc(cp, len + 1);
-			if (new == NULL)
+			if (new == NULL) {
+				err = got_error_from_errno("realloc");
 				goto done;
+			}
 			cp = new;
 		}
 		cp[len - 1] = '\n';
@@ -676,13 +698,13 @@ get_line(FILE *b, size_t *n, struct diff3_state *d3s)
 	}
 
 	free(d3s->buf);
-	ret = d3s->buf = cp;
+	*ret = d3s->buf = cp;
 	cp = NULL;
 	if (n != NULL)
 		*n = len;
 done:
 	free(cp);
-	return (ret);
+	return err;
 }
 
 static const struct got_error *
@@ -714,9 +736,15 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 			/* stuff peculiar to 1st file */
 			if (d3s->eflag == 0) {
 				separate("1", d3s);
-				change(1, &d1->old, 0, d3s);
-				keep(2, &d1->new, d3s);
-				change(3, &d1->new, 0, d3s);
+				err = change(1, &d1->old, 0, d3s);
+				if (err)
+					return err;
+				err = keep(2, &d1->new, d3s);
+				if (err)
+					return err;
+				err = change(3, &d1->new, 0, d3s);
+				if (err)
+					return err;
 			}
 			d1++;
 			continue;
@@ -726,9 +754,15 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		if (!t1 || (t2 && d2->new.to < d1->new.from)) {
 			if (d3s->eflag == 0) {
 				separate("2", d3s);
-				keep(1, &d2->new, d3s);
-				change(2, &d2->old, 0, d3s);
-				change(3, &d2->new, 0, d3s);
+				err = keep(1, &d2->new, d3s);
+				if (err)
+					return err;
+				err = change(2, &d2->old, 0, d3s);
+				if (err)
+					return err;
+				err = change(3, &d2->new, 0, d3s);
+				if (err)
+					return err;
 			}
 			d2++;
 			continue;
@@ -764,12 +798,21 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 			 */
 			if (d3s->eflag == 0) {
 				separate(dpl ? "3" : "", d3s);
-				change(1, &d1->old, dpl, d3s);
-				change(2, &d2->old, 0, d3s);
+				err = change(1, &d1->old, dpl, d3s);
+				if (err)
+					return err;
+				err = change(2, &d2->old, 0, d3s);
+				if (err)
+					return err;
 				d3 = d1->old.to > d1->old.from ? d1 : d2;
-				change(3, &d3->new, 0, d3s);
-			} else
-				j = edit(d1, dpl, j, d3s);
+				err = change(3, &d3->new, 0, d3s);
+				if (err)
+					return err;
+			} else {
+				err = edit(d1, dpl, &j, d3s);
+				if (err)
+					return err;
+			}
 			d1++;
 			d2++;
 			continue;
@@ -809,17 +852,22 @@ separate(const char *s, struct diff3_state *d3s)
  * It is to be printed only if it does not duplicate something to be
  * printed later.
  */
-static void
+static const struct got_error *
 change(int i, struct range *rold, int fdup, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
+	int nskipped;
+
 	diff_output(d3s->diffbuf, "%d:", i);
 	d3s->last[i] = rold->to;
 	prange(rold, d3s);
 	if (fdup || d3s->debug)
-		return;
+		return NULL;
 	i--;
-	(void)skip(i, rold->from, NULL, d3s);
-	(void)skip(i, rold->to, "  ", d3s);
+	err = skip(&nskipped, i, rold->from, NULL, d3s);
+	if (err)
+		return err;
+	return skip(&nskipped, i, rold->to, "  ", d3s);
 }
 
 /*
@@ -843,7 +891,7 @@ prange(struct range *rold, struct diff3_state *d3s)
  * and an artificial dummy difference (trange) must be ginned up to
  * correspond to the change reported in the other file.
  */
-static void
+static const struct got_error *
 keep(int i, struct range *rnew, struct diff3_state *d3s)
 {
 	int delta;
@@ -852,27 +900,31 @@ keep(int i, struct range *rnew, struct diff3_state *d3s)
 	delta = d3s->last[3] - d3s->last[i];
 	trange.from = rnew->from - delta;
 	trange.to = rnew->to - delta;
-	change(i, &trange, 1, d3s);
+	return change(i, &trange, 1, d3s);
 }
 
 /*
  * skip to just before line number from in file "i".  If "pr" is non-NULL,
  * print all skipped stuff with string pr as a prefix.
  */
-static int
-skip(int i, int from, char *pr, struct diff3_state *d3s)
+static const struct got_error *
+skip(int *nskipped, int i, int from, char *pr, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	size_t j, n;
 	char *line;
 
+	*nskipped = 0;
 	for (n = 0; d3s->cline[i] < from - 1; n += j) {
-		if ((line = get_line(d3s->fp[i], &j, d3s)) == NULL)
-			return (-1);
+		err = get_line(&line, d3s->fp[i], &j, d3s);
+		if (err)
+			return err;
 		if (pr != NULL)
 			diff_output(d3s->diffbuf, "%s%s", pr, line);
 		d3s->cline[i]++;
 	}
-	return ((int) n);
+	*nskipped = n;
+	return NULL;
 }
 
 /*
@@ -885,15 +937,19 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 	const struct got_error *err = NULL;
 	int c,d;
 	int nchar;
-	int nline;
+	int nline, nskipped;
 
 	*dpl = 0;
 
 	if (r1->to-r1->from != r2->to-r2->from)
 		return NULL;
 
-	(void)skip(0, r1->from, NULL, d3s);
-	(void)skip(1, r2->from, NULL, d3s);
+	err = skip(&nskipped, 0, r1->from, NULL, d3s);
+	if (err)
+		return err;
+	err = skip(&nskipped, 1, r2->from, NULL, d3s);
+	if (err)
+		return err;
 	nchar = 0;
 	for (nline=0; nline < r1->to - r1->from; nline++) {
 		do {
@@ -931,22 +987,27 @@ repos(int nchar, struct diff3_state *d3s)
 /*
  * collect an editing script for later regurgitation
  */
-static int
-edit(struct diff *diff, int fdup, int j, struct diff3_state *d3s)
+static const struct got_error *
+edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
+	int nskipped;
+
 	if (((fdup + 1) & d3s->eflag) == 0)
-		return (j);
-	j++;
-	d3s->overlap[j] = !fdup;
+		return NULL;
+	(*j)++;
+	d3s->overlap[*j] = !fdup;
 	if (!fdup)
 		d3s->overlapcnt++;
-	d3s->de[j].old.from = diff->old.from;
-	d3s->de[j].old.to = diff->old.to;
-	d3s->de[j].new.from =
-	    d3s->de[j-1].new.to + skip(2, diff->new.from, NULL, d3s);
-	d3s->de[j].new.to =
-	    d3s->de[j].new.from + skip(2, diff->new.to, NULL, d3s);
-	return (j);
+	d3s->de[*j].old.from = diff->old.from;
+	d3s->de[*j].old.to = diff->old.to;
+	err = skip(&nskipped, 2, diff->new.from, NULL, d3s);
+	if (err)
+		return err;
+	d3s->de[*j].new.from = d3s->de[*j - 1].new.to +  nskipped;
+	err = skip(&nskipped, 2, diff->new.to, NULL, d3s);
+	d3s->de[*j].new.to = d3s->de[*j].new.from +  nskipped;
+	return NULL;
 }
 
 /* regurgitate */
