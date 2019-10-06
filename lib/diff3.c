@@ -140,7 +140,6 @@ struct diff3_state {
 	 * is stored in last[1-3];
 	 */
 	int last[4];
-	int eflag;
 	int debug;
 	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
 
@@ -165,12 +164,8 @@ static const struct got_error *skip(int *, int, int, char *,
     struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
-static const struct got_error *change(int, struct range *, int,
-    struct diff3_state *);
-static const struct got_error *keep(int, struct range *, struct diff3_state *);
 static const struct got_error *prange(struct range *, struct diff3_state *);
 static const struct got_error *repos(int, struct diff3_state *);
-static const struct got_error *separate(const char *, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
     char *, char *, const char *, const char *, struct diff3_state *,
@@ -288,7 +283,6 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	d3s = calloc(1, sizeof(*d3s));
 	if (d3s == NULL)
 		return got_error_from_errno("calloc");
-	d3s->eflag = 3; /* default -E for compatibility with former RCS */
 
 	b1 = b2 = b3 = d1 = d2 = diffb = NULL;
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
@@ -711,7 +705,7 @@ static const struct got_error *
 merge(size_t m1, size_t m2, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	struct diff *d1, *d2, *d3;
+	struct diff *d1, *d2;
 	int dpl, j, t1, t2;
 
 	d1 = d3s->d13;
@@ -734,40 +728,12 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		/* first file is different from others */
 		if (!t2 || (t1 && d1->new.to < d2->new.from)) {
 			/* stuff peculiar to 1st file */
-			if (d3s->eflag == 0) {
-				err = separate("1", d3s);
-				if (err)
-					return err;
-				err = change(1, &d1->old, 0, d3s);
-				if (err)
-					return err;
-				err = keep(2, &d1->new, d3s);
-				if (err)
-					return err;
-				err = change(3, &d1->new, 0, d3s);
-				if (err)
-					return err;
-			}
 			d1++;
 			continue;
 		}
 
 		/* second file is different from others */
 		if (!t1 || (t2 && d2->new.to < d1->new.from)) {
-			if (d3s->eflag == 0) {
-				err = separate("2", d3s);
-				if (err)
-					return err;
-				err = keep(1, &d2->new, d3s);
-				if (err)
-					return err;
-				err = change(2, &d2->old, 0, d3s);
-				if (err)
-					return err;
-				err = change(3, &d2->new, 0, d3s);
-				if (err)
-					return err;
-			}
 			d2++;
 			continue;
 		}
@@ -800,25 +766,9 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 			 * dpl = 0 means all files differ
 			 * dpl = 1 means files 1 and 2 identical
 			 */
-			if (d3s->eflag == 0) {
-				err = separate(dpl ? "3" : "", d3s);
-				if (err)
-					return err;
-				err = change(1, &d1->old, dpl, d3s);
-				if (err)
-					return err;
-				err = change(2, &d2->old, 0, d3s);
-				if (err)
-					return err;
-				d3 = d1->old.to > d1->old.from ? d1 : d2;
-				err = change(3, &d3->new, 0, d3s);
-				if (err)
-					return err;
-			} else {
-				err = edit(d1, dpl, &j, d3s);
-				if (err)
-					return err;
-			}
+			err = edit(d1, dpl, &j, d3s);
+			if (err)
+				return err;
 			d1++;
 			d2++;
 			continue;
@@ -845,39 +795,6 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 	}
 
 	return (edscript(j, d3s));
-}
-
-static const struct got_error *
-separate(const char *s, struct diff3_state *d3s)
-{
-	return diff_output(d3s->diffbuf, "====%s\n", s);
-}
-
-/*
- * The range of lines rold.from thru rold.to in file i is to be changed.
- * It is to be printed only if it does not duplicate something to be
- * printed later.
- */
-static const struct got_error *
-change(int i, struct range *rold, int fdup, struct diff3_state *d3s)
-{
-	const struct got_error *err = NULL;
-	int nskipped;
-
-	err = diff_output(d3s->diffbuf, "%d:", i);
-	if (err)
-		return err;
-	d3s->last[i] = rold->to;
-	err = prange(rold, d3s);
-	if (err)
-		return err;
-	if (fdup || d3s->debug)
-		return NULL;
-	i--;
-	err = skip(&nskipped, i, rold->from, NULL, d3s);
-	if (err)
-		return err;
-	return skip(&nskipped, i, rold->to, "  ", d3s);
 }
 
 /*
@@ -907,23 +824,6 @@ prange(struct range *rold, struct diff3_state *d3s)
 	}
 
 	return NULL;
-}
-
-/*
- * No difference was reported by diff between file 1 (or 2) and file 3,
- * and an artificial dummy difference (trange) must be ginned up to
- * correspond to the change reported in the other file.
- */
-static const struct got_error *
-keep(int i, struct range *rnew, struct diff3_state *d3s)
-{
-	int delta;
-	struct range trange;
-
-	delta = d3s->last[3] - d3s->last[i];
-	trange.from = rnew->from - delta;
-	trange.to = rnew->to - delta;
-	return change(i, &trange, 1, d3s);
 }
 
 /*
@@ -1019,7 +919,7 @@ edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 	const struct got_error *err = NULL;
 	int nskipped;
 
-	if (((fdup + 1) & d3s->eflag) == 0)
+	if (((fdup + 1) & 3) == 0)
 		return NULL;
 	(*j)++;
 	d3s->overlap[*j] = !fdup;
