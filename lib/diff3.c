@@ -173,6 +173,7 @@ static const struct got_error *diff3_internal(char *, char *, char *,
 static const struct got_error *
 diff_output(BUF *diffbuf, const char *fmt, ...)
 {
+	const struct got_error *err = NULL;
 	va_list vap;
 	int i;
 	char *str;
@@ -183,9 +184,9 @@ diff_output(BUF *diffbuf, const char *fmt, ...)
 	va_end(vap);
 	if (i == -1)
 		return got_error_from_errno("vasprintf");
-	buf_append(&newsize, diffbuf, str, strlen(str));
+	err = buf_append(&newsize, diffbuf, str, strlen(str));
 	free(str);
-	return NULL;
+	return err;
 }
 
 static const struct got_error*
