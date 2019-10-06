@@ -1055,7 +1055,9 @@ edscript(int n, struct diff3_state *d3s)
 			if (err)
 				return err;
 		}
-		(void)fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET);
+		if (fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET)
+		    == -1)
+			return got_error_from_errno("fseek");
 		k = d3s->de[n].new.to - d3s->de[n].new.from;
 		for (; k > 0; k-= j) {
 			j = k > BUFSIZ ? BUFSIZ : k;
