@@ -140,7 +140,6 @@ struct diff3_state {
 	 * is stored in last[1-3];
 	 */
 	int last[4];
-	int debug;
 	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
 
 	char *buf;
@@ -716,14 +715,6 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		t2 = (d2 < d3s->d23 + m2);
 		if (!t1 && !t2)
 			break;
-
-		if (d3s->debug) {
-			printf("%d,%d=%d,%d %d,%d=%d,%d\n",
-			d1->old.from, d1->old.to,
-			d1->new.from, d1->new.to,
-			d2->old.from, d2->old.to,
-			d2->new.from, d2->new.to);
-		}
 
 		/* first file is different from others */
 		if (!t2 || (t1 && d1->new.to < d2->new.from)) {
