@@ -1,3 +1,12 @@
+* got 0.17; 2019-10-06
+- make 'got branch' without args show work tree's branch (requested by benno)
+- show temporary branch in 'got branch -l' during rebase and histedit
+- refresh references when 'tog log' view is refreshed with Ctrl+L
+- make 'got status' read .gitignore files; support **/ and /**/ in patterns
+- handle empty trees during 'import' and 'checkout' (issue reported by sthen)
+- show only whitelisted commit headers in 'got log' (semarie)
+- properly handle getline(3) return type as ssize_t (hiltjo)
+
 * got 0.16; 2019-09-23
 - replace fgetln(3) with getline(3) for portability (patch by Steven McDonald)
 - fix implicit time.h includes (patch by Steven McDonald)
