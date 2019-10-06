@@ -150,7 +150,8 @@ struct diff3_state {
 };
 
 
-static int duplicate(struct range *, struct range *, struct diff3_state *);
+static const struct got_error *duplicate(int *, struct range *, struct range *,
+    struct diff3_state *);
 static int edit(struct diff *, int, int, struct diff3_state *);
 static char *getchange(FILE *, struct diff3_state *);
 static char *get_line(FILE *, size_t *, struct diff3_state *);
@@ -159,8 +160,8 @@ static const struct got_error *readin(size_t *, char *, struct diff **,
     struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
 static int skip(int, int, char *, struct diff3_state *);
-static int edscript(int, struct diff3_state *);
-static int merge(size_t, size_t, struct diff3_state *);
+static const struct got_error *edscript(int, struct diff3_state *);
+static const struct got_error *merge(size_t, size_t, struct diff3_state *);
 static void change(int, struct range *, int, struct diff3_state *);
 static void keep(int, struct range *, struct diff3_state *);
 static void prange(struct range *, struct diff3_state *);
@@ -448,9 +449,7 @@ diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
 	if ((d3s->fp[2] = fopen(path3, "r")) == NULL)
 		return got_error_from_errno2("fopen", path3);
 
-	if (merge(m, n, d3s) < 0)
-		return got_error_from_errno("merge");
-	return NULL;
+	return merge(m, n, d3s);
 }
 
 static int
@@ -686,9 +685,10 @@ done:
 	return (ret);
 }
 
-static int
+static const struct got_error *
 merge(size_t m1, size_t m2, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	struct diff *d1, *d2, *d3;
 	int dpl, j, t1, t2;
 
@@ -754,9 +754,9 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		}
 		/* stuff peculiar to third file or different in all */
 		if (d1->new.from == d2->new.from && d1->new.to == d2->new.to) {
-			dpl = duplicate(&d1->old, &d2->old, d3s);
-			if (dpl == -1)
-				return (-1);
+			err = duplicate(&dpl, &d1->old, &d2->old, d3s);
+			if (err)
+				return err;
 
 			/*
 			 * dpl = 0 means all files differ
@@ -876,36 +876,42 @@ skip(int i, int from, char *pr, struct diff3_state *d3s)
 }
 
 /*
- * Return 1 or 0 according as the old range (in file 1) contains exactly
+ * Set *dpl to 1 or 0 according as the old range (in file 1) contains exactly
  * the same data as the new range (in file 2).
  */
-static int
-duplicate(struct range *r1, struct range *r2, struct diff3_state *d3s)
+static const struct got_error *
+duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 {
 	int c,d;
 	int nchar;
 	int nline;
 
+	*dpl = 0;
+
 	if (r1->to-r1->from != r2->to-r2->from)
-		return (0);
+		return NULL;
+
 	(void)skip(0, r1->from, NULL, d3s);
 	(void)skip(1, r2->from, NULL, d3s);
 	nchar = 0;
 	for (nline=0; nline < r1->to - r1->from; nline++) {
 		do {
 			c = getc(d3s->fp[0]);
+			if (c == EOF)
+				return got_ferror(d3s->fp[0], GOT_ERR_EOF);
 			d = getc(d3s->fp[1]);
-			if (c == -1 || d== -1)
-				return (-1);
+			if (d == EOF)
+				return got_ferror(d3s->fp[1], GOT_ERR_EOF);
 			nchar++;
 			if (c != d) {
 				repos(nchar, d3s);
-				return (0);
+				return NULL;
 			}
 		} while (c != '\n');
 	}
 	repos(nchar, d3s);
-	return (1);
+	*dpl = 1;
+	return NULL;
 }
 
 static void
@@ -939,7 +945,7 @@ edit(struct diff *diff, int fdup, int j, struct diff3_state *d3s)
 }
 
 /* regurgitate */
-static int
+static const struct got_error *
 edscript(int n, struct diff3_state *d3s)
 {
 	int j, k;
@@ -956,7 +962,7 @@ edscript(int n, struct diff3_state *d3s)
 		for (; k > 0; k-= j) {
 			j = k > BUFSIZ ? BUFSIZ : k;
 			if (fread(block, 1, j, d3s->fp[2]) != (size_t)j)
-				return (-1);
+				return got_ferror(d3s->fp[2], GOT_ERR_IO);
 			block[j] = '\0';
 			diff_output(d3s->diffbuf, "%s", block);
 		}
@@ -970,7 +976,7 @@ edscript(int n, struct diff3_state *d3s)
 		}
 	}
 
-	return (d3s->overlapcnt);
+	return NULL;
 }
 
 static const struct got_error *
