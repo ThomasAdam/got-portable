@@ -168,9 +168,9 @@ static const struct got_error *merge(size_t, size_t, struct diff3_state *);
 static const struct got_error *change(int, struct range *, int,
     struct diff3_state *);
 static const struct got_error *keep(int, struct range *, struct diff3_state *);
-static void prange(struct range *, struct diff3_state *);
+static const struct got_error *prange(struct range *, struct diff3_state *);
 static const struct got_error *repos(int, struct diff3_state *);
-static void separate(const char *, struct diff3_state *);
+static const struct got_error *separate(const char *, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
     char *, char *, const char *, const char *, struct diff3_state *,
@@ -735,7 +735,9 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		if (!t2 || (t1 && d1->new.to < d2->new.from)) {
 			/* stuff peculiar to 1st file */
 			if (d3s->eflag == 0) {
-				separate("1", d3s);
+				err = separate("1", d3s);
+				if (err)
+					return err;
 				err = change(1, &d1->old, 0, d3s);
 				if (err)
 					return err;
@@ -753,7 +755,9 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		/* second file is different from others */
 		if (!t1 || (t2 && d2->new.to < d1->new.from)) {
 			if (d3s->eflag == 0) {
-				separate("2", d3s);
+				err = separate("2", d3s);
+				if (err)
+					return err;
 				err = keep(1, &d2->new, d3s);
 				if (err)
 					return err;
@@ -797,7 +801,9 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 			 * dpl = 1 means files 1 and 2 identical
 			 */
 			if (d3s->eflag == 0) {
-				separate(dpl ? "3" : "", d3s);
+				err = separate(dpl ? "3" : "", d3s);
+				if (err)
+					return err;
 				err = change(1, &d1->old, dpl, d3s);
 				if (err)
 					return err;
@@ -841,10 +847,10 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 	return (edscript(j, d3s));
 }
 
-static void
+static const struct got_error *
 separate(const char *s, struct diff3_state *d3s)
 {
-	diff_output(d3s->diffbuf, "====%s\n", s);
+	return diff_output(d3s->diffbuf, "====%s\n", s);
 }
 
 /*
@@ -858,9 +864,13 @@ change(int i, struct range *rold, int fdup, struct diff3_state *d3s)
 	const struct got_error *err = NULL;
 	int nskipped;
 
-	diff_output(d3s->diffbuf, "%d:", i);
+	err = diff_output(d3s->diffbuf, "%d:", i);
+	if (err)
+		return err;
 	d3s->last[i] = rold->to;
-	prange(rold, d3s);
+	err = prange(rold, d3s);
+	if (err)
+		return err;
 	if (fdup || d3s->debug)
 		return NULL;
 	i--;
@@ -873,17 +883,30 @@ change(int i, struct range *rold, int fdup, struct diff3_state *d3s)
 /*
  * print the range of line numbers, rold.from thru rold.to, as n1,n2 or n1
  */
-static void
+static const struct got_error *
 prange(struct range *rold, struct diff3_state *d3s)
 {
-	if (rold->to <= rold->from)
-		diff_output(d3s->diffbuf, "%da\n", rold->from - 1);
-	else {
-		diff_output(d3s->diffbuf, "%d", rold->from);
-		if (rold->to > rold->from+1)
-			diff_output(d3s->diffbuf, ",%d", rold->to - 1);
-		diff_output(d3s->diffbuf, "c\n");
+	const struct got_error *err = NULL;
+
+	if (rold->to <= rold->from) {
+		err = diff_output(d3s->diffbuf, "%da\n", rold->from - 1);
+		if (err)
+			return err;
+	} else {
+		err = diff_output(d3s->diffbuf, "%d", rold->from);
+		if (err)
+			return err;
+		if (rold->to > rold->from + 1) {
+			err = diff_output(d3s->diffbuf, ",%d", rold->to - 1);
+			if (err)
+				return err;
+		}
+		err = diff_output(d3s->diffbuf, "c\n");
+		if (err)
+			return err;
 	}
+
+	return NULL;
 }
 
 /*
@@ -919,8 +942,11 @@ skip(int *nskipped, int i, int from, char *pr, struct diff3_state *d3s)
 		err = get_line(&line, d3s->fp[i], &j, d3s);
 		if (err)
 			return err;
-		if (pr != NULL)
-			diff_output(d3s->diffbuf, "%s%s", pr, line);
+		if (pr != NULL) {
+			err = diff_output(d3s->diffbuf, "%s%s", pr, line);
+			if (err)
+				return err;
+		}
 		d3s->cline[i]++;
 	}
 	*nskipped = n;
@@ -1014,15 +1040,21 @@ edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 static const struct got_error *
 edscript(int n, struct diff3_state *d3s)
 {
+	const struct got_error *err = NULL;
 	int j, k;
 	char block[BUFSIZ+1];
 
 	for (; n > 0; n--) {
-		if (!d3s->overlap[n])
-			prange(&d3s->de[n].old, d3s);
-		else
-			diff_output(d3s->diffbuf, "%da\n%s\n",
+		if (!d3s->overlap[n]) {
+			err = prange(&d3s->de[n].old, d3s);
+			if (err)
+				return err;
+		} else {
+			err = diff_output(d3s->diffbuf, "%da\n%s\n",
 			    d3s->de[n].old.to -1, GOT_DIFF_CONFLICT_MARKER_SEP);
+			if (err)
+				return err;
+		}
 		(void)fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET);
 		k = d3s->de[n].new.to - d3s->de[n].new.from;
 		for (; k > 0; k-= j) {
@@ -1030,15 +1062,23 @@ edscript(int n, struct diff3_state *d3s)
 			if (fread(block, 1, j, d3s->fp[2]) != (size_t)j)
 				return got_ferror(d3s->fp[2], GOT_ERR_IO);
 			block[j] = '\0';
-			diff_output(d3s->diffbuf, "%s", block);
+			err = diff_output(d3s->diffbuf, "%s", block);
+			if (err)
+				return err;
 		}
 
-		if (!d3s->overlap[n])
-			diff_output(d3s->diffbuf, ".\n");
-		else {
-			diff_output(d3s->diffbuf, "%s\n.\n", d3s->f3mark);
-			diff_output(d3s->diffbuf, "%da\n%s\n.\n",
+		if (!d3s->overlap[n]) {
+			err = diff_output(d3s->diffbuf, ".\n");
+			if (err)
+				return err;
+		} else {
+			err = diff_output(d3s->diffbuf, "%s\n.\n", d3s->f3mark);
+			if (err)
+				return err;
+			err = diff_output(d3s->diffbuf, "%da\n%s\n.\n",
 			    d3s->de[n].old.from - 1, d3s->f1mark);
+			if (err)
+				return err;
 		}
 	}
 
