@@ -598,7 +598,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		}
 		kind = *p++;
 		c = d = number(&p);
-		if (*p==',') {
+		if (*p == ',') {
 			p++;
 			d = number(&p);
 		}
@@ -619,8 +619,8 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 	}
 
 	if (i) {
-		(*dd)[i].old.from = (*dd)[i-1].old.to;
-		(*dd)[i].new.from = (*dd)[i-1].new.to;
+		(*dd)[i].old.from = (*dd)[i - 1].old.to;
+		(*dd)[i].new.from = (*dd)[i - 1].new.to;
 	}
 
 	if (fclose(d3s->fp[0]) != 0)
@@ -771,10 +771,10 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		 * appropriately to make them coincide.
 		 */
 		if (d1->new.from < d2->new.from) {
-			d2->old.from -= d2->new.from-d1->new.from;
+			d2->old.from -= d2->new.from - d1->new.from;
 			d2->new.from = d1->new.from;
 		} else if (d2->new.from < d1->new.from) {
-			d1->old.from -= d1->new.from-d2->new.from;
+			d1->old.from -= d1->new.from - d2->new.from;
 			d1->new.from = d2->new.from;
 		}
 		if (d1->new.to > d2->new.to) {
@@ -859,7 +859,7 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 
 	*dpl = 0;
 
-	if (r1->to-r1->from != r2->to-r2->from)
+	if (r1->to - r1->from != r2->to - r2->from)
 		return NULL;
 
 	err = skip(&nskipped, 0, r1->from, NULL, d3s);
@@ -869,7 +869,7 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 	if (err)
 		return err;
 	nchar = 0;
-	for (nline=0; nline < r1->to - r1->from; nline++) {
+	for (nline = 0; nline < r1->to - r1->from; nline++) {
 		do {
 			c = getc(d3s->fp[0]);
 			if (c == EOF)
@@ -922,9 +922,9 @@ edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 	err = skip(&nskipped, 2, diff->new.from, NULL, d3s);
 	if (err)
 		return err;
-	d3s->de[*j].new.from = d3s->de[*j - 1].new.to +  nskipped;
+	d3s->de[*j].new.from = d3s->de[*j - 1].new.to + nskipped;
 	err = skip(&nskipped, 2, diff->new.to, NULL, d3s);
-	d3s->de[*j].new.to = d3s->de[*j].new.from +  nskipped;
+	d3s->de[*j].new.to = d3s->de[*j].new.from + nskipped;
 	return NULL;
 }
 
@@ -951,7 +951,7 @@ edscript(int n, struct diff3_state *d3s)
 		    == -1)
 			return got_error_from_errno("fseek");
 		k = d3s->de[n].new.to - d3s->de[n].new.from;
-		for (; k > 0; k-= j) {
+		for (; k > 0; k -= j) {
 			j = k > BUFSIZ ? BUFSIZ : k;
 			if (fread(block, 1, j, d3s->fp[2]) != (size_t)j)
 				return got_ferror(d3s->fp[2], GOT_ERR_IO);
