@@ -99,6 +99,7 @@ BUF *
 rcs_patchfile(u_char *data, size_t dlen, u_char *patch, size_t plen,
     int (*p)(struct rcs_lines *, struct rcs_lines *))
 {
+	const struct got_error *err = NULL;
 	struct rcs_lines *dlines, *plines;
 	struct rcs_line *lp;
 	BUF *res;
@@ -113,7 +114,9 @@ rcs_patchfile(u_char *data, size_t dlen, u_char *patch, size_t plen,
 		return (NULL);
 	}
 
-	res = buf_alloc(1024);
+	err = buf_alloc(&res, 1024);
+	if (err)
+		return NULL;
 	TAILQ_FOREACH(lp, &dlines->l_lines, l_list) {
 		if (lp->l_line == NULL)
 			continue;

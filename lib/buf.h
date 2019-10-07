@@ -43,8 +43,8 @@
 typedef struct buf BUF;
 struct wklhead;
 
-BUF		*buf_alloc(size_t);
-BUF		*buf_load(const char *);
+const struct got_error *buf_alloc(BUF **, size_t);
+const struct got_error *buf_load(BUF **, const char *);
 void		 buf_free(BUF *);
 void		*buf_release(BUF *);
 u_char		 buf_getc(BUF *, size_t);

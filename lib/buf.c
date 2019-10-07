@@ -49,7 +49,7 @@ struct buf {
 	size_t	 cb_len;
 };
 
-#define SIZE_LEFT(b)	(b->cb_size - b->cb_len)
+#define SIZE_LEFT(b)	((b)->cb_size - (b)->cb_len)
 
 static const struct got_error *buf_grow(BUF *, size_t);
 
@@ -58,28 +58,30 @@ static const struct got_error *buf_grow(BUF *, size_t);
  * uses dynamically-allocated memory and must be freed with buf_free(), once
  * the buffer is no longer needed.
  */
-BUF *
-buf_alloc(size_t len)
+const struct got_error *
+buf_alloc(BUF **b, size_t len)
 {
-	BUF *b;
+	const struct got_error *err = NULL;
 
-	b = malloc(sizeof(*b));
-	if (b == NULL)
+	*b = malloc(sizeof(**b));
+	if (*b == NULL)
 		return NULL;
 	/* Postpone creation of zero-sized buffers */
 	if (len > 0) {
-		b->cb_buf = calloc(1, len);
-		if (b->cb_buf == NULL) {
-			free(b);
-			return NULL;
+		(*b)->cb_buf = calloc(1, len);
+		if ((*b)->cb_buf == NULL) {
+			err = got_error_from_errno("calloc");
+			free(*b);
+			*b = NULL;
+			return err;
 		}
 	} else
-		b->cb_buf = NULL;
+		(*b)->cb_buf = NULL;
 
-	b->cb_size = len;
-	b->cb_len = 0;
+	(*b)->cb_size = len;
+	(*b)->cb_len = 0;
 
-	return (b);
+	return NULL;
 }
 
 /*
@@ -88,57 +90,54 @@ buf_alloc(size_t len)
  * Returns the loaded buffer on success or NULL on failure.
  * Sets errno on error.
  */
-BUF *
-buf_load(const char *path)
+const struct got_error *
+buf_load(BUF **buf, const char *path)
 {
+	const struct got_error *err = NULL;
 	int fd;
 	ssize_t ret;
 	size_t len;
 	u_char *bp;
 	struct stat st;
-	BUF *buf;
 
-	buf = NULL;
+	*buf = NULL;
 
-	if ((fd = open(path, O_RDONLY, 0600)) == -1)
-		goto out;
+	fd = open(path, O_RDONLY, 0600);
+	if (fd == -1)
+		return got_error_from_errno2("open", path);
 
-	if (fstat(fd, &st) == -1)
-		goto out;
-
-	if ((uintmax_t)st.st_size > SIZE_MAX) {
-		errno = EFBIG;
+	if (fstat(fd, &st) == -1) {
+		err = got_error_from_errno2("fstat", path);
 		goto out;
 	}
-	buf = buf_alloc(st.st_size);
-	for (bp = buf->cb_buf; ; bp += (size_t)ret) {
-		len = SIZE_LEFT(buf);
+
+	if ((uintmax_t)st.st_size > SIZE_MAX) {
+		err = got_error_set_errno(EFBIG, path);
+		goto out;
+	}
+	err = buf_alloc(buf, st.st_size);
+	if (err)
+		goto out;
+	for (bp = (*buf)->cb_buf; ; bp += (size_t)ret) {
+		len = SIZE_LEFT(*buf);
 		ret = read(fd, bp, len);
 		if (ret == -1) {
-			int saved_errno;
-
-			saved_errno = errno;
-			buf_free(buf);
-			buf = NULL;
-			errno = saved_errno;
+			err = got_error_from_errno2("read", path);
 			goto out;
 		} else if (ret == 0)
 			break;
 
-		buf->cb_len += (size_t)ret;
+		(*buf)->cb_len += (size_t)ret;
 	}
 
 out:
-	if (fd != -1) {
-		int saved_errno;
-
-		/* We may want to preserve errno here. */
-		saved_errno = errno;
-		(void)close(fd);
-		errno = saved_errno;
+	if (close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path);
+	if (err) {
+		buf_free(*buf);
+		*buf = NULL;
 	}
-
-	return (buf);
+	return err;
 }
 
 void

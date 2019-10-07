@@ -243,9 +243,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		goto done;
 	}
 
-	*d = buf_load(outpath);
-	if (*d == NULL)
-		err = got_error_from_errno("buf_load");
+	err = buf_load(d, outpath);
 done:
 	if (outpath) {
 		unlink(outpath);
@@ -288,14 +286,19 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
 	data = patch = NULL;
 
-	if ((b1 = buf_load(p1)) == NULL)
+	err = buf_load(&b1, p1);
+	if (err)
 		goto out;
-	if ((b2 = buf_load(p2)) == NULL)
+	err = buf_load(&b2, p2);
+	if (err)
 		goto out;
-	if ((b3 = buf_load(p3)) == NULL)
+	err = buf_load(&b3, p3);
+	if (err)
 		goto out;
 
-	diffb = buf_alloc(128);
+	err = buf_alloc(&diffb, 128);
+	if (err)
+		goto out;
 
 	if (asprintf(&path1, "/tmp/got-diff1.XXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
