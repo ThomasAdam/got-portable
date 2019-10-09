@@ -294,7 +294,7 @@ got_ref_alloc(struct got_reference **ref, const char *name,
     struct got_object_id *id)
 {
 	if (!is_valid_ref_name(name))
-		return got_error(GOT_ERR_BAD_REF_NAME);
+		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
 	return alloc_ref(ref, name, id, 0);
 }
@@ -304,7 +304,7 @@ got_ref_alloc_symref(struct got_reference **ref, const char *name,
 	struct got_reference *target_ref)
 {
 	if (!is_valid_ref_name(name))
-		return got_error(GOT_ERR_BAD_REF_NAME);
+		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
 	return alloc_symref(ref, name, got_ref_get_name(target_ref), 0);
 }
