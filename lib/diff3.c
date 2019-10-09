@@ -587,12 +587,12 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		return got_error_from_errno2("fopen", name);
 	err = getchange(&p, f, d3s);
 	if (err)
-		return err;
+		goto done;
 	for (i = 0; p; i++) {
 		if (i >= d3s->szchanges - 1) {
 			err = increase(d3s);
 			if (err)
-				return err;
+				goto done;
 		}
 		a = b = number(&p);
 		if (*p == ',') {
@@ -618,18 +618,18 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 
 		err = getchange(&p, f, d3s);
 		if (err)
-			return err;
+			goto done;
 	}
 
 	if (i) {
 		(*dd)[i].old.from = (*dd)[i - 1].old.to;
 		(*dd)[i].new.from = (*dd)[i - 1].new.to;
 	}
-
-	if (fclose(f) != 0)
+done:
+	if (fclose(f) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
-
-	*n = i;
+	if (err == NULL)
+		*n = i;
 	return err;
 }
 
