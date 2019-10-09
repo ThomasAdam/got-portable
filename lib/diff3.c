@@ -824,12 +824,12 @@ static const struct got_error *
 skip(int *nskipped, int i, int from, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	size_t j, n;
+	size_t len, n;
 	char *line;
 
 	*nskipped = 0;
-	for (n = 0; d3s->cline[i] < from - 1; n += j) {
-		err = get_line(&line, d3s->fp[i], &j, d3s);
+	for (n = 0; d3s->cline[i] < from - 1; n += len) {
+		err = get_line(&line, d3s->fp[i], &len, d3s);
 		if (err)
 			return err;
 		d3s->cline[i]++;
