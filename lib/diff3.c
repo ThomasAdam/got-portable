@@ -942,7 +942,7 @@ static const struct got_error *
 edscript(int n, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	off_t k, len;
+	size_t k, len;
 	char block[BUFSIZ+1];
 
 	for (; n > 0; n--) {
@@ -959,10 +959,10 @@ edscript(int n, struct diff3_state *d3s)
 		if (fseeko(d3s->fp[2], d3s->de[n].newo.from, SEEK_SET)
 		    == -1)
 			return got_error_from_errno("fseek");
-		k = d3s->de[n].newo.to - d3s->de[n].newo.from;
+		k = (size_t)(d3s->de[n].newo.to - d3s->de[n].newo.from);
 		for (; k > 0; k -= len) {
 			len = k > BUFSIZ ? BUFSIZ : k;
-			if (fread(block, 1, len, d3s->fp[2]) != (size_t)len)
+			if (fread(block, 1, len, d3s->fp[2]) != len)
 				return got_ferror(d3s->fp[2], GOT_ERR_IO);
 			block[len] = '\0';
 			err = diff_output(d3s->diffbuf, "%s", block);
