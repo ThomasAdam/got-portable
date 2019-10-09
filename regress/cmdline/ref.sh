@@ -20,7 +20,16 @@ function test_ref_create {
 	local testroot=`test_init ref_create`
 	local commit_id=`git_show_head $testroot/repo`
 
-	# Create a head ref based on repository's HEAD reference
+	# Create a ref based on a commit ID
+	got ref -r $testroot/repo refs/heads/commitref $commit_id
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a ref based on repository's HEAD reference
 	got ref -r $testroot/repo refs/heads/newref HEAD
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -103,6 +112,7 @@ function test_ref_create {
 	cat $testroot/wt/.got/uuid | tr -d '\n' >> $testroot/stdout.expected
 	echo ": $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/anotherref: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/commitref: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/newref: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/symbolicref: refs/heads/master" \
