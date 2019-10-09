@@ -575,16 +575,17 @@ static const struct got_error *
 readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
+	FILE *f;
 	int a, b, c, d;
 	char kind, *p;
 	size_t i;
 
 	*n = 0;
 
-	d3s->fp[0] = fopen(name, "r");
-	if (d3s->fp[0] == NULL)
+	f = fopen(name, "r");
+	if (f == NULL)
 		return got_error_from_errno2("fopen", name);
-	err = getchange(&p, d3s->fp[0], d3s);
+	err = getchange(&p, f, d3s);
 	if (err)
 		return err;
 	for (i = 0; p; i++) {
@@ -615,7 +616,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		(*dd)[i].new.from = c;
 		(*dd)[i].new.to = d;
 
-		err = getchange(&p, d3s->fp[0], d3s);
+		err = getchange(&p, f, d3s);
 		if (err)
 			return err;
 	}
@@ -625,7 +626,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		(*dd)[i].new.from = (*dd)[i - 1].new.to;
 	}
 
-	if (fclose(d3s->fp[0]) != 0)
+	if (fclose(f) != 0)
 		err = got_error_from_errno("fclose");
 
 	*n = i;
