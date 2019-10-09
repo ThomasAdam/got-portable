@@ -83,7 +83,6 @@
 #include "buf.h"
 #include "rcsutil.h"
 #include "got_lib_diff.h"
-#include "worklist.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -270,13 +269,10 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	BUF *b1, *b2, *b3, *d1, *d2, *diffb;
 	u_char *data, *patch;
 	size_t dlen, plen;
-	struct wklhead temp_files;
 	struct diff3_state *d3s;
 	int i;
 
 	*overlapcnt = 0;
-
-	SLIST_INIT(&temp_files);
 
 	d3s = calloc(1, sizeof(*d3s));
 	if (d3s == NULL)
@@ -313,13 +309,13 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 		goto out;
 	}
 
-	err = buf_write_stmp(b1, path1, &temp_files);
+	err = buf_write_stmp(b1, path1);
 	if (err)
 		goto out;
-	err = buf_write_stmp(b2, path2, &temp_files);
+	err = buf_write_stmp(b2, path2);
 	if (err)
 		goto out;
-	err = buf_write_stmp(b3, path3, &temp_files);
+	err = buf_write_stmp(b3, path3);
 	if (err)
 		goto out;
 
@@ -344,7 +340,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	err = buf_write_stmp(d1, dp13, &temp_files);
+	err = buf_write_stmp(d1, dp13);
 	if (err)
 		goto out;
 
@@ -355,7 +351,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	err = buf_write_stmp(d2, dp23, &temp_files);
+	err = buf_write_stmp(d2, dp23);
 	if (err)
 		goto out;
 
@@ -401,8 +397,6 @@ out:
 	free(dp23);
 	free(data);
 	free(patch);
-
-	worklist_clean(&temp_files, worklist_unlink);
 
 	for (i = 0; i < nitems(d3s->fp); i++) {
 		if (d3s->fp[i] && fclose(d3s->fp[i]) != 0 && err == NULL)

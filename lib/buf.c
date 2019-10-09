@@ -36,7 +36,6 @@
 #include <unistd.h>
 
 #include "buf.h"
-#include "worklist.h"
 
 #include "got_error.h"
 
@@ -323,15 +322,13 @@ buf_write(BUF *b, const char *path, mode_t mode)
  * NB. This function will modify <template>, as per mkstemp
  */
 const struct got_error *
-buf_write_stmp(BUF *b, char *template, struct wklhead *temp_files)
+buf_write_stmp(BUF *b, char *template)
 {
 	const struct got_error *err = NULL;
 	int fd;
 
 	if ((fd = mkstemp(template)) == -1)
 		return got_error_from_errno("mkstemp");
-
-	worklist_add(template, temp_files);
 
 	if (buf_write_fd(b, fd) == -1) {
 		err = got_error_from_errno("buf_write_fd");
