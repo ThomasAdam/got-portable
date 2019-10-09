@@ -159,8 +159,7 @@ static int number(char **);
 static const struct got_error *readin(size_t *, char *, struct diff **,
     struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
-static const struct got_error *skip(int *, int, int, char *,
-    struct diff3_state *);
+static const struct got_error *skip(int *, int, int, struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
 static const struct got_error *prange(struct range *, struct diff3_state *);
@@ -821,12 +820,9 @@ prange(struct range *rold, struct diff3_state *d3s)
 	return NULL;
 }
 
-/*
- * skip to just before line number from in file "i".  If "pr" is non-NULL,
- * print all skipped stuff with string pr as a prefix.
- */
+/* skip to just before line number from in file "i". */
 static const struct got_error *
-skip(int *nskipped, int i, int from, char *pr, struct diff3_state *d3s)
+skip(int *nskipped, int i, int from, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 	size_t j, n;
@@ -837,11 +833,6 @@ skip(int *nskipped, int i, int from, char *pr, struct diff3_state *d3s)
 		err = get_line(&line, d3s->fp[i], &j, d3s);
 		if (err)
 			return err;
-		if (pr != NULL) {
-			err = diff_output(d3s->diffbuf, "%s%s", pr, line);
-			if (err)
-				return err;
-		}
 		d3s->cline[i]++;
 	}
 	*nskipped = n;
@@ -865,10 +856,10 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 	if (r1->to - r1->from != r2->to - r2->from)
 		return NULL;
 
-	err = skip(&nskipped, 0, r1->from, NULL, d3s);
+	err = skip(&nskipped, 0, r1->from, d3s);
 	if (err)
 		return err;
-	err = skip(&nskipped, 1, r2->from, NULL, d3s);
+	err = skip(&nskipped, 1, r2->from, d3s);
 	if (err)
 		return err;
 	nchar = 0;
@@ -922,11 +913,11 @@ edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 		d3s->overlapcnt++;
 	d3s->de[*j].old.from = diff->old.from;
 	d3s->de[*j].old.to = diff->old.to;
-	err = skip(&nskipped, 2, diff->new.from, NULL, d3s);
+	err = skip(&nskipped, 2, diff->new.from, d3s);
 	if (err)
 		return err;
 	d3s->de[*j].new.from = d3s->de[*j - 1].new.to + nskipped;
-	err = skip(&nskipped, 2, diff->new.to, NULL, d3s);
+	err = skip(&nskipped, 2, diff->new.to, d3s);
 	d3s->de[*j].new.to = d3s->de[*j].new.from + nskipped;
 	return NULL;
 }
