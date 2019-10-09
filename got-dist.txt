@@ -75,8 +75,6 @@
 /lib/repository.c
 /lib/sha1.c
 /lib/utf8.c
-/lib/worklist.c
-/lib/worklist.h
 /lib/worktree.c
 /libexec
 /libexec/Makefile
