@@ -158,7 +158,7 @@ static int number(char **);
 static const struct got_error *readin(size_t *, char *, struct diff **,
     struct diff3_state *);
 static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
-static const struct got_error *skip(int *, int, int, struct diff3_state *);
+static const struct got_error *skip(size_t *, int, int, struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
 static const struct got_error *prange(struct range *, struct diff3_state *);
@@ -821,9 +821,12 @@ prange(struct range *rold, struct diff3_state *d3s)
 	return NULL;
 }
 
-/* skip to just before line number from in file "i". */
+/*
+ * Skip to just before line number from in file "i".
+ * Return the number of bytes skipped in *nskipped.
+ */
 static const struct got_error *
-skip(int *nskipped, int i, int from, struct diff3_state *d3s)
+skip(size_t *nskipped, int i, int from, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 	size_t len, n;
@@ -850,7 +853,8 @@ duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
 	const struct got_error *err = NULL;
 	int c,d;
 	int nchar;
-	int nline, nskipped;
+	int nline;
+	size_t nskipped;
 
 	*dpl = 0;
 
@@ -904,7 +908,7 @@ static const struct got_error *
 edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	int nskipped;
+	size_t nskipped;
 
 	if (((fdup + 1) & 3) == 0)
 		return NULL;
