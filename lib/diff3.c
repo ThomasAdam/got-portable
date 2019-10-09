@@ -245,7 +245,8 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	err = buf_load(d, outpath);
 done:
 	if (outpath) {
-		unlink(outpath);
+		if (unlink(outpath) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink", outpath);
 		free(outpath);
 	}
 	if (outfile && fclose(outfile) != 0 && err == NULL)
@@ -382,9 +383,16 @@ out:
 	buf_free(d1);
 	buf_free(d2);
 
-	(void)unlink(path1);
-	(void)unlink(path2);
-	(void)unlink(path3);
+	if (unlink(path1) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path1);
+	if (unlink(path2) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path2);
+	if (unlink(path3) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path3);
+	if (unlink(dp13) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", dp13);
+	if (unlink(dp23) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", dp23);
 
 	free(path1);
 	free(path2);
