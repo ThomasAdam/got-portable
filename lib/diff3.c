@@ -104,14 +104,20 @@
  * "from" is first in range of changed lines; "to" is last+1
  * from=to=line after point of insertion for added lines.
  */
-struct range {
+struct line_range {
 	int from;
 	int to;
 };
 
+struct off_range {
+	off_t from;
+	off_t to;
+};
+
 struct diff {
-	struct range old;
-	struct range new;
+	struct line_range old;
+	struct line_range new;
+	struct off_range newo;
 };
 
 struct diff3_state {
@@ -123,10 +129,9 @@ struct diff3_state {
 	/*
 	 * "de" is used to gather editing scripts.  These are later spewed out
 	 * in reverse order.  Its first element must be all zero, the "new"
-	 * component of "de" contains line positions or byte positions
-	 * depending on when you look (!?).  Array overlap indicates which
-	 * sections in "de" correspond to lines that are different in all
-	 * three files.
+	 * component of "de" contains line positions and byte positions.
+	 * Array overlap indicates which sections in "de" correspond to lines
+	 * that are different in all three files.
 	 */
 	struct diff *de;
 	char *overlap;
@@ -147,8 +152,8 @@ struct diff3_state {
 };
 
 
-static const struct got_error *duplicate(int *, struct range *, struct range *,
-    struct diff3_state *);
+static const struct got_error *duplicate(int *, struct line_range *,
+    struct line_range *, struct diff3_state *);
 static const struct got_error *edit(struct diff *, int, int *,
     struct diff3_state *);
 static const struct got_error *getchange(char **, FILE *, struct diff3_state *);
@@ -161,7 +166,7 @@ static int ed_patch_lines(struct rcs_lines *, struct rcs_lines *);
 static const struct got_error *skip(size_t *, int, int, struct diff3_state *);
 static const struct got_error *edscript(int, struct diff3_state *);
 static const struct got_error *merge(size_t, size_t, struct diff3_state *);
-static const struct got_error *prange(struct range *, struct diff3_state *);
+static const struct got_error *prange(struct line_range *, struct diff3_state *);
 static const struct got_error *repos(int, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
@@ -796,7 +801,7 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
  * print the range of line numbers, rold.from thru rold.to, as n1,n2 or n1
  */
 static const struct got_error *
-prange(struct range *rold, struct diff3_state *d3s)
+prange(struct line_range *rold, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 
@@ -848,7 +853,8 @@ skip(size_t *nskipped, int i, int from, struct diff3_state *d3s)
  * the same data as the new range (in file 2).
  */
 static const struct got_error *
-duplicate(int *dpl, struct range *r1, struct range *r2, struct diff3_state *d3s)
+duplicate(int *dpl, struct line_range *r1, struct line_range *r2,
+    struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
 	int c,d;
@@ -918,12 +924,16 @@ edit(struct diff *diff, int fdup, int *j, struct diff3_state *d3s)
 		d3s->overlapcnt++;
 	d3s->de[*j].old.from = diff->old.from;
 	d3s->de[*j].old.to = diff->old.to;
+
 	err = skip(&nskipped, 2, diff->new.from, d3s);
 	if (err)
 		return err;
-	d3s->de[*j].new.from = d3s->de[*j - 1].new.to + nskipped;
+	d3s->de[*j].newo.from = d3s->de[*j - 1].newo.to + nskipped;
+
 	err = skip(&nskipped, 2, diff->new.to, d3s);
-	d3s->de[*j].new.to = d3s->de[*j].new.from + nskipped;
+	if (err)
+		return err;
+	d3s->de[*j].newo.to = d3s->de[*j].newo.from + nskipped;
 	return NULL;
 }
 
@@ -932,7 +942,7 @@ static const struct got_error *
 edscript(int n, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	int len, k;
+	off_t k, len;
 	char block[BUFSIZ+1];
 
 	for (; n > 0; n--) {
@@ -946,10 +956,10 @@ edscript(int n, struct diff3_state *d3s)
 			if (err)
 				return err;
 		}
-		if (fseek(d3s->fp[2], (long)d3s->de[n].new.from, SEEK_SET)
+		if (fseeko(d3s->fp[2], d3s->de[n].newo.from, SEEK_SET)
 		    == -1)
 			return got_error_from_errno("fseek");
-		k = d3s->de[n].new.to - d3s->de[n].new.from;
+		k = d3s->de[n].newo.to - d3s->de[n].newo.from;
 		for (; k > 0; k -= len) {
 			len = k > BUFSIZ ? BUFSIZ : k;
 			if (fread(block, 1, len, d3s->fp[2]) != (size_t)len)
