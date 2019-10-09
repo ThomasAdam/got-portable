@@ -385,8 +385,6 @@ out:
 	(void)unlink(path1);
 	(void)unlink(path2);
 	(void)unlink(path3);
-	(void)unlink(dp13);
-	(void)unlink(dp23);
 
 	free(path1);
 	free(path2);
