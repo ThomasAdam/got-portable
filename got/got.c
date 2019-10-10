@@ -1422,7 +1422,8 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
-	got_object_tree_close(tree2);
+	if (tree2)
+		got_object_tree_close(tree2);
 	return err;
 }
 
