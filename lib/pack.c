@@ -126,9 +126,10 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->version, sizeof(*h->version));
-		if (n < 0)
+		if (n < 0) {
 			err = got_error_from_errno("read");
-		else if (n != sizeof(*h->version)) {
+			goto done;
+		} else if (n != sizeof(*h->version)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
@@ -158,9 +159,10 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 		n = read(p->fd, h->fanout_table, len_fanout);
-		if (n < 0)
+		if (n < 0) {
 			err = got_error_from_errno("read");
-		else if (n != len_fanout) {
+			goto done;
+		} else if (n != len_fanout) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
