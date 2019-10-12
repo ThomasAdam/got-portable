@@ -680,6 +680,8 @@ function test_update_merges_file_edits {
 	git_show_head $testroot/repo >> $testroot/content.expected
 	echo >> $testroot/content.expected
 	echo "modified alpha" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha, too" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected
@@ -1364,6 +1366,8 @@ function test_update_to_another_branch {
 	git_show_head $testroot/repo >> $testroot/content.expected
 	echo >> $testroot/content.expected
 	echo "modified alpha on new branch" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha in work tree" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected

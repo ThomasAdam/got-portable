@@ -135,6 +135,7 @@ struct got_diff_args {
 };
 
 #define GOT_DIFF_CONFLICT_MARKER_BEGIN	"<<<<<<<"
+#define GOT_DIFF_CONFLICT_MARKER_ORIG	"|||||||"
 #define GOT_DIFF_CONFLICT_MARKER_SEP	"======="
 #define GOT_DIFF_CONFLICT_MARKER_END	">>>>>>>"
 

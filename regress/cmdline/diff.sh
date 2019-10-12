@@ -111,11 +111,13 @@ function test_diff_shows_conflict {
 	fi
 
 	sed -i 's/2/22/' $testroot/repo/numbers
+	sed -i 's/8/33/' $testroot/repo/numbers
 	git_commit $testroot/repo -m "modified line 2"
 	local head_rev=`git_show_head $testroot/repo`
 
-	# modify line 2 in a conflicting way
+	# modify lines 2 and 8 in conflicting ways
 	sed -i 's/2/77/' $testroot/wt/numbers
+	sed -i 's/8/88/' $testroot/wt/numbers
 
 	echo "C  numbers" > $testroot/stdout.expected
 	echo -n "Updated to commit $head_rev" >> $testroot/stdout.expected
@@ -138,16 +140,27 @@ function test_diff_shows_conflict {
 	echo 'file + numbers' >> $testroot/stdout.expected
 	echo '--- numbers' >> $testroot/stdout.expected
 	echo '+++ numbers' >> $testroot/stdout.expected
-	echo '@@ -1,5 +1,9 @@' >> $testroot/stdout.expected
+	echo '@@ -1,8 +1,20 @@' >> $testroot/stdout.expected
 	echo ' 1' >> $testroot/stdout.expected
 	echo "+<<<<<<< commit $head_rev" >> $testroot/stdout.expected
 	echo ' 22' >> $testroot/stdout.expected
+	echo '+|||||||' >> $testroot/stdout.expected
+	echo '+2' >> $testroot/stdout.expected
 	echo '+=======' >> $testroot/stdout.expected
 	echo '+77' >> $testroot/stdout.expected
 	echo '+>>>>>>> numbers' >> $testroot/stdout.expected
 	echo ' 3' >> $testroot/stdout.expected
 	echo ' 4' >> $testroot/stdout.expected
 	echo ' 5' >> $testroot/stdout.expected
+	echo ' 6' >> $testroot/stdout.expected
+	echo ' 7' >> $testroot/stdout.expected
+	echo "+<<<<<<< commit $head_rev" >> $testroot/stdout.expected
+	echo ' 33' >> $testroot/stdout.expected
+	echo '+|||||||' >> $testroot/stdout.expected
+	echo '+8' >> $testroot/stdout.expected
+	echo '+=======' >> $testroot/stdout.expected
+	echo '+88' >> $testroot/stdout.expected
+	echo '+>>>>>>> numbers' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 

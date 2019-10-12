@@ -117,6 +117,7 @@ struct off_range {
 struct diff {
 	struct line_range old;
 	struct line_range new;
+	struct off_range oldo;
 	struct off_range newo;
 };
 
@@ -129,7 +130,8 @@ struct diff3_state {
 	/*
 	 * "de" is used to gather editing scripts.  These are later spewed out
 	 * in reverse order.  Its first element must be all zero, the "new"
-	 * component of "de" contains line positions and byte positions.
+	 * component of "de" contains line positions, and "oldo" and "newo"
+	 * components contain byte positions.
 	 * Array overlap indicates which sections in "de" correspond to lines
 	 * that are different in all three files.
 	 */
@@ -152,7 +154,7 @@ struct diff3_state {
 };
 
 
-static const struct got_error *duplicate(int *, struct line_range *,
+static const struct got_error *duplicate(int *, int, struct line_range *,
     struct line_range *, struct diff3_state *);
 static const struct got_error *edit(struct diff *, int, int *,
     struct diff3_state *);
@@ -758,7 +760,7 @@ merge(size_t m1, size_t m2, struct diff3_state *d3s)
 		}
 		/* stuff peculiar to third file or different in all */
 		if (d1->new.from == d2->new.from && d1->new.to == d2->new.to) {
-			err = duplicate(&dpl, &d1->old, &d2->old, d3s);
+			err = duplicate(&dpl, j, &d1->old, &d2->old, d3s);
 			if (err)
 				return err;
 
@@ -851,9 +853,12 @@ skip(size_t *nskipped, int i, int from, struct diff3_state *d3s)
 /*
  * Set *dpl to 1 or 0 according as the old range (in file 1) contains exactly
  * the same data as the new range (in file 2).
+ *
+ * If this change could overlap, remember start/end offsets in file 2 so we
+ * can write out the original lines of text if a merge conflict occurs.
  */
 static const struct got_error *
-duplicate(int *dpl, struct line_range *r1, struct line_range *r2,
+duplicate(int *dpl, int j, struct line_range *r1, struct line_range *r2,
     struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
@@ -861,6 +866,7 @@ duplicate(int *dpl, struct line_range *r1, struct line_range *r2,
 	int nchar;
 	int nline;
 	size_t nskipped;
+	off_t off;
 
 	*dpl = 0;
 
@@ -873,6 +879,12 @@ duplicate(int *dpl, struct line_range *r1, struct line_range *r2,
 	err = skip(&nskipped, 1, r2->from, d3s);
 	if (err)
 		return err;
+
+	off = ftello(d3s->fp[1]);
+	if (off == -1)
+		return got_error_from_errno("ftello");
+	d3s->de[j + 1].oldo.from = off; /* original lines start here */
+
 	nchar = 0;
 	for (nline = 0; nline < r1->to - r1->from; nline++) {
 		do {
@@ -883,8 +895,26 @@ duplicate(int *dpl, struct line_range *r1, struct line_range *r2,
 			if (d == EOF)
 				return got_ferror(d3s->fp[1], GOT_ERR_EOF);
 			nchar++;
-			if (c != d)
-				return repos(nchar, d3s);
+			if (c != d) {
+				long orig_line_len = nchar;
+				while (d != '\n') {
+					d = getc(d3s->fp[1]);
+					if (d == EOF)
+						break;
+					orig_line_len++;
+				}
+				if (orig_line_len > nchar &&
+				    fseek(d3s->fp[1], -(orig_line_len - nchar),
+				    SEEK_CUR) == -1)
+					return got_ferror(d3s->fp[1],
+						GOT_ERR_IO);
+ 				/* original lines end here */
+				d3s->de[j + 1].oldo.to = off + orig_line_len;
+				err = repos(nchar, d3s);
+				if (err)
+					return err;
+				return NULL;
+			}
 		} while (c != '\n');
 	}
 	err = repos(nchar, d3s);
@@ -950,8 +980,33 @@ edscript(int n, struct diff3_state *d3s)
 			err = prange(&d3s->de[n].old, d3s);
 			if (err)
 				return err;
-		} else {
+		} else if (d3s->de[n].oldo.from < d3s->de[n].oldo.to) {
+			/* Output a block of 3-way diff base file content. */
 			err = diff_output(d3s->diffbuf, "%da\n%s\n",
+			    d3s->de[n].old.to -1,
+			    GOT_DIFF_CONFLICT_MARKER_ORIG);
+			if (err)
+				return err;
+			if (fseeko(d3s->fp[1], d3s->de[n].oldo.from, SEEK_SET)
+			    == -1)
+				return got_error_from_errno("fseeko");
+			k = (size_t)(d3s->de[n].oldo.to - d3s->de[n].oldo.from);
+			for (; k > 0; k -= len) {
+				len = k > BUFSIZ ? BUFSIZ : k;
+				if (fread(block, 1, len, d3s->fp[1]) != len)
+					return got_ferror(d3s->fp[1],
+					    GOT_ERR_IO);
+				block[len] = '\0';
+				err = diff_output(d3s->diffbuf, "%s", block);
+				if (err)
+					return err;
+			}
+			err = diff_output(d3s->diffbuf, "%s\n",
+			    GOT_DIFF_CONFLICT_MARKER_SEP);
+			if (err)
+				return err;
+ 		} else {
+ 			err = diff_output(d3s->diffbuf, "%da\n%s\n",
 			    d3s->de[n].old.to -1, GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
 				return err;

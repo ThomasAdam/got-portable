@@ -218,6 +218,8 @@ function test_rebase_continue {
 
 	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected
@@ -347,6 +349,8 @@ function test_rebase_abort {
 
 	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected
@@ -455,6 +459,8 @@ function test_rebase_no_op_change {
 
 	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected
@@ -560,6 +566,8 @@ function test_rebase_in_progress {
 
 	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
+	echo "|||||||" >> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
 	echo '>>>>>>> alpha' >> $testroot/content.expected
