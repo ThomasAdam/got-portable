@@ -775,7 +775,8 @@ check_cancelled(void *arg)
 
 static const struct got_error *
 check_linear_ancestry(struct got_object_id *commit_id,
-    struct got_object_id *base_commit_id, struct got_repository *repo)
+    struct got_object_id *base_commit_id, int allow_forwards_in_time_only,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *yca_id;
@@ -806,7 +807,10 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	 * Update forwards in time:  A (base/yca) - B - C - D (commit)
 	 * Update backwards in time: D (base) - C - B - A (commit/yca)
 	 */
-	if (got_object_id_cmp(commit_id, yca_id) != 0 &&
+	if (allow_forwards_in_time_only) {
+	    if (got_object_id_cmp(base_commit_id, yca_id) != 0)
+		return got_error(GOT_ERR_ANCESTRY);
+	} else if (got_object_id_cmp(commit_id, yca_id) != 0 &&
 	    got_object_id_cmp(base_commit_id, yca_id) != 0)
 		return got_error(GOT_ERR_ANCESTRY);
 
@@ -1063,7 +1067,7 @@ cmd_checkout(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id,
-		    got_worktree_get_base_commit_id(worktree), repo);
+		    got_worktree_get_base_commit_id(worktree), 0, repo);
 		if (error != NULL) {
 			free(commit_id);
 			goto done;
@@ -1143,7 +1147,7 @@ switch_head_ref(struct got_reference *head_ref,
 	}
 
 	err = check_linear_ancestry(commit_id,
-	    got_worktree_get_base_commit_id(worktree), repo);
+	    got_worktree_get_base_commit_id(worktree), 0, repo);
 	if (err) {
 		if (err->code != GOT_ERR_ANCESTRY)
 			return err;
@@ -1317,7 +1321,8 @@ cmd_update(int argc, char *argv[])
 		error = got_ref_resolve(&head_commit_id, repo, head_ref);
 		if (error)
 			goto done;
-		error = check_linear_ancestry(commit_id, head_commit_id, repo);
+		error = check_linear_ancestry(commit_id, head_commit_id, 0,
+		    repo);
 		free(head_commit_id);
 		if (error != NULL)
 			goto done;
@@ -1329,7 +1334,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	} else {
 		error = check_linear_ancestry(commit_id,
-		    got_worktree_get_base_commit_id(worktree), repo);
+		    got_worktree_get_base_commit_id(worktree), 0, repo);
 		if (error != NULL) {
 			if (error->code == GOT_ERR_ANCESTRY)
 				error = got_error(GOT_ERR_BRANCH_MOVED);
@@ -6564,7 +6569,7 @@ cmd_integrate(int argc, char *argv[])
 		goto done;
 	}
 
-	error = check_linear_ancestry(commit_id, base_commit_id, repo);
+	error = check_linear_ancestry(commit_id, base_commit_id, 1, repo);
 	if (error) {
 		if (error->code == GOT_ERR_ANCESTRY)
 			error = got_error(GOT_ERR_REBASE_REQUIRED);

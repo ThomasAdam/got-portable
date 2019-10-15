@@ -291,7 +291,84 @@ function test_integrate_path_prefix {
 	test_done "$testroot" "$ret"
 }
 
+function test_integrate_backwards_in_time {
+	local testroot=`test_init integrate_backwards_in_time`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got rebase failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	# attempt to integrate master into newbranch (wrong way around)
+	(cd $testroot/wt && got update -b newbranch > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update failed unexpectedly"
+		test_done "$testroot" "$ret"
+	 return 1
+	fi
+
+	(cd $testroot/wt && got integrate master \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got integrate succeeded unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: specified branch must be rebased first" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
 
 run_test test_integrate_basic
 run_test test_integrate_requires_rebase_first
 run_test test_integrate_path_prefix
+run_test test_integrate_backwards_in_time
