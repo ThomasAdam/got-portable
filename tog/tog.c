@@ -138,9 +138,11 @@ struct tog_log_thread_args {
 	struct got_repository *repo;
 	int log_complete;
 	sig_atomic_t *quit;
-	struct tog_view *view;
 	struct commit_queue_entry **first_displayed_entry;
 	struct commit_queue_entry **selected_entry;
+	int *searching;
+	int *search_next_done;
+	regex_t *regex;
 };
 
 struct tog_log_view_state {
@@ -1168,18 +1170,51 @@ free_commits(struct commit_queue *commits)
 }
 
 static const struct got_error *
-queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
-    int minqueue, struct got_repository *repo, const char *path)
+match_commit(int *have_match, struct got_object_id *id,
+    struct got_commit_object *commit, regex_t *regex)
 {
 	const struct got_error *err = NULL;
-	int nqueued = 0;
+	regmatch_t regmatch;
+	char *id_str = NULL, *logmsg = NULL;
+
+	*have_match = 0;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	if (err)
+		goto done;
+
+	if (regexec(regex, got_object_commit_get_author(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, got_object_commit_get_committer(commit), 1,
+	    &regmatch, 0) == 0 ||
+	    regexec(regex, id_str, 1, &regmatch, 0) == 0 ||
+	    regexec(regex, logmsg, 1, &regmatch, 0) == 0)
+		*have_match = 1;
+done:
+	free(id_str);
+	free(logmsg);
+	return err;
+}
+
+static const struct got_error *
+queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
+    int minqueue, struct got_repository *repo, const char *path,
+    int *searching, int *search_next_done, regex_t *regex)
+{
+	const struct got_error *err = NULL;
+	int nqueued = 0, have_match = 0;
 
 	/*
 	 * We keep all commits open throughout the lifetime of the log
 	 * view in order to avoid having to re-fetch commits from disk
 	 * while updating the display.
 	 */
-	while (nqueued < minqueue) {
+	while (nqueued < minqueue ||
+	    (*searching == TOG_SEARCH_FORWARD && !*search_next_done)) {
 		struct got_object_id *id;
 		struct got_commit_object *commit;
 		struct commit_queue_entry *entry;
@@ -1210,7 +1245,8 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 
 		errcode = pthread_mutex_lock(&tog_mutex);
 		if (errcode) {
-			err = got_error_set_errno(errcode, "pthread_mutex_lock");
+			err = got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
 			break;
 		}
 
@@ -1219,10 +1255,21 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 		nqueued++;
 		commits->ncommits++;
 
+		if (*searching == TOG_SEARCH_FORWARD && !*search_next_done) {
+			err = match_commit(&have_match, id, commit, regex);
+			if (err) {
+				pthread_mutex_lock(&tog_mutex);
+				break;
+			}
+		}
+
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode && err == NULL)
 			err = got_error_set_errno(errcode,
 			    "pthread_mutex_unlock");
+
+		if (have_match)
+			break;
 	}
 
 	return err;
@@ -1654,7 +1701,8 @@ log_thread(void *arg)
 
 	while (!done && !err && !tog_sigpipe_received) {
 		err = queue_commits(a->graph, a->commits, 1, a->repo,
-		    a->in_repo_path);
+		    a->in_repo_path, a->searching, a->search_next_done,
+		    a->regex);
 		if (err) {
 			if (err->code != GOT_ERR_ITER_COMPLETED)
 				return (void *)err;
@@ -1763,23 +1811,6 @@ search_start_log_view(struct tog_view *view)
 	return NULL;
 }
 
-static int
-match_commit(struct got_commit_object *commit, const char *id_str,
-    const char *logmsg, regex_t *regex)
-{
-	regmatch_t regmatch;
-
-	if (regexec(regex, got_object_commit_get_author(commit), 1,
-	    &regmatch, 0) == 0 ||
-	    regexec(regex, got_object_commit_get_committer(commit), 1,
-	    &regmatch, 0) == 0 ||
-	    regexec(regex, id_str, 1, &regmatch, 0) == 0 ||
-	    regexec(regex, logmsg, 1, &regmatch, 0) == 0)
-		return 1;
-
-	return 0;
-}
-
 static const struct got_error *
 search_next_log_view(struct tog_view *view)
 {
@@ -1793,7 +1824,17 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	if (s->search_entry) {
-		if (wgetch(view->window) == KEY_BACKSPACE) {
+		int errcode, ch;
+		errcode = pthread_mutex_unlock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_unlock");
+		ch = wgetch(view->window);
+		errcode = pthread_mutex_lock(&tog_mutex);
+		if (errcode)
+			return got_error_set_errno(errcode,
+			    "pthread_mutex_lock");
+		if (ch == KEY_BACKSPACE) {
 			view->search_next_done = 1;
 			return NULL;
 		}
@@ -1816,7 +1857,8 @@ search_next_log_view(struct tog_view *view)
 	}
 
 	while (1) {
-		char *id_str, *logmsg;
+		int have_match = 0;
+
 		if (entry == NULL) {
 			if (s->thread_args.log_complete ||
 			    view->searching == TOG_SEARCH_BACKWARD) {
@@ -1835,22 +1877,16 @@ search_next_log_view(struct tog_view *view)
 			    &s->thread_args.need_commits);
 		}
 
-		err = got_object_id_str(&id_str, entry->id);
+		err = match_commit(&have_match, entry->id, entry->commit,
+		    &view->regex);
 		if (err)
-			return err;
-
-		err = got_object_commit_get_logmsg(&logmsg, entry->commit);
-		if (err)
-			return err;
-		if (match_commit(entry->commit, id_str, logmsg, &view->regex)) {
-			free(logmsg);
+			break;
+		if (have_match) {
 			view->search_next_done = 1;
 			s->matched_entry = entry;
-			free(id_str);
 			break;
 		}
-		free(logmsg);
-		free(id_str);
+
 		s->search_entry = entry;
 		if (view->searching == TOG_SEARCH_FORWARD)
 			entry = TAILQ_NEXT(entry, entry);
@@ -1935,9 +1971,11 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->thread_args.repo = thread_repo;
 	s->thread_args.log_complete = 0;
 	s->thread_args.quit = &s->quit;
-	s->thread_args.view = view;
 	s->thread_args.first_displayed_entry = &s->first_displayed_entry;
 	s->thread_args.selected_entry = &s->selected_entry;
+	s->thread_args.searching = &view->searching;
+	s->thread_args.search_next_done = &view->search_next_done;
+	s->thread_args.regex = &view->regex;
 done:
 	if (err)
 		close_log_view(view);
