@@ -97,6 +97,7 @@ __dead static void	usage_cherrypick(void);
 __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
 __dead static void	usage_histedit(void);
+__dead static void	usage_integrate(void);
 __dead static void	usage_stage(void);
 __dead static void	usage_unstage(void);
 __dead static void	usage_cat(void);
@@ -121,6 +122,7 @@ static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
 static const struct got_error*		cmd_histedit(int, char *[]);
+static const struct got_error*		cmd_integrate(int, char *[]);
 static const struct got_error*		cmd_stage(int, char *[]);
 static const struct got_error*		cmd_unstage(int, char *[]);
 static const struct got_error*		cmd_cat(int, char *[]);
@@ -146,6 +148,7 @@ static struct got_cmd got_commands[] = {
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
 	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
+	{ "integrate",  cmd_integrate,  usage_integrate,"ig" },
 	{ "stage",	cmd_stage,	usage_stage,	"sg" },
 	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
 	{ "cat",	cmd_cat,	usage_cat,	"" },
@@ -6454,6 +6457,139 @@ done:
 		got_worktree_close(worktree);
 	if (repo)
 		got_repo_close(repo);
+	return error;
+}
+
+__dead static void
+usage_integrate(void)
+{
+	fprintf(stderr, "usage: %s integrate branch\n", getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_integrate(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *refname = NULL, *base_refname = NULL;
+	const char *branch_arg = NULL;
+	struct got_reference *branch_ref = NULL, *base_branch_ref = NULL;
+	struct got_fileindex *fileindex = NULL;
+	struct got_object_id *commit_id = NULL, *base_commit_id = NULL;
+	int ch, did_something = 0;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_integrate();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_integrate();
+	branch_arg = argv[0];
+
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error)
+		goto done;
+
+	error = check_rebase_or_histedit_in_progress(worktree);
+	if (error)
+		goto done;
+
+	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
+	    NULL);
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	if (asprintf(&refname, "refs/heads/%s", branch_arg) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	error = got_worktree_integrate_prepare(&fileindex, &branch_ref,
+	    &base_branch_ref, worktree, refname, repo);
+	if (error)
+		goto done;
+
+	refname = strdup(got_ref_get_name(branch_ref));
+	if (refname == NULL) {
+		error = got_error_from_errno("strdup");
+		got_worktree_integrate_abort(worktree, fileindex, repo,
+		    branch_ref, base_branch_ref);
+		goto done;
+	}
+	base_refname = strdup(got_ref_get_name(base_branch_ref));
+	if (base_refname == NULL) {
+		error = got_error_from_errno("strdup");
+		got_worktree_integrate_abort(worktree, fileindex, repo,
+		    branch_ref, base_branch_ref);
+		goto done;
+	}
+
+	error = got_ref_resolve(&commit_id, repo, branch_ref);
+	if (error)
+		goto done;
+
+	error = got_ref_resolve(&base_commit_id, repo, base_branch_ref);
+	if (error)
+		goto done;
+
+	if (got_object_id_cmp(commit_id, base_commit_id) == 0) {
+		error = got_error_msg(GOT_ERR_SAME_BRANCH,
+		    "specified branch has already been integrated");
+		got_worktree_integrate_abort(worktree, fileindex, repo,
+		    branch_ref, base_branch_ref);
+		goto done;
+	}
+
+	error = check_linear_ancestry(commit_id, base_commit_id, repo);
+	if (error) {
+		if (error->code == GOT_ERR_ANCESTRY)
+			error = got_error(GOT_ERR_REBASE_REQUIRED);
+		got_worktree_integrate_abort(worktree, fileindex, repo,
+		    branch_ref, base_branch_ref);
+		goto done;
+	}
+
+	error = got_worktree_integrate_continue(worktree, fileindex, repo,
+	    branch_ref, base_branch_ref, update_progress, &did_something,
+	    check_cancelled, NULL);
+	if (error)
+		goto done;
+
+	printf("Integrated %s into %s\n", refname, base_refname);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(cwd);
+	free(base_commit_id);
+	free(commit_id);
+	free(refname);
+	free(base_refname);
 	return error;
 }
 

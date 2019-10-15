@@ -1,6 +1,6 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
-	ref commit revert cherrypick backout rebase import histedit stage \
-	unstage cat
+	ref commit revert cherrypick backout rebase import histedit \
+	integrate stage unstage cat
 NOOBJ=Yes
 
 checkout:
@@ -56,6 +56,9 @@ import:
 
 histedit:
 	./histedit.sh
+
+integrate:
+	./integrate.sh
 
 stage:
 	./stage.sh

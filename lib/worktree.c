@@ -5613,6 +5613,143 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_worktree_integrate_prepare(struct got_fileindex **fileindex,
+    struct got_reference **branch_ref, struct got_reference **base_branch_ref,
+    struct got_worktree *worktree, const char *refname,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *fileindex_path = NULL;
+	struct check_rebase_ok_arg ok_arg;
+
+	*fileindex = NULL;
+	*branch_ref = NULL;
+	*base_branch_ref = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	if (strcmp(refname, got_worktree_get_head_ref_name(worktree)) == 0) {
+		err = got_error_msg(GOT_ERR_SAME_BRANCH,
+		    "cannot integrate a branch into itself; "
+		    "update -b or different branch name required");
+		goto done;
+	}
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	/* Preconditions are the same as for rebase. */
+	ok_arg.worktree = worktree;
+	ok_arg.repo = repo;
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
+	    &ok_arg);
+	if (err)
+		goto done;
+
+	err = got_ref_open(branch_ref, repo, refname, 1);
+	if (err)
+		goto done;
+
+	err = got_ref_open(base_branch_ref, repo,
+	    got_worktree_get_head_ref_name(worktree), 1);
+done:
+	if (err) {
+		if (*branch_ref) {
+			got_ref_close(*branch_ref);
+			*branch_ref = NULL;
+		}
+		if (*base_branch_ref) {
+			got_ref_close(*base_branch_ref);
+			*base_branch_ref = NULL;
+		}
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_integrate_continue(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    struct got_reference *branch_ref, struct got_reference *base_branch_ref,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err = NULL, *sync_err, *unlockerr;
+	char *fileindex_path = NULL;
+	struct got_object_id *tree_id = NULL, *commit_id = NULL;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&commit_id, repo, branch_ref);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&tree_id, repo, commit_id,
+	    worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = got_worktree_set_base_commit_id(worktree, repo, commit_id);
+	if (err)
+		goto done;
+
+	err = checkout_files(worktree, fileindex, "", tree_id, NULL, repo,
+	    progress_cb, progress_arg, cancel_cb, cancel_arg);
+	if (err)
+		goto sync;
+
+	err = got_ref_change_ref(base_branch_ref, commit_id);
+	if (err)
+		goto sync;
+
+	err = got_ref_write(base_branch_ref, repo);
+sync:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+
+done:
+	unlockerr = got_ref_unlock(branch_ref);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	got_ref_close(branch_ref);
+
+	unlockerr = got_ref_unlock(base_branch_ref);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	got_ref_close(base_branch_ref);
+
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
+	free(tree_id);
+
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_integrate_abort(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    struct got_reference *branch_ref, struct got_reference *base_branch_ref)
+{
+	got_ref_close(branch_ref);
+	got_ref_close(base_branch_ref);
+	got_fileindex_free(fileindex);
+	return lock_worktree(worktree, LOCK_SH);
+}
+
 struct check_stage_ok_arg {
 	struct got_object_id *head_commit_id;
 	struct got_worktree *worktree;

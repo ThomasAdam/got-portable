@@ -382,6 +382,29 @@ const struct got_error *got_worktree_histedit_abort(struct got_worktree *,
 const struct got_error *got_worktree_get_histedit_script_path(char **,
     struct got_worktree *);
 
+/*
+ * Prepare a work tree for integrating a branch.
+ * Return pointers to a fileindex and locked references which must be
+ * passed back to other integrate-related functions.
+ */
+const struct got_error *
+got_worktree_integrate_prepare(struct got_fileindex **,
+   struct got_reference **, struct got_reference **,
+    struct got_worktree *, const char *, struct got_repository *);
+
+/*
+ * Carry out a prepared branch integration operation.
+ * Report affected files via the specified progress callback.
+ */
+const struct got_error *got_worktree_integrate_continue(
+    struct got_worktree *, struct got_fileindex *, struct got_repository *,
+    struct got_reference *, struct got_reference *,
+    got_worktree_checkout_cb, void *, got_cancel_cb, void *);
+
+/* Abort a prepared branch integration operation. */
+const struct got_error *got_worktree_integrate_abort(struct got_worktree *,
+    struct got_fileindex *, struct got_repository *,
+    struct got_reference *, struct got_reference *);
 
 /*
  * Stage the specified paths for commit.

@@ -124,6 +124,7 @@
 #define GOT_ERR_COMMIT_NO_EMAIL	108
 #define GOT_ERR_TAG_EXISTS	109
 #define GOT_ERR_GIT_REPO_FORMAT	110
+#define GOT_ERR_REBASE_REQUIRED	111
 
 static const struct got_error {
 	int code;
@@ -254,6 +255,7 @@ static const struct got_error {
 	    "with Git" },
 	{ GOT_ERR_TAG_EXISTS,"specified tag already exists" },
 	{ GOT_ERR_GIT_REPO_FORMAT,"unknown git repository format version" },
+	{ GOT_ERR_REBASE_REQUIRED,"specified branch must be rebased first" },
 };
 
 /*

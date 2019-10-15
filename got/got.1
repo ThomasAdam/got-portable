@@ -1042,6 +1042,58 @@ If this option is used, no other command-line arguments are allowed.
 .It Cm he
 Short alias for
 .Cm histedit .
+.It Cm integrate Ar branch
+Integrate the specified
+.Ar branch
+into the work tree's current branch.
+Files in the work tree are updated to match the contents on the integrated
+.Ar branch ,
+and the reference of the work tree's branch is changed to point at the
+head commit of the integrated
+.Ar branch .
+.Pp
+Both branches can be considered equivalent after integration since they
+will be pointing at the same commit.
+Both branches remain available for future work, if desired.
+In case the integrated
+.Ar branch
+is no longer needed it may be deleted with
+.Cm got branch -d .
+.Pp
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It U Ta file was updated
+.It D Ta file was deleted
+.It A Ta new file was added
+.It \(a~ Ta versioned file is obstructed by a non-regular file
+.It ! Ta a missing versioned file was restored
+.El
+.Pp
+.Cm got integrate
+will refuse to run if certain preconditions are not met.
+Most importantly, the
+.Ar branch
+must have been rebased onto the work tree's current branch with
+.Cm got rebase
+before it can be integrated, in order to linearize commit history and
+resolve merge conflicts.
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If changes have been staged with
+.Cm got stage ,
+these changes must first be committed with
+.Cm got commit
+or unstaged with
+.Cm got unstage .
+If the work tree contains local changes, these changes must first be
+committed with
+.Cm got commit
+or reverted with
+.Cm got revert .
+.It Cm ig
+Short alias for
+.Cm integrate .
 .It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
 Stage local changes for inclusion in the next commit.
 If no
