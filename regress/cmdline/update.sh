@@ -1556,6 +1556,93 @@ function test_update_tag {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_toggles_xbit {
+	local testroot=`test_init update_toggles_xbit 1`
+
+	touch $testroot/repo/xfile
+	chmod +x $testroot/repo/xfile
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding executable file"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ls -l $testroot/wt/xfile | grep -q '^-rwx'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is not executable" >&2
+		ls -l $testroot/wt/xfile >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	chmod -x $testroot/wt/xfile
+	(cd $testroot/wt && got commit -m "clear x bit" >/dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	echo "U  xfile" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $commit_id1 > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  xfile" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+
+	ls -l $testroot/wt/xfile | grep -q '^-rwx'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is not executable" >&2
+		ls -l $testroot/wt/xfile >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  xfile" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id2" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	ls -l $testroot/wt/xfile | grep -q '^-rw-'
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "file is unexpectedly executable" >&2
+		ls -l $testroot/wt/xfile >&2
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1586,3 +1673,4 @@ run_test test_update_to_another_branch
 run_test test_update_to_commit_on_wrong_branch
 run_test test_update_bumps_base_commit_id
 run_test test_update_tag
+run_test test_update_toggles_xbit

@@ -1253,7 +1253,8 @@ update_blob(struct got_worktree *worktree,
 		goto done;
 	}
 
-	if (ie && status != GOT_STATUS_MISSING) {
+	if (ie && status != GOT_STATUS_MISSING &&
+	    (te->mode & S_IXUSR) == (sb.st_mode & S_IXUSR)) {
 		if (got_fileindex_entry_has_commit(ie) &&
 		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
