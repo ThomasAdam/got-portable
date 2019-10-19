@@ -645,6 +645,104 @@ function test_commit_gitconfig_author {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_xbit_change {
+	local testroot=`test_init commit_xbit_change`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	chmod +x $testroot/wt/alpha
+
+	echo 'm  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -mx > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	echo 'm  alpha' > $testroot/stdout.expected
+	echo "Created commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	chmod -x $testroot/wt/alpha
+
+	echo 'm  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -mx > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	echo 'm  alpha' > $testroot/stdout.expected
+	echo "Created commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	chmod +x $testroot/wt/alpha
+
+	echo 'm  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -661,3 +759,4 @@ run_test test_commit_outside_refs_heads
 run_test test_commit_no_email
 run_test test_commit_tree_entry_sorting
 run_test test_commit_gitconfig_author
+run_test test_commit_xbit_change

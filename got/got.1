@@ -252,6 +252,7 @@ using the following status codes:
 .It \(a~ Ta versioned file is obstructed by a non-regular file
 .It ? Ta unversioned item not tracked by
 .Nm
+.It m Ta modified file modes (executable bit only)
 .It N Ta non-existent
 .Ar path
 specified on the command line
@@ -706,6 +707,7 @@ Show the status of each affected file, using the following status codes:
 .It M Ta modified file
 .It D Ta file was deleted
 .It A Ta new file was added
+.It m Ta modified file modes (executable bit only)
 .El
 .Pp
 Files which are not part of the new commit will retain their previously

@@ -911,6 +911,23 @@ update_blob_fileindex_entry(struct got_worktree *worktree,
 	return err;
 }
 
+static mode_t
+get_ondisk_perms(int executable, mode_t st_mode)
+{
+	mode_t xbits = S_IXUSR;
+
+	if (executable) {
+		/* Map read bits to execute bits. */
+		if (st_mode & S_IRGRP)
+			xbits |= S_IXGRP;
+		if (st_mode & S_IROTH)
+			xbits |= S_IXOTH;
+		return st_mode | xbits;
+	}
+
+	return (st_mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
+}
+
 static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, uint16_t te_mode, uint16_t st_mode,
@@ -1000,16 +1017,10 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 		}
 	}
 
-	if (te_mode & S_IXUSR) {
-		if (chmod(ondisk_path, st_mode | S_IXUSR) == -1) {
-			err = got_error_from_errno2("chmod", ondisk_path);
-			goto done;
-		}
-	} else {
-		if (chmod(ondisk_path, st_mode & ~S_IXUSR) == -1) {
-			err = got_error_from_errno2("chmod", ondisk_path);
-			goto done;
-		}
+	if (chmod(ondisk_path,
+	    get_ondisk_perms(te_mode & S_IXUSR, st_mode)) == -1) {
+		err = got_error_from_errno2("chmod", ondisk_path);
+		goto done;
 	}
 
 done:
@@ -1056,13 +1067,21 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 }
 
 static int
+xbit_differs(struct got_fileindex_entry *ie, uint16_t st_mode)
+{
+	mode_t ie_mode = got_fileindex_perms_to_st(ie);
+	return ((ie_mode & S_IXUSR) != (st_mode & S_IXUSR));
+}
+
+static int
 stat_info_differs(struct got_fileindex_entry *ie, struct stat *sb)
 {
 	return !(ie->ctime_sec == sb->st_ctime &&
 	    ie->ctime_nsec == sb->st_ctimensec &&
 	    ie->mtime_sec == sb->st_mtime &&
 	    ie->mtime_nsec == sb->st_mtimensec &&
-	    ie->size == (sb->st_size & 0xffffffff));
+	    ie->size == (sb->st_size & 0xffffffff) &&
+	    !xbit_differs(ie, sb->st_mode));
 }
 
 static unsigned char
@@ -1175,7 +1194,8 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (*status == GOT_STATUS_MODIFY) {
 		rewind(f);
 		err = get_modified_file_content_status(status, f);
-	}
+	} else if (xbit_differs(ie, sb->st_mode))
+		*status = GOT_STATUS_MODE_CHANGE;
 done:
 	if (blob)
 		got_object_blob_close(blob);
@@ -1282,6 +1302,9 @@ update_blob(struct got_worktree *worktree,
 		err = got_fileindex_entry_update(ie, ondisk_path,
 		    blob->id.sha1, worktree->base_commit_id->sha1,
 		    update_timestamps);
+	} else if (status == GOT_STATUS_MODE_CHANGE) {
+		err = got_fileindex_entry_update(ie, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
 	} else if (status == GOT_STATUS_DELETE) {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		if (err)
@@ -3078,6 +3101,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	const struct got_error *err;
 	struct got_blob_object *blob = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
+	int fd2 = -1;
 	char *path1 = NULL, *id_str = NULL;
 	struct stat sb1, sb2;
 	struct got_diff_changes *changes = NULL;
@@ -3093,11 +3117,22 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		return err;
 
-	f2 = fopen(path2, "r");
+	fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
+	if (fd2 == -1) {
+		err = got_error_from_errno2("open", path2);
+		goto done;
+	}
+	if (fstat(fd2, &sb2) == -1) {
+		err = got_error_from_errno2("fstat", path2);
+		goto done;
+	}
+
+	f2 = fdopen(fd2, "r");
 	if (f2 == NULL) {
 		err = got_error_from_errno2("fopen", path2);
 		goto done;
 	}
+	fd2 = -1;
 
 	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
 	if (err)
@@ -3113,10 +3148,6 @@ create_patched_content(char **path_outfile, int reverse_patch,
 
 	if (stat(path1, &sb1) == -1) {
 		err = got_error_from_errno2("stat", path1);
-		goto done;
-	}
-	if (stat(path2, &sb2) == -1) {
-		err = got_error_from_errno2("stat", path2);
 		goto done;
 	}
 
@@ -3148,10 +3179,18 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		else if (choice == GOT_PATCH_CHOICE_QUIT)
 			break;
 	}
-	if (have_content)
+	if (have_content) {
 		err = copy_remaining_content(f1, f2, &line_cur1, &line_cur2,
 		    reverse_patch ? NULL : outfile,
 		    reverse_patch ? outfile : NULL);
+		if (err)
+			goto done;
+
+		if (chmod(*path_outfile, sb2.st_mode) == -1) {
+			err = got_error_from_errno2("chmod", path2);
+			goto done;
+		}
+	}
 done:
 	free(id_str);
 	if (blob)
@@ -3160,6 +3199,8 @@ done:
 		err = got_error_from_errno2("fclose", path1);
 	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path2);
+	if (fd2 != -1 && close(fd2) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path2);
 	if (outfile && fclose(outfile) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", *path_outfile);
 	if (path1 && unlink(path1) == -1 && err == NULL)
@@ -3298,6 +3339,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		}
 		/* fall through */
 	case GOT_STATUS_MODIFY:
+	case GOT_STATUS_MODE_CHANGE:
 	case GOT_STATUS_CONFLICT:
 	case GOT_STATUS_MISSING: {
 		struct got_object_id id;
@@ -3337,7 +3379,8 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			    a->repo, a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
-			if (status == GOT_STATUS_DELETE) {
+			if (status == GOT_STATUS_DELETE ||
+			    status == GOT_STATUS_MODE_CHANGE) {
 				err = update_blob_fileindex_entry(a->worktree,
 				    a->fileindex, ie, ondisk_path, ie->path,
 				    blob, 1);
@@ -3454,6 +3497,7 @@ collect_commitables(void *arg, unsigned char status,
 			return got_error(GOT_ERR_COMMIT_CONFLICT);
 
 		if (status != GOT_STATUS_MODIFY &&
+		    status != GOT_STATUS_MODE_CHANGE &&
 		    status != GOT_STATUS_ADD &&
 		    status != GOT_STATUS_DELETE)
 			return NULL;
@@ -3748,6 +3792,7 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 
 		if (ct->staged_status == GOT_STATUS_NO_CHANGE) {
 			if (ct->status != GOT_STATUS_MODIFY &&
+			    ct->status != GOT_STATUS_MODE_CHANGE &&
 			    ct->status != GOT_STATUS_DELETE)
 				continue;
 		} else {
@@ -3935,6 +3980,7 @@ write_tree(struct got_object_id **new_tree_id,
 			if (ct) {
 				/* NB: Deleted entries get dropped here. */
 				if (ct->status == GOT_STATUS_MODIFY ||
+				    ct->status == GOT_STATUS_MODE_CHANGE ||
 				    ct->staged_status == GOT_STATUS_MODIFY) {
 					err = alloc_modified_blob_tree_entry(
 					    &new_te, te, ct);
@@ -4113,7 +4159,8 @@ commit_worktree(struct got_object_id **new_commit_id,
 			continue;
 
 		if (ct->status != GOT_STATUS_ADD &&
-		    ct->status != GOT_STATUS_MODIFY)
+		    ct->status != GOT_STATUS_MODIFY &&
+		    ct->status != GOT_STATUS_MODE_CHANGE)
 			continue;
 
 		if (asprintf(&ondisk_path, "%s/%s",

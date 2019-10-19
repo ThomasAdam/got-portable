@@ -26,6 +26,7 @@ struct got_fileindex;
 #define GOT_STATUS_UPDATE	'U'
 #define GOT_STATUS_DELETE	'D'
 #define GOT_STATUS_MODIFY	'M'
+#define GOT_STATUS_MODE_CHANGE	'm'
 #define GOT_STATUS_CONFLICT	'C'
 #define GOT_STATUS_MERGE	'G'
 #define GOT_STATUS_MISSING	'!'
