@@ -217,7 +217,8 @@ function test_diff_tag {
 	echo "blob - /dev/null" >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $commit_id2 | grep 'new$' | \
-		cut -d' ' -f 1 >> $testroot/stdout.expected
+		cut -d' ' -f 1 | tr -d '\n' >> $testroot/stdout.expected
+	echo " (mode 644)" >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected

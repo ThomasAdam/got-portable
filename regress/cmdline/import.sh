@@ -67,25 +67,25 @@ function test_import_basic {
 	echo " " >> $testroot/stdout.expected
 	echo "diff /dev/null $tree_id" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
-	echo "blob + $id_alpha" >> $testroot/stdout.expected
+	echo "blob + $id_alpha (mode 644)" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ alpha" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
 	echo "+alpha" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
-	echo "blob + $id_beta" >> $testroot/stdout.expected
+	echo "blob + $id_beta (mode 644)" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ beta" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
 	echo "+beta" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
-	echo "blob + $id_zeta" >> $testroot/stdout.expected
+	echo "blob + $id_zeta (mode 644)" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ epsilon/zeta" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
 	echo "+zeta" >> $testroot/stdout.expected
 	echo "blob - /dev/null" >> $testroot/stdout.expected
-	echo "blob + $id_delta" >> $testroot/stdout.expected
+	echo "blob + $id_delta (mode 644)" >> $testroot/stdout.expected
 	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ gamma/delta" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected

@@ -44,11 +44,13 @@ const struct got_error *got_diff_blob_file(struct got_blob_object *,
  * the second blob contains content on the new side of the diff.
  * The set of arguments relating to either blob may be NULL to indicate
  * that no content is present on its respective side of the diff.
+ * File modes from relevant tree objects which contain the blobs may
+ * also be passed. These will be zero if not available.
  */
 typedef const struct got_error *(*got_diff_blob_cb)(void *,
     struct got_blob_object *, struct got_blob_object *,
     struct got_object_id *, struct got_object_id *,
-    const char *, const char *, struct got_repository *);
+    const char *, const char *, mode_t, mode_t, struct got_repository *);
 
 /*
  * A pre-defined implementation of got_diff_blob_cb() which appends unidiff
@@ -63,7 +65,7 @@ struct got_diff_blob_output_unidiff_arg {
 const struct got_error *got_diff_blob_output_unidiff(void *,
     struct got_blob_object *, struct got_blob_object *,
     struct got_object_id *, struct got_object_id *,
-    const char *, const char *, struct got_repository *);
+    const char *, const char *, mode_t, mode_t, struct got_repository *);
 
 /*
  * Compute the differences between two trees and invoke the provided

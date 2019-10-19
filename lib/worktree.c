@@ -1986,7 +1986,7 @@ static const struct got_error *
 merge_file_cb(void *arg, struct got_blob_object *blob1,
     struct got_blob_object *blob2, struct got_object_id *id1,
     struct got_object_id *id2, const char *path1, const char *path2,
-    struct got_repository *repo)
+    mode_t mode1, mode_t mode2, struct got_repository *repo)
 {
 	static const struct got_error *err = NULL;
 	struct merge_file_cb_arg *a = arg;

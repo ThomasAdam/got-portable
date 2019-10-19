@@ -1359,8 +1359,9 @@ function test_stage_commit {
 	echo '+modified file' >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i -c $first_commit \
-		| grep 'beta$' | cut -d' ' -f 1 \
+		| grep 'beta$' | cut -d' ' -f 1 | tr -d '\n' \
 		>> $testroot/stdout.expected
+	echo " (mode 644)" >> $testroot/stdout.expected
 	echo 'blob + /dev/null' >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
 	echo '+++ /dev/null' >> $testroot/stdout.expected
@@ -1368,7 +1369,8 @@ function test_stage_commit {
 	echo '-beta' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo -n 'blob + ' >> $testroot/stdout.expected
-	cat $testroot/blob_id_foo >> $testroot/stdout.expected
+	cat $testroot/blob_id_foo | tr -d '\n' >> $testroot/stdout.expected
+	echo " (mode 644)" >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
