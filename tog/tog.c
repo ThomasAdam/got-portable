@@ -1404,6 +1404,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 			author_cols = width;
 		free(wauthor);
 		free(author);
+		ncommits++;
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
