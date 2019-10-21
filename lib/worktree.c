@@ -60,6 +60,9 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+#define GOT_MERGE_LABEL_MERGED	"merged change"
+#define GOT_MERGE_LABEL_BASE	"3-way merge base"
+
 static const struct got_error *
 create_meta_file(const char *path_got, const char *name, const char *content)
 {
@@ -728,7 +731,8 @@ static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
     struct got_blob_object *blob_orig, const char *ondisk_path,
     const char *path, uint16_t st_mode, const char *deriv_path,
-    const char *label_deriv, struct got_repository *repo,
+    const char *label_orig, const char *label_deriv,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -776,7 +780,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	}
 
 	err = got_merge_diff3(&overlapcnt, merged_fd, deriv_path,
-	    blob_orig_path, ondisk_path, label_deriv, path);
+	    blob_orig_path, ondisk_path, label_deriv, label_orig, NULL);
 	if (err)
 		goto done;
 
@@ -832,10 +836,10 @@ done:
 static const struct got_error *
 merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
     struct got_blob_object *blob_orig, const char *ondisk_path,
-    const char *path, uint16_t st_mode, struct got_blob_object *blob_deriv,
-    struct got_object_id *deriv_base_commit_id,
-    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg)
+    const char *path, uint16_t st_mode, const char *label_orig,
+    struct got_blob_object *blob_deriv,
+    struct got_object_id *deriv_base_commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	FILE *f_deriv = NULL;
@@ -866,14 +870,15 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	err = got_object_id_str(&id_str, deriv_base_commit_id);
 	if (err)
 		goto done;
-	if (asprintf(&label_deriv, "commit %s", id_str) == -1) {
+	if (asprintf(&label_deriv, "%s: commit %s",
+	    GOT_MERGE_LABEL_MERGED, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
 	err = merge_file(local_changes_subsumed, worktree, blob_orig,
-	    ondisk_path, path, st_mode, blob_deriv_path, label_deriv,
-	    repo, progress_cb, progress_arg);
+	    ondisk_path, path, st_mode, blob_deriv_path, label_orig,
+	    label_deriv, repo, progress_cb, progress_arg);
 done:
 	if (f_deriv && fclose(f_deriv) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -1280,6 +1285,7 @@ update_blob(struct got_worktree *worktree,
 	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_ADD) {
 		int update_timestamps;
 		struct got_blob_object *blob2 = NULL;
+		char *label_orig = NULL;
 		if (got_fileindex_entry_has_blob(ie)) {
 			struct got_object_id id2;
 			memcpy(id2.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
@@ -1287,10 +1293,24 @@ update_blob(struct got_worktree *worktree,
 			if (err)
 				goto done;
 		}
+		if (got_fileindex_entry_has_commit(ie)) {
+			char id_str[SHA1_DIGEST_STRING_LENGTH];
+			if (got_sha1_digest_to_str(ie->commit_sha1, id_str,
+			    sizeof(id_str)) == NULL) {
+				err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+				goto done;
+			}
+			if (asprintf(&label_orig, "%s: commit %s",
+			    GOT_MERGE_LABEL_BASE, id_str) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		}
 		err = merge_blob(&update_timestamps, worktree, blob2,
-		    ondisk_path, path, sb.st_mode, blob,
+		    ondisk_path, path, sb.st_mode, label_orig, blob,
 		    worktree->base_commit_id, repo,
 		    progress_cb, progress_arg);
+		free(label_orig);
 		if (blob2)
 			got_object_blob_close(blob2);
 		if (err)
@@ -1979,6 +1999,7 @@ struct merge_file_cb_arg {
     void *progress_arg;
     got_cancel_cb cancel_cb;
     void *cancel_arg;
+    const char *label_orig;
     struct got_object_id *commit_id2;
 };
 
@@ -2025,8 +2046,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		}
 
 		err = merge_blob(&local_changes_subsumed, a->worktree, blob1,
-		    ondisk_path, path2, sb.st_mode, blob2, a->commit_id2, repo,
-		    a->progress_cb, a->progress_arg);
+		    ondisk_path, path2, sb.st_mode, a->label_orig, blob2,
+		    a->commit_id2, repo, a->progress_cb, a->progress_arg);
 	} else if (blob1) {
 		ie = got_fileindex_entry_get(a->fileindex, path1,
 		    strlen(path1));
@@ -2099,9 +2120,10 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				goto done;
 			}
 			err = merge_blob(&local_changes_subsumed, a->worktree,
-			    NULL, ondisk_path, path2, sb.st_mode, blob2,
-			    a->commit_id2, repo,
-			    a->progress_cb, a->progress_arg);
+			    NULL, ondisk_path, path2, sb.st_mode,
+			    a->label_orig, blob2, a->commit_id2, repo,
+			    a->progress_cb,
+			    a->progress_arg);
 			if (status == GOT_STATUS_DELETE) {
 				err = update_blob_fileindex_entry(a->worktree,
 				    a->fileindex, ie, ondisk_path, ie->path,
@@ -2178,8 +2200,11 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct merge_file_cb_arg arg;
+	char *label_orig = NULL;
 
 	if (commit_id1) {
+		char *id_str;
+
 		err = got_object_id_by_path(&tree_id1, repo, commit_id1,
 		    worktree->path_prefix);
 		if (err)
@@ -2188,6 +2213,18 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		err = got_object_open_as_tree(&tree1, repo, tree_id1);
 		if (err)
 			goto done;
+
+		err = got_object_id_str(&id_str, commit_id1);
+		if (err)
+			goto done;
+
+		if (asprintf(&label_orig, "%s: commit %s",
+		    GOT_MERGE_LABEL_BASE, id_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(id_str);
+			goto done;
+		}
+		free(id_str);
 	}
 
 	err = got_object_id_by_path(&tree_id2, repo, commit_id2,
@@ -2205,6 +2242,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	arg.progress_arg = progress_arg;
 	arg.cancel_cb = cancel_cb;
 	arg.cancel_arg = cancel_arg;
+	arg.label_orig = label_orig;
 	arg.commit_id2 = commit_id2;
 	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg, 1);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
@@ -2215,6 +2253,7 @@ done:
 		got_object_tree_close(tree1);
 	if (tree2)
 		got_object_tree_close(tree2);
+	free(label_orig);
 	return err;
 }
 
@@ -6227,6 +6266,7 @@ unstage_path(void *arg, unsigned char status,
 	struct got_blob_object *blob_base = NULL, *blob_staged = NULL;
 	char *ondisk_path = NULL, *path_unstaged_content = NULL;
 	char *path_new_staged_content = NULL;
+	char *id_str = NULL, *label_orig = NULL;
 	int local_changes_subsumed;
 	struct stat sb;
 
@@ -6242,6 +6282,16 @@ unstage_path(void *arg, unsigned char status,
 	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, relpath)
 	    == -1)
 		return got_error_from_errno("asprintf");
+
+	err = got_object_id_str(&id_str,
+	    commit_id ? commit_id : a->worktree->base_commit_id);
+	if (err)
+		goto done;
+	if (asprintf(&label_orig, "%s: commit %s", GOT_MERGE_LABEL_BASE,
+	    id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	switch (staged_status) {
 	case GOT_STATUS_MODIFY:
@@ -6282,8 +6332,9 @@ unstage_path(void *arg, unsigned char status,
 				err = merge_file(&local_changes_subsumed,
 				    a->worktree, blob_base, ondisk_path,
 				    relpath, got_fileindex_perms_to_st(ie),
-				    path_unstaged_content, "unstaged",
-				    a->repo, a->progress_cb, a->progress_arg);
+				    path_unstaged_content, label_orig,
+				    "unstaged", a->repo, a->progress_cb,
+				    a->progress_arg);
 				if (err == NULL &&
 				    path_new_staged_content == NULL)
 					got_fileindex_entry_stage_set(ie,
@@ -6297,7 +6348,7 @@ unstage_path(void *arg, unsigned char status,
 			break;
 		err = merge_blob(&local_changes_subsumed, a->worktree,
 		    blob_base, ondisk_path, relpath,
-		    got_fileindex_perms_to_st(ie), blob_staged,
+		    got_fileindex_perms_to_st(ie), label_orig, blob_staged,
 		    commit_id ? commit_id : a->worktree->base_commit_id,
 		    a->repo, a->progress_cb, a->progress_arg);
 		if (err == NULL)
@@ -6325,7 +6376,7 @@ unstage_path(void *arg, unsigned char status,
 		err = (*a->progress_cb)(a->progress_arg, status, relpath);
 		break;
 	}
-
+done:
 	free(ondisk_path);
 	if (path_unstaged_content &&
 	    unlink(path_unstaged_content) == -1 && err == NULL)
@@ -6339,6 +6390,8 @@ unstage_path(void *arg, unsigned char status,
 		got_object_blob_close(blob_base);
 	if (blob_staged)
 		got_object_blob_close(blob_staged);
+	free(id_str);
+	free(label_orig);
 	return err;
 }
 

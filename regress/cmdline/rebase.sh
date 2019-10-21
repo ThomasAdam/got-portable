@@ -176,6 +176,7 @@ function test_rebase_ancestry_check {
 
 function test_rebase_continue {
 	local testroot=`test_init rebase_continue`
+	local init_commit=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
 	echo "modified alpha on branch" > $testroot/repo/alpha
@@ -216,13 +217,15 @@ function test_rebase_continue {
 		return 1
 	fi
 
-	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $orig_commit1" \
+		> $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $init_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
@@ -347,13 +350,15 @@ function test_rebase_abort {
 		return 1
 	fi
 
-	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $orig_commit1" \
+		> $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $init_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
@@ -457,13 +462,15 @@ function test_rebase_no_op_change {
 		return 1
 	fi
 
-	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $orig_commit1" \
+		> $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $init_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
@@ -564,13 +571,15 @@ function test_rebase_in_progress {
 		return 1
 	fi
 
-	echo "<<<<<<< commit $orig_commit1" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $orig_commit1" \
+		> $testroot/content.expected
 	echo "modified alpha on branch" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $init_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha on master" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	cat $testroot/wt/alpha > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"

@@ -146,7 +146,9 @@ struct diff3_state {
 	 * is stored in last[1-3];
 	 */
 	int last[4];
-	char f1mark[PATH_MAX], f3mark[PATH_MAX]; /* markers for -E and -X */
+	char f1mark[PATH_MAX];
+	char f2mark[PATH_MAX];
+	char f3mark[PATH_MAX];
 
 	char *buf;
 
@@ -173,7 +175,7 @@ static const struct got_error *repos(int, struct diff3_state *);
 static const struct got_error *increase(struct diff3_state *);
 static const struct got_error *diff3_internal(char *, char *, char *,
     char *, char *, const char *, const char *, struct diff3_state *,
-    const char *, const char *);
+    const char *, const char *, const char *);
 
 static const struct got_error *
 diff_output(BUF *diffbuf, const char *fmt, ...)
@@ -269,7 +271,7 @@ done:
  */
 const struct got_error *
 got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
-    const char *p3, const char *label1, const char *label3)
+    const char *p3, const char *label1, const char *label2, const char *label3)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -367,7 +369,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 
 	d3s->diffbuf = diffb;
 	err = diff3_internal(dp13, dp23, path1, path2, path3,
-	    label1, label3, d3s, label1, label3);
+	    label1, label3, d3s, label1, label2, label3);
 	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
@@ -422,19 +424,27 @@ out:
 static const struct got_error *
 diff3_internal(char *dp13, char *dp23, char *path1, char *path2, char *path3,
     const char *fmark, const char *rmark, struct diff3_state *d3s,
-    const char *label1, const char *label3)
+    const char *label1, const char *label2, const char *label3)
 {
 	const struct got_error *err = NULL;
 	ssize_t m, n;
 	int i;
 
 	i = snprintf(d3s->f1mark, sizeof(d3s->f1mark),
-	    "%s %s", GOT_DIFF_CONFLICT_MARKER_BEGIN, label1);
+	    "%s%s%s", GOT_DIFF_CONFLICT_MARKER_BEGIN,
+	    label1 ? " " : "", label1 ? label1 : "");
 	if (i < 0 || i >= (int)sizeof(d3s->f1mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
+	i = snprintf(d3s->f2mark, sizeof(d3s->f2mark),
+	    "%s%s%s", GOT_DIFF_CONFLICT_MARKER_ORIG,
+	    label2 ? " " : "", label2 ? label2 : "");
+	if (i < 0 || i >= (int)sizeof(d3s->f2mark))
+		return got_error(GOT_ERR_NO_SPACE);
+
 	i = snprintf(d3s->f3mark, sizeof(d3s->f3mark),
-	    "%s %s", GOT_DIFF_CONFLICT_MARKER_END, label3);
+	    "%s%s%s", GOT_DIFF_CONFLICT_MARKER_END,
+	    label3 ? " " : "", label3 ? label3 : "");
 	if (i < 0 || i >= (int)sizeof(d3s->f3mark))
 		return got_error(GOT_ERR_NO_SPACE);
 
@@ -983,8 +993,7 @@ edscript(int n, struct diff3_state *d3s)
 		} else if (d3s->de[n].oldo.from < d3s->de[n].oldo.to) {
 			/* Output a block of 3-way diff base file content. */
 			err = diff_output(d3s->diffbuf, "%da\n%s\n",
-			    d3s->de[n].old.to -1,
-			    GOT_DIFF_CONFLICT_MARKER_ORIG);
+			    d3s->de[n].old.to - 1, d3s->f2mark);
 			if (err)
 				return err;
 			if (fseeko(d3s->fp[1], d3s->de[n].oldo.from, SEEK_SET)

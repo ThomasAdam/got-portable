@@ -642,6 +642,7 @@ function test_update_merges_file_edits {
 	echo "8" >> $testroot/repo/numbers
 	(cd $testroot/repo && git add numbers)
 	git_commit $testroot/repo -m "added numbers file"
+	local base_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -676,15 +677,16 @@ function test_update_merges_file_edits {
 		return 1
 	fi
 
-	echo -n "<<<<<<< commit " > $testroot/content.expected
+	echo -n "<<<<<<< merged change: commit " > $testroot/content.expected
 	git_show_head $testroot/repo >> $testroot/content.expected
 	echo >> $testroot/content.expected
 	echo "modified alpha" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $base_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha, too" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	echo "modified beta" >> $testroot/content.expected
 	echo "1" >> $testroot/content.expected
 	echo "22" >> $testroot/content.expected
@@ -881,13 +883,13 @@ function test_update_conflict_wt_add_vs_repo_add {
 		return 1
 	fi
 
-	echo -n "<<<<<<< commit " > $testroot/content.expected
+	echo -n "<<<<<<< merged change: commit " > $testroot/content.expected
 	git_show_head $testroot/repo >> $testroot/content.expected
 	echo >> $testroot/content.expected
 	echo "new" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "also new" >> $testroot/content.expected
-	echo '>>>>>>> gamma/new' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 
 	cat $testroot/wt/gamma/new > $testroot/content
 
@@ -1323,6 +1325,7 @@ function test_update_moved_branch_ref {
 
 function test_update_to_another_branch {
 	local testroot=`test_init update_to_another_branch`
+	local base_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -1362,15 +1365,16 @@ function test_update_to_another_branch {
 		return 1
 	fi
 
-	echo -n "<<<<<<< commit " > $testroot/content.expected
+	echo -n "<<<<<<< merged change: commit " > $testroot/content.expected
 	git_show_head $testroot/repo >> $testroot/content.expected
 	echo >> $testroot/content.expected
 	echo "modified alpha on new branch" >> $testroot/content.expected
-	echo "|||||||" >> $testroot/content.expected
+	echo "||||||| 3-way merge base: commit $base_commit" \
+		>> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "modified alpha in work tree" >> $testroot/content.expected
-	echo '>>>>>>> alpha' >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 
 	cat $testroot/wt/alpha > $testroot/content
 
