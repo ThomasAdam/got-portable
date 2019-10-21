@@ -601,7 +601,8 @@ cmd_import(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL) {
-				error = got_error_from_errno("realpath");
+				error = got_error_from_errno2("realpath",
+				    optarg);
 				goto done;
 			}
 			break;
@@ -665,7 +666,7 @@ cmd_import(int argc, char *argv[])
 
 	path_dir = realpath(argv[0], NULL);
 	if (path_dir == NULL) {
-		error = got_error_from_errno("realpath");
+		error = got_error_from_errno2("realpath", argv[0]);
 		goto done;
 	}
 	got_path_strip_trailing_slashes(path_dir);
@@ -1819,7 +1820,8 @@ cmd_log(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		default:
@@ -2203,7 +2205,8 @@ cmd_diff(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 's':
@@ -2531,7 +2534,8 @@ cmd_blame(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		default:
@@ -2824,7 +2828,8 @@ cmd_tree(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'i':
@@ -3164,7 +3169,8 @@ cmd_ref(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'l':
@@ -3469,7 +3475,8 @@ cmd_branch(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'l':
@@ -3947,7 +3954,8 @@ cmd_tag(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'l':
@@ -7076,7 +7084,8 @@ cmd_cat(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
 			break;
 		case 'P':

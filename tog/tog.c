@@ -2278,7 +2278,8 @@ cmd_log(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			break;
 		default:
 			usage_log();
@@ -3824,7 +3825,8 @@ cmd_blame(int argc, char *argv[])
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
-				err(1, "-r option");
+				return got_error_from_errno2("realpath",
+				    optarg);
 			break;
 		default:
 			usage_blame();
