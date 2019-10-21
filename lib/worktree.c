@@ -5831,10 +5831,23 @@ got_worktree_integrate_abort(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
     struct got_reference *branch_ref, struct got_reference *base_branch_ref)
 {
-	got_ref_close(branch_ref);
-	got_ref_close(base_branch_ref);
+	const struct got_error *err = NULL, *unlockerr = NULL;
+
 	got_fileindex_free(fileindex);
-	return lock_worktree(worktree, LOCK_SH);
+
+	err = lock_worktree(worktree, LOCK_SH);
+
+	unlockerr = got_ref_unlock(branch_ref);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	got_ref_close(branch_ref);
+
+	unlockerr = got_ref_unlock(base_branch_ref);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	got_ref_close(base_branch_ref);
+
+	return err;
 }
 
 struct check_stage_ok_arg {

@@ -220,6 +220,23 @@ function test_integrate_requires_rebase_first {
 	echo "commit $new_commit1" >> $testroot/stdout.expected
 	echo "commit $init_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && got branch -l > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got rebase failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "  master: $master_commit" > $testroot/stdout.expected
+	echo "  newbranch: $new_commit2" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
