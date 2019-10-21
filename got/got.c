@@ -2391,7 +2391,7 @@ struct blame_line {
 	int annotated;
 	char *id_str;
 	char *committer;
-	char datebuf[9]; /* YY-MM-DD + NUL */
+	char datebuf[11]; /* YYYY-MM-DD + NUL */
 };
 
 struct blame_cb_args {
@@ -2448,7 +2448,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("localtime_r");
-	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%g/%m/%d",
+	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%G/%m/%d",
 	    &tm) >= sizeof(bline->datebuf)) {
 		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
