@@ -4499,11 +4499,6 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content);
 done:
-	if (err == NULL || err->code == GOT_ERR_COMMIT_MSG_EMPTY) {
-		unlink(a->logmsg_path);
-		free(a->logmsg_path);
-		a->logmsg_path = NULL;
-	}
 	free(initial_content);
 	free(template);
 
@@ -4529,7 +4524,7 @@ cmd_commit(int argc, char *argv[])
 	const char *logmsg = NULL;
 	struct collect_commit_logmsg_arg cl_arg;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
-	int ch, rebase_in_progress, histedit_in_progress;
+	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
@@ -4619,20 +4614,23 @@ cmd_commit(int argc, char *argv[])
 	error = got_worktree_commit(&id, worktree, &paths, author, NULL,
 	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
 	if (error) {
-		if (cl_arg.logmsg_path)
-			fprintf(stderr, "%s: log message preserved in %s\n",
-			    getprogname(), cl_arg.logmsg_path);
+		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
+		    cl_arg.logmsg_path != NULL)
+			preserve_logmsg = 1;
 		goto done;
 	}
-
-	if (cl_arg.logmsg_path)
-		unlink(cl_arg.logmsg_path);
 
 	error = got_object_id_str(&id_str, id);
 	if (error)
 		goto done;
 	printf("Created commit %s\n", id_str);
 done:
+	if (preserve_logmsg) {
+		fprintf(stderr, "%s: log message preserved in %s\n",
+		    getprogname(), cl_arg.logmsg_path);
+	} else if (cl_arg.logmsg_path && unlink(cl_arg.logmsg_path) == -1 &&
+	    error == NULL)
+		error = got_error_from_errno2("unlink", cl_arg.logmsg_path);
 	free(cl_arg.logmsg_path);
 	if (repo)
 		got_repo_close(repo);
