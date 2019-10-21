@@ -595,7 +595,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 	FILE *f;
 	int a, b, c, d;
 	char kind, *p;
-	size_t i;
+	size_t i = 0;
 
 	*n = 0;
 
