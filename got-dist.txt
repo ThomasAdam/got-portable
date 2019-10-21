@@ -117,6 +117,7 @@
 /regress/cmdline/diff.sh
 /regress/cmdline/histedit.sh
 /regress/cmdline/import.sh
+/regress/cmdline/integrate.sh
 /regress/cmdline/log.sh
 /regress/cmdline/rebase.sh
 /regress/cmdline/ref.sh
