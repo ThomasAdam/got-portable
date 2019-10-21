@@ -165,9 +165,9 @@ parse_ref_file(struct got_reference **ref, const char *name,
 {
 	const struct got_error *err = NULL;
 	FILE *f;
-	char *line;
-	size_t len;
-	const char delim[3] = {'\0', '\0', '\0'};
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 	struct got_lockfile *lf = NULL;
 
 	if (lock) {
@@ -183,12 +183,19 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		return NULL;
 	}
 
-	line = fparseln(f, &len, NULL, delim, 0);
-	if (line == NULL) {
-		err = got_error(GOT_ERR_BAD_REF_DATA);
+	linelen = getline(&line, &linesize, f);
+	if (linelen == -1) {
+		if (feof(f))
+			err = NULL; /* ignore empty files (could be locks) */
+		else
+			err = got_error_from_errno2("getline", abspath);
 		if (lock)
 			got_lockfile_unlock(lf);
 		goto done;
+	}
+	while (linelen > 0 && line[linelen - 1] == '\n') {
+		line[linelen - 1] = '\0';
+		linelen--;
 	}
 
 	err = parse_ref_line(ref, name, line);
