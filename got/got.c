@@ -3733,12 +3733,12 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 }
 
 static const struct got_error *
-get_tag_message(char **tagmsg, const char *commit_id_str,
+get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
     const char *tag_name, const char *repo_path)
 {
 	const struct got_error *err = NULL;
 	char *template = NULL, *initial_content = NULL;
-	char *tagmsg_path = NULL, *editor = NULL;
+	char *editor = NULL;
 	int fd = -1;
 
 	if (asprintf(&template, "/tmp/got-tagmsg") == -1) {
@@ -3752,7 +3752,7 @@ get_tag_message(char **tagmsg, const char *commit_id_str,
 		goto done;
 	}
 
-	err = got_opentemp_named_fd(&tagmsg_path, &fd, template);
+	err = got_opentemp_named_fd(tagmsg_path, &fd, template);
 	if (err)
 		goto done;
 
@@ -3762,13 +3762,8 @@ get_tag_message(char **tagmsg, const char *commit_id_str,
 	err = get_editor(&editor);
 	if (err)
 		goto done;
-	err = edit_logmsg(tagmsg, editor, tagmsg_path, initial_content);
+	err = edit_logmsg(tagmsg, editor, *tagmsg_path, initial_content);
 done:
-	if (err == NULL || err->code == GOT_ERR_COMMIT_MSG_EMPTY) {
-		unlink(tagmsg_path);
-		free(tagmsg_path);
-		tagmsg_path = NULL;
-	}
 	free(initial_content);
 	free(template);
 	free(editor);
@@ -3793,6 +3788,8 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	char *label = NULL, *commit_id_str = NULL;
 	struct got_reference *ref = NULL;
 	char *refname = NULL, *tagmsg = NULL, *tagger = NULL;
+	char *tagmsg_path = NULL, *tag_id_str = NULL;
+	int preserve_tagmsg = 0;
 
 	/*
 	 * Don't let the user create a tag named '-'.
@@ -3835,36 +3832,59 @@ add_tag(struct got_repository *repo, const char *tag_name,
 		goto done;
 
 	if (tagmsg_arg == NULL) {
-		err = get_tag_message(&tagmsg, commit_id_str,
+		err = get_tag_message(&tagmsg, &tagmsg_path, commit_id_str,
 		    tag_name, got_repo_get_path(repo));
-		if (err)
+		if (err) {
+			if (err->code != GOT_ERR_COMMIT_MSG_EMPTY &&
+			    tagmsg_path != NULL)
+				preserve_tagmsg = 1;
 			goto done;
+		}
 	}
 
 	err = got_object_tag_create(&tag_id, tag_name, commit_id,
 	    tagger, time(NULL), tagmsg ? tagmsg : tagmsg_arg, repo);
-	if (err)
+	if (err) {
+		if (tagmsg_path)
+			preserve_tagmsg = 1;
 		goto done;
+	}
 
 	err = got_ref_alloc(&ref, refname, tag_id);
-	if (err)
+	if (err) {
+		if (tagmsg_path)
+			preserve_tagmsg = 1;
 		goto done;
+	}
 
 	err = got_ref_write(ref, repo);
-
-	if (err == NULL) {
-		char *tag_id_str;
-		err = got_object_id_str(&tag_id_str, tag_id);
-		printf("Created tag %s\n", tag_id_str);
-		free(tag_id_str);
+	if (err) {
+		if (tagmsg_path)
+			preserve_tagmsg = 1;
+		goto done;
 	}
+
+	err = got_object_id_str(&tag_id_str, tag_id);
+	if (err) {
+		if (tagmsg_path)
+			preserve_tagmsg = 1;
+		goto done;
+	}
+	printf("Created tag %s\n", tag_id_str);
 done:
+	if (preserve_tagmsg) {
+		fprintf(stderr, "%s: tag message preserved in %s\n",
+		    getprogname(), tagmsg_path);
+	} else if (tagmsg_path && unlink(tagmsg_path) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tagmsg_path);
+	free(tag_id_str);
 	if (ref)
 		got_ref_close(ref);
 	free(commit_id);
 	free(commit_id_str);
 	free(refname);
 	free(tagmsg);
+	free(tagmsg_path);
 	free(tagger);
 	return err;
 }
