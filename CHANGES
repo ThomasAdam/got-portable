@@ -1,3 +1,20 @@
+* got 0.18; 2019-10-21
+- always show the input path when realpath(3) returns an error
+- preserve log message when an error occurs during commit, tag, or import
+- ignore empty files in refs directory instead of throwing errors
+- show file mode differences (executable bit) when diffing in-repository trees
+- fix handling of executable-bit changes during update, commit, and status
+- improve tog's responsiveness after loading hundreds of thousands of commits
+- fix tog performance bug which made searching through commits very slow
+- add 'got integrate' command for merging a branch back to its parent branch
+- show content from the merge-base file in 3-way merge conflicts, if available
+- improved indication of 3-way merge inputs in conflict marker labels
+- handle read errors in got_packidx_init_hdr (found by jj@ with scan-build)
+- remove worklist code; it was only used to unlink files already unlinked
+- show bad reference names in error messages to make such errors more clear
+- add -w (ignore whitespace) option to 'got diff'
+- improved coding style and error handling in diff3 code
+
 * got 0.17; 2019-10-06
 - make 'got branch' without args show work tree's branch (requested by benno)
 - show temporary branch in 'got branch -l' during rebase and histedit
