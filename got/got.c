@@ -461,10 +461,10 @@ done:
 }
 
 static const struct got_error *
-collect_import_msg(char **logmsg, const char *editor, const char *path_dir,
-    const char *branch_name)
+collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
+    const char *path_dir, const char *branch_name)
 {
-	char *initial_content = NULL, *logmsg_path = NULL;
+	char *initial_content = NULL;
 	const struct got_error *err = NULL;
 	int fd;
 
@@ -473,17 +473,16 @@ collect_import_msg(char **logmsg, const char *editor, const char *path_dir,
 	    branch_name) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_opentemp_named_fd(&logmsg_path, &fd, "/tmp/got-importmsg");
+	err = got_opentemp_named_fd(logmsg_path, &fd, "/tmp/got-importmsg");
 	if (err)
 		goto done;
 
 	dprintf(fd, initial_content);
 	close(fd);
 
-	err = edit_logmsg(logmsg, editor, logmsg_path, initial_content);
+	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content);
 done:
 	free(initial_content);
-	free(logmsg_path);
 	return err;
 }
 
@@ -576,13 +575,14 @@ cmd_import(int argc, char *argv[])
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	const char *branch_name = "master";
-	char *refname = NULL, *id_str = NULL;
+	char *refname = NULL, *id_str = NULL, *logmsg_path = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reference *branch_ref = NULL, *head_ref = NULL;
 	struct got_object_id *new_commit_id = NULL;
 	int ch;
 	struct got_pathlist_head ignores;
 	struct got_pathlist_entry *pe;
+	int preserve_logmsg = 0;
 
 	TAILQ_INIT(&ignores);
 
@@ -679,54 +679,93 @@ cmd_import(int argc, char *argv[])
 		if (error)
 			goto done;
 		free(logmsg);
-		error = collect_import_msg(&logmsg, editor, path_dir, refname);
-		if (error)
+		error = collect_import_msg(&logmsg, &logmsg_path, editor,
+		    path_dir, refname);
+		if (error) {
+			if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
+			    logmsg_path != NULL)
+				preserve_logmsg = 1;
 			goto done;
+		}
 	}
 
-	if (unveil(path_dir, "r") != 0)
-		return got_error_from_errno2("unveil", path_dir);
+	if (unveil(path_dir, "r") != 0) {
+		error = got_error_from_errno2("unveil", path_dir);
+		if (logmsg_path)
+			preserve_logmsg = 1;
+		goto done;
+	}
 
 	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
-	if (error)
+	if (error) {
+		if (logmsg_path)
+			preserve_logmsg = 1;
 		goto done;
+	}
 
 	error = got_repo_import(&new_commit_id, path_dir, logmsg,
 	    author, &ignores, repo, import_progress, NULL);
-	if (error)
+	if (error) {
+		if (logmsg_path)
+			preserve_logmsg = 1;
 		goto done;
+	}
 
 	error = got_ref_alloc(&branch_ref, refname, new_commit_id);
-	if (error)
+	if (error) {
+		if (logmsg_path)
+			preserve_logmsg = 1;
 		goto done;
+	}
 
 	error = got_ref_write(branch_ref, repo);
-	if (error)
+	if (error) {
+		if (logmsg_path)
+			preserve_logmsg = 1;
 		goto done;
+	}
 
 	error = got_object_id_str(&id_str, new_commit_id);
-	if (error)
+	if (error) {
+		if (logmsg_path)
+			preserve_logmsg = 1;
 		goto done;
+	}
 
 	error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
 	if (error) {
-		if (error->code != GOT_ERR_NOT_REF)
+		if (error->code != GOT_ERR_NOT_REF) {
+			if (logmsg_path)
+				preserve_logmsg = 1;
 			goto done;
+		}
 
 		error = got_ref_alloc_symref(&head_ref, GOT_REF_HEAD,
 		    branch_ref);
-		if (error)
+		if (error) {
+			if (logmsg_path)
+				preserve_logmsg = 1;
 			goto done;
+		}
 
 		error = got_ref_write(head_ref, repo);
-		if (error)
+		if (error) {
+			if (logmsg_path)
+				preserve_logmsg = 1;
 			goto done;
+		}
 	}
 
 	printf("Created branch %s with commit %s\n",
 	    got_ref_get_name(branch_ref), id_str);
 done:
+	if (preserve_logmsg) {
+		fprintf(stderr, "%s: log message preserved in %s\n",
+		    getprogname(), logmsg_path);
+	} else if (logmsg_path && unlink(logmsg_path) == -1 && error == NULL)
+		error = got_error_from_errno2("unlink", logmsg_path);
 	free(logmsg);
+	free(logmsg_path);
 	free(repo_path);
 	free(editor);
 	free(refname);
