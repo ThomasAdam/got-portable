@@ -18,6 +18,8 @@ tog:
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
 - implement search feature for diff view
+- highlight matched parts of commits in tog log search, and then allow regular
+  input to continue (such that the cursor can be moved) while tog is searching
 - implement 'limit' for 'tog log' (like search but display matched commits only)
 - allow moving to prev/next blamed line in diff view if opened from blame view,
   similar to how the diff view can switch commits if opened from log view
