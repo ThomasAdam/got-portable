@@ -352,7 +352,7 @@ function test_double_stage {
 	(cd $testroot/wt && got add foo > /dev/null)
 	(cd $testroot/wt && got stage alpha beta foo > /dev/null)
 
-	echo "got: alpha: no changes to stage" > $testroot/stderr.expected
+	echo "got: no changes to stage" > $testroot/stderr.expected
 	(cd $testroot/wt && got stage alpha 2> $testroot/stderr)
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -362,10 +362,11 @@ function test_double_stage {
 		return 1
 	fi
 
-	(cd $testroot/wt && got stage beta > $testroot/stdout)
+	(cd $testroot/wt && got stage beta \
+		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" != "0" ]; then
-		echo "got stage command failed unexpectedly" >&2
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -378,7 +379,35 @@ function test_double_stage {
 		return 1
 	fi
 
-	echo "got: foo: no changes to stage" > $testroot/stderr.expected
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	(cd $testroot/wt && got stage foo 2> $testroot/stderr)
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf "q\n" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: no changes to stage" > $testroot/stderr.expected
 	(cd $testroot/wt && got stage foo 2> $testroot/stderr)
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -1421,10 +1450,10 @@ function test_stage_patch {
 	# don't stage any hunks
 	printf "n\nn\nn\n" > $testroot/patchscript
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
-		numbers > $testroot/stdout)
+		numbers > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" != "0" ]; then
-		echo "got stage command failed unexpectedly" >&2
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -1471,6 +1500,16 @@ EOF
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	echo "got: no changes to stage" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	echo "M  numbers" > $testroot/stdout.expected
@@ -1968,7 +2007,7 @@ function test_stage_patch_added_twice {
 		return 1
 	fi
 
-	echo "got: epsilon/new: no changes to stage" > $testroot/stderr.expected
+	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -2087,13 +2126,13 @@ function test_stage_patch_removed_twice {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" != "0" ]; then
-		echo "got stage command failed unexpectedly" >&2
+	if [ "$ret" == "0" ]; then
+		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	echo -n > $testroot/stderr.expected
+	echo "got: no changes to stage" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

@@ -5871,7 +5871,8 @@ check_stage_ok(void *arg, unsigned char status,
 	struct got_object_id *base_commit_idp = NULL;
 	char *in_repo_path = NULL, *p;
 
-	if (status == GOT_STATUS_UNVERSIONED)
+	if (status == GOT_STATUS_UNVERSIONED ||
+	    status == GOT_STATUS_NO_CHANGE)
 		return NULL;
 	if (status == GOT_STATUS_NONEXISTENT)
 		return got_error_set_errno(ENOENT, relpath);
@@ -5891,10 +5892,7 @@ check_stage_ok(void *arg, unsigned char status,
 		base_commit_idp = &base_commit_id;
 	}
 
-	if (status == GOT_STATUS_NO_CHANGE) {
-		err = got_error_path(ie->path, GOT_ERR_STAGE_NO_CHANGE);
-		goto done;
-	} else if (status == GOT_STATUS_CONFLICT) {
+	if (status == GOT_STATUS_CONFLICT) {
 		err = got_error_path(ie->path, GOT_ERR_STAGE_CONFLICT);
 		goto done;
 	} else if (status != GOT_STATUS_ADD &&
@@ -5925,6 +5923,7 @@ struct stage_path_arg {
 	void *status_arg;
 	got_worktree_patch_cb patch_cb;
 	void *patch_arg;
+	int staged_something;
 };
 
 static const struct got_error *
@@ -5983,6 +5982,7 @@ stage_path(void *arg, unsigned char status,
 		else
 			stage = GOT_FILEIDX_STAGE_MODIFY;
 		got_fileindex_entry_stage_set(ie, stage);
+		a->staged_something = 1;
 		if (a->status_cb == NULL)
 			break;
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
@@ -6007,13 +6007,13 @@ stage_path(void *arg, unsigned char status,
 		}
 		stage = GOT_FILEIDX_STAGE_DELETE;
 		got_fileindex_entry_stage_set(ie, stage);
+		a->staged_something = 1;
 		if (a->status_cb == NULL)
 			break;
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, NULL, NULL, NULL);
 		break;
 	case GOT_STATUS_NO_CHANGE:
-		err = got_error_path(relpath, GOT_ERR_STAGE_NO_CHANGE);
 		break;
 	case GOT_STATUS_CONFLICT:
 		err = got_error_path(relpath, GOT_ERR_STAGE_CONFLICT);
@@ -6089,11 +6089,16 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.patch_arg = patch_arg;
 	spa.status_cb = status_cb;
 	spa.status_arg = status_arg;
+	spa.staged_something = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    stage_path, &spa, NULL, NULL);
 		if (err)
 			goto done;
+	}
+	if (!spa.staged_something) {
+		err = got_error(GOT_ERR_STAGE_NO_CHANGE);
+		goto done;
 	}
 
 	sync_err = sync_fileindex(fileindex, fileindex_path);
