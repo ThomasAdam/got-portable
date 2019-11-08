@@ -112,12 +112,12 @@ struct commit_queue {
 	struct commit_queue_head head;
 };
 
-struct tog_line_color {
-	SIMPLEQ_ENTRY(tog_line_color) entry;
+struct tog_color {
+	SIMPLEQ_ENTRY(tog_color) entry;
 	regex_t regex;
 	short colorpair;
 };
-SIMPLEQ_HEAD(tog_line_colors, tog_line_color);
+SIMPLEQ_HEAD(tog_colors, tog_color);
 
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
@@ -128,7 +128,7 @@ struct tog_diff_view_state {
 	int diff_context;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
-	struct tog_line_colors line_colors;
+	struct tog_colors line_colors;
 
 	/* passed from log view; may be NULL */
 	struct tog_view *log_view;
@@ -242,7 +242,7 @@ struct tog_tree_view_state {
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct got_tree_entry *matched_entry;
-	struct tog_line_colors line_colors;
+	struct tog_colors line_colors;
 };
 
 /*
@@ -2458,10 +2458,10 @@ match_line(const char *line, regex_t *regex)
 	return regexec(regex, line, 1, &regmatch, 0) == 0;
 }
 
-struct tog_line_color *
-match_line_color(struct tog_line_colors *colors, const char *line)
+struct tog_color *
+match_line_color(struct tog_colors *colors, const char *line)
 {
-	struct tog_line_color *tc = NULL;
+	struct tog_color *tc = NULL;
 
 	SIMPLEQ_FOREACH(tc, colors, entry) {
 		if (match_line(line, &tc->regex))
@@ -2474,12 +2474,12 @@ match_line_color(struct tog_line_colors *colors, const char *line)
 static const struct got_error *
 draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
     int *last_displayed_line, int *eof, int max_lines, char *header,
-    struct tog_line_colors *colors)
+    struct tog_colors *colors)
 {
 	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
 	char *line;
-	struct tog_line_color *lc;
+	struct tog_color *tc;
 	size_t len;
 	wchar_t *wline;
 	int width;
@@ -2524,14 +2524,14 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			return err;
 		}
 
-		lc = match_line_color(colors, line);
-		if (lc)
+		tc = match_line_color(colors, line);
+		if (tc)
 			wattr_on(view->window,
-			    COLOR_PAIR(lc->colorpair), NULL);
+			    COLOR_PAIR(tc->colorpair), NULL);
 		waddwstr(view->window, wline);
-		if (lc)
+		if (tc)
 			wattr_off(view->window,
-			    COLOR_PAIR(lc->colorpair), NULL);
+			    COLOR_PAIR(tc->colorpair), NULL);
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
@@ -2727,46 +2727,46 @@ diff_view_indicate_progress(struct tog_view *view)
 }
 
 static const struct got_error *
-add_line_color(struct tog_line_colors *colors, const char *pattern,
+add_line_color(struct tog_colors *colors, const char *pattern,
     int idx, short color)
 {
 	const struct got_error *err = NULL;
-	struct tog_line_color *lc;
+	struct tog_color *tc;
 	int regerr = 0;
 
 	init_pair(idx, color, -1);
 
-	lc = calloc(1, sizeof(*lc));
-	if (lc == NULL)
+	tc = calloc(1, sizeof(*tc));
+	if (tc == NULL)
 		return got_error_from_errno("calloc");
-	regerr = regcomp(&lc->regex, pattern,
+	regerr = regcomp(&tc->regex, pattern,
 	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE);
 	if (regerr) {
 		static char regerr_msg[512];
 		static char err_msg[512];
-		regerror(regerr, &lc->regex, regerr_msg,
+		regerror(regerr, &tc->regex, regerr_msg,
 		    sizeof(regerr_msg));
 		snprintf(err_msg, sizeof(err_msg), "regcomp: %s",
 		    regerr_msg);
 		err = got_error_msg(GOT_ERR_REGEX, err_msg);
-		free(lc);
+		free(tc);
 		return err;
 	}
-	lc->colorpair = idx;
-	SIMPLEQ_INSERT_HEAD(colors, lc, entry);
+	tc->colorpair = idx;
+	SIMPLEQ_INSERT_HEAD(colors, tc, entry);
 	return NULL;
 }
 
 static void
-free_line_colors(struct tog_line_colors *colors)
+free_line_colors(struct tog_colors *colors)
 {
-	struct tog_line_color *lc;
+	struct tog_color *tc;
 
 	while (!SIMPLEQ_EMPTY(colors)) {
-		lc = SIMPLEQ_FIRST(colors);
+		tc = SIMPLEQ_FIRST(colors);
 		SIMPLEQ_REMOVE_HEAD(colors, entry);
-		regfree(&lc->regex);
-		free(lc);
+		regfree(&tc->regex);
+		free(tc);
 	}
 }
 
@@ -4127,12 +4127,12 @@ draw_tree_entries(struct tog_view *view,
     struct got_tree_entry **selected_entry, int *ndisplayed,
     const char *label, int show_ids, const char *parent_path,
     const struct got_tree_entries *entries, int selected, int limit,
-    int isroot, struct tog_line_colors *colors)
+    int isroot, struct tog_colors *colors)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
 	wchar_t *wline;
-	struct tog_line_color *lc;
+	struct tog_color *tc;
 	int width, n;
 
 	*ndisplayed = 0;
@@ -4224,14 +4224,14 @@ draw_tree_entries(struct tog_view *view,
 				wstandout(view->window);
 			*selected_entry = te;
 		}
-		lc = match_line_color(colors, line);
-		if (lc)
+		tc = match_line_color(colors, line);
+		if (tc)
 			wattr_on(view->window,
-			    COLOR_PAIR(lc->colorpair), NULL);
+			    COLOR_PAIR(tc->colorpair), NULL);
 		waddwstr(view->window, wline);
-		if (lc)
+		if (tc)
 			wattr_off(view->window,
-			    COLOR_PAIR(lc->colorpair), NULL);
+			    COLOR_PAIR(tc->colorpair), NULL);
 		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
 		if (n == selected && view->focussed)
