@@ -1,3 +1,9 @@
+* got 0.19; 2019-11-08
+- add optional colorized display mode to tog
+- make 'tog log' show abbreviated commit IDs if the window is large enough
+- fix staging of multiple files with -p
+- show commit date's century in 'got blame' output (patch by Tracey Emery)
+
 * got 0.18; 2019-10-21
 - always show the input path when realpath(3) returns an error
 - preserve log message when an error occurs during commit, tag, or import
