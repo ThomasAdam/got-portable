@@ -1487,7 +1487,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
 	int width;
-	int ncommits, author_cols = 10;
+	int ncommits, author_cols = 4;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
