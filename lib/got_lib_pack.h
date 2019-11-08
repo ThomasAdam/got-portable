@@ -89,6 +89,7 @@ struct got_packidx {
 	int fd;
 	uint8_t *map;
 	size_t len;
+	size_t nlargeobj;
 	struct got_packidx_v2_hdr hdr; /* convenient pointers into map */
 };
 

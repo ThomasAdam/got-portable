@@ -75,6 +75,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t nobj, len_fanout, len_ids, offset, remain;
 	ssize_t n;
+	int i;
 
 	SHA1Init(&ctx);
 
@@ -255,35 +256,41 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	offset += nobj * sizeof(*h->offsets);
 
 	/* Large file offsets are contained only in files > 2GB. */
-	if (p->len <= 0x80000000)
+	for (i = 0; i < nobj; i++) {
+		uint32_t o = betoh32(h->offsets[i]);
+		if (o & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
+			p->nlargeobj++;
+	}
+	if (p->nlargeobj == 0)
 		goto checksum;
 
-	if (remain < nobj * sizeof(*h->large_offsets)) {
+	if (remain < p->nlargeobj * sizeof(*h->large_offsets)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
 	if (p->map)
 		h->large_offsets = (uint64_t *)((uint8_t*)(p->map + offset));
 	else {
-		h->large_offsets = malloc(nobj * sizeof(*h->large_offsets));
+		h->large_offsets = malloc(p->nlargeobj *
+		    sizeof(*h->large_offsets));
 		if (h->large_offsets == NULL) {
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
 		n = read(p->fd, h->large_offsets,
-		    nobj * sizeof(*h->large_offsets));
+		    p->nlargeobj * sizeof(*h->large_offsets));
 		if (n < 0)
 			err = got_error_from_errno("read");
-		else if (n != nobj * sizeof(*h->large_offsets)) {
+		else if (n != p->nlargeobj * sizeof(*h->large_offsets)) {
 			err = got_error(GOT_ERR_BAD_PACKIDX);
 			goto done;
 		}
 	}
 	if (verify)
 		SHA1Update(&ctx, (uint8_t*)h->large_offsets,
-		    nobj * sizeof(*h->large_offsets));
-	remain -= nobj * sizeof(*h->large_offsets);
-	offset += nobj * sizeof(*h->large_offsets);
+		    p->nlargeobj * sizeof(*h->large_offsets));
+	remain -= p->nlargeobj * sizeof(*h->large_offsets);
+	offset += p->nlargeobj * sizeof(*h->large_offsets);
 
 checksum:
 	if (remain < sizeof(*h->trailer)) {
@@ -408,12 +415,11 @@ got_packidx_close(struct got_packidx *packidx)
 static off_t
 get_object_offset(struct got_packidx *packidx, int idx)
 {
-	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
 	uint32_t offset = betoh32(packidx->hdr.offsets[idx]);
 	if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
 		uint64_t loffset;
 		idx = offset & GOT_PACKIDX_OFFSET_VAL_MASK;
-		if (idx < 0 || idx > totobj ||
+		if (idx < 0 || idx >= packidx->nlargeobj ||
 		    packidx->hdr.large_offsets == NULL)
 			return -1;
 		loffset = betoh64(packidx->hdr.large_offsets[idx]);
