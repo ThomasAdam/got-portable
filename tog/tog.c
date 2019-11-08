@@ -119,6 +119,126 @@ struct tog_color {
 };
 SIMPLEQ_HEAD(tog_colors, tog_color);
 
+static const struct got_error *
+add_color(struct tog_colors *colors, const char *pattern,
+    int idx, short color)
+{
+	const struct got_error *err = NULL;
+	struct tog_color *tc;
+	int regerr = 0;
+
+	if (idx < 1 || idx > COLOR_PAIRS - 1)
+		return NULL;
+
+	init_pair(idx, color, -1);
+
+	tc = calloc(1, sizeof(*tc));
+	if (tc == NULL)
+		return got_error_from_errno("calloc");
+	regerr = regcomp(&tc->regex, pattern,
+	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE);
+	if (regerr) {
+		static char regerr_msg[512];
+		static char err_msg[512];
+		regerror(regerr, &tc->regex, regerr_msg,
+		    sizeof(regerr_msg));
+		snprintf(err_msg, sizeof(err_msg), "regcomp: %s",
+		    regerr_msg);
+		err = got_error_msg(GOT_ERR_REGEX, err_msg);
+		free(tc);
+		return err;
+	}
+	tc->colorpair = idx;
+	SIMPLEQ_INSERT_HEAD(colors, tc, entry);
+	return NULL;
+}
+
+static void
+free_colors(struct tog_colors *colors)
+{
+	struct tog_color *tc;
+
+	while (!SIMPLEQ_EMPTY(colors)) {
+		tc = SIMPLEQ_FIRST(colors);
+		SIMPLEQ_REMOVE_HEAD(colors, entry);
+		regfree(&tc->regex);
+		free(tc);
+	}
+}
+
+struct tog_color *
+get_color(struct tog_colors *colors, int colorpair)
+{
+	struct tog_color *tc = NULL;
+
+	SIMPLEQ_FOREACH(tc, colors, entry) {
+		if (tc->colorpair == colorpair)
+			return tc;
+	}
+
+	return NULL;
+}
+
+static int
+default_color_value(const char *envvar)
+{
+	if (strcmp(envvar, "TOG_COLOR_DIFF_MINUS") == 0)
+		return COLOR_MAGENTA;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_PLUS") == 0)
+		return COLOR_CYAN;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_CHUNK_HEADER") == 0)
+		return COLOR_YELLOW;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_META") == 0)
+		return COLOR_GREEN;
+	if (strcmp(envvar, "TOG_COLOR_TREE_SUBMODULE") == 0)
+		return COLOR_MAGENTA;
+	if (strcmp(envvar, "TOG_COLOR_TREE_SYMLINK") == 0)
+		return COLOR_CYAN;
+	if (strcmp(envvar, "TOG_COLOR_TREE_DIRECTORY") == 0)
+		return COLOR_BLUE;
+	if (strcmp(envvar, "TOG_COLOR_TREE_EXECUTABLE") == 0)
+		return COLOR_GREEN;
+	if (strcmp(envvar, "TOG_COLOR_COMMIT") == 0)
+		return COLOR_GREEN;
+	if (strcmp(envvar, "TOG_COLOR_AUTHOR") == 0)
+		return COLOR_CYAN;
+	if (strcmp(envvar, "TOG_COLOR_DATE") == 0)
+		return COLOR_YELLOW;
+
+	return -1;
+}
+
+static int
+get_color_value(const char *envvar)
+{
+	const char *val = getenv(envvar);
+
+	if (val == NULL)
+		return default_color_value(envvar);
+
+	if (strcasecmp(val, "black") == 0)
+		return COLOR_BLACK;
+	if (strcasecmp(val, "red") == 0)
+		return COLOR_RED;
+	if (strcasecmp(val, "green") == 0)
+		return COLOR_GREEN;
+	if (strcasecmp(val, "yellow") == 0)
+		return COLOR_YELLOW;
+	if (strcasecmp(val, "blue") == 0)
+		return COLOR_BLUE;
+	if (strcasecmp(val, "magenta") == 0)
+		return COLOR_MAGENTA;
+	if (strcasecmp(val, "cyan") == 0)
+		return COLOR_CYAN;
+	if (strcasecmp(val, "white") == 0)
+		return COLOR_WHITE;
+	if (strcasecmp(val, "default") == 0)
+		return -1;
+
+	return default_color_value(envvar);
+}
+
+
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	FILE *f;
@@ -169,7 +289,20 @@ struct tog_log_view_state {
 	struct tog_log_thread_args thread_args;
 	struct commit_queue_entry *matched_entry;
 	struct commit_queue_entry *search_entry;
+	struct tog_colors colors;
 };
+
+#define TOG_COLOR_DIFF_MINUS		1
+#define TOG_COLOR_DIFF_PLUS		2
+#define TOG_COLOR_DIFF_CHUNK_HEADER	3
+#define TOG_COLOR_DIFF_META		4
+#define TOG_COLOR_TREE_SUBMODULE	5
+#define TOG_COLOR_TREE_SYMLINK		6
+#define TOG_COLOR_TREE_DIRECTORY	7
+#define TOG_COLOR_TREE_EXECUTABLE	8
+#define TOG_COLOR_COMMIT		9
+#define TOG_COLOR_AUTHOR		10
+#define TOG_COLOR_DATE		11
 
 struct tog_blame_cb_args {
 	struct tog_blame_line *lines; /* one per line */
@@ -216,6 +349,7 @@ struct tog_blame_view_state {
 	struct got_object_id *commit_id;
 	struct tog_blame blame;
 	int matched_line;
+	struct tog_colors colors;
 };
 
 struct tog_parent_tree {
@@ -1067,7 +1201,8 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 static const struct got_error *
 draw_commit(struct tog_view *view, struct got_commit_object *commit,
     struct got_object_id *id, struct got_reflist_head *refs,
-    const size_t date_display_cols, int author_display_cols)
+    const size_t date_display_cols, int author_display_cols,
+    struct tog_colors *colors)
 {
 	const struct got_error *err = NULL;
 	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
@@ -1080,6 +1215,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	const int avail = view->ncols;
 	struct tm tm;
 	time_t committer_time;
+	struct tog_color *tc;
 
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
@@ -1092,7 +1228,14 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		limit = MIN(sizeof(datebuf) - 1, avail);
 	else
 		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
+	tc = get_color(colors, TOG_COLOR_DATE);
+	if (tc)
+		wattr_on(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	waddnstr(view->window, datebuf, limit);
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	col = limit;
 	if (col > avail)
 		goto done;
@@ -1102,7 +1245,14 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		err = got_object_id_str(&id_str, id);
 		if (err)
 			goto done;
+		tc = get_color(colors, TOG_COLOR_COMMIT);
+		if (tc)
+			wattr_on(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
 		wprintw(view->window, "%.8s ", id_str);
+		if (tc)
+			wattr_off(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
 		free(id_str);
 		col += 9;
 		if (col > avail)
@@ -1117,7 +1267,14 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	err = format_author(&wauthor, &author_width, author, avail - col, col);
 	if (err)
 		goto done;
+	tc = get_color(colors, TOG_COLOR_AUTHOR);
+	if (tc)
+		wattr_on(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wauthor);
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	col += author_width;
 	while (col < avail && author_width < author_display_cols + 2) {
 		waddch(view->window, ' ');
@@ -1323,7 +1480,8 @@ static const struct got_error *
 draw_commits(struct tog_view *view, struct commit_queue_entry **last,
     struct commit_queue_entry **selected, struct commit_queue_entry *first,
     struct commit_queue *commits, int selected_idx, int limit,
-    struct got_reflist_head *refs, const char *path, int commits_needed)
+    struct got_reflist_head *refs, const char *path, int commits_needed,
+    struct tog_colors *colors)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -1333,6 +1491,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
 	char *refs_str = NULL;
 	wchar_t *wline;
+	struct tog_color *tc;
 	static const size_t date_display_cols = 9;
 
 	entry = first;
@@ -1394,7 +1553,14 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
+	tc = get_color(colors, TOG_COLOR_COMMIT);
+	if (tc)
+		wattr_on(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	while (width < view->ncols) {
 		waddch(view->window, ' ');
 		width++;
@@ -1438,7 +1604,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (ncommits == selected_idx)
 			wstandout(view->window);
 		err = draw_commit(view, entry->commit, entry->id, refs,
-		    date_display_cols, author_cols);
+		    date_display_cols, author_cols, colors);
 		if (ncommits == selected_idx)
 			wstandend(view->window);
 		if (err)
@@ -1965,6 +2131,26 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		goto done;
 	}
 
+	SIMPLEQ_INIT(&s->colors);
+	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+		err = add_color(&s->colors, "^$", TOG_COLOR_COMMIT,
+		    get_color_value("TOG_COLOR_COMMIT"));
+		if (err)
+			goto done;
+		err = add_color(&s->colors, "^$", TOG_COLOR_AUTHOR,
+		    get_color_value("TOG_COLOR_AUTHOR"));
+		if (err) {
+			free_colors(&s->colors);
+			goto done;
+		}
+		err = add_color(&s->colors, "^$", TOG_COLOR_DATE,
+		    get_color_value("TOG_COLOR_DATE"));
+		if (err) {
+			free_colors(&s->colors);
+			goto done;
+		}
+	}
+
 	view->show = show_log_view;
 	view->input = input_log_view;
 	view->close = close_log_view;
@@ -2019,7 +2205,7 @@ show_log_view(struct tog_view *view)
 	return draw_commits(view, &s->last_displayed_entry,
 	    &s->selected_entry, s->first_displayed_entry,
 	    &s->commits, s->selected, view->nlines, s->refs,
-	    s->in_repo_path, s->thread_args.commits_needed);
+	    s->in_repo_path, s->thread_args.commits_needed, &s->colors);
 }
 
 static const struct got_error *
@@ -2727,103 +2913,6 @@ diff_view_indicate_progress(struct tog_view *view)
 }
 
 static const struct got_error *
-add_color(struct tog_colors *colors, const char *pattern,
-    int idx, short color)
-{
-	const struct got_error *err = NULL;
-	struct tog_color *tc;
-	int regerr = 0;
-
-	init_pair(idx, color, -1);
-
-	tc = calloc(1, sizeof(*tc));
-	if (tc == NULL)
-		return got_error_from_errno("calloc");
-	regerr = regcomp(&tc->regex, pattern,
-	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE);
-	if (regerr) {
-		static char regerr_msg[512];
-		static char err_msg[512];
-		regerror(regerr, &tc->regex, regerr_msg,
-		    sizeof(regerr_msg));
-		snprintf(err_msg, sizeof(err_msg), "regcomp: %s",
-		    regerr_msg);
-		err = got_error_msg(GOT_ERR_REGEX, err_msg);
-		free(tc);
-		return err;
-	}
-	tc->colorpair = idx;
-	SIMPLEQ_INSERT_HEAD(colors, tc, entry);
-	return NULL;
-}
-
-static void
-free_colors(struct tog_colors *colors)
-{
-	struct tog_color *tc;
-
-	while (!SIMPLEQ_EMPTY(colors)) {
-		tc = SIMPLEQ_FIRST(colors);
-		SIMPLEQ_REMOVE_HEAD(colors, entry);
-		regfree(&tc->regex);
-		free(tc);
-	}
-}
-
-static int
-default_color_value(const char *envvar)
-{
-	if (strcmp(envvar, "TOG_COLOR_DIFF_MINUS") == 0)
-		return COLOR_MAGENTA;
-	if (strcmp(envvar, "TOG_COLOR_DIFF_PLUS") == 0)
-		return COLOR_CYAN;
-	if (strcmp(envvar, "TOG_COLOR_DIFF_CHUNK_HEADER") == 0)
-		return COLOR_YELLOW;
-	if (strcmp(envvar, "TOG_COLOR_DIFF_META") == 0)
-		return COLOR_GREEN;
-	if (strcmp(envvar, "TOG_COLOR_TREE_SUBMODULE") == 0)
-		return COLOR_MAGENTA;
-	if (strcmp(envvar, "TOG_COLOR_TREE_SYMLINK") == 0)
-		return COLOR_CYAN;
-	if (strcmp(envvar, "TOG_COLOR_TREE_DIRECTORY") == 0)
-		return COLOR_BLUE;
-	if (strcmp(envvar, "TOG_COLOR_TREE_EXECUTABLE") == 0)
-		return COLOR_GREEN;
-
-	return -1;
-}
-
-static int
-get_color_value(const char *envvar)
-{
-	const char *val = getenv(envvar);
-
-	if (val == NULL)
-		return default_color_value(envvar);
-
-	if (strcasecmp(val, "black") == 0)
-		return COLOR_BLACK;
-	if (strcasecmp(val, "red") == 0)
-		return COLOR_RED;
-	if (strcasecmp(val, "green") == 0)
-		return COLOR_GREEN;
-	if (strcasecmp(val, "yellow") == 0)
-		return COLOR_YELLOW;
-	if (strcasecmp(val, "blue") == 0)
-		return COLOR_BLUE;
-	if (strcasecmp(val, "magenta") == 0)
-		return COLOR_MAGENTA;
-	if (strcasecmp(val, "cyan") == 0)
-		return COLOR_CYAN;
-	if (strcasecmp(val, "white") == 0)
-		return COLOR_WHITE;
-	if (strcasecmp(val, "default") == 0)
-		return -1;
-
-	return default_color_value(envvar);
-}
-
-static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, struct tog_view *log_view,
     struct got_reflist_head *refs, struct got_repository *repo)
@@ -2867,17 +2956,19 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&view->state.diff.colors,
-		    "^-", 1, get_color_value("TOG_COLOR_DIFF_MINUS"));
+		    "^-", TOG_COLOR_DIFF_MINUS,
+		    get_color_value("TOG_COLOR_DIFF_MINUS"));
 		if (err)
 			return err;
-		err = add_color(&view->state.diff.colors,
-		    "^\\+", 2, get_color_value("TOG_COLOR_DIFF_PLUS"));
+		err = add_color(&view->state.diff.colors, "^\\+",
+		    TOG_COLOR_DIFF_PLUS,
+		    get_color_value("TOG_COLOR_DIFF_PLUS"));
 		if (err) {
 			free_colors(&view->state.diff.colors);
 			return err;
 		}
 		err = add_color(&view->state.diff.colors, 
-		    "^@@", 3,
+		    "^@@", TOG_COLOR_DIFF_CHUNK_HEADER,
 		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
 		if (err) {
 			free_colors(&view->state.diff.colors);
@@ -2885,8 +2976,24 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 
 		err = add_color(&view->state.diff.colors, 
-		    "^(commit|(blob|file) [-+] )", 4,
+		    "^(commit|(blob|file) [-+] )", TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
+		if (err) {
+			free_colors(&view->state.diff.colors);
+			return err;
+		}
+
+		err = add_color(&view->state.diff.colors, 
+		    "^(from|via): ", TOG_COLOR_AUTHOR,
+		    get_color_value("TOG_COLOR_AUTHOR"));
+		if (err) {
+			free_colors(&view->state.diff.colors);
+			return err;
+		}
+
+		err = add_color(&view->state.diff.colors, 
+		    "^date: ", TOG_COLOR_DATE,
+		    get_color_value("TOG_COLOR_DATE"));
 		if (err) {
 			free_colors(&view->state.diff.colors);
 			return err;
@@ -3221,7 +3328,8 @@ static const struct got_error *
 draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
     const char *path, struct tog_blame_line *lines, int nlines,
     int blame_complete, int selected_line, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines)
+    int *last_displayed_line, int *eof, int max_lines,
+    struct tog_colors *colors)
 {
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
@@ -3232,6 +3340,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	struct tog_blame_line *blame_line;
 	struct got_object_id *prev_id = NULL;
 	char *id_str;
+	struct tog_color *tc;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
@@ -3253,7 +3362,14 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		return err;
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
+	tc = get_color(colors, TOG_COLOR_COMMIT);
+	if (tc)
+		wattr_on(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
@@ -3324,7 +3440,14 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 					free(wline);
 					return err;
 				}
+				tc = get_color(colors, TOG_COLOR_COMMIT);
+				if (tc)
+					wattr_on(view->window,
+					    COLOR_PAIR(tc->colorpair), NULL);
 				wprintw(view->window, "%.8s", id_str);
+				if (tc)
+					wattr_off(view->window,
+					    COLOR_PAIR(tc->colorpair), NULL);
 				free(id_str);
 				prev_id = blame_line->id;
 			} else {
@@ -3620,6 +3743,14 @@ open_blame_view(struct tog_view *view, char *path,
 	s->commit_id = commit_id;
 	memset(&s->blame, 0, sizeof(s->blame));
 
+	SIMPLEQ_INIT(&s->colors);
+	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+		err = add_color(&s->colors, "^", TOG_COLOR_COMMIT,
+		    get_color_value("TOG_COLOR_COMMIT"));
+		if (err)
+			return err;
+	}
+
 	view->show = show_blame_view;
 	view->input = input_blame_view;
 	view->close = close_blame_view;
@@ -3649,6 +3780,7 @@ close_blame_view(struct tog_view *view)
 	}
 
 	free(s->path);
+	free_colors(&s->colors);
 
 	return err;
 }
@@ -3753,7 +3885,7 @@ show_blame_view(struct tog_view *view)
 	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
 	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
 	    s->selected_line, &s->first_displayed_line,
-	    &s->last_displayed_line, &s->eof, view->nlines);
+	    &s->last_displayed_line, &s->eof, view->nlines, &s->colors);
 
 	view_vborder(view);
 	return err;
@@ -4147,7 +4279,14 @@ draw_tree_entries(struct tog_view *view,
 		return err;
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
+	tc = get_color(colors, TOG_COLOR_COMMIT);
+	if (tc)
+		wattr_on(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	waddwstr(view->window, wline);
+	if (tc)
+		wattr_off(view->window,
+		    COLOR_PAIR(tc->colorpair), NULL);
 	if (view_needs_focus_indication(view))
 		wstandend(view->window);
 	free(wline);
@@ -4446,25 +4585,35 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	SIMPLEQ_INIT(&s->colors);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
-		err = add_color(&s->colors,
-		    "\\$$", 1, get_color_value("TOG_COLOR_TREE_SUBMODULE"));
+		err = add_color(&s->colors, "\\$$",
+		    TOG_COLOR_TREE_SUBMODULE,
+		    get_color_value("TOG_COLOR_TREE_SUBMODULE"));
 		if (err)
 			goto done;
-		err = add_color(&s->colors,
-		    "@$", 2, get_color_value("TOG_COLOR_TREE_SYMLINK"));
+		err = add_color(&s->colors, "@$", TOG_COLOR_TREE_SYMLINK,
+		    get_color_value("TOG_COLOR_TREE_SYMLINK"));
 		if (err) {
 			free_colors(&s->colors);
 			goto done;
 		}
-		err = add_color(&s->colors, 
-		    "/$", 3, get_color_value("TOG_COLOR_TREE_DIRECTORY"));
+		err = add_color(&s->colors, "/$",
+		    TOG_COLOR_TREE_DIRECTORY,
+		    get_color_value("TOG_COLOR_TREE_DIRECTORY"));
 		if (err) {
 			free_colors(&s->colors);
 			goto done;
 		}
 
-		err = add_color(&s->colors, 
-		    "\\*$", 4, get_color_value("TOG_COLOR_TREE_EXECUTABLE"));
+		err = add_color(&s->colors, "\\*$",
+		    TOG_COLOR_TREE_EXECUTABLE,
+		    get_color_value("TOG_COLOR_TREE_EXECUTABLE"));
+		if (err) {
+			free_colors(&s->colors);
+			goto done;
+		}
+
+		err = add_color(&s->colors, "^$", TOG_COLOR_COMMIT,
+		    get_color_value("TOG_COLOR_COMMIT"));
 		if (err) {
 			free_colors(&s->colors);
 			goto done;
