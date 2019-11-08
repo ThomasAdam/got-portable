@@ -2817,6 +2817,8 @@ get_color_value(const char *envvar)
 		return COLOR_CYAN;
 	if (strcasecmp(val, "white") == 0)
 		return COLOR_WHITE;
+	if (strcasecmp(val, "default") == 0)
+		return -1;
 
 	return default_color_value(envvar);
 }
