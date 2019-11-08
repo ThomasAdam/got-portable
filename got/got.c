@@ -219,7 +219,10 @@ main(int argc, char *argv[])
 			got_commands[i].cmd_usage();
 
 		error = got_commands[i].cmd_main(argc, argv);
-		if (error && !(sigint_received || sigpipe_received)) {
+		if (error && error->code != GOT_ERR_CANCELLED &&
+		    error->code != GOT_ERR_PRIVSEP_EXIT &&
+		    !(sigpipe_received &&
+		      error->code == GOT_ERR_ERRNO && errno == EPIPE)) {
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}
