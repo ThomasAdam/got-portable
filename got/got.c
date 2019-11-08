@@ -222,7 +222,9 @@ main(int argc, char *argv[])
 		if (error && error->code != GOT_ERR_CANCELLED &&
 		    error->code != GOT_ERR_PRIVSEP_EXIT &&
 		    !(sigpipe_received &&
-		      error->code == GOT_ERR_ERRNO && errno == EPIPE)) {
+		      error->code == GOT_ERR_ERRNO && errno == EPIPE) &&
+		    !(sigint_received &&
+		      error->code == GOT_ERR_ERRNO && errno == EINTR)) {
 			fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 			return 1;
 		}
