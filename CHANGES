@@ -1,3 +1,9 @@
+* got 0.20; 2019-11-09
+- fix reading pack files larger than 2GB
+- try not to hide errors from helper programs when got exits
+- use less empty padding space after author name in 'tog log'
+- rename 'got init' and 'got import' default branch to "main" (patch by kmos@)
+
 * got 0.19; 2019-11-08
 - add optional colorized display mode to tog
 - make 'tog log' show abbreviated commit IDs if the window is large enough
