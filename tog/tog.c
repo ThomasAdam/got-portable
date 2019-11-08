@@ -128,7 +128,7 @@ struct tog_diff_view_state {
 	int diff_context;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
-	struct tog_colors line_colors;
+	struct tog_colors colors;
 
 	/* passed from log view; may be NULL */
 	struct tog_view *log_view;
@@ -242,7 +242,7 @@ struct tog_tree_view_state {
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct got_tree_entry *matched_entry;
-	struct tog_colors line_colors;
+	struct tog_colors colors;
 };
 
 /*
@@ -2459,7 +2459,7 @@ match_line(const char *line, regex_t *regex)
 }
 
 struct tog_color *
-match_line_color(struct tog_colors *colors, const char *line)
+match_color(struct tog_colors *colors, const char *line)
 {
 	struct tog_color *tc = NULL;
 
@@ -2524,7 +2524,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			return err;
 		}
 
-		tc = match_line_color(colors, line);
+		tc = match_color(colors, line);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -2727,7 +2727,7 @@ diff_view_indicate_progress(struct tog_view *view)
 }
 
 static const struct got_error *
-add_line_color(struct tog_colors *colors, const char *pattern,
+add_color(struct tog_colors *colors, const char *pattern,
     int idx, short color)
 {
 	const struct got_error *err = NULL;
@@ -2758,7 +2758,7 @@ add_line_color(struct tog_colors *colors, const char *pattern,
 }
 
 static void
-free_line_colors(struct tog_colors *colors)
+free_colors(struct tog_colors *colors)
 {
 	struct tog_color *tc;
 
@@ -2863,32 +2863,32 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->state.diff.log_view = log_view;
 	view->state.diff.repo = repo;
 	view->state.diff.refs = refs;
-	SIMPLEQ_INIT(&view->state.diff.line_colors);
+	SIMPLEQ_INIT(&view->state.diff.colors);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
-		err = add_line_color(&view->state.diff.line_colors,
+		err = add_color(&view->state.diff.colors,
 		    "^-", 1, get_color_value("TOG_COLOR_DIFF_MINUS"));
 		if (err)
 			return err;
-		err = add_line_color(&view->state.diff.line_colors,
+		err = add_color(&view->state.diff.colors,
 		    "^\\+", 2, get_color_value("TOG_COLOR_DIFF_PLUS"));
 		if (err) {
-			free_line_colors(&view->state.diff.line_colors);
+			free_colors(&view->state.diff.colors);
 			return err;
 		}
-		err = add_line_color(&view->state.diff.line_colors, 
+		err = add_color(&view->state.diff.colors, 
 		    "^@@", 3,
 		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
 		if (err) {
-			free_line_colors(&view->state.diff.line_colors);
+			free_colors(&view->state.diff.colors);
 			return err;
 		}
 
-		err = add_line_color(&view->state.diff.line_colors, 
+		err = add_color(&view->state.diff.colors, 
 		    "^(commit|(blob|file) [-+] )", 4,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
-			free_line_colors(&view->state.diff.line_colors);
+			free_colors(&view->state.diff.colors);
 			return err;
 		}
 	}
@@ -2924,7 +2924,7 @@ close_diff_view(struct tog_view *view)
 	view->state.diff.id2 = NULL;
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno("fclose");
-	free_line_colors(&view->state.diff.line_colors);
+	free_colors(&view->state.diff.colors);
 	return err;
 }
 
@@ -2956,7 +2956,7 @@ show_diff_view(struct tog_view *view)
 
 	return draw_file(view, s->f, &s->first_displayed_line,
 	    &s->last_displayed_line, &s->eof, view->nlines,
-	    header, &s->line_colors);
+	    header, &s->colors);
 }
 
 static const struct got_error *
@@ -4224,7 +4224,7 @@ draw_tree_entries(struct tog_view *view,
 				wstandout(view->window);
 			*selected_entry = te;
 		}
-		tc = match_line_color(colors, line);
+		tc = match_color(colors, line);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -4443,30 +4443,30 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->refs = refs;
 	s->repo = repo;
 
-	SIMPLEQ_INIT(&s->line_colors);
+	SIMPLEQ_INIT(&s->colors);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
-		err = add_line_color(&s->line_colors,
+		err = add_color(&s->colors,
 		    "\\$$", 1, get_color_value("TOG_COLOR_TREE_SUBMODULE"));
 		if (err)
 			goto done;
-		err = add_line_color(&s->line_colors,
+		err = add_color(&s->colors,
 		    "@$", 2, get_color_value("TOG_COLOR_TREE_SYMLINK"));
 		if (err) {
-			free_line_colors(&s->line_colors);
+			free_colors(&s->colors);
 			goto done;
 		}
-		err = add_line_color(&s->line_colors, 
+		err = add_color(&s->colors, 
 		    "/$", 3, get_color_value("TOG_COLOR_TREE_DIRECTORY"));
 		if (err) {
-			free_line_colors(&s->line_colors);
+			free_colors(&s->colors);
 			goto done;
 		}
 
-		err = add_line_color(&s->line_colors, 
+		err = add_color(&s->colors, 
 		    "\\*$", 4, get_color_value("TOG_COLOR_TREE_EXECUTABLE"));
 		if (err) {
-			free_line_colors(&s->line_colors);
+			free_colors(&s->colors);
 			goto done;
 		}
 	}
@@ -4490,7 +4490,7 @@ close_tree_view(struct tog_view *view)
 {
 	struct tog_tree_view_state *s = &view->state.tree;
 
-	free_line_colors(&s->line_colors);
+	free_colors(&s->colors);
 	free(s->tree_label);
 	s->tree_label = NULL;
 	free(s->commit_id);
@@ -4625,7 +4625,7 @@ show_tree_view(struct tog_view *view)
 	    &s->last_displayed_entry, &s->selected_entry,
 	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
 	    s->entries, s->selected, view->nlines, s->tree == s->root,
-	    &s->line_colors);
+	    &s->colors);
 	free(parent_path);
 
 	view_vborder(view);
