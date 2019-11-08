@@ -574,7 +574,7 @@ cmd_import(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	char *path_dir = NULL, *repo_path = NULL, *logmsg = NULL;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
-	const char *branch_name = "master";
+	const char *branch_name = "main";
 	char *refname = NULL, *id_str = NULL, *logmsg_path = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reference *branch_ref = NULL, *head_ref = NULL;

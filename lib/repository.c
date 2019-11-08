@@ -1015,7 +1015,7 @@ got_repo_init(const char *repo_path)
 	};
 	const char *description_str = "Unnamed repository; "
 	    "edit this file 'description' to name the repository.";
-	const char *headref_str = "ref: refs/heads/master";
+	const char *headref_str = "ref: refs/heads/main";
 	const char *gitconfig_str = "[core]\n"
 	    "\trepositoryformatversion = 0\n"
 	    "\tfilemode = true\n"

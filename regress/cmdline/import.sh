@@ -38,7 +38,7 @@ function test_import_basic {
 	echo "A  $testroot/tree/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/alpha" >> $testroot/stdout.expected
 	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
-	echo "Created branch refs/heads/master with commit $head_commit" \
+	echo "Created branch refs/heads/main with commit $head_commit" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -60,7 +60,7 @@ function test_import_basic {
 
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
-	echo "commit $head_commit (master)" >> $testroot/stdout.expected
+	echo "commit $head_commit (main)" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	echo " init" >> $testroot/stdout.expected
@@ -142,7 +142,7 @@ function test_import_requires_new_branch {
 	mkdir $testroot/tree
 	make_test_tree $testroot/tree
 
-	got import -m 'init' -r $testroot/repo $testroot/tree \
+	got import -b master -m 'init' -r $testroot/repo $testroot/tree \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" == "0" ]; then
@@ -187,7 +187,7 @@ function test_import_ignores {
 
 	local head_commit=`git_show_head $testroot/repo`
 	echo "A  $testroot/tree/beta" >> $testroot/stdout.expected
-	echo "Created branch refs/heads/master with commit $head_commit" \
+	echo "Created branch refs/heads/main with commit $head_commit" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -217,7 +217,7 @@ function test_import_empty_dir {
 
 	local head_commit=`git_show_head $testroot/repo`
 	echo "A  $testroot/tree/notempty/alpha" >> $testroot/stdout.expected
-	echo "Created branch refs/heads/master with commit $head_commit" \
+	echo "Created branch refs/heads/main with commit $head_commit" \
 		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
