@@ -112,6 +112,13 @@ struct commit_queue {
 	struct commit_queue_head head;
 };
 
+struct tog_line_color {
+	SIMPLEQ_ENTRY(tog_line_color) entry;
+	regex_t regex;
+	short colorpair;
+};
+SIMPLEQ_HEAD(tog_line_colors, tog_line_color);
+
 struct tog_diff_view_state {
 	struct got_object_id *id1, *id2;
 	FILE *f;
@@ -121,6 +128,7 @@ struct tog_diff_view_state {
 	int diff_context;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
+	struct tog_line_colors line_colors;
 
 	/* passed from log view; may be NULL */
 	struct tog_view *log_view;
@@ -2257,6 +2265,10 @@ init_curses(void)
 	intrflush(stdscr, FALSE);
 	keypad(stdscr, TRUE);
 	curs_set(0);
+	if (getenv("TOG_COLORS") != NULL) {
+		start_color();
+		use_default_colors();
+	}
 	signal(SIGWINCH, tog_sigwinch);
 	signal(SIGPIPE, tog_sigpipe);
 }
@@ -2437,14 +2449,36 @@ parse_next_line(FILE *f, size_t *len)
 	return line;
 }
 
+static int
+match_line(const char *line, regex_t *regex)
+{
+	regmatch_t regmatch;
+
+	return regexec(regex, line, 1, &regmatch, 0) == 0;
+}
+
+struct tog_line_color *
+match_line_color(struct tog_line_colors *colors, const char *line)
+{
+	struct tog_line_color *tc = NULL;
+
+	SIMPLEQ_FOREACH(tc, colors, entry) {
+		if (match_line(line, &tc->regex))
+			return tc;
+	}
+
+	return NULL;
+}
+
 static const struct got_error *
 draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines,
-    char *header)
+    int *last_displayed_line, int *eof, int max_lines, char *header,
+    struct tog_line_colors *colors)
 {
 	const struct got_error *err;
 	int nlines = 0, nprinted = 0;
 	char *line;
+	struct tog_line_color *lc;
 	size_t len;
 	wchar_t *wline;
 	int width;
@@ -2488,7 +2522,15 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			free(line);
 			return err;
 		}
+
+		lc = match_line_color(colors, line);
+		if (lc)
+			wattr_on(view->window,
+			    COLOR_PAIR(lc->colorpair), NULL);
 		waddwstr(view->window, wline);
+		if (lc)
+			wattr_off(view->window,
+			    COLOR_PAIR(lc->colorpair), NULL);
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
@@ -2684,6 +2726,93 @@ diff_view_indicate_progress(struct tog_view *view)
 }
 
 static const struct got_error *
+add_line_color(struct tog_line_colors *colors, const char *pattern,
+    int idx, short color)
+{
+	const struct got_error *err = NULL;
+	struct tog_line_color *lc;
+	int regerr = 0;
+
+	init_pair(idx, color, -1);
+
+	lc = calloc(1, sizeof(*lc));
+	if (lc == NULL)
+		return got_error_from_errno("calloc");
+	regerr = regcomp(&lc->regex, pattern,
+	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE);
+	if (regerr) {
+		static char regerr_msg[512];
+		static char err_msg[512];
+		regerror(regerr, &lc->regex, regerr_msg,
+		    sizeof(regerr_msg));
+		snprintf(err_msg, sizeof(err_msg), "regcomp: %s",
+		    regerr_msg);
+		err = got_error_msg(GOT_ERR_REGEX, err_msg);
+		free(lc);
+		return err;
+	}
+	lc->colorpair = idx;
+	SIMPLEQ_INSERT_HEAD(colors, lc, entry);
+	return NULL;
+}
+
+void
+free_line_colors(struct tog_line_colors *colors)
+{
+	struct tog_line_color *lc;
+
+	while (!SIMPLEQ_EMPTY(colors)) {
+		lc = SIMPLEQ_FIRST(colors);
+		SIMPLEQ_REMOVE_HEAD(colors, entry);
+		regfree(&lc->regex);
+		free(lc);
+	}
+}
+
+static int
+default_color_value(const char *envvar)
+{
+	if (strcmp(envvar, "TOG_COLOR_DIFF_MINUS") == 0)
+		return COLOR_MAGENTA;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_PLUS") == 0)
+		return COLOR_CYAN;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_CHUNK_HEADER") == 0)
+		return COLOR_YELLOW;
+	if (strcmp(envvar, "TOG_COLOR_DIFF_META") == 0)
+		return COLOR_GREEN;
+
+	return -1;
+}
+
+static int
+get_color_value(const char *envvar)
+{
+	const char *val = getenv(envvar);
+
+	if (val == NULL)
+		return default_color_value(envvar);
+
+	if (strcasecmp(val, "black") == 0)
+		return COLOR_BLACK;
+	if (strcasecmp(val, "red") == 0)
+		return COLOR_RED;
+	if (strcasecmp(val, "green") == 0)
+		return COLOR_GREEN;
+	if (strcasecmp(val, "yellow") == 0)
+		return COLOR_YELLOW;
+	if (strcasecmp(val, "blue") == 0)
+		return COLOR_BLUE;
+	if (strcasecmp(val, "magenta") == 0)
+		return COLOR_MAGENTA;
+	if (strcasecmp(val, "cyan") == 0)
+		return COLOR_CYAN;
+	if (strcasecmp(val, "white") == 0)
+		return COLOR_WHITE;
+
+	return default_color_value(envvar);
+}
+
+static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, struct tog_view *log_view,
     struct got_reflist_head *refs, struct got_repository *repo)
@@ -2723,6 +2852,35 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->state.diff.log_view = log_view;
 	view->state.diff.repo = repo;
 	view->state.diff.refs = refs;
+	SIMPLEQ_INIT(&view->state.diff.line_colors);
+
+	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+		err = add_line_color(&view->state.diff.line_colors,
+		    "^-", 1, get_color_value("TOG_COLOR_DIFF_MINUS"));
+		if (err)
+			return err;
+		err = add_line_color(&view->state.diff.line_colors,
+		    "^\\+", 2, get_color_value("TOG_COLOR_DIFF_PLUS"));
+		if (err) {
+			free_line_colors(&view->state.diff.line_colors);
+			return err;
+		}
+		err = add_line_color(&view->state.diff.line_colors, 
+		    "^@@", 3,
+		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
+		if (err) {
+			free_line_colors(&view->state.diff.line_colors);
+			return err;
+		}
+
+		err = add_line_color(&view->state.diff.line_colors, 
+		    "^(commit|(blob|file) [-+] )", 4,
+		    get_color_value("TOG_COLOR_DIFF_META"));
+		if (err) {
+			free_line_colors(&view->state.diff.line_colors);
+			return err;
+		}
+	}
 
 	if (log_view && view_is_splitscreen(view))
 		show_log_view(log_view); /* draw vborder */
@@ -2755,6 +2913,7 @@ close_diff_view(struct tog_view *view)
 	view->state.diff.id2 = NULL;
 	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
 		err = got_error_from_errno("fclose");
+	free_line_colors(&view->state.diff.line_colors);
 	return err;
 }
 
@@ -2786,7 +2945,7 @@ show_diff_view(struct tog_view *view)
 
 	return draw_file(view, s->f, &s->first_displayed_line,
 	    &s->last_displayed_line, &s->eof, view->nlines,
-	    header);
+	    header, &s->line_colors);
 }
 
 static const struct got_error *
@@ -3491,15 +3650,6 @@ search_start_blame_view(struct tog_view *view)
 	s->matched_line = 0;
 	return NULL;
 }
-
-static int
-match_line(const char *line, regex_t *regex)
-{
-	regmatch_t regmatch;
-
-	return regexec(regex, line, 1, &regmatch, 0) == 0;
-}
-
 
 static const struct got_error *
 search_next_blame_view(struct tog_view *view)

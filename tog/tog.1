@@ -296,6 +296,43 @@ An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 .El
 .El
+.Sh ENVIRONMENT
+.Bl -tag -width TOG_COLORS
+.It Ev TOG_COLORS
+.Nm
+shows colorized output if this variable is set to a non-empty value.
+The default color scheme can be modified by setting the environment
+variables documented below.
+The colors available in color schemes are
+.Dq black ,
+.Dq red ,
+.Dq green ,
+.Dq yellow ,
+.Dq blue ,
+.Dq megenta ,
+and
+.Dq cyan .
+.It Ev TOG_COLOR_DIFF_MINUS
+The color used to mark up removed lines in diffs.
+If not set, the default value
+.Dq magenta
+is used.
+.It Ev TOG_COLOR_DIFF_PLUS
+The color used to mark up added lines in diffs.
+If not set, the default value
+.Dq cyan
+is used.
+.It Ev TOG_COLOR_DIFF_CHUNK_HEADER
+The color used to mark up chunk header lines in diffs.
+If not set, the default value
+.Dq yellow
+is used.
+.It Ev TOG_COLOR_DIFF_META
+The color used to mark up meta data in diffs.
+If not set, the default value
+.Dq green
+is used.
+.El
 .Sh EXIT STATUS
 .Ex -std tog
 .Sh SEE ALSO
