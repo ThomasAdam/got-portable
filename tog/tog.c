@@ -242,6 +242,7 @@ struct tog_tree_view_state {
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct got_tree_entry *matched_entry;
+	struct tog_line_colors line_colors;
 };
 
 /*
@@ -2780,6 +2781,14 @@ default_color_value(const char *envvar)
 		return COLOR_YELLOW;
 	if (strcmp(envvar, "TOG_COLOR_DIFF_META") == 0)
 		return COLOR_GREEN;
+	if (strcmp(envvar, "TOG_COLOR_TREE_SUBMODULE") == 0)
+		return COLOR_MAGENTA;
+	if (strcmp(envvar, "TOG_COLOR_TREE_SYMLINK") == 0)
+		return COLOR_CYAN;
+	if (strcmp(envvar, "TOG_COLOR_TREE_DIRECTORY") == 0)
+		return COLOR_BLUE;
+	if (strcmp(envvar, "TOG_COLOR_TREE_EXECUTABLE") == 0)
+		return COLOR_GREEN;
 
 	return -1;
 }
@@ -4115,11 +4124,13 @@ draw_tree_entries(struct tog_view *view,
     struct got_tree_entry **last_displayed_entry,
     struct got_tree_entry **selected_entry, int *ndisplayed,
     const char *label, int show_ids, const char *parent_path,
-    const struct got_tree_entries *entries, int selected, int limit, int isroot)
+    const struct got_tree_entries *entries, int selected, int limit,
+    int isroot, struct tog_line_colors *colors)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
 	wchar_t *wline;
+	struct tog_line_color *lc;
 	int width, n;
 
 	*ndisplayed = 0;
@@ -4211,7 +4222,14 @@ draw_tree_entries(struct tog_view *view,
 				wstandout(view->window);
 			*selected_entry = te;
 		}
+		lc = match_line_color(colors, line);
+		if (lc)
+			wattr_on(view->window,
+			    COLOR_PAIR(lc->colorpair), NULL);
 		waddwstr(view->window, wline);
+		if (lc)
+			wattr_off(view->window,
+			    COLOR_PAIR(lc->colorpair), NULL);
 		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
 		if (n == selected && view->focussed)
@@ -4423,6 +4441,34 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	s->refs = refs;
 	s->repo = repo;
 
+	SIMPLEQ_INIT(&s->line_colors);
+
+	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+		err = add_line_color(&s->line_colors,
+		    "\\$$", 1, get_color_value("TOG_COLOR_TREE_SUBMODULE"));
+		if (err)
+			goto done;
+		err = add_line_color(&s->line_colors,
+		    "@$", 2, get_color_value("TOG_COLOR_TREE_SYMLINK"));
+		if (err) {
+			free_line_colors(&s->line_colors);
+			goto done;
+		}
+		err = add_line_color(&s->line_colors, 
+		    "/$", 3, get_color_value("TOG_COLOR_TREE_DIRECTORY"));
+		if (err) {
+			free_line_colors(&s->line_colors);
+			goto done;
+		}
+
+		err = add_line_color(&s->line_colors, 
+		    "\\*$", 4, get_color_value("TOG_COLOR_TREE_EXECUTABLE"));
+		if (err) {
+			free_line_colors(&s->line_colors);
+			goto done;
+		}
+	}
+
 	view->show = show_tree_view;
 	view->input = input_tree_view;
 	view->close = close_tree_view;
@@ -4442,6 +4488,7 @@ close_tree_view(struct tog_view *view)
 {
 	struct tog_tree_view_state *s = &view->state.tree;
 
+	free_line_colors(&s->line_colors);
 	free(s->tree_label);
 	s->tree_label = NULL;
 	free(s->commit_id);
@@ -4575,7 +4622,8 @@ show_tree_view(struct tog_view *view)
 	err = draw_tree_entries(view, &s->first_displayed_entry,
 	    &s->last_displayed_entry, &s->selected_entry,
 	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
-	    s->entries, s->selected, view->nlines, s->tree == s->root);
+	    s->entries, s->selected, view->nlines, s->tree == s->root,
+	    &s->line_colors);
 	free(parent_path);
 
 	view_vborder(view);
