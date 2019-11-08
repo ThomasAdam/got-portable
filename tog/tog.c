@@ -2756,7 +2756,7 @@ add_line_color(struct tog_line_colors *colors, const char *pattern,
 	return NULL;
 }
 
-void
+static void
 free_line_colors(struct tog_line_colors *colors)
 {
 	struct tog_line_color *lc;
