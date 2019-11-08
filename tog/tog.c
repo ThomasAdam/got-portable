@@ -1088,6 +1088,18 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (col > avail)
 		goto done;
 
+	if (avail >= 120) {
+		char *id_str;
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			goto done;
+		wprintw(view->window, "%.8s ", id_str);
+		free(id_str);
+		col += 9;
+		if (col > avail)
+			goto done;
+	}
+
 	author = strdup(got_object_commit_get_author(commit));
 	if (author == NULL) {
 		err = got_error_from_errno("strdup");
