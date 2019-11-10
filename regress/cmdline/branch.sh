@@ -74,7 +74,7 @@ function test_branch_create {
 	fi
 
 	# Create a branch based on another specific branch
-	(cd $testroot/wt && got branch yetanotherbranch master)
+	(cd $testroot/wt && got branch -c master yetanotherbranch)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -91,7 +91,7 @@ function test_branch_create {
 
 	# Create a branch based on a specific commit
 	local commit_id=`git_show_head $testroot/repo`
-	got branch -r $testroot/repo commitbranch $commit_id
+	got branch -r $testroot/repo -c $commit_id commitbranch
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got branch command failed unexpectedly"

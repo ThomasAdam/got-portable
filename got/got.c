@@ -3275,8 +3275,8 @@ __dead static void
 usage_branch(void)
 {
 	fprintf(stderr,
-	    "usage: %s branch [-r repository] [-l] | -d name | "
-	    "[name [commit]]\n", getprogname());
+	    "usage: %s branch [-c commit] [-r repository] [-l] | -d name | "
+	    "[name]\n", getprogname());
 	exit(1);
 }
 
@@ -3415,11 +3415,9 @@ done:
 
 static const struct got_error *
 add_branch(struct got_repository *repo, const char *branch_name,
-    const char *base_branch)
+    struct got_object_id *base_commit_id)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *id = NULL;
-	char *label;
 	struct got_reference *ref = NULL;
 	char *base_refname = NULL, *refname = NULL;
 
@@ -3430,11 +3428,6 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	 */
 	if (branch_name[0] == '-' && branch_name[1] == '\0')
 		return got_error_path(branch_name, GOT_ERR_BAD_REF_NAME);
-
-	err = match_object_id(&id, &label, base_branch,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
-	if (err)
-		return err;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		 err = got_error_from_errno("asprintf");
@@ -3448,7 +3441,7 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	} else if (err->code != GOT_ERR_NOT_REF)
 		goto done;
 
-	err = got_ref_alloc(&ref, refname, id);
+	err = got_ref_alloc(&ref, refname, base_commit_id);
 	if (err)
 		goto done;
 
@@ -3456,7 +3449,6 @@ add_branch(struct got_repository *repo, const char *branch_name,
 done:
 	if (ref)
 		got_ref_close(ref);
-	free(id);
 	free(base_refname);
 	free(refname);
 	return err;
@@ -3470,10 +3462,13 @@ cmd_branch(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
 	int ch, do_list = 0, do_show = 0;
-	const char *delref = NULL;
+	const char *delref = NULL, *commit_id_arg = NULL;
 
-	while ((ch = getopt(argc, argv, "d:r:l")) != -1) {
+	while ((ch = getopt(argc, argv, "c:d:r:l")) != -1) {
 		switch (ch) {
+		case 'c':
+			commit_id_arg = optarg;
+			break;
 		case 'd':
 			delref = optarg;
 			break;
@@ -3502,10 +3497,13 @@ cmd_branch(int argc, char *argv[])
 	if (!do_list && !delref && argc == 0)
 		do_show = 1;
 
+	if ((do_list || delref || do_show) && commit_id_arg != NULL)
+		errx(1, "-c option can only be used when creating a branch");
+
 	if (do_list || delref) {
 		if (argc > 0)
 			usage_branch();
-	} else if (!do_show && (argc < 1 || argc > 2))
+	} else if (!do_show && argc != 1)
 		usage_branch();
 
 #ifndef PROFILE
@@ -3563,16 +3561,16 @@ cmd_branch(int argc, char *argv[])
 	else if (delref)
 		error = delete_branch(repo, worktree, delref);
 	else {
-		const char *base_branch;
-		if (argc == 1) {
-			base_branch = worktree ?
+		struct got_object_id *commit_id;
+		if (commit_id_arg == NULL)
+			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
-			if (strncmp(base_branch, "refs/heads/", 11) == 0)
-				base_branch += 11;
-		} else
-			base_branch = argv[1];
-		error = add_branch(repo, argv[0], base_branch);
+		error = resolve_commit_arg(&commit_id, commit_id_arg, repo);
+		if (error)
+			goto done;
+		error = add_branch(repo, argv[0], commit_id);
+		free(commit_id);
 	}
 done:
 	if (repo)
