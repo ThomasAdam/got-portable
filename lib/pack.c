@@ -39,6 +39,7 @@
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
+#include "got_lib_delta_cache.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
@@ -546,6 +547,10 @@ got_pack_close(struct got_pack *pack)
 	free(pack->path_packfile);
 	pack->path_packfile = NULL;
 	pack->filesize = 0;
+	if (pack->delta_cache) {
+		got_delta_cache_free(pack->delta_cache);
+		pack->delta_cache = NULL;
+	}
 
 	return err;
 }
@@ -998,14 +1003,29 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
 			const struct got_error *err;
 			uint8_t *delta_buf;
 			size_t delta_len;
+			int cached = 1;
 
-			err = read_delta_data(&delta_buf, &delta_len,
-			    delta->data_offset, pack);
-			if (err)
-				return err;
+			got_delta_cache_get(&delta_buf, &delta_len,
+			    pack->delta_cache, delta->data_offset);
+			if (delta_buf == NULL) {
+				cached = 0;
+				err = read_delta_data(&delta_buf, &delta_len,
+				    delta->data_offset, pack);
+				if (err)
+					return err;
+				err = got_delta_cache_add(pack->delta_cache,
+				    delta->data_offset, delta_buf, delta_len);
+				if (err == NULL)
+					cached = 1;
+				else if (err->code != GOT_ERR_NO_SPACE) {
+					free(delta_buf);
+					return err;
+				}
+			}
 			err = got_delta_get_sizes(&base_size, &result_size,
 			    delta_buf, delta_len);
-			free(delta_buf);
+			if (!cached)
+				free(delta_buf);
 			if (err)
 				return err;
 		} else
@@ -1059,6 +1079,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+		int cached = 1;
 		if (n == 0) {
 			size_t mapoff;
 			off_t delta_data_offset;
@@ -1111,10 +1132,23 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			continue;
 		}
 
-		err = read_delta_data(&delta_buf, &delta_len,
-		    delta->data_offset, pack);
-		if (err)
-			goto done;
+		got_delta_cache_get(&delta_buf, &delta_len,
+		    pack->delta_cache, delta->data_offset);
+		if (delta_buf == NULL) {
+			cached = 0;
+			err = read_delta_data(&delta_buf, &delta_len,
+			    delta->data_offset, pack);
+			if (err)
+				goto done;
+			err = got_delta_cache_add(pack->delta_cache,
+			    delta->data_offset, delta_buf, delta_len);
+			if (err == NULL)
+				cached = 1;
+			else if (err->code != GOT_ERR_NO_SPACE) {
+				free(delta_buf);
+				goto done;
+			}
+		}
 		if (base_buf) {
 			err = got_delta_apply_in_mem(base_buf, base_bufsz,
 			    delta_buf, delta_len, accum_buf,
@@ -1127,7 +1161,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			    ++n < deltas->nentries ? accum_file : outfile,
 			    &accum_size);
 		}
-		free(delta_buf);
+		if (!cached)
+			free(delta_buf);
 		if (err)
 			goto done;
 
@@ -1204,6 +1239,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 
 	/* Deltas are ordered in ascending order. */
 	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+		int cached = 1;
 		if (n == 0) {
 			size_t delta_data_offset;
 
@@ -1241,14 +1277,28 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			continue;
 		}
 
-		err = read_delta_data(&delta_buf, &delta_len,
-		    delta->data_offset, pack);
-		if (err)
-			goto done;
+		got_delta_cache_get(&delta_buf, &delta_len,
+		    pack->delta_cache, delta->data_offset);
+		if (delta_buf == NULL) {
+			cached = 0;
+			err = read_delta_data(&delta_buf, &delta_len,
+			    delta->data_offset, pack);
+			if (err)
+				goto done;
+			err = got_delta_cache_add(pack->delta_cache,
+			    delta->data_offset, delta_buf, delta_len);
+			if (err == NULL)
+				cached = 1;
+			else if (err->code != GOT_ERR_NO_SPACE) {
+				free(delta_buf);
+				goto done;
+			}
+		}
 		err = got_delta_apply_in_mem(base_buf, base_bufsz,
 		    delta_buf, delta_len, accum_buf,
 		    &accum_size, max_size);
-		free(delta_buf);
+		if (!cached)
+			free(delta_buf);
 		n++;
 		if (err)
 			goto done;

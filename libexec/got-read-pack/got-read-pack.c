@@ -35,6 +35,7 @@
 #include "got_object.h"
 
 #include "got_lib_delta.h"
+#include "got_lib_delta_cache.h"
 #include "got_lib_object.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_object_parse.h"
@@ -491,6 +492,13 @@ receive_pack(struct got_pack **packp, struct imsgbuf *ibuf)
 	pack->path_packfile = strdup(ipack.path_packfile);
 	if (pack->path_packfile == NULL) {
 		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	pack->delta_cache = got_delta_cache_alloc(100,
+	    GOT_DELTA_RESULT_SIZE_CACHED_MAX);
+	if (pack->delta_cache == NULL) {
+		err = got_error_from_errno("got_delta_cache_alloc");
 		goto done;
 	}
 
