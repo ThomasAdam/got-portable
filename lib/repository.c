@@ -1246,7 +1246,7 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 	for (i = 0; i < strlen(id_str_prefix); i++) {
 		if (isxdigit((unsigned char)id_str_prefix[i]))
 			continue;
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 	}
 
 	len = strlen(id_str_prefix);
@@ -1279,7 +1279,7 @@ got_repo_match_object_id_prefix(struct got_object_id **id,
 				goto done;
 		}
 	} else {
-		err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		err = got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 		goto done;
 	}
 done:

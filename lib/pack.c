@@ -471,13 +471,13 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	SIMPLEQ_INIT(matched_ids);
 
 	if (prefix_len < 2)
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
 	hex[0] = id_str_prefix[0];
 	hex[1] = id_str_prefix[1];
 	hex[2] = '\0';
 	if (!got_parse_xdigit(&id0, hex))
-		return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
 	i = betoh32(packidx->hdr.fanout_table[id0 - 1]);
 	if (i == 0)

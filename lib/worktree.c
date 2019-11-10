@@ -1297,7 +1297,8 @@ update_blob(struct got_worktree *worktree,
 			char id_str[SHA1_DIGEST_STRING_LENGTH];
 			if (got_sha1_digest_to_str(ie->commit_sha1, id_str,
 			    sizeof(id_str)) == NULL) {
-				err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+				err = got_error_path(id_str,
+				    GOT_ERR_BAD_OBJ_ID_STR);
 				goto done;
 			}
 			if (asprintf(&label_orig, "%s: commit %s",
