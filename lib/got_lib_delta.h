@@ -21,8 +21,6 @@ struct got_delta {
 	int type;
 	size_t size;
 	off_t data_offset;
-	uint8_t *delta_buf;
-	size_t delta_len;
 };
 
 struct got_delta_chain {
@@ -32,8 +30,7 @@ struct got_delta_chain {
 
 #define GOT_DELTA_CHAIN_RECURSION_MAX	500
 
-struct got_delta *got_delta_open(off_t, size_t, int, size_t, off_t,
-    uint8_t *, size_t);
+struct got_delta *got_delta_open(off_t, size_t, int, size_t, off_t);
 const struct got_error *got_delta_chain_get_base_type(int *,
     struct got_delta_chain *);
 const struct got_error *got_delta_get_sizes(uint64_t *, uint64_t *,

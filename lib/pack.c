@@ -707,15 +707,32 @@ resolve_delta_chain(struct got_delta_chain *, struct got_packidx *,
     struct got_pack *, off_t, size_t, int, size_t, unsigned int);
 
 static const struct got_error *
+read_delta_data(uint8_t **delta_buf, size_t *delta_len,
+    size_t delta_data_offset, struct got_pack *pack)
+{
+	const struct got_error *err = NULL;
+
+	if (pack->map) {
+		if (delta_data_offset >= pack->filesize)
+			return got_error(GOT_ERR_PACK_OFFSET);
+		err = got_inflate_to_mem_mmap(delta_buf, delta_len, pack->map,
+		    delta_data_offset, pack->filesize - delta_data_offset);
+	} else {
+		if (lseek(pack->fd, delta_data_offset, SEEK_SET) == -1)
+			return got_error_from_errno("lseek");
+		err = got_inflate_to_mem_fd(delta_buf, delta_len, pack->fd);
+	}
+	return err;
+}
+
+static const struct got_error *
 add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
-    int delta_type, size_t delta_size, size_t delta_data_offset,
-    uint8_t *delta_buf, size_t delta_len)
+    int delta_type, size_t delta_size, size_t delta_data_offset)
 {
 	struct got_delta *delta;
 
 	delta = got_delta_open(delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset, delta_buf,
-	    delta_len);
+	    delta_data_offset);
 	if (delta == NULL)
 		return got_error_from_errno("got_delta_open");
 	/* delta is freed in got_object_close() */
@@ -736,8 +753,7 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 	uint64_t base_size;
 	size_t base_tslen;
 	off_t delta_data_offset;
-	uint8_t *delta_buf;
-	size_t delta_len, consumed;
+	size_t consumed;
 
 	err = parse_offset_delta(&base_offset, &consumed, pack,
 	    delta_offset, tslen);
@@ -754,21 +770,8 @@ resolve_offset_delta(struct got_delta_chain *deltas,
 			return got_error_from_errno("lseek");
 	}
 
-	if (pack->map) {
-		size_t mapoff = (size_t)delta_data_offset;
-		err = got_inflate_to_mem_mmap(&delta_buf, &delta_len, pack->map,
-		    mapoff, pack->filesize - mapoff);
-		if (err)
-			return err;
-	} else {
-
-		err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
-		if (err)
-			return err;
-	}
-
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset, delta_buf, delta_len);
+	    delta_data_offset);
 	if (err)
 		return err;
 
@@ -801,28 +804,27 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	uint8_t *delta_buf;
 	size_t delta_len;
 
-	if (delta_offset >= pack->filesize)
-		return got_error(GOT_ERR_PACK_OFFSET);
-	delta_data_offset = delta_offset + tslen;
-	if (delta_data_offset >= pack->filesize)
+	if (delta_offset + tslen >= pack->filesize)
 		return got_error(GOT_ERR_PACK_OFFSET);
 
 	if (pack->map == NULL) {
-		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
-		if (delta_data_offset == -1)
-			return got_error_from_errno("lseek");
 	}
 
 	if (pack->map) {
-		size_t mapoff = (size_t)delta_data_offset;
+		size_t mapoff = delta_offset + tslen;
 		memcpy(&id, pack->map + mapoff, sizeof(id));
 		mapoff += sizeof(id);
+		delta_data_offset = (off_t)mapoff;
 		err = got_inflate_to_mem_mmap(&delta_buf, &delta_len, pack->map,
 		    mapoff, pack->filesize - mapoff);
 		if (err)
 			return err;
 	} else {
-		ssize_t n = read(pack->fd, &id, sizeof(id));
+		ssize_t n;
+		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
+		if (delta_data_offset == -1)
+			return got_error_from_errno("lseek");
+		n = read(pack->fd, &id, sizeof(id));
 		if (n < 0)
 			return got_error_from_errno("read");
 		if (n != sizeof(id))
@@ -833,7 +835,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
-	    delta_data_offset, delta_buf, delta_len);
+	    delta_data_offset);
 	if (err)
 		return err;
 
@@ -875,7 +877,7 @@ resolve_delta_chain(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	case GOT_OBJ_TYPE_TAG:
 		/* Plain types are the final delta base. Recursion ends. */
 		err = add_delta(deltas, delta_offset, tslen, delta_type,
-		    delta_size, 0, NULL, 0);
+		    delta_size, 0);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		err = resolve_offset_delta(deltas, packidx, pack,
@@ -980,7 +982,8 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 }
 
 static const struct got_error *
-get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
+get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas,
+    struct got_pack *pack)
 {
 	struct got_delta *delta;
 	uint64_t base_size = 0, result_size = 0;
@@ -993,8 +996,16 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 		    delta->type != GOT_OBJ_TYPE_BLOB &&
 		    delta->type != GOT_OBJ_TYPE_TAG) {
 			const struct got_error *err;
+			uint8_t *delta_buf;
+			size_t delta_len;
+
+			err = read_delta_data(&delta_buf, &delta_len,
+			    delta->data_offset, pack);
+			if (err)
+				return err;
 			err = got_delta_get_sizes(&base_size, &result_size,
-			    delta->delta_buf, delta->delta_len);
+			    delta_buf, delta_len);
+			free(delta_buf);
 			if (err)
 				return err;
 		} else
@@ -1009,12 +1020,13 @@ get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *deltas)
 }
 
 const struct got_error *
-got_pack_get_max_delta_object_size(uint64_t *size, struct got_object *obj)
+got_pack_get_max_delta_object_size(uint64_t *size, struct got_object *obj,
+    struct got_pack *pack)
 {
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
 		return got_error(GOT_ERR_OBJ_TYPE);
 
-	return get_delta_chain_max_size(size, &obj->deltas);
+	return get_delta_chain_max_size(size, &obj->deltas, pack);
 }
 
 static const struct got_error *
@@ -1023,8 +1035,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	uint8_t *base_buf = NULL, *accum_buf = NULL;
-	size_t base_bufsz = 0, accum_size = 0;
+	uint8_t *base_buf = NULL, *accum_buf = NULL, *delta_buf;
+	size_t base_bufsz = 0, accum_size = 0, delta_len;
 	uint64_t max_size;
 	int n = 0;
 
@@ -1034,7 +1046,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
 	/* We process small enough files entirely in memory for speed. */
-	err = get_delta_chain_max_size(&max_size, deltas);
+	err = get_delta_chain_max_size(&max_size, deltas, pack);
 	if (err)
 		return err;
 	if (max_size < GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
@@ -1099,18 +1111,23 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 			continue;
 		}
 
+		err = read_delta_data(&delta_buf, &delta_len,
+		    delta->data_offset, pack);
+		if (err)
+			goto done;
 		if (base_buf) {
 			err = got_delta_apply_in_mem(base_buf, base_bufsz,
-			    delta->delta_buf, delta->delta_len, accum_buf,
+			    delta_buf, delta_len, accum_buf,
 			    &accum_size, max_size);
 			n++;
 		} else {
-			err = got_delta_apply(base_file, delta->delta_buf,
-			    delta->delta_len,
+			err = got_delta_apply(base_file, delta_buf,
+			    delta_len,
 			    /* Final delta application writes to output file. */
 			    ++n < deltas->nentries ? accum_file : outfile,
 			    &accum_size);
 		}
+		free(delta_buf);
 		if (err)
 			goto done;
 
@@ -1167,8 +1184,8 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
-	uint8_t *base_buf = NULL, *accum_buf = NULL;
-	size_t base_bufsz = 0, accum_size = 0;
+	uint8_t *base_buf = NULL, *accum_buf = NULL, *delta_buf;
+	size_t base_bufsz = 0, accum_size = 0, delta_len;
 	uint64_t max_size;
 	int n = 0;
 
@@ -1178,7 +1195,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	if (SIMPLEQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
-	err = get_delta_chain_max_size(&max_size, deltas);
+	err = get_delta_chain_max_size(&max_size, deltas, pack);
 	if (err)
 		return err;
 	accum_buf = malloc(max_size);
@@ -1224,9 +1241,14 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			continue;
 		}
 
+		err = read_delta_data(&delta_buf, &delta_len,
+		    delta->data_offset, pack);
+		if (err)
+			goto done;
 		err = got_delta_apply_in_mem(base_buf, base_bufsz,
-		    delta->delta_buf, delta->delta_len, accum_buf,
+		    delta_buf, delta_len, accum_buf,
 		    &accum_size, max_size);
+		free(delta_buf);
 		n++;
 		if (err)
 			goto done;

@@ -40,7 +40,7 @@
 
 struct got_delta *
 got_delta_open(off_t offset, size_t tslen, int type, size_t size,
-    off_t data_offset, uint8_t *delta_buf, size_t delta_len)
+    off_t data_offset)
 {
 	struct got_delta *delta;
 
@@ -53,8 +53,6 @@ got_delta_open(off_t offset, size_t tslen, int type, size_t size,
 	delta->tslen = tslen;
 	delta->size = size;
 	delta->data_offset = data_offset;
-	delta->delta_buf = delta_buf;
-	delta->delta_len = delta_len;
 	return delta;
 }
 

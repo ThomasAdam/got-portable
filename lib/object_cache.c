@@ -84,9 +84,9 @@ get_size_obj(struct got_object *obj)
 		return size;
 
 	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
-		if (SIZE_MAX - (sizeof(*delta) + delta->delta_len) < size)
+		if (SIZE_MAX - sizeof(*delta) < size)
 			return SIZE_MAX;
-		size += sizeof(*delta) + delta->delta_len;
+		size += sizeof(*delta);
 	}
 
 	return size;
