@@ -50,6 +50,11 @@ struct got_delta_cache {
 	int nelem;
 	int maxelem;
 	size_t maxelemsize;
+	int cache_search;
+	int cache_hit;
+	int cache_miss;
+	int cache_evict;
+	int cache_toolarge;
 };
 
 struct got_delta_cache *
@@ -72,6 +77,12 @@ got_delta_cache_free(struct got_delta_cache *cache)
 {
 	struct got_delta_cache_element *entry;
 
+#ifdef GOT_OBJ_CACHE_DEBUG
+	fprintf(stderr, "%s: delta cache: %d elements, %d searches, %d hits, "
+	    "%d missed, %d evicted, %d too large\n", getprogname(), cache->nelem,
+	    cache->cache_search, cache->cache_hit, cache->cache_miss,
+	    cache->cache_evict, cache->cache_toolarge);
+#endif
 	while (!TAILQ_EMPTY(&cache->entries)) {
 		entry = TAILQ_FIRST(&cache->entries);
 		TAILQ_REMOVE(&cache->entries, entry, entry);
@@ -94,6 +105,7 @@ remove_least_used_element(struct got_delta_cache *cache)
 	free(entry->delta_data);
 	free(entry);
 	cache->nelem--;
+	cache->cache_evict++;
 }
 
 
@@ -103,8 +115,10 @@ got_delta_cache_add(struct got_delta_cache *cache,
 {
 	struct got_delta_cache_element *entry;
 
-	if (delta_len > cache->maxelemsize)
+	if (delta_len > cache->maxelemsize) {
+		cache->cache_toolarge++;
 		return got_error(GOT_ERR_NO_SPACE);
+	}
 
 	if (cache->nelem >= cache->maxelem)
 		remove_least_used_element(cache);
@@ -128,11 +142,13 @@ got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
 {
 	struct got_delta_cache_element *entry;
 
+	cache->cache_search++;
 	*delta_data = NULL;
 	*delta_len = 0;
 	TAILQ_FOREACH(entry, &cache->entries, entry) {
 		if (entry->delta_data_offset != delta_data_offset)
 			continue;
+		cache->cache_hit++;
 		if (entry != TAILQ_FIRST(&cache->entries)) {
 			TAILQ_REMOVE(&cache->entries, entry, entry);
 			TAILQ_INSERT_HEAD(&cache->entries, entry, entry);
@@ -141,4 +157,6 @@ got_delta_cache_get(uint8_t **delta_data, size_t *delta_len,
 		*delta_len = entry->delta_len;
 		return;
 	}
+
+	cache->cache_miss++;
 }
