@@ -1294,7 +1294,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	if (newline)
 		*newline = '\0';
 	limit = avail - col;
-	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, 0);
+	err = format_line(&wlogmsg, &logmsg_width, logmsg, limit, col);
 	if (err)
 		goto done;
 	waddwstr(view->window, wlogmsg);
