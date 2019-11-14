@@ -231,6 +231,7 @@ struct got_imsg_packed_object {
 
 struct got_pack;
 struct got_packidx;
+struct got_pathlist_head;
 
 const struct got_error *got_privsep_wait_for_child(pid_t);
 const struct got_error *got_privsep_send_stop(int);
@@ -261,7 +262,7 @@ const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
 const struct got_error *got_privsep_recv_tree(struct got_tree_object **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_tree(struct imsgbuf *,
-    struct got_tree_object *);
+    struct got_pathlist_head *, int);
 const struct got_error *got_privsep_send_blob(struct imsgbuf *, size_t, size_t,
     const uint8_t *);
 const struct got_error *got_privsep_recv_blob(uint8_t **, size_t *, size_t *,

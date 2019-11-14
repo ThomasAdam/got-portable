@@ -45,6 +45,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_parse.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
@@ -663,88 +664,83 @@ got_alloc_tree_entry_partial(void)
 }
 
 static const struct got_error *
-parse_tree_entry(struct got_tree_entry **te, size_t *elen, char *buf,
+parse_tree_entry(struct got_parsed_tree_entry **pte, const char **name,
+    size_t *elen, char *buf,
     size_t maxlen)
 {
 	char *p, *space;
 	const struct got_error *err = NULL;
 
+	*name = NULL;
 	*elen = 0;
 
-	*te = got_alloc_tree_entry_partial();
-	if (*te == NULL)
-		return got_error_from_errno("got_alloc_tree_entry_partial");
+	*pte = malloc(sizeof(**pte));
+	if (*pte == NULL)
+		return got_error_from_errno("malloc");
 
 	*elen = strnlen(buf, maxlen) + 1;
 	if (*elen > maxlen) {
-		free(*te);
-		*te = NULL;
+		free(*pte);
+		*pte = NULL;
 		return got_error(GOT_ERR_BAD_OBJ_DATA);
 	}
 
 	space = memchr(buf, ' ', *elen);
 	if (space == NULL || space <= buf) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
-		free(*te);
-		*te = NULL;
+		free(*pte);
+		*pte = NULL;
 		return err;
 	}
-	(*te)->mode = 0;
+	(*pte)->mode = 0;
 	p = buf;
 	while (p < space) {
 		if (*p < '0' && *p > '7') {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
-		(*te)->mode <<= 3;
-		(*te)->mode |= *p - '0';
+		(*pte)->mode <<= 3;
+		(*pte)->mode |= *p - '0';
 		p++;
 	}
 
-	(*te)->name = strdup(space + 1);
 	if (*elen > maxlen || maxlen - *elen < SHA1_DIGEST_LENGTH) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
+	*name = space + 1;
 	buf += *elen;
-	memcpy((*te)->id->sha1, buf, SHA1_DIGEST_LENGTH);
+	(*pte)->id = buf;
 	*elen += SHA1_DIGEST_LENGTH;
 done:
 	if (err) {
-		got_object_tree_entry_close(*te);
-		*te = NULL;
+		free(*pte);
+		*pte = NULL;
 	}
 	return err;
 }
 
 const struct got_error *
-got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
+got_object_parse_tree(struct got_pathlist_head *entries, int *nentries,
+    uint8_t *buf, size_t len)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	size_t remain = len;
-	struct got_pathlist_head pathlist;
-	struct got_pathlist_entry *pe;
 
-	TAILQ_INIT(&pathlist);
-
-	*tree = calloc(1, sizeof(**tree));
-	if (*tree == NULL)
-		return got_error_from_errno("calloc");
-
-	SIMPLEQ_INIT(&(*tree)->entries.head);
-
+	*nentries = 0;
 	if (remain == 0)
 		return NULL; /* tree is empty */
 
 	while (remain > 0) {
-		struct got_tree_entry *te;
+		struct got_parsed_tree_entry *pte;
 		struct got_pathlist_entry *new = NULL;
+		const char *name;
 		size_t elen;
 
-		err = parse_tree_entry(&te, &elen, buf, remain);
+		err = parse_tree_entry(&pte, &name, &elen, buf, remain);
 		if (err)
 			goto done;
-		err = got_pathlist_insert(&new, &pathlist, te->name, te);
+		err = got_pathlist_insert(&new, entries, name, pte);
 		if (err)
 			goto done;
 		if (new == NULL) {
@@ -753,22 +749,18 @@ got_object_parse_tree(struct got_tree_object **tree, uint8_t *buf, size_t len)
 		}
 		buf += elen;
 		remain -= elen;
+		(*nentries)++;
 	}
 
 	if (remain != 0) {
-		got_object_tree_close(*tree);
-		*tree = NULL;
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
 		goto done;
 	}
-
-	TAILQ_FOREACH(pe, &pathlist, entry) {
-		struct got_tree_entry *te = pe->data;
-		(*tree)->entries.nentries++;
-		SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
-	}
 done:
-	got_pathlist_free(&pathlist);
+	if (err) {
+		got_pathlist_free(entries);
+		*nentries = 0;
+	}
 	return err;
 }
 

@@ -33,6 +33,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_delta_cache.h"
@@ -166,11 +167,14 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
-	struct got_tree_object *tree = NULL;
+	struct got_pathlist_head entries;
+	int nentries = 0;
 	uint8_t *buf = NULL;
 	size_t len;
 	struct got_object_id id;
 	size_t datalen;
+
+	TAILQ_INIT(&entries);
 
 	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
 	if (datalen != sizeof(iobj))
@@ -193,16 +197,15 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		goto done;
 
 	obj->size = len;
-	err = got_object_parse_tree(&tree, buf, len);
+	err = got_object_parse_tree(&entries, &nentries, buf, len);
 	if (err)
 		goto done;
 
-	err = got_privsep_send_tree(ibuf, tree);
+	err = got_privsep_send_tree(ibuf, &entries, nentries);
 done:
+	got_pathlist_free(&entries);
 	free(buf);
 	got_object_close(obj);
-	if (tree)
-		got_object_tree_close(tree);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;

@@ -33,6 +33,7 @@
 
 #include "got_object.h"
 #include "got_error.h"
+#include "got_path.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
@@ -690,25 +691,28 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
+got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
+    int nentries)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_tree_object itree;
-	struct got_tree_entry *te;
+	struct got_pathlist_entry *pe;
 	size_t totlen;
 	int nimsg; /* number of imsg queued in ibuf */
 
-	itree.nentries = tree->entries.nentries;
+	itree.nentries = nentries;
 	if (imsg_compose(ibuf, GOT_IMSG_TREE, 0, 0, -1, &itree, sizeof(itree))
 	    == -1)
 		return got_error_from_errno("imsg_compose TREE");
 
 	totlen = sizeof(itree);
 	nimsg = 1;
-	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		struct got_imsg_tree_entry *ite;
-		uint8_t *buf = NULL;
-		size_t len = sizeof(*ite) + strlen(te->name);
+	TAILQ_FOREACH(pe, entries, entry) {
+		const char *name = pe->path;
+		struct got_parsed_tree_entry *pte = pe->data;
+		struct ibuf *wbuf;
+		size_t namelen = strlen(name);
+		size_t len = sizeof(struct got_imsg_tree_object) + namelen;
 
 		if (len > MAX_IMSGSIZE)
 			return got_error(GOT_ERR_NO_SPACE);
@@ -721,21 +725,28 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_tree_object *tree)
 			nimsg = 0;
 		}
 
-		buf = malloc(len);
-		if (buf == NULL)
-			return got_error_from_errno("malloc");
+		wbuf = imsg_create(ibuf, GOT_IMSG_TREE_ENTRY, 0, 0, len);
+		if (wbuf == NULL)
+			return got_error_from_errno("imsg_create TREE_ENTRY");
 
-		ite = (struct got_imsg_tree_entry *)buf;
-		memcpy(ite->id, te->id->sha1, sizeof(ite->id));
-		ite->mode = te->mode;
-		memcpy(buf + sizeof(*ite), te->name, strlen(te->name));
-
-		if (imsg_compose(ibuf, GOT_IMSG_TREE_ENTRY, 0, 0, -1,
-		    buf, len) == -1)
-			err = got_error_from_errno("imsg_compose TREE_ENTRY");
-		free(buf);
+		/* Keep in sync with struct got_imsg_tree_object definition! */
+		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1)
+			err = got_error_from_errno("imsg_add TREE_ENTRY");
 		if (err)
 			return err;
+		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1)
+			err = got_error_from_errno("imsg_add TREE_ENTRY");
+		if (err)
+			return err;
+
+		if (imsg_add(wbuf, name, namelen) == -1)
+			err = got_error_from_errno("imsg_add TREE_ENTRY");
+		if (err)
+			return err;
+
+		wbuf->fd = -1;
+		imsg_close(ibuf, wbuf);
+
 		totlen += len;
 	}
 

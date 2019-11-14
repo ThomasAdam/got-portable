@@ -32,6 +32,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_path.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
@@ -46,19 +47,20 @@ catch_sigint(int signo)
 {
 	sigint_received = 1;
 }
+
 static const struct got_error *
-read_tree_object(struct got_tree_object **tree, FILE *f)
+read_tree_object(struct got_pathlist_head *entries, int *nentries,
+    uint8_t **p, FILE *f)
 {
 	const struct got_error *err = NULL;
 	struct got_object *obj;
 	size_t len;
-	uint8_t *p;
 
-	err = got_inflate_to_mem(&p, &len, f);
+	err = got_inflate_to_mem(p, &len, f);
 	if (err)
 		return err;
 
-	err = got_object_parse_header(&obj, p, len);
+	err = got_object_parse_header(&obj, *p, len);
 	if (err)
 		return err;
 
@@ -69,9 +71,8 @@ read_tree_object(struct got_tree_object **tree, FILE *f)
 
 	/* Skip object header. */
 	len -= obj->hdrlen;
-	err = got_object_parse_tree(tree, p + obj->hdrlen, len);
+	err = got_object_parse_tree(entries, nentries, *p + obj->hdrlen, len);
 done:
-	free(p);
 	got_object_close(obj);
 	return err;
 }
@@ -98,7 +99,11 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg imsg;
 		FILE *f = NULL;
-		struct got_tree_object *tree = NULL;
+		struct got_pathlist_head entries;
+		int nentries = 0;
+		uint8_t *buf = NULL;
+
+		TAILQ_INIT(&entries);
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -132,12 +137,14 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		err = read_tree_object(&tree, f);
+		err = read_tree_object(&entries, &nentries, &buf, f);
 		if (err)
 			goto done;
 
-		err = got_privsep_send_tree(&ibuf, tree);
+		err = got_privsep_send_tree(&ibuf, &entries, nentries);
 done:
+		got_pathlist_free(&entries);
+		free(buf);
 		if (f) {
 			if (fclose(f) != 0 && err == NULL)
 				err = got_error_from_errno("fclose");
