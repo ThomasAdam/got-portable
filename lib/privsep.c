@@ -269,25 +269,29 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_packed_object iobj, *iobjp;
-	size_t len;
+	struct ibuf *wbuf;
+	size_t len = id ? sizeof(struct got_imsg_packed_object) : 0;
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create TREE_REQUEST");
 
 	if (id) { /* tree is packed */
-		iobj.idx = pack_idx;
-		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
-		iobjp = &iobj;
-		len = sizeof(iobj);
-	} else {
-		iobjp = NULL;
-		len = 0;
+		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+			err = got_error_from_errno("imsg_add TREE_ENTRY");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1) {
+			err = got_error_from_errno("imsg_add TREE_ENTRY");
+			ibuf_free(wbuf);
+			return err;
+		}
 	}
 
-	if (imsg_compose(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, fd, iobjp, len)
-	    == -1) {
-		err = got_error_from_errno("imsg_compose TREE_REQUEST");
-		close(fd);
-		return err;
-	}
+	wbuf->fd = fd;
+	imsg_close(ibuf, wbuf);
 
 	return flush_imsg(ibuf);
 }
