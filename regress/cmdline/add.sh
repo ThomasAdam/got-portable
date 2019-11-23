@@ -151,8 +151,71 @@ function test_add_deleted {
 	test_done "$testroot" "$ret"
 }
 
+function test_add_directory {
+	local testroot=`test_init add_directory`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got add . > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got add command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: adding directories requires -R option" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(touch $testroot/wt/epsilon/zeta1 && touch $testroot/wt/epsilon/zeta2)
+
+	(cd $testroot/wt && got add -R . > $testroot/stdout)
+
+	echo 'A  epsilon/zeta1' > $testroot/stdout.expected
+	echo 'A  epsilon/zeta2' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "zeta" > $testroot/content.expected
+	cat $testroot/wt/epsilon/zeta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple
 run_test test_add_file_in_new_subdir
 run_test test_add_deleted
+run_test test_add_directory

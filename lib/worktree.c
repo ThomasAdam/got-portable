@@ -2563,7 +2563,7 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 		err = read_ignores(ignores, path, ignoresfile);
 
 	if (ignoresfile && fclose(ignoresfile) == EOF && err == NULL)
-		err = got_error_from_errno2("flose", path);
+		err = got_error_from_errno2("fclose", path);
 	free(ignorespath);
 	return err;
 }
@@ -2771,19 +2771,30 @@ done:
 	return err;
 }
 
+struct schedule_addition_args {
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	const char *ondisk_path;
+	got_worktree_checkout_cb progress_cb;
+	void *progress_arg;
+	struct got_repository *repo;
+};
+
 static const struct got_error *
-schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
-    const char *relpath, got_worktree_status_cb status_cb, void *status_arg,
-    struct got_repository *repo)
+schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
+    const char *relpath, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
 {
+	struct schedule_addition_args *a = arg;
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
-	unsigned char status;
 	struct stat sb;
+	char *path = NULL;
 
-	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie) {
-		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		err = get_file_status(&status, &sb, ie, a->ondisk_path,
+		    a->repo);
 		if (err)
 			return err;
 		/* Re-adding an existing entry is a no-op. */
@@ -2792,29 +2803,51 @@ schedule_addition(const char *ondisk_path, struct got_fileindex *fileindex,
 		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
 	}
 
-	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
-	if (err)
-		return err;
-
-	err = got_fileindex_entry_add(fileindex, ie);
-	if (err) {
-		got_fileindex_entry_free(ie);
-		return err;
+	if (status == GOT_STATUS_UNVERSIONED) {
+		if (lstat(a->ondisk_path, &sb) != 0) {
+			err = got_error_from_errno2("lstat", a->ondisk_path);
+			return err;
+		}
+		if (S_ISDIR(sb.st_mode)) {
+			if (asprintf(&path, "%s/%s",
+			    got_worktree_get_root_path(a->worktree),
+			    relpath) == -1) {
+				err = got_error_from_errno("asprintf");
+				return err;
+			}
+		} else
+			path = strdup(a->ondisk_path);
 	}
 
-	return report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
+	err = got_fileindex_entry_alloc(&ie, path, relpath, NULL, NULL);
+	if (err)
+		goto done;
+
+	err = got_fileindex_entry_add(a->fileindex, ie);
+	if (err) {
+		got_fileindex_entry_free(ie);
+		goto done;
+	}
+
+	free(path);
+	return (*a->progress_cb)(a->progress_arg,
+		    GOT_STATUS_ADD, relpath);
+done:
+	free(path);
+	return err;
 }
 
 const struct got_error *
 got_worktree_schedule_add(struct got_worktree *worktree,
     struct got_pathlist_head *paths,
-    got_worktree_status_cb status_cb, void *status_arg,
+    got_worktree_checkout_cb progress_cb, void *progress_arg,
     struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
+	struct schedule_addition_args saa;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -2824,13 +2857,20 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	saa.worktree = worktree;
+	saa.fileindex = fileindex;
+	saa.progress_cb = progress_cb;
+	saa.progress_arg = progress_arg;
+	saa.repo = repo;
+
 	TAILQ_FOREACH(pe, paths, entry) {
 		char *ondisk_path;
 		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
 		    pe->path) == -1)
 			return got_error_from_errno("asprintf");
-		err = schedule_addition(ondisk_path, fileindex, pe->path,
-		    status_cb, status_arg, repo);
+		saa.ondisk_path = ondisk_path;
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+			schedule_addition, &saa, NULL, NULL);
 		free(ondisk_path);
 		if (err)
 			break;

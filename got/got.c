@@ -4086,6 +4086,15 @@ usage_add(void)
 }
 
 static const struct got_error *
+add_progress(void *arg, unsigned char status, const char *path)
+{
+	while (path[0] == '/')
+		path++;
+	printf("%c  %s\n", status, path);
+	return NULL;
+}
+
+static const struct got_error *
 cmd_add(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -4094,12 +4103,15 @@ cmd_add(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch;
+	int ch, can_recurse = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "R")) != -1) {
 		switch (ch) {
+		case 'R':
+			can_recurse = 1;
+			break;
 		default:
 			usage_add();
 			/* NOTREACHED */
@@ -4141,7 +4153,35 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_schedule_add(worktree, &paths, print_status,
+	if (!can_recurse) {
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			       pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "adding directories requires -R option");
+				goto done;
+			}
+		}
+	}
+	error = got_worktree_schedule_add(worktree, &paths, add_progress,
 	    NULL, repo);
 done:
 	if (repo)
