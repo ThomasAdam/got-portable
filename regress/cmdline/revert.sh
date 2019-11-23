@@ -332,7 +332,7 @@ function test_revert_directory_unknown {
 
 	echo "modified alpha" > $testroot/wt/alpha
 	echo "new untracked file" > $testroot/wt/epsilon/new_file
-	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta	
+	echo "modified epsilon/zeta" > $testroot/wt/epsilon/zeta
 
 	(cd $testroot/wt && got revert -R . > $testroot/stdout)
 
@@ -357,7 +357,7 @@ function test_revert_directory_unknown {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	
+
 	echo "zeta" > $testroot/content.expected
 	cat $testroot/wt/epsilon/zeta > $testroot/content
 
