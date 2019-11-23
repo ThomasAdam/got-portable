@@ -734,19 +734,22 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
 			return got_error_from_errno("imsg_create TREE_ENTRY");
 
 		/* Keep in sync with struct got_imsg_tree_object definition! */
-		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1)
+		if (imsg_add(wbuf, pte->id, SHA1_DIGEST_LENGTH) == -1) {
 			err = got_error_from_errno("imsg_add TREE_ENTRY");
-		if (err)
+			ibuf_free(wbuf);
 			return err;
-		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1)
+		}
+		if (imsg_add(wbuf, &pte->mode, sizeof(pte->mode)) == -1) {
 			err = got_error_from_errno("imsg_add TREE_ENTRY");
-		if (err)
+			ibuf_free(wbuf);
 			return err;
+		}
 
-		if (imsg_add(wbuf, name, namelen) == -1)
+		if (imsg_add(wbuf, name, namelen) == -1) {
 			err = got_error_from_errno("imsg_add TREE_ENTRY");
-		if (err)
+			ibuf_free(wbuf);
 			return err;
+		}
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
