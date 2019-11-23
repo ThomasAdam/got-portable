@@ -2830,8 +2830,7 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 	}
 
 	free(path);
-	return (*a->progress_cb)(a->progress_arg,
-		    GOT_STATUS_ADD, relpath);
+	return (*a->progress_cb)(a->progress_arg, GOT_STATUS_ADD, relpath);
 done:
 	free(path);
 	return err;
