@@ -34,6 +34,7 @@
 /lib/commit_graph.c
 /lib/deflate.c
 /lib/delta.c
+/lib/delta_cache.c
 /lib/diff.c
 /lib/diff3.c
 /lib/diffreg.c
@@ -42,6 +43,7 @@
 /lib/gitconfig.c
 /lib/got_lib_deflate.h
 /lib/got_lib_delta.h
+/lib/got_lib_delta_cache.h
 /lib/got_lib_diff.h
 /lib/got_lib_fileindex.h
 /lib/got_lib_gitconfig.h
