@@ -1,3 +1,10 @@
+* got 0.21; 2019-11-25
+- add -R option to 'got add' for recursive addition (patch by Tracey Emery)
+- reduce the amount of memcpy() and strdup() while parsing tree entries
+- fix tog display issue caused by Tab in commit messages; reported by mpi@
+- cache delta data buffers in an LRU cache to improve performance
+- add -c option to 'got branch', replacing the optional second argument
+
 * got 0.20; 2019-11-09
 - fix reading pack files larger than 2GB
 - try not to hide errors from helper programs when got exits
