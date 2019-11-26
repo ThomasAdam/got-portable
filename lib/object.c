@@ -196,11 +196,6 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	if (err)
 		return err;
 
-	(*obj)->path_packfile = strdup(pack->path_packfile);
-	if ((*obj)->path_packfile == NULL) {
-		err = got_error_from_errno("strdup");
-		return err;
-	}
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 
 	return NULL;
@@ -325,7 +320,7 @@ open_packed_object(struct got_object **obj, struct got_object_id *id,
 	if (err)
 		goto done;
 
-	err = got_repo_cache_pack(NULL, repo, (*obj)->path_packfile, packidx);
+	err = got_repo_cache_pack(NULL, repo, path_packfile, packidx);
 done:
 	free(path_packfile);
 	return err;

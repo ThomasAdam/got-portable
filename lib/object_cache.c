@@ -77,9 +77,6 @@ get_size_obj(struct got_object *obj)
 	size_t size = sizeof(*obj);
 	struct got_delta *delta;
 
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		size += strlen(obj->path_packfile);
-
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
 		return size;
 

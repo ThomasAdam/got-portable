@@ -611,20 +611,12 @@ parse_object_type_and_size(uint8_t *type, uint64_t *size, size_t *len,
 }
 
 static const struct got_error *
-open_plain_object(struct got_object **obj, const char *path_packfile,
-    struct got_object_id *id, uint8_t type, off_t offset, size_t size, int idx)
+open_plain_object(struct got_object **obj, struct got_object_id *id,
+    uint8_t type, off_t offset, size_t size, int idx)
 {
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL)
 		return got_error_from_errno("calloc");
-
-	(*obj)->path_packfile = strdup(path_packfile);
-	if ((*obj)->path_packfile == NULL) {
-		const struct got_error *err = got_error_from_errno("strdup");
-		free(*obj);
-		*obj = NULL;
-		return err;
-	}
 
 	(*obj)->type = type;
 	(*obj)->flags = GOT_OBJ_FLAG_PACKED;
@@ -919,12 +911,6 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 
 	SIMPLEQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
-
-	(*obj)->path_packfile = strdup(pack->path_packfile);
-	if ((*obj)->path_packfile == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
-	}
 	(*obj)->flags |= GOT_OBJ_FLAG_PACKED;
 	(*obj)->pack_idx = idx;
 
@@ -970,8 +956,8 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_TAG:
-		err = open_plain_object(obj, pack->path_packfile, id, type,
-		    offset + tslen, size, idx);
+		err = open_plain_object(obj, id, type, offset + tslen,
+		    size, idx);
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 	case GOT_OBJ_TYPE_REF_DELTA:

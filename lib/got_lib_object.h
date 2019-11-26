@@ -29,7 +29,6 @@ struct got_object {
 	size_t size;
 	struct got_object_id id;
 
-	char *path_packfile;	/* if packed */
 	int pack_idx;		/* if packed */
 	off_t pack_offset;	/* if packed */
 	struct got_delta_chain deltas; /* if deltified */

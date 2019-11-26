@@ -117,8 +117,6 @@ got_object_close(struct got_object *obj)
 			free(delta);
 		}
 	}
-	if (obj->flags & GOT_OBJ_FLAG_PACKED)
-		free(obj->path_packfile);
 	free(obj);
 }
 
