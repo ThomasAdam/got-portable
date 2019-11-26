@@ -21,7 +21,7 @@ BINGRP != id -g -n
 
 .if defined(PROFILE)
 CPPFLAGS += -DPROFILE
-DEBUG = -O0 -pg -g
+DEBUG = -O0 -pg -g -static
 .else
 DEBUG = -O0 -g
 .endif
