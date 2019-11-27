@@ -716,7 +716,7 @@ got_privsep_send_tree(struct imsgbuf *ibuf, struct got_pathlist_head *entries,
 		struct got_parsed_tree_entry *pte = pe->data;
 		struct ibuf *wbuf;
 		size_t namelen = strlen(name);
-		size_t len = sizeof(struct got_imsg_tree_object) + namelen;
+		size_t len = sizeof(struct got_imsg_tree_entry) + namelen;
 
 		if (len > MAX_IMSGSIZE)
 			return got_error(GOT_ERR_NO_SPACE);
