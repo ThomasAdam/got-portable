@@ -827,10 +827,68 @@ got_object_tree_open(struct got_tree_object **tree,
 	return open_tree(tree, repo, got_object_get_id(obj), 1);
 }
 
-const struct got_tree_entries *
-got_object_tree_get_entries(struct got_tree_object *tree)
+int
+got_object_tree_get_nentries(struct got_tree_object *tree)
 {
-	return &tree->entries;
+	return tree->nentries;
+}
+
+struct got_tree_entry *
+got_object_tree_get_first_entry(struct got_tree_object *tree)
+{
+	return got_object_tree_get_entry(tree, 0);
+}
+
+struct got_tree_entry *
+got_object_tree_get_last_entry(struct got_tree_object *tree)
+{
+	return got_object_tree_get_entry(tree, tree->nentries - 1);
+}
+
+struct got_tree_entry *
+got_object_tree_get_entry(struct got_tree_object *tree, int i)
+{
+	if (i < 0 || i >= tree->nentries)
+		return NULL;
+	return &tree->entries[i];
+}
+
+mode_t
+got_tree_entry_get_mode(struct got_tree_entry *te)
+{
+	return te->mode;
+}
+
+const char *
+got_tree_entry_get_name(struct got_tree_entry *te)
+{
+	return &te->name[0];
+}
+
+struct got_object_id *
+got_tree_entry_get_id(struct got_tree_entry *te)
+{
+	return &te->id;
+}
+
+int
+got_tree_entry_get_index(struct got_tree_entry *te)
+{
+	return te->idx;
+}
+
+struct got_tree_entry *
+got_tree_entry_get_next(struct got_tree_object *tree,
+    struct got_tree_entry *te)
+{
+	return got_object_tree_get_entry(tree, te->idx + 1);
+}
+
+struct got_tree_entry *
+got_tree_entry_get_prev(struct got_tree_object *tree,
+    struct got_tree_entry *te)
+{
+	return got_object_tree_get_entry(tree, te->idx - 1);
 }
 
 static const struct got_error *
@@ -1472,10 +1530,11 @@ got_object_tag_get_message(struct got_tag_object *tag)
 static struct got_tree_entry *
 find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 {
-	struct got_tree_entry *te;
+	int i;
 
 	/* Note that tree entries are sorted in strncmp() order. */
-	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
+	for (i = 0; i < tree->nentries; i++) {
+		struct got_tree_entry *te = &tree->entries[i];
 		int cmp = strncmp(te->name, name, len);
 		if (cmp < 0)
 			continue;
@@ -1487,7 +1546,7 @@ find_entry_by_name(struct got_tree_object *tree, const char *name, size_t len)
 	return NULL;
 }
 
-const struct got_tree_entry *
+struct got_tree_entry *
 got_object_tree_find_entry(struct got_tree_object *tree, const char *name)
 {
 	return find_entry_by_name(tree, name, strlen(name));
@@ -1551,7 +1610,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 		s++;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree, repo,
-			    te->id);
+			    &te->id);
 			te = NULL;
 			if (err)
 				goto done;
@@ -1561,7 +1620,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 	}
 
 	if (te) {
-		*id = got_object_id_dup(te->id);
+		*id = got_object_id_dup(&te->id);
 		if (*id == NULL)
 			return got_error_from_errno("got_object_id_dup");
 	} else
@@ -1628,7 +1687,7 @@ got_object_tree_path_changed(int *changed,
 			goto done;
 		}
 
-		if (got_object_id_cmp(te1->id, te2->id) == 0) {
+		if (got_object_id_cmp(&te1->id, &te2->id) == 0) {
 			*changed = 0;
 			goto done;
 		}
@@ -1643,7 +1702,7 @@ got_object_tree_path_changed(int *changed,
 		seglen = 0;
 		if (*s) {
 			err = got_object_open_as_tree(&next_tree1, repo,
-			    te1->id);
+			    &te1->id);
 			te1 = NULL;
 			if (err)
 				goto done;
@@ -1652,7 +1711,7 @@ got_object_tree_path_changed(int *changed,
 			tree1 = next_tree1;
 
 			err = got_object_open_as_tree(&next_tree2, repo,
-			    te2->id);
+			    &te2->id);
 			te2 = NULL;
 			if (err)
 				goto done;
@@ -1680,27 +1739,13 @@ got_object_tree_entry_dup(struct got_tree_entry **new_te,
 		return got_error_from_errno("calloc");
 
 	(*new_te)->mode = te->mode;
-	(*new_te)->name = strdup(te->name);
-	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno("strdup");
-		goto done;
-	}
-
-	(*new_te)->id = got_object_id_dup(te->id);
-	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		goto done;
-	}
-done:
-	if (err) {
-		got_object_tree_entry_close(*new_te);
-		*new_te = NULL;
-	}
+	memcpy((*new_te)->name, te->name, sizeof((*new_te)->name));
+	memcpy(&(*new_te)->id, &te->id, sizeof((*new_te)->id));
 	return err;
 }
 
 int
-got_object_tree_entry_is_submodule(const struct got_tree_entry *te)
+got_object_tree_entry_is_submodule(struct got_tree_entry *te)
 {
 	return (te->mode & S_IFMT) == (S_IFDIR | S_IFLNK);
 }

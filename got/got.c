@@ -2723,6 +2723,7 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 {
 	int is_root_path = (strcmp(path, root_path) == 0);
 	const char *modestr = "";
+	mode_t mode = got_tree_entry_get_mode(te);
 
 	path += strlen(root_path);
 	while (path[0] == '/')
@@ -2730,15 +2731,15 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 
 	if (got_object_tree_entry_is_submodule(te))
 		modestr = "$";
-	else if (S_ISLNK(te->mode))
+	else if (S_ISLNK(mode))
 		modestr = "@";
-	else if (S_ISDIR(te->mode))
+	else if (S_ISDIR(mode))
 		modestr = "/";
-	else if (te->mode & S_IXUSR)
+	else if (mode & S_IXUSR)
 		modestr = "*";
 
 	printf("%s%s%s%s%s\n", id ? id : "", path,
-	    is_root_path ? "" : "/", te->name, modestr);
+	    is_root_path ? "" : "/", got_tree_entry_get_name(te), modestr);
 }
 
 static const struct got_error *
@@ -2749,8 +2750,7 @@ print_tree(const char *path, struct got_object_id *commit_id,
 	const struct got_error *err = NULL;
 	struct got_object_id *tree_id = NULL;
 	struct got_tree_object *tree = NULL;
-	const struct got_tree_entries *entries;
-	struct got_tree_entry *te;
+	int nentries, i;
 
 	err = got_object_id_by_path(&tree_id, repo, commit_id, path);
 	if (err)
@@ -2759,17 +2759,19 @@ print_tree(const char *path, struct got_object_id *commit_id,
 	err = got_object_open_as_tree(&tree, repo, tree_id);
 	if (err)
 		goto done;
-	entries = got_object_tree_get_entries(tree);
-	te = SIMPLEQ_FIRST(&entries->head);
-	while (te) {
+	nentries = got_object_tree_get_nentries(tree);
+	for (i = 0; i < nentries; i++) {
+		struct got_tree_entry *te;
 		char *id = NULL;
 
 		if (sigint_received || sigpipe_received)
 			break;
 
+		te = got_object_tree_get_entry(tree, i);
 		if (show_ids) {
 			char *id_str;
-			err = got_object_id_str(&id_str, te->id);
+			err = got_object_id_str(&id_str,
+			    got_tree_entry_get_id(te));
 			if (err)
 				goto done;
 			if (asprintf(&id, "%s ", id_str) == -1) {
@@ -2782,11 +2784,11 @@ print_tree(const char *path, struct got_object_id *commit_id,
 		print_entry(te, id, path, root_path);
 		free(id);
 
-		if (recurse && S_ISDIR(te->mode)) {
+		if (recurse && S_ISDIR(got_tree_entry_get_mode(te))) {
 			char *child_path;
 			if (asprintf(&child_path, "%s%s%s", path,
 			    path[0] == '/' && path[1] == '\0' ? "" : "/",
-			    te->name) == -1) {
+			    got_tree_entry_get_name(te)) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -2796,8 +2798,6 @@ print_tree(const char *path, struct got_object_id *commit_id,
 			if (err)
 				goto done;
 		}
-
-		te = SIMPLEQ_NEXT(te, entry);
 	}
 done:
 	if (tree)
@@ -6975,25 +6975,26 @@ cat_tree(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree;
-	const struct got_tree_entries *entries;
-	struct got_tree_entry *te;
+	int nentries, i;
 
 	err = got_object_open_as_tree(&tree, repo, id);
 	if (err)
 		return err;
 
-	entries = got_object_tree_get_entries(tree);
-	te = SIMPLEQ_FIRST(&entries->head);
-	while (te) {
+	nentries = got_object_tree_get_nentries(tree);
+	for (i = 0; i < nentries; i++) {
+		struct got_tree_entry *te;
 		char *id_str;
 		if (sigint_received || sigpipe_received)
 			break;
-		err = got_object_id_str(&id_str, te->id);
+		te = got_object_tree_get_entry(tree, i);
+		err = got_object_id_str(&id_str, got_tree_entry_get_id(te));
 		if (err)
 			break;
-		fprintf(outfile, "%s %.7o %s\n", id_str, te->mode, te->name);
+		fprintf(outfile, "%s %.7o %s\n", id_str,
+		    got_tree_entry_get_mode(te),
+		    got_tree_entry_get_name(te));
 		free(id_str);
-		te = SIMPLEQ_NEXT(te, entry);
 	}
 
 	got_object_tree_close(tree);

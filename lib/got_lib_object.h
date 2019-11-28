@@ -49,8 +49,16 @@ struct got_commit_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+struct got_tree_entry {
+	mode_t mode;
+	char name[NAME_MAX];
+	struct got_object_id id;
+	int idx;
+};
+
 struct got_tree_object {
-	struct got_tree_entries entries;
+	int nentries;
+	struct got_tree_entry *entries;
 	int refcnt;
 };
 

@@ -612,26 +612,6 @@ done:
 }
 
 void
-got_object_tree_entry_close(struct got_tree_entry *te)
-{
-	free(te->id);
-	free(te->name);
-	free(te);
-}
-
-void
-got_object_tree_entries_close(struct got_tree_entries *entries)
-{
-	struct got_tree_entry *te;
-
-	while (!SIMPLEQ_EMPTY(&entries->head)) {
-		te = SIMPLEQ_FIRST(&entries->head);
-		SIMPLEQ_REMOVE_HEAD(&entries->head, entry);
-		got_object_tree_entry_close(te);
-	}
-}
-
-void
 got_object_tree_close(struct got_tree_object *tree)
 {
 	if (tree->refcnt > 0) {
@@ -640,25 +620,8 @@ got_object_tree_close(struct got_tree_object *tree)
 			return;
 	}
 
-	got_object_tree_entries_close(&tree->entries);
+	free(tree->entries);
 	free(tree);
-}
-
-struct got_tree_entry *
-got_alloc_tree_entry_partial(void)
-{
-	struct got_tree_entry *te;
-
-	te = malloc(sizeof(*te));
-	if (te == NULL)
-		return NULL;
-
-	te->id = malloc(sizeof(*te->id));
-	if (te->id == NULL) {
-		free(te);
-		te = NULL;
-	}
-	return te;
 }
 
 static const struct got_error *

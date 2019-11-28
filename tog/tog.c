@@ -366,7 +366,6 @@ struct tog_tree_view_state {
 	char *tree_label;
 	struct got_tree_object *root;
 	struct got_tree_object *tree;
-	const struct got_tree_entries *entries;
 	struct got_tree_entry *first_displayed_entry;
 	struct got_tree_entry *last_displayed_entry;
 	struct got_tree_entry *selected_entry;
@@ -1768,7 +1767,6 @@ tree_view_visit_subtree(struct got_tree_object *subtree,
 	parent->selected = s->selected;
 	TAILQ_INSERT_HEAD(&s->parents, parent, entry);
 	s->tree = subtree;
-	s->entries = got_object_tree_get_entries(s->tree);
 	s->selected = 0;
 	s->first_displayed_entry = NULL;
 	return NULL;
@@ -1782,7 +1780,6 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
-	struct got_tree_entry *te;
 	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
 	char *slash, *subpath = NULL;
@@ -1811,27 +1808,33 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	while (p[0] == '/')
 		p++;
 	while (*p) {
+		struct got_tree_entry *te;
 		struct got_object_id *tree_id;
+		char *te_name;
 
 		/* Ensure the correct subtree entry is selected. */
 		slash = strchr(p, '/');
 		if (slash == NULL)
 			slash = strchr(p, '\0');
-		SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
-			if (strncmp(p, te->name, slash - p) == 0) {
-				s->selected_entry = te;
-				break;
-			}
-			s->selected++;
-		}
-		if (s->selected_entry == NULL) {
-			err = got_error(GOT_ERR_NO_TREE_ENTRY);
+
+		te_name = strndup(p, slash -p);
+		if (te_name == NULL) {
+			err = got_error_from_errno("strndup");
 			break;
 		}
+		te = got_object_tree_find_entry(s->tree, te_name);
+		if (te == NULL) {
+			err = got_error_path(te_name, GOT_ERR_NO_TREE_ENTRY);
+			free(te_name);
+			break;
+		}
+		free(te_name);
+		s->selected_entry = te;
+		s->selected = got_tree_entry_get_index(te);
 		if (s->tree != s->root)
 			s->selected++; /* skip '..' */
 
-		if (!S_ISDIR(s->selected_entry->mode)) {
+		if (!S_ISDIR(got_tree_entry_get_mode(s->selected_entry))) {
 			/* Jump to this file's entry. */
 			s->first_displayed_entry = s->selected_entry;
 			s->selected = 0;
@@ -4258,14 +4261,14 @@ draw_tree_entries(struct tog_view *view,
     struct got_tree_entry **last_displayed_entry,
     struct got_tree_entry **selected_entry, int *ndisplayed,
     const char *label, int show_ids, const char *parent_path,
-    const struct got_tree_entries *entries, int selected, int limit,
+    struct got_tree_object *tree, int selected, int limit,
     int isroot, struct tog_colors *colors)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
 	wchar_t *wline;
 	struct tog_color *tc;
-	int width, n;
+	int width, n, i, nentries;
 
 	*ndisplayed = 0;
 
@@ -4309,8 +4312,8 @@ draw_tree_entries(struct tog_view *view,
 	if (--limit <= 0)
 		return NULL;
 
-	te = SIMPLEQ_FIRST(&entries->head);
 	if (*first_displayed_entry == NULL) {
+		te = got_object_tree_get_first_entry(tree);
 		if (selected == 0) {
 			if (view->focussed)
 				wstandout(view->window);
@@ -4325,30 +4328,35 @@ draw_tree_entries(struct tog_view *view,
 		n = 1;
 	} else {
 		n = 0;
-		while (te != *first_displayed_entry)
-			te = SIMPLEQ_NEXT(te, entry);
+		te = *first_displayed_entry;
 	}
 
-	while (te) {
+	nentries = got_object_tree_get_nentries(tree);
+	for (i = got_tree_entry_get_index(te); i < nentries; i++) {
 		char *line = NULL, *id_str = NULL;
 		const char *modestr = "";
+		mode_t mode;
+
+		te = got_object_tree_get_entry(tree, i);
+		mode = got_tree_entry_get_mode(te);
 
 		if (show_ids) {
-			err = got_object_id_str(&id_str, te->id);
+			err = got_object_id_str(&id_str,
+			    got_tree_entry_get_id(te));
 			if (err)
 				return got_error_from_errno(
 				    "got_object_id_str");
 		}
 		if (got_object_tree_entry_is_submodule(te))
 			modestr = "$";
-		else if (S_ISLNK(te->mode))
+		else if (S_ISLNK(mode))
 			modestr = "@";
-		else if (S_ISDIR(te->mode))
+		else if (S_ISDIR(mode))
 			modestr = "/";
-		else if (te->mode & S_IXUSR)
+		else if (mode & S_IXUSR)
 			modestr = "*";
 		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
-		    te->name, modestr) == -1) {
+		    got_tree_entry_get_name(te), modestr) == -1) {
 			free(id_str);
 			return got_error_from_errno("asprintf");
 		}
@@ -4383,7 +4391,6 @@ draw_tree_entries(struct tog_view *view,
 		*last_displayed_entry = te;
 		if (--limit <= 0)
 			break;
-		te = SIMPLEQ_NEXT(te, entry);
 	}
 
 	return err;
@@ -4392,52 +4399,50 @@ draw_tree_entries(struct tog_view *view,
 static void
 tree_scroll_up(struct tog_view *view,
     struct got_tree_entry **first_displayed_entry, int maxscroll,
-    const struct got_tree_entries *entries, int isroot)
+    struct got_tree_object *tree, int isroot)
 {
-	struct got_tree_entry *te, *prev;
+	struct got_tree_entry *te;
 	int i;
 
 	if (*first_displayed_entry == NULL)
 		return;
 
-	te = SIMPLEQ_FIRST(&entries->head);
+	te = got_object_tree_get_entry(tree, 0);
 	if (*first_displayed_entry == te) {
 		if (!isroot)
 			*first_displayed_entry = NULL;
 		return;
 	}
 
-	/* XXX this is stupid... switch to TAILQ? */
-	for (i = 0; i < maxscroll; i++) {
-		while (te != *first_displayed_entry) {
-			prev = te;
-			te = SIMPLEQ_NEXT(te, entry);
-		}
-		*first_displayed_entry = prev;
-		te = SIMPLEQ_FIRST(&entries->head);
+	i = 0;
+	while (*first_displayed_entry && i < maxscroll) {
+		*first_displayed_entry = got_tree_entry_get_prev(tree,
+		    *first_displayed_entry);
+		i++;
 	}
-	if (!isroot && te == SIMPLEQ_FIRST(&entries->head) && i < maxscroll)
+	if (!isroot && te == got_object_tree_get_first_entry(tree) && i < maxscroll)
 		*first_displayed_entry = NULL;
 }
 
 static int
 tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 	struct got_tree_entry *last_displayed_entry,
-	const struct got_tree_entries *entries)
+	struct got_tree_object *tree)
 {
 	struct got_tree_entry *next, *last;
 	int n = 0;
 
 	if (*first_displayed_entry)
-		next = SIMPLEQ_NEXT(*first_displayed_entry, entry);
+		next = got_tree_entry_get_next(tree, *first_displayed_entry);
 	else
-		next = SIMPLEQ_FIRST(&entries->head);
+		next = got_object_tree_get_first_entry(tree);
+
 	last = last_displayed_entry;
 	while (next && last && n++ < maxscroll) {
-		last = SIMPLEQ_NEXT(last, entry);
+		last = got_tree_entry_get_next(tree, last);
 		if (last) {
 			*first_displayed_entry = next;
-			next = SIMPLEQ_NEXT(next, entry);
+			next = got_tree_entry_get_next(tree, next);
 		}
 	}
 	return n;
@@ -4452,9 +4457,10 @@ tree_entry_path(char **path, struct tog_parent_trees *parents,
 	size_t len = 2; /* for leading slash and NUL */
 
 	TAILQ_FOREACH(pt, parents, entry)
-		len += strlen(pt->selected_entry->name) + 1 /* slash */;
+		len += strlen(got_tree_entry_get_name(pt->selected_entry))
+		    + 1 /* slash */;
 	if (te)
-		len += strlen(te->name);
+		len += strlen(got_tree_entry_get_name(te));
 
 	*path = calloc(1, len);
 	if (path == NULL)
@@ -4463,7 +4469,8 @@ tree_entry_path(char **path, struct tog_parent_trees *parents,
 	(*path)[0] = '/';
 	pt = TAILQ_LAST(parents, tog_parent_trees);
 	while (pt) {
-		if (strlcat(*path, pt->selected_entry->name, len) >= len) {
+		const char *name = got_tree_entry_get_name(pt->selected_entry);
+		if (strlcat(*path, name, len) >= len) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
@@ -4474,7 +4481,7 @@ tree_entry_path(char **path, struct tog_parent_trees *parents,
 		pt = TAILQ_PREV(pt, tog_parent_trees, entry);
 	}
 	if (te) {
-		if (strlcat(*path, te->name, len) >= len) {
+		if (strlcat(*path, got_tree_entry_get_name(te), len) >= len) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
@@ -4571,9 +4578,8 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	}
 
 	s->root = s->tree = root;
-	s->entries = got_object_tree_get_entries(root);
-	s->first_displayed_entry = SIMPLEQ_FIRST(&s->entries->head);
-	s->selected_entry = SIMPLEQ_FIRST(&s->entries->head);
+	s->first_displayed_entry = got_object_tree_get_entry(s->tree, 0);
+	s->selected_entry = got_object_tree_get_entry(s->tree, 0);
 	s->commit_id = got_object_id_dup(commit_id);
 	if (s->commit_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
@@ -4672,14 +4678,15 @@ match_tree_entry(struct got_tree_entry *te, regex_t *regex)
 {
 	regmatch_t regmatch;
 
-	return regexec(regex, te->name, 1, &regmatch, 0) == 0;
+	return regexec(regex, got_tree_entry_get_name(te), 1, &regmatch,
+	    0) == 0;
 }
 
 static const struct got_error *
 search_next_tree_view(struct tog_view *view)
 {
 	struct tog_tree_view_state *s = &view->state.tree;
-	struct got_tree_entry *entry = NULL, *te;
+	struct got_tree_entry *te = NULL;
 
 	if (!view->searching) {
 		view->search_next_done = 1;
@@ -4689,66 +4696,46 @@ search_next_tree_view(struct tog_view *view)
 	if (s->matched_entry) {
 		if (view->searching == TOG_SEARCH_FORWARD) {
 			if (s->selected_entry)
-				entry = SIMPLEQ_NEXT(s->selected_entry, entry);
+				te = got_tree_entry_get_next(s->tree,
+				    s->selected_entry);
 			else
-				entry = SIMPLEQ_FIRST(&s->entries->head);
-		}
-		else {
-			if (s->selected_entry == NULL) {
-				SIMPLEQ_FOREACH(te, &s->entries->head, entry)
-					entry = te;
-			} else {
-				SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
-					entry = te;
-					if (SIMPLEQ_NEXT(te, entry) ==
-					    s->selected_entry)
-						break;
-				}
-			}
+				te = got_object_tree_get_first_entry(s->tree);
+		} else {
+			if (s->selected_entry == NULL)
+				te = got_object_tree_get_last_entry(s->tree);
+			else
+				te = got_tree_entry_get_prev(s->tree,
+				    s->selected_entry);
 		}
 	} else {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			entry = SIMPLEQ_FIRST(&s->entries->head);
-		else {
-			SIMPLEQ_FOREACH(te, &s->entries->head, entry)
-				entry = te;
-		}
+			te = got_object_tree_get_first_entry(s->tree);
+		else
+			te = got_object_tree_get_last_entry(s->tree);
 	}
 
 	while (1) {
-		if (entry == NULL) {
+		if (te == NULL) {
 			if (s->matched_entry == NULL) {
 				view->search_next_done = 1;
 				return NULL;
 			}
 			if (view->searching == TOG_SEARCH_FORWARD)
-				entry = SIMPLEQ_FIRST(&s->entries->head);
-			else {
-				SIMPLEQ_FOREACH(te, &s->entries->head, entry)
-					entry = te;
-			}
+				te = got_object_tree_get_first_entry(s->tree);
+			else
+				te = got_object_tree_get_last_entry(s->tree);
 		}
 
-		if (match_tree_entry(entry, &view->regex)) {
+		if (match_tree_entry(te, &view->regex)) {
 			view->search_next_done = 1;
-			s->matched_entry = entry;
+			s->matched_entry = te;
 			break;
 		}
 
 		if (view->searching == TOG_SEARCH_FORWARD)
-			entry = SIMPLEQ_NEXT(entry, entry);
-		else {
-			if (SIMPLEQ_FIRST(&s->entries->head) == entry)
-				entry = NULL;
-			else {
-				SIMPLEQ_FOREACH(te, &s->entries->head, entry) {
-					if (SIMPLEQ_NEXT(te, entry) == entry) {
-						entry = te;
-						break;
-					}
-				}
-			}
-		}
+			te = got_tree_entry_get_next(s->tree, te);
+		else
+			te = got_tree_entry_get_prev(s->tree, te);
 	}
 
 	if (s->matched_entry) {
@@ -4773,7 +4760,7 @@ show_tree_view(struct tog_view *view)
 	err = draw_tree_entries(view, &s->first_displayed_entry,
 	    &s->last_displayed_entry, &s->selected_entry,
 	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
-	    s->entries, s->selected, view->nlines, s->tree == s->root,
+	    s->tree, s->selected, view->nlines, s->tree == s->root,
 	    &s->colors);
 	free(parent_path);
 
@@ -4826,14 +4813,14 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (s->selected > 0)
 			break;
 		tree_scroll_up(view, &s->first_displayed_entry, 1,
-		    s->entries, s->tree == s->root);
+		    s->tree, s->tree == s->root);
 		break;
 	case KEY_PPAGE:
 		tree_scroll_up(view, &s->first_displayed_entry,
-		    MAX(0, view->nlines - 4 - s->selected), s->entries,
+		    MAX(0, view->nlines - 4 - s->selected), s->tree,
 		    s->tree == s->root);
 		s->selected = 0;
-		if (SIMPLEQ_FIRST(&s->entries->head) ==
+		if (got_object_tree_get_first_entry(s->tree) ==
 		    s->first_displayed_entry && s->tree != s->root)
 			s->first_displayed_entry = NULL;
 		break;
@@ -4843,14 +4830,15 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected++;
 			break;
 		}
-		if (SIMPLEQ_NEXT(s->last_displayed_entry, entry) == NULL)
+		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
+		    == NULL)
 			/* can't scroll any further */
 			break;
 		tree_scroll_down(&s->first_displayed_entry, 1,
-		    s->last_displayed_entry, s->entries);
+		    s->last_displayed_entry, s->tree);
 		break;
 	case KEY_NPAGE:
-		if (SIMPLEQ_NEXT(s->last_displayed_entry, entry)
+		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
 			if (s->selected < s->ndisplayed - 1)
@@ -4858,14 +4846,14 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		}
 		nscrolled = tree_scroll_down(&s->first_displayed_entry,
-		    view->nlines, s->last_displayed_entry, s->entries);
+		    view->nlines, s->last_displayed_entry, s->tree);
 		if (nscrolled < view->nlines) {
 			int ndisplayed = 0;
 			struct got_tree_entry *te;
 			te = s->first_displayed_entry;
 			do {
 				ndisplayed++;
-				te = SIMPLEQ_NEXT(te, entry);
+				te = got_tree_entry_get_next(s->tree, te);
 			} while (te);
 			s->selected = ndisplayed - 1;
 		}
@@ -4883,18 +4871,17 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			    entry);
 			got_object_tree_close(s->tree);
 			s->tree = parent->tree;
-			s->entries =
-			    got_object_tree_get_entries(s->tree);
 			s->first_displayed_entry =
 			    parent->first_displayed_entry;
 			s->selected_entry =
 			    parent->selected_entry;
 			s->selected = parent->selected;
 			free(parent);
-		} else if (S_ISDIR(s->selected_entry->mode)) {
+		} else if (S_ISDIR(got_tree_entry_get_mode(
+		    s->selected_entry))) {
 			struct got_tree_object *subtree;
-			err = got_object_open_as_tree(&subtree,
-			    s->repo, s->selected_entry->id);
+			err = got_object_open_as_tree(&subtree, s->repo,
+			    got_tree_entry_get_id(s->selected_entry));
 			if (err)
 				break;
 			err = tree_view_visit_subtree(subtree, s);
@@ -4902,7 +4889,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				got_object_tree_close(subtree);
 				break;
 			}
-		} else if (S_ISREG(s->selected_entry->mode)) {
+		} else if (S_ISREG(got_tree_entry_get_mode(
+		    s->selected_entry))) {
 			struct tog_view *blame_view;
 			int begin_x = view_is_parent_view(view) ?
 			    view_split_begin_x(view->begin_x) : 0;

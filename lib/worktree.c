@@ -1271,14 +1271,14 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 		}
 		if (got_fileindex_entry_has_blob(ie) &&
-		    memcmp(ie->blob_sha1, te->id->sha1,
+		    memcmp(ie->blob_sha1, te->id.sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			err = sync_timestamps(ondisk_path, status, ie, &sb);
 			goto done;
 		}
 	}
 
-	err = got_object_open_as_blob(&blob, repo, te->id, 8192);
+	err = got_object_open_as_blob(&blob, repo, &te->id, 8192);
 	if (err)
 		goto done;
 
@@ -3683,7 +3683,7 @@ write_subtree(struct got_object_id **new_subtree_id,
 	    got_path_is_root_dir(parent_path) ? "" : "/", te->name) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_object_open_as_tree(&subtree, repo, te->id);
+	err = got_object_open_as_tree(&subtree, repo, &te->id);
 	if (err)
 		return err;
 
@@ -3735,18 +3735,14 @@ alloc_modified_blob_tree_entry(struct got_tree_entry **new_te,
 
 	(*new_te)->mode = get_ct_file_mode(ct);
 
-	free((*new_te)->id);
 	if (ct->staged_status == GOT_STATUS_MODIFY)
-		(*new_te)->id = got_object_id_dup(ct->staged_blob_id);
+		memcpy(&(*new_te)->id, ct->staged_blob_id,
+		    sizeof((*new_te)->id));
 	else
-		(*new_te)->id = got_object_id_dup(ct->blob_id);
-	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		goto done;
-	}
+		memcpy(&(*new_te)->id, ct->blob_id, sizeof((*new_te)->id));
 done:
 	if (err && *new_te) {
-		got_object_tree_entry_close(*new_te);
+		free(*new_te);
 		*new_te = NULL;
 	}
 	return err;
@@ -3770,25 +3766,22 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 		err = got_error_from_errno2("basename", ct->path);
 		goto done;
 	}
-	(*new_te)->name = strdup(ct_name);
-	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno("strdup");
+	if (strlcpy((*new_te)->name, ct_name, sizeof((*new_te)->name)) >=
+	    sizeof((*new_te)->name)) {
+		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
 
 	(*new_te)->mode = get_ct_file_mode(ct);
 
 	if (ct->staged_status == GOT_STATUS_ADD)
-		(*new_te)->id = got_object_id_dup(ct->staged_blob_id);
+		memcpy(&(*new_te)->id, ct->staged_blob_id,
+		    sizeof((*new_te)->id));
 	else
-		(*new_te)->id = got_object_id_dup(ct->blob_id);
-	if ((*new_te)->id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		goto done;
-	}
+		memcpy(&(*new_te)->id, ct->blob_id, sizeof((*new_te)->id));
 done:
 	if (err && *new_te) {
-		got_object_tree_entry_close(*new_te);
+		free(*new_te);
 		*new_te = NULL;
 	}
 	return err;
@@ -3881,7 +3874,7 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 				continue;
 		}
 
-		if (got_object_id_cmp(ct->base_blob_id, te->id) != 0)
+		if (got_object_id_cmp(ct->base_blob_id, &te->id) != 0)
 			continue;
 
 		 err = match_ct_parent_path(&path_matches, ct, base_tree_path);
@@ -3914,6 +3907,7 @@ make_subtree_for_added_blob(struct got_tree_entry **new_tep,
 	const struct got_error *err = NULL;
 	struct got_tree_entry *new_te;
 	char *subtree_path;
+	struct got_object_id *id = NULL;
 
 	*new_tep = NULL;
 
@@ -3926,19 +3920,21 @@ make_subtree_for_added_blob(struct got_tree_entry **new_tep,
 	if (new_te == NULL)
 		return got_error_from_errno("calloc");
 	new_te->mode = S_IFDIR;
-	new_te->name = strdup(child_path);
-	if (new_te->name == NULL) {
-		err = got_error_from_errno("strdup");
-		got_object_tree_entry_close(new_te);
+
+	if (strlcpy(new_te->name, child_path, sizeof(new_te->name)) >=
+	    sizeof(new_te->name)) {
+		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
-	err = write_tree(&new_te->id, NULL, subtree_path,
+	err = write_tree(&id, NULL, subtree_path,
 	    commitable_paths, status_cb, status_arg, repo);
 	if (err) {
-		got_object_tree_entry_close(new_te);
+		free(new_te);
 		goto done;
 	}
+	memcpy(&new_te->id, id, sizeof(new_te->id));
 done:
+	free(id);
 	free(subtree_path);
 	if (err == NULL)
 		*new_tep = new_te;
@@ -3953,15 +3949,12 @@ write_tree(struct got_object_id **new_tree_id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	const struct got_tree_entries *base_entries = NULL;
 	struct got_pathlist_head paths;
-	struct got_tree_entries new_tree_entries;
 	struct got_tree_entry *te, *new_te = NULL;
 	struct got_pathlist_entry *pe;
+	int nentries = 0;
 
 	TAILQ_INIT(&paths);
-	new_tree_entries.nentries = 0;
-	SIMPLEQ_INIT(&new_tree_entries.head);
 
 	/* Insert, and recurse into, newly added entries first. */
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
@@ -3994,6 +3987,7 @@ write_tree(struct got_object_id **new_tree_id,
 			err = insert_tree_entry(new_te, &paths);
 			if (err)
 				goto done;
+			nentries++;
 		} else {
 			*slash = '\0'; /* trim trailing path components */
 			if (base_tree == NULL ||
@@ -4008,16 +4002,19 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
+				nentries++;
 			}
 		}
 	}
 
 	if (base_tree) {
+		int i, nbase_entries;
 		/* Handle modified and deleted entries. */
-		base_entries = got_object_tree_get_entries(base_tree);
-		SIMPLEQ_FOREACH(te, &base_entries->head, entry) {
+		nbase_entries = got_object_tree_get_nentries(base_tree);
+		for (i = 0; i < nbase_entries; i++) {
 			struct got_commitable *ct = NULL;
 
+			te = got_object_tree_get_entry(base_tree, i);
 			if (got_object_tree_entry_is_submodule(te)) {
 				/* Entry is a submodule; just copy it. */
 				err = got_object_tree_entry_dup(&new_te, te);
@@ -4026,6 +4023,7 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
+				nentries++;
 				continue;
 			}
 
@@ -4040,16 +4038,20 @@ write_tree(struct got_object_id **new_tree_id,
 					goto done;
 				/* Avoid recursion into unmodified subtrees. */
 				if (modified) {
-					free(new_te->id);
-					err = write_subtree(&new_te->id, te,
+					struct got_object_id *new_id;
+					err = write_subtree(&new_id, te,
 					    path_base_tree, commitable_paths,
 					    status_cb, status_arg, repo);
 					if (err)
 						goto done;
+					memcpy(&new_te->id, new_id,
+					    sizeof(new_te->id));
+					free(new_id);
 				}
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
+				nentries++;
 				continue;
 			}
 
@@ -4069,6 +4071,7 @@ write_tree(struct got_object_id **new_tree_id,
 					err = insert_tree_entry(new_te, &paths);
 					if (err)
 						goto done;
+					nentries++;
 				}
 				err = report_ct_status(ct, status_cb,
 				    status_arg);
@@ -4082,19 +4085,14 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
+				nentries++;
 			}
 		}
 	}
 
 	/* Write new list of entries; deleted entries have been dropped. */
-	TAILQ_FOREACH(pe, &paths, entry) {
-		struct got_tree_entry *te = pe->data;
-		new_tree_entries.nentries++;
-		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
-	}
-	err = got_object_tree_create(new_tree_id, &new_tree_entries, repo);
+	err = got_object_tree_create(new_tree_id, &paths, nentries, repo);
 done:
-	got_object_tree_entries_close(&new_tree_entries);
 	got_pathlist_free(&paths);
 	return err;
 }

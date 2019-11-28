@@ -785,7 +785,7 @@ get_more:
 
 		n = imsg_get(ibuf, &imsg);
 		if (n == 0) {
-			if (*tree && (*tree)->entries.nentries != nentries)
+			if (*tree && (*tree)->nentries != nentries)
 				goto get_more;
 			break;
 		}
@@ -815,8 +815,13 @@ get_more:
 				err = got_error_from_errno("malloc");
 				break;
 			}
-			(*tree)->entries.nentries = itree->nentries;
-			SIMPLEQ_INIT(&(*tree)->entries.head);
+			(*tree)->entries = calloc(itree->nentries,
+			    sizeof(struct got_tree_entry));
+			if ((*tree)->entries == NULL) {
+				err = got_error_from_errno("malloc");
+				break;
+			}
+			(*tree)->nentries = itree->nentries;
 			(*tree)->refcnt = 0;
 			break;
 		case GOT_IMSG_TREE_ENTRY:
@@ -838,24 +843,17 @@ get_more:
 			}
 			ite = imsg.data;
 
-			te = got_alloc_tree_entry_partial();
-			if (te == NULL) {
-				err = got_error_from_errno(
-				    "got_alloc_tree_entry_partial");
+			if (datalen + 1 > sizeof(te->name)) {
+				err = got_error(GOT_ERR_NO_SPACE);
 				break;
 			}
-			te->name = malloc(datalen + 1);
-			if (te->name == NULL) {
-				free(te);
-				err = got_error_from_errno("malloc");
-				break;
-			}
+			te = &(*tree)->entries[nentries];
 			memcpy(te->name, imsg.data + sizeof(*ite), datalen);
 			te->name[datalen] = '\0';
 
-			memcpy(te->id->sha1, ite->id, SHA1_DIGEST_LENGTH);
+			memcpy(te->id.sha1, ite->id, SHA1_DIGEST_LENGTH);
 			te->mode = ite->mode;
-			SIMPLEQ_INSERT_TAIL(&(*tree)->entries.head, te, entry);
+			te->idx = nentries;
 			nentries++;
 			break;
 		default:
@@ -866,7 +864,7 @@ get_more:
 		imsg_free(&imsg);
 	}
 done:
-	if (*tree && (*tree)->entries.nentries != nentries) {
+	if (*tree && (*tree)->nentries != nentries) {
 		if (err == NULL)
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 		got_object_tree_close(*tree);

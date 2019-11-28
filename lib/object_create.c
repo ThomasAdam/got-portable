@@ -21,6 +21,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -210,117 +211,32 @@ mode2str(char *buf, size_t len, mode_t mode)
 	return NULL;
 }
 
-
-static const struct got_error *
-te_git_name(char **name, struct got_tree_entry *te)
-{
-	const struct got_error *err = NULL;
-
-	if (S_ISDIR(te->mode)) {
-		if (asprintf(name, "%s/", te->name) == -1)
-			err = got_error_from_errno("asprintf");
-	} else {
-		*name = strdup(te->name);
-		if (*name == NULL)
-			err = got_error_from_errno("strdup");
-	}
-	return err;
-}
-
-static const struct got_error *
-insert_tree_entry(struct got_tree_entries *sorted, struct got_tree_entry *new)
-{
-	const struct got_error *err = NULL;
-	struct got_tree_entry *te = NULL, *prev = NULL;
-	char *name;
-	int cmp;
-
-	if (SIMPLEQ_EMPTY(&sorted->head)) {
-		SIMPLEQ_INSERT_HEAD(&sorted->head, new, entry);
-		sorted->nentries++;
-		return NULL;
-	}
-
-	err = te_git_name(&name, new);
-	if (err)
-		return err;
-
-	te = SIMPLEQ_FIRST(&sorted->head);
-	while (te) {
-		char *te_name;
-		if (prev == NULL) {
-			prev = te;
-			te = SIMPLEQ_NEXT(te, entry);
-			continue;
-		}
-		err = te_git_name(&te_name, te);
-		if (err)
-			goto done;
-		cmp = strcmp(te_name, name);
-		free(te_name);
-		if (cmp == 0) {
-			err = got_error(GOT_ERR_TREE_DUP_ENTRY);
-			goto done;
-		}
-		if (cmp > 0) {
-			SIMPLEQ_INSERT_AFTER(&sorted->head, prev, new, entry);
-			sorted->nentries++;
-			break;
-		}
-		prev = te;
-		te = SIMPLEQ_NEXT(te, entry);
-	}
-
-	if (te == NULL) {
-		SIMPLEQ_INSERT_TAIL(&sorted->head, new, entry);
-		sorted->nentries++;
-	}
-done:
-	free(name);
-	return err;
-}
-
 /*
  * Git expects directory tree entries to be sorted with an imaginary slash
  * appended to their name, and will break otherwise. Let's be nice.
+ * This function is intended to be used with mergesort(3) to sort an
+ * array of pointers to struct got_tree_entry objects.
  */
-static const struct got_error *
-sort_tree_entries_the_way_git_likes_it(struct got_tree_entries **sorted,
-    struct got_tree_entries *tree_entries)
+static int
+sort_tree_entries_the_way_git_likes_it(const void *arg1, const void *arg2)
 {
-	const struct got_error *err = NULL;
-	struct got_tree_entry *te;
+	struct got_tree_entry * const *te1 = arg1;
+	struct got_tree_entry * const *te2 = arg2;
+	char name1[NAME_MAX + 1];
+	char name2[NAME_MAX + 1];
 
-	*sorted = malloc(sizeof(**sorted));
-	if (*sorted == NULL)
-		return got_error_from_errno("malloc");
-
-	(*sorted)->nentries = 0;
-	SIMPLEQ_INIT(&(*sorted)->head);
-
-	SIMPLEQ_FOREACH(te, &tree_entries->head, entry) {
-		struct got_tree_entry *new;
-		err = got_object_tree_entry_dup(&new, te);
-		if (err)
-			break;
-		err = insert_tree_entry(*sorted, new);
-		if (err) {
-			got_object_tree_entry_close(new);
-			break;
-		}
-	}
-
-	if (err) {
-		free(*sorted);
-		*sorted = NULL;
-	}
-
-	return err;
+	strlcpy(name1, (*te1)->name, sizeof(name1));
+	strlcpy(name2, (*te2)->name, sizeof(name2));
+	if (S_ISDIR((*te1)->mode))
+		strlcat(name1, "/", sizeof(name1));
+	if (S_ISDIR((*te2)->mode))
+		strlcat(name2, "/", sizeof(name2));
+	return strcmp(name1, name2);
 }
 
 const struct got_error *
 got_object_tree_create(struct got_object_id **id,
-    struct got_tree_entries *tree_entries, struct got_repository *repo)
+    struct got_pathlist_head *paths, int nentries, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char modebuf[sizeof("100644 ")];
@@ -328,18 +244,27 @@ got_object_tree_create(struct got_object_id **id,
 	char *header = NULL;
 	size_t headerlen, len = 0, n;
 	FILE *treefile = NULL;
-	struct got_tree_entries *entries; /* sorted according to Git rules */
+	struct got_pathlist_entry *pe;
+	struct got_tree_entry **sorted_entries;
 	struct got_tree_entry *te;
+	int i;
 
 	*id = NULL;
 
 	SHA1Init(&sha1_ctx);
 
-	err = sort_tree_entries_the_way_git_likes_it(&entries, tree_entries);
-	if (err)
-		return err;
+	sorted_entries = calloc(nentries, sizeof(struct got_tree_entry *));
+	if (sorted_entries == NULL)
+		return got_error_from_errno("calloc");
 
-	SIMPLEQ_FOREACH(te, &entries->head, entry) {
+	i = 0;
+	TAILQ_FOREACH(pe, paths, entry)
+		sorted_entries[i++] = pe->data;
+	mergesort(sorted_entries, nentries, sizeof(struct got_tree_entry *),
+	    sort_tree_entries_the_way_git_likes_it);
+
+	for (i = 0; i < nentries; i++) {
+		te = sorted_entries[i];
 		err = mode2str(modebuf, sizeof(modebuf), te->mode);
 		if (err)
 			goto done;
@@ -366,7 +291,8 @@ got_object_tree_create(struct got_object_id **id,
 		goto done;
 	}
 
-	SIMPLEQ_FOREACH(te, &entries->head, entry) {
+	for (i = 0; i < nentries; i++) {
+		te = sorted_entries[i];
 		err = mode2str(modebuf, sizeof(modebuf), te->mode);
 		if (err)
 			goto done;
@@ -387,12 +313,12 @@ got_object_tree_create(struct got_object_id **id,
 		SHA1Update(&sha1_ctx, te->name, len);
 
 		len = SHA1_DIGEST_LENGTH;
-		n = fwrite(te->id->sha1, 1, len, treefile);
+		n = fwrite(te->id.sha1, 1, len, treefile);
 		if (n != len) {
 			err = got_ferror(treefile, GOT_ERR_IO);
 			goto done;
 		}
-		SHA1Update(&sha1_ctx, te->id->sha1, len);
+		SHA1Update(&sha1_ctx, te->id.sha1, len);
 	}
 
 	*id = malloc(sizeof(**id));
@@ -411,8 +337,7 @@ got_object_tree_create(struct got_object_id **id,
 	err = create_object_file(*id, treefile, repo);
 done:
 	free(header);
-	got_object_tree_entries_close(entries);
-	free(entries);
+	free(sorted_entries);
 	if (treefile && fclose(treefile) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {

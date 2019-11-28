@@ -1349,17 +1349,17 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 	if (*new_te == NULL)
 		return got_error_from_errno("calloc");
 
-	(*new_te)->name = strdup(name);
-	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno("strdup");
+	if (strlcpy((*new_te)->name, name, sizeof((*new_te)->name)) >=
+	    sizeof((*new_te)->name)) {
+		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
 
 	(*new_te)->mode = S_IFREG | (mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
-	(*new_te)->id = blob_id;
+	memcpy(&(*new_te)->id, blob_id, sizeof((*new_te)->id));
 done:
 	if (err && *new_te) {
-		got_object_tree_entry_close(*new_te);
+		free(*new_te);
 		*new_te = NULL;
 	}
 	return err;
@@ -1422,6 +1422,7 @@ import_subdir(struct got_tree_entry **new_te, struct dirent *de,
     got_repo_import_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err;
+	struct got_object_id *id = NULL;
 	char *subdirpath;
 
 	if (asprintf(&subdirpath, "%s%s%s", path,
@@ -1432,18 +1433,22 @@ import_subdir(struct got_tree_entry **new_te, struct dirent *de,
 	if (*new_te == NULL)
 		return got_error_from_errno("calloc");
 	(*new_te)->mode = S_IFDIR;
-	(*new_te)->name = strdup(de->d_name);
-	if ((*new_te)->name == NULL) {
-		err = got_error_from_errno("strdup");
+	if (strlcpy((*new_te)->name, de->d_name, sizeof((*new_te)->name)) >=
+	    sizeof((*new_te)->name)) {
+		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
-
-	err = write_tree(&(*new_te)->id, subdirpath, ignores,  repo,
+	err = write_tree(&id, subdirpath, ignores,  repo,
 	    progress_cb, progress_arg);
+	if (err)
+		goto done;
+	memcpy(&(*new_te)->id, id, sizeof((*new_te)->id));
+	
 done:
+	free(id);
 	free(subdirpath);
 	if (err) {
-		got_object_tree_entry_close(*new_te);
+		free(*new_te);
 		*new_te = NULL;
 	}
 	return err;
@@ -1457,7 +1462,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	const struct got_error *err = NULL;
 	DIR *dir;
 	struct dirent *de;
-	struct got_tree_entries new_tree_entries;
+	int nentries;
 	struct got_tree_entry *new_te = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
@@ -1465,8 +1470,6 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	*new_tree_id = NULL;
 
 	TAILQ_INIT(&paths);
-	new_tree_entries.nentries = 0;
-	SIMPLEQ_INIT(&new_tree_entries.head);
 
 	dir = opendir(path_dir);
 	if (dir == NULL) {
@@ -1474,6 +1477,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		goto done;
 	}
 
+	nentries = 0;
 	while ((de = readdir(dir)) != NULL) {
 		int ignore = 0;
 
@@ -1508,6 +1512,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		err = insert_tree_entry(new_te, &paths);
 		if (err)
 			goto done;
+		nentries++;
 	}
 
 	if (TAILQ_EMPTY(&paths)) {
@@ -1518,8 +1523,6 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	TAILQ_FOREACH(pe, &paths, entry) {
 		struct got_tree_entry *te = pe->data;
 		char *path;
-		new_tree_entries.nentries++;
-		SIMPLEQ_INSERT_TAIL(&new_tree_entries.head, te, entry);
 		if (!S_ISREG(te->mode))
 			continue;
 		if (asprintf(&path, "%s/%s", path_dir, pe->path) == -1) {
@@ -1532,11 +1535,10 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 			goto done;
 	}
 
-	err = got_object_tree_create(new_tree_id, &new_tree_entries, repo);
+	err = got_object_tree_create(new_tree_id, &paths, nentries, repo);
 done:
 	if (dir)
 		closedir(dir);
-	got_object_tree_entries_close(&new_tree_entries);
 	got_pathlist_free(&paths);
 	return err;
 }

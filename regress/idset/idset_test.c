@@ -16,6 +16,7 @@
 
 #include <sys/queue.h>
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -18,22 +18,9 @@ struct got_object_id;
 
 struct got_blob_object;
 struct got_tree_object;
+struct got_tree_entry;
 struct got_tag_object;
 struct got_commit_object;
-
-struct got_tree_entry {
-	SIMPLEQ_ENTRY(got_tree_entry) entry;
-	mode_t mode;
-	char *name;
-	struct got_object_id *id;
-};
-
-SIMPLEQ_HEAD(got_tree_entries_queue, got_tree_entry);
-
-struct got_tree_entries {
-	int nentries;
-	struct got_tree_entries_queue head;
-};
 
 struct got_object_qid {
 	SIMPLEQ_ENTRY(got_object_qid) entry;
@@ -178,16 +165,45 @@ const struct got_error *got_object_open_as_tree(struct got_tree_object **,
 /* Dispose of a tree object. */
 void got_object_tree_close(struct got_tree_object *);
 
-/* Get the entries of a tree object. */
-const struct got_tree_entries *got_object_tree_get_entries(
-    struct got_tree_object *);
+/* Get the number of entries in this tree object. */
+int got_object_tree_get_nentries(struct got_tree_object *);
 
-/* Find a particular entry in a tree. */
-const struct got_tree_entry *got_object_tree_find_entry(
+/* Get the first tree entry from a tree, or NULL if there is none. */
+struct got_tree_entry *got_object_tree_get_first_entry(struct got_tree_object *);
+
+/* Get the last tree entry from a tree, or NULL if there is none. */
+struct got_tree_entry *got_object_tree_get_last_entry(struct got_tree_object *);
+
+/* Get the entry with the specified index from a tree object. */
+struct got_tree_entry *got_object_tree_get_entry(
+    struct got_tree_object *, int);
+
+/* Find a particular entry in a tree by name. */
+struct got_tree_entry *got_object_tree_find_entry(
     struct got_tree_object *, const char *);
 
+/* Get the file permission mode of a tree entry. */
+mode_t got_tree_entry_get_mode(struct got_tree_entry *);
+
+/* Get the name of a tree entry. */
+const char *got_tree_entry_get_name(struct got_tree_entry *);
+
+/* Get the object ID of a tree entry. */
+struct got_object_id *got_tree_entry_get_id(struct got_tree_entry *);
+
+/* Get the index of a tree entry. */
+int got_tree_entry_get_index(struct got_tree_entry *);
+
+/* Get the next tree entry from a tree, or NULL if there is none. */
+struct got_tree_entry *got_tree_entry_get_next(struct got_tree_object *,
+    struct got_tree_entry *);
+
+/* Get the previous tree entry from a tree, or NULL if there is none. */
+struct got_tree_entry *got_tree_entry_get_prev(struct got_tree_object *,
+    struct got_tree_entry *);
+
 /* Return non-zero if the specified tree entry is a Git submodule. */
-int got_object_tree_entry_is_submodule(const struct got_tree_entry *);
+int got_object_tree_entry_is_submodule(struct got_tree_entry *);
 
 /*
  * Compare two trees and indicate whether the entry at the specified path

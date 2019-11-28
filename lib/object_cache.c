@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 #include <sha1.h>
 #include <zlib.h>
 
@@ -93,14 +94,8 @@ size_t
 get_size_tree(struct got_tree_object *tree)
 {
 	size_t size = sizeof(*tree);
-	struct got_tree_entry *te;
 
-	SIMPLEQ_FOREACH(te, &tree->entries.head, entry) {
-		size += sizeof(*te);
-		size += strlen(te->name);
-		size += sizeof(*te->id);
-	}
-
+	size += sizeof(struct got_tree_entry) * tree->nentries;
 	return size;
 }
 

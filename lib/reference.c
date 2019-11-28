@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <limits.h>
 #include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>

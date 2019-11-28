@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 #include <zlib.h>
 #include <sha1.h>
 #include <time.h>
