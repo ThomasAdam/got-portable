@@ -126,6 +126,7 @@
 #define GOT_ERR_GIT_REPO_FORMAT	110
 #define GOT_ERR_REBASE_REQUIRED	111
 #define GOT_ERR_REGEX		112
+#define GOT_ERR_REF_NAME_MINUS	113
 
 static const struct got_error {
 	int code;
@@ -258,6 +259,7 @@ static const struct got_error {
 	{ GOT_ERR_GIT_REPO_FORMAT,"unknown git repository format version" },
 	{ GOT_ERR_REBASE_REQUIRED,"specified branch must be rebased first" },
 	{ GOT_ERR_REGEX, "regular expression error" },
+	{ GOT_ERR_REF_NAME_MINUS, "reference name may not start with '-'" },
 };
 
 /*

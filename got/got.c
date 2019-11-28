@@ -655,12 +655,12 @@ cmd_import(int argc, char *argv[])
 		return error;
 
 	/*
-	 * Don't let the user create a branch named '-'.
+	 * Don't let the user create a branch name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (branch_name[0] == '-' && branch_name[1] == '\0')
-		return got_error_path(branch_name, GOT_ERR_BAD_REF_NAME);
+	if (branch_name[0] == '-')
+		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		error = got_error_from_errno("asprintf");
@@ -3096,12 +3096,12 @@ add_ref(struct got_repository *repo, const char *refname, const char *target)
 	struct got_reference *ref = NULL;
 
 	/*
-	 * Don't let the user create a reference named '-'.
+	 * Don't let the user create a reference name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (refname[0] == '-' && refname[1] == '\0')
-		return got_error_path(refname, GOT_ERR_BAD_REF_NAME);
+	if (refname[0] == '-')
+		return got_error_path(refname, GOT_ERR_REF_NAME_MINUS);
 
 	err = got_repo_match_object_id_prefix(&id, target, GOT_OBJ_TYPE_ANY,
 	    repo);
@@ -3139,12 +3139,12 @@ add_symref(struct got_repository *repo, const char *refname, const char *target)
 	struct got_reference *target_ref = NULL;
 
 	/*
-	 * Don't let the user create a reference named '-'.
+	 * Don't let the user create a reference name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (refname[0] == '-' && refname[1] == '\0')
-		return got_error_path(refname, GOT_ERR_BAD_REF_NAME);
+	if (refname[0] == '-')
+		return got_error_path(refname, GOT_ERR_REF_NAME_MINUS);
 
 	err = got_ref_open(&target_ref, repo, target, 0);
 	if (err)
@@ -3430,12 +3430,12 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	char *base_refname = NULL, *refname = NULL;
 
 	/*
-	 * Don't let the user create a branch named '-'.
+	 * Don't let the user create a branch name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (branch_name[0] == '-' && branch_name[1] == '\0')
-		return got_error_path(branch_name, GOT_ERR_BAD_REF_NAME);
+	if (branch_name[0] == '-')
+		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		 err = got_error_from_errno("asprintf");
@@ -3849,12 +3849,12 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	int preserve_tagmsg = 0;
 
 	/*
-	 * Don't let the user create a tag named '-'.
+	 * Don't let the user create a tag name with a leading '-'.
 	 * While technically a valid reference name, this case is usually
 	 * an unintended typo.
 	 */
-	if (tag_name[0] == '-' && tag_name[1] == '\0')
-		return got_error_path(tag_name, GOT_ERR_BAD_REF_NAME);
+	if (tag_name[0] == '-')
+		return got_error_path(tag_name, GOT_ERR_REF_NAME_MINUS);
 
 	err = get_author(&tagger, repo);
 	if (err)
