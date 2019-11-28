@@ -654,6 +654,14 @@ cmd_import(int argc, char *argv[])
 	if (error)
 		return error;
 
+	/*
+	 * Don't let the user create a branch named '-'.
+	 * While technically a valid reference name, this case is usually
+	 * an unintended typo.
+	 */
+	if (branch_name[0] == '-' && branch_name[1] == '\0')
+		return got_error_path(branch_name, GOT_ERR_BAD_REF_NAME);
+
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
