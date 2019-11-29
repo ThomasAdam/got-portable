@@ -34,6 +34,7 @@
 #include <libgen.h>
 #include <time.h>
 #include <paths.h>
+#include <regex.h>
 
 #include "got_version.h"
 #include "got_error.h"
@@ -1589,6 +1590,32 @@ get_datestr(time_t *time, char *datebuf)
 	return s;
 }
 
+static const struct got_error *
+match_logmsg(int *have_match, struct got_object_id *id,
+    struct got_commit_object *commit, regex_t *regex)
+{
+	const struct got_error *err = NULL;
+	regmatch_t regmatch;
+	char *id_str = NULL, *logmsg = NULL;
+
+	*have_match = 0;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	if (err)
+		goto done;
+
+	if (regexec(regex, logmsg, 1, &regmatch, 0) == 0)
+		*have_match = 1;
+done:
+	free(id_str);
+	free(logmsg);
+	return err;
+}
+
 #define GOT_COMMIT_SEP_STR "-----------------------------------------------\n"
 
 static const struct got_error *
@@ -1705,11 +1732,17 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_repository *repo,
-    char *path, int show_patch, int diff_context, int limit,
-    int first_parent_traversal, struct got_reflist_head *refs)
+    char *path, int show_patch, char *search_pattern, int diff_context,
+    int limit, int first_parent_traversal, struct got_reflist_head *refs)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
+	regex_t regex;
+	int have_match;
+
+	if (search_pattern &&
+	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
+		return got_error_msg(GOT_ERR_REGEX, search_pattern);
 
 	err = got_commit_graph_open(&graph, root_id, path,
 	    first_parent_traversal, repo);
@@ -1747,6 +1780,19 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 		err = got_object_open_as_commit(&commit, repo, id);
 		if (err)
 			break;
+
+		if (search_pattern) {
+			err = match_logmsg(&have_match, id, commit, &regex);
+			if (err) {
+				got_object_commit_close(commit);
+				break;
+			}
+			if (have_match == 0) {
+				got_object_commit_close(commit);
+				continue;
+			}
+		}
+
 		err = print_commit(commit, id, repo, path, show_patch,
 		    diff_context, refs);
 		got_object_commit_close(commit);
@@ -1754,6 +1800,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 			break;
 	}
 done:
+	if (search_pattern)
+		regfree(&regex);
 	got_commit_graph_close(graph);
 	return err;
 }
@@ -1762,7 +1810,7 @@ __dead static void
 usage_log(void)
 {
 	fprintf(stderr, "usage: %s log [-c commit] [-C number] [-f] [ -l N ] [-p] "
-	    "[-r repository-path] [path]\n", getprogname());
+	    "[-s search-pattern] [-r repository-path] [path]\n", getprogname());
 	exit(1);
 }
 
@@ -1791,7 +1839,7 @@ cmd_log(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
-	char *start_commit = NULL;
+	char *start_commit = NULL, *search_pattern = NULL;
 	int diff_context = 3, ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
@@ -1808,7 +1856,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:s:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -1836,6 +1884,9 @@ cmd_log(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 's':
+			search_pattern = optarg;
 			break;
 		default:
 			usage_log();
@@ -1982,7 +2033,7 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = print_commits(id, repo, path, show_patch,
+	error = print_commits(id, repo, path, show_patch, search_pattern,
 	    diff_context, limit, first_parent_traversal, &refs);
 done:
 	free(path);
