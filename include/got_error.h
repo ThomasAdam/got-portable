@@ -127,6 +127,7 @@
 #define GOT_ERR_REBASE_REQUIRED	111
 #define GOT_ERR_REGEX		112
 #define GOT_ERR_REF_NAME_MINUS	113
+#define GOT_ERR_GITCONFIG_SYNTAX 114
 
 static const struct got_error {
 	int code;
@@ -260,6 +261,7 @@ static const struct got_error {
 	{ GOT_ERR_REBASE_REQUIRED,"specified branch must be rebased first" },
 	{ GOT_ERR_REGEX, "regular expression error" },
 	{ GOT_ERR_REF_NAME_MINUS, "reference name may not start with '-'" },
+	{ GOT_ERR_GITCONFIG_SYNTAX, "gitconfig syntax error" },
 };
 
 /*

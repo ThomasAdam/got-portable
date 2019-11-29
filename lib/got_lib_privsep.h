@@ -111,8 +111,11 @@ enum got_imsg_type {
 	GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST,
 	GOT_IMSG_GITCONFIG_AUTHOR_NAME_REQUEST,
 	GOT_IMSG_GITCONFIG_AUTHOR_EMAIL_REQUEST,
+	GOT_IMSG_GITCONFIG_REMOTES_REQUEST,
 	GOT_IMSG_GITCONFIG_INT_VAL,
 	GOT_IMSG_GITCONFIG_STR_VAL,
+	GOT_IMSG_GITCONFIG_REMOTES,
+	GOT_IMSG_GITCONFIG_REMOTE,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -229,6 +232,24 @@ struct got_imsg_packed_object {
 	int idx;
 } __attribute__((__packed__));
 
+/*
+ * Structure for GOT_IMSG_GITCONFIG_REMOTE data.
+ */
+struct got_imsg_remote {
+	size_t name_len;
+	size_t url_len;
+
+	/* Followed by name_len + url_len data bytes. */
+};
+
+/*
+ * Structure for GOT_IMSG_GITCONFIG_REMOTES data.
+ */
+struct got_imsg_remotes {
+	int nremotes; /* This many GOT_IMSG_GITCONFIG_REMOTE messages follow. */
+};
+
+struct got_remote_repo;
 struct got_pack;
 struct got_packidx;
 struct got_pathlist_head;
@@ -285,11 +306,17 @@ const struct got_error *got_privsep_send_gitconfig_author_name_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_author_email_req(
     struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_remotes_req(
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_str(struct imsgbuf *,
     const char *);
 const struct got_error *got_privsep_recv_gitconfig_str(char **,
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_int(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_gitconfig_int(int *, struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_remotes(struct imsgbuf *,
+    struct got_remote_repo *, int);
+const struct got_error *got_privsep_recv_gitconfig_remotes(
+    struct got_remote_repo **, int *, struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);

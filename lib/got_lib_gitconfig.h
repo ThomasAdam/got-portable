@@ -39,6 +39,8 @@ struct got_gitconfig_list {
 struct got_gitconfig;
 
 void     got_gitconfig_free_list(struct got_gitconfig_list *);
+const struct got_error *got_gitconfig_get_section_list(
+    struct got_gitconfig_list **, struct got_gitconfig *);
 struct got_gitconfig_list *got_gitconfig_get_list(struct got_gitconfig *,
     char *, char *);
 struct got_gitconfig_list *got_gitconfig_get_tag_list(struct got_gitconfig *, char *);

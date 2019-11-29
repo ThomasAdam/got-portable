@@ -34,6 +34,7 @@
 #include "got_object.h"
 #include "got_error.h"
 #include "got_path.h"
+#include "got_repository.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
@@ -1279,6 +1280,17 @@ got_privsep_send_gitconfig_author_email_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_gitconfig_remotes_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_REMOTES_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_REMOTE_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
 {
 	size_t len = value ? strlen(value) + 1 : 0;
@@ -1366,6 +1378,170 @@ got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 	}
 
 	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
+    struct got_remote_repo *remotes, int nremotes)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_remotes iremotes;
+	int i;
+
+	iremotes.nremotes = nremotes;
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_REMOTES, 0, 0, -1,
+	    &iremotes, sizeof(iremotes)) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_REMOTES");
+
+	err = flush_imsg(ibuf);
+	imsg_clear(ibuf);
+	if (err)
+		return err;
+
+	for (i = 0; i < nremotes; i++) {
+		struct got_imsg_remote iremote;
+		size_t len = sizeof(iremote);
+		struct ibuf *wbuf;
+
+		iremote.name_len = strlen(remotes[i].name);
+		len += iremote.name_len;
+		iremote.url_len = strlen(remotes[i].url);
+		len += iremote.url_len;
+
+		wbuf = imsg_create(ibuf, GOT_IMSG_GITCONFIG_REMOTE, 0, 0, len);
+		if (wbuf == NULL)
+			return got_error_from_errno(
+			    "imsg_create GITCONFIG_REMOTE");
+
+		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GIITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GIITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GIITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		wbuf->fd = -1;
+		imsg_close(ibuf, wbuf);
+		err = flush_imsg(ibuf);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
+const struct got_error *
+got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
+    int *nremotes, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	struct got_imsg_remotes iremotes;
+	struct got_imsg_remote iremote;
+
+	*remotes = NULL;
+	*nremotes = 0;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, sizeof(iremotes));
+	if (err)
+		return err;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_GITCONFIG_REMOTES:
+		if (datalen != sizeof(iremotes)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		memcpy(&iremotes, imsg.data, sizeof(iremotes));
+		if (iremotes.nremotes == 0) {
+			imsg_free(&imsg);
+			return NULL;
+		}
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	*remotes = recallocarray(NULL, 0, iremotes.nremotes, sizeof(iremote));
+	if (*remotes == NULL)
+		return got_error_from_errno("recallocarray");
+
+	while (*nremotes < iremotes.nremotes) {
+		struct got_remote_repo *remote;
+	
+		err = got_privsep_recv_imsg(&imsg, ibuf, sizeof(iremote));
+		if (err)
+			break;
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+		switch (imsg.hdr.type) {
+		case GOT_IMSG_GITCONFIG_REMOTE:
+			remote = &(*remotes)[*nremotes];
+			if (datalen < sizeof(iremote)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			memcpy(&iremote, imsg.data, sizeof(iremote));
+			if (iremote.name_len == 0 || iremote.url_len == 0 ||
+			    (sizeof(iremote) + iremote.name_len +
+			    iremote.url_len) > datalen) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			remote->name = strndup(imsg.data + sizeof(iremote),
+			    iremote.name_len);
+			if (remote->name == NULL) {
+				err = got_error_from_errno("strndup");
+				break;
+			}
+			remote->url = strndup(imsg.data + sizeof(iremote) +
+			    iremote.name_len, iremote.url_len);
+			if (remote->url == NULL) {
+				err = got_error_from_errno("strndup");
+				free(remote->name);
+				break;
+			}
+			(*nremotes)++;
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
+		imsg_free(&imsg);
+		if (err)
+			break;
+	}
+
+	if (err) {
+		int i;
+		for (i = 0; i < *nremotes; i++) {
+			free((*remotes)[i].name);
+			free((*remotes)[i].url);
+		}
+		free(*remotes);
+		*remotes = NULL;
+		*nremotes = 0;
+	}
 	return err;
 }
 

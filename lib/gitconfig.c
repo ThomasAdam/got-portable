@@ -494,6 +494,51 @@ got_gitconfig_get_str(struct got_gitconfig *conf, char *section, char *tag)
 	return 0;
 }
 
+const struct got_error *
+got_gitconfig_get_section_list(struct got_gitconfig_list **sections,
+    struct got_gitconfig *conf)
+{
+	const struct got_error *err = NULL;
+	struct got_gitconfig_list *list = NULL;
+	struct got_gitconfig_list_node *node = 0;
+	struct got_gitconfig_binding *cb;
+	int i;
+
+	*sections = NULL;
+
+	list = malloc(sizeof *list);
+	if (!list)
+		return got_error_from_errno("malloc");
+	TAILQ_INIT(&list->fields);
+	list->cnt = 0;
+	for (i = 0; i < nitems(conf->bindings); i++) {
+		for (cb = LIST_FIRST(&conf->bindings[i]); cb;
+		    cb = LIST_NEXT(cb, link)) {
+			list->cnt++;
+			node = calloc(1, sizeof *node);
+			if (!node) {
+				err = got_error_from_errno("calloc");
+				goto cleanup;
+			}
+			node->field = strdup(cb->section);
+			if (!node->field) {
+				err = got_error_from_errno("strdup");
+				goto cleanup;
+			}
+			TAILQ_INSERT_TAIL(&list->fields, node, link);
+		}
+	}
+
+	*sections = list;
+	return NULL;
+
+cleanup:
+	free(node);
+	if (list)
+		got_gitconfig_free_list(list);
+	return err;
+}
+
 /*
  * Build a list of string values out of the comma separated value denoted by
  * TAG in SECTION.

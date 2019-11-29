@@ -170,6 +170,14 @@ get_path_gitconfig(char **p, struct got_repository *repo)
 	return NULL;
 }
 
+void
+got_repo_get_gitconfig_remotes(int *nremotes, struct got_remote_repo **remotes,
+    struct got_repository *repo)
+{
+	*nremotes = repo->ngitconfig_remotes;
+	*remotes = repo->gitconfig_remotes;
+}
+
 static int
 is_git_repo(struct got_repository *repo)
 {
@@ -365,6 +373,7 @@ done:
 static const struct got_error *
 parse_gitconfig_file(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
+    struct got_remote_repo **remotes, int *nremotes,
     const char *gitconfig_path)
 {
 	const struct got_error *err = NULL, *child_err = NULL;
@@ -442,6 +451,17 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 	if (err)
 		goto done;
 
+	if (remotes && nremotes) {
+		err = got_privsep_send_gitconfig_remotes_req(ibuf);
+		if (err)
+			goto done;
+
+		err = got_privsep_recv_gitconfig_remotes(remotes,
+		    nremotes, ibuf);
+		if (err)
+			goto done;
+	}
+
 	imsg_clear(ibuf);
 	err = got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
@@ -470,7 +490,7 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 		err = parse_gitconfig_file(&dummy_repo_version,
 		    &repo->global_gitconfig_author_name,
 		    &repo->global_gitconfig_author_email,
-		    global_gitconfig_path);
+		    NULL, NULL, global_gitconfig_path);
 		if (err)
 			return err;
 	}
@@ -482,6 +502,7 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 
 	err = parse_gitconfig_file(&repo->gitconfig_repository_format_version,
 	    &repo->gitconfig_author_name, &repo->gitconfig_author_email,
+	    &repo->gitconfig_remotes, &repo->ngitconfig_remotes,
 	    repo_gitconfig_path);
 	if (err)
 		goto done;
@@ -620,6 +641,11 @@ got_repo_close(struct got_repository *repo)
 
 	free(repo->gitconfig_author_name);
 	free(repo->gitconfig_author_email);
+	for (i = 0; i < repo->ngitconfig_remotes; i++) {
+		free(repo->gitconfig_remotes[i].name);
+		free(repo->gitconfig_remotes[i].url);
+	}
+	free(repo->gitconfig_remotes);
 	free(repo);
 
 	return err;

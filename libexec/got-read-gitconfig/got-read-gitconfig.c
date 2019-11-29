@@ -32,6 +32,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_repository.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_object.h"
@@ -70,6 +71,75 @@ gitconfig_str_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
 
 	value = got_gitconfig_get_str(gitconfig, section, tag);
 	return got_privsep_send_gitconfig_str(ibuf, value);
+}
+
+static const struct got_error *
+gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
+{
+	const struct got_error *err = NULL;
+	struct got_gitconfig_list *sections;
+	struct got_gitconfig_list_node *node;
+	struct got_remote_repo *remotes = NULL;
+	int nremotes = 0, i;
+
+	if (gitconfig == NULL)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	err = got_gitconfig_get_section_list(&sections, gitconfig);
+	if (err)
+		return err;
+
+	TAILQ_FOREACH(node, &sections->fields, link) {
+		if (strncasecmp("remote \"", node->field, 8) != 0)
+			continue;
+		nremotes++;
+	}
+
+	if (nremotes == 0) {
+		err = got_privsep_send_gitconfig_remotes(ibuf, NULL, 0);
+		goto done;
+	}
+
+	remotes = recallocarray(NULL, 0, nremotes, sizeof(*remotes));
+	if (remotes == NULL) {
+		err = got_error_from_errno("recallocarray");
+		goto done;
+	}
+
+	i = 0;
+	TAILQ_FOREACH(node, &sections->fields, link) {
+		char *name, *end;
+
+		if (strncasecmp("remote \"", node->field, 8) != 0)
+			continue;
+
+		name = strdup(node->field + 8);
+		if (name == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		end = strrchr(name, '"');
+		if (end)
+			*end = '\0';
+		remotes[i].name = name;
+
+		remotes[i].url = got_gitconfig_get_str(gitconfig,
+		    node->field, "url");
+		if (remotes[i].url == NULL) {
+			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
+			goto done;
+		}
+
+		i++;
+	}
+
+	err = got_privsep_send_gitconfig_remotes(ibuf, remotes, nremotes);
+done:
+	for (i = 0; i < nremotes; i++)
+		free(remotes[i].name);
+	free(remotes);
+	got_gitconfig_free_list(sections);
+	return err;
 }
 
 int
@@ -146,6 +216,9 @@ main(int argc, char *argv[])
 		case GOT_IMSG_GITCONFIG_AUTHOR_EMAIL_REQUEST:
 			err = gitconfig_str_request(&ibuf, gitconfig, "user",
 			    "email");
+			break;
+		case GOT_IMSG_GITCONFIG_REMOTES_REQUEST:
+			err = gitconfig_remotes_request(&ibuf, gitconfig);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);

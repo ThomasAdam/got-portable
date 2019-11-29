@@ -44,6 +44,16 @@ const char *got_repo_get_global_gitconfig_author_name(struct got_repository *);
 /* Obtain global commit author email parsed ~/.gitconfig, else NULL. */
 const char *got_repo_get_global_gitconfig_author_email(struct got_repository *);
 
+/* Information about one remote repository. */
+struct got_remote_repo {
+	char *name;
+	char *url;
+};
+
+/* Obtain the list of remote repositories parsed from gitconfig. */ 
+void got_repo_get_gitconfig_remotes(int *, struct got_remote_repo **,
+    struct got_repository *);
+
 /*
  * Obtain paths to various directories within a repository.
  * The caller must dispose of a path with free(3).
