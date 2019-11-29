@@ -2267,7 +2267,8 @@ cmd_diff(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "C:r:sw")) != -1) {
 		switch (ch) {
 		case 'C':
-			diff_context = strtonum(optarg, 1, INT_MAX, &errstr);
+			diff_context = strtonum(optarg, 0, GOT_DIFF_MAX_CONTEXT,
+			    &errstr);
 			if (errstr != NULL)
 				err(1, "-C option %s", errstr);
 			break;
