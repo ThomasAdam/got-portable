@@ -51,7 +51,7 @@ struct got_commit_object {
 
 struct got_tree_entry {
 	mode_t mode;
-	char name[NAME_MAX];
+	char name[NAME_MAX + 1 /* NUL */];
 	struct got_object_id id;
 	int idx;
 };

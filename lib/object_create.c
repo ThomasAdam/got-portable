@@ -222,8 +222,8 @@ sort_tree_entries_the_way_git_likes_it(const void *arg1, const void *arg2)
 {
 	struct got_tree_entry * const *te1 = arg1;
 	struct got_tree_entry * const *te2 = arg2;
-	char name1[NAME_MAX + 1];
-	char name2[NAME_MAX + 1];
+	char name1[NAME_MAX + 2];
+	char name2[NAME_MAX + 2];
 
 	strlcpy(name1, (*te1)->name, sizeof(name1));
 	strlcpy(name2, (*te2)->name, sizeof(name2));
