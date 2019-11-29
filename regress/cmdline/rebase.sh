@@ -780,6 +780,96 @@ function test_rebase_no_commits_to_rebase {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_forward {
+	local testroot=`test_init rebase_forward`
+	local commit0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "change alpha 1" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test rebase_forward' \
+		> /dev/null)
+	local commit1=`git_show_head $testroot/repo`
+
+	echo "change alpha 2" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test rebase_forward' \
+		> /dev/null)
+	local commit2=`git_show_head $testroot/repo`
+
+	# Simulate a situation where fast-forward is required. 
+	# We want to fast-forward master to origin/master:
+	# commit 3907e11dceaae2ca7f8db79c2af31794673945ad (origin/master)
+	# commit ffcffcd102cf1af6572fbdbb4cf07a0f1fd2d840 (master)
+	# commit 87a6a8a2263a15b61c016ff1720b24741d455eb5
+	(cd $testroot/repo && got ref -d master)
+	(cd $testroot/repo && got ref refs/heads/master $commit1)
+	(cd $testroot/repo && got ref refs/remotes/origin/master $commit2)
+
+
+	(cd $testroot/wt && got up -b origin/master > /dev/null)
+
+	(cd $testroot/wt && got rebase master \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	echo "Forwarding refs/heads/master to commit $commit2" \
+		> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Ensure that rebase operation was completed correctly
+	(cd $testroot/wt && got rebase -a \
+		> $testroot/stdout 2> $testroot/stderr)
+	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "got: rebase operation not in progress" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got branch > $testroot/stdout)
+	echo "master" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $commit2 (master, origin/master)" > $testroot/stdout.expected
+	echo "commit $commit1" >> $testroot/stdout.expected
+	echo "commit $commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -789,3 +879,4 @@ run_test test_rebase_in_progress
 run_test test_rebase_path_prefix
 run_test test_rebase_preserves_logmsg
 run_test test_rebase_no_commits_to_rebase
+run_test test_rebase_forward

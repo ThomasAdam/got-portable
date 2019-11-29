@@ -5447,12 +5447,27 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 
 	if (SIMPLEQ_EMPTY(&commits)) {
-		if (continue_rebase)
+		if (continue_rebase) {
 			error = rebase_complete(worktree, fileindex,
 			    branch, new_base_branch, tmp_branch, repo);
-		else
-			error = got_error(GOT_ERR_EMPTY_REBASE);
-		goto done;
+			goto done;
+		} else {
+			/* Fast-forward the reference of the branch. */
+			struct got_object_id *new_head_commit_id;
+			char *id_str;
+			error = got_ref_resolve(&new_head_commit_id, repo,
+			    new_base_branch);
+			if (error)
+				goto done;
+			error = got_object_id_str(&id_str, new_head_commit_id);
+			printf("Forwarding %s to commit %s\n",
+			    got_ref_get_name(branch), id_str);
+			free(id_str);
+			error = got_ref_change_ref(branch,
+			    new_head_commit_id);
+			if (error)
+				goto done;
+		}
 	}
 
 	pid = NULL;
