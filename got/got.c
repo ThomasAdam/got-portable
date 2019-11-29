@@ -1840,7 +1840,7 @@ cmd_log(int argc, char *argv[])
 	struct got_object_id *id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
 	char *start_commit = NULL, *search_pattern = NULL;
-	int diff_context = 3, ch;
+	int diff_context = -1, ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
@@ -1896,6 +1896,11 @@ cmd_log(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
+
+	if (diff_context == -1)
+		diff_context = 3;
+	else if (!show_patch)
+		errx(1, "-C reguires -p");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
