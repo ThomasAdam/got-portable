@@ -1732,8 +1732,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_repository *repo,
-    char *path, int show_patch, char *search_pattern, int diff_context,
-    int limit, int first_parent_traversal, struct got_reflist_head *refs)
+    const char *path, int show_patch, const char *search_pattern,
+    int diff_context, int limit, int first_parent_traversal,
+    struct got_reflist_head *refs)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -1839,7 +1840,7 @@ cmd_log(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
-	char *start_commit = NULL, *search_pattern = NULL;
+	const char *start_commit = NULL, *search_pattern = NULL;
 	int diff_context = -1, ch;
 	int show_patch = 0, limit = 0, first_parent_traversal = 0;
 	const char *errstr;
