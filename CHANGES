@@ -1,3 +1,12 @@
+* got 0.22; 2019-12-01
+- allow empty diff context context (-C0) in 'got diff' (kn@)
+- add '-s search-pattern' option to 'got log' (kn@)
+- forward rebased branch if there are no commits to rebase, instead of error
+- parse remote repository URLs from gitconfig
+- actually forbid new reference names with a leading '-', as intended
+- convert tree entries from SIMPLEQ to an array for better performance
+- compile static binaries in PROFILE build
+
 * got 0.21; 2019-11-25
 - add -R option to 'got add' for recursive addition (patch by Tracey Emery)
 - reduce the amount of memcpy() and strdup() while parsing tree entries
