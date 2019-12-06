@@ -625,7 +625,7 @@ If a tag must be deleted, the
 command may be used to delete a tag's reference.
 This should only be done if the tag has not already been copied to
 another repository.
-.It Cm add Oo Fl R Oc Ar path ...
+.It Cm add Oo Fl R Oc Oo Fl I Oc Ar path ...
 Schedule unversioned files in a work tree for addition to the
 repository in the next commit.
 .Pp
@@ -640,6 +640,10 @@ If this option is not specified,
 will refuse to run if a specified
 .Ar path
 is a directory.
+.It Fl I
+With -R, add files even if they match a
+.Cm got status
+ignore pattern.
 .El
 .It Cm remove Ar file-path ...
 Remove versioned files from a work tree and schedule them for deletion

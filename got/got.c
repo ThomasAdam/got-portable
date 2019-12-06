@@ -4146,7 +4146,8 @@ done:
 __dead static void
 usage_add(void)
 {
-	fprintf(stderr, "usage: %s add file-path ...\n", getprogname());
+	fprintf(stderr, "usage: %s add [-R] [-I] file-path ...\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -4168,12 +4169,15 @@ cmd_add(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, can_recurse = 0;
+	int ch, can_recurse = 0, no_ignores = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "R")) != -1) {
+	while ((ch = getopt(argc, argv, "IR")) != -1) {
 		switch (ch) {
+		case 'I':
+			no_ignores = 1;
+			break;
 		case 'R':
 			can_recurse = 1;
 			break;
@@ -4218,6 +4222,13 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (!can_recurse && no_ignores) {
+		error = got_error_msg(GOT_ERR_BAD_PATH,
+		    "disregarding ignores requires -R option");
+		goto done;
+
+	}
+
 	if (!can_recurse) {
 		char *ondisk_path;
 		struct stat sb;
@@ -4246,8 +4257,9 @@ cmd_add(int argc, char *argv[])
 			}
 		}
 	}
+
 	error = got_worktree_schedule_add(worktree, &paths, add_progress,
-	    NULL, repo);
+	    NULL, repo, no_ignores);
 done:
 	if (repo)
 		got_repo_close(repo);

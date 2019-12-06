@@ -2637,7 +2637,7 @@ static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg)
+    got_cancel_cb cancel_cb, void *cancel_arg, int no_ignores)
 {
 	const struct got_error *err = NULL;
 	DIR *workdir = NULL;
@@ -2670,11 +2670,13 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
 		TAILQ_INIT(&arg.ignores);
-		err = add_ignores(&arg.ignores, worktree->root_path, path,
-		    ".cvsignore");
-		if (err == NULL)
+		if (!no_ignores) {
 			err = add_ignores(&arg.ignores, worktree->root_path,
-			    path, ".gitignore");
+			    path, ".cvsignore");
+			if (err == NULL)
+				err = add_ignores(&arg.ignores,
+				    worktree->root_path, path, ".gitignore");
+		}
 		if (err == NULL)
 			err = got_fileindex_diff_dir(fileindex, workdir,
 			    worktree->root_path, path, repo, &fdiff_cb, &arg);
@@ -2704,7 +2706,7 @@ got_worktree_status(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			status_cb, status_arg, cancel_cb, cancel_arg);
+			status_cb, status_arg, cancel_cb, cancel_arg, 0);
 		if (err)
 			break;
 	}
@@ -2840,7 +2842,7 @@ const struct got_error *
 got_worktree_schedule_add(struct got_worktree *worktree,
     struct got_pathlist_head *paths,
     got_worktree_checkout_cb progress_cb, void *progress_arg,
-    struct got_repository *repo)
+    struct got_repository *repo, int no_ignores)
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
@@ -2869,7 +2871,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 			return got_error_from_errno("asprintf");
 		saa.ondisk_path = ondisk_path;
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			schedule_addition, &saa, NULL, NULL);
+			schedule_addition, &saa, NULL, NULL, no_ignores);
 		free(ondisk_path);
 		if (err)
 			break;
@@ -3517,7 +3519,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.repo = repo;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    revert_file, &rfa, NULL, NULL);
+		    revert_file, &rfa, NULL, NULL, 0);
 		if (err)
 			break;
 	}
@@ -4430,7 +4432,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.have_staged_files = have_staged_files;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL);
+		    collect_commitables, &cc_arg, NULL, NULL, 0);
 		if (err)
 			goto done;
 	}
@@ -4988,13 +4990,13 @@ rebase_commit(struct got_object_id **new_commit_id,
 		}
 		TAILQ_FOREACH(pe, merged_paths, entry) {
 			err = worktree_status(worktree, pe->path, fileindex,
-			    repo, collect_commitables, &cc_arg, NULL, NULL);
+			    repo, collect_commitables, &cc_arg, NULL, NULL, 0);
 			if (err)
 				goto done;
 		}
 	} else {
 		err = worktree_status(worktree, "", fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL);
+		    collect_commitables, &cc_arg, NULL, NULL, 0);
 		if (err)
 			goto done;
 	}
@@ -5302,7 +5304,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL);
+	    revert_file, &rfa, NULL, NULL, 0);
 	if (err)
 		goto sync;
 
@@ -5655,7 +5657,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL);
+	    revert_file, &rfa, NULL, NULL, 0);
 	if (err)
 		goto sync;
 
@@ -6111,7 +6113,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	oka.have_changes = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    check_stage_ok, &oka, NULL, NULL);
+		    check_stage_ok, &oka, NULL, NULL, 0);
 		if (err)
 			goto done;
 	}
@@ -6130,7 +6132,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.staged_something = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    stage_path, &spa, NULL, NULL);
+		    stage_path, &spa, NULL, NULL, 0);
 		if (err)
 			goto done;
 	}
@@ -6481,7 +6483,7 @@ got_worktree_unstage(struct got_worktree *worktree,
 	upa.patch_arg = patch_arg;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    unstage_path, &upa, NULL, NULL);
+		    unstage_path, &upa, NULL, NULL, 0);
 		if (err)
 			goto done;
 	}

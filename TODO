@@ -11,7 +11,6 @@ lib:
 
 got:
 - 'histedit -c' prompts for log message even if there are no changes to commit
-- recursive addition: got add -R
 - recursive removal: got rm -R
 
 tog:

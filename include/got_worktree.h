@@ -159,7 +159,7 @@ const struct got_error *got_worktree_resolve_path(char **,
 /* Schedule files at on-disk paths for addition in the next commit. */
 const struct got_error *got_worktree_schedule_add(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_checkout_cb, void *,
-    struct got_repository *);
+    struct got_repository *, int);
 
 /*
  * Remove files from disk and schedule them to be deleted in the next commit.
