@@ -65,7 +65,7 @@ function test_blame_basic {
 	local short_commit2=`trim_obj_id 32 $commit2`
 	local short_commit3=`trim_obj_id 32 $commit3`
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 	echo "2) $short_commit2 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 	echo "3) $short_commit3 $d $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
@@ -113,7 +113,7 @@ function test_blame_tag {
 	local short_commit1=`trim_obj_id 32 $commit1`
 	local short_commit2=`trim_obj_id 32 $commit2`
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 	echo "2) $short_commit2 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 
@@ -149,7 +149,7 @@ function test_blame_file_single_line {
 
 	local short_commit1=`trim_obj_id 32 $commit1`
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -184,7 +184,7 @@ function test_blame_file_single_line_no_newline {
 
 	local short_commit1=`trim_obj_id 32 $commit1`
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -213,7 +213,7 @@ function test_blame_all_lines_replaced {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 	echo "2) $short_commit1 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 	echo "3) $short_commit1 $d $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
@@ -265,7 +265,7 @@ function test_blame_lines_shifted_up {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
 	echo "2) $short_commit1 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
 	echo "3) $short_commit3 $d $GOT_AUTHOR_8 foo" >> $testroot/stdout.expected
@@ -321,7 +321,7 @@ function test_blame_lines_shifted_down {
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 
-	d=`date -r $author_time +"%G/%m/%d"`
+	d=`date -r $author_time +"%G-%m-%d"`
 	echo "01) $short_commit1 $d $GOT_AUTHOR_8 1" \
 		> $testroot/stdout.expected
 	echo "02) $short_commit1 $d $GOT_AUTHOR_8 2" \
@@ -394,7 +394,7 @@ EOF
 	local commit1=`git_show_head $testroot/repo`
 	local short_commit1=`trim_obj_id 32 $commit1`
 	local author_time1=`git_show_author_time $testroot/repo`
-	local d1=`date -r $author_time1 +"%G/%m/%d"`
+	local d1=`date -r $author_time1 +"%G-%m-%d"`
 
 	cat > $testroot/wt/alpha <<EOF
 SUBDIRS = ext modules codedocs docs
@@ -421,7 +421,7 @@ EOF
 	local commit2=`git_show_head $testroot/repo`
 	local short_commit2=`trim_obj_id 32 $commit2`
 	local author_time2=`git_show_author_time $testroot/repo`
-	local d2=`date -r $author_time2 +"%G/%m/%d"`
+	local d2=`date -r $author_time2 +"%G-%m-%d"`
 
 	cat > $testroot/wt/alpha <<EOF
 SUBDIRS = ext modules pdns codedocs docs
@@ -445,7 +445,7 @@ EOF
 	local commit3=`git_show_head $testroot/repo`
 	local short_commit3=`trim_obj_id 32 $commit3`
 	local author_time3=`git_show_author_time $testroot/repo`
-	local d3=`date -r $author_time3 +"%G/%m/%d"`
+	local d3=`date -r $author_time3 +"%G-%m-%d"`
 
 	cat > $testroot/wt/alpha <<EOF
 SUBDIRS = ext modules pdns codedocs docs
@@ -469,7 +469,7 @@ EOF
 	local commit4=`git_show_head $testroot/repo`
 	local short_commit4=`trim_obj_id 32 $commit4`
 	local author_time4=`git_show_author_time $testroot/repo`
-	local d4=`date -r $author_time4 +"%G/%m/%d"`
+	local d4=`date -r $author_time4 +"%G-%m-%d"`
 
 	(cd $testroot/wt && got blame alpha > $testroot/stdout)
 

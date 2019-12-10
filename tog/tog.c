@@ -1204,7 +1204,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
     struct tog_colors *colors)
 {
 	const struct got_error *err = NULL;
-	char datebuf[10]; /* YY-MM-DD + SPACE + NUL */
+	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
 	char *author = NULL;
 	wchar_t *wlogmsg = NULL, *wauthor = NULL;
@@ -1219,7 +1219,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("localtime_r");
-	if (strftime(datebuf, sizeof(datebuf), "%g/%m/%d ", &tm)
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm)
 	    >= sizeof(datebuf))
 		return got_error(GOT_ERR_NO_SPACE);
 
@@ -1491,7 +1491,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	char *refs_str = NULL;
 	wchar_t *wline;
 	struct tog_color *tc;
-	static const size_t date_display_cols = 9;
+	static const size_t date_display_cols = 12;
 
 	entry = first;
 	ncommits = 0;
