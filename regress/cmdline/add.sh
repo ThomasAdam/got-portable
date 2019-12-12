@@ -52,7 +52,7 @@ function test_double_add {
 	echo "new file" > $testroot/wt/foo
 	(cd $testroot/wt && got add foo > /dev/null)
 
-	(cd $testroot/wt && got add foo)
+	(cd $testroot/wt && got add foo > $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got add failed unexpectedly" >&2
@@ -60,6 +60,12 @@ function test_double_add {
 		return 1
 	fi
 
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
 	test_done "$testroot" "$ret"
 }
 

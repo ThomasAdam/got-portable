@@ -2776,7 +2776,6 @@ done:
 struct schedule_addition_args {
 	struct got_worktree *worktree;
 	struct got_fileindex *fileindex;
-	const char *ondisk_path;
 	got_worktree_checkout_cb progress_cb;
 	void *progress_arg;
 	struct got_repository *repo;
@@ -2791,37 +2790,32 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie;
 	struct stat sb;
-	char *path = NULL;
+	char *ondisk_path;
+
+	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+	    relpath) == -1)
+		return got_error_from_errno("asprintf");
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie) {
-		err = get_file_status(&status, &sb, ie, a->ondisk_path,
+		err = get_file_status(&status, &sb, ie, ondisk_path,
 		    a->repo);
 		if (err)
-			return err;
+			goto done;
 		/* Re-adding an existing entry is a no-op. */
 		if (status == GOT_STATUS_ADD)
-			return NULL;
-		return got_error_path(relpath, GOT_ERR_FILE_STATUS);
+			goto done;
+		err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
+		if (err)
+			goto done;
 	}
 
-	if (status == GOT_STATUS_UNVERSIONED) {
-		if (lstat(a->ondisk_path, &sb) != 0) {
-			err = got_error_from_errno2("lstat", a->ondisk_path);
-			return err;
-		}
-		if (S_ISDIR(sb.st_mode)) {
-			if (asprintf(&path, "%s/%s",
-			    got_worktree_get_root_path(a->worktree),
-			    relpath) == -1) {
-				err = got_error_from_errno("asprintf");
-				return err;
-			}
-		} else
-			path = strdup(a->ondisk_path);
+	if (status != GOT_STATUS_UNVERSIONED) {
+		err = got_error_path(ondisk_path, GOT_ERR_FILE_STATUS);
+		goto done;
 	}
 
-	err = got_fileindex_entry_alloc(&ie, path, relpath, NULL, NULL);
+	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -2830,12 +2824,13 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 		got_fileindex_entry_free(ie);
 		goto done;
 	}
-
-	free(path);
-	return (*a->progress_cb)(a->progress_arg, GOT_STATUS_ADD, relpath);
 done:
-	free(path);
-	return err;
+	free(ondisk_path);
+	if (err)
+		return err;
+	if (status == GOT_STATUS_ADD)
+		return NULL;
+	return (*a->progress_cb)(a->progress_arg, GOT_STATUS_ADD, relpath);
 }
 
 const struct got_error *
@@ -2865,14 +2860,8 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 	saa.repo = repo;
 
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *ondisk_path;
-		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-		    pe->path) == -1)
-			return got_error_from_errno("asprintf");
-		saa.ondisk_path = ondisk_path;
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 			schedule_addition, &saa, NULL, NULL, no_ignores);
-		free(ondisk_path);
 		if (err)
 			break;
 	}
