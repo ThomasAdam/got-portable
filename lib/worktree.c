@@ -2929,6 +2929,7 @@ struct schedule_deletion_args {
 	void *progress_arg;
 	struct got_repository *repo;
 	int delete_local_mods;
+	int keep_on_disk;
 };
 
 static const struct got_error *
@@ -2977,7 +2978,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 		}
 	}
 
-	if (status != GOT_STATUS_MISSING) {
+	if (!a->keep_on_disk && status != GOT_STATUS_MISSING) {
 		if (dirfd != -1) {
 			if (unlinkat(dirfd, de_name, 0) != 0) {
 				err = got_error_from_errno2("unlinkat",
@@ -3005,7 +3006,7 @@ const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *worktree,
     struct got_pathlist_head *paths, int delete_local_mods,
     got_worktree_delete_cb progress_cb, void *progress_arg,
-    struct got_repository *repo)
+    struct got_repository *repo, int keep_on_disk)
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
@@ -3027,6 +3028,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	sda.progress_arg = progress_arg;
 	sda.repo = repo;
 	sda.delete_local_mods = delete_local_mods;
+	sda.keep_on_disk = keep_on_disk;
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,

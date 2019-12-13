@@ -242,8 +242,89 @@ function test_rm_directory {
 	test_done "$testroot" "$ret"
 }
 
+function test_rm_directory_keep_files {
+	local testroot=`test_init rm_directory`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm . > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	echo "got: removing directories requires -R option" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm -k -R . > $testroot/stdout)
+
+	echo 'D  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'D  gamma/delta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got st . > $testroot/stdout)
+
+	echo 'D  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	echo 'D  gamma/delta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "keep" > /dev/null)
+	(cd $testroot/wt && got st . > $testroot/stdout)
+
+	echo '?  alpha' > $testroot/stdout.expected
+	echo '?  beta' >> $testroot/stdout.expected
+	echo '?  epsilon/zeta' >> $testroot/stdout.expected
+	echo '?  gamma/delta' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rm_basic
 run_test test_rm_with_local_mods
 run_test test_double_rm
 run_test test_rm_and_add_elsewhere
 run_test test_rm_directory
+run_test test_rm_directory_keep_files

@@ -4296,7 +4296,7 @@ done:
 __dead static void
 usage_remove(void)
 {
-	fprintf(stderr, "usage: %s remove [-f] [-R] file-path ...\n",
+	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] file-path ...\n",
 	    getprogname());
 	exit(1);
 }
@@ -4324,14 +4324,17 @@ cmd_remove(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, delete_local_mods = 0, can_recurse = 0;
+	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "fR")) != -1) {
+	while ((ch = getopt(argc, argv, "fkR")) != -1) {
 		switch (ch) {
 		case 'f':
 			delete_local_mods = 1;
+			break;
+		case 'k':
+			keep_on_disk = 1;
 			break;
 		case 'R':
 			can_recurse = 1;
@@ -4406,7 +4409,7 @@ cmd_remove(int argc, char *argv[])
 	}
 
 	error = got_worktree_schedule_delete(worktree, &paths,
-	    delete_local_mods, print_remove_status, NULL, repo);
+	    delete_local_mods, print_remove_status, NULL, repo, keep_on_disk);
 	if (error)
 		goto done;
 done:
