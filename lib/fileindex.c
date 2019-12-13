@@ -1003,7 +1003,8 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			    strlen(path) + 1 + de->d_namlen);
 			free(de_path);
 			if (cmp == 0) {
-				err = cb->diff_old_new(cb_arg, *ie, de, path);
+				err = cb->diff_old_new(cb_arg, *ie, de, path,
+				    dirfd);
 				if (err)
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
@@ -1015,7 +1016,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
 			} else {
-				err = cb->diff_new(cb_arg, de, path);
+				err = cb->diff_new(cb_arg, de, path, dirfd);
 				if (err)
 					break;
 				err = walk_dir(&dle, fileindex, ie, dle, dirfd,
@@ -1030,7 +1031,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
 			de = dle->data;
-			err = cb->diff_new(cb_arg, de, path);
+			err = cb->diff_new(cb_arg, de, path, dirfd);
 			if (err)
 				break;
 			err = walk_dir(&dle, fileindex, ie, dle, dirfd, path,

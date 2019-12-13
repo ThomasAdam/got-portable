@@ -1107,7 +1107,7 @@ get_staged_status(struct got_fileindex_entry *ie)
 static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
-    struct got_repository *repo)
+    int dirfd, const char *de_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id id;
@@ -1121,9 +1121,20 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	*status = GOT_STATUS_NO_CHANGE;
 
-	fd = open(abspath, O_RDONLY | O_NOFOLLOW);
-	if (fd == -1 && errno != ENOENT)
-		return got_error_from_errno2("open", abspath);
+	/*
+	 * Whenever the caller provides a directory descriptor and a
+	 * directory entry name for the file, use them! This prevents
+	 * race conditions if filesystem paths change beneath our feet.
+	 */
+	if (dirfd != -1) {
+		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1 && errno != ENOENT)
+			return got_error_from_errno2("openat", abspath);
+	} else {
+		fd = open(abspath, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1 && errno != ENOENT)
+			return got_error_from_errno2("open", abspath);
+	}
 	if (fd == -1 || fstat(fd, sb) == -1) {
 		if (errno == ENOENT) {
 			if (got_fileindex_entry_has_file_on_disk(ie))
@@ -1253,7 +1264,8 @@ update_blob(struct got_worktree *worktree,
 			err = got_error_path(ie->path, GOT_ERR_FILE_STAGED);
 			goto done;
 		}
-		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
+		    repo);
 		if (err)
 			goto done;
 		if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
@@ -1405,7 +1417,7 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	    == -1)
 		return got_error_from_errno("asprintf");
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, repo);
 	if (err)
 		return err;
 
@@ -2037,7 +2049,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    path2) == -1)
 			return got_error_from_errno("asprintf");
 
-		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
+		    repo);
 		if (err)
 			goto done;
 
@@ -2068,7 +2081,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    path1) == -1)
 			return got_error_from_errno("asprintf");
 
-		err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
+		    repo);
 		if (err)
 			goto done;
 
@@ -2117,7 +2131,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    strlen(path2));
 		if (ie) {
 			err = get_file_status(&status, &sb, ie, ondisk_path,
-			    repo);
+			    -1, NULL, repo);
 			if (err)
 				goto done;
 			if (status != GOT_STATUS_NO_CHANGE &&
@@ -2189,7 +2203,7 @@ check_merge_ok(void *arg, struct got_fileindex_entry *ie)
 		return got_error_from_errno("asprintf");
 
 	/* Reject merges into a work tree with conflicted files. */
-	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, a->repo);
 	if (err)
 		return err;
 	if (status == GOT_STATUS_CONFLICT)
@@ -2321,6 +2335,7 @@ struct diff_dir_cb_arg {
 
 static const struct got_error *
 report_file_status(struct got_fileindex_entry *ie, const char *abspath,
+    int dirfd, const char *de_name,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo, int report_unchanged)
 {
@@ -2332,7 +2347,7 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	struct got_object_id *blob_idp = NULL, *commit_idp = NULL;
 	struct got_object_id *staged_blob_idp = NULL;
 
-	err = get_file_status(&status, &sb, ie, abspath, repo);
+	err = get_file_status(&status, &sb, ie, abspath, dirfd, de_name, repo);
 	if (err)
 		return err;
 
@@ -2361,7 +2376,7 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 
 static const struct got_error *
 status_old_new(void *arg, struct got_fileindex_entry *ie,
-    struct dirent *de, const char *parent_path)
+    struct dirent *de, const char *parent_path, int dirfd)
 {
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
@@ -2385,8 +2400,8 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 			return got_error_from_errno("asprintf");
 	}
 
-	err = report_file_status(ie, abspath, a->status_cb, a->status_arg,
-	    a->repo, a->report_unchanged);
+	err = report_file_status(ie, abspath, dirfd, de->d_name,
+	    a->status_cb, a->status_arg, a->repo, a->report_unchanged);
 	free(abspath);
 	return err;
 }
@@ -2578,7 +2593,7 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 }
 
 static const struct got_error *
-status_new(void *arg, struct dirent *de, const char *parent_path)
+status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 {
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
@@ -2624,8 +2639,8 @@ void *status_arg, struct got_repository *repo, int report_unchanged)
 
 	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
-		return report_file_status(ie, ondisk_path, status_cb,
-		    status_arg, repo, report_unchanged);
+		return report_file_status(ie, ondisk_path, -1, NULL,
+		    status_cb, status_arg, repo, report_unchanged);
 
 	if (lstat(ondisk_path, &sb) == -1) {
 		if (errno != ENOENT)
@@ -2810,7 +2825,7 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie) {
-		err = get_file_status(&status, &sb, ie, ondisk_path,
+		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
 		    a->repo);
 		if (err)
 			goto done;
@@ -2926,7 +2941,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 	    relpath) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, a->repo);
 	if (err)
 		goto done;
 
@@ -4555,7 +4570,7 @@ check_rebase_ok(void *arg, struct got_fileindex_entry *ie)
 		return got_error_from_errno("asprintf");
 
 	/* Reject rebase of a work tree with modified or staged files. */
-	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, a->repo);
 	free(ondisk_path);
 	if (err)
 		return err;
@@ -6460,7 +6475,8 @@ unstage_path(void *arg, unsigned char status,
 			}
 		}
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
-		err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
+		    a->repo);
 		if (err)
 			break;
 		err = (*a->progress_cb)(a->progress_arg, status, relpath);
