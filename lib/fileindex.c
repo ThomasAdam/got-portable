@@ -856,9 +856,6 @@ read_dirlist(struct got_pathlist_head *dirlist, int dirfd, const char *path)
 	struct dirent *dep = NULL;
 	struct dirent *de = NULL;
 
-	if (lseek(dirfd, SEEK_SET, 0) == -1)
-		return got_error_from_errno("lseek");
-
 	dir = fdopendir(dirfd);
 	if (dir == NULL)
 		return got_error_from_errno2("fdopendir", path);
