@@ -1184,8 +1184,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	if (dirfd != -1) {
 		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1)
-			return got_error_from_errno2("openat", abspath);
+		if (fd == -1) {
+			err = got_error_from_errno2("openat", abspath);
+			goto done;
+		}
 	}
 
 	f = fdopen(fd, "r");
