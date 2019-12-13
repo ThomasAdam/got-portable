@@ -139,10 +139,17 @@ got_worktree_merge_files(struct got_worktree *,
     struct got_repository *, got_worktree_checkout_cb, void *,
     got_cancel_cb, void *);
 
-/* A callback function which is invoked to report a path's status. */
+/*
+ * A callback function which is invoked to report a file's status.
+ *
+ * If a valid directory file descriptor and a directory entry name are passed,
+ * these should be used to open the file instead of opening the file by path.
+ * This prevents race conditions if the filesystem is modified concurrently.
+ * If the directory descriptor is not available then its value will be -1.
+ */
 typedef const struct got_error *(*got_worktree_status_cb)(void *,
     unsigned char, unsigned char, const char *, struct got_object_id *,
-    struct got_object_id *, struct got_object_id *);
+    struct got_object_id *, struct got_object_id *, int, const char *);
 
 /*
  * Report the status of paths in the work tree.

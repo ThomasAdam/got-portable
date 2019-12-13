@@ -2371,7 +2371,7 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 	}
 
 	return (*status_cb)(status_arg, status, staged_status,
-	    ie->path, blob_idp, staged_blob_idp, commit_idp);
+	    ie->path, blob_idp, staged_blob_idp, commit_idp, dirfd, de_name);
 }
 
 static const struct got_error *
@@ -2426,7 +2426,7 @@ status_old(void *arg, struct got_fileindex_entry *ie, const char *parent_path)
 	else
 		status = GOT_STATUS_DELETE;
 	return (*a->status_cb)(a->status_arg, status, get_staged_status(ie),
-	    ie->path, &blob_id, NULL, &commit_id);
+	    ie->path, &blob_id, NULL, &commit_id, -1, NULL);
 }
 
 void
@@ -2623,7 +2623,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 	else if (got_path_is_child(path, a->status_path, a->status_path_len)
 	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
-		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 	if (parent_path[0])
 		free(path);
 	return err;
@@ -2646,13 +2646,13 @@ void *status_arg, struct got_repository *repo, int report_unchanged)
 		if (errno != ENOENT)
 			return got_error_from_errno2("lstat", ondisk_path);
 		return (*status_cb)(status_arg, GOT_STATUS_NONEXISTENT,
-		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 		return NULL;
 	}
 
 	if (S_ISREG(sb.st_mode))
 		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED,
-		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL);
+		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 
 	return NULL;
 }
@@ -2811,7 +2811,8 @@ struct schedule_addition_args {
 static const struct got_error *
 schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
     const char *relpath, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	struct schedule_addition_args *a = arg;
 	const struct got_error *err = NULL;
@@ -2825,8 +2826,8 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie) {
-		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
-		    a->repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path, dirfd,
+		    de_name, a->repo);
 		if (err)
 			goto done;
 		/* Re-adding an existing entry is a no-op. */
@@ -2918,7 +2919,7 @@ static const struct got_error *
 schedule_for_deletion(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
 	struct schedule_deletion_args *a = arg;
 	const struct got_error *err = NULL;
@@ -2941,7 +2942,8 @@ schedule_for_deletion(void *arg, unsigned char status,
 	    relpath) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, a->repo);
+	err = get_file_status(&status, &sb, ie, ondisk_path, dirfd, de_name,
+	    a->repo);
 	if (err)
 		goto done;
 
@@ -2959,9 +2961,17 @@ schedule_for_deletion(void *arg, unsigned char status,
 		}
 	}
 
-	if (status != GOT_STATUS_MISSING && unlink(ondisk_path) != 0) {
-		err = got_error_from_errno2("unlink", ondisk_path);
-		goto done;
+	if (status != GOT_STATUS_MISSING) {
+		if (dirfd != -1) {
+			if (unlinkat(dirfd, de_name, 0) != 0) {
+				err = got_error_from_errno2("unlinkat",
+				    ondisk_path);
+				goto done;
+			}
+		} else if (unlink(ondisk_path) != 0) {
+			err = got_error_from_errno2("unlink", ondisk_path);
+			goto done;
+		}
 	}
 
 	got_fileindex_entry_mark_deleted_from_disk(ie);
@@ -3223,6 +3233,7 @@ struct revert_file_args {
 static const struct got_error *
 create_patched_content(char **path_outfile, int reverse_patch,
     struct got_object_id *blob_id, const char *path2,
+    int dirfd2, const char *de_name2,
     const char *relpath, struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
@@ -3245,10 +3256,18 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		return err;
 
-	fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
-	if (fd2 == -1) {
-		err = got_error_from_errno2("open", path2);
-		goto done;
+	if (dirfd2 != -1) {
+		fd2 = openat(dirfd2, de_name2, O_RDONLY | O_NOFOLLOW);
+		if (fd2 == -1) {
+			err = got_error_from_errno2("openat", path2);
+			goto done;
+		}
+	} else {
+		fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
+		if (fd2 == -1) {
+			err = got_error_from_errno2("open", path2);
+			goto done;
+		}
 	}
 	if (fstat(fd2, &sb2) == -1) {
 		err = got_error_from_errno2("fstat", path2);
@@ -3353,7 +3372,8 @@ done:
 static const struct got_error *
 revert_file(void *arg, unsigned char status, unsigned char staged_status,
     const char *relpath, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	struct revert_file_args *a = arg;
 	const struct got_error *err = NULL;
@@ -3491,7 +3511,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		if (a->patch_cb && (status == GOT_STATUS_MODIFY ||
 		    status == GOT_STATUS_CONFLICT)) {
 			err = create_patched_content(&path_content, 1, &id,
-			    ondisk_path, ie->path, a->repo,
+			    ondisk_path, dirfd, de_name, ie->path, a->repo,
 			    a->patch_cb, a->patch_arg);
 			if (err || path_content == NULL)
 				break;
@@ -3606,7 +3626,7 @@ static const struct got_error *
 collect_commitables(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
 	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -3659,7 +3679,14 @@ collect_commitables(void *arg, unsigned char status,
 	if (status == GOT_STATUS_DELETE || staged_status == GOT_STATUS_DELETE) {
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	} else {
-		if (lstat(ct->ondisk_path, &sb) != 0) {
+		if (dirfd != -1) {
+			if (fstatat(dirfd, de_name, &sb,
+			    AT_SYMLINK_NOFOLLOW) == -1) {
+				err = got_error_from_errno2("lstat",
+				    ct->ondisk_path);
+				goto done;
+			}
+		} else if (lstat(ct->ondisk_path, &sb) == -1) {
 			err = got_error_from_errno2("lstat", ct->ondisk_path);
 			goto done;
 		}
@@ -3866,7 +3893,7 @@ report_ct_status(struct got_commitable *ct,
 		status = ct->status;
 
 	return (*status_cb)(status_arg, status, GOT_STATUS_NO_CHANGE,
-	    ct_path, ct->blob_id, NULL, NULL);
+	    ct_path, ct->blob_id, NULL, NULL, -1, NULL);
 }
 
 static const struct got_error *
@@ -4823,7 +4850,8 @@ collect_rebase_commit_msg(struct got_pathlist_head *commitable_paths,
 static const struct got_error *
 rebase_status(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	return NULL;
 }
@@ -5949,7 +5977,7 @@ const struct got_error *
 check_stage_ok(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
 	struct check_stage_ok_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -6017,7 +6045,7 @@ static const struct got_error *
 stage_path(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
 	struct stage_path_arg *a = arg;
 	const struct got_error *err = NULL;
@@ -6052,8 +6080,8 @@ stage_path(void *arg, unsigned char status,
 			} else {
 				err = create_patched_content(&path_content, 0,
 				    staged_blob_id ? staged_blob_id : blob_id,
-				    ondisk_path, ie->path, a->repo,
-				    a->patch_cb, a->patch_arg);
+				    ondisk_path, dirfd, de_name, ie->path,
+				    a->repo, a->patch_cb, a->patch_arg);
 				if (err || path_content == NULL)
 					break;
 			}
@@ -6074,7 +6102,7 @@ stage_path(void *arg, unsigned char status,
 			break;
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
 		    get_staged_status(ie), relpath, blob_id,
-		    new_staged_blob_id, NULL);
+		    new_staged_blob_id, NULL, dirfd, de_name);
 		break;
 	case GOT_STATUS_DELETE:
 		if (staged_status == GOT_STATUS_DELETE)
@@ -6098,7 +6126,8 @@ stage_path(void *arg, unsigned char status,
 		if (a->status_cb == NULL)
 			break;
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_NO_CHANGE,
-		    get_staged_status(ie), relpath, NULL, NULL, NULL);
+		    get_staged_status(ie), relpath, NULL, NULL, NULL, dirfd,
+		    de_name);
 		break;
 	case GOT_STATUS_NO_CHANGE:
 		break;
@@ -6363,7 +6392,7 @@ static const struct got_error *
 unstage_path(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
 	const struct got_error *err = NULL;
 	struct unstage_path_arg *a = arg;
@@ -6475,8 +6504,8 @@ unstage_path(void *arg, unsigned char status,
 			}
 		}
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
-		err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL,
-		    a->repo);
+		err = get_file_status(&status, &sb, ie, ondisk_path,
+		    dirfd, de_name, a->repo);
 		if (err)
 			break;
 		err = (*a->progress_cb)(a->progress_arg, status, relpath);

@@ -23,6 +23,7 @@
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <locale.h>
 #include <ctype.h>
@@ -2079,11 +2080,13 @@ struct print_diff_arg {
 static const struct got_error *
 print_diff(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	struct print_diff_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob1 = NULL;
+	int fd = -1;
 	FILE *f2 = NULL;
 	char *abspath = NULL, *label1 = NULL;
 	struct stat sb;
@@ -2162,15 +2165,29 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 			goto done;
 		}
 
-		f2 = fopen(abspath, "r");
+		if (dirfd != -1) {
+			fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
+			if (fd == -1) {
+				err = got_error_from_errno2("openat", abspath);
+				goto done;
+			}
+		} else {
+			fd = open(abspath, O_RDONLY | O_NOFOLLOW);
+			if (fd == -1) {
+				err = got_error_from_errno2("open", abspath);
+				goto done;
+			}
+		}
+		if (fstat(fd, &sb) == -1) {
+			err = got_error_from_errno2("fstat", abspath);
+			goto done;
+		}
+		f2 = fdopen(fd, "r");
 		if (f2 == NULL) {
-			err = got_error_from_errno2("fopen", abspath);
+			err = got_error_from_errno2("fdopen", abspath);
 			goto done;
 		}
-		if (lstat(abspath, &sb) == -1) {
-			err = got_error_from_errno2("lstat", abspath);
-			goto done;
-		}
+		fd = -1;
 	} else
 		sb.st_size = 0;
 
@@ -2179,8 +2196,10 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	free(abspath);
 	return err;
 }
@@ -3026,7 +3045,8 @@ usage_status(void)
 static const struct got_error *
 print_status(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	if (status == staged_status && (status == GOT_STATUS_DELETE))
 		status = GOT_STATUS_NO_CHANGE;
@@ -6844,7 +6864,8 @@ usage_stage(void)
 static const struct got_error *
 print_stage(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id)
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
 {
 	const struct got_error *err = NULL;
 	char *id_str = NULL;
