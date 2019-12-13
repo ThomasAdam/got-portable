@@ -860,6 +860,8 @@ read_dirlist(struct got_pathlist_head *dirlist, int dirfd, const char *path)
 		return got_error_from_errno("lseek");
 
 	dir = fdopendir(dirfd);
+	if (dir == NULL)
+		return got_error_from_errno2("fdopendir", path);
 	for (;;) {
 		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
 		if (de == NULL) {
