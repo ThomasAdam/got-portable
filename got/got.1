@@ -645,7 +645,7 @@ With -R, add files even if they match a
 .Cm got status
 ignore pattern.
 .El
-.It Cm remove Ar file-path ...
+.It Cm remove Oo Fl R Oc Ar file-path ...
 Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
 .Pp
@@ -655,6 +655,13 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl f
 Perform the operation even if a file contains uncommitted modifications.
+.It Fl R
+Permit recursion into directories.
+If this option is not specified,
+.Cm got remove
+will refuse to run if a specified
+.Ar path
+is a directory.
 .El
 .It Cm rm
 Short alias for

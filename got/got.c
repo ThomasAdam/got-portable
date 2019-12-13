@@ -4276,16 +4276,17 @@ done:
 __dead static void
 usage_remove(void)
 {
-	fprintf(stderr, "usage: %s remove [-f] file-path ...\n", getprogname());
+	fprintf(stderr, "usage: %s remove [-f] [-R] file-path ...\n",
+	    getprogname());
 	exit(1);
 }
 
 static const struct got_error *
 print_remove_status(void *arg, unsigned char status,
-    unsigned char staged_status, const char *path,
-    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
-    struct got_object_id *commit_id)
+    unsigned char staged_status, const char *path)
 {
+	while (path[0] == '/')
+		path++;
 	if (status == GOT_STATUS_NONEXISTENT)
 		return NULL;
 	if (status == staged_status && (status == GOT_STATUS_DELETE))
@@ -4303,17 +4304,20 @@ cmd_remove(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, delete_local_mods = 0;
+	int ch, delete_local_mods = 0, can_recurse = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "f")) != -1) {
+	while ((ch = getopt(argc, argv, "fR")) != -1) {
 		switch (ch) {
 		case 'f':
 			delete_local_mods = 1;
 			break;
+		case 'R':
+			can_recurse = 1;
+			break;
 		default:
-			usage_add();
+			usage_remove();
 			/* NOTREACHED */
 		}
 	}
@@ -4351,6 +4355,35 @@ cmd_remove(int argc, char *argv[])
 	error = get_worktree_paths_from_argv(&paths, argc, argv, worktree);
 	if (error)
 		goto done;
+
+	if (!can_recurse) {
+		char *ondisk_path;
+		struct stat sb;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(worktree),
+			       pe->path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (lstat(ondisk_path, &sb) == -1) {
+				if (errno == ENOENT) {
+					free(ondisk_path);
+					continue;
+				}
+				error = got_error_from_errno2("lstat",
+				    ondisk_path);
+				free(ondisk_path);
+				goto done;
+			}
+			free(ondisk_path);
+			if (S_ISDIR(sb.st_mode)) {
+				error = got_error_msg(GOT_ERR_BAD_PATH,
+				    "removing directories requires -R option");
+				goto done;
+			}
+		}
+	}
 
 	error = got_worktree_schedule_delete(worktree, &paths,
 	    delete_local_mods, print_remove_status, NULL, repo);

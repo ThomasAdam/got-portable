@@ -104,6 +104,10 @@ const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
 typedef const struct got_error *(*got_worktree_checkout_cb)(void *,
     unsigned char, const char *);
 
+/* A callback function which is invoked when a path is removed. */
+typedef const struct got_error *(*got_worktree_delete_cb)(void *,
+    unsigned char, unsigned char, const char *);
+
 /*
  * Attempt to check out files into a work tree from its associated repository
  * and path prefix, and update the work tree's file index accordingly.
@@ -168,7 +172,7 @@ const struct got_error *got_worktree_schedule_add(struct got_worktree *,
  */
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *,
-    struct got_pathlist_head *, int, got_worktree_status_cb, void *,
+    struct got_pathlist_head *, int, got_worktree_delete_cb, void *,
     struct got_repository *);
 
 /* A callback function which is used to select or reject a patch. */

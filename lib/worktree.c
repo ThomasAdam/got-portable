@@ -2308,12 +2308,13 @@ struct diff_dir_cb_arg {
     void *cancel_arg;
     /* A pathlist containing per-directory pathlists of ignore patterns. */
     struct got_pathlist_head ignores;
+    int report_unchanged;
 };
 
 static const struct got_error *
 report_file_status(struct got_fileindex_entry *ie, const char *abspath,
     got_worktree_status_cb status_cb, void *status_arg,
-    struct got_repository *repo)
+    struct got_repository *repo, int report_unchanged)
 {
 	const struct got_error *err = NULL;
 	unsigned char status = GOT_STATUS_NO_CHANGE;
@@ -2328,7 +2329,7 @@ report_file_status(struct got_fileindex_entry *ie, const char *abspath,
 		return err;
 
 	if (status == GOT_STATUS_NO_CHANGE &&
-	    staged_status == GOT_STATUS_NO_CHANGE)
+	    staged_status == GOT_STATUS_NO_CHANGE && !report_unchanged)
 		return NULL;
 
 	if (got_fileindex_entry_has_blob(ie)) {
@@ -2377,7 +2378,7 @@ status_old_new(void *arg, struct got_fileindex_entry *ie,
 	}
 
 	err = report_file_status(ie, abspath, a->status_cb, a->status_arg,
-	    a->repo);
+	    a->repo, a->report_unchanged);
 	free(abspath);
 	return err;
 }
@@ -2608,7 +2609,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path)
 static const struct got_error *
 report_single_file_status(const char *path, const char *ondisk_path,
 struct got_fileindex *fileindex, got_worktree_status_cb status_cb,
-void *status_arg, struct got_repository *repo)
+void *status_arg, struct got_repository *repo, int report_unchanged)
 {
 	struct got_fileindex_entry *ie;
 	struct stat sb;
@@ -2616,7 +2617,7 @@ void *status_arg, struct got_repository *repo)
 	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
 		return report_file_status(ie, ondisk_path, status_cb,
-		    status_arg, repo);
+		    status_arg, repo, report_unchanged);
 
 	if (lstat(ondisk_path, &sb) == -1) {
 		if (errno != ENOENT)
@@ -2637,7 +2638,8 @@ static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
-    got_cancel_cb cancel_cb, void *cancel_arg, int no_ignores)
+    got_cancel_cb cancel_cb, void *cancel_arg, int no_ignores,
+    int report_unchanged)
 {
 	const struct got_error *err = NULL;
 	DIR *workdir = NULL;
@@ -2655,7 +2657,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 			err = got_error_from_errno2("opendir", ondisk_path);
 		else
 			err = report_single_file_status(path, ondisk_path,
-			    fileindex, status_cb, status_arg, repo);
+			    fileindex, status_cb, status_arg, repo,
+			    report_unchanged);
 	} else {
 		fdiff_cb.diff_old_new = status_old_new;
 		fdiff_cb.diff_old = status_old;
@@ -2669,6 +2672,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.status_arg = status_arg;
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
+		arg.report_unchanged = report_unchanged;
 		TAILQ_INIT(&arg.ignores);
 		if (!no_ignores) {
 			err = add_ignores(&arg.ignores, worktree->root_path,
@@ -2706,7 +2710,7 @@ got_worktree_status(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			status_cb, status_arg, cancel_cb, cancel_arg, 0);
+			status_cb, status_arg, cancel_cb, cancel_arg, 0, 0);
 		if (err)
 			break;
 	}
@@ -2861,7 +2865,7 @@ got_worktree_schedule_add(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			schedule_addition, &saa, NULL, NULL, no_ignores);
+			schedule_addition, &saa, NULL, NULL, no_ignores, 0);
 		if (err)
 			break;
 	}
@@ -2878,18 +2882,28 @@ done:
 	return err;
 }
 
+struct schedule_deletion_args {
+	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
+	got_worktree_delete_cb progress_cb;
+	void *progress_arg;
+	struct got_repository *repo;
+	int delete_local_mods;
+};
+
 static const struct got_error *
-schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
-    const char *relpath, int delete_local_mods,
-    got_worktree_status_cb status_cb, void *status_arg,
-    struct got_repository *repo)
+schedule_for_deletion(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
 {
+	struct schedule_deletion_args *a = arg;
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie = NULL;
-	unsigned char status, staged_status;
 	struct stat sb;
+	char *ondisk_path;
 
-	ie = got_fileindex_entry_get(fileindex, relpath, strlen(relpath));
+	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
 		return got_error(GOT_ERR_BAD_PATH);
 
@@ -2900,37 +2914,55 @@ schedule_for_deletion(const char *ondisk_path, struct got_fileindex *fileindex,
 		return got_error_path(relpath, GOT_ERR_FILE_STAGED);
 	}
 
-	err = get_file_status(&status, &sb, ie, ondisk_path, repo);
+	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
+	    relpath) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = get_file_status(&status, &sb, ie, ondisk_path, a->repo);
 	if (err)
-		return err;
+		goto done;
 
 	if (status != GOT_STATUS_NO_CHANGE) {
 		if (status == GOT_STATUS_DELETE)
-			return NULL;
-		if (status == GOT_STATUS_MODIFY && !delete_local_mods)
-			return got_error_path(relpath, GOT_ERR_FILE_MODIFIED);
+			goto done;
+		if (status == GOT_STATUS_MODIFY && !a->delete_local_mods) {
+			err = got_error_path(relpath, GOT_ERR_FILE_MODIFIED);
+			goto done;
+		}
 		if (status != GOT_STATUS_MODIFY &&
-		    status != GOT_STATUS_MISSING)
-			return got_error_path(relpath, GOT_ERR_FILE_STATUS);
+		    status != GOT_STATUS_MISSING) {
+			err = got_error_path(relpath, GOT_ERR_FILE_STATUS);
+			goto done;
+		}
 	}
 
-	if (status != GOT_STATUS_MISSING && unlink(ondisk_path) != 0)
-		return got_error_from_errno2("unlink", ondisk_path);
+	if (status != GOT_STATUS_MISSING && unlink(ondisk_path) != 0) {
+		err = got_error_from_errno2("unlink", ondisk_path);
+		goto done;
+	}
 
 	got_fileindex_entry_mark_deleted_from_disk(ie);
-	return report_file_status(ie, ondisk_path, status_cb, status_arg, repo);
+done:
+	free(ondisk_path);
+	if (err)
+		return err;
+	if (status == GOT_STATUS_DELETE)
+		return NULL;
+	return (*a->progress_cb)(a->progress_arg, GOT_STATUS_DELETE,
+	    staged_status, relpath);
 }
 
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *worktree,
     struct got_pathlist_head *paths, int delete_local_mods,
-    got_worktree_status_cb status_cb, void *status_arg,
+    got_worktree_delete_cb progress_cb, void *progress_arg,
     struct got_repository *repo)
 {
 	struct got_fileindex *fileindex = NULL;
 	char *fileindex_path = NULL;
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
+	struct schedule_deletion_args sda;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -2940,14 +2972,16 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
+	sda.worktree = worktree;
+	sda.fileindex = fileindex;
+	sda.progress_cb = progress_cb;
+	sda.progress_arg = progress_arg;
+	sda.repo = repo;
+	sda.delete_local_mods = delete_local_mods;
+
 	TAILQ_FOREACH(pe, paths, entry) {
-		char *ondisk_path;
-		if (asprintf(&ondisk_path, "%s/%s", worktree->root_path,
-		    pe->path) == -1)
-			return got_error_from_errno("asprintf");
-		err = schedule_for_deletion(ondisk_path, fileindex, pe->path,
-		    delete_local_mods, status_cb, status_arg, repo);
-		free(ondisk_path);
+		err = worktree_status(worktree, pe->path, fileindex, repo,
+			schedule_for_deletion, &sda, NULL, NULL, 0, 1);
 		if (err)
 			break;
 	}
@@ -3508,7 +3542,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.repo = repo;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    revert_file, &rfa, NULL, NULL, 0);
+		    revert_file, &rfa, NULL, NULL, 0, 0);
 		if (err)
 			break;
 	}
@@ -4421,7 +4455,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.have_staged_files = have_staged_files;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL, 0);
+		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -4979,13 +5013,14 @@ rebase_commit(struct got_object_id **new_commit_id,
 		}
 		TAILQ_FOREACH(pe, merged_paths, entry) {
 			err = worktree_status(worktree, pe->path, fileindex,
-			    repo, collect_commitables, &cc_arg, NULL, NULL, 0);
+			    repo, collect_commitables, &cc_arg, NULL, NULL, 0,
+			    0);
 			if (err)
 				goto done;
 		}
 	} else {
 		err = worktree_status(worktree, "", fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL, 0);
+		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -5293,7 +5328,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 0);
+	    revert_file, &rfa, NULL, NULL, 0, 0);
 	if (err)
 		goto sync;
 
@@ -5646,7 +5681,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 0);
+	    revert_file, &rfa, NULL, NULL, 0, 0);
 	if (err)
 		goto sync;
 
@@ -6102,7 +6137,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	oka.have_changes = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    check_stage_ok, &oka, NULL, NULL, 0);
+		    check_stage_ok, &oka, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -6121,7 +6156,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.staged_something = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    stage_path, &spa, NULL, NULL, 0);
+		    stage_path, &spa, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
@@ -6472,7 +6507,7 @@ got_worktree_unstage(struct got_worktree *worktree,
 	upa.patch_arg = patch_arg;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    unstage_path, &upa, NULL, NULL, 0);
+		    unstage_path, &upa, NULL, NULL, 0, 0);
 		if (err)
 			goto done;
 	}
