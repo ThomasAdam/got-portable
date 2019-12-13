@@ -1127,24 +1127,25 @@ get_file_status(unsigned char *status, struct stat *sb,
 	 * race conditions if filesystem paths change beneath our feet.
 	 */
 	if (dirfd != -1) {
-		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1 && errno != ENOENT)
-			return got_error_from_errno2("openat", abspath);
+		if (fstatat(dirfd, de_name, sb, AT_SYMLINK_NOFOLLOW) == -1) {
+			err = got_error_from_errno2("fstatat", abspath);
+			goto done;
+		}
 	} else {
 		fd = open(abspath, O_RDONLY | O_NOFOLLOW);
 		if (fd == -1 && errno != ENOENT)
 			return got_error_from_errno2("open", abspath);
-	}
-	if (fd == -1 || fstat(fd, sb) == -1) {
-		if (errno == ENOENT) {
-			if (got_fileindex_entry_has_file_on_disk(ie))
-				*status = GOT_STATUS_MISSING;
-			else
-				*status = GOT_STATUS_DELETE;
+		if (fd == -1 || fstat(fd, sb) == -1) {
+			if (errno == ENOENT) {
+				if (got_fileindex_entry_has_file_on_disk(ie))
+					*status = GOT_STATUS_MISSING;
+				else
+					*status = GOT_STATUS_DELETE;
+				goto done;
+			}
+			err = got_error_from_errno2("fstat", abspath);
 			goto done;
 		}
-		err = got_error_from_errno2("fstat", abspath);
-		goto done;
 	}
 
 	if (!S_ISREG(sb->st_mode)) {
@@ -1173,6 +1174,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
 	if (err)
 		goto done;
+
+	if (dirfd != -1) {
+		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1 && errno != ENOENT)
+			return got_error_from_errno2("openat", abspath);
+	}
 
 	f = fdopen(fd, "r");
 	if (f == NULL) {
