@@ -3682,7 +3682,7 @@ collect_commitables(void *arg, unsigned char status,
 		if (dirfd != -1) {
 			if (fstatat(dirfd, de_name, &sb,
 			    AT_SYMLINK_NOFOLLOW) == -1) {
-				err = got_error_from_errno2("lstat",
+				err = got_error_from_errno2("fstatat",
 				    ct->ondisk_path);
 				goto done;
 			}
