@@ -2650,7 +2650,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
     int report_unchanged)
 {
 	const struct got_error *err = NULL;
-	DIR *workdir = NULL;
+	int fd = -1;
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
@@ -2659,10 +2659,10 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
 		return got_error_from_errno("asprintf");
 
-	workdir = opendir(ondisk_path);
-	if (workdir == NULL) {
+	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+	if (fd == -1) {
 		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES)
-			err = got_error_from_errno2("opendir", ondisk_path);
+			err = got_error_from_errno2("open", ondisk_path);
 		else
 			err = report_single_file_status(path, ondisk_path,
 			    fileindex, status_cb, status_arg, repo,
@@ -2690,13 +2690,13 @@ worktree_status(struct got_worktree *worktree, const char *path,
 				    worktree->root_path, path, ".gitignore");
 		}
 		if (err == NULL)
-			err = got_fileindex_diff_dir(fileindex, workdir,
+			err = got_fileindex_diff_dir(fileindex, fd,
 			    worktree->root_path, path, repo, &fdiff_cb, &arg);
 		free_ignores(&arg.ignores);
 	}
 
-	if (workdir)
-		closedir(workdir);
+	if (fd != -1 && close(fd) != 0 && err == NULL)
+		err = got_error_from_errno("close");
 	free(ondisk_path);
 	return err;
 }

@@ -149,7 +149,7 @@ struct got_fileindex_diff_dir_cb {
 	got_fileindex_diff_dir_old_cb diff_old;
 	got_fileindex_diff_dir_new_cb diff_new;
 };
-const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, DIR *,
+const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, int,
     const char *, const char *, struct got_repository *,
     struct got_fileindex_diff_dir_cb *, void *);
 
