@@ -1112,6 +1112,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 	const struct got_error *err = NULL;
 	struct got_object_id id;
 	size_t hdrlen;
+	int fd = -1;
 	FILE *f = NULL;
 	uint8_t fbuf[8192];
 	struct got_blob_object *blob = NULL;
@@ -1120,33 +1121,37 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	*status = GOT_STATUS_NO_CHANGE;
 
-	if (lstat(abspath, sb) == -1) {
+	fd = open(abspath, O_RDONLY | O_NOFOLLOW);
+	if (fd == -1 && errno != ENOENT)
+		return got_error_from_errno2("open", abspath);
+	if (fd == -1 || fstat(fd, sb) == -1) {
 		if (errno == ENOENT) {
 			if (got_fileindex_entry_has_file_on_disk(ie))
 				*status = GOT_STATUS_MISSING;
 			else
 				*status = GOT_STATUS_DELETE;
-			return NULL;
+			goto done;
 		}
-		return got_error_from_errno2("lstat", abspath);
+		err = got_error_from_errno2("fstat", abspath);
+		goto done;
 	}
 
 	if (!S_ISREG(sb->st_mode)) {
 		*status = GOT_STATUS_OBSTRUCTED;
-		return NULL;
+		goto done;
 	}
 
 	if (!got_fileindex_entry_has_file_on_disk(ie)) {
 		*status = GOT_STATUS_DELETE;
-		return NULL;
+		goto done;
 	} else if (!got_fileindex_entry_has_blob(ie) &&
 	    staged_status != GOT_STATUS_ADD) {
 		*status = GOT_STATUS_ADD;
-		return NULL;
+		goto done;
 	}
 
 	if (!stat_info_differs(ie, sb))
-		return NULL;
+		goto done;
 
 	if (staged_status == GOT_STATUS_MODIFY ||
 	    staged_status == GOT_STATUS_ADD)
@@ -1156,13 +1161,14 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
 	if (err)
-		return err;
+		goto done;
 
-	f = fopen(abspath, "r");
+	f = fdopen(fd, "r");
 	if (f == NULL) {
 		err = got_error_from_errno2("fopen", abspath);
 		goto done;
 	}
+	fd = -1;
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	for (;;) {
 		const uint8_t *bbuf = got_object_blob_get_read_buf(blob);
@@ -1206,6 +1212,8 @@ done:
 		got_object_blob_close(blob);
 	if (f)
 		fclose(f);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", abspath);
 	return err;
 }
 
