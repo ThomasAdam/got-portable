@@ -1211,7 +1211,7 @@ done:
 	if (blob)
 		got_object_blob_close(blob);
 	if (f != NULL && fclose(f) == EOF && err == NULL)
-		fclose(f);
+		err = got_error_from_errno2("fclose", abspath);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", abspath);
 	return err;
