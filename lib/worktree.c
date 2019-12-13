@@ -1128,6 +1128,13 @@ get_file_status(unsigned char *status, struct stat *sb,
 	 */
 	if (dirfd != -1) {
 		if (fstatat(dirfd, de_name, sb, AT_SYMLINK_NOFOLLOW) == -1) {
+			if (errno == ENOENT) {
+				if (got_fileindex_entry_has_file_on_disk(ie))
+					*status = GOT_STATUS_MISSING;
+				else
+					*status = GOT_STATUS_DELETE;
+				goto done;
+			}
 			err = got_error_from_errno2("fstatat", abspath);
 			goto done;
 		}
@@ -1177,7 +1184,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	if (dirfd != -1) {
 		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1 && errno != ENOENT)
+		if (fd == -1)
 			return got_error_from_errno2("openat", abspath);
 	}
 
