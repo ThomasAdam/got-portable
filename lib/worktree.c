@@ -704,11 +704,11 @@ check_files_equal(int *same, const char *f1_path, const char *f2_path)
 
 	f1 = fopen(f1_path, "r");
 	if (f1 == NULL)
-		return got_error_from_errno2("open", f1_path);
+		return got_error_from_errno2("fopen", f1_path);
 
 	f2 = fopen(f2_path, "r");
 	if (f2 == NULL) {
-		err = got_error_from_errno2("open", f2_path);
+		err = got_error_from_errno2("fopen", f2_path);
 		goto done;
 	}
 
@@ -1192,7 +1192,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 
 	f = fdopen(fd, "r");
 	if (f == NULL) {
-		err = got_error_from_errno2("fopen", abspath);
+		err = got_error_from_errno2("fdopen", abspath);
 		goto done;
 	}
 	fd = -1;
@@ -3323,7 +3323,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 
 	f2 = fdopen(fd2, "r");
 	if (f2 == NULL) {
-		err = got_error_from_errno2("fopen", path2);
+		err = got_error_from_errno2("fdopen", path2);
 		goto done;
 	}
 	fd2 = -1;
