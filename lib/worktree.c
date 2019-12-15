@@ -802,8 +802,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 			goto done;
 	}
 
-	if (chmod(merged_path, st_mode) != 0) {
-		err = got_error_from_errno2("chmod", merged_path);
+	if (fchmod(merged_fd, st_mode) != 0) {
+		err = got_error_from_errno2("fchmod", merged_path);
 		goto done;
 	}
 
