@@ -810,11 +810,13 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (rename(merged_path, ondisk_path) != 0) {
 		err = got_error_from_errno3("rename", merged_path,
 		    ondisk_path);
-		unlink(merged_path);
 		goto done;
 	}
-
 done:
+	if (err) {
+		if (merged_path)
+			unlink(merged_path);
+	}
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
 	if (f_orig && fclose(f_orig) != 0 && err == NULL)
