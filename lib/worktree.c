@@ -2651,10 +2651,12 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 	}
 
 	if (de->d_type == DT_DIR) {
-		int subdirfd;
-		subdirfd = openat(dirfd, de->d_name,
+		int subdirfd = openat(dirfd, de->d_name,
 		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
-		if (subdirfd != -1) {
+		if (subdirfd == -1) {
+			if (errno != ENOENT && errno != EACCES)
+				err = got_error_from_errno2("openat", path);
+		} else {
 			err = add_ignores(&a->ignores, a->worktree->root_path,
 			    path, subdirfd, ".cvsignore");
 			if (err == NULL)
