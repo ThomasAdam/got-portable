@@ -2584,26 +2584,47 @@ match_ignores(struct got_pathlist_head *ignores, const char *path)
 
 static const struct got_error *
 add_ignores(struct got_pathlist_head *ignores, const char *root_path,
-    const char *path, const char *ignores_filename)
+    const char *path, int dirfd, const char *ignores_filename)
 {
 	const struct got_error *err = NULL;
 	char *ignorespath;
+	int fd = -1;
 	FILE *ignoresfile = NULL;
 
 	if (asprintf(&ignorespath, "%s/%s%s%s", root_path, path,
 	    path[0] ? "/" : "", ignores_filename) == -1)
 		return got_error_from_errno("asprintf");
 
-	ignoresfile = fopen(ignorespath, "r");
-	if (ignoresfile == NULL) {
-		if (errno != ENOENT && errno != EACCES)
-			err = got_error_from_errno2("fopen",
-			    ignorespath);
-	} else
-		err = read_ignores(ignores, path, ignoresfile);
+	if (dirfd != -1) {
+		fd = openat(dirfd, ignores_filename, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1) {
+			if (errno != ENOENT && errno != EACCES)
+				err = got_error_from_errno2("openat",
+				    ignorespath);
+		} else {
+			ignoresfile = fdopen(fd, "r");
+			if (ignoresfile == NULL) 
+				err = got_error_from_errno2("fdopen",
+				    ignorespath);
+			else {
+				fd = -1;
+				err = read_ignores(ignores, path, ignoresfile);
+			}
+		}
+	} else {
+		ignoresfile = fopen(ignorespath, "r");
+		if (ignoresfile == NULL) {
+			if (errno != ENOENT && errno != EACCES)
+				err = got_error_from_errno2("fopen",
+				    ignorespath);
+		} else
+			err = read_ignores(ignores, path, ignoresfile);
+	}
 
 	if (ignoresfile && fclose(ignoresfile) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", path);
 	free(ignorespath);
 	return err;
 }
@@ -2630,13 +2651,20 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 	}
 
 	if (de->d_type == DT_DIR) {
-		err = add_ignores(&a->ignores, a->worktree->root_path, path,
-		    ".cvsignore");
-		if (err == NULL)
+		int subdirfd;
+		subdirfd = openat(dirfd, de->d_name,
+		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
+		if (subdirfd != -1) {
 			err = add_ignores(&a->ignores, a->worktree->root_path,
-			    path, ".gitignore");
-	}
-	else if (got_path_is_child(path, a->status_path, a->status_path_len)
+			    path, subdirfd, ".cvsignore");
+			if (err == NULL)
+				err = add_ignores(&a->ignores,
+				    a->worktree->root_path, path,
+				    subdirfd, ".gitignore");
+			if (close(subdirfd) == -1 && err == NULL)
+				err = got_error_from_errno2("close", path);
+		}
+	} else if (got_path_is_child(path, a->status_path, a->status_path_len)
 	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
@@ -2715,10 +2743,11 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		TAILQ_INIT(&arg.ignores);
 		if (!no_ignores) {
 			err = add_ignores(&arg.ignores, worktree->root_path,
-			    path, ".cvsignore");
+			    path, fd, ".cvsignore");
 			if (err == NULL)
 				err = add_ignores(&arg.ignores,
-				    worktree->root_path, path, ".gitignore");
+				    worktree->root_path, path, fd,
+				    ".gitignore");
 		}
 		if (err == NULL)
 			err = got_fileindex_diff_dir(fileindex, fd,
