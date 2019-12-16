@@ -4167,7 +4167,7 @@ done:
 __dead static void
 usage_add(void)
 {
-	fprintf(stderr, "usage: %s add [-R] [-I] file-path ...\n",
+	fprintf(stderr, "usage: %s add [-R] [-I] path ...\n",
 	    getprogname());
 	exit(1);
 }
@@ -4296,7 +4296,7 @@ done:
 __dead static void
 usage_remove(void)
 {
-	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] file-path ...\n",
+	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] path ...\n",
 	    getprogname());
 	exit(1);
 }
