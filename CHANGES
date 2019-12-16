@@ -1,3 +1,10 @@
+* got 0.23; 2019-12-16
+- prevent status crawl from racing with paths changing in the filesystem
+- add -k option to 'got remove' to keep files on disk (Tracey Emery)
+- add -R option to 'got remove' for recursive deletion (Tracey Emery)
+- add -I option to 'got add' to disregard ignore patterns (Tracey Emery)
+- show numeric dates in ISO-8601/xkcd-1179 format in 'tog log' and 'got blame'
+
 * got 0.22; 2019-12-01
 - allow empty diff context context (-C0) in 'got diff' (kn@)
 - add '-s search-pattern' option to 'got log' (kn@)
