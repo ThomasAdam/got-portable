@@ -848,17 +848,13 @@ diff_fileindex_dir(struct got_fileindex *, struct got_fileindex_entry **,
     struct got_repository *, struct got_fileindex_diff_dir_cb *, void *);
 
 static const struct got_error *
-read_dirlist(struct got_pathlist_head *dirlist, int dirfd, const char *path)
+read_dirlist(struct got_pathlist_head *dirlist, DIR *dir, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *new = NULL;
-	DIR *dir = NULL;
 	struct dirent *dep = NULL;
 	struct dirent *de = NULL;
 
-	dir = fdopendir(dirfd);
-	if (dir == NULL)
-		return got_error_from_errno2("fdopendir", path);
 	for (;;) {
 		de = malloc(sizeof(struct dirent) + NAME_MAX + 1);
 		if (de == NULL) {
@@ -911,12 +907,13 @@ free_dirlist(struct got_pathlist_head *dirlist)
 
 static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
-    struct got_fileindex_entry **ie, struct got_pathlist_entry *dle, int dirfd,
+    struct got_fileindex_entry **ie, struct got_pathlist_entry *dle, int fd,
     const char *path, const char *rootpath, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = dle->data;
+	DIR *subdir = NULL;
 	int subdirfd = -1;
 
 	*next = NULL;
@@ -937,30 +934,34 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 			return got_error_from_errno("asprintf");
 		}
 
-		subdirfd = openat(dirfd, de->d_name,
+		subdirfd = openat(fd, de->d_name,
 		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
 		if (subdirfd == -1) {
 			if (errno == EACCES) {
 				*next = TAILQ_NEXT(dle, entry);
 				return NULL;
 			}
-			err = got_error_from_errno2("opendir", subdirpath);
+			err = got_error_from_errno2("openat", subdirpath);
 			free(subpath);
 			free(subdirpath);
 			return err;
 		}
 
-		err = read_dirlist(&subdirlist, subdirfd, subdirpath);
+		subdir = fdopendir(subdirfd);
+		if (subdir == NULL)
+			return got_error_from_errno2("fdopendir", path);
+		subdirfd = -1;
+		err = read_dirlist(&subdirlist, subdir, subdirpath);
 		if (err) {
 			free(subpath);
 			free(subdirpath);
-			close(subdirfd);
+			closedir(subdir);
 			return err;
 		}
-		err = diff_fileindex_dir(fileindex, ie, &subdirlist, subdirfd,
-		    rootpath, subpath, repo, cb, cb_arg);
-		if (subdirfd != -1 && close(subdirfd) == -1 && err == NULL)
-			err = got_error_from_errno2("close", subdirpath);
+		err = diff_fileindex_dir(fileindex, ie, &subdirlist,
+		    dirfd(subdir), rootpath, subpath, repo, cb, cb_arg);
+		if (subdir && closedir(subdir) == -1 && err == NULL)
+			err = got_error_from_errno2("closedir", subdirpath);
 		free(subpath);
 		free(subdirpath);
 		free_dirlist(&subdirlist);
@@ -1042,23 +1043,42 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 }
 
 const struct got_error *
-got_fileindex_diff_dir(struct got_fileindex *fileindex, int dirfd,
+got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
     const char *rootpath, const char *path, struct got_repository *repo,
     struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err;
 	struct got_fileindex_entry *ie;
 	struct got_pathlist_head dirlist;
+	int fd2;
+	DIR *dir;
 
 	TAILQ_INIT(&dirlist);
-	err = read_dirlist(&dirlist, dirfd, path);
-	if (err)
+
+	/* 
+	 * Duplicate the file descriptor so we can call closedir() below
+	 * without closing the file descriptor passed in by our caller.
+	 */
+	fd2 = dup(fd);
+	if (fd2 == -1)
+		return got_error_from_errno2("dup", path);
+	dir = fdopendir(fd2);
+	if (dir == NULL)
+		return got_error_from_errno2("fdopendir", path);
+	err = read_dirlist(&dirlist, dir, path);
+	if (err) {
+		closedir(dir);
 		return err;
+	}
+
 	ie = RB_MIN(got_fileindex_tree, &fileindex->entries);
 	while (ie && !got_path_is_child(ie->path, path, strlen(path)))
 		ie = walk_fileindex(fileindex, ie);
-	err = diff_fileindex_dir(fileindex, &ie, &dirlist, dirfd, rootpath,
-	    path, repo, cb, cb_arg);
+	err = diff_fileindex_dir(fileindex, &ie, &dirlist, dirfd(dir),
+	    rootpath, path, repo, cb, cb_arg);
+
+	if (closedir(dir) == -1 && err == NULL)
+		err = got_error_from_errno2("closedir", path);
 	free_dirlist(&dirlist);
 	return err;
 }
