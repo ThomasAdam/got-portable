@@ -36,6 +36,7 @@ struct got_fileindex;
 #define GOT_STATUS_REVERT	'R'
 #define GOT_STATUS_CANNOT_DELETE 'd'
 #define GOT_STATUS_BUMP_BASE	'b'
+#define GOT_STATUS_BASE_REF_ERR	'B'
 
 /*
  * Attempt to initialize a new work tree on disk.

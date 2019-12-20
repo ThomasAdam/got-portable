@@ -804,19 +804,39 @@ usage_checkout(void)
 	exit(1);
 }
 
+static void
+show_worktree_base_ref_warning(void)
+{
+	fprintf(stderr, "%s: warning: could not create a reference "
+	    "to the work tree's base commit; the commit could be "
+	    "garbage-collected by Git; making the repository "
+	    "writable and running 'got update' will prevent this\n",
+	    getprogname());
+}
+
+struct got_checkout_progress_arg {
+	const char *worktree_path;
+	int had_base_commit_ref_error;
+};
+
 static const struct got_error *
 checkout_progress(void *arg, unsigned char status, const char *path)
 {
-	char *worktree_path = arg;
+	struct got_checkout_progress_arg *a = arg;
 
 	/* Base commit bump happens silently. */
 	if (status == GOT_STATUS_BUMP_BASE)
 		return NULL;
 
+	if (status == GOT_STATUS_BASE_REF_ERR) {
+		a->had_base_commit_ref_error = 1;
+		return NULL;
+	}
+
 	while (path[0] == '/')
 		path++;
 
-	printf("%c  %s/%s\n", status, worktree_path, path);
+	printf("%c  %s/%s\n", status, a->worktree_path, path);
 	return NULL;
 }
 
@@ -985,6 +1005,7 @@ cmd_checkout(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int ch, same_path_prefix;
 	struct got_pathlist_head paths;
+	struct got_checkout_progress_arg cpa;
 
 	TAILQ_INIT(&paths);
 
@@ -1140,12 +1161,16 @@ cmd_checkout(int argc, char *argv[])
 	error = got_pathlist_append(&paths, "", NULL);
 	if (error)
 		goto done;
+	cpa.worktree_path = worktree_path;
+	cpa.had_base_commit_ref_error = 0;
 	error = got_worktree_checkout_files(worktree, &paths, repo,
-	    checkout_progress, worktree_path, check_cancelled, NULL);
+	    checkout_progress, &cpa, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
 	printf("Now shut up and hack\n");
+	if (cpa.had_base_commit_ref_error)
+		show_worktree_base_ref_warning();
 
 done:
 	got_pathlist_free(&paths);
@@ -1168,7 +1193,8 @@ update_progress(void *arg, unsigned char status, const char *path)
 {
 	int *did_something = arg;
 
-	if (status == GOT_STATUS_EXISTS)
+	if (status == GOT_STATUS_EXISTS ||
+	    status == GOT_STATUS_BASE_REF_ERR)
 		return NULL;
 
 	*did_something = 1;

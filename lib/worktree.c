@@ -1881,8 +1881,14 @@ checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	struct diff_cb_arg arg;
 
 	err = ref_base_commit(worktree, repo);
-	if (err)
-		goto done;
+	if (err) {
+		if (!(err->code == GOT_ERR_ERRNO && errno == EACCES))
+			goto done;
+		err = (*progress_cb)(progress_arg,
+		    GOT_STATUS_BASE_REF_ERR, worktree->root_path);
+		if (err)
+			return err;
+	}
 
 	err = got_object_open_as_commit(&commit, repo,
 	   worktree->base_commit_id);
