@@ -930,8 +930,8 @@ when the rebase operation continues.
 .Pp
 .Cm got rebase
 will refuse to run if certain preconditions are not met.
-If the work tree contains multiple base commits it must first be updated
-to a single base commit with
+If the work tree is not yet fully updated to the tip commit of its
+branch then the work tree must first be updated with
 .Cm got update .
 If changes have been staged with
 .Cm got stage ,
