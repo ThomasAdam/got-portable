@@ -17,8 +17,7 @@
 struct got_commit_graph;
 
 const struct got_error *got_commit_graph_open(struct got_commit_graph **,
-    struct got_object_id *commit_id, const char *, int,
-    struct got_repository *repo);
+    const char *, int);
 void got_commit_graph_close(struct got_commit_graph *);
 
 const struct got_error *got_commit_graph_iter_start(

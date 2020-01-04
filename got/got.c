@@ -916,7 +916,7 @@ check_same_branch(struct got_object_id *commit_id,
 		goto done;
 	}
 
-	err = got_commit_graph_open(&graph, head_commit_id, "/", 1, repo);
+	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
 		goto done;
 
@@ -1767,8 +1767,7 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
 		return got_error_msg(GOT_ERR_REGEX, search_pattern);
 
-	err = got_commit_graph_open(&graph, root_id, path,
-	    first_parent_traversal, repo);
+	err = got_commit_graph_open(&graph, path, first_parent_traversal);
 	if (err)
 		return err;
 	err = got_commit_graph_iter_start(graph, root_id, repo,
@@ -5353,7 +5352,7 @@ collect_commits(struct got_object_id_queue *commits,
 	struct got_object_qid *qid;
         struct got_object_id *commit_id = initial_commit_id;
 
-	err = got_commit_graph_open(&graph, initial_commit_id, "/", 1, repo);
+	err = got_commit_graph_open(&graph, "/", 1);
 	if (err)
 		return err;
 

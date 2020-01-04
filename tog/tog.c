@@ -2153,8 +2153,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
 	if (err)
 		goto done;
-	err = got_commit_graph_open(&thread_graph, start_id, s->in_repo_path,
-	    0, thread_repo);
+	err = got_commit_graph_open(&thread_graph, s->in_repo_path, 0);
 	if (err)
 		goto done;
 

@@ -237,7 +237,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 
-	err = got_commit_graph_open(&graph, start_commit_id, path, 1, repo);
+	err = got_commit_graph_open(&graph, path, 1);
 	if (err)
 		return err;
 	err = got_commit_graph_iter_start(graph, start_commit_id, repo,
