@@ -480,18 +480,13 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object *commit;
 
 	if (!TAILQ_EMPTY(&graph->iter_list))
 		return got_error(GOT_ERR_ITER_BUSY);
 
-	err = got_object_open_as_commit(&commit, repo, id);
-	if (err)
-		return err;
-
 	err = got_object_idset_add(graph->open_branches, id, NULL);
 	if (err)
-		goto done;
+		return err;
 
 	/* Locate first commit which changed graph->path. */
 	while (graph->iter_node == NULL &&
@@ -499,11 +494,10 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 		err = fetch_commits_from_open_branches(graph, repo,
 		    cancel_cb, cancel_arg);
 		if (err)
-			break;
+			return err;
 	}
-done:
-	got_object_commit_close(commit);
-	return err;
+
+	return NULL;
 }
 
 const struct got_error *
