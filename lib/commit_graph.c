@@ -450,7 +450,9 @@ fetch_commits_from_open_branches(int *nfetched,
 			 * branch. Keep going on other branches.
 			 */
 			err = close_branch(graph, commit_id);
-			break;
+			if (err)
+				break;
+			continue;
 		}
 		if (changed) {
 			add_node_to_iter_list(graph, new_node);
