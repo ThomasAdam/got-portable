@@ -197,10 +197,10 @@ advance_branch(struct got_commit_graph *graph,
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
 		if (qid == NULL ||
-		    got_object_idset_get(graph->open_branches, qid->id))
+		    got_object_idset_contains(graph->open_branches, qid->id))
 			return NULL;
 		return got_object_idset_add(graph->open_branches,
-		    qid->id, node);
+		    qid->id, NULL);
 	}
 
 	/*
@@ -219,7 +219,8 @@ advance_branch(struct got_commit_graph *graph,
 		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
 			struct got_object_id *id;
 
-			if (got_object_idset_get(graph->open_branches, qid->id))
+			if (got_object_idset_contains(graph->open_branches,
+			    qid->id))
 				continue;
 
 			err = got_object_id_by_path(&id, repo, qid->id,
@@ -248,7 +249,7 @@ advance_branch(struct got_commit_graph *graph,
 			 */
 			if (got_object_id_cmp(merged_id, id) == 0) {
 				err = got_object_idset_add(graph->open_branches,
-				    qid->id, node);
+				    qid->id, NULL);
 				free(merged_id);
 				free(id);
 				return err;
@@ -268,21 +269,23 @@ advance_branch(struct got_commit_graph *graph,
 			qid = SIMPLEQ_FIRST(&commit->parent_ids);
 			if (qid == NULL)
 				return NULL;
-			if (got_object_idset_get(graph->open_branches, qid->id))
+			if (got_object_idset_contains(graph->open_branches,
+			    qid->id))
 				return NULL;
-			if (got_object_idset_get(graph->node_ids, qid->id))
+			if (got_object_idset_contains(graph->node_ids,
+			    qid->id))
 				return NULL; /* parent already traversed */
 			return got_object_idset_add(graph->open_branches,
-			    qid->id, node);
+			    qid->id, NULL);
 		}
 	}
 
 	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
-		if (got_object_idset_get(graph->open_branches, qid->id))
+		if (got_object_idset_contains(graph->open_branches, qid->id))
 			continue;
-		if (got_object_idset_get(graph->node_ids, qid->id))
+		if (got_object_idset_contains(graph->node_ids, qid->id))
 			continue; /* parent already traversed */
-		err = got_object_idset_add(graph->open_branches, qid->id, node);
+		err = got_object_idset_add(graph->open_branches, qid->id, NULL);
 		if (err)
 			return err;
 	}
@@ -309,7 +312,7 @@ add_node(struct got_commit_graph_node **new_node,
 	memcpy(&node->id, commit_id, sizeof(node->id));
 	node->timestamp = commit->committer_time;
 
-	err = got_object_idset_add(graph->node_ids, &node->id, node);
+	err = got_object_idset_add(graph->node_ids, &node->id, NULL);
 	if (err)
 		free(node);
 	else
@@ -462,20 +465,11 @@ done:
 	return err;
 }
 
-static const struct got_error *
-free_node_iter(struct got_object_id *id, void *data, void *arg)
-{
-	struct got_commit_graph_node *node = data;
-	free(node);
-	return NULL;
-}
-
 void
 got_commit_graph_close(struct got_commit_graph *graph)
 {
 	if (graph->open_branches)
 		got_object_idset_free(graph->open_branches);
-	got_object_idset_for_each(graph->node_ids, free_node_iter, NULL);
 	if (graph->node_ids)
 		got_object_idset_free(graph->node_ids);
 	free(graph->tips);
@@ -631,7 +625,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		}
 
 		if (id) {
-			if (got_object_idset_get(commit_ids, id)) {
+			if (got_object_idset_contains(commit_ids, id)) {
 				*yca_id = got_object_id_dup(id);
 				if (*yca_id)
 					break;
@@ -639,12 +633,12 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				break;
 
 			}
-			err = got_object_idset_add(commit_ids, id, id);
+			err = got_object_idset_add(commit_ids, id, NULL);
 			if (err)
 				break;
 		}
 		if (id2) {
-			if (got_object_idset_get(commit_ids, id2)) {
+			if (got_object_idset_contains(commit_ids, id2)) {
 				*yca_id = got_object_id_dup(id2);
 				if (*yca_id)
 					break;
@@ -652,7 +646,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 				break;
 
 			}
-			err = got_object_idset_add(commit_ids, id2, id2);
+			err = got_object_idset_add(commit_ids, id2, NULL);
 			if (err)
 				break;
 		}
