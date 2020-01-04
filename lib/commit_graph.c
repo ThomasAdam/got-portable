@@ -52,8 +52,6 @@ struct got_commit_graph_branch_tip {
 	struct got_object_id *commit_id;
 	struct got_commit_object *commit;
 	struct got_commit_graph_node *new_node;
-	int changed;
-	int branch_done;
 };
 
 struct got_commit_graph {
@@ -149,8 +147,7 @@ done:
 
 static void
 add_node_to_iter_list(struct got_commit_graph *graph,
-    struct got_commit_graph_node *node,
-    struct got_commit_graph_node *child_node)
+    struct got_commit_graph_node *node)
 {
 	struct got_commit_graph_node *n, *next;
 
@@ -294,17 +291,16 @@ advance_branch(struct got_commit_graph *graph,
 }
 
 static const struct got_error *
-add_node(struct got_commit_graph_node **new_node, int *changed,
-    int *branch_done, struct got_commit_graph *graph,
-    struct got_object_id *commit_id, struct got_commit_object *commit,
-    struct got_commit_graph_node *child_node, struct got_repository *repo)
+add_node(struct got_commit_graph_node **new_node,
+    struct got_commit_graph *graph,
+    struct got_object_id *commit_id,
+    struct got_commit_object *commit,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *node;
 
 	*new_node = NULL;
-	*changed = 0;
-	*branch_done = 0;
 
 	node = calloc(1, sizeof(*node));
 	if (node == NULL)
@@ -314,32 +310,35 @@ add_node(struct got_commit_graph_node **new_node, int *changed,
 	node->timestamp = commit->committer_time;
 
 	err = got_object_idset_add(graph->node_ids, &node->id, node);
-	if (err) {
+	if (err)
 		free(node);
-		return err;
-	}
+	else
+		*new_node = node;
+	return err;
+}
 
-	err = detect_changed_path(changed, commit, commit_id, graph->path,
-	    repo);
+const struct got_error *
+detect_change(int *changed, int *branch_done, const char *path,
+    struct got_commit_object *commit, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+
+	*changed = 0;
+	*branch_done = 0;
+
+	err = detect_changed_path(changed, commit, commit_id, path, repo);
 	if (err) {
-		if (err->code == GOT_ERR_NO_OBJ) {
-			/*
-			 * History of the path stops here on the current
-			 * branch. Keep going on other branches.
-			 */
-			err = NULL;
-			*branch_done = 1;
-		} else {
-			got_object_idset_remove(NULL, graph->node_ids,
-			    &node->id);
-			free(node);
+		if (err->code != GOT_ERR_NO_OBJ)
 			return err;
-		}
+		/*
+		 * History of the path stops here on the current
+		 * branch. Keep going on other branches.
+		 */
+		err = NULL;
+		*branch_done = 1;
 	}
 
-	if (*changed)
-		add_node_to_iter_list(graph, node, child_node);
-	*new_node = node;
 	return NULL;
 }
 
@@ -394,26 +393,21 @@ static const struct got_error *
 add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 {
 	const struct got_error *err;
-	struct got_commit_graph_node *child_node = data;
 	struct add_branch_tip_arg *a = arg;
 	struct got_commit_graph_node *new_node;
 	struct got_commit_object *commit;
-	int changed, branch_done;
 
 	err = got_object_open_as_commit(&commit, a->repo, commit_id);
 	if (err)
 		return err;
 
-	err = add_node(&new_node, &changed, &branch_done, a->graph,
-	    commit_id, commit, child_node, a->repo);
+	err = add_node(&new_node, a->graph, commit_id, commit, a->repo);
 	if (err)
 		return err;
 
 	a->tips[a->ntips].commit_id = new_node ? &new_node->id : NULL;
 	a->tips[a->ntips].commit = commit;
 	a->tips[a->ntips].new_node = new_node;
-	a->tips[a->ntips].changed = changed;
-	a->tips[a->ntips].branch_done = branch_done;
 	a->ntips++;
 
 	return NULL;
@@ -470,9 +464,16 @@ fetch_commits_from_open_branches(int *nfetched,
 		commit_id = arg.tips[i].commit_id;
 		commit = arg.tips[i].commit;
 		new_node = arg.tips[i].new_node;
-		branch_done = arg.tips[i].branch_done;
-		changed = arg.tips[i].changed;
 
+		err = detect_change(&changed, &branch_done, graph->path,
+		    commit, commit_id, repo);
+		if (err)
+			break;
+		if (changed) {
+			add_node_to_iter_list(graph, new_node);
+			if (changed_id && *changed_id == NULL)
+				*changed_id = commit_id;
+		}
 		if (branch_done)
 			err = close_branch(graph, commit_id);
 		else
@@ -480,8 +481,6 @@ fetch_commits_from_open_branches(int *nfetched,
 			    commit, repo);
 		if (err)
 			break;
-		if (changed && changed_id && *changed_id == NULL)
-			*changed_id = commit_id;
 	}
 done:
 	for (i = 0; i < arg.ntips; i++)
@@ -528,10 +527,16 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (err)
 		return err;
 
-	err = add_node(&start_node, &changed, &branch_done, graph, id,
-	    commit, NULL, repo);
+	err = add_node(&start_node, graph, id, commit, repo);
 	if (err)
 		goto done;
+
+	err = detect_change(&changed, &branch_done, graph->path,
+	    commit, id, repo);
+	if (err)
+		goto done;
+	if (changed)
+		add_node_to_iter_list(graph, start_node);
 
 	err = advance_branch(graph, start_node, id, commit, repo);
 	if (err)
