@@ -389,17 +389,12 @@ add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 }
 
 static const struct got_error *
-fetch_commits_from_open_branches(int *nfetched,
-    struct got_object_id **changed_id, struct got_commit_graph *graph,
+fetch_commits_from_open_branches(struct got_commit_graph *graph,
     struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
 	struct add_branch_tip_arg arg;
 	int i, ntips;
-
-	*nfetched = 0;
-	if (changed_id)
-		*changed_id = NULL;
 
 	ntips = got_object_idset_num_elements(graph->open_branches);
 	if (ntips == 0)
@@ -454,11 +449,8 @@ fetch_commits_from_open_branches(int *nfetched,
 				break;
 			continue;
 		}
-		if (changed) {
+		if (changed)
 			add_node_to_iter_list(graph, new_node);
-			if (changed_id && *changed_id == NULL)
-				*changed_id = commit_id;
-		}
 		err = advance_branch(graph, new_node, commit_id,
 		    commit, repo);
 		if (err)
@@ -467,7 +459,6 @@ fetch_commits_from_open_branches(int *nfetched,
 done:
 	for (i = 0; i < arg.ntips; i++)
 		got_object_commit_close(arg.tips[i].commit);
-	(*nfetched) = arg.ntips;
 	return err;
 }
 
@@ -525,22 +516,16 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 
 	if (!changed) {
 		/* Locate first commit which changed graph->path. */
-		struct got_object_id *changed_id = NULL;
-		while (changed_id == NULL) {
-			int ncommits;
-			err = fetch_commits_from_open_branches(&ncommits,
-			    &changed_id, graph, repo, cancel_cb, cancel_arg);
-			if (err) {
-				got_object_commit_close(commit);
-				return err;
-			}
+		while (graph->iter_node == NULL &&
+		    got_object_idset_num_elements(graph->open_branches) > 0) {
+			err = fetch_commits_from_open_branches(graph, repo,
+			    cancel_cb, cancel_arg);
+			if (err)
+				break;
 		}
-		start_node = got_object_idset_get(graph->node_ids, changed_id);
 	}
 done:
 	got_object_commit_close(commit);
-	if (err == NULL)
-		graph->iter_node = start_node;
 	return err;
 }
 
@@ -569,10 +554,8 @@ got_commit_graph_iter_next(struct got_object_id **id,
 
 	while (TAILQ_NEXT(graph->iter_node, entry) == NULL &&
 	    got_object_idset_num_elements(graph->open_branches) > 0) {
-		int ncommits;
-		struct got_object_id *changed_id;
-		err = fetch_commits_from_open_branches(&ncommits,
-		    &changed_id, graph, repo, cancel_cb, cancel_arg);
+		err = fetch_commits_from_open_branches(graph, repo,
+		    cancel_cb, cancel_arg);
 		if (err)
 			return err;
 	}
