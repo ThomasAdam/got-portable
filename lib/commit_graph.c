@@ -347,7 +347,7 @@ const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
     const char *path, int first_parent_traversal)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 
 	*graph = calloc(1, sizeof(**graph));
 	if (*graph == NULL)
@@ -356,35 +356,30 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	(*graph)->path = strdup(path);
 	if ((*graph)->path == NULL) {
 		err = got_error_from_errno("strdup");
-		free(*graph);
-		*graph = NULL;
-		return err;
+		goto done;
 	}
 
 	(*graph)->node_ids = got_object_idset_alloc();
 	if ((*graph)->node_ids == NULL) {
 		err = got_error_from_errno("got_object_idset_alloc");
-		free((*graph)->path);
-		free(*graph);
-		*graph = NULL;
-		return NULL;
+		goto done;
 	}
 
 	(*graph)->open_branches = got_object_idset_alloc();
 	if ((*graph)->open_branches == NULL) {
 		err = got_error_from_errno("got_object_idset_alloc");
-		got_object_idset_free((*graph)->node_ids);
-		free((*graph)->path);
-		free(*graph);
-		*graph = NULL;
-		return err;
+		goto done;
 	}
 
 	TAILQ_INIT(&(*graph)->iter_list);
 	if (first_parent_traversal)
 		(*graph)->flags |= GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL;
-
-	return NULL;
+done:
+	if (err) {
+		got_commit_graph_close(*graph);
+		*graph = NULL;
+	}
+	return err;
 }
 
 struct add_branch_tip_arg {
@@ -505,9 +500,11 @@ free_node_iter(struct got_object_id *id, void *data, void *arg)
 void
 got_commit_graph_close(struct got_commit_graph *graph)
 {
-	got_object_idset_free(graph->open_branches);
+	if (graph->open_branches)
+		got_object_idset_free(graph->open_branches);
 	got_object_idset_for_each(graph->node_ids, free_node_iter, NULL);
-	got_object_idset_free(graph->node_ids);
+	if (graph->node_ids)
+		got_object_idset_free(graph->node_ids);
 	free(graph->tips);
 	free(graph->path);
 	free(graph);
