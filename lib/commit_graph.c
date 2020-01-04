@@ -60,9 +60,6 @@ struct got_commit_graph {
 	/* The set of all commits we have traversed. */
 	struct got_object_idset *node_ids;
 
-	/* The commit at which traversal began (youngest commit in node_ids). */
-	struct got_commit_graph_node *head_node;
-
 	int flags;
 #define GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL		0x01
 
@@ -388,6 +385,7 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit;
 	int changed, branch_done;
+	struct got_commit_graph_node *node;
 
 	*graph = NULL;
 
@@ -414,10 +412,10 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	if (first_parent_traversal)
 		(*graph)->flags |= GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL;
 
-	err = add_node(&(*graph)->head_node, &changed, &branch_done, *graph,
+	err = add_node(&node, &changed, &branch_done, *graph,
 	    commit_id, commit, NULL, repo);
 	if (err == NULL) {
-		err = advance_branch(*graph, (*graph)->head_node, commit_id,
+		err = advance_branch(*graph, node, commit_id,
 		    commit, repo);
 	}
 	got_object_commit_close(commit);
