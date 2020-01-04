@@ -128,6 +128,7 @@
 #define GOT_ERR_REGEX		112
 #define GOT_ERR_REF_NAME_MINUS	113
 #define GOT_ERR_GITCONFIG_SYNTAX 114
+#define GOT_ERR_REBASE_OUT_OF_DATE 115
 
 static const struct got_error {
 	int code;
@@ -262,6 +263,8 @@ static const struct got_error {
 	{ GOT_ERR_REGEX, "regular expression error" },
 	{ GOT_ERR_REF_NAME_MINUS, "reference name may not start with '-'" },
 	{ GOT_ERR_GITCONFIG_SYNTAX, "gitconfig syntax error" },
+	{ GOT_ERR_REBASE_OUT_OF_DATE, "work tree must be updated before it "
+	    "can be used to rebase a branch" },
 };
 
 /*

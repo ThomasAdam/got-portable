@@ -870,6 +870,76 @@ function test_rebase_forward {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_out_of_date {
+	local testroot=`test_init rebase_out_of_date`
+	local initial_commit=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit1=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified beta on master" > $testroot/repo/beta
+	git_commit $testroot/repo -m "committing to beta on master"
+	local master_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $master_commit1 $testroot/repo $testroot/wt \
+		> /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
+		2> $testroot/stderr)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: work tree must be updated before it can be " \
+		> $testroot/stderr.expected
+	echo "used to rebase a branch" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $master_commit2 (master)" > $testroot/stdout.expected
+	echo "commit $master_commit1" >> $testroot/stdout.expected
+	echo "commit $initial_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -880,3 +950,4 @@ run_test test_rebase_path_prefix
 run_test test_rebase_preserves_logmsg
 run_test test_rebase_no_commits_to_rebase
 run_test test_rebase_forward
+run_test test_rebase_out_of_date

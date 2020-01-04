@@ -4679,6 +4679,7 @@ got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
 	char *fileindex_path = NULL;
 	struct check_rebase_ok_arg ok_arg;
 	struct got_reference *wt_branch = NULL, *branch_ref = NULL;
+	struct got_object_id *wt_branch_tip = NULL;
 
 	*new_base_branch_ref = NULL;
 	*tmp_branch = NULL;
@@ -4715,6 +4716,14 @@ got_worktree_rebase_prepare(struct got_reference **new_base_branch_ref,
 	    0);
 	if (err)
 		goto done;
+
+	err = got_ref_resolve(&wt_branch_tip, repo, wt_branch);
+	if (err)
+		goto done;
+	if (got_object_id_cmp(worktree->base_commit_id, wt_branch_tip) != 0) {
+		err = got_error(GOT_ERR_REBASE_OUT_OF_DATE);
+		goto done;
+	}
 
 	err = got_ref_alloc_symref(new_base_branch_ref,
 	    new_base_branch_ref_name, wt_branch);
@@ -4754,6 +4763,7 @@ done:
 		got_ref_close(branch_ref);
 	if (wt_branch)
 		got_ref_close(wt_branch);
+	free(wt_branch_tip);
 	if (err) {
 		if (*new_base_branch_ref) {
 			got_ref_close(*new_base_branch_ref);
