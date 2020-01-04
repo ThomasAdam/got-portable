@@ -85,10 +85,10 @@ struct got_commit_graph {
 	/* Path of tree entry of interest to the API user. */
 	char *path;
 
-	/* The next commit to return when the API user asks for one. */
-	struct got_commit_graph_node *iter_node;
-
-	/* The graph iteration list contains all nodes in sorted order. */
+	/*
+	 * Nodes which will be passed to the API user next, sorted by
+	 * commit timestmap.
+	 */
 	struct got_commit_graph_iter_list iter_list;
 };
 
@@ -153,11 +153,10 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 
 	if (TAILQ_EMPTY(&graph->iter_list)) {
 		TAILQ_INSERT_HEAD(&graph->iter_list, node, entry);
-		graph->iter_node = node;
 		return;
 	}
 
-	n = graph->iter_node;
+	n = TAILQ_FIRST(&graph->iter_list);
 	/* Ensure that an iteration in progress will see this new commit. */
 	while (n) {
 		next = TAILQ_NEXT(n, entry);
@@ -489,7 +488,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 		return err;
 
 	/* Locate first commit which changed graph->path. */
-	while (graph->iter_node == NULL &&
+	while (TAILQ_EMPTY(&graph->iter_list) &&
 	    got_object_idset_num_elements(graph->open_branches) > 0) {
 		err = fetch_commits_from_open_branches(graph, repo,
 		    cancel_cb, cancel_arg);
@@ -497,7 +496,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 			return err;
 	}
 
-	if (graph->iter_node == NULL) {
+	if (TAILQ_EMPTY(&graph->iter_list)) {
 		const char *path;
 		if (got_path_is_root_dir(graph->path))
 			return got_error_no_obj(id);
@@ -516,24 +515,17 @@ got_commit_graph_iter_next(struct got_object_id **id,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
+	struct got_commit_graph_node *node;
 
 	*id = NULL;
 
-	if (graph->iter_node == NULL) {
+	if (TAILQ_EMPTY(&graph->iter_list)) {
 		/* We are done iterating, or iteration was not started. */
 		return got_error(GOT_ERR_ITER_COMPLETED);
 	}
 
-	if (graph->iter_node ==
-	    TAILQ_LAST(&graph->iter_list, got_commit_graph_iter_list) &&
-	    got_object_idset_num_elements(graph->open_branches) == 0) {
-		/* We are done iterating. */
-		*id = &graph->iter_node->id;
-		graph->iter_node = NULL;
-		return NULL;
-	}
-
-	while (TAILQ_NEXT(graph->iter_node, entry) == NULL &&
+	node = TAILQ_FIRST(&graph->iter_list);
+	while (TAILQ_NEXT(node, entry) == NULL &&
 	    got_object_idset_num_elements(graph->open_branches) > 0) {
 		err = fetch_commits_from_open_branches(graph, repo,
 		    cancel_cb, cancel_arg);
@@ -541,8 +533,8 @@ got_commit_graph_iter_next(struct got_object_id **id,
 			return err;
 	}
 
-	*id = &graph->iter_node->id;
-	graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
+	*id = &node->id;
+	TAILQ_REMOVE(&graph->iter_list, node, entry);
 	return NULL;
 }
 
