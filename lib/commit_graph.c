@@ -318,31 +318,6 @@ add_node(struct got_commit_graph_node **new_node,
 }
 
 const struct got_error *
-detect_change(int *changed, int *branch_done, const char *path,
-    struct got_commit_object *commit, struct got_object_id *commit_id,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-
-	*changed = 0;
-	*branch_done = 0;
-
-	err = detect_changed_path(changed, commit, commit_id, path, repo);
-	if (err) {
-		if (err->code != GOT_ERR_NO_OBJ)
-			return err;
-		/*
-		 * History of the path stops here on the current
-		 * branch. Keep going on other branches.
-		 */
-		err = NULL;
-		*branch_done = 1;
-	}
-
-	return NULL;
-}
-
-const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
     const char *path, int first_parent_traversal)
 {
@@ -453,7 +428,7 @@ fetch_commits_from_open_branches(int *nfetched,
 		struct got_object_id *commit_id;
 		struct got_commit_object *commit;
 		struct got_commit_graph_node *new_node;
-		int branch_done, changed;
+		int changed;
 
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
@@ -465,20 +440,25 @@ fetch_commits_from_open_branches(int *nfetched,
 		commit = arg.tips[i].commit;
 		new_node = arg.tips[i].new_node;
 
-		err = detect_change(&changed, &branch_done, graph->path,
-		    commit, commit_id, repo);
-		if (err)
+		err = detect_changed_path(&changed, commit, commit_id,
+		    graph->path, repo);
+		if (err) {
+			if (err->code != GOT_ERR_NO_OBJ)
+				break;
+			/*
+			 * History of the path stops here on the current
+			 * branch. Keep going on other branches.
+			 */
+			err = close_branch(graph, commit_id);
 			break;
+		}
 		if (changed) {
 			add_node_to_iter_list(graph, new_node);
 			if (changed_id && *changed_id == NULL)
 				*changed_id = commit_id;
 		}
-		if (branch_done)
-			err = close_branch(graph, commit_id);
-		else
-			err = advance_branch(graph, new_node, commit_id,
-			    commit, repo);
+		err = advance_branch(graph, new_node, commit_id,
+		    commit, repo);
 		if (err)
 			break;
 	}
@@ -518,7 +498,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	const struct got_error *err = NULL;
 	struct got_commit_graph_node *start_node;
 	struct got_commit_object *commit;
-	int changed, branch_done;
+	int changed;
 
 	if (!TAILQ_EMPTY(&graph->iter_list))
 		return got_error(GOT_ERR_ITER_BUSY);
@@ -531,8 +511,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (err)
 		goto done;
 
-	err = detect_change(&changed, &branch_done, graph->path,
-	    commit, id, repo);
+	err = detect_changed_path(&changed, commit, id, graph->path, repo);
 	if (err)
 		goto done;
 	if (changed)
