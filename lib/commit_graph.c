@@ -497,6 +497,16 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 			return err;
 	}
 
+	if (graph->iter_node == NULL) {
+		const char *path;
+		if (got_path_is_root_dir(graph->path))
+			return got_error_no_obj(id);
+		path = graph->path;
+		while (path[0] == '/')
+			path++;
+		return got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
+	}
+
 	return NULL;
 }
 

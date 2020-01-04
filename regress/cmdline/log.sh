@@ -265,9 +265,44 @@ function test_log_limit {
 	test_done "$testroot" "0"
 }
 
+function test_log_nonexistent_path {
+	local testroot=`test_init log_nonexistent_path`
+	local head_rev=`git_show_head $testroot/repo`
+
+	echo "commit $head_rev (master)" > $testroot/stdout.expected
+
+	(cd $testroot/repo && got log this/does/not/exist \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "log command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: this/does/not/exist: no such entry found in tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
 run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
+run_test test_log_nonexistent_path
