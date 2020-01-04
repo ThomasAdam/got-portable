@@ -151,11 +151,6 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 {
 	struct got_commit_graph_node *n, *next;
 
-	if (TAILQ_EMPTY(&graph->iter_list)) {
-		TAILQ_INSERT_HEAD(&graph->iter_list, node, entry);
-		return;
-	}
-
 	n = TAILQ_FIRST(&graph->iter_list);
 	/* Ensure that an iteration in progress will see this new commit. */
 	while (n) {
