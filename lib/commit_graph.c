@@ -182,10 +182,8 @@ close_branch(struct got_commit_graph *graph, struct got_object_id *commit_id)
 }
 
 static const struct got_error *
-advance_branch(struct got_commit_graph *graph,
-    struct got_commit_graph_node *node,
-    struct got_object_id *commit_id, struct got_commit_object *commit,
-    struct got_repository *repo)
+advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
+    struct got_commit_object *commit, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *qid;
@@ -454,8 +452,7 @@ fetch_commits_from_open_branches(struct got_commit_graph *graph,
 		}
 		if (changed)
 			add_node_to_iter_list(graph, new_node);
-		err = advance_branch(graph, new_node, commit_id,
-		    commit, repo);
+		err = advance_branch(graph, commit_id, commit, repo);
 		if (err)
 			break;
 	}
@@ -504,7 +501,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (changed)
 		add_node_to_iter_list(graph, start_node);
 
-	err = advance_branch(graph, start_node, id, commit, repo);
+	err = advance_branch(graph, id, commit, repo);
 	if (err)
 		goto done;
 
