@@ -4,7 +4,7 @@ CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 #CFLAGS += -DGOT_NO_OBJ_CACHE
 #CFLAGS += -DGOT_OBJ_CACHE_DEBUG
 
-.if ${GOT_RELEASE} == "Yes"
+.if "${GOT_RELEASE}" == "Yes"
 PREFIX ?= /usr/local
 BINDIR ?= ${PREFIX}/bin
 LIBEXECDIR ?= ${PREFIX}/libexec
