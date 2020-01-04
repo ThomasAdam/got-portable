@@ -353,6 +353,8 @@ got_commit_graph_open(struct got_commit_graph **graph,
 	if (*graph == NULL)
 		return got_error_from_errno("calloc");
 
+	TAILQ_INIT(&(*graph)->iter_list);
+
 	(*graph)->path = strdup(path);
 	if ((*graph)->path == NULL) {
 		err = got_error_from_errno("strdup");
@@ -371,7 +373,6 @@ got_commit_graph_open(struct got_commit_graph **graph,
 		goto done;
 	}
 
-	TAILQ_INIT(&(*graph)->iter_list);
 	if (first_parent_traversal)
 		(*graph)->flags |= GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL;
 done:
