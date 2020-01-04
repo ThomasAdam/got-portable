@@ -94,40 +94,6 @@ struct got_commit_graph {
 	struct got_commit_graph_iter_list iter_list;
 };
 
-static struct got_commit_graph *
-alloc_graph(const char *path)
-{
-	struct got_commit_graph *graph;
-
-	graph = calloc(1, sizeof(*graph));
-	if (graph == NULL)
-		return NULL;
-
-	graph->path = strdup(path);
-	if (graph->path == NULL) {
-		free(graph);
-		return NULL;
-	}
-
-	graph->node_ids = got_object_idset_alloc();
-	if (graph->node_ids == NULL) {
-		free(graph->path);
-		free(graph);
-		return NULL;
-	}
-
-	graph->open_branches = got_object_idset_alloc();
-	if (graph->open_branches == NULL) {
-		got_object_idset_free(graph->node_ids);
-		free(graph->path);
-		free(graph);
-		return NULL;
-	}
-
-	TAILQ_INIT(&graph->iter_list);
-	return graph;
-}
-
 static const struct got_error *
 detect_changed_path(int *changed, struct got_commit_object *commit,
     struct got_object_id *commit_id, const char *path,
@@ -381,10 +347,40 @@ const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
     const char *path, int first_parent_traversal)
 {
-	*graph = alloc_graph(path);
-	if (*graph == NULL)
-		return got_error_from_errno("alloc_graph");
+	const struct got_error *err;
 
+	*graph = calloc(1, sizeof(**graph));
+	if (*graph == NULL)
+		return got_error_from_errno("calloc");
+
+	(*graph)->path = strdup(path);
+	if ((*graph)->path == NULL) {
+		err = got_error_from_errno("strdup");
+		free(*graph);
+		*graph = NULL;
+		return err;
+	}
+
+	(*graph)->node_ids = got_object_idset_alloc();
+	if ((*graph)->node_ids == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		free((*graph)->path);
+		free(*graph);
+		*graph = NULL;
+		return NULL;
+	}
+
+	(*graph)->open_branches = got_object_idset_alloc();
+	if ((*graph)->open_branches == NULL) {
+		err = got_error_from_errno("got_object_idset_alloc");
+		got_object_idset_free((*graph)->node_ids);
+		free((*graph)->path);
+		free(*graph);
+		*graph = NULL;
+		return err;
+	}
+
+	TAILQ_INIT(&(*graph)->iter_list);
 	if (first_parent_traversal)
 		(*graph)->flags |= GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL;
 
