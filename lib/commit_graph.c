@@ -480,9 +480,7 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_graph_node *start_node;
 	struct got_commit_object *commit;
-	int changed;
 
 	if (!TAILQ_EMPTY(&graph->iter_list))
 		return got_error(GOT_ERR_ITER_BUSY);
@@ -491,29 +489,17 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (err)
 		return err;
 
-	err = add_node(&start_node, graph, id, commit, repo);
+	err = got_object_idset_add(graph->open_branches, id, NULL);
 	if (err)
 		goto done;
 
-	err = detect_changed_path(&changed, commit, id, graph->path, repo);
-	if (err)
-		goto done;
-	if (changed)
-		add_node_to_iter_list(graph, start_node);
-
-	err = advance_branch(graph, id, commit, repo);
-	if (err)
-		goto done;
-
-	if (!changed) {
-		/* Locate first commit which changed graph->path. */
-		while (graph->iter_node == NULL &&
-		    got_object_idset_num_elements(graph->open_branches) > 0) {
-			err = fetch_commits_from_open_branches(graph, repo,
-			    cancel_cb, cancel_arg);
-			if (err)
-				break;
-		}
+	/* Locate first commit which changed graph->path. */
+	while (graph->iter_node == NULL &&
+	    got_object_idset_num_elements(graph->open_branches) > 0) {
+		err = fetch_commits_from_open_branches(graph, repo,
+		    cancel_cb, cancel_arg);
+		if (err)
+			break;
 	}
 done:
 	got_object_commit_close(commit);
