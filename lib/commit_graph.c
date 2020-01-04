@@ -536,13 +536,6 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 	if (err)
 		goto done;
 
-	err = detect_changed_path(&changed, commit, &start_node->id,
-	    graph->path, repo);
-	if (err) {
-		got_object_commit_close(commit);
-		return err;
-	}
-
 	if (!changed) {
 		/* Locate first commit which changed graph->path. */
 		struct got_object_id *changed_id = NULL;
