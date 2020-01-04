@@ -927,17 +927,12 @@ check_same_branch(struct got_object_id *commit_id,
 
 	for (;;) {
 		struct got_object_id *id;
-		err = got_commit_graph_iter_next(&id, graph);
+		err = got_commit_graph_iter_next(&id, graph, repo,
+		    check_cancelled, NULL);
 		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
 				err = NULL;
-				break;
-			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph, 1,
-			    repo, check_cancelled, NULL);
-			if (err)
-				break;
+			break;
 		}
 
 		if (id) {
@@ -1787,20 +1782,12 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 		if (sigint_received || sigpipe_received)
 			break;
 
-		err = got_commit_graph_iter_next(&id, graph);
+		err = got_commit_graph_iter_next(&id, graph, repo,
+		    check_cancelled, NULL);
 		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
 				err = NULL;
-				break;
-			}
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo,
-			    check_cancelled, NULL);
-			if (err)
-				break;
-			else
-				continue;
+			break;
 		}
 		if (id == NULL)
 			break;
@@ -5375,20 +5362,16 @@ collect_commits(struct got_object_id_queue *commits,
 	if (err)
 		goto done;
 	while (got_object_id_cmp(commit_id, iter_stop_id) != 0) {
-		err = got_commit_graph_iter_next(&parent_id, graph);
+		err = got_commit_graph_iter_next(&parent_id, graph, repo,
+		    check_cancelled, NULL);
 		if (err) {
 			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				err = got_error_msg(GOT_ERR_ANCESTRY,
 				    "ran out of commits to rebase before "
 				    "youngest common ancestor commit has "
 				    "been reached?!?");
-				goto done;
-			} else if (err->code != GOT_ERR_ITER_NEED_MORE)
-				goto done;
-			err = got_commit_graph_fetch_commits(graph, 1, repo,
-			    check_cancelled, NULL);
-			if (err)
-				goto done;
+			}
+			goto done;
 		} else {
 			err = check_path_prefix(parent_id, commit_id,
 			    path_prefix, path_prefix_errcode, repo);

@@ -1397,18 +1397,8 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 		struct commit_queue_entry *entry;
 		int errcode;
 
-		err = got_commit_graph_iter_next(&id, graph);
-		if (err) {
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph,
-			    minqueue, repo, NULL, NULL);
-			if (err)
-				return err;
-			continue;
-		}
-
-		if (id == NULL)
+		err = got_commit_graph_iter_next(&id, graph, repo, NULL, NULL);
+		if (err || id == NULL)
 			break;
 
 		err = got_object_open_as_commit(&commit, repo, id);

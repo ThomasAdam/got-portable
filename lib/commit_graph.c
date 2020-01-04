@@ -537,33 +537,6 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_commit_graph_fetch_commits(struct got_commit_graph *graph, int limit,
-    struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
-{
-	const struct got_error *err;
-	int nfetched = 0, ncommits;
-	struct got_object_id *changed_id = NULL;
-
-	while (nfetched < limit) {
-		if (cancel_cb) {
-			err = (*cancel_cb)(cancel_arg);
-			if (err)
-				return err;
-		}
-		err = fetch_commits_from_open_branches(&ncommits,
-		    &changed_id, graph, repo, cancel_cb, cancel_arg);
-		if (err)
-			return err;
-		if (ncommits == 0)
-			break;
-		if (changed_id)
-			nfetched += ncommits;
-	}
-
-	return NULL;
-}
-
 static const struct got_error *
 free_node_iter(struct got_object_id *id, void *data, void *arg)
 {
@@ -638,8 +611,11 @@ got_commit_graph_iter_start(struct got_commit_graph *graph,
 
 const struct got_error *
 got_commit_graph_iter_next(struct got_object_id **id,
-    struct got_commit_graph *graph)
+    struct got_commit_graph *graph, struct got_repository *repo,
+    got_cancel_cb cancel_cb, void *cancel_arg)
 {
+	const struct got_error *err = NULL;
+
 	*id = NULL;
 
 	if (graph->iter_node == NULL) {
@@ -656,8 +632,15 @@ got_commit_graph_iter_next(struct got_object_id **id,
 		return NULL;
 	}
 
-	if (TAILQ_NEXT(graph->iter_node, entry) == NULL)
-		return got_error(GOT_ERR_ITER_NEED_MORE);
+	while (TAILQ_NEXT(graph->iter_node, entry) == NULL &&
+	    got_object_idset_num_elements(graph->open_branches) > 0) {
+		int ncommits;
+		struct got_object_id *changed_id;
+		err = fetch_commits_from_open_branches(&ncommits,
+		    &changed_id, graph, repo, cancel_cb, cancel_arg);
+		if (err)
+			return err;
+	}
 
 	*id = &graph->iter_node->id;
 	graph->iter_node = TAILQ_NEXT(graph->iter_node, entry);
@@ -699,7 +682,7 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		goto done;
 
 	for (;;) {
-		struct got_object_id *id, *id2;
+		struct got_object_id *id = NULL, *id2 = NULL;
 
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
@@ -708,30 +691,24 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 		}
 
 		if (!completed) {
-			err = got_commit_graph_iter_next(&id, graph);
+			err = got_commit_graph_iter_next(&id, graph, repo,
+			    cancel_cb, cancel_arg);
 			if (err) {
-				if (err->code == GOT_ERR_ITER_COMPLETED)
-					completed = 1;
-				else if (err->code != GOT_ERR_ITER_NEED_MORE)
+				if (err->code != GOT_ERR_ITER_COMPLETED)
 					break;
-				err = got_commit_graph_fetch_commits(graph, 1,
-				    repo, cancel_cb, cancel_arg);
-				if (err)
-					break;
+				err = NULL;
+				completed = 1;
 			}
 		}
 
 		if (!completed2) {
-			err = got_commit_graph_iter_next(&id2, graph2);
+			err = got_commit_graph_iter_next(&id2, graph2, repo,
+			    cancel_cb, cancel_arg);
 			if (err) {
-				if (err->code == GOT_ERR_ITER_COMPLETED)
-					completed2 = 1;
-				else if (err->code != GOT_ERR_ITER_NEED_MORE)
+				if (err->code != GOT_ERR_ITER_COMPLETED)
 					break;
-				err = got_commit_graph_fetch_commits(graph2, 1,
-				    repo, cancel_cb, cancel_arg);
-				if (err)
-					break;
+				err = NULL;
+				completed2 = 1;
 			}
 		}
 

@@ -58,7 +58,7 @@
 #define GOT_ERR_PACK_OFFSET	42
 #define GOT_ERR_OBJ_EXISTS	43
 #define GOT_ERR_BAD_OBJ_ID	44
-#define GOT_ERR_ITER_NEED_MORE	45
+/* 45 is currently unused */
 #define GOT_ERR_ITER_COMPLETED	46
 #define GOT_ERR_RANGE		47
 #define GOT_ERR_EXPECTED	48 /* for use in regress tests only */
@@ -176,7 +176,7 @@ static const struct got_error {
 	{ GOT_ERR_PACK_OFFSET,	"bad offset in pack file" },
 	{ GOT_ERR_OBJ_EXISTS,	"object already exists" },
 	{ GOT_ERR_BAD_OBJ_ID,	"bad object id" },
-	{ GOT_ERR_ITER_NEED_MORE,"more items needed to continue iteration" },
+	/* 45 is currently unused */
 	{ GOT_ERR_ITER_COMPLETED,"iteration completed" },
 	{ GOT_ERR_RANGE,	"value out of range" },
 	{ GOT_ERR_EXPECTED,	"expected an error but have no error" },

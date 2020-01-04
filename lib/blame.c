@@ -246,19 +246,12 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	id = start_commit_id;
 	for (;;) {
-		err = got_commit_graph_iter_next(&pid, graph);
+		err = got_commit_graph_iter_next(&pid, graph, repo,
+		    cancel_cb, cancel_arg);
 		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
 				err = NULL;
-				break;
-			}
-			if (err->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			err = got_commit_graph_fetch_commits(graph, 1, repo,
-			    cancel_cb, cancel_arg);
-			if (err)
-				break;
-			continue;
+			break;
 		}
 		if (pid) {
 			err = blame_commit(blame, pid, id, path, repo, cb, arg);
