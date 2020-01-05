@@ -29,11 +29,20 @@ function git_init
 	git init -q "$1"
 }
 
+function maybe_pack_repo
+{
+	local repo="$1"
+	if [ -n "$GOT_TEST_PACK" ]; then
+		(cd $repo && git repack -a -q)
+	fi
+}
+
 function git_commit
 {
 	local repo="$1"
 	shift
 	(cd $repo && git commit --author="$GOT_AUTHOR" -q -a "$@")
+	maybe_pack_repo $repo
 }
 
 function git_rm
@@ -96,6 +105,7 @@ function git_commit_tree
 	local msg="$2"
 	local tree="$3"
 	(cd $repo && git commit-tree -m "$msg" "$tree")
+	maybe_pack_repo $repo
 }
 
 function make_test_tree

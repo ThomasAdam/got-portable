@@ -33,6 +33,10 @@ binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
  $ doas pkg_add git
  $ make regress
 
+To test with packed repositories, run:
+
+ $ make regress GOT_TEST_PACK=1
+
 Man page files in the Got source tree can be viewed with 'man -l':
 
  $ man -l got/got.1
