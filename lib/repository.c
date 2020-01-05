@@ -1156,6 +1156,8 @@ match_packed_object(struct got_object_id **unique_id,
 					goto done;
 				}
 			} else {
+				if (got_object_id_cmp(*unique_id, qid->id) == 0)
+					continue; /* packed multiple times */
 				err = got_error(GOT_ERR_AMBIGUOUS_ID);
 				goto done;
 			}
@@ -1241,6 +1243,8 @@ match_loose_object(struct got_object_id **unique_id, const char *path_objects,
 				goto done;
 			}
 		} else {
+			if (got_object_id_cmp(*unique_id, &id) == 0)
+				continue; /* both packed and loose */
 			err = got_error(GOT_ERR_AMBIGUOUS_ID);
 			free(id_str);
 			goto done;
