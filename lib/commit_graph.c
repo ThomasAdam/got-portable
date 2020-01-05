@@ -513,12 +513,12 @@ got_commit_graph_iter_next(struct got_object_id **id,
 
 	*id = NULL;
 
-	if (TAILQ_EMPTY(&graph->iter_list)) {
+	node = TAILQ_FIRST(&graph->iter_list);
+	if (node == NULL) {
 		/* We are done iterating, or iteration was not started. */
 		return got_error(GOT_ERR_ITER_COMPLETED);
 	}
 
-	node = TAILQ_FIRST(&graph->iter_list);
 	while (TAILQ_NEXT(node, entry) == NULL &&
 	    got_object_idset_num_elements(graph->open_branches) > 0) {
 		err = fetch_commits_from_open_branches(graph, repo,
