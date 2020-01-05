@@ -152,7 +152,6 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 	struct got_commit_graph_node *n, *next;
 
 	n = TAILQ_FIRST(&graph->iter_list);
-	/* Ensure that an iteration in progress will see this new commit. */
 	while (n) {
 		next = TAILQ_NEXT(n, entry);
 		if (next && node->timestamp >= next->timestamp) {
