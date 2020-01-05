@@ -164,26 +164,11 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 }
 
 static const struct got_error *
-close_branch(struct got_commit_graph *graph, struct got_object_id *commit_id)
-{
-	const struct got_error *err;
-
-	err = got_object_idset_remove(NULL, graph->open_branches, commit_id);
-	if (err && err->code != GOT_ERR_NO_OBJ)
-		return err;
-	return NULL;
-}
-
-static const struct got_error *
 advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
     struct got_commit_object *commit, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *qid;
-
-	err = close_branch(graph, commit_id);
-	if (err)
-		return err;
 
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
 		qid = SIMPLEQ_FIRST(&commit->parent_ids);
@@ -429,6 +414,11 @@ fetch_commits_from_open_branches(struct got_commit_graph *graph,
 		commit = arg.tips[i].commit;
 		new_node = arg.tips[i].new_node;
 
+		err = got_object_idset_remove(NULL, graph->open_branches,
+		    commit_id);
+		if (err && err->code != GOT_ERR_NO_OBJ)
+			break;
+
 		err = detect_changed_path(&changed, commit, commit_id,
 		    graph->path, repo);
 		if (err) {
@@ -438,9 +428,6 @@ fetch_commits_from_open_branches(struct got_commit_graph *graph,
 			 * History of the path stops here on the current
 			 * branch. Keep going on other branches.
 			 */
-			err = close_branch(graph, commit_id);
-			if (err)
-				break;
 			continue;
 		}
 		if (changed)
