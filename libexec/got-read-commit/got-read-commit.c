@@ -145,6 +145,7 @@ main(int argc, char *argv[])
 			goto done;
 
 		err = got_privsep_send_commit(&ibuf, commit);
+		got_object_commit_close(commit);
 done:
 		if (f) {
 			if (fclose(f) != 0 && err == NULL)
