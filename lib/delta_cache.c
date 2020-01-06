@@ -92,6 +92,7 @@ got_delta_cache_free(struct got_delta_cache *cache)
 	free(cache);
 }
 
+#ifndef GOT_NO_OBJ_CACHE
 static void
 remove_least_used_element(struct got_delta_cache *cache)
 {
@@ -107,12 +108,15 @@ remove_least_used_element(struct got_delta_cache *cache)
 	cache->nelem--;
 	cache->cache_evict++;
 }
-
+#endif
 
 const struct got_error *
 got_delta_cache_add(struct got_delta_cache *cache,
     off_t delta_data_offset, uint8_t *delta_data, size_t delta_len)
 {
+#ifdef GOT_NO_OBJ_CACHE
+	return got_error(GOT_ERR_NO_SPACE);
+#else
 	struct got_delta_cache_element *entry;
 
 	if (delta_len > cache->maxelemsize) {
@@ -134,6 +138,7 @@ got_delta_cache_add(struct got_delta_cache *cache,
 	TAILQ_INSERT_HEAD(&cache->entries, entry, entry);
 	cache->nelem++;
 	return NULL;
+#endif
 }
 
 void
