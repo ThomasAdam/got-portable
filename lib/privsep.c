@@ -148,6 +148,8 @@ got_privsep_recv_imsg(struct imsg *imsg, struct imsgbuf *ibuf,
 		if (err)
 			return err;
 		n = imsg_get(ibuf, imsg);
+		if (n == -1)
+			return got_error_from_errno("imsg_get");
 	}
 
 	if (imsg->hdr.len < IMSG_HEADER_SIZE + min_datalen)
