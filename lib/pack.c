@@ -804,9 +804,6 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	if (delta_offset + tslen >= pack->filesize)
 		return got_error(GOT_ERR_PACK_OFFSET);
 
-	if (pack->map == NULL) {
-	}
-
 	if (pack->map) {
 		size_t mapoff = delta_offset + tslen;
 		memcpy(&id, pack->map + mapoff, sizeof(id));
@@ -818,14 +815,14 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 			return err;
 	} else {
 		ssize_t n;
-		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
-		if (delta_data_offset == -1)
-			return got_error_from_errno("lseek");
 		n = read(pack->fd, &id, sizeof(id));
 		if (n < 0)
 			return got_error_from_errno("read");
 		if (n != sizeof(id))
 			return got_error(GOT_ERR_BAD_PACKFILE);
+		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
+		if (delta_data_offset == -1)
+			return got_error_from_errno("lseek");
 		err = got_inflate_to_mem_fd(&delta_buf, &delta_len, pack->fd);
 		if (err)
 			return err;
