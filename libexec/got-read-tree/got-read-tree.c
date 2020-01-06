@@ -143,7 +143,7 @@ main(int argc, char *argv[])
 
 		err = got_privsep_send_tree(&ibuf, &entries, nentries);
 done:
-		got_pathlist_free(&entries);
+		got_object_tree_entries_free(&entries);
 		free(buf);
 		if (f) {
 			if (fclose(f) != 0 && err == NULL)

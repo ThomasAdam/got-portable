@@ -203,7 +203,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 
 	err = got_privsep_send_tree(ibuf, &entries, nentries);
 done:
-	got_pathlist_free(&entries);
+	got_object_tree_entries_free(&entries);
 	free(buf);
 	got_object_close(obj);
 	if (err) {

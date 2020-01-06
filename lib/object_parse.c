@@ -719,10 +719,22 @@ got_object_parse_tree(struct got_pathlist_head *entries, int *nentries,
 	}
 done:
 	if (err) {
-		got_pathlist_free(entries);
+		got_object_tree_entries_free(entries);
 		*nentries = 0;
 	}
 	return err;
+}
+
+void
+got_object_tree_entries_free(struct got_pathlist_head *entries)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, entries, entry) {
+		struct got_parsed_tree_entry *pte = pe->data;
+		free(pte);
+	}
+	got_pathlist_free(entries);
 }
 
 void

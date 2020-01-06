@@ -34,6 +34,7 @@ struct got_parsed_tree_entry {
 };
 const struct got_error *got_object_parse_tree(struct got_pathlist_head *, int *,
     uint8_t *, size_t);
+void got_object_tree_entries_free(struct got_pathlist_head *);
 
 const struct got_error *got_object_parse_tag(struct got_tag_object **,
     uint8_t *, size_t);
