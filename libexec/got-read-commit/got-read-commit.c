@@ -60,8 +60,10 @@ read_commit_object(struct got_commit_object **commit, FILE *f)
 		return err;
 
 	err = got_object_parse_header(&obj, p, len);
-	if (err)
+	if (err) {
+		free(p);
 		return err;
+	}
 
 	if (len < obj->hdrlen + obj->size) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
