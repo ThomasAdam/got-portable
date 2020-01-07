@@ -1,11 +1,4 @@
 lib:
-- fix 'got log -l1 -c fb4d85023675bc7da402da96b2bb84fd12905dbf -p';
-  this command runs too slow in got-read-pack
-  (maybe let got-read-pack cache ref/offset delta objects in object_cache.c?)
-  commit fb4d85023675bc7da402da96b2bb84fd12905dbf is:
-      from: jsg <jsg@openbsd.org>
-      date: Wed May 22 00:40:06 2019 UTC
-      "add amdgpu from linux 4.19.44 for recent AMD Radeon parts"
 - improve performance of usr.bin/diff and port these changes back to got
   (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
 
