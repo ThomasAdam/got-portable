@@ -430,9 +430,9 @@ get_object_offset(struct got_packidx *packidx, int idx)
 }
 
 int
-got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
+got_packidx_get_object_idx_sha1(struct got_packidx *packidx, uint8_t *sha1)
 {
-	u_int8_t id0 = id->sha1[0];
+	u_int8_t id0 = sha1[0];
 	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = totobj - 1;
 
@@ -445,7 +445,7 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 
 		i = ((left + right) / 2);
 		oid = &packidx->hdr.sorted_ids[i];
-		cmp = memcmp(id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		cmp = memcmp(sha1, oid->sha1, SHA1_DIGEST_LENGTH);
 		if (cmp == 0)
 			return i;
 		else if (cmp > 0)
@@ -455,6 +455,12 @@ got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id
 	}
 
 	return -1;
+}
+
+int
+got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
+{
+	return got_packidx_get_object_idx_sha1(packidx, id->sha1);
 }
 
 const struct got_error *

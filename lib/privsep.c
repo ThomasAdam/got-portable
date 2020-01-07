@@ -549,14 +549,140 @@ done:
 	return err;
 }
 
+static const struct got_error *
+get_commit_from_imsg(struct got_commit_object **commit,
+    struct imsg *imsg, size_t datalen, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_commit_object *icommit;
+	size_t len = 0;
+	int i;
+
+	if (datalen < sizeof(*icommit))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	icommit = imsg->data;
+	if (datalen != sizeof(*icommit) + icommit->author_len +
+	    icommit->committer_len +
+	    icommit->nparents * SHA1_DIGEST_LENGTH)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	if (icommit->nparents < 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+
+	len += sizeof(*icommit);
+
+	*commit = got_object_commit_alloc_partial();
+	if (*commit == NULL)
+		return got_error_from_errno(
+		    "got_object_commit_alloc_partial");
+
+	memcpy((*commit)->tree_id->sha1, icommit->tree_id,
+	    SHA1_DIGEST_LENGTH);
+	(*commit)->author_time = icommit->author_time;
+	(*commit)->author_gmtoff = icommit->author_gmtoff;
+	(*commit)->committer_time = icommit->committer_time;
+	(*commit)->committer_gmtoff = icommit->committer_gmtoff;
+
+	if (icommit->author_len == 0) {
+		(*commit)->author = strdup("");
+		if ((*commit)->author == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		(*commit)->author = malloc(icommit->author_len + 1);
+		if ((*commit)->author == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		memcpy((*commit)->author, imsg->data + len,
+		    icommit->author_len);
+		(*commit)->author[icommit->author_len] = '\0';
+	}
+	len += icommit->author_len;
+
+	if (icommit->committer_len == 0) {
+		(*commit)->committer = strdup("");
+		if ((*commit)->committer == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		(*commit)->committer =
+		    malloc(icommit->committer_len + 1);
+		if ((*commit)->committer == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		memcpy((*commit)->committer, imsg->data + len,
+		    icommit->committer_len);
+		(*commit)->committer[icommit->committer_len] = '\0';
+	}
+	len += icommit->committer_len;
+
+	if (icommit->logmsg_len == 0) {
+		(*commit)->logmsg = strdup("");
+		if ((*commit)->logmsg == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		size_t offset = 0, remain = icommit->logmsg_len;
+
+		(*commit)->logmsg = malloc(icommit->logmsg_len + 1);
+		if ((*commit)->logmsg == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		while (remain > 0) {
+			struct imsg imsg_log;
+			size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE,
+			    remain);
+
+			err = got_privsep_recv_imsg(&imsg_log, ibuf, n);
+			if (err)
+				goto done;
+
+			if (imsg_log.hdr.type != GOT_IMSG_COMMIT_LOGMSG) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				goto done;
+			}
+
+			memcpy((*commit)->logmsg + offset,
+			    imsg_log.data, n);
+			imsg_free(&imsg_log);
+			offset += n;
+			remain -= n;
+		}
+		(*commit)->logmsg[icommit->logmsg_len] = '\0';
+	}
+
+	for (i = 0; i < icommit->nparents; i++) {
+		struct got_object_qid *qid;
+
+		err = got_object_qid_alloc_partial(&qid);
+		if (err)
+			break;
+		memcpy(qid->id, imsg->data + len +
+		    i * SHA1_DIGEST_LENGTH, sizeof(*qid->id));
+		SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
+		(*commit)->nparents++;
+	}
+done:
+	if (err) {
+		got_object_commit_close(*commit);
+		*commit = NULL;
+	}
+	return err;
+}
+
 const struct got_error *
 got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
-	struct got_imsg_commit_object *icommit;
-	size_t len, datalen;
-	int i;
+	size_t datalen;
 	const size_t min_datalen =
 	    MIN(sizeof(struct got_imsg_error),
 	    sizeof(struct got_imsg_commit_object));
@@ -568,124 +694,10 @@ got_privsep_recv_commit(struct got_commit_object **commit, struct imsgbuf *ibuf)
 		return err;
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-	len = 0;
 
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_COMMIT:
-		if (datalen < sizeof(*icommit)) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		icommit = imsg.data;
-		if (datalen != sizeof(*icommit) + icommit->author_len +
-		    icommit->committer_len +
-		    icommit->nparents * SHA1_DIGEST_LENGTH) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		if (icommit->nparents < 0) {
-			err = got_error(GOT_ERR_PRIVSEP_LEN);
-			break;
-		}
-		len += sizeof(*icommit);
-
-		*commit = got_object_commit_alloc_partial();
-		if (*commit == NULL) {
-			err = got_error_from_errno(
-			    "got_object_commit_alloc_partial");
-			break;
-		}
-
-		memcpy((*commit)->tree_id->sha1, icommit->tree_id,
-		    SHA1_DIGEST_LENGTH);
-		(*commit)->author_time = icommit->author_time;
-		(*commit)->author_gmtoff = icommit->author_gmtoff;
-		(*commit)->committer_time = icommit->committer_time;
-		(*commit)->committer_gmtoff = icommit->committer_gmtoff;
-
-		if (icommit->author_len == 0) {
-			(*commit)->author = strdup("");
-			if ((*commit)->author == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		} else {
-			(*commit)->author = malloc(icommit->author_len + 1);
-			if ((*commit)->author == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			memcpy((*commit)->author, imsg.data + len,
-			    icommit->author_len);
-			(*commit)->author[icommit->author_len] = '\0';
-		}
-		len += icommit->author_len;
-
-		if (icommit->committer_len == 0) {
-			(*commit)->committer = strdup("");
-			if ((*commit)->committer == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		} else {
-			(*commit)->committer =
-			    malloc(icommit->committer_len + 1);
-			if ((*commit)->committer == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			memcpy((*commit)->committer, imsg.data + len,
-			    icommit->committer_len);
-			(*commit)->committer[icommit->committer_len] = '\0';
-		}
-		len += icommit->committer_len;
-
-		if (icommit->logmsg_len == 0) {
-			(*commit)->logmsg = strdup("");
-			if ((*commit)->logmsg == NULL) {
-				err = got_error_from_errno("strdup");
-				break;
-			}
-		} else {
-			size_t offset = 0, remain = icommit->logmsg_len;
-
-			(*commit)->logmsg = malloc(icommit->logmsg_len + 1);
-			if ((*commit)->logmsg == NULL) {
-				err = got_error_from_errno("malloc");
-				break;
-			}
-			while (remain > 0) {
-				struct imsg imsg_log;
-				size_t n = MIN(MAX_IMSGSIZE - IMSG_HEADER_SIZE,
-				    remain);
-
-				err = got_privsep_recv_imsg(&imsg_log, ibuf, n);
-				if (err)
-					return err;
-
-				if (imsg_log.hdr.type != GOT_IMSG_COMMIT_LOGMSG)
-					return got_error(GOT_ERR_PRIVSEP_MSG);
-
-				memcpy((*commit)->logmsg + offset,
-				    imsg_log.data, n);
-				imsg_free(&imsg_log);
-				offset += n;
-				remain -= n;
-			}
-			(*commit)->logmsg[icommit->logmsg_len] = '\0';
-		}
-
-		for (i = 0; i < icommit->nparents; i++) {
-			struct got_object_qid *qid;
-
-			err = got_object_qid_alloc_partial(&qid);
-			if (err)
-				break;
-			memcpy(qid->id, imsg.data + len +
-			    i * SHA1_DIGEST_LENGTH, sizeof(*qid->id));
-			SIMPLEQ_INSERT_TAIL(&(*commit)->parent_ids, qid, entry);
-			(*commit)->nparents++;
-		}
+		err = get_commit_from_imsg(commit, &imsg, datalen, ibuf);
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
@@ -1545,6 +1557,162 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 		*nremotes = 0;
 	}
 	return err;
+}
+
+const struct got_error *
+got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
+     struct got_object_id *id, int idx, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t path_len = strlen(path) + 1;
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_COMMIT_TRAVERSAL_REQUEST, 0, 0,
+	    sizeof(struct got_imsg_commit_traversal_request) + path_len);
+	if (wbuf == NULL)
+		return got_error_from_errno(
+		    "imsg_create COMMIT_TRAVERSAL_REQUEST");
+	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, &idx, sizeof(idx)) == -1) {
+		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, path, path_len) == -1) {
+		err = got_error_from_errno("imsg_add COMMIT_TRAVERSAL_REQUEST");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_traversed_commits(struct got_object_id *commit_ids, 
+    size_t ncommits, struct imsgbuf *ibuf)
+{
+	const struct got_error *err;
+	struct ibuf *wbuf;
+	int i;
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_TRAVERSED_COMMITS, 0, 0,
+	    sizeof(struct got_imsg_traversed_commits) +
+	    ncommits * SHA1_DIGEST_LENGTH);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create TRAVERSED_COMMITS");
+
+	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1) {
+		err = got_error_from_errno("imsg_add TRAVERSED_COMMITS");
+		ibuf_free(wbuf);
+		return err;
+	}
+	for (i = 0; i < ncommits; i++) {
+		struct got_object_id *id = &commit_ids[i];
+		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add TRAVERSED_COMMITS");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
+    struct got_object_id **changed_commit_id,
+    struct got_object_id_queue *commit_ids, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_traversed_commits *icommits;
+	size_t datalen;
+	int i, done = 0;
+
+	*changed_commit = NULL;
+	*changed_commit_id = NULL;
+
+	while (!done) {
+		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+		if (err)
+			return err;
+
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		switch (imsg.hdr.type) {
+		case GOT_IMSG_TRAVERSED_COMMITS:
+			icommits = imsg.data;
+			if (datalen != sizeof(*icommits) +
+			    icommits->ncommits * SHA1_DIGEST_LENGTH) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			for (i = 0; i < icommits->ncommits; i++) {
+				struct got_object_qid *qid;
+				uint8_t *sha1 = (uint8_t *)imsg.data +
+				    sizeof(*icommits) + i * SHA1_DIGEST_LENGTH;
+				err = got_object_qid_alloc_partial(&qid);
+				if (err)
+					break;
+				memcpy(qid->id->sha1, sha1, SHA1_DIGEST_LENGTH);
+				SIMPLEQ_INSERT_TAIL(commit_ids, qid, entry);
+
+				/* The last commit may contain a change. */
+				if (i == icommits->ncommits - 1) {
+					*changed_commit_id =
+					    got_object_id_dup(qid->id);
+					if (*changed_commit_id == NULL) {
+						err = got_error_from_errno(
+						    "got_object_id_dup");
+						break;
+					}
+				}
+			}
+			break;
+		case GOT_IMSG_COMMIT:
+			if (*changed_commit_id == NULL) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				break;
+			}
+			err = get_commit_from_imsg(changed_commit, &imsg,
+			    datalen, ibuf);
+			break;
+		case GOT_IMSG_COMMIT_TRAVERSAL_DONE:
+			done = 1;
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
+		imsg_free(&imsg);
+		if (err)
+			break;
+	}
+
+	if (err)
+		got_object_id_queue_free(commit_ids);
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_commit_traversal_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_TRAVERSAL_DONE, 0, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose TRAVERSAL_DONE");
+
+	return flush_imsg(ibuf);
 }
 
 const struct got_error *

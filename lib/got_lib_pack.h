@@ -162,6 +162,7 @@ const struct got_error *got_packidx_init_hdr(struct got_packidx *, int);
 const struct got_error *got_packidx_open(struct got_packidx **,
     const char *, int);
 const struct got_error *got_packidx_close(struct got_packidx *);
+int got_packidx_get_object_idx_sha1(struct got_packidx *, uint8_t *);
 int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
 const struct got_error *got_packidx_match_id_str_prefix(
     struct got_object_id_queue *, struct got_packidx *, const char *);

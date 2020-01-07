@@ -58,18 +58,6 @@
 #endif
 
 struct got_object_id *
-got_object_id_dup(struct got_object_id *id1)
-{
-	struct got_object_id *id2;
-
-	id2 = malloc(sizeof(*id2));
-	if (id2 == NULL)
-		return NULL;
-	memcpy(id2, id1, sizeof(*id2));
-	return id2;
-}
-
-struct got_object_id *
 got_object_get_id(struct got_object *obj)
 {
 	return &obj->id;
@@ -480,7 +468,12 @@ request_packed_commit(struct got_commit_object **commit, struct got_pack *pack,
 	if (err)
 		return err;
 
-	return got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
+	err = got_privsep_recv_commit(commit, pack->privsep_child->ibuf);
+	if (err)
+		return err;
+
+	(*commit)->flags |= GOT_COMMIT_FLAG_PACKED;
+	return NULL;
 }
 
 static const struct got_error *
@@ -1748,4 +1741,67 @@ int
 got_object_tree_entry_is_submodule(struct got_tree_entry *te)
 {
 	return (te->mode & S_IFMT) == (S_IFDIR | S_IFLNK);
+}
+
+const struct got_error *
+got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
+    struct got_object_id *commit_id, const char *path,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pack *pack = NULL;
+	struct got_packidx *packidx = NULL;
+	char *path_packfile = NULL;
+	struct got_commit_object *changed_commit = NULL;
+	struct got_object_id *changed_commit_id = NULL;
+	int idx;
+
+	err = got_repo_search_packidx(&packidx, &idx, repo, commit_id);
+	if (err) {
+		if (err->code != GOT_ERR_NO_OBJ)
+			return err;
+		return NULL;
+	}
+
+	err = get_packfile_path(&path_packfile, packidx);
+	if (err)
+		return err;
+
+	pack = got_repo_get_cached_pack(repo, path_packfile);
+	if (pack == NULL) {
+		err = got_repo_cache_pack(&pack, repo, path_packfile, packidx);
+		if (err)
+			goto done;
+	}
+
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			goto done;
+	}
+
+	err = got_privsep_send_commit_traversal_request(
+	    pack->privsep_child->ibuf, commit_id, idx, path);
+	if (err)
+		goto done;
+
+	err = got_privsep_recv_traversed_commits(&changed_commit,
+	    &changed_commit_id, traversed_commits, pack->privsep_child->ibuf);
+	if (err)
+		goto done;
+
+	if (changed_commit) {
+		/*
+		 * Cache the commit in which the path was changed.
+		 * This commit might be opened again soon.
+		 */
+		changed_commit->refcnt++;
+		err = got_repo_cache_commit(repo, changed_commit_id,
+		    changed_commit);
+		got_object_commit_close(changed_commit);
+	}
+done:
+	free(path_packfile);
+	free(changed_commit_id);
+	return err;
 }

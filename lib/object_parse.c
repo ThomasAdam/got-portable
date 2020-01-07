@@ -55,6 +55,18 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+struct got_object_id *
+got_object_id_dup(struct got_object_id *id1)
+{
+	struct got_object_id *id2;
+
+	id2 = malloc(sizeof(*id2));
+	if (id2 == NULL)
+		return NULL;
+	memcpy(id2, id1, sizeof(*id2));
+	return id2;
+}
+
 int
 got_object_id_cmp(const struct got_object_id *id1,
     const struct got_object_id *id2)

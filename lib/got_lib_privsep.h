@@ -102,6 +102,9 @@ enum got_imsg_type {
 	GOT_IMSG_PACKIDX,
 	GOT_IMSG_PACK,
 	GOT_IMSG_PACKED_OBJECT_REQUEST,
+	GOT_IMSG_COMMIT_TRAVERSAL_REQUEST,
+	GOT_IMSG_TRAVERSED_COMMITS,
+	GOT_IMSG_COMMIT_TRAVERSAL_DONE,
 
 	/* Message sending file descriptor to a temporary file. */
 	GOT_IMSG_TMPFD,
@@ -232,6 +235,20 @@ struct got_imsg_packed_object {
 	int idx;
 } __attribute__((__packed__));
 
+/* Structure for GOT_IMSG_COMMIT_TRAVERSAL_REQUEST  */
+struct got_imsg_commit_traversal_request {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	int idx;
+	size_t path_len;
+	/* Followed by path_len bytes of path data */
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_TRAVERSED_COMMITS  */
+struct got_imsg_traversed_commits {
+	size_t ncommits;
+	/* Followed by ncommit IDs of SHA1_DIGEST_LENGTH each */
+} __attribute__((__packed__));
+
 /*
  * Structure for GOT_IMSG_GITCONFIG_REMOTE data.
  */
@@ -318,5 +335,15 @@ const struct got_error *got_privsep_send_gitconfig_remotes(struct imsgbuf *,
     struct got_remote_repo *, int);
 const struct got_error *got_privsep_recv_gitconfig_remotes(
     struct got_remote_repo **, int *, struct imsgbuf *);
+
+const struct got_error *got_privsep_send_commit_traversal_request(
+    struct imsgbuf *, struct got_object_id *, int, const char *);
+const struct got_error *got_privsep_recv_traversed_commits(
+    struct got_commit_object **, struct got_object_id **,
+    struct got_object_id_queue *, struct imsgbuf *);
+const struct got_error *got_privsep_send_traversed_commits(
+    struct got_object_id *, size_t, struct imsgbuf *);
+const struct got_error *got_privsep_send_commit_traversal_done(
+    struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);

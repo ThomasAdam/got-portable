@@ -40,9 +40,9 @@
 
 struct got_commit_graph_node {
 	struct got_object_id id;
-	time_t timestamp;
 
-	/* Used during graph iteration. */
+	/* Used only during iteration. */
+	time_t timestamp;
 	TAILQ_ENTRY(got_commit_graph_node) entry;
 };
 
@@ -147,9 +147,11 @@ done:
 
 static void
 add_node_to_iter_list(struct got_commit_graph *graph,
-    struct got_commit_graph_node *node)
+    struct got_commit_graph_node *node, time_t committer_time)
 {
 	struct got_commit_graph_node *n, *next;
+
+	node->timestamp = committer_time;
 
 	n = TAILQ_FIRST(&graph->iter_list);
 	while (n) {
@@ -161,6 +163,79 @@ add_node_to_iter_list(struct got_commit_graph *graph,
 		n = next;
 	}
 	TAILQ_INSERT_TAIL(&graph->iter_list, node, entry);
+}
+
+static const struct got_error *
+add_node(struct got_commit_graph_node **new_node,
+    struct got_commit_graph *graph, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph_node *node;
+
+	*new_node = NULL;
+
+	node = calloc(1, sizeof(*node));
+	if (node == NULL)
+		return got_error_from_errno("calloc");
+
+	memcpy(&node->id, commit_id, sizeof(node->id));
+	err = got_object_idset_add(graph->node_ids, &node->id, NULL);
+	if (err)
+		free(node);
+	else
+		*new_node = node;
+	return err;
+}
+
+/*
+ * Ask got-read-pack to traverse first-parent history until a commit is
+ * encountered which modified graph->path, or until the pack file runs
+ * out of relevant commits. This is faster than sending an individual
+ * request for each commit stored in the pack file.
+ */
+static const struct got_error *
+packed_first_parent_traversal(int *ncommits_traversed,
+    struct got_commit_graph *graph, struct got_object_id *commit_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id_queue traversed_commits;
+	struct got_object_qid *qid;
+
+	SIMPLEQ_INIT(&traversed_commits);
+	*ncommits_traversed = 0;
+
+	err = got_traverse_packed_commits(&traversed_commits,
+	    commit_id, graph->path, repo);
+	if (err)
+		return err;
+
+	/* Add all traversed commits to the graph... */
+	SIMPLEQ_FOREACH(qid, &traversed_commits, entry) {
+		struct got_commit_graph_node *node;
+
+		if (got_object_idset_contains(graph->open_branches, qid->id))
+			continue;
+		if (got_object_idset_contains(graph->node_ids, qid->id))
+			continue;
+
+		(*ncommits_traversed)++;
+
+		/* ... except the last commit is the new branch tip. */
+		if (SIMPLEQ_NEXT(qid, entry) == NULL) {
+			err = got_object_idset_add(graph->open_branches,
+			    qid->id, NULL);
+			break;
+		}
+
+		err = add_node(&node, graph, qid->id, repo);
+		if (err)
+			break;
+	}
+
+	got_object_id_queue_free(&traversed_commits);
+	return err;
 }
 
 static const struct got_error *
@@ -190,6 +265,22 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		if (qid == NULL ||
 		    got_object_idset_contains(graph->open_branches, qid->id))
 			return NULL;
+		/*
+		 * The root directory always changes by definition, and when
+		 * logging the root we want to traverse consecutive commits
+		 * even if they point at the same tree.
+		 * But if we are looking for a specific path then we can avoid
+		 * fetching packed commits which did not modify the path and
+		 * only fetch their IDs. This speeds up 'got blame'.
+		 */
+		if (!got_path_is_root_dir(graph->path) &&
+		    (commit->flags & GOT_COMMIT_FLAG_PACKED)) {
+			int ncommits = 0;
+			err = packed_first_parent_traversal(&ncommits,
+			    graph, qid->id, repo);
+			if (err || ncommits > 0)
+				return err;
+		}
 		return got_object_idset_add(graph->open_branches,
 		    qid->id, NULL);
 	}
@@ -284,33 +375,6 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 	return NULL;
 }
 
-static const struct got_error *
-add_node(struct got_commit_graph_node **new_node,
-    struct got_commit_graph *graph,
-    struct got_object_id *commit_id,
-    struct got_commit_object *commit,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_commit_graph_node *node;
-
-	*new_node = NULL;
-
-	node = calloc(1, sizeof(*node));
-	if (node == NULL)
-		return got_error_from_errno("calloc");
-
-	memcpy(&node->id, commit_id, sizeof(node->id));
-	node->timestamp = commit->committer_time;
-
-	err = got_object_idset_add(graph->node_ids, &node->id, NULL);
-	if (err)
-		free(node);
-	else
-		*new_node = node;
-	return err;
-}
-
 const struct got_error *
 got_commit_graph_open(struct got_commit_graph **graph,
     const char *path, int first_parent_traversal)
@@ -370,7 +434,7 @@ add_branch_tip(struct got_object_id *commit_id, void *data, void *arg)
 	if (err)
 		return err;
 
-	err = add_node(&new_node, a->graph, commit_id, commit, a->repo);
+	err = add_node(&new_node, a->graph, commit_id, a->repo);
 	if (err)
 		return err;
 
@@ -444,7 +508,8 @@ fetch_commits_from_open_branches(struct got_commit_graph *graph,
 			continue;
 		}
 		if (changed)
-			add_node_to_iter_list(graph, new_node);
+			add_node_to_iter_list(graph, new_node,
+			    got_object_commit_get_committer_time(commit));
 		err = advance_branch(graph, commit_id, commit, repo);
 		if (err)
 			break;

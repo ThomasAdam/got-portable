@@ -106,30 +106,23 @@ done:
 	return err;
 }
 
-static const struct got_error *
-commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
-    struct got_packidx *packidx, struct got_object_cache *objcache)
+const struct got_error *
+open_commit(struct got_commit_object **commit, struct got_pack *pack,
+    struct got_packidx *packidx, int obj_idx, struct got_object_id *id,
+    struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_packed_object iobj;
 	struct got_object *obj = NULL;
-	struct got_commit_object *commit = NULL;
 	uint8_t *buf = NULL;
 	size_t len;
-	struct got_object_id id;
-	size_t datalen;
 
-	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
-	if (datalen != sizeof(iobj))
-		return got_error(GOT_ERR_PRIVSEP_LEN);
-	memcpy(&iobj, imsg->data, sizeof(iobj));
-	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+	*commit = NULL;
 
-	obj = got_object_cache_get(objcache, &id);
+	obj = got_object_cache_get(objcache, id);
 	if (obj) {
 		obj->refcnt++;
 	} else {
-		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		err = open_object(&obj, pack, packidx, obj_idx, id,
 		    objcache);
 		if (err)
 			return err;
@@ -140,14 +133,36 @@ commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 		goto done;
 
 	obj->size = len;
-	err = got_object_parse_commit(&commit, buf, len);
+
+	err = got_object_parse_commit(commit, buf, len);
+done:
+	got_object_close(obj);
+	free(buf);
+	return err;
+}
+
+static const struct got_error *
+commit_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
+    struct got_packidx *packidx, struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_packed_object iobj;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id id;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	err = open_commit(&commit, pack, packidx, iobj.idx, &id, objcache);
 	if (err)
 		goto done;
 
 	err = got_privsep_send_commit(ibuf, commit);
 done:
-	free(buf);
-	got_object_close(obj);
 	if (commit)
 		got_object_commit_close(commit);
 	if (err) {
@@ -160,17 +175,53 @@ done:
 	return err;
 }
 
+const struct got_error *
+open_tree(uint8_t **buf, struct got_pathlist_head *entries, int *nentries,
+    struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
+    struct got_object_id *id, struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_object *obj = NULL;
+	size_t len;
+
+	*buf = NULL;
+	*nentries = 0;
+
+	obj = got_object_cache_get(objcache, id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, obj_idx, id,
+		    objcache);
+		if (err)
+			return err;
+	}
+
+	err = got_packfile_extract_object_to_mem(buf, &len, obj, pack);
+	if (err)
+		goto done;
+
+	obj->size = len;
+
+	err = got_object_parse_tree(entries, nentries, *buf, len);
+done:
+	got_object_close(obj);
+	if (err) {
+		free(*buf);
+		*buf = NULL;
+	}
+	return err;
+}
+
 static const struct got_error *
 tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
     struct got_packidx *packidx, struct got_object_cache *objcache)
 {
 	const struct got_error *err = NULL;
 	struct got_imsg_packed_object iobj;
-	struct got_object *obj = NULL;
 	struct got_pathlist_head entries;
 	int nentries = 0;
 	uint8_t *buf = NULL;
-	size_t len;
 	struct got_object_id id;
 	size_t datalen;
 
@@ -182,30 +233,14 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(&iobj, imsg->data, sizeof(iobj));
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
-	obj = got_object_cache_get(objcache, &id);
-	if (obj) {
-		obj->refcnt++;
-	} else {
-		err = open_object(&obj, pack, packidx, iobj.idx, &id,
-		    objcache);
-		if (err)
-			return err;
-	}
-
-	err = got_packfile_extract_object_to_mem(&buf, &len, obj, pack);
+	err = open_tree(&buf, &entries, &nentries, pack, packidx, iobj.idx,
+	     &id, objcache);
 	if (err)
-		goto done;
-
-	obj->size = len;
-	err = got_object_parse_tree(&entries, &nentries, buf, len);
-	if (err)
-		goto done;
+		return err;
 
 	err = got_privsep_send_tree(ibuf, &entries, nentries);
-done:
 	got_object_parsed_tree_entries_free(&entries);
 	free(buf);
-	got_object_close(obj);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -368,6 +403,325 @@ done:
 	got_object_close(obj);
 	if (tag)
 		got_object_tag_close(tag);
+	if (err) {
+		if (err->code == GOT_ERR_PRIVSEP_PIPE)
+			err = NULL;
+		else
+			got_privsep_send_error(ibuf, err);
+	}
+
+	return err;
+}
+
+static struct got_parsed_tree_entry *
+find_entry_by_name(struct got_pathlist_head *entries, int nentries,
+    const char *name, size_t len)
+{
+	struct got_pathlist_entry *pe;
+
+	/* Note that tree entries are sorted in strncmp() order. */
+	TAILQ_FOREACH(pe, entries, entry) {
+		int cmp = strncmp(pe->path, name, len);
+		if (cmp < 0)
+			continue;
+		if (cmp > 0)
+			break;
+		if (pe->path[len] == '\0')
+			return (struct got_parsed_tree_entry *)pe->data;
+	}
+	return NULL;
+}
+
+const struct got_error *
+tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
+    struct got_pathlist_head *entries1, int *nentries1,
+    struct got_pathlist_head *entries2, int *nentries2,
+    const char *path, struct got_pack *pack, struct got_packidx *packidx,
+    struct imsgbuf *ibuf, struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_parsed_tree_entry *pte1 = NULL, *pte2 = NULL;
+	const char *seg, *s;
+	size_t seglen;
+
+	*changed = 0;
+
+	/* We are expecting an absolute in-repository path. */
+	if (path[0] != '/')
+		return got_error(GOT_ERR_NOT_ABSPATH);
+
+	/* We not do support comparing the root path. */
+	if (path[1] == '\0')
+		return got_error(GOT_ERR_BAD_PATH);
+
+	s = path;
+	s++; /* skip leading '/' */
+	seg = s;
+	seglen = 0;
+	while (*s) {
+		if (*s != '/') {
+			s++;
+			seglen++;
+			if (*s)
+				continue;
+		}
+
+		pte1 = find_entry_by_name(entries1, *nentries1, seg, seglen);
+		if (pte1 == NULL) {
+			err = got_error(GOT_ERR_NO_OBJ);
+			break;
+		}
+
+		pte2 = find_entry_by_name(entries2, *nentries2, seg, seglen);
+		if (pte2 == NULL) {
+			*changed = 1;
+			break;
+		}
+
+		if (pte1->mode != pte2->mode) {
+			*changed = 1;
+			break;
+		}
+
+		if (memcmp(pte1->id, pte2->id, SHA1_DIGEST_LENGTH) == 0) {
+			*changed = 0;
+			break;
+		}
+
+		if (*s == '\0') { /* final path element */
+			*changed = 1;
+			break;
+		}
+
+		seg = s + 1;
+		s++;
+		seglen = 0;
+		if (*s) {
+			struct got_object_id id1, id2;
+			int idx;
+
+			idx = got_packidx_get_object_idx_sha1(packidx,
+			    pte1->id);
+			if (idx == -1) {
+				err = got_error(GOT_ERR_NO_OBJ);
+				break;
+			}
+			memcpy(id1.sha1, pte1->id, SHA1_DIGEST_LENGTH);
+			got_object_parsed_tree_entries_free(entries1);
+			*nentries1 = 0;
+			free(*buf1);
+			*buf1 = NULL;
+			err = open_tree(buf1, entries1, nentries1, pack,
+			    packidx, idx, &id1, objcache);
+			pte1 = NULL;
+			if (err)
+				break;
+
+			idx = got_packidx_get_object_idx_sha1(packidx,
+			    pte2->id);
+			if (idx == -1) {
+				err = got_error(GOT_ERR_NO_OBJ);
+				break;
+			}
+			memcpy(id2.sha1, pte2->id, SHA1_DIGEST_LENGTH);
+			got_object_parsed_tree_entries_free(entries2);
+			*nentries2 = 0;
+			free(*buf2);
+			*buf2 = NULL;
+			err = open_tree(buf2, entries2, nentries2, pack,
+			    packidx, idx, &id2, objcache);
+			pte2 = NULL;
+			if (err)
+				break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
+commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
+    struct got_pack *pack, struct got_packidx *packidx,
+    struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_packed_object iobj;
+	struct got_object_qid *pid;
+	struct got_commit_object *commit = NULL, *pcommit = NULL;
+	struct got_pathlist_head entries, pentries;
+	int nentries = 0, pnentries = 0;
+	struct got_object_id id;
+	size_t datalen, path_len;
+	char *path = NULL;
+	const int min_alloc = 64;
+	int changed = 0, ncommits = 0, nallocated = 0;
+	struct got_object_id *commit_ids = NULL;
+
+	TAILQ_INIT(&entries);
+	TAILQ_INIT(&pentries);
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	path_len = datalen - sizeof(iobj) - 1;
+	if (path_len < 0)
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	if (path_len > 0) {
+		path = imsg->data + sizeof(iobj);
+		if (path[path_len] != '\0')
+			return got_error(GOT_ERR_PRIVSEP_LEN);
+	}
+
+	nallocated = min_alloc;
+	commit_ids = reallocarray(NULL, nallocated, sizeof(*commit_ids));
+	if (commit_ids == NULL)
+		return got_error_from_errno("reallocarray");
+
+	do {
+		const size_t max_datalen = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
+		int idx;
+
+		if (sigint_received) {
+			err = got_error(GOT_ERR_CANCELLED);
+			goto done;
+		}
+
+		if (commit == NULL) {
+			idx = got_packidx_get_object_idx(packidx, &id);
+			if (idx == -1)
+				break;
+			err = open_commit(&commit, pack, packidx,
+			    idx, &id, objcache);
+			if (err) {
+				if (err->code != GOT_ERR_NO_OBJ)
+					goto done;
+				err = NULL;
+				break;
+			}
+		}
+
+		if (sizeof(struct got_imsg_traversed_commits) +
+		    ncommits * SHA1_DIGEST_LENGTH >= max_datalen) {
+			err = got_privsep_send_traversed_commits(commit_ids,
+			    ncommits, ibuf);
+			if (err)
+				goto done;
+			ncommits = 0;
+		}
+		ncommits++;
+		if (ncommits > nallocated) {
+			struct got_object_id *new;
+			nallocated += min_alloc;
+			new = reallocarray(commit_ids, nallocated,
+			    sizeof(*commit_ids));
+			if (new == NULL) {
+				err = got_error_from_errno("reallocarray");
+				goto done;
+			}
+			commit_ids = new;
+		}
+		memcpy(commit_ids[ncommits - 1].sha1, id.sha1,
+		    SHA1_DIGEST_LENGTH);
+
+		pid = SIMPLEQ_FIRST(&commit->parent_ids);
+		if (pid == NULL)
+			break;
+
+		idx = got_packidx_get_object_idx(packidx, pid->id);
+		if (idx == -1)
+			break;
+
+		err = open_commit(&pcommit, pack, packidx, idx, pid->id,
+		    objcache);
+		if (err) {
+			if (err->code != GOT_ERR_NO_OBJ)
+				goto done;
+			err = NULL;
+			break;
+		}
+
+		if (path[0] == '/' && path[1] == '\0') {
+			if (got_object_id_cmp(pcommit->tree_id,
+			    commit->tree_id) != 0) {
+				changed = 1;
+				break;
+			}
+		} else {
+			int pidx;
+			uint8_t *buf = NULL, *pbuf = NULL;
+
+			idx = got_packidx_get_object_idx(packidx,
+			    commit->tree_id);
+			if (idx == -1)
+				break;
+			pidx = got_packidx_get_object_idx(packidx,
+			    pcommit->tree_id);
+			if (pidx == -1)
+				break;
+
+			err = open_tree(&buf, &entries, &nentries, pack,
+			    packidx, idx, commit->tree_id, objcache);
+			if (err)
+				goto done;
+			err = open_tree(&pbuf, &pentries, &pnentries, pack,
+			    packidx, pidx, pcommit->tree_id, objcache);
+			if (err) {
+				free(buf);
+				goto done;
+			}
+
+			err = tree_path_changed(&changed, &buf, &pbuf,
+			    &entries, &nentries, &pentries, &pnentries, path,
+			    pack, packidx, ibuf, objcache);
+
+			got_object_parsed_tree_entries_free(&entries);
+			nentries = 0;
+			free(buf);
+			got_object_parsed_tree_entries_free(&pentries);
+			pnentries = 0;
+			free(pbuf);
+			if (err) {
+				if (err->code != GOT_ERR_NO_OBJ)
+					goto done;
+				err = NULL;
+				break;
+			}
+		}
+
+		if (!changed) {
+			memcpy(id.sha1, pid->id->sha1, SHA1_DIGEST_LENGTH);
+			got_object_commit_close(commit);
+			commit = pcommit;
+			pcommit = NULL;
+		}
+	} while (!changed);
+
+	if (ncommits > 0) {
+		err = got_privsep_send_traversed_commits(commit_ids,
+		    ncommits, ibuf);
+		if (err)
+			goto done;
+
+		if (changed) {
+			err = got_privsep_send_commit(ibuf, commit);
+			if (err)
+				goto done;
+		}
+	}
+	err = got_privsep_send_commit_traversal_done(ibuf);
+done:
+	free(commit_ids);
+	if (commit)
+		got_object_commit_close(commit);
+	if (pcommit)
+		got_object_commit_close(pcommit);
+	if (nentries != 0)
+		got_object_parsed_tree_entries_free(&entries);
+	if (pnentries != 0)
+		got_object_parsed_tree_entries_free(&pentries);
 	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -605,6 +959,10 @@ main(int argc, char *argv[])
 		case GOT_IMSG_TAG_REQUEST:
 			err = tag_request(&imsg, &ibuf, pack, packidx,
 			   &objcache);
+			break;
+		case GOT_IMSG_COMMIT_TRAVERSAL_REQUEST:
+			err = commit_traversal_request(&imsg, &ibuf, pack,
+			    packidx, &objcache);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);

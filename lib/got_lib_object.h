@@ -47,6 +47,9 @@ struct got_commit_object {
 	time_t committer_gmtoff;
 	char *logmsg;
 	int refcnt;		/* > 0 if open and/or cached */
+
+	int flags;
+#define GOT_COMMIT_FLAG_PACKED		0x01
 };
 
 struct got_tree_entry {
@@ -102,3 +105,7 @@ const struct got_error *got_object_tag_open(struct got_tag_object **,
     struct got_repository *, struct got_object *);
 const struct got_error *got_object_tree_entry_dup(struct got_tree_entry **,
     struct got_tree_entry *);
+
+const struct got_error *got_traverse_packed_commits(
+    struct got_object_id_queue *, struct got_object_id *, const char *,
+    struct got_repository *);
