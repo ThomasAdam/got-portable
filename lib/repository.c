@@ -850,12 +850,17 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			break;
 		*idx = got_packidx_get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
-			struct got_packidx *p;
-			/* Move matched cache entry to the front. */
-			p = repo->packidx_cache[0];
 			*packidx = repo->packidx_cache[i];
-			repo->packidx_cache[0] = *packidx;
-			repo->packidx_cache[i] = p;
+			/*
+			 * Move this cache entry to the front. Repeatedly
+			 * searching a wrong pack index can be expensive.
+			 */
+			if (i > 0) {
+				struct got_packidx *p;
+				p = repo->packidx_cache[0];
+				repo->packidx_cache[0] = *packidx;
+				repo->packidx_cache[i] = p;
+			}
 			return NULL;
 		}
 	}
