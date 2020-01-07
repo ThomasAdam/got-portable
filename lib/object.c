@@ -307,8 +307,6 @@ open_packed_object(struct got_object **obj, struct got_object_id *id,
 	err = read_packed_object_privsep(obj, repo, pack, packidx, idx, id);
 	if (err)
 		goto done;
-
-	err = got_repo_cache_pack(NULL, repo, path_packfile, packidx);
 done:
 	free(path_packfile);
 	return err;

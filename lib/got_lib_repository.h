@@ -67,8 +67,6 @@ const struct got_error*got_repo_cache_tag(struct got_repository *,
     struct got_object_id *, struct got_tag_object *);
 struct got_tag_object *got_repo_get_cached_tag(struct got_repository *,
     struct got_object_id *);
-const struct got_error *got_repo_cache_packidx(struct got_repository *,
-    struct got_packidx *);
 const struct got_error *got_repo_search_packidx(struct got_packidx **, int *,
     struct got_repository *, struct got_object_id *);
 const struct got_error *got_repo_cache_pack(struct got_pack **,

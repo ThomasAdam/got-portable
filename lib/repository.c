@@ -784,8 +784,9 @@ done:
 	return err;
 }
 
-const struct got_error *
-got_repo_cache_packidx(struct got_repository *repo, struct got_packidx *packidx)
+static const struct got_error *
+cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
+    const char *path_packidx)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -793,6 +794,10 @@ got_repo_cache_packidx(struct got_repository *repo, struct got_packidx *packidx)
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
+		if (strcmp(repo->packidx_cache[i]->path_packidx,
+		    path_packidx) == 0) {
+			return got_error(GOT_ERR_CACHE_DUP_ENTRY);
+		}
 	}
 	if (i == nitems(repo->packidx_cache)) {
 		err = got_packidx_close(repo->packidx_cache[i - 1]);
@@ -845,7 +850,12 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			break;
 		*idx = got_packidx_get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
+			struct got_packidx *p;
+			/* Move matched cache entry to the front. */
+			p = repo->packidx_cache[0];
 			*packidx = repo->packidx_cache[i];
+			repo->packidx_cache[0] = *packidx;
+			repo->packidx_cache[i] = p;
 			return NULL;
 		}
 	}
@@ -865,6 +875,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
+		int is_cached = 0;
+
 		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
@@ -874,7 +886,27 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 		}
 
+		for (i = 0; i < nitems(repo->packidx_cache); i++) {
+			if (repo->packidx_cache[i] == NULL)
+				break;
+			if (strcmp(repo->packidx_cache[i]->path_packidx,
+			    path_packidx) == 0) {
+				is_cached = 1;
+				break;
+			}
+		}
+		if (is_cached) {
+			free(path_packidx);
+			continue; /* already searched */
+		}
+
 		err = got_packidx_open(packidx, path_packidx, 0);
+		if (err) {
+			free(path_packidx);
+			goto done;
+		}
+
+		err = cache_packidx(repo, *packidx, path_packidx);
 		free(path_packidx);
 		if (err)
 			goto done;
@@ -882,14 +914,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 		*idx = got_packidx_get_object_idx(*packidx, id);
 		if (*idx != -1) {
 			err = NULL; /* found the object */
-			err = got_repo_cache_packidx(repo, *packidx);
 			goto done;
 		}
-
-		err = got_packidx_close(*packidx);
-		*packidx = NULL;
-		if (err)
-			goto done;
 	}
 
 	err = got_error_no_obj(id);
@@ -959,7 +985,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 		if (pack->path_packfile == NULL)
 			break;
 		if (strcmp(pack->path_packfile, path_packfile) == 0)
-			return NULL;
+			return got_error(GOT_ERR_CACHE_DUP_ENTRY);
 	}
 
 	if (i == nitems(repo->packs) - 1) {

@@ -129,6 +129,7 @@
 #define GOT_ERR_REF_NAME_MINUS	113
 #define GOT_ERR_GITCONFIG_SYNTAX 114
 #define GOT_ERR_REBASE_OUT_OF_DATE 115
+#define GOT_ERR_CACHE_DUP_ENTRY	116
 
 static const struct got_error {
 	int code;
@@ -265,6 +266,7 @@ static const struct got_error {
 	{ GOT_ERR_GITCONFIG_SYNTAX, "gitconfig syntax error" },
 	{ GOT_ERR_REBASE_OUT_OF_DATE, "work tree must be updated before it "
 	    "can be used to rebase a branch" },
+	{ GOT_ERR_CACHE_DUP_ENTRY, "duplicate cache entry" },
 };
 
 /*
