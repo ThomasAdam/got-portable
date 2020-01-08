@@ -1,3 +1,15 @@
+* got 0.24; 2020-01-08
+- do not open and close pack index files needlessly
+- fix 'got log' and 'tog log' performance issue when lots of tags exist
+- do history traversal in got-read-pack to improve 'got blame' performance
+- plug memory leaks in got-read-commit, got-read-tree, and got-read-pack
+- fix reading reference deltas with GOT_PACK_NO_MMAP builds
+- disable got-read-pack's delta cache in GOT_NO_OBJ_CACHE builds
+- make it possible to run regress tests with packed repositories
+- more portable string comparison in Makefile.inc (patch by Edgar Pettijohn)
+- prevent rebase with an out-of-date work tree
+- make 'got checkout' and 'got update' work with read-only repositories
+
 * got 0.23; 2019-12-16
 - prevent status crawl from racing with paths changing in the filesystem
 - add -k option to 'got remove' to keep files on disk (Tracey Emery)
