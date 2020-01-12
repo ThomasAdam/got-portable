@@ -1793,21 +1793,25 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 
 	*new_view = tree_view;
 
+	if (got_path_is_root_dir(path))
+		return NULL;
+		
 	/* Walk the path and open corresponding tree objects. */
 	p = path;
-	while (p[0] == '/')
-		p++;
 	while (*p) {
 		struct got_tree_entry *te;
 		struct got_object_id *tree_id;
 		char *te_name;
 
+		while (p[0] == '/')
+			p++;
+
 		/* Ensure the correct subtree entry is selected. */
 		slash = strchr(p, '/');
 		if (slash == NULL)
-			slash = strchr(p, '\0');
-
-		te_name = strndup(p, slash -p);
+			te_name = strdup(p);
+		else
+			te_name = strndup(p, slash - p);
 		if (te_name == NULL) {
 			err = got_error_from_errno("strndup");
 			break;
