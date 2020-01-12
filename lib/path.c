@@ -391,9 +391,10 @@ got_path_basename(char **s, const char *path)
 void
 got_path_strip_trailing_slashes(char *path)
 {
-	int x;
+	size_t x;
 
-	while (path[x = strlen(path) - 1] == '/')
+	x = strlen(path);
+	while (x-- > 0 && path[x] == '/')
 		path[x] = '\0';
 }
 
