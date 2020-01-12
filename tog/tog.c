@@ -1879,11 +1879,6 @@ log_thread(void *arg)
 	struct tog_log_thread_args *a = arg;
 	int done = 0;
 
-	err = got_commit_graph_iter_start(a->graph, a->start_id, a->repo,
-	    NULL, NULL);
-	if (err)
-		return (void *)err;
-
 	while (!done && !err && !tog_sigpipe_received) {
 		err = queue_commits(a->graph, a->commits, 1, a->repo,
 		    a->in_repo_path, a->searching, a->search_next_done,
@@ -2158,6 +2153,10 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	if (err)
 		goto done;
 	err = got_commit_graph_open(&thread_graph, s->in_repo_path, 0);
+	if (err)
+		goto done;
+	err = got_commit_graph_iter_start(thread_graph,
+	     s->start_id, s->repo, NULL, NULL);
 	if (err)
 		goto done;
 
