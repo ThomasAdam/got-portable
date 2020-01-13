@@ -36,6 +36,7 @@
 #include <time.h>
 #include <paths.h>
 #include <regex.h>
+#include <getopt.h>
 
 #include "got_version.h"
 #include "got_error.h"
@@ -176,10 +177,14 @@ main(int argc, char *argv[])
 	unsigned int i;
 	int ch;
 	int hflag = 0, Vflag = 0;
+	static struct option longopts[] = {
+	     { "version", no_argument, NULL, 'V' },
+	     { NULL, 0, NULL, 0}
+	};
 
 	setlocale(LC_CTYPE, "");
 
-	while ((ch = getopt(argc, argv, "hV")) != -1) {
+	while ((ch = getopt_long(argc, argv, "hV", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			hflag = 1;

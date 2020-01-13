@@ -5099,10 +5099,14 @@ main(int argc, char *argv[])
 	struct tog_cmd *cmd = NULL;
 	int ch, hflag = 0, Vflag = 0;
 	char **cmd_argv = NULL;
+	static struct option longopts[] = {
+	     { "version", no_argument, NULL, 'V' },
+	     { NULL, 0, NULL, 0}
+	};
 
 	setlocale(LC_CTYPE, "");
 
-	while ((ch = getopt(argc, argv, "hV")) != -1) {
+	while ((ch = getopt_long(argc, argv, "hV", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			hflag = 1;
