@@ -5106,7 +5106,7 @@ main(int argc, char *argv[])
 
 	setlocale(LC_CTYPE, "");
 
-	while ((ch = getopt_long(argc, argv, "hV", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "+hV", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'h':
 			hflag = 1;
