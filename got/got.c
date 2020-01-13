@@ -247,7 +247,7 @@ main(int argc, char *argv[])
 __dead static void
 usage(int hflag)
 {
-	fprintf(stderr, "usage: %s [-h] [-V] command [arg ...]\n",
+	fprintf(stderr, "usage: %s [-h] [-V | --version] command [arg ...]\n",
 	    getprogname());
 	if (hflag)
 		list_commands();
