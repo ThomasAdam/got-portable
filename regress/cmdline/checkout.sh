@@ -356,6 +356,146 @@ function test_checkout_read_only {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_into_nonempty_dir {
+	local testroot=`test_init checkout_into_nonempty_dir`
+
+	mkdir -p $testroot/wt
+	make_test_tree $testroot/wt
+
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "checkout succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: $testroot/wt: directory exists and is not empty" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "U  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "U  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "U  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "E  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	echo "E  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "E  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty
@@ -364,3 +504,4 @@ run_test test_checkout_commit_from_wrong_branch
 run_test test_checkout_tag
 run_test test_checkout_ignores_submodules
 run_test test_checkout_read_only
+run_test test_checkout_into_nonempty_dir

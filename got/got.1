@@ -136,8 +136,14 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
-.It Cm checkout Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
+.It Cm checkout  Oo Fl E Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit OcOo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
 Copy files from a repository into a new work tree.
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It A Ta new file was added
+.It E Ta file already exists in work tree's meta-data
+.El
+.Pp
 If the
 .Ar work tree path
 is not specified, either use the last component of
@@ -151,6 +157,11 @@ The options for
 .Cm got checkout
 are as follows:
 .Bl -tag -width Ds
+.It Fl E
+Proceed with the checkout operation even if the directory at
+.Ar work-tree-path
+is not empty.
+Existing files will be left intact.
 .It Fl b Ar branch
 Check out files from a commit on the specified
 .Ar branch .

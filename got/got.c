@@ -799,7 +799,7 @@ done:
 __dead static void
 usage_checkout(void)
 {
-	fprintf(stderr, "usage: %s checkout [-b branch] [-c commit] "
+	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
 	    "[-p prefix] repository-path [worktree-path]\n", getprogname());
 	exit(1);
 }
@@ -998,13 +998,13 @@ cmd_checkout(int argc, char *argv[])
 	const char *path_prefix = "";
 	const char *branch_name = GOT_REF_HEAD;
 	char *commit_id_str = NULL;
-	int ch, same_path_prefix;
+	int ch, same_path_prefix, allow_nonempty = 0;
 	struct got_pathlist_head paths;
 	struct got_checkout_progress_arg cpa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "b:c:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:c:Ep:")) != -1) {
 		switch (ch) {
 		case 'b':
 			branch_name = optarg;
@@ -1013,6 +1013,9 @@ cmd_checkout(int argc, char *argv[])
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
 				return got_error_from_errno("strdup");
+			break;
+		case 'E':
+			allow_nonempty = 1;
 			break;
 		case 'p':
 			path_prefix = optarg;
@@ -1100,7 +1103,8 @@ cmd_checkout(int argc, char *argv[])
 		if (!(error->code == GOT_ERR_ERRNO && errno == EISDIR) &&
 		    !(error->code == GOT_ERR_ERRNO && errno == EEXIST))
 			goto done;
-		if (!got_path_dir_is_empty(worktree_path)) {
+		if (!allow_nonempty &&
+		    !got_path_dir_is_empty(worktree_path)) {
 			error = got_error_path(worktree_path,
 			    GOT_ERR_DIR_NOT_EMPTY);
 			goto done;

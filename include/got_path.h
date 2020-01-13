@@ -16,8 +16,10 @@
 
 /* Utilities for dealing with filesystem paths. */
 
-#define GOT_DEFAULT_FILE_MODE	(S_IRUSR|S_IWUSR | S_IRGRP | S_IROTH)
-#define GOT_DEFAULT_DIR_MODE	(S_IRWXU | S_IRGRP|S_IXGRP | S_IROTH|S_IXOTH)
+#define GOT_DEFAULT_FILE_MODE	(S_IFREG | \
+	S_IRUSR|S_IWUSR | S_IRGRP | S_IROTH)
+#define GOT_DEFAULT_DIR_MODE	(S_IFDIR | \
+	S_IRWXU | S_IRGRP|S_IXGRP | S_IROTH|S_IXOTH)
 
 /* Determine whether a path is an absolute path. */
 int got_path_is_absolute(const char *);
