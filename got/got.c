@@ -358,9 +358,6 @@ cmd_init(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_init(repo_path);
-	if (error != NULL)
-		goto done;
-
 done:
 	free(repo_path);
 	return error;
@@ -1175,7 +1172,6 @@ cmd_checkout(int argc, char *argv[])
 	printf("Now shut up and hack\n");
 	if (cpa.had_base_commit_ref_error)
 		show_worktree_base_ref_warning();
-
 done:
 	got_pathlist_free(&paths);
 	free(commit_id_str);
@@ -1594,7 +1590,6 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
 		err = diff_trees(obj_id1, obj_id2, "", diff_context, 0, repo);
 	}
-
 done:
 	free(id_str1);
 	free(id_str2);
@@ -2472,7 +2467,6 @@ cmd_diff(int argc, char *argv[])
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	}
-
 done:
 	free(label1);
 	free(label2);
@@ -2783,8 +2777,6 @@ cmd_blame(int argc, char *argv[])
 
 	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca,
 	    check_cancelled, NULL);
-	if (error)
-		goto done;
 done:
 	free(in_repo_path);
 	free(repo_path);
@@ -4486,8 +4478,6 @@ cmd_remove(int argc, char *argv[])
 
 	error = got_worktree_schedule_delete(worktree, &paths,
 	    delete_local_mods, print_remove_status, NULL, repo, keep_on_disk);
-	if (error)
-		goto done;
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -4740,8 +4730,6 @@ cmd_revert(int argc, char *argv[])
 	cpa.action = "revert";
 	error = got_worktree_revert(worktree, &paths, revert_progress, NULL,
 	    pflag ? choose_patch : NULL, &cpa, repo);
-	if (error)
-		goto done;
 done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
@@ -5871,7 +5859,6 @@ append_folded_commit_msg(char **new_msg, struct got_histedit_list_entry *hle,
 	    logmsg ? logmsg : "", logmsg ? "\n" : "", id_str,
 	    folded_logmsg) == -1) {
 		err = got_error_from_errno("asprintf");
-		goto done;
 	}
 done:
 	if (folded_commit)
@@ -6384,7 +6371,6 @@ show_histedit_progress(struct got_commit_object *commit,
 	default:
 		break;
 	}
-
 done:
 	free(old_id_str);
 	free(new_id_str);
@@ -7454,7 +7440,6 @@ cmd_cat(int argc, char *argv[])
 		free(id);
 		id = NULL;
 	}
-
 done:
 	free(label);
 	free(id);
