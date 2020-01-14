@@ -170,5 +170,53 @@ function test_tag_list {
 	test_done "$testroot" "$ret"
 }
 
+function test_tag_list_lightweight {
+	local testroot=`test_init tag_list_lightweight`
+	local commit_id=`git_show_head $testroot/repo`
+	local tag=1.0.0
+	local tag2=2.0.0
+
+	# create "lightweight" tag with Git
+	(cd $testroot/repo && git tag $tag)
+	(cd $testroot/repo && git tag $tag2)
+
+	tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+	local tagger_time=`git_show_author_time $testroot/repo $tag`
+	d1=`env TZ=UTC date -r $tagger_time +"%a %b %e %X %Y UTC"`
+	tag_id2=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
+	local tagger_time2=`git_show_author_time $testroot/repo $tag2`
+	d2=`env TZ=UTC date -r $tagger_time2 +"%a %b %e %X %Y UTC"`
+
+	got tag -r $testroot/repo -l > $testroot/stdout
+
+	echo "-----------------------------------------------" \
+		> $testroot/stdout.expected
+	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d1" >> $testroot/stdout.expected
+	echo "object: commit $commit_id" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " adding the test tree" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo "-----------------------------------------------" \
+		>> $testroot/stdout.expected
+	echo "tag $tag $tag_id" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d2" >> $testroot/stdout.expected
+	echo "object: commit $commit_id" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " adding the test tree" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_tag_create
 run_test test_tag_list
+run_test test_tag_list_lightweight

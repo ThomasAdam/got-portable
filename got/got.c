@@ -3764,6 +3764,7 @@ cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
 	struct got_repository *repo = arg;
 	struct got_object_id *id1, *id2 = NULL;
 	struct got_tag_object *tag1 = NULL, *tag2 = NULL;
+	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
 	time_t time1, time2;
 
 	*cmp = 0;
@@ -3772,18 +3773,31 @@ cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
 	if (err)
 		return err;
 	err = got_object_open_as_tag(&tag1, repo, id1);
-	if (err)
-		goto done;
+	if (err) {
+		if (err->code != GOT_ERR_OBJ_TYPE)
+			goto done;
+		/* "lightweight" tag */
+		err = got_object_open_as_commit(&commit1, repo, id1);
+		if (err)
+			goto done;
+		time1 = got_object_commit_get_committer_time(commit1);
+	} else
+		time1 = got_object_tag_get_tagger_time(tag1);
 
 	err = got_ref_resolve(&id2, repo, ref2);
 	if (err)
 		goto done;
 	err = got_object_open_as_tag(&tag2, repo, id2);
-	if (err)
-		goto done;
-
-	time1 = got_object_tag_get_tagger_time(tag1);
-	time2 = got_object_tag_get_tagger_time(tag2);
+	if (err) {
+		if (err->code != GOT_ERR_OBJ_TYPE)
+			goto done;
+		/* "lightweight" tag */
+		err = got_object_open_as_commit(&commit2, repo, id2);
+		if (err)
+			goto done;
+		time2 = got_object_commit_get_committer_time(commit2);
+	} else
+		time2 = got_object_tag_get_tagger_time(tag2);
 
 	/* Put latest tags first. */
 	if (time1 < time2)
@@ -3799,6 +3813,10 @@ done:
 		got_object_tag_close(tag1);
 	if (tag2)
 		got_object_tag_close(tag2);
+	if (commit1)
+		got_object_commit_close(commit1);
+	if (commit2)
+		got_object_commit_close(commit2);
 	return err;
 }
 
@@ -3819,9 +3837,11 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 		const char *refname;
 		char *refstr, *tagmsg0, *tagmsg, *line, *id_str, *datestr;
 		char datebuf[26];
+		const char *tagger;
 		time_t tagger_time;
 		struct got_object_id *id;
 		struct got_tag_object *tag;
+		struct got_commit_object *commit = NULL;
 
 		refname = got_ref_get_name(re->ref);
 		if (strncmp(refname, "refs/tags/", 10) != 0)
@@ -3839,40 +3859,74 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 		if (err)
 			break;
 		err = got_object_open_as_tag(&tag, repo, id);
-		free(id);
-		if (err)
-			break;
-		printf("from: %s\n", got_object_tag_get_tagger(tag));
-		tagger_time = got_object_tag_get_tagger_time(tag);
+		if (err) {
+			if (err->code != GOT_ERR_OBJ_TYPE) {
+				free(id);
+				break;
+			}
+			/* "lightweight" tag */
+			err = got_object_open_as_commit(&commit, repo, id);
+			if (err) {
+				free(id);
+				break;
+			}
+			tagger = got_object_commit_get_committer(commit);
+			tagger_time =
+			    got_object_commit_get_committer_time(commit);
+			err = got_object_id_str(&id_str, id);
+			free(id);
+			if (err)
+				break;
+		} else {
+			free(id);
+			tagger = got_object_tag_get_tagger(tag);
+			tagger_time = got_object_tag_get_tagger_time(tag);
+			err = got_object_id_str(&id_str,
+			    got_object_tag_get_object_id(tag));
+			if (err)
+				break;
+		}
+		printf("from: %s\n", tagger);
 		datestr = get_datestr(&tagger_time, datebuf);
 		if (datestr)
 			printf("date: %s UTC\n", datestr);
-		err = got_object_id_str(&id_str,
-		    got_object_tag_get_object_id(tag));
-		if (err)
-			break;
-		switch (got_object_tag_get_object_type(tag)) {
-		case GOT_OBJ_TYPE_BLOB:
-			printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB, id_str);
-			break;
-		case GOT_OBJ_TYPE_TREE:
-			printf("object: %s %s\n", GOT_OBJ_LABEL_TREE, id_str);
-			break;
-		case GOT_OBJ_TYPE_COMMIT:
+		if (commit)
 			printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str);
-			break;
-		case GOT_OBJ_TYPE_TAG:
-			printf("object: %s %s\n", GOT_OBJ_LABEL_TAG, id_str);
-			break;
-		default:
-			break;
+		else {
+			switch (got_object_tag_get_object_type(tag)) {
+			case GOT_OBJ_TYPE_BLOB:
+				printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB,
+				    id_str);
+				break;
+			case GOT_OBJ_TYPE_TREE:
+				printf("object: %s %s\n", GOT_OBJ_LABEL_TREE,
+				    id_str);
+				break;
+			case GOT_OBJ_TYPE_COMMIT:
+				printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT,
+				    id_str);
+				break;
+			case GOT_OBJ_TYPE_TAG:
+				printf("object: %s %s\n", GOT_OBJ_LABEL_TAG,
+				    id_str);
+				break;
+			default:
+				break;
+			}
 		}
 		free(id_str);
-		tagmsg0 = strdup(got_object_tag_get_message(tag));
-		got_object_tag_close(tag);
-		if (tagmsg0 == NULL) {
-			err = got_error_from_errno("strdup");
-			break;
+		if (commit) {
+			err = got_object_commit_get_logmsg(&tagmsg0, commit);
+			if (err)
+				break;
+			got_object_commit_close(commit);
+		} else {
+			tagmsg0 = strdup(got_object_tag_get_message(tag));
+			got_object_tag_close(tag);
+			if (tagmsg0 == NULL) {
+				err = got_error_from_errno("strdup");
+				break;
+			}
 		}
 
 		tagmsg = tagmsg0;
