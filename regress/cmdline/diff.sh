@@ -238,6 +238,67 @@ function test_diff_tag {
 	test_done "$testroot" "$ret"
 }
 
+function test_diff_lightweight_tag {
+	local testroot=`test_init diff_tag`
+	local commit_id0=`git_show_head $testroot/repo`
+	local tag1=1.0.0
+	local tag2=2.0.0
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "changed alpha"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git tag $tag1)
+
+	echo "new file" > $testroot/repo/new
+	(cd $testroot/repo && git add new)
+	git_commit $testroot/repo -m "new file"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git tag $tag2)
+
+	echo "diff $commit_id0 refs/tags/$tag1" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id0 -i | grep 'alpha$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+
+	got diff -r $testroot/repo $commit_id0 $tag1 > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff refs/tags/$tag1 refs/tags/$tag2" > $testroot/stdout.expected
+	echo "blob - /dev/null" >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i -c $commit_id2 | grep 'new$' | \
+		cut -d' ' -f 1 | tr -d '\n' >> $testroot/stdout.expected
+	echo " (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	got diff -r $testroot/repo $tag1 $tag2 > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_diff_ignore_whitespace {
 	local testroot=`test_init diff_ignore_whitespace`
 	local commit_id0=`git_show_head $testroot/repo`
@@ -270,4 +331,5 @@ function test_diff_ignore_whitespace {
 run_test test_diff_basic
 run_test test_diff_shows_conflict
 run_test test_diff_tag
+run_test test_diff_lightweight_tag
 run_test test_diff_ignore_whitespace

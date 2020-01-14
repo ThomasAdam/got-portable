@@ -2253,7 +2253,8 @@ match_object_id(struct got_object_id **id, char **label,
 			}
 			got_object_tag_close(tag);
 			return err;
-		} else if (err->code != GOT_ERR_NO_OBJ)
+		} else if (err->code != GOT_ERR_OBJ_TYPE &&
+		    err->code != GOT_ERR_NO_OBJ)
 			return err;
 	}
 
