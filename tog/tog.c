@@ -24,6 +24,7 @@
 #undef _XOPEN_SOURCE_EXTENDED
 #include <panel.h>
 #include <locale.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
@@ -470,6 +471,7 @@ static const struct got_error *search_next_tree_view(struct tog_view *);
 
 static volatile sig_atomic_t tog_sigwinch_received;
 static volatile sig_atomic_t tog_sigpipe_received;
+static volatile sig_atomic_t tog_sigcont_received;
 
 static void
 tog_sigwinch(int signo)
@@ -481,6 +483,12 @@ static void
 tog_sigpipe(int signo)
 {
 	tog_sigpipe_received = 1;
+}
+
+static void
+tog_sigcont(int signo)
+{
+	tog_sigcont_received = 1;
 }
 
 static const struct got_error *
@@ -763,9 +771,10 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		return got_error_set_errno(errcode, "pthread_mutex_lock");
 	nodelay(stdscr, TRUE);
 
-	if (tog_sigwinch_received) {
+	if (tog_sigwinch_received || tog_sigcont_received) {
 		tog_resizeterm();
 		tog_sigwinch_received = 0;
+		tog_sigcont_received = 0;
 		TAILQ_FOREACH(v, views, entry) {
 			err = view_resize(v);
 			if (err)
@@ -1871,6 +1880,32 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	return err;
 }
 
+static const struct got_error *
+block_signals_used_by_main_thread(void)
+{
+	sigset_t sigset;
+	int errcode;
+
+	if (sigemptyset(&sigset) == -1)
+		return got_error_from_errno("sigemptyset");
+
+	/* tog handles SIGWINCH and SIGCONT */
+	if (sigaddset(&sigset, SIGWINCH) == -1)
+		return got_error_from_errno("sigaddset");
+	if (sigaddset(&sigset, SIGCONT) == -1)
+		return got_error_from_errno("sigaddset");
+
+	/* ncurses handles SIGTSTP */
+	if (sigaddset(&sigset, SIGTSTP) == -1)
+		return got_error_from_errno("sigaddset");
+
+	errcode = pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+	if (errcode)
+		return got_error_set_errno(errcode, "pthread_sigmask");
+
+	return NULL;
+}
+
 static void *
 log_thread(void *arg)
 {
@@ -1878,6 +1913,10 @@ log_thread(void *arg)
 	int errcode = 0;
 	struct tog_log_thread_args *a = arg;
 	int done = 0;
+
+	err = block_signals_used_by_main_thread();
+	if (err)
+		return (void *)err;
 
 	while (!done && !err && !tog_sigpipe_received) {
 		err = queue_commits(a->graph, a->commits, 1, a->repo,
@@ -2453,6 +2492,7 @@ init_curses(void)
 	}
 	signal(SIGWINCH, tog_sigwinch);
 	signal(SIGPIPE, tog_sigpipe);
+	signal(SIGCONT, tog_sigcont);
 }
 
 static const struct got_error *
@@ -3522,6 +3562,10 @@ blame_thread(void *arg)
 	struct tog_blame_thread_args *ta = arg;
 	struct tog_blame_cb_args *a = ta->cb_args;
 	int errcode;
+
+	err = block_signals_used_by_main_thread();
+	if (err)
+		return (void *)err;
 
 	err = got_blame(ta->path, a->commit_id, ta->repo,
 	    blame_cb, ta->cb_args, ta->cancel_cb, ta->cancel_arg);
