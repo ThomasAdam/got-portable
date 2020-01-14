@@ -1,3 +1,14 @@
+* got 0.25; 2020-01-14
+- fix suspending and resuming tog with Ctrl-Z and fg (reported by naddy@)
+- fix 'tog tree' usage displayed in error case (patch by naddy@)
+- support Git-style "lightweight" tags as arguments for 'got diff'
+- handle Git-style "lightweight" tags in got tag -l
+- make got and tog accept a --version argument (prompted by tedu@)
+- add -E option to 'got checkout' allowing use of a non-empty work tree path
+- make 'tog log PATH' fail when a non-existent path is specified
+- fix out of bounds access (patch by Martin <openbsd () academicsolutions ! ch>)
+- fix switching to tog's tree view when logging a path (reported by naddy@)
+
 * got 0.24; 2020-01-08
 - do not open and close pack index files needlessly
 - fix 'got log' and 'tog log' performance issue when lots of tags exist
