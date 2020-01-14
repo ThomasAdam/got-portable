@@ -4987,7 +4987,7 @@ cmd_tree(int argc, char *argv[])
 		if (repo_path == NULL)
 			return got_error_from_errno2("realpath", argv[0]);
 	} else
-		usage_log();
+		usage_tree();
 
 	init_curses();
 
