@@ -185,7 +185,7 @@ static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
 static const struct got_error*	 gw_load_got_path(struct gw_trans *,
 				    struct gw_dir *);
 static const struct got_error*	 gw_parse_querystring(struct gw_trans *);
-static const struct got_error*	 match_logmsg(int *, struct got_object_id *,
+static const struct got_error*	 gw_match_logmsg(int *, struct got_object_id *,
 				    struct got_commit_object *, regex_t *);
 
 static const struct got_error*	 gw_blame(struct gw_trans *);
@@ -968,7 +968,7 @@ gw_init_gw_dir(char *dir)
 }
 
 static const struct got_error*
-match_logmsg(int *have_match, struct got_object_id *id,
+gw_match_logmsg(int *have_match, struct got_object_id *id,
     struct got_commit_object *commit, regex_t *regex)
 {
 	const struct got_error *err = NULL;
@@ -1607,7 +1607,7 @@ gw_get_repo_log(struct gw_trans *gw_trans, const char *search_pattern,
 			break;
 
 		if (search_pattern) {
-			error = match_logmsg(&have_match, id1, commit,
+			error = gw_match_logmsg(&have_match, id1, commit,
 			    &regex);
 			if (error) {
 				got_object_commit_close(commit);
