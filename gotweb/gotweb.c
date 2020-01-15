@@ -414,7 +414,7 @@ gw_summary(struct trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
 	     *cloneurl_html, *shortlog, *tags, *heads, *shortlog_html,
-	     *tags_html, *heads_html;
+	     *tags_html, *heads_html, *age;
 
 	error = apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -446,14 +446,15 @@ gw_summary(struct trans *gw_trans)
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_age) {
-		if (gw_trans->gw_dir->age != NULL &&
-		    (strcmp(gw_trans->gw_dir->age, "") != 0)) {
-			if ((asprintf(&repo_age_html, last_change,
-			    gw_trans->gw_dir->age)) == -1)
+		age = gw_get_repo_age(gw_trans, gw_trans->gw_dir->path,
+		    "refs/heads", TM_LONG);
+		if (age != NULL && (strcmp(age, "") != 0)) {
+			if ((asprintf(&repo_age_html, last_change, age)) == -1)
 				return got_error_from_errno("asprintf");
 
 			khttp_puts(gw_trans->gw_req, repo_age_html);
 			free(repo_age_html);
+			free(age);
 		}
 	}
 
@@ -1055,10 +1056,98 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 static char *
 gw_get_repo_shortlog(struct trans *gw_trans)
 {
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	struct got_reflist_head refs;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id *id = NULL;
+	char *start_commit = NULL, *head_ref_name = NULL;
 	char *shortlog = NULL;
+
+	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	if (start_commit == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		if (error != NULL)
+			return NULL;
+		error = got_ref_resolve(&id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			return NULL;
+		error = got_object_open_as_commit(&commit, repo, id);
+	} else {
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, start_commit, 0);
+		if (error == NULL) {
+			int obj_type;
+			error = got_ref_resolve(&id, repo, ref);
+			got_ref_close(ref);
+			if (error != NULL)
+				goto done;
+			error = got_object_get_type(&obj_type, repo, id);
+			if (error != NULL)
+				goto done;
+			if (obj_type == GOT_OBJ_TYPE_TAG) {
+				struct got_tag_object *tag;
+				error = got_object_open_as_tag(&tag, repo, id);
+				if (error != NULL)
+					goto done;
+				if (got_object_tag_get_object_type(tag) !=
+				    GOT_OBJ_TYPE_COMMIT) {
+					got_object_tag_close(tag);
+					error = got_error(GOT_ERR_OBJ_TYPE);
+					goto done;
+				}
+				free(id);
+				id = got_object_id_dup(
+				    got_object_tag_get_object_id(tag));
+				if (id == NULL)
+					error = got_error_from_errno(
+					    "got_object_id_dup");
+				got_object_tag_close(tag);
+				if (error)
+					goto done;
+			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+				error = got_error(GOT_ERR_OBJ_TYPE);
+				goto done;
+			}
+			error = got_object_open_as_commit(&commit, repo, id);
+			if (error != NULL)
+				goto done;
+		}
+		if (commit == NULL) {
+			error = got_repo_match_object_id_prefix(&id,
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+			if (error != NULL)
+				return NULL;
+		}
+	}
+
+	if (error != NULL)
+		goto done;
+
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
+	/* int diff_context = -1, show_patch = 0; */
+	/* error = print_commits(id, repo, path, show_patch, search_pattern, */
+	/*     diff_context, limit, first_parent_traversal, &refs); */
+	/* error = print_commit(commit, id, repo, path, 0, */
+	/* 	    -1, refs); */
+	got_object_commit_close(commit);
 
 	asprintf(&shortlog, shortlog_row, "30 min ago", "Flan Author", "this is just a fake ass place holder", shortlog_navs);
 	return shortlog;
+done:
+	free(head_ref_name);
+	if (repo)
+		got_repo_close(repo);
+	got_ref_list_free(&refs);
+	return NULL;
 }
 
 static char *
