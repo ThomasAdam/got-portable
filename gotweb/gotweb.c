@@ -66,7 +66,7 @@ struct trans {
 	unsigned int		 action;
 	unsigned int		 page;
 	unsigned int		 repos_total;
-	enum kmime               mime;
+	enum kmime		 mime;
 };
 
 enum gw_key {
@@ -100,10 +100,12 @@ enum tmpl {
 	TEMPL_REPO_OWNER,
 	TEMPL_REPO_AGE,
 	TEMPL_CLONEURL,
-	TEMPL_SUMMARY_SHORTLOG,
-	TEMPL_SUMMARY_TAGS,
-	TEMPL_SUMMARY_HEADS,
 	TEMPL__MAX
+};
+
+enum ref_tm {
+	TM_DIFF,
+	TM_LONG,
 };
 
 static const char *const templs[TEMPL__MAX] = {
@@ -118,9 +120,6 @@ static const char *const templs[TEMPL__MAX] = {
 	"repo_owner",
 	"repo_age",
 	"cloneurl",
-	"summary_shortlog",
-	"summary_tags",
-	"summary_heads",
 };
 
 static const struct kvalid gw_keys[KEY__MAX] = {
@@ -138,7 +137,7 @@ static char			*gw_get_repo_description(struct trans *,
 static char			*gw_get_repo_owner(struct trans *,
 				    char *);
 static char			*gw_get_repo_age(struct trans *,
-				    char *, char *);
+				    char *, char *, int);
 static char			*gw_get_clone_url(struct trans *, char *);
 static char			*gw_get_got_link(struct trans *);
 static char			*gw_get_site_link(struct trans *);
@@ -168,6 +167,7 @@ static const struct got_error*	 gw_log(struct trans *);
 static const struct got_error*	 gw_raw(struct trans *);
 static const struct got_error*	 gw_shortlog(struct trans *);
 static const struct got_error*	 gw_snapshot(struct trans *);
+static const struct got_error*	 gw_summary(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
 
 struct gw_query_action {
@@ -200,14 +200,14 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_BLOBDIFF,	 "blobdiff",	gw_blob_diff,	"gw_tmpl/index.tmpl" },
 	{ GW_COMMIT,	 "commit",	gw_commit,	"gw_tmpl/index.tmpl" },
 	{ GW_COMMITDIFF, "commit_diff",	gw_commit_diff,	"gw_tmpl/index.tmpl" },
-	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/err.tmpl" },
+	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/index.tmpl" },
 	{ GW_HISTORY,	 "history",	gw_history,	"gw_tmpl/index.tmpl" },
 	{ GW_INDEX,	 "index",	gw_index,	"gw_tmpl/index.tmpl" },
 	{ GW_LOG,	 "log",		gw_log,		"gw_tmpl/index.tmpl" },
 	{ GW_RAW,	 "raw",		gw_raw,		"gw_tmpl/index.tmpl" },
 	{ GW_SHORTLOG,	 "shortlog",	gw_shortlog,	"gw_tmpl/index.tmpl" },
 	{ GW_SNAPSHOT,	 "snapshot",	gw_snapshot,	"gw_tmpl/index.tmpl" },
-	{ GW_SUMMARY,	 "summary",	NULL,		"gw_tmpl/summary.tmpl" },
+	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/summary.tmpl" },
 	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
 };
 
@@ -294,7 +294,7 @@ gw_index(struct trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_dir *dir = NULL;
 	char *html, *navs, *next, *prev;
-	unsigned int  prev_disp = 0, next_disp = 1, dir_c = 0;
+	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 
 	error = gw_load_got_paths(gw_trans);
 	if (error && error->code != GOT_ERR_OK)
@@ -408,6 +408,17 @@ gw_snapshot(struct trans *gw_trans)
 }
 
 static const struct got_error *
+gw_summary(struct trans *gw_trans)
+{
+	const struct got_error *error = NULL;
+
+		khttp_puts(gw_trans->gw_req, summary_shortlog);
+		khttp_puts(gw_trans->gw_req, summary_tags);
+		khttp_puts(gw_trans->gw_req, summary_heads);
+	return error;
+}
+
+static const struct got_error *
 gw_tree(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
@@ -461,7 +472,8 @@ done:
 	gw_dir->description = gw_get_repo_description(gw_trans,
 	    gw_dir->path);
 	gw_dir->owner = gw_get_repo_owner(gw_trans, gw_dir->path);
-	gw_dir->age = gw_get_repo_age(gw_trans, gw_dir->path, NULL);
+	gw_dir->age = gw_get_repo_age(gw_trans, gw_dir->path, "refs/heads",
+	    TM_DIFF);
 	gw_dir->url = gw_get_clone_url(gw_trans, gw_dir->path);
 
 errored:
@@ -552,7 +564,7 @@ gw_parse_querystring(struct trans *gw_trans)
 			return got_error_from_errno("asprintf");
 
 		if ((asprintf(&gw_trans->repo_path, "%s/%s",
-		    gw_trans->gw_conf->got_repos_path,  p->parsed.s)) == -1)
+		    gw_trans->gw_conf->got_repos_path, p->parsed.s)) == -1)
 			return got_error_from_errno("asprintf");
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID]))
@@ -598,7 +610,7 @@ gw_parse_querystring(struct trans *gw_trans)
 		gw_trans->page = p->parsed.i;
 
 	if (gw_trans->action == GW_RAW)
-		gw_trans->mime =  KMIME_TEXT_PLAIN;
+		gw_trans->mime = KMIME_TEXT_PLAIN;
 
 	return error;
 }
@@ -623,7 +635,7 @@ gw_display_open(struct trans *gw_trans, enum khttp code, enum kmime mime)
 	khttp_head(gw_trans->gw_req, kresps[KRESP_ALLOW], "GET");
 	khttp_head(gw_trans->gw_req, kresps[KRESP_STATUS], "%s",
 	    khttps[code]);
-        khttp_head(gw_trans->gw_req, kresps[KRESP_CONTENT_TYPE], "%s",
+	khttp_head(gw_trans->gw_req, kresps[KRESP_CONTENT_TYPE], "%s",
 	    kmimetypes[mime]);
 	khttp_head(gw_trans->gw_req, "X-Content-Type-Options", "nosniff");
 	khttp_head(gw_trans->gw_req, "X-Frame-Options", "DENY");
@@ -742,10 +754,10 @@ gw_template(size_t key, void *arg)
 	case(TEMPL_REPO_AGE):
 		if (gw_trans->gw_conf->got_show_repo_age) {
 			repo_age = gw_get_repo_age(gw_trans,
-			    gw_trans->repo_path, NULL);
+			    gw_trans->repo_path, "refs/heads", TM_LONG);
 			if (repo_age != NULL) {
 				if ((asprintf(&repo_age_h, summary_last_change,
-			    	    repo_age)) == -1)
+				    repo_age)) == -1)
 				return 0;
 				khttp_puts(gw_trans->gw_req, repo_age_h);
 				free(repo_age);
@@ -768,15 +780,6 @@ gw_template(size_t key, void *arg)
 			}
 
 		}
-		break;
-	case(TEMPL_SUMMARY_SHORTLOG):
-		khttp_puts(gw_trans->gw_req, summary_shortlog);
-		break;
-	case(TEMPL_SUMMARY_TAGS):
-		khttp_puts(gw_trans->gw_req, summary_tags);
-		break;
-	case(TEMPL_SUMMARY_HEADS):
-		khttp_puts(gw_trans->gw_req, summary_heads);
 		break;
 	default:
 		return 0;
@@ -819,7 +822,7 @@ err:
 }
 
 static char *
-gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref)
+gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -828,11 +831,16 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref)
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct got_reference *head_ref;
+	struct tm tm;
 	time_t committer_time = 0, cmp_time = 0, diff_time;
 	char *repo_age = NULL, *years = "years ago", *months = "months ago";
 	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
 	char *minutes = "minutes ago", *seconds = "seconds ago";
 	char *now = "right now";
+	char datebuf[BUFFER_SIZE];
+
+	if (repo_ref == NULL)
+		return NULL;
 
 	SIMPLEQ_INIT(&refs);
 	if (gw_trans->gw_conf->got_show_repo_age == false) {
@@ -843,7 +851,7 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref)
 	if (error != NULL)
 		goto err;
 
-	error = got_ref_list(&refs, repo, "refs/heads", got_ref_cmp_by_name,
+	error = got_ref_list(&refs, repo, repo_ref, got_ref_cmp_by_name,
 	    NULL);
 	if (error != NULL)
 		goto err;
@@ -860,50 +868,75 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref)
 		if (error != NULL)
 			goto err;
 
+		/*  here is what breaks tags, so adjust */
 		error = got_object_open_as_commit(&commit, repo, id);
 		if (error != NULL)
 			goto err;
 
 		committer_time =
 		    got_object_commit_get_committer_time(commit);
-		if (repo_ref != NULL && (strcmp(refname, repo_ref) == 0)) {
-			cmp_time = 0;
-			break;
-		}
 
-		if (committer_time > cmp_time)
+		if (cmp_time < committer_time)
 			cmp_time = committer_time;
-	}
-
-	if (repo_ref != NULL && (strcmp(refname, repo_ref) != 0)) {
-		asprintf(&repo_age, "");
-		goto noref;
 	}
 
 	if (cmp_time != 0)
 		committer_time = cmp_time;
 
-	diff_time = time(NULL) - committer_time;
-	if (diff_time > 60 * 60 * 24 * 365 * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60 / 60 / 24 / 365),
-		    years);
-	else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60 / 60 / 24 /
-		    (365 / 12)), months);
-	else if (diff_time > 60 * 60 * 24 * 7 * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60 / 60 / 24 / 7),
-		    weeks);
-	else if (diff_time > 60 * 60 * 24 * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60 / 60 / 24),
-		    days);
-	else if (diff_time > 60 * 60 * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60 / 60), hours);
-	else if (diff_time > 60 * 2)
-		asprintf(&repo_age, "%lld %s", (diff_time / 60), minutes);
-	else if (diff_time > 2)
-		asprintf(&repo_age, "%lld %s", diff_time, seconds);
-	else
-		asprintf(&repo_age, "%s", now);
+	switch (ref_tm) {
+	case TM_DIFF:
+		diff_time = time(NULL) - committer_time;
+		if (diff_time > 60 * 60 * 24 * 365 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 365), years)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / (365 / 12)),
+			    months)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 7), weeks)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24), days)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60), hours)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 2) {
+			if ((asprintf(&repo_age, "%lld %s", (diff_time / 60),
+			    minutes)) == -1)
+				return NULL;
+		} else if (diff_time > 2) {
+			if ((asprintf(&repo_age, "%lld %s", diff_time,
+			    seconds)) == -1)
+				return NULL;
+		} else {
+			if ((asprintf(&repo_age, "%s", now)) == -1)
+				return NULL;
+		}
+		break;
+	case TM_LONG:
+		if (cmp_time != 0) {
+			if (gmtime_r(&committer_time, &tm) == NULL)
+				return NULL;
+			if (strftime(datebuf, sizeof(datebuf),
+			    "%G-%m-%d %H:%M:%S (%z)",
+			    &tm) >= sizeof(datebuf))
+				return NULL;
+
+			if ((asprintf(&repo_age, "%s", datebuf)) == -1)
+				return NULL;
+		} else {
+			if ((asprintf(&repo_age, "")) == -1)
+				return NULL;
+		}
+		break;
+	}
 
 noref:
 	got_ref_list_free(&refs);
@@ -1112,7 +1145,7 @@ main()
 	if ((gw_trans->gw_conf =
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
 		gw_malloc = false;
-		error =  got_error_from_errno("malloc");
+		error = got_error_from_errno("malloc");
 		goto err;
 	}
 
