@@ -1,0 +1,76 @@
+.\"
+.\" Copyright (c) 2020 Tracey Emery <tracey@traceyemery.net>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: January 15 2020 $
+.Dt GOTWEB.CONF 5
+.Os
+.Sh NAME
+.Nm gotweb.conf
+.Nd gotweb configuration file
+.Sh DESCRIPTION
+.Nm
+is the configuration file for gotweb.
+.Sh GLOBAL CONFIGURATION
+Here are the settings that can be set globally:
+.Bl -tag -width Ds
+.It Ic got_repos_path Ar string
+Set the default git repository path.
+This is a required setting.
+.It Ic got_www_path Ar string
+Set the public gotweb httpd path.
+This is a required setting.
+.It Ic got_max_repos Ar string
+Set the maximum amount of repositories gotweb will work with.
+.It Ic got_max_repos_display Ar string
+Set the maximum amount of repositories displayed on the index screen.
+.It Ic got_commits_display Ar string
+Set the maximum amount of log lines displayed.
+.It Ic got_site_name Ar string
+Set the displayed site name title.
+.It Ic got_site_owner Ar string
+Set the displayed site owner.
+.It Ic got_site_link Ar string
+Set the displayed site link name for the index page.
+.It Ic got_logo Ar string
+Set the displayed logo.
+.It Ic got_logo_url Ar string
+Set the href link for the logo.
+.It Ic got_show_site_owner Ar string
+Set whether to display the site owner, or not.
+.It Ic got_repo_owner Ar string
+Set whether to display the repository owner, or not.
+This requires the owner to be added to config in the repository.
+.It Ic got_repo_age Ar string
+Set whether to display the repository age, or not.
+.It Ic got_repo_description Ar string
+Set whether to display the repository description, or not.
+This requires the description file to be edited in the repository.
+.It Ic got_repo_cloneurl Ar string
+Set whether to display clone URLs for a repository.
+This requires the creation of a cloneurl file in the repository.
+.El
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa /var/www/etc/gotweb.conf
+gotweb configuration file.
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr tog 1
+.Sh HISTORY
+The
+.Nm
+file format first appeared in
+.Ox 6.7 .
