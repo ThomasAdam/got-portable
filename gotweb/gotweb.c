@@ -1290,6 +1290,8 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 				continue;
 		}
 
+		got_ref_list_free(&refs);
+
 		/* commit id */
 		error = got_object_id_str(&id_str, id);
 		if (error)
@@ -1342,7 +1344,8 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 			return NULL;
 	}
 
-	got_ref_list_free(&refs);
+	if (search_pattern)
+		regfree(&regex);
 	return shortlog;
 done:
 	if (repo)

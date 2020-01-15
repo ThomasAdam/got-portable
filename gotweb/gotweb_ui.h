@@ -128,7 +128,7 @@ char *shortlog_row =
 
 char *shortlog_navs =
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
-	"<a href='?path=%s&action=commitdiff&commit=%s'>commit diff</a> | " \
+	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
 

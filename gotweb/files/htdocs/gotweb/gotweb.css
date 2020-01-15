@@ -193,58 +193,73 @@ body {
 #shortlog_wrapper {
 	clear: left;
 	float: left;
-	width: 95%;
+	width: 100%;
+}
+#shortlog_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
-}
-#shortlog_age {
 	float: left;
-	width: 6.5em;
+	width: 7.5em;
+	overflow: auto;
 }
 #shortlog_author {
 	float: left;
+	padding-top: 5px;
+	padding-bottom: 5px;
 	width: 8.5em;
 	font-style: italic;
+	overflow: auto;
 }
 #shortlog_log {
 	float: left;
-	width: 75%;
+	padding-right: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	width: 65%;
 }
 #tags_wrapper {
 	clear: left;
 	float: left;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
+	width: 100%;
 }
 #tags_age {
 	float: left;
-	width: 6.5em;
+	width: 7.5em;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 #tag {
 	float: left;
 	width: 8.5em;
 	font-style: italic;
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 #tag_name {
 	float: left;
-	font-weight: bold;
+	padding-right: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 #heads_wrapper {
 	clear: left;
 	float: left;
+	width: 100%;
+}
+#heads_age {
+	float: left;
+	width: 7.5em;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
-#heads_age {
-	float: left;
-	width: 6.5em;
-}
 #head {
 	float: left;
-	font-weight: bold;
+	padding-right: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
 }
 
 /* index.tmpl */
