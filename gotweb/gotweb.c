@@ -142,7 +142,7 @@ static char			*gw_get_time_str(time_t, int);
 static char			*gw_get_repo_age(struct trans *,
 				    char *, char *, int);
 static char			*gw_get_repo_shortlog(struct trans *,
-				    const char *);
+				    const char *, int);
 static char			*gw_get_repo_tags(struct trans *);
 static char			*gw_get_repo_heads(struct trans *);
 static char			*gw_get_clone_url(struct trans *, char *);
@@ -409,6 +409,19 @@ static const struct got_error *
 gw_shortlog(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *shortlog, *shortlog_html;
+
+	shortlog = gw_get_repo_shortlog(gw_trans, NULL,
+	    gw_trans->gw_conf->got_max_commits_display);
+
+	if (shortlog != NULL && strcmp(shortlog, "") != 0) {
+		if ((asprintf(&shortlog_html, summary_shortlog,
+		    shortlog)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, shortlog_html);
+		free(shortlog_html);
+		free(shortlog);
+	}
 
 	return error;
 }
@@ -484,7 +497,7 @@ gw_summary(struct trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	shortlog = gw_get_repo_shortlog(gw_trans, NULL);
+	shortlog = gw_get_repo_shortlog(gw_trans, NULL, D_MAXSLCOMMDISP);
 	tags = gw_get_repo_tags(gw_trans);
 	heads = gw_get_repo_heads(gw_trans);
 
@@ -1098,7 +1111,8 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 }
 
 static char *
-gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
+gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
+    int limit)
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
@@ -1110,9 +1124,9 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 	char *start_commit = NULL, *shortlog = NULL, *id_str = NULL,
 	     *path = NULL, *in_repo_path = NULL, *commit_row = NULL,
 	     *commit_age = NULL, *commit_author = NULL, *commit_log = NULL,
-	     *shortlog_navs_html = NULL;
+	     *commit_log0, *newline, *shortlog_navs_html = NULL;
 	regex_t regex;
-	int have_match, limit = D_MAXSLCOMMDISP;
+	int have_match;
 	size_t newsize;
 	struct buf *diffbuf;
 	time_t committer_time;
@@ -1303,9 +1317,17 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 		    TM_DIFF));
 		asprintf(&commit_author, "%s",
 		    got_object_commit_get_author(commit_disp));
-		error = got_object_commit_get_logmsg(&commit_log, commit_disp);
+		error = got_object_commit_get_logmsg(&commit_log0, commit_disp);
 		if (error)
 			commit_log = strdup("");
+		else {
+			commit_log = commit_log0;
+			while (*commit_log == '\n')
+				commit_log++;
+			newline = strchr(commit_log, '\n');
+			if (newline)
+				*newline = '\0';
+		}
 		asprintf(&shortlog_navs_html, shortlog_navs,
 		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str,
 		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str);
@@ -1316,7 +1338,7 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 
 		free(commit_age);
 		free(commit_author);
-		free(commit_log);
+		free(commit_log0);
 		free(shortlog_navs_html);
 		free(commit_row);
 		free(id_str);
