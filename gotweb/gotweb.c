@@ -145,7 +145,8 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_stringne,	"path" },
 };
 
-int				 gw_get_repo_log_count(struct gw_trans *, char *);
+int				 gw_get_repo_log_count(struct gw_trans *,
+				    char *);
 
 static struct gw_dir		*gw_init_gw_dir(char *);
 
@@ -156,8 +157,8 @@ static char			*gw_get_repo_owner(struct gw_trans *,
 static char			*gw_get_time_str(time_t, int);
 static char			*gw_get_repo_age(struct gw_trans *,
 				    char *, char *, int);
-static char			*gw_get_repo_log(struct gw_trans *, const char *,
-				    char *, int, int);
+static char			*gw_get_repo_log(struct gw_trans *,
+				    const char *, char *, int, int);
 static char			*gw_get_file_blame(struct gw_trans *, char *);
 static char			*gw_get_repo_tree(struct gw_trans *, char *);
 static char			*gw_get_repo_diff(struct gw_trans *, char *,
@@ -168,7 +169,7 @@ static char			*gw_get_clone_url(struct gw_trans *, char *);
 static char			*gw_get_got_link(struct gw_trans *);
 static char			*gw_get_site_link(struct gw_trans *);
 static char			*gw_html_escape(const char *);
-static char			*color_diff_line(char *);
+static char			*gw_colordiff_line(char *);
 
 static void			 gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
@@ -1292,7 +1293,8 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 }
 
 static char *
-gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
+gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
+    int ref_tm)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -1445,7 +1447,7 @@ gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
 	fseek(f, 0, SEEK_SET);
 
 	while ((fgets(buf, 128, f)) != NULL) {
-		buf_color = color_diff_line(buf);
+		buf_color = gw_colordiff_line(buf);
 		error = buf_puts(&newsize, diffbuf, buf_color);
 		if (error)
 			return NULL;
@@ -2765,7 +2767,7 @@ gw_get_site_link(struct gw_trans *gw_trans)
 }
 
 static char *
-color_diff_line(char *buf)
+gw_colordiff_line(char *buf)
 {
 	const struct got_error *error = NULL;
 	char *colorized_line = NULL, *div_diff_line_div = NULL, *color = NULL;
