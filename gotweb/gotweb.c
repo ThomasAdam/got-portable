@@ -149,6 +149,8 @@ static const struct kvalid gw_keys[KEY__MAX] = {
 	{ kvalid_stringne,	"headref" },
 };
 
+int				 gw_get_repo_log_count(struct trans *, char *);
+
 static struct gw_dir		*gw_init_gw_dir(char *);
 
 static char			*gw_get_repo_description(struct trans *,
@@ -316,6 +318,144 @@ done:
 	if (tag2)
 		got_object_tag_close(tag2);
 	return err;
+}
+
+int
+gw_get_repo_log_count(struct trans *gw_trans, char *start_commit)
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	struct got_reflist_head refs;
+	struct got_commit_object *commit = NULL;
+	struct got_object_id *id = NULL;
+	struct got_commit_graph *graph = NULL;
+	char *in_repo_path = NULL, *path = NULL;
+	int log_count = 0;
+
+	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	if (error != NULL)
+		return 0;
+
+	SIMPLEQ_INIT(&refs);
+
+	if (start_commit == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
+		if (error != NULL)
+			goto done;
+
+		error = got_ref_resolve(&id, repo, head_ref);
+		got_ref_close(head_ref);
+		if (error != NULL)
+			goto done;
+
+		error = got_object_open_as_commit(&commit, repo, id);
+	} else {
+		struct got_reference *ref;
+		error = got_ref_open(&ref, repo, start_commit, 0);
+		if (error == NULL) {
+			int obj_type;
+			error = got_ref_resolve(&id, repo, ref);
+			got_ref_close(ref);
+			if (error != NULL)
+				goto done;
+			error = got_object_get_type(&obj_type, repo, id);
+			if (error != NULL)
+				goto done;
+			if (obj_type == GOT_OBJ_TYPE_TAG) {
+				struct got_tag_object *tag;
+				error = got_object_open_as_tag(&tag, repo, id);
+				if (error != NULL)
+					goto done;
+				if (got_object_tag_get_object_type(tag) !=
+				    GOT_OBJ_TYPE_COMMIT) {
+					got_object_tag_close(tag);
+					error = got_error(GOT_ERR_OBJ_TYPE);
+					goto done;
+				}
+				free(id);
+				id = got_object_id_dup(
+				    got_object_tag_get_object_id(tag));
+				if (id == NULL)
+					error = got_error_from_errno(
+					    "got_object_id_dup");
+				got_object_tag_close(tag);
+				if (error)
+					goto done;
+			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+				error = got_error(GOT_ERR_OBJ_TYPE);
+				goto done;
+			}
+			error = got_object_open_as_commit(&commit, repo, id);
+			if (error != NULL)
+				goto done;
+		}
+		if (commit == NULL) {
+			error = got_repo_match_object_id_prefix(&id,
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+			if (error != NULL)
+				goto done;
+		}
+		error = got_repo_match_object_id_prefix(&id,
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+			if (error != NULL)
+				goto done;
+	}
+
+	error = got_object_open_as_commit(&commit, repo, id);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
+	if (error != NULL)
+		goto done;
+
+	if (in_repo_path) {
+		free(path);
+		path = in_repo_path;
+	}
+
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
+	error = got_commit_graph_open(&graph, path, 0);
+	if (error)
+		goto done;
+
+	error = got_commit_graph_iter_start(graph, id, repo, NULL, NULL);
+	if (error)
+		goto done;
+
+	for (;;) {
+		error = got_commit_graph_iter_next(&id, graph, repo, NULL,
+		    NULL);
+		if (error) {
+			if (error->code == GOT_ERR_ITER_COMPLETED)
+				error = NULL;
+			break;
+		}
+		if (id == NULL)
+			break;
+
+		if (error)
+			break;
+		log_count++;
+	}
+done:
+	if (graph)
+		got_commit_graph_close(graph);
+	if (repo) {
+		error = got_repo_close(repo);
+		if (error != NULL)
+			return 0;
+	}
+	if (error) {
+		khttp_puts(gw_trans->gw_req, "Error: ");
+		khttp_puts(gw_trans->gw_req, error->msg);
+		return 0;
+	} else
+		return log_count;
 }
 
 static const struct got_error *
@@ -1304,10 +1444,13 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	     *commit_tree_disp = NULL, *log_tag_html = NULL;
 	char *commit_log0, *newline;
 	regex_t regex;
-	int have_match;
+	int have_match, log_count = 0;
 	size_t newsize;
 	struct buf *diffbuf = NULL;
 	time_t committer_time;
+
+	if (gw_trans->action == GW_LOG || gw_trans->action == GW_LOGBRIEFS)
+		log_count = gw_get_repo_log_count(gw_trans, start_commit);
 
 	error = buf_alloc(&diffbuf, 0);
 	if (error != NULL)
@@ -1384,8 +1527,6 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 		}
 		error = got_repo_match_object_id_prefix(&id1,
 			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
-			if (error != NULL)
-				goto done;
 	}
 
 	if (error != NULL)
@@ -1404,7 +1545,7 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	if (error)
 		goto done;
 
-	error = got_commit_graph_open(&graph, id1, path, 0, repo);
+	error = got_commit_graph_open(&graph, path, 0);
 	if (error)
 		goto done;
 
@@ -1413,20 +1554,12 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 		goto done;
 
 	for (;;) {
-		error = got_commit_graph_iter_next(&id1, graph);
+		error = got_commit_graph_iter_next(&id1, graph, repo, NULL,
+		    NULL);
 		if (error) {
-			if (error->code == GOT_ERR_ITER_COMPLETED) {
+			if (error->code == GOT_ERR_ITER_COMPLETED)
 				error = NULL;
-				break;
-			}
-			if (error->code != GOT_ERR_ITER_NEED_MORE)
-				break;
-			error = got_commit_graph_fetch_commits(graph, 1, repo,
-			    NULL, NULL);
-			if (error)
-				break;
-			else
-				continue;
+			break;
 		}
 		if (id1 == NULL)
 			break;
