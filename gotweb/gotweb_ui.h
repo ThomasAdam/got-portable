@@ -122,7 +122,7 @@ char *tags_row =
 char *tags_navs =
 	"<a href='?path=%s&action=tagt&commit=%s'>tag</a> | " \
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
-	"<a href='?path=%s&action=logbriefs&commit=%s'>Log Briefs</a> | " \
+	"<a href='?path=%s&action=logbriefs&commit=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&commit=%s'>log</a>";
 
 char *heads_row =
@@ -137,7 +137,7 @@ char *heads_row =
 	"<div id='dotted_line'></div>";
 
 char *heads_navs =
-	"<a href='?path=%s&action=logbriefs&headref=%s'>Log Briefs</a> | " \
+	"<a href='?path=%s&action=logbriefs&headref=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
 	"<a href='?path=%s&action=tree&headref=%s'>commit</a>";
 
