@@ -114,6 +114,58 @@ char *cloneurl =
 	"<div id='cloneurl_title'>Clone URL: </div>" \
 	"<div id='cloneurl'>%s</div>";
 
+char *shortlog_row =
+	"<div id='shortlog_wrapper'>" \
+	"<div id='shortlog_age'>%s</div>" \
+	"<div id='shortlog_author'>%s</div>" \
+	"<div id='shortlog_log'>%s</div>" \
+	"</div>" \
+	"<div id='navs_wrapper'>" \
+	"<div id='navs'>%s</div>" \
+	"</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>";
+
+char *shortlog_navs =
+	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	"<a href='?path=%s&action=commitdiff&commit=%s'>commit diff</a> | " \
+	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
+
+char *tags_row =
+	"<div id='tags_wrapper'>" \
+	"<div id='tags_age'>%s</div>" \
+	"<div id='tag'>%s</div>" \
+	"<div id='tag_name'>%s</div>" \
+	"</div>" \
+	"<div id='navs_wrapper'>" \
+	"<div id='navs'>%s</div>" \
+	"</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>";
+
+char *tags_navs =
+	"<a href='?path=%s&action=tagt&commit=%s'>tag</a> | " \
+	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	"<a href='?path=%s&action=shortlog&commit=%s'>shortlog</a> | " \
+	"<a href='?path=%s&action=log&commit=%s'>log</a>";
+
+char *heads_row =
+	"<div id='heads_wrapper'>" \
+	"<div id='heads_age'>%s</div>" \
+	"<div id='head'>%s</div>" \
+	"</div>" \
+	"<div id='navs_wrapper'>" \
+	"<div id='navs'>%s</div>" \
+	"</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>";
+
+char *heads_navs =
+	"<a href='?path=%s&action=shortlog&headref=%s'>shortlog</a> | " \
+	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
+	"<a href='?path=%s&action=tree&headref=%s'>commit</a>";
+
 /* index.tmpl */
 
 char *index_projects_header =
@@ -133,7 +185,7 @@ char *index_projects =
 	"<div id='index_project_owner'>%s</div>" \
 	"<div id='index_project_age'>%s</div>" \
 	"<div id='navs_wrapper'>" \
-	"<div id='np_navs'>%s</div>" \
+	"<div id='navs'>%s</div>" \
 	"</div>" \
 	"</div>" \
 	"<div id='dotted_line'></div>";
@@ -152,22 +204,16 @@ char *summary_wrapper =
 char *summary_shortlog =
 	"<div id='summary_shortlog_title_wrapper'>" \
 	"<div id='summary_shortlog_title'>Shortlog</div></div>" \
-	"<div id='summary_shortlog_content_wrapper'>" \
-	"<div id='summary_shortlog_content'>%s</div>" \
-	"</div>";
+	"<div id='summary_shortlog_content'>%s</div>";
 
 char *summary_tags =
 	"<div id='summary_tags_title_wrapper'>" \
 	"<div id='summary_tags_title'>Tags</div></div>" \
-	"<div id='summary_tags_content_wrapper'>" \
-	"<div id='summary_tags_content'>%s</div>" \
-	"</div>";
+	"<div id='summary_tags_content'>%s</div>";
 
 char *summary_heads =
 	"<div id='summary_heads_title_wrapper'>" \
 	"<div id='summary_heads_title'>Heads</div></div>" \
-	"<div id='summary_heads_content_wrapper'>" \
-	"<div id='summary_heads_content'>%s</div>" \
-	"</div>";
+	"<div id='summary_heads_content'>%s</div>";
 
 #endif /* GOTWEB_UI_H */

@@ -131,6 +131,9 @@ static char			*gw_get_repo_owner(struct trans *,
 				    char *);
 static char			*gw_get_repo_age(struct trans *,
 				    char *, char *, int);
+static char			*gw_get_repo_shortlog(struct trans *);
+static char			*gw_get_repo_tags(struct trans *);
+static char			*gw_get_repo_heads(struct trans *);
 static char			*gw_get_clone_url(struct trans *, char *);
 static char			*gw_get_got_link(struct trans *);
 static char			*gw_get_site_link(struct trans *);
@@ -154,7 +157,6 @@ static const struct got_error*	 gw_blob(struct trans *);
 static const struct got_error*	 gw_blob_diff(struct trans *);
 static const struct got_error*	 gw_commit(struct trans *);
 static const struct got_error*	 gw_commit_diff(struct trans *);
-static const struct got_error*	 gw_heads(struct trans *);
 static const struct got_error*	 gw_history(struct trans *);
 static const struct got_error*	 gw_index(struct trans *);
 static const struct got_error*	 gw_log(struct trans *);
@@ -162,7 +164,6 @@ static const struct got_error*	 gw_raw(struct trans *);
 static const struct got_error*	 gw_shortlog(struct trans *);
 static const struct got_error*	 gw_snapshot(struct trans *);
 static const struct got_error*	 gw_summary(struct trans *);
-static const struct got_error*	 gw_tags(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
 
 struct gw_query_action {
@@ -269,14 +270,6 @@ gw_commit(struct trans *gw_trans)
 
 static const struct got_error *
 gw_commit_diff(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-
-	return error;
-}
-
-static const struct got_error *
-gw_heads(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
@@ -403,12 +396,6 @@ static const struct got_error *
 gw_shortlog(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
-
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error != NULL)
-		return error;
-
 
 	return error;
 }
@@ -426,7 +413,8 @@ gw_summary(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
-	     *cloneurl_html;
+	     *cloneurl_html, *shortlog, *tags, *heads, *shortlog_html,
+	     *tags_html, *heads_html;
 
 	error = apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -482,19 +470,36 @@ gw_summary(struct trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	error = gw_shortlog(gw_trans);
-	error = gw_tags(gw_trans);
-	error = gw_heads(gw_trans);
-	khttp_puts(gw_trans->gw_req, summary_shortlog);
-	khttp_puts(gw_trans->gw_req, summary_tags);
-	khttp_puts(gw_trans->gw_req, summary_heads);
-	return error;
-}
+	shortlog = gw_get_repo_shortlog(gw_trans);
+	tags = gw_get_repo_tags(gw_trans);
+	heads = gw_get_repo_heads(gw_trans);
 
-static const struct got_error *
-gw_tags(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
+	if (shortlog != NULL && strcmp(shortlog, "") != 0) {
+		if ((asprintf(&shortlog_html, summary_shortlog,
+		    shortlog)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, shortlog_html);
+		free(shortlog_html);
+		free(shortlog);
+	}
+
+	if (tags != NULL && strcmp(tags, "") != 0) {
+		if ((asprintf(&tags_html, summary_tags,
+		    tags)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, tags_html);
+		free(tags_html);
+		free(tags);
+	}
+
+	if (heads != NULL && strcmp(heads, "") != 0) {
+		if ((asprintf(&heads_html, summary_heads,
+		    heads)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, heads_html);
+		free(heads_html);
+		free(heads);
+	}
 
 	return error;
 }
@@ -1045,6 +1050,33 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 	fclose(f);
 	free(d_file);
 	return url;
+}
+
+static char *
+gw_get_repo_shortlog(struct trans *gw_trans)
+{
+	char *shortlog = NULL;
+
+	asprintf(&shortlog, shortlog_row, "30 min ago", "Flan Author", "this is just a fake ass place holder", shortlog_navs);
+	return shortlog;
+}
+
+static char *
+gw_get_repo_tags(struct trans *gw_trans)
+{
+	char *tags = NULL;
+
+	asprintf(&tags, tags_row, "30 min ago", "1.0.0", "tag 1.0.0", tags_navs);
+	return tags;
+}
+
+static char *
+gw_get_repo_heads(struct trans *gw_trans)
+{
+	char *heads = NULL;
+
+	asprintf(&heads, heads_row, "30 min ago", "master", heads_navs);
+	return heads;
 }
 
 static char *
