@@ -116,6 +116,7 @@ enum logs {
 	LOGTREE,
 	LOGDIFF,
 	LOGBLAME,
+	LOGTAG,
 };
 
 enum tags {
@@ -197,6 +198,7 @@ static const struct got_error*	 gw_raw(struct trans *);
 static const struct got_error*	 gw_logbriefs(struct trans *);
 static const struct got_error*	 gw_snapshot(struct trans *);
 static const struct got_error*	 gw_summary(struct trans *);
+static const struct got_error*	 gw_tag(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
 
 struct gw_query_action {
@@ -220,7 +222,8 @@ enum gw_query_actions {
 	GW_LOGBRIEFS,
 	GW_SNAPSHOT,
 	GW_SUMMARY,
-	GW_TREE
+	GW_TAG,
+	GW_TREE,
 };
 
 static struct gw_query_action gw_query_funcs[] = {
@@ -237,6 +240,7 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_LOGBRIEFS,	 "logbriefs",	gw_logbriefs,	"gw_tmpl/index.tmpl" },
 	{ GW_SNAPSHOT,	 "snapshot",	gw_snapshot,	"gw_tmpl/index.tmpl" },
 	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/index.tmpl" },
+	{ GW_TAG,	 "tag",		gw_tag,		"gw_tmpl/index.tmpl" },
 	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
 };
 
@@ -643,6 +647,28 @@ gw_summary(struct trans *gw_trans)
 }
 
 static const struct got_error *
+gw_tag(struct trans *gw_trans)
+{
+	const struct got_error *error = NULL;
+	char *log, *log_html;
+
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
+
+	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGTAG);
+
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, log_tree, log)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
+	}
+	return error;
+}
+
+static const struct got_error *
 gw_tree(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
@@ -807,14 +833,14 @@ gw_parse_querystring(struct trans *gw_trans)
 				action = &gw_query_funcs[i];
 				if (action->func_name == NULL)
 					continue;
-
+khttp_puts(gw_trans->gw_req, p->parsed.s);
 				if (strcmp(action->func_name,
 				    p->parsed.s) == 0) {
 					gw_trans->action = i;
 					if ((asprintf(&gw_trans->action_name,
 					    "%s", action->func_name)) == -1)
 						return
-						got_error_from_errno(
+						    got_error_from_errno(
 						    "asprintf");
 
 					break;
@@ -1646,6 +1672,17 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 
 			free(logbriefs_navs_html);
 			logbriefs_navs_html = NULL;
+			break;
+		case (LOGTAG):
+			log_tree_html = strdup("tag log here");
+
+			if ((asprintf(&commit_row, log_tree_row,
+			    gw_html_escape(commit_log), log_tree_html)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			free(log_tree_html);
 			break;
 		case (LOGTREE):
 			log_tree_html = strdup("log tree here");

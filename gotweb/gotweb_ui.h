@@ -120,7 +120,7 @@ char *tags_row =
 	"<div id='dotted_line'></div>";
 
 char *tags_navs =
-	"<a href='?path=%s&action=tagt&commit=%s'>tag</a> | " \
+	"<a href='?path=%s&action=tag&commit=%s'>tag</a> | " \
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
 	"<a href='?path=%s&action=logbriefs&commit=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&commit=%s'>log</a>";
