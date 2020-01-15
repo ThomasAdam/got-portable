@@ -141,8 +141,8 @@ static char			*gw_get_repo_owner(struct trans *,
 static char			*gw_get_time_str(time_t, int);
 static char			*gw_get_repo_age(struct trans *,
 				    char *, char *, int);
-static char			*gw_get_repo_shortlog(struct trans *,
-				    const char *, int);
+static char			*gw_get_repo_log(struct trans *, const char *,
+				    char *, int, int);
 static char			*gw_get_repo_tags(struct trans *);
 static char			*gw_get_repo_heads(struct trans *);
 static char			*gw_get_clone_url(struct trans *, char *);
@@ -174,7 +174,7 @@ static const struct got_error*	 gw_history(struct trans *);
 static const struct got_error*	 gw_index(struct trans *);
 static const struct got_error*	 gw_log(struct trans *);
 static const struct got_error*	 gw_raw(struct trans *);
-static const struct got_error*	 gw_shortlog(struct trans *);
+static const struct got_error*	 gw_logbriefs(struct trans *);
 static const struct got_error*	 gw_snapshot(struct trans *);
 static const struct got_error*	 gw_summary(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
@@ -197,7 +197,7 @@ enum gw_query_actions {
 	GW_INDEX,
 	GW_LOG,
 	GW_RAW,
-	GW_SHORTLOG,
+	GW_LOGBRIEFS,
 	GW_SNAPSHOT,
 	GW_SUMMARY,
 	GW_TREE
@@ -214,7 +214,7 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_INDEX,	 "index",	gw_index,	"gw_tmpl/index.tmpl" },
 	{ GW_LOG,	 "log",		gw_log,		"gw_tmpl/index.tmpl" },
 	{ GW_RAW,	 "raw",		gw_raw,		"gw_tmpl/index.tmpl" },
-	{ GW_SHORTLOG,	 "shortlog",	gw_shortlog,	"gw_tmpl/index.tmpl" },
+	{ GW_LOGBRIEFS,	 "logbriefs",	gw_logbriefs,	"gw_tmpl/index.tmpl" },
 	{ GW_SNAPSHOT,	 "snapshot",	gw_snapshot,	"gw_tmpl/index.tmpl" },
 	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/index.tmpl" },
 	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
@@ -393,7 +393,18 @@ static const struct got_error *
 gw_log(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *log, *log_html;
 
+	log = gw_get_repo_log(gw_trans, NULL, NULL,
+	    gw_trans->gw_conf->got_max_commits_display, 1);
+
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, logs, log)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
+	}
 	return error;
 }
 
@@ -406,23 +417,22 @@ gw_raw(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_shortlog(struct trans *gw_trans)
+gw_logbriefs(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *shortlog, *shortlog_html;
+	char *logbriefs, *logbriefs_html;
 
-	shortlog = gw_get_repo_shortlog(gw_trans, NULL,
-	    gw_trans->gw_conf->got_max_commits_display);
+	logbriefs = gw_get_repo_log(gw_trans, NULL, NULL,
+	    gw_trans->gw_conf->got_max_commits_display, 0);
 
-	if (shortlog != NULL && strcmp(shortlog, "") != 0) {
-		if ((asprintf(&shortlog_html, summary_shortlog,
-		    shortlog)) == -1)
+	if (logbriefs != NULL && strcmp(logbriefs, "") != 0) {
+		if ((asprintf(&logbriefs_html, summary_logbriefs,
+		    logbriefs)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, shortlog_html);
-		free(shortlog_html);
-		free(shortlog);
+		khttp_puts(gw_trans->gw_req, logbriefs_html);
+		free(logbriefs_html);
+		free(logbriefs);
 	}
-
 	return error;
 }
 
@@ -439,7 +449,7 @@ gw_summary(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
-	     *cloneurl_html, *shortlog, *tags, *heads, *shortlog_html,
+	     *cloneurl_html, *logbriefs, *tags, *heads, *logbriefs_html,
 	     *tags_html, *heads_html, *age;
 
 	error = apply_unveil(gw_trans->gw_dir->path, NULL);
@@ -497,17 +507,17 @@ gw_summary(struct trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	shortlog = gw_get_repo_shortlog(gw_trans, NULL, D_MAXSLCOMMDISP);
+	logbriefs = gw_get_repo_log(gw_trans, NULL, NULL, D_MAXSLCOMMDISP, 0);
 	tags = gw_get_repo_tags(gw_trans);
 	heads = gw_get_repo_heads(gw_trans);
 
-	if (shortlog != NULL && strcmp(shortlog, "") != 0) {
-		if ((asprintf(&shortlog_html, summary_shortlog,
-		    shortlog)) == -1)
+	if (logbriefs != NULL && strcmp(logbriefs, "") != 0) {
+		if ((asprintf(&logbriefs_html, summary_logbriefs,
+		    logbriefs)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, shortlog_html);
-		free(shortlog_html);
-		free(shortlog);
+		khttp_puts(gw_trans->gw_req, logbriefs_html);
+		free(logbriefs_html);
+		free(logbriefs);
 	}
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
@@ -545,7 +555,7 @@ gw_load_got_path(struct trans *gw_trans, struct gw_dir *gw_dir)
 	const struct got_error *error = NULL;
 	DIR *dt;
 	char *dir_test;
-	bool opened = false;
+	int opened = 0;
 
 	if ((asprintf(&dir_test, "%s/%s/%s",
 	    gw_trans->gw_conf->got_repos_path, gw_dir->name,
@@ -557,7 +567,7 @@ gw_load_got_path(struct trans *gw_trans, struct gw_dir *gw_dir)
 		free(dir_test);
 	} else {
 		gw_dir->path = strdup(dir_test);
-		opened = true;
+		opened = 1;
 		goto done;
 	}
 
@@ -570,7 +580,7 @@ gw_load_got_path(struct trans *gw_trans, struct gw_dir *gw_dir)
 	if (dt == NULL)
 		free(dir_test);
 	else {
-		opened = true;
+		opened = 1;
 		error = got_error(GOT_ERR_NOT_GIT_REPO);
 		goto errored;
 	}
@@ -1111,8 +1121,8 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 }
 
 static char *
-gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
-    int limit)
+gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
+    char *start_commit, int limit, int full_log)
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
@@ -1121,10 +1131,10 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
 	struct got_commit_graph *graph = NULL;
-	char *start_commit = NULL, *shortlog = NULL, *id_str = NULL,
-	     *path = NULL, *in_repo_path = NULL, *commit_row = NULL,
-	     *commit_age = NULL, *commit_author = NULL, *commit_log = NULL,
-	     *commit_log0, *newline, *shortlog_navs_html = NULL;
+	char *logbriefs = NULL, *id_str = NULL, *path = NULL,
+	     *in_repo_path = NULL, *commit_row = NULL, *commit_age = NULL,
+	     *commit_author = NULL, *commit_log = NULL, *commit_log0, *newline,
+	     *logbriefs_navs_html = NULL;
 	regex_t regex;
 	int have_match;
 	size_t newsize;
@@ -1313,39 +1323,65 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
 
 		committer_time =
 		    got_object_commit_get_committer_time(commit_disp);
-		asprintf(&commit_age, "%s", gw_get_time_str(committer_time,
-		    TM_DIFF));
-		asprintf(&commit_author, "%s",
-		    got_object_commit_get_author(commit_disp));
-		error = got_object_commit_get_logmsg(&commit_log0, commit_disp);
-		if (error)
-			commit_log = strdup("");
-		else {
-			commit_log = commit_log0;
-			while (*commit_log == '\n')
-				commit_log++;
-			newline = strchr(commit_log, '\n');
-			if (newline)
-				*newline = '\0';
+
+		if (full_log) {
+
+			asprintf(&commit_age, "%s",
+			    gw_get_time_str(committer_time, TM_LONG));
+			asprintf(&commit_author, "%s",
+			    got_object_commit_get_author(commit_disp));
+			error = got_object_commit_get_logmsg(&commit_log0,
+			    commit_disp);
+			if (error)
+				commit_log = strdup("");
+			else
+				commit_log = gw_html_escape(commit_log0);
+			asprintf(&logbriefs_navs_html, logbriefs_navs,
+			    gw_trans->repo_name, id_str, gw_trans->repo_name,
+			    id_str, gw_trans->repo_name, id_str,
+			    gw_trans->repo_name, id_str);
+			asprintf(&commit_row, logs_row, id_str,
+			    gw_html_escape(commit_author), commit_age,
+			    commit_log, logbriefs_navs_html);
+			error = buf_append(&newsize, diffbuf, commit_row,
+			    strlen(commit_row));
+		} else {
+			asprintf(&commit_age, "%s",
+			    gw_get_time_str(committer_time, TM_DIFF));
+			asprintf(&commit_author, "%s",
+			    got_object_commit_get_author(commit_disp));
+			error = got_object_commit_get_logmsg(&commit_log0,
+			    commit_disp);
+			if (error)
+				commit_log = strdup("");
+			else {
+				commit_log = commit_log0;
+				while (*commit_log == '\n')
+					commit_log++;
+				newline = strchr(commit_log, '\n');
+				if (newline)
+					*newline = '\0';
+			}
+			asprintf(&logbriefs_navs_html, logbriefs_navs,
+			    gw_trans->repo_name, id_str, gw_trans->repo_name,
+			    id_str, gw_trans->repo_name, id_str,
+			    gw_trans->repo_name, id_str);
+			asprintf(&commit_row, logbriefs_row, commit_age,
+			    commit_author, commit_log, logbriefs_navs_html);
+			error = buf_append(&newsize, diffbuf, commit_row,
+			    strlen(commit_row));
 		}
-		asprintf(&shortlog_navs_html, shortlog_navs,
-		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str,
-		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str);
-		asprintf(&commit_row, shortlog_row, commit_age, commit_author,
-		    commit_log, shortlog_navs_html);
-		error = buf_append(&newsize, diffbuf, commit_row,
-		    strlen(commit_row));
 
 		free(commit_age);
 		free(commit_author);
 		free(commit_log0);
-		free(shortlog_navs_html);
+		free(logbriefs_navs_html);
 		free(commit_row);
 		free(id_str);
 		commit_age = NULL;
 		commit_author = NULL;
 		commit_log = NULL;
-		shortlog_navs_html = NULL;
+		logbriefs_navs_html = NULL;
 		commit_row = NULL;
 		id_str = NULL;
 
@@ -1353,7 +1389,7 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
 		if (error || (limit && --limit == 0))
 			break;
 	}
-	shortlog = strdup(diffbuf->cb_buf);
+	logbriefs = strdup(diffbuf->cb_buf);
 	got_object_commit_close(commit);
 
 	free(path);
@@ -1368,7 +1404,7 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern,
 
 	if (search_pattern)
 		regfree(&regex);
-	return shortlog;
+	return logbriefs;
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -1385,7 +1421,8 @@ gw_get_repo_tags(struct trans *gw_trans)
 {
 	char *tags = NULL;
 
-	asprintf(&tags, tags_row, "30 min ago", "1.0.0", "tag 1.0.0", tags_navs);
+	asprintf(&tags, tags_row, "30 min ago", "1.0.0", "tag 1.0.0",
+	    tags_navs);
 	return tags;
 }
 
@@ -1488,7 +1525,7 @@ main()
 	struct trans *gw_trans;
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
-	bool gw_malloc = true;
+	int gw_malloc = 1;
 
 	if ((gw_trans = malloc(sizeof(struct trans))) == NULL)
 		errx(1, "malloc");
@@ -1508,7 +1545,7 @@ main()
 
 	if ((gw_trans->gw_conf =
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
-		gw_malloc = false;
+		gw_malloc = 0;
 		error = got_error_from_errno("malloc");
 		goto err;
 	}

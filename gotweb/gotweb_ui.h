@@ -14,31 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * header nav
- *
- * ***index
- * search
- * Projects
- * 	Project|Description|Owner|Last Commit
- * 	DIV (summary|shortlog|log|tree)
- * ***summary
- * repo navs | search
- * repo description
- * 	description
- * 	owner
- * 	last commit
- * 	URL
- * shortlog
- * 	Date|committer|commit description (commit|commitdiff|tree|snapshot)
- * heads
- * 	create date | head (shortlog|log|tree)
- *
- *
- *
- * footer
- */
-
 #ifndef GOTWEB_UI_H
 #define GOTWEB_UI_H
 
@@ -114,11 +89,11 @@ char *cloneurl =
 	"<div id='cloneurl_title'>Clone URL: </div>" \
 	"<div id='cloneurl'>%s</div>";
 
-char *shortlog_row =
-	"<div id='shortlog_wrapper'>" \
-	"<div id='shortlog_age'>%s</div>" \
-	"<div id='shortlog_author'>%s</div>" \
-	"<div id='shortlog_log'>%s</div>" \
+char *logbriefs_row =
+	"<div id='logbriefs_wrapper'>" \
+	"<div id='logbriefs_age'>%s</div>" \
+	"<div id='logbriefs_author'>%s</div>" \
+	"<div id='logbriefs_log'>%s</div>" \
 	"</div>" \
 	"<div id='navs_wrapper'>" \
 	"<div id='navs'>%s</div>" \
@@ -126,7 +101,7 @@ char *shortlog_row =
 	"</div>" \
 	"<div id='dotted_line'></div>";
 
-char *shortlog_navs =
+char *logbriefs_navs =
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
@@ -147,7 +122,7 @@ char *tags_row =
 char *tags_navs =
 	"<a href='?path=%s&action=tagt&commit=%s'>tag</a> | " \
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
-	"<a href='?path=%s&action=shortlog&commit=%s'>shortlog</a> | " \
+	"<a href='?path=%s&action=logbriefs&commit=%s'>Log Briefs</a> | " \
 	"<a href='?path=%s&action=log&commit=%s'>log</a>";
 
 char *heads_row =
@@ -162,9 +137,39 @@ char *heads_row =
 	"<div id='dotted_line'></div>";
 
 char *heads_navs =
-	"<a href='?path=%s&action=shortlog&headref=%s'>shortlog</a> | " \
+	"<a href='?path=%s&action=logbriefs&headref=%s'>Log Briefs</a> | " \
 	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
 	"<a href='?path=%s&action=tree&headref=%s'>commit</a>";
+
+/* log.tmpl */
+
+char *logs_wrapper =
+	"<div id='logs_wrapper'>";
+
+char *logs =
+	"<div id='logs_title_wrapper'>" \
+	"<div id='logs_title'>Commits</div></div>" \
+	"<div id='logs_content'>%s</div>";
+
+char *logs_row =
+	"<div id='logs_row_wrapper'>" \
+	"<div id='logs_commit'>Commit: %s</div>" \
+	"<div id='logs_author'>From: %s</div>" \
+	"<div id='logs_age'>Date: %s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='log'>%s</div>" \
+	"<div id='navs_wrapper'>" \
+	"<div id='navs'>%s</div>" \
+	"</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>";
+
+char *logs_navs =
+	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
+	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
 
 /* index.tmpl */
 
@@ -192,7 +197,7 @@ char *index_projects =
 
 char *index_navs =
 	"<a href='?path=%s&action=summary'>summary</a> | " \
-	"<a href='?path=%s&action=shortlog'>shortlog</a> | " \
+	"<a href='?path=%s&action=logbriefs'>log briefs</a> | " \
 	"<a href='?path=%s&action=log'>log</a> | " \
 	"<a href='?path=%s&action=tree'>tree</a>";
 
@@ -201,10 +206,10 @@ char *index_navs =
 char *summary_wrapper =
 	"<div id='summary_wrapper'>";
 
-char *summary_shortlog =
-	"<div id='summary_shortlog_title_wrapper'>" \
-	"<div id='summary_shortlog_title'>Shortlog</div></div>" \
-	"<div id='summary_shortlog_content'>%s</div>";
+char *summary_logbriefs =
+	"<div id='summary_logbriefs_title_wrapper'>" \
+	"<div id='summary_logbriefs_title'>Log Briefs</div></div>" \
+	"<div id='summary_logbriefs_content'>%s</div>";
 
 char *summary_tags =
 	"<div id='summary_tags_title_wrapper'>" \

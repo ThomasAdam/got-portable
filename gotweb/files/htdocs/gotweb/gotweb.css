@@ -190,12 +190,12 @@ body {
 	padding-bottom: 5px;
 	overflow: auto;
 }
-#shortlog_wrapper {
+#logbriefs_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#shortlog_age {
+#logbriefs_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -203,7 +203,7 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
-#shortlog_author {
+#logbriefs_author {
 	float: left;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -211,8 +211,9 @@ body {
 	font-style: italic;
 	overflow: auto;
 }
-#shortlog_log {
+#logbriefs_log {
 	float: left;
+	padding-left: 10px;
 	padding-right: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -353,6 +354,66 @@ body {
 	text-decoration: none;
 }
 
+/* logs.tmpl */
+
+#logs_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#logs_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#logs_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#logs_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#logs_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#logs_commit {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+}
+#logs_author {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#logs_age {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 5px;
+}
+
+#log {
+	clear: left;
+	float: left;
+	padding-left: 20px;
+	padding-top: 2px;
+	padding-bottom: 20px;
+}
+
 /* summary.tmpl */
 
 #summary_wrapper {
@@ -361,19 +422,19 @@ body {
 	width: 100%;
 	background-color: Khaki;
 }
-#summary_shortlog_title_wrapper {
+#summary_logbriefs_title_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 	background-color: LightSlateGray;
 	color: #ffffff;
 }
-#summary_shortlog_title {
+#summary_logbriefs_title {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
-#summary_shortlog_content {
+#summary_logbriefs_content {
 	clear: left;
 	float: left;
 	width: 100%;
