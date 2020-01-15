@@ -639,7 +639,6 @@ gw_summary(struct trans *gw_trans)
 		free(heads_html);
 		free(heads);
 	}
-
 	return error;
 }
 
@@ -1032,7 +1031,7 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 	char *minutes = "minutes ago", *seconds = "seconds ago";
 	char *now = "right now";
 	char *repo_age, *s;
-	char datebuf[BUFFER_SIZE];
+	char datebuf[29];
 
 	switch (ref_tm) {
 	case TM_DIFF:
@@ -1186,10 +1185,10 @@ gw_get_repo_owner(struct trans *gw_trans, char *dir)
 	if ((f = fopen(d_file, "r")) == NULL)
 		goto err;
 
-	if ((buf = calloc(BUFFER_SIZE, sizeof(char *))) == NULL)
+	if ((buf = calloc(128, sizeof(char *))) == NULL)
 		goto err;
 
-	while ((fgets(buf, BUFFER_SIZE, f)) != NULL) {
+	while ((fgets(buf, 128, f)) != NULL) {
 		if ((pos = strstr(buf, gotweb)) != NULL)
 			break;
 
@@ -1201,7 +1200,7 @@ gw_get_repo_owner(struct trans *gw_trans, char *dir)
 		goto err;
 
 	do {
-		fgets(buf, BUFFER_SIZE, f);
+		fgets(buf, 128, f);
 	} while ((comp = strcasestr(buf, gw_owner)) == NULL);
 
 	if (comp == NULL)
@@ -1285,30 +1284,32 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	struct buf *diffbuf = NULL;
 	time_t committer_time;
 
+	error = buf_alloc(&diffbuf, 0);
+	if (error != NULL)
+		return NULL;
+
 	if (search_pattern &&
 	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB |
 	    REG_NEWLINE))
 		return NULL;
 
-	SIMPLEQ_INIT(&refs);
-
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error != NULL)
-		goto done;
+		return NULL;
 
-	error = buf_alloc(&diffbuf, BUFFER_SIZE);
-	if (error != NULL)
-		goto done;
+	SIMPLEQ_INIT(&refs);
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
 		if (error != NULL)
 			goto done;
+
 		error = got_ref_resolve(&id1, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error != NULL)
 			goto done;
+
 		error = got_object_open_as_commit(&commit, repo, id1);
 	} else {
 		struct got_reference *ref;
@@ -1364,6 +1365,7 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 
 	if (error != NULL)
 		goto done;
+
 	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
 	if (error != NULL)
 		goto done;
@@ -1702,8 +1704,7 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 			return NULL;
 		}
 
-		error = buf_append(&newsize, diffbuf, commit_row,
-		    strlen(commit_row));
+		error = buf_puts(&newsize, diffbuf, commit_row);
 
 		free(commit_parent);
 		free(commit_diff_disp);
@@ -1733,7 +1734,10 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	if (error)
 		goto done;
 
-	logs = strdup(diffbuf->cb_buf);
+	if (buf_len(diffbuf) > 0) {
+		error = buf_putc(diffbuf, '\0');
+		logs = strdup(buf_get(diffbuf));
+	}
 done:
 	buf_free(diffbuf);
 	if (commit != NULL)
@@ -1768,15 +1772,14 @@ gw_get_repo_tags(struct trans *gw_trans, int limit, int tag_type)
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
-	error = buf_alloc(&diffbuf, BUFFER_SIZE);
+	error = buf_alloc(&diffbuf, 0);
 	if (error != NULL)
-		goto done;
+		return NULL;
+	SIMPLEQ_INIT(&refs);
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error != NULL)
 		goto done;
-
-	SIMPLEQ_INIT(&refs);
 
 	error = got_ref_list(&refs, repo, "refs/tags", cmp_tags, repo);
 	if (error)
@@ -1816,7 +1819,6 @@ gw_get_repo_tags(struct trans *gw_trans, int limit, int tag_type)
 
 		tag_log0 = strdup(got_object_tag_get_message(tag));
 
-		got_object_tag_close(tag);
 		if (tag_log0 == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
@@ -1859,70 +1861,25 @@ gw_get_repo_tags(struct trans *gw_trans, int limit, int tag_type)
 		default:
 			break;
 		}
-		/* /1* printf("%stag %s %s\n", GOT_COMMIT_SEP_STR, refname, refstr); *1/ */
-		/* free(refstr); */
 
-		/* error = got_ref_resolve(&id, repo, re->ref); */
-		/* if (error) */
-		/* 	break; */
-		/* error = got_object_open_as_tag(&tag, repo, id); */
-		/* free(id); */
-		/* if (error) */
-		/* 	break; */
-		/* /1* printf("from: %s\n", got_object_tag_get_tagger(tag)); *1/ */
-		/* tagger_time = got_object_tag_get_tagger_time(tag); */
-		/* /1* datestr = get_datestr(&tagger_time, datebuf); *1/ */
-		/* /1* if (datestr) *1/ */
-		/* /1* 	printf("date: %s UTC\n", datestr); *1/ */
-		/* error = got_object_id_str(&id_str, */
-		/*     got_object_tag_get_object_id(tag)); */
-		/* if (error) */
-		/* 	break; */
-		/* switch (got_object_tag_get_object_type(tag)) { */
-		/* case GOT_OBJ_TYPE_BLOB: */
-		/* 	/1* printf("object: %s %s\n", GOT_OBJ_LABEL_BLOB, id_str); *1/ */
-		/* 	break; */
-		/* case GOT_OBJ_TYPE_TREE: */
-		/* 	/1* printf("object: %s %s\n", GOT_OBJ_LABEL_TREE, id_str); *1/ */
-		/* 	break; */
-		/* case GOT_OBJ_TYPE_COMMIT: */
-		/* 	/1* printf("object: %s %s\n", GOT_OBJ_LABEL_COMMIT, id_str); *1/ */
-		/* 	break; */
-		/* case GOT_OBJ_TYPE_TAG: */
-		/* 	/1* printf("object: %s %s\n", GOT_OBJ_LABEL_TAG, id_str); *1/ */
-		/* 	break; */
-		/* default: */
-		/* 	break; */
-		/* } */
-		/* free(id_str); */
-		/* tagmsg0 = strdup(got_object_tag_get_message(tag)); */
-		/* got_object_tag_close(tag); */
-		/* if (tagmsg0 == NULL) { */
-		/* 	error = got_error_from_errno("strdup"); */
-		/* 	break; */
-		/* } */
+		got_object_tag_close(tag);
 
-		/* tagmsg = tagmsg0; */
-		/* do { */
-		/* 	line = strsep(&tagmsg, "\n"); */
-		/* 	if (line) */
-		/* 		printf(" %s\n", line); */
-		/* } while (line); */
-		/* free(tagmsg0); */
-		/* error = buf_append(&newsize, diffbuf, tags_row, */
-		/*     strlen(tags_row)); */
-		error = buf_append(&newsize, diffbuf, tag_row, strlen(tag_row));
+		error = buf_puts(&newsize, diffbuf, tag_row);
 
+		free(id_str);
+		free(refstr);
+		free(age);
 		free(tag_log0);
 		free(tag_row);
-		free(age);
-		free(id_str);
-		id_str = NULL;
 
 		if (error || (limit && --limit == 0))
 			break;
 	}
-	tags = strdup(diffbuf->cb_buf);
+
+	if (buf_len(diffbuf) > 0) {
+		error = buf_putc(diffbuf, '\0');
+		tags = strdup(buf_get(diffbuf));
+	}
 done:
 	buf_free(diffbuf);
 	got_ref_list_free(&refs);
@@ -1945,9 +1902,9 @@ gw_get_repo_heads(struct trans *gw_trans)
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
-	error = buf_alloc(&diffbuf, BUFFER_SIZE);
+	error = buf_alloc(&diffbuf, 0);
 	if (error != NULL)
-		goto done;
+		return NULL;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error != NULL)
@@ -1993,14 +1950,16 @@ gw_get_repo_heads(struct trans *gw_trans)
 			goto done;
 		}
 
-		error = buf_append(&newsize, diffbuf, head_row,
-		    strlen(head_row));
+		error = buf_puts(&newsize, diffbuf, head_row);
 
 		free(head_navs_disp);
 		free(head_row);
 	}
 
-	heads = strdup(diffbuf->cb_buf);
+	if (buf_len(diffbuf) > 0) {
+		error = buf_putc(diffbuf, '\0');
+		heads = strdup(buf_get(diffbuf));
+	}
 done:
 	buf_free(diffbuf);
 	got_ref_list_free(&refs);
@@ -2050,9 +2009,9 @@ gw_html_escape(const char *html)
 {
 	char *escaped_str = NULL, *buf;
 	char c[1];
-	size_t sz, i;
+	size_t sz, i, buff_sz = 2048;
 
-	if ((buf = calloc(BUFFER_SIZE, sizeof(char *))) == NULL)
+	if ((buf = calloc(buff_sz, sizeof(char *))) == NULL)
 		return NULL;
 
 	if (html == NULL)
@@ -2061,9 +2020,9 @@ gw_html_escape(const char *html)
 		if ((sz = strlen(html)) == 0)
 			return NULL;
 
-	/* only work with BUFFER_SIZE */
-	if (BUFFER_SIZE < sz)
-		sz = BUFFER_SIZE;
+	/* only work with buff_sz */
+	if (buff_sz < sz)
+		sz = buff_sz;
 
 	for (i = 0; i < sz; i++) {
 		c[0] = html[i];
