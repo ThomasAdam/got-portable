@@ -3662,70 +3662,6 @@ done:
 #endif
 
 static const struct got_error *
-cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
-    struct got_reference *ref2)
-{
-	const struct got_error *err = NULL;
-	struct got_repository *repo = arg;
-	struct got_object_id *id1, *id2 = NULL;
-	struct got_tag_object *tag1 = NULL, *tag2 = NULL;
-	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
-	time_t time1, time2;
-
-	*cmp = 0;
-
-	err = got_ref_resolve(&id1, repo, ref1);
-	if (err)
-		return err;
-	err = got_object_open_as_tag(&tag1, repo, id1);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			goto done;
-		/* "lightweight" tag */
-		err = got_object_open_as_commit(&commit1, repo, id1);
-		if (err)
-			goto done;
-		time1 = got_object_commit_get_committer_time(commit1);
-	} else
-		time1 = got_object_tag_get_tagger_time(tag1);
-
-	err = got_ref_resolve(&id2, repo, ref2);
-	if (err)
-		goto done;
-	err = got_object_open_as_tag(&tag2, repo, id2);
-	if (err) {
-		if (err->code != GOT_ERR_OBJ_TYPE)
-			goto done;
-		/* "lightweight" tag */
-		err = got_object_open_as_commit(&commit2, repo, id2);
-		if (err)
-			goto done;
-		time2 = got_object_commit_get_committer_time(commit2);
-	} else
-		time2 = got_object_tag_get_tagger_time(tag2);
-
-	/* Put latest tags first. */
-	if (time1 < time2)
-		*cmp = 1;
-	else if (time1 > time2)
-		*cmp = -1;
-	else
-		err = got_ref_cmp_by_name(NULL, cmp, ref2, ref1);
-done:
-	free(id1);
-	free(id2);
-	if (tag1)
-		got_object_tag_close(tag1);
-	if (tag2)
-		got_object_tag_close(tag2);
-	if (commit1)
-		got_object_commit_close(commit1);
-	if (commit2)
-		got_object_commit_close(commit2);
-	return err;
-}
-
-static const struct got_error *
 list_tags(struct got_repository *repo, struct got_worktree *worktree)
 {
 	static const struct got_error *err = NULL;
@@ -3734,7 +3670,7 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo, "refs/tags", cmp_tags, repo);
+	err = got_ref_list(&refs, repo, "refs/tags", got_repo_cmp_tags, repo);
 	if (err)
 		return err;
 

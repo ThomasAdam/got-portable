@@ -116,3 +116,7 @@ typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);
 const struct got_error *got_repo_import(struct got_object_id **, const char *,
     const char *, const char *, struct got_pathlist_head *,
     struct got_repository *, got_repo_import_cb, void *);
+
+/* Attempt to compare two reference tags */
+const struct got_error *got_repo_cmp_tags(void *, int *,
+    struct got_reference *, struct got_reference *);
