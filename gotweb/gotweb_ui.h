@@ -50,13 +50,13 @@ char *site_owner =
 	"<div id='site_owner_wrapper'><div id='site_owner'>%s</div></div>";
 
 char *search =
-	"<div id='search'>" \
+	"<!--/* <div id='search'>" \
 	"<form method='POST'>" \
 	"<input type='search' id='got-search' name='got-search' size='15'" \
 	    " maxlength='50' />" \
 	"<button>Search</button>" \
 	"</form>" \
-	"</div>";
+	"</div> */-->";
 
 char *np_wrapper_start =
 	"<div id='np_wrapper'>" \
@@ -104,13 +104,13 @@ char *logbriefs_row =
 char *logbriefs_navs =
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
-	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
-	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
+	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
 char *tags_row =
 	"<div id='tags_wrapper'>" \
 	"<div id='tags_age'>%s</div>" \
-	"<div id='tag'>%s</div>" \
+	"<div id='tag'>tag %s</div>" \
 	"<div id='tag_name'>%s</div>" \
 	"</div>" \
 	"<div id='navs_wrapper'>" \
@@ -137,6 +137,7 @@ char *heads_row =
 	"<div id='dotted_line'></div>";
 
 char *heads_navs =
+	"<a href='?path=%s&action=summary&headref=%s'>summary</a> | " \
 	"<a href='?path=%s&action=logbriefs&headref=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
 	"<a href='?path=%s&action=tree&headref=%s'>commit</a>";
@@ -165,10 +166,11 @@ char *commit_log_html =
 	"<div id='commit_log_title'>Log:</div>" \
 	"<div id='commit_log'>%s</div>";
 
-/* log.tmpl */
+char *commit_tree_html =
+	"<div id='commit_log_title'>Tree:</div>" \
+	"<div id='commit_log'>%s</div>";
 
-char *logs_wrapper =
-	"<div id='logs_wrapper'>";
+/* log.tmpl */
 
 char *logs =
 	"<div id='logs_title_wrapper'>" \
@@ -188,13 +190,10 @@ char *logs_row =
 char *logs_navs =
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
-	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
-	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
+	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
 /* tree.tmpl */
-
-char *log_tree_wrapper =
-	"<div id='log_tree_wrapper'>";
 
 char *log_tree =
 	"<div id='log_tree_title_wrapper'>" \
@@ -212,13 +211,10 @@ char *log_tree_row =
 char *log_tree_navs =
 	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
-	"<a href='?path=%s&action=tree&commit=%s'>tree</a> | " \
-	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a>";
+	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
 /* commit.tmpl */
-
-char *log_commit_wrapper =
-	"<div id='log_commit_wrapper'>";
 
 char *log_commit =
 	"<div id='log_commit_title_wrapper'>" \
@@ -227,10 +223,25 @@ char *log_commit =
 
 char *log_commit_row =
 	"<div id='log_commit_row_wrapper'>" \
-	"<div id='log_commit_commit'>%s%s%s%s%s%s</div>" \
+	"<div id='log_commit_commit'>%s%s%s%s%s%s%s</div>" \
 	"</div>" \
 	"<div id='dotted_line'></div>" \
 	"<div id='log_commit'>%s</div>" \
+	"</div>";
+
+/* diff.tmpl */
+
+char *log_diff =
+	"<div id='log_diff_title_wrapper'>" \
+	"<div id='log_diff_title'>Commit Diff</div></div>" \
+	"<div id='log_diff_content'>%s</div>";
+
+char *log_diff_row =
+	"<div id='log_diff_row_wrapper'>" \
+	"<div id='log_commit_diff'>%s%s%s%s%s%s%s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='log_diff'>%s</div>" \
 	"</div>";
 
 /* index.tmpl */

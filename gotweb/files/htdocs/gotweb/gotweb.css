@@ -231,11 +231,12 @@ body {
 	width: 100%;
 }
 #tags_age {
-	float: left;
-	width: 7.5em;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
+	float: left;
+	width: 7.5em;
+	overflow: auto;
 }
 #tag {
 	float: left;
@@ -246,6 +247,7 @@ body {
 }
 #tag_name {
 	float: left;
+	padding-left: 10px;
 	padding-right: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -256,11 +258,12 @@ body {
 	width: 100%;
 }
 #heads_age {
-	float: left;
-	width: 7.5em;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
+	float: left;
+	width: 7.5em;
+	overflow: auto;
 }
 #head {
 	float: left;
@@ -446,11 +449,6 @@ body {
 
 /* logs.tmpl */
 
-#logs_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-}
 #logs_title_wrapper {
 	clear: left;
 	float: left;
@@ -486,11 +484,6 @@ body {
 
 /* tree.tmpl */
 
-#log_tree_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-}
 #log_tree_title_wrapper {
 	clear: left;
 	float: left;
@@ -525,15 +518,11 @@ body {
 	clear: left;
 	float: left;
 	padding: 20px;
+	font-family: monospace;
 }
 
 /* commit.tmpl */
 
-#log_commit_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-}
 #log_commit_title_wrapper {
 	clear: left;
 	float: left;
@@ -568,6 +557,46 @@ body {
 	clear: left;
 	float: left;
 	padding: 20px;
+	font-family: monospace;
+}
+
+/* diff.tmpl */
+
+#log_diff_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#log_diff_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#log_diff_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_diff_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#log_commit_diff {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+}
+#log_diff {
+	clear: left;
+	float: left;
+	padding: 20px;
+	font-family: monospace;
 }
 
 /* summary.tmpl */
