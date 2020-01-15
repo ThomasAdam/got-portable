@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Tracey Emery <tracey@traceyemery.net>
+ * Copyright (c) 2019, 2020 Tracey Emery <tracey@traceyemery.net>
  * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2014, 2015, 2017 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -125,7 +125,6 @@ enum tags {
 };
 
 struct buf {
-	/* buffer handle, buffer size, and data length */
 	u_char	*cb_buf;
 	size_t	 cb_size;
 	size_t	 cb_len;
@@ -659,7 +658,7 @@ gw_tag(struct trans *gw_trans)
 	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGTAG);
 
 	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_tree, log)) == -1)
+		if ((asprintf(&log_html, log_tag, log)) == -1)
 			return got_error_from_errno("asprintf");
 		khttp_puts(gw_trans->gw_req, log_html);
 		free(log_html);

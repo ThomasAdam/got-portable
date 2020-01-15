@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Tracey Emery <tracey@traceyemery.net>
+ * Copyright (c) 2019, 2020 Tracey Emery <tracey@traceyemery.net>
  * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
