@@ -193,6 +193,7 @@ body {
 #shortlog_wrapper {
 	clear: left;
 	float: left;
+	width: 95%;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -208,6 +209,7 @@ body {
 }
 #shortlog_log {
 	float: left;
+	width: 75%;
 }
 #tags_wrapper {
 	clear: left;
