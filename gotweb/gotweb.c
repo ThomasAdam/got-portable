@@ -161,6 +161,7 @@ static const struct got_error*	 gw_blob(struct trans *);
 static const struct got_error*	 gw_blob_diff(struct trans *);
 static const struct got_error*	 gw_commit(struct trans *);
 static const struct got_error*	 gw_commit_diff(struct trans *);
+static const struct got_error*	 gw_heads(struct trans *);
 static const struct got_error*	 gw_history(struct trans *);
 static const struct got_error*	 gw_index(struct trans *);
 static const struct got_error*	 gw_log(struct trans *);
@@ -168,6 +169,7 @@ static const struct got_error*	 gw_raw(struct trans *);
 static const struct got_error*	 gw_shortlog(struct trans *);
 static const struct got_error*	 gw_snapshot(struct trans *);
 static const struct got_error*	 gw_summary(struct trans *);
+static const struct got_error*	 gw_tags(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
 
 struct gw_query_action {
@@ -274,6 +276,14 @@ gw_commit(struct trans *gw_trans)
 
 static const struct got_error *
 gw_commit_diff(struct trans *gw_trans)
+{
+	const struct got_error *error = NULL;
+
+	return error;
+}
+
+static const struct got_error *
+gw_heads(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
@@ -412,9 +422,20 @@ gw_summary(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
-		khttp_puts(gw_trans->gw_req, summary_shortlog);
-		khttp_puts(gw_trans->gw_req, summary_tags);
-		khttp_puts(gw_trans->gw_req, summary_heads);
+	error = gw_shortlog(gw_trans);
+	error = gw_tags(gw_trans);
+	error = gw_heads(gw_trans);
+	khttp_puts(gw_trans->gw_req, summary_shortlog);
+	khttp_puts(gw_trans->gw_req, summary_tags);
+	khttp_puts(gw_trans->gw_req, summary_heads);
+	return error;
+}
+
+static const struct got_error *
+gw_tags(struct trans *gw_trans)
+{
+	const struct got_error *error = NULL;
+
 	return error;
 }
 
@@ -837,6 +858,7 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
 	char *minutes = "minutes ago", *seconds = "seconds ago";
 	char *now = "right now";
+	char *s;
 	char datebuf[BUFFER_SIZE];
 
 	if (repo_ref == NULL)
@@ -924,12 +946,12 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 		if (cmp_time != 0) {
 			if (gmtime_r(&committer_time, &tm) == NULL)
 				return NULL;
-			if (strftime(datebuf, sizeof(datebuf),
-			    "%G-%m-%d %H:%M:%S (%z)",
-			    &tm) >= sizeof(datebuf))
+
+			s = asctime_r(&tm, datebuf);
+			if (s == NULL)
 				return NULL;
 
-			if ((asprintf(&repo_age, "%s", datebuf)) == -1)
+			if ((asprintf(&repo_age, "%s UTC", datebuf)) == -1)
 				return NULL;
 		} else {
 			if ((asprintf(&repo_age, "")) == -1)
