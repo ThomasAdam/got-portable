@@ -511,7 +511,6 @@ parse_conf(const char *filename, struct gotweb_conf *gconf)
 	gw_conf->got_max_repos_display = D_MAXREPODISP;
 	gw_conf->got_max_commits_display = D_MAXCOMMITDISP;
 	if ((file = pushfile(filename)) == NULL) {
-		error = got_error_from_errno2("parse_conf", GOTWEB_CONF);
 		goto done;
 	}
 	topfile = file;

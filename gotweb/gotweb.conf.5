@@ -65,6 +65,37 @@ Set whether to display the site owner, or not.
 .It Ic got_www_path Ar string
 Set the public gotweb httpd path.
 .El
+.Sh EXAMPLES
+These are the currently configurable items for Gotweb.
+The configuration file gotweb.conf must be located at /var/www/etc/gotweb.conf.
+.Bd -literal -offset indent
+
+#
+# gotweb options
+# all paths relative to /var/www (httpd chroot jail)
+#
+
+got_repos_path			"/got/public"
+got_www_path			"/gotweb"
+
+#got_max_repos			100
+#got_max_repos_display		25
+got_max_commits_display		50
+
+got_site_name			"my public repos"
+got_site_owner			"Got Owner"
+got_site_link			"repos"
+
+got_logo			"got.png"
+got_logo_url			"https://gameoftrees.org"
+
+# on by default
+#got_show_site_owner		off
+#got_show_repo_owner		off
+#got_show_repo_age		false
+#got_show_repo_description	no
+#got_show_repo_cloneurl		off
+.Ed
 .Sh FILES
 .Bl -tag -width Ds -compact
 .It Pa /var/www/etc/gotweb.conf

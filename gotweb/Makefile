@@ -35,11 +35,6 @@ realinstall:
 	if [ ! -d ${ETC_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${ETC_DIR}; \
 	fi
-	if [ ! -d ${EXPL_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${EXPL_DIR}; \
-	fi
-	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 files/etc/gotweb.conf \
-		${ETC_DIR}/examples/gotweb.conf
 	if [ ! -d ${HTTPD_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
 	fi

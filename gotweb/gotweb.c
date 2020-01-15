@@ -2009,7 +2009,7 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, "refs/tags", got_repo_cmp_tags, repo);
+	error = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
 	if (error)
 		goto done;
 
