@@ -1,7 +1,4 @@
-Complete templates.
-Complete stylesheets.
-Complete gw_funcs
-----
+TODO
 
 - Add Prev/Next to shortlogs/logs that have more entries than
   got_max_commits_display
@@ -14,3 +11,5 @@ Complete gw_funcs
 
 - Redo index header, so columns are removed when content is set to not display
   in gotweb.conf.
+
+- Move pledge to each function. Only diffing needs wpath and cpath.

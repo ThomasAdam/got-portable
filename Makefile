@@ -4,8 +4,9 @@ SUBDIR = libexec got tog
 
 .if make(regress) || make(obj) || make(clean) || make(release)
 SUBDIR += regress
-# not part of original SUBDIR, since we don't build gotweb by default and
-# the port will be split into sub packages
+.endif
+
+.if make(clean)
 SUBDIR += gotweb
 .endif
 

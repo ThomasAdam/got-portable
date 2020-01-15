@@ -1,4 +1,4 @@
-Game of Trees Web (Gotweb) is a read-only web implementation of Got.
+Game of Trees Web (Gotweb) is a read-only web front-end for Got.
 
 Gotweb is still under development; it is being developed exclusively
 on OpenBSD and its target audience are OpenBSD developers. Gotweb is

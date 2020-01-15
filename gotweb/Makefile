@@ -32,9 +32,6 @@ realinstall:
 	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
 	    files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
-	if [ ! -d ${ETC_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${ETC_DIR}; \
-	fi
 	if [ ! -d ${HTTPD_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
 	fi
