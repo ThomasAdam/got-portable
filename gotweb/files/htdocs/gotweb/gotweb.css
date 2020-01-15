@@ -203,12 +203,11 @@ body {
 }
 #shortlog_author {
 	float: left;
-	width: 7.5em;
+	width: 8.5em;
 	font-style: italic;
 }
 #shortlog_log {
 	float: left;
-	font-weight: bold;
 }
 #tags_wrapper {
 	clear: left;
@@ -223,7 +222,7 @@ body {
 }
 #tag {
 	float: left;
-	width: 7.5em;
+	width: 8.5em;
 	font-style: italic;
 }
 #tag_name {

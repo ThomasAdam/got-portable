@@ -22,6 +22,7 @@
 
 #include <dirent.h>
 #include <err.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -45,6 +46,7 @@
 #include <kcgi.h>
 #include <kcgihtml.h>
 
+#include "buf.h"
 #include "gotweb.h"
 #include "gotweb_ui.h"
 
@@ -105,6 +107,13 @@ enum ref_tm {
 	TM_LONG,
 };
 
+struct buf {
+	/* buffer handle, buffer size, and data length */
+	u_char	*cb_buf;
+	size_t	 cb_size;
+	size_t	 cb_len;
+};
+
 static const char *const templs[TEMPL__MAX] = {
 	"head",
 	"header",
@@ -129,9 +138,11 @@ static char			*gw_get_repo_description(struct trans *,
 				    char *);
 static char			*gw_get_repo_owner(struct trans *,
 				    char *);
+static char			*gw_get_time_str(time_t, int);
 static char			*gw_get_repo_age(struct trans *,
 				    char *, char *, int);
-static char			*gw_get_repo_shortlog(struct trans *);
+static char			*gw_get_repo_shortlog(struct trans *,
+				    const char *);
 static char			*gw_get_repo_tags(struct trans *);
 static char			*gw_get_repo_heads(struct trans *);
 static char			*gw_get_clone_url(struct trans *, char *);
@@ -151,6 +162,8 @@ static const struct got_error*	 gw_load_got_paths(struct trans *);
 static const struct got_error*	 gw_load_got_path(struct trans *,
 				    struct gw_dir *);
 static const struct got_error*	 gw_parse_querystring(struct trans *);
+static const struct got_error*	 match_logmsg(int *, struct got_object_id *,
+				    struct got_commit_object *, regex_t *);
 
 static const struct got_error*	 gw_blame(struct trans *);
 static const struct got_error*	 gw_blob(struct trans *);
@@ -471,7 +484,7 @@ gw_summary(struct trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	shortlog = gw_get_repo_shortlog(gw_trans);
+	shortlog = gw_get_repo_shortlog(gw_trans, NULL);
 	tags = gw_get_repo_tags(gw_trans);
 	heads = gw_get_repo_heads(gw_trans);
 
@@ -714,6 +727,32 @@ gw_init_gw_dir(char *dir)
 	return gw_dir;
 }
 
+static const struct got_error*
+match_logmsg(int *have_match, struct got_object_id *id,
+    struct got_commit_object *commit, regex_t *regex)
+{
+	const struct got_error *err = NULL;
+	regmatch_t regmatch;
+	char *id_str = NULL, *logmsg = NULL;
+
+	*have_match = 0;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_object_commit_get_logmsg(&logmsg, commit);
+	if (err)
+		goto done;
+
+	if (regexec(regex, logmsg, 1, &regmatch, 0) == 0)
+		*have_match = 1;
+done:
+	free(id_str);
+	free(logmsg);
+	return err;
+}
+
 static void
 gw_display_open(struct trans *gw_trans, enum khttp code, enum kmime mime)
 {
@@ -840,6 +879,70 @@ err:
 }
 
 static char *
+gw_get_time_str(time_t committer_time, int ref_tm)
+{
+	struct tm tm;
+	time_t diff_time;
+	char *years = "years ago", *months = "months ago";
+	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
+	char *minutes = "minutes ago", *seconds = "seconds ago";
+	char *now = "right now";
+	char *repo_age, *s;
+	char datebuf[BUFFER_SIZE];
+
+	switch (ref_tm) {
+	case TM_DIFF:
+		diff_time = time(NULL) - committer_time;
+		if (diff_time > 60 * 60 * 24 * 365 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 365), years)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / (365 / 12)),
+			    months)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 7), weeks)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 24 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24), days)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 60 * 2) {
+			if ((asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60), hours)) == -1)
+				return NULL;
+		} else if (diff_time > 60 * 2) {
+			if ((asprintf(&repo_age, "%lld %s", (diff_time / 60),
+			    minutes)) == -1)
+				return NULL;
+		} else if (diff_time > 2) {
+			if ((asprintf(&repo_age, "%lld %s", diff_time,
+			    seconds)) == -1)
+				return NULL;
+		} else {
+			if ((asprintf(&repo_age, "%s", now)) == -1)
+				return NULL;
+		}
+		break;
+	case TM_LONG:
+		if (gmtime_r(&committer_time, &tm) == NULL)
+			return NULL;
+
+		s = asctime_r(&tm, datebuf);
+		if (s == NULL)
+			return NULL;
+
+		if ((asprintf(&repo_age, "%s UTC", datebuf)) == -1)
+			return NULL;
+		break;
+	}
+	return repo_age;
+}
+
+static char *
 gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 {
 	const struct got_error *error = NULL;
@@ -849,14 +952,8 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct got_reference *head_ref;
-	struct tm tm;
-	time_t committer_time = 0, cmp_time = 0, diff_time;
-	char *repo_age = NULL, *years = "years ago", *months = "months ago";
-	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
-	char *minutes = "minutes ago", *seconds = "seconds ago";
-	char *now = "right now";
-	char *s;
-	char datebuf[BUFFER_SIZE];
+	time_t committer_time = 0, cmp_time = 0;
+	char *repo_age = NULL;
 
 	if (repo_ref == NULL)
 		return NULL;
@@ -899,65 +996,12 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 			cmp_time = committer_time;
 	}
 
-	if (cmp_time != 0)
+	if (cmp_time != 0) {
 		committer_time = cmp_time;
-
-	switch (ref_tm) {
-	case TM_DIFF:
-		diff_time = time(NULL) - committer_time;
-		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 365), years)) == -1)
-				return NULL;
-		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / (365 / 12)),
-			    months)) == -1)
-				return NULL;
-		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 7), weeks)) == -1)
-				return NULL;
-		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24), days)) == -1)
-				return NULL;
-		} else if (diff_time > 60 * 60 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60), hours)) == -1)
-				return NULL;
-		} else if (diff_time > 60 * 2) {
-			if ((asprintf(&repo_age, "%lld %s", (diff_time / 60),
-			    minutes)) == -1)
-				return NULL;
-		} else if (diff_time > 2) {
-			if ((asprintf(&repo_age, "%lld %s", diff_time,
-			    seconds)) == -1)
-				return NULL;
-		} else {
-			if ((asprintf(&repo_age, "%s", now)) == -1)
-				return NULL;
-		}
-		break;
-	case TM_LONG:
-		if (cmp_time != 0) {
-			if (gmtime_r(&committer_time, &tm) == NULL)
-				return NULL;
-
-			s = asctime_r(&tm, datebuf);
-			if (s == NULL)
-				return NULL;
-
-			if ((asprintf(&repo_age, "%s UTC", datebuf)) == -1)
-				return NULL;
-		} else {
-			if ((asprintf(&repo_age, "")) == -1)
-				return NULL;
-		}
-		break;
-	}
-
-/* noref: */
+		repo_age = gw_get_time_str(committer_time, ref_tm);
+	} else
+		if ((asprintf(&repo_age, "")) == -1)
+			return NULL;
 	got_ref_list_free(&refs);
 	free(id);
 	return repo_age;
@@ -1054,17 +1098,37 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 }
 
 static char *
-gw_get_repo_shortlog(struct trans *gw_trans)
+gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
 	struct got_commit_object *commit = NULL;
 	struct got_object_id *id = NULL;
-	char *start_commit = NULL, *head_ref_name = NULL;
-	char *shortlog = NULL;
+	struct got_commit_graph *graph = NULL;
+	char *start_commit = NULL, *shortlog = NULL, *id_str = NULL,
+	     *path = NULL, *in_repo_path = NULL, *commit_row = NULL,
+	     *commit_age = NULL, *commit_author = NULL, *commit_log = NULL,
+	     *shortlog_navs_html = NULL;
+	regex_t regex;
+	int have_match, limit = 25;
+	size_t newsize;
+	struct buf *diffbuf;
+	time_t committer_time;
+
+	if (search_pattern &&
+	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB |
+	    REG_NEWLINE))
+		return NULL;
+
+	SIMPLEQ_INIT(&refs);
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	error = buf_alloc(&diffbuf, BUFFER_SIZE);
 	if (error != NULL)
 		goto done;
 
@@ -1129,24 +1193,165 @@ gw_get_repo_shortlog(struct trans *gw_trans)
 	if (error != NULL)
 		goto done;
 
+	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
+	if (error != NULL)
+		goto done;
+
+	if (in_repo_path) {
+		free(path);
+		path = in_repo_path;
+	}
+
 	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
-	/* int diff_context = -1, show_patch = 0; */
-	/* error = print_commits(id, repo, path, show_patch, search_pattern, */
-	/*     diff_context, limit, first_parent_traversal, &refs); */
-	/* error = print_commit(commit, id, repo, path, 0, */
-	/* 	    -1, refs); */
+	error = got_commit_graph_open(&graph, id, path, 0, repo);
+	if (error)
+		goto done;
+
+	error = got_commit_graph_iter_start(graph, id, repo, NULL, NULL);
+	if (error)
+		goto done;
+
+	for (;;) {
+		struct got_commit_object *commit_disp;
+
+		error = got_commit_graph_iter_next(&id, graph);
+		if (error) {
+			if (error->code == GOT_ERR_ITER_COMPLETED) {
+				error = NULL;
+				break;
+			}
+			if (error->code != GOT_ERR_ITER_NEED_MORE)
+				break;
+			error = got_commit_graph_fetch_commits(graph, 1, repo,
+			    NULL, NULL);
+			if (error)
+				break;
+			else
+				continue;
+		}
+		if (id == NULL)
+			break;
+
+		error = got_object_open_as_commit(&commit_disp, repo, id);
+		if (error)
+			break;
+
+		if (search_pattern) {
+			error = match_logmsg(&have_match, id, commit_disp,
+			    &regex);
+			if (error) {
+				got_object_commit_close(commit_disp);
+				break;
+			}
+			if (have_match == 0) {
+				got_object_commit_close(commit_disp);
+				continue;
+			}
+		}
+
+		SIMPLEQ_FOREACH(re, &refs, entry) {
+			const char *name;
+			struct got_tag_object *tag = NULL;
+			int cmp;
+
+			name = got_ref_get_name(re->ref);
+			if (strcmp(name, GOT_REF_HEAD) == 0)
+				continue;
+			if (strncmp(name, "refs/", 5) == 0)
+				name += 5;
+			if (strncmp(name, "got/", 4) == 0)
+				continue;
+			if (strncmp(name, "heads/", 6) == 0)
+				name += 6;
+			if (strncmp(name, "remotes/", 8) == 0)
+				name += 8;
+			if (strncmp(name, "tags/", 5) == 0) {
+				error = got_object_open_as_tag(&tag, repo,
+				    re->id);
+				if (error) {
+					if (error->code != GOT_ERR_OBJ_TYPE)
+						continue;
+					/*
+					 * Ref points at something other
+					 * than a tag.
+					 */
+					error = NULL;
+					tag = NULL;
+				}
+			}
+			cmp = got_object_id_cmp(tag ?
+			    got_object_tag_get_object_id(tag) : re->id, id);
+			if (tag)
+				got_object_tag_close(tag);
+			if (cmp != 0)
+				continue;
+		}
+
+		/* commit id */
+		error = got_object_id_str(&id_str, id);
+		if (error)
+			break;
+
+		committer_time =
+		    got_object_commit_get_committer_time(commit_disp);
+		asprintf(&commit_age, "%s", gw_get_time_str(committer_time,
+		    TM_DIFF));
+		asprintf(&commit_author, "%s",
+		    got_object_commit_get_author(commit_disp));
+		error = got_object_commit_get_logmsg(&commit_log, commit_disp);
+		if (error)
+			commit_log = strdup("");
+		asprintf(&shortlog_navs_html, shortlog_navs,
+		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str,
+		    gw_trans->repo_name, id_str, gw_trans->repo_name, id_str);
+		asprintf(&commit_row, shortlog_row, commit_age, commit_author,
+		    commit_log, shortlog_navs_html);
+		error = buf_append(&newsize, diffbuf, commit_row,
+		    strlen(commit_row));
+
+		free(commit_age);
+		free(commit_author);
+		free(commit_log);
+		free(shortlog_navs_html);
+		free(commit_row);
+		free(id_str);
+		commit_age = NULL;
+		commit_author = NULL;
+		commit_log = NULL;
+		shortlog_navs_html = NULL;
+		commit_row = NULL;
+		id_str = NULL;
+
+		got_object_commit_close(commit_disp);
+		if (error || (limit && --limit == 0))
+			break;
+	}
+	shortlog = strdup(diffbuf->cb_buf);
 	got_object_commit_close(commit);
 
-	asprintf(&shortlog, shortlog_row, "30 min ago", "Flan Author", "this is just a fake ass place holder", shortlog_navs);
+	free(path);
+	free(id);
+	buf_free(diffbuf);
+
+	if (repo) {
+		error = got_repo_close(repo);
+		if (error != NULL)
+			return NULL;
+	}
+
+	got_ref_list_free(&refs);
 	return shortlog;
 done:
-	free(head_ref_name);
 	if (repo)
 		got_repo_close(repo);
 	got_ref_list_free(&refs);
+
+	if (search_pattern)
+		regfree(&regex);
+	got_commit_graph_close(graph);
 	return NULL;
 }
 
