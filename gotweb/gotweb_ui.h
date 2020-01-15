@@ -247,11 +247,11 @@ char *log_blame_navs =
 
 char *log_blame_line =
 	"<div id='blame_wrapper'>" \
-	"<div id='blame'>%.*d</div>" \
-	"<div id='blame'>%.8s</div>" \
-	"<div id='blame'>%s</div>" \
-	"<div id='blame'>%-8s</div>" \
-	"<div id='blame'>%s</div>" \
+	"<div id='blame_number'>%.*d</div>" \
+	"<div id='blame_hash'>%.8s</div>" \
+	"<div id='blame_date'>%s</div>" \
+	"<div id='blame_author'>%-8s</div>" \
+	"<div id='blame_code'>%s</div>" \
 	"</div>";
 
 /* tree.tmpl */

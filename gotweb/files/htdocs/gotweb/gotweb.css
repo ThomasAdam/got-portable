@@ -577,19 +577,37 @@ body {
 	padding: 20px;
 	font-family: monospace;
 	white-space: pre;
+	overflow: auto;
 }
 #blame_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#blame_id {
+#blame_number {
 	float: left;
-	padding: 2px;
+	width: 3em;
+	overflow: hidden;
 }
-#blame {
-	float:left ;
-	padding: 2px;
+#blame_hash {
+	float: left;
+	width: 6em;
+	overflow: auto;
+}
+#blame_date {
+	float: left;
+	width: 7em;
+	overflow: auto;
+}
+#blame_author {
+	float: left;
+	width: 6em;
+	overflow: hidden;
+}
+#blame_code {
+	float:left;
+	width: 50%;
+	overflow: visible;
 }
 
 /* tree.tmpl */

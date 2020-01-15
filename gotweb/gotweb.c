@@ -202,16 +202,12 @@ static const struct got_error*	 match_logmsg(int *, struct got_object_id *,
 				    struct got_commit_object *, regex_t *);
 
 static const struct got_error*	 gw_blame(struct trans *);
-static const struct got_error*	 gw_blob(struct trans *);
-static const struct got_error*	 gw_blobdiff(struct trans *);
 static const struct got_error*	 gw_commit(struct trans *);
 static const struct got_error*	 gw_commitdiff(struct trans *);
-static const struct got_error*	 gw_history(struct trans *);
 static const struct got_error*	 gw_index(struct trans *);
 static const struct got_error*	 gw_log(struct trans *);
 static const struct got_error*	 gw_raw(struct trans *);
 static const struct got_error*	 gw_logbriefs(struct trans *);
-static const struct got_error*	 gw_snapshot(struct trans *);
 static const struct got_error*	 gw_summary(struct trans *);
 static const struct got_error*	 gw_tag(struct trans *);
 static const struct got_error*	 gw_tree(struct trans *);
@@ -225,17 +221,13 @@ struct gw_query_action {
 
 enum gw_query_actions {
 	GW_BLAME,
-	GW_BLOB,
-	GW_BLOBDIFF,
 	GW_COMMIT,
 	GW_COMMITDIFF,
 	GW_ERR,
-	GW_HISTORY,
 	GW_INDEX,
 	GW_LOG,
 	GW_RAW,
 	GW_LOGBRIEFS,
-	GW_SNAPSHOT,
 	GW_SUMMARY,
 	GW_TAG,
 	GW_TREE,
@@ -243,17 +235,13 @@ enum gw_query_actions {
 
 static struct gw_query_action gw_query_funcs[] = {
 	{ GW_BLAME,	 "blame",	gw_blame,	"gw_tmpl/index.tmpl" },
-	{ GW_BLOB,	 "blob",	gw_blob,	"gw_tmpl/index.tmpl" },
-	{ GW_BLOBDIFF,	 "blobdiff",	gw_blobdiff,	"gw_tmpl/index.tmpl" },
 	{ GW_COMMIT,	 "commit",	gw_commit,	"gw_tmpl/index.tmpl" },
 	{ GW_COMMITDIFF, "commitdiff",	gw_commitdiff,	"gw_tmpl/index.tmpl" },
 	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/index.tmpl" },
-	{ GW_HISTORY,	 "history",	gw_history,	"gw_tmpl/index.tmpl" },
 	{ GW_INDEX,	 "index",	gw_index,	"gw_tmpl/index.tmpl" },
 	{ GW_LOG,	 "log",		gw_log,		"gw_tmpl/index.tmpl" },
 	{ GW_RAW,	 "raw",		gw_raw,		"gw_tmpl/index.tmpl" },
 	{ GW_LOGBRIEFS,	 "logbriefs",	gw_logbriefs,	"gw_tmpl/index.tmpl" },
-	{ GW_SNAPSHOT,	 "snapshot",	gw_snapshot,	"gw_tmpl/index.tmpl" },
 	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/index.tmpl" },
 	{ GW_TAG,	 "tag",		gw_tag,		"gw_tmpl/index.tmpl" },
 	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
@@ -588,22 +576,6 @@ gw_blame(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_blob(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-
-	return error;
-}
-
-static const struct got_error *
-gw_blobdiff(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-
-	return error;
-}
-
-static const struct got_error *
 gw_commit(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
@@ -644,14 +616,6 @@ gw_commitdiff(struct trans *gw_trans)
 		free(log_html);
 		free(log);
 	}
-	return error;
-}
-
-static const struct got_error *
-gw_history(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-
 	return error;
 }
 
@@ -799,14 +763,6 @@ gw_logbriefs(struct trans *gw_trans)
 		free(log_html);
 		free(log);
 	}
-	return error;
-}
-
-static const struct got_error *
-gw_snapshot(struct trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-
 	return error;
 }
 
@@ -2441,9 +2397,9 @@ gw_get_file_blame(struct trans *gw_trans, char *commit_str)
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
 	char *blame_html = NULL, *path = NULL, *in_repo_path = NULL,
-	    *blame_row = NULL, *id_str, *folder = NULL;
+	     *folder = NULL;
 	struct blame_cb_args bca;
-	int nentries, i, obj_type;
+	int i, obj_type;
 	size_t filesize;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
