@@ -403,6 +403,12 @@ static const struct got_error *
 gw_shortlog(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+
+	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	if (error != NULL)
+		return error;
+
 
 	return error;
 }
