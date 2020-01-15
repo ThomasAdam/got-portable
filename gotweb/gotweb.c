@@ -162,6 +162,7 @@ static char			*gw_get_repo_age(struct trans *,
 				    char *, char *, int);
 static char			*gw_get_repo_log(struct trans *, const char *,
 				    char *, int, int);
+static char			*gw_get_repo_tree(struct trans *, char *);
 static char			*gw_get_repo_tags(struct trans *, int, int);
 static char			*gw_get_repo_heads(struct trans *);
 static char			*gw_get_clone_url(struct trans *, char *);
@@ -180,6 +181,8 @@ static const struct got_error*	 apply_unveil(const char *, const char *);
 static const struct got_error*	 cmp_tags(void *, int *,
 				    struct got_reference *,
 				    struct got_reference *);
+static const struct got_error*	resolve_commit_arg(struct got_object_id **,
+				    const char *, struct got_repository *);
 static const struct got_error*	 gw_load_got_paths(struct trans *);
 static const struct got_error*	 gw_load_got_path(struct trans *,
 				    struct gw_dir *);
@@ -317,6 +320,39 @@ done:
 		got_object_tag_close(tag1);
 	if (tag2)
 		got_object_tag_close(tag2);
+	return err;
+}
+
+static const struct got_error *
+resolve_commit_arg(struct got_object_id **commit_id,
+    const char *commit_id_arg, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *ref;
+	struct got_tag_object *tag;
+
+	err = got_repo_object_match_tag(&tag, commit_id_arg,
+	    GOT_OBJ_TYPE_COMMIT, repo);
+	if (err == NULL) {
+		*commit_id = got_object_id_dup(
+		    got_object_tag_get_object_id(tag));
+		if (*commit_id == NULL)
+			err = got_error_from_errno("got_object_id_dup");
+		got_object_tag_close(tag);
+		return err;
+	} else if (err->code != GOT_ERR_NO_OBJ)
+		return err;
+
+	err = got_ref_open(&ref, repo, commit_id_arg, 0);
+	if (err == NULL) {
+		err = got_ref_resolve(commit_id, repo, ref);
+		got_ref_close(ref);
+	} else {
+		if (err->code != GOT_ERR_NOT_REF)
+			return err;
+		err = got_repo_match_object_id_prefix(commit_id,
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
+	}
 	return err;
 }
 
@@ -1817,7 +1853,8 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 			free(log_tag_html);
 			break;
 		case (LOGTREE):
-			log_tree_html = strdup("log tree here");
+			log_tree_html = gw_get_repo_tree(gw_trans,
+			    start_commit);
 
 			if ((asprintf(&commit_row, log_tree_row,
 			    gw_html_escape(commit_log), log_tree_html)) == -1) {
@@ -2058,6 +2095,106 @@ done:
 		return NULL;
 	else
 		return tags;
+}
+
+static char*
+gw_get_repo_tree(struct trans *gw_trans, char *start_commit)
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	struct got_object_id *tree_id = NULL, *commit_id = NULL;
+	struct got_tree_object *tree = NULL;
+	struct buf *diffbuf = NULL;
+	size_t newsize;
+	char *tree_html = NULL, *path = NULL, *in_repo_path = NULL,
+	    *tree_row = NULL, *id_str;
+	const char *modestr = "";
+	int nentries, i;
+
+	error = buf_alloc(&diffbuf, 0);
+	if (error != NULL)
+		return NULL;
+
+	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
+	if (error != NULL)
+		goto done;
+
+	if (in_repo_path) {
+		free(path);
+		path = in_repo_path;
+	}
+
+	error = resolve_commit_arg(&commit_id, start_commit, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&tree_id, repo, commit_id, in_repo_path);
+	if (error)
+		goto done;
+
+	error = got_object_open_as_tree(&tree, repo, tree_id);
+	if (error)
+		goto done;
+
+	nentries = got_object_tree_get_nentries(tree);
+
+	for (i = 0; i < nentries; i++) {
+		struct got_tree_entry *te;
+		char *id = NULL;
+
+		te = got_object_tree_get_entry(tree, i);
+
+		error = got_object_id_str(&id_str, got_tree_entry_get_id(te));
+		if (error)
+			goto done;
+
+		if (asprintf(&id, "%s", id_str) == -1) {
+			error = got_error_from_errno("asprintf");
+			free(id_str);
+			goto done;
+		}
+
+		mode_t mode = got_tree_entry_get_mode(te);
+
+		if (got_object_tree_entry_is_submodule(te))
+			modestr = "$";
+		else if (S_ISLNK(mode))
+			modestr = "@";
+		else if (S_ISDIR(mode))
+			modestr = "/";
+		else if (mode & S_IXUSR)
+			modestr = "*";
+
+		if ((asprintf(&tree_row, trees_row, id_str,
+		    got_tree_entry_get_name(te), modestr)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		error = buf_puts(&newsize, diffbuf, tree_row);
+		free(id);
+		free(id_str);
+
+	}
+
+	if (buf_len(diffbuf) > 0) {
+		error = buf_putc(diffbuf, '\0');
+		tree_html = strdup(buf_get(diffbuf));
+	}
+done:
+	if (tree)
+		got_object_tree_close(tree);
+
+	free(tree_id);
+	free(diffbuf);
+	if (error)
+		return NULL;
+	else
+		return tree_html;
+
 }
 
 static char *

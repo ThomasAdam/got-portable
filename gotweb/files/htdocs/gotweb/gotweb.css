@@ -559,6 +559,19 @@ body {
 	padding: 20px;
 	font-family: monospace;
 }
+#tree_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#tree_id {
+	float: left;
+	padding: 2px;
+}
+#tree {
+	float:left ;
+	padding: 2px;
+}
 
 /* commit.tmpl */
 

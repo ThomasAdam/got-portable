@@ -125,6 +125,12 @@ char *tags_navs =
 	"<a href='?path=%s&action=logbriefs&commit=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&commit=%s'>log</a>";
 
+char *trees_row =
+	"<div id='tree_wrapper'>" \
+	"<div id='tree_id'>%s</div>" \
+	"<div id='tree'>%s%s</div>" \
+	"</div>";
+
 char *heads_row =
 	"<div id='heads_wrapper'>" \
 	"<div id='heads_age'>%s</div>" \
