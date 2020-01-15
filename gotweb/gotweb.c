@@ -182,10 +182,7 @@ static const struct got_error*	 gw_apply_unveil(const char *, const char *);
 static const struct got_error*	 cmp_tags(void *, int *,
 				    struct got_reference *,
 				    struct got_reference *);
-static const struct got_error*	 match_object_id(struct got_object_id **,
-				    char **, const char *r, int, int,
-				    struct got_repository *);
-static const struct got_error*	 blame_cb(void *, int, int,
+static const struct got_error*	 gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
 static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
 static const struct got_error*	 gw_load_got_path(struct gw_trans *,
@@ -312,64 +309,6 @@ done:
 		got_object_tag_close(tag1);
 	if (tag2)
 		got_object_tag_close(tag2);
-	return err;
-}
-
-static const struct got_error *
-match_object_id(struct got_object_id **id, char **label,
-    const char *id_str, int obj_type, int resolve_tags,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_tag_object *tag;
-	struct got_reference *ref = NULL;
-
-	*id = NULL;
-	*label = NULL;
-
-	if (resolve_tags) {
-		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
-		    repo);
-		if (err == NULL) {
-			*id = got_object_id_dup(
-			    got_object_tag_get_object_id(tag));
-			if (*id == NULL)
-				err = got_error_from_errno("got_object_id_dup");
-			else if (asprintf(label, "refs/tags/%s",
-			    got_object_tag_get_name(tag)) == -1) {
-				err = got_error_from_errno("asprintf");
-				free(*id);
-				*id = NULL;
-			}
-			got_object_tag_close(tag);
-			return err;
-		} else if (err->code != GOT_ERR_NO_OBJ)
-			return err;
-	}
-
-	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
-	if (err) {
-		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
-			return err;
-		err = got_ref_open(&ref, repo, id_str, 0);
-		if (err != NULL)
-			goto done;
-		*label = strdup(got_ref_get_name(ref));
-		if (*label == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		err = got_ref_resolve(id, repo, ref);
-	} else {
-		err = got_object_id_str(label, *id);
-		if (*label == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
-done:
-	if (ref)
-		got_ref_close(ref);
 	return err;
 }
 
@@ -1400,13 +1339,13 @@ gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
 	if (error)
 		goto done;
 
-	error = match_object_id(&id1, &label1, id_str1, GOT_OBJ_TYPE_ANY, 1,
-	    repo);
+	error = got_repo_match_object_id(&id1, &label1, id_str1,
+	    GOT_OBJ_TYPE_ANY, 1, repo);
 	if (error)
 		goto done;
 
 	if (id_str2) {
-		error = match_object_id(&id2, &label2, id_str2,
+		error = got_repo_match_object_id(&id2, &label2, id_str2,
 		    GOT_OBJ_TYPE_ANY, 1, repo);
 		if (error)
 			goto done;
@@ -2236,7 +2175,7 @@ struct blame_line {
 	char datebuf[11]; /* YYYY-MM-DD + NUL */
 };
 
-struct blame_cb_args {
+struct gw_blame_cb_args {
 	struct blame_line *lines;
 	int nlines;
 	int nlines_prec;
@@ -2249,10 +2188,10 @@ struct blame_cb_args {
 };
 
 static const struct got_error *
-blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
+gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
-	struct blame_cb_args *a = arg;
+	struct gw_blame_cb_args *a = arg;
 	struct blame_line *bline;
 	char *line = NULL;
 	size_t linesize = 0, newsize;
@@ -2367,7 +2306,7 @@ gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
 	struct got_blob_object *blob = NULL;
 	char *blame_html = NULL, *path = NULL, *in_repo_path = NULL,
 	     *folder = NULL;
-	struct blame_cb_args bca;
+	struct gw_blame_cb_args bca;
 	int i, obj_type;
 	size_t filesize;
 
@@ -2393,7 +2332,8 @@ gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
 	if (error)
 		goto done;
 
-	error = got_repo_resolve_commit_arg(&commit_id, commit_str, repo);
+	error = got_repo_match_object_id(&commit_id, NULL, commit_str,
+	    GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (error)
 		goto done;
 
@@ -2452,8 +2392,8 @@ gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
 	bca.repo = repo;
 	bca.gw_trans = gw_trans;
 
-	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca, NULL,
-	    NULL);
+	error = got_blame(in_repo_path, commit_id, repo, gw_blame_cb, &bca,
+	    NULL, NULL);
 	if (buf_len(bca.blamebuf) > 0) {
 		error = buf_putc(bca.blamebuf, '\0');
 		blame_html = strdup(buf_get(bca.blamebuf));
@@ -2530,8 +2470,8 @@ gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
 		got_ref_close(head_ref);
 
 	} else
-		error = got_repo_resolve_commit_arg(&commit_id, commit_str,
-		    repo);
+		error = got_repo_match_object_id(&commit_id, NULL, commit_str,
+		    GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (error)
 		goto done;
 
