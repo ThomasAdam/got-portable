@@ -88,19 +88,23 @@ const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
     const char *, int, struct got_repository *);
 
 /*
+ * Given an object ID string or reference name, attempt to find a corresponding
+ * commit object. Tags can optionally be ignored during matching.
+ * The object type may be restricted to commit, tree, blob, or tag.
+ * GOT_OBJ_TYPE_ANY will match any type of object.
+ * A human-readable label can optionally be returned, which the caller should
+ * dispose of with free(3).
+ * Return GOT_ERR_NO_OBJ if no matching commit can be found.
+ */
+const struct got_error *got_repo_match_object_id(struct got_object_id **,
+    char **, const char *, int, int, struct got_repository *);
+
+/*
  * Attempt to find a tag object with a given name and target object type.
  * Return GOT_ERR_NO_OBJ if no matching tag can be found.
  */
 const struct got_error *got_repo_object_match_tag(struct got_tag_object **,
     const char *, int, struct got_repository *);
-
-/*
- * Given an object ID string or reference name argument,
- * attempt to find a corresponding commit object.
- * Return GOT_ERR_NO_OBJ if no matching commit can be found.
- */
-const struct got_error *got_repo_resolve_commit_arg(struct got_object_id **,
-    const char *, struct got_repository *);
 
 /* A callback function which is invoked when a path is imported. */
 typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);

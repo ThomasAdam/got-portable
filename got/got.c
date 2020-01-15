@@ -1107,8 +1107,8 @@ cmd_checkout(int argc, char *argv[])
 
 	if (commit_id_str) {
 		struct got_object_id *commit_id;
-		error = got_repo_resolve_commit_arg(&commit_id,
-		    commit_id_str, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id,
@@ -1347,8 +1347,8 @@ cmd_update(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_resolve_commit_arg(&commit_id,
-		    commit_id_str, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		free(commit_id_str);
 		commit_id_str = NULL;
 		if (error)
@@ -2190,66 +2190,6 @@ done:
 }
 
 static const struct got_error *
-match_object_id(struct got_object_id **id, char **label,
-    const char *id_str, int obj_type, int resolve_tags,
-    struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_tag_object *tag;
-	struct got_reference *ref = NULL;
-
-	*id = NULL;
-	*label = NULL;
-
-	if (resolve_tags) {
-		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
-		    repo);
-		if (err == NULL) {
-			*id = got_object_id_dup(
-			    got_object_tag_get_object_id(tag));
-			if (*id == NULL)
-				err = got_error_from_errno("got_object_id_dup");
-			else if (asprintf(label, "refs/tags/%s",
-			    got_object_tag_get_name(tag)) == -1) {
-				err = got_error_from_errno("asprintf");
-				free(*id);
-				*id = NULL;
-			}
-			got_object_tag_close(tag);
-			return err;
-		} else if (err->code != GOT_ERR_OBJ_TYPE &&
-		    err->code != GOT_ERR_NO_OBJ)
-			return err;
-	}
-
-	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
-	if (err) {
-		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
-			return err;
-		err = got_ref_open(&ref, repo, id_str, 0);
-		if (err != NULL)
-			goto done;
-		*label = strdup(got_ref_get_name(ref));
-		if (*label == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-		err = got_ref_resolve(id, repo, ref);
-	} else {
-		err = got_object_id_str(label, *id);
-		if (*label == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
-done:
-	if (ref)
-		got_ref_close(ref);
-	return err;
-}
-
-
-static const struct got_error *
 cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -2396,13 +2336,13 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
-	error = match_object_id(&id1, &label1, id_str1, GOT_OBJ_TYPE_ANY, 1,
-	    repo);
+	error = got_repo_match_object_id(&id1, &label1, id_str1,
+	    GOT_OBJ_TYPE_ANY, 1, repo);
 	if (error)
 		goto done;
 
-	error = match_object_id(&id2, &label2, id_str2, GOT_OBJ_TYPE_ANY, 1,
-	    repo);
+	error = got_repo_match_object_id(&id2, &label2, id_str2,
+	    GOT_OBJ_TYPE_ANY, 1, repo);
 	if (error)
 		goto done;
 
@@ -2691,8 +2631,8 @@ cmd_blame(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_resolve_commit_arg(&commit_id,
-		    commit_id_str, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error)
 			goto done;
 	}
@@ -2996,8 +2936,8 @@ cmd_tree(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = got_repo_resolve_commit_arg(&commit_id,
-		    commit_id_str, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error)
 			goto done;
 	}
@@ -3637,8 +3577,8 @@ cmd_branch(int argc, char *argv[])
 			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
-		error = got_repo_resolve_commit_arg(&commit_id,
-		    commit_id_arg, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error)
 			goto done;
 		error = add_branch(repo, argv[0], commit_id);
@@ -3978,7 +3918,7 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	if (err)
 		return err;
 
-	err = match_object_id(&commit_id, &label, commit_arg,
+	err = got_repo_match_object_id(&commit_id, &label, commit_arg,
 	    GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (err)
 		goto done;
@@ -7360,7 +7300,8 @@ cmd_cat(int argc, char *argv[])
 
 	if (commit_id_str == NULL)
 		commit_id_str = GOT_REF_HEAD;
-	error = got_repo_resolve_commit_arg(&commit_id, commit_id_str, repo);
+	error = got_repo_match_object_id(&commit_id, NULL,
+	    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (error)
 		goto done;
 
@@ -7371,7 +7312,7 @@ cmd_cat(int argc, char *argv[])
 			if (error)
 				break;
 		} else {
-			error = match_object_id(&id, &label, argv[i],
+			error = got_repo_match_object_id(&id, &label, argv[i],
 			    GOT_OBJ_TYPE_ANY, 0, repo);
 			if (error) {
 				if (error->code != GOT_ERR_BAD_OBJ_ID_STR &&

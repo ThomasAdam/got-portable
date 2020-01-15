@@ -1355,6 +1355,68 @@ done:
 }
 
 const struct got_error *
+got_repo_match_object_id(struct got_object_id **id, char **label,
+    const char *id_str, int obj_type, int resolve_tags,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_tag_object *tag;
+	struct got_reference *ref = NULL;
+
+	*id = NULL;
+	if (label)
+		*label = NULL;
+
+	if (resolve_tags) {
+		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
+		    repo);
+		if (err == NULL) {
+			*id = got_object_id_dup(
+			    got_object_tag_get_object_id(tag));
+			if (*id == NULL)
+				err = got_error_from_errno("got_object_id_dup");
+			else if (label && asprintf(label, "refs/tags/%s",
+			    got_object_tag_get_name(tag)) == -1) {
+				err = got_error_from_errno("asprintf");
+				free(*id);
+				*id = NULL;
+			}
+			got_object_tag_close(tag);
+			return err;
+		} else if (err->code != GOT_ERR_OBJ_TYPE &&
+		    err->code != GOT_ERR_NO_OBJ)
+			return err;
+	}
+
+	err = got_repo_match_object_id_prefix(id, id_str, obj_type, repo);
+	if (err) {
+		if (err->code != GOT_ERR_BAD_OBJ_ID_STR)
+			return err;
+		err = got_ref_open(&ref, repo, id_str, 0);
+		if (err != NULL)
+			goto done;
+		if (label) {
+			*label = strdup(got_ref_get_name(ref));
+			if (*label == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+		err = got_ref_resolve(id, repo, ref);
+	} else if (label) {
+		err = got_object_id_str(label, *id);
+		if (*label == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+done:
+	if (ref)
+		got_ref_close(ref);
+	return err;
+}
+
+const struct got_error *
 got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
     int obj_type, struct got_repository *repo)
 {
@@ -1395,39 +1457,6 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	got_ref_list_free(&refs);
 	if (err == NULL && *tag == NULL)
 		err = got_error(GOT_ERR_NO_OBJ);
-	return err;
-}
-
-const struct got_error *
-got_repo_resolve_commit_arg(struct got_object_id **commit_id,
-    const char *commit_id_arg, struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_reference *ref;
-	struct got_tag_object *tag;
-
-	err = got_repo_object_match_tag(&tag, commit_id_arg,
-	    GOT_OBJ_TYPE_COMMIT, repo);
-	if (err == NULL) {
-		*commit_id = got_object_id_dup(
-		    got_object_tag_get_object_id(tag));
-		if (*commit_id == NULL)
-			err = got_error_from_errno("got_object_id_dup");
-		got_object_tag_close(tag);
-		return err;
-	} else if (err->code != GOT_ERR_NO_OBJ)
-		return err;
-
-	err = got_ref_open(&ref, repo, commit_id_arg, 0);
-	if (err == NULL) {
-		err = got_ref_resolve(commit_id, repo, ref);
-		got_ref_close(ref);
-	} else {
-		if (err->code != GOT_ERR_NOT_REF)
-			return err;
-		err = got_repo_match_object_id_prefix(commit_id,
-		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
-	}
 	return err;
 }
 
