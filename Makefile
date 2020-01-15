@@ -3,7 +3,7 @@ SUBDIR = libexec got tog
 .PHONY: release dist
 
 .if make(regress) || make(obj) || make(clean) || make(release)
-SUBDIR += regress
+SUBDIR += regress gotweb
 .endif
 
 .include "got-version.mk"
@@ -24,5 +24,15 @@ dist: clean
 		| sort > got-dist.txt.new
 	diff -u got-dist.txt got-dist.txt.new
 	rm got-dist.txt.new
+
+web:
+	sed -i -e "s/MAKEWEB=No/MAKEWEB=Yes/" got-version.mk
+	${MAKE} -C gotweb
+	sed -i -e "s/MAKEWEB=Yes/MAKEWEB=No/" got-version.mk
+
+web-install:
+	sed -i -e "s/MAKEWEB=No/MAKEWEB=Yes/" got-version.mk
+	${MAKE} -C gotweb install
+	sed -i -e "s/MAKEWEB=Yes/MAKEWEB=No/" got-version.mk
 
 .include <bsd.subdir.mk>

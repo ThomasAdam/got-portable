@@ -27,3 +27,18 @@ DEBUG = -O0 -g
 .endif
 
 .endif
+
+.if ${MAKEWEB} == "Yes"
+LDADD =		-L${PREFIX}/lib -static -lkcgihtml -lkcgi -lz -lutil
+PREFIX =	/usr/local
+CHROOT_DIR =	/var/www
+GOTWEB_DIR =	/cgi-bin/gotweb
+LIBEXECDIR =	${GOTWEB_DIR}/libexec
+LIBEXEC_DIR =	${CHROOT_DIR}${LIBEXECDIR}
+ETC_DIR =	${CHROOT_DIR}/etc
+EXPL_DIR =	${ETC_DIR}/examples
+HTTPD_DIR =	${CHROOT_DIR}/htdocs
+PROG_DIR =	${HTTPD_DIR}/${PROG}
+CGI_DIR =	${CHROOT_DIR}${GOTWEB_DIR}
+TMPL_DIR =	${CGI_DIR}/gw_tmpl
+.endif
