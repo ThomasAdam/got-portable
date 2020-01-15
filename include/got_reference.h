@@ -95,6 +95,10 @@ typedef const struct got_error *(*got_ref_cmp_cb)(void *, int *,
 const struct got_error *got_ref_cmp_by_name(void *, int *,
     struct got_reference *, struct got_reference *);
 
+/* An implementation of got_ref_cmp_cb which compares two tags. */
+const struct got_error *got_ref_cmp_tags(void *, int *,
+    struct got_reference *, struct got_reference *);
+
 /*
  * Append all known references to a caller-provided ref list head.
  * Optionally limit references returned to those within a given

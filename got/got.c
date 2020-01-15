@@ -3670,7 +3670,7 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 
 	SIMPLEQ_INIT(&refs);
 
-	err = got_ref_list(&refs, repo, "refs/tags", got_repo_cmp_tags, repo);
+	err = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
 	if (err)
 		return err;
 
