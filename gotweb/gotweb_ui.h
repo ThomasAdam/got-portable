@@ -193,6 +193,21 @@ char *logs_navs =
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
+/* tag.tmpl */
+
+char *log_tag =
+	"<div id='log_tree_title_wrapper'>" \
+	"<div id='log_tree_title'>Tag</div></div>" \
+	"<div id='log_tree_content'>%s</div>";
+
+char *log_tag_row =
+	"<div id='log_tag_row_wrapper'>" \
+	"<div id='log_tag_commit'>%s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='log_tag'>%s</div>" \
+	"</div>";
+
 /* tree.tmpl */
 
 char *log_tree =

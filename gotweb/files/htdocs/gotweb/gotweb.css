@@ -482,6 +482,45 @@ body {
 	padding-bottom: 20px;
 }
 
+/* tag.tmpl */
+
+#log_tag_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#log_tag_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#log_tag_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_tag_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#log_tag_commit {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+}
+#log_tag {
+	clear: left;
+	float: left;
+	padding: 20px;
+	font-family: monospace;
+}
+
 /* tree.tmpl */
 
 #log_tree_title_wrapper {

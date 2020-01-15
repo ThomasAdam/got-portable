@@ -833,7 +833,7 @@ gw_parse_querystring(struct trans *gw_trans)
 				action = &gw_query_funcs[i];
 				if (action->func_name == NULL)
 					continue;
-khttp_puts(gw_trans->gw_req, p->parsed.s);
+
 				if (strcmp(action->func_name,
 				    p->parsed.s) == 0) {
 					gw_trans->action = i;
@@ -1302,7 +1302,7 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	     *commit_diff_disp = NULL, *logbriefs_navs_html = NULL,
 	     *log_tree_html = NULL, *log_commit_html = NULL,
 	     *log_diff_html = NULL, *commit_tree = NULL,
-	     *commit_tree_disp = NULL;
+	     *commit_tree_disp = NULL, *log_tag_html = NULL;
 	char *commit_log0, *newline;
 	regex_t regex;
 	int have_match;
@@ -1674,15 +1674,15 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 			logbriefs_navs_html = NULL;
 			break;
 		case (LOGTAG):
-			log_tree_html = strdup("tag log here");
+			log_tag_html = strdup("tag log here");
 
-			if ((asprintf(&commit_row, log_tree_row,
-			    gw_html_escape(commit_log), log_tree_html)) == -1) {
+			if ((asprintf(&commit_row, log_tag_row,
+			    gw_html_escape(commit_log), log_tag_html)) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 
-			free(log_tree_html);
+			free(log_tag_html);
 			break;
 		case (LOGTREE):
 			log_tree_html = strdup("log tree here");
