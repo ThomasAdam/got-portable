@@ -187,9 +187,9 @@ static const struct got_error*	 apply_unveil(const char *, const char *);
 static const struct got_error*	 cmp_tags(void *, int *,
 				    struct got_reference *,
 				    struct got_reference *);
-static const struct got_error*	resolve_commit_arg(struct got_object_id **,
+static const struct got_error*	 resolve_commit_arg(struct got_object_id **,
 				    const char *, struct got_repository *);
-static const struct got_error*	match_object_id(struct got_object_id **,
+static const struct got_error*	 match_object_id(struct got_object_id **,
 				    char **, const char *r, int, int,
 				    struct got_repository *);
 static const struct got_error*	 blame_cb(void *, int, int,
@@ -2347,7 +2347,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 
 	while (bline->annotated) {
-		char *smallerthan, *at, *nl, *committer, *blame_row = NULL;
+		char *smallerthan, *at, *nl, *committer, *blame_row = NULL,
+		     *line_escape = NULL;
 		size_t len;
 
 		if (getline(&line, &linesize, a->f) == -1) {
@@ -2370,15 +2371,22 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
+
+		if (strcmp(line, "") != 0)
+			line_escape = strdup(gw_html_escape(line));
+		else
+			line_escape = strdup("");
+
 		asprintf(&blame_row, log_blame_line, a->nlines_prec,
 		    a->lineno_cur, bline->id_str, bline->datebuf, committer,
-		    line);
+		    line_escape);
 		a->lineno_cur++;
 		err = buf_puts(&newsize, a->blamebuf, blame_row);
 		if (err)
 			return err;
 
 		bline = &a->lines[a->lineno_cur - 1];
+		free(line_escape);
 		free(blame_row);
 	}
 done:
