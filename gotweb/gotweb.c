@@ -179,9 +179,6 @@ static void			 gw_display_index(struct gw_trans *,
 static int			 gw_template(size_t, void *);
 
 static const struct got_error*	 gw_apply_unveil(const char *, const char *);
-static const struct got_error*	 cmp_tags(void *, int *,
-				    struct got_reference *,
-				    struct got_reference *);
 static const struct got_error*	 gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
 static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
@@ -264,52 +261,6 @@ gw_apply_unveil(const char *repo_path, const char *repo_file)
 		return got_error_from_errno("unveil");
 
 	return NULL;
-}
-
-static const struct got_error *
-cmp_tags(void *arg, int *cmp, struct got_reference *ref1,
-    struct got_reference *ref2)
-{
-	const struct got_error *err = NULL;
-	struct got_repository *repo = arg;
-	struct got_object_id *id1, *id2 = NULL;
-	struct got_tag_object *tag1 = NULL, *tag2 = NULL;
-	time_t time1, time2;
-
-	*cmp = 0;
-
-	err = got_ref_resolve(&id1, repo, ref1);
-	if (err)
-		return err;
-	err = got_object_open_as_tag(&tag1, repo, id1);
-	if (err)
-		goto done;
-
-	err = got_ref_resolve(&id2, repo, ref2);
-	if (err)
-		goto done;
-	err = got_object_open_as_tag(&tag2, repo, id2);
-	if (err)
-		goto done;
-
-	time1 = got_object_tag_get_tagger_time(tag1);
-	time2 = got_object_tag_get_tagger_time(tag2);
-
-	/* Put latest tags first. */
-	if (time1 < time2)
-		*cmp = 1;
-	else if (time1 > time2)
-		*cmp = -1;
-	else
-		err = got_ref_cmp_by_name(NULL, cmp, ref2, ref1);
-done:
-	free(id1);
-	free(id2);
-	if (tag1)
-		got_object_tag_close(tag1);
-	if (tag2)
-		got_object_tag_close(tag2);
-	return err;
 }
 
 int
@@ -2058,7 +2009,7 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, "refs/tags", cmp_tags, repo);
+	error = got_ref_list(&refs, repo, "refs/tags", got_repo_cmp_tags, repo);
 	if (error)
 		goto done;
 
