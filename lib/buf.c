@@ -41,13 +41,6 @@
 
 #define BUF_INCR	128
 
-struct buf {
-	/* buffer handle, buffer size, and data length */
-	u_char	*cb_buf;
-	size_t	 cb_size;
-	size_t	 cb_len;
-};
-
 #define SIZE_LEFT(b)	((b)->cb_size - (b)->cb_len)
 
 static const struct got_error *buf_grow(BUF *, size_t);

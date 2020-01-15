@@ -1,12 +1,13 @@
 .include "../Makefile.inc"
 
-.if ${MAKEWEB} == "Yes"
+.if "${MAKEWEB}" == "Yes"
 realinstall:
-	if [ ! -d ${LIBEXEC_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${LIBEXEC_DIR}; \
+	if [ ! -d ${CHROOT_DIR}${LIBEXECDIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 \
+		    ${CHROOT_DIR}${LIBEXECDIR}; \
 	fi
 	${INSTALL} ${INSTALL_COPY} -o root -g daemon -m 755 ${PROG} \
-	${LIBEXEC_DIR}/${PROG}
+	    ${CHROOT_DIR}${LIBEXECDIR}/${PROG}
 .else
 realinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \

@@ -3,7 +3,10 @@ SUBDIR = libexec got tog
 .PHONY: release dist
 
 .if make(regress) || make(obj) || make(clean) || make(release)
-SUBDIR += regress gotweb
+SUBDIR += regress
+# not part of original SUBDIR, since we don't build gotweb by default and
+# the port will be split into sub packages
+SUBDIR += gotweb
 .endif
 
 .include "got-version.mk"
@@ -26,13 +29,9 @@ dist: clean
 	rm got-dist.txt.new
 
 web:
-	sed -i -e "s/MAKEWEB=No/MAKEWEB=Yes/" got-version.mk
-	${MAKE} -C gotweb
-	sed -i -e "s/MAKEWEB=Yes/MAKEWEB=No/" got-version.mk
+	${MAKE} -C gotweb MAKEWEB=Yes
 
 web-install:
-	sed -i -e "s/MAKEWEB=No/MAKEWEB=Yes/" got-version.mk
-	${MAKE} -C gotweb install
-	sed -i -e "s/MAKEWEB=Yes/MAKEWEB=No/" got-version.mk
+	${MAKE} -C gotweb install MAKEWEB=Yes
 
 .include <bsd.subdir.mk>

@@ -18,13 +18,6 @@ Man page files in the Gotweb source tree can be viewed with 'man -l':
 
  $ man -l gotweb/gotweb.conf.5
 
-Guidelines for reporting problems:
-
-Report all Gotweb problems in as much detail as possible. Gotweb code is not
-covered by automated tests.
-
-Mail problem reports to: gameoftrees@openbsd.org
-
 Example configuration for httpd.conf:
 
 ext_if = "*"
@@ -50,7 +43,6 @@ Guidelines for submitting patches:
 Mail patches to: gameoftrees@openbsd.org
 Pull requests via any Git hosting sites will likely be overlooked.
 Please keep the intended target audience in mind when contributing to Gotweb.
-
 
 Subscribing to the gameoftrees@openbsd.org mailing list:
 

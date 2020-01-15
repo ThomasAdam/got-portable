@@ -25,28 +25,31 @@ realinstall:
 	if [ ! -d ${CGI_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${CGI_DIR}; \
 	fi
-	${INSTALL} -c -o www -g www -m 0755 ${PROG} ${CGI_DIR}/${PROG}
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 ${PROG} \
+	    ${CGI_DIR}/${PROG}
 	if [ ! -d ${TMPL_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${TMPL_DIR}; \
 	fi
-	${INSTALL} -c -o www -g www -m 0755 files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
+	    files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
 	if [ ! -d ${ETC_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${ETC_DIR}; \
 	fi
 	if [ ! -d ${EXPL_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${EXPL_DIR}; \
 	fi
-	${INSTALL} -c -o www -g www -m 0755 files/etc/gotweb.conf \
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 files/etc/gotweb.conf \
 		${ETC_DIR}/examples/gotweb.conf
 	if [ ! -d ${HTTPD_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
 	fi
 	if [ ! -d ${TMP_DIR}/. ]; then \
-		${INSTALL} -d -o www -g www -m 755 ${TMP_DIR}; \
+		${INSTALL} -d -o ${WWWUSR} -g ${WWWGRP} -m 755 ${TMP_DIR}; \
 	fi
 	if [ ! -d ${PROG_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${PROG_DIR}; \
 	fi
-	${INSTALL} -c -o www -g www -m 0755 files/htdocs/${PROG}/* ${PROG_DIR}
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 files/htdocs/${PROG}/* \
+	    ${PROG_DIR}
 
 .include <bsd.prog.mk>

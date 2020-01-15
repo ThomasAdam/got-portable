@@ -28,7 +28,7 @@ DEBUG = -O0 -g
 
 .endif
 
-.if ${MAKEWEB} == "Yes"
+.if "${MAKEWEB}" == "Yes"
 LDADD =		-L${PREFIX}/lib -static -lkcgihtml -lkcgi -lz -lutil
 PREFIX =	/usr/local
 CHROOT_DIR =	/var/www
@@ -42,4 +42,6 @@ TMP_DIR =	${CHROOT_DIR}/tmp
 PROG_DIR =	${HTTPD_DIR}/${PROG}
 CGI_DIR =	${CHROOT_DIR}${GOTWEB_DIR}
 TMPL_DIR =	${CGI_DIR}/gw_tmpl
+WWWUSR ?=	www
+WWWGRP ?=	www
 .endif

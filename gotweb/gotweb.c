@@ -53,7 +53,7 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
-struct trans {
+struct gw_trans {
 	TAILQ_HEAD(dirs, gw_dir) gw_dirs;
 	struct gw_dir		*gw_dir;
 	struct gotweb_conf	*gw_conf;
@@ -94,7 +94,7 @@ struct gw_dir {
 	char			*path;
 };
 
-enum tmpl {
+enum gw_tmpl {
 	TEMPL_HEAD,
 	TEMPL_HEADER,
 	TEMPL_SITEPATH,
@@ -105,12 +105,12 @@ enum tmpl {
 	TEMPL__MAX
 };
 
-enum ref_tm {
+enum gw_ref_tm {
 	TM_DIFF,
 	TM_LONG,
 };
 
-enum logs {
+enum gw_logs {
 	LOGBRIEF,
 	LOGCOMMIT,
 	LOGFULL,
@@ -120,18 +120,12 @@ enum logs {
 	LOGTAG,
 };
 
-enum tags {
+enum gw_tags {
 	TAGBRIEF,
 	TAGFULL,
 };
 
-struct buf {
-	u_char	*cb_buf;
-	size_t	 cb_size;
-	size_t	 cb_len;
-};
-
-static const char *const templs[TEMPL__MAX] = {
+static const char *const gw_templs[TEMPL__MAX] = {
 	"head",
 	"header",
 	"sitepath",
@@ -151,42 +145,44 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_stringne,	"path" },
 };
 
-int				 gw_get_repo_log_count(struct trans *, char *);
+int				 gw_get_repo_log_count(struct gw_trans *, char *);
 
 static struct gw_dir		*gw_init_gw_dir(char *);
 
-static char			*gw_get_repo_description(struct trans *,
+static char			*gw_get_repo_description(struct gw_trans *,
 				    char *);
-static char			*gw_get_repo_owner(struct trans *,
+static char			*gw_get_repo_owner(struct gw_trans *,
 				    char *);
 static char			*gw_get_time_str(time_t, int);
-static char			*gw_get_repo_age(struct trans *,
+static char			*gw_get_repo_age(struct gw_trans *,
 				    char *, char *, int);
-static char			*gw_get_repo_log(struct trans *, const char *,
+static char			*gw_get_repo_log(struct gw_trans *, const char *,
 				    char *, int, int);
-static char			*gw_get_file_blame(struct trans *, char *);
-static char			*gw_get_repo_tree(struct trans *, char *);
-static char			*gw_get_repo_diff(struct trans *, char *,
+static char			*gw_get_file_blame(struct gw_trans *, char *);
+static char			*gw_get_repo_tree(struct gw_trans *, char *);
+static char			*gw_get_repo_diff(struct gw_trans *, char *,
 				    char *);
-static char			*gw_get_repo_tags(struct trans *, int, int);
-static char			*gw_get_repo_heads(struct trans *);
-static char			*gw_get_clone_url(struct trans *, char *);
-static char			*gw_get_got_link(struct trans *);
-static char			*gw_get_site_link(struct trans *);
+static char			*gw_get_repo_tags(struct gw_trans *, int, int);
+static char			*gw_get_repo_heads(struct gw_trans *);
+static char			*gw_get_clone_url(struct gw_trans *, char *);
+static char			*gw_get_got_link(struct gw_trans *);
+static char			*gw_get_site_link(struct gw_trans *);
 static char			*gw_html_escape(const char *);
 static char			*color_diff_line(char *);
 
-static void			 gw_display_open(struct trans *, enum khttp,
+static void			 gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
-static void			 gw_display_index(struct trans *,
+static void			 gw_display_index(struct gw_trans *,
 				    const struct got_error *);
 
 static int			 gw_template(size_t, void *);
 
-static const struct got_error*	 apply_unveil(const char *, const char *);
+static const struct got_error*	 gw_apply_unveil(const char *, const char *);
 static const struct got_error*	 cmp_tags(void *, int *,
 				    struct got_reference *,
 				    struct got_reference *);
+
+/* got_repo_resolve_commit_arg */
 static const struct got_error*	 resolve_commit_arg(struct got_object_id **,
 				    const char *, struct got_repository *);
 static const struct got_error*	 match_object_id(struct got_object_id **,
@@ -194,28 +190,28 @@ static const struct got_error*	 match_object_id(struct got_object_id **,
 				    struct got_repository *);
 static const struct got_error*	 blame_cb(void *, int, int,
 				    struct got_object_id *);
-static const struct got_error*	 gw_load_got_paths(struct trans *);
-static const struct got_error*	 gw_load_got_path(struct trans *,
+static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
+static const struct got_error*	 gw_load_got_path(struct gw_trans *,
 				    struct gw_dir *);
-static const struct got_error*	 gw_parse_querystring(struct trans *);
+static const struct got_error*	 gw_parse_querystring(struct gw_trans *);
 static const struct got_error*	 match_logmsg(int *, struct got_object_id *,
 				    struct got_commit_object *, regex_t *);
 
-static const struct got_error*	 gw_blame(struct trans *);
-static const struct got_error*	 gw_commit(struct trans *);
-static const struct got_error*	 gw_commitdiff(struct trans *);
-static const struct got_error*	 gw_index(struct trans *);
-static const struct got_error*	 gw_log(struct trans *);
-static const struct got_error*	 gw_raw(struct trans *);
-static const struct got_error*	 gw_logbriefs(struct trans *);
-static const struct got_error*	 gw_summary(struct trans *);
-static const struct got_error*	 gw_tag(struct trans *);
-static const struct got_error*	 gw_tree(struct trans *);
+static const struct got_error*	 gw_blame(struct gw_trans *);
+static const struct got_error*	 gw_commit(struct gw_trans *);
+static const struct got_error*	 gw_commitdiff(struct gw_trans *);
+static const struct got_error*	 gw_index(struct gw_trans *);
+static const struct got_error*	 gw_log(struct gw_trans *);
+static const struct got_error*	 gw_raw(struct gw_trans *);
+static const struct got_error*	 gw_logbriefs(struct gw_trans *);
+static const struct got_error*	 gw_summary(struct gw_trans *);
+static const struct got_error*	 gw_tag(struct gw_trans *);
+static const struct got_error*	 gw_tree(struct gw_trans *);
 
 struct gw_query_action {
 	unsigned int		 func_id;
 	const char		*func_name;
-	const struct got_error	*(*func_main)(struct trans *);
+	const struct got_error	*(*func_main)(struct gw_trans *);
 	char			*template;
 };
 
@@ -248,7 +244,7 @@ static struct gw_query_action gw_query_funcs[] = {
 };
 
 static const struct got_error *
-apply_unveil(const char *repo_path, const char *repo_file)
+gw_apply_unveil(const char *repo_path, const char *repo_file)
 {
 	const struct got_error *err;
 
@@ -414,7 +410,7 @@ done:
 }
 
 int
-gw_get_repo_log_count(struct trans *gw_trans, char *start_commit)
+gw_get_repo_log_count(struct gw_trans *gw_trans, char *start_commit)
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
@@ -553,13 +549,13 @@ done:
 }
 
 static const struct got_error *
-gw_blame(struct trans *gw_trans)
+gw_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -576,12 +572,12 @@ gw_blame(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_commit(struct trans *gw_trans)
+gw_commit(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -598,12 +594,12 @@ gw_commit(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_commitdiff(struct trans *gw_trans)
+gw_commitdiff(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -620,14 +616,14 @@ gw_commitdiff(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_index(struct trans *gw_trans)
+gw_index(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_dir *gw_dir = NULL;
 	char *html, *navs, *next, *prev;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 
-	error = apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
 	if (error)
 		return error;
 
@@ -712,12 +708,12 @@ gw_index(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_log(struct trans *gw_trans)
+gw_log(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -735,7 +731,7 @@ gw_log(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_raw(struct trans *gw_trans)
+gw_raw(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
@@ -743,12 +739,12 @@ gw_raw(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_logbriefs(struct trans *gw_trans)
+gw_logbriefs(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -767,14 +763,14 @@ gw_logbriefs(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_summary(struct trans *gw_trans)
+gw_summary(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
 	     *cloneurl_html, *log, *log_html, *tags, *heads, *tags_html,
 	     *heads_html, *age;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -863,12 +859,12 @@ gw_summary(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_tag(struct trans *gw_trans)
+gw_tag(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -885,12 +881,12 @@ gw_tag(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_tree(struct trans *gw_trans)
+gw_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
-	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
@@ -907,7 +903,7 @@ gw_tree(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_load_got_path(struct trans *gw_trans, struct gw_dir *gw_dir)
+gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 {
 	const struct got_error *error = NULL;
 	DIR *dt;
@@ -964,7 +960,7 @@ errored:
 }
 
 static const struct got_error *
-gw_load_got_paths(struct trans *gw_trans)
+gw_load_got_paths(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	DIR *d;
@@ -1019,7 +1015,7 @@ gw_load_got_paths(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_parse_querystring(struct trans *gw_trans)
+gw_parse_querystring(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct kpair *p;
@@ -1144,7 +1140,7 @@ done:
 }
 
 static void
-gw_display_open(struct trans *gw_trans, enum khttp code, enum kmime mime)
+gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 {
 	khttp_head(gw_trans->gw_req, kresps[KRESP_ALLOW], "GET");
 	khttp_head(gw_trans->gw_req, kresps[KRESP_STATUS], "%s",
@@ -1158,7 +1154,7 @@ gw_display_open(struct trans *gw_trans, enum khttp code, enum kmime mime)
 }
 
 static void
-gw_display_index(struct trans *gw_trans, const struct got_error *err)
+gw_display_index(struct gw_trans *gw_trans, const struct got_error *err)
 {
 	gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
 	khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
@@ -1176,7 +1172,7 @@ static int
 gw_template(size_t key, void *arg)
 {
 	const struct got_error *error = NULL;
-	struct trans *gw_trans = arg;
+	struct gw_trans *gw_trans = arg;
 	char *gw_got_link, *gw_site_link;
 	char *site_owner_name, *site_owner_name_h;
 
@@ -1236,7 +1232,7 @@ gw_template(size_t key, void *arg)
 }
 
 static char *
-gw_get_repo_description(struct trans *gw_trans, char *dir)
+gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 {
 	FILE *f;
 	char *description = NULL, *d_file = NULL;
@@ -1333,7 +1329,7 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 }
 
 static char *
-gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
+gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -1415,7 +1411,7 @@ err:
 }
 
 static char *
-gw_get_repo_diff(struct trans *gw_trans, char *id_str1, char *id_str2)
+gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
 {
 	const struct got_error *error;
 	FILE *f = NULL;
@@ -1519,7 +1515,7 @@ done:
 }
 
 static char *
-gw_get_repo_owner(struct trans *gw_trans, char *dir)
+gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 {
 	FILE *f;
 	char *owner = NULL, *d_file = NULL;
@@ -1578,7 +1574,7 @@ err:
 }
 
 static char *
-gw_get_clone_url(struct trans *gw_trans, char *dir)
+gw_get_clone_url(struct gw_trans *gw_trans, char *dir)
 {
 	FILE *f;
 	char *url = NULL, *d_file = NULL;
@@ -1604,7 +1600,7 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 }
 
 static char *
-gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
+gw_get_repo_log(struct gw_trans *gw_trans, const char *search_pattern,
     char *start_commit, int limit, int log_type)
 {
 	const struct got_error *error;
@@ -2137,7 +2133,7 @@ done:
 }
 
 static char *
-gw_get_repo_tags(struct trans *gw_trans, int limit, int tag_type)
+gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2283,7 +2279,7 @@ struct blame_cb_args {
 	off_t *line_offsets;
 	FILE *f;
 	struct got_repository *repo;
-	struct trans *gw_trans;
+	struct gw_trans *gw_trans;
 	struct buf *blamebuf;
 };
 
@@ -2397,7 +2393,7 @@ done:
 }
 
 static char*
-gw_get_file_blame(struct trans *gw_trans, char *commit_str)
+gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2528,7 +2524,7 @@ done:
 }
 
 static char*
-gw_get_repo_tree(struct trans *gw_trans, char *commit_str)
+gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2692,7 +2688,7 @@ done:
 }
 
 static char *
-gw_get_repo_heads(struct trans *gw_trans)
+gw_get_repo_heads(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2772,7 +2768,7 @@ done:
 }
 
 static char *
-gw_get_got_link(struct trans *gw_trans)
+gw_get_got_link(struct gw_trans *gw_trans)
 {
 	char *link;
 
@@ -2784,7 +2780,7 @@ gw_get_got_link(struct trans *gw_trans)
 }
 
 static char *
-gw_get_site_link(struct trans *gw_trans)
+gw_get_site_link(struct gw_trans *gw_trans)
 {
 	char *link, *repo = "", *action = "";
 
@@ -2918,12 +2914,12 @@ int
 main()
 {
 	const struct got_error *error = NULL;
-	struct trans *gw_trans;
+	struct gw_trans *gw_trans;
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
 	int gw_malloc = 1;
 
-	if ((gw_trans = malloc(sizeof(struct trans))) == NULL)
+	if ((gw_trans = malloc(sizeof(struct gw_trans))) == NULL)
 		errx(1, "malloc");
 
 	if ((gw_trans->gw_req = malloc(sizeof(struct kreq))) == NULL)
@@ -2960,7 +2956,7 @@ main()
 	gw_trans->commit = NULL;
 	gw_trans->headref = strdup(GOT_REF_HEAD);
 	gw_trans->mime = KMIME_TEXT_HTML;
-	gw_trans->gw_tmpl->key = templs;
+	gw_trans->gw_tmpl->key = gw_templs;
 	gw_trans->gw_tmpl->keysz = TEMPL__MAX;
 	gw_trans->gw_tmpl->arg = gw_trans;
 	gw_trans->gw_tmpl->cb = gw_template;

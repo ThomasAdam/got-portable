@@ -105,35 +105,35 @@ boolean		: STRING			{
 		;
 
 main		: GOT_REPOS_PATH STRING {
-      			if ((gw_conf->got_repos_path = strdup($2)) == NULL)
+			if ((gw_conf->got_repos_path = strdup($2)) == NULL)
 				errx(1, "out of memory");
-      		}
+		}
 		| GOT_WWW_PATH STRING {
-      			if ((gw_conf->got_www_path = strdup($2)) == NULL)
+			if ((gw_conf->got_www_path = strdup($2)) == NULL)
 				errx(1, "out of memory");
-      		}
+		}
 		| GOT_MAX_REPOS NUMBER {
 			if ($2 > 0)
 				gw_conf->got_max_repos = $2;
 		}
 		| GOT_SITE_NAME STRING {
-      			if ((gw_conf->got_site_name = strdup($2)) == NULL)
+				if ((gw_conf->got_site_name = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
 		| GOT_SITE_OWNER STRING {
-      			if ((gw_conf->got_site_owner = strdup($2)) == NULL)
+				if ((gw_conf->got_site_owner = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
 		| GOT_SITE_LINK STRING {
-      			if ((gw_conf->got_site_link = strdup($2)) == NULL)
+				if ((gw_conf->got_site_link = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
 		| GOT_LOGO STRING {
-      			if ((gw_conf->got_logo = strdup($2)) == NULL)
+				if ((gw_conf->got_logo = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
 		| GOT_LOGO_URL STRING {
-      			if ((gw_conf->got_logo_url = strdup($2)) == NULL)
+				if ((gw_conf->got_logo_url = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
 		| GOT_SHOW_SITE_OWNER boolean {
@@ -157,7 +157,7 @@ main		: GOT_REPOS_PATH STRING {
 			if ($2 > 0)
 				gw_conf->got_max_commits_display = $2;
 		}
-      		;
+		;
 
 %%
 
@@ -488,20 +488,20 @@ parse_conf(const char *filename, struct gotweb_conf *gconf)
 	static const struct got_error*	 error = NULL;
 
 	gw_conf = gconf;
-      	if ((gw_conf->got_repos_path = strdup(D_GOTPATH)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_www_path = strdup(D_GOTWWW)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_site_name = strdup(D_SITENAME)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_site_owner = strdup(D_SITEOWNER)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_site_link = strdup(D_SITELINK)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_logo = strdup(D_GOTLOGO)) == NULL)
-		errx(1, "out of memory");
-      	if ((gw_conf->got_logo_url = strdup(D_GOTURL)) == NULL)
-		errx(1, "out of memory");
+	if ((gw_conf->got_repos_path = strdup(D_GOTPATH)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_www_path = strdup(D_GOTWWW)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_site_name = strdup(D_SITENAME)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_site_owner = strdup(D_SITEOWNER)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_site_link = strdup(D_SITELINK)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_logo = strdup(D_GOTLOGO)) == NULL)
+	err(1, "strdup");
+	if ((gw_conf->got_logo_url = strdup(D_GOTURL)) == NULL)
+	err(1, "strdup");
 	gw_conf->got_show_site_owner = D_SHOWSOWNER;
 	gw_conf->got_show_repo_owner = D_SHOWROWNER;
 	gw_conf->got_show_repo_age = D_SHOWAGE;

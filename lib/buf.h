@@ -42,6 +42,13 @@
 
 typedef struct buf BUF;
 
+struct buf {
+	/* buffer handle, buffer size, and data length */
+	u_char	*cb_buf;
+	size_t	 cb_size;
+	size_t	 cb_len;
+};
+
 const struct got_error *buf_alloc(BUF **, size_t);
 const struct got_error *buf_load(BUF **, const char *);
 void		 buf_free(BUF *);
