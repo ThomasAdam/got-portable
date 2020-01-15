@@ -54,6 +54,7 @@
 
 struct trans {
 	TAILQ_HEAD(dirs, gw_dir) gw_dirs;
+	struct gw_dir		*gw_dir;
 	struct gotweb_conf	*gw_conf;
 	struct ktemplate	*gw_tmpl;
 	struct khtmlreq		*gw_html_req;
@@ -95,11 +96,7 @@ enum tmpl {
 	TEMPL_SITEOWNER,
 	TEMPL_TITLE,
 	TEMPL_SEARCH,
-	TEMPL_DESCRIPTION,
 	TEMPL_CONTENT,
-	TEMPL_REPO_OWNER,
-	TEMPL_REPO_AGE,
-	TEMPL_CLONEURL,
 	TEMPL__MAX
 };
 
@@ -115,11 +112,7 @@ static const char *const templs[TEMPL__MAX] = {
 	"siteowner",
 	"title",
 	"search",
-	"description",
 	"content",
-	"repo_owner",
-	"repo_age",
-	"cloneurl",
 };
 
 static const struct kvalid gw_keys[KEY__MAX] = {
@@ -209,7 +202,7 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_RAW,	 "raw",		gw_raw,		"gw_tmpl/index.tmpl" },
 	{ GW_SHORTLOG,	 "shortlog",	gw_shortlog,	"gw_tmpl/index.tmpl" },
 	{ GW_SNAPSHOT,	 "snapshot",	gw_snapshot,	"gw_tmpl/index.tmpl" },
-	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/summary.tmpl" },
+	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/index.tmpl" },
 	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
 };
 
@@ -302,20 +295,24 @@ static const struct got_error *
 gw_index(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct gw_dir *dir = NULL;
+	struct gw_dir *gw_dir = NULL;
 	char *html, *navs, *next, *prev;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 
+	error = apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
+	if (error)
+		return error;
+
 	error = gw_load_got_paths(gw_trans);
-	if (error && error->code != GOT_ERR_OK)
+	if (error)
 		return error;
 
 	khttp_puts(gw_trans->gw_req, index_projects_header);
 
-	TAILQ_FOREACH(dir, &gw_trans->gw_dirs, entry)
+	TAILQ_FOREACH(gw_dir, &gw_trans->gw_dirs, entry)
 		dir_c++;
 
-	TAILQ_FOREACH(dir, &gw_trans->gw_dirs, entry) {
+	TAILQ_FOREACH(gw_dir, &gw_trans->gw_dirs, entry) {
 		if (gw_trans->page > 0 && (gw_trans->page *
 		    gw_trans->gw_conf->got_max_repos_display) > prev_disp) {
 			prev_disp++;
@@ -323,12 +320,13 @@ gw_index(struct trans *gw_trans)
 		}
 
 		prev_disp++;
-		if((asprintf(&navs, index_navs, dir->name, dir->name, dir->name,
-		    dir->name)) == -1)
+		if((asprintf(&navs, index_navs, gw_dir->name, gw_dir->name,
+		    gw_dir->name, gw_dir->name)) == -1)
 			return got_error_from_errno("asprintf");
 
-		if ((asprintf(&html, index_projects, dir->name, dir->name,
-		    dir->description, dir->owner, dir->age, navs)) == -1)
+		if ((asprintf(&html, index_projects, gw_dir->name, gw_dir->name,
+		    gw_dir->description, gw_dir->owner, gw_dir->age,
+		    navs)) == -1)
 			return got_error_from_errno("asprintf");
 
 		khttp_puts(gw_trans->gw_req, html);
@@ -421,6 +419,62 @@ static const struct got_error *
 gw_summary(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *description_html, *repo_owner_html, *repo_age_html,
+	     *cloneurl_html;
+
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
+
+	khttp_puts(gw_trans->gw_req, summary_wrapper);
+	if (gw_trans->gw_conf->got_show_repo_description) {
+		if (gw_trans->gw_dir->description != NULL &&
+		    (strcmp(gw_trans->gw_dir->description, "") != 0)) {
+			if ((asprintf(&description_html, description,
+			    gw_trans->gw_dir->description)) == -1)
+				return got_error_from_errno("asprintf");
+
+			khttp_puts(gw_trans->gw_req, description_html);
+			free(description_html);
+		}
+	}
+
+	if (gw_trans->gw_conf->got_show_repo_owner) {
+		if (gw_trans->gw_dir->owner != NULL &&
+		    (strcmp(gw_trans->gw_dir->owner, "") != 0)) {
+			if ((asprintf(&repo_owner_html, repo_owner,
+			    gw_trans->gw_dir->owner)) == -1)
+				return got_error_from_errno("asprintf");
+
+			khttp_puts(gw_trans->gw_req, repo_owner_html);
+			free(repo_owner_html);
+		}
+	}
+
+	if (gw_trans->gw_conf->got_show_repo_age) {
+		if (gw_trans->gw_dir->age != NULL &&
+		    (strcmp(gw_trans->gw_dir->age, "") != 0)) {
+			if ((asprintf(&repo_age_html, last_change,
+			    gw_trans->gw_dir->age)) == -1)
+				return got_error_from_errno("asprintf");
+
+			khttp_puts(gw_trans->gw_req, repo_age_html);
+			free(repo_age_html);
+		}
+	}
+
+	if (gw_trans->gw_conf->got_show_repo_cloneurl) {
+		if (gw_trans->gw_dir->url != NULL &&
+		    (strcmp(gw_trans->gw_dir->url, "") != 0)) {
+			if ((asprintf(&cloneurl_html, cloneurl,
+			    gw_trans->gw_dir->url)) == -1)
+				return got_error_from_errno("asprintf");
+
+			khttp_puts(gw_trans->gw_req, cloneurl_html);
+			free(cloneurl_html);
+		}
+	}
+	khttp_puts(gw_trans->gw_req, div_end);
 
 	error = gw_shortlog(gw_trans);
 	error = gw_tags(gw_trans);
@@ -513,15 +567,6 @@ gw_load_got_paths(struct trans *gw_trans)
 	struct gw_dir *gw_dir;
 	struct stat st;
 	unsigned int d_cnt, d_i;
-
-	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
-
-	error = apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
-	if (error)
-		return error;
 
 	d = opendir(gw_trans->gw_conf->got_repos_path);
 	if (d == NULL) {
@@ -624,6 +669,13 @@ gw_parse_querystring(struct trans *gw_trans)
 			error = got_error_from_errno("invalid action");
 			return error;
 		}
+		if ((gw_trans->gw_dir =
+		    gw_init_gw_dir(gw_trans->repo_name)) == NULL)
+			return got_error_from_errno("gw_dir malloc");
+
+		error = gw_load_got_path(gw_trans, gw_trans->gw_dir);
+		if (error)
+			return error;
 	} else
 		gw_trans->action = GW_INDEX;
 
@@ -686,10 +738,6 @@ gw_template(size_t key, void *arg)
 	struct trans *gw_trans = arg;
 	char *gw_got_link, *gw_site_link;
 	char *site_owner_name, *site_owner_name_h;
-	char *description, *description_h;
-	char *repo_owner, *repo_owner_h;
-	char *repo_age, *repo_age_h;
-	char *cloneurl, *cloneurl_h;
 
 	switch (key) {
 	case (TEMPL_HEAD):
@@ -718,23 +766,6 @@ gw_template(size_t key, void *arg)
 	case (TEMPL_SEARCH):
 		khttp_puts(gw_trans->gw_req, search);
 		break;
-	case(TEMPL_DESCRIPTION):
-		if (gw_trans->gw_conf->got_show_repo_description) {
-			description = gw_html_escape(
-			    gw_get_repo_description(gw_trans,
-			    gw_trans->repo_path));
-			if (description != NULL &&
-			    (strcmp(description, "") != 0)) {
-				if ((asprintf(&description_h,
-				    summary_description, description)) == -1)
-					return 0;
-
-				khttp_puts(gw_trans->gw_req, description_h);
-				free(description);
-				free(description_h);
-			}
-		}
-		break;
 	case(TEMPL_SITEOWNER):
 		if (gw_trans->gw_conf->got_site_owner != NULL &&
 		    gw_trans->gw_conf->got_show_site_owner) {
@@ -755,52 +786,6 @@ gw_template(size_t key, void *arg)
 		if (error)
 			khttp_puts(gw_trans->gw_req, error->msg);
 
-		break;
-	case(TEMPL_REPO_OWNER):
-		if (gw_trans->gw_conf->got_show_repo_owner) {
-			repo_owner = gw_html_escape(gw_get_repo_owner(gw_trans,
-			    gw_trans->repo_path));
-			if ((asprintf(&repo_owner_h, summary_repo_owner,
-			    repo_owner)) == -1)
-				return 0;
-
-			if (repo_owner != NULL &&
-			    (strcmp(repo_owner, "") != 0)) {
-				khttp_puts(gw_trans->gw_req, repo_owner_h);
-			}
-
-			free(repo_owner_h);
-		}
-		break;
-	case(TEMPL_REPO_AGE):
-		if (gw_trans->gw_conf->got_show_repo_age) {
-			repo_age = gw_get_repo_age(gw_trans,
-			    gw_trans->repo_path, "refs/heads", TM_LONG);
-			if (repo_age != NULL) {
-				if ((asprintf(&repo_age_h, summary_last_change,
-				    repo_age)) == -1)
-				return 0;
-				khttp_puts(gw_trans->gw_req, repo_age_h);
-				free(repo_age);
-				free(repo_age_h);
-			}
-		}
-		break;
-	case(TEMPL_CLONEURL):
-		if (gw_trans->gw_conf->got_show_repo_cloneurl) {
-			cloneurl = gw_html_escape(gw_get_clone_url(gw_trans,
-			    gw_trans->repo_path));
-			if (cloneurl != NULL) {
-				if ((asprintf(&cloneurl_h,
-				    summary_cloneurl, cloneurl)) == -1)
-					return 0;
-
-				khttp_puts(gw_trans->gw_req, cloneurl_h);
-				free(cloneurl);
-				free(cloneurl_h);
-			}
-
-		}
 		break;
 	default:
 		return 0;
@@ -960,7 +945,7 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 		break;
 	}
 
-noref:
+/* noref: */
 	got_ref_list_free(&refs);
 	free(id);
 	return repo_age;
@@ -1168,6 +1153,11 @@ main()
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
 		gw_malloc = false;
 		error = got_error_from_errno("malloc");
+		goto err;
+	}
+
+	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1) {
+		error = got_error_from_errno("pledge");
 		goto err;
 	}
 

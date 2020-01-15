@@ -132,6 +132,63 @@ body {
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
+#description_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#description {
+	float: left;
+	width: 72%;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#repo_owner_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#repo_owner {
+	float: left;
+	width: 72%;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#last_change_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#last_change {
+	float: left;
+	width: 72%;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#cloneurl_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#cloneurl {
+	float: left;
+	width: 72%;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	overflow: auto;
+}
 
 /* index.tmpl */
 
@@ -231,63 +288,6 @@ body {
 	float: left;
 	width: 100%;
 	background-color: Khaki;
-}
-#summary_description_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_description {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_repo_owner_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_repo_owner {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_last_change_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_last_change {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_cloneurl_title {
-	clear: left;
-	float: left;
-	width: 6.5em;
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#summary_cloneurl {
-	float: left;
-	width: 72%;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	overflow: auto;
 }
 #summary_shortlog_title_wrapper {
 	clear: left;

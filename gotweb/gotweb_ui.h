@@ -98,6 +98,22 @@ char *nav_next =
 char *nav_prev =
 	"<a href='?page=%d'>Previous<a/>";
 
+char *description =
+	"<div id='description_title'>Description: </div>" \
+	"<div id='description'>%s</div>";
+
+char *repo_owner =
+	"<div id='repo_owner_title'>Owner: </div>" \
+	"<div id='repo_owner'>%s</div>";
+
+char *last_change =
+	"<div id='last_change_title'>Last Change: </div>" \
+	"<div id='last_change'>%s</div>";
+
+char *cloneurl =
+	"<div id='cloneurl_title'>Clone URL: </div>" \
+	"<div id='cloneurl'>%s</div>";
+
 /* index.tmpl */
 
 char *index_projects_header =
@@ -130,21 +146,8 @@ char *index_navs =
 
 /* summary.tmpl */
 
-char *summary_description =
-	"<div id='summary_description_title'>Description: </div>" \
-	"<div id='summary_description'>%s</div>";
-
-char *summary_repo_owner =
-	"<div id='summary_repo_owner_title'>Owner: </div>" \
-	"<div id='summary_repo_owner'>%s</div>";
-
-char *summary_last_change =
-	"<div id='summary_last_change_title'>Last Change: </div>" \
-	"<div id='summary_last_change'>%s</div>";
-
-char *summary_cloneurl =
-	"<div id='summary_cloneurl_title'>Clone URL: </div>" \
-	"<div id='summary_cloneurl'>%s</div>";
+char *summary_wrapper =
+	"<div id='summary_wrapper'>";
 
 char *summary_shortlog =
 	"<div id='summary_shortlog_title_wrapper'>" \
