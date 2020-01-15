@@ -548,6 +548,7 @@ gw_get_repo_log_count(struct trans *gw_trans, char *start_commit)
 		log_count++;
 	}
 done:
+	free(in_repo_path);
 	if (graph)
 		got_commit_graph_close(graph);
 	if (repo) {
@@ -577,7 +578,7 @@ gw_blame(struct trans *gw_trans)
 	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGBLAME);
 
 	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_tree, log)) == -1)
+		if ((asprintf(&log_html, log_blame, log)) == -1)
 			return got_error_from_errno("asprintf");
 		khttp_puts(gw_trans->gw_req, log_html);
 		free(log_html);
@@ -2159,6 +2160,7 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	}
 done:
 	buf_free(diffbuf);
+	free(in_repo_path);
 	if (commit != NULL)
 		got_object_commit_close(commit);
 	if (search_pattern)
@@ -2325,6 +2327,8 @@ struct blame_cb_args {
 	off_t *line_offsets;
 	FILE *f;
 	struct got_repository *repo;
+	struct trans *gw_trans;
+	struct buf *blamebuf;
 };
 
 static const struct got_error *
@@ -2334,7 +2338,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	struct blame_cb_args *a = arg;
 	struct blame_line *bline;
 	char *line = NULL;
-	size_t linesize = 0;
+	size_t linesize = 0, newsize;
 	struct got_commit_object *commit = NULL;
 	off_t offset;
 	struct tm tm;
@@ -2387,7 +2391,7 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 
 	while (bline->annotated) {
-		char *smallerthan, *at, *nl, *committer;
+		char *smallerthan, *at, *nl, *committer, *blame_row = NULL;
 		size_t len;
 
 		if (getline(&line, &linesize, a->f) == -1) {
@@ -2410,11 +2414,16 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		nl = strchr(line, '\n');
 		if (nl)
 			*nl = '\0';
-		printf("%.*d) %.8s %s %-8s %s\n", a->nlines_prec, a->lineno_cur,
-		    bline->id_str, bline->datebuf, committer, line);
-
+		asprintf(&blame_row, log_blame_line, a->nlines_prec,
+		    a->lineno_cur, bline->id_str, bline->datebuf, committer,
+		    line);
 		a->lineno_cur++;
+		err = buf_puts(&newsize, a->blamebuf, blame_row);
+		if (err)
+			return err;
+
 		bline = &a->lines[a->lineno_cur - 1];
+		free(blame_row);
 	}
 done:
 	if (commit)
@@ -2431,23 +2440,31 @@ gw_get_file_blame(struct trans *gw_trans, char *commit_str)
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
-	struct buf *diffbuf = NULL;
-	size_t newsize;
 	char *blame_html = NULL, *path = NULL, *in_repo_path = NULL,
-	    *blame_row = NULL, *id_str;
+	    *blame_row = NULL, *id_str, *folder = NULL;
 	struct blame_cb_args bca;
 	int nentries, i, obj_type;
 	size_t filesize;
-
-	error = buf_alloc(&diffbuf, 0);
-	if (error)
-		return NULL;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
+	if (gw_trans->repo_folder != NULL) {
+		if ((asprintf(&folder, "%s/", gw_trans->repo_folder)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else
+		folder = strdup("");
+
+	if ((asprintf(&path, "%s%s", folder, gw_trans->repo_file)) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+	free(folder);
+
+	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error)
 		goto done;
 
@@ -2458,6 +2475,7 @@ gw_get_file_blame(struct trans *gw_trans, char *commit_str)
 	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
 	if (error)
 		goto done;
+
 	if (obj_id == NULL) {
 		error = got_error(GOT_ERR_NO_OBJ);
 		goto done;
@@ -2473,6 +2491,10 @@ gw_get_file_blame(struct trans *gw_trans, char *commit_str)
 	}
 
 	error = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	if (error)
+		goto done;
+
+	error = buf_alloc(&bca.blamebuf, 0);
 	if (error)
 		goto done;
 
@@ -2503,12 +2525,38 @@ gw_get_file_blame(struct trans *gw_trans, char *commit_str)
 		bca.nlines_prec++;
 	}
 	bca.repo = repo;
+	bca.gw_trans = gw_trans;
 
 	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca, NULL,
 	    NULL);
-	blame_html = strdup("blame");
+	if (buf_len(bca.blamebuf) > 0) {
+		error = buf_putc(bca.blamebuf, '\0');
+		blame_html = strdup(buf_get(bca.blamebuf));
+	}
 done:
-	free(diffbuf);
+	free(bca.blamebuf);
+	free(in_repo_path);
+	free(commit_id);
+	free(obj_id);
+	free(path);
+
+	if (blob)
+		error = got_object_blob_close(blob);
+	if (repo)
+		error = got_repo_close(repo);
+	if (error)
+		return NULL;
+	if (bca.lines) {
+		for (i = 0; i < bca.nlines; i++) {
+			struct blame_line *bline = &bca.lines[i];
+			free(bline->id_str);
+			free(bline->committer);
+		}
+		free(bca.lines);
+	}
+	free(bca.line_offsets);
+	if (bca.f && fclose(bca.f) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	if (error)
 		return NULL;
 	else
@@ -2667,7 +2715,10 @@ gw_get_repo_tree(struct trans *gw_trans, char *commit_str)
 done:
 	if (tree)
 		got_object_tree_close(tree);
+	if (repo)
+		got_repo_close(repo);
 
+	free(in_repo_path);
 	free(tree_id);
 	free(diffbuf);
 	if (error)

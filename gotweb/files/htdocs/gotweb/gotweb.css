@@ -576,6 +576,7 @@ body {
 	float: left;
 	padding: 20px;
 	font-family: monospace;
+	white-space: pre;
 }
 #blame_wrapper {
 	clear: left;

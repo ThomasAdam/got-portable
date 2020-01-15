@@ -180,11 +180,11 @@ char *commit_tree_html =
 	"<div id='commit_log'>%s</div>";
 
 char *folder_html =
-	"<a href='?path=%s&action=%s&commit=%s&folder=%s' " \
+	"<a href='?path=%s&action=%s&commit=%s&folder=/%s' " \
 	    "class='diff_directory'>%s%s</a>";
 
 char *file_html =
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s%s</a>";
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s%s</a>";
 
 /* log.tmpl */
 
@@ -228,7 +228,7 @@ char *log_tag_row =
 
 char *log_blame =
 	"<div id='log_blame_title_wrapper'>" \
-	"<div id='log_blame_title'>blame</div></div>" \
+	"<div id='log_blame_title'>Blame</div></div>" \
 	"<div id='log_blame_content'>%s</div>";
 
 char *log_blame_row =
@@ -244,6 +244,15 @@ char *log_blame_navs =
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=blame&commit=%s'>blame</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
+
+char *log_blame_line =
+	"<div id='blame_wrapper'>" \
+	"<div id='blame'>%.*d</div>" \
+	"<div id='blame'>%.8s</div>" \
+	"<div id='blame'>%s</div>" \
+	"<div id='blame'>%-8s</div>" \
+	"<div id='blame'>%s</div>" \
+	"</div>";
 
 /* tree.tmpl */
 
