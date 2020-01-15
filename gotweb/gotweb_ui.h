@@ -140,7 +140,7 @@ char *heads_navs =
 	"<a href='?path=%s&action=summary&headref=%s'>summary</a> | " \
 	"<a href='?path=%s&action=logbriefs&headref=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
-	"<a href='?path=%s&action=tree&headref=%s'>commit</a>";
+	"<a href='?path=%s&action=commit&headref=%s'>commit</a>";
 
 char *commit_diff_html =
 	"<div id='commit_diff_title'>Diff:</div>" \
