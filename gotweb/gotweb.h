@@ -44,6 +44,7 @@
 #define D_SHOWURL	 true
 #define	D_MAXREPO	 0
 #define D_MAXREPODISP	 25
+#define D_MAXSLCOMMDISP	 10
 #define D_MAXCOMMITDISP	 25
 
 #define BUFFER_SIZE	 2048

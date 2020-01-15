@@ -1112,7 +1112,7 @@ gw_get_repo_shortlog(struct trans *gw_trans, const char *search_pattern)
 	     *commit_age = NULL, *commit_author = NULL, *commit_log = NULL,
 	     *shortlog_navs_html = NULL;
 	regex_t regex;
-	int have_match, limit = 25;
+	int have_match, limit = D_MAXSLCOMMDISP;
 	size_t newsize;
 	struct buf *diffbuf;
 	time_t committer_time;
