@@ -38,6 +38,12 @@ body {
 	width: 100%;
 	border-top: 1px dotted #444444;
 }
+#solid_line {
+	clear: left;
+	float: left;
+	width: 100%;
+	border-top: 1px solid #444444;
+}
 #header {
 	overflow: auto;
 	width: 100%;
@@ -262,6 +268,90 @@ body {
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
+#commit_commit_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_commit {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_diff_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_diff {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_author_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_author {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_committer_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_committer {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_age_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_age {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_log_title {
+	clear: left;
+	float: left;
+	width: 6.5em;
+	padding-left: 10px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+#commit_log {
+	float: left;
+	width: 72%;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
 
 /* index.tmpl */
 
@@ -382,36 +472,102 @@ body {
 	clear: left;
 	float: left;
 	background-color: #f5fcfb;
+	padding-top: 3px;
+	padding-bottom: 3px;
 	width: 100%;
 }
-#logs_commit {
+#log {
+	clear: left;
+	float: left;
+	padding-left: 20px;
+	padding-top: 20px;
+	padding-bottom: 20px;
+}
+
+/* tree.tmpl */
+
+#log_tree_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_tree_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#log_tree_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#log_tree_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_tree_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#log_tree_commit {
 	clear: left;
 	float: left;
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
 }
-#logs_author {
+#log_tree {
 	clear: left;
 	float: left;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 2px;
-}
-#logs_age {
-	clear: left;
-	float: left;
-	padding-left: 10px;
-	padding-top: 2px;
-	padding-bottom: 5px;
+	padding: 20px;
 }
 
-#log {
+/* commit.tmpl */
+
+#log_commit_wrapper {
 	clear: left;
 	float: left;
-	padding-left: 20px;
-	padding-top: 2px;
-	padding-bottom: 20px;
+	width: 100%;
+}
+#log_commit_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#log_commit_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#log_commit_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_commit_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#log_commit_commit {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+}
+#log_commit {
+	clear: left;
+	float: left;
+	padding: 20px;
 }
 
 /* summary.tmpl */

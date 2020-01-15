@@ -66,6 +66,7 @@ struct trans {
 	char			*commit;
 	char			*repo_file;
 	char			*action_name;
+	char			*headref;
 	unsigned int		 action;
 	unsigned int		 page;
 	unsigned int		 repos_total;
@@ -78,6 +79,7 @@ enum gw_key {
 	KEY_COMMIT_ID,
 	KEY_FILE,
 	KEY_PAGE,
+	KEY_HEADREF,
 	KEY__MAX
 };
 
@@ -107,6 +109,13 @@ enum ref_tm {
 	TM_LONG,
 };
 
+enum logs {
+	LOGBRIEF,
+	LOGCOMMIT,
+	LOGFULL,
+	LOGTREE,
+};
+
 struct buf {
 	/* buffer handle, buffer size, and data length */
 	u_char	*cb_buf;
@@ -130,6 +139,7 @@ static const struct kvalid gw_keys[KEY__MAX] = {
 	{ kvalid_stringne,	"commit" },
 	{ kvalid_stringne,	"file" },
 	{ kvalid_int,		"page" },
+	{ kvalid_stringne,	"headref" },
 };
 
 static struct gw_dir		*gw_init_gw_dir(char *);
@@ -167,9 +177,9 @@ static const struct got_error*	 match_logmsg(int *, struct got_object_id *,
 
 static const struct got_error*	 gw_blame(struct trans *);
 static const struct got_error*	 gw_blob(struct trans *);
-static const struct got_error*	 gw_blob_diff(struct trans *);
+static const struct got_error*	 gw_blobdiff(struct trans *);
 static const struct got_error*	 gw_commit(struct trans *);
-static const struct got_error*	 gw_commit_diff(struct trans *);
+static const struct got_error*	 gw_commitdiff(struct trans *);
 static const struct got_error*	 gw_history(struct trans *);
 static const struct got_error*	 gw_index(struct trans *);
 static const struct got_error*	 gw_log(struct trans *);
@@ -206,9 +216,9 @@ enum gw_query_actions {
 static struct gw_query_action gw_query_funcs[] = {
 	{ GW_BLAME,	 "blame",	gw_blame,	"gw_tmpl/index.tmpl" },
 	{ GW_BLOB,	 "blob",	gw_blob,	"gw_tmpl/index.tmpl" },
-	{ GW_BLOBDIFF,	 "blobdiff",	gw_blob_diff,	"gw_tmpl/index.tmpl" },
+	{ GW_BLOBDIFF,	 "blobdiff",	gw_blobdiff,	"gw_tmpl/index.tmpl" },
 	{ GW_COMMIT,	 "commit",	gw_commit,	"gw_tmpl/index.tmpl" },
-	{ GW_COMMITDIFF, "commit_diff",	gw_commit_diff,	"gw_tmpl/index.tmpl" },
+	{ GW_COMMITDIFF, "commitdiff",	gw_commitdiff,	"gw_tmpl/index.tmpl" },
 	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/index.tmpl" },
 	{ GW_HISTORY,	 "history",	gw_history,	"gw_tmpl/index.tmpl" },
 	{ GW_INDEX,	 "index",	gw_index,	"gw_tmpl/index.tmpl" },
@@ -266,7 +276,7 @@ gw_blob(struct trans *gw_trans)
 }
 
 static const struct got_error *
-gw_blob_diff(struct trans *gw_trans)
+gw_blobdiff(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
@@ -277,12 +287,26 @@ static const struct got_error *
 gw_commit(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *log, *log_html;
 
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
+
+	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGCOMMIT);
+
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, log_commit, log)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
+	}
 	return error;
 }
 
 static const struct got_error *
-gw_commit_diff(struct trans *gw_trans)
+gw_commitdiff(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 
@@ -395,8 +419,12 @@ gw_log(struct trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
+
 	log = gw_get_repo_log(gw_trans, NULL, NULL,
-	    gw_trans->gw_conf->got_max_commits_display, 1);
+	    gw_trans->gw_conf->got_max_commits_display, LOGFULL);
 
 	if (log != NULL && strcmp(log, "") != 0) {
 		if ((asprintf(&log_html, logs, log)) == -1)
@@ -420,18 +448,22 @@ static const struct got_error *
 gw_logbriefs(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *logbriefs, *logbriefs_html;
+	char *log, *log_html;
 
-	logbriefs = gw_get_repo_log(gw_trans, NULL, NULL,
-	    gw_trans->gw_conf->got_max_commits_display, 0);
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
 
-	if (logbriefs != NULL && strcmp(logbriefs, "") != 0) {
-		if ((asprintf(&logbriefs_html, summary_logbriefs,
-		    logbriefs)) == -1)
+	log = gw_get_repo_log(gw_trans, NULL, NULL,
+	    gw_trans->gw_conf->got_max_commits_display, LOGBRIEF);
+
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, summary_logbriefs,
+		    log)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, logbriefs_html);
-		free(logbriefs_html);
-		free(logbriefs);
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
 	}
 	return error;
 }
@@ -449,8 +481,8 @@ gw_summary(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
-	     *cloneurl_html, *logbriefs, *tags, *heads, *logbriefs_html,
-	     *tags_html, *heads_html, *age;
+	     *cloneurl_html, *log, *log_html, *tags, *heads, *tags_html,
+	     *heads_html, *age;
 
 	error = apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -507,17 +539,17 @@ gw_summary(struct trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	logbriefs = gw_get_repo_log(gw_trans, NULL, NULL, D_MAXSLCOMMDISP, 0);
+	log = gw_get_repo_log(gw_trans, NULL, NULL, D_MAXSLCOMMDISP, 0);
 	tags = gw_get_repo_tags(gw_trans);
 	heads = gw_get_repo_heads(gw_trans);
 
-	if (logbriefs != NULL && strcmp(logbriefs, "") != 0) {
-		if ((asprintf(&logbriefs_html, summary_logbriefs,
-		    logbriefs)) == -1)
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, summary_logbriefs,
+		    log)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, logbriefs_html);
-		free(logbriefs_html);
-		free(logbriefs);
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
 	}
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
@@ -545,7 +577,21 @@ static const struct got_error *
 gw_tree(struct trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *log, *log_html;
 
+	error = apply_unveil(gw_trans->gw_dir->path, NULL);
+	if (error)
+		return error;
+
+	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGTREE);
+
+	if (log != NULL && strcmp(log, "") != 0) {
+		if ((asprintf(&log_html, log_tree, log)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, log_html);
+		free(log_html);
+		free(log);
+	}
 	return error;
 }
 
@@ -710,6 +756,11 @@ gw_parse_querystring(struct trans *gw_trans)
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE]))
 			if ((asprintf(&gw_trans->repo_file, "%s",
+			    p->parsed.s)) == -1)
+				return got_error_from_errno("asprintf");
+
+		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF]))
+			if ((asprintf(&gw_trans->headref, "%s",
 			    p->parsed.s)) == -1)
 				return got_error_from_errno("asprintf");
 
@@ -983,7 +1034,8 @@ gw_get_repo_age(struct trans *gw_trans, char *dir, char *repo_ref, int ref_tm)
 
 	SIMPLEQ_INIT(&refs);
 	if (gw_trans->gw_conf->got_show_repo_age == false) {
-		asprintf(&repo_age, "");
+		if ((asprintf(&repo_age, "")) == -1)
+			return NULL;
 		return repo_age;
 	}
 	error = got_repo_open(&repo, dir, NULL);
@@ -1122,23 +1174,32 @@ gw_get_clone_url(struct trans *gw_trans, char *dir)
 
 static char *
 gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
-    char *start_commit, int limit, int full_log)
+    char *start_commit, int limit, int log_type)
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct got_commit_object *commit = NULL;
-	struct got_object_id *id = NULL;
+	struct got_object_id *id1 = NULL, *id2 = NULL;
+	struct got_object_qid *parent_id;
 	struct got_commit_graph *graph = NULL;
-	char *logbriefs = NULL, *id_str = NULL, *path = NULL,
-	     *in_repo_path = NULL, *commit_row = NULL, *commit_age = NULL,
-	     *commit_author = NULL, *commit_log = NULL, *commit_log0, *newline,
-	     *logbriefs_navs_html = NULL;
+	char *logs = NULL, *id_str1 = NULL, *id_str2 = NULL,
+	     *path = NULL, *refs_str_disp = NULL,
+	     *refs_str = NULL, *in_repo_path = NULL, *commit_row = NULL,
+	     *commit_commit = NULL, *commit_commit_disp = NULL,
+	     *commit_age_diff = NULL, *commit_age_diff_disp = NULL,
+	     *commit_age_long = NULL, *commit_age_long_disp = NULL,
+	     *commit_author = NULL, *commit_author_disp = NULL,
+	     *commit_committer = NULL, *commit_committer_disp = NULL,
+	     *commit_log = NULL, *commit_log_disp = NULL,
+	     *commit_parent = NULL, *commit_diff_disp = NULL, *commit_log0,
+	     *newline, *logbriefs_navs_html = NULL,
+	     *log_tree_html = NULL, *log_commit_html = NULL;
 	regex_t regex;
 	int have_match;
 	size_t newsize;
-	struct buf *diffbuf;
+	struct buf *diffbuf = NULL;
 	time_t committer_time;
 
 	if (search_pattern &&
@@ -1158,29 +1219,29 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
 		if (error != NULL)
-			return NULL;
-		error = got_ref_resolve(&id, repo, head_ref);
+			goto done;
+		error = got_ref_resolve(&id1, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error != NULL)
-			return NULL;
-		error = got_object_open_as_commit(&commit, repo, id);
+			goto done;
+		error = got_object_open_as_commit(&commit, repo, id1);
 	} else {
 		struct got_reference *ref;
 		error = got_ref_open(&ref, repo, start_commit, 0);
 		if (error == NULL) {
 			int obj_type;
-			error = got_ref_resolve(&id, repo, ref);
+			error = got_ref_resolve(&id1, repo, ref);
 			got_ref_close(ref);
 			if (error != NULL)
 				goto done;
-			error = got_object_get_type(&obj_type, repo, id);
+			error = got_object_get_type(&obj_type, repo, id1);
 			if (error != NULL)
 				goto done;
 			if (obj_type == GOT_OBJ_TYPE_TAG) {
 				struct got_tag_object *tag;
-				error = got_object_open_as_tag(&tag, repo, id);
+				error = got_object_open_as_tag(&tag, repo, id1);
 				if (error != NULL)
 					goto done;
 				if (got_object_tag_get_object_type(tag) !=
@@ -1189,10 +1250,10 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 					error = got_error(GOT_ERR_OBJ_TYPE);
 					goto done;
 				}
-				free(id);
-				id = got_object_id_dup(
+				free(id1);
+				id1 = got_object_id_dup(
 				    got_object_tag_get_object_id(tag));
-				if (id == NULL)
+				if (id1 == NULL)
 					error = got_error_from_errno(
 					    "got_object_id_dup");
 				got_object_tag_close(tag);
@@ -1202,21 +1263,24 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 				error = got_error(GOT_ERR_OBJ_TYPE);
 				goto done;
 			}
-			error = got_object_open_as_commit(&commit, repo, id);
+			error = got_object_open_as_commit(&commit, repo, id1);
 			if (error != NULL)
 				goto done;
 		}
 		if (commit == NULL) {
-			error = got_repo_match_object_id_prefix(&id,
+			error = got_repo_match_object_id_prefix(&id1,
 			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
 			if (error != NULL)
-				return NULL;
+				goto done;
 		}
+		error = got_repo_match_object_id_prefix(&id1,
+			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
+			if (error != NULL)
+				goto done;
 	}
 
 	if (error != NULL)
 		goto done;
-
 	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
 	if (error != NULL)
 		goto done;
@@ -1230,18 +1294,16 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 	if (error)
 		goto done;
 
-	error = got_commit_graph_open(&graph, id, path, 0, repo);
+	error = got_commit_graph_open(&graph, id1, path, 0, repo);
 	if (error)
 		goto done;
 
-	error = got_commit_graph_iter_start(graph, id, repo, NULL, NULL);
+	error = got_commit_graph_iter_start(graph, id1, repo, NULL, NULL);
 	if (error)
 		goto done;
 
 	for (;;) {
-		struct got_commit_object *commit_disp;
-
-		error = got_commit_graph_iter_next(&id, graph);
+		error = got_commit_graph_iter_next(&id1, graph);
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED) {
 				error = NULL;
@@ -1256,27 +1318,28 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 			else
 				continue;
 		}
-		if (id == NULL)
+		if (id1 == NULL)
 			break;
 
-		error = got_object_open_as_commit(&commit_disp, repo, id);
+		error = got_object_open_as_commit(&commit, repo, id1);
 		if (error)
 			break;
 
 		if (search_pattern) {
-			error = match_logmsg(&have_match, id, commit_disp,
+			error = match_logmsg(&have_match, id1, commit,
 			    &regex);
 			if (error) {
-				got_object_commit_close(commit_disp);
+				got_object_commit_close(commit);
 				break;
 			}
 			if (have_match == 0) {
-				got_object_commit_close(commit_disp);
+				got_object_commit_close(commit);
 				continue;
 			}
 		}
 
 		SIMPLEQ_FOREACH(re, &refs, entry) {
+			char *s;
 			const char *name;
 			struct got_tag_object *tag = NULL;
 			int cmp;
@@ -1307,113 +1370,282 @@ gw_get_repo_log(struct trans *gw_trans, const char *search_pattern,
 				}
 			}
 			cmp = got_object_id_cmp(tag ?
-			    got_object_tag_get_object_id(tag) : re->id, id);
+			    got_object_tag_get_object_id(tag) : re->id, id1);
 			if (tag)
 				got_object_tag_close(tag);
 			if (cmp != 0)
 				continue;
+			s = refs_str;
+			if ((asprintf(&refs_str, "%s%s%s", s ? s : "",
+			    s ? ", " : "", name)) == -1) {
+				error = got_error_from_errno("asprintf");
+				free(s);
+				goto done;
+			}
+			free(s);
 		}
 
-		got_ref_list_free(&refs);
+		if (refs_str == NULL)
+			refs_str_disp = strdup("");
+		else {
+			if ((asprintf(&refs_str_disp, "(%s)",
+			    refs_str)) == -1) {
+				error = got_error_from_errno("asprintf");
+				free(refs_str);
+				goto done;
+			}
+		}
 
 		/* commit id */
-		error = got_object_id_str(&id_str, id);
+		error = got_object_id_str(&id_str1, id1);
 		if (error)
-			break;
+			goto done;
 
-		committer_time =
-		    got_object_commit_get_committer_time(commit_disp);
-
-		if (full_log) {
-
-			asprintf(&commit_age, "%s",
-			    gw_get_time_str(committer_time, TM_LONG));
-			asprintf(&commit_author, "%s",
-			    got_object_commit_get_author(commit_disp));
-			error = got_object_commit_get_logmsg(&commit_log0,
-			    commit_disp);
-			if (error)
-				commit_log = strdup("");
-			else
-				commit_log = gw_html_escape(commit_log0);
-			asprintf(&logbriefs_navs_html, logbriefs_navs,
-			    gw_trans->repo_name, id_str, gw_trans->repo_name,
-			    id_str, gw_trans->repo_name, id_str,
-			    gw_trans->repo_name, id_str);
-			asprintf(&commit_row, logs_row, id_str,
-			    gw_html_escape(commit_author), commit_age,
-			    commit_log, logbriefs_navs_html);
-			error = buf_append(&newsize, diffbuf, commit_row,
-			    strlen(commit_row));
-		} else {
-			asprintf(&commit_age, "%s",
-			    gw_get_time_str(committer_time, TM_DIFF));
-			asprintf(&commit_author, "%s",
-			    got_object_commit_get_author(commit_disp));
-			error = got_object_commit_get_logmsg(&commit_log0,
-			    commit_disp);
-			if (error)
-				commit_log = strdup("");
-			else {
-				commit_log = commit_log0;
-				while (*commit_log == '\n')
-					commit_log++;
-				newline = strchr(commit_log, '\n');
-				if (newline)
-					*newline = '\0';
-			}
-			asprintf(&logbriefs_navs_html, logbriefs_navs,
-			    gw_trans->repo_name, id_str, gw_trans->repo_name,
-			    id_str, gw_trans->repo_name, id_str,
-			    gw_trans->repo_name, id_str);
-			asprintf(&commit_row, logbriefs_row, commit_age,
-			    commit_author, commit_log, logbriefs_navs_html);
-			error = buf_append(&newsize, diffbuf, commit_row,
-			    strlen(commit_row));
+		if (gw_trans->action == GW_COMMIT) {
+			parent_id =
+			    SIMPLEQ_FIRST(
+			    got_object_commit_get_parent_ids(commit));
+			if (parent_id != NULL) {
+				id2 = got_object_id_dup(parent_id->id);
+				free (parent_id);
+				error = got_object_id_str(&id_str2, id2);
+				if (error)
+					goto done;
+			} else
+				id_str2 = strdup("/dev/null");
 		}
 
-		free(commit_age);
-		free(commit_author);
-		free(commit_log0);
-		free(logbriefs_navs_html);
-		free(commit_row);
-		free(id_str);
-		commit_age = NULL;
-		commit_author = NULL;
-		commit_log = NULL;
-		logbriefs_navs_html = NULL;
-		commit_row = NULL;
-		id_str = NULL;
+		committer_time =
+		    got_object_commit_get_committer_time(commit);
 
-		got_object_commit_close(commit_disp);
+		if ((asprintf(&commit_parent, "%s", id_str2)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_diff_disp, commit_diff_html, id_str2,
+			id_str1)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_commit, "%s", id_str1)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_commit_disp, commit_commit_html,
+		    commit_commit, refs_str_disp)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_age_long, "%s",
+		    gw_get_time_str(committer_time, TM_LONG))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_age_long_disp, commit_age_html,
+		    commit_age_long)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_age_diff, "%s",
+		    gw_get_time_str(committer_time, TM_DIFF))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_age_diff_disp, commit_age_html,
+		    commit_age_diff)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_author, "%s",
+		    got_object_commit_get_author(commit))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_author_disp, commit_author_html,
+		    gw_html_escape(commit_author))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_committer, "%s",
+		    got_object_commit_get_committer(commit))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if ((asprintf(&commit_committer_disp, commit_committer_html,
+		    gw_html_escape(commit_committer))) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		if (strcmp(commit_author, commit_committer) == 0) {
+			free(commit_committer_disp);
+			commit_committer_disp = strdup("");
+		}
+
+		error = got_object_commit_get_logmsg(&commit_log0, commit);
+		if (error)
+			goto done;
+
+		switch(log_type) {
+		case (LOGBRIEF):
+			commit_log = commit_log0;
+			while (*commit_log == '\n')
+				commit_log++;
+			newline = strchr(commit_log, '\n');
+			if (newline)
+				*newline = '\0';
+
+			if ((asprintf(&logbriefs_navs_html, logbriefs_navs,
+			    gw_trans->repo_name, id_str1, gw_trans->repo_name,
+			    id_str1, gw_trans->repo_name, id_str1,
+			    gw_trans->repo_name, id_str1)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			if ((asprintf(&commit_row, logbriefs_row,
+			    commit_age_diff, commit_author, commit_log,
+			    logbriefs_navs_html)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			free(logbriefs_navs_html);
+			logbriefs_navs_html = NULL;
+			break;
+		case (LOGFULL):
+			commit_log = commit_log0;
+			while (*commit_log == '\n')
+				commit_log++;
+			newline = strchr(commit_log, '\n');
+			if (newline)
+				*newline = '\n';
+
+			if ((asprintf(&logbriefs_navs_html, logbriefs_navs,
+			    gw_trans->repo_name, id_str1, gw_trans->repo_name,
+			    id_str1, gw_trans->repo_name, id_str1,
+			    gw_trans->repo_name, id_str1)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			if ((asprintf(&commit_row, logs_row, commit_commit_disp,
+			    commit_author_disp, commit_committer_disp,
+			    commit_age_long_disp, gw_html_escape(commit_log),
+			    logbriefs_navs_html)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			free(logbriefs_navs_html);
+			logbriefs_navs_html = NULL;
+			break;
+		case (LOGTREE):
+			commit_log = gw_html_escape(commit_log0);
+
+			log_tree_html = strdup("log tree here");
+
+			if ((asprintf(&commit_row, log_tree_row, commit_log,
+			    log_tree_html)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			free(log_tree_html);
+			break;
+		case (LOGCOMMIT):
+			commit_log = commit_log0;
+			while (*commit_log == '\n')
+				commit_log++;
+			newline = strchr(commit_log, '\n');
+			if (newline)
+				*newline = '\n';
+
+			if ((asprintf(&commit_log_disp, commit_log_html,
+			    gw_html_escape(commit_log))) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			log_commit_html = strdup("commit here");
+
+			if ((asprintf(&commit_row, log_commit_row,
+			    commit_diff_disp, commit_commit_disp,
+			    commit_author_disp, commit_committer_disp,
+			    commit_age_long_disp, commit_log_disp,
+			    log_commit_html)) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(commit_log_disp);
+			free(log_commit_html);
+
+			break;
+		default:
+			return NULL;
+		}
+
+		error = buf_append(&newsize, diffbuf, commit_row,
+		    strlen(commit_row));
+
+		free(commit_parent);
+		free(commit_diff_disp);
+		free(commit_age_diff);
+		free(commit_age_diff_disp);
+		free(commit_age_long);
+		free(commit_age_long_disp);
+		free(commit_author);
+		free(commit_author_disp);
+		free(commit_committer);
+		free(commit_committer_disp);
+		free(commit_log0);
+		free(commit_row);
+		free(refs_str_disp);
+		free(refs_str);
+		refs_str = NULL;
+		free(id_str1);
+		id_str1 = NULL;
+		free(id_str2);
+		id_str2 = NULL;
+
 		if (error || (limit && --limit == 0))
 			break;
 	}
-	logbriefs = strdup(diffbuf->cb_buf);
-	got_object_commit_close(commit);
 
-	free(path);
-	free(id);
+	if (error)
+		goto done;
+
+	logs = strdup(diffbuf->cb_buf);
+done:
 	buf_free(diffbuf);
-
+	if (commit != NULL)
+		got_object_commit_close(commit);
+	if (search_pattern)
+		regfree(&regex);
+	if (graph)
+		got_commit_graph_close(graph);
 	if (repo) {
 		error = got_repo_close(repo);
 		if (error != NULL)
 			return NULL;
 	}
-
-	if (search_pattern)
-		regfree(&regex);
-	return logbriefs;
-done:
-	if (repo)
-		got_repo_close(repo);
-	got_ref_list_free(&refs);
-
-	if (search_pattern)
-		regfree(&regex);
-	got_commit_graph_close(graph);
-	return NULL;
+	if (error) {
+		khttp_puts(gw_trans->gw_req, "Error: ");
+		khttp_puts(gw_trans->gw_req, error->msg);
+		return NULL;
+	} else
+		return logs;
 }
 
 static char *
@@ -1508,6 +1740,8 @@ gw_html_escape(const char *html)
 			break;
 		case ('\n'):
 			strcat(buf, "<br />");
+		case ('|'):
+			strcat(buf, " ");
 		default:
 			strcat(buf, &c[0]);
 			break;
@@ -1561,6 +1795,7 @@ main()
 	gw_trans->repos_total = 0;
 	gw_trans->repo_path = NULL;
 	gw_trans->commit = NULL;
+	gw_trans->headref = strdup(GOT_REF_HEAD);
 	gw_trans->mime = KMIME_TEXT_HTML;
 	gw_trans->gw_tmpl->key = templs;
 	gw_trans->gw_tmpl->keysz = TEMPL__MAX;
@@ -1597,6 +1832,7 @@ done:
 		free(gw_trans->repo_name);
 		free(gw_trans->repo_file);
 		free(gw_trans->action_name);
+		free(gw_trans->headref);
 
 		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
 			free(dir->name);
