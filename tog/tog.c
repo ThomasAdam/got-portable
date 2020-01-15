@@ -1452,29 +1452,6 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 }
 
 static const struct got_error *
-get_head_commit_id(struct got_object_id **head_id, const char *branch_name,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_reference *head_ref;
-
-	*head_id = NULL;
-
-	err = got_ref_open(&head_ref, repo, branch_name, 0);
-	if (err)
-		return err;
-
-	err = got_ref_resolve(head_id, repo, head_ref);
-	got_ref_close(head_ref);
-	if (err) {
-		*head_id = NULL;
-		return err;
-	}
-
-	return NULL;
-}
-
-static const struct got_error *
 draw_commits(struct tog_view *view, struct commit_queue_entry **last,
     struct commit_queue_entry **selected, struct commit_queue_entry *first,
     struct commit_queue *commits, int selected_idx, int limit,
@@ -2410,8 +2387,9 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
 		if (lv == NULL)
 			return got_error_from_errno("view_open");
-		err = get_head_commit_id(&start_id, s->head_ref_name ?
-		    s->head_ref_name : GOT_REF_HEAD, s->repo);
+		err = got_repo_resolve_commit_arg(&start_id,
+		    s->head_ref_name ?  s->head_ref_name : GOT_REF_HEAD,
+		    s->repo);
 		if (err) {
 			view_close(lv);
 			return err;
@@ -2592,18 +2570,12 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	if (start_commit == NULL)
-		error = get_head_commit_id(&start_id, worktree ?
+		error = got_repo_resolve_commit_arg(&start_id, worktree ?
 		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
 		    repo);
-	else {
-		error = get_head_commit_id(&start_id, start_commit, repo);
-		if (error) {
-			if (error->code != GOT_ERR_NOT_REF)
-				goto done;
-			error = got_repo_match_object_id_prefix(&start_id,
-			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
-		}
-	}
+	else
+		error = got_repo_resolve_commit_arg(&start_id, start_commit,
+		    repo);
 	if (error != NULL)
 		goto done;
 
@@ -4250,13 +4222,8 @@ cmd_blame(int argc, char *argv[])
 		error = got_ref_resolve(&commit_id, repo, head_ref);
 		got_ref_close(head_ref);
 	} else {
-		error = get_head_commit_id(&commit_id, commit_id_str, repo);
-		if (error) {
-			if (error->code != GOT_ERR_NOT_REF)
-				goto done;
-			error = got_repo_match_object_id_prefix(&commit_id,
-			    commit_id_str, GOT_OBJ_TYPE_COMMIT, repo);
-		}
+		error = got_repo_resolve_commit_arg(&commit_id, commit_id_str,
+		    repo);
 	}
 	if (error != NULL)
 		goto done;
@@ -5043,17 +5010,8 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (commit_id_arg == NULL)
-		error = get_head_commit_id(&commit_id, GOT_REF_HEAD, repo);
-	else {
-		error = get_head_commit_id(&commit_id, commit_id_arg, repo);
-		if (error) {
-			if (error->code != GOT_ERR_NOT_REF)
-				goto done;
-			error = got_repo_match_object_id_prefix(&commit_id,
-			    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
-		}
-	}
+	error = got_repo_resolve_commit_arg(&commit_id,
+	    commit_id_arg ? commit_id_arg : GOT_REF_HEAD, repo);
 	if (error != NULL)
 		goto done;
 

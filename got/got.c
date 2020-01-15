@@ -956,39 +956,6 @@ done:
 }
 
 static const struct got_error *
-resolve_commit_arg(struct got_object_id **commit_id,
-    const char *commit_id_arg, struct got_repository *repo)
-{
-	const struct got_error *err;
-	struct got_reference *ref;
-	struct got_tag_object *tag;
-
-	err = got_repo_object_match_tag(&tag, commit_id_arg,
-	    GOT_OBJ_TYPE_COMMIT, repo);
-	if (err == NULL) {
-		*commit_id = got_object_id_dup(
-		    got_object_tag_get_object_id(tag));
-		if (*commit_id == NULL)
-			err = got_error_from_errno("got_object_id_dup");
-		got_object_tag_close(tag);
-		return err;
-	} else if (err->code != GOT_ERR_NO_OBJ)
-		return err;
-
-	err = got_ref_open(&ref, repo, commit_id_arg, 0);
-	if (err == NULL) {
-		err = got_ref_resolve(commit_id, repo, ref);
-		got_ref_close(ref);
-	} else {
-		if (err->code != GOT_ERR_NOT_REF)
-			return err;
-		err = got_repo_match_object_id_prefix(commit_id,
-		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, repo);
-	}
-	return err;
-}
-
-static const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1140,7 +1107,8 @@ cmd_checkout(int argc, char *argv[])
 
 	if (commit_id_str) {
 		struct got_object_id *commit_id;
-		error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+		error = got_repo_resolve_commit_arg(&commit_id,
+		    commit_id_str, repo);
 		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id,
@@ -1379,7 +1347,8 @@ cmd_update(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+		error = got_repo_resolve_commit_arg(&commit_id,
+		    commit_id_str, repo);
 		free(commit_id_str);
 		commit_id_str = NULL;
 		if (error)
@@ -2722,7 +2691,8 @@ cmd_blame(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+		error = got_repo_resolve_commit_arg(&commit_id,
+		    commit_id_str, repo);
 		if (error)
 			goto done;
 	}
@@ -3026,7 +2996,8 @@ cmd_tree(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
-		error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+		error = got_repo_resolve_commit_arg(&commit_id,
+		    commit_id_str, repo);
 		if (error)
 			goto done;
 	}
@@ -3666,7 +3637,8 @@ cmd_branch(int argc, char *argv[])
 			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
-		error = resolve_commit_arg(&commit_id, commit_id_arg, repo);
+		error = got_repo_resolve_commit_arg(&commit_id,
+		    commit_id_arg, repo);
 		if (error)
 			goto done;
 		error = add_branch(repo, argv[0], commit_id);
@@ -7388,7 +7360,7 @@ cmd_cat(int argc, char *argv[])
 
 	if (commit_id_str == NULL)
 		commit_id_str = GOT_REF_HEAD;
-	error = resolve_commit_arg(&commit_id, commit_id_str, repo);
+	error = got_repo_resolve_commit_arg(&commit_id, commit_id_str, repo);
 	if (error)
 		goto done;
 

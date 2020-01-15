@@ -94,6 +94,14 @@ const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
 const struct got_error *got_repo_object_match_tag(struct got_tag_object **,
     const char *, int, struct got_repository *);
 
+/*
+ * Given an object ID string or reference name argument,
+ * attempt to find a corresponding commit object.
+ * Return GOT_ERR_NO_OBJ if no matching commit can be found.
+ */
+const struct got_error *got_repo_resolve_commit_arg(struct got_object_id **,
+    const char *, struct got_repository *);
+
 /* A callback function which is invoked when a path is imported. */
 typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);
 
