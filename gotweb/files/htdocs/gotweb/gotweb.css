@@ -32,6 +32,24 @@ body {
 	padding: 0;
 	font-family: Arial, sans-serif;
 }
+
+.diff_minus, .diff_submodule {
+	color: magenta;
+}
+.diff_plus, .diff_symlink, .diff_author {
+	color: darkcyan;
+}
+.diff_chunk_header, .diff_date {
+	background-color: LightSlateGray;
+	color: yellow;
+}
+.diff_meta, .diff_executable, .diff_commit {
+	color: green;
+}
+.diff_directory {
+	color: blue;
+}
+
 #dotted_line {
 	clear: left;
 	float: left;
@@ -521,6 +539,58 @@ body {
 	font-family: monospace;
 }
 
+/* blame.tmpl */
+
+#log_blame_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#log_blame_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#log_blame_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#log_blame_row_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#log_blame_commit {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+}
+#log_blame {
+	clear: left;
+	float: left;
+	padding: 20px;
+	font-family: monospace;
+}
+#blame_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#blame_id {
+	float: left;
+	padding: 2px;
+}
+#blame {
+	float:left ;
+	padding: 2px;
+}
+
 /* tree.tmpl */
 
 #log_tree_title_wrapper {
@@ -649,6 +719,7 @@ body {
 	float: left;
 	padding: 20px;
 	font-family: monospace;
+	white-space: pre;
 }
 
 /* summary.tmpl */

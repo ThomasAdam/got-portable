@@ -1,5 +1,5 @@
 CPPFLAGS += -DGOT_LIBEXECDIR=${LIBEXECDIR} -DGOT_VERSION=${GOT_VERSION}
-CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
+#CFLAGS += -Werror -Wall -Wstrict-prototypes -Wunused-variable
 #CFLAGS += -DGOT_PACK_NO_MMAP
 #CFLAGS += -DGOT_NO_OBJ_CACHE
 #CFLAGS += -DGOT_OBJ_CACHE_DEBUG
@@ -38,6 +38,7 @@ LIBEXEC_DIR =	${CHROOT_DIR}${LIBEXECDIR}
 ETC_DIR =	${CHROOT_DIR}/etc
 EXPL_DIR =	${ETC_DIR}/examples
 HTTPD_DIR =	${CHROOT_DIR}/htdocs
+TMP_DIR =	${CHROOT_DIR}/tmp
 PROG_DIR =	${HTTPD_DIR}/${PROG}
 CGI_DIR =	${CHROOT_DIR}${GOTWEB_DIR}
 TMPL_DIR =	${CGI_DIR}/gw_tmpl

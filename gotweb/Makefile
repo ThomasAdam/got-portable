@@ -41,6 +41,9 @@ realinstall:
 	if [ ! -d ${HTTPD_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
 	fi
+	if [ ! -d ${TMP_DIR}/. ]; then \
+		${INSTALL} -d -o www -g www -m 755 ${TMP_DIR}; \
+	fi
 	if [ ! -d ${PROG_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${PROG_DIR}; \
 	fi

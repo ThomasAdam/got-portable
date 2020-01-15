@@ -62,6 +62,9 @@ char *np_wrapper_start =
 	"<div id='np_wrapper'>" \
 	"<div id='nav_prev'>";
 
+char *div_diff_line =
+	"<div id='diff_line' class='%s'>";
+
 char *div_end =
 	"</div>";
 
@@ -102,7 +105,7 @@ char *logbriefs_row =
 	"<div id='dotted_line'></div>";
 
 char *logbriefs_navs =
-	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	/* "<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \ */
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
@@ -121,14 +124,14 @@ char *tags_row =
 
 char *tags_navs =
 	"<a href='?path=%s&action=tag&commit=%s'>tag</a> | " \
-	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	/* "<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \ */
 	"<a href='?path=%s&action=logbriefs&commit=%s'>log briefs</a> | " \
 	"<a href='?path=%s&action=log&commit=%s'>log</a>";
 
 char *trees_row =
 	"<div id='tree_wrapper'>" \
 	"<div id='tree_id'>%s</div>" \
-	"<div id='tree'>%s%s</div>" \
+	"<div id='tree'>%s</div>" \
 	"</div>";
 
 char *heads_row =
@@ -145,8 +148,8 @@ char *heads_row =
 char *heads_navs =
 	"<a href='?path=%s&action=summary&headref=%s'>summary</a> | " \
 	"<a href='?path=%s&action=logbriefs&headref=%s'>log briefs</a> | " \
-	"<a href='?path=%s&action=log&headref=%s'>log</a> | " \
-	"<a href='?path=%s&action=commit&headref=%s'>commit</a>";
+	"<a href='?path=%s&action=log&headref=%s'>log</a> | ";
+	/* "<a href='?path=%s&action=commit&headref=%s'>commit</a>"; */
 
 char *commit_diff_html =
 	"<div id='commit_diff_title'>Diff:</div>" \
@@ -176,6 +179,13 @@ char *commit_tree_html =
 	"<div id='commit_log_title'>Tree:</div>" \
 	"<div id='commit_log'>%s</div>";
 
+char *folder_html =
+	"<a href='?path=%s&action=%s&commit=%s&folder=%s' " \
+	    "class='diff_directory'>%s%s</a>";
+
+char *file_html =
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s%s</a>";
+
 /* log.tmpl */
 
 char *logs =
@@ -194,7 +204,7 @@ char *logs_row =
 	"<div id='solid_line'></div>";
 
 char *logs_navs =
-	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	/* "<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \ */
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
@@ -214,6 +224,27 @@ char *log_tag_row =
 	"<div id='log_tag'>%s</div>" \
 	"</div>";
 
+/* blame.tmpl */
+
+char *log_blame =
+	"<div id='log_blame_title_wrapper'>" \
+	"<div id='log_blame_title'>blame</div></div>" \
+	"<div id='log_blame_content'>%s</div>";
+
+char *log_blame_row =
+	"<div id='log_blame_row_wrapper'>" \
+	"<div id='log_blame_commit'>%s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='log_blame'>%s</div>" \
+	"</div>";
+
+char *log_blame_navs =
+	/* "<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \ */
+	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
+	"<a href='?path=%s&action=blame&commit=%s'>blame</a><!--/* | " \
+	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
+
 /* tree.tmpl */
 
 char *log_tree =
@@ -230,7 +261,7 @@ char *log_tree_row =
 	"</div>";
 
 char *log_tree_navs =
-	"<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \
+	/* "<a href='?path=%s&action=commit&commit=%s'>commit</a> | " \ */
 	"<a href='?path=%s&action=commitdiff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
