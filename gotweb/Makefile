@@ -13,7 +13,8 @@ SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
 		deflate.c object_create.c delta_cache.c
 MAN =		${PROG}.conf.5
 
-CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${PREFIX}/include
+CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \
+		-I${PREFIX}/include
 
 LDADD +=	-L${PREFIX}/lib -static -lkcgihtml -lkcgi -lz -lutil
 

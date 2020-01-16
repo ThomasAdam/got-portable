@@ -6,7 +6,7 @@ SUBDIR = libexec got tog
 SUBDIR += regress
 .endif
 
-.if make(clean)
+.if make(clean) || make(obj)
 SUBDIR += gotweb
 .endif
 
