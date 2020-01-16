@@ -267,6 +267,12 @@ gw_blame(struct gw_trans *gw_trans)
 
 	char *log, *log_html;
 
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
+
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
@@ -289,6 +295,12 @@ gw_commit(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
+
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
@@ -310,6 +322,12 @@ gw_commitdiff(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
+
+	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -334,6 +352,12 @@ gw_index(struct gw_trans *gw_trans)
 	struct gw_dir *gw_dir = NULL;
 	char *html, *navs, *next, *prev;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
+
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
 
 	error = gw_apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
 	if (error)
@@ -425,6 +449,12 @@ gw_log(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
+
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
@@ -456,6 +486,12 @@ gw_logbriefs(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
+
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
@@ -481,6 +517,12 @@ gw_summary(struct gw_trans *gw_trans)
 	char *description_html, *repo_owner_html, *repo_age_html,
 	     *cloneurl_html, *log, *log_html, *tags, *heads, *tags_html,
 	     *heads_html, *age;
+
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -576,6 +618,12 @@ gw_tag(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *log, *log_html;
 
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
+
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
@@ -597,6 +645,12 @@ gw_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *log, *log_html;
+
+	if (pledge("stdio rpath proc exec sendfd unveil",
+	    NULL) == -1) {
+		error = got_error_from_errno("pledge");
+		return error;
+	}
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
@@ -2651,12 +2705,6 @@ main(int argc, char *argv[])
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
 		gw_malloc = 0;
 		error = got_error_from_errno("malloc");
-		goto err;
-	}
-
-	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
 		goto err;
 	}
 

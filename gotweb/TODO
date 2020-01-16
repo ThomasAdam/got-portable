@@ -11,5 +11,3 @@ TODO
 
 - Redo index header, so columns are removed when content is set to not display
   in gotweb.conf.
-
-- Move pledge to each function. Only diffing needs wpath and cpath.
