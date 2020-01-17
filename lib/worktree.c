@@ -1743,6 +1743,7 @@ sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
 	const struct got_error *err = NULL;
 	char *new_fileindex_path = NULL;
 	FILE *new_index = NULL;
+	struct timespec timeout;
 
 	err = got_opentemp_named(&new_fileindex_path, &new_index,
 	    fileindex_path);
@@ -1758,6 +1759,15 @@ sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
 		    fileindex_path);
 		unlink(new_fileindex_path);
 	}
+
+	/*
+	 * Sleep for a short amount of time to ensure that files modified after
+	 * this program exits have a different time stamp from the one which
+	 * was recorded in the file index.
+	 */
+	 timeout.tv_sec = 0;
+	 timeout.tv_nsec = 1;
+	 nanosleep(&timeout,  NULL);
 done:
 	if (new_index)
 		fclose(new_index);
