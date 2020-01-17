@@ -148,7 +148,7 @@ function test_tag_list {
 		> $testroot/stdout.expected
 	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
-	echo "date: $d1" >> $testroot/stdout.expected
+	echo "date: $d2" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	echo " test" >> $testroot/stdout.expected
@@ -157,7 +157,7 @@ function test_tag_list {
 		>> $testroot/stdout.expected
 	echo "tag $tag $tag_id" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
-	echo "date: $d2" >> $testroot/stdout.expected
+	echo "date: $d1" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	echo " test" >> $testroot/stdout.expected
@@ -195,7 +195,7 @@ function test_tag_list_lightweight {
 		> $testroot/stdout.expected
 	echo "tag $tag2 $tag_id2" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
-	echo "date: $d1" >> $testroot/stdout.expected
+	echo "date: $d2" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	echo " adding the test tree" >> $testroot/stdout.expected
@@ -204,7 +204,7 @@ function test_tag_list_lightweight {
 		>> $testroot/stdout.expected
 	echo "tag $tag $tag_id" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
-	echo "date: $d2" >> $testroot/stdout.expected
+	echo "date: $d1" >> $testroot/stdout.expected
 	echo "object: commit $commit_id" >> $testroot/stdout.expected
 	echo " " >> $testroot/stdout.expected
 	echo " adding the test tree" >> $testroot/stdout.expected
