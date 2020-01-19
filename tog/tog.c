@@ -747,15 +747,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	*focus = NULL;
 
 	if (view->searching && !view->search_next_done) {
-		errcode = pthread_mutex_unlock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_unlock");
-		pthread_yield();
-		errcode = pthread_mutex_lock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_lock");
 		view->search_next(view);
 		return NULL;
 	}
@@ -1638,16 +1629,6 @@ trigger_log_thread(int load_all, int *commits_needed, int *log_complete,
 		if (errcode)
 			return got_error_set_errno(errcode,
 			    "pthread_cond_signal");
-		errcode = pthread_mutex_unlock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_unlock");
-		pthread_yield();
-		errcode = pthread_mutex_lock(&tog_mutex);
-		if (errcode)
-			return got_error_set_errno(errcode,
-			    "pthread_mutex_lock");
-
 		if (*commits_needed > 0 && (!load_all || --max_wait <= 0)) {
 			/*
 			 * Thread is not done yet; lose a key press
