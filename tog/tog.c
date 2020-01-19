@@ -3635,8 +3635,6 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 	err = got_object_id_by_path(&obj_id, repo, commit_id, path);
 	if (err)
 		return err;
-	if (obj_id == NULL)
-		return got_error(GOT_ERR_NO_OBJ);
 
 	err = got_object_get_type(&obj_type, repo, obj_id);
 	if (err)

@@ -2640,10 +2640,6 @@ cmd_blame(int argc, char *argv[])
 	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
 	if (error)
 		goto done;
-	if (obj_id == NULL) {
-		error = got_error(GOT_ERR_NO_OBJ);
-		goto done;
-	}
 
 	error = got_object_get_type(&obj_type, repo, obj_id);
 	if (error)
