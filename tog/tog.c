@@ -1424,10 +1424,6 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 
 		if (*searching == TOG_SEARCH_FORWARD && !*search_next_done) {
 			err = match_commit(&have_match, id, commit, regex);
-			if (err) {
-				pthread_mutex_lock(&tog_mutex);
-				break;
-			}
 		}
 
 		errcode = pthread_mutex_unlock(&tog_mutex);
@@ -1435,7 +1431,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			err = got_error_set_errno(errcode,
 			    "pthread_mutex_unlock");
 
-		if (have_match)
+		if (err || have_match)
 			break;
 	}
 
