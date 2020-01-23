@@ -3,11 +3,11 @@ TODO
 - Add Prev/Next to shortlogs/logs that have more entries than
   got_max_commits_display
 
-- Alter gw_get_repo_log full_log int to type more logs output for other options,
-  such as header displays for commit, commit_diff, etc.
-
-- Discuss how much of the gitweb functionality we really need or want. A user
-  can really go down an endless rabbit hole. Is it all worthwhile?
-
 - Redo index header, so columns are removed when content is set to not display
   in gotweb.conf.
+
+- Massage ALL error returns. There are some examples in the code already, but
+  let's be consistent.
+
+- Integrate kcgi error codes. Hard fail or report error? Perhaps reporting is a
+  security flaw and hard fail is the better design.

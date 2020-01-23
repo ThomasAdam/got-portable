@@ -54,7 +54,8 @@
 #endif
 
 struct gw_trans {
-	TAILQ_HEAD(dirs, gw_dir) gw_dirs;
+	TAILQ_HEAD(headers, gw_header)	 gw_headers;
+	TAILQ_HEAD(dirs, gw_dir)	 gw_dirs;
 	struct gw_dir		*gw_dir;
 	struct gotweb_conf	*gw_conf;
 	struct ktemplate	*gw_tmpl;
@@ -73,15 +74,22 @@ struct gw_trans {
 	enum kmime		 mime;
 };
 
-enum gw_key {
-	KEY_ACTION,
-	KEY_COMMIT_ID,
-	KEY_FILE,
-	KEY_FOLDER,
-	KEY_HEADREF,
-	KEY_PAGE,
-	KEY_PATH,
-	KEY__ZMAX
+struct gw_header {
+	TAILQ_ENTRY(gw_header)		 entry;
+	struct got_repository		*repo;
+	struct got_reflist_head		 refs;
+	struct got_commit_object	*commit;
+	struct got_object_id		*id;
+	char				*path;
+
+	char			*refs_str;
+	char			*commit_id; /* id_str1 */
+	char			*parent_id; /* id_str2 */
+	char			*tree_id;
+	char			*author;
+	char			*committer;
+	char			*commit_msg;
+	time_t			 committer_time;
 };
 
 struct gw_dir {
@@ -94,14 +102,25 @@ struct gw_dir {
 	char			*path;
 };
 
+enum gw_key {
+	KEY_ACTION,
+	KEY_COMMIT_ID,
+	KEY_FILE,
+	KEY_FOLDER,
+	KEY_HEADREF,
+	KEY_PAGE,
+	KEY_PATH,
+	KEY__ZMAX
+};
+
 enum gw_tmpl {
+	TEMPL_CONTENT,
 	TEMPL_HEAD,
 	TEMPL_HEADER,
+	TEMPL_SEARCH,
 	TEMPL_SITEPATH,
 	TEMPL_SITEOWNER,
 	TEMPL_TITLE,
-	TEMPL_SEARCH,
-	TEMPL_CONTENT,
 	TEMPL__MAX
 };
 
@@ -110,29 +129,19 @@ enum gw_ref_tm {
 	TM_LONG,
 };
 
-enum gw_logs {
-	LOGBRIEF,
-	LOGCOMMIT,
-	LOGFULL,
-	LOGTREE,
-	LOGDIFF,
-	LOGBLAME,
-	LOGTAG,
-};
-
 enum gw_tags {
 	TAGBRIEF,
 	TAGFULL,
 };
 
 static const char *const gw_templs[TEMPL__MAX] = {
+	"content",
 	"head",
 	"header",
+	"search",
 	"sitepath",
 	"siteowner",
 	"title",
-	"search",
-	"content",
 };
 
 static const struct kvalid gw_keys[KEY__ZMAX] = {
@@ -146,6 +155,7 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 };
 
 static struct gw_dir		*gw_init_gw_dir(char *);
+static struct gw_header		*gw_init_header(void);
 
 static char			*gw_get_repo_description(struct gw_trans *,
 				    char *);
@@ -154,12 +164,10 @@ static char			*gw_get_repo_owner(struct gw_trans *,
 static char			*gw_get_time_str(time_t, int);
 static char			*gw_get_repo_age(struct gw_trans *,
 				    char *, char *, int);
-static char			*gw_get_repo_log(struct gw_trans *,
-				    const char *, char *, int, int);
-static char			*gw_get_file_blame(struct gw_trans *, char *);
-static char			*gw_get_repo_tree(struct gw_trans *, char *);
-static char			*gw_get_repo_diff(struct gw_trans *, char *,
-				    char *);
+static char			*gw_get_file_blame(struct gw_trans *);
+static char			*gw_get_repo_tree(struct gw_trans *);
+static char			*gw_get_diff(struct gw_trans *,
+				    struct gw_header *);
 static char			*gw_get_repo_tags(struct gw_trans *, int, int);
 static char			*gw_get_repo_heads(struct gw_trans *);
 static char			*gw_get_clone_url(struct gw_trans *, char *);
@@ -168,6 +176,15 @@ static char			*gw_get_site_link(struct gw_trans *);
 static char			*gw_html_escape(const char *);
 static char			*gw_colordiff_line(char *);
 
+static char			*gw_gen_commit_header(char *, char*);
+static char			*gw_gen_diff_header(char *, char*);
+static char			*gw_gen_author_header(char *);
+static char			*gw_gen_committer_header(char *);
+static char			*gw_gen_age_header(char *);
+static char			*gw_gen_commit_msg_header(char *);
+static char			*gw_gen_tree_header(char *);
+
+static void			 gw_free_headers(struct gw_header *);
 static void			 gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
 static void			 gw_display_index(struct gw_trans *,
@@ -175,6 +192,12 @@ static void			 gw_display_index(struct gw_trans *,
 
 static int			 gw_template(size_t, void *);
 
+static const struct got_error*	 gw_get_header(struct gw_trans *,
+				    struct gw_header *, int);
+static const struct got_error*	 gw_get_commits(struct gw_trans *,
+				    struct gw_header *, int);
+static const struct got_error*	 gw_get_commit(struct gw_trans *,
+				    struct gw_header *);
 static const struct got_error*	 gw_apply_unveil(const char *, const char *);
 static const struct got_error*	 gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
@@ -182,18 +205,13 @@ static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
 static const struct got_error*	 gw_load_got_path(struct gw_trans *,
 				    struct gw_dir *);
 static const struct got_error*	 gw_parse_querystring(struct gw_trans *);
-static const struct got_error*	 gw_match_logmsg(int *, struct got_object_id *,
-				    struct got_commit_object *, regex_t *);
 
 static const struct got_error*	 gw_blame(struct gw_trans *);
-static const struct got_error*	 gw_commit(struct gw_trans *);
-static const struct got_error*	 gw_commitdiff(struct gw_trans *);
+static const struct got_error*	 gw_diff(struct gw_trans *);
 static const struct got_error*	 gw_index(struct gw_trans *);
-static const struct got_error*	 gw_log(struct gw_trans *);
-static const struct got_error*	 gw_raw(struct gw_trans *);
-static const struct got_error*	 gw_logbriefs(struct gw_trans *);
+static const struct got_error*	 gw_commits(struct gw_trans *);
+static const struct got_error*	 gw_briefs(struct gw_trans *);
 static const struct got_error*	 gw_summary(struct gw_trans *);
-static const struct got_error*	 gw_tag(struct gw_trans *);
 static const struct got_error*	 gw_tree(struct gw_trans *);
 
 struct gw_query_action {
@@ -205,30 +223,24 @@ struct gw_query_action {
 
 enum gw_query_actions {
 	GW_BLAME,
-	GW_COMMIT,
-	GW_COMMITDIFF,
+	GW_BRIEFS,
+	GW_COMMITS,
+	GW_DIFF,
 	GW_ERR,
 	GW_INDEX,
-	GW_LOG,
-	GW_RAW,
-	GW_LOGBRIEFS,
 	GW_SUMMARY,
-	GW_TAG,
 	GW_TREE,
 };
 
 static struct gw_query_action gw_query_funcs[] = {
-	{ GW_BLAME,	 "blame",	gw_blame,	"gw_tmpl/index.tmpl" },
-	{ GW_COMMIT,	 "commit",	gw_commit,	"gw_tmpl/index.tmpl" },
-	{ GW_COMMITDIFF, "commitdiff",	gw_commitdiff,	"gw_tmpl/index.tmpl" },
-	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/index.tmpl" },
-	{ GW_INDEX,	 "index",	gw_index,	"gw_tmpl/index.tmpl" },
-	{ GW_LOG,	 "log",		gw_log,		"gw_tmpl/index.tmpl" },
-	{ GW_RAW,	 "raw",		gw_raw,		"gw_tmpl/index.tmpl" },
-	{ GW_LOGBRIEFS,	 "logbriefs",	gw_logbriefs,	"gw_tmpl/index.tmpl" },
-	{ GW_SUMMARY,	 "summary",	gw_summary,	"gw_tmpl/index.tmpl" },
-	{ GW_TAG,	 "tag",		gw_tag,		"gw_tmpl/index.tmpl" },
-	{ GW_TREE,	 "tree",	gw_tree,	"gw_tmpl/index.tmpl" },
+	{ GW_BLAME,	"blame",	gw_blame,	"gw_tmpl/blame.tmpl" },
+	{ GW_BRIEFS,	"briefs",	gw_briefs,	"gw_tmpl/briefs.tmpl" },
+	{ GW_COMMITS,	"commits",	gw_commits,	"gw_tmpl/commit.tmpl" },
+	{ GW_DIFF,	"diff",		gw_diff,	"gw_tmpl/diff.tmpl" },
+	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/err.tmpl" },
+	{ GW_INDEX,	"index",	gw_index,	"gw_tmpl/index.tmpl" },
+	{ GW_SUMMARY,	"summary",	gw_summary,	"gw_tmpl/summry.tmpl" },
+	{ GW_TREE,	"tree",		gw_tree,	"gw_tmpl/tree.tmpl" },
 };
 
 static const struct got_error *
@@ -264,84 +276,94 @@ static const struct got_error *
 gw_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-
-	char *log, *log_html;
+	struct gw_header *header = NULL;
+	char *blame = NULL, *blame_html = NULL, *blame_html_disp = NULL;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
+	    NULL) == -1)
+		return got_error_from_errno("pledge");
+
+	if ((header = gw_init_header()) == NULL)
+		return got_error_from_errno("malloc");
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGBLAME);
+	error = gw_get_header(gw_trans, header, 1);
+	if (error)
+		return error;
 
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_blame, log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
+	blame_html = gw_get_file_blame(gw_trans);
+
+	if (blame_html == NULL)
+		blame_html = strdup("");
+
+	if ((asprintf(&blame_html_disp, blame_header,
+	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
+	    blame_html)) == -1)
+		return got_error_from_errno("asprintf");
+
+	if ((asprintf(&blame, blame_wrapper, blame_html_disp)) == -1)
+		return got_error_from_errno("asprintf");
+
+	khttp_puts(gw_trans->gw_req, blame);
+	got_ref_list_free(&header->refs);
+	gw_free_headers(header);
+	free(blame_html_disp);
+	free(blame_html);
+	free(blame);
 	return error;
 }
 
 static const struct got_error *
-gw_commit(struct gw_trans *gw_trans)
+gw_diff(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *log, *log_html;
-
-	if (pledge("stdio rpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
-
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
-	if (error)
-		return error;
-
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGCOMMIT);
-
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_commit, log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
-	return error;
-}
-
-static const struct got_error *
-gw_commitdiff(struct gw_trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-	char *log, *log_html;
+	struct gw_header *header = NULL;
+	char *diff = NULL, *diff_html = NULL, *diff_html_disp = NULL;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
+	    NULL) == -1)
+		return got_error_from_errno("pledge");
+
+	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+		return got_error_from_errno("malloc");
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGDIFF);
+	error = gw_get_header(gw_trans, header, 1);
+	if (error)
+		return error;
 
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_diff, log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
+	diff_html = gw_get_diff(gw_trans, header);
+
+	if (diff_html == NULL)
+		diff_html = strdup("");
+
+	if ((asprintf(&diff_html_disp, diff_header,
+	    gw_gen_diff_header(header->commit_id, header->parent_id),
+	    gw_gen_commit_header(header->commit_id, header->refs_str),
+	    gw_gen_tree_header(header->tree_id),
+	    gw_gen_author_header(header->author),
+	    gw_gen_committer_header(header->committer),
+	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
+	    diff_html)) == -1)
+		return got_error_from_errno("asprintf");
+
+	if ((asprintf(&diff, diff_wrapper, diff_html_disp)) == -1)
+		return got_error_from_errno("asprintf");
+
+	khttp_puts(gw_trans->gw_req, diff);
+	got_ref_list_free(&header->refs);
+	gw_free_headers(header);
+	free(diff_html_disp);
+	free(diff_html);
+	free(diff);
 	return error;
 }
 
@@ -380,6 +402,9 @@ gw_index(struct gw_trans *gw_trans)
 		}
 
 		prev_disp++;
+
+		if (error)
+			return error;
 		if((asprintf(&navs, index_navs, gw_dir->name, gw_dir->name,
 		    gw_dir->name, gw_dir->name)) == -1)
 			return got_error_from_errno("asprintf");
@@ -444,10 +469,14 @@ gw_index(struct gw_trans *gw_trans)
 }
 
 static const struct got_error *
-gw_log(struct gw_trans *gw_trans)
+gw_commits(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *log, *log_html;
+	char *commits_html, *commits_navs_html;
+	struct gw_header *header = NULL, *n_header = NULL;
+
+	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+		return got_error_from_errno("malloc");
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
@@ -459,32 +488,46 @@ gw_log(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit,
-	    gw_trans->gw_conf->got_max_commits_display, LOGFULL);
+	error = gw_get_header(gw_trans, header,
+	    gw_trans->gw_conf->got_max_commits_display);
 
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, logs, log)) == -1)
+	khttp_puts(gw_trans->gw_req, commits_wrapper);
+	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
+		if ((asprintf(&commits_navs_html, commits_navs,
+		    gw_trans->repo_name, n_header->commit_id,
+		    gw_trans->repo_name, n_header->commit_id,
+		    gw_trans->repo_name, n_header->commit_id)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
+
+		if ((asprintf(&commits_html, commits_line,
+	    	    gw_gen_commit_header(n_header->commit_id,
+		        n_header->refs_str),
+	    	    gw_gen_author_header(n_header->author),
+	    	    gw_gen_committer_header(n_header->committer),
+		    gw_gen_age_header(gw_get_time_str(n_header->committer_time,
+		        TM_LONG)), gw_html_escape(n_header->commit_msg),
+		    commits_navs_html)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, commits_html);
 	}
+	khttp_puts(gw_trans->gw_req, div_end);
+
+	got_ref_list_free(&header->refs);
+	gw_free_headers(header);
+	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
+		gw_free_headers(n_header);
 	return error;
 }
 
 static const struct got_error *
-gw_raw(struct gw_trans *gw_trans)
+gw_briefs(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
+	char *briefs_html = NULL, *briefs_navs_html = NULL, *newline;
+	struct gw_header *header = NULL, *n_header = NULL;
 
-	return error;
-}
-
-static const struct got_error *
-gw_logbriefs(struct gw_trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-	char *log, *log_html;
+	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+		return got_error_from_errno("malloc");
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
@@ -496,17 +539,35 @@ gw_logbriefs(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit,
-	    gw_trans->gw_conf->got_max_commits_display, LOGBRIEF);
+	if (gw_trans->action == GW_SUMMARY)
+		error = gw_get_header(gw_trans, header, D_MAXSLCOMMDISP);
+	else
+		error = gw_get_header(gw_trans, header,
+		    gw_trans->gw_conf->got_max_commits_display);
 
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, summary_logbriefs,
-		    log)) == -1)
+	khttp_puts(gw_trans->gw_req, briefs_wrapper);
+	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
+		if ((asprintf(&briefs_navs_html, briefs_navs,
+		    gw_trans->repo_name, n_header->commit_id,
+		    gw_trans->repo_name, n_header->commit_id,
+		    gw_trans->repo_name, n_header->commit_id)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
+		newline = strchr(n_header->commit_msg, '\n');
+		if (newline)
+			*newline = '\0';
+		if ((asprintf(&briefs_html, briefs_line,
+		    gw_get_time_str(n_header->committer_time, TM_DIFF),
+		    n_header->author, gw_html_escape(n_header->commit_msg),
+		    briefs_navs_html)) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, briefs_html);
 	}
+	khttp_puts(gw_trans->gw_req, div_end);
+
+	got_ref_list_free(&header->refs);
+	gw_free_headers(header);
+	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
+		gw_free_headers(n_header);
 	return error;
 }
 
@@ -515,7 +576,7 @@ gw_summary(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
-	     *cloneurl_html, *log, *log_html, *tags, *heads, *tags_html,
+	     *cloneurl_html, *tags, *heads, *tags_html,
 	     *heads_html, *age;
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
@@ -524,9 +585,7 @@ gw_summary(struct gw_trans *gw_trans)
 		return error;
 	}
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
-	if (error)
-		return error;
+	/* unveil is applied with gw_briefs below */
 
 	khttp_puts(gw_trans->gw_req, summary_wrapper);
 	if (gw_trans->gw_conf->got_show_repo_description) {
@@ -579,18 +638,12 @@ gw_summary(struct gw_trans *gw_trans)
 	}
 	khttp_puts(gw_trans->gw_req, div_end);
 
-	log = gw_get_repo_log(gw_trans, NULL, NULL, D_MAXSLCOMMDISP, 0);
+	error = gw_briefs(gw_trans);
+	if (error)
+		return error;
+
 	tags = gw_get_repo_tags(gw_trans, D_MAXSLCOMMDISP, TAGBRIEF);
 	heads = gw_get_repo_heads(gw_trans);
-
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, summary_logbriefs,
-		    log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
 		if ((asprintf(&tags_html, summary_tags,
@@ -613,58 +666,46 @@ gw_summary(struct gw_trans *gw_trans)
 }
 
 static const struct got_error *
-gw_tag(struct gw_trans *gw_trans)
-{
-	const struct got_error *error = NULL;
-	char *log, *log_html;
-
-	if (pledge("stdio rpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
-
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
-	if (error)
-		return error;
-
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGTAG);
-
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_tag, log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
-	return error;
-}
-
-static const struct got_error *
 gw_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *log, *log_html;
+	struct gw_header *header = NULL;
+	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
 
-	if (pledge("stdio rpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
+	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+		return got_error_from_errno("pledge");
+
+	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+		return got_error_from_errno("malloc");
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
 		return error;
 
-	log = gw_get_repo_log(gw_trans, NULL, gw_trans->commit, 1, LOGTREE);
+	error = gw_get_header(gw_trans, header, 1);
+	if (error)
+		return error;
 
-	if (log != NULL && strcmp(log, "") != 0) {
-		if ((asprintf(&log_html, log_tree, log)) == -1)
-			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, log_html);
-		free(log_html);
-		free(log);
-	}
+	tree_html = gw_get_repo_tree(gw_trans);
+
+	if (tree_html == NULL)
+		tree_html = strdup("");
+
+	if ((asprintf(&tree_html_disp, tree_header,
+	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
+	    tree_html)) == -1)
+		return got_error_from_errno("asprintf");
+
+	if ((asprintf(&tree, tree_wrapper, tree_html_disp)) == -1)
+		return got_error_from_errno("asprintf");
+
+	khttp_puts(gw_trans->gw_req, tree);
+	got_ref_list_free(&header->refs);
+	gw_free_headers(header);
+	free(tree_html_disp);
+	free(tree_html);
+	free(tree);
 	return error;
 }
 
@@ -859,8 +900,8 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 	if ((p = gw_trans->gw_req->fieldmap[KEY_PAGE]))
 		gw_trans->page = p->parsed.i;
 
-	if (gw_trans->action == GW_RAW)
-		gw_trans->mime = KMIME_TEXT_PLAIN;
+	/* if (gw_trans->action == GW_RAW) */
+	/* 	gw_trans->mime = KMIME_TEXT_PLAIN; */
 
 	return error;
 }
@@ -877,32 +918,6 @@ gw_init_gw_dir(char *dir)
 		return NULL;
 
 	return gw_dir;
-}
-
-static const struct got_error*
-gw_match_logmsg(int *have_match, struct got_object_id *id,
-    struct got_commit_object *commit, regex_t *regex)
-{
-	const struct got_error *err = NULL;
-	regmatch_t regmatch;
-	char *id_str = NULL, *logmsg = NULL;
-
-	*have_match = 0;
-
-	err = got_object_id_str(&id_str, id);
-	if (err)
-		return err;
-
-	err = got_object_commit_get_logmsg(&logmsg, commit);
-	if (err)
-		goto done;
-
-	if (regexec(regex, logmsg, 1, &regmatch, 0) == 0)
-		*have_match = 1;
-done:
-	free(id_str);
-	free(logmsg);
-	return err;
 }
 
 static void
@@ -995,6 +1010,93 @@ gw_template(size_t key, void *arg)
 		break;
 	}
 	return 1;
+}
+
+static char *
+gw_gen_commit_header(char *str1, char *str2)
+{
+	char *return_html = NULL, *ref_str = NULL;
+
+	if (strcmp(str2, "") != 0) {
+		if ((asprintf(&ref_str, "(%s)", str2)) == -1) {
+			return_html = strdup("");
+			return return_html;
+		}
+	} else
+		ref_str = strdup("");
+
+
+	if ((asprintf(&return_html, header_commit_html, str1, ref_str)) == -1)
+		return_html = strdup("");
+
+	free(ref_str);
+	return return_html;
+}
+
+static char *
+gw_gen_diff_header(char *str1, char *str2)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_diff_html, str1, str2)) == -1)
+		return_html = strdup("");
+
+	return return_html;
+}
+
+static char *
+gw_gen_author_header(char *str)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_author_html, str)) == -1)
+		return_html = strdup("");
+
+	return return_html;
+}
+
+static char *
+gw_gen_committer_header(char *str)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_committer_html, str)) == -1)
+		return_html = strdup("");
+
+	return return_html;
+}
+
+static char *
+gw_gen_age_header(char *str)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_age_html, str)) == -1)
+		return_html = strdup("");
+
+	return return_html;
+}
+
+static char *
+gw_gen_commit_msg_header(char *str)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_commit_msg_html, str)) == -1)
+		return_html = strdup("");
+
+	return return_html;
+}
+
+static char *
+gw_gen_tree_header(char *str)
+{
+	char *return_html = NULL;
+
+	if ((asprintf(&return_html, header_tree_html, str)) == -1)
+		return_html = strdup("");
+
+	return return_html;
 }
 
 static char *
@@ -1178,7 +1280,7 @@ err:
 }
 
 static char *
-gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
+gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error;
 	FILE *f = NULL;
@@ -1202,14 +1304,14 @@ gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&id1, &label1, id_str1,
+	error = got_repo_match_object_id(&id1, &label1, header->commit_id,
 	    GOT_OBJ_TYPE_ANY, 1, repo);
 	if (error)
 		goto done;
 
-	if (id_str2) {
-		error = got_repo_match_object_id(&id2, &label2, id_str2,
-		    GOT_OBJ_TYPE_ANY, 1, repo);
+	if (header->parent_id) {
+		error = got_repo_match_object_id(&id2, &label2,
+		    header->parent_id, GOT_OBJ_TYPE_ANY, 1, repo);
 		if (error)
 			goto done;
 
@@ -1222,7 +1324,7 @@ gw_get_repo_diff(struct gw_trans *gw_trans, char *id_str1, char *id_str2)
 	if (error)
 		goto done;
 
-	if (id_str2 && type1 != type2) {
+	if (header->parent_id && type1 != type2) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
@@ -1367,536 +1469,6 @@ gw_get_clone_url(struct gw_trans *gw_trans, char *dir)
 }
 
 static char *
-gw_get_repo_log(struct gw_trans *gw_trans, const char *search_pattern,
-    char *start_commit, int limit, int log_type)
-{
-	const struct got_error *error;
-	struct got_repository *repo = NULL;
-	struct got_reflist_head refs;
-	struct got_reflist_entry *re;
-	struct got_commit_object *commit = NULL;
-	struct got_object_id *id1 = NULL, *id2 = NULL;
-	struct got_object_qid *parent_id;
-	struct got_commit_graph *graph = NULL;
-	char *logs = NULL, *id_str1 = NULL, *id_str2 = NULL, *path = NULL,
-	     *in_repo_path = NULL, *refs_str = NULL, *refs_str_disp = NULL,
-	     *treeid = NULL, *commit_row = NULL, *commit_commit = NULL,
-	     *commit_commit_disp = NULL, *commit_age_diff = NULL,
-	     *commit_age_diff_disp = NULL, *commit_age_long = NULL,
-	     *commit_age_long_disp = NULL, *commit_author = NULL,
-	     *commit_author_disp = NULL, *commit_committer = NULL,
-	     *commit_committer_disp = NULL, *commit_log = NULL,
-	     *commit_log_disp = NULL, *commit_parent = NULL,
-	     *commit_diff_disp = NULL, *logbriefs_navs_html = NULL,
-	     *log_tree_html = NULL, *log_commit_html = NULL,
-	     *log_diff_html = NULL, *commit_tree = NULL,
-	     *commit_tree_disp = NULL, *log_tag_html = NULL,
-	     *log_blame_html = NULL;
-	char *commit_log0, *newline;
-	regex_t regex;
-	int have_match, has_parent = 1;
-	size_t newsize;
-	struct buf *diffbuf = NULL;
-	time_t committer_time;
-
-	error = buf_alloc(&diffbuf, 0);
-	if (error)
-		return NULL;
-
-	if (search_pattern &&
-	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB |
-	    REG_NEWLINE))
-		return NULL;
-
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		return NULL;
-
-	SIMPLEQ_INIT(&refs);
-
-	if (start_commit == NULL) {
-		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
-		if (error)
-			goto done;
-
-		error = got_ref_resolve(&id1, repo, head_ref);
-		got_ref_close(head_ref);
-		if (error)
-			goto done;
-
-		error = got_object_open_as_commit(&commit, repo, id1);
-	} else {
-		struct got_reference *ref;
-		error = got_ref_open(&ref, repo, start_commit, 0);
-		if (error == NULL) {
-			int obj_type;
-			error = got_ref_resolve(&id1, repo, ref);
-			got_ref_close(ref);
-			if (error)
-				goto done;
-			error = got_object_get_type(&obj_type, repo, id1);
-			if (error)
-				goto done;
-			if (obj_type == GOT_OBJ_TYPE_TAG) {
-				struct got_tag_object *tag;
-				error = got_object_open_as_tag(&tag, repo, id1);
-				if (error)
-					goto done;
-				if (got_object_tag_get_object_type(tag) !=
-				    GOT_OBJ_TYPE_COMMIT) {
-					got_object_tag_close(tag);
-					error = got_error(GOT_ERR_OBJ_TYPE);
-					goto done;
-				}
-				free(id1);
-				id1 = got_object_id_dup(
-				    got_object_tag_get_object_id(tag));
-				if (id1 == NULL)
-					error = got_error_from_errno(
-					    "got_object_id_dup");
-				got_object_tag_close(tag);
-				if (error)
-					goto done;
-			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
-				error = got_error(GOT_ERR_OBJ_TYPE);
-				goto done;
-			}
-			error = got_object_open_as_commit(&commit, repo, id1);
-			if (error)
-				goto done;
-		}
-		if (commit == NULL) {
-			error = got_repo_match_object_id_prefix(&id1,
-			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
-			if (error)
-				goto done;
-		}
-		error = got_repo_match_object_id_prefix(&id1,
-			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
-	}
-
-	if (error)
-		goto done;
-
-	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
-	if (error)
-		goto done;
-
-	if (in_repo_path) {
-		free(path);
-		path = in_repo_path;
-	}
-
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
-	error = got_commit_graph_open(&graph, path, 0);
-	if (error)
-		goto done;
-
-	error = got_commit_graph_iter_start(graph, id1, repo, NULL, NULL);
-	if (error)
-		goto done;
-
-	for (;;) {
-		error = got_commit_graph_iter_next(&id1, graph, repo, NULL,
-		    NULL);
-		if (error) {
-			if (error->code == GOT_ERR_ITER_COMPLETED)
-				error = NULL;
-			break;
-		}
-		if (id1 == NULL)
-			break;
-
-		error = got_object_open_as_commit(&commit, repo, id1);
-		if (error)
-			break;
-
-		if (search_pattern) {
-			error = gw_match_logmsg(&have_match, id1, commit,
-			    &regex);
-			if (error) {
-				got_object_commit_close(commit);
-				break;
-			}
-			if (have_match == 0) {
-				got_object_commit_close(commit);
-				continue;
-			}
-		}
-
-		SIMPLEQ_FOREACH(re, &refs, entry) {
-			char *s;
-			const char *name;
-			struct got_tag_object *tag = NULL;
-			int cmp;
-
-			name = got_ref_get_name(re->ref);
-			if (strcmp(name, GOT_REF_HEAD) == 0)
-				continue;
-			if (strncmp(name, "refs/", 5) == 0)
-				name += 5;
-			if (strncmp(name, "got/", 4) == 0)
-				continue;
-			if (strncmp(name, "heads/", 6) == 0)
-				name += 6;
-			if (strncmp(name, "remotes/", 8) == 0)
-				name += 8;
-			if (strncmp(name, "tags/", 5) == 0) {
-				error = got_object_open_as_tag(&tag, repo,
-				    re->id);
-				if (error) {
-					if (error->code != GOT_ERR_OBJ_TYPE)
-						continue;
-					/*
-					 * Ref points at something other
-					 * than a tag.
-					 */
-					error = NULL;
-					tag = NULL;
-				}
-			}
-			cmp = got_object_id_cmp(tag ?
-			    got_object_tag_get_object_id(tag) : re->id, id1);
-			if (tag)
-				got_object_tag_close(tag);
-			if (cmp != 0)
-				continue;
-			s = refs_str;
-			if ((asprintf(&refs_str, "%s%s%s", s ? s : "",
-			    s ? ", " : "", name)) == -1) {
-				error = got_error_from_errno("asprintf");
-				free(s);
-				goto done;
-			}
-			free(s);
-		}
-
-		if (refs_str == NULL)
-			refs_str_disp = strdup("");
-		else {
-			if ((asprintf(&refs_str_disp, "(%s)",
-			    refs_str)) == -1) {
-				error = got_error_from_errno("asprintf");
-				free(refs_str);
-				goto done;
-			}
-		}
-
-		error = got_object_id_str(&id_str1, id1);
-		if (error)
-			goto done;
-
-		error = got_object_id_str(&treeid,
-		    got_object_commit_get_tree_id(commit));
-		if (error)
-			goto done;
-
-		if (gw_trans->action == GW_COMMIT ||
-		    gw_trans->action == GW_COMMITDIFF) {
-			parent_id =
-			    SIMPLEQ_FIRST(
-			    got_object_commit_get_parent_ids(commit));
-			if (parent_id != NULL) {
-				id2 = got_object_id_dup(parent_id->id);
-				free (parent_id);
-				error = got_object_id_str(&id_str2, id2);
-				if (error)
-					goto done;
-				free(id2);
-			} else {
-				has_parent = 0;
-				id_str2 = strdup("/dev/null");
-			}
-		}
-
-		committer_time =
-		    got_object_commit_get_committer_time(commit);
-
-		if ((asprintf(&commit_parent, "%s", id_str2)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_tree, "%s", treeid)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_tree_disp, commit_tree_html,
-		    treeid)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_diff_disp, commit_diff_html, id_str2,
-			id_str1)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_commit, "%s", id_str1)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_commit_disp, commit_commit_html,
-		    commit_commit, refs_str_disp)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_age_long, "%s",
-		    gw_get_time_str(committer_time, TM_LONG))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_age_long_disp, commit_age_html,
-		    commit_age_long)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_age_diff, "%s",
-		    gw_get_time_str(committer_time, TM_DIFF))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_age_diff_disp, commit_age_html,
-		    commit_age_diff)) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_author, "%s",
-		    got_object_commit_get_author(commit))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_author_disp, commit_author_html,
-		    gw_html_escape(commit_author))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_committer, "%s",
-		    got_object_commit_get_committer(commit))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if ((asprintf(&commit_committer_disp, commit_committer_html,
-		    gw_html_escape(commit_committer))) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
-		if (strcmp(commit_author, commit_committer) == 0) {
-			free(commit_committer_disp);
-			commit_committer_disp = strdup("");
-		}
-
-		error = got_object_commit_get_logmsg(&commit_log0, commit);
-		if (error)
-			goto done;
-
-		commit_log = commit_log0;
-		while (*commit_log == '\n')
-			commit_log++;
-
-		switch(log_type) {
-		case (LOGBRIEF):
-			newline = strchr(commit_log, '\n');
-			if (newline)
-				*newline = '\0';
-
-			if ((asprintf(&logbriefs_navs_html, logbriefs_navs,
-			    gw_trans->repo_name, id_str1, gw_trans->repo_name,
-			    id_str1, gw_trans->repo_name, id_str1,
-			    gw_trans->repo_name, id_str1)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			if ((asprintf(&commit_row, logbriefs_row,
-			    commit_age_diff, commit_author, commit_log,
-			    logbriefs_navs_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			free(logbriefs_navs_html);
-			logbriefs_navs_html = NULL;
-			break;
-		case (LOGFULL):
-			if ((asprintf(&logbriefs_navs_html, logbriefs_navs,
-			    gw_trans->repo_name, id_str1, gw_trans->repo_name,
-			    id_str1, gw_trans->repo_name, id_str1,
-			    gw_trans->repo_name, id_str1)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			if ((asprintf(&commit_row, logs_row, commit_commit_disp,
-			    commit_author_disp, commit_committer_disp,
-			    commit_age_long_disp, gw_html_escape(commit_log),
-			    logbriefs_navs_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			free(logbriefs_navs_html);
-			logbriefs_navs_html = NULL;
-			break;
-		case (LOGTAG):
-			log_tag_html = strdup("tag log here");
-
-			if ((asprintf(&commit_row, log_tag_row,
-			    gw_html_escape(commit_log), log_tag_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			free(log_tag_html);
-			break;
-		case (LOGBLAME):
-			log_blame_html = gw_get_file_blame(gw_trans,
-			    start_commit);
-
-			if ((asprintf(&commit_row, log_blame_row,
-			    gw_html_escape(commit_log), log_blame_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			free(log_blame_html);
-			break;
-		case (LOGTREE):
-			log_tree_html = gw_get_repo_tree(gw_trans,
-			    start_commit);
-
-			if ((asprintf(&commit_row, log_tree_row,
-			    gw_html_escape(commit_log), log_tree_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			free(log_tree_html);
-			break;
-		case (LOGCOMMIT):
-			if ((asprintf(&commit_log_disp, commit_log_html,
-			    gw_html_escape(commit_log))) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			log_commit_html = strdup("commit here");
-
-			if ((asprintf(&commit_row, log_commit_row,
-			    commit_diff_disp, commit_commit_disp,
-			    commit_tree_disp, commit_author_disp,
-			    commit_committer_disp, commit_age_long_disp,
-			    commit_log_disp, log_commit_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			free(commit_log_disp);
-			free(log_commit_html);
-
-			break;
-		case (LOGDIFF):
-			if ((asprintf(&commit_log_disp, commit_log_html,
-			    gw_html_escape(commit_log))) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
-			if (has_parent)
-				log_diff_html = gw_get_repo_diff(gw_trans,
-				    commit_commit, commit_parent);
-			else
-				log_diff_html = gw_get_repo_diff(gw_trans,
-				    commit_commit, NULL);
-
-			if ((asprintf(&commit_row, log_diff_row,
-			    commit_diff_disp, commit_commit_disp,
-			    commit_tree_disp, commit_author_disp,
-			    commit_committer_disp, commit_age_long_disp,
-			    commit_log_disp, log_diff_html)) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			free(commit_log_disp);
-			free(log_diff_html);
-
-			break;
-		default:
-			return NULL;
-		}
-
-		error = buf_puts(&newsize, diffbuf, commit_row);
-
-		free(commit_parent);
-		free(commit_diff_disp);
-		free(commit_tree_disp);
-		free(commit_age_diff);
-		free(commit_age_diff_disp);
-		free(commit_age_long);
-		free(commit_age_long_disp);
-		free(commit_author);
-		free(commit_author_disp);
-		free(commit_committer);
-		free(commit_committer_disp);
-		free(commit_log0);
-		free(commit_row);
-		free(refs_str_disp);
-		free(refs_str);
-		refs_str = NULL;
-		free(id_str1);
-		id_str1 = NULL;
-		free(id_str2);
-		id_str2 = NULL;
-
-		if (error || (limit && --limit == 0))
-			break;
-	}
-
-	if (error)
-		goto done;
-
-	if (buf_len(diffbuf) > 0) {
-		error = buf_putc(diffbuf, '\0');
-		logs = strdup(buf_get(diffbuf));
-	}
-done:
-	buf_free(diffbuf);
-	free(in_repo_path);
-	if (commit != NULL)
-		got_object_commit_close(commit);
-	if (search_pattern)
-		regfree(&regex);
-	if (graph)
-		got_commit_graph_close(graph);
-	if (repo) {
-		error = got_repo_close(repo);
-		if (error)
-			return NULL;
-	}
-	if (error) {
-		khttp_puts(gw_trans->gw_req, "Error: ");
-		khttp_puts(gw_trans->gw_req, error->msg);
-		return NULL;
-	} else
-		return logs;
-}
-
-static char *
 gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 {
 	const struct got_error *error = NULL;
@@ -1924,7 +1496,7 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		const char *refname;
-		char *refstr, *tag_log0, *tag_log, *id_str;
+		char *refstr, *tag_commit0, *tag_commit, *id_str;
 		time_t tagger_time;
 		struct got_object_id *id;
 		struct got_tag_object *tag;
@@ -1954,20 +1526,20 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 		if (error)
 			goto done;
 
-		tag_log0 = strdup(got_object_tag_get_message(tag));
+		tag_commit0 = strdup(got_object_tag_get_message(tag));
 
-		if (tag_log0 == NULL) {
+		if (tag_commit0 == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
 		}
 
-		tag_log = tag_log0;
-		while (*tag_log == '\n')
-			tag_log++;
+		tag_commit = tag_commit0;
+		while (*tag_commit == '\n')
+			tag_commit++;
 
 		switch (tag_type) {
 		case TAGBRIEF:
-			newline = strchr(tag_log, '\n');
+			newline = strchr(tag_commit, '\n');
 			if (newline)
 				*newline = '\0';
 
@@ -1985,8 +1557,8 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 				goto done;
 			}
 
-			if ((asprintf(&tag_row, tags_row, age, refname, tag_log,
-			    tags_navs_disp)) == -1) {
+			if ((asprintf(&tag_row, tags_row, age, refname,
+			    tag_commit, tags_navs_disp)) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -2006,7 +1578,7 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 		free(id_str);
 		free(refstr);
 		free(age);
-		free(tag_log0);
+		free(tag_commit0);
 		free(tag_row);
 
 		if (error || (limit && --limit == 0))
@@ -2026,6 +1598,304 @@ done:
 		return NULL;
 	else
 		return tags;
+}
+
+static void
+gw_free_headers(struct gw_header *header)
+{
+	free(header->id);
+	free(header->path);
+	if (header->commit != NULL)
+		got_object_commit_close(header->commit);
+	if (header->repo)
+		got_repo_close(header->repo);
+	free(header->refs_str);
+	free(header->commit_id);
+	free(header->parent_id);
+	free(header->tree_id);
+	free(header->author);
+	free(header->committer);
+	free(header->commit_msg);
+}
+
+static struct gw_header *
+gw_init_header()
+{
+	struct gw_header *header;
+
+	if ((header = malloc(sizeof(*header))) == NULL)
+		return NULL;
+
+	header->repo = NULL;
+	header->commit = NULL;
+	header->id = NULL;
+	header->path = NULL;
+
+	return header;
+}
+
+static const struct got_error *
+gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
+    int limit)
+{
+	const struct got_error *error = NULL;
+	struct got_commit_graph *graph = NULL;
+
+	error = got_commit_graph_open(&graph, header->path, 0);
+	if (error)
+		goto done;
+
+	error = got_commit_graph_iter_start(graph, header->id, header->repo,
+	    NULL, NULL);
+	if (error)
+		goto done;
+
+	for (;;) {
+		error = got_commit_graph_iter_next(&header->id, graph,
+		    header->repo, NULL, NULL);
+		if (error) {
+			if (error->code == GOT_ERR_ITER_COMPLETED)
+				error = NULL;
+			goto done;
+		}
+		if (header->id == NULL)
+			goto done;
+
+		error = got_object_open_as_commit(&header->commit, header->repo,
+		    header->id);
+		if (error)
+			goto done;
+
+		error = gw_get_commit(gw_trans, header);
+		if (limit > 1) {
+			struct gw_header *n_header = NULL;
+			if ((n_header = gw_init_header()) == NULL)
+				error = got_error_from_errno("malloc");
+
+			n_header->refs_str = strdup(header->refs_str);
+			n_header->commit_id = strdup(header->commit_id);
+			n_header->parent_id = strdup(header->parent_id);
+			n_header->tree_id = strdup(header->tree_id);
+			n_header->author = strdup(header->author);
+			n_header->committer = strdup(header->committer);
+			n_header->commit_msg = strdup(header->commit_msg);
+			n_header->committer_time = header->committer_time;
+			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
+			    entry);
+		}
+		if (error || (limit && --limit == 0))
+			break;
+	}
+done:
+	if (graph)
+		got_commit_graph_close(graph);
+	return error;
+}
+
+static const struct got_error *
+gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
+{
+	const struct got_error *error = NULL;
+	struct got_reflist_entry *re;
+	struct got_object_id *id2 = NULL;
+	struct got_object_qid *parent_id;
+	char *refs_str = NULL,
+	     *commit_msg = NULL, *commit_msg0;
+
+	/*print commit*/
+	SIMPLEQ_FOREACH(re, &header->refs, entry) {
+		char *s;
+		const char *name;
+		struct got_tag_object *tag = NULL;
+		int cmp;
+
+		name = got_ref_get_name(re->ref);
+		if (strcmp(name, GOT_REF_HEAD) == 0)
+			continue;
+		if (strncmp(name, "refs/", 5) == 0)
+			name += 5;
+		if (strncmp(name, "got/", 4) == 0)
+			continue;
+		if (strncmp(name, "heads/", 6) == 0)
+			name += 6;
+		if (strncmp(name, "remotes/", 8) == 0)
+			name += 8;
+		if (strncmp(name, "tags/", 5) == 0) {
+			error = got_object_open_as_tag(&tag, header->repo,
+			    re->id);
+			if (error) {
+				if (error->code != GOT_ERR_OBJ_TYPE)
+					continue;
+				/*
+				 * Ref points at something other
+				 * than a tag.
+				 */
+				error = NULL;
+				tag = NULL;
+			}
+		}
+		cmp = got_object_id_cmp(tag ?
+		    got_object_tag_get_object_id(tag) : re->id, header->id);
+		if (tag)
+			got_object_tag_close(tag);
+		if (cmp != 0)
+			continue;
+		s = refs_str;
+		if ((asprintf(&refs_str, "%s%s%s", s ? s : "",
+		    s ? ", " : "", name)) == -1) {
+			error = got_error_from_errno("asprintf");
+			free(s);
+			return error;
+		}
+		header->refs_str = strdup(refs_str);
+		free(s);
+	}
+
+	if (refs_str == NULL)
+		header->refs_str = strdup("");
+	free(refs_str);
+
+	error = got_object_id_str(&header->commit_id, header->id);
+	if (error)
+		return error;
+
+	error = got_object_id_str(&header->tree_id,
+	    got_object_commit_get_tree_id(header->commit));
+	if (error)
+		return error;
+
+	if (gw_trans->action == GW_DIFF) {
+		parent_id = SIMPLEQ_FIRST(
+		    got_object_commit_get_parent_ids(header->commit));
+		if (parent_id != NULL) {
+			id2 = got_object_id_dup(parent_id->id);
+			free (parent_id);
+			error = got_object_id_str(&header->parent_id, id2);
+			if (error)
+				return error;
+			free(id2);
+		} else
+			header->parent_id = strdup("/dev/null");
+	} else
+		header->parent_id = strdup("");
+
+	header->committer_time =
+	    got_object_commit_get_committer_time(header->commit);
+	header->author = strdup(got_object_commit_get_author(header->commit));
+	header->committer =
+	    strdup(got_object_commit_get_committer(header->commit));
+
+	error = got_object_commit_get_logmsg(&commit_msg0, header->commit);
+	if (error)
+		return error;
+
+	commit_msg = commit_msg0;
+	while (*commit_msg == '\n')
+		commit_msg++;
+
+	header->commit_msg = strdup(commit_msg);
+	free(commit_msg0);
+	return error;
+}
+
+static const struct got_error *
+gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
+{
+	const struct got_error *error = NULL;
+	char *in_repo_path = NULL;
+
+	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
+	if (error)
+		return error;
+
+	SIMPLEQ_INIT(&header->refs);
+
+	if (gw_trans->commit == NULL) {
+		struct got_reference *head_ref;
+		error = got_ref_open(&head_ref, header->repo,
+		    gw_trans->headref, 0);
+		if (error)
+			return error;
+
+		error = got_ref_resolve(&header->id, header->repo, head_ref);
+		got_ref_close(head_ref);
+		if (error)
+			return error;
+
+		error = got_object_open_as_commit(&header->commit,
+		    header->repo, header->id);
+	} else {
+		struct got_reference *ref;
+		error = got_ref_open(&ref, header->repo, gw_trans->commit, 0);
+		if (error == NULL) {
+			int obj_type;
+			error = got_ref_resolve(&header->id, header->repo, ref);
+			got_ref_close(ref);
+			if (error)
+				return error;
+			error = got_object_get_type(&obj_type, header->repo,
+			    header->id);
+			if (error)
+				return error;
+			if (obj_type == GOT_OBJ_TYPE_TAG) {
+				struct got_tag_object *tag;
+				error = got_object_open_as_tag(&tag,
+				    header->repo, header->id);
+				if (error)
+					return error;
+				if (got_object_tag_get_object_type(tag) !=
+				    GOT_OBJ_TYPE_COMMIT) {
+					got_object_tag_close(tag);
+					error = got_error(GOT_ERR_OBJ_TYPE);
+					return error;
+				}
+				free(header->id);
+				header->id = got_object_id_dup(
+				    got_object_tag_get_object_id(tag));
+				if (header->id == NULL)
+					error = got_error_from_errno(
+					    "got_object_id_dup");
+				got_object_tag_close(tag);
+				if (error)
+					return error;
+			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+				error = got_error(GOT_ERR_OBJ_TYPE);
+				return error;
+			}
+			error = got_object_open_as_commit(&header->commit,
+			    header->repo, header->id);
+			if (error)
+				return error;
+		}
+		if (header->commit == NULL) {
+			error = got_repo_match_object_id_prefix(&header->id,
+			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
+			    header->repo);
+			if (error)
+				return error;
+		}
+		error = got_repo_match_object_id_prefix(&header->id,
+			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
+			    header->repo);
+	}
+
+	error = got_repo_map_path(&in_repo_path, header->repo,
+	    gw_trans->repo_path, 1);
+	if (error)
+		return error;
+
+	if (in_repo_path) {
+		header->path = strdup(in_repo_path);
+	}
+	free(in_repo_path);
+
+	error = got_ref_list(&header->refs, header->repo, NULL,
+	    got_ref_cmp_by_name, NULL);
+	if (error)
+		return error;
+
+	error = gw_get_commits(gw_trans, header, limit);
+	return error;
 }
 
 struct blame_line {
@@ -2137,7 +2007,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		else
 			line_escape = strdup("");
 
-		asprintf(&blame_row, log_blame_line, a->nlines_prec,
+		asprintf(&blame_row, blame_line, a->nlines_prec,
 		    a->lineno_cur, bline->id_str, bline->datebuf, committer,
 		    line_escape);
 		a->lineno_cur++;
@@ -2157,7 +2027,7 @@ done:
 }
 
 static char*
-gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
+gw_get_file_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2192,7 +2062,7 @@ gw_get_file_blame(struct gw_trans *gw_trans, char *commit_str)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&commit_id, NULL, commit_str,
+	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit,
 	    GOT_OBJ_TYPE_COMMIT, 1, repo);
 	if (error)
 		goto done;
@@ -2289,7 +2159,7 @@ done:
 }
 
 static char*
-gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
+gw_get_repo_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2320,7 +2190,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
 		path = in_repo_path;
 	}
 
-	if (commit_str == NULL) {
+	if (gw_trans->commit == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
 		if (error)
@@ -2330,8 +2200,12 @@ gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
 		got_ref_close(head_ref);
 
 	} else
-		error = got_repo_match_object_id(&commit_id, NULL, commit_str,
-		    GOT_OBJ_TYPE_COMMIT, 1, repo);
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    gw_trans->commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_str(&gw_trans->commit, commit_id);
 	if (error)
 		goto done;
 
@@ -2420,7 +2294,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans, char *commit_str)
 		if (error)
 			goto done;
 
-		if ((asprintf(&tree_row, trees_row, "", url_html)) == -1) {
+		if ((asprintf(&tree_row, tree_line, url_html)) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2709,6 +2583,7 @@ main(int argc, char *argv[])
 	}
 
 	TAILQ_INIT(&gw_trans->gw_dirs);
+	TAILQ_INIT(&gw_trans->gw_headers);
 
 	gw_trans->page = 0;
 	gw_trans->repos_total = 0;
