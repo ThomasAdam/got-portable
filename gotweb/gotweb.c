@@ -1285,7 +1285,6 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	const struct got_error *error;
 	FILE *f = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
-	struct got_repository *repo = NULL;
 	struct buf *diffbuf = NULL;
 	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *buf = NULL,
 	     *buf_color = NULL;
@@ -1300,46 +1299,45 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		return NULL;
 
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
+	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&id1, &label1, header->commit_id,
-	    GOT_OBJ_TYPE_ANY, 1, repo);
+	    GOT_OBJ_TYPE_ANY, 1, header->repo);
 	if (error)
 		goto done;
 
-	if (header->parent_id) {
-		error = got_repo_match_object_id(&id2, &label2,
-		    header->parent_id, GOT_OBJ_TYPE_ANY, 1, repo);
-		if (error)
-			goto done;
-
-		error = got_object_get_type(&type2, repo, id2);
-		if (error)
-			goto done;
-	}
-
-	error = got_object_get_type(&type1, repo, id1);
+	error = got_repo_match_object_id(&id2, &label2,
+	    header->parent_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
 	if (error)
 		goto done;
 
-	if (header->parent_id && type1 != type2) {
+	error = got_object_get_type(&type1, header->repo, id1);
+	if (error)
+		goto done;
+
+	error = got_object_get_type(&type2, header->repo, id2);
+	if (error)
+		goto done;
+
+	if (type1 != type2) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
 	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(id2, id1, NULL, NULL, 3, 0,
-		    repo, f);
+		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL, 3, 0,
+		    header->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(id2, id1, "", "", 3, 0, repo,
-		    f);
+		error = got_diff_objects_as_trees(id1, id2, "", "", 3, 0,
+		    header->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		error = got_diff_objects_as_commits(id2, id1, 3, 0, repo, f);
+		error = got_diff_objects_as_commits(id1, id2, 3, 0,
+		    header->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -1374,8 +1372,6 @@ done:
 	free(label2);
 	free(id1);
 	free(id2);
-	if (repo)
-		got_repo_close(repo);
 
 	if (error)
 		return NULL;
