@@ -1287,7 +1287,7 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct buf *diffbuf = NULL;
 	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *buf = NULL,
-	     *buf_color = NULL;
+	     *buf_color = NULL, *n_buf = NULL, *newline = NULL;
 	int type1, type2;
 	size_t newsize;
 
@@ -1349,7 +1349,14 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	fseek(f, 0, SEEK_SET);
 
 	while ((fgets(buf, 128, f)) != NULL) {
-		buf_color = gw_colordiff_line(buf);
+		n_buf = buf;
+		while (*n_buf == '\n')
+			n_buf++;
+		newline = strchr(n_buf, '\n');
+		if (newline)
+			*newline = ' ';
+
+		buf_color = gw_colordiff_line(gw_html_escape(n_buf));
 		error = buf_puts(&newsize, diffbuf, buf_color);
 		if (error)
 			return NULL;
