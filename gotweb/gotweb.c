@@ -1318,7 +1318,6 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	error = got_object_get_type(&obj_type, header->repo, id2);
 	if (error)
 		goto done;
-
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL, 3, 0,
@@ -1341,7 +1340,7 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 
 	fseek(f, 0, SEEK_SET);
 
-	while ((fgets(buf, 128, f)) != NULL) {
+	while ((fgets(buf, 2048, f)) != NULL) {
 		n_buf = buf;
 		while (*n_buf == '\n')
 			n_buf++;
@@ -1350,6 +1349,9 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 			*newline = ' ';
 
 		buf_color = gw_colordiff_line(gw_html_escape(n_buf));
+		if (buf_color == NULL)
+			continue;
+
 		error = buf_puts(&newsize, diffbuf, buf_color);
 		if (error)
 			return NULL;
@@ -2448,6 +2450,8 @@ gw_colordiff_line(char *buf)
 	if (error)
 		return NULL;
 
+	if (buf == NULL)
+		return NULL;
 	if (strncmp(buf, "-", 1) == 0)
 		color = "diff_minus";
 	if (strncmp(buf, "+", 1) == 0)
