@@ -1288,7 +1288,7 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	struct buf *diffbuf = NULL;
 	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *buf = NULL,
 	     *buf_color = NULL, *n_buf = NULL, *newline = NULL;
-	int type1, type2;
+	int obj_type;
 	size_t newsize;
 
 	f = got_opentemp();
@@ -1303,30 +1303,23 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&id1, &label1, header->parent_id,
-	    GOT_OBJ_TYPE_ANY, 1, header->repo);
-	if (error)
-		goto done;
+	if (strncmp(header->parent_id, "/dev/null", 9) != 0) {
+		error = got_repo_match_object_id(&id1, &label1,
+			header->parent_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
+		if (error)
+			goto done;
+	}
 
 	error = got_repo_match_object_id(&id2, &label2,
 	    header->commit_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
 	if (error)
 		goto done;
 
-	error = got_object_get_type(&type1, header->repo, id1);
+	error = got_object_get_type(&obj_type, header->repo, id2);
 	if (error)
 		goto done;
 
-	error = got_object_get_type(&type2, header->repo, id2);
-	if (error)
-		goto done;
-
-	if (type1 != type2) {
-		error = got_error(GOT_ERR_OBJ_TYPE);
-		goto done;
-	}
-
-	switch (type1) {
+	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL, 3, 0,
 		    header->repo, f);
