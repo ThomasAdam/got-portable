@@ -345,7 +345,7 @@ gw_diff(struct gw_trans *gw_trans)
 		diff_html = strdup("");
 
 	if ((asprintf(&diff_html_disp, diff_header,
-	    gw_gen_diff_header(header->commit_id, header->parent_id),
+	    gw_gen_diff_header(header->parent_id, header->commit_id),
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_tree_header(header->tree_id),
 	    gw_gen_author_header(header->author),
@@ -1303,13 +1303,13 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&id1, &label1, header->commit_id,
+	error = got_repo_match_object_id(&id1, &label1, header->parent_id,
 	    GOT_OBJ_TYPE_ANY, 1, header->repo);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&id2, &label2,
-	    header->parent_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
+	    header->commit_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
 	if (error)
 		goto done;
 
