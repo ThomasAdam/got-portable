@@ -92,6 +92,12 @@
 
 #include "got_lib_diff.h"
 
+/* 
+ * XXX:band-aid patch include
+ * remove when proper patch in place
+ */
+#include <got_opentemp.h>
+
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
 
@@ -305,7 +311,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		return NULL;
 	}
 	if (flags & D_EMPTY1) {
-		f1 = fopen(_PATH_DEVNULL, "r");
+		f1 = got_opentemp();
 		if (f1 == NULL) {
 			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
 			goto closem;
@@ -317,7 +323,7 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 	}
 
 	if (flags & D_EMPTY2) {
-		f2 = fopen(_PATH_DEVNULL, "r");
+		f2 = got_opentemp();
 		if (f2 == NULL) {
 			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
 			goto closem;
