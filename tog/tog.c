@@ -194,9 +194,9 @@ default_color_value(const char *envvar)
 	if (strcmp(envvar, "TOG_COLOR_TREE_SUBMODULE") == 0)
 		return COLOR_MAGENTA;
 	if (strcmp(envvar, "TOG_COLOR_TREE_SYMLINK") == 0)
-		return COLOR_CYAN;
+		return COLOR_MAGENTA;
 	if (strcmp(envvar, "TOG_COLOR_TREE_DIRECTORY") == 0)
-		return COLOR_BLUE;
+		return COLOR_CYAN;
 	if (strcmp(envvar, "TOG_COLOR_TREE_EXECUTABLE") == 0)
 		return COLOR_GREEN;
 	if (strcmp(envvar, "TOG_COLOR_COMMIT") == 0)
