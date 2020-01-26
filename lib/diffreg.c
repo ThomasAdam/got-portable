@@ -92,12 +92,6 @@
 
 #include "got_lib_diff.h"
 
-/* 
- * XXX:band-aid patch include
- * remove when proper patch in place
- */
-#include <got_opentemp.h>
-
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
 
@@ -201,7 +195,7 @@ static int	 skipline(FILE *);
 static int	 isqrt(int);
 static int	 stone(struct got_diff_state *, int *, int, int *, int *, int);
 static int	 readhash(struct got_diff_state *, FILE *, int);
-static int	 files_differ(struct got_diff_state *, FILE *, FILE *, int);
+static int	 files_differ(struct got_diff_state *, FILE *, FILE *);
 static char	*match_function(struct got_diff_state *, const long *, int, FILE *);
 
 /*
@@ -310,30 +304,17 @@ got_diffreg(int *rval, FILE *f1, FILE *f2, int flags,
 		*rval = (S_ISDIR(ds->stb1.st_mode) ? D_MISMATCH1 : D_MISMATCH2);
 		return NULL;
 	}
-	if (flags & D_EMPTY1) {
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
-			goto closem;
-		}
-	}
-	else if (f1 == NULL) {
+	if (!(flags & D_EMPTY1) && f1 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
 
-	if (flags & D_EMPTY2) {
-		f2 = got_opentemp();
-		if (f2 == NULL) {
-			err = got_error_from_errno2("fopen", _PATH_DEVNULL);
-			goto closem;
-		}
-	} else if (f2 == NULL) {
+	if (!(flags & D_EMPTY2) && f2 == NULL) {
 		args->status |= 2;
 		goto closem;
 	}
 
-	switch (files_differ(ds, f1, f2, flags)) {
+	switch (files_differ(ds, f1, f2)) {
 	case 0:
 		goto closem;
 	case 1:
@@ -432,14 +413,6 @@ closem:
 		if (*rval == D_SAME)
 			*rval = D_DIFFER;
 	}
-	if ((flags & D_EMPTY1) && f1) {
-		if (fclose(f1) != 0 && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
-	if ((flags & D_EMPTY2) && f2) {
-		if (fclose(f2) != 0 && err == NULL)
-			err = got_error_from_errno("fclose");
-	}
 	return (err);
 }
 
@@ -449,12 +422,12 @@ closem:
  * XXX - could use code from cmp(1) [faster]
  */
 static int
-files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
+files_differ(struct got_diff_state *ds, FILE *f1, FILE *f2)
 {
 	char buf1[BUFSIZ], buf2[BUFSIZ];
 	size_t i, j;
 
-	if ((flags & (D_EMPTY1|D_EMPTY2)) || ds->stb1.st_size != ds->stb2.st_size ||
+	if (f1 == NULL || f2 == NULL || ds->stb1.st_size != ds->stb2.st_size ||
 	    (ds->stb1.st_mode & S_IFMT) != (ds->stb2.st_mode & S_IFMT))
 		return (1);
 	for (;;) {
@@ -478,7 +451,8 @@ prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 	int j, h;
 	size_t sz;
 
-	rewind(fd);
+	if (fd != NULL)
+		rewind(fd);
 
 	sz = (filesize <= SIZE_MAX ? filesize : SIZE_MAX) / 25;
 	if (sz < 100)
@@ -487,7 +461,7 @@ prepare(struct got_diff_state *ds, int i, FILE *fd, off_t filesize, int flags)
 	p = calloc(sz + 3, sizeof(*p));
 	if (p == NULL)
 		return (-1);
-	for (j = 0; (h = readhash(ds, fd, flags));) {
+	for (j = 0; fd != NULL && (h = readhash(ds, fd, flags));) {
 		if (j == sz) {
 			sz = sz * 3 / 2;
 			q = reallocarray(p, sz + 3, sizeof(*p));
@@ -701,8 +675,10 @@ check(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 	int i, j, jackpot, c, d;
 	long ctold, ctnew;
 
-	rewind(f1);
-	rewind(f2);
+	if (f1 != NULL)
+		rewind(f1);
+	if (f2 != NULL)
+		rewind(f2);
 	j = 1;
 	ds->ixold[0] = ds->ixnew[0] = 0;
 	jackpot = 0;
@@ -718,8 +694,8 @@ check(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 		}
 		if (flags & (D_FOLDBLANKS|D_IGNOREBLANKS|D_IGNORECASE)) {
 			for (;;) {
-				c = getc(f1);
-				d = getc(f2);
+				c = (f1 == NULL ? EOF : getc(f1));
+				d = (f2 == NULL ? EOF : getc(f2));
 				/*
 				 * GNU diff ignores a missing newline
 				 * in one file for -b or -w.
@@ -741,18 +717,18 @@ check(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 						if (c == '\n')
 							break;
 						ctold++;
-					} while (isspace(c = getc(f1)));
+					} while (f1 && isspace(c = getc(f1)));
 					do {
 						if (d == '\n')
 							break;
 						ctnew++;
-					} while (isspace(d = getc(f2)));
+					} while (f2 && isspace(d = getc(f2)));
 				} else if ((flags & D_IGNOREBLANKS)) {
-					while (isspace(c) && c != '\n') {
+					while (f1 && isspace(c) && c != '\n') {
 						c = getc(f1);
 						ctold++;
 					}
-					while (isspace(d) && d != '\n') {
+					while (f2 && isspace(d) && d != '\n') {
 						d = getc(f2);
 						ctnew++;
 					}
@@ -773,7 +749,9 @@ check(struct got_diff_state *ds, FILE *f1, FILE *f2, int flags)
 			for (;;) {
 				ctold++;
 				ctnew++;
-				if ((c = getc(f1)) != (d = getc(f2))) {
+				c = (f1 == NULL ? EOF : getc(f1));
+				d = (f2 == NULL ? EOF : getc(f2));
+				if (c != d) {
 					/* jackpot++; */
 					ds->J[i] = 0;
 					if (c != '\n' && c != EOF)
@@ -853,7 +831,7 @@ skipline(FILE *f)
 {
 	int i, c;
 
-	for (i = 1; (c = getc(f)) != '\n' && c != EOF; i++)
+	for (i = 1; f != NULL && (c = getc(f)) != '\n' && c != EOF; i++)
 		continue;
 	return (i);
 }
@@ -866,8 +844,10 @@ output(FILE *outfile, struct got_diff_changes *changes,
 	int m, i0, i1, j0, j1;
 	int error = 0;
 
-	rewind(f1);
-	rewind(f2);
+	if (f1 != NULL)
+		rewind(f1);
+	if (f2 != NULL)
+		rewind(f2);
 	m = ds->len[0];
 	ds->J[0] = 0;
 	ds->J[m + 1] = ds->len[1] + 1;
@@ -1002,7 +982,7 @@ fetch(FILE *outfile, struct got_diff_state *ds, struct got_diff_args *args,
 {
 	int i, j, c, col, nc;
 
-	if (a > b)
+	if (lb == NULL || a > b)
 		return;
 	for (i = a; i <= b; i++) {
 		fseek(lb, f[i - 1], SEEK_SET);
@@ -1183,7 +1163,7 @@ dump_unified_vec(FILE *outfile, struct got_diff_changes *changes,
 	diff_output(outfile, " +");
 	uni_range(outfile, lowc, upd);
 	diff_output(outfile, " @@");
-	if ((flags & D_PROTOTYPE)) {
+	if (f1 != NULL && (flags & D_PROTOTYPE)) {
 		f = match_function(ds, ds->ixold, lowa-1, f1);
 		if (f != NULL)
 			diff_output(outfile, " %s", f);
