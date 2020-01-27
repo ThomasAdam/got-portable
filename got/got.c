@@ -2010,7 +2010,7 @@ cmd_log(int argc, char *argv[])
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
-		error = got_repo_map_path(&in_repo_path, repo, p, 1);
+		error = got_repo_map_path(&in_repo_path, repo, p, 0);
 		free(p);
 	} else
 		error = got_repo_map_path(&in_repo_path, repo, path, 1);
@@ -2909,7 +2909,7 @@ cmd_tree(int argc, char *argv[])
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
-			error = got_repo_map_path(&in_repo_path, repo, p, 1);
+			error = got_repo_map_path(&in_repo_path, repo, p, 0);
 			free(p);
 			if (error)
 				goto done;

@@ -2483,7 +2483,7 @@ cmd_log(int argc, char *argv[])
 	struct got_object_id *start_id = NULL;
 	char *path = NULL, *repo_path = NULL, *cwd = NULL;
 	char *start_commit = NULL, *head_ref_name = NULL;
-	int ch, log_branches = 0;
+	int ch, log_branches = 0, check_disk = 1;
 	struct tog_view *view;
 
 	SIMPLEQ_INIT(&refs);
@@ -2592,6 +2592,17 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 	if (worktree) {
+		const char *prefix = got_worktree_get_path_prefix(worktree);
+		char *p;
+		if (asprintf(&p, "%s%s%s", prefix,
+		    (strcmp(prefix, "/") != 0) ? "/" : "", path) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		free(path);
+		path = p;
+		check_disk = 0;
+
 		head_ref_name = strdup(
 		    got_worktree_get_head_ref_name(worktree));
 		if (head_ref_name == NULL) {
@@ -2600,7 +2611,7 @@ cmd_log(int argc, char *argv[])
 		}
 	}
 	error = open_log_view(view, start_id, &refs, repo, head_ref_name,
-	    path, 1, log_branches);
+	    path, check_disk, log_branches);
 	if (error)
 		goto done;
 	if (worktree) {

@@ -71,8 +71,14 @@ function test_log_in_bare_repo {
 }
 
 function test_log_in_worktree {
-	local testroot=`test_init log_in_worktree`
-	local head_rev=`git_show_head $testroot/repo`
+	local testroot=`test_init log_in_worktree 1`
+
+	make_test_tree $testroot/repo
+	mkdir -p $testroot/repo/epsilon/d
+	echo foo > $testroot/repo/epsilon/d/foo
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding the test tree"
+	local head_commit=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -81,7 +87,7 @@ function test_log_in_worktree {
 		return 1
 	fi
 
-	echo "commit $head_rev (master)" > $testroot/stdout.expected
+	echo "commit $head_commit (master)" > $testroot/stdout.expected
 
 	for p in "" "." alpha epsilon; do
 		(cd $testroot/wt && got log $p | \
@@ -97,6 +103,18 @@ function test_log_in_worktree {
 
 	for p in "" "." zeta; do
 		(cd $testroot/wt/epsilon && got log $p | \
+			grep ^commit > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	for p in "" "." foo; do
+		(cd $testroot/wt/epsilon && got log d/$p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout
 		ret="$?"
