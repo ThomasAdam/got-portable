@@ -337,7 +337,6 @@ function test_revert_directory_unknown {
 	(cd $testroot/wt && got revert -R . > $testroot/stdout)
 
 	echo 'R  alpha' > $testroot/stdout.expected
-	echo '?  epsilon/new_file' >> $testroot/stdout.expected
 	echo 'R  epsilon/zeta' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
