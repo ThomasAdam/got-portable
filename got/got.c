@@ -1728,7 +1728,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_repository *repo,
     const char *path, int show_patch, const char *search_pattern,
-    int diff_context, int limit, int first_parent_traversal,
+    int diff_context, int limit, int log_branches,
     struct got_reflist_head *refs)
 {
 	const struct got_error *err;
@@ -1740,7 +1740,7 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
 		return got_error_msg(GOT_ERR_REGEX, search_pattern);
 
-	err = got_commit_graph_open(&graph, path, first_parent_traversal);
+	err = got_commit_graph_open(&graph, path, !log_branches);
 	if (err)
 		return err;
 	err = got_commit_graph_iter_start(graph, root_id, repo,
@@ -1796,7 +1796,7 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-c commit] [-C number] [-f] [ -l N ] [-p] "
+	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] [-p] "
 	    "[-s search-pattern] [-r repository-path] [path]\n", getprogname());
 	exit(1);
 }
@@ -1828,7 +1828,7 @@ cmd_log(int argc, char *argv[])
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
 	const char *start_commit = NULL, *search_pattern = NULL;
 	int diff_context = -1, ch;
-	int show_patch = 0, limit = 0, first_parent_traversal = 0;
+	int show_patch = 0, limit = 0, log_branches = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
 
@@ -1843,7 +1843,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "b:pc:C:l:fr:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "bpc:C:l:r:s:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -1862,8 +1862,8 @@ cmd_log(int argc, char *argv[])
 			if (errstr != NULL)
 				err(1, "-l option %s", errstr);
 			break;
-		case 'f':
-			first_parent_traversal = 1;
+		case 'b':
+			log_branches = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -2026,7 +2026,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = print_commits(id, repo, path, show_patch, search_pattern,
-	    diff_context, limit, first_parent_traversal, &refs);
+	    diff_context, limit, log_branches, &refs);
 done:
 	free(path);
 	free(repo_path);

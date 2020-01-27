@@ -325,7 +325,7 @@ in a pattern.
 .It Cm st
 Short alias for
 .Cm status .
-.It Cm log Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl f Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Op Ar path
+.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -335,6 +335,11 @@ The options for
 .Cm got log
 are as follows:
 .Bl -tag -width Ds
+.It Fl b
+Display individual commits which were merged into the current branch.
+By default,
+.Cm got log
+shows the linear history of the current branch only.
 .It Fl c Ar commit
 Start traversing history at the specified
 .Ar commit .
@@ -348,11 +353,6 @@ if invoked in a work tree, or to the repository's HEAD reference.
 Set the number of context lines shown in diffs with
 .Fl p .
 By default, 3 lines of context are shown.
-.It Fl f
-Restrict history traversal to the first parent of each commit.
-This shows the linear history of the current branch only.
-Merge commits which affected the current branch will be shown but
-individual commits which originated on other branches will be omitted.
 .It Fl l Ar N
 Limit history traversal to a given number of commits.
 If this option is not specified, a default limit value of zero is used,
@@ -1442,7 +1442,7 @@ In a work tree or a git repository directory, view changes committed in
 the 3 most recent commits to the work tree's branch, or the branch resolved
 via the repository's HEAD reference, respectively:
 .Pp
-.Dl $ got log -p -l 3 -f
+.Dl $ got log -p -l 3
 .Pp
 Add new files and remove obsolete files in a work tree directory:
 .Pp
