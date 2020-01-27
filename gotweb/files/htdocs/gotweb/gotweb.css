@@ -571,12 +571,14 @@ body {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 100%;
+	width: 80%;
 }
 #blame {
 	clear: left;
 	float: left;
-	padding: 20px;
+	margin-left: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
 	font-family: monospace;
 	white-space: pre;
 	overflow: auto;
@@ -642,12 +644,14 @@ body {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 100%;
+	width: 80%;
 }
 #tree {
 	clear: left;
 	float: left;
-	padding: 20px;
+	margin-left: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
 	font-family: monospace;
 }
 #tree_wrapper {
@@ -689,12 +693,14 @@ body {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 2px;
-	width: 100%;
+	width: 80%;
 }
 #diff {
 	clear: left;
 	float: left;
-	padding: 20px;
+	margin-left: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
 	font-family: monospace;
 	white-space: pre;
 }
