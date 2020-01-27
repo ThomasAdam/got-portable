@@ -282,6 +282,7 @@ struct tog_log_view_state {
 	int selected;
 	char *in_repo_path;
 	const char *head_ref_name;
+	int log_branches;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct got_object_id *start_id;
@@ -442,7 +443,7 @@ static const struct got_error* close_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_reflist_head *,
-    struct got_repository *, const char *, const char *, int);
+    struct got_repository *, const char *, const char *, int, int);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1021,7 +1022,7 @@ usage_log(void)
 {
 	endwin();
 	fprintf(stderr,
-	    "usage: %s log [-c commit] [-r repository-path] [path]\n",
+	    "usage: %s log [-b] [-c commit] [-r repository-path] [path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -2091,7 +2092,8 @@ search_next_log_view(struct tog_view *view)
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_reflist_head *refs, struct got_repository *repo,
-    const char *head_ref_name, const char *path, int check_disk)
+    const char *head_ref_name, const char *path, int check_disk,
+    int log_branches)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
@@ -2115,6 +2117,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
+	s->log_branches = log_branches;
 
 	SIMPLEQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
@@ -2145,7 +2148,8 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
 	if (err)
 		goto done;
-	err = got_commit_graph_open(&thread_graph, s->in_repo_path, 0);
+	err = got_commit_graph_open(&thread_graph, s->in_repo_path,
+	    !s->log_branches);
 	if (err)
 		goto done;
 	err = got_commit_graph_iter_start(thread_graph,
@@ -2344,7 +2348,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				return got_error_from_errno(
 				    "view_open");
 			err = open_log_view(lv, s->start_id, s->refs,
-			    s->repo, s->head_ref_name, parent_path, 0);
+			    s->repo, s->head_ref_name, parent_path, 0,
+			    s->log_branches);
 			if (err)
 				return err;;
 			if (view_is_parent_view(view))
@@ -2386,9 +2391,27 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			return err;
 		}
 		err = open_log_view(lv, start_id, s->refs, s->repo,
-		    s->head_ref_name, in_repo_path, 0);
+		    s->head_ref_name, in_repo_path, 0, s->log_branches);
 		if (err) {
 			free(start_id);
+			view_close(lv);
+			return err;;
+		}
+		*dead_view = view;
+		*new_view = lv;
+		break;
+	case 'B':
+		s->log_branches = !s->log_branches;
+		err = stop_log_thread(s);
+		if (err)
+			return err;
+		lv = view_open(view->nlines, view->ncols,
+		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
+		if (lv == NULL)
+			return got_error_from_errno("view_open");
+		err = open_log_view(lv, s->start_id, s->refs, s->repo,
+		    s->head_ref_name, s->in_repo_path, 0, s->log_branches);
+		if (err) {
 			view_close(lv);
 			return err;;
 		}
@@ -2460,7 +2483,7 @@ cmd_log(int argc, char *argv[])
 	struct got_object_id *start_id = NULL;
 	char *path = NULL, *repo_path = NULL, *cwd = NULL;
 	char *start_commit = NULL, *head_ref_name = NULL;
-	int ch;
+	int ch, log_branches = 0;
 	struct tog_view *view;
 
 	SIMPLEQ_INIT(&refs);
@@ -2471,8 +2494,11 @@ cmd_log(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "bc:r:")) != -1) {
 		switch (ch) {
+		case 'b':
+			log_branches = 1;
+			break;
 		case 'c':
 			start_commit = optarg;
 			break;
@@ -2574,7 +2600,7 @@ cmd_log(int argc, char *argv[])
 		}
 	}
 	error = open_log_view(view, start_id, &refs, repo, head_ref_name,
-	    path, 1);
+	    path, 1, log_branches);
 	if (error)
 		goto done;
 	if (worktree) {
@@ -4526,7 +4552,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0);
+	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0, 0);
 	if (err)
 		view_close(log_view);
 	else
