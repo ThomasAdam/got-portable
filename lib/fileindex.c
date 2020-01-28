@@ -1045,14 +1045,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
-			char *de_path;
 			de = dle->data;
-			if (asprintf(&de_path, "%s/%s", path,
-			    de->d_name) == -1) {
-				err = got_error_from_errno("asprintf");
-				break;
-			}
-			free(de_path);
 			err = cb->diff_new(cb_arg, de, path, dirfd);
 			if (err)
 				break;
