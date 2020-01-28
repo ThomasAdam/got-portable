@@ -1062,9 +1062,17 @@ got_fileindex_diff_dir(struct got_fileindex *fileindex, int fd,
 	fd2 = dup(fd);
 	if (fd2 == -1)
 		return got_error_from_errno2("dup", path);
+	if (lseek(fd2, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", path);
+		close(fd2);
+		return err;
+	}
 	dir = fdopendir(fd2);
-	if (dir == NULL)
-		return got_error_from_errno2("fdopendir", path);
+	if (dir == NULL) {
+		err = got_error_from_errno2("fdopendir", path);
+		close(fd2);
+		return err;
+	}
 	err = read_dirlist(&dirlist, dir, path);
 	if (err) {
 		closedir(dir);
