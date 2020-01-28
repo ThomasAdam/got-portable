@@ -1998,9 +1998,17 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 
 	header->committer_time =
 	    got_object_commit_get_committer_time(header->commit);
-	header->author = strdup(
-		gw_html_escape(got_object_commit_get_author(header->commit))
-	);
+
+	if (gw_trans->action != GW_BRIEFS && gw_trans->action != GW_SUMMARY) {
+		header->author = strdup(
+	 	    gw_html_escape(got_object_commit_get_author(header->commit))
+		);
+	} else {
+		header->author = strdup(
+		    got_object_commit_get_author(header->commit)
+		);
+	}
+
 	header->committer = strdup(
 		gw_html_escape(got_object_commit_get_committer(header->commit))
 	);
