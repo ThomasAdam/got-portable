@@ -47,7 +47,7 @@ Man page files in the Got source tree can be viewed with 'man -l':
 EXAMPLES in got.1 contains a quick-start guide for OpenBSD developers.
 
 Game of Trees Web (Gotweb) is a CGI program which displays repository data
-and is designed to work with httpd(8).
+and is designed to work with httpd(8) and slowcgi(8).
 
 To compile gotweb on OpenBSD, run:
 
@@ -77,6 +77,11 @@ Example configuration for httpd.conf:
   		directory index "index.html"
   	}
   }
+
+httpd(8) and slowcgi(8) should be enabled and started:
+
+  # rcctl enable httpd slowcgi
+  # rcctl start httpd slowcgi
 
 Gotweb's run-time behaviour can be configured in the gotweb.conf file:
 
