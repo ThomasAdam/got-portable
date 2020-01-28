@@ -408,8 +408,7 @@ gw_diff(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 done:
-	if (header)
-		got_ref_list_free(&header->refs);
+	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(diff_html_disp);
 	free(diff_html);
@@ -600,8 +599,7 @@ gw_commits(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 
-	if (header)
-		got_ref_list_free(&header->refs);
+	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
@@ -664,8 +662,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 
-	if (header)
-		got_ref_list_free(&header->refs);
+	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
@@ -823,8 +820,7 @@ gw_tree(struct gw_trans *gw_trans)
 	kerr = khttp_puts(gw_trans->gw_req, tree);
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
-	if (header)
-		got_ref_list_free(&header->refs);
+	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(tree_html_disp);
 	free(tree_html);
