@@ -26,6 +26,9 @@ realinstall:
 	if [ ! -d ${CGI_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${CGI_DIR}; \
 	fi
+	if [ ! -d ${PUB_REPOS_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${PUB_REPOS_DIR}; \
+	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 ${PROG} \
 	    ${CGI_DIR}/${PROG}
 	if [ ! -d ${TMPL_DIR}/. ]; then \

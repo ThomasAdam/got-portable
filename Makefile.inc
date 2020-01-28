@@ -41,6 +41,7 @@ TMP_DIR =	${CHROOT_DIR}/tmp
 PROG_DIR =	${HTTPD_DIR}/${PROG}
 CGI_DIR =	${CHROOT_DIR}${GOTWEB_DIR}
 TMPL_DIR =	${CGI_DIR}/gw_tmpl
+PUB_REPOS_DIR =	${CHROOT_DIR}/got/public
 WWWUSR ?=	www
 WWWGRP ?=	www
 .endif
