@@ -25,7 +25,7 @@ is the configuration file for gotweb.
 .Sh GLOBAL CONFIGURATION
 Here are the settings that can be set globally:
 .Bl -tag -width Ds
-.It Ic got_commits_display Ar number
+.It Ic got_max_commits_display Ar number
 Set the maximum amount of log lines displayed.
 .It Ic got_logo Ar string
 Set the displayed logo.
@@ -35,17 +35,17 @@ Set the href link for the logo.
 Set the maximum amount of repositories gotweb will work with.
 .It Ic got_max_repos_display Ar number
 Set the maximum amount of repositories displayed on the index screen.
-.It Ic got_repo_age Ar string
+.It Ic got_show_repo_age Ar string
 Set whether to display the repository age, or not.
-.It Ic got_repo_cloneurl Ar string
+.It Ic got_show_repo_cloneurl Ar string
 Set whether to display clone URLs for a repository.
 This requires the creation of a cloneurl file in the repository.
-.It Ic got_repo_description Ar string
+.It Ic got_show_repo_description Ar string
 Set whether to display the repository description, or not.
 This requires the description file to be edited in the repository.
 .It Ic got_repos_path Ar string
 Set the default git repository path.
-.It Ic got_repo_owner Ar string
+.It Ic got_show_repo_owner Ar string
 Set whether to display the repository owner, or not.
 This requires the owner to be added to the config file in the repository.
 The gotweb code will parse either [gotweb] or [gitweb] owner information.
