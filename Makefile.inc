@@ -29,7 +29,8 @@ DEBUG = -O0 -g
 .endif
 
 .if "${MAKEWEB}" == "Yes"
-LDADD =		-L${PREFIX}/lib -static -lkcgihtml -lkcgi -lz -lutil
+LDADD +=	-L${PREFIX}/lib -lz -lutil
+LDSTATIC =	${STATIC}
 PREFIX =	/usr/local
 CHROOT_DIR =	/var/www
 GOTWEB_DIR =	/cgi-bin/gotweb

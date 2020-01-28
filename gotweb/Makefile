@@ -16,7 +16,8 @@ MAN =		${PROG}.conf.5
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \
 		-I${PREFIX}/include
 
-LDADD +=	-L${PREFIX}/lib -static -lkcgihtml -lkcgi -lz -lutil
+LDADD =		-L${PREFIX}/lib -lkcgihtml -lkcgi -lz -lutil
+LDSTATIC =	${STATIC}
 
 .if ${GOT_RELEASE} != "Yes"
 NOMAN = Yes
