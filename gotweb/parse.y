@@ -108,10 +108,6 @@ main		: GOT_REPOS_PATH STRING {
 			if ((gw_conf->got_repos_path = strdup($2)) == NULL)
 				errx(1, "out of memory");
 		}
-		| GOT_WWW_PATH STRING {
-			if ((gw_conf->got_www_path = strdup($2)) == NULL)
-				errx(1, "out of memory");
-		}
 		| GOT_MAX_REPOS NUMBER {
 			if ($2 > 0)
 				gw_conf->got_max_repos = $2;
@@ -211,7 +207,6 @@ lookup(char *s)
 		{ "got_site_link",		GOT_SITE_LINK },
 		{ "got_site_name",		GOT_SITE_NAME },
 		{ "got_site_owner",		GOT_SITE_OWNER },
-		{ "got_www_path",		GOT_WWW_PATH },
 	};
 	const struct keywords	*p;
 
@@ -489,8 +484,6 @@ parse_conf(const char *filename, struct gotweb_conf *gconf)
 
 	gw_conf = gconf;
 	if ((gw_conf->got_repos_path = strdup(D_GOTPATH)) == NULL)
-	err(1, "strdup");
-	if ((gw_conf->got_www_path = strdup(D_GOTWWW)) == NULL)
 	err(1, "strdup");
 	if ((gw_conf->got_site_name = strdup(D_SITENAME)) == NULL)
 	err(1, "strdup");

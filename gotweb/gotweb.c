@@ -2756,7 +2756,6 @@ done:
 	}
 	if (gw_malloc) {
 		free(gw_trans->gw_conf->got_repos_path);
-		free(gw_trans->gw_conf->got_www_path);
 		free(gw_trans->gw_conf->got_site_name);
 		free(gw_trans->gw_conf->got_site_owner);
 		free(gw_trans->gw_conf->got_site_link);
