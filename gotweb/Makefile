@@ -32,7 +32,7 @@ realinstall:
 		${INSTALL} -d -o root -g daemon -m 755 ${TMPL_DIR}; \
 	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
-	    files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
+	    ${.CURDIR}/files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
 	if [ ! -d ${HTTPD_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
 	fi
@@ -42,7 +42,7 @@ realinstall:
 	if [ ! -d ${PROG_DIR}/. ]; then \
 		${INSTALL} -d -o root -g daemon -m 755 ${PROG_DIR}; \
 	fi
-	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 files/htdocs/${PROG}/* \
-	    ${PROG_DIR}
+	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
+	    ${.CURDIR}/files/htdocs/${PROG}/* ${PROG_DIR}
 
 .include <bsd.prog.mk>
