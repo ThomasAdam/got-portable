@@ -27,22 +27,3 @@ DEBUG = -O0 -g
 .endif
 
 .endif
-
-.if "${MAKEWEB}" == "Yes"
-LDADD +=	-L${PREFIX}/lib -lz -lutil
-LDSTATIC =	${STATIC}
-PREFIX =	/usr/local
-CHROOT_DIR =	/var/www
-GOTWEB_DIR =	/cgi-bin/gotweb
-LIBEXECDIR =	${GOTWEB_DIR}/libexec
-LIBEXEC_DIR =	${CHROOT_DIR}${LIBEXECDIR}
-ETC_DIR =	${CHROOT_DIR}/etc
-HTTPD_DIR =	${CHROOT_DIR}/htdocs
-TMP_DIR =	${CHROOT_DIR}/tmp
-PROG_DIR =	${HTTPD_DIR}/${PROG}
-CGI_DIR =	${CHROOT_DIR}${GOTWEB_DIR}
-TMPL_DIR =	${CGI_DIR}/gw_tmpl
-PUB_REPOS_DIR =	${CHROOT_DIR}/got/public
-WWWUSR ?=	www
-WWWGRP ?=	www
-.endif

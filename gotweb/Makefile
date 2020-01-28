@@ -1,8 +1,9 @@
 .PATH:${.CURDIR}/../lib
 
-SUBDIR = ../libexec
+SUBDIR = libexec
 
 .include "../got-version.mk"
+.include "Makefile.inc"
 
 PROG =		gotweb
 SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
@@ -14,9 +15,8 @@ SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
 MAN =		${PROG}.conf.5
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \
-		-I${PREFIX}/include
-
-LDADD =		-L${PREFIX}/lib -lkcgihtml -lkcgi -lz -lutil
+		-I${KCGIBASE}/include
+LDADD +=	-L${KCGIBASE}/lib -lkcgihtml -lkcgi
 LDSTATIC =	${STATIC}
 
 .if ${GOT_RELEASE} != "Yes"

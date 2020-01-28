@@ -30,9 +30,9 @@ dist: clean
 	rm got-dist.txt.new
 
 web:
-	${MAKE} -C gotweb MAKEWEB=Yes
+	${MAKE} -C gotweb
 
 web-install:
-	${MAKE} -C gotweb install MAKEWEB=Yes
+	${MAKE} -C gotweb install
 
 .include <bsd.subdir.mk>
