@@ -1354,13 +1354,14 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 	const char *refname;
 	char *repo_age = NULL;
 
+	SIMPLEQ_INIT(&refs);
+
 	if (repo_ref == NULL)
 		return NULL;
 
 	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
 		is_head = 1;
 
-	SIMPLEQ_INIT(&refs);
 	if (gw_trans->gw_conf->got_show_repo_age == false) {
 		if ((asprintf(&repo_age, "")) == -1)
 			return NULL;
@@ -1621,10 +1622,11 @@ gw_get_repo_tags(struct gw_trans *gw_trans, int limit, int tag_type)
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
+	SIMPLEQ_INIT(&refs);
+
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
 		return NULL;
-	SIMPLEQ_INIT(&refs);
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -2478,6 +2480,8 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
+	SIMPLEQ_INIT(&refs);
+
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
 		return NULL;
@@ -2486,7 +2490,6 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	SIMPLEQ_INIT(&refs);
 	error = got_ref_list(&refs, repo, "refs/heads", got_ref_cmp_by_name,
 	    NULL);
 	if (error)
