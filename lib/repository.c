@@ -680,8 +680,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			goto done;
 		}
 	} else {
-		int is_repo_child = 0;
-
 		path = realpath(canonpath, NULL);
 		if (path == NULL) {
 			if (errno != ENOENT) {
@@ -703,8 +701,6 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 		repolen = strlen(repo_abspath);
 		len = strlen(path);
 
-		if (len > repolen && strncmp(path, repo_abspath, repolen) == 0)
-			is_repo_child = 1;
 
 		if (strcmp(path, repo_abspath) == 0) {
 			free(path);
@@ -713,7 +709,8 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 				err = got_error_from_errno("strdup");
 				goto done;
 			}
-		} else if (is_repo_child) {
+		} else if (len > repolen &&
+		    got_path_is_child(path, repo_abspath, repolen)) {
 			/* Matched an on-disk path inside repository. */
 			if (got_repo_is_bare(repo)) {
 				/*
