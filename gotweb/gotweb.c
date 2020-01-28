@@ -21,6 +21,7 @@
 
 #include <dirent.h>
 #include <err.h>
+#include <errno.h>
 #include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -185,9 +186,9 @@ static char			*gw_gen_commit_msg_header(char *);
 static char			*gw_gen_tree_header(char *);
 
 static void			 gw_free_headers(struct gw_header *);
-static void			 gw_display_open(struct gw_trans *, enum khttp,
+static const struct got_error*	 gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
-static void			 gw_display_index(struct gw_trans *,
+static const struct got_error*	 gw_display_index(struct gw_trans *,
 				    const struct got_error *);
 
 static int			 gw_template(size_t, void *);
@@ -244,6 +245,30 @@ static struct gw_query_action gw_query_funcs[] = {
 };
 
 static const struct got_error *
+gw_kcgi_error(enum kcgi_err kerr)
+{
+	if (kerr == KCGI_OK)
+		return NULL;
+
+	if (kerr == KCGI_EXIT || kerr == KCGI_HUP)
+		return got_error(GOT_ERR_CANCELLED);
+
+	if (kerr == KCGI_ENOMEM)
+		return got_error_set_errno(ENOMEM, kcgi_strerror(kerr));
+
+	if (kerr == KCGI_ENFILE)
+		return got_error_set_errno(ENFILE, kcgi_strerror(kerr));
+
+	if (kerr == KCGI_EAGAIN)
+		return got_error_set_errno(EAGAIN, kcgi_strerror(kerr));
+
+	if (kerr == KCGI_FORM)
+		return got_error_msg(GOT_ERR_IO, kcgi_strerror(kerr));
+
+	return got_error_from_errno(kcgi_strerror(kerr));
+}
+
+static const struct got_error *
 gw_apply_unveil(const char *repo_path, const char *repo_file)
 {
 	const struct got_error *err;
@@ -278,6 +303,7 @@ gw_blame(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *blame = NULL, *blame_html = NULL, *blame_html_disp = NULL;
+	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
@@ -308,7 +334,9 @@ gw_blame(struct gw_trans *gw_trans)
 	if ((asprintf(&blame, blame_wrapper, blame_html_disp)) == -1)
 		return got_error_from_errno("asprintf");
 
-	khttp_puts(gw_trans->gw_req, blame);
+	kerr = khttp_puts(gw_trans->gw_req, blame);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(blame_html_disp);
@@ -323,6 +351,7 @@ gw_diff(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *diff = NULL, *diff_html = NULL, *diff_html_disp = NULL;
+	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
@@ -358,7 +387,9 @@ gw_diff(struct gw_trans *gw_trans)
 	if ((asprintf(&diff, diff_wrapper, diff_html_disp)) == -1)
 		return got_error_from_errno("asprintf");
 
-	khttp_puts(gw_trans->gw_req, diff);
+	kerr = khttp_puts(gw_trans->gw_req, diff);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(diff_html_disp);
@@ -374,6 +405,7 @@ gw_index(struct gw_trans *gw_trans)
 	struct gw_dir *gw_dir = NULL;
 	char *html, *navs, *next, *prev;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
+	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
@@ -389,15 +421,19 @@ gw_index(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
-	khttp_puts(gw_trans->gw_req, index_projects_header);
+	kerr = khttp_puts(gw_trans->gw_req, index_projects_header);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
 
 	if (TAILQ_EMPTY(&gw_trans->gw_dirs)) {
 		if (asprintf(&html, index_projects_empty,
 		    gw_trans->gw_conf->got_repos_path) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, html);
+		kerr = khttp_puts(gw_trans->gw_req, html);
+		if (kerr != KCGI_OK)
+			error = gw_kcgi_error(kerr);
 		free(html);
-		return NULL;
+		return error;
 	}
 
 	TAILQ_FOREACH(gw_dir, &gw_trans->gw_dirs, entry)
@@ -423,21 +459,27 @@ gw_index(struct gw_trans *gw_trans)
 		    navs)) == -1)
 			return got_error_from_errno("asprintf");
 
-		khttp_puts(gw_trans->gw_req, html);
-
+		kerr = khttp_puts(gw_trans->gw_req, html);
 		free(navs);
 		free(html);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 
 		if (gw_trans->gw_conf->got_max_repos_display == 0)
 			continue;
 
-		if (next_disp == gw_trans->gw_conf->got_max_repos_display)
-			khttp_puts(gw_trans->gw_req, np_wrapper_start);
-		else if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
+		if (next_disp == gw_trans->gw_conf->got_max_repos_display) {
+			kerr = khttp_puts(gw_trans->gw_req, np_wrapper_start);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+		} else if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
-		    prev_disp == gw_trans->repos_total))
-			khttp_puts(gw_trans->gw_req, np_wrapper_start);
+		    prev_disp == gw_trans->repos_total)) {
+			kerr = khttp_puts(gw_trans->gw_req, np_wrapper_start);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+		}
 
 		if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
@@ -446,11 +488,15 @@ gw_index(struct gw_trans *gw_trans)
 			if ((asprintf(&prev, nav_prev,
 			    gw_trans->page - 1)) == -1)
 				return got_error_from_errno("asprintf");
-			khttp_puts(gw_trans->gw_req, prev);
+			kerr = khttp_puts(gw_trans->gw_req, prev);
 			free(prev);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 		}
 
-		khttp_puts(gw_trans->gw_req, div_end);
+		kerr = khttp_puts(gw_trans->gw_req, div_end);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 
 		if (gw_trans->gw_conf->got_max_repos_display > 0 &&
 		    next_disp == gw_trans->gw_conf->got_max_repos_display &&
@@ -459,9 +505,13 @@ gw_index(struct gw_trans *gw_trans)
 			if ((asprintf(&next, nav_next,
 			    gw_trans->page + 1)) == -1)
 				return got_error_from_errno("calloc");
-			khttp_puts(gw_trans->gw_req, next);
-			khttp_puts(gw_trans->gw_req, div_end);
+			kerr = khttp_puts(gw_trans->gw_req, next);
 			free(next);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khttp_puts(gw_trans->gw_req, div_end);
+			if (kerr != KCGI_OK)
+				error = gw_kcgi_error(kerr);
 			next_disp = 0;
 			break;
 		}
@@ -469,8 +519,11 @@ gw_index(struct gw_trans *gw_trans)
 		if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
-		    prev_disp == gw_trans->repos_total))
-			khttp_puts(gw_trans->gw_req, div_end);
+		    prev_disp == gw_trans->repos_total)) {
+			kerr = khttp_puts(gw_trans->gw_req, div_end);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+		}
 
 		next_disp++;
 	}
@@ -483,6 +536,7 @@ gw_commits(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *commits_html, *commits_navs_html;
 	struct gw_header *header = NULL, *n_header = NULL;
+	enum kcgi_err kerr;
 
 	if ((header = malloc(sizeof(struct gw_header))) == NULL)
 		return got_error_from_errno("malloc");
@@ -500,7 +554,9 @@ gw_commits(struct gw_trans *gw_trans)
 	error = gw_get_header(gw_trans, header,
 	    gw_trans->gw_conf->got_max_commits_display);
 
-	khttp_puts(gw_trans->gw_req, commits_wrapper);
+	kerr = khttp_puts(gw_trans->gw_req, commits_wrapper);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
 		if ((asprintf(&commits_navs_html, commits_navs,
 		    gw_trans->repo_name, n_header->commit_id,
@@ -517,9 +573,13 @@ gw_commits(struct gw_trans *gw_trans)
 		        TM_LONG)), gw_html_escape(n_header->commit_msg),
 		    commits_navs_html)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, commits_html);
+		kerr = khttp_puts(gw_trans->gw_req, commits_html);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 	}
-	khttp_puts(gw_trans->gw_req, div_end);
+	kerr = khttp_puts(gw_trans->gw_req, div_end);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -534,6 +594,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *briefs_html = NULL, *briefs_navs_html = NULL, *newline;
 	struct gw_header *header = NULL, *n_header = NULL;
+	enum kcgi_err kerr;
 
 	if ((header = malloc(sizeof(struct gw_header))) == NULL)
 		return got_error_from_errno("malloc");
@@ -554,7 +615,13 @@ gw_briefs(struct gw_trans *gw_trans)
 		error = gw_get_header(gw_trans, header,
 		    gw_trans->gw_conf->got_max_commits_display);
 
-	khttp_puts(gw_trans->gw_req, briefs_wrapper);
+	if (error)
+		return error;
+
+	kerr = khttp_puts(gw_trans->gw_req, briefs_wrapper);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
 		if ((asprintf(&briefs_navs_html, briefs_navs,
 		    gw_trans->repo_name, n_header->commit_id,
@@ -569,9 +636,13 @@ gw_briefs(struct gw_trans *gw_trans)
 		    n_header->author, gw_html_escape(n_header->commit_msg),
 		    briefs_navs_html)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, briefs_html);
+		kerr = khttp_puts(gw_trans->gw_req, briefs_html);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 	}
-	khttp_puts(gw_trans->gw_req, div_end);
+	kerr = khttp_puts(gw_trans->gw_req, div_end);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -587,6 +658,7 @@ gw_summary(struct gw_trans *gw_trans)
 	char *description_html, *repo_owner_html, *repo_age_html,
 	     *cloneurl_html, *tags, *heads, *tags_html,
 	     *heads_html, *age;
+	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
@@ -596,7 +668,10 @@ gw_summary(struct gw_trans *gw_trans)
 
 	/* unveil is applied with gw_briefs below */
 
-	khttp_puts(gw_trans->gw_req, summary_wrapper);
+	kerr = khttp_puts(gw_trans->gw_req, summary_wrapper);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+
 	if (gw_trans->gw_conf->got_show_repo_description) {
 		if (gw_trans->gw_dir->description != NULL &&
 		    (strcmp(gw_trans->gw_dir->description, "") != 0)) {
@@ -604,8 +679,10 @@ gw_summary(struct gw_trans *gw_trans)
 			    gw_trans->gw_dir->description)) == -1)
 				return got_error_from_errno("asprintf");
 
-			khttp_puts(gw_trans->gw_req, description_html);
+			kerr = khttp_puts(gw_trans->gw_req, description_html);
 			free(description_html);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 		}
 	}
 
@@ -616,8 +693,10 @@ gw_summary(struct gw_trans *gw_trans)
 			    gw_trans->gw_dir->owner)) == -1)
 				return got_error_from_errno("asprintf");
 
-			khttp_puts(gw_trans->gw_req, repo_owner_html);
+			kerr = khttp_puts(gw_trans->gw_req, repo_owner_html);
 			free(repo_owner_html);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 		}
 	}
 
@@ -628,9 +707,11 @@ gw_summary(struct gw_trans *gw_trans)
 			if ((asprintf(&repo_age_html, last_change, age)) == -1)
 				return got_error_from_errno("asprintf");
 
-			khttp_puts(gw_trans->gw_req, repo_age_html);
+			kerr = khttp_puts(gw_trans->gw_req, repo_age_html);
 			free(repo_age_html);
 			free(age);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 		}
 	}
 
@@ -641,11 +722,15 @@ gw_summary(struct gw_trans *gw_trans)
 			    gw_trans->gw_dir->url)) == -1)
 				return got_error_from_errno("asprintf");
 
-			khttp_puts(gw_trans->gw_req, cloneurl_html);
+			kerr = khttp_puts(gw_trans->gw_req, cloneurl_html);
 			free(cloneurl_html);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 		}
 	}
-	khttp_puts(gw_trans->gw_req, div_end);
+	kerr = khttp_puts(gw_trans->gw_req, div_end);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
 
 	error = gw_briefs(gw_trans);
 	if (error)
@@ -658,18 +743,22 @@ gw_summary(struct gw_trans *gw_trans)
 		if ((asprintf(&tags_html, summary_tags,
 		    tags)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, tags_html);
+		kerr = khttp_puts(gw_trans->gw_req, tags_html);
 		free(tags_html);
 		free(tags);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 	}
 
 	if (heads != NULL && strcmp(heads, "") != 0) {
 		if ((asprintf(&heads_html, summary_heads,
 		    heads)) == -1)
 			return got_error_from_errno("asprintf");
-		khttp_puts(gw_trans->gw_req, heads_html);
+		kerr = khttp_puts(gw_trans->gw_req, heads_html);
 		free(heads_html);
 		free(heads);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 	}
 	return error;
 }
@@ -680,6 +769,7 @@ gw_tree(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
+	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
@@ -709,7 +799,9 @@ gw_tree(struct gw_trans *gw_trans)
 	if ((asprintf(&tree, tree_wrapper, tree_html_disp)) == -1)
 		return got_error_from_errno("asprintf");
 
-	khttp_puts(gw_trans->gw_req, tree);
+	kerr = khttp_puts(gw_trans->gw_req, tree);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(tree_html_disp);
@@ -929,33 +1021,54 @@ gw_init_gw_dir(char *dir)
 	return gw_dir;
 }
 
-static void
+static const struct got_error *
 gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 {
-	khttp_head(gw_trans->gw_req, kresps[KRESP_ALLOW], "GET");
-	khttp_head(gw_trans->gw_req, kresps[KRESP_STATUS], "%s",
+	enum kcgi_err kerr;
+
+	kerr = khttp_head(gw_trans->gw_req, kresps[KRESP_ALLOW], "GET");
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khttp_head(gw_trans->gw_req, kresps[KRESP_STATUS], "%s",
 	    khttps[code]);
-	khttp_head(gw_trans->gw_req, kresps[KRESP_CONTENT_TYPE], "%s",
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khttp_head(gw_trans->gw_req, kresps[KRESP_CONTENT_TYPE], "%s",
 	    kmimetypes[mime]);
-	khttp_head(gw_trans->gw_req, "X-Content-Type-Options", "nosniff");
-	khttp_head(gw_trans->gw_req, "X-Frame-Options", "DENY");
-	khttp_head(gw_trans->gw_req, "X-XSS-Protection", "1; mode=block");
-	khttp_body(gw_trans->gw_req);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khttp_head(gw_trans->gw_req, "X-Content-Type-Options", "nosniff");
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khttp_head(gw_trans->gw_req, "X-Frame-Options", "DENY");
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khttp_head(gw_trans->gw_req, "X-XSS-Protection", "1; mode=block");
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+
+	kerr = khttp_body(gw_trans->gw_req);
+	return gw_kcgi_error(kerr);
 }
 
-static void
+static const struct got_error *
 gw_display_index(struct gw_trans *gw_trans, const struct got_error *err)
 {
+	enum kcgi_err kerr;
+
 	gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
-	khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
+	kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
 
 	if (err)
-		khttp_puts(gw_trans->gw_req, err->msg);
+		kerr = khttp_puts(gw_trans->gw_req, err->msg);
 	else
-		khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
+		kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
 		    gw_query_funcs[gw_trans->action].template);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
 
-	khtml_close(gw_trans->gw_html_req);
+	kerr = khtml_close(gw_trans->gw_html_req);
+	return gw_kcgi_error(kerr);
 }
 
 static int
@@ -1012,11 +1125,9 @@ gw_template(size_t key, void *arg)
 		error = gw_query_funcs[gw_trans->action].func_main(gw_trans);
 		if (error)
 			khttp_puts(gw_trans->gw_req, error->msg);
-
 		break;
 	default:
 		return 0;
-		break;
 	}
 	return 1;
 }
@@ -2567,6 +2678,7 @@ main(int argc, char *argv[])
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
 	int gw_malloc = 1;
+	enum kcgi_err kerr;
 
 	if ((gw_trans = malloc(sizeof(struct gw_trans))) == NULL)
 		errx(1, "malloc");
@@ -2580,9 +2692,11 @@ main(int argc, char *argv[])
 	if ((gw_trans->gw_tmpl = malloc(sizeof(struct ktemplate))) == NULL)
 		errx(1, "malloc");
 
-	if (KCGI_OK != khttp_parse(gw_trans->gw_req, gw_keys, KEY__ZMAX,
-	    &page, 1, 0))
-		errx(1, "khttp_parse");
+	kerr = khttp_parse(gw_trans->gw_req, gw_keys, KEY__ZMAX, &page, 1, 0);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto err;
+	}
 
 	if ((gw_trans->gw_conf =
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
@@ -2618,7 +2732,9 @@ err:
 	if (error)
 		goto err;
 
-	gw_display_index(gw_trans, error);
+	error = gw_display_index(gw_trans, error);
+	if (error)
+		goto err;
 
 done:
 	if (gw_malloc) {
