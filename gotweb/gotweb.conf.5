@@ -24,6 +24,11 @@
 is the run-time configuration file for
 .Xr gotweb 8 .
 .Pp
+The file format is line-based, with one configuration directive per line.
+Any lines beginning with a
+.Sq #
+are treated as comments and ignored.
+.Pp
 Paths mentioned in
 .Nm
 must be relative to
@@ -33,7 +38,7 @@ the
 environment of
 .Xr httpd 8 .
 .Sh GLOBAL CONFIGURATION
-The available settings are as follows:
+The available configuration directives are as follows:
 .Bl -tag -width Ds
 .It Ic got_max_commits_display Ar number
 Set the maximum amount of log lines displayed.
