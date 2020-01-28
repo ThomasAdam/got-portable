@@ -322,21 +322,29 @@ gw_blame(struct gw_trans *gw_trans)
 
 	blame_html = gw_get_file_blame(gw_trans);
 
-	if (blame_html == NULL)
+	if (blame_html == NULL) {
 		blame_html = strdup("");
+		if (blame_html == NULL)
+			return got_error_from_errno("strdup");
+	}
 
 	if ((asprintf(&blame_html_disp, blame_header,
 	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    blame_html)) == -1)
-		return got_error_from_errno("asprintf");
+	    blame_html)) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
-	if ((asprintf(&blame, blame_wrapper, blame_html_disp)) == -1)
-		return got_error_from_errno("asprintf");
+	if (asprintf(&blame, blame_wrapper, blame_html_disp) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	kerr = khttp_puts(gw_trans->gw_req, blame);
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
+done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(blame_html_disp);
