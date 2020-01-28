@@ -365,7 +365,7 @@ gw_diff(struct gw_trans *gw_trans)
 	    NULL) == -1)
 		return got_error_from_errno("pledge");
 
-	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
@@ -546,7 +546,7 @@ gw_commits(struct gw_trans *gw_trans)
 	struct gw_header *header = NULL, *n_header = NULL;
 	enum kcgi_err kerr;
 
-	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
@@ -589,7 +589,8 @@ gw_commits(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 
-	got_ref_list_free(&header->refs);
+	if (header)
+		got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
@@ -604,7 +605,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	struct gw_header *header = NULL, *n_header = NULL;
 	enum kcgi_err kerr;
 
-	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
@@ -652,7 +653,8 @@ gw_briefs(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 
-	got_ref_list_free(&header->refs);
+	if (header)
+		got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
@@ -782,7 +784,7 @@ gw_tree(struct gw_trans *gw_trans)
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
 
-	if ((header = malloc(sizeof(struct gw_header))) == NULL)
+	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
@@ -810,7 +812,8 @@ gw_tree(struct gw_trans *gw_trans)
 	kerr = khttp_puts(gw_trans->gw_req, tree);
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
-	got_ref_list_free(&header->refs);
+	if (header)
+		got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(tree_html_disp);
 	free(tree_html);
@@ -1749,13 +1752,15 @@ gw_init_header()
 {
 	struct gw_header *header;
 
-	if ((header = malloc(sizeof(*header))) == NULL)
+	header = malloc(sizeof(*header));
+	if (header == NULL)
 		return NULL;
 
 	header->repo = NULL;
 	header->commit = NULL;
 	header->id = NULL;
 	header->path = NULL;
+	SIMPLEQ_INIT(&header->refs);
 
 	return header;
 }
@@ -1933,8 +1938,6 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
 	if (error)
 		return error;
-
-	SIMPLEQ_INIT(&header->refs);
 
 	if (gw_trans->commit == NULL) {
 		struct got_reference *head_ref;
