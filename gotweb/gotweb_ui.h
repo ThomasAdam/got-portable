@@ -95,8 +95,8 @@ char *cloneurl =
 char *tags_row =
 	"<div id='tags_wrapper'>" \
 	"<div id='tags_age'>%s</div>" \
-	"<div id='tag'>tag %s</div>" \
-	"<div id='tag_name'>%s</div>" \
+	"<div id='tags'>tag %s</div>" \
+	"<div id='tags_name'>%s</div>" \
 	"</div>" \
 	"<div id='navs_wrapper'>" \
 	"<div id='navs'>%s</div>" \
@@ -105,6 +105,7 @@ char *tags_row =
 	"<div id='dotted_line'></div>";
 
 char *tags_navs =
+	"<a href='?path=%s&action=tag&commit=%s'>tag</a> | " \
 	"<a href='?path=%s&action=briefs&commit=%s'>commit briefs</a> | " \
 	"<a href='?path=%s&action=commits&commit=%s'>commits</a>";
 
@@ -250,6 +251,33 @@ char *tree_line =
 	"<div id='tree_wrapper'>" \
 	"<div id='tree_line'>%s</div>" \
 	"</div>";
+
+/* tag.tmpl */
+
+char *tag_wrapper =
+	"<div id='tag_title_wrapper'>" \
+	"<div id='tag_title'>Tag</div></div>" \
+	"<div id='tag_content'>%s</div>";
+
+char *tag_header =
+	"<div id='tag_header_wrapper'>" \
+	"<div id='tag_header'>%s%s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='tag'>%s</div>" \
+	"</div>";
+
+char *tag_line =
+	"<div id='tag_wrapper'>" \
+	"<div id='tag_line'>%s</div>" \
+	"</div>";
+
+char *tag_info =
+	"<div id='tag_info_date_title'>Tag Date:</div>" \
+	"<div id='tag_info_date'>%s</div>" \
+	"<div id='tag_info_tagger_title'>Tagger:</div>" \
+	"<div id='tag_info_tagger'>%s</div>" \
+	"<div id='tag_info'>%s</div>";
 
 /* diff.tmpl */
 

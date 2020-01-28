@@ -316,36 +316,6 @@ body {
 	padding-bottom: 2px;
 }
 
-/* tags.tmpl */
-
-#tags_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-}
-#tags_age {
-	padding-left: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-	float: left;
-	width: 7.5em;
-	overflow: auto;
-}
-#tag {
-	float: left;
-	width: 8.5em;
-	font-style: italic;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-#tag_name {
-	float: left;
-	padding-left: 10px;
-	padding-right: 10px;
-	padding-top: 5px;
-	padding-bottom: 5px;
-}
-
 /* heads.tmpl */
 
 #heads_wrapper {
@@ -662,6 +632,107 @@ body {
 #tree_line {
 	clear: left;
 	float:left ;
+}
+
+/* tag.tmpl */
+
+#tag_title_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+	background-color: LightSlateGray;
+	color: #ffffff;
+}
+#tag_title {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#tag_content {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#tag_header_wrapper {
+	clear: left;
+	float: left;
+	background-color: #f5fcfb;
+	width: 100%;
+}
+#tag_header {
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 2px;
+	width: 80%;
+}
+#tag {
+	clear: left;
+	float: left;
+	margin-left: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
+	font-family: monospace;
+}
+#tag_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#tag_line {
+	clear: left;
+	float:left ;
+}
+
+/* tags.tmpl */
+
+#tags_wrapper {
+	clear: left;
+	float: left;
+	width: 100%;
+}
+#tags_age {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	float: left;
+	width: 7.5em;
+	overflow: auto;
+}
+#tags {
+	float: left;
+	width: 8.5em;
+	font-style: italic;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#tags_name {
+	float: left;
+	padding-left: 10px;
+	padding-right: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+#tag_info_date_title {
+	clear: left;
+	float: left;
+	width: 7.5em;
+}
+#tag_info_date {
+	float: left;
+}
+#tag_info_tagger_title {
+	clear: left;
+	float: left;
+	width: 7.5em;
+}
+#tag_info_tagger {
+	float: left;
+}
+#tag_info {
+	clear: left;
+	float: left;
+	margin-top: 25px;
 }
 
 /* diff.tmpl */
