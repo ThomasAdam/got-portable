@@ -47,7 +47,9 @@ Set the path to an image file containing a logo to be displayed.
 .It Ic got_logo_url Ar url
 Set a hyperlink for the logo.
 .It Ic got_max_repos Ar number
-Set the maximum amount of repositories gotweb will work with.
+Set the maximum amount of repositories
+.Xr gotweb 8
+will work with.
 .It Ic got_max_repos_display Ar number
 Set the maximum amount of repositories displayed on the index screen.
 .It Ic got_show_repo_age Ar on | off
@@ -71,7 +73,9 @@ Set whether to display the repository owner.
 Displaying the owner requires owner information to be added to the
 .Pa config
 file in the repository.
-The gotweb code will parse either [gotweb] or [gitweb] owner information.
+The
+.Xr gotweb 8
+code will parse either [gotweb] or [gitweb] owner information.
 For example:
 .Bd -literal -offset indent
 [gotweb]
