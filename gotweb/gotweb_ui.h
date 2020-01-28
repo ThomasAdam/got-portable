@@ -290,6 +290,12 @@ char *index_projects =
 	"</div>" \
 	"<div id='dotted_line'></div>";
 
+char *index_projects_empty =
+	"<div id='index_wrapper'>" \
+	"No repositories found in %s" \
+	"</div>" \
+	"<div id='dotted_line'></div>";
+
 char *index_navs =
 	"<a href='?path=%s&action=summary'>summary</a> | " \
 	"<a href='?path=%s&action=briefs'>commit briefs</a> | " \

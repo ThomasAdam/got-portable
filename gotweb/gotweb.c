@@ -391,6 +391,15 @@ gw_index(struct gw_trans *gw_trans)
 
 	khttp_puts(gw_trans->gw_req, index_projects_header);
 
+	if (TAILQ_EMPTY(&gw_trans->gw_dirs)) {
+		if (asprintf(&html, index_projects_empty,
+		    gw_trans->gw_conf->got_repos_path) == -1)
+			return got_error_from_errno("asprintf");
+		khttp_puts(gw_trans->gw_req, html);
+		free(html);
+		return NULL;
+	}
+
 	TAILQ_FOREACH(gw_dir, &gw_trans->gw_dirs, entry)
 		dir_c++;
 
