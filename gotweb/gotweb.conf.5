@@ -21,7 +21,17 @@
 .Nd gotweb configuration file
 .Sh DESCRIPTION
 .Nm
-is the configuration file for gotweb.
+is the run-time configuration file for
+.Xr gotweb 8 .
+.Pp
+Paths mentioned in
+.Nm
+must be relative to
+.Pa /var/www ,
+the
+.Xr chroot 2
+environment of
+.Xr httpd 8 .
 .Sh GLOBAL CONFIGURATION
 Here are the settings that can be set globally:
 .Bl -tag -width Ds
