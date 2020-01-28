@@ -45,10 +45,11 @@
 #define GOT_FILEIDX_F_NO_BLOB		0x00020000
 #define GOT_FILEIDX_F_NO_COMMIT		0x00040000
 #define GOT_FILEIDX_F_NO_FILE_ON_DISK	0x00080000
+#define GOT_FILEIDX_F_REMOVE_ON_FLUSH	0x00100000
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
-	int nentries;
+	int nentries; /* Does not include entries marked for removal. */
 #define GOT_FILEIDX_MAX_ENTRIES INT_MAX
 };
 
@@ -220,7 +221,14 @@ void
 got_fileindex_entry_remove(struct got_fileindex *fileindex,
     struct got_fileindex_entry *ie)
 {
-	RB_REMOVE(got_fileindex_tree, &fileindex->entries, ie);
+	/*
+	 * Removing an entry from the RB tree immediately breaks
+	 * in-progress iterations over file index entries.
+	 * So flag this entry for removal and skip it once the index
+	 * is written out to disk, and pretend this entry no longer
+	 * exists if we get queried for it again before then.
+	 */
+	ie->flags |= GOT_FILEIDX_F_REMOVE_ON_FLUSH;
 	fileindex->nentries--;
 }
 
@@ -228,11 +236,15 @@ struct got_fileindex_entry *
 got_fileindex_entry_get(struct got_fileindex *fileindex, const char *path,
     size_t path_len)
 {
+	struct got_fileindex_entry *ie;
 	struct got_fileindex_entry key;
 	memset(&key, 0, sizeof(key));
 	key.path = (char *)path;
 	key.flags = (path_len & GOT_FILEIDX_F_PATH_LEN);
-	return RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
+	ie = RB_FIND(got_fileindex_tree, &fileindex->entries, &key);
+	if (ie && (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH))
+		return NULL;
+	return ie;
 }
 
 const struct got_error *
@@ -243,6 +255,8 @@ got_fileindex_for_each_entry_safe(struct got_fileindex *fileindex,
 	struct got_fileindex_entry *ie, *tmp;
 
 	RB_FOREACH_SAFE(ie, got_fileindex_tree, &fileindex->entries, tmp) {
+		if (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH)
+			continue;
 		err = (*cb)(cb_arg, ie);
 		if (err)
 			return err;
@@ -434,6 +448,8 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 
 	RB_FOREACH(ie, got_fileindex_tree, &fileindex->entries) {
 		ie->flags &= ~GOT_FILEIDX_F_NOT_FLUSHED;
+		if (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH)
+			continue;
 		err = write_fileindex_entry(&ctx, ie, outfile);
 		if (err)
 			return err;
@@ -686,8 +702,9 @@ walk_fileindex(struct got_fileindex *fileindex, struct got_fileindex_entry *ie)
 
 	next = RB_NEXT(got_fileindex_tree, &fileindex->entries, ie);
 
-	/* Skip entries which were newly added by diff callbacks. */
-	while (next && (next->flags & GOT_FILEIDX_F_NOT_FLUSHED))
+	/* Skip entries which were added or removed by diff callbacks. */
+	while (next && (next->flags & (GOT_FILEIDX_F_NOT_FLUSHED |
+	    GOT_FILEIDX_F_REMOVE_ON_FLUSH)))
 		next = RB_NEXT(got_fileindex_tree, &fileindex->entries, next);
 
 	return next;
@@ -1028,7 +1045,14 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 				break;
 			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
+			char *de_path;
 			de = dle->data;
+			if (asprintf(&de_path, "%s/%s", path,
+			    de->d_name) == -1) {
+				err = got_error_from_errno("asprintf");
+				break;
+			}
+			free(de_path);
 			err = cb->diff_new(cb_arg, de, path, dirfd);
 			if (err)
 				break;

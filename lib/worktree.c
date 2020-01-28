@@ -4256,7 +4256,6 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 			if (ct->status == GOT_STATUS_DELETE ||
 			    ct->staged_status == GOT_STATUS_DELETE) {
 				got_fileindex_entry_remove(fileindex, ie);
-				got_fileindex_entry_free(ie);
 			} else if (ct->staged_status == GOT_STATUS_ADD ||
 			    ct->staged_status == GOT_STATUS_MODIFY) {
 				got_fileindex_entry_stage_set(ie,
