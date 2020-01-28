@@ -370,18 +370,23 @@ gw_diff(struct gw_trans *gw_trans)
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
-		return error;
+		goto done;
 
 	diff_html = gw_get_diff(gw_trans, header);
 
-	if (diff_html == NULL)
+	if (diff_html == NULL) {
 		diff_html = strdup("");
+		if (diff_html == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
 
-	if ((asprintf(&diff_html_disp, diff_header,
+	if (asprintf(&diff_html_disp, diff_header,
 	    gw_gen_diff_header(header->parent_id, header->commit_id),
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_tree_header(header->tree_id),
@@ -389,16 +394,22 @@ gw_diff(struct gw_trans *gw_trans)
 	    gw_gen_committer_header(header->committer),
 	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    diff_html)) == -1)
-		return got_error_from_errno("asprintf");
+	    diff_html) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
-	if ((asprintf(&diff, diff_wrapper, diff_html_disp)) == -1)
-		return got_error_from_errno("asprintf");
+	if (asprintf(&diff, diff_wrapper, diff_html_disp) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	kerr = khttp_puts(gw_trans->gw_req, diff);
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
-	got_ref_list_free(&header->refs);
+done:
+	if (header)
+		got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(diff_html_disp);
 	free(diff_html);
