@@ -2716,14 +2716,14 @@ main(int argc, char *argv[])
 	kerr = khttp_parse(gw_trans->gw_req, gw_keys, KEY__ZMAX, &page, 1, 0);
 	if (kerr != KCGI_OK) {
 		error = gw_kcgi_error(kerr);
-		goto err;
+		goto done;
 	}
 
 	if ((gw_trans->gw_conf =
 	    malloc(sizeof(struct gotweb_conf))) == NULL) {
 		gw_malloc = 0;
 		error = got_error_from_errno("malloc");
-		goto err;
+		goto done;
 	}
 
 	TAILQ_INIT(&gw_trans->gw_dirs);
@@ -2740,24 +2740,20 @@ main(int argc, char *argv[])
 	gw_trans->gw_tmpl->arg = gw_trans;
 	gw_trans->gw_tmpl->cb = gw_template;
 	error = parse_conf(GOTWEB_CONF, gw_trans->gw_conf);
+	if (error)
+		goto done;
 
-err:
+	error = gw_parse_querystring(gw_trans);
+	if (error)
+		goto done;
+
+	error = gw_display_index(gw_trans, error);
+done:
 	if (error) {
 		gw_trans->mime = KMIME_TEXT_PLAIN;
 		gw_trans->action = GW_ERR;
 		gw_display_index(gw_trans, error);
-		goto done;
 	}
-
-	error = gw_parse_querystring(gw_trans);
-	if (error)
-		goto err;
-
-	error = gw_display_index(gw_trans, error);
-	if (error)
-		goto err;
-
-done:
 	if (gw_malloc) {
 		free(gw_trans->gw_conf->got_repos_path);
 		free(gw_trans->gw_conf->got_www_path);
