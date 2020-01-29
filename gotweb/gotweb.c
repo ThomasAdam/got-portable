@@ -698,11 +698,8 @@ gw_summary(struct gw_trans *gw_trans)
 	     *heads_html;
 	enum kcgi_err kerr;
 
-	if (pledge("stdio rpath proc exec sendfd unveil",
-	    NULL) == -1) {
-		error = got_error_from_errno("pledge");
-		return error;
-	}
+	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+		return got_error_from_errno("pledge");
 
 	/* unveil is applied with gw_briefs below */
 
