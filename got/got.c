@@ -5645,14 +5645,34 @@ histedit_write_commit_list(struct got_object_id_queue *commits, FILE *f,
 }
 
 static const struct got_error *
-write_cmd_list(FILE *f)
+write_cmd_list(FILE *f, const char *branch_name,
+    struct got_object_id_queue *commits)
 {
 	const struct got_error *err = NULL;
 	int n, i;
+	char *id_str;
+	struct got_object_qid *qid;
+
+	qid = SIMPLEQ_FIRST(commits);
+	err = got_object_id_str(&id_str, qid->id);
+	if (err)
+		return err;
+
+	n = fprintf(f,
+	    "# Editing the history of branch '%s' starting at\n"
+	    "# commit %s\n"
+	    "# Commits will be processed in order from top to "
+	    "bottom of this file.\n", branch_name, id_str);
+	if (n < 0) {
+		err = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
 
 	n = fprintf(f, "# Available histedit commands:\n");
-	if (n < 0)
-		return got_ferror(f, GOT_ERR_IO);
+	if (n < 0) {
+		err = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
 
 	for (i = 0; i < nitems(got_histedit_cmds); i++) {
 		struct got_histedit_cmd *cmd = &got_histedit_cmds[i];
@@ -5663,10 +5683,8 @@ write_cmd_list(FILE *f)
 			break;
 		}
 	}
-	n = fprintf(f, "# Commits will be processed in order from top to "
-	    "bottom of this file.\n");
-	if (n < 0)
-		return got_ferror(f, GOT_ERR_IO);
+done:
+	free(id_str);
 	return err;
 }
 
@@ -5991,11 +6009,13 @@ done:
 
 static const struct got_error *
 histedit_edit_list_retry(struct got_histedit_list *, const struct got_error *,
-    struct got_object_id_queue *, const char *, struct got_repository *);
+    struct got_object_id_queue *, const char *, const char *,
+    struct got_repository *);
 
 static const struct got_error *
 histedit_edit_script(struct got_histedit_list *histedit_cmds,
-    struct got_object_id_queue *commits, struct got_repository *repo)
+    struct got_object_id_queue *commits, const char *branch_name,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	FILE *f = NULL;
@@ -6005,7 +6025,7 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 	if (err)
 		return err;
 
-	err = write_cmd_list(f);
+	err = write_cmd_list(f, branch_name, commits);
 	if (err)
 		goto done;
 
@@ -6025,7 +6045,7 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 		    err->code != GOT_ERR_HISTEDIT_CMD)
 			goto done;
 		err = histedit_edit_list_retry(histedit_cmds, err,
-		    commits, path, repo);
+		    commits, path, branch_name, repo);
 	}
 done:
 	if (f && fclose(f) != 0 && err == NULL)
@@ -6113,7 +6133,7 @@ done:
 static const struct got_error *
 histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
     const struct got_error *edit_err, struct got_object_id_queue *commits,
-    const char *path, struct got_repository *repo)
+    const char *path, const char *branch_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *prev_err = edit_err;
 	int resp = ' ';
@@ -6140,7 +6160,7 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 		} else if (resp == 'r') {
 			histedit_free_list(histedit_cmds);
 			err = histedit_edit_script(histedit_cmds,
-			    commits, repo);
+			    commits, branch_name, repo);
 			if (err) {
 				if (err->code != GOT_ERR_HISTEDIT_SYNTAX &&
 				    err->code != GOT_ERR_HISTEDIT_CMD)
@@ -6499,8 +6519,12 @@ cmd_histedit(int argc, char *argv[])
 				goto done;
 			}
 		} else {
+			const char *branch_name;
+			branch_name = got_ref_get_symref_target(branch);
+			if (strncmp(branch_name, "refs/heads/", 11) == 0)
+				branch_name += 11;
 			error = histedit_edit_script(&histedit_cmds, &commits,
-			    repo);
+			    branch_name, repo);
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
