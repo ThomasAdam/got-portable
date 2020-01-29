@@ -1912,8 +1912,10 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		error = gw_get_commit(gw_trans, header);
 		if (limit > 1) {
 			struct gw_header *n_header = NULL;
-			if ((n_header = gw_init_header()) == NULL)
+			if ((n_header = gw_init_header()) == NULL) {
 				error = got_error_from_errno("malloc");
+				goto done;
+			}
 
 			n_header->refs_str = strdup(header->refs_str);
 			n_header->commit_id = strdup(header->commit_id);
