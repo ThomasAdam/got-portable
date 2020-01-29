@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <ctype.h>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -240,7 +241,7 @@ enum gw_query_actions {
 
 static struct gw_query_action gw_query_funcs[] = {
 	{ GW_BLAME,	"blame",	gw_blame,	"gw_tmpl/blame.tmpl" },
-	{ GW_BLOB,	"blob",		gw_blob,	"gw_tmpl/blob.tmpl" },
+	{ GW_BLOB,	"blob",		NULL,		NULL },
 	{ GW_BRIEFS,	"briefs",	gw_briefs,	"gw_tmpl/briefs.tmpl" },
 	{ GW_COMMITS,	"commits",	gw_commits,	"gw_tmpl/commit.tmpl" },
 	{ GW_DIFF,	"diff",		gw_diff,	"gw_tmpl/diff.tmpl" },
@@ -395,9 +396,13 @@ gw_blob(struct gw_trans *gw_trans)
 		}
 	}
 
-	kerr = khttp_puts(gw_trans->gw_req, blob);
-	if (kerr != KCGI_OK)
-		error = gw_kcgi_error(kerr);
+	if (gw_trans->mime == KMIME_APP_OCTET_STREAM)
+		goto done;
+	else {
+		kerr = khttp_puts(gw_trans->gw_req, blob);
+		if (kerr != KCGI_OK)
+			error = gw_kcgi_error(kerr);
+	}
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -1179,9 +1184,6 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 	if ((p = gw_trans->gw_req->fieldmap[KEY_PAGE]))
 		gw_trans->page = p->parsed.i;
 
-	if (gw_trans->action == GW_BLOB)
-		gw_trans->mime = KMIME_TEXT_PLAIN;
-
 	return error;
 }
 
@@ -1215,15 +1217,25 @@ gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 	    kmimetypes[mime]);
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
-	kerr = khttp_head(gw_trans->gw_req, "X-Content-Type-Options", "nosniff");
+	kerr = khttp_head(gw_trans->gw_req, "X-Content-Type-Options",
+	    "nosniff");
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
 	kerr = khttp_head(gw_trans->gw_req, "X-Frame-Options", "DENY");
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
-	kerr = khttp_head(gw_trans->gw_req, "X-XSS-Protection", "1; mode=block");
+	kerr = khttp_head(gw_trans->gw_req, "X-XSS-Protection",
+	    "1; mode=block");
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
+
+	if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
+		kerr = khttp_head(gw_trans->gw_req,
+		    kresps[KRESP_CONTENT_DISPOSITION],
+		    "attachment; filename=%s", gw_trans->repo_file);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+	}
 
 	kerr = khttp_body(gw_trans->gw_req);
 	return gw_kcgi_error(kerr);
@@ -1243,11 +1255,13 @@ gw_display_index(struct gw_trans *gw_trans)
 	if (kerr)
 		return gw_kcgi_error(kerr);
 
-	kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
-	    gw_query_funcs[gw_trans->action].template);
-	if (kerr != KCGI_OK) {
-		khtml_close(gw_trans->gw_html_req);
-		return gw_kcgi_error(kerr);
+	if (gw_trans->action != GW_BLOB) {
+		kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
+		    gw_query_funcs[gw_trans->action].template);
+		if (kerr != KCGI_OK) {
+			khtml_close(gw_trans->gw_html_req);
+			return gw_kcgi_error(kerr);
+		}
 	}
 
 	return gw_kcgi_error(khtml_close(gw_trans->gw_html_req));
@@ -2371,6 +2385,7 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 	struct gw_blame_cb_args bca;
 	int i, obj_type;
 	size_t filesize;
+	enum kcgi_err kerr;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -2436,13 +2451,41 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 		goto done;
 
 	if (gw_trans->action == GW_BLOB) {
-		int len;
+		int len, p, p_check, t = 0, t_check = 50;
+
 		fseek(bca.f, 0, SEEK_END);
-		len = ftell(bca.f) + 1;
+		p_check = len = ftell(bca.f) + 1;
 		fseek(bca.f, 0, SEEK_SET);
+
 		if ((blame_html = calloc(len, sizeof(char *))) == NULL)
 			goto done;
+
 		fread(blame_html, 1, len, bca.f);
+
+		for (p = 0; p < p_check; p++) {
+			if (isprint(blame_html[p]) == 0)
+				if (iscntrl(blame_html[p]) == 0)
+					t++;
+		}
+
+		/*
+		 * Anything over zero is most likely not plain text,
+		 * but let's be sure. Perhaps there's a better way to
+		 * check in the future.
+		 */
+
+		if (t > t_check)
+			gw_trans->mime = KMIME_APP_OCTET_STREAM;
+		else
+			gw_trans->mime = KMIME_TEXT_PLAIN;
+
+		error = gw_display_index(gw_trans);
+
+		if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
+			kerr = khttp_write(gw_trans->gw_req, blame_html, len);
+			if (kerr != KCGI_OK)
+				error = gw_kcgi_error(kerr);
+		}
 		goto done;
 	}
 
@@ -2625,6 +2668,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
+
 		if (asprintf(&tree_row, tree_line, class, url_html,
 			class) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -2735,8 +2779,8 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 			continue;
 		}
 
-		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path, refname,
-		    TM_DIFF);
+		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path,
+		    refname, TM_DIFF);
 		if (error)
 			goto done;
 
@@ -2979,7 +3023,10 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = gw_display_index(gw_trans);
+	if (gw_trans->action == GW_BLOB)
+		error = gw_blob(gw_trans);
+	else
+		error = gw_display_index(gw_trans);
 done:
 	if (error) {
 		gw_trans->mime = KMIME_TEXT_PLAIN;
