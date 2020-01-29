@@ -2656,7 +2656,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 					goto done;
 				}
 			} else {
-				if (asprintf(&build_folder, "%s",
+				if (asprintf(&build_folder, "/%s",
 				    got_tree_entry_get_name(te)) == -1)
 					goto done;
 			}
