@@ -646,36 +646,43 @@ gw_briefs(struct gw_trans *gw_trans)
 	else
 		error = gw_get_header(gw_trans, header,
 		    gw_trans->gw_conf->got_max_commits_display);
-
 	if (error)
-		return error;
+		goto done;
 
 	kerr = khttp_puts(gw_trans->gw_req, briefs_wrapper);
-	if (kerr != KCGI_OK)
-		return gw_kcgi_error(kerr);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
 
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
 		if ((asprintf(&briefs_navs_html, briefs_navs,
 		    gw_trans->repo_name, n_header->commit_id,
 		    gw_trans->repo_name, n_header->commit_id,
-		    gw_trans->repo_name, n_header->commit_id)) == -1)
-			return got_error_from_errno("asprintf");
+		    gw_trans->repo_name, n_header->commit_id)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		newline = strchr(n_header->commit_msg, '\n');
 		if (newline)
 			*newline = '\0';
 		if ((asprintf(&briefs_html, briefs_line,
 		    gw_get_time_str(n_header->committer_time, TM_DIFF),
 		    n_header->author, gw_html_escape(n_header->commit_msg),
-		    briefs_navs_html)) == -1)
-			return got_error_from_errno("asprintf");
+		    briefs_navs_html)) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		kerr = khttp_puts(gw_trans->gw_req, briefs_html);
-		if (kerr != KCGI_OK)
-			return gw_kcgi_error(kerr);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
 	}
 	kerr = khttp_puts(gw_trans->gw_req, div_end);
 	if (kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
-
+done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
