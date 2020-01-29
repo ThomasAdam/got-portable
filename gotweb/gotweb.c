@@ -2897,5 +2897,5 @@ done:
 	}
 
 	khttp_free(gw_trans->gw_req);
-	return EXIT_SUCCESS;
+	return 0;
 }
