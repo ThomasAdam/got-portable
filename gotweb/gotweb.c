@@ -367,7 +367,7 @@ gw_blob(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *blob = NULL, *blob_html = NULL, *blob_html_disp = NULL;
+	char *blob = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -385,27 +385,14 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	blob_html = gw_get_file_blame_blob(gw_trans);
+	blob = gw_get_file_blame_blob(gw_trans);
 
-	if (blob_html == NULL) {
-		blob_html = strdup("");
-		if (blob_html == NULL) {
+	if (blob == NULL) {
+		blob = strdup("");
+		if (blob == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
 		}
-	}
-
-	if (asprintf(&blob_html_disp, blob_header,
-	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
-	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    blob_html) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	if (asprintf(&blob, blob_wrapper, blob_html_disp) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
 	}
 
 	kerr = khttp_puts(gw_trans->gw_req, blob);
@@ -414,8 +401,6 @@ gw_blob(struct gw_trans *gw_trans)
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(blob_html_disp);
-	free(blob_html);
 	free(blob);
 	return error;
 }
@@ -1194,8 +1179,8 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 	if ((p = gw_trans->gw_req->fieldmap[KEY_PAGE]))
 		gw_trans->page = p->parsed.i;
 
-	/* if (gw_trans->action == GW_RAW) */
-	/* 	gw_trans->mime = KMIME_TEXT_PLAIN; */
+	if (gw_trans->action == GW_BLOB)
+		gw_trans->mime = KMIME_TEXT_PLAIN;
 
 	return error;
 }

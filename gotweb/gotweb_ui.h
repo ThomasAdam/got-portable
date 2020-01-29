@@ -208,30 +208,6 @@ char *briefs_navs =
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
-/* blob.tmpl */
-
-char *blob_wrapper =
-	"<div id='blob_title_wrapper'>" \
-	"<div id='blob_title'>Blob</div></div>" \
-	"<div id='blob_content'>%s</div>";
-
-char *blob_header =
-	"<div id='blob_header_wrapper'>" \
-	"<div id='blob_header'>%s%s</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>" \
-	"<div id='blob'>%s</div>" \
-	"</div>";
-
-char *blob_line =
-	"<div id='blob_wrapper'>" \
-	"<div id='blob_number'>%.*d</div>" \
-	"<div id='blob_hash'>%.8s</div>" \
-	"<div id='blob_date'>%s</div>" \
-	"<div id='blob_author'>%-8s</div>" \
-	"<div id='blob_code'>%s</div>" \
-	"</div>";
-
 /* blame.tmpl */
 
 char *blame_wrapper =
