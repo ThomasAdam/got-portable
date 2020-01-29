@@ -1186,9 +1186,13 @@ gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 static const struct got_error *
 gw_display_index(struct gw_trans *gw_trans)
 {
+	const struct got_error *error;
 	enum kcgi_err kerr;
 
-	gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
+	error = gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
+	if (error)
+		return error;
+
 	kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
 	if (kerr)
 		return gw_kcgi_error(kerr);
