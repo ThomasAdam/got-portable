@@ -126,11 +126,11 @@ char *heads_navs =
 	"<a href='?path=%s&action=commits&headref=%s'>commits</a>";
 
 char *folder_html =
-	"<a href='?path=%s&action=%s&commit=%s&folder=/%s' " \
+	"<a href='?path=%s&action=%s&commit=%s&folder=%s' " \
 	    "class='diff_directory'>%s%s</a>";
 
 char *file_html =
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s%s</a>";
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s%s</a>";
 
 /* headers */
 
@@ -257,8 +257,8 @@ char *tree_line_with_navs =
 	"<div id='tree_wrapper'>" \
 	"<div id='tree_line' class='%s'>%s</div>" \
 	"<div id='tree_line_navs' class='%s'>" \
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s</a> | " \
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s</a>" \
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s</a> | " \
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s</a>" \
 	"</div>" \
 	"</div>";
 
