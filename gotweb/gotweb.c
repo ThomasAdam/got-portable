@@ -1348,10 +1348,7 @@ gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 	free(d_file);
 	return description;
 err:
-	if (asprintf(&description, "%s", "") == -1)
-		return NULL;
-
-	return description;
+	return strdup("");
 }
 
 static char *
@@ -1442,11 +1439,8 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
 		is_head = 1;
 
-	if (gw_trans->gw_conf->got_show_repo_age == false) {
-		if (asprintf(&repo_age, "") == -1)
-			return NULL;
-		return repo_age;
-	}
+	if (gw_trans->gw_conf->got_show_repo_age == false)
+		return strdup("");
 
 	error = got_repo_open(&repo, dir, NULL);
 	if (error)
@@ -1490,8 +1484,7 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 		committer_time = cmp_time;
 		repo_age = gw_get_time_str(committer_time, ref_tm);
 	} else
-		if (asprintf(&repo_age, "") == -1)
-			return NULL;
+		return strdup("");
 	got_ref_list_free(&refs);
 	free(id);
 	return repo_age;
@@ -1657,10 +1650,7 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 	free(d_file);
 	return owner;
 err:
-	if (asprintf(&owner, "%s", "") == -1)
-		return NULL;
-
-	return owner;
+	return strdup("");
 }
 
 static char *
