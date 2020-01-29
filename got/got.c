@@ -5577,7 +5577,8 @@ static struct got_histedit_cmd {
 } got_histedit_cmds[] = {
 	{ GOT_HISTEDIT_PICK, "pick", "use commit" },
 	{ GOT_HISTEDIT_EDIT, "edit", "use commit but stop for amending" },
-	{ GOT_HISTEDIT_FOLD, "fold", "combine with commit below" },
+	{ GOT_HISTEDIT_FOLD, "fold", "combine with next commit that will "
+	    "be used" },
 	{ GOT_HISTEDIT_DROP, "drop", "remove commit from history" },
 	{ GOT_HISTEDIT_MESG, "mesg",
 	    "single-line log message for commit above (open editor if empty)" },
