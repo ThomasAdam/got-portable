@@ -249,7 +249,7 @@ char *tree_header =
 
 char *tree_line =
 	"<div id='tree_wrapper'>" \
-	"<div id='tree_line'>%s</div>" \
+	"<div id='tree_line' class='%s'>%s</div>" \
 	"</div>";
 
 /* tag.tmpl */

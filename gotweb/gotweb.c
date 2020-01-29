@@ -2456,8 +2456,8 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 	char *tree_html = NULL, *path = NULL, *in_repo_path = NULL,
-	    *tree_row = NULL, *id_str;
-	int nentries, i;
+	    *tree_row = NULL, *id_str, *class = NULL;
+	int nentries, i, class_flip = 0;
 
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
@@ -2535,6 +2535,14 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		else if (mode & S_IXUSR)
 			modestr = "*";
 
+		if (class_flip == 0) {
+			class = strdup("back_lightgray");
+			class_flip = 1;
+		} else {
+			class = strdup("back_white");
+			class_flip = 0;
+		}
+
 		char *build_folder = NULL;
 		if (S_ISDIR(got_tree_entry_get_mode(te))) {
 			if (gw_trans->repo_folder != NULL) {
@@ -2582,7 +2590,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 
-		if (asprintf(&tree_row, tree_line, url_html) == -1) {
+		if ((asprintf(&tree_row, tree_line, class, url_html)) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}

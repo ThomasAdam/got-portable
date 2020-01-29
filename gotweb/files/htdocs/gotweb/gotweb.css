@@ -50,6 +50,13 @@ body {
 	color: blue;
 }
 
+.back_white {
+	background-color: #ffffff;
+}
+.back_lightgray {
+	background-color: #d8f3ef;
+}
+
 #dotted_line {
 	clear: left;
 	float: left;
@@ -631,7 +638,8 @@ body {
 }
 #tree_line {
 	clear: left;
-	float:left ;
+	float: left;
+	width: 20em;
 }
 
 /* tag.tmpl */
