@@ -208,6 +208,30 @@ char *briefs_navs =
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
 
+/* blob.tmpl */
+
+char *blob_wrapper =
+	"<div id='blob_title_wrapper'>" \
+	"<div id='blob_title'>Blob</div></div>" \
+	"<div id='blob_content'>%s</div>";
+
+char *blob_header =
+	"<div id='blob_header_wrapper'>" \
+	"<div id='blob_header'>%s%s</div>" \
+	"</div>" \
+	"<div id='dotted_line'></div>" \
+	"<div id='blob'>%s</div>" \
+	"</div>";
+
+char *blob_line =
+	"<div id='blob_wrapper'>" \
+	"<div id='blob_number'>%.*d</div>" \
+	"<div id='blob_hash'>%.8s</div>" \
+	"<div id='blob_date'>%s</div>" \
+	"<div id='blob_author'>%-8s</div>" \
+	"<div id='blob_code'>%s</div>" \
+	"</div>";
+
 /* blame.tmpl */
 
 char *blame_wrapper =
@@ -250,6 +274,16 @@ char *tree_header =
 char *tree_line =
 	"<div id='tree_wrapper'>" \
 	"<div id='tree_line' class='%s'>%s</div>" \
+	"<div id='tree_line_blank' class='%s'>&nbsp;</div>" \
+	"</div>";
+
+char *tree_line_with_navs =
+	"<div id='tree_wrapper'>" \
+	"<div id='tree_line' class='%s'>%s</div>" \
+	"<div id='tree_line_navs' class='%s'>" \
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s</a> | " \
+	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=/%s'>%s</a>" \
+	"</div>" \
 	"</div>";
 
 /* tag.tmpl */
