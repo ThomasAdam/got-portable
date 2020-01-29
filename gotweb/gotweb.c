@@ -188,7 +188,8 @@ static char			*gw_gen_tree_header(char *);
 static void			 gw_free_headers(struct gw_header *);
 static const struct got_error*	 gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
-static const struct got_error*	 gw_display_index(struct gw_trans *,
+static const struct got_error*	 gw_display_index(struct gw_trans *);
+static void			 gw_display_error(struct gw_trans *,
 				    const struct got_error *);
 
 static int			 gw_template(size_t, void *);
@@ -1183,24 +1184,36 @@ gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 }
 
 static const struct got_error *
-gw_display_index(struct gw_trans *gw_trans, const struct got_error *err)
+gw_display_index(struct gw_trans *gw_trans)
 {
 	enum kcgi_err kerr;
 
 	gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
 	kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
+	if (kerr)
+		return gw_kcgi_error(kerr);
 
-	if (err)
-		kerr = khttp_puts(gw_trans->gw_req, err->msg);
-	else
-		kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
-		    gw_query_funcs[gw_trans->action].template);
+	kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
+	    gw_query_funcs[gw_trans->action].template);
 	if (kerr != KCGI_OK) {
 		khtml_close(gw_trans->gw_html_req);
 		return gw_kcgi_error(kerr);
 	}
 
 	return gw_kcgi_error(khtml_close(gw_trans->gw_html_req));
+}
+
+static void
+gw_display_error(struct gw_trans *gw_trans, const struct got_error *err)
+{
+	if (gw_display_open(gw_trans, KHTTP_200, gw_trans->mime) != NULL)
+		return;
+
+	if (khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0) != KCGI_OK)
+		return;
+
+	khttp_puts(gw_trans->gw_req, err->msg);
+	khtml_close(gw_trans->gw_html_req);
 }
 
 static int
@@ -2882,12 +2895,12 @@ main(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = gw_display_index(gw_trans, error);
+	error = gw_display_index(gw_trans);
 done:
 	if (error) {
 		gw_trans->mime = KMIME_TEXT_PLAIN;
 		gw_trans->action = GW_ERR;
-		gw_display_index(gw_trans, error);
+		gw_display_error(gw_trans, error);
 	}
 	if (gw_malloc) {
 		free(gw_trans->gw_conf->got_repos_path);
