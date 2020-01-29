@@ -279,7 +279,7 @@ gw_apply_unveil(const char *repo_path, const char *repo_file)
 
 	if (repo_path && repo_file) {
 		char *full_path;
-		if ((asprintf(&full_path, "%s/%s", repo_path, repo_file)) == -1)
+		if (asprintf(&full_path, "%s/%s", repo_path, repo_file) == -1)
 			return got_error_from_errno("asprintf unveil");
 		if (unveil(full_path, "r") != 0)
 			return got_error_from_errno2("unveil", full_path);
@@ -334,10 +334,10 @@ gw_blame(struct gw_trans *gw_trans)
 		}
 	}
 
-	if ((asprintf(&blame_html_disp, blame_header,
+	if (asprintf(&blame_html_disp, blame_header,
 	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    blame_html)) == -1) {
+	    blame_html) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -474,13 +474,13 @@ gw_index(struct gw_trans *gw_trans)
 
 		if (error)
 			return error;
-		if((asprintf(&navs, index_navs, gw_dir->name, gw_dir->name,
-		    gw_dir->name, gw_dir->name)) == -1)
+		if(asprintf(&navs, index_navs, gw_dir->name, gw_dir->name,
+		    gw_dir->name, gw_dir->name) == -1)
 			return got_error_from_errno("asprintf");
 
-		if ((asprintf(&html, index_projects, gw_dir->name, gw_dir->name,
+		if (asprintf(&html, index_projects, gw_dir->name, gw_dir->name,
 		    gw_dir->description, gw_dir->owner, gw_dir->age,
-		    navs)) == -1)
+		    navs) == -1)
 			return got_error_from_errno("asprintf");
 
 		kerr = khttp_puts(gw_trans->gw_req, html);
@@ -509,8 +509,7 @@ gw_index(struct gw_trans *gw_trans)
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
-			if ((asprintf(&prev, nav_prev,
-			    gw_trans->page - 1)) == -1)
+			if (asprintf(&prev, nav_prev, gw_trans->page - 1) == -1)
 				return got_error_from_errno("asprintf");
 			kerr = khttp_puts(gw_trans->gw_req, prev);
 			free(prev);
@@ -526,8 +525,7 @@ gw_index(struct gw_trans *gw_trans)
 		    next_disp == gw_trans->gw_conf->got_max_repos_display &&
 		    dir_c != (gw_trans->page + 1) *
 		    gw_trans->gw_conf->got_max_repos_display) {
-			if ((asprintf(&next, nav_next,
-			    gw_trans->page + 1)) == -1)
+			if (asprintf(&next, nav_next, gw_trans->page + 1) == -1)
 				return got_error_from_errno("calloc");
 			kerr = khttp_puts(gw_trans->gw_req, next);
 			free(next);
@@ -586,22 +584,22 @@ gw_commits(struct gw_trans *gw_trans)
 		goto done;
 	}
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
-		if ((asprintf(&commits_navs_html, commits_navs,
+		if (asprintf(&commits_navs_html, commits_navs,
 		    gw_trans->repo_name, n_header->commit_id,
 		    gw_trans->repo_name, n_header->commit_id,
-		    gw_trans->repo_name, n_header->commit_id)) == -1) {
+		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 
-		if ((asprintf(&commits_html, commits_line,
+		if (asprintf(&commits_html, commits_line,
 	    	    gw_gen_commit_header(n_header->commit_id,
 		        n_header->refs_str),
 	    	    gw_gen_author_header(n_header->author),
 	    	    gw_gen_committer_header(n_header->committer),
 		    gw_gen_age_header(gw_get_time_str(n_header->committer_time,
 		        TM_LONG)), gw_html_escape(n_header->commit_msg),
-		    commits_navs_html)) == -1) {
+		    commits_navs_html) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -658,20 +656,20 @@ gw_briefs(struct gw_trans *gw_trans)
 	}
 
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
-		if ((asprintf(&briefs_navs_html, briefs_navs,
+		if (asprintf(&briefs_navs_html, briefs_navs,
 		    gw_trans->repo_name, n_header->commit_id,
 		    gw_trans->repo_name, n_header->commit_id,
-		    gw_trans->repo_name, n_header->commit_id)) == -1) {
+		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 		newline = strchr(n_header->commit_msg, '\n');
 		if (newline)
 			*newline = '\0';
-		if ((asprintf(&briefs_html, briefs_line,
+		if (asprintf(&briefs_html, briefs_line,
 		    gw_get_time_str(n_header->committer_time, TM_DIFF),
 		    n_header->author, gw_html_escape(n_header->commit_msg),
-		    briefs_navs_html)) == -1) {
+		    briefs_navs_html) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -716,8 +714,8 @@ gw_summary(struct gw_trans *gw_trans)
 	if (gw_trans->gw_conf->got_show_repo_description) {
 		if (gw_trans->gw_dir->description != NULL &&
 		    (strcmp(gw_trans->gw_dir->description, "") != 0)) {
-			if ((asprintf(&description_html, description,
-			    gw_trans->gw_dir->description)) == -1)
+			if (asprintf(&description_html, description,
+			    gw_trans->gw_dir->description) == -1)
 				return got_error_from_errno("asprintf");
 
 			kerr = khttp_puts(gw_trans->gw_req, description_html);
@@ -730,8 +728,8 @@ gw_summary(struct gw_trans *gw_trans)
 	if (gw_trans->gw_conf->got_show_repo_owner) {
 		if (gw_trans->gw_dir->owner != NULL &&
 		    (strcmp(gw_trans->gw_dir->owner, "") != 0)) {
-			if ((asprintf(&repo_owner_html, repo_owner,
-			    gw_trans->gw_dir->owner)) == -1)
+			if (asprintf(&repo_owner_html, repo_owner,
+			    gw_trans->gw_dir->owner) == -1)
 				return got_error_from_errno("asprintf");
 
 			kerr = khttp_puts(gw_trans->gw_req, repo_owner_html);
@@ -745,7 +743,7 @@ gw_summary(struct gw_trans *gw_trans)
 		age = gw_get_repo_age(gw_trans, gw_trans->gw_dir->path,
 		    "refs/heads", TM_LONG);
 		if (age != NULL && (strcmp(age, "") != 0)) {
-			if ((asprintf(&repo_age_html, last_change, age)) == -1)
+			if (asprintf(&repo_age_html, last_change, age) == -1)
 				return got_error_from_errno("asprintf");
 
 			kerr = khttp_puts(gw_trans->gw_req, repo_age_html);
@@ -759,8 +757,8 @@ gw_summary(struct gw_trans *gw_trans)
 	if (gw_trans->gw_conf->got_show_repo_cloneurl) {
 		if (gw_trans->gw_dir->url != NULL &&
 		    (strcmp(gw_trans->gw_dir->url, "") != 0)) {
-			if ((asprintf(&cloneurl_html, cloneurl,
-			    gw_trans->gw_dir->url)) == -1)
+			if (asprintf(&cloneurl_html, cloneurl,
+			    gw_trans->gw_dir->url) == -1)
 				return got_error_from_errno("asprintf");
 
 			kerr = khttp_puts(gw_trans->gw_req, cloneurl_html);
@@ -781,8 +779,7 @@ gw_summary(struct gw_trans *gw_trans)
 	heads = gw_get_repo_heads(gw_trans);
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
-		if ((asprintf(&tags_html, summary_tags,
-		    tags)) == -1)
+		if (asprintf(&tags_html, summary_tags, tags) == -1)
 			return got_error_from_errno("asprintf");
 		kerr = khttp_puts(gw_trans->gw_req, tags_html);
 		free(tags_html);
@@ -792,8 +789,7 @@ gw_summary(struct gw_trans *gw_trans)
 	}
 
 	if (heads != NULL && strcmp(heads, "") != 0) {
-		if ((asprintf(&heads_html, summary_heads,
-		    heads)) == -1)
+		if (asprintf(&heads_html, summary_heads, heads) == -1)
 			return got_error_from_errno("asprintf");
 		kerr = khttp_puts(gw_trans->gw_req, heads_html);
 		free(heads_html);
@@ -836,10 +832,10 @@ gw_tree(struct gw_trans *gw_trans)
 		}
 	}
 
-	if ((asprintf(&tree_html_disp, tree_header,
+	if (asprintf(&tree_html_disp, tree_header,
 	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    tree_html)) == -1) {
+	    tree_html) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -892,10 +888,10 @@ gw_tag(struct gw_trans *gw_trans)
 		}
 	}
 
-	if ((asprintf(&tag_html_disp, tag_header,
+	if (asprintf(&tag_html_disp, tag_header,
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    tag_html)) == -1) {
+	    tag_html) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -925,9 +921,9 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 	char *dir_test;
 	int opened = 0;
 
-	if ((asprintf(&dir_test, "%s/%s/%s",
+	if (asprintf(&dir_test, "%s/%s/%s",
 	    gw_trans->gw_conf->got_repos_path, gw_dir->name,
-	    GOTWEB_GIT_DIR)) == -1)
+	    GOTWEB_GIT_DIR) == -1)
 		return got_error_from_errno("asprintf");
 
 	dt = opendir(dir_test);
@@ -939,9 +935,9 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 		goto done;
 	}
 
-	if ((asprintf(&dir_test, "%s/%s/%s",
+	if (asprintf(&dir_test, "%s/%s/%s",
 	    gw_trans->gw_conf->got_repos_path, gw_dir->name,
-	    GOTWEB_GOT_DIR)) == -1)
+	    GOTWEB_GOT_DIR) == -1)
 		return got_error_from_errno("asprintf");
 
 	dt = opendir(dir_test);
@@ -953,8 +949,8 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 		goto errored;
 	}
 
-	if ((asprintf(&dir_test, "%s/%s",
-	    gw_trans->gw_conf->got_repos_path, gw_dir->name)) == -1)
+	if (asprintf(&dir_test, "%s/%s",
+	    gw_trans->gw_conf->got_repos_path, gw_dir->name) == -1)
 		return got_error_from_errno("asprintf");
 
 	gw_dir->path = strdup(dir_test);
@@ -1042,11 +1038,11 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		return error;
 	} else if ((p = gw_trans->gw_req->fieldmap[KEY_PATH])) {
 		/* define gw_trans->repo_path */
-		if ((asprintf(&gw_trans->repo_name, "%s", p->parsed.s)) == -1)
+		if (asprintf(&gw_trans->repo_name, "%s", p->parsed.s) == -1)
 			return got_error_from_errno("asprintf");
 
-		if ((asprintf(&gw_trans->repo_path, "%s/%s",
-		    gw_trans->gw_conf->got_repos_path, p->parsed.s)) == -1)
+		if (asprintf(&gw_trans->repo_path, "%s/%s",
+		    gw_trans->gw_conf->got_repos_path, p->parsed.s) == -1)
 			return got_error_from_errno("asprintf");
 
 		/* get action and set function */
@@ -1059,8 +1055,8 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				if (strcmp(action->func_name,
 				    p->parsed.s) == 0) {
 					gw_trans->action = i;
-					if ((asprintf(&gw_trans->action_name,
-					    "%s", action->func_name)) == -1)
+					if (asprintf(&gw_trans->action_name,
+					    "%s", action->func_name) == -1)
 						return
 						    got_error_from_errno(
 						    "asprintf");
@@ -1072,23 +1068,23 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 			}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID]))
-			if ((asprintf(&gw_trans->commit, "%s",
-			    p->parsed.s)) == -1)
+			if (asprintf(&gw_trans->commit, "%s",
+			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE]))
-			if ((asprintf(&gw_trans->repo_file, "%s",
-			    p->parsed.s)) == -1)
+			if (asprintf(&gw_trans->repo_file, "%s",
+			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_FOLDER]))
-			if ((asprintf(&gw_trans->repo_folder, "%s",
-			    p->parsed.s)) == -1)
+			if (asprintf(&gw_trans->repo_folder, "%s",
+			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF]))
-			if ((asprintf(&gw_trans->headref, "%s",
-			    p->parsed.s)) == -1)
+			if (asprintf(&gw_trans->headref, "%s",
+			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 
 		if (action == NULL) {
@@ -1122,7 +1118,7 @@ gw_init_gw_dir(char *dir)
 	if ((gw_dir = malloc(sizeof(*gw_dir))) == NULL)
 		return NULL;
 
-	if ((asprintf(&gw_dir->name, "%s", dir)) == -1)
+	if (asprintf(&gw_dir->name, "%s", dir) == -1)
 		return NULL;
 
 	return gw_dir;
@@ -1218,9 +1214,8 @@ gw_template(size_t key, void *arg)
 		    gw_trans->gw_conf->got_show_site_owner) {
 			site_owner_name =
 			    gw_html_escape(gw_trans->gw_conf->got_site_owner);
-			if ((asprintf(&site_owner_name_h, site_owner,
-			    site_owner_name))
-			    == -1)
+			if (asprintf(&site_owner_name_h, site_owner,
+			    site_owner_name) == -1)
 				return 0;
 
 			khttp_puts(gw_trans->gw_req, site_owner_name_h);
@@ -1245,7 +1240,7 @@ gw_gen_commit_header(char *str1, char *str2)
 	char *return_html = NULL, *ref_str = NULL;
 
 	if (strcmp(str2, "") != 0) {
-		if ((asprintf(&ref_str, "(%s)", str2)) == -1) {
+		if (asprintf(&ref_str, "(%s)", str2) == -1) {
 			return_html = strdup("");
 			return return_html;
 		}
@@ -1253,7 +1248,7 @@ gw_gen_commit_header(char *str1, char *str2)
 		ref_str = strdup("");
 
 
-	if ((asprintf(&return_html, header_commit_html, str1, ref_str)) == -1)
+	if (asprintf(&return_html, header_commit_html, str1, ref_str) == -1)
 		return_html = strdup("");
 
 	free(ref_str);
@@ -1265,7 +1260,7 @@ gw_gen_diff_header(char *str1, char *str2)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_diff_html, str1, str2)) == -1)
+	if (asprintf(&return_html, header_diff_html, str1, str2) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1276,7 +1271,7 @@ gw_gen_author_header(char *str)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_author_html, str)) == -1)
+	if (asprintf(&return_html, header_author_html, str) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1287,7 +1282,7 @@ gw_gen_committer_header(char *str)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_committer_html, str)) == -1)
+	if (asprintf(&return_html, header_committer_html, str) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1298,7 +1293,7 @@ gw_gen_age_header(char *str)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_age_html, str)) == -1)
+	if (asprintf(&return_html, header_age_html, str) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1309,7 +1304,7 @@ gw_gen_commit_msg_header(char *str)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_commit_msg_html, str)) == -1)
+	if (asprintf(&return_html, header_commit_msg_html, str) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1320,7 +1315,7 @@ gw_gen_tree_header(char *str)
 {
 	char *return_html = NULL;
 
-	if ((asprintf(&return_html, header_tree_html, str)) == -1)
+	if (asprintf(&return_html, header_tree_html, str) == -1)
 		return_html = strdup("");
 
 	return return_html;
@@ -1336,7 +1331,7 @@ gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 	if (gw_trans->gw_conf->got_show_repo_description == false)
 		goto err;
 
-	if ((asprintf(&d_file, "%s/description", dir)) == -1)
+	if (asprintf(&d_file, "%s/description", dir) == -1)
 		goto err;
 
 	if ((f = fopen(d_file, "r")) == NULL)
@@ -1353,7 +1348,7 @@ gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 	free(d_file);
 	return description;
 err:
-	if ((asprintf(&description, "%s", "")) == -1)
+	if (asprintf(&description, "%s", "") == -1)
 		return NULL;
 
 	return description;
@@ -1375,36 +1370,36 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 	case TM_DIFF:
 		diff_time = time(NULL) - committer_time;
 		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 365), years)) == -1)
+			if (asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 365), years) == -1)
 				return NULL;
 		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
+			if (asprintf(&repo_age, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / (365 / 12)),
-			    months)) == -1)
+			    months) == -1)
 				return NULL;
 		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24 / 7), weeks)) == -1)
+			if (asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
 				return NULL;
 		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60 / 24), days)) == -1)
+			if (asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60 / 24), days) == -1)
 				return NULL;
 		} else if (diff_time > 60 * 60 * 2) {
-			if ((asprintf(&repo_age, "%lld %s",
-			    (diff_time / 60 / 60), hours)) == -1)
+			if (asprintf(&repo_age, "%lld %s",
+			    (diff_time / 60 / 60), hours) == -1)
 				return NULL;
 		} else if (diff_time > 60 * 2) {
-			if ((asprintf(&repo_age, "%lld %s", (diff_time / 60),
-			    minutes)) == -1)
+			if (asprintf(&repo_age, "%lld %s", (diff_time / 60),
+			    minutes) == -1)
 				return NULL;
 		} else if (diff_time > 2) {
-			if ((asprintf(&repo_age, "%lld %s", diff_time,
-			    seconds)) == -1)
+			if (asprintf(&repo_age, "%lld %s", diff_time,
+			    seconds) == -1)
 				return NULL;
 		} else {
-			if ((asprintf(&repo_age, "%s", now)) == -1)
+			if (asprintf(&repo_age, "%s", now) == -1)
 				return NULL;
 		}
 		break;
@@ -1416,7 +1411,7 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 		if (s == NULL)
 			return NULL;
 
-		if ((asprintf(&repo_age, "%s UTC", datebuf)) == -1)
+		if (asprintf(&repo_age, "%s UTC", datebuf) == -1)
 			return NULL;
 		break;
 	}
@@ -1448,7 +1443,7 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 		is_head = 1;
 
 	if (gw_trans->gw_conf->got_show_repo_age == false) {
-		if ((asprintf(&repo_age, "")) == -1)
+		if (asprintf(&repo_age, "") == -1)
 			return NULL;
 		return repo_age;
 	}
@@ -1495,13 +1490,13 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 		committer_time = cmp_time;
 		repo_age = gw_get_time_str(committer_time, ref_tm);
 	} else
-		if ((asprintf(&repo_age, "")) == -1)
+		if (asprintf(&repo_age, "") == -1)
 			return NULL;
 	got_ref_list_free(&refs);
 	free(id);
 	return repo_age;
 err:
-	if ((asprintf(&repo_age, "%s", error->msg)) == -1)
+	if (asprintf(&repo_age, "%s", error->msg) == -1)
 		return NULL;
 
 	return repo_age;
@@ -1621,7 +1616,7 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 	if (gw_trans->gw_conf->got_show_repo_owner == false)
 		goto err;
 
-	if ((asprintf(&d_file, "%s/config", dir)) == -1)
+	if (asprintf(&d_file, "%s/config", dir) == -1)
 		goto err;
 
 	if ((f = fopen(d_file, "r")) == NULL)
@@ -1662,7 +1657,7 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 	free(d_file);
 	return owner;
 err:
-	if ((asprintf(&owner, "%s", "")) == -1)
+	if (asprintf(&owner, "%s", "") == -1)
 		return NULL;
 
 	return owner;
@@ -1675,7 +1670,7 @@ gw_get_clone_url(struct gw_trans *gw_trans, char *dir)
 	char *url = NULL, *d_file = NULL;
 	unsigned int len;
 
-	if ((asprintf(&d_file, "%s/cloneurl", dir)) == -1)
+	if (asprintf(&d_file, "%s/cloneurl", dir) == -1)
 		return NULL;
 
 	if ((f = fopen(d_file, "r")) == NULL)
@@ -1773,22 +1768,22 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			if (newline)
 				*newline = '\0';
 
-			if ((asprintf(&age, "%s", gw_get_time_str(tagger_time,
-			    TM_DIFF))) == -1) {
+			if (asprintf(&age, "%s", gw_get_time_str(tagger_time,
+			    TM_DIFF)) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 
-			if ((asprintf(&tags_navs_disp, tags_navs,
+			if (asprintf(&tags_navs_disp, tags_navs,
 			    gw_trans->repo_name, id_str, gw_trans->repo_name,
 			    id_str, gw_trans->repo_name, id_str,
-			    gw_trans->repo_name, id_str)) == -1) {
+			    gw_trans->repo_name, id_str) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 
-			if ((asprintf(&tag_row, tags_row, age, refname,
-			    tag_commit, tags_navs_disp)) == -1) {
+			if (asprintf(&tag_row, tags_row, age, refname,
+			    tag_commit, tags_navs_disp) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -1796,14 +1791,14 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			free(tags_navs_disp);
 			break;
 		case TAGFULL:
-			if ((asprintf(&age, "%s", gw_get_time_str(tagger_time,
-			    TM_LONG))) == -1) {
+			if (asprintf(&age, "%s", gw_get_time_str(tagger_time,
+			    TM_LONG)) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
-			if ((asprintf(&tag_row, tag_info, age,
+			if (asprintf(&tag_row, tag_info, age,
 			    gw_html_escape(tagger),
-			    gw_html_escape(tag_commit))) == -1) {
+			    gw_html_escape(tag_commit)) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -1986,8 +1981,8 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		if (cmp != 0)
 			continue;
 		s = refs_str;
-		if ((asprintf(&refs_str, "%s%s%s", s ? s : "",
-		    s ? ", " : "", name)) == -1) {
+		if (asprintf(&refs_str, "%s%s%s", s ? s : "",
+		    s ? ", " : "", name) == -1) {
 			error = got_error_from_errno("asprintf");
 			free(s);
 			return error;
@@ -2299,14 +2294,14 @@ gw_get_file_blame(struct gw_trans *gw_trans)
 		goto done;
 
 	if (gw_trans->repo_folder != NULL) {
-		if ((asprintf(&folder, "%s/", gw_trans->repo_folder)) == -1) {
+		if (asprintf(&folder, "%s/", gw_trans->repo_folder) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 	} else
 		folder = strdup("");
 
-	if ((asprintf(&path, "%s%s", folder, gw_trans->repo_file)) == -1) {
+	if (asprintf(&path, "%s%s", folder, gw_trans->repo_file) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -2484,7 +2479,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 
-		if ((asprintf(&id, "%s", id_str)) == -1) {
+		if (asprintf(&id, "%s", id_str) == -1) {
 			error = got_error_from_errno("asprintf");
 			free(id_str);
 			goto done;
@@ -2504,9 +2499,9 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		char *build_folder = NULL;
 		if (S_ISDIR(got_tree_entry_get_mode(te))) {
 			if (gw_trans->repo_folder != NULL) {
-				if ((asprintf(&build_folder, "%s/%s",
+				if (asprintf(&build_folder, "%s/%s",
 				    gw_trans->repo_folder,
-				    got_tree_entry_get_name(te))) == -1) {
+				    got_tree_entry_get_name(te)) == -1) {
 					error =
 					    got_error_from_errno("asprintf");
 					goto done;
@@ -2517,17 +2512,17 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 					goto done;
 			}
 
-			if ((asprintf(&url_html, folder_html,
+			if (asprintf(&url_html, folder_html,
 			    gw_trans->repo_name, gw_trans->action_name,
 			    gw_trans->commit, build_folder,
-			    got_tree_entry_get_name(te), modestr)) == -1) {
+			    got_tree_entry_get_name(te), modestr) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 		} else {
 			if (gw_trans->repo_folder != NULL) {
-				if ((asprintf(&build_folder, "%s",
-				    gw_trans->repo_folder)) == -1) {
+				if (asprintf(&build_folder, "%s",
+				    gw_trans->repo_folder) == -1) {
 					error =
 					    got_error_from_errno("asprintf");
 					goto done;
@@ -2535,10 +2530,10 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 			} else
 				build_folder = strdup("");
 
-			if ((asprintf(&url_html, file_html, gw_trans->repo_name,
+			if (asprintf(&url_html, file_html, gw_trans->repo_name,
 			    "blame", gw_trans->commit,
 			    got_tree_entry_get_name(te), build_folder,
-			    got_tree_entry_get_name(te), modestr)) == -1) {
+			    got_tree_entry_get_name(te), modestr) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -2548,7 +2543,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 
-		if ((asprintf(&tree_row, tree_line, url_html)) == -1) {
+		if (asprintf(&tree_row, tree_line, url_html) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2624,10 +2619,10 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 		age = gw_get_repo_age(gw_trans, gw_trans->gw_dir->path, refname,
 		    TM_DIFF);
 
-		if ((asprintf(&head_navs_disp, heads_navs, gw_trans->repo_name,
+		if (asprintf(&head_navs_disp, heads_navs, gw_trans->repo_name,
 		    refname, gw_trans->repo_name, refname,
 		    gw_trans->repo_name, refname, gw_trans->repo_name,
-		    refname)) == -1) {
+		    refname) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2635,8 +2630,8 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 		if (strncmp(refname, "refs/heads/", 11) == 0)
 			refname += 11;
 
-		if ((asprintf(&head_row, heads_row, age, refname,
-		    head_navs_disp)) == -1) {
+		if (asprintf(&head_row, heads_row, age, refname,
+		    head_navs_disp) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2667,8 +2662,8 @@ gw_get_got_link(struct gw_trans *gw_trans)
 {
 	char *link;
 
-	if ((asprintf(&link, got_link, gw_trans->gw_conf->got_logo_url,
-	    gw_trans->gw_conf->got_logo)) == -1)
+	if (asprintf(&link, got_link, gw_trans->gw_conf->got_logo_url,
+	    gw_trans->gw_conf->got_logo) == -1)
 		return NULL;
 
 	return link;
@@ -2680,16 +2675,16 @@ gw_get_site_link(struct gw_trans *gw_trans)
 	char *link, *repo = "", *action = "";
 
 	if (gw_trans->repo_name != NULL)
-		if ((asprintf(&repo, " / <a href='?path=%s&action=summary'>%s" \
-		    "</a>", gw_trans->repo_name, gw_trans->repo_name)) == -1)
+		if (asprintf(&repo, " / <a href='?path=%s&action=summary'>%s" \
+		    "</a>", gw_trans->repo_name, gw_trans->repo_name) == -1)
 			return NULL;
 
 	if (gw_trans->action_name != NULL)
-		if ((asprintf(&action, " / %s", gw_trans->action_name)) == -1)
+		if (asprintf(&action, " / %s", gw_trans->action_name) == -1)
 			return NULL;
 
-	if ((asprintf(&link, site_link, GOTWEB,
-	    gw_trans->gw_conf->got_site_link, repo, action)) == -1)
+	if (asprintf(&link, site_link, GOTWEB,
+	    gw_trans->gw_conf->got_site_link, repo, action) == -1)
 		return NULL;
 
 	return link;
@@ -2736,7 +2731,7 @@ gw_colordiff_line(char *buf)
 	if (strncmp(buf, "date:", 5) == 0)
 		color = "diff_date";
 
-	if ((asprintf(&div_diff_line_div, div_diff_line, color)) == -1)
+	if (asprintf(&div_diff_line_div, div_diff_line, color) == -1)
 		return NULL;
 
 	error = buf_puts(&newsize, diffbuf, div_diff_line_div);
