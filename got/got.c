@@ -6304,6 +6304,38 @@ histedit_skip_commit(struct got_histedit_list_entry *hle,
 }
 
 static const struct got_error *
+check_local_changes(void *arg, unsigned char status,
+    unsigned char staged_status, const char *path,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
+{
+	int *have_local_changes = arg;
+
+	switch (status) {
+	case GOT_STATUS_ADD:
+	case GOT_STATUS_DELETE:
+	case GOT_STATUS_MODIFY:
+	case GOT_STATUS_CONFLICT:
+		*have_local_changes = 1;
+		return got_error(GOT_ERR_CANCELLED);
+	default:
+		break;
+	}
+
+	switch (staged_status) {
+	case GOT_STATUS_ADD:
+	case GOT_STATUS_DELETE:
+	case GOT_STATUS_MODIFY:
+		*have_local_changes = 1;
+		return got_error(GOT_ERR_CANCELLED);
+	default:
+		break;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_histedit(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -6560,12 +6592,44 @@ cmd_histedit(int argc, char *argv[])
 			    hle->cmd->code == GOT_HISTEDIT_FOLD) {
 				error = histedit_skip_commit(hle, worktree,
 				   repo);
+				if (error)
+					goto done;
 			} else {
-				error = histedit_commit(NULL, worktree,
-				    fileindex, tmp_branch, hle, repo);
+				struct got_pathlist_head paths;
+				int have_changes = 0;
+
+				TAILQ_INIT(&paths);
+				error = got_pathlist_append(&paths, "", NULL);
+				if (error)
+					goto done;
+				error = got_worktree_status(worktree, &paths,
+				    repo, check_local_changes, &have_changes,
+				    check_cancelled, NULL);
+				got_pathlist_free(&paths);
+				if (error) {
+					if (error->code != GOT_ERR_CANCELLED)
+						goto done;
+					if (sigint_received || sigpipe_received)
+						goto done;
+				}
+				if (have_changes) {
+					error = histedit_commit(NULL, worktree,
+					    fileindex, tmp_branch, hle, repo);
+					if (error)
+						goto done;
+				} else {
+					error = got_object_open_as_commit(
+					    &commit, repo, hle->commit_id);
+					if (error)
+						goto done;
+					error = show_histedit_progress(commit,
+					    hle, NULL);
+					got_object_commit_close(commit);
+					commit = NULL;
+					if (error)
+						goto done;
+				}
 			}
-			if (error)
-				goto done;
 			continue;
 		}
 

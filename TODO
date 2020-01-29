@@ -2,9 +2,6 @@ lib:
 - improve performance of usr.bin/diff and port these changes back to got
   (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
 
-got:
-- 'histedit -c' prompts for log message even if there are no changes to commit
-
 tog:
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
