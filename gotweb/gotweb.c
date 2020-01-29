@@ -879,10 +879,9 @@ gw_tag(struct gw_trans *gw_trans)
 
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
-		return error;
+		goto done;
 
 	tag_html = gw_get_repo_tags(gw_trans, header, 1, TAGFULL);
-
 	if (tag_html == NULL) {
 		tag_html = strdup("");
 		if (tag_html == NULL) {
@@ -894,11 +893,15 @@ gw_tag(struct gw_trans *gw_trans)
 	if ((asprintf(&tag_html_disp, tag_header,
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
-	    tag_html)) == -1)
-		return got_error_from_errno("asprintf");
+	    tag_html)) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
-	if ((asprintf(&tag, tag_wrapper, tag_html_disp)) == -1)
-		return got_error_from_errno("asprintf");
+	if (asprintf(&tag, tag_wrapper, tag_html_disp) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	kerr = khttp_puts(gw_trans->gw_req, tag);
 	if (kerr != KCGI_OK)
