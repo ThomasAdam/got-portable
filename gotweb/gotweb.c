@@ -24,7 +24,6 @@
 #include <errno.h>
 #include <regex.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1328,7 +1327,7 @@ gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 	char *description = NULL, *d_file = NULL;
 	unsigned int len;
 
-	if (gw_trans->gw_conf->got_show_repo_description == false)
+	if (gw_trans->gw_conf->got_show_repo_description == 0)
 		goto err;
 
 	if (asprintf(&d_file, "%s/description", dir) == -1)
@@ -1439,7 +1438,7 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
 		is_head = 1;
 
-	if (gw_trans->gw_conf->got_show_repo_age == false)
+	if (gw_trans->gw_conf->got_show_repo_age == 0)
 		return strdup("");
 
 	error = got_repo_open(&repo, dir, NULL);
@@ -1606,7 +1605,7 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 	char *comp, *pos, *buf;
 	unsigned int i;
 
-	if (gw_trans->gw_conf->got_show_repo_owner == false)
+	if (gw_trans->gw_conf->got_show_repo_owner == 0)
 		goto err;
 
 	if (asprintf(&d_file, "%s/config", dir) == -1)
