@@ -162,7 +162,7 @@ static char			*gw_get_repo_description(struct gw_trans *,
 static char			*gw_get_repo_owner(struct gw_trans *,
 				    char *);
 static char			*gw_get_time_str(time_t, int);
-static char			*gw_get_repo_age(struct gw_trans *,
+static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
 static char			*gw_get_file_blame(struct gw_trans *);
 static char			*gw_get_repo_tree(struct gw_trans *);
@@ -695,7 +695,7 @@ gw_summary(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *description_html, *repo_owner_html, *repo_age_html,
 	     *cloneurl_html, *tags, *heads, *tags_html,
-	     *heads_html, *age;
+	     *heads_html;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
@@ -739,18 +739,21 @@ gw_summary(struct gw_trans *gw_trans)
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_age) {
-		age = gw_get_repo_age(gw_trans, gw_trans->gw_dir->path,
+		char *age;
+		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path,
 		    "refs/heads", TM_LONG);
-		if (age != NULL && (strcmp(age, "") != 0)) {
+		if (error)
+			return error;
+		if (strcmp(age, "") != 0) {
 			if (asprintf(&repo_age_html, last_change, age) == -1)
 				return got_error_from_errno("asprintf");
 
 			kerr = khttp_puts(gw_trans->gw_req, repo_age_html);
 			free(repo_age_html);
-			free(age);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
 		}
+		free(age);
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_cloneurl) {
@@ -958,8 +961,10 @@ done:
 	gw_dir->description = gw_get_repo_description(gw_trans,
 	    gw_dir->path);
 	gw_dir->owner = gw_get_repo_owner(gw_trans, gw_dir->path);
-	gw_dir->age = gw_get_repo_age(gw_trans, gw_dir->path, "refs/heads",
-	    TM_DIFF);
+	error = gw_get_repo_age(&gw_dir->age, gw_trans, gw_dir->path,
+	    "refs/heads", TM_DIFF);
+	if (error)
+		goto errored;
 	gw_dir->url = gw_get_clone_url(gw_trans, gw_dir->path);
 
 errored:
@@ -1414,9 +1419,9 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 	return repo_age;
 }
 
-static char *
-gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
-    int ref_tm)
+static const struct got_error *
+gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
+    char *repo_ref, int ref_tm)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *id = NULL;
@@ -1428,8 +1433,8 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 	int is_head = 0;
 	time_t committer_time = 0, cmp_time = 0;
 	const char *refname;
-	char *repo_age = NULL;
 
+	*repo_age = NULL;
 	SIMPLEQ_INIT(&refs);
 
 	if (repo_ref == NULL)
@@ -1438,12 +1443,16 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
 		is_head = 1;
 
-	if (gw_trans->gw_conf->got_show_repo_age == 0)
-		return strdup("");
+	if (gw_trans->gw_conf->got_show_repo_age == 0) {
+		*repo_age = strdup("");
+		if (*repo_age == NULL)
+			return got_error_from_errno("strdup");
+		return NULL;
+	}
 
 	error = got_repo_open(&repo, dir, NULL);
 	if (error)
-		goto err;
+		goto done;
 
 	if (is_head)
 		error = got_ref_list(&refs, repo, "refs/heads",
@@ -1452,7 +1461,7 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 		error = got_ref_list(&refs, repo, repo_ref,
 		    got_ref_cmp_by_name, NULL);
 	if (error)
-		goto err;
+		goto done;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		if (is_head)
@@ -1461,16 +1470,16 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 			refname = got_ref_get_name(re->ref);
 		error = got_ref_open(&head_ref, repo, refname, 0);
 		if (error)
-			goto err;
+			goto done;
 
 		error = got_ref_resolve(&id, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error)
-			goto err;
+			goto done;
 
 		error = got_object_open_as_commit(&commit, repo, id);
 		if (error)
-			goto err;
+			goto done;
 
 		committer_time =
 		    got_object_commit_get_committer_time(commit);
@@ -1481,17 +1490,16 @@ gw_get_repo_age(struct gw_trans *gw_trans, char *dir, char *repo_ref,
 
 	if (cmp_time != 0) {
 		committer_time = cmp_time;
-		repo_age = gw_get_time_str(committer_time, ref_tm);
-	} else
-		return strdup("");
+		*repo_age = gw_get_time_str(committer_time, ref_tm);
+	} else {
+		*repo_age = strdup("");
+		if (*repo_age == NULL)
+			error = got_error_from_errno("strdup");
+	}
+done:
 	got_ref_list_free(&refs);
 	free(id);
-	return repo_age;
-err:
-	if (asprintf(&repo_age, "%s", error->msg) == -1)
-		return NULL;
-
-	return repo_age;
+	return error;
 }
 
 static char *
@@ -2605,8 +2613,10 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 			continue;
 		}
 
-		age = gw_get_repo_age(gw_trans, gw_trans->gw_dir->path, refname,
+		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path, refname,
 		    TM_DIFF);
+		if (error)
+			goto done;
 
 		if (asprintf(&head_navs_disp, heads_navs, gw_trans->repo_name,
 		    refname, gw_trans->repo_name, refname,
