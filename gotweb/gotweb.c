@@ -318,18 +318,20 @@ gw_blame(struct gw_trans *gw_trans)
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
-		return error;
+		goto done;
 
 	blame_html = gw_get_file_blame(gw_trans);
 
 	if (blame_html == NULL) {
 		blame_html = strdup("");
-		if (blame_html == NULL)
-			return got_error_from_errno("strdup");
+		if (blame_html == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 
 	if ((asprintf(&blame_html_disp, blame_header,
@@ -566,12 +568,12 @@ gw_commits(struct gw_trans *gw_trans)
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
-		return error;
+		goto done;
 	}
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_header(gw_trans, header,
 	    gw_trans->gw_conf->got_max_commits_display);
@@ -634,12 +636,12 @@ gw_briefs(struct gw_trans *gw_trans)
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
-		return error;
+		goto done;
 	}
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	if (gw_trans->action == GW_SUMMARY)
 		error = gw_get_header(gw_trans, header, D_MAXSLCOMMDISP);
@@ -818,7 +820,7 @@ gw_tree(struct gw_trans *gw_trans)
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
@@ -875,7 +877,7 @@ gw_tag(struct gw_trans *gw_trans)
 
 	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
