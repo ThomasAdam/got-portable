@@ -1195,11 +1195,12 @@ gw_display_index(struct gw_trans *gw_trans, const struct got_error *err)
 	else
 		kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
 		    gw_query_funcs[gw_trans->action].template);
-	if (kerr != KCGI_OK)
+	if (kerr != KCGI_OK) {
+		khtml_close(gw_trans->gw_html_req);
 		return gw_kcgi_error(kerr);
+	}
 
-	kerr = khtml_close(gw_trans->gw_html_req);
-	return gw_kcgi_error(kerr);
+	return gw_kcgi_error(khtml_close(gw_trans->gw_html_req));
 }
 
 static int
