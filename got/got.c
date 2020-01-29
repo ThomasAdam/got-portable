@@ -6536,6 +6536,11 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 
+		if (SIMPLEQ_EMPTY(&commits)) {
+			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
+			goto done;
+		}
+
 		error = got_worktree_histedit_prepare(&tmp_branch, &branch,
 		    &base_commit_id, &fileindex, worktree, repo);
 		if (error)
