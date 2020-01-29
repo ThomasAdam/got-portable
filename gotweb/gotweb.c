@@ -693,9 +693,10 @@ static const struct got_error *
 gw_summary(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *description_html, *repo_owner_html, *repo_age_html,
-	     *cloneurl_html, *tags, *heads, *tags_html,
-	     *heads_html;
+	char *description_html = NULL, *repo_owner_html = NULL;
+	char *age = NULL, *repo_age_html = NULL, *cloneurl_html = NULL;
+	char *tags = NULL, *tags_html = NULL;
+	char *heads = NULL, *heads_html = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -711,13 +712,16 @@ gw_summary(struct gw_trans *gw_trans)
 		if (gw_trans->gw_dir->description != NULL &&
 		    (strcmp(gw_trans->gw_dir->description, "") != 0)) {
 			if (asprintf(&description_html, description,
-			    gw_trans->gw_dir->description) == -1)
-				return got_error_from_errno("asprintf");
+			    gw_trans->gw_dir->description) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 
 			kerr = khttp_puts(gw_trans->gw_req, description_html);
-			free(description_html);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
 	}
 
@@ -725,77 +729,100 @@ gw_summary(struct gw_trans *gw_trans)
 		if (gw_trans->gw_dir->owner != NULL &&
 		    (strcmp(gw_trans->gw_dir->owner, "") != 0)) {
 			if (asprintf(&repo_owner_html, repo_owner,
-			    gw_trans->gw_dir->owner) == -1)
-				return got_error_from_errno("asprintf");
+			    gw_trans->gw_dir->owner) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 
 			kerr = khttp_puts(gw_trans->gw_req, repo_owner_html);
-			free(repo_owner_html);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_age) {
-		char *age;
 		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path,
 		    "refs/heads", TM_LONG);
 		if (error)
-			return error;
+			goto done;
 		if (strcmp(age, "") != 0) {
-			if (asprintf(&repo_age_html, last_change, age) == -1)
-				return got_error_from_errno("asprintf");
+			if (asprintf(&repo_age_html, last_change, age) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 
 			kerr = khttp_puts(gw_trans->gw_req, repo_age_html);
-			free(repo_age_html);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
-		free(age);
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_cloneurl) {
 		if (gw_trans->gw_dir->url != NULL &&
 		    (strcmp(gw_trans->gw_dir->url, "") != 0)) {
 			if (asprintf(&cloneurl_html, cloneurl,
-			    gw_trans->gw_dir->url) == -1)
-				return got_error_from_errno("asprintf");
+			    gw_trans->gw_dir->url) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 
 			kerr = khttp_puts(gw_trans->gw_req, cloneurl_html);
-			free(cloneurl_html);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
 	}
 	kerr = khttp_puts(gw_trans->gw_req, div_end);
-	if (kerr != KCGI_OK)
-		return gw_kcgi_error(kerr);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
 
 	error = gw_briefs(gw_trans);
 	if (error)
-		return error;
+		goto done;
 
 	tags = gw_get_repo_tags(gw_trans, NULL, D_MAXSLCOMMDISP, TAGBRIEF);
 	heads = gw_get_repo_heads(gw_trans);
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
-		if (asprintf(&tags_html, summary_tags, tags) == -1)
-			return got_error_from_errno("asprintf");
+		if (asprintf(&tags_html, summary_tags, tags) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		kerr = khttp_puts(gw_trans->gw_req, tags_html);
-		free(tags_html);
-		free(tags);
-		if (kerr != KCGI_OK)
-			return gw_kcgi_error(kerr);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
 	}
 
 	if (heads != NULL && strcmp(heads, "") != 0) {
-		if (asprintf(&heads_html, summary_heads, heads) == -1)
-			return got_error_from_errno("asprintf");
+		if (asprintf(&heads_html, summary_heads, heads) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		kerr = khttp_puts(gw_trans->gw_req, heads_html);
-		free(heads_html);
-		free(heads);
-		if (kerr != KCGI_OK)
-			return gw_kcgi_error(kerr);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
 	}
+done:
+	free(description_html);
+	free(repo_owner_html);
+	free(age);
+	free(repo_age_html);
+	free(cloneurl_html);
+	free(tags);
+	free(tags_html);
+	free(heads);
+	free(heads_html);
 	return error;
 }
 
