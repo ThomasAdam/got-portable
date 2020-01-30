@@ -1,7 +1,7 @@
 KCGIBASE ?=	/usr/local
 LDADD +=	-lz -lutil
 LDSTATIC =	${STATIC}
-CHROOT_DIR =	/var/www
+CHROOT_DIR ?=	/var/www
 GOTWEB_DIR =	/cgi-bin/gotweb
 LIBEXECDIR =	${GOTWEB_DIR}/libexec
 LIBEXEC_DIR =	${CHROOT_DIR}${LIBEXECDIR}
