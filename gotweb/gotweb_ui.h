@@ -226,7 +226,9 @@ char *blame_header =
 char *blame_line =
 	"<div id='blame_wrapper'>" \
 	"<div id='blame_number'>%.*d</div>" \
-	"<div id='blame_hash'>%.8s</div>" \
+	"<div id='blame_hash'>" \
+	"<a href='?path=%s&action=blob&commit=%s&file=%s&folder=%s'>%.8s</a>" \
+	"</div>" \
 	"<div id='blame_date'>%s</div>" \
 	"<div id='blame_author'>%-8s</div>" \
 	"<div id='blame_code'>%s</div>" \

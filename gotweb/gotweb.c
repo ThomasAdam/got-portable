@@ -2353,9 +2353,10 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		else
 			line_escape = strdup("");
 
-		asprintf(&blame_row, blame_line, a->nlines_prec,
-		    a->lineno_cur, bline->id_str, bline->datebuf, committer,
-		    line_escape);
+		asprintf(&blame_row, blame_line, a->nlines_prec, a->lineno_cur,
+		    a->gw_trans->repo_name, bline->id_str,
+		    a->gw_trans->repo_file, a->gw_trans->repo_folder,
+		    bline->id_str, bline->datebuf, committer, line_escape);
 		a->lineno_cur++;
 		err = buf_puts(&newsize, a->blamebuf, blame_row);
 		if (err)
