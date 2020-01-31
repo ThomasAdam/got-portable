@@ -2353,6 +2353,10 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		else
 			line_escape = strdup("");
 
+		if (a->gw_trans->repo_folder == NULL)
+			a->gw_trans->repo_folder = strdup("");
+		if (a->gw_trans->repo_folder == NULL)
+			goto err;
 		asprintf(&blame_row, blame_line, a->nlines_prec, a->lineno_cur,
 		    a->gw_trans->repo_name, bline->id_str,
 		    a->gw_trans->repo_file, a->gw_trans->repo_folder,
@@ -2363,6 +2367,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 			return err;
 
 		bline = &a->lines[a->lineno_cur - 1];
+err:
 		free(line_escape);
 		free(blame_row);
 	}
