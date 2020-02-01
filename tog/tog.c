@@ -2939,6 +2939,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_reflist_head *refs, struct got_repository *repo)
 {
 	const struct got_error *err;
+	struct tog_diff_view_state *s = &view->state.diff;
 
 	if (id1 != NULL && id2 != NULL) {
 	    int type1, type2;
@@ -2954,69 +2955,69 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	}
 
 	if (id1) {
-		view->state.diff.id1 = got_object_id_dup(id1);
-		if (view->state.diff.id1 == NULL)
+		s->id1 = got_object_id_dup(id1);
+		if (s->id1 == NULL)
 			return got_error_from_errno("got_object_id_dup");
 	} else
-		view->state.diff.id1 = NULL;
+		s->id1 = NULL;
 
-	view->state.diff.id2 = got_object_id_dup(id2);
-	if (view->state.diff.id2 == NULL) {
-		free(view->state.diff.id1);
-		view->state.diff.id1 = NULL;
+	s->id2 = got_object_id_dup(id2);
+	if (s->id2 == NULL) {
+		free(s->id1);
+		s->id1 = NULL;
 		return got_error_from_errno("got_object_id_dup");
 	}
-	view->state.diff.f = NULL;
-	view->state.diff.first_displayed_line = 1;
-	view->state.diff.last_displayed_line = view->nlines;
-	view->state.diff.diff_context = 3;
-	view->state.diff.log_view = log_view;
-	view->state.diff.repo = repo;
-	view->state.diff.refs = refs;
-	SIMPLEQ_INIT(&view->state.diff.colors);
+	s->f = NULL;
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->diff_context = 3;
+	s->log_view = log_view;
+	s->repo = repo;
+	s->refs = refs;
+	SIMPLEQ_INIT(&s->colors);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
-		err = add_color(&view->state.diff.colors,
+		err = add_color(&s->colors,
 		    "^-", TOG_COLOR_DIFF_MINUS,
 		    get_color_value("TOG_COLOR_DIFF_MINUS"));
 		if (err)
 			return err;
-		err = add_color(&view->state.diff.colors, "^\\+",
+		err = add_color(&s->colors, "^\\+",
 		    TOG_COLOR_DIFF_PLUS,
 		    get_color_value("TOG_COLOR_DIFF_PLUS"));
 		if (err) {
-			free_colors(&view->state.diff.colors);
+			free_colors(&s->colors);
 			return err;
 		}
-		err = add_color(&view->state.diff.colors, 
+		err = add_color(&s->colors,
 		    "^@@", TOG_COLOR_DIFF_CHUNK_HEADER,
 		    get_color_value("TOG_COLOR_DIFF_CHUNK_HEADER"));
 		if (err) {
-			free_colors(&view->state.diff.colors);
+			free_colors(&s->colors);
 			return err;
 		}
 
-		err = add_color(&view->state.diff.colors, 
+		err = add_color(&s->colors, 
 		    "^(commit|(blob|file) [-+] )", TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
-			free_colors(&view->state.diff.colors);
+			free_colors(&s->colors);
 			return err;
 		}
 
-		err = add_color(&view->state.diff.colors, 
+		err = add_color(&s->colors,
 		    "^(from|via): ", TOG_COLOR_AUTHOR,
 		    get_color_value("TOG_COLOR_AUTHOR"));
 		if (err) {
-			free_colors(&view->state.diff.colors);
+			free_colors(&s->colors);
 			return err;
 		}
 
-		err = add_color(&view->state.diff.colors, 
+		err = add_color(&s->colors,
 		    "^date: ", TOG_COLOR_DATE,
 		    get_color_value("TOG_COLOR_DATE"));
 		if (err) {
-			free_colors(&view->state.diff.colors);
+			free_colors(&s->colors);
 			return err;
 		}
 	}
@@ -3025,12 +3026,12 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		show_log_view(log_view); /* draw vborder */
 	diff_view_indicate_progress(view);
 
-	err = create_diff(&view->state.diff);
+	err = create_diff(s);
 	if (err) {
-		free(view->state.diff.id1);
-		view->state.diff.id1 = NULL;
-		free(view->state.diff.id2);
-		view->state.diff.id2 = NULL;
+		free(s->id1);
+		s->id1 = NULL;
+		free(s->id2);
+		s->id2 = NULL;
 		return err;
 	}
 
@@ -3045,14 +3046,15 @@ static const struct got_error *
 close_diff_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
+	struct tog_diff_view_state *s = &view->state.diff;
 
-	free(view->state.diff.id1);
-	view->state.diff.id1 = NULL;
-	free(view->state.diff.id2);
-	view->state.diff.id2 = NULL;
-	if (view->state.diff.f && fclose(view->state.diff.f) == EOF)
+	free(s->id1);
+	s->id1 = NULL;
+	free(s->id2);
+	s->id2 = NULL;
+	if (s->f && fclose(s->f) == EOF)
 		err = got_error_from_errno("fclose");
-	free_colors(&view->state.diff.colors);
+	free_colors(&s->colors);
 	return err;
 }
 
