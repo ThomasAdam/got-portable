@@ -2378,6 +2378,12 @@ done:
 	return err;
 }
 
+static int
+isbinary(const char *buf, size_t n)
+{
+	return (memchr(buf, '\0', n) != NULL);
+}
+
 static char*
 gw_get_file_blame_blob(struct gw_trans *gw_trans)
 {
@@ -2457,30 +2463,23 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 		goto done;
 
 	if (gw_trans->action == GW_BLOB) {
-		int len, p, p_check, t = 0, t_check = 50;
+		int len;
+		size_t n;
 
 		fseek(bca.f, 0, SEEK_END);
-		p_check = len = ftell(bca.f) + 1;
+		len = ftell(bca.f) + 1;
 		fseek(bca.f, 0, SEEK_SET);
 
 		if ((blame_html = calloc(len, sizeof(char *))) == NULL)
 			goto done;
 
-		fread(blame_html, 1, len, bca.f);
-
-		for (p = 0; p < p_check; p++) {
-			if (isprint(blame_html[p]) == 0)
-				if (iscntrl(blame_html[p]) == 0)
-					t++;
+		n = fread(blame_html, 1, len, bca.f);
+		if (n == -1) {
+			error = got_ferror(bca.f, GOT_ERR_IO);
+			goto done;
 		}
 
-		/*
-		 * Anything over zero is most likely not plain text,
-		 * but let's be sure. Perhaps there's a better way to
-		 * check in the future.
-		 */
-
-		if (t > t_check)
+		if (isbinary(blame_html, n))
 			gw_trans->mime = KMIME_APP_OCTET_STREAM;
 		else
 			gw_trans->mime = KMIME_TEXT_PLAIN;
