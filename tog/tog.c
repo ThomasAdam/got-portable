@@ -3002,6 +3002,7 @@ create_diff(struct tog_diff_view_state *s)
 					    s->repo, s->f);
 					if (err)
 						goto done;
+					break;
 				}
 			}
 		}
