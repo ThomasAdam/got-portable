@@ -1232,7 +1232,7 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 				*nlines = 1;
 				*line_offsets = calloc(1, sizeof(**line_offsets));
 				if (*line_offsets == NULL)
-					return got_error_from_errno("malloc");
+					return got_error_from_errno("calloc");
 
 				/* Skip forward over end of first line. */
 				while (i < len) {
