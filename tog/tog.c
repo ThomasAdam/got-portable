@@ -2988,7 +2988,7 @@ create_diff(struct tog_diff_view_state *s)
 
 		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
 		if (err)
-			break;
+			goto done;
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
 			err =write_commit_info(s->id2, s->refs, s->repo, s->f);
@@ -3002,7 +3002,6 @@ create_diff(struct tog_diff_view_state *s)
 					    s->repo, s->f);
 					if (err)
 						goto done;
-					break;
 				}
 			}
 		}
