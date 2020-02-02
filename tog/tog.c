@@ -250,6 +250,11 @@ struct tog_diff_view_state {
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct tog_colors colors;
+	int nlines;
+	off_t *line_offsets;
+	int matched_line;
+	int selected_line;
+	size_t filesize;
 
 	/* passed from log view; may be NULL */
 	struct tog_view *log_view;
@@ -440,6 +445,8 @@ static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
 static const struct got_error* close_diff_view(struct tog_view *);
+static const struct got_error *search_start_diff_view(struct tog_view *);
+static const struct got_error *search_next_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_reflist_head *,
@@ -2679,12 +2686,12 @@ match_color(struct tog_colors *colors, const char *line)
 }
 
 static const struct got_error *
-draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines, char *header,
-    struct tog_colors *colors)
+draw_file(struct tog_view *view, FILE *f, int *first_displayed_line, int nlines,
+    int selected_line, int max_lines, int *last_displayed_line, int *eof,
+    char *header, struct tog_colors *colors)
 {
 	const struct got_error *err;
-	int nlines = 0, nprinted = 0;
+	int lineno = 0, nprinted = 0;
 	char *line;
 	struct tog_color *tc;
 	size_t len;
@@ -2720,7 +2727,7 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 			*eof = 1;
 			break;
 		}
-		if (++nlines < *first_displayed_line) {
+		if (++lineno < *first_displayed_line) {
 			free(line);
 			continue;
 		}
@@ -2742,12 +2749,12 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line,
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
-			*first_displayed_line = nlines;
+			*first_displayed_line = lineno;
 		free(line);
 		free(wline);
 		wline = NULL;
 	}
-	*last_displayed_line = nlines;
+	*last_displayed_line = lineno;
 
 	view_vborder(view);
 
@@ -2854,6 +2861,92 @@ done:
 	return err;
 }
 
+const struct got_error *
+get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
+    FILE *infile)
+{
+	size_t len;
+	char *buf = NULL;
+	int i;
+	size_t noffsets = 0;
+	off_t off = 0;
+
+	if (line_offsets)
+		*line_offsets = NULL;
+	if (filesize)
+		*filesize = 0;
+	if (nlines)
+		*nlines = 0;
+
+	if (fseek(infile, 0, SEEK_END) == -1)
+		return got_error_from_errno("fseek");
+	len = ftell(infile) + 1;
+	if (ferror(infile))
+		return got_error_from_errno("ftell");
+	if (fseek(infile, 0, SEEK_SET) == -1)
+		return got_error_from_errno("fseek");
+
+	if (len == 0)
+		return NULL;
+	if ((buf = calloc(len, sizeof(char *))) == NULL)
+		return got_error_from_errno("calloc");
+
+	fread(buf, 1, len, infile);
+	if (ferror(infile))
+		return got_error_from_errno("fread");
+
+	i = 0;
+	if (line_offsets && nlines) {
+		if (*line_offsets == NULL) {
+			/* Have some data but perhaps no '\n'. */
+			noffsets = 1;
+			*nlines = 1;
+			*line_offsets = calloc(1, sizeof(**line_offsets));
+			if (*line_offsets == NULL)
+				return got_error_from_errno("calloc");
+				/* Skip forward over end of first line. */
+			while (i < len) {
+				if (buf[i] == '\n')
+					break;
+				i++;
+			}
+		}
+		/* Scan '\n' offsets in remaining chunk of data. */
+		while (i < len) {
+			if (buf[i] != '\n') {
+				i++;
+				continue;
+			}
+			(*nlines)++;
+			if (noffsets < *nlines) {
+				off_t *o = recallocarray(*line_offsets,
+				    noffsets, *nlines,
+				    sizeof(**line_offsets));
+				if (o == NULL) {
+					free(*line_offsets);
+					*line_offsets = NULL;
+					return got_error_from_errno(
+					    "recallocarray");
+				}
+				*line_offsets = o;
+				noffsets = *nlines;
+			}
+			off = i + 1;
+			(*line_offsets)[*nlines - 1] = off;
+			i++;
+		}
+	}
+
+	if (fflush(infile) != 0)
+		return got_error_from_errno("fflush");
+	rewind(infile);
+
+	if (filesize)
+		*filesize = len;
+
+	return NULL;
+}
+
 static const struct got_error *
 create_diff(struct tog_diff_view_state *s)
 {
@@ -2882,11 +2975,11 @@ create_diff(struct tog_diff_view_state *s)
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(s->id1, s->id2, NULL, NULL,
-		    s->diff_context, 0, s->repo, f);
+		    s->diff_context, 0, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(s->id1, s->id2, "", "",
-		    s->diff_context, 0, s->repo, f);
+		    s->diff_context, 0, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -2897,14 +2990,18 @@ create_diff(struct tog_diff_view_state *s)
 		if (err)
 			break;
 		/* Show commit info if we're diffing to a parent/root commit. */
-		if (s->id1 == NULL)
-			write_commit_info(s->id2, s->refs, s->repo, f);
-		else {
+		if (s->id1 == NULL) {
+			err =write_commit_info(s->id2, s->refs, s->repo, s->f);
+			if (err)
+				goto done;
+		} else {
 			parent_ids = got_object_commit_get_parent_ids(commit2);
 			SIMPLEQ_FOREACH(pid, parent_ids, entry) {
 				if (got_object_id_cmp(s->id1, pid->id) == 0) {
-					write_commit_info(s->id2, s->refs,
-					    s->repo, f);
+					err = write_commit_info(s->id2, s->refs,
+					    s->repo, s->f);
+					if (err)
+						goto done;
 					break;
 				}
 			}
@@ -2912,15 +3009,19 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(s->id1, s->id2,
-		    s->diff_context, 0, s->repo, f);
+		    s->diff_context, 0, s->repo, s->f);
 		break;
 	}
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);
 		break;
 	}
+	if (err)
+		goto done;
+	err = get_filestream_info(&s->filesize, &s->nlines, &s->line_offsets,
+	    s->f);
 done:
-	if (f && fflush(f) != 0 && err == NULL)
+	if (s->f && fflush(s->f) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
 	return err;
 }
@@ -2931,6 +3032,84 @@ diff_view_indicate_progress(struct tog_view *view)
 	mvwaddstr(view->window, 0, 0, "diffing...");
 	update_panels();
 	doupdate();
+}
+
+static const struct got_error *
+search_start_diff_view(struct tog_view *view)
+{
+	struct tog_diff_view_state *s = &view->state.diff;
+
+	s->matched_line = 0;
+	return NULL;
+}
+
+static const struct got_error *
+search_next_diff_view(struct tog_view *view)
+{
+	struct tog_diff_view_state *s = &view->state.diff;
+	int lineno;
+
+	if (!view->searching) {
+		view->search_next_done = 1;
+		return NULL;
+	}
+
+	if (s->matched_line) {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno = s->matched_line + 1;
+		else
+			lineno = s->matched_line - 1;
+	} else {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno = 1;
+		else
+			lineno = s->nlines;
+	}
+
+	while (1) {
+		char *line = NULL;
+		off_t offset;
+		size_t len;
+
+		if (lineno <= 0 || lineno > s->nlines) {
+			if (s->matched_line == 0) {
+				view->search_next_done = 1;
+				free(line);
+				break;
+			}
+
+			if (view->searching == TOG_SEARCH_FORWARD)
+				lineno = 1;
+			else
+				lineno = s->nlines;
+		}
+
+		offset = s->line_offsets[lineno - 1];
+		if (fseeko(s->f, offset, SEEK_SET) != 0) {
+			free(line);
+			return got_error_from_errno("fseeko");
+		}
+		free(line);
+		line = parse_next_line(s->f, &len);
+		if (line && match_line(line, &view->regex)) {
+			view->search_next_done = 1;
+			s->matched_line = lineno;
+			free(line);
+			break;
+		}
+		free(line);
+		if (view->searching == TOG_SEARCH_FORWARD)
+			lineno++;
+		else
+			lineno--;
+	}
+
+	if (s->matched_line) {
+		s->first_displayed_line = s->matched_line;
+		s->selected_line = 1;
+	}
+
+	return NULL;
 }
 
 static const struct got_error *
@@ -2953,6 +3132,13 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	    if (type1 != type2)
 		return got_error(GOT_ERR_OBJ_TYPE);
 	}
+	s->first_displayed_line = 1;
+	s->last_displayed_line = view->nlines;
+	s->selected_line = 1;
+	s->repo = repo;
+	s->refs = refs;
+	s->id1 = id1;
+	s->id2 = id2;
 
 	if (id1) {
 		s->id1 = got_object_id_dup(id1);
@@ -2974,8 +3160,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->log_view = log_view;
 	s->repo = repo;
 	s->refs = refs;
-	SIMPLEQ_INIT(&s->colors);
 
+	SIMPLEQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors,
 		    "^-", TOG_COLOR_DIFF_MINUS,
@@ -2997,7 +3183,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 			return err;
 		}
 
-		err = add_color(&s->colors, 
+		err = add_color(&s->colors,
 		    "^(commit|(blob|file) [-+] )", TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
@@ -3038,6 +3224,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	view->show = show_diff_view;
 	view->input = input_diff_view;
 	view->close = close_diff_view;
+	view->search_start = search_start_diff_view;
+	view->search_next = search_next_diff_view;
 
 	return NULL;
 }
@@ -3055,6 +3243,7 @@ close_diff_view(struct tog_view *view)
 	if (s->f && fclose(s->f) == EOF)
 		err = got_error_from_errno("fclose");
 	free_colors(&s->colors);
+	free(s->line_offsets);
 	return err;
 }
 
@@ -3084,8 +3273,8 @@ show_diff_view(struct tog_view *view)
 	free(id_str1);
 	free(id_str2);
 
-	return draw_file(view, s->f, &s->first_displayed_line,
-	    &s->last_displayed_line, &s->eof, view->nlines,
+	return draw_file(view, s->f, &s->first_displayed_line, s->nlines,
+	    s->selected_line, view->nlines, &s->last_displayed_line, &s->eof,
 	    header, &s->colors);
 }
 
