@@ -1892,7 +1892,8 @@ checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	err = ref_base_commit(worktree, repo);
 	if (err) {
-		if (!(err->code == GOT_ERR_ERRNO && errno == EACCES))
+		if (!(err->code == GOT_ERR_ERRNO &&
+		    (errno == EACCES || errno == EROFS)))
 			goto done;
 		err = (*progress_cb)(progress_arg,
 		    GOT_STATUS_BASE_REF_ERR, worktree->root_path);
