@@ -1430,7 +1430,7 @@ gw_gen_tree_header(char *str)
 static char *
 gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 {
-	FILE *f;
+	FILE *f = NULL;
 	char *description = NULL, *d_file = NULL;
 	unsigned int len;
 
@@ -1443,17 +1443,25 @@ gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
 	if ((f = fopen(d_file, "r")) == NULL)
 		goto err;
 
-	fseek(f, 0, SEEK_END);
+	if (fseek(f, 0, SEEK_END) == -1)
+		goto err;
 	len = ftell(f) + 1;
-	fseek(f, 0, SEEK_SET);
+	if (ferror(f))
+		goto err;
+	if (fseek(f, 0, SEEK_SET) == -1)
+		goto err;
 	if ((description = calloc(len, sizeof(char *))) == NULL)
 		goto err;
 
 	fread(description, 1, len, f);
+	if (ferror(f))
+		goto err;
 	fclose(f);
 	free(d_file);
 	return description;
 err:
+	if (f != NULL)
+		fclose(f);
 	return strdup("");
 }
 
@@ -1660,12 +1668,18 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	}
 
+	if (error)
+		goto done;
+
 	if ((buf = calloc(128, sizeof(char *))) == NULL)
 		goto done;
 
-	fseek(f, 0, SEEK_SET);
+	if (fseek(f, 0, SEEK_SET) == -1)
+		goto done;
 
 	while ((fgets(buf, 2048, f)) != NULL) {
+		if (ferror(f))
+			goto done;
 		n_buf = buf;
 		while (*n_buf == '\n')
 			n_buf++;
@@ -1679,11 +1693,11 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 
 		error = buf_puts(&newsize, diffbuf, buf_color);
 		if (error)
-			return NULL;
+			goto done;
 
 		error = buf_puts(&newsize, diffbuf, div_end);
 		if (error)
-			return NULL;
+			goto done;
 	}
 
 	if (buf_len(diffbuf) > 0) {
@@ -1728,6 +1742,8 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 		goto err;
 
 	while ((fgets(buf, 128, f)) != NULL) {
+		if (ferror(f))
+			goto err;
 		if ((pos = strstr(buf, gotweb)) != NULL)
 			break;
 
@@ -1740,6 +1756,8 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 
 	do {
 		fgets(buf, 128, f);
+		if (ferror(f))
+			goto err;
 	} while ((comp = strcasestr(buf, gw_owner)) == NULL);
 
 	if (comp == NULL)
@@ -1748,9 +1766,8 @@ gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
 	if (strncmp(gw_owner, comp, strlen(gw_owner)) != 0)
 		goto err;
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 2; i++)
 		owner = strsep(&buf, "\"");
-	}
 
 	if (owner == NULL)
 		goto err;
@@ -1775,14 +1792,20 @@ gw_get_clone_url(struct gw_trans *gw_trans, char *dir)
 	if ((f = fopen(d_file, "r")) == NULL)
 		return NULL;
 
-	fseek(f, 0, SEEK_END);
+	if (fseek(f, 0, SEEK_END) == -1)
+		return NULL;
 	len = ftell(f) + 1;
-	fseek(f, 0, SEEK_SET);
+	if (ferror(f))
+		return NULL;
+	if (fseek(f, 0, SEEK_SET) == -1)
+		return NULL;
 
 	if ((url = calloc(len, sizeof(char *))) == NULL)
 		return NULL;
 
 	fread(url, 1, len, f);
+	if (ferror(f))
+		return NULL;
 	fclose(f);
 	free(d_file);
 	return url;
@@ -2466,14 +2489,20 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 		int len;
 		size_t n;
 
-		fseek(bca.f, 0, SEEK_END);
+		if (fseek(bca.f, 0, SEEK_END) == -1)
+			goto done;
 		len = ftell(bca.f) + 1;
-		fseek(bca.f, 0, SEEK_SET);
+		if (ferror(bca.f))
+			goto done;
+		if (fseek(bca.f, 0, SEEK_SET) == -1)
+			goto done;;
 
 		if ((blame_html = calloc(len, sizeof(char *))) == NULL)
 			goto done;
 
 		n = fread(blame_html, 1, len, bca.f);
+		if (ferror(bca.f))
+			goto done;
 		if (n == -1) {
 			error = got_ferror(bca.f, GOT_ERR_IO);
 			goto done;
