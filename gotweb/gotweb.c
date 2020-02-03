@@ -169,7 +169,7 @@ static const struct got_error	*gw_get_file_blame_blob(char **, struct gw_trans *
 static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
 				    struct gw_trans *);
 static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
-static char			*gw_get_diff(struct gw_trans *,
+static const struct got_error	*gw_get_diff(char **, struct gw_trans *,
 				    struct gw_header *);
 static char			*gw_get_repo_tags(struct gw_trans *,
 				    struct gw_header *, int, int);
@@ -178,7 +178,7 @@ static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *, char
 static char			*gw_get_got_link(struct gw_trans *);
 static char			*gw_get_site_link(struct gw_trans *);
 static const struct got_error	*gw_html_escape(char **, const char *);
-static char			*gw_colordiff_line(char *);
+static const struct got_error	*gw_colordiff_line(char **, char *);
 
 static char			*gw_gen_commit_header(char *, char*);
 static char			*gw_gen_diff_header(char *, char*);
@@ -456,15 +456,9 @@ gw_diff(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	diff_html = gw_get_diff(gw_trans, header);
-
-	if (diff_html == NULL) {
-		diff_html = strdup("");
-		if (diff_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = gw_get_diff(&diff_html, gw_trans, header);
+	if (error)
+		goto done;
 
 	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
 	if (error)
@@ -483,7 +477,7 @@ gw_diff(struct gw_trans *gw_trans)
 	    gw_gen_author_header(header->author),
 	    gw_gen_committer_header(header->committer), age_html,
 	    gw_gen_commit_msg_header(escaped_commit_msg),
-	    diff_html) == -1) {
+	    diff_html ? diff_html : "") == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -1704,17 +1698,19 @@ done:
 	return error;
 }
 
-static char *
-gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
+static const struct got_error *
+gw_get_diff(char **diff_html, struct gw_trans *gw_trans,
+    struct gw_header *header)
 {
 	const struct got_error *error;
 	FILE *f = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct buf *diffbuf = NULL;
-	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *line = NULL;
-	char *buf_color = NULL;
+	char *label1 = NULL, *label2 = NULL, *line = NULL;
+	char *diff_line_html = NULL;
 	int obj_type;
 	size_t newsize, linesize = 0;
+	ssize_t linelen;
 
 	f = got_opentemp();
 	if (f == NULL)
@@ -1759,7 +1755,6 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	}
-
 	if (error)
 		goto done;
 
@@ -1768,16 +1763,17 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		goto done;
 	}
 
-	while (getline(&line, &linesize, f) != -1) {
+	while ((linelen = getline(&line, &linesize, f)) != -1) {
 		char *escaped_line;
 		error = gw_html_escape(&escaped_line, line);
 		if (error)
 			goto done;
-		buf_color = gw_colordiff_line(escaped_line);
-		if (buf_color == NULL)
-			continue;
 
-		error = buf_puts(&newsize, diffbuf, buf_color);
+		error = gw_colordiff_line(&diff_line_html, escaped_line);
+		if (error)
+			goto done;
+
+		error = buf_puts(&newsize, diffbuf, diff_line_html);
 		if (error)
 			goto done;
 
@@ -1785,19 +1781,23 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		if (error)
 			goto done;
 	}
+	if (linelen == -1 && ferror(f)) {
+		error = got_error_from_errno("getline");
+		goto done;
+	}
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
 		if (error)
 			goto done;
-		diff_html = strdup(buf_get(diffbuf));
-		if (diff_html == NULL)
+		*diff_html = strdup(buf_get(diffbuf));
+		if (*diff_html == NULL)
 			error = got_error_from_errno("strdup");
 	}
 done:
 	if (f && fclose(f) == -1 && error == NULL)
 		error = got_error_from_errno("fclose");
-	free(buf_color);
+	free(diff_line_html);
 	free(line);
 	free(diffbuf);
 	free(label1);
@@ -1805,10 +1805,7 @@ done:
 	free(id1);
 	free(id2);
 
-	if (error)
-		return NULL;
-	else
-		return diff_html;
+	return error;
 }
 
 static const struct got_error *
@@ -3012,66 +3009,71 @@ gw_get_site_link(struct gw_trans *gw_trans)
 	return link;
 }
 
-static char *
-gw_colordiff_line(char *buf)
+static const struct got_error *
+gw_colordiff_line(char **colorized_line, char *buf)
 {
 	const struct got_error *error = NULL;
-	char *colorized_line = NULL, *div_diff_line_div = NULL, *color = NULL;
+	char *div_diff_line_div = NULL, *color = NULL;
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
+	*colorized_line = NULL;
+
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
-		return NULL;
+		return error;
 
-	if (buf == NULL)
-		return NULL;
 	if (strncmp(buf, "-", 1) == 0)
 		color = "diff_minus";
-	if (strncmp(buf, "+", 1) == 0)
+	else if (strncmp(buf, "+", 1) == 0)
 		color = "diff_plus";
-	if (strncmp(buf, "@@", 2) == 0)
+	else if (strncmp(buf, "@@", 2) == 0)
 		color = "diff_chunk_header";
-	if (strncmp(buf, "@@", 2) == 0)
+	else if (strncmp(buf, "@@", 2) == 0)
 		color = "diff_chunk_header";
-	if (strncmp(buf, "commit +", 8) == 0)
+	else if (strncmp(buf, "commit +", 8) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "commit -", 8) == 0)
+	else if (strncmp(buf, "commit -", 8) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "blob +", 6) == 0)
+	else if (strncmp(buf, "blob +", 6) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "blob -", 6) == 0)
+	else if (strncmp(buf, "blob -", 6) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "file +", 6) == 0)
+	else if (strncmp(buf, "file +", 6) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "file -", 6) == 0)
+	else if (strncmp(buf, "file -", 6) == 0)
 		color = "diff_meta";
-	if (strncmp(buf, "from:", 5) == 0)
+	else if (strncmp(buf, "from:", 5) == 0)
 		color = "diff_author";
-	if (strncmp(buf, "via:", 4) == 0)
+	else if (strncmp(buf, "via:", 4) == 0)
 		color = "diff_author";
-	if (strncmp(buf, "date:", 5) == 0)
+	else if (strncmp(buf, "date:", 5) == 0)
 		color = "diff_date";
 
-	if (asprintf(&div_diff_line_div, div_diff_line, color) == -1)
-		return NULL;
+	if (asprintf(&div_diff_line_div, div_diff_line, color ? color : "")
+	    == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	error = buf_puts(&newsize, diffbuf, div_diff_line_div);
 	if (error)
-		return NULL;
+		goto done;
 
 	error = buf_puts(&newsize, diffbuf, buf);
 	if (error)
-		return NULL;
+		goto done;
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
-		colorized_line = strdup(buf_get(diffbuf));
+		*colorized_line = strdup(buf_get(diffbuf));
+		if (*colorized_line == NULL)
+			error = got_error_from_errno("strdup");
 	}
-
+done:
 	free(diffbuf);
 	free(div_diff_line_div);
-	return colorized_line;
+	return error;
 }
 
 /*
