@@ -1446,7 +1446,7 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 	FILE *f = NULL;
 	char *d_file = NULL;
 	unsigned int len;
-	ssize_t n;
+	size_t n;
 
 	*description = NULL;
 	if (gw_trans->gw_conf->got_show_repo_description == 0)
@@ -1483,10 +1483,8 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 	}
 
 	n = fread(*description, 1, len, f);
-	if (n == -1) {
+	if (n == 0 && ferror(f))
 		error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
 done:
 	if (f != NULL && fclose(f) == -1 && error == NULL)
 		error = got_error_from_errno("fclose");
