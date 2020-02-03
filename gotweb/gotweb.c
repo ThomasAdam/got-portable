@@ -173,7 +173,7 @@ static const struct got_error	*gw_get_diff(char **, struct gw_trans *,
 				    struct gw_header *);
 static const struct got_error	*gw_get_repo_tags(char **, struct gw_trans *,
 				    struct gw_header *, int, int);
-static char			*gw_get_repo_heads(struct gw_trans *);
+static const struct got_error	*gw_get_repo_heads(char **, struct gw_trans *);
 static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *, char *);
 static char			*gw_get_got_link(struct gw_trans *);
 static char			*gw_get_site_link(struct gw_trans *);
@@ -1150,7 +1150,9 @@ gw_summary(struct gw_trans *gw_trans)
 	}
 
 	/* heads */
-	heads = gw_get_repo_heads(gw_trans);
+	error = gw_get_repo_heads(&heads, gw_trans);
+	if (error)
+		goto done;
 	if (heads != NULL && strcmp(heads, "") != 0) {
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "summary_heads_title_wrapper", KATTR__MAX);
@@ -3166,16 +3168,18 @@ done:
 	return error;
 }
 
-static char *
-gw_get_repo_heads(struct gw_trans *gw_trans)
+static const struct got_error *
+gw_get_repo_heads(char **head_html, struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	char *heads, *head_row = NULL, *head_navs_disp = NULL, *age = NULL;
+	char *head_row = NULL, *head_navs_disp = NULL, *age = NULL;
 	struct buf *diffbuf = NULL;
 	size_t newsize;
+
+	*head_html = NULL;
 
 	SIMPLEQ_INIT(&refs);
 
@@ -3236,17 +3240,16 @@ gw_get_repo_heads(struct gw_trans *gw_trans)
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
-		heads = strdup(buf_get(diffbuf));
+		*head_html = strdup(buf_get(diffbuf));
+		if (*head_html == NULL)
+			error = got_error_from_errno("strdup");
 	}
 done:
 	buf_free(diffbuf);
 	got_ref_list_free(&refs);
 	if (repo)
 		got_repo_close(repo);
-	if (error)
-		return NULL;
-	else
-		return heads;
+	return error;
 }
 
 static char *
