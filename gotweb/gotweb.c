@@ -87,7 +87,7 @@ struct gw_header {
 	char			*commit_id; /* id_str1 */
 	char			*parent_id; /* id_str2 */
 	char			*tree_id;
-	char			*author;
+	const char		*author;
 	char			*committer;
 	char			*commit_msg;
 	time_t			 committer_time;
@@ -182,7 +182,7 @@ static const struct got_error	*gw_colordiff_line(char **, char *);
 
 static char			*gw_gen_commit_header(char *, char*);
 static char			*gw_gen_diff_header(char *, char*);
-static char			*gw_gen_author_header(char *);
+static char			*gw_gen_author_header(const char *);
 static char			*gw_gen_committer_header(char *);
 static char			*gw_gen_commit_msg_header(char *);
 static char			*gw_gen_tree_header(char *);
@@ -726,9 +726,10 @@ static const struct got_error *
 gw_briefs(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *briefs_html = NULL, *briefs_navs_html = NULL, *newline;
 	struct gw_header *header = NULL, *n_header = NULL;
-	char *age = NULL, *age_html = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL, *age_html = NULL;
+	char *href_diff = NULL, *href_tree = NULL;
+	char *newline, *smallerthan;
 	enum kcgi_err kerr;
 
 	if ((header = gw_init_header()) == NULL)
@@ -752,56 +753,129 @@ gw_briefs(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	kerr = khttp_puts(gw_trans->gw_req, briefs_wrapper);
-	if (kerr != KCGI_OK) {
-		error = gw_kcgi_error(kerr);
-		goto done;
-	}
-
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
-		if (asprintf(&briefs_navs_html, briefs_navs,
-		    gw_trans->repo_name, n_header->commit_id,
-		    gw_trans->repo_name, n_header->commit_id,
-		    gw_trans->repo_name, n_header->commit_id) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-		newline = strchr(n_header->commit_msg, '\n');
-		if (newline)
-			*newline = '\0';
 		error = gw_get_time_str(&age, n_header->committer_time,
 		    TM_DIFF);
 		if (error)
 			goto done;
-		if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+
+		/* briefs wrapper */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "briefs_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* briefs age */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "briefs_age", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&age_html, "%s", age ? age : "") == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
-		error = gw_html_escape(&escaped_commit_msg,
-		    n_header->commit_msg);
-		if (error)
+		kerr = khtml_puts(gw_trans->gw_html_req, age_html);
+		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&briefs_html, briefs_line, age_html,
-		    n_header->author, escaped_commit_msg,
-		    briefs_navs_html) == -1) {
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* briefs author */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "briefs_author", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		smallerthan = strchr(n_header->author, '<');
+		if (smallerthan)
+			*smallerthan = '\0';
+		kerr = khtml_puts(gw_trans->gw_html_req, n_header->author);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* briefs log */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "briefs_log", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		newline = strchr(n_header->commit_msg, '\n');
+		if (newline)
+			*newline = '\0';
+		kerr = khtml_puts(gw_trans->gw_html_req, n_header->commit_msg);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* build diff nav */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "navs_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "navs", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&href_diff, "?path=%s&action=diff&commit=%s",
+		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_diff, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "diff");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* build tree nav */
+		if (asprintf(&href_tree, "?path=%s&action=tree&commit=%s",
+		    gw_trans->repo_name, n_header->commit_id) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_tree, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		khtml_puts(gw_trans->gw_html_req, "tree");
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		/* dotted line */
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "dotted_line", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+		if (kerr != KCGI_OK)
+			goto done;
+
 		free(age);
 		age = NULL;
 		free(age_html);
 		age_html = NULL;
-		free(escaped_commit_msg);
-		escaped_commit_msg = NULL;
-		kerr = khttp_puts(gw_trans->gw_req, briefs_html);
-		if (kerr != KCGI_OK) {
-			error = gw_kcgi_error(kerr);
-			goto done;
-		}
+		free(href_diff);
+		href_diff = NULL;
+		free(href_tree);
+		href_tree = NULL;
 	}
-	kerr = khttp_puts(gw_trans->gw_req, div_end);
-	if (kerr != KCGI_OK)
-		error = gw_kcgi_error(kerr);
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -809,7 +883,8 @@ done:
 		gw_free_headers(n_header);
 	free(age);
 	free(age_html);
-	free(escaped_commit_msg);
+	free(href_diff);
+	free(href_tree);
 	return error;
 }
 
@@ -900,6 +975,30 @@ gw_summary(struct gw_trans *gw_trans)
 		}
 	}
 	kerr = khttp_puts(gw_trans->gw_req, div_end);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
+
+	/* commit briefs header */
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "briefs_title_wrapper", KATTR__MAX);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "briefs_title", KATTR__MAX);
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
+	kerr = khtml_puts(gw_trans->gw_html_req, "Commit Briefs");
+	if (kerr != KCGI_OK) {
+		error = gw_kcgi_error(kerr);
+		goto done;
+	}
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 	if (kerr != KCGI_OK) {
 		error = gw_kcgi_error(kerr);
 		goto done;
@@ -1335,7 +1434,7 @@ gw_display_index(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
-	kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
+	kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, KHTML_PRETTY);
 	if (kerr)
 		return gw_kcgi_error(kerr);
 
@@ -1367,58 +1466,76 @@ static int
 gw_template(size_t key, void *arg)
 {
 	const struct got_error *error = NULL;
+	enum kcgi_err kerr;
 	struct gw_trans *gw_trans = arg;
 	char *gw_got_link, *gw_site_link;
-	char *site_owner_name, *site_owner_name_h;
 
 	switch (key) {
 	case (TEMPL_HEAD):
-		khttp_puts(gw_trans->gw_req, head);
+		kerr = khttp_puts(gw_trans->gw_req, head);
+		if (kerr != KCGI_OK)
+			return 0;
 		break;
 	case(TEMPL_HEADER):
 		gw_got_link = gw_get_got_link(gw_trans);
-		if (gw_got_link != NULL)
-			khttp_puts(gw_trans->gw_req, gw_got_link);
-
+		if (gw_got_link != NULL) {
+			kerr = khttp_puts(gw_trans->gw_req, gw_got_link);
+			if (kerr != KCGI_OK) {
+				free(gw_got_link);
+				return 0;
+			}
+		}
 		free(gw_got_link);
 		break;
 	case (TEMPL_SITEPATH):
 		gw_site_link = gw_get_site_link(gw_trans);
-		if (gw_site_link != NULL)
-			khttp_puts(gw_trans->gw_req, gw_site_link);
-
+		if (gw_site_link != NULL) {
+			kerr = khttp_puts(gw_trans->gw_req, gw_site_link);
+			if (kerr != KCGI_OK) {
+				free(gw_site_link);
+				return 0;
+			}
+		}
 		free(gw_site_link);
 		break;
 	case(TEMPL_TITLE):
-		if (gw_trans->gw_conf->got_site_name != NULL)
-			khtml_puts(gw_trans->gw_html_req,
+		if (gw_trans->gw_conf->got_site_name != NULL) {
+			kerr = khtml_puts(gw_trans->gw_html_req,
 			    gw_trans->gw_conf->got_site_name);
-
+			if (kerr != KCGI_OK)
+				return 0;
+		}
 		break;
 	case (TEMPL_SEARCH):
-		khttp_puts(gw_trans->gw_req, search);
+		kerr = khttp_puts(gw_trans->gw_req, search);
+		if (kerr != KCGI_OK)
+			return 0;
 		break;
 	case(TEMPL_SITEOWNER):
 		if (gw_trans->gw_conf->got_site_owner != NULL &&
 		    gw_trans->gw_conf->got_show_site_owner) {
-			error = gw_html_escape(&site_owner_name,
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "site_owner_wrapper", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				return 0;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "site_owner", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				return 0;
+			kerr = khtml_puts(gw_trans->gw_html_req,
 			    gw_trans->gw_conf->got_site_owner);
-			if (error)
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+			if (kerr != KCGI_OK)
 				return 0;
-			if (asprintf(&site_owner_name_h, site_owner,
-			    site_owner_name) == -1) {
-				free(site_owner_name);
-				return 0;
-			}
-			khttp_puts(gw_trans->gw_req, site_owner_name_h);
-			free(site_owner_name);
-			free(site_owner_name_h);
 		}
 		break;
 	case(TEMPL_CONTENT):
 		error = gw_query_funcs[gw_trans->action].func_main(gw_trans);
-		if (error)
-			khttp_puts(gw_trans->gw_req, error->msg);
+		if (error) {
+			kerr = khttp_puts(gw_trans->gw_req, error->msg);
+			if (kerr != KCGI_OK)
+				return 0;
+		}
 		break;
 	default:
 		return 0;
@@ -1459,7 +1576,7 @@ gw_gen_diff_header(char *str1, char *str2)
 }
 
 static char *
-gw_gen_author_header(char *str)
+gw_gen_author_header(const char *str)
 {
 	char *return_html = NULL;
 
@@ -2069,7 +2186,6 @@ gw_free_headers(struct gw_header *header)
 	free(header->commit_id);
 	free(header->parent_id);
 	free(header->tree_id);
-	free(header->author);
 	free(header->committer);
 	free(header->commit_msg);
 }
@@ -2241,10 +2357,8 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 	header->committer_time =
 	    got_object_commit_get_committer_time(header->commit);
 
-	error = gw_html_escape(&header->author,
-	    got_object_commit_get_author(header->commit));
-	if (error)
-		return error;
+	header->author =
+	    got_object_commit_get_author(header->commit);
 	error = gw_html_escape(&header->committer,
 	    got_object_commit_get_committer(header->commit));
 	if (error)

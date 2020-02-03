@@ -46,9 +46,6 @@ char *site_link =
 	"<a href='%s'>%s</a> %s %s" \
 	"</div>";
 
-char *site_owner =
-	"<div id='site_owner_wrapper'><div id='site_owner'>%s</div></div>";
-
 char *search =
 	"<!--/* <div id='search'>" \
 	"<form method='POST'>" \
@@ -180,30 +177,6 @@ char *commits_line =
 	"<div id='solid_line'></div>";
 
 char *commits_navs =
-	"<a href='?path=%s&action=diff&commit=%s'>diff</a> | " \
-	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
-	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
-
-/* briefs.tmpl */
-
-char *briefs_wrapper =
-	"<div id='briefs_title_wrapper'>" \
-	"<div id='briefs_title'>Commit Briefs</div></div>" \
-	"<div id='briefs_content'>";
-
-char *briefs_line =
-	"<div id='briefs_wrapper'>" \
-	"<div id='briefs_age'>%s</div>" \
-	"<div id='briefs_author'>%s</div>" \
-	"<div id='briefs_log'>%s</div>" \
-	"</div>" \
-	"<div id='navs_wrapper'>" \
-	"<div id='navs'>%s</div>" \
-	"</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>";
-
-char *briefs_navs =
 	"<a href='?path=%s&action=diff&commit=%s'>diff</a> | " \
 	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
 	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
