@@ -3003,21 +3003,29 @@ gw_get_got_link(struct gw_trans *gw_trans)
 static char *
 gw_get_site_link(struct gw_trans *gw_trans)
 {
-	char *link, *repo = "", *action = "";
+	char *link = NULL, *repo = NULL, *action = NULL;
 
-	if (gw_trans->repo_name != NULL)
-		if (asprintf(&repo, " / <a href='?path=%s&action=summary'>%s" \
-		    "</a>", gw_trans->repo_name, gw_trans->repo_name) == -1)
-			return NULL;
-
-	if (gw_trans->action_name != NULL)
-		if (asprintf(&action, " / %s", gw_trans->action_name) == -1)
-			return NULL;
-
-	if (asprintf(&link, site_link, GOTWEB,
-	    gw_trans->gw_conf->got_site_link, repo, action) == -1)
+	if (gw_trans->repo_name != NULL &&
+	    asprintf(&repo, " / <a href='?path=%s&action=summary'>%s</a>",
+	    gw_trans->repo_name, gw_trans->repo_name) == -1)
 		return NULL;
 
+	if (gw_trans->action_name != NULL &&
+	    asprintf(&action, " / %s", gw_trans->action_name) == -1) {
+		free(repo);
+		return NULL;
+	}
+
+	if (asprintf(&link, site_link, GOTWEB,
+	    gw_trans->gw_conf->got_site_link,
+	    repo ? repo : "", action ? action : "") == -1) {
+		free(repo);
+		free(action);
+		return NULL;
+	}
+
+	free(repo);
+	free(action);
 	return link;
 }
 
