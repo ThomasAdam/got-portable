@@ -166,7 +166,8 @@ static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
 static const struct got_error	*gw_get_file_blame_blob(char **, struct gw_trans *);
-static const struct got_error	*gw_get_file_read_blob(char **, struct gw_trans *);
+static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
+				    struct gw_trans *);
 static char			*gw_get_repo_tree(struct gw_trans *);
 static char			*gw_get_diff(struct gw_trans *,
 				    struct gw_header *);
@@ -314,6 +315,13 @@ gw_empty_string(char **s)
 	return NULL;
 }
 
+static int
+isbinary(const char *buf, size_t n)
+{
+	return (memchr(buf, '\0', n) != NULL);
+}
+
+
 static const struct got_error *
 gw_blame(struct gw_trans *gw_trans)
 {
@@ -379,7 +387,8 @@ gw_blob(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *blob = NULL;
+	char *content = NULL;
+	size_t filesize = 0;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -397,21 +406,26 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_get_file_read_blob(&blob, gw_trans);
+	error = gw_get_file_read_blob(&content, &filesize, gw_trans);
 	if (error)
 		goto done;
 
-	if (gw_trans->mime == KMIME_APP_OCTET_STREAM)
+	if (isbinary(content, filesize))
+		gw_trans->mime = KMIME_APP_OCTET_STREAM;
+	else
+		gw_trans->mime = KMIME_TEXT_PLAIN;
+
+	error = gw_display_index(gw_trans);
+	if (error)
 		goto done;
-	else {
-		kerr = khttp_puts(gw_trans->gw_req, blob);
-		if (kerr != KCGI_OK)
-			error = gw_kcgi_error(kerr);
-	}
+
+	kerr = khttp_write(gw_trans->gw_req, content, filesize);
+	if (kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(blob);
+	free(content);
 	return error;
 }
 
@@ -2440,12 +2454,6 @@ done:
 	return err;
 }
 
-static int
-isbinary(const char *buf, size_t n)
-{
-	return (memchr(buf, '\0', n) != NULL);
-}
-
 static const struct got_error *
 gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
 {
@@ -2575,7 +2583,7 @@ done:
 }
 
 static const struct got_error *
-gw_get_file_read_blob(char **blobstr, struct gw_trans *gw_trans)
+gw_get_file_read_blob(char **blobstr, size_t *filesize, struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2584,11 +2592,11 @@ gw_get_file_read_blob(char **blobstr, struct gw_trans *gw_trans)
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
 	int obj_type;
-	size_t filesize, n;
-	enum kcgi_err kerr;
+	size_t n;
 	FILE *f = NULL;
 
 	*blobstr = NULL;
+	*filesize = 0;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -2638,37 +2646,22 @@ gw_get_file_read_blob(char **blobstr, struct gw_trans *gw_trans)
 		error = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-	error = got_object_blob_dump_to_file(&filesize, NULL, NULL, f, blob);
+	error = got_object_blob_dump_to_file(filesize, NULL, NULL, f, blob);
 	if (error)
 		goto done;
 
 	/* XXX This will fail on large files... */
-	*blobstr = calloc(filesize + 1, sizeof(**blobstr));
+	*blobstr = calloc(*filesize + 1, sizeof(**blobstr));
 	if (*blobstr == NULL) {
 		error = got_error_from_errno("calloc");
 		goto done;
 	}
 
-	n = fread(*blobstr, 1, filesize, f);
+	n = fread(*blobstr, 1, *filesize, f);
 	if (n == 0) {
 		if (ferror(f))
 			error = got_ferror(f, GOT_ERR_IO);
 		goto done;
-	}
-
-	if (isbinary(*blobstr, n))
-		gw_trans->mime = KMIME_APP_OCTET_STREAM;
-	else
-		gw_trans->mime = KMIME_TEXT_PLAIN;
-
-	error = gw_display_index(gw_trans);
-	if (error)
-		goto done;
-
-	if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
-		kerr = khttp_write(gw_trans->gw_req, *blobstr, filesize);
-		if (kerr != KCGI_OK)
-			error = gw_kcgi_error(kerr);
 	}
 done:
 	free(in_repo_path);
@@ -2681,6 +2674,11 @@ done:
 		got_repo_close(repo);
 	if (f != NULL && fclose(f) == -1 && error == NULL)
 		error = got_error_from_errno("fclose");
+	if (error) {
+		free(*blobstr);
+		*blobstr = NULL;
+		*filesize = 0;
+	}
 	return error;
 }
 
