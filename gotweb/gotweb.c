@@ -1717,10 +1717,10 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	FILE *f = NULL;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct buf *diffbuf = NULL;
-	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *buf = NULL;
-	char *buf_color = NULL, *n_buf = NULL, *newline = NULL;
+	char *label1 = NULL, *label2 = NULL, *diff_html = NULL, *line = NULL;
+	char *buf_color = NULL;
 	int obj_type;
-	size_t newsize;
+	size_t newsize, linesize = 0;
 
 	f = got_opentemp();
 	if (f == NULL)
@@ -1728,7 +1728,7 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
-		return NULL;
+		goto done;
 
 	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -1769,27 +1769,17 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	if ((buf = calloc(128, sizeof(char *))) == NULL)
+	if (fseek(f, 0, SEEK_SET) == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
 		goto done;
+	}
 
-	if (fseek(f, 0, SEEK_SET) == -1)
-		goto done;
-
-	while ((fgets(buf, 2048, f)) != NULL) {
-		char *escaped_buf;
-		if (ferror(f))
-			goto done;
-		n_buf = buf;
-		while (*n_buf == '\n')
-			n_buf++;
-		newline = strchr(n_buf, '\n');
-		if (newline)
-			*newline = ' ';
-
-		error = gw_html_escape(&escaped_buf, n_buf);
+	while (getline(&line, &linesize, f) != -1) {
+		char *escaped_line;
+		error = gw_html_escape(&escaped_line, line);
 		if (error)
 			goto done;
-		buf_color = gw_colordiff_line(escaped_buf);
+		buf_color = gw_colordiff_line(escaped_line);
 		if (buf_color == NULL)
 			continue;
 
@@ -1804,12 +1794,17 @@ gw_get_diff(struct gw_trans *gw_trans, struct gw_header *header)
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
+		if (error)
+			goto done;
 		diff_html = strdup(buf_get(diffbuf));
+		if (diff_html == NULL)
+			error = got_error_from_errno("strdup");
 	}
 done:
-	fclose(f);
+	if (f && fclose(f) == -1 && error == NULL)
+		error = got_error_from_errno("fclose");
 	free(buf_color);
-	free(buf);
+	free(line);
 	free(diffbuf);
 	free(label1);
 	free(label2);
