@@ -113,6 +113,12 @@ got_repo_get_global_gitconfig_author_email(struct got_repository *repo)
 	return repo->global_gitconfig_author_email;
 }
 
+const char *
+got_repo_get_gitconfig_owner(struct got_repository *repo)
+{
+	return repo->gitconfig_owner;
+}
+
 int
 got_repo_is_bare(struct got_repository *repo)
 {
@@ -374,6 +380,7 @@ static const struct got_error *
 parse_gitconfig_file(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
     struct got_remote_repo **remotes, int *nremotes,
+    char **gitconfig_owner,
     const char *gitconfig_path)
 {
 	const struct got_error *err = NULL, *child_err = NULL;
@@ -462,6 +469,15 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 			goto done;
 	}
 
+	if (gitconfig_owner) {
+		err = got_privsep_send_gitconfig_owner_req(ibuf);
+		if (err)
+			goto done;
+		err = got_privsep_recv_gitconfig_str(gitconfig_owner, ibuf);
+		if (err)
+			goto done;
+	}
+
 	imsg_clear(ibuf);
 	err = got_privsep_send_stop(imsg_fds[0]);
 	child_err = got_privsep_wait_for_child(pid);
@@ -490,7 +506,7 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 		err = parse_gitconfig_file(&dummy_repo_version,
 		    &repo->global_gitconfig_author_name,
 		    &repo->global_gitconfig_author_email,
-		    NULL, NULL, global_gitconfig_path);
+		    NULL, NULL, NULL, global_gitconfig_path);
 		if (err)
 			return err;
 	}
@@ -503,7 +519,7 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 	err = parse_gitconfig_file(&repo->gitconfig_repository_format_version,
 	    &repo->gitconfig_author_name, &repo->gitconfig_author_email,
 	    &repo->gitconfig_remotes, &repo->ngitconfig_remotes,
-	    repo_gitconfig_path);
+	    &repo->gitconfig_owner, repo_gitconfig_path);
 	if (err)
 		goto done;
 done:

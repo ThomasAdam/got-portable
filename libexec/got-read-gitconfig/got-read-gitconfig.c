@@ -142,6 +142,21 @@ done:
 	return err;
 }
 
+static const struct got_error *
+gitconfig_owner_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
+{
+	char *value;
+
+	if (gitconfig == NULL)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	value = got_gitconfig_get_str(gitconfig, "gotweb", "owner");
+	if (value)
+		return got_privsep_send_gitconfig_str(ibuf, value);
+	value = got_gitconfig_get_str(gitconfig, "gitweb", "owner");
+	return got_privsep_send_gitconfig_str(ibuf, value);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -219,6 +234,9 @@ main(int argc, char *argv[])
 			break;
 		case GOT_IMSG_GITCONFIG_REMOTES_REQUEST:
 			err = gitconfig_remotes_request(&ibuf, gitconfig);
+			break;
+		case GOT_IMSG_GITCONFIG_OWNER_REQUEST:
+			err = gitconfig_owner_request(&ibuf, gitconfig);
 			break;
 		default:
 			err = got_error(GOT_ERR_PRIVSEP_MSG);

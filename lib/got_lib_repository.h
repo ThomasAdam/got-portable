@@ -49,6 +49,7 @@ struct got_repository {
 	char *global_gitconfig_author_email;
 	int ngitconfig_remotes;
 	struct got_remote_repo *gitconfig_remotes;
+	char *gitconfig_owner;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,

@@ -1305,6 +1305,17 @@ got_privsep_send_gitconfig_remotes_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_gitconfig_owner_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_OWNER_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_OWNER_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
 {
 	size_t len = value ? strlen(value) + 1 : 0;

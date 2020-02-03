@@ -119,6 +119,8 @@ enum got_imsg_type {
 	GOT_IMSG_GITCONFIG_STR_VAL,
 	GOT_IMSG_GITCONFIG_REMOTES,
 	GOT_IMSG_GITCONFIG_REMOTE,
+	GOT_IMSG_GITCONFIG_OWNER_REQUEST,
+	GOT_IMSG_GITCONFIG_OWNER,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -325,6 +327,7 @@ const struct got_error *got_privsep_send_gitconfig_author_email_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_remotes_req(
     struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_owner_req(struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_str(struct imsgbuf *,
     const char *);
 const struct got_error *got_privsep_recv_gitconfig_str(char **,

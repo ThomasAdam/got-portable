@@ -160,7 +160,7 @@ static struct gw_header		*gw_init_header(void);
 
 static const struct got_error	*gw_get_repo_description(char **, struct gw_trans *,
 				    char *);
-static char			*gw_get_repo_owner(struct gw_trans *,
+static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 				    char *);
 static char			*gw_get_time_str(time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
@@ -539,7 +539,8 @@ gw_index(struct gw_trans *gw_trans)
 			return got_error_from_errno("asprintf");
 
 		if (asprintf(&html, index_projects, gw_dir->name, gw_dir->name,
-		    gw_dir->description, gw_dir->owner, gw_dir->age,
+		    gw_dir->description, gw_dir->owner ? gw_dir->owner : "",
+		    gw_dir->age,
 		    navs) == -1)
 			return got_error_from_errno("asprintf");
 
@@ -786,20 +787,18 @@ gw_summary(struct gw_trans *gw_trans)
 		}
 	}
 
-	if (gw_trans->gw_conf->got_show_repo_owner) {
-		if (gw_trans->gw_dir->owner != NULL &&
-		    (strcmp(gw_trans->gw_dir->owner, "") != 0)) {
-			if (asprintf(&repo_owner_html, repo_owner,
-			    gw_trans->gw_dir->owner) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
+	if (gw_trans->gw_conf->got_show_repo_owner &&
+	    gw_trans->gw_dir->owner != NULL) {
+		if (asprintf(&repo_owner_html, repo_owner,
+		    gw_trans->gw_dir->owner) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 
-			kerr = khttp_puts(gw_trans->gw_req, repo_owner_html);
-			if (kerr != KCGI_OK) {
-				error = gw_kcgi_error(kerr);
-				goto done;
-			}
+		kerr = khttp_puts(gw_trans->gw_req, repo_owner_html);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
 		}
 	}
 
@@ -1047,7 +1046,9 @@ done:
 	    gw_dir->path);
 	if (error)
 		goto errored;
-	gw_dir->owner = gw_get_repo_owner(gw_trans, gw_dir->path);
+	error = gw_get_repo_owner(&gw_dir->owner, gw_trans, gw_dir->path);
+	if (error)
+		goto errored;
 	error = gw_get_repo_age(&gw_dir->age, gw_trans, gw_dir->path,
 	    "refs/heads", TM_DIFF);
 	if (error)
@@ -1746,63 +1747,29 @@ done:
 		return diff_html;
 }
 
-static char *
-gw_get_repo_owner(struct gw_trans *gw_trans, char *dir)
+static const struct got_error *
+gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 {
-	FILE *f;
-	char *owner = NULL, *d_file = NULL;
-	char *gotweb = "[gotweb]", *gitweb = "[gitweb]", *gw_owner = "owner";
-	char *comp, *pos, *buf;
-	unsigned int i;
+	const struct got_error *error = NULL;
+	struct got_repository *repo;
+	const char *gitconfig_owner;
+
+	*owner = NULL;
 
 	if (gw_trans->gw_conf->got_show_repo_owner == 0)
-		goto err;
+		return NULL;
 
-	if (asprintf(&d_file, "%s/config", dir) == -1)
-		goto err;
-
-	if ((f = fopen(d_file, "r")) == NULL)
-		goto err;
-
-	if ((buf = calloc(128, sizeof(char *))) == NULL)
-		goto err;
-
-	while ((fgets(buf, 128, f)) != NULL) {
-		if (ferror(f))
-			goto err;
-		if ((pos = strstr(buf, gotweb)) != NULL)
-			break;
-
-		if ((pos = strstr(buf, gitweb)) != NULL)
-			break;
+	error = got_repo_open(&repo, dir, NULL);
+	if (error)
+		return error;
+	gitconfig_owner = got_repo_get_gitconfig_owner(repo);
+	if (gitconfig_owner) {
+		*owner = strdup(gitconfig_owner);
+		if (*owner == NULL)
+			error = got_error_from_errno("strdup");
 	}
-
-	if (pos == NULL)
-		goto err;
-
-	do {
-		fgets(buf, 128, f);
-		if (ferror(f))
-			goto err;
-	} while ((comp = strcasestr(buf, gw_owner)) == NULL);
-
-	if (comp == NULL)
-		goto err;
-
-	if (strncmp(gw_owner, comp, strlen(gw_owner)) != 0)
-		goto err;
-
-	for (i = 0; i < 2; i++)
-		owner = strsep(&buf, "\"");
-
-	if (owner == NULL)
-		goto err;
-
-	fclose(f);
-	free(d_file);
-	return owner;
-err:
-	return strdup("");
+	got_repo_close(repo);
+	return error;
 }
 
 static const struct got_error *
