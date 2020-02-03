@@ -158,7 +158,7 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 static struct gw_dir		*gw_init_gw_dir(char *);
 static struct gw_header		*gw_init_header(void);
 
-static char			*gw_get_repo_description(struct gw_trans *,
+static const struct got_error	*gw_get_repo_description(char **, struct gw_trans *,
 				    char *);
 static char			*gw_get_repo_owner(struct gw_trans *,
 				    char *);
@@ -302,6 +302,15 @@ gw_apply_unveil(const char *repo_path, const char *repo_file)
 	if (unveil(NULL, NULL) != 0)
 		return got_error_from_errno("unveil");
 
+	return NULL;
+}
+
+static const struct got_error *
+gw_empty_string(char **s)
+{
+	*s = strdup("");
+	if (*s == NULL)
+		return got_error_from_errno("strdup");
 	return NULL;
 }
 
@@ -1034,8 +1043,10 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 	gw_dir->path = strdup(dir_test);
 
 done:
-	gw_dir->description = gw_get_repo_description(gw_trans,
+	error = gw_get_repo_description(&gw_dir->description, gw_trans,
 	    gw_dir->path);
+	if (error)
+		goto errored;
 	gw_dir->owner = gw_get_repo_owner(gw_trans, gw_dir->path);
 	error = gw_get_repo_age(&gw_dir->age, gw_trans, gw_dir->path,
 	    "refs/heads", TM_DIFF);
@@ -1427,42 +1438,60 @@ gw_gen_tree_header(char *str)
 	return return_html;
 }
 
-static char *
-gw_get_repo_description(struct gw_trans *gw_trans, char *dir)
+static const struct got_error *
+gw_get_repo_description(char **description, struct gw_trans *gw_trans,
+    char *dir)
 {
+	const struct got_error *error = NULL;
 	FILE *f = NULL;
-	char *description = NULL, *d_file = NULL;
+	char *d_file = NULL;
 	unsigned int len;
+	ssize_t n;
 
+	*description = NULL;
 	if (gw_trans->gw_conf->got_show_repo_description == 0)
-		goto err;
+		return gw_empty_string(description);
 
 	if (asprintf(&d_file, "%s/description", dir) == -1)
-		goto err;
+		return got_error_from_errno("asprintf");
 
-	if ((f = fopen(d_file, "r")) == NULL)
-		goto err;
+	f = fopen(d_file, "r");
+	if (f == NULL) {
+		if (errno == ENOENT || errno == EACCES)
+			return gw_empty_string(description);
+		error = got_error_from_errno2("fopen", d_file);
+		goto done;
+	}
 
-	if (fseek(f, 0, SEEK_END) == -1)
-		goto err;
-	len = ftell(f) + 1;
-	if (ferror(f))
-		goto err;
-	if (fseek(f, 0, SEEK_SET) == -1)
-		goto err;
-	if ((description = calloc(len, sizeof(char *))) == NULL)
-		goto err;
+	if (fseek(f, 0, SEEK_END) == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	len = ftell(f);
+	if (len == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	if (fseek(f, 0, SEEK_SET) == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	*description = calloc(len + 1, sizeof(**description));
+	if (*description == NULL) {
+		error = got_error_from_errno("calloc");
+		goto done;
+	}
 
-	fread(description, 1, len, f);
-	if (ferror(f))
-		goto err;
-	fclose(f);
+	n = fread(*description, 1, len, f);
+	if (n == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+done:
+	if (f != NULL && fclose(f) == -1 && error == NULL)
+		error = got_error_from_errno("fclose");
 	free(d_file);
-	return description;
-err:
-	if (f != NULL)
-		fclose(f);
-	return strdup("");
+	return error;
 }
 
 static char *
