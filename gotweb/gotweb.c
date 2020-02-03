@@ -362,7 +362,7 @@ gw_blame(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 	if (asprintf(&blame_html_disp, blame_header, age_html,
-	    escaped_commit_msg, blame_html) == -1) {
+	    gw_gen_commit_msg_header(escaped_commit_msg), blame_html) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
