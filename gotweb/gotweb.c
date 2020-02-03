@@ -165,7 +165,7 @@ static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
-static char			*gw_get_file_blame_blob(struct gw_trans *);
+static const struct got_error	*gw_get_file_blame_blob(char **, struct gw_trans *);
 static char			*gw_get_repo_tree(struct gw_trans *);
 static char			*gw_get_diff(struct gw_trans *,
 				    struct gw_header *);
@@ -337,16 +337,9 @@ gw_blame(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	blame_html = gw_get_file_blame_blob(gw_trans);
-
-	if (blame_html == NULL) {
-		blame_html = strdup("");
-		if (blame_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
-
+	error = gw_get_file_blame_blob(&blame_html, gw_trans);
+	if (error)
+		goto done;
 
 	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
 	if (error)
@@ -403,15 +396,9 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	blob = gw_get_file_blame_blob(gw_trans);
-
-	if (blob == NULL) {
-		blob = strdup("");
-		if (blob == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = gw_get_file_blame_blob(&blob, gw_trans);
+	if (error)
+		goto done;
 
 	if (gw_trans->mime == KMIME_APP_OCTET_STREAM)
 		goto done;
@@ -2458,38 +2445,33 @@ isbinary(const char *buf, size_t n)
 	return (memchr(buf, '\0', n) != NULL);
 }
 
-static char*
-gw_get_file_blame_blob(struct gw_trans *gw_trans)
+static const struct got_error *
+gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
-	char *blame_html = NULL, *path = NULL, *in_repo_path = NULL;
-	char *folder = NULL;
+	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
 	int i, obj_type;
 	size_t filesize;
 	enum kcgi_err kerr;
 
+	*blame_html = NULL;
+
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
-		goto done;
+		return error;
 
-	if (gw_trans->repo_folder != NULL) {
-		if (asprintf(&folder, "%s/", gw_trans->repo_folder) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	} else
-		folder = strdup("");
-
-	if (asprintf(&path, "%s%s", folder, gw_trans->repo_file) == -1) {
+	if (asprintf(&path, "%s%s%s",
+	    gw_trans->repo_folder ? "/" : "",
+	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+	    gw_trans->repo_file) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
-	free(folder);
 
 	error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	if (error)
@@ -2542,32 +2524,40 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 
 		if (fseek(bca.f, 0, SEEK_END) == -1)
 			goto done;
-		len = ftell(bca.f) + 1;
-		if (ferror(bca.f))
+		len = ftell(bca.f);
+		if (len == -1) {
+			error = got_ferror(bca.f, GOT_ERR_IO);
 			goto done;
-		if (fseek(bca.f, 0, SEEK_SET) == -1)
-			goto done;;
-
-		if ((blame_html = calloc(len, sizeof(char *))) == NULL)
-			goto done;
-
-		n = fread(blame_html, 1, len, bca.f);
-		if (ferror(bca.f))
-			goto done;
-		if (n == -1) {
+		}
+		if (fseek(bca.f, 0, SEEK_SET) == -1) {
 			error = got_ferror(bca.f, GOT_ERR_IO);
 			goto done;
 		}
 
-		if (isbinary(blame_html, n))
+		*blame_html = calloc(len + 1, sizeof(char *));
+		if (*blame_html == NULL) {
+			error = got_error_from_errno("calloc");
+			goto done;
+		}
+
+		n = fread(*blame_html, 1, len, bca.f);
+		if (n == 0) {
+			if (ferror(bca.f))
+				error = got_ferror(bca.f, GOT_ERR_IO);
+			goto done;
+		}
+	
+		if (isbinary(*blame_html, n))
 			gw_trans->mime = KMIME_APP_OCTET_STREAM;
 		else
 			gw_trans->mime = KMIME_TEXT_PLAIN;
 
 		error = gw_display_index(gw_trans);
+		if (error)
+			goto done;
 
 		if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
-			kerr = khttp_write(gw_trans->gw_req, blame_html, len);
+			kerr = khttp_write(gw_trans->gw_req, *blame_html, len);
 			if (kerr != KCGI_OK)
 				error = gw_kcgi_error(kerr);
 		}
@@ -2599,7 +2589,13 @@ gw_get_file_blame_blob(struct gw_trans *gw_trans)
 		goto done;
 	if (buf_len(bca.blamebuf) > 0) {
 		error = buf_putc(bca.blamebuf, '\0');
-		blame_html = strdup(buf_get(bca.blamebuf));
+		if (error)
+			goto done;
+		*blame_html = strdup(buf_get(bca.blamebuf));
+		if (*blame_html == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 done:
 	free(bca.line_offsets);
@@ -2617,20 +2613,13 @@ done:
 		}
 		free(bca.lines);
 	}
-	if (error)
-		return NULL;
 	if (bca.f && fclose(bca.f) == EOF && error == NULL)
-		return NULL;
+		error = got_error_from_errno("fclose");
 	if (blob)
-		error = got_object_blob_close(blob);
-	if (error)
-		return NULL;
+		got_object_blob_close(blob);
 	if (repo)
-		error = got_repo_close(repo);
-	if (error)
-		return NULL;
-	else
-		return blame_html;
+		got_repo_close(repo);
+	return error;
 }
 
 static char*
