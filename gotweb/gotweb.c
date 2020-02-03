@@ -172,7 +172,7 @@ static char			*gw_get_diff(struct gw_trans *,
 static char			*gw_get_repo_tags(struct gw_trans *,
 				    struct gw_header *, int, int);
 static char			*gw_get_repo_heads(struct gw_trans *);
-static char			*gw_get_clone_url(struct gw_trans *, char *);
+static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *, char *);
 static char			*gw_get_got_link(struct gw_trans *);
 static char			*gw_get_site_link(struct gw_trans *);
 static char			*gw_html_escape(const char *);
@@ -1052,8 +1052,7 @@ done:
 	    "refs/heads", TM_DIFF);
 	if (error)
 		goto errored;
-	gw_dir->url = gw_get_clone_url(gw_trans, gw_dir->path);
-
+	error = gw_get_clone_url(&gw_dir->url, gw_trans, gw_dir->path);
 errored:
 	free(dir_test);
 	if (opened)
@@ -1806,36 +1805,55 @@ err:
 	return strdup("");
 }
 
-static char *
-gw_get_clone_url(struct gw_trans *gw_trans, char *dir)
+static const struct got_error *
+gw_get_clone_url(char **url, struct gw_trans *gw_trans, char *dir)
 {
+	const struct got_error *error = NULL;
 	FILE *f;
-	char *url = NULL, *d_file = NULL;
+	char *d_file = NULL;
 	unsigned int len;
+	size_t n;
+
+	*url = NULL;
 
 	if (asprintf(&d_file, "%s/cloneurl", dir) == -1)
-		return NULL;
+		return got_error_from_errno("asprintf");
 
-	if ((f = fopen(d_file, "r")) == NULL)
-		return NULL;
+	f = fopen(d_file, "r");
+	if (f == NULL) {
+		if (errno != ENOENT && errno != EACCES)
+			error = got_error_from_errno2("fopen", d_file);
+		goto done;
+	}
 
-	if (fseek(f, 0, SEEK_END) == -1)
-		return NULL;
-	len = ftell(f) + 1;
-	if (ferror(f))
-		return NULL;
-	if (fseek(f, 0, SEEK_SET) == -1)
-		return NULL;
+	if (fseek(f, 0, SEEK_END) == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	len = ftell(f);
+	if (len == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	if (fseek(f, 0, SEEK_SET) == -1) {
+		error = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
 
-	if ((url = calloc(len, sizeof(char *))) == NULL)
-		return NULL;
+	*url = calloc(len + 1, sizeof(**url));
+	if (*url == NULL) {
+		error = got_error_from_errno("calloc");
+		goto done;
+	}
 
-	fread(url, 1, len, f);
-	if (ferror(f))
-		return NULL;
-	fclose(f);
+	n = fread(*url, 1, len, f);
+	if (n == 0 && ferror(f))
+		error = got_ferror(f, GOT_ERR_IO);
+done:
+	if (f && fclose(f) == -1 && error == NULL)
+		error = got_error_from_errno("fclose");
 	free(d_file);
-	return url;
+	return NULL;
 }
 
 static char *
