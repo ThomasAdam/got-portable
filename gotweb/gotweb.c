@@ -171,7 +171,7 @@ static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
 static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
 static const struct got_error	*gw_get_diff(char **, struct gw_trans *,
 				    struct gw_header *);
-static char			*gw_get_repo_tags(struct gw_trans *,
+static const struct got_error	*gw_get_repo_tags(char **, struct gw_trans *,
 				    struct gw_header *, int, int);
 static char			*gw_get_repo_heads(struct gw_trans *);
 static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *, char *);
@@ -909,7 +909,11 @@ gw_summary(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	tags = gw_get_repo_tags(gw_trans, NULL, D_MAXSLCOMMDISP, TAGBRIEF);
+	error = gw_get_repo_tags(&tags, gw_trans, NULL, D_MAXSLCOMMDISP,
+	    TAGBRIEF);
+	if (error)
+		goto done;
+
 	heads = gw_get_repo_heads(gw_trans);
 
 	if (tags != NULL && strcmp(tags, "") != 0) {
@@ -1035,14 +1039,9 @@ gw_tag(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	tag_html = gw_get_repo_tags(gw_trans, header, 1, TAGFULL);
-	if (tag_html == NULL) {
-		tag_html = strdup("");
-		if (tag_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = gw_get_repo_tags(&tag_html, gw_trans, header, 1, TAGFULL);
+	if (error)
+		goto done;
 
 	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
 	if (error)
@@ -1050,7 +1049,7 @@ gw_tag(struct gw_trans *gw_trans)
 	if (asprintf(&tag_html_disp, tag_header,
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_commit_msg_header(escaped_commit_msg),
-	    tag_html) == -1) {
+	    tag_html ? tag_html : "") == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -1884,19 +1883,24 @@ done:
 	return NULL;
 }
 
-static char *
-gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
-    int tag_type)
+static const struct got_error *
+gw_get_repo_tags(char **tag_html, struct gw_trans *gw_trans,
+    struct gw_header *header, int limit, int tag_type)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	char *tags = NULL, *tag_row = NULL, *tags_navs_disp = NULL;
-	char *age = NULL, *age_html = NULL, *newline, *time_str = NULL;
+	char *tag_row = NULL, *tags_navs_disp = NULL;
+	char *age = NULL, *age_html = NULL, *newline;
 	char *escaped_tagger = NULL, *escaped_tag_commit = NULL;
+	char *id_str = NULL, *refstr = NULL;
+	char *tag_commit0 = NULL;
 	struct buf *diffbuf = NULL;
 	size_t newsize;
+	struct got_tag_object *tag = NULL;
+
+	*tag_html = NULL;
 
 	SIMPLEQ_INIT(&refs);
 
@@ -1914,11 +1918,10 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		const char *refname;
-		char *refstr, *tag_commit0, *tag_commit, *id_str;
 		const char *tagger;
+		const char *tag_commit;
 		time_t tagger_time;
 		struct got_object_id *id;
-		struct got_tag_object *tag;
 
 		refname = got_ref_get_name(re->ref);
 		if (strncmp(refname, "refs/tags/", 10) != 0)
@@ -1947,7 +1950,6 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			goto done;
 
 		tag_commit0 = strdup(got_object_tag_get_message(tag));
-
 		if (tag_commit0 == NULL) {
 			error = got_error_from_errno("strdup");
 			goto done;
@@ -2003,12 +2005,19 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			break;
 		}
 
-		got_object_tag_close(tag);
-
 		error = buf_puts(&newsize, diffbuf, tag_row);
+		if (error)
+			goto done;
+	
+		if (limit && --limit == 0)
+			break;
 
+		got_object_tag_close(tag);
+		tag = NULL;
 		free(id_str);
+		id_str = NULL;
 		free(refstr);
+		refstr = NULL;
 		free(age);
 		age = NULL;
 		free(age_html);
@@ -2018,30 +2027,33 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 		free(escaped_tag_commit);
 		escaped_tag_commit = NULL;
 		free(tag_commit0);
+		tag_commit0 = NULL;
 		free(tag_row);
-
-		if (error || (limit && --limit == 0))
-			break;
+		tag_row = NULL;
 	}
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
-		tags = strdup(buf_get(diffbuf));
+		*tag_html = strdup(buf_get(diffbuf));
+		if (*tag_html == NULL)
+			error = got_error_from_errno("strdup");
 	}
 done:
-	free(time_str);
-	buf_free(diffbuf);
-	got_ref_list_free(&refs);
-	if (repo)
-		got_repo_close(repo);
+	if (tag)
+		got_object_tag_close(tag);
+	free(id_str);
+	free(refstr);
 	free(age);
 	free(age_html);
 	free(escaped_tagger);
 	free(escaped_tag_commit);
-	if (error)
-		return NULL;
-	else
-		return tags;
+	free(tag_commit0);
+	free(tag_row);
+	buf_free(diffbuf);
+	got_ref_list_free(&refs);
+	if (repo)
+		got_repo_close(repo);
+	return error;
 }
 
 static void
