@@ -73,21 +73,9 @@ char *nav_next =
 char *nav_prev =
 	"<a href='?page=%d'>Previous<a/>";
 
-char *description =
-	"<div id='description_title'>Description: </div>" \
-	"<div id='description'>%s</div>";
-
 char *repo_owner =
 	"<div id='repo_owner_title'>Owner: </div>" \
 	"<div id='repo_owner'>%s</div>";
-
-char *last_change =
-	"<div id='last_change_title'>Last Change: </div>" \
-	"<div id='last_change'>%s</div>";
-
-char *cloneurl =
-	"<div id='cloneurl_title'>Clone URL: </div>" \
-	"<div id='cloneurl'>%s</div>";
 
 char *tags_row =
 	"<div id='tags_wrapper'>" \
@@ -314,20 +302,5 @@ char *index_navs =
 	"<a href='?path=%s&action=briefs'>commit briefs</a> | " \
 	"<a href='?path=%s&action=commits'>commits</a> | " \
 	"<a href='?path=%s&action=tree'>tree</a>";
-
-/* summary.tmpl */
-
-char *summary_wrapper =
-	"<div id='summary_wrapper'>";
-
-char *summary_tags =
-	"<div id='summary_tags_title_wrapper'>" \
-	"<div id='summary_tags_title'>Tags</div></div>" \
-	"<div id='summary_tags_content'>%s</div>";
-
-char *summary_heads =
-	"<div id='summary_heads_title_wrapper'>" \
-	"<div id='summary_heads_title'>Heads</div></div>" \
-	"<div id='summary_heads_content'>%s</div>";
 
 #endif /* GOTWEB_UI_H */
