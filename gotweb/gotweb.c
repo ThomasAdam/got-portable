@@ -1342,8 +1342,7 @@ gw_display_error(struct gw_trans *gw_trans, const struct got_error *err)
 
 	if (khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0) != KCGI_OK)
 		return;
-
-	khttp_puts(gw_trans->gw_req, err->msg);
+	khtml_puts(gw_trans->gw_html_req, err->msg);
 	khtml_close(gw_trans->gw_html_req);
 }
 
