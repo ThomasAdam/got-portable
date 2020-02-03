@@ -797,6 +797,11 @@ gw_briefs(struct gw_trans *gw_trans)
 			goto done;
 
 		/* briefs log */
+		if (asprintf(&href_diff, "?path=%s&action=diff&commit=%s",
+		    gw_trans->repo_name, n_header->commit_id) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "briefs_log", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -804,10 +809,14 @@ gw_briefs(struct gw_trans *gw_trans)
 		newline = strchr(n_header->commit_msg, '\n');
 		if (newline)
 			*newline = '\0';
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_diff, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
 		kerr = khtml_puts(gw_trans->gw_html_req, n_header->commit_msg);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 		if (kerr != KCGI_OK)
 			goto done;
 
@@ -820,11 +829,6 @@ gw_briefs(struct gw_trans *gw_trans)
 		    KATTR_ID, "navs", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&href_diff, "?path=%s&action=diff&commit=%s",
-		    gw_trans->repo_name, n_header->commit_id) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_diff, KATTR__MAX);
 		if (kerr != KCGI_OK)
