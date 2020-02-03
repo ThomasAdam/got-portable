@@ -168,7 +168,7 @@ static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 static const struct got_error	*gw_get_file_blame_blob(char **, struct gw_trans *);
 static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
 				    struct gw_trans *);
-static char			*gw_get_repo_tree(struct gw_trans *);
+static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
 static char			*gw_get_diff(struct gw_trans *,
 				    struct gw_header *);
 static char			*gw_get_repo_tags(struct gw_trans *,
@@ -977,15 +977,9 @@ gw_tree(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	tree_html = gw_get_repo_tree(gw_trans);
-
-	if (tree_html == NULL) {
-		tree_html = strdup("");
-		if (tree_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
+	error = gw_get_repo_tree(&tree_html, gw_trans);
+	if (error)
+		goto done;
 
 	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
 	if (error)
@@ -999,7 +993,7 @@ gw_tree(struct gw_trans *gw_trans)
 		goto done;
 	if (asprintf(&tree_html_disp, tree_header, age_html,
 	    gw_gen_commit_msg_header(escaped_commit_msg),
-	    tree_html) == -1) {
+	    tree_html ? tree_html : "") == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -2720,8 +2714,8 @@ done:
 	return error;
 }
 
-static char*
-gw_get_repo_tree(struct gw_trans *gw_trans)
+static const struct got_error *
+gw_get_repo_tree(char **tree_html, struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2729,25 +2723,30 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 	struct got_tree_object *tree = NULL;
 	struct buf *diffbuf = NULL;
 	size_t newsize;
-	char *tree_html = NULL, *path = NULL, *in_repo_path = NULL,
-	    *tree_row = NULL, *id_str, *class = NULL;
+	char *path = NULL, *in_repo_path = NULL, *tree_row = NULL;
+	char *id_str = NULL;
+	char *build_folder = NULL;
+	char *url_html = NULL;
+	const char *class = NULL;
 	int nentries, i, class_flip = 0;
+
+	*tree_html = NULL;
 
 	error = buf_alloc(&diffbuf, 0);
 	if (error)
-		return NULL;
+		return error;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
 		goto done;
 
-	error = got_repo_map_path(&in_repo_path, repo, gw_trans->repo_path, 1);
-	if (error)
-		goto done;
-
 	if (gw_trans->repo_folder != NULL)
 		path = strdup(gw_trans->repo_folder);
-	else if (in_repo_path) {
+	else {
+		error = got_repo_map_path(&in_repo_path, repo,
+		    gw_trans->repo_path, 1);
+		if (error)
+			goto done;
 		free(path);
 		path = in_repo_path;
 	}
@@ -2757,15 +2756,17 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
 		if (error)
 			goto done;
-
 		error = got_ref_resolve(&commit_id, repo, head_ref);
+		if (error)
+			goto done;
 		got_ref_close(head_ref);
 
-	} else
+	} else {
 		error = got_repo_match_object_id(&commit_id, NULL,
 		    gw_trans->commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
-	if (error)
-		goto done;
+		if (error)
+			goto done;
+	}
 
 	error = got_object_id_str(&gw_trans->commit, commit_id);
 	if (error)
@@ -2780,11 +2781,10 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		goto done;
 
 	nentries = got_object_tree_get_nentries(tree);
-
 	for (i = 0; i < nentries; i++) {
 		struct got_tree_entry *te;
 		const char *modestr = "";
-		char *id = NULL, *url_html = NULL;
+		mode_t mode;
 
 		te = got_object_tree_get_entry(tree, i);
 
@@ -2792,14 +2792,7 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 
-		if (asprintf(&id, "%s", id_str) == -1) {
-			error = got_error_from_errno("asprintf");
-			free(id_str);
-			goto done;
-		}
-
-		mode_t mode = got_tree_entry_get_mode(te);
-
+		mode = got_tree_entry_get_mode(te);
 		if (got_object_tree_entry_is_submodule(te))
 			modestr = "$";
 		else if (S_ISLNK(mode))
@@ -2810,27 +2803,21 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 			modestr = "*";
 
 		if (class_flip == 0) {
-			class = strdup("back_lightgray");
+			class = "back_lightgray";
 			class_flip = 1;
 		} else {
-			class = strdup("back_white");
+			class = "back_white";
 			class_flip = 0;
 		}
 
-		char *build_folder = NULL;
-		if (S_ISDIR(got_tree_entry_get_mode(te))) {
-			if (gw_trans->repo_folder != NULL) {
-				if (asprintf(&build_folder, "%s/%s",
-				    gw_trans->repo_folder,
-				    got_tree_entry_get_name(te)) == -1) {
-					error =
-					    got_error_from_errno("asprintf");
-					goto done;
-				}
-			} else {
-				if (asprintf(&build_folder, "/%s",
-				    got_tree_entry_get_name(te)) == -1)
-					goto done;
+		if (S_ISDIR(mode)) {
+			if (asprintf(&build_folder, "%s%s%s",
+			    gw_trans->repo_folder ? "/" : "",
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+			    got_tree_entry_get_name(te)) == -1) {
+				error = got_error_from_errno(
+				    "asprintf");
+				goto done;
 			}
 
 			if (asprintf(&url_html, folder_html,
@@ -2840,61 +2827,58 @@ gw_get_repo_tree(struct gw_trans *gw_trans)
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
-
-		if (asprintf(&tree_row, tree_line, class, url_html,
-			class) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
+			if (asprintf(&tree_row, tree_line, class, url_html,
+			    class) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 		} else {
-			if (gw_trans->repo_folder != NULL) {
-				if (asprintf(&build_folder, "%s",
-				    gw_trans->repo_folder) == -1) {
-					error =
-					    got_error_from_errno("asprintf");
-					goto done;
-				}
-			} else
-				build_folder = strdup("");
-
 			if (asprintf(&url_html, file_html, gw_trans->repo_name,
 			    "blob", gw_trans->commit,
-			    got_tree_entry_get_name(te), build_folder,
+			    got_tree_entry_get_name(te),
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 			    got_tree_entry_get_name(te), modestr) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 
 			if (asprintf(&tree_row, tree_line_with_navs, class,
-				url_html, class, gw_trans->repo_name, "blob",
-				gw_trans->commit, got_tree_entry_get_name(te),
-				build_folder, "blob", gw_trans->repo_name,
-				"blame", gw_trans->commit,
-				got_tree_entry_get_name(te), build_folder,
-				"blame") == -1) {
+			    url_html, class, gw_trans->repo_name, "blob",
+			    gw_trans->commit, got_tree_entry_get_name(te),
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+			    "blob", gw_trans->repo_name,
+			    "blame", gw_trans->commit,
+			    got_tree_entry_get_name(te),
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+			    "blame") == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 		}
-		free(build_folder);
-
-		if (error)
-			goto done;
 
 		error = buf_puts(&newsize, diffbuf, tree_row);
 		if (error)
 			goto done;
 
-		free(id);
 		free(id_str);
+		id_str = NULL;
 		free(url_html);
+		url_html = NULL;
 		free(tree_row);
+		tree_row = NULL;
+		free(build_folder);
+		build_folder = NULL;
 	}
 
 	if (buf_len(diffbuf) > 0) {
 		error = buf_putc(diffbuf, '\0');
-		tree_html = strdup(buf_get(diffbuf));
+		if (error)
+			goto done;
+		*tree_html = strdup(buf_get(diffbuf));
+		if (*tree_html == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
 done:
 	if (tree)
@@ -2902,13 +2886,14 @@ done:
 	if (repo)
 		got_repo_close(repo);
 
+	free(id_str);
+	free(url_html);
+	free(tree_row);
 	free(in_repo_path);
 	free(tree_id);
 	free(diffbuf);
-	if (error)
-		return NULL;
-	else
-		return tree_html;
+	free(build_folder);
+	return error;
 }
 
 static char *
