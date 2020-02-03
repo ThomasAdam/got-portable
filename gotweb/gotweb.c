@@ -162,7 +162,7 @@ static const struct got_error	*gw_get_repo_description(char **, struct gw_trans 
 				    char *);
 static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 				    char *);
-static char			*gw_get_time_str(time_t, int);
+static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
 static char			*gw_get_file_blame_blob(struct gw_trans *);
@@ -182,7 +182,6 @@ static char			*gw_gen_commit_header(char *, char*);
 static char			*gw_gen_diff_header(char *, char*);
 static char			*gw_gen_author_header(char *);
 static char			*gw_gen_committer_header(char *);
-static char			*gw_gen_age_header(char *);
 static char			*gw_gen_commit_msg_header(char *);
 static char			*gw_gen_tree_header(char *);
 
@@ -320,6 +319,7 @@ gw_blame(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *blame = NULL, *blame_html = NULL, *blame_html_disp = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -347,8 +347,16 @@ gw_blame(struct gw_trans *gw_trans)
 		}
 	}
 
-	if (asprintf(&blame_html_disp, blame_header,
-	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+
+	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
+	if (error)
+		goto done;
+	if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	if (asprintf(&blame_html_disp, blame_header, age_html,
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
 	    blame_html) == -1) {
 		error = got_error_from_errno("asprintf");
@@ -425,6 +433,7 @@ gw_diff(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *diff = NULL, *diff_html = NULL, *diff_html_disp = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -452,13 +461,19 @@ gw_diff(struct gw_trans *gw_trans)
 		}
 	}
 
+	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
+	if (error)
+		goto done;
+	if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
 	if (asprintf(&diff_html_disp, diff_header,
 	    gw_gen_diff_header(header->parent_id, header->commit_id),
 	    gw_gen_commit_header(header->commit_id, header->refs_str),
 	    gw_gen_tree_header(header->tree_id),
 	    gw_gen_author_header(header->author),
-	    gw_gen_committer_header(header->committer),
-	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+	    gw_gen_committer_header(header->committer), age_html,
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
 	    diff_html) == -1) {
 		error = got_error_from_errno("asprintf");
@@ -479,6 +494,8 @@ done:
 	free(diff_html_disp);
 	free(diff_html);
 	free(diff);
+	free(age);
+	free(age_html);
 	return error;
 }
 
@@ -619,6 +636,7 @@ gw_commits(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *commits_html, *commits_navs_html;
 	struct gw_header *header = NULL, *n_header = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if ((header = gw_init_header()) == NULL)
@@ -652,18 +670,29 @@ gw_commits(struct gw_trans *gw_trans)
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
-
+		error = gw_get_time_str(&age, n_header->committer_time,
+		    TM_LONG);
+		if (error)
+			goto done;
+		if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		if (asprintf(&commits_html, commits_line,
 		    gw_gen_commit_header(n_header->commit_id,
 		        n_header->refs_str),
 		    gw_gen_author_header(n_header->author),
 		    gw_gen_committer_header(n_header->committer),
-		    gw_gen_age_header(gw_get_time_str(n_header->committer_time,
-		        TM_LONG)), gw_html_escape(n_header->commit_msg),
+		    age_html,
+		    gw_html_escape(n_header->commit_msg),
 		    commits_navs_html) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
+		free(age);
+		age = NULL;
+		free(age_html);
+		age_html = NULL;
 		kerr = khttp_puts(gw_trans->gw_req, commits_html);
 		if (kerr != KCGI_OK) {
 			error = gw_kcgi_error(kerr);
@@ -678,6 +707,8 @@ done:
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
+	free(age);
+	free(age_html);
 	return error;
 }
 
@@ -687,6 +718,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	char *briefs_html = NULL, *briefs_navs_html = NULL, *newline;
 	struct gw_header *header = NULL, *n_header = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if ((header = gw_init_header()) == NULL)
@@ -727,13 +759,24 @@ gw_briefs(struct gw_trans *gw_trans)
 		newline = strchr(n_header->commit_msg, '\n');
 		if (newline)
 			*newline = '\0';
-		if (asprintf(&briefs_html, briefs_line,
-		    gw_get_time_str(n_header->committer_time, TM_DIFF),
+		error = gw_get_time_str(&age, n_header->committer_time,
+		    TM_DIFF);
+		if (error)
+			goto done;
+		if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		if (asprintf(&briefs_html, briefs_line, age_html,
 		    n_header->author, gw_html_escape(n_header->commit_msg),
 		    briefs_navs_html) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
+		free(age);
+		age = NULL;
+		free(age_html);
+		age_html = NULL;
 		kerr = khttp_puts(gw_trans->gw_req, briefs_html);
 		if (kerr != KCGI_OK) {
 			error = gw_kcgi_error(kerr);
@@ -748,6 +791,8 @@ done:
 	gw_free_headers(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
+	free(age);
+	free(age_html);
 	return error;
 }
 
@@ -807,7 +852,7 @@ gw_summary(struct gw_trans *gw_trans)
 		    "refs/heads", TM_LONG);
 		if (error)
 			goto done;
-		if (strcmp(age, "") != 0) {
+		if (age != NULL) {
 			if (asprintf(&repo_age_html, last_change, age) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
@@ -892,6 +937,7 @@ gw_tree(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -918,8 +964,14 @@ gw_tree(struct gw_trans *gw_trans)
 		}
 	}
 
-	if (asprintf(&tree_html_disp, tree_header,
-	    gw_gen_age_header(gw_get_time_str(header->committer_time, TM_LONG)),
+	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
+	if (error)
+		goto done;
+	if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+	if (asprintf(&tree_html_disp, tree_header, age_html,
 	    gw_gen_commit_msg_header(gw_html_escape(header->commit_msg)),
 	    tree_html) == -1) {
 		error = got_error_from_errno("asprintf");
@@ -940,6 +992,8 @@ done:
 	free(tree_html_disp);
 	free(tree_html);
 	free(tree);
+	free(age);
+	free(age_html);
 	return error;
 }
 
@@ -1406,17 +1460,6 @@ gw_gen_committer_header(char *str)
 }
 
 static char *
-gw_gen_age_header(char *str)
-{
-	char *return_html = NULL;
-
-	if (asprintf(&return_html, header_age_html, str) == -1)
-		return_html = strdup("");
-
-	return return_html;
-}
-
-static char *
 gw_gen_commit_msg_header(char *str)
 {
 	char *return_html = NULL;
@@ -1492,8 +1535,8 @@ done:
 	return error;
 }
 
-static char *
-gw_get_time_str(time_t committer_time, int ref_tm)
+static const struct got_error *
+gw_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 {
 	struct tm tm;
 	time_t diff_time;
@@ -1501,59 +1544,61 @@ gw_get_time_str(time_t committer_time, int ref_tm)
 	char *weeks = "weeks ago", *days = "days ago", *hours = "hours ago";
 	char *minutes = "minutes ago", *seconds = "seconds ago";
 	char *now = "right now";
-	char *repo_age, *s;
+	char *s;
 	char datebuf[29];
+
+	*repo_age = NULL;
 
 	switch (ref_tm) {
 	case TM_DIFF:
 		diff_time = time(NULL) - committer_time;
 		if (diff_time > 60 * 60 * 24 * 365 * 2) {
-			if (asprintf(&repo_age, "%lld %s",
+			if (asprintf(repo_age, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 365), years) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 60 * 60 * 24 * (365 / 12) * 2) {
-			if (asprintf(&repo_age, "%lld %s",
+			if (asprintf(repo_age, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / (365 / 12)),
 			    months) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 60 * 60 * 24 * 7 * 2) {
-			if (asprintf(&repo_age, "%lld %s",
+			if (asprintf(repo_age, "%lld %s",
 			    (diff_time / 60 / 60 / 24 / 7), weeks) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 60 * 60 * 24 * 2) {
-			if (asprintf(&repo_age, "%lld %s",
+			if (asprintf(repo_age, "%lld %s",
 			    (diff_time / 60 / 60 / 24), days) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 60 * 60 * 2) {
-			if (asprintf(&repo_age, "%lld %s",
+			if (asprintf(repo_age, "%lld %s",
 			    (diff_time / 60 / 60), hours) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 60 * 2) {
-			if (asprintf(&repo_age, "%lld %s", (diff_time / 60),
+			if (asprintf(repo_age, "%lld %s", (diff_time / 60),
 			    minutes) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else if (diff_time > 2) {
-			if (asprintf(&repo_age, "%lld %s", diff_time,
+			if (asprintf(repo_age, "%lld %s", diff_time,
 			    seconds) == -1)
-				return NULL;
+				return got_error_from_errno("asprintf");
 		} else {
-			if (asprintf(&repo_age, "%s", now) == -1)
-				return NULL;
+			if (asprintf(repo_age, "%s", now) == -1)
+				return got_error_from_errno("asprintf");
 		}
 		break;
 	case TM_LONG:
 		if (gmtime_r(&committer_time, &tm) == NULL)
-			return NULL;
+			return got_error_from_errno("gmtime_r");
 
 		s = asctime_r(&tm, datebuf);
 		if (s == NULL)
-			return NULL;
+			return got_error_from_errno("asctime_r");
 
-		if (asprintf(&repo_age, "%s UTC", datebuf) == -1)
-			return NULL;
+		if (asprintf(repo_age, "%s UTC", datebuf) == -1)
+			return got_error_from_errno("asprintf");
 		break;
 	}
-	return repo_age;
+	return NULL;
 }
 
 static const struct got_error *
@@ -1580,12 +1625,8 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
 		is_head = 1;
 
-	if (gw_trans->gw_conf->got_show_repo_age == 0) {
-		*repo_age = strdup("");
-		if (*repo_age == NULL)
-			return got_error_from_errno("strdup");
+	if (gw_trans->gw_conf->got_show_repo_age == 0)
 		return NULL;
-	}
 
 	error = got_repo_open(&repo, dir, NULL);
 	if (error)
@@ -1627,11 +1668,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 
 	if (cmp_time != 0) {
 		committer_time = cmp_time;
-		*repo_age = gw_get_time_str(committer_time, ref_tm);
-	} else {
-		*repo_age = strdup("");
-		if (*repo_age == NULL)
-			error = got_error_from_errno("strdup");
+		error = gw_get_time_str(repo_age, committer_time, ref_tm);
 	}
 done:
 	got_ref_list_free(&refs);
@@ -1832,7 +1869,7 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *tags = NULL, *tag_row = NULL, *tags_navs_disp = NULL;
-	char *age = NULL, *newline;
+	char *age = NULL, *age_html = NULL, *newline, *time_str = NULL;
 	struct buf *diffbuf = NULL;
 	size_t newsize;
 
@@ -1901,11 +1938,9 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			if (newline)
 				*newline = '\0';
 
-			if (asprintf(&age, "%s", gw_get_time_str(tagger_time,
-			    TM_DIFF)) == -1) {
-				error = got_error_from_errno("asprintf");
+			error = gw_get_time_str(&age, tagger_time, TM_DIFF);
+			if (error)
 				goto done;
-			}
 
 			if (asprintf(&tags_navs_disp, tags_navs,
 			    gw_trans->repo_name, id_str, gw_trans->repo_name,
@@ -1915,8 +1950,8 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 				goto done;
 			}
 
-			if (asprintf(&tag_row, tags_row, age, refname,
-			    tag_commit, tags_navs_disp) == -1) {
+			if (asprintf(&tag_row, tags_row, age ? age : "",
+			    refname, tag_commit, tags_navs_disp) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -1924,12 +1959,10 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 			free(tags_navs_disp);
 			break;
 		case TAGFULL:
-			if (asprintf(&age, "%s", gw_get_time_str(tagger_time,
-			    TM_LONG)) == -1) {
-				error = got_error_from_errno("asprintf");
+			error = gw_get_time_str(&age, tagger_time, TM_LONG);
+			if (error)
 				goto done;
-			}
-			if (asprintf(&tag_row, tag_info, age,
+			if (asprintf(&tag_row, tag_info, age ? age : "",
 			    gw_html_escape(tagger),
 			    gw_html_escape(tag_commit)) == -1) {
 				error = got_error_from_errno("asprintf");
@@ -1947,6 +1980,9 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 		free(id_str);
 		free(refstr);
 		free(age);
+		age = NULL;
+		free(age_html);
+		age_html = NULL;
 		free(tag_commit0);
 		free(tag_row);
 
@@ -1959,10 +1995,13 @@ gw_get_repo_tags(struct gw_trans *gw_trans, struct gw_header *header, int limit,
 		tags = strdup(buf_get(diffbuf));
 	}
 done:
+	free(time_str);
 	buf_free(diffbuf);
 	got_ref_list_free(&refs);
 	if (repo)
 		got_repo_close(repo);
+	free(age);
+	free(age_html);
 	if (error)
 		return NULL;
 	else
