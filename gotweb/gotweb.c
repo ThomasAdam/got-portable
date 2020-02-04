@@ -88,7 +88,7 @@ struct gw_header {
 	char			*parent_id; /* id_str2 */
 	char			*tree_id;
 	const char		*author;
-	char			*committer;
+	const char		*committer;
 	char			*commit_msg;
 	time_t			 committer_time;
 };
@@ -192,7 +192,7 @@ static const struct got_error	*gw_gen_age_header(struct gw_trans *,
 				    const char *);
 static const struct got_error	*gw_gen_committer_header(struct gw_trans *,
 				    const char *);
-static char			*gw_gen_committer_header_old(char *);
+static char			*gw_gen_committer_header_old(const char *);
 static char			*gw_gen_commit_msg_header(char *);
 static char			*gw_gen_tree_header(char *);
 
@@ -1805,14 +1805,21 @@ gw_gen_diff_header(char *str1, char *str2)
 	return return_html;
 }
 
+/* XXX: slated for deletion */
 static char *
 gw_gen_author_header_old(const char *str)
 {
+	const struct got_error *error = NULL;
 	char *return_html = NULL;
+	char *escaped_html = NULL;
 
-	if (asprintf(&return_html, header_author_html, str) == -1)
+	error = gw_html_escape(&escaped_html, str);
+	if (error)
+		return_html = strdup("");
+	if (asprintf(&return_html, header_author_html, escaped_html) == -1)
 		return_html = strdup("");
 
+	free(escaped_html);
 	return return_html;
 }
 
@@ -1912,14 +1919,21 @@ done:
 	return error;
 }
 
+/* XXX: slated for deletion */
 static char *
-gw_gen_committer_header_old(char *str)
+gw_gen_committer_header_old(const char *str)
 {
+	const struct got_error *error = NULL;
 	char *return_html = NULL;
+	char *escaped_html = NULL;
 
-	if (asprintf(&return_html, header_committer_html, str) == -1)
+	error = gw_html_escape(&escaped_html, str);
+	if (error)
+		return_html = strdup("");
+	if (asprintf(&return_html, header_committer_html, escaped_html) == -1)
 		return_html = strdup("");
 
+	free(escaped_html);
 	return return_html;
 }
 
@@ -2512,7 +2526,6 @@ gw_free_headers(struct gw_header *header)
 	free(header->commit_id);
 	free(header->parent_id);
 	free(header->tree_id);
-	free(header->committer);
 	free(header->commit_msg);
 }
 
@@ -2685,8 +2698,8 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 
 	header->author =
 	    got_object_commit_get_author(header->commit);
-	error = gw_html_escape(&header->committer,
-	    got_object_commit_get_committer(header->commit));
+	header->committer =
+	    got_object_commit_get_committer(header->commit);
 	if (error)
 		return error;
 
