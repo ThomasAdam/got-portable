@@ -1815,7 +1815,7 @@ gw_gen_author_header_old(const char *str)
 
 	error = gw_html_escape(&escaped_html, str);
 	if (error)
-		return_html = strdup("");
+		return strdup("");
 	if (asprintf(&return_html, header_author_html, escaped_html) == -1)
 		return_html = strdup("");
 
@@ -1929,7 +1929,7 @@ gw_gen_committer_header_old(const char *str)
 
 	error = gw_html_escape(&escaped_html, str);
 	if (error)
-		return_html = strdup("");
+		return strdup("");
 	if (asprintf(&return_html, header_committer_html, escaped_html) == -1)
 		return_html = strdup("");
 
