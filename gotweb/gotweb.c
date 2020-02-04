@@ -158,14 +158,15 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 static struct gw_dir		*gw_init_gw_dir(char *);
 static struct gw_header		*gw_init_header(void);
 
-static const struct got_error	*gw_get_repo_description(char **, struct gw_trans *,
-				    char *);
+static const struct got_error	*gw_get_repo_description(char **,
+				    struct gw_trans *, char *);
 static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 				    char *);
 static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
-static const struct got_error	*gw_get_file_blame_blob(char **, struct gw_trans *);
+static const struct got_error	*gw_get_file_blame_blob(char **,
+				    struct gw_trans *);
 static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
 				    struct gw_trans *);
 static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
@@ -174,8 +175,8 @@ static const struct got_error	*gw_get_diff(char **, struct gw_trans *,
 static const struct got_error	*gw_get_repo_tags(char **, struct gw_trans *,
 				    struct gw_header *, int, int);
 static const struct got_error	*gw_get_repo_heads(char **, struct gw_trans *);
-static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *, char *);
-static char			*gw_get_got_link(struct gw_trans *);
+static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *,
+				    char *);
 static char			*gw_get_site_link(struct gw_trans *);
 static const struct got_error	*gw_html_escape(char **, const char *);
 static const struct got_error	*gw_colordiff_line(char **, char *);
@@ -1617,7 +1618,7 @@ gw_template(size_t key, void *arg)
 	const struct got_error *error = NULL;
 	enum kcgi_err kerr;
 	struct gw_trans *gw_trans = arg;
-	char *gw_got_link, *gw_site_link;
+	char *gw_site_link, *img_src = NULL;
 
 	switch (key) {
 	case (TEMPL_HEAD):
@@ -1626,15 +1627,29 @@ gw_template(size_t key, void *arg)
 			return 0;
 		break;
 	case(TEMPL_HEADER):
-		gw_got_link = gw_get_got_link(gw_trans);
-		if (gw_got_link != NULL) {
-			kerr = khttp_puts(gw_trans->gw_req, gw_got_link);
-			if (kerr != KCGI_OK) {
-				free(gw_got_link);
-				return 0;
-			}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "got_link", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF,  gw_trans->gw_conf->got_logo_url,
+		    KATTR_TARGET, "_sotd", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		if (asprintf(&img_src, "/%s",
+		    gw_trans->gw_conf->got_logo) == -1)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_IMG,
+		    KATTR_SRC, img_src, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			free(img_src);
+			return 0;
 		}
-		free(gw_got_link);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+		if (kerr != KCGI_OK) {
+			free(img_src);
+			return 0;
+		}
 		break;
 	case (TEMPL_SITEPATH):
 		gw_site_link = gw_get_site_link(gw_trans);
@@ -3250,18 +3265,6 @@ done:
 	if (repo)
 		got_repo_close(repo);
 	return error;
-}
-
-static char *
-gw_get_got_link(struct gw_trans *gw_trans)
-{
-	char *link;
-
-	if (asprintf(&link, got_link, gw_trans->gw_conf->got_logo_url,
-	    gw_trans->gw_conf->got_logo) == -1)
-		return NULL;
-
-	return link;
 }
 
 static char *
