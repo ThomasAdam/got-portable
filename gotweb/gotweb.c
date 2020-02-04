@@ -330,7 +330,6 @@ isbinary(const char *buf, size_t n)
 	return (memchr(buf, '\0', n) != NULL);
 }
 
-
 static const struct got_error *
 gw_blame(struct gw_trans *gw_trans)
 {
@@ -857,9 +856,6 @@ gw_briefs(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	/*
-	 * XXX: Convert all of these from kerr
-	 */
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
 		error = gw_get_time_str(&age, n_header->committer_time,
 		    TM_DIFF);
@@ -1744,7 +1740,6 @@ gw_gen_commit_header_old(char *str1, char *str2)
 	} else
 		ref_str = strdup("");
 
-
 	if (asprintf(&return_html, header_commit_html, str1, ref_str) == -1)
 		return_html = strdup("");
 
@@ -1895,6 +1890,7 @@ gw_gen_committer_header(struct gw_trans *gw_trans, const char *str)
 	    KATTR_ID, "header_committer_title", KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
+	kerr = khtml_puts(gw_trans->gw_html_req, "Committer: ");
 	if (kerr != KCGI_OK)
 		goto done;
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2455,7 +2451,7 @@ gw_get_repo_tags(char **tag_html, struct gw_trans *gw_trans,
 		error = buf_puts(&newsize, diffbuf, tag_row);
 		if (error)
 			goto done;
-	
+
 		if (limit && --limit == 0)
 			break;
 
