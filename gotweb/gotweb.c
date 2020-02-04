@@ -731,7 +731,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	char *age = NULL, *age_html = NULL;
 	char *href_diff = NULL, *href_tree = NULL;
 	char *newline, *smallerthan;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
@@ -890,6 +890,8 @@ done:
 	free(age_html);
 	free(href_diff);
 	free(href_tree);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
