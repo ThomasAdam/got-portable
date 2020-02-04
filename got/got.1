@@ -1551,18 +1551,19 @@ repository with
 .Dl $ cd /var/git/repo
 .Dl $ git fetch
 .Pp
-Before outgoing changes on the local
+To make changes fetched from the remote repository appear on the
 .Dq master
-branch can be pushed to the remote repository, the local
+branch, the
 .Dq master
 branch must be rebased onto the
 .Dq origin/master
-branch:
+branch.
+This will also merge local changes, if any, with the incoming changes:
 .Pp
 .Dl $ got update -b origin/master
 .Dl $ got rebase master
 .Pp
-Changes on the local
+Local changes on the
 .Dq master
 branch can then be pushed to the remote
 repository with
