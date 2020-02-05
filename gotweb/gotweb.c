@@ -468,28 +468,6 @@ gw_diff(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	/* diff title */
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "diff_title_wrapper", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "diff_title", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, "Commit Diff");
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
-	if (kerr != KCGI_OK)
-		goto done;
-
-	/* diff content */
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "diff_content", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
-
 	/* diff header */
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 	    "diff_header_wrapper", KATTR__MAX);
@@ -554,7 +532,7 @@ gw_diff(struct gw_trans *gw_trans)
 		goto done;
 
 	/* diff content close */
-	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 	if (kerr != KCGI_OK)
 		goto done;
 done:
@@ -725,27 +703,7 @@ gw_commits(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	/* commit briefs header */
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "commits_title_wrapper", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "commits_title", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, "Commits");
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
-	if (kerr != KCGI_OK)
-		goto done;
-
 	/* commit content */
-	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
-	    "commits_content", KATTR__MAX);
-	if (kerr != KCGI_OK)
-		goto done;
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
 		/* commit line */
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
@@ -857,7 +815,7 @@ gw_commits(struct gw_trans *gw_trans)
 		    "solid_line", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 		if (kerr != KCGI_OK)
 			goto done;
 
@@ -866,7 +824,6 @@ gw_commits(struct gw_trans *gw_trans)
 		free(escaped_commit_msg);
 		escaped_commit_msg = NULL;
 	}
-	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
