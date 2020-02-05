@@ -3351,9 +3351,8 @@ gw_get_repo_tree(char **tree_html, struct gw_trans *gw_trans)
 		}
 
 		if (S_ISDIR(mode)) {
-			if (asprintf(&build_folder, "%s%s%s",
+			if (asprintf(&build_folder, "%s/%s",
 			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
-			    gw_trans->repo_folder ? "/" : "",
 			    got_tree_entry_get_name(te)) == -1) {
 				error = got_error_from_errno(
 				    "asprintf");
