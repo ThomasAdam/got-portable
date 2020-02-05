@@ -128,28 +128,6 @@ char *header_commit_msg_html =
 	"<div id='header_commit_msg_title'>Message:</div>" \
 	"<div id='header_commit_msg'>%s</div>";
 
-/* commit.tmpl */
-
-char *commits_wrapper =
-	"<div id='commits_title_wrapper'>" \
-	"<div id='commits_title'>Commits</div></div>" \
-	"<div id='commits_content'>";
-
-char *commits_line =
-	"<div id='commits_line_wrapper'>%s%s%s%s</div>" \
-	"<div id='dotted_line'></div>" \
-	"<div id='commit'>%s</div>" \
-	"<div id='navs_wrapper'>" \
-	"<div id='navs'>%s</div>" \
-	"</div>" \
-	"</div>" \
-	"<div id='solid_line'></div>";
-
-char *commits_navs =
-	"<a href='?path=%s&action=diff&commit=%s'>diff</a> | " \
-	"<a href='?path=%s&action=tree&commit=%s'>tree</a><!--/* | " \
-	"<a href='?path=%s&action=snapshot&commit=%s'>snapshot</a> */-->";
-
 /* blame.tmpl */
 
 char *blame_wrapper =
