@@ -59,9 +59,6 @@ char *np_wrapper_start =
 	"<div id='np_wrapper'>" \
 	"<div id='nav_prev'>";
 
-char *div_diff_line =
-	"<div id='diff_line' class='%s'>";
-
 char *div_end =
 	"</div>";
 
@@ -123,18 +120,6 @@ char *header_commit_html =
 	"<div id='header_commit_title'>Commit:</div>" \
 	"<div id='header_commit'>%s %s</div>";
 
-char *header_diff_html =
-	"<div id='header_diff_title'>Diff:</div>" \
-	"<div id='header_diff'>%s %s</div>";
-
-char *header_author_html =
-	"<div id='header_author_title'>Author:</div>" \
-	"<div id='header_author'>%s</div>";
-
-char *header_committer_html =
-	"<div id='header_committer_title'>Committer:</div>" \
-	"<div id='header_committer'>%s</div>";
-
 char *header_age_html =
 	"<div id='header_age_title'>Date:</div>" \
 	"<div id='header_age'>%s</div>";
@@ -142,10 +127,6 @@ char *header_age_html =
 char *header_commit_msg_html =
 	"<div id='header_commit_msg_title'>Message:</div>" \
 	"<div id='header_commit_msg'>%s</div>";
-
-char *header_tree_html =
-	"<div id='header_tree_title'>Tree:</div>" \
-	"<div id='header_tree'>%s</div>";
 
 /* commit.tmpl */
 
@@ -251,21 +232,6 @@ char *tag_info =
 	"<div id='tag_info_tagger_title'>Tagger:</div>" \
 	"<div id='tag_info_tagger'>%s</div>" \
 	"<div id='tag_info'>%s</div>";
-
-/* diff.tmpl */
-
-char *diff_wrapper =
-	"<div id='diff_title_wrapper'>" \
-	"<div id='diff_title'>Commit Diff</div></div>" \
-	"<div id='diff_content'>%s</div>";
-
-char *diff_header =
-	"<div id='diff_header_wrapper'>" \
-	"<div id='diff_header'>%s%s%s%s%s%s%s</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>" \
-	"<div id='diff'>%s</div>" \
-	"</div>";
 
 /* index.tmpl */
 
