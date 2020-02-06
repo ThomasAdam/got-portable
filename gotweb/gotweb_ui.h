@@ -107,13 +107,6 @@ char *heads_navs =
 	"<a href='?path=%s&action=briefs&headref=%s'>commit briefs</a> | " \
 	"<a href='?path=%s&action=commits&headref=%s'>commits</a>";
 
-char *folder_html =
-	"<a href='?path=%s&action=%s&commit=%s&folder=%s' " \
-	    "class='diff_directory'>%s%s</a>";
-
-char *file_html =
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s%s</a>";
-
 /* headers */
 
 char *header_commit_html =
@@ -127,36 +120,6 @@ char *header_age_html =
 char *header_commit_msg_html =
 	"<div id='header_commit_msg_title'>Message:</div>" \
 	"<div id='header_commit_msg'>%s</div>";
-
-/* tree.tmpl */
-
-char *tree_wrapper =
-	"<div id='tree_title_wrapper'>" \
-	"<div id='tree_title'>Tree</div></div>" \
-	"<div id='tree_content'>%s</div>";
-
-char *tree_header =
-	"<div id='tree_header_wrapper'>" \
-	"<div id='tree_header'>%s%s</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>" \
-	"<div id='tree'>%s</div>" \
-	"</div>";
-
-char *tree_line =
-	"<div id='tree_wrapper'>" \
-	"<div id='tree_line' class='%s'>%s</div>" \
-	"<div id='tree_line_blank' class='%s'>&nbsp;</div>" \
-	"</div>";
-
-char *tree_line_with_navs =
-	"<div id='tree_wrapper'>" \
-	"<div id='tree_line' class='%s'>%s</div>" \
-	"<div id='tree_line_navs' class='%s'>" \
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s</a> | " \
-	"<a href='?path=%s&action=%s&commit=%s&file=%s&folder=%s'>%s</a>" \
-	"</div>" \
-	"</div>";
 
 /* tag.tmpl */
 

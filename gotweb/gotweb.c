@@ -167,7 +167,7 @@ static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
 static const struct got_error	*gw_output_file_blame(struct gw_trans *);
 static const struct got_error	*gw_output_blob_buf(struct gw_trans *);
-static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
+static const struct got_error	*gw_output_repo_tree(struct gw_trans *);
 static const struct got_error	*gw_get_diff(struct gw_trans *,
 				    struct gw_header *);
 static const struct got_error	*gw_get_repo_tags(char **, struct gw_trans *,
@@ -681,7 +681,7 @@ gw_commits(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL, *n_header = NULL;
 	char *age = NULL, *escaped_commit_msg = NULL;
-	char *href_diff = NULL, *href_tree = NULL;
+	char *href_diff = NULL, *href_blob = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
 	if ((header = gw_init_header()) == NULL)
@@ -793,13 +793,13 @@ gw_commits(struct gw_trans *gw_trans)
 
 		/* XXX: create gen code for this */
 		/* build tree nav */
-		if (asprintf(&href_tree, "?path=%s&action=tree&commit=%s",
+		if (asprintf(&href_blob, "?path=%s&action=tree&commit=%s",
 		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
-		    KATTR_HREF, href_tree, KATTR__MAX);
+		    KATTR_HREF, href_blob, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
 		khtml_puts(gw_trans->gw_html_req, "tree");
@@ -830,7 +830,7 @@ done:
 		gw_free_headers(n_header);
 	free(age);
 	free(href_diff);
-	free(href_tree);
+	free(href_blob);
 	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
@@ -843,7 +843,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL, *n_header = NULL;
 	char *age = NULL, *age_html = NULL;
-	char *href_diff = NULL, *href_tree = NULL;
+	char *href_diff = NULL, *href_blob = NULL;
 	char *newline, *smallerthan;
 	enum kcgi_err kerr = KCGI_OK;
 
@@ -960,13 +960,13 @@ gw_briefs(struct gw_trans *gw_trans)
 			goto done;
 
 		/* build tree nav */
-		if (asprintf(&href_tree, "?path=%s&action=tree&commit=%s",
+		if (asprintf(&href_blob, "?path=%s&action=tree&commit=%s",
 		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
-		    KATTR_HREF, href_tree, KATTR__MAX);
+		    KATTR_HREF, href_blob, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
 		khtml_puts(gw_trans->gw_html_req, "tree");
@@ -992,8 +992,8 @@ gw_briefs(struct gw_trans *gw_trans)
 		age_html = NULL;
 		free(href_diff);
 		href_diff = NULL;
-		free(href_tree);
-		href_tree = NULL;
+		free(href_blob);
+		href_blob = NULL;
 	}
 done:
 	got_ref_list_free(&header->refs);
@@ -1003,7 +1003,7 @@ done:
 	free(age);
 	free(age_html);
 	free(href_diff);
-	free(href_tree);
+	free(href_blob);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -1256,35 +1256,60 @@ gw_tree(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_get_repo_tree(&tree_html, gw_trans);
-	if (error)
-		goto done;
 
-	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
+	/* tree header */
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "tree_header_wrapper", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "tree_header", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	error = gw_gen_tree_header(gw_trans, header->tree_id);
 	if (error)
 		goto done;
-	if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
-		error = got_error_from_errno("asprintf");
+	error = gw_get_time_str(&age, header->committer_time,
+	    TM_LONG);
+	if (error)
 		goto done;
-	}
+	error = gw_gen_age_header(gw_trans, age ?age : "");
+	if (error)
+		goto done;
+	/*
+	 * XXX: keeping this for now, since kcgihtml does not convert
+	 * \n into <br /> yet.
+	 */
 	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
 	if (error)
 		goto done;
-	if (asprintf(&tree_html_disp, tree_header, age_html,
-	    gw_gen_commit_msg_header_old(escaped_commit_msg),
-	    tree_html ? tree_html : "") == -1) {
-		error = got_error_from_errno("asprintf");
+	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
+	if (error)
 		goto done;
-	}
-
-	if (asprintf(&tree, tree_wrapper, tree_html_disp) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	kerr = khttp_puts(gw_trans->gw_req, tree);
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 	if (kerr != KCGI_OK)
-		error = gw_kcgi_error(kerr);
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "dotted_line", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		goto done;
+
+	/* tree */
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "tree", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	error = gw_output_repo_tree(gw_trans);
+	if (error)
+		goto done;
+
+	/* tree content close */
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		goto done;
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -1294,6 +1319,8 @@ done:
 	free(age);
 	free(age_html);
 	free(escaped_commit_msg);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
@@ -3266,26 +3293,19 @@ done:
 }
 
 static const struct got_error *
-gw_get_repo_tree(char **tree_html, struct gw_trans *gw_trans)
+gw_output_repo_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
 	struct got_tree_object *tree = NULL;
-	struct buf *diffbuf = NULL;
-	size_t newsize;
-	char *path = NULL, *in_repo_path = NULL, *tree_row = NULL;
+	char *path = NULL, *in_repo_path = NULL;
 	char *id_str = NULL;
 	char *build_folder = NULL;
-	char *url_html = NULL;
+	char *href_blob = NULL, *href_blame = NULL;
 	const char *class = NULL;
 	int nentries, i, class_flip = 0;
-
-	*tree_html = NULL;
-
-	error = buf_alloc(&diffbuf, 0);
-	if (error)
-		return error;
+	enum kcgi_err kerr = KCGI_OK;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -3369,80 +3389,146 @@ gw_get_repo_tree(char **tree_html, struct gw_trans *gw_trans)
 				    "asprintf");
 				goto done;
 			}
-
-			if (asprintf(&url_html, folder_html,
+			if (asprintf(&href_blob,
+			    "?path=%s&action=%s&commit=%s&folder=%s",
 			    gw_trans->repo_name, gw_trans->action_name,
-			    gw_trans->commit, build_folder,
-			    got_tree_entry_get_name(te), modestr) == -1) {
+			    gw_trans->commit, build_folder) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
-			if (asprintf(&tree_row, tree_line, class, url_html,
-			    class) == -1) {
-				error = got_error_from_errno("asprintf");
+
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_wrapper", KATTR__MAX);
+			if (kerr != KCGI_OK)
 				goto done;
-			}
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_line", KATTR_CLASS, class,
+			    KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_blob, KATTR_CLASS,
+			    "diff_directory", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    got_tree_entry_get_name(te));
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, modestr);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_line_blank", KATTR_CLASS, class,
+			    KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_entity(gw_trans->gw_html_req,
+			    KENTITY_nbsp);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+			if (kerr != KCGI_OK)
+				goto done;
 		} else {
-			if (asprintf(&url_html, file_html, gw_trans->repo_name,
-			    "blob", gw_trans->commit,
+			if (asprintf(&href_blob,
+			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
+			    gw_trans->repo_name, "blob", gw_trans->commit,
 			    got_tree_entry_get_name(te),
-			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
-			    got_tree_entry_get_name(te), modestr) == -1) {
+			    gw_trans->repo_folder ?
+			    gw_trans->repo_folder : "") == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (asprintf(&href_blame,
+			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
+			    gw_trans->repo_name, "blame", gw_trans->commit,
+			    got_tree_entry_get_name(te),
+			    gw_trans->repo_folder ?
+			    gw_trans->repo_folder : "") == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 
-			if (asprintf(&tree_row, tree_line_with_navs, class,
-			    url_html, class, gw_trans->repo_name, "blob",
-			    gw_trans->commit, got_tree_entry_get_name(te),
-			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
-			    "blob", gw_trans->repo_name,
-			    "blame", gw_trans->commit,
-			    got_tree_entry_get_name(te),
-			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
-			    "blame") == -1) {
-				error = got_error_from_errno("asprintf");
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_wrapper", KATTR__MAX);
+			if (kerr != KCGI_OK)
 				goto done;
-			}
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_line", KATTR_CLASS, class,
+			    KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_blob, KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    got_tree_entry_get_name(te));
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, modestr);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tree_line_navs", KATTR_CLASS, class,
+			    KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_blob, KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, "blob");
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			if (kerr != KCGI_OK)
+				goto done;
+
+			kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+			if (kerr != KCGI_OK)
+				goto done;
+
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_blame, KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, "blame");
+			if (kerr != KCGI_OK)
+				goto done;
+
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+			if (kerr != KCGI_OK)
+				goto done;
 		}
-
-		error = buf_puts(&newsize, diffbuf, tree_row);
-		if (error)
-			goto done;
-
 		free(id_str);
 		id_str = NULL;
-		free(url_html);
-		url_html = NULL;
-		free(tree_row);
-		tree_row = NULL;
+		free(href_blob);
+		href_blob = NULL;
 		free(build_folder);
 		build_folder = NULL;
-	}
-
-	if (buf_len(diffbuf) > 0) {
-		error = buf_putc(diffbuf, '\0');
-		if (error)
-			goto done;
-		*tree_html = strdup(buf_get(diffbuf));
-		if (*tree_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 	}
 done:
 	if (tree)
 		got_object_tree_close(tree);
 	if (repo)
 		got_repo_close(repo);
-
 	free(id_str);
-	free(url_html);
-	free(tree_row);
+	free(href_blob);
+	free(href_blame);
 	free(in_repo_path);
 	free(tree_id);
-	free(diffbuf);
 	free(build_folder);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
