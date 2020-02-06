@@ -333,9 +333,6 @@ isbinary(const uint8_t *buf, size_t n)
 {
 	size_t i;
 
-	if (n == 0)
-		return 0;
-
 	for (i = 0; i < n; i++)
 		if (buf[i] == 0)
 			return 1;
