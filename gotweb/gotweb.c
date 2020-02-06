@@ -167,8 +167,7 @@ static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
 static const struct got_error	*gw_get_file_blame_blob(char **,
 				    struct gw_trans *);
-static const struct got_error	*gw_get_file_read_blob(char **, size_t *,
-				    struct gw_trans *);
+static const struct got_error	*gw_output_blob_buf(struct gw_trans *);
 static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
 static const struct got_error	*gw_get_diff(struct gw_trans *,
 				    struct gw_header *);
@@ -330,9 +329,17 @@ gw_empty_string(char **s)
 }
 
 static int
-isbinary(const char *buf, size_t n)
+isbinary(const uint8_t *buf, size_t n)
 {
-	return (memchr(buf, '\0', n) != NULL);
+	size_t i;
+
+	if (n == 0)
+		return 0;
+
+	for (i = 0; i < n; i++)
+		if (buf[i] == 0)
+			return 1;
+	return 0;
 }
 
 static const struct got_error *
@@ -403,9 +410,6 @@ gw_blob(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *content = NULL;
-	size_t filesize = 0;
-	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
@@ -422,26 +426,10 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_get_file_read_blob(&content, &filesize, gw_trans);
-	if (error)
-		goto done;
-
-	if (isbinary(content, filesize))
-		gw_trans->mime = KMIME_APP_OCTET_STREAM;
-	else
-		gw_trans->mime = KMIME_TEXT_PLAIN;
-
-	error = gw_display_index(gw_trans);
-	if (error)
-		goto done;
-
-	kerr = khttp_write(gw_trans->gw_req, content, filesize);
-	if (kerr != KCGI_OK)
-		error = gw_kcgi_error(kerr);
+	error = gw_output_blob_buf(gw_trans);
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(content);
 	return error;
 }
 
@@ -3112,7 +3100,7 @@ done:
 }
 
 static const struct got_error *
-gw_get_file_read_blob(char **blobstr, size_t *filesize, struct gw_trans *gw_trans)
+gw_output_blob_buf(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -3120,12 +3108,10 @@ gw_get_file_read_blob(char **blobstr, size_t *filesize, struct gw_trans *gw_tran
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
 	char *path = NULL, *in_repo_path = NULL;
-	int obj_type;
-	size_t n;
-	FILE *f = NULL;
-
-	*blobstr = NULL;
-	*filesize = 0;
+	int obj_type, set_mime = 0;
+	size_t len, hdrlen;
+	const uint8_t *buf;
+	enum kcgi_err kerr = KCGI_OK;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -3170,28 +3156,33 @@ gw_get_file_read_blob(char **blobstr, size_t *filesize, struct gw_trans *gw_tran
 	if (error)
 		goto done;
 
-	f = got_opentemp();
-	if (f == NULL) {
-		error = got_error_from_errno("got_opentemp");
-		goto done;
-	}
-	error = got_object_blob_dump_to_file(filesize, NULL, NULL, f, blob);
-	if (error)
-		goto done;
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	do {
+		error = got_object_blob_read_block(&len, blob);
+		if (error)
+			goto done;
+		if (len == 0)
+			break;
+		buf = got_object_blob_get_read_buf(blob);
 
-	/* XXX This will fail on large files... */
-	*blobstr = calloc(*filesize + 1, sizeof(**blobstr));
-	if (*blobstr == NULL) {
-		error = got_error_from_errno("calloc");
-		goto done;
-	}
-
-	n = fread(*blobstr, 1, *filesize, f);
-	if (n == 0) {
-		if (ferror(f))
-			error = got_ferror(f, GOT_ERR_IO);
-		goto done;
-	}
+		/*
+		 * Skip blob object header first time around,
+		 * which also contains a zero byte.
+		 */
+		buf += hdrlen;
+		if (set_mime == 0) {
+			if (isbinary(buf, len - hdrlen))
+				gw_trans->mime = KMIME_APP_OCTET_STREAM;
+			else
+				gw_trans->mime = KMIME_TEXT_PLAIN;
+			set_mime = 1;
+			error = gw_display_index(gw_trans);
+			if (error)
+				goto done;
+		}
+		khttp_write(gw_trans->gw_req, buf, len - hdrlen);
+		hdrlen = 0;
+	} while (len != 0);
 done:
 	free(in_repo_path);
 	free(commit_id);
@@ -3201,13 +3192,8 @@ done:
 		got_object_blob_close(blob);
 	if (repo)
 		got_repo_close(repo);
-	if (f != NULL && fclose(f) == -1 && error == NULL)
-		error = got_error_from_errno("fclose");
-	if (error) {
-		free(*blobstr);
-		*blobstr = NULL;
-		*filesize = 0;
-	}
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
