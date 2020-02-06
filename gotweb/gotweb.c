@@ -274,21 +274,21 @@ gw_kcgi_error(enum kcgi_err kerr)
 
 	if (kerr == KCGI_ENOMEM)
 		return got_error_set_errno(ENOMEM,
-		    kcgi_strerror(kerr != KCGI_OK));
+		    kcgi_strerror(kerr));
 
 	if (kerr == KCGI_ENFILE)
 		return got_error_set_errno(ENFILE,
-		    kcgi_strerror(kerr != KCGI_OK));
+		    kcgi_strerror(kerr));
 
 	if (kerr == KCGI_EAGAIN)
 		return got_error_set_errno(EAGAIN,
-		    kcgi_strerror(kerr != KCGI_OK));
+		    kcgi_strerror(kerr));
 
 	if (kerr == KCGI_FORM)
 		return got_error_msg(GOT_ERR_IO,
-		    kcgi_strerror(kerr != KCGI_OK));
+		    kcgi_strerror(kerr));
 
-	return got_error_from_errno(kcgi_strerror(kerr != KCGI_OK));
+	return got_error_from_errno(kcgi_strerror(kerr));
 }
 
 static const struct got_error *
