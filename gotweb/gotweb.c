@@ -2495,10 +2495,15 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    KATTR_ID, "tags_name", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
+			if (asprintf(&href_tag, "?path=%s&action=tag&commit=%s",
+			    gw_trans->repo_name, id_str) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 			kerr = khtml_puts(gw_trans->gw_html_req, tag_commit);
 			if (kerr != KCGI_OK)
 				goto done;
-			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
 			if (kerr != KCGI_OK)
 				goto done;
 
@@ -2511,11 +2516,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			if (kerr != KCGI_OK)
 				goto done;
 
-			if (asprintf(&href_tag, "?path=%s&action=tag&commit=%s",
-			    gw_trans->repo_name, id_str) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_tag, KATTR__MAX);
 			if (kerr != KCGI_OK)
