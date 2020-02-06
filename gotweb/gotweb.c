@@ -2500,6 +2500,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_tag, KATTR__MAX);
+			if (kerr != KCGI_OK)
+				goto done;
 			kerr = khtml_puts(gw_trans->gw_html_req, tag_commit);
 			if (kerr != KCGI_OK)
 				goto done;
