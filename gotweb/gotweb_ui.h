@@ -128,32 +128,6 @@ char *header_commit_msg_html =
 	"<div id='header_commit_msg_title'>Message:</div>" \
 	"<div id='header_commit_msg'>%s</div>";
 
-/* blame.tmpl */
-
-char *blame_wrapper =
-	"<div id='blame_title_wrapper'>" \
-	"<div id='blame_title'>Blame</div></div>" \
-	"<div id='blame_content'>%s</div>";
-
-char *blame_header =
-	"<div id='blame_header_wrapper'>" \
-	"<div id='blame_header'>%s%s</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>" \
-	"<div id='blame'>%s</div>" \
-	"</div>";
-
-char *blame_line =
-	"<div id='blame_wrapper'>" \
-	"<div id='blame_number'>%.*d</div>" \
-	"<div id='blame_hash'>" \
-	"<a href='?path=%s&action=diff&commit=%s&file=%s&folder=%s'>%.8s</a>" \
-	"</div>" \
-	"<div id='blame_date'>%s</div>" \
-	"<div id='blame_author'>%-8s</div>" \
-	"<div id='blame_code'>%s</div>" \
-	"</div>";
-
 /* tree.tmpl */
 
 char *tree_wrapper =

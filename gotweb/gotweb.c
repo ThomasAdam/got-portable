@@ -165,8 +165,7 @@ static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, char *, int);
-static const struct got_error	*gw_get_file_blame_blob(char **,
-				    struct gw_trans *);
+static const struct got_error	*gw_output_file_blame(struct gw_trans *);
 static const struct got_error	*gw_output_blob_buf(struct gw_trans *);
 static const struct got_error	*gw_get_repo_tree(char **, struct gw_trans *);
 static const struct got_error	*gw_get_diff(struct gw_trans *,
@@ -344,8 +343,7 @@ gw_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *blame = NULL, *blame_html = NULL, *blame_html_disp = NULL;
-	char *age = NULL, *age_html = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL, *escaped_commit_msg = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -363,42 +361,58 @@ gw_blame(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_get_file_blame_blob(&blame_html, gw_trans);
+	/* blame header */
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "blame_header_wrapper", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "blame_header", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	error = gw_get_time_str(&age, header->committer_time,
+	    TM_LONG);
 	if (error)
 		goto done;
-
-	error = gw_get_time_str(&age, header->committer_time, TM_LONG);
+	error = gw_gen_age_header(gw_trans, age ?age : "");
 	if (error)
 		goto done;
-	if (asprintf(&age_html, header_age_html, age ? age : "") == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-
+	/*
+	 * XXX: keeping this for now, since kcgihtml does not convert
+	 * \n into <br /> yet.
+	 */
 	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
 	if (error)
 		goto done;
-	if (asprintf(&blame_html_disp, blame_header, age_html,
-	    gw_gen_commit_msg_header_old(escaped_commit_msg), blame_html) == -1) {
-		error = got_error_from_errno("asprintf");
+	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
+	if (error)
 		goto done;
-	}
-
-	if (asprintf(&blame, blame_wrapper, blame_html_disp) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-
-	kerr = khttp_puts(gw_trans->gw_req, blame);
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 	if (kerr != KCGI_OK)
-		error = gw_kcgi_error(kerr);
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "dotted_line", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		goto done;
+
+	/* blame */
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "blame", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	error = gw_output_file_blame(gw_trans);
+	if (error)
+		goto done;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(blame_html_disp);
-	free(blame_html);
-	free(blame);
 	free(escaped_commit_msg);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
@@ -2851,7 +2865,6 @@ struct gw_blame_cb_args {
 	FILE *f;
 	struct got_repository *repo;
 	struct gw_trans *gw_trans;
-	struct buf *blamebuf;
 };
 
 static const struct got_error *
@@ -2861,11 +2874,12 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	struct gw_blame_cb_args *a = arg;
 	struct blame_line *bline;
 	char *line = NULL;
-	size_t linesize = 0, newsize;
+	size_t linesize = 0;
 	struct got_commit_object *commit = NULL;
 	off_t offset;
 	struct tm tm;
 	time_t committer_time;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (nlines != a->nlines ||
 	    (lineno != -1 && lineno < 1) || lineno > a->nlines)
@@ -2914,8 +2928,8 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 
 	while (bline->annotated) {
-		char *smallerthan, *at, *nl, *committer, *blame_row = NULL,
-		     *line_escape = NULL;
+		char *smallerthan, *at, *nl, *committer;
+		char *lineno = NULL, *href_diff = NULL, *href_link = NULL;
 		size_t len;
 
 		if (getline(&line, &linesize, a->f) == -1) {
@@ -2939,37 +2953,111 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		if (nl)
 			*nl = '\0';
 
-		err = gw_html_escape(&line_escape, line);
-		if (err)
-			goto err;
-
 		if (a->gw_trans->repo_folder == NULL)
 			a->gw_trans->repo_folder = strdup("");
 		if (a->gw_trans->repo_folder == NULL)
 			goto err;
-		asprintf(&blame_row, blame_line, a->nlines_prec, a->lineno_cur,
-		    a->gw_trans->repo_name, bline->id_str,
-		    a->gw_trans->repo_file, a->gw_trans->repo_folder,
-		    bline->id_str, bline->datebuf, committer, line_escape);
-		a->lineno_cur++;
-		err = buf_puts(&newsize, a->blamebuf, blame_row);
-		if (err)
-			return err;
 
+		/* blame line */
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_number", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		if (asprintf(&lineno, "%.*d", a->nlines_prec,
+		    a->lineno_cur) == -1)
+			goto err;
+		kerr = khtml_puts(a->gw_trans->gw_html_req, lineno);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_hash", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		if (asprintf(&href_diff,
+		    "?path=%s&action=diff&commit=%s&file=%s&folder=%s",
+		    a->gw_trans->repo_name, bline->id_str,
+		    a->gw_trans->repo_file, a->gw_trans->repo_folder) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto err;
+		}
+		if (asprintf(&href_link, "%.8s", bline->id_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto err;
+		}
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_diff, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(a->gw_trans->gw_html_req, href_link);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_date", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_puts(a->gw_trans->gw_html_req, bline->datebuf);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_author", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_puts(a->gw_trans->gw_html_req, committer);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "blame_code", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_puts(a->gw_trans->gw_html_req, line);
+		if (kerr != KCGI_OK)
+			goto err;
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto err;
+
+		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
 err:
-		free(line_escape);
-		free(blame_row);
+		free(lineno);
+		free(href_diff);
+		free(href_link);
 	}
 done:
 	if (commit)
 		got_object_commit_close(commit);
 	free(line);
+	if (err == NULL && kerr != KCGI_OK)
+		err = gw_kcgi_error(kerr);
 	return err;
 }
 
 static const struct got_error *
-gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
+gw_output_file_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
@@ -2980,8 +3068,6 @@ gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
 	struct gw_blame_cb_args bca;
 	int i, obj_type;
 	size_t filesize;
-
-	*blame_html = NULL;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -3026,10 +3112,6 @@ gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = buf_alloc(&bca.blamebuf, 0);
-	if (error)
-		goto done;
-
 	bca.f = got_opentemp();
 	if (bca.f == NULL) {
 		error = got_error_from_errno("got_opentemp");
@@ -3063,19 +3145,8 @@ gw_get_file_blame_blob(char **blame_html, struct gw_trans *gw_trans)
 	    NULL, NULL);
 	if (error)
 		goto done;
-	if (buf_len(bca.blamebuf) > 0) {
-		error = buf_putc(bca.blamebuf, '\0');
-		if (error)
-			goto done;
-		*blame_html = strdup(buf_get(bca.blamebuf));
-		if (*blame_html == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
 done:
 	free(bca.line_offsets);
-	free(bca.blamebuf);
 	free(in_repo_path);
 	free(commit_id);
 	free(obj_id);
