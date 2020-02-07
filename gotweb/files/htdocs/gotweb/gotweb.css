@@ -222,6 +222,14 @@ body {
 	overflow: auto;
 	white-space: pre-wrap;
 }
+#tmpl_err {
+	clear: left;
+	float: left;
+	padding-left: 20px;
+	padding-top: 20px;
+	padding-bottom: 20px;
+	white-space: pre-wrap;
+}
 
 /* headers */
 

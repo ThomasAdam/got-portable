@@ -1700,7 +1700,17 @@ gw_template(size_t key, void *arg)
 	case(TEMPL_CONTENT):
 		error = gw_query_funcs[gw_trans->action].func_main(gw_trans);
 		if (error) {
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "tmpl_err", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				return 0;
+			kerr = khttp_puts(gw_trans->gw_req, "Error: ");
+			if (kerr != KCGI_OK)
+				return 0;
 			kerr = khttp_puts(gw_trans->gw_req, error->msg);
+			if (kerr != KCGI_OK)
+				return 0;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 			if (kerr != KCGI_OK)
 				return 0;
 		}
