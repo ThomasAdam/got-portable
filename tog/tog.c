@@ -4438,7 +4438,8 @@ cmd_blame(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		error = got_ref_open(&head_ref, repo, worktree ?
+		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
