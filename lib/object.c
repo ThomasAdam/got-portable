@@ -1415,7 +1415,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 				goto done;
 		}
 
-		/* Beware of "leightweight" tags: Check object type first. */
+		/* Beware of "lightweight" tags: Check object type first. */
 		err = read_packed_object_privsep(&obj, repo, pack, packidx,
 		    idx, id);
 		if (err)

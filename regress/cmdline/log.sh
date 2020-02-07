@@ -190,7 +190,7 @@ function test_log_tag {
 		return 1
 	fi
 
-	# test a "leightweight" tag
+	# test a "lightweight" tag
 	(cd $testroot/repo && git tag $tag2)
 
 	echo "commit $commit_id (master, tags/$tag, tags/$tag2)" \
