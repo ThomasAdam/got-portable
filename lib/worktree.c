@@ -2110,7 +2110,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		    strlen(path1));
 		if (ie == NULL)
 			return (*a->progress_cb)(a->progress_arg,
-			    GOT_STATUS_MISSING, path2);
+			    GOT_STATUS_MISSING, path1);
 
 		if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path,
 		    path1) == -1)
