@@ -250,11 +250,8 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
-.It Cm tree Oo Fl c Ar commit Oc Op Ar repository-path
+.It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc
 Display the repository tree.
-If the
-.Ar repository path
-is omitted, assume the repository is located in the current working directory.
 .Pp
 Displayed tree entries may carry one of the following trailing annotations:
 .Bl -column YXZ description
@@ -308,6 +305,13 @@ Start traversing history at the specified
 The expected argument is the name of a branch or a commit ID SHA1 hash.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .El
 .El
 .Sh ENVIRONMENT

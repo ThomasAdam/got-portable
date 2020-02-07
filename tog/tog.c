@@ -5156,7 +5156,7 @@ __dead static void
 usage_tree(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s tree [-c commit] [repository-path]\n",
+	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5183,10 +5183,16 @@ cmd_tree(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
 			break;
 		default:
 			usage_tree();
@@ -5197,7 +5203,10 @@ cmd_tree(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0) {
+	if (argc != 0)
+		usage_tree();
+
+	if (repo_path == NULL) {
 		struct got_worktree *worktree;
 		char *cwd = getcwd(NULL, 0);
 		if (cwd == NULL)
@@ -5205,6 +5214,8 @@ cmd_tree(int argc, char *argv[])
 		error = got_worktree_open(&worktree, cwd);
 		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
+		else
+			error = NULL;
 		if (worktree) {
 			free(cwd);
 			repo_path =
@@ -5216,12 +5227,7 @@ cmd_tree(int argc, char *argv[])
 			error = got_error_from_errno("strdup");
 			goto done;
 		}
-	} else if (argc == 1) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno2("realpath", argv[0]);
-	} else
-		usage_tree();
+	}
 
 	init_curses();
 
