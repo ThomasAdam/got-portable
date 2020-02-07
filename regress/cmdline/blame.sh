@@ -681,6 +681,56 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+function test_blame_added_on_branch {
+	local testroot=`test_init blame_added_on_branch`
+
+	got branch -r $testroot/repo -c master newbranch
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 1 > $testroot/wt/new
+	(cd $testroot/wt && got add new > /dev/null)
+	(cd $testroot/wt && got commit -m "change 1" > /dev/null)
+	local commit1=`git_show_branch_head $testroot/repo newbranch`
+
+	echo 2 >> $testroot/wt/new
+	(cd $testroot/wt && got commit -m "change 2" > /dev/null)
+	local commit2=`git_show_branch_head $testroot/repo newbranch`
+
+	echo 3 >> $testroot/wt/new
+	(cd $testroot/wt && got commit -m "change 3" > /dev/null)
+	local commit3=`git_show_branch_head $testroot/repo newbranch`
+	local author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/wt && got blame new > $testroot/stdout)
+
+	local short_commit1=`trim_obj_id 32 $commit1`
+	local short_commit2=`trim_obj_id 32 $commit2`
+	local short_commit3=`trim_obj_id 32 $commit3`
+
+	d=`date -r $author_time +"%G-%m-%d"`
+	echo "1) $short_commit1 $d $GOT_AUTHOR_8 1" > $testroot/stdout.expected
+	echo "2) $short_commit2 $d $GOT_AUTHOR_8 2" >> $testroot/stdout.expected
+	echo "3) $short_commit3 $d $GOT_AUTHOR_8 3" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_blame_basic
 run_test test_blame_tag
 run_test test_blame_file_single_line
@@ -690,3 +740,4 @@ run_test test_blame_lines_shifted_up
 run_test test_blame_lines_shifted_down
 run_test test_blame_commit_subsumed
 run_test test_blame_blame_h
+run_test test_blame_added_on_branch

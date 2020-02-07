@@ -58,6 +58,14 @@ function git_show_head
 	(cd $repo && git show --no-patch --pretty='format:%H')
 }
 
+function git_show_branch_head
+{
+	local repo="$1"
+	local branch="$2"
+	(cd $repo && git show --no-patch --pretty='format:%H' $branch)
+}
+
+
 function git_show_author_time
 {
 	local repo="$1"
