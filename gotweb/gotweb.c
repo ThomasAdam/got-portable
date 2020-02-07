@@ -3375,8 +3375,6 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		error = got_object_blob_read_block(&len, blob);
 		if (error)
 			goto done;
-		if (len == 0)
-			break;
 		buf = got_object_blob_get_read_buf(blob);
 
 		/*
