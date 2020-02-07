@@ -2319,7 +2319,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *age = NULL;
-	char *id_str = NULL, *refstr = NULL, *newline, *href_commits = NULL;
+	char *id_str = NULL, *newline, *href_commits = NULL;
 	char *tag_commit0 = NULL, *href_tag = NULL, *href_briefs = NULL;
 	struct got_tag_object *tag = NULL;
 	enum kcgi_err kerr = KCGI_OK;
@@ -2341,44 +2341,45 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		const char *tag_commit;
 		time_t tagger_time;
 		struct got_object_id *id;
+		struct got_commit_object *commit = NULL;
 
 		refname = got_ref_get_name(re->ref);
 		if (strncmp(refname, "refs/tags/", 10) != 0)
 			continue;
 		refname += 10;
-		refstr = got_ref_to_str(re->ref);
-		if (refstr == NULL) {
-			error = got_error_from_errno("got_ref_to_str");
-			goto done;
-		}
 
 		error = got_ref_resolve(&id, repo, re->ref);
 		if (error)
 			goto done;
 
-		/* 
-		 * XXX: some of my repos are failing here. need to investigate.
-		 * currently setting error to NULL so no error is returned,
-		 * which stops Heads from being displayed on gw_summary.
-		 *
-		 * got ref -l lists refs and first tag ref above can be
-		 * displayed
-		 *
-		 * got tag -l will list tags just fine, so I don't know what
-		 * is happening.
-		 */
 		error = got_object_open_as_tag(&tag, repo, id);
-		free(id);
 		if (error) {
-			error = NULL;
-			goto done;
+			if (error->code != GOT_ERR_OBJ_TYPE) {
+				free(id);
+				goto done;
+			}
+			/* "lightweight" tag */
+			error = got_object_open_as_commit(&commit, repo, id);
+			if (error) {
+				free(id);
+				goto done;
+			}
+			tagger = got_object_commit_get_committer(commit);
+			tagger_time =
+			    got_object_commit_get_committer_time(commit);
+			error = got_object_id_str(&id_str, id);
+			free(id);
+			if (error)
+				goto done;
+		} else {
+			free(id);
+			tagger = got_object_tag_get_tagger(tag);
+			tagger_time = got_object_tag_get_tagger_time(tag);
+			error = got_object_id_str(&id_str,
+			    got_object_tag_get_object_id(tag));
+			if (error)
+				goto done;
 		}
-
-		tagger = got_object_tag_get_tagger(tag);
-		tagger_time = got_object_tag_get_tagger_time(tag);
-
-		error = got_object_id_str(&id_str,
-		    got_object_tag_get_object_id(tag));
 		if (error)
 			goto done;
 
@@ -2386,10 +2387,18 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		    strlen(id_str)) != 0)
 			continue;
 
-		tag_commit0 = strdup(got_object_tag_get_message(tag));
-		if (tag_commit0 == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
+		if (commit) {
+			error = got_object_commit_get_logmsg(&tag_commit0,
+			    commit);
+			if (error)
+				goto done;
+			got_object_commit_close(commit);
+		} else {
+			tag_commit0 = strdup(got_object_tag_get_message(tag));
+			if (tag_commit0 == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
 		}
 
 		tag_commit = tag_commit0;
@@ -2500,7 +2509,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			kerr = khtml_puts(gw_trans->gw_html_req, " | ");
 			if (kerr != KCGI_OK)
 				goto done;
-
 			if (asprintf(&href_briefs,
 			    "?path=%s&action=briefs&commit=%s",
 			    gw_trans->repo_name, id_str) == -1) {
@@ -2545,7 +2553,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    KATTR_ID, "dotted_line", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 			if (kerr != KCGI_OK)
 				goto done;
 			break;
@@ -2614,12 +2622,11 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		if (limit && --limit == 0)
 			break;
 
-		got_object_tag_close(tag);
+		if (tag)
+			got_object_tag_close(tag);
 		tag = NULL;
 		free(id_str);
 		id_str = NULL;
-		free(refstr);
-		refstr = NULL;
 		free(age);
 		age = NULL;
 		free(tag_commit0);
@@ -2635,7 +2642,6 @@ done:
 	if (tag)
 		got_object_tag_close(tag);
 	free(id_str);
-	free(refstr);
 	free(age);
 	free(tag_commit0);
 	free(href_tag);
