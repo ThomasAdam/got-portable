@@ -1468,8 +1468,10 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 			return got_error_from_errno("gw_dir malloc");
 
 		error = gw_load_got_path(gw_trans, gw_dir);
-		if (error && error->code == GOT_ERR_NOT_GIT_REPO)
+		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
+			error = NULL;
 			continue;
+		}
 		else if (error)
 			return error;
 
