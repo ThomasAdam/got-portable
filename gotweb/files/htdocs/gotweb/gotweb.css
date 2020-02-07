@@ -220,6 +220,7 @@ body {
 	padding-top: 5px;
 	padding-bottom: 5px;
 	overflow: auto;
+	white-space: pre-wrap;
 }
 
 /* headers */
@@ -307,6 +308,7 @@ body {
 	width: 72%;
 	padding-top: 2px;
 	padding-bottom: 2px;
+	white-space: pre-wrap;
 }
 #header_tree_title {
 	clear: left;
@@ -517,6 +519,7 @@ body {
 	padding-left: 20px;
 	padding-top: 20px;
 	padding-bottom: 20px;
+	white-space: pre-wrap;
 }
 
 /* blame.tmpl */
@@ -753,6 +756,7 @@ body {
 	clear: left;
 	float: left;
 	margin-top: 25px;
+	white-space: pre-wrap;
 }
 
 /* diff.tmpl */

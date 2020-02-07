@@ -176,7 +176,6 @@ static const struct got_error	*gw_get_repo_heads(char **, struct gw_trans *);
 static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *,
 				    char *);
 static char			*gw_get_site_link(struct gw_trans *);
-static const struct got_error	*gw_html_escape(char **, const char *);
 static const struct got_error	*gw_colordiff_line(struct gw_trans *, char *);
 
 static const struct got_error	*gw_gen_commit_header(struct gw_trans *, char *,
@@ -341,7 +340,7 @@ gw_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *age = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -375,13 +374,6 @@ gw_blame(struct gw_trans *gw_trans)
 	error = gw_gen_age_header(gw_trans, age ?age : "");
 	if (error)
 		goto done;
-	/*
-	 * XXX: keeping this for now, since kcgihtml does not convert
-	 * \n into <br /> yet.
-	 */
-	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
-	if (error)
-		goto done;
 	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
 	if (error)
 		goto done;
@@ -408,7 +400,6 @@ gw_blame(struct gw_trans *gw_trans)
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -447,7 +438,7 @@ gw_diff(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *age = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
@@ -498,13 +489,6 @@ gw_diff(struct gw_trans *gw_trans)
 	error = gw_gen_age_header(gw_trans, age ?age : "");
 	if (error)
 		goto done;
-	/*
-	 * XXX: keeping this for now, since kcgihtml does not convert
-	 * \n into <br /> yet.
-	 */
-	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
-	if (error)
-		goto done;
 	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
 	if (error)
 		goto done;
@@ -536,7 +520,6 @@ done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
 	free(age);
-	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -678,7 +661,7 @@ gw_commits(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL, *n_header = NULL;
-	char *age = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL;
 	char *href_diff = NULL, *href_blob = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
@@ -742,15 +725,7 @@ gw_commits(struct gw_trans *gw_trans)
 		    "commit", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		/*
-		 * XXX: keeping this for now, since kcgihtml does not convert
-		 * \n into <br /> yet.
-		 */
-		error = gw_html_escape(&escaped_commit_msg,
-		    n_header->commit_msg);
-		if (error)
-			goto done;
-		kerr = khttp_puts(gw_trans->gw_req, escaped_commit_msg);
+		kerr = khttp_puts(gw_trans->gw_req, n_header->commit_msg);
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -818,8 +793,6 @@ gw_commits(struct gw_trans *gw_trans)
 
 		free(age);
 		age = NULL;
-		free(escaped_commit_msg);
-		escaped_commit_msg = NULL;
 	}
 done:
 	got_ref_list_free(&header->refs);
@@ -829,7 +802,6 @@ done:
 	free(age);
 	free(href_diff);
 	free(href_blob);
-	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -1210,7 +1182,7 @@ gw_tree(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
-	char *age = NULL, *age_html = NULL, *escaped_commit_msg = NULL;
+	char *age = NULL, *age_html = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -1246,13 +1218,6 @@ gw_tree(struct gw_trans *gw_trans)
 	error = gw_gen_age_header(gw_trans, age ?age : "");
 	if (error)
 		goto done;
-	/*
-	 * XXX: keeping this for now, since kcgihtml does not convert
-	 * \n into <br /> yet.
-	 */
-	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
-	if (error)
-		goto done;
 	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
 	if (error)
 		goto done;
@@ -1286,7 +1251,6 @@ done:
 	free(tree);
 	free(age);
 	free(age_html);
-	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -1297,7 +1261,6 @@ gw_tag(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	char *escaped_commit_msg = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -1325,13 +1288,6 @@ gw_tag(struct gw_trans *gw_trans)
 		goto done;
 	error = gw_gen_commit_header(gw_trans, header->commit_id,
 	    header->refs_str);
-	if (error)
-		goto done;
-	/*
-	 * XXX: keeping this for now, since kcgihtml does not convert
-	 * \n into <br /> yet.
-	 */
-	error = gw_html_escape(&escaped_commit_msg, header->commit_msg);
 	if (error)
 		goto done;
 	error = gw_gen_commit_msg_header(gw_trans, header->commit_msg);
@@ -1363,7 +1319,6 @@ gw_tag(struct gw_trans *gw_trans)
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
-	free(escaped_commit_msg);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -2354,7 +2309,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *age = NULL;
-	char *escaped_tag_commit = NULL;
 	char *id_str = NULL, *refstr = NULL, *newline, *href_commits = NULL;
 	char *tag_commit0 = NULL, *href_tag = NULL, *href_briefs = NULL;
 	struct got_tag_object *tag = NULL;
@@ -2636,14 +2590,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    KATTR_ID, "tag_info", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			/*
-			 * XXX: keeping this for now, since kcgihtml does not
-			 * convert \n into <br /> yet.
-			 */
-			error = gw_html_escape(&escaped_tag_commit, tag_commit);
-			if (error)
-				goto done;
-			kerr = khttp_puts(gw_trans->gw_req, escaped_tag_commit);
+			kerr = khttp_puts(gw_trans->gw_req, tag_commit);
 			if (kerr != KCGI_OK)
 				goto done;
 			break;
@@ -2665,8 +2612,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		refstr = NULL;
 		free(age);
 		age = NULL;
-		free(escaped_tag_commit);
-		escaped_tag_commit = NULL;
 		free(tag_commit0);
 		tag_commit0 = NULL;
 		free(href_tag);
@@ -2682,7 +2627,6 @@ done:
 	free(id_str);
 	free(refstr);
 	free(age);
-	free(escaped_tag_commit);
 	free(tag_commit0);
 	free(href_tag);
 	free(href_briefs);
@@ -2884,8 +2828,6 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 	    got_object_commit_get_committer(header->commit);
 	if (error)
 		return error;
-
-	/* XXX Doesn't the log message require escaping? */
 	error = got_object_commit_get_logmsg(&commit_msg0, header->commit);
 	if (error)
 		return error;
@@ -3801,73 +3743,6 @@ gw_colordiff_line(struct gw_trans *gw_trans, char *buf)
 	    "diff_line", KATTR_CLASS, color ? color : "", KATTR__MAX);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
-	return error;
-}
-
-/*
- * XXX This function should not exist.
- * We should let khtml_puts(3) handle HTML escaping.
- */
-static const struct got_error *
-gw_html_escape(char **escaped_html, const char *orig_html)
-{
-	const struct got_error *error = NULL;
-	struct escape_pair {
-		char c;
-		const char *s;
-	} esc[] = {
-		{ '>', "&gt;" },
-		{ '<', "&lt;" },
-		{ '&', "&amp;" },
-		{ '"', "&quot;" },
-		{ '\'', "&apos;" },
-		{ '\n', "<br />" },
-	};
-	size_t orig_len, len;
-	int i, j, x;
-
-	orig_len = strlen(orig_html);
-	len = orig_len;
-	for (i = 0; i < orig_len; i++) {
-		for (j = 0; j < nitems(esc); j++) {
-			if (orig_html[i] != esc[j].c)
-				continue;
-			len += strlen(esc[j].s) - 1 /* escaped char */;
-		}
-	}
-
-	*escaped_html = calloc(len + 1 /* NUL */, sizeof(**escaped_html));
-	if (*escaped_html == NULL)
-		return got_error_from_errno("calloc");
-
-	x = 0;
-	for (i = 0; i < orig_len; i++) {
-		int escaped = 0;
-		for (j = 0; j < nitems(esc); j++) {
-			if (orig_html[i] != esc[j].c)
-				continue;
-
-			if (strlcat(*escaped_html, esc[j].s, len + 1)
-			    >= len + 1) {
-				error = got_error(GOT_ERR_NO_SPACE);
-				goto done;
-			}
-			x += strlen(esc[j].s);
-			escaped = 1;
-			break;
-		}
-		if (!escaped) {
-			(*escaped_html)[x] = orig_html[i];
-			x++;
-		}
-	}
-done:
-	if (error) {
-		free(*escaped_html);
-		*escaped_html = NULL;
-	} else {
-		(*escaped_html)[x] = '\0';
-	}
 	return error;
 }
 
