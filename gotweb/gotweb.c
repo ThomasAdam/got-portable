@@ -1626,7 +1626,84 @@ gw_template(size_t key, void *arg)
 
 	switch (key) {
 	case (TEMPL_HEAD):
-		kerr = khttp_puts(gw_trans->gw_req, head);
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_META,
+		    KATTR_CONTENT, "initial-scale=1.0, user-scalable=no",
+		    KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_META,
+		    KATTR_CHARSET, "utf-8",
+		    KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_META,
+		    KATTR_NAME, "msapplication-TileColor",
+		    KATTR_CONTENT, "#da532c", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_META,
+		    KATTR_NAME, "theme-color",
+		    KATTR_CONTENT, "#ffffff", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "apple-touch-icon", KATTR_SIZES, "180x180",
+		    KATTR_HREF, "/apple-touch-icon.png", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "icon", KATTR_TYPE, "image/png", KATTR_SIZES,
+		    "32x32", KATTR_HREF, "/favicon-32x32.png", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "icon", KATTR_TYPE, "image/png", KATTR_SIZES,
+		    "16x16", KATTR_HREF, "/favicon-16x16.png", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "manifest", KATTR_HREF, "/site.webmanifest",
+		    KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "mask-icon", KATTR_HREF,
+		    "/safari-pinned-tab.svg", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
+		    KATTR_REL, "stylesheet", KATTR_TYPE, "text/css",
+		    KATTR_HREF, "/gotweb.css", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			return 0;
 		break;
