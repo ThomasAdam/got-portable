@@ -173,9 +173,9 @@ static const struct got_error	*gw_output_diff(struct gw_trans *,
 static const struct got_error	*gw_output_repo_tags(struct gw_trans *,
 				    struct gw_header *, int, int);
 static const struct got_error	*gw_output_repo_heads(struct gw_trans *);
+static const struct got_error	*gw_output_site_link(struct gw_trans *);
 static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *,
 				    char *);
-static char			*gw_get_site_link(struct gw_trans *);
 static const struct got_error	*gw_colordiff_line(struct gw_trans *, char *);
 
 static const struct got_error	*gw_gen_commit_header(struct gw_trans *, char *,
@@ -1587,7 +1587,7 @@ gw_template(size_t key, void *arg)
 	const struct got_error *error = NULL;
 	enum kcgi_err kerr;
 	struct gw_trans *gw_trans = arg;
-	char *gw_site_link, *img_src = NULL;
+	char *img_src = NULL;
 
 	switch (key) {
 	case (TEMPL_HEAD):
@@ -1698,15 +1698,9 @@ gw_template(size_t key, void *arg)
 		}
 		break;
 	case (TEMPL_SITEPATH):
-		gw_site_link = gw_get_site_link(gw_trans);
-		if (gw_site_link != NULL) {
-			kerr = khttp_puts(gw_trans->gw_req, gw_site_link);
-			if (kerr != KCGI_OK) {
-				free(gw_site_link);
-				return 0;
-			}
-		}
-		free(gw_site_link);
+		error = gw_output_site_link(gw_trans);
+		if (error)
+			return 0;
 		break;
 	case(TEMPL_TITLE):
 		if (gw_trans->gw_conf->got_site_name != NULL) {
@@ -3843,33 +3837,60 @@ done:
 	return error;
 }
 
-static char *
-gw_get_site_link(struct gw_trans *gw_trans)
+static const struct got_error *
+gw_output_site_link(struct gw_trans *gw_trans)
 {
-	char *link = NULL, *repo = NULL, *action = NULL;
+	const struct got_error *error = NULL;
+	char *href_summary = NULL;
+	enum kcgi_err kerr = KCGI_OK;
 
-	if (gw_trans->repo_name != NULL &&
-	    asprintf(&repo, " / <a href='?path=%s&action=summary'>%s</a>",
-	    gw_trans->repo_name, gw_trans->repo_name) == -1)
-		return NULL;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "site_link", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF, GOTWEB,
+	    KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_puts(gw_trans->gw_html_req,
+	   gw_trans->gw_conf->got_site_link);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		goto done;
 
-	if (gw_trans->action_name != NULL &&
-	    asprintf(&action, " / %s", gw_trans->action_name) == -1) {
-		free(repo);
-		return NULL;
+	if (gw_trans->repo_name != NULL) {
+		kerr = khtml_puts(gw_trans->gw_html_req, " / ");
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&href_summary, "?path=%s&action=summary",
+		    gw_trans->repo_name) == -1)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_summary, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->repo_name);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, " / ");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->action_name);
+		if (kerr != KCGI_OK)
+			goto done;
 	}
 
-	if (asprintf(&link, site_link, GOTWEB,
-	    gw_trans->gw_conf->got_site_link,
-	    repo ? repo : "", action ? action : "") == -1) {
-		free(repo);
-		free(action);
-		return NULL;
-	}
-
-	free(repo);
-	free(action);
-	return link;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		goto done;
+done:
+	free(href_summary);
+	return error;
 }
 
 static const struct got_error *
