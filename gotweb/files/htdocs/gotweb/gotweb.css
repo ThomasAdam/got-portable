@@ -348,6 +348,14 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
+#heads_space {
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	float: left;
+	width: 8.5em;
+	overflow: auto;
+}
 #head {
 	float: left;
 	padding-right: 10px;

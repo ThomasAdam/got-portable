@@ -48,40 +48,6 @@ char *nav_next =
 char *nav_prev =
 	"<a href='?page=%d'>Previous<a/>";
 
-char *repo_owner =
-	"<div id='repo_owner_title'>Owner: </div>" \
-	"<div id='repo_owner'>%s</div>";
-
-char *heads_row =
-	"<div id='heads_wrapper'>" \
-	"<div id='heads_age'>%s</div>" \
-	"<div id='head'>%s</div>" \
-	"</div>" \
-	"<div id='navs_wrapper'>" \
-	"<div id='navs'>%s</div>" \
-	"</div>" \
-	"</div>" \
-	"<div id='dotted_line'></div>";
-
-char *heads_navs =
-	"<a href='?path=%s&action=summary&headref=%s'>summary</a> | " \
-	"<a href='?path=%s&action=briefs&headref=%s'>commit briefs</a> | " \
-	"<a href='?path=%s&action=commits&headref=%s'>commits</a>";
-
-/* headers */
-
-char *header_commit_html =
-	"<div id='header_commit_title'>Commit:</div>" \
-	"<div id='header_commit'>%s %s</div>";
-
-char *header_age_html =
-	"<div id='header_age_title'>Date:</div>" \
-	"<div id='header_age'>%s</div>";
-
-char *header_commit_msg_html =
-	"<div id='header_commit_msg_title'>Message:</div>" \
-	"<div id='header_commit_msg'>%s</div>";
-
 /* index.tmpl */
 
 char *index_projects_header =

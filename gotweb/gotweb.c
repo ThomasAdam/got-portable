@@ -172,7 +172,7 @@ static const struct got_error	*gw_output_diff(struct gw_trans *,
 				    struct gw_header *);
 static const struct got_error	*gw_output_repo_tags(struct gw_trans *,
 				    struct gw_header *, int, int);
-static const struct got_error	*gw_get_repo_heads(char **, struct gw_trans *);
+static const struct got_error	*gw_output_repo_heads(struct gw_trans *);
 static const struct got_error	*gw_get_clone_url(char **, struct gw_trans *,
 				    char *);
 static char			*gw_get_site_link(struct gw_trans *);
@@ -733,9 +733,6 @@ gw_commits(struct gw_trans *gw_trans)
 			goto done;
 
 		/* navs */
-
-		/* XXX: create gen code for this */
-		/* build diff nav */
 		if (asprintf(&href_diff, "?path=%s&action=diff&commit=%s",
 		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -764,8 +761,6 @@ gw_commits(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 
-		/* XXX: create gen code for this */
-		/* build tree nav */
 		if (asprintf(&href_blob, "?path=%s&action=tree&commit=%s",
 		    gw_trans->repo_name, n_header->commit_id) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -983,7 +978,7 @@ static const struct got_error *
 gw_summary(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	char *age = NULL, *tags = NULL, *heads = NULL;
+	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -1138,39 +1133,9 @@ gw_summary(struct gw_trans *gw_trans)
 		goto done;
 
 	/* heads */
-	error = gw_get_repo_heads(&heads, gw_trans);
-	if (error)
-		goto done;
-	if (heads != NULL && strcmp(heads, "") != 0) {
-		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-		    KATTR_ID, "summary_heads_title_wrapper", KATTR__MAX);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-		    KATTR_ID, "summary_heads_title", KATTR__MAX);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, "Heads");
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-		    KATTR_ID, "summary_heads_content", KATTR__MAX);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khttp_puts(gw_trans->gw_req, heads);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
-		if (kerr != KCGI_OK)
-			goto done;
-	}
+	error = gw_output_repo_heads(gw_trans);
 done:
 	free(age);
-	free(tags);
-	free(heads);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -3687,23 +3652,17 @@ done:
 }
 
 static const struct got_error *
-gw_get_repo_heads(char **head_html, struct gw_trans *gw_trans)
+gw_output_repo_heads(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	char *head_row = NULL, *head_navs_disp = NULL, *age = NULL;
-	struct buf *diffbuf = NULL;
-	size_t newsize;
-
-	*head_html = NULL;
+	char *age = NULL, *href_summary = NULL, *href_briefs = NULL;
+	char *href_commits = NULL;
+	enum kcgi_err kerr = KCGI_OK;
 
 	SIMPLEQ_INIT(&refs);
-
-	error = buf_alloc(&diffbuf, 0);
-	if (error)
-		return NULL;
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -3712,6 +3671,25 @@ gw_get_repo_heads(char **head_html, struct gw_trans *gw_trans)
 	error = got_ref_list(&refs, repo, "refs/heads", got_ref_cmp_by_name,
 	    NULL);
 	if (error)
+		goto done;
+
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+	    KATTR_ID, "summary_heads_title_wrapper", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+	    KATTR_ID, "summary_heads_title", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_puts(gw_trans->gw_html_req, "Heads");
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+	if (kerr != KCGI_OK)
+		goto done;
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+	    KATTR_ID, "summary_heads_content", KATTR__MAX);
+	if (kerr != KCGI_OK)
 		goto done;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
@@ -3733,38 +3711,133 @@ gw_get_repo_heads(char **head_html, struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 
-		if (asprintf(&head_navs_disp, heads_navs, gw_trans->repo_name,
-		    refname, gw_trans->repo_name, refname,
-		    gw_trans->repo_name, refname, gw_trans->repo_name,
-		    refname) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-
 		if (strncmp(refname, "refs/heads/", 11) == 0)
 			refname += 11;
 
-		if (asprintf(&head_row, heads_row, age, refname,
-		    head_navs_disp) == -1) {
+
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "heads_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "heads_age", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, age ? age : "");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "heads_space", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_entity(gw_trans->gw_html_req, KENTITY_nbsp);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "head", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&href_summary,
+		    "?path=%s&action=summary&headref=%s",
+		    gw_trans->repo_name, refname) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_summary, KATTR__MAX);
+		kerr = khtml_puts(gw_trans->gw_html_req, refname);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+		if (kerr != KCGI_OK)
+			goto done;
 
-		error = buf_puts(&newsize, diffbuf, head_row);
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "navs_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "navs", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
 
-		free(head_navs_disp);
-		free(head_row);
-	}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_summary, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "summary");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
 
-	if (buf_len(diffbuf) > 0) {
-		error = buf_putc(diffbuf, '\0');
-		*head_html = strdup(buf_get(diffbuf));
-		if (*head_html == NULL)
-			error = got_error_from_errno("strdup");
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&href_briefs, "?path=%s&action=briefs&headref=%s",
+		    gw_trans->repo_name, refname) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_briefs, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "commit briefs");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK)
+			goto done;
+
+		if (asprintf(&href_commits,
+		    "?path=%s&action=commits&headref=%s",
+		    gw_trans->repo_name, refname) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_commits, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "commits");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "dotted_line", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK)
+			goto done;
+		break;
+		free(href_summary);
+		href_summary = NULL;
+		free(href_briefs);
+		href_briefs = NULL;
+		free(href_commits);
+		href_commits = NULL;
 	}
 done:
-	buf_free(diffbuf);
 	got_ref_list_free(&refs);
+	free(href_summary);
+	free(href_briefs);
+	free(href_commits);
 	if (repo)
 		got_repo_close(repo);
 	return error;
