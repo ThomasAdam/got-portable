@@ -17,37 +17,6 @@
 #ifndef GOTWEB_UI_H
 #define GOTWEB_UI_H
 
-/* general html */
-
-char *site_link =
-	"<div id='site_link'>" \
-	"<a href='%s'>%s</a> %s %s" \
-	"</div>";
-
-char *search =
-	"<!--/* <div id='search'>" \
-	"<form method='POST'>" \
-	"<input type='search' id='got-search' name='got-search' size='15'" \
-	    " maxlength='50' />" \
-	"<button>Search</button>" \
-	"</form>" \
-	"</div> */-->";
-
-char *np_wrapper_start =
-	"<div id='np_wrapper'>" \
-	"<div id='nav_prev'>";
-
-char *div_end =
-	"</div>";
-
-char *nav_next =
-	"<div id='nav_next'>" \
-	"<a href='?page=%d'>Next<a/>" \
-	"</div>";
-
-char *nav_prev =
-	"<a href='?page=%d'>Previous<a/>";
-
 /* index.tmpl */
 
 char *index_projects_header =

@@ -530,7 +530,8 @@ gw_index(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_dir *gw_dir = NULL;
-	char *html, *navs, *next, *prev;
+	char *html, *navs;
+	char *href_next = NULL, *href_prev = NULL;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 	enum kcgi_err kerr;
 
@@ -597,14 +598,24 @@ gw_index(struct gw_trans *gw_trans)
 			continue;
 
 		if (next_disp == gw_trans->gw_conf->got_max_repos_display) {
-			kerr = khttp_puts(gw_trans->gw_req, np_wrapper_start);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "np_wrapper", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "nav_prev", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
 		} else if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
-			kerr = khttp_puts(gw_trans->gw_req, np_wrapper_start);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "np_wrapper", KATTR__MAX);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "nav_prev", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
 		}
@@ -613,15 +624,23 @@ gw_index(struct gw_trans *gw_trans)
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
-			if (asprintf(&prev, nav_prev, gw_trans->page - 1) == -1)
+			if (asprintf(&href_prev, "?page=%d",
+			    gw_trans->page - 1) == -1)
 				return got_error_from_errno("asprintf");
-			kerr = khttp_puts(gw_trans->gw_req, prev);
-			free(prev);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_prev, KATTR__MAX);
+			free(href_prev);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khtml_puts(gw_trans->gw_html_req, "Previous");
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
 		}
 
-		kerr = khttp_puts(gw_trans->gw_req, div_end);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			return gw_kcgi_error(kerr);
 
@@ -629,15 +648,24 @@ gw_index(struct gw_trans *gw_trans)
 		    next_disp == gw_trans->gw_conf->got_max_repos_display &&
 		    dir_c != (gw_trans->page + 1) *
 		    gw_trans->gw_conf->got_max_repos_display) {
-			if (asprintf(&next, nav_next, gw_trans->page + 1) == -1)
-				return got_error_from_errno("calloc");
-			kerr = khttp_puts(gw_trans->gw_req, next);
-			free(next);
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "nav_next", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
-			kerr = khttp_puts(gw_trans->gw_req, div_end);
+			if (asprintf(&href_next, "?page=%d",
+			    gw_trans->page + 1) == -1)
+				return got_error_from_errno("calloc");
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+			    KATTR_HREF, href_next, KATTR__MAX);
+			free(href_next);
 			if (kerr != KCGI_OK)
-				error = gw_kcgi_error(kerr);
+				return gw_kcgi_error(kerr);
+			kerr = khtml_puts(gw_trans->gw_html_req, "Next");
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+			if (kerr != KCGI_OK)
+				return gw_kcgi_error(kerr);
 			next_disp = 0;
 			break;
 		}
@@ -646,7 +674,7 @@ gw_index(struct gw_trans *gw_trans)
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
-			kerr = khttp_puts(gw_trans->gw_req, div_end);
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 			if (kerr != KCGI_OK)
 				return gw_kcgi_error(kerr);
 		}
@@ -1711,7 +1739,28 @@ gw_template(size_t key, void *arg)
 		}
 		break;
 	case (TEMPL_SEARCH):
-		kerr = khttp_puts(gw_trans->gw_req, search);
+		break;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "search", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_FORM,
+			    KATTR_METHOD, "POST", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_INPUT, KATTR_ID,
+		    "got-search", KATTR_NAME, "got-search", KATTR_SIZE, "15",
+		    KATTR_MAXLENGTH, "50", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_BUTTON,
+		    KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_puts(gw_trans->gw_html_req, "Search");
+		if (kerr != KCGI_OK)
+			return 0;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 4);
 		if (kerr != KCGI_OK)
 			return 0;
 		break;
