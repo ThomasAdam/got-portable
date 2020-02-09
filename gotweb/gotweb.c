@@ -48,7 +48,6 @@
 
 #include "buf.h"
 #include "gotweb.h"
-#include "gotweb_ui.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -525,8 +524,8 @@ gw_index(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_dir *gw_dir = NULL;
-	char *html, *navs;
-	char *href_next = NULL, *href_prev = NULL;
+	char *href_next = NULL, *href_prev = NULL, *href_summary = NULL;
+	char *href_briefs = NULL, *href_commits = NULL, *href_tree = NULL;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 	enum kcgi_err kerr;
 
@@ -544,18 +543,87 @@ gw_index(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
-	kerr = khttp_puts(gw_trans->gw_req, index_projects_header);
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "index_header", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+	    "index_header_project", KATTR__MAX);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khtml_puts(gw_trans->gw_html_req, "Project");
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+	if (kerr != KCGI_OK)
+		return gw_kcgi_error(kerr);
+
+	if (gw_trans->gw_conf->got_show_repo_description) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_header_description", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_puts(gw_trans->gw_html_req, "Description");
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+	}
+
+	if (gw_trans->gw_conf->got_show_repo_owner) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_header_owner", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_puts(gw_trans->gw_html_req, "Owner");
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+	}
+
+	if (gw_trans->gw_conf->got_show_repo_age) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_header_age", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_puts(gw_trans->gw_html_req, "Last Change");
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+	}
+
+	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
 
 	if (TAILQ_EMPTY(&gw_trans->gw_dirs)) {
-		if (asprintf(&html, index_projects_empty,
-		    gw_trans->gw_conf->got_repos_path) == -1)
-			return got_error_from_errno("asprintf");
-		kerr = khttp_puts(gw_trans->gw_req, html);
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
-			error = gw_kcgi_error(kerr);
-		free(html);
+			return gw_kcgi_error(kerr);
+		kerr = khtml_puts(gw_trans->gw_html_req,
+		    "No repositories found in ");
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_puts(gw_trans->gw_html_req,
+		    gw_trans->gw_conf->got_repos_path);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "dotted_line", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
 		return error;
 	}
 
@@ -571,23 +639,230 @@ gw_index(struct gw_trans *gw_trans)
 
 		prev_disp++;
 
-		if (error)
-			return error;
-		if(asprintf(&navs, index_navs, gw_dir->name, gw_dir->name,
-		    gw_dir->name, gw_dir->name) == -1)
-			return got_error_from_errno("asprintf");
-
-		if (asprintf(&html, index_projects, gw_dir->name, gw_dir->name,
-		    gw_dir->description, gw_dir->owner ? gw_dir->owner : "",
-		    gw_dir->age,
-		    navs) == -1)
-			return got_error_from_errno("asprintf");
-
-		kerr = khttp_puts(gw_trans->gw_req, html);
-		free(navs);
-		free(html);
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return gw_kcgi_error(kerr);
+
+		if (asprintf(&href_summary, "?path=%s&action=summary",
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			return error;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "index_project", KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_summary, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_puts(gw_trans->gw_html_req, gw_dir->name);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		if (gw_trans->gw_conf->got_show_repo_description) {
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "index_project_description", KATTR__MAX);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    gw_dir->description ? gw_dir->description : "");
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+		}
+		if (gw_trans->gw_conf->got_show_repo_owner) {
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "index_project_owner", KATTR__MAX);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    gw_dir->owner ? gw_dir->owner : "");
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+		}
+		if (gw_trans->gw_conf->got_show_repo_age) {
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+			    KATTR_ID, "index_project_age", KATTR__MAX);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    gw_dir->age ? gw_dir->age : "");
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
+		}
+
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "navs_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "navs", KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_summary, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_puts(gw_trans->gw_html_req, "summary");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		if (asprintf(&href_briefs, "?path=%s&action=briefs",
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_briefs, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_puts(gw_trans->gw_html_req, "commit briefs");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		if (asprintf(&href_commits, "?path=%s&action=commits",
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_commits, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_puts(gw_trans->gw_html_req, "commits");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		if (asprintf(&href_tree, "?path=%s&action=tree",
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_tree, KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_puts(gw_trans->gw_html_req, "tree");
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 4);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "dotted_line", KATTR__MAX);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK) {
+			error = gw_kcgi_error(kerr);
+			goto done;
+		}
+
+		free(href_summary);
+		href_summary = NULL;
+		free(href_briefs);
+		href_briefs = NULL;
+		free(href_commits);
+		href_commits = NULL;
+		free(href_tree);
+		href_tree = NULL;
 
 		if (gw_trans->gw_conf->got_max_repos_display == 0)
 			continue;
@@ -595,24 +870,32 @@ gw_index(struct gw_trans *gw_trans)
 		if (next_disp == gw_trans->gw_conf->got_max_repos_display) {
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "np_wrapper", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "nav_prev", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		} else if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "np_wrapper", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "nav_prev", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
 
 		if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
@@ -620,19 +903,27 @@ gw_index(struct gw_trans *gw_trans)
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
 			if (asprintf(&href_prev, "?page=%d",
-			    gw_trans->page - 1) == -1)
-				return got_error_from_errno("asprintf");
+			    gw_trans->page - 1) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_prev, KATTR__MAX);
 			free(href_prev);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_puts(gw_trans->gw_html_req, "Previous");
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
 
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -645,22 +936,32 @@ gw_index(struct gw_trans *gw_trans)
 		    gw_trans->gw_conf->got_max_repos_display) {
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "nav_next", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			if (asprintf(&href_next, "?page=%d",
-			    gw_trans->page + 1) == -1)
-				return got_error_from_errno("calloc");
+			    gw_trans->page + 1) == -1) {
+				error = got_error_from_errno("calloc");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_next, KATTR__MAX);
 			free(href_next);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_puts(gw_trans->gw_html_req, "Next");
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 			next_disp = 0;
 			break;
 		}
@@ -670,12 +971,18 @@ gw_index(struct gw_trans *gw_trans)
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
 		    prev_disp == gw_trans->repos_total)) {
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
-			if (kerr != KCGI_OK)
-				return gw_kcgi_error(kerr);
+			if (kerr != KCGI_OK) {
+				error = gw_kcgi_error(kerr);
+				goto done;
+			}
 		}
-
 		next_disp++;
 	}
+done:
+	free(href_summary);
+	free(href_briefs);
+	free(href_commits);
+	free(href_tree);
 	return error;
 }
 
@@ -3723,7 +4030,6 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 
 		if (strncmp(refname, "refs/heads/", 11) == 0)
 			refname += 11;
-
 
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "heads_wrapper", KATTR__MAX);
