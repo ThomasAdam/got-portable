@@ -46,7 +46,6 @@
 #include <kcgi.h>
 #include <kcgihtml.h>
 
-#include "buf.h"
 #include "gotweb.h"
 
 #ifndef nitems
