@@ -156,6 +156,12 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 static struct gw_dir		*gw_init_gw_dir(char *);
 static struct gw_header		*gw_init_header(void);
 
+static void			 gw_free_headers(struct gw_header *);
+static void			 gw_display_error(struct gw_trans *,
+				    const struct got_error *);
+
+static int			 gw_template(size_t, void *);
+
 static const struct got_error	*gw_strdup_string(char **, char *,
 				    const char *);
 static const struct got_error	*gw_get_repo_description(char **,
@@ -191,39 +197,31 @@ static const struct got_error	*gw_gen_committer_header(struct gw_trans *,
 static const struct got_error	*gw_gen_commit_msg_header(struct gw_trans*,
 				    char *);
 static const struct got_error	*gw_gen_tree_header(struct gw_trans *, char *);
-
-static void			 gw_free_headers(struct gw_header *);
-static const struct got_error*	 gw_display_open(struct gw_trans *, enum khttp,
+static const struct got_error	*gw_display_open(struct gw_trans *, enum khttp,
 				    enum kmime);
-static const struct got_error*	 gw_display_index(struct gw_trans *);
-static void			 gw_display_error(struct gw_trans *,
-				    const struct got_error *);
-
-static int			 gw_template(size_t, void *);
-
-static const struct got_error*	 gw_get_header(struct gw_trans *,
+static const struct got_error	*gw_display_index(struct gw_trans *);
+static const struct got_error	*gw_get_header(struct gw_trans *,
 				    struct gw_header *, int);
-static const struct got_error*	 gw_get_commits(struct gw_trans *,
+static const struct got_error	*gw_get_commits(struct gw_trans *,
 				    struct gw_header *, int);
-static const struct got_error*	 gw_get_commit(struct gw_trans *,
+static const struct got_error	*gw_get_commit(struct gw_trans *,
 				    struct gw_header *);
-static const struct got_error*	 gw_apply_unveil(const char *, const char *);
-static const struct got_error*	 gw_blame_cb(void *, int, int,
+static const struct got_error	*gw_apply_unveil(const char *, const char *);
+static const struct got_error	*gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
-static const struct got_error*	 gw_load_got_paths(struct gw_trans *);
-static const struct got_error*	 gw_load_got_path(struct gw_trans *,
+static const struct got_error	*gw_load_got_paths(struct gw_trans *);
+static const struct got_error	*gw_load_got_path(struct gw_trans *,
 				    struct gw_dir *);
-static const struct got_error*	 gw_parse_querystring(struct gw_trans *);
-
-static const struct got_error*	 gw_blame(struct gw_trans *);
-static const struct got_error*	 gw_blob(struct gw_trans *);
-static const struct got_error*	 gw_diff(struct gw_trans *);
-static const struct got_error*	 gw_index(struct gw_trans *);
-static const struct got_error*	 gw_commits(struct gw_trans *);
-static const struct got_error*	 gw_briefs(struct gw_trans *);
-static const struct got_error*	 gw_summary(struct gw_trans *);
-static const struct got_error*	 gw_tree(struct gw_trans *);
-static const struct got_error*	 gw_tag(struct gw_trans *);
+static const struct got_error	*gw_parse_querystring(struct gw_trans *);
+static const struct got_error	*gw_blame(struct gw_trans *);
+static const struct got_error	*gw_blob(struct gw_trans *);
+static const struct got_error	*gw_diff(struct gw_trans *);
+static const struct got_error	*gw_index(struct gw_trans *);
+static const struct got_error	*gw_commits(struct gw_trans *);
+static const struct got_error	*gw_briefs(struct gw_trans *);
+static const struct got_error	*gw_summary(struct gw_trans *);
+static const struct got_error	*gw_tree(struct gw_trans *);
+static const struct got_error	*gw_tag(struct gw_trans *);
 
 struct gw_query_action {
 	unsigned int		 func_id;
@@ -320,7 +318,6 @@ gw_strdup_string(char **s, char *str1, const char *str2)
 {
 	if (str1 && str2)
 		return got_error_from_errno("strdup");
-
 	if (str1)
 		*s = strdup(str1);
 	else
@@ -515,8 +512,6 @@ gw_diff(struct gw_trans *gw_trans)
 		goto done;
 
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
-	if (kerr != KCGI_OK)
-		goto done;
 done:
 	got_ref_list_free(&header->refs);
 	gw_free_headers(header);
@@ -842,7 +837,6 @@ gw_index(struct gw_trans *gw_trans)
 			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_prev, KATTR__MAX);
-			free(href_prev);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_puts(gw_trans->gw_html_req, "Previous");
@@ -872,7 +866,6 @@ gw_index(struct gw_trans *gw_trans)
 			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_next, KATTR__MAX);
-			free(href_next);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_puts(gw_trans->gw_html_req, "Next");
@@ -896,6 +889,8 @@ gw_index(struct gw_trans *gw_trans)
 		next_disp++;
 	}
 done:
+	free(href_prev);
+	free(href_next);
 	free(href_summary);
 	free(href_briefs);
 	free(href_commits);
@@ -2621,7 +2616,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
-		goto done;
+		return error;
 
 	error = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
 	if (error)
@@ -2661,16 +2656,12 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    got_object_commit_get_committer_time(commit);
 			error = got_object_id_str(&id_str, id);
 			free(id);
-			if (error)
-				goto done;
 		} else {
 			free(id);
 			tagger = got_object_tag_get_tagger(tag);
 			tagger_time = got_object_tag_get_tagger_time(tag);
 			error = got_object_id_str(&id_str,
 			    got_object_tag_get_object_id(tag));
-			if (error)
-				goto done;
 		}
 		if (error)
 			goto done;
@@ -2992,7 +2983,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 
 	error = got_commit_graph_open(&graph, header->path, 0);
 	if (error)
-		goto done;
+		return error;
 
 	error = got_commit_graph_iter_start(graph, header->id, header->repo,
 	    NULL, NULL);
@@ -3584,8 +3575,6 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 
 	error = got_blame(in_repo_path, commit_id, repo, gw_blame_cb, &bca,
 	    NULL, NULL);
-	if (error)
-		goto done;
 done:
 	free(bca.line_offsets);
 	free(in_repo_path);
@@ -3721,7 +3710,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 
 	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
 	if (error)
-		goto done;
+		return error;
 
 	if (gw_trans->repo_folder != NULL) {
 		error = gw_strdup_string(&path, gw_trans->repo_folder, NULL);
