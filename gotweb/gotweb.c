@@ -85,8 +85,8 @@ struct gw_header {
 	char			*commit_id; /* id_str1 */
 	char			*parent_id; /* id_str2 */
 	char			*tree_id;
-	const char		*author;
-	const char		*committer;
+	char			*author;
+	char			*committer;
 	char			*commit_msg;
 	time_t			 committer_time;
 };
@@ -156,6 +156,8 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 static struct gw_dir		*gw_init_gw_dir(char *);
 static struct gw_header		*gw_init_header(void);
 
+static const struct got_error	*gw_strdup_string(char **, char *,
+				    const char *);
 static const struct got_error	*gw_get_repo_description(char **,
 				    struct gw_trans *, char *);
 static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
@@ -314,9 +316,15 @@ gw_apply_unveil(const char *repo_path, const char *repo_file)
 }
 
 static const struct got_error *
-gw_empty_string(char **s)
+gw_strdup_string(char **s, char *str1, const char *str2)
 {
-	*s = strdup("");
+	if (str1 && str2)
+		return got_error_from_errno("strdup");
+
+	if (str1)
+		*s = strdup(str1);
+	else
+		*s = strdup(str2);
 	if (*s == NULL)
 		return got_error_from_errno("strdup");
 	return NULL;
@@ -1247,7 +1255,8 @@ gw_summary(struct gw_trans *gw_trans)
 	}
 
 	if (gw_trans->gw_conf->got_show_repo_owner &&
-	    gw_trans->gw_dir->owner != NULL) {
+	    gw_trans->gw_dir->owner != NULL &&
+	    (strcmp(gw_trans->gw_dir->owner, "") != 0)) {
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "repo_owner_title", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1520,8 +1529,10 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 	if (dt == NULL) {
 		free(dir_test);
 	} else {
-		gw_dir->path = strdup(dir_test);
+		error = gw_strdup_string(&gw_dir->path, dir_test, NULL);
 		opened = 1;
+		if (error)
+			goto errored;
 		goto done;
 	}
 
@@ -1543,7 +1554,11 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 	    gw_trans->gw_conf->got_repos_path, gw_dir->name) == -1)
 		return got_error_from_errno("asprintf");
 
-	gw_dir->path = strdup(dir_test);
+	error = gw_strdup_string(&gw_dir->path, dir_test, NULL);
+	if (error) {
+		opened = 1;
+		goto errored;
+	}
 done:
 	error = gw_get_repo_description(&gw_dir->description, gw_trans,
 	    gw_dir->path);
@@ -2004,8 +2019,11 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
-	} else
-		ref_str = strdup("");
+	} else {
+		error = gw_strdup_string(&ref_str, "", NULL);
+		if (error)
+			goto done;
+	}
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_commit_title", KATTR__MAX);
@@ -2235,7 +2253,7 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 
 	*description = NULL;
 	if (gw_trans->gw_conf->got_show_repo_description == 0)
-		return gw_empty_string(description);
+		return NULL;
 
 	if (asprintf(&d_file, "%s/description", dir) == -1)
 		return got_error_from_errno("asprintf");
@@ -2243,7 +2261,7 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 	f = fopen(d_file, "r");
 	if (f == NULL) {
 		if (errno == ENOENT || errno == EACCES)
-			return gw_empty_string(description);
+			return NULL;
 		error = got_error_from_errno2("fopen", d_file);
 		goto done;
 	}
@@ -2356,7 +2374,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	struct got_reference *head_ref;
 	int is_head = 0;
 	time_t committer_time = 0, cmp_time = 0;
-	const char *refname;
+	char *refname;
 
 	*repo_age = NULL;
 	SIMPLEQ_INIT(&refs);
@@ -2384,10 +2402,16 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 		goto done;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
-		if (is_head)
-			refname = strdup(repo_ref);
-		else
-			refname = got_ref_get_name(re->ref);
+		if (is_head) {
+			error = gw_strdup_string(&refname, repo_ref, NULL);
+			if (error)
+				goto done;
+		} else {
+			error = gw_strdup_string(&refname, NULL,
+			    got_ref_get_name(re->ref));
+			if (error)
+				goto done;
+		}
 		error = got_ref_open(&head_ref, repo, refname, 0);
 		if (error)
 			goto done;
@@ -2521,11 +2545,8 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 	if (error)
 		return error;
 	gitconfig_owner = got_repo_get_gitconfig_owner(repo);
-	if (gitconfig_owner) {
-		*owner = strdup(gitconfig_owner);
-		if (*owner == NULL)
-			error = got_error_from_errno("strdup");
-	}
+	if (gitconfig_owner)
+		error = gw_strdup_string(owner, NULL, gitconfig_owner);
 	got_repo_close(repo);
 	return error;
 }
@@ -2937,6 +2958,8 @@ gw_free_headers(struct gw_header *header)
 		got_repo_close(header->repo);
 	free(header->refs_str);
 	free(header->commit_id);
+	free(header->author);
+	free(header->committer);
 	free(header->parent_id);
 	free(header->tree_id);
 	free(header->commit_msg);
@@ -3000,13 +3023,34 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				goto done;
 			}
 
-			n_header->refs_str = strdup(header->refs_str);
-			n_header->commit_id = strdup(header->commit_id);
-			n_header->parent_id = strdup(header->parent_id);
-			n_header->tree_id = strdup(header->tree_id);
-			n_header->author = strdup(header->author);
-			n_header->committer = strdup(header->committer);
-			n_header->commit_msg = strdup(header->commit_msg);
+			error = gw_strdup_string(&n_header->refs_str,
+			    header->refs_str, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->commit_id,
+			    header->commit_id, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->parent_id,
+			    header->parent_id, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->tree_id,
+			    header->tree_id, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->author,
+			    header->author, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->committer,
+			    header->committer, NULL);
+			if (error)
+				goto done;
+			error = gw_strdup_string(&n_header->commit_msg,
+			    header->commit_msg, NULL);
+			if (error)
+				goto done;
 			n_header->committer_time = header->committer_time;
 			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
 			    entry);
@@ -3074,12 +3118,17 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 			free(s);
 			return error;
 		}
-		header->refs_str = strdup(refs_str);
+		error = gw_strdup_string(&header->refs_str, refs_str, NULL);
 		free(s);
+		if (error)
+			return error;
 	}
 
-	if (refs_str == NULL)
-		header->refs_str = strdup("");
+	if (refs_str == NULL) {
+		error = gw_strdup_string(&header->refs_str, "", NULL);
+		if (error)
+			return error;
+	}
 	free(refs_str);
 
 	error = got_object_id_str(&header->commit_id, header->id);
@@ -3101,18 +3150,27 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 			if (error)
 				return error;
 			free(id2);
-		} else
-			header->parent_id = strdup("/dev/null");
-	} else
-		header->parent_id = strdup("");
+		} else {
+			error = gw_strdup_string(&header->parent_id,
+			    "/dev/null", NULL);
+			if (error)
+				return error;
+		}
+	} else {
+		error = gw_strdup_string(&header->parent_id, "", NULL);
+		if (error)
+			return error;
+	}
 
 	header->committer_time =
 	    got_object_commit_get_committer_time(header->commit);
 
-	header->author =
-	    got_object_commit_get_author(header->commit);
-	header->committer =
-	    got_object_commit_get_committer(header->commit);
+	error = gw_strdup_string(&header->author, NULL,
+	    got_object_commit_get_author(header->commit));
+	if (error)
+		return error;
+	error = gw_strdup_string(&header->committer, NULL,
+	    got_object_commit_get_committer(header->commit));
 	if (error)
 		return error;
 	error = got_object_commit_get_logmsg(&commit_msg0, header->commit);
@@ -3123,7 +3181,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 	while (*commit_msg == '\n')
 		commit_msg++;
 
-	header->commit_msg = strdup(commit_msg);
+	error = gw_strdup_string(&header->commit_msg, commit_msg, NULL);
 	free(commit_msg0);
 	return error;
 }
@@ -3213,7 +3271,11 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		return error;
 
 	if (in_repo_path) {
-		header->path = strdup(in_repo_path);
+		error = gw_strdup_string(&header->path, in_repo_path, NULL);
+		if (error) {
+			free(in_repo_path);
+			return error;
+		}
 	}
 	free(in_repo_path);
 
@@ -3277,11 +3339,10 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	if (err)
 		goto done;
 
-	bline->committer = strdup(got_object_commit_get_committer(commit));
-	if (bline->committer == NULL) {
-		err = got_error_from_errno("strdup");
+	err = gw_strdup_string(&bline->committer, NULL,
+	    got_object_commit_get_committer(commit));
+	if (err)
 		goto done;
-	}
 
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
@@ -3330,8 +3391,12 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		if (nl)
 			*nl = '\0';
 
-		if (a->gw_trans->repo_folder == NULL)
-			a->gw_trans->repo_folder = strdup("");
+		if (a->gw_trans->repo_folder == NULL) {
+			err = gw_strdup_string(&a->gw_trans->repo_folder, "",
+			    NULL);
+			if (err)
+				goto err;
+		}
 		if (a->gw_trans->repo_folder == NULL)
 			goto err;
 
@@ -3658,9 +3723,11 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	if (gw_trans->repo_folder != NULL)
-		path = strdup(gw_trans->repo_folder);
-	else {
+	if (gw_trans->repo_folder != NULL) {
+		error = gw_strdup_string(&path, gw_trans->repo_folder, NULL);
+		if (error)
+			goto done;
+	} else {
 		error = got_repo_map_path(&in_repo_path, repo,
 		    gw_trans->repo_path, 1);
 		if (error)
@@ -3923,11 +3990,10 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		char *refname;
 
-		refname = strdup(got_ref_get_name(re->ref));
-		if (refname == NULL) {
-			error = got_error_from_errno("got_ref_to_str");
+		error = gw_strdup_string(&refname, NULL,
+		    got_ref_get_name(re->ref));
+		if (error)
 			goto done;
-		}
 
 		if (strncmp(refname, "refs/heads/", 11) != 0) {
 			free(refname);
@@ -4208,7 +4274,9 @@ main(int argc, char *argv[])
 	gw_trans->repos_total = 0;
 	gw_trans->repo_path = NULL;
 	gw_trans->commit = NULL;
-	gw_trans->headref = strdup(GOT_REF_HEAD);
+	error = gw_strdup_string(&gw_trans->headref, GOT_REF_HEAD, NULL);
+	if (error)
+		goto done;
 	gw_trans->mime = KMIME_TEXT_HTML;
 	gw_trans->gw_tmpl->key = gw_templs;
 	gw_trans->gw_tmpl->keysz = TEMPL__MAX;
