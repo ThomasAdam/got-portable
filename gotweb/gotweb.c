@@ -1816,7 +1816,8 @@ gw_template(size_t key, void *arg)
 	switch (key) {
 	case (TEMPL_HEAD):
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_META,
-		    KATTR_CONTENT, "initial-scale=1.0, user-scalable=no",
+		    KATTR_NAME, "viewport",
+		    KATTR_CONTENT, "initial-scale=.75, user-scalable=yes",
 		    KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
