@@ -2,12 +2,3 @@ TODO
 
 - Add Prev/Next to shortlogs/logs that have more entries than
   got_max_commits_display
-
-- Redo index header, so columns are removed when content is set to not display
-  in gotweb.conf.
-
-- Massage ALL error returns. There are some examples in the code already, but
-  let's be consistent.
-
-- Integrate kcgi error codes. Hard fail or report error? Perhaps reporting is a
-  security flaw and hard fail is the better design.
