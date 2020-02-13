@@ -153,7 +153,7 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_stringne,	"path" },
 };
 
-static struct gw_dir		*gw_init_gw_dir(char *);
+static const struct got_error	*gw_init_gw_dir(struct gw_dir **, char *);
 static struct gw_header		*gw_init_header(void);
 
 static void			 gw_free_headers(struct gw_header *);
@@ -1602,8 +1602,9 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 		    strcmp(sd_dent[d_i]->d_name, "..") == 0)
 			continue;
 
-		if ((gw_dir = gw_init_gw_dir(sd_dent[d_i]->d_name)) == NULL)
-			return got_error_from_errno("gw_dir malloc");
+		error = gw_init_gw_dir(&gw_dir, sd_dent[d_i]->d_name);
+		if (error)
+			return error;
 
 		error = gw_load_got_path(gw_trans, gw_dir);
 		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
@@ -1691,9 +1692,9 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 			error = got_error_from_errno("invalid action");
 			return error;
 		}
-		if ((gw_trans->gw_dir =
-		    gw_init_gw_dir(gw_trans->repo_name)) == NULL)
-			return got_error_from_errno("gw_dir malloc");
+		error = gw_init_gw_dir(&gw_trans->gw_dir, gw_trans->repo_name);
+		if (error)
+			return error;
 
 		error = gw_load_got_path(gw_trans, gw_trans->gw_dir);
 		if (error)
@@ -1707,18 +1708,23 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 	return error;
 }
 
-static struct gw_dir *
-gw_init_gw_dir(char *dir)
+static const struct got_error *
+gw_init_gw_dir(struct gw_dir **gw_dir, char *dir)
 {
-	struct gw_dir *gw_dir;
+	const struct got_error *error;
 
-	if ((gw_dir = malloc(sizeof(*gw_dir))) == NULL)
+	*gw_dir = malloc(sizeof(**gw_dir));
+	if (*gw_dir == NULL)
+		return got_error_from_errno("malloc");
+
+	if (asprintf(&(*gw_dir)->name, "%s", dir) == -1) {
+		error = got_error_from_errno("asprintf");
+		free(*gw_dir);
+		*gw_dir = NULL;
 		return NULL;
+	}
 
-	if (asprintf(&gw_dir->name, "%s", dir) == -1)
-		return NULL;
-
-	return gw_dir;
+	return NULL;
 }
 
 static const struct got_error *
