@@ -1991,21 +1991,7 @@ static const struct got_error *
 gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 {
 	const struct got_error *error = NULL;
-	char *ref_str = NULL;
 	enum kcgi_err kerr = KCGI_OK;
-
-	if (strcmp(str2, "") != 0) {
-		if (asprintf(&ref_str, "(%s)", str2) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	} else {
-		ref_str = strdup("");
-		if (ref_str == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_commit_title", KATTR__MAX);
@@ -2027,9 +2013,17 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 	kerr = khtml_puts(gw_trans->gw_html_req, " ");
 	if (kerr != KCGI_OK)
 		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, ref_str);
-	if (kerr != KCGI_OK)
-		goto done;
+	if (str2 != NULL) {
+		kerr = khtml_puts(gw_trans->gw_html_req, "(");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, str2);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, ")");
+		if (kerr != KCGI_OK)
+			goto done;
+	}
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
 	if (error == NULL && kerr != KCGI_OK)
@@ -2057,9 +2051,11 @@ gw_gen_diff_header(struct gw_trans *gw_trans, char *str1, char *str2)
 	    KATTR_ID, "header_diff", KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, str1);
-	if (kerr != KCGI_OK)
-		goto done;
+	if (str1 != NULL) {
+		kerr = khtml_puts(gw_trans->gw_html_req, str1);
+		if (kerr != KCGI_OK)
+			goto done;
+	}
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_BR, KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
@@ -2447,7 +2443,8 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (error)
 		goto done;
 
-	if (strncmp(header->parent_id, "/dev/null", 9) != 0) {
+	if (header->parent_id != NULL &&
+	    strncmp(header->parent_id, "/dev/null", 9) != 0) {
 		error = got_repo_match_object_id(&id1, &label1,
 			header->parent_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
 		if (error)
@@ -2962,6 +2959,12 @@ gw_init_header()
 	header->path = NULL;
 	SIMPLEQ_INIT(&header->refs);
 
+	header->refs_str = NULL;
+	header->commit_id = NULL;
+	header->parent_id = NULL;
+	header->tree_id = NULL;
+	header->commit_msg = NULL;
+
 	return header;
 }
 
@@ -3005,20 +3008,24 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				goto done;
 			}
 
-			n_header->refs_str = strdup(header->refs_str);
-			if (n_header->refs_str == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
+			if (header->refs_str != NULL) {
+				n_header->refs_str = strdup(header->refs_str);
+				if (n_header->refs_str == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
 			}
 			n_header->commit_id = strdup(header->commit_id);
 			if (n_header->commit_id == NULL) {
 				error = got_error_from_errno("strdup");
 				goto done;
 			}
-			n_header->parent_id = strdup(header->parent_id);
-			if (n_header->parent_id == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
+			if (header->parent_id != NULL) {
+				n_header->parent_id = strdup(header->parent_id);
+				if (n_header->parent_id == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
 			}
 			n_header->tree_id = strdup(header->tree_id);
 			if (n_header->tree_id == NULL) {
@@ -3107,13 +3114,6 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		}
 	}
 
-	if (refs_str == NULL) {
-		header->refs_str = strdup("");
-		if (header->refs_str == NULL) {
-			error = got_error_from_errno("strdup");
-			return error;
-		}
-	}
 	free(refs_str);
 
 	error = got_object_id_str(&header->commit_id, header->id);
@@ -3141,12 +3141,6 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 				error = got_error_from_errno("strdup");
 				return error;
 			}
-		}
-	} else {
-		header->parent_id = strdup("");
-		if (header->parent_id == NULL) {
-			error = got_error_from_errno("strdup");
-			return error;
 		}
 	}
 
@@ -3381,14 +3375,6 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		if (nl)
 			*nl = '\0';
 
-		if (a->gw_trans->repo_folder == NULL) {
-			a->gw_trans->repo_folder = strdup("");
-			if (a->gw_trans->repo_folder == NULL) {
-				err = got_error_from_errno("strdup");
-				goto err;
-			}
-		}
-
 		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 		    "blame_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -3415,7 +3401,8 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		if (asprintf(&href_diff,
 		    "?path=%s&action=diff&commit=%s&file=%s&folder=%s",
 		    a->gw_trans->repo_name, bline->id_str,
-		    a->gw_trans->repo_file, a->gw_trans->repo_folder) == -1) {
+		    a->gw_trans->repo_file, a->gw_trans->repo_folder ?
+		    a->gw_trans->repo_folder : "") == -1) {
 			err = got_error_from_errno("asprintf");
 			goto err;
 		}
