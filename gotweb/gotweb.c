@@ -3051,7 +3051,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 	struct got_reflist_entry *re;
 	struct got_object_id *id2 = NULL;
 	struct got_object_qid *parent_id;
-	char *refs_str = NULL, *commit_msg = NULL, *commit_msg0;
+	char *commit_msg = NULL, *commit_msg0;
 
 	/*print commit*/
 	SIMPLEQ_FOREACH(re, &header->refs, entry) {
@@ -3091,22 +3091,16 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 			got_object_tag_close(tag);
 		if (cmp != 0)
 			continue;
-		s = refs_str;
-		if (asprintf(&refs_str, "%s%s%s", s ? s : "",
+		s = header->refs_str;
+		if (asprintf(&header->refs_str, "%s%s%s", s ? s : "",
 		    s ? ", " : "", name) == -1) {
 			error = got_error_from_errno("asprintf");
 			free(s);
+			header->refs_str = NULL;
 			return error;
 		}
 		free(s);
-		header->refs_str = strdup(refs_str);
-		if (header->refs_str == NULL) {
-			error = got_error_from_errno("strdup");
-			return error;
-		}
 	}
-
-	free(refs_str);
 
 	error = got_object_id_str(&header->commit_id, header->id);
 	if (error)
