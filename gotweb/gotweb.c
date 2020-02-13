@@ -4108,7 +4108,6 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 		if (kerr != KCGI_OK)
 			goto done;
-		break;
 		free(href_summary);
 		href_summary = NULL;
 		free(href_briefs);
