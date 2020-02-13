@@ -309,6 +309,7 @@ static const struct got_error *
 gw_strdup_string(char **s, char *str1, const char *str2)
 {
 	if (str1 && str2)
+		/* XXX and what is the value of errno ?!? */
 		return got_error_from_errno("strdup");
 	if (str1)
 		*s = strdup(str1);
