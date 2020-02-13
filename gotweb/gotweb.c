@@ -60,6 +60,7 @@ struct gw_trans {
 	struct ktemplate	*gw_tmpl;
 	struct khtmlreq		*gw_html_req;
 	struct kreq		*gw_req;
+	const struct got_error	*error;
 	const char		*repo_name;
 	char			*repo_path;
 	char			*commit;
@@ -152,15 +153,14 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_stringne,	"path" },
 };
 
-static const struct got_error	*gw_init_gw_dir(struct gw_dir **, const char *);
 static struct gw_header		*gw_init_header(void);
 
 static void			 gw_free_headers(struct gw_header *);
-static void			 gw_display_error(struct gw_trans *,
-				    const struct got_error *);
 
 static int			 gw_template(size_t, void *);
 
+static const struct got_error	*gw_error(struct gw_trans *);
+static const struct got_error	*gw_init_gw_dir(struct gw_dir **, const char *);
 static const struct got_error	*gw_get_repo_description(char **,
 				    struct gw_trans *, char *);
 static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
@@ -246,7 +246,7 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_BRIEFS,	"briefs",	gw_briefs,	"gw_tmpl/briefs.tmpl" },
 	{ GW_COMMITS,	"commits",	gw_commits,	"gw_tmpl/commit.tmpl" },
 	{ GW_DIFF,	"diff",		gw_diff,	"gw_tmpl/diff.tmpl" },
-	{ GW_ERR,	 NULL,		NULL,		"gw_tmpl/err.tmpl" },
+	{ GW_ERR,	"error",	gw_error,	"gw_tmpl/err.tmpl" },
 	{ GW_INDEX,	"index",	gw_index,	"gw_tmpl/index.tmpl" },
 	{ GW_SUMMARY,	"summary",	gw_summary,	"gw_tmpl/summry.tmpl" },
 	{ GW_TAG,	"tag",		gw_tag,		"gw_tmpl/tag.tmpl" },
@@ -1637,16 +1637,22 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 			return got_error_from_errno("asprintf");
 
 		/* get action and set function */
-		if ((p = gw_trans->gw_req->fieldmap[KEY_ACTION]))
+		if ((p = gw_trans->gw_req->fieldmap[KEY_ACTION])) {
 			for (i = 0; i < nitems(gw_query_funcs); i++) {
 				action = &gw_query_funcs[i];
-				if (action->func_name == NULL ||
-				    strcmp(action->func_name, p->parsed.s))
+				if (action->func_name == NULL)
 					continue;
-
-				gw_trans->action = i;
-				break;
+				if (strcmp(action->func_name,
+				    p->parsed.s) == 0) {
+					gw_trans->action = i;
+					break;
+				}
 			}
+			if (gw_trans->action == -1) {
+				gw_trans->action = GW_ERR;
+				gw_trans->error = got_error_from_errno("bad action");
+			}
+		}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
 			if (asprintf(&gw_trans->commit, "%s",
@@ -1669,10 +1675,6 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				return got_error_from_errno("asprintf");
 		}
 
-		if (action == NULL) {
-			error = got_error_from_errno("invalid action");
-			return error;
-		}
 		error = gw_init_gw_dir(&gw_trans->gw_dir, gw_trans->repo_name);
 		if (error)
 			return error;
@@ -1775,16 +1777,14 @@ gw_display_index(struct gw_trans *gw_trans)
 	return gw_kcgi_error(khtml_close(gw_trans->gw_html_req));
 }
 
-static void
-gw_display_error(struct gw_trans *gw_trans, const struct got_error *err)
+static const struct got_error *
+gw_error(struct gw_trans *gw_trans)
 {
-	if (gw_display_open(gw_trans, KHTTP_200, gw_trans->mime) != NULL)
-		return;
+	enum kcgi_err kerr;
 
-	if (khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0) != KCGI_OK)
-		return;
-	khtml_puts(gw_trans->gw_html_req, err->msg);
-	khtml_close(gw_trans->gw_html_req);
+	kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->error->msg);
+
+	return gw_kcgi_error(kerr);
 }
 
 static int
@@ -3108,6 +3108,8 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		free(s);
 	}
 
+	free(refs_str);
+
 	error = got_object_id_str(&header->commit_id, header->id);
 	if (error)
 		return error;
@@ -4246,6 +4248,7 @@ main(int argc, char *argv[])
 	TAILQ_INIT(&gw_trans->gw_dirs);
 	TAILQ_INIT(&gw_trans->gw_headers);
 
+	gw_trans->action = -1;
 	gw_trans->page = 0;
 	gw_trans->repos_total = 0;
 	gw_trans->repo_path = NULL;
@@ -4273,11 +4276,6 @@ main(int argc, char *argv[])
 	else
 		error = gw_display_index(gw_trans);
 done:
-	if (error) {
-		gw_trans->mime = KMIME_TEXT_PLAIN;
-		gw_trans->action = GW_ERR;
-		gw_display_error(gw_trans, error);
-	}
 	if (gw_malloc) {
 		free(gw_trans->gw_conf->got_repos_path);
 		free(gw_trans->gw_conf->got_site_name);
