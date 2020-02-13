@@ -3025,16 +3025,8 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				error = got_error_from_errno("strdup");
 				goto done;
 			}
-			n_header->author = strdup(header->author);
-			if (n_header->author == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			n_header->committer = strdup(header->committer);
-			if (n_header->committer == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
+			n_header->author = header->author;
+			n_header->committer = header->committer;
 			n_header->commit_msg = strdup(header->commit_msg);
 			if (n_header->commit_msg == NULL) {
 				error = got_error_from_errno("strdup");
