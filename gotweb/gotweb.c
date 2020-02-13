@@ -1539,6 +1539,12 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 		error = got_error_from_errno("strdup");
 		goto errored;
 	}
+
+	dt = opendir(dir_test);
+	if (dt == NULL) {
+		error = got_error(GOT_ERR_NOT_GIT_REPO);
+		goto errored;
+	}
 done:
 	error = gw_get_repo_description(&gw_dir->description, gw_trans,
 	    gw_dir->path);
@@ -1652,6 +1658,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		if (gw_trans->action == -1) {
 			gw_trans->action = GW_ERR;
 			gw_trans->error = got_error_from_errno("bad action");
+			return error;
 		}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
@@ -1679,9 +1686,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		if (error)
 			return error;
 
-		error = gw_load_got_path(gw_trans, gw_trans->gw_dir);
-		if (error)
-			return error;
+		gw_trans->error = gw_load_got_path(gw_trans, gw_trans->gw_dir);
 	} else
 		gw_trans->action = GW_INDEX;
 
@@ -1756,6 +1761,10 @@ gw_display_index(struct gw_trans *gw_trans)
 {
 	const struct got_error *error;
 	enum kcgi_err kerr;
+
+	/* catch early querystring errors */
+	if (gw_trans->error)
+		gw_trans->action = GW_ERR;
 
 	error = gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
 	if (error)
