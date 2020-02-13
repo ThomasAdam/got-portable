@@ -3108,8 +3108,6 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		free(s);
 	}
 
-	free(refs_str);
-
 	error = got_object_id_str(&header->commit_id, header->id);
 	if (error)
 		return error;
