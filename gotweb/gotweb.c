@@ -1511,8 +1511,11 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 
 	if (asprintf(&dir_test, "%s/%s/%s",
 	    gw_trans->gw_conf->got_repos_path, gw_dir->name,
-	    GOTWEB_GOT_DIR) == -1)
-		return got_error_from_errno("asprintf");
+	    GOTWEB_GOT_DIR) == -1) {
+		dir_test = NULL;
+		error = got_error_from_errno("asprintf");
+		goto errored;
+	}
 
 	dt = opendir(dir_test);
 	if (dt == NULL)
@@ -1524,8 +1527,11 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 	}
 
 	if (asprintf(&dir_test, "%s/%s",
-	    gw_trans->gw_conf->got_repos_path, gw_dir->name) == -1)
-		return got_error_from_errno("asprintf");
+	    gw_trans->gw_conf->got_repos_path, gw_dir->name) == -1) {
+		error = got_error_from_errno("asprintf");
+		dir_test = NULL;
+		goto errored;
+	}
 
 	gw_dir->path = strdup(dir_test);
 	if (gw_dir->path == NULL) {
