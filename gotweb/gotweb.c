@@ -63,7 +63,7 @@ struct gw_trans {
 	const char		*repo_name;
 	char			*repo_path;
 	char			*commit;
-	char			*repo_file;
+	const char		*repo_file;
 	char			*repo_folder;
 	char			*headref;
 	unsigned int		 action;
@@ -1669,11 +1669,8 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				return got_error_from_errno("asprintf");
 		}
 
-		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE])) {
-			if (asprintf(&gw_trans->repo_file, "%s",
-			    p->parsed.s) == -1)
-				return got_error_from_errno("asprintf");
-		}
+		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE]))
+			gw_trans->repo_file = p->parsed.s;
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_FOLDER])) {
 			if (asprintf(&gw_trans->repo_folder, "%s",
@@ -1754,6 +1751,7 @@ gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
 
+	/* XXX repo_file could be NULL if not present in querystring */
 	if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
 		kerr = khttp_head(gw_trans->gw_req,
 		    kresps[KRESP_CONTENT_DISPOSITION],
@@ -3413,6 +3411,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		    "blame_hash", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto err;
+		/* XXX repo_file could be NULL if not present in querystring */
 		if (asprintf(&href_diff,
 		    "?path=%s&action=diff&commit=%s&file=%s&folder=%s",
 		    a->gw_trans->repo_name, bline->id_str,
@@ -3505,6 +3504,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
+	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 	    gw_trans->repo_folder ? "/" : "",
@@ -3615,6 +3615,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 	if (error)
 		return error;
 
+	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 	    gw_trans->repo_folder ? "/" : "",
@@ -4304,7 +4305,6 @@ done:
 		free(gw_trans->gw_conf);
 		free(gw_trans->commit);
 		free(gw_trans->repo_path);
-		free(gw_trans->repo_file);
 		free(gw_trans->headref);
 
 		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
