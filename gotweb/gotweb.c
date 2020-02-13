@@ -65,7 +65,6 @@ struct gw_trans {
 	char			*commit;
 	char			*repo_file;
 	char			*repo_folder;
-	char			*action_name;
 	char			*headref;
 	unsigned int		 action;
 	unsigned int		 page;
@@ -255,6 +254,12 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_TAG,	"tag",		gw_tag,		"gw_tmpl/tag.tmpl" },
 	{ GW_TREE,	"tree",		gw_tree,	"gw_tmpl/tree.tmpl" },
 };
+
+static const char * 
+gw_get_action_name(struct gw_trans *gw_trans)
+{
+	return gw_query_funcs[gw_trans->action].func_name;
+}
 
 static const struct got_error *
 gw_kcgi_error(enum kcgi_err kerr)
@@ -1654,10 +1659,6 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				if (action->func_name == NULL ||
 				    strcmp(action->func_name, p->parsed.s))
 					continue;
-
-				if (asprintf(&gw_trans->action_name, "%s",
-				    action->func_name) == -1)
-					return got_error_from_errno("asprintf");
 
 				gw_trans->action = i;
 				break;
@@ -3790,7 +3791,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			}
 			if (asprintf(&href_blob,
 			    "?path=%s&action=%s&commit=%s&folder=%s",
-			    gw_trans->repo_name, gw_trans->action_name,
+			    gw_trans->repo_name, gw_get_action_name(gw_trans),
 			    gw_trans->commit, build_folder) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
@@ -4163,7 +4164,8 @@ gw_output_site_link(struct gw_trans *gw_trans)
 		kerr = khtml_puts(gw_trans->gw_html_req, " / ");
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->action_name);
+		kerr = khtml_puts(gw_trans->gw_html_req,
+		    gw_get_action_name(gw_trans));
 		if (kerr != KCGI_OK)
 			goto done;
 	}
@@ -4296,7 +4298,6 @@ done:
 		free(gw_trans->repo_path);
 		free(gw_trans->repo_name);
 		free(gw_trans->repo_file);
-		free(gw_trans->action_name);
 		free(gw_trans->headref);
 
 		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
