@@ -60,7 +60,7 @@ struct gw_trans {
 	struct ktemplate	*gw_tmpl;
 	struct khtmlreq		*gw_html_req;
 	struct kreq		*gw_req;
-	char			*repo_name;
+	const char		*repo_name;
 	char			*repo_path;
 	char			*commit;
 	char			*repo_file;
@@ -152,7 +152,7 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_stringne,	"path" },
 };
 
-static const struct got_error	*gw_init_gw_dir(struct gw_dir **, char *);
+static const struct got_error	*gw_init_gw_dir(struct gw_dir **, const char *);
 static struct gw_header		*gw_init_header(void);
 
 static void			 gw_free_headers(struct gw_header *);
@@ -1645,8 +1645,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		return error;
 	} else if ((p = gw_trans->gw_req->fieldmap[KEY_PATH])) {
 		/* define gw_trans->repo_path */
-		if (asprintf(&gw_trans->repo_name, "%s", p->parsed.s) == -1)
-			return got_error_from_errno("asprintf");
+		gw_trans->repo_name = p->parsed.s;
 
 		if (asprintf(&gw_trans->repo_path, "%s/%s",
 		    gw_trans->gw_conf->got_repos_path, p->parsed.s) == -1)
@@ -1709,7 +1708,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 }
 
 static const struct got_error *
-gw_init_gw_dir(struct gw_dir **gw_dir, char *dir)
+gw_init_gw_dir(struct gw_dir **gw_dir, const char *dir)
 {
 	const struct got_error *error;
 
@@ -4300,7 +4299,6 @@ done:
 		free(gw_trans->gw_conf);
 		free(gw_trans->commit);
 		free(gw_trans->repo_path);
-		free(gw_trans->repo_name);
 		free(gw_trans->repo_file);
 		free(gw_trans->headref);
 
