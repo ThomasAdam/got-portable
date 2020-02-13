@@ -1648,10 +1648,10 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 					break;
 				}
 			}
-			if (gw_trans->action == -1) {
-				gw_trans->action = GW_ERR;
-				gw_trans->error = got_error_from_errno("bad action");
-			}
+		}
+		if (gw_trans->action == -1) {
+			gw_trans->action = GW_ERR;
+			gw_trans->error = got_error_from_errno("bad action");
 		}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
