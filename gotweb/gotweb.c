@@ -1651,22 +1651,16 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		if ((p = gw_trans->gw_req->fieldmap[KEY_ACTION]))
 			for (i = 0; i < nitems(gw_query_funcs); i++) {
 				action = &gw_query_funcs[i];
-				if (action->func_name == NULL)
+				if (action->func_name == NULL ||
+				    strcmp(action->func_name, p->parsed.s))
 					continue;
 
-				if (strcmp(action->func_name,
-				    p->parsed.s) == 0) {
-					gw_trans->action = i;
-					if (asprintf(&gw_trans->action_name,
-					    "%s", action->func_name) == -1)
-						return
-						    got_error_from_errno(
-						    "asprintf");
+				if (asprintf(&gw_trans->action_name, "%s",
+				    action->func_name) == -1)
+					return got_error_from_errno("asprintf");
 
-					break;
-				}
-
-				action = NULL;
+				gw_trans->action = i;
+				break;
 			}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID]))
