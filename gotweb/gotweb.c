@@ -1664,25 +1664,29 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				break;
 			}
 
- 		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID]))
+ 		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
 			if (asprintf(&gw_trans->commit, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
+		}
 
-		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE]))
+		if ((p = gw_trans->gw_req->fieldmap[KEY_FILE])) {
 			if (asprintf(&gw_trans->repo_file, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
+		}
 
-		if ((p = gw_trans->gw_req->fieldmap[KEY_FOLDER]))
+		if ((p = gw_trans->gw_req->fieldmap[KEY_FOLDER])) {
 			if (asprintf(&gw_trans->repo_folder, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
+		}
 
-		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF]))
+		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF])) {
 			if (asprintf(&gw_trans->headref, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
+		}
 
 		if (action == NULL) {
 			error = got_error_from_errno("invalid action");
