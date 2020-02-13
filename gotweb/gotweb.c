@@ -1029,7 +1029,7 @@ gw_briefs(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL, *n_header = NULL;
-	char *age = NULL, *age_html = NULL;
+	char *age = NULL;
 	char *href_diff = NULL, *href_blob = NULL;
 	char *newline, *smallerthan;
 	enum kcgi_err kerr = KCGI_OK;
@@ -1070,11 +1070,7 @@ gw_briefs(struct gw_trans *gw_trans)
 		    KATTR_ID, "briefs_age", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&age_html, "%s", age ? age : "") == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-		kerr = khtml_puts(gw_trans->gw_html_req, age_html);
+		kerr = khtml_puts(gw_trans->gw_html_req, age ? age : "");
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -1168,8 +1164,6 @@ gw_briefs(struct gw_trans *gw_trans)
 
 		free(age);
 		age = NULL;
-		free(age_html);
-		age_html = NULL;
 		free(href_diff);
 		href_diff = NULL;
 		free(href_blob);
@@ -1181,7 +1175,6 @@ done:
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_headers(n_header);
 	free(age);
-	free(age_html);
 	free(href_diff);
 	free(href_blob);
 	if (error == NULL && kerr != KCGI_OK)
@@ -1354,7 +1347,7 @@ gw_tree(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
-	char *age = NULL, *age_html = NULL;
+	char *age = NULL;
 	enum kcgi_err kerr;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
@@ -1419,7 +1412,6 @@ done:
 	free(tree_html);
 	free(tree);
 	free(age);
-	free(age_html);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -3783,8 +3775,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			if (asprintf(&build_folder, "%s/%s",
 			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 			    got_tree_entry_get_name(te)) == -1) {
-				error = got_error_from_errno(
-				    "asprintf");
+				error = got_error_from_errno("asprintf");
 				goto done;
 			}
 			if (asprintf(&href_blob,
