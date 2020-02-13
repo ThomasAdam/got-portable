@@ -636,11 +636,13 @@ gw_index(struct gw_trans *gw_trans)
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 		    "index_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
-			return gw_kcgi_error(kerr);
+			goto done;
 
 		if (asprintf(&href_summary, "?path=%s&action=summary",
-		    gw_dir->name) == -1)
-			return got_error_from_errno("asprintf");
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 		    "index_project", KATTR__MAX);
 		if (kerr != KCGI_OK)
