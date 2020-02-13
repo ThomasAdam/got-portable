@@ -3742,6 +3742,11 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			goto done;
 	}
 
+	/*
+	 * XXX gw_trans->commit might have already been allocated in
+	 * gw_parse_querystring(); could we more cleanly seperate values
+	 * we received as arguments from values we compute ourselves?
+	 */
 	error = got_object_id_str(&gw_trans->commit, commit_id);
 	if (error)
 		goto done;
