@@ -206,7 +206,7 @@ static const struct got_error	*gw_get_commits(struct gw_trans *,
 				    struct gw_header *, int);
 static const struct got_error	*gw_get_commit(struct gw_trans *,
 				    struct gw_header *);
-static const struct got_error	*gw_apply_unveil(const char *, const char *);
+static const struct got_error	*gw_apply_unveil(const char *);
 static const struct got_error	*gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
 static const struct got_error	*gw_load_got_paths(struct gw_trans *);
@@ -285,17 +285,9 @@ gw_kcgi_error(enum kcgi_err kerr)
 }
 
 static const struct got_error *
-gw_apply_unveil(const char *repo_path, const char *repo_file)
+gw_apply_unveil(const char *repo_path)
 {
 	const struct got_error *err;
-
-	if (repo_path && repo_file) {
-		char *full_path;
-		if (asprintf(&full_path, "%s/%s", repo_path, repo_file) == -1)
-			return got_error_from_errno("asprintf unveil");
-		if (unveil(full_path, "r") != 0)
-			return got_error_from_errno2("unveil", full_path);
-	}
 
 	if (repo_path && unveil(repo_path, "r") != 0)
 		return got_error_from_errno2("unveil", repo_path);
@@ -353,7 +345,7 @@ gw_blame(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -419,7 +411,7 @@ gw_blob(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -449,7 +441,7 @@ gw_diff(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -537,7 +529,7 @@ gw_index(struct gw_trans *gw_trans)
 		return error;
 	}
 
-	error = gw_apply_unveil(gw_trans->gw_conf->got_repos_path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_conf->got_repos_path);
 	if (error)
 		return error;
 
@@ -918,7 +910,7 @@ gw_commits(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -1060,7 +1052,7 @@ gw_briefs(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -1380,7 +1372,7 @@ gw_tree(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
@@ -1455,7 +1447,7 @@ gw_tag(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path, NULL);
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
 
