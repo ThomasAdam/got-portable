@@ -55,6 +55,7 @@
 struct gw_trans {
 	TAILQ_HEAD(headers, gw_header)	 gw_headers;
 	TAILQ_HEAD(dirs, gw_dir)	 gw_dirs;
+	struct got_repository	*repo;
 	struct gw_dir		*gw_dir;
 	struct gotweb_conf	*gw_conf;
 	struct ktemplate	*gw_tmpl;
@@ -75,7 +76,6 @@ struct gw_trans {
 
 struct gw_header {
 	TAILQ_ENTRY(gw_header)		 entry;
-	struct got_repository		*repo;
 	struct got_reflist_head		 refs;
 	char				*path;
 
@@ -2366,9 +2366,13 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	if (gw_trans->gw_conf->got_show_repo_age == 0)
 		return NULL;
 
-	error = got_repo_open(&repo, dir, NULL);
-	if (error)
-		return error;
+	if (gw_trans->repo)
+		repo = gw_trans->repo;
+	else {
+		error = got_repo_open(&repo, dir, NULL);
+		if (error)
+			return error;
+	}
 
 	error = got_ref_list(&refs, repo, "refs/heads",
 	    got_ref_cmp_by_name, NULL);
@@ -2410,7 +2414,8 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	}
 done:
 	got_ref_list_free(&refs);
-	got_repo_close(repo);
+	if (gw_trans->repo == NULL)
+		got_repo_close(repo);
 	return error;
 }
 
@@ -2430,38 +2435,34 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (f == NULL)
 		return NULL;
 
-	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
-	if (error)
-		goto done;
-
 	if (header->parent_id != NULL &&
 	    strncmp(header->parent_id, "/dev/null", 9) != 0) {
 		error = got_repo_match_object_id(&id1, &label1,
-			header->parent_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
+			header->parent_id, GOT_OBJ_TYPE_ANY, 1, gw_trans->repo);
 		if (error)
 			goto done;
 	}
 
 	error = got_repo_match_object_id(&id2, &label2,
-	    header->commit_id, GOT_OBJ_TYPE_ANY, 1, header->repo);
+	    header->commit_id, GOT_OBJ_TYPE_ANY, 1, gw_trans->repo);
 	if (error)
 		goto done;
 
-	error = got_object_get_type(&obj_type, header->repo, id2);
+	error = got_object_get_type(&obj_type, gw_trans->repo, id2);
 	if (error)
 		goto done;
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL, 3, 0,
-		    header->repo, f);
+		    gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(id1, id2, "", "", 3, 0,
-		    header->repo, f);
+		    gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(id1, id2, 3, 0,
-		    header->repo, f);
+		    gw_trans->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);
@@ -2583,7 +2584,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
     int limit, int tag_type)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *age = NULL;
@@ -2595,11 +2595,8 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 
 	SIMPLEQ_INIT(&refs);
 
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		return error;
-
-	error = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
+	error = got_ref_list(&refs, gw_trans->repo, "refs/tags",
+	    got_ref_cmp_tags, gw_trans->repo);
 	if (error)
 		goto done;
 
@@ -2616,18 +2613,19 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			continue;
 		refname += 10;
 
-		error = got_ref_resolve(&id, repo, re->ref);
+		error = got_ref_resolve(&id, gw_trans->repo, re->ref);
 		if (error)
 			goto done;
 
-		error = got_object_open_as_tag(&tag, repo, id);
+		error = got_object_open_as_tag(&tag, gw_trans->repo, id);
 		if (error) {
 			if (error->code != GOT_ERR_OBJ_TYPE) {
 				free(id);
 				goto done;
 			}
 			/* "lightweight" tag */
-			error = got_object_open_as_commit(&commit, repo, id);
+			error = got_object_open_as_commit(&commit,
+			    gw_trans->repo, id);
 			if (error) {
 				free(id);
 				goto done;
@@ -2912,8 +2910,6 @@ done:
 	free(href_briefs);
 	free(href_commits);
 	got_ref_list_free(&refs);
-	if (repo)
-		got_repo_close(repo);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -2923,8 +2919,6 @@ static void
 gw_free_header(struct gw_header *header)
 {
 	free(header->path);
-	if (header->repo)
-		got_repo_close(header->repo);
 	free(header->author);
 	free(header->committer);
 	free(header->refs_str);
@@ -2943,7 +2937,6 @@ gw_init_header()
 	if (header == NULL)
 		return NULL;
 
-	header->repo = NULL;
 	header->path = NULL;
 	SIMPLEQ_INIT(&header->refs);
 
@@ -2968,13 +2961,13 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	if (error)
 		return error;
 
-	error = got_commit_graph_iter_start(graph, id, header->repo, NULL,
+	error = got_commit_graph_iter_start(graph, id, gw_trans->repo, NULL,
 	    NULL);
 	if (error)
 		goto done;
 
 	for (;;) {
-		error = got_commit_graph_iter_next(&id, graph, header->repo,
+		error = got_commit_graph_iter_next(&id, graph, gw_trans->repo,
 		    NULL, NULL);
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED)
@@ -2984,7 +2977,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		if (id == NULL)
 			goto done;
 
-		error = got_object_open_as_commit(&commit, header->repo, id);
+		error = got_object_open_as_commit(&commit, gw_trans->repo, id);
 			if (error)
 				goto done;
 		if (limit == 1) {
@@ -3044,7 +3037,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 		if (strncmp(name, "remotes/", 8) == 0)
 			name += 8;
 		if (strncmp(name, "tags/", 5) == 0) {
-			error = got_object_open_as_tag(&tag, header->repo,
+			error = got_object_open_as_tag(&tag, gw_trans->repo,
 			    re->id);
 			if (error) {
 				if (error->code != GOT_ERR_OBJ_TYPE)
@@ -3139,38 +3132,38 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	char *in_repo_path = NULL;
 	struct got_object_id *id = NULL;
 
-	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
+	error = got_repo_open(&gw_trans->repo, gw_trans->repo_path, NULL);
 	if (error)
 		return error;
 
 	if (gw_trans->commit == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, header->repo,
+		error = got_ref_open(&head_ref, gw_trans->repo,
 		    gw_trans->headref, 0);
 		if (error)
 			return error;
 
-		error = got_ref_resolve(&id, header->repo, head_ref);
+		error = got_ref_resolve(&id, gw_trans->repo, head_ref);
 		got_ref_close(head_ref);
 		if (error)
 			return error;
 	} else {
 		struct got_reference *ref;
-		error = got_ref_open(&ref, header->repo, gw_trans->commit, 0);
+		error = got_ref_open(&ref, gw_trans->repo, gw_trans->commit, 0);
 		if (error == NULL) {
 			int obj_type;
-			error = got_ref_resolve(&id, header->repo, ref);
+			error = got_ref_resolve(&id, gw_trans->repo, ref);
 			got_ref_close(ref);
 			if (error)
 				return error;
-			error = got_object_get_type(&obj_type, header->repo,
+			error = got_object_get_type(&obj_type, gw_trans->repo,
 			    id);
 			if (error)
 				goto done;
 			if (obj_type == GOT_OBJ_TYPE_TAG) {
 				struct got_tag_object *tag;
 				error = got_object_open_as_tag(&tag,
-				    header->repo, id);
+				    gw_trans->repo, id);
 				if (error)
 					goto done;
 				if (got_object_tag_get_object_type(tag) !=
@@ -3195,12 +3188,12 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		}
 		error = got_repo_match_object_id_prefix(&id,
 			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
-			    header->repo);
+			    gw_trans->repo);
 		if (error)
 			goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, header->repo,
+	error = got_repo_map_path(&in_repo_path, gw_trans->repo,
 	    gw_trans->repo_path, 1);
 	if (error)
 		goto done;
@@ -3213,7 +3206,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		}
 	}
 
-	error = got_ref_list(&header->refs, header->repo, NULL,
+	error = got_ref_list(&header->refs, gw_trans->repo, NULL,
 	    got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
@@ -3433,7 +3426,6 @@ static const struct got_error *
 gw_output_file_blame(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
@@ -3441,10 +3433,6 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	struct gw_blame_cb_args bca;
 	int i, obj_type;
 	size_t filesize;
-
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		return error;
 
 	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
@@ -3455,16 +3443,17 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, path, 1);
+	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path, 1);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
+	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit_id,
+	    in_repo_path);
 	if (error)
 		goto done;
 
@@ -3473,7 +3462,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_object_get_type(&obj_type, repo, obj_id);
+	error = got_object_get_type(&obj_type, gw_trans->repo, obj_id);
 	if (error)
 		goto done;
 
@@ -3482,7 +3471,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192);
 	if (error)
 		goto done;
 
@@ -3512,11 +3501,11 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		i /= 10;
 		bca.nlines_prec++;
 	}
-	bca.repo = repo;
+	bca.repo = gw_trans->repo;
 	bca.gw_trans = gw_trans;
 
-	error = got_blame(in_repo_path, commit_id, repo, gw_blame_cb, &bca,
-	    NULL, NULL);
+	error = got_blame(in_repo_path, commit_id, gw_trans->repo, gw_blame_cb,
+	    &bca, NULL, NULL);
 done:
 	free(bca.line_offsets);
 	free(in_repo_path);
@@ -3534,8 +3523,6 @@ done:
 		error = got_error_from_errno("fclose");
 	if (blob)
 		got_object_blob_close(blob);
-	if (repo)
-		got_repo_close(repo);
 	return error;
 }
 
@@ -3543,7 +3530,6 @@ static const struct got_error *
 gw_output_blob_buf(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
@@ -3552,10 +3538,6 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 	size_t len, hdrlen;
 	const uint8_t *buf;
 	enum kcgi_err kerr = KCGI_OK;
-
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		return error;
 
 	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
@@ -3566,16 +3548,17 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, repo, path, 1);
+	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path, 1);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
+	error = got_object_id_by_path(&obj_id, gw_trans->repo, commit_id,
+	    in_repo_path);
 	if (error)
 		goto done;
 
@@ -3584,7 +3567,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_object_get_type(&obj_type, repo, obj_id);
+	error = got_object_get_type(&obj_type, gw_trans->repo, obj_id);
 	if (error)
 		goto done;
 
@@ -3593,7 +3576,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	error = got_object_open_as_blob(&blob, gw_trans->repo, obj_id, 8192);
 	if (error)
 		goto done;
 
@@ -3629,8 +3612,6 @@ done:
 	free(path);
 	if (blob)
 		got_object_blob_close(blob);
-	if (repo)
-		got_repo_close(repo);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -3640,7 +3621,6 @@ static const struct got_error *
 gw_output_repo_tree(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
 	struct got_tree_object *tree = NULL;
 	char *path = NULL, *in_repo_path = NULL;
@@ -3651,10 +3631,6 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 	int nentries, i, class_flip = 0;
 	enum kcgi_err kerr = KCGI_OK;
 
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		return error;
-
 	if (gw_trans->repo_folder != NULL) {
 		path = strdup(gw_trans->repo_folder);
 		if (path == NULL) {
@@ -3662,7 +3638,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			goto done;
 		}
 	} else {
-		error = got_repo_map_path(&in_repo_path, repo,
+		error = got_repo_map_path(&in_repo_path, gw_trans->repo,
 		    gw_trans->repo_path, 1);
 		if (error)
 			goto done;
@@ -3672,17 +3648,18 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 
 	if (gw_trans->commit == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, gw_trans->headref, 0);
+		error = got_ref_open(&head_ref, gw_trans->repo,
+		    gw_trans->headref, 0);
 		if (error)
 			goto done;
-		error = got_ref_resolve(&commit_id, repo, head_ref);
+		error = got_ref_resolve(&commit_id, gw_trans->repo, head_ref);
 		if (error)
 			goto done;
 		got_ref_close(head_ref);
 
 	} else {
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    gw_trans->commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    gw_trans->commit, GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
 		if (error)
 			goto done;
 	}
@@ -3696,11 +3673,11 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = got_object_id_by_path(&tree_id, repo, commit_id, path);
+	error = got_object_id_by_path(&tree_id, gw_trans->repo, commit_id, path);
 	if (error)
 		goto done;
 
-	error = got_object_open_as_tree(&tree, repo, tree_id);
+	error = got_object_open_as_tree(&tree, gw_trans->repo, tree_id);
 	if (error)
 		goto done;
 
@@ -3871,8 +3848,6 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 done:
 	if (tree)
 		got_object_tree_close(tree);
-	if (repo)
-		got_repo_close(repo);
 	free(id_str);
 	free(href_blob);
 	free(href_blame);
@@ -3888,7 +3863,6 @@ static const struct got_error *
 gw_output_repo_heads(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
-	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	char *age = NULL, *href_summary = NULL, *href_briefs = NULL;
@@ -3897,12 +3871,8 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 
 	SIMPLEQ_INIT(&refs);
 
-	error = got_repo_open(&repo, gw_trans->repo_path, NULL);
-	if (error)
-		goto done;
-
-	error = got_ref_list(&refs, repo, "refs/heads", got_ref_cmp_by_name,
-	    NULL);
+	error = got_ref_list(&refs, gw_trans->repo, "refs/heads",
+	    got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
@@ -4070,8 +4040,6 @@ done:
 	free(href_summary);
 	free(href_briefs);
 	free(href_commits);
-	if (repo)
-		got_repo_close(repo);
 	return error;
 }
 
@@ -4244,6 +4212,8 @@ done:
 		free(gw_trans->gw_conf);
 		free(gw_trans->commit);
 		free(gw_trans->repo_path);
+		if (gw_trans->repo)
+			got_repo_close(gw_trans->repo);
 
 		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
 			free(dir->name);
