@@ -3099,9 +3099,10 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		struct got_tag_object *tag = NULL;
 		int cmp;
 
-		name = got_ref_get_name(re->ref);
-		if (strcmp(name, GOT_REF_HEAD) == 0)
+		if (got_ref_is_symbolic(re->ref))
 			continue;
+
+		name = got_ref_get_name(re->ref);
 		if (strncmp(name, "refs/", 5) == 0)
 			name += 5;
 		if (strncmp(name, "got/", 4) == 0)
@@ -4001,6 +4002,9 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
 		char *refname;
+
+		if (got_ref_is_symbolic(re->ref))
+			continue;
 
 		refname = strdup(got_ref_get_name(re->ref));
 		if (refname == NULL) {
