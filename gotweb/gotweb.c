@@ -155,7 +155,7 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 
 static struct gw_header		*gw_init_header(void);
 
-static void			 gw_free_headers(struct gw_header *);
+static void			 gw_free_header(struct gw_header *);
 
 static int			 gw_template(size_t, void *);
 
@@ -381,7 +381,7 @@ gw_blame(struct gw_trans *gw_trans)
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -411,7 +411,7 @@ gw_blob(struct gw_trans *gw_trans)
 	error = gw_output_blob_buf(gw_trans);
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	return error;
 }
 
@@ -495,7 +495,7 @@ gw_diff(struct gw_trans *gw_trans)
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	free(age);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
@@ -1013,9 +1013,9 @@ gw_commits(struct gw_trans *gw_trans)
 	}
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
-		gw_free_headers(n_header);
+		gw_free_header(n_header);
 	free(age);
 	free(href_diff);
 	free(href_blob);
@@ -1171,9 +1171,9 @@ gw_briefs(struct gw_trans *gw_trans)
 	}
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
-		gw_free_headers(n_header);
+		gw_free_header(n_header);
 	free(age);
 	free(href_diff);
 	free(href_blob);
@@ -1418,7 +1418,7 @@ gw_tree(struct gw_trans *gw_trans)
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	free(tree_html_disp);
 	free(tree_html);
 	free(tree);
@@ -1487,7 +1487,7 @@ gw_tag(struct gw_trans *gw_trans)
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
 	got_ref_list_free(&header->refs);
-	gw_free_headers(header);
+	gw_free_header(header);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -2948,7 +2948,7 @@ done:
 }
 
 static void
-gw_free_headers(struct gw_header *header)
+gw_free_header(struct gw_header *header)
 {
 	free(header->id);
 	free(header->path);
