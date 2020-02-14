@@ -3004,6 +3004,30 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		goto done;
 
 	for (;;) {
+		/*
+		 * XXX This is gross; Some fields of 'header' change during every
+		 * loop iteration, some remain constant (e.g. header->repo).
+		 * We should refactor this to be able to call gw_free_header()
+		 * during every loop iteration. Or perhaps do away with the
+		 * appraoch of passing a struct around which contains data
+		 * of various lifetimes, and instead pass globals like 'repo'
+		 * around separately as done in e.g. tog(1). Any state which
+		 * keeps changing with every iteration (e.g. header->id) would
+		 * better stored in local variables of this function instead.
+		 */
+		/* Clear fields that will be filled again by gw_get_commit. */
+		free(header->refs_str);
+		header->refs_str = NULL;
+		free(header->commit_id);
+		header->commit_id = NULL;
+		free(header->parent_id);
+		header->parent_id = NULL;
+		free(header->tree_id);
+		header->tree_id = NULL;
+		free(header->commit_msg);
+		header->commit_msg = NULL;
+	
+		free(header->id); /* XXX see above comment */
 		error = got_commit_graph_iter_next(&header->id, graph,
 		    header->repo, NULL, NULL);
 		if (error) {
@@ -3014,6 +3038,8 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		if (header->id == NULL)
 			goto done;
 
+		if (header->commit != NULL) /* XXX see above comment */
+			got_object_commit_close(header->commit);
 		error = got_object_open_as_commit(&header->commit, header->repo,
 		    header->id);
 		if (error)
