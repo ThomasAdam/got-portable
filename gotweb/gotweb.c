@@ -64,7 +64,7 @@ struct gw_trans {
 	const struct got_error	*error;
 	const char		*repo_name;
 	char			*repo_path;
-	char			*commit;
+	char			*commit_id;
 	const char		*repo_file;
 	char			*repo_folder;
 	const char		*headref;
@@ -1440,6 +1440,7 @@ gw_tag(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
+	khttp_puts(gw_trans->gw_req, header->commit_id);
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
 		goto done;
@@ -1668,7 +1669,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		}
 
  		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
-			if (asprintf(&gw_trans->commit, "%s",
+			if (asprintf(&gw_trans->commit_id, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 		}
@@ -3138,7 +3139,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	if (error)
 		return error;
 
-	if (gw_trans->commit == NULL) {
+	if (gw_trans->commit_id == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, gw_trans->repo,
 		    gw_trans->headref, 0);
@@ -3151,7 +3152,8 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 			return error;
 	} else {
 		struct got_reference *ref;
-		error = got_ref_open(&ref, gw_trans->repo, gw_trans->commit, 0);
+		error = got_ref_open(&ref, gw_trans->repo,
+		    gw_trans->commit_id, 0);
 		if (error == NULL) {
 			int obj_type;
 			error = got_ref_resolve(&id, gw_trans->repo, ref);
@@ -3189,7 +3191,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 			}
 		}
 		error = got_repo_match_object_id_prefix(&id,
-			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
+			    gw_trans->commit_id, GOT_OBJ_TYPE_COMMIT,
 			    gw_trans->repo);
 		if (error)
 			goto done;
@@ -3449,7 +3451,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit,
+	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit_id,
 	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
 	if (error)
 		goto done;
@@ -3554,7 +3556,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit,
+	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit_id,
 	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
 	if (error)
 		goto done;
@@ -3648,7 +3650,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 		path = in_repo_path;
 	}
 
-	if (gw_trans->commit == NULL) {
+	if (gw_trans->commit_id == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, gw_trans->repo,
 		    gw_trans->headref, 0);
@@ -3658,24 +3660,26 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 		if (error)
 			goto done;
 		got_ref_close(head_ref);
+		/*
+		 * gw_trans->commit_id was not parsed from the querystring
+		 * we hit this code path from gw_index, where we don't know the
+		 * commit values for the tree link yet, so set
+		 * gw_trans->commit_id here to continue further into the tree
+		 */
+		error = got_object_id_str(&gw_trans->commit_id, commit_id);
+		if (error)
+			goto done;
 
 	} else {
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    gw_trans->commit, GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
+		    gw_trans->commit_id, GOT_OBJ_TYPE_COMMIT, 1,
+		    gw_trans->repo);
 		if (error)
 			goto done;
 	}
 
-	/*
-	 * XXX gw_trans->commit might have already been allocated in
-	 * gw_parse_querystring(); could we more cleanly seperate values
-	 * we received as arguments from values we compute ourselves?
-	 */
-	error = got_object_id_str(&gw_trans->commit, commit_id);
-	if (error)
-		goto done;
-
-	error = got_object_id_by_path(&tree_id, gw_trans->repo, commit_id, path);
+	error = got_object_id_by_path(&tree_id, gw_trans->repo, commit_id,
+	    path);
 	if (error)
 		goto done;
 
@@ -3723,7 +3727,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			if (asprintf(&href_blob,
 			    "?path=%s&action=%s&commit=%s&folder=%s",
 			    gw_trans->repo_name, gw_get_action_name(gw_trans),
-			    gw_trans->commit, build_folder) == -1) {
+			    gw_trans->commit_id, build_folder) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -3767,7 +3771,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 		} else {
 			if (asprintf(&href_blob,
 			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
-			    gw_trans->repo_name, "blob", gw_trans->commit,
+			    gw_trans->repo_name, "blob", gw_trans->commit_id,
 			    got_tree_entry_get_name(te),
 			    gw_trans->repo_folder ?
 			    gw_trans->repo_folder : "") == -1) {
@@ -3776,7 +3780,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			}
 			if (asprintf(&href_blame,
 			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
-			    gw_trans->repo_name, "blame", gw_trans->commit,
+			    gw_trans->repo_name, "blame", gw_trans->commit_id,
 			    got_tree_entry_get_name(te),
 			    gw_trans->repo_folder ?
 			    gw_trans->repo_folder : "") == -1) {
@@ -4184,7 +4188,7 @@ main(int argc, char *argv[])
 	gw_trans->page = 0;
 	gw_trans->repos_total = 0;
 	gw_trans->repo_path = NULL;
-	gw_trans->commit = NULL;
+	gw_trans->commit_id = NULL;
 	gw_trans->headref = GOT_REF_HEAD;
 	gw_trans->mime = KMIME_TEXT_HTML;
 	gw_trans->gw_tmpl->key = gw_templs;
@@ -4212,7 +4216,7 @@ done:
 		free(gw_trans->gw_conf->got_logo);
 		free(gw_trans->gw_conf->got_logo_url);
 		free(gw_trans->gw_conf);
-		free(gw_trans->commit);
+		free(gw_trans->commit_id);
 		free(gw_trans->repo_path);
 		if (gw_trans->repo)
 			got_repo_close(gw_trans->repo);
