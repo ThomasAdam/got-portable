@@ -2942,6 +2942,8 @@ gw_init_header()
 
 	header->refs_str = NULL;
 	header->commit_id = NULL;
+	header->committer = NULL;
+	header->author = NULL;
 	header->parent_id = NULL;
 	header->tree_id = NULL;
 	header->commit_msg = NULL;
