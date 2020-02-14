@@ -77,7 +77,6 @@ struct gw_header {
 	TAILQ_ENTRY(gw_header)		 entry;
 	struct got_repository		*repo;
 	struct got_reflist_head		 refs;
-	struct got_object_id		*id;
 	char				*path;
 
 	char			*refs_str;
@@ -199,11 +198,12 @@ static const struct got_error	*gw_display_index(struct gw_trans *);
 static const struct got_error	*gw_get_header(struct gw_trans *,
 				    struct gw_header *, int);
 static const struct got_error	*gw_get_commits(struct gw_trans *,
-				    struct gw_header *, int);
+				    struct gw_header *, int,
+				    struct got_object_id *);
 static const struct got_error	*gw_get_commit(struct gw_trans *,
 				    struct gw_header *,
 				    struct got_commit_object *,
-				    struct got_object_id *id);
+				    struct got_object_id *);
 static const struct got_error	*gw_apply_unveil(const char *);
 static const struct got_error	*gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
@@ -2944,7 +2944,6 @@ gw_init_header()
 		return NULL;
 
 	header->repo = NULL;
-	header->id = NULL;
 	header->path = NULL;
 	SIMPLEQ_INIT(&header->refs);
 
@@ -2959,7 +2958,7 @@ gw_init_header()
 
 static const struct got_error *
 gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
-    int limit)
+    int limit, struct got_object_id *id)
 {
 	const struct got_error *error = NULL;
 	struct got_commit_graph *graph = NULL;
@@ -2969,29 +2968,27 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	if (error)
 		return error;
 
-	error = got_commit_graph_iter_start(graph, header->id, header->repo,
-	    NULL, NULL);
+	error = got_commit_graph_iter_start(graph, id, header->repo, NULL,
+	    NULL);
 	if (error)
 		goto done;
 
 	for (;;) {
-		error = got_commit_graph_iter_next(&header->id, graph,
-		    header->repo, NULL, NULL);
+		error = got_commit_graph_iter_next(&id, graph, header->repo,
+		    NULL, NULL);
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED)
 				error = NULL;
 			goto done;
 		}
-		if (header->id == NULL)
+		if (id == NULL)
 			goto done;
 
-		error = got_object_open_as_commit(&commit, header->repo,
-		    header->id);
+		error = got_object_open_as_commit(&commit, header->repo, id);
 			if (error)
 				goto done;
 		if (limit == 1) {
-			error = gw_get_commit(gw_trans, header, commit,
-			    header->id);
+			error = gw_get_commit(gw_trans, header, commit, id);
 			if (error)
 				goto done;
 		} else {
@@ -3000,8 +2997,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				error = got_error_from_errno("malloc");
 				goto done;
 			}
-			error = gw_get_commit(gw_trans, n_header, commit,
-			    header->id);
+			error = gw_get_commit(gw_trans, n_header, commit, id);
 			if (error)
 				goto done;
 			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
@@ -3141,6 +3137,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 {
 	const struct got_error *error = NULL;
 	char *in_repo_path = NULL;
+	struct got_object_id *id = NULL;
 
 	error = got_repo_open(&header->repo, gw_trans->repo_path, NULL);
 	if (error)
@@ -3153,7 +3150,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		if (error)
 			return error;
 
-		error = got_ref_resolve(&header->id, header->repo, head_ref);
+		error = got_ref_resolve(&id, header->repo, head_ref);
 		got_ref_close(head_ref);
 		if (error)
 			return error;
@@ -3162,18 +3159,18 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		error = got_ref_open(&ref, header->repo, gw_trans->commit, 0);
 		if (error == NULL) {
 			int obj_type;
-			error = got_ref_resolve(&header->id, header->repo, ref);
+			error = got_ref_resolve(&id, header->repo, ref);
 			got_ref_close(ref);
 			if (error)
 				return error;
 			error = got_object_get_type(&obj_type, header->repo,
-			    header->id);
+			    id);
 			if (error)
 				goto done;
 			if (obj_type == GOT_OBJ_TYPE_TAG) {
 				struct got_tag_object *tag;
 				error = got_object_open_as_tag(&tag,
-				    header->repo, header->id);
+				    header->repo, id);
 				if (error)
 					goto done;
 				if (got_object_tag_get_object_type(tag) !=
@@ -3182,10 +3179,10 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 					error = got_error(GOT_ERR_OBJ_TYPE);
 					goto done;
 				}
-				free(header->id);
-				header->id = got_object_id_dup(
+				free(id);
+				id = got_object_id_dup(
 				    got_object_tag_get_object_id(tag));
-				if (header->id == NULL)
+				if (id == NULL)
 					error = got_error_from_errno(
 					    "got_object_id_dup");
 				got_object_tag_close(tag);
@@ -3196,7 +3193,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 				goto done;
 			}
 		}
-		error = got_repo_match_object_id_prefix(&header->id,
+		error = got_repo_match_object_id_prefix(&id,
 			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
 			    header->repo);
 		if (error)
@@ -3221,10 +3218,10 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	if (error)
 		goto done;
 
-	error = gw_get_commits(gw_trans, header, limit);
+	error = gw_get_commits(gw_trans, header, limit, id);
 done:
 	got_ref_list_free(&header->refs);
-	free(header->id);
+	free(id);
 	free(in_repo_path);
 	return error;
 }
