@@ -77,7 +77,6 @@ struct gw_header {
 	TAILQ_ENTRY(gw_header)		 entry;
 	struct got_repository		*repo;
 	struct got_reflist_head		 refs;
-	struct got_commit_object	*commit;
 	struct got_object_id		*id;
 	char				*path;
 
@@ -85,8 +84,8 @@ struct gw_header {
 	char			*commit_id; /* id_str1 */
 	char			*parent_id; /* id_str2 */
 	char			*tree_id;
-	const char		*author;
-	const char		*committer;
+	char			*author;
+	char			*committer;
 	char			*commit_msg;
 	time_t			 committer_time;
 };
@@ -202,7 +201,9 @@ static const struct got_error	*gw_get_header(struct gw_trans *,
 static const struct got_error	*gw_get_commits(struct gw_trans *,
 				    struct gw_header *, int);
 static const struct got_error	*gw_get_commit(struct gw_trans *,
-				    struct gw_header *);
+				    struct gw_header *,
+				    struct got_commit_object *,
+				    struct got_object_id *id);
 static const struct got_error	*gw_apply_unveil(const char *);
 static const struct got_error	*gw_blame_cb(void *, int, int,
 				    struct got_object_id *);
@@ -380,7 +381,6 @@ gw_blame(struct gw_trans *gw_trans)
 		goto done;
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
@@ -410,7 +410,6 @@ gw_blob(struct gw_trans *gw_trans)
 
 	error = gw_output_blob_buf(gw_trans);
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	return error;
 }
@@ -494,7 +493,6 @@ gw_diff(struct gw_trans *gw_trans)
 
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	free(age);
 	if (error == NULL && kerr != KCGI_OK)
@@ -1012,7 +1010,6 @@ gw_commits(struct gw_trans *gw_trans)
 		age = NULL;
 	}
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_header(n_header);
@@ -1170,7 +1167,6 @@ gw_briefs(struct gw_trans *gw_trans)
 		href_blob = NULL;
 	}
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry)
 		gw_free_header(n_header);
@@ -1417,7 +1413,6 @@ gw_tree(struct gw_trans *gw_trans)
 
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	free(tree_html_disp);
 	free(tree_html);
@@ -1486,7 +1481,6 @@ gw_tag(struct gw_trans *gw_trans)
 
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 done:
-	got_ref_list_free(&header->refs);
 	gw_free_header(header);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
@@ -2390,7 +2384,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 
 		if (refname && strcmp(got_ref_get_name(re->ref), refname) != 0)
 			continue;
-	
+
 		error = got_ref_resolve(&id, repo, re->ref);
 		if (error)
 			goto done;
@@ -2928,12 +2922,11 @@ done:
 static void
 gw_free_header(struct gw_header *header)
 {
-	free(header->id);
 	free(header->path);
-	if (header->commit != NULL)
-		got_object_commit_close(header->commit);
 	if (header->repo)
 		got_repo_close(header->repo);
+	free(header->author);
+	free(header->committer);
 	free(header->refs_str);
 	free(header->commit_id);
 	free(header->parent_id);
@@ -2951,7 +2944,6 @@ gw_init_header()
 		return NULL;
 
 	header->repo = NULL;
-	header->commit = NULL;
 	header->id = NULL;
 	header->path = NULL;
 	SIMPLEQ_INIT(&header->refs);
@@ -2971,6 +2963,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 {
 	const struct got_error *error = NULL;
 	struct got_commit_graph *graph = NULL;
+	struct got_commit_object *commit = NULL;
 
 	error = got_commit_graph_open(&graph, header->path, 0);
 	if (error)
@@ -2982,30 +2975,6 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		goto done;
 
 	for (;;) {
-		/*
-		 * XXX This is gross; Some fields of 'header' change during every
-		 * loop iteration, some remain constant (e.g. header->repo).
-		 * We should refactor this to be able to call gw_free_header()
-		 * during every loop iteration. Or perhaps do away with the
-		 * appraoch of passing a struct around which contains data
-		 * of various lifetimes, and instead pass globals like 'repo'
-		 * around separately as done in e.g. tog(1). Any state which
-		 * keeps changing with every iteration (e.g. header->id) would
-		 * better stored in local variables of this function instead.
-		 */
-		/* Clear fields that will be filled again by gw_get_commit. */
-		free(header->refs_str);
-		header->refs_str = NULL;
-		free(header->commit_id);
-		header->commit_id = NULL;
-		free(header->parent_id);
-		header->parent_id = NULL;
-		free(header->tree_id);
-		header->tree_id = NULL;
-		free(header->commit_msg);
-		header->commit_msg = NULL;
-	
-		free(header->id); /* XXX see above comment */
 		error = got_commit_graph_iter_next(&header->id, graph,
 		    header->repo, NULL, NULL);
 		if (error) {
@@ -3016,53 +2985,25 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		if (header->id == NULL)
 			goto done;
 
-		if (header->commit != NULL) /* XXX see above comment */
-			got_object_commit_close(header->commit);
-		error = got_object_open_as_commit(&header->commit, header->repo,
+		error = got_object_open_as_commit(&commit, header->repo,
 		    header->id);
-		if (error)
-			goto done;
-
-		error = gw_get_commit(gw_trans, header);
-		if (limit > 1) {
+			if (error)
+				goto done;
+		if (limit == 1) {
+			error = gw_get_commit(gw_trans, header, commit,
+			    header->id);
+			if (error)
+				goto done;
+		} else {
 			struct gw_header *n_header = NULL;
 			if ((n_header = gw_init_header()) == NULL) {
 				error = got_error_from_errno("malloc");
 				goto done;
 			}
-
-			if (header->refs_str != NULL) {
-				n_header->refs_str = strdup(header->refs_str);
-				if (n_header->refs_str == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-			}
-			n_header->commit_id = strdup(header->commit_id);
-			if (n_header->commit_id == NULL) {
-				error = got_error_from_errno("strdup");
+			error = gw_get_commit(gw_trans, n_header, commit,
+			    header->id);
+			if (error)
 				goto done;
-			}
-			if (header->parent_id != NULL) {
-				n_header->parent_id = strdup(header->parent_id);
-				if (n_header->parent_id == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-			}
-			n_header->tree_id = strdup(header->tree_id);
-			if (n_header->tree_id == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			n_header->author = header->author;
-			n_header->committer = header->committer;
-			n_header->commit_msg = strdup(header->commit_msg);
-			if (n_header->commit_msg == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			n_header->committer_time = header->committer_time;
 			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
 			    entry);
 		}
@@ -3070,13 +3011,16 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 			break;
 	}
 done:
+	if (commit != NULL)
+		got_object_commit_close(commit);
 	if (graph)
 		got_commit_graph_close(graph);
 	return error;
 }
 
 static const struct got_error *
-gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
+gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
+    struct got_commit_object *commit, struct got_object_id *id)
 {
 	const struct got_error *error = NULL;
 	struct got_reflist_entry *re;
@@ -3118,7 +3062,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 			}
 		}
 		cmp = got_object_id_cmp(tag ?
-		    got_object_tag_get_object_id(tag) : re->id, header->id);
+		    got_object_tag_get_object_id(tag) : re->id, id);
 		if (tag)
 			got_object_tag_close(tag);
 		if (cmp != 0)
@@ -3134,18 +3078,18 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 		free(s);
 	}
 
-	error = got_object_id_str(&header->commit_id, header->id);
+	error = got_object_id_str(&header->commit_id, id);
 	if (error)
 		return error;
 
 	error = got_object_id_str(&header->tree_id,
-	    got_object_commit_get_tree_id(header->commit));
+	    got_object_commit_get_tree_id(commit));
 	if (error)
 		return error;
 
 	if (gw_trans->action == GW_DIFF) {
 		parent_id = SIMPLEQ_FIRST(
-		    got_object_commit_get_parent_ids(header->commit));
+		    got_object_commit_get_parent_ids(commit));
 		if (parent_id != NULL) {
 			id2 = got_object_id_dup(parent_id->id);
 			free (parent_id);
@@ -3163,15 +3107,21 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header)
 	}
 
 	header->committer_time =
-	    got_object_commit_get_committer_time(header->commit);
+	    got_object_commit_get_committer_time(commit);
 
 	header->author =
-	    got_object_commit_get_author(header->commit);
-	header->committer =
-	    got_object_commit_get_committer(header->commit);
-	if (error)
+	    strdup(got_object_commit_get_author(commit));
+	if (header->author == NULL) {
+		error = got_error_from_errno("strdup");
 		return error;
-	error = got_object_commit_get_logmsg(&commit_msg0, header->commit);
+	}
+	header->committer =
+	    strdup(got_object_commit_get_committer(commit));
+	if (header->committer == NULL) {
+		error = got_error_from_errno("strdup");
+		return error;
+	}
+	error = got_object_commit_get_logmsg(&commit_msg0, commit);
 	if (error)
 		return error;
 
@@ -3207,11 +3157,6 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		got_ref_close(head_ref);
 		if (error)
 			return error;
-
-		error = got_object_open_as_commit(&header->commit,
-		    header->repo, header->id);
-		if (error)
-			return error;
 	} else {
 		struct got_reference *ref;
 		error = got_ref_open(&ref, header->repo, gw_trans->commit, 0);
@@ -3224,18 +3169,18 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 			error = got_object_get_type(&obj_type, header->repo,
 			    header->id);
 			if (error)
-				return error;
+				goto done;
 			if (obj_type == GOT_OBJ_TYPE_TAG) {
 				struct got_tag_object *tag;
 				error = got_object_open_as_tag(&tag,
 				    header->repo, header->id);
 				if (error)
-					return error;
+					goto done;
 				if (got_object_tag_get_object_type(tag) !=
 				    GOT_OBJ_TYPE_COMMIT) {
 					got_object_tag_close(tag);
 					error = got_error(GOT_ERR_OBJ_TYPE);
-					return error;
+					goto done;
 				}
 				free(header->id);
 				header->id = got_object_id_dup(
@@ -3245,51 +3190,42 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 					    "got_object_id_dup");
 				got_object_tag_close(tag);
 				if (error)
-					return error;
+					goto done;
 			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
 				error = got_error(GOT_ERR_OBJ_TYPE);
-				return error;
+				goto done;
 			}
-			error = got_object_open_as_commit(&header->commit,
-			    header->repo, header->id);
-			if (error)
-				return error;
-		}
-		if (header->commit == NULL) {
-			error = got_repo_match_object_id_prefix(&header->id,
-			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
-			    header->repo);
-			if (error)
-				return error;
 		}
 		error = got_repo_match_object_id_prefix(&header->id,
 			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
 			    header->repo);
 		if (error)
-			return error;
+			goto done;
 	}
 
 	error = got_repo_map_path(&in_repo_path, header->repo,
 	    gw_trans->repo_path, 1);
 	if (error)
-		return error;
+		goto done;
 
 	if (in_repo_path) {
 		header->path = strdup(in_repo_path);
 		if (header->path == NULL) {
 			error = got_error_from_errno("strdup");
-			free(in_repo_path);
-			return error;
+			goto done;
 		}
 	}
-	free(in_repo_path);
 
 	error = got_ref_list(&header->refs, header->repo, NULL,
 	    got_ref_cmp_by_name, NULL);
 	if (error)
-		return error;
+		goto done;
 
 	error = gw_get_commits(gw_trans, header, limit);
+done:
+	got_ref_list_free(&header->refs);
+	free(header->id);
+	free(in_repo_path);
 	return error;
 }
 
