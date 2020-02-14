@@ -390,8 +390,9 @@ done:
 static const struct got_error *
 gw_blob(struct gw_trans *gw_trans)
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *err = NULL;
 	struct gw_header *header = NULL;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
@@ -404,13 +405,37 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
+	/* check querystring */
+	if (gw_trans->repo_file == NULL) {
+		error = got_error_msg(GOT_ERR_QUERYSTRING,
+		    "file required in querystring");
+		goto done;
+	}
+	if (gw_trans->commit_id == NULL) {
+		error = got_error_msg(GOT_ERR_QUERYSTRING,
+		    "commit required in querystring");
+		goto done;
+	}
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
 		goto done;
 
 	error = gw_output_blob_buf(gw_trans);
 done:
+
+	if (error) {
+		gw_trans->mime = KMIME_TEXT_PLAIN;
+		err = gw_display_index(gw_trans);
+		if (err) {
+			error = err;
+			goto errored;
+		}
+		kerr = khttp_puts(gw_trans->gw_req, error->msg);
+	}
+errored:
 	gw_free_header(header);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
@@ -3548,7 +3573,6 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 	const uint8_t *buf;
 	enum kcgi_err kerr = KCGI_OK;
 
-	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 	    gw_trans->repo_folder ? "/" : "",
@@ -3611,7 +3635,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 			if (error)
 				goto done;
 		}
-		khttp_write(gw_trans->gw_req, buf, len - hdrlen);
+		kerr = khttp_write(gw_trans->gw_req, buf, len - hdrlen);
 		hdrlen = 0;
 	} while (len != 0);
 done:
