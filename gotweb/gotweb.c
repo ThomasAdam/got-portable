@@ -4001,21 +4001,19 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 		goto done;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
-		char *refname;
+		const char *refname;
 
 		if (got_ref_is_symbolic(re->ref))
 			continue;
 
-		refname = strdup(got_ref_get_name(re->ref));
+		refname = got_ref_get_name(re->ref);
 		if (refname == NULL) {
 			error = got_error_from_errno("got_ref_to_str");
 			goto done;
 		}
 
-		if (strncmp(refname, "refs/heads/", 11) != 0) {
-			free(refname);
+		if (strncmp(refname, "refs/heads/", 11) != 0)
 			continue;
-		}
 
 		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path,
 		    refname, TM_DIFF);
