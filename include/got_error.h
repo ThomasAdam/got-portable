@@ -130,6 +130,7 @@
 #define GOT_ERR_GITCONFIG_SYNTAX 114
 #define GOT_ERR_REBASE_OUT_OF_DATE 115
 #define GOT_ERR_CACHE_DUP_ENTRY	116
+#define GOT_ERR_QUERYSTRING	117
 
 static const struct got_error {
 	int code;
@@ -267,6 +268,7 @@ static const struct got_error {
 	{ GOT_ERR_REBASE_OUT_OF_DATE, "work tree must be updated before it "
 	    "can be used to rebase a branch" },
 	{ GOT_ERR_CACHE_DUP_ENTRY, "duplicate cache entry" },
+	{ GOT_ERR_QUERYSTRING, "bad querystring" },
 };
 
 /*

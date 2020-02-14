@@ -1440,7 +1440,12 @@ gw_tag(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	khttp_puts(gw_trans->gw_req, header->commit_id);
+	if (gw_trans->commit_id == NULL) {
+		error = got_error_msg(GOT_ERR_QUERYSTRING,
+		    "commit required in querystring");
+		goto done;
+	}
+
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
 		goto done;
