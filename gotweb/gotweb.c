@@ -2396,19 +2396,8 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 		goto done;
 
 	SIMPLEQ_FOREACH(re, &refs, entry) {
-		if (is_head) {
-			refname = strdup(repo_ref);
-			if (refname == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		} else {
-			refname = got_ref_get_name(re->ref);
-			if (refname == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
+		refname = is_head ? repo_ref : got_ref_get_name(re->ref);
+
 		error = got_ref_open(&head_ref, repo, refname, 0);
 		if (error)
 			goto done;
