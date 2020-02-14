@@ -326,7 +326,7 @@ gw_blame(struct gw_trans *gw_trans)
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
 	char *age = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
@@ -339,10 +339,21 @@ gw_blame(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
+	/* check querystring */
+	if (gw_trans->repo_file == NULL) {
+		error = got_error_msg(GOT_ERR_QUERYSTRING,
+		    "file required in querystring");
+		goto done;
+	}
+	if (gw_trans->commit_id == NULL) {
+		error = got_error_msg(GOT_ERR_QUERYSTRING,
+		    "commit required in querystring");
+		goto done;
+	}
+
 	error = gw_get_header(gw_trans, header, 1);
 	if (error)
 		goto done;
-
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 	    "blame_header_wrapper", KATTR__MAX);
 	if (kerr != KCGI_OK)
@@ -1777,7 +1788,6 @@ gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 	if (kerr != KCGI_OK)
 		return gw_kcgi_error(kerr);
 
-	/* XXX repo_file could be NULL if not present in querystring */
 	if (gw_trans->mime == KMIME_APP_OCTET_STREAM) {
 		kerr = khttp_head(gw_trans->gw_req,
 		    kresps[KRESP_CONTENT_DISPOSITION],
@@ -3379,7 +3389,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		    "blame_hash", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto err;
-		/* XXX repo_file could be NULL if not present in querystring */
+
 		if (asprintf(&href_diff,
 		    "?path=%s&action=diff&commit=%s&file=%s&folder=%s",
 		    a->gw_trans->repo_name, bline->id_str,
@@ -3468,7 +3478,6 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	int i, obj_type;
 	size_t filesize;
 
-	/* XXX repo_file could be NULL if not present in querystring */
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 	    gw_trans->repo_folder ? "/" : "",
@@ -3541,20 +3550,22 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	error = got_blame(in_repo_path, commit_id, gw_trans->repo, gw_blame_cb,
 	    &bca, NULL, NULL);
 done:
-	free(bca.line_offsets);
 	free(in_repo_path);
 	free(commit_id);
 	free(obj_id);
 	free(path);
 
-	for (i = 0; i < bca.nlines; i++) {
-		struct blame_line *bline = &bca.lines[i];
-		free(bline->id_str);
-		free(bline->committer);
+	if (blob) {
+		free(bca.line_offsets);
+		for (i = 0; i < bca.nlines; i++) {
+			struct blame_line *bline = &bca.lines[i];
+			free(bline->id_str);
+			free(bline->committer);
+		}
+		free(bca.lines);
+		if (bca.f && fclose(bca.f) == EOF && error == NULL)
+			error = got_error_from_errno("fclose");
 	}
-	free(bca.lines);
-	if (bca.f && fclose(bca.f) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
 	if (blob)
 		got_object_blob_close(blob);
 	return error;
