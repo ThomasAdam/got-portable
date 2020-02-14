@@ -167,7 +167,7 @@ static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 				    char *);
 static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
-				    char *, char *, int);
+				    char *, const char *, int);
 static const struct got_error	*gw_output_file_blame(struct gw_trans *);
 static const struct got_error	*gw_output_blob_buf(struct gw_trans *);
 static const struct got_error	*gw_output_repo_tree(struct gw_trans *);
@@ -1253,7 +1253,7 @@ gw_summary(struct gw_trans *gw_trans)
 
 	if (gw_trans->gw_conf->got_show_repo_age) {
 		error = gw_get_repo_age(&age, gw_trans, gw_trans->gw_dir->path,
-		    "refs/heads", TM_LONG);
+		    NULL, TM_LONG);
 		if (error)
 			goto done;
 		if (age != NULL) {
@@ -1566,7 +1566,7 @@ done:
 	if (error)
 		goto errored;
 	error = gw_get_repo_age(&gw_dir->age, gw_trans, gw_dir->path,
-	    "refs/heads", TM_DIFF);
+	    NULL, TM_DIFF);
 	if (error)
 		goto errored;
 	error = gw_get_clone_url(&gw_dir->url, gw_trans, gw_dir->path);
@@ -2357,65 +2357,57 @@ gw_get_time_str(char **repo_age, time_t committer_time, int ref_tm)
 
 static const struct got_error *
 gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
-    char *repo_ref, int ref_tm)
+    const char *refname, int ref_tm)
 {
 	const struct got_error *error = NULL;
-	struct got_object_id *id = NULL;
 	struct got_repository *repo = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
-	struct got_reference *head_ref;
-	int is_head = 0;
 	time_t committer_time = 0, cmp_time = 0;
-	const char *refname;
 
 	*repo_age = NULL;
 	SIMPLEQ_INIT(&refs);
-
-	if (repo_ref == NULL)
-		return NULL;
-
-	if (strncmp(repo_ref, "refs/heads/", 11) == 0)
-		is_head = 1;
 
 	if (gw_trans->gw_conf->got_show_repo_age == 0)
 		return NULL;
 
 	error = got_repo_open(&repo, dir, NULL);
 	if (error)
-		goto done;
+		return error;
 
-	if (is_head)
-		error = got_ref_list(&refs, repo, "refs/heads",
-		    got_ref_cmp_by_name, NULL);
-	else
-		error = got_ref_list(&refs, repo, repo_ref,
-		    got_ref_cmp_by_name, NULL);
+	error = got_ref_list(&refs, repo, "refs/heads",
+	    got_ref_cmp_by_name, NULL);
 	if (error)
 		goto done;
 
+	/*
+	 * Find the youngest branch tip in the repository, or the age of
+	 * the a specific branch tip if a name was provided by the caller.
+	 */
 	SIMPLEQ_FOREACH(re, &refs, entry) {
-		refname = is_head ? repo_ref : got_ref_get_name(re->ref);
+		struct got_object_id *id = NULL;
 
-		error = got_ref_open(&head_ref, repo, refname, 0);
-		if (error)
-			goto done;
-
-		error = got_ref_resolve(&id, repo, head_ref);
-		got_ref_close(head_ref);
+		if (refname && strcmp(got_ref_get_name(re->ref), refname) != 0)
+			continue;
+	
+		error = got_ref_resolve(&id, repo, re->ref);
 		if (error)
 			goto done;
 
 		error = got_object_open_as_commit(&commit, repo, id);
+		free(id);
 		if (error)
 			goto done;
 
 		committer_time =
 		    got_object_commit_get_committer_time(commit);
-
+		got_object_commit_close(commit);
 		if (cmp_time < committer_time)
 			cmp_time = committer_time;
+
+		if (refname)
+			break;
 	}
 
 	if (cmp_time != 0) {
@@ -2424,7 +2416,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	}
 done:
 	got_ref_list_free(&refs);
-	free(id);
+	got_repo_close(repo);
 	return error;
 }
 
