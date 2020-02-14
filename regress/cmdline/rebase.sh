@@ -940,6 +940,111 @@ function test_rebase_out_of_date {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_trims_empty_dir {
+	local testroot=`test_init rebase_trims_empty_dir`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	(cd $testroot/repo && git rm -q epsilon/zeta)
+	git_commit $testroot/repo -m "removing zeta on newbranch"
+
+	local orig_commit1=`git_show_parent_commit $testroot/repo`
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_parent_commit $testroot/repo`
+	local new_commit2=`git_show_head $testroot/repo`
+
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> $short_new_commit1" \
+		>> $testroot/stdout.expected
+	echo ": committing to delta on newbranch" >> $testroot/stdout.expected
+	echo "D  epsilon/zeta" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit2 -> $short_new_commit2" \
+		>> $testroot/stdout.expected
+	echo ": removing zeta on newbranch" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/newbranch" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified delta on branch" > $testroot/content.expected
+	cat $testroot/wt/gamma/delta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha on master" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon ]; then
+		echo "parent of removed zeta still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit2 (newbranch)" > $testroot/stdout.expected
+	echo "commit $new_commit1" >> $testroot/stdout.expected
+	echo "commit $master_commit (master)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -951,3 +1056,4 @@ run_test test_rebase_preserves_logmsg
 run_test test_rebase_no_commits_to_rebase
 run_test test_rebase_forward
 run_test test_rebase_out_of_date
+run_test test_rebase_trims_empty_dir
