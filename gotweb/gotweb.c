@@ -1321,6 +1321,17 @@ gw_summary(struct gw_trans *gw_trans)
 	kerr = khtml_puts(gw_trans->gw_html_req, "Commit Briefs");
 	if (kerr != KCGI_OK)
 		goto done;
+	if (gw_trans->headref) {
+		kerr = khtml_puts(gw_trans->gw_html_req, " (");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->headref);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, ")");
+		if (kerr != KCGI_OK)
+			goto done;
+	}
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 	if (kerr != KCGI_OK)
 		goto done;
