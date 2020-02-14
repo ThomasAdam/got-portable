@@ -66,7 +66,7 @@ struct gw_trans {
 	char			*commit;
 	const char		*repo_file;
 	char			*repo_folder;
-	char			*headref;
+	const char		*headref;
 	unsigned int		 action;
 	unsigned int		 page;
 	unsigned int		 repos_total;
@@ -1688,11 +1688,8 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 				return got_error_from_errno("asprintf");
 		}
 
-		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF])) {
-			if (asprintf(&gw_trans->headref, "%s",
-			    p->parsed.s) == -1)
-				return got_error_from_errno("asprintf");
-		}
+		if ((p = gw_trans->gw_req->fieldmap[KEY_HEADREF]))
+			gw_trans->headref = p->parsed.s;
 
 		error = gw_init_gw_dir(&gw_trans->gw_dir, gw_trans->repo_name);
 		if (error)
@@ -4302,11 +4299,7 @@ main(int argc, char *argv[])
 	gw_trans->repos_total = 0;
 	gw_trans->repo_path = NULL;
 	gw_trans->commit = NULL;
-	gw_trans->headref = strdup(GOT_REF_HEAD);
-	if (gw_trans->headref == NULL) {
-		error = got_error_from_errno("strdup");
-		goto done;
-	}
+	gw_trans->headref = GOT_REF_HEAD;
 	gw_trans->mime = KMIME_TEXT_HTML;
 	gw_trans->gw_tmpl->key = gw_templs;
 	gw_trans->gw_tmpl->keysz = TEMPL__MAX;
@@ -4335,7 +4328,6 @@ done:
 		free(gw_trans->gw_conf);
 		free(gw_trans->commit);
 		free(gw_trans->repo_path);
-		free(gw_trans->headref);
 
 		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
 			free(dir->name);
