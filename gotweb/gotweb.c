@@ -3231,6 +3231,8 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 
 		error = got_object_open_as_commit(&header->commit,
 		    header->repo, header->id);
+		if (error)
+			return error;
 	} else {
 		struct got_reference *ref;
 		error = got_ref_open(&ref, header->repo, gw_trans->commit, 0);
@@ -3284,6 +3286,8 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 		error = got_repo_match_object_id_prefix(&header->id,
 			    gw_trans->commit, GOT_OBJ_TYPE_COMMIT,
 			    header->repo);
+		if (error)
+			return error;
 	}
 
 	error = got_repo_map_path(&in_repo_path, header->repo,
