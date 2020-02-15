@@ -194,6 +194,15 @@ If the diff view was opened via the log view, move to the previous (younger)
 commit.
 .It Cm >, Full stop
 If the diff view was opened via the log view, move to the next (older) commit.
+.It Cm /
+Prompt for a search pattern and start searching for matching line.
+The search pattern is an extended regular expression.
+Regular expression syntax is documented in
+.Xr re_format 7 .
+.It Cm n
+Find the next line which matches the current search pattern.
+.It Cm N
+Find the previous line which matches the current search pattern.
 .El
 .It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.
