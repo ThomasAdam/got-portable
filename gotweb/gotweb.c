@@ -1143,7 +1143,34 @@ gw_briefs(struct gw_trans *gw_trans)
 		kerr = khtml_puts(gw_trans->gw_html_req, n_header->commit_msg);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		if (n_header->refs_str) {
+			kerr = khtml_puts(gw_trans->gw_html_req, " ");
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_SPAN,
+			    KATTR_ID, "refs_str", KATTR__MAX);
+			if (kerr != KCGI_OK)
+			goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, "(");
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req,
+			    n_header->refs_str);
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_puts(gw_trans->gw_html_req, ")");
+			if (kerr != KCGI_OK)
+				goto done;
+			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+			if (kerr != KCGI_OK)
+				goto done;
+		}
+
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			goto done;
 
@@ -1353,17 +1380,6 @@ gw_summary(struct gw_trans *gw_trans)
 	kerr = khtml_puts(gw_trans->gw_html_req, "Commit Briefs");
 	if (kerr != KCGI_OK)
 		goto done;
-	if (gw_trans->headref) {
-		kerr = khtml_puts(gw_trans->gw_html_req, " (");
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->headref);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, ")");
-		if (kerr != KCGI_OK)
-			goto done;
-	}
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
 	if (kerr != KCGI_OK)
 		goto done;
@@ -2065,6 +2081,10 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 	if (kerr != KCGI_OK)
 		goto done;
 	if (str2 != NULL) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_SPAN,
+		    KATTR_ID, "refs_str", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
 		kerr = khtml_puts(gw_trans->gw_html_req, "(");
 		if (kerr != KCGI_OK)
 			goto done;
@@ -2072,6 +2092,9 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_puts(gw_trans->gw_html_req, ")");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			goto done;
 	}
@@ -3033,6 +3056,11 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 				error = got_error_from_errno("malloc");
 				goto done;
 			}
+			error = got_ref_list(&n_header->refs, gw_trans->repo,
+			    NULL, got_ref_cmp_by_name, NULL);
+			if (error)
+				goto done;
+
 			error = gw_get_commit(gw_trans, n_header, commit, id);
 			if (error)
 				goto done;

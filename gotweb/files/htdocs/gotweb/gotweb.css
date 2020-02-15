@@ -57,6 +57,11 @@ body {
 	background-color: #d8f3ef;
 }
 
+#refs_str {
+	background-color: #243647;
+	color: #ffffff;
+	font-style: italic;
+}
 #dotted_line {
 	clear: left;
 	float: left;
