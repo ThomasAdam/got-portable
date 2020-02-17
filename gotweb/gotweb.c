@@ -1076,9 +1076,11 @@ gw_briefs(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = gw_apply_unveil(gw_trans->gw_dir->path);
-	if (error)
-		goto done;
+	if (gw_trans->action != GW_SUMMARY) {
+		error = gw_apply_unveil(gw_trans->gw_dir->path);
+		if (error)
+			goto done;
+	}
 
 	if (gw_trans->action == GW_SUMMARY)
 		error = gw_get_header(gw_trans, header, D_MAXSLCOMMDISP);
@@ -1251,7 +1253,9 @@ gw_summary(struct gw_trans *gw_trans)
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
 
-	/* unveil is applied with gw_briefs below */
+	error = gw_apply_unveil(gw_trans->gw_dir->path);
+	if (error)
+		goto done;
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 	    "summary_wrapper", KATTR__MAX);
