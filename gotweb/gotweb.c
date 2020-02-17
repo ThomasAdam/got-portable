@@ -1629,7 +1629,8 @@ done:
 errored:
 	free(dir_test);
 	if (opened)
-		closedir(dt);
+		if (d && closedir(dt) == -1 && error == NULL)
+			error = got_error_from_errno("closedir");
 	return error;
 }
 
@@ -1687,7 +1688,8 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 		}
 	}
 done:
-	closedir(d);
+	if (d && closedir(d) == -1 && error == NULL)
+		error = got_error_from_errno("closedir");
 	return error;
 }
 
