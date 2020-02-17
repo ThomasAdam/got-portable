@@ -16,6 +16,13 @@
 
 /* Utilities for opening temporary files. */
 
+#ifndef GOT_TMPDIR
+#define GOT_TMPDIR /tmp
+#endif
+#define GOT_STRINGIFY_TMP(x) #x
+#define GOT_STRINGVAL_TMP(x) GOT_STRINGIFY_TMP(x)
+#define GOT_TMPDIR_STR GOT_STRINGVAL_TMP(GOT_TMPDIR)
+
 /* Open a file descriptor to a new temporary file for writing.
  * The file is not visible in the filesystem. */
 int got_opentempfd(void);

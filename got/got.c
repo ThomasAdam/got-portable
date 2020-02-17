@@ -297,8 +297,8 @@ apply_unveil(const char *repo_path, int repo_read_only,
 	if (worktree_path && unveil(worktree_path, "rwc") != 0)
 		return got_error_from_errno2("unveil", worktree_path);
 
-	if (unveil("/tmp", "rwc") != 0)
-		return got_error_from_errno2("unveil", "/tmp");
+	if (unveil(GOT_TMPDIR_STR, "rwc") != 0)
+		return got_error_from_errno2("unveil", GOT_TMPDIR_STR);
 
 	err = got_privsep_unveil_exec_helpers();
 	if (err != NULL)
@@ -482,7 +482,8 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	    branch_name) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_opentemp_named_fd(logmsg_path, &fd, "/tmp/got-importmsg");
+	err = got_opentemp_named_fd(logmsg_path, &fd,
+	    GOT_TMPDIR_STR "/got-importmsg");
 	if (err)
 		goto done;
 
@@ -3789,7 +3790,7 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	char *editor = NULL;
 	int fd = -1;
 
-	if (asprintf(&template, "/tmp/got-tagmsg") == -1) {
+	if (asprintf(&template, GOT_TMPDIR_STR "/got-tagmsg") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -5802,7 +5803,8 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err)
 		goto done;
 
-	err = got_opentemp_named_fd(&logmsg_path, &fd, "/tmp/got-logmsg");
+	err = got_opentemp_named_fd(&logmsg_path, &fd,
+	    GOT_TMPDIR_STR "/got-logmsg");
 	if (err)
 		goto done;
 

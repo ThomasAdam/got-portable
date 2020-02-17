@@ -18,10 +18,10 @@
 #error "GOT_VERSION is undefined"
 #endif
 
-#define GOT_STRINGIFY(x) #x
-#define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
+#define GOT_STRINGIFY_VERSION(x) #x
+#define GOT_STRINGVAL_VERSION(x) GOT_STRINGIFY_VERSION(x)
 
-#define GOT_VERSION_STR GOT_STRINGVAL(GOT_VERSION)
+#define GOT_VERSION_STR GOT_STRINGVAL_VERSION(GOT_VERSION)
 
 static inline void
 got_version_print_str(void)

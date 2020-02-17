@@ -219,7 +219,8 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		goto done;
 	}
 
-	err = got_opentemp_named(&outpath, &outfile, "/tmp/got-diffreg");
+	err = got_opentemp_named(&outpath, &outfile,
+	    GOT_TMPDIR_STR "/got-diffreg");
 	if (err)
 		goto done;
 
@@ -305,15 +306,15 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	if (err)
 		goto out;
 
-	if (asprintf(&path1, "/tmp/got-diff1.XXXXXXXX") == -1) {
+	if (asprintf(&path1, GOT_TMPDIR_STR "/got-diff1.XXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	if (asprintf(&path2, "/tmp/got-diff2.XXXXXXXX") == -1) {
+	if (asprintf(&path2, GOT_TMPDIR_STR "/got-diff2.XXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
-	if (asprintf(&path3, "/tmp/got-diff3.XXXXXXXX") == -1) {
+	if (asprintf(&path3, GOT_TMPDIR_STR "/got-diff3.XXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
@@ -345,7 +346,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 		goto out;
 	}
 
-	if (asprintf(&dp13, "/tmp/got-d13.XXXXXXXXXX") == -1) {
+	if (asprintf(&dp13, GOT_TMPDIR_STR "/got-d13.XXXXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}
@@ -356,7 +357,7 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	buf_free(d1);
 	d1 = NULL;
 
-	if (asprintf(&dp23, "/tmp/got-d23.XXXXXXXXXX") == -1) {
+	if (asprintf(&dp23, GOT_TMPDIR_STR "/got-d23.XXXXXXXXXX") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto out;
 	}

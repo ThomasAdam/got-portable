@@ -29,7 +29,8 @@ got_opentempfd(void)
 	char name[PATH_MAX];
 	int fd;
 
-	if (strlcpy(name, "/tmp/got.XXXXXXXX", sizeof(name)) >= sizeof(name))
+	if (strlcpy(name, GOT_TMPDIR_STR "/got.XXXXXXXX", sizeof(name))
+	    >= sizeof(name))
 		return -1;
 
 	fd = mkstemp(name);

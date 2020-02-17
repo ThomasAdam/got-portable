@@ -61,7 +61,7 @@ This will create the following files:
   helper programs from the libexec directory in /var/www/cgi-bin/gotweb/libexec
   several template files in /var/www/cgi-bin/gw_tmpl/
   html, css, and image files in /var/www/htdocs/gotweb/
-  the directory /var/www/tmp/
+  the directory /var/www/got/tmp/
   man pages (only installed if building sources from a Got release tarball)
 
 Documentation is available in manual pages:

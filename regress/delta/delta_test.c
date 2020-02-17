@@ -137,7 +137,7 @@ main(int argc, const char *argv[])
 	if (pledge("stdio rpath wpath cpath unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (unveil("/tmp", "rwc") != 0)
+	if (unveil(GOT_TMPDIR_STR, "rwc") != 0)
 		err(1, "unveil");
 
 	if (unveil(NULL, NULL) != 0)
