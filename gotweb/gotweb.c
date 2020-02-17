@@ -1629,7 +1629,7 @@ done:
 errored:
 	free(dir_test);
 	if (opened)
-		if (d && closedir(dt) == -1 && error == NULL)
+		if (dt && closedir(dt) == -1 && error == NULL)
 			error = got_error_from_errno("closedir");
 	return error;
 }
