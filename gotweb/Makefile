@@ -24,29 +24,29 @@ NOMAN = Yes
 .endif
 
 realinstall:
-	if [ ! -d ${CGI_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${CGI_DIR}; \
+	if [ ! -d ${DESTDIR}${CGI_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${CGI_DIR}; \
 	fi
-	if [ ! -d ${PUB_REPOS_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${PUB_REPOS_DIR}; \
+	if [ ! -d ${DESTDIR}${PUB_REPOS_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${PUB_REPOS_DIR}; \
 	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 ${PROG} \
-	    ${CGI_DIR}/${PROG}
-	if [ ! -d ${TMPL_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${TMPL_DIR}; \
+	    ${DESTDIR}${CGI_DIR}/${PROG}
+	if [ ! -d ${DESTDIR}${TMPL_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${TMPL_DIR}; \
 	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
-	    ${.CURDIR}/files/cgi-bin/gw_tmpl/* ${TMPL_DIR}
-	if [ ! -d ${HTTPD_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${HTTPD_DIR}; \
+	    ${.CURDIR}/files/cgi-bin/gw_tmpl/* ${DESTDIR}${TMPL_DIR}
+	if [ ! -d ${DESTDIR}${HTTPD_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${HTTPD_DIR}; \
 	fi
-	if [ ! -d ${TMP_DIR}/. ]; then \
-		${INSTALL} -d -o ${WWWUSR} -g ${WWWGRP} -m 755 ${TMP_DIR}; \
+	if [ ! -d ${DESTDIR}${TMP_DIR}/. ]; then \
+		${INSTALL} -d -o ${WWWUSR} -g ${WWWGRP} -m 755 ${DESTDIR}${TMP_DIR}; \
 	fi
-	if [ ! -d ${PROG_DIR}/. ]; then \
-		${INSTALL} -d -o root -g daemon -m 755 ${PROG_DIR}; \
+	if [ ! -d ${DESTDIR}${PROG_DIR}/. ]; then \
+		${INSTALL} -d -o root -g daemon -m 755 ${DESTDIR}${PROG_DIR}; \
 	fi
 	${INSTALL} -c -o ${WWWUSR} -g ${WWWGRP} -m 0755 \
-	    ${.CURDIR}/files/htdocs/${PROG}/* ${PROG_DIR}
+	    ${.CURDIR}/files/htdocs/${PROG}/* ${DESTDIR}${PROG_DIR}
 
 .include <bsd.prog.mk>
