@@ -1702,8 +1702,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 	unsigned int i;
 
 	if (gw_trans->gw_req->fieldnmap[0]) {
-		error = got_error_from_errno("bad parse");
-		return error;
+		return got_error(GOT_ERR_QUERYSTRING);
 	} else if ((p = gw_trans->gw_req->fieldmap[KEY_PATH])) {
 		/* define gw_trans->repo_path */
 		gw_trans->repo_name = p->parsed.s;
@@ -1727,7 +1726,9 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 		}
 		if (gw_trans->action == -1) {
 			gw_trans->action = GW_ERR;
-			gw_trans->error = got_error_from_errno("bad action");
+			gw_trans->error = got_error_msg(GOT_ERR_QUERYSTRING,
+			    p != NULL ? "bad action in querystring" :
+			    "no action in querystring");
 			return error;
 		}
 
