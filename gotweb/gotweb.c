@@ -3070,6 +3070,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 			error = gw_get_commit(gw_trans, n_header, commit, id);
 			if (error)
 				goto done;
+			got_ref_list_free(&n_header->refs);
 			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
 			    entry);
 		}
