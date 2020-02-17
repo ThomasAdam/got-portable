@@ -1609,7 +1609,7 @@ gw_load_got_path(struct gw_trans *gw_trans, struct gw_dir *gw_dir)
 
 	dt = opendir(dir_test);
 	if (dt == NULL) {
-		error = got_error_from_errno2("bad path", dir_test);
+		error = got_error_path(gw_dir->name, GOT_ERR_NOT_GIT_REPO);
 		goto errored;
 	} else
 		opened = 1;
