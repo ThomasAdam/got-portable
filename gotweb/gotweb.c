@@ -3682,6 +3682,8 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 				goto done;
 		}
 		kerr = khttp_write(gw_trans->gw_req, buf, len - hdrlen);
+		if (kerr != KCGI_OK)
+			goto done;
 		hdrlen = 0;
 	} while (len != 0);
 done:
