@@ -3986,11 +3986,6 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 			continue;
 
 		refname = got_ref_get_name(re->ref);
-		if (refname == NULL) {
-			error = got_error_from_errno("got_ref_to_str");
-			goto done;
-		}
-
 		if (strncmp(refname, "refs/heads/", 11) != 0)
 			continue;
 
