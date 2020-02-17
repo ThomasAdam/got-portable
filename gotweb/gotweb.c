@@ -3427,10 +3427,8 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 			goto err;
 
 		if (asprintf(&href_diff,
-		    "?path=%s&action=diff&commit=%s&file=%s&folder=%s",
-		    a->gw_trans->repo_name, bline->id_str,
-		    a->gw_trans->repo_file, a->gw_trans->repo_folder ?
-		    a->gw_trans->repo_folder : "") == -1) {
+		    "?path=%s&action=diff&commit=%s",
+		    a->gw_trans->repo_name, bline->id_str) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto err;
 		}
