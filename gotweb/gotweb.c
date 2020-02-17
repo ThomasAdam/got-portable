@@ -1655,7 +1655,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 	if (d_cnt == -1) {
 		error = got_error_from_errno2("scandir",
 		    gw_trans->gw_conf->got_repos_path);
-		return error;
+		goto done;
 	}
 
 	for (d_i = 0; d_i < d_cnt; d_i++) {
@@ -1669,7 +1669,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 
 		error = gw_init_gw_dir(&gw_dir, sd_dent[d_i]->d_name);
 		if (error)
-			return error;
+			goto done;
 
 		error = gw_load_got_path(gw_trans, gw_dir);
 		if (error && error->code == GOT_ERR_NOT_GIT_REPO) {
@@ -1677,7 +1677,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 			continue;
 		}
 		else if (error)
-			return error;
+			goto done;
 
 		if (lstat(gw_dir->path, &st) == 0 && S_ISDIR(st.st_mode) &&
 		    !got_path_dir_is_empty(gw_dir->path)) {
@@ -1686,7 +1686,7 @@ gw_load_got_paths(struct gw_trans *gw_trans)
 			gw_trans->repos_total++;
 		}
 	}
-
+done:
 	closedir(d);
 	return error;
 }
