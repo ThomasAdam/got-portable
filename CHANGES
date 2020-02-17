@@ -1,3 +1,21 @@
+* got 0.26; 2020-02-17
+- initial release of gotweb(8), a repository server for web browsers (tracey)
+- fix a segfault in 'got backout' (tracey, reported by semarie)
+- switch 'tog tree' repository path argument to a new -r option
+- fix 'got blame' and 'tog blame' on files added on worktree's current branch
+- enable searching in tog diff view with the '/' key (tracey)
+- ignore EROFS during checkout for repositories on read-only filesystems
+- do not open log message editor if there are no changes during 'histedit -c'
+- display branch name and first commit to be edited at top of histedit script
+- fix bug where 'got revert -R' failed on added subtrees
+- fix bug where 'got log PATH' failed to map PATH into the repository
+- make 'tog log' show linear history by default; add -b option and B key
+- make 'got log' show linear history by default; remove -f and add -b option
+- do not display unversioned files during 'got revert -R'
+- tweak default colors for directories and symlinks in 'tog tree'
+- sleep for one nanosecond after syncing the file index to disk
+- fix 'tog log -c' with tags
+
 * got 0.25; 2020-01-14
 - fix suspending and resuming tog with Ctrl-Z and fg (reported by naddy@)
 - fix 'tog tree' usage displayed in error case (patch by naddy@)
