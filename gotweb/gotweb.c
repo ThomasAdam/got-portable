@@ -1065,7 +1065,7 @@ gw_commits(struct gw_trans *gw_trans)
 			goto done;
 	}
 
-	if (gw_trans->page > 0) {
+	if (gw_trans->page > 0 && gw_trans->prev_id) {
 		if (asprintf(&href_prev,
 		    "?path=%s&page=%d&action=commits&commit=%s&prev=%s",
 		    gw_trans->repo_name, gw_trans->page - 1,
@@ -1326,7 +1326,7 @@ gw_briefs(struct gw_trans *gw_trans)
 			goto done;
 	}
 
-	if (gw_trans->page > 0) {
+	if (gw_trans->page > 0 && gw_trans->prev_id) {
 		if (asprintf(&href_prev,
 		    "?path=%s&page=%d&action=briefs&commit=%s&prev=%s",
 		    gw_trans->repo_name, gw_trans->page - 1,
@@ -3224,7 +3224,8 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		error = got_object_open_as_commit(&commit, gw_trans->repo, id);
 			if (error)
 				goto done;
-		if (limit == 1 && chk_multi == 0) {
+		if (limit == 1 && chk_multi == 0 &&
+		    gw_trans->gw_conf->got_max_commits_display != 1) {
 			error = gw_get_commit(gw_trans, header, commit, id);
 			if (error)
 				goto done;
