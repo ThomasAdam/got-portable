@@ -828,19 +828,11 @@ gw_index(struct gw_trans *gw_trans)
 		if (gw_trans->gw_conf->got_max_repos_display == 0)
 			continue;
 
-		if (next_disp == gw_trans->gw_conf->got_max_repos_display) {
-			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "np_wrapper", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				goto done;
-			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "nav_prev", KATTR__MAX);
-			if (kerr != KCGI_OK)
-				goto done;
-		} else if ((gw_trans->gw_conf->got_max_repos_display > 0) &&
+		if ((next_disp == gw_trans->gw_conf->got_max_repos_display) ||
+		    ((gw_trans->gw_conf->got_max_repos_display > 0) &&
 		    (gw_trans->page > 0) &&
 		    (next_disp == gw_trans->gw_conf->got_max_repos_display ||
-		    prev_disp == gw_trans->repos_total)) {
+		    prev_disp == gw_trans->repos_total))) {
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "np_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
