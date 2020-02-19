@@ -796,7 +796,6 @@ gw_index(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 
-
 		if (asprintf(&href_tags, "?path=%s&action=tags",
 		    gw_dir->name) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -3332,8 +3331,6 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
-		if (kerr != KCGI_OK)
-			goto done;
 	}
 done:
 	if (tag)
