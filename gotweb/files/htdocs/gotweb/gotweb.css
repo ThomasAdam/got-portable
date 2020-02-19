@@ -733,32 +733,12 @@ body {
 	padding-bottom: 2px;
 	width: 80%;
 }
-#tag {
-	clear: left;
-	float: left;
-	margin-left: 20px;
-	margin-top: 20px;
-	margin-bottom: 20px;
-	font-family: monospace;
-}
 #tag_wrapper {
 	clear: left;
 	float: left;
 	width: 100%;
 }
-#tag_line {
-	clear: left;
-	float:left ;
-}
-
-/* tags.tmpl */
-
-#tags_wrapper {
-	clear: left;
-	float: left;
-	width: 100%;
-}
-#tags_age {
+#tag_age {
 	padding-left: 10px;
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -766,14 +746,14 @@ body {
 	width: 7.5em;
 	overflow: auto;
 }
-#tags {
+#tag {
 	float: left;
 	width: 8.5em;
 	font-style: italic;
 	padding-top: 5px;
 	padding-bottom: 5px;
 }
-#tags_name {
+#tag_name {
 	float: left;
 	padding-left: 10px;
 	padding-right: 10px;
@@ -802,6 +782,16 @@ body {
 	margin-top: 25px;
 	white-space: pre-wrap;
 }
+
+/* tags.tmpl */
+#tags_info {
+	clear: left;
+	float: left;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
 
 /* diff.tmpl */
 

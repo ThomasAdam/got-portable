@@ -27,6 +27,7 @@
 /gotweb/files/cgi-bin/gw_tmpl/index.tmpl
 /gotweb/files/cgi-bin/gw_tmpl/summry.tmpl
 /gotweb/files/cgi-bin/gw_tmpl/tag.tmpl
+/gotweb/files/cgi-bin/gw_tmpl/tags.tmpl
 /gotweb/files/cgi-bin/gw_tmpl/tree.tmpl
 /gotweb/files/htdocs
 /gotweb/files/htdocs/gotweb

@@ -132,7 +132,7 @@ enum gw_ref_tm {
 	TM_LONG,
 };
 
-enum gw_tags {
+enum gw_tags_type {
 	TAGBRIEF,
 	TAGFULL,
 };
@@ -228,6 +228,7 @@ static const struct got_error	*gw_briefs(struct gw_trans *);
 static const struct got_error	*gw_summary(struct gw_trans *);
 static const struct got_error	*gw_tree(struct gw_trans *);
 static const struct got_error	*gw_tag(struct gw_trans *);
+static const struct got_error	*gw_tags(struct gw_trans *);
 
 struct gw_query_action {
 	unsigned int		 func_id;
@@ -246,6 +247,7 @@ enum gw_query_actions {
 	GW_INDEX,
 	GW_SUMMARY,
 	GW_TAG,
+	GW_TAGS,
 	GW_TREE,
 };
 
@@ -259,6 +261,7 @@ static struct gw_query_action gw_query_funcs[] = {
 	{ GW_INDEX,	"index",	gw_index,	"gw_tmpl/index.tmpl" },
 	{ GW_SUMMARY,	"summary",	gw_summary,	"gw_tmpl/summry.tmpl" },
 	{ GW_TAG,	"tag",		gw_tag,		"gw_tmpl/tag.tmpl" },
+	{ GW_TAGS,	"tags",		gw_tags,	"gw_tmpl/tags.tmpl" },
 	{ GW_TREE,	"tree",		gw_tree,	"gw_tmpl/tree.tmpl" },
 };
 
@@ -551,6 +554,7 @@ gw_index(struct gw_trans *gw_trans)
 	struct gw_dir *gw_dir = NULL;
 	char *href_next = NULL, *href_prev = NULL, *href_summary = NULL;
 	char *href_briefs = NULL, *href_commits = NULL, *href_tree = NULL;
+	char *href_tags = NULL;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 	enum kcgi_err kerr;
 
@@ -792,6 +796,27 @@ gw_index(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 
+
+		if (asprintf(&href_tags, "?path=%s&action=tags",
+		    gw_dir->name) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
+		    href_tags, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "tags");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+
+		kerr = khtml_puts(gw_trans->gw_html_req, " | ");
+		if (kerr != KCGI_OK)
+			goto done;
+
 		if (asprintf(&href_tree, "?path=%s&action=tree",
 		    gw_dir->name) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -822,6 +847,8 @@ gw_index(struct gw_trans *gw_trans)
 		href_briefs = NULL;
 		free(href_commits);
 		href_commits = NULL;
+		free(href_tags);
+		href_tags = NULL;
 		free(href_tree);
 		href_tree = NULL;
 
@@ -911,6 +938,7 @@ done:
 	free(href_summary);
 	free(href_briefs);
 	free(href_commits);
+	free(href_tags);
 	free(href_tree);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
@@ -1541,8 +1569,7 @@ gw_summary(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_output_repo_tags(gw_trans, NULL, D_MAXSLCOMMDISP,
-	    TAGBRIEF);
+	error = gw_tags(gw_trans);
 	if (error)
 		goto done;
 
@@ -1624,6 +1651,123 @@ done:
 	free(tree_html);
 	free(tree);
 	free(age);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
+	return error;
+}
+
+static const struct got_error *
+gw_tags(struct gw_trans *gw_trans)
+{
+	const struct got_error *error = NULL;
+	struct gw_header *header = NULL;
+	char *href_next = NULL, *href_prev = NULL;
+	enum kcgi_err kerr = KCGI_OK;
+
+	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
+		return got_error_from_errno("pledge");
+
+	if ((header = gw_init_header()) == NULL)
+		return got_error_from_errno("malloc");
+
+	if (gw_trans->action != GW_SUMMARY) {
+		error = gw_apply_unveil(gw_trans->gw_dir->path);
+		if (error)
+			goto done;
+	}
+
+	error = gw_get_header(gw_trans, header, 1);
+	if (error)
+		goto done;
+
+	if (gw_trans->action == GW_SUMMARY) {
+		error = gw_output_repo_tags(gw_trans, header,
+		    D_MAXSLCOMMDISP, TAGBRIEF);
+		if (error)
+			goto done;
+	} else {
+		error = gw_output_repo_tags(gw_trans, header,
+		    gw_trans->gw_conf->got_max_commits_display, TAGBRIEF);
+		if (error)
+			goto done;
+	}
+
+	if (gw_trans->next_id || gw_trans->page > 0) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "np_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "nav_prev", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+	}
+
+	if (gw_trans->page > 0 && gw_trans->prev_id) {
+		if (asprintf(&href_prev,
+		    "?path=%s&page=%d&action=tags&commit=%s&prev=%s",
+		    gw_trans->repo_name, gw_trans->page - 1,
+		    gw_trans->prev_id ? gw_trans->prev_id : "",
+		    gw_trans->prev_prev_id ?
+		    gw_trans->prev_prev_id : "") == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_prev, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "Previous");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			goto done;
+	}
+
+	if (gw_trans->next_id || gw_trans->page > 0) {
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
+		if (kerr != KCGI_OK)
+			return gw_kcgi_error(kerr);
+	}
+
+	if (gw_trans->next_id) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
+		    KATTR_ID, "nav_next", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		if (asprintf(&href_next,
+		    "?path=%s&page=%d&action=tags" \
+		    "&commit=%s&prev=%s&prev_prev=%s",
+		    gw_trans->repo_name, gw_trans->page + 1,
+		    gw_trans->next_id,
+		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
+		    gw_trans->prev_id ?
+		    gw_trans->prev_id : "") == -1) {
+			error = got_error_from_errno("calloc");
+			goto done;
+		}
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
+		    KATTR_HREF, href_next, KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "Next");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
+		if (kerr != KCGI_OK)
+			goto done;
+	}
+
+	if (gw_trans->next_id || gw_trans->page > 0) {
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK)
+			goto done;
+	}
+done:
+	gw_free_header(header);
+	free(href_next);
+	free(href_prev);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
@@ -2824,7 +2968,8 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 	char *tag_commit0 = NULL, *href_tag = NULL, *href_briefs = NULL;
 	struct got_tag_object *tag = NULL;
 	enum kcgi_err kerr = KCGI_OK;
-	int summary_header_displayed = 0;
+	int summary_header_displayed = 0, start_tag = 0, chk_next = 0;
+	int prev_set = 0, tag_count = 0;
 
 	SIMPLEQ_INIT(&refs);
 
@@ -2882,6 +3027,32 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		    strlen(id_str)) != 0)
 			continue;
 
+		if (tag_type == TAGBRIEF && gw_trans->commit_id &&
+		    start_tag == 0 && strncmp(id_str, header->commit_id,
+		    strlen(id_str)) != 0) {
+			continue;
+		} else {
+			start_tag = 1;
+		}
+
+		tag_count++;
+
+		if (prev_set == 0 && start_tag == 1) {
+			gw_trans->next_prev_id = strdup(id_str);
+			if (gw_trans->next_prev_id == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+			prev_set = 1;
+		}
+
+		if (chk_next) {
+			gw_trans->next_id = strdup(id_str);
+			if (gw_trans->next_id == NULL)
+				error = got_error_from_errno("strdup");
+			goto done;
+		}
+
 		if (commit) {
 			error = got_object_commit_get_logmsg(&tag_commit0,
 			    commit);
@@ -2934,11 +3105,11 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			}
 
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "tags_wrapper", KATTR__MAX);
+			    KATTR_ID, "tag_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "tags_age", KATTR__MAX);
+			    KATTR_ID, "tag_age", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
 			error = gw_get_time_str(&age, tagger_time, TM_DIFF);
@@ -2952,7 +3123,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "tags", KATTR__MAX);
+			    KATTR_ID, "tag", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_puts(gw_trans->gw_html_req, refname);
@@ -2962,7 +3133,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
-			    KATTR_ID, "tags_name", KATTR__MAX);
+			    KATTR_ID, "tag_name", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
 			if (asprintf(&href_tag, "?path=%s&action=tag&commit=%s",
@@ -3115,7 +3286,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			goto done;
 
 		if (limit && --limit == 0)
-			break;
+			chk_next = 1;
 
 		if (tag)
 			got_object_tag_close(tag);
@@ -3132,6 +3303,37 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		href_briefs = NULL;
 		free(href_commits);
 		href_commits = NULL;
+	}
+	if (tag_count == 0) {
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "summary_tags_title_wrapper", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "summary_tags_title", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_puts(gw_trans->gw_html_req, "Tags");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "summary_tags_content", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
+		    "tags_info", KATTR__MAX);
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khttp_puts(gw_trans->gw_req,
+		    "There are no tags for this repo.");
+		if (kerr != KCGI_OK)
+			goto done;
+		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		if (kerr != KCGI_OK)
+			goto done;
 	}
 done:
 	if (tag)
