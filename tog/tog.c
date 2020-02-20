@@ -5218,7 +5218,7 @@ cmd_tree(int argc, char *argv[])
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
 		else
-			repo_path = cwd;
+			repo_path = strdup(cwd);
 	}
 	if (repo_path == NULL) {
 		error = got_error_from_errno("strdup");
@@ -5282,6 +5282,7 @@ cmd_tree(int argc, char *argv[])
 	error = view_loop(view);
 done:
 	free(repo_path);
+	free(cwd);
 	free(commit_id);
 	if (commit)
 		got_object_commit_close(commit);
