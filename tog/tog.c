@@ -468,8 +468,8 @@ static const struct got_error *search_start_blame_view(struct tog_view *);
 static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
-    struct got_tree_object *, struct got_object_id *,
-    struct got_reflist_head *, struct got_repository *);
+    struct got_tree_object *, struct got_object_id *, struct got_reflist_head *,
+    struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1748,40 +1748,16 @@ tree_view_visit_subtree(struct got_tree_object *subtree,
 	return NULL;
 }
 
-
 static const struct got_error *
-browse_commit_tree(struct tog_view **new_view, int begin_x,
-    struct commit_queue_entry *entry, const char *path,
-    struct got_reflist_head *refs, struct got_repository *repo)
+tree_view_walk_path(struct tog_tree_view_state *s,
+    struct got_object_id *commit_id,
+    const char *path, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_tree_object *tree;
-	struct tog_tree_view_state *s;
-	struct tog_view *tree_view;
-	char *slash, *subpath = NULL;
+	struct got_tree_object *tree = NULL;
 	const char *p;
+	char *slash, *subpath = NULL;
 
-	err = got_object_open_as_tree(&tree, repo,
-	    got_object_commit_get_tree_id(entry->commit));
-	if (err)
-		return err;
-
-	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
-	if (tree_view == NULL)
-		return got_error_from_errno("view_open");
-
-	err = open_tree_view(tree_view, tree, entry->id, refs, repo);
-	if (err) {
-		got_object_tree_close(tree);
-		return err;
-	}
-	s = &tree_view->state.tree;
-
-	*new_view = tree_view;
-
-	if (got_path_is_root_dir(path))
-		return NULL;
-		
 	/* Walk the path and open corresponding tree objects. */
 	p = path;
 	while (*p) {
@@ -1831,7 +1807,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 			break;
 		}
 
-		err = got_object_id_by_path(&tree_id, repo, entry->id,
+		err = got_object_id_by_path(&tree_id, repo, commit_id,
 		    subpath);
 		if (err)
 			break;
@@ -1855,6 +1831,40 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 
 	free(subpath);
 	return err;
+}
+
+static const struct got_error *
+browse_commit_tree(struct tog_view **new_view, int begin_x,
+    struct commit_queue_entry *entry, const char *path,
+    struct got_reflist_head *refs, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_tree_object *tree;
+	struct tog_tree_view_state *s;
+	struct tog_view *tree_view;
+
+	err = got_object_open_as_tree(&tree, repo,
+	    got_object_commit_get_tree_id(entry->commit));
+	if (err)
+		return err;
+
+	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
+	if (tree_view == NULL)
+		return got_error_from_errno("view_open");
+
+	err = open_tree_view(tree_view, tree, entry->id, refs, repo);
+	if (err) {
+		got_object_tree_close(tree);
+		return err;
+	}
+	s = &tree_view->state.tree;
+
+	*new_view = tree_view;
+
+	if (got_path_is_root_dir(path))
+		return NULL;
+
+	return tree_view_walk_path(s, entry->id, path, repo);
 }
 
 static const struct got_error *
@@ -5144,7 +5154,7 @@ __dead static void
 usage_tree(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path]\n",
+	fprintf(stderr, "usage: %s tree [-c commit] [-r repository-path] [path]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5154,8 +5164,9 @@ cmd_tree(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
 	struct got_reflist_head refs;
-	char *repo_path = NULL;
+	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_arg = NULL;
 	struct got_commit_object *commit = NULL;
@@ -5191,37 +5202,39 @@ cmd_tree(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 0)
+	if (argc > 1)
 		usage_tree();
 
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+
 	if (repo_path == NULL) {
-		struct got_worktree *worktree;
-		char *cwd = getcwd(NULL, 0);
-		if (cwd == NULL)
-			return got_error_from_errno("getcwd");
-		error = got_worktree_open(&worktree, cwd);
-		if (error && error->code != GOT_ERR_NOT_WORKTREE)
-			goto done;
-		else
-			error = NULL;
-		if (worktree) {
-			free(cwd);
+		if (worktree)
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
-			got_worktree_close(worktree);
-		} else
+		else
 			repo_path = cwd;
-		if (repo_path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 	}
-
-	init_curses();
+	if (repo_path == NULL) {
+		error = got_error_from_errno("strdup");
+		goto done;
+	}
 
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
+
+	error = get_in_repo_path_from_argv0(&in_repo_path, argc, argv,
+	    repo, worktree);
+	if (error)
+		goto done;
+
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -5230,16 +5243,16 @@ cmd_tree(int argc, char *argv[])
 	error = got_repo_match_object_id(&commit_id, NULL,
 	    commit_id_arg ? commit_id_arg : GOT_REF_HEAD,
 	    GOT_OBJ_TYPE_COMMIT, 1, repo);
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	error = got_object_open_as_commit(&commit, repo, commit_id);
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	error = got_object_open_as_tree(&tree, repo,
 	    got_object_commit_get_tree_id(commit));
-	if (error != NULL)
+	if (error)
 		goto done;
 
 	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
@@ -5254,6 +5267,18 @@ cmd_tree(int argc, char *argv[])
 	error = open_tree_view(view, tree, commit_id, &refs, repo);
 	if (error)
 		goto done;
+	if (!got_path_is_root_dir(in_repo_path)) {
+		error = tree_view_walk_path(&view->state.tree, commit_id,
+		    in_repo_path, repo);
+		if (error)
+			goto done;
+	}
+
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
 	error = view_loop(view);
 done:
 	free(repo_path);
