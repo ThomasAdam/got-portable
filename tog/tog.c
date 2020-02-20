@@ -2592,18 +2592,17 @@ cmd_log(int argc, char *argv[])
 		usage_log();
 
 	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
-	}
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error && error->code != GOT_ERR_NOT_WORKTREE)
 		goto done;
 
 	if (repo_path == NULL) {
 		if (worktree)
-			repo_path = strdup(
-			    got_worktree_get_repo_path(worktree));
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
 		else
 			repo_path = strdup(cwd);
 	}
@@ -4398,10 +4397,9 @@ cmd_blame(int argc, char *argv[])
 		usage_blame();
 
 	cwd = getcwd(NULL, 0);
-	if (cwd == NULL) {
-		error = got_error_from_errno("getcwd");
-		goto done;
-	}
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
 	error = got_worktree_open(&worktree, cwd);
 	if (error && error->code != GOT_ERR_NOT_WORKTREE)
 		goto done;
