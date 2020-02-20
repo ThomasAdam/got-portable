@@ -450,7 +450,7 @@ static const struct got_error *search_next_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
     struct got_object_id *, struct got_reflist_head *,
-    struct got_repository *, const char *, const char *, int, int);
+    struct got_repository *, const char *, const char *, int);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -2114,7 +2114,7 @@ search_next_log_view(struct tog_view *view)
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
     struct got_reflist_head *refs, struct got_repository *repo,
-    const char *head_ref_name, const char *path, int check_disk,
+    const char *head_ref_name, const char *in_repo_path,
     int log_branches)
 {
 	const struct got_error *err = NULL;
@@ -2123,9 +2123,12 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
 
-	err = got_repo_map_path(&s->in_repo_path, repo, path, check_disk);
-	if (err != NULL)
-		goto done;
+	if (in_repo_path != s->in_repo_path) {
+		free(s->in_repo_path);
+		s->in_repo_path = strdup(in_repo_path);
+		if (s->in_repo_path == NULL)
+			return got_error_from_errno("strdup");
+	}
 
 	/* The commit queue only contains commits being displayed. */
 	TAILQ_INIT(&s->commits.head);
@@ -2370,7 +2373,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				return got_error_from_errno(
 				    "view_open");
 			err = open_log_view(lv, s->start_id, s->refs,
-			    s->repo, s->head_ref_name, parent_path, 0,
+			    s->repo, s->head_ref_name, parent_path,
 			    s->log_branches);
 			if (err)
 				return err;;
@@ -2413,7 +2416,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			return err;
 		}
 		err = open_log_view(lv, start_id, s->refs, s->repo,
-		    s->head_ref_name, in_repo_path, 0, s->log_branches);
+		    s->head_ref_name, in_repo_path, s->log_branches);
 		if (err) {
 			free(start_id);
 			view_close(lv);
@@ -2432,7 +2435,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (lv == NULL)
 			return got_error_from_errno("view_open");
 		err = open_log_view(lv, s->start_id, s->refs, s->repo,
-		    s->head_ref_name, s->in_repo_path, 0, s->log_branches);
+		    s->head_ref_name, s->in_repo_path, s->log_branches);
 		if (err) {
 			view_close(lv);
 			return err;;
@@ -2496,6 +2499,42 @@ init_curses(void)
 }
 
 static const struct got_error *
+get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
+    struct got_repository *repo, struct got_worktree *worktree)
+{
+	const struct got_error *err = NULL;
+
+	if (argc == 0) {
+		*in_repo_path = strdup("/");
+		if (*in_repo_path == NULL)
+			return got_error_from_errno("strdup");
+		return NULL;
+	}
+
+	if (worktree) {
+		const char *prefix = got_worktree_get_path_prefix(worktree);
+		char *wt_path, *p;
+
+		err = got_worktree_resolve_path(&wt_path, worktree, argv[0]);
+		if (err)
+			return err;
+
+		if (asprintf(&p, "%s%s%s", prefix,
+		    (strcmp(prefix, "/") != 0) ? "/" : "", wt_path) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(wt_path);
+			return err;
+		}
+		err = got_repo_map_path(in_repo_path, repo, p, 0);
+		free(p);
+		free(wt_path);
+	} else
+		err = got_repo_map_path(in_repo_path, repo, argv[0], 1);
+
+	return err;
+}
+
+static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -2503,9 +2542,9 @@ cmd_log(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_reflist_head refs;
 	struct got_object_id *start_id = NULL;
-	char *path = NULL, *repo_path = NULL, *cwd = NULL;
+	char *in_repo_path = NULL, *repo_path = NULL, *cwd = NULL;
 	char *start_commit = NULL, *head_ref_name = NULL;
-	int ch, log_branches = 0, check_disk = 1;
+	int ch, log_branches = 0;
 	struct tog_view *view;
 
 	SIMPLEQ_INIT(&refs);
@@ -2539,6 +2578,9 @@ cmd_log(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if (argc > 1)
+		usage_log();
+
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
@@ -2547,29 +2589,6 @@ cmd_log(int argc, char *argv[])
 	error = got_worktree_open(&worktree, cwd);
 	if (error && error->code != GOT_ERR_NOT_WORKTREE)
 		goto done;
-	error = NULL;
-
-	if (argc == 0) {
-		path = strdup("");
-		if (path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else if (argc == 1) {
-		if (worktree) {
-			error = got_worktree_resolve_path(&path, worktree,
-			    argv[0]);
-			if (error)
-				goto done;
-		} else {
-			path = strdup(argv[0]);
-			if (path == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
-	} else
-		usage_log();
 
 	if (repo_path == NULL) {
 		if (worktree)
@@ -2583,11 +2602,16 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	init_curses();
-
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
+
+	error = get_in_repo_path_from_argv0(&in_repo_path, argc, argv,
+	    repo, worktree);
+	if (error)
+		goto done;
+
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo),
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
@@ -2614,17 +2638,6 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 	if (worktree) {
-		const char *prefix = got_worktree_get_path_prefix(worktree);
-		char *p;
-		if (asprintf(&p, "%s%s%s", prefix,
-		    (strcmp(prefix, "/") != 0) ? "/" : "", path) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-		free(path);
-		path = p;
-		check_disk = 0;
-
 		head_ref_name = strdup(
 		    got_worktree_get_head_ref_name(worktree));
 		if (head_ref_name == NULL) {
@@ -2633,7 +2646,7 @@ cmd_log(int argc, char *argv[])
 		}
 	}
 	error = open_log_view(view, start_id, &refs, repo, head_ref_name,
-	    path, check_disk, log_branches);
+	    in_repo_path, log_branches);
 	if (error)
 		goto done;
 	if (worktree) {
@@ -2643,9 +2656,9 @@ cmd_log(int argc, char *argv[])
 	}
 	error = view_loop(view);
 done:
+	free(in_repo_path);
 	free(repo_path);
 	free(cwd);
-	free(path);
 	free(start_id);
 	free(head_ref_name);
 	if (repo)
@@ -4337,7 +4350,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_reflist_head refs;
 	struct got_worktree *worktree = NULL;
-	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -4371,9 +4384,7 @@ cmd_blame(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 1)
-		path = argv[0];
-	else
+	if (argc != 1)
 		usage_blame();
 
 	cwd = getcwd(NULL, 0);
@@ -4381,54 +4392,34 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+
 	if (repo_path == NULL) {
-		error = got_worktree_open(&worktree, cwd);
-		if (error && error->code != GOT_ERR_NOT_WORKTREE)
-			goto done;
-		else
-			error = NULL;
-		if (worktree) {
+		if (worktree)
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
-			if (repo_path == NULL)
-				error = got_error_from_errno("strdup");
-			if (error)
-				goto done;
-		} else {
+		else
 			repo_path = strdup(cwd);
-			if (repo_path == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
 	}
-
-	init_curses();
+	if (repo_path == NULL) {
+		error = got_error_from_errno("strdup");
+		goto done;
+	}
 
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), NULL);
+	error = get_in_repo_path_from_argv0(&in_repo_path, argc, argv, repo,
+	    worktree);
 	if (error)
 		goto done;
 
-	if (worktree) {
-		const char *prefix = got_worktree_get_path_prefix(worktree);
-		char *p, *worktree_subdir = cwd +
-		    strlen(got_worktree_get_root_path(worktree));
-		if (asprintf(&p, "%s%s%s%s%s",
-		    prefix, (strcmp(prefix, "/") != 0) ? "/" : "",
-		    worktree_subdir, worktree_subdir[0] ? "/" : "",
-		    path) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-		error = got_repo_map_path(&in_repo_path, repo, p, 0);
-		free(p);
-	} else {
-		error = got_repo_map_path(&in_repo_path, repo, path, 1);
-	}
+	init_curses();
+
+	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
 		goto done;
 
@@ -4467,6 +4458,7 @@ cmd_blame(int argc, char *argv[])
 	error = view_loop(view);
 done:
 	free(repo_path);
+	free(in_repo_path);
 	free(cwd);
 	free(commit_id);
 	if (worktree)
@@ -4770,7 +4762,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0, 0);
+	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0);
 	if (err)
 		view_close(log_view);
 	else
