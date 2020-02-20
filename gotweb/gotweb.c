@@ -556,7 +556,7 @@ gw_index(struct gw_trans *gw_trans)
 	char *href_briefs = NULL, *href_commits = NULL, *href_tree = NULL;
 	char *href_tags = NULL;
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
@@ -1587,7 +1587,7 @@ gw_tree(struct gw_trans *gw_trans)
 	struct gw_header *header = NULL;
 	char *tree = NULL, *tree_html = NULL, *tree_html_disp = NULL;
 	char *age = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
@@ -1777,7 +1777,7 @@ gw_tag(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
@@ -2091,7 +2091,7 @@ gw_init_gw_dir(struct gw_dir **gw_dir, const char *dir)
 static const struct got_error *
 gw_display_open(struct gw_trans *gw_trans, enum khttp code, enum kmime mime)
 {
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khttp_head(gw_trans->gw_req, kresps[KRESP_ALLOW], "GET");
 	if (kerr != KCGI_OK)
@@ -2132,7 +2132,7 @@ static const struct got_error *
 gw_display_index(struct gw_trans *gw_trans)
 {
 	const struct got_error *error;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	/* catch early querystring errors */
 	if (gw_trans->error)
@@ -2161,7 +2161,7 @@ gw_display_index(struct gw_trans *gw_trans)
 static const struct got_error *
 gw_error(struct gw_trans *gw_trans)
 {
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khtml_puts(gw_trans->gw_html_req, gw_trans->error->msg);
 
@@ -2172,7 +2172,7 @@ static int
 gw_template(size_t key, void *arg)
 {
 	const struct got_error *error = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 	struct gw_trans *gw_trans = arg;
 	char *img_src = NULL;
 
@@ -2489,7 +2489,7 @@ static const struct got_error *
 gw_gen_author_header(struct gw_trans *gw_trans, const char *str)
 {
 	const struct got_error *error = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_author_title", KATTR__MAX);
@@ -2519,7 +2519,7 @@ static const struct got_error *
 gw_gen_committer_header(struct gw_trans *gw_trans, const char *str)
 {
 	const struct got_error *error = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_committer_title", KATTR__MAX);
@@ -2549,7 +2549,7 @@ static const struct got_error *
 gw_gen_commit_msg_header(struct gw_trans *gw_trans, char *str)
 {
 	const struct got_error *error = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_commit_msg_title", KATTR__MAX);
@@ -2579,7 +2579,7 @@ static const struct got_error *
 gw_gen_tree_header(struct gw_trans *gw_trans, char *str)
 {
 	const struct got_error *error = NULL;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 	    KATTR_ID, "header_tree_title", KATTR__MAX);
@@ -4625,7 +4625,7 @@ main(int argc, char *argv[])
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
 	int gw_malloc = 1;
-	enum kcgi_err kerr;
+	enum kcgi_err kerr = KCGI_OK;
 
 	if ((gw_trans = malloc(sizeof(struct gw_trans))) == NULL)
 		errx(1, "malloc");
