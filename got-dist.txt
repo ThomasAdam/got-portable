@@ -15,7 +15,6 @@
 /gotweb
 /gotweb/Makefile
 /gotweb/Makefile.inc
-/gotweb/TODO
 /gotweb/files
 /gotweb/files/cgi-bin
 /gotweb/files/cgi-bin/gw_tmpl
