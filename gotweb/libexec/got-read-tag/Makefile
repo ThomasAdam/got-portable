@@ -1,5 +1,6 @@
 
 .include "../../../got-version.mk"
+.include "../Makefile.inc"
 
 PROG=		got-read-tag
 SRCS=		got-read-tag.c error.c inflate.c object_parse.c \

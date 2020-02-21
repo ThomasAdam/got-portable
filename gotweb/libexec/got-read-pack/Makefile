@@ -1,5 +1,6 @@
 
 .include "../../../got-version.mk"
+.include "../Makefile.inc"
 
 PROG=		got-read-pack
 SRCS=		got-read-pack.c delta.c error.c inflate.c object_cache.c \
