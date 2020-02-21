@@ -106,8 +106,34 @@ function test_ref_create {
 		return 1
 	fi
 
+	# Change HEAD
+	got ref -r $testroot/repo -s HEAD refs/heads/newref
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Ensure that Git recognizes the ref Got has created
+	(cd $testroot/repo && git checkout -q HEAD)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "git checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Ensure Got recognizes the new ref
+	(cd $testroot/wt && got update -b HEAD >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 	got ref -r $testroot/repo -l > $testroot/stdout
-	echo "HEAD: refs/heads/symbolicref" > $testroot/stdout.expected
+	echo "HEAD: refs/heads/newref" > $testroot/stdout.expected
 	echo -n "refs/got/worktree/base-" >> $testroot/stdout.expected
 	cat $testroot/wt/.got/uuid | tr -d '\n' >> $testroot/stdout.expected
 	echo ": $commit_id" >> $testroot/stdout.expected

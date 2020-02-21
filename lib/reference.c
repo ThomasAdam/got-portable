@@ -245,7 +245,7 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 static int
 is_valid_ref_name(const char *name)
 {
-	const char *s, *slash, *seg;
+	const char *s, *seg;
 	const char forbidden[] = { ' ', '~', '^', ':', '?', '*', '[' , '\\' };
 	const char *forbidden_seq[] = { "//", "..", "@{" };
 	const char *lfs = GOT_LOCKFILE_SUFFIX;
@@ -253,10 +253,6 @@ is_valid_ref_name(const char *name)
 	int i;
 
 	if (name[0] == '@' && name[1] == '\0')
-		return 0;
-
-	slash = strchr(name, '/');
-	if (slash == NULL)
 		return 0;
 
 	s = name;
