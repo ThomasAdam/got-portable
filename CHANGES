@@ -1,3 +1,12 @@
+* got 0.27; 2020-02-21
+- fix gotweb build with -O2 on sparc64 (tracey; reported by kmos)
+- add next/prev navigation to gotweb commit briefs and commits pages (tracey)
+- add new gotweb tags page and ability to navigate all tags (tracey)
+- ensure gotweb's libexec helpers inherit build flags from parent directories
+- allow 'got ref' to manipulate refs which do not have a slash in their name
+- add an optional path argument to 'tog tree'
+- fix misplaced tog search prompt in split-screen views
+
 * got 0.26; 2020-02-17
 - initial release of gotweb(8), a repository server for web browsers (tracey)
 - fix a segfault in 'got backout' (tracey, reported by semarie)
