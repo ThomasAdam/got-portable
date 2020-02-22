@@ -330,6 +330,11 @@ Display history of a repository.
 If a
 .Ar path
 is specified, show only commits which modified this path.
+If invoked in a work tree, the
+.Ar path
+is interpreted relative to the current working directory,
+and the work tree's path prefix is implicitly prepended.
+Otherwise, the path is interpreted relative to the repository root.
 .Pp
 The options for
 .Cm got log
