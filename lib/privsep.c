@@ -1501,8 +1501,8 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 		}
 		break;
 	default:
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-		break;
+		imsg_free(&imsg);
+		return got_error(GOT_ERR_PRIVSEP_MSG);
 	}
 
 	imsg_free(&imsg);
