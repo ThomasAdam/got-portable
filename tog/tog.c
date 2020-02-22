@@ -4164,6 +4164,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->first_displayed_line--;
 		break;
 	case KEY_PPAGE:
+	case CTRL('b'):
 		if (s->first_displayed_line == 1) {
 			s->selected_line = 1;
 			break;
@@ -4319,6 +4320,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		break;
 	}
 	case KEY_NPAGE:
+	case CTRL('f'):
 	case ' ':
 		if (s->last_displayed_line >= s->blame.nlines &&
 		    s->selected_line >= MIN(s->blame.nlines,
@@ -5038,6 +5040,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    s->tree, s->tree == s->root);
 		break;
 	case KEY_PPAGE:
+	case CTRL('b'):
 		tree_scroll_up(view, &s->first_displayed_entry,
 		    MAX(0, view->nlines - 4 - s->selected), s->tree,
 		    s->tree == s->root);
@@ -5060,6 +5063,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    s->last_displayed_entry, s->tree);
 		break;
 	case KEY_NPAGE:
+	case CTRL('f'):
 		if (got_tree_entry_get_next(s->tree, s->last_displayed_entry)
 		    == NULL) {
 			/* can't scroll any further; move cursor down */
