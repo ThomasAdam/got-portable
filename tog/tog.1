@@ -166,7 +166,7 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
-.It Cm diff Oo Ar repository-path Oc Ar object1 object2
+.It Cm diff Oo Fl r Ar repository-path Oc Ar object1 object2
 Display the differences between two objects in the repository.
 Each
 .Ar object
@@ -174,9 +174,6 @@ argument is an object ID SHA1 hash.
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 Both objects must be of the same type (blobs, trees, or commits).
-If the
-.Ar repository path
-is omitted, use the current working directory.
 .Pp
 The key bindings for
 .Cm tog diff
@@ -208,6 +205,16 @@ Regular expression syntax is documented in
 Find the next line which matches the current search pattern.
 .It Cm N
 Find the previous line which matches the current search pattern.
+.El
+.Pp
+The options for
+.Cm tog diff
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
 .El
 .It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.

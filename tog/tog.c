@@ -2682,7 +2682,7 @@ __dead static void
 usage_diff(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s diff [repository-path] object1 object2\n",
+	fprintf(stderr, "usage: %s diff [-r repository-path] object1 object2\n",
 	    getprogname());
 	exit(1);
 }
@@ -3491,8 +3491,14 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			break;
 		default:
 			usage_diff();
 			/* NOTREACHED */
@@ -3507,12 +3513,6 @@ cmd_diff(int argc, char *argv[])
 	} else if (argc == 2) {
 		id_str1 = argv[0];
 		id_str2 = argv[1];
-	} else if (argc == 3) {
-		repo_path = realpath(argv[0], NULL);
-		if (repo_path == NULL)
-			return got_error_from_errno2("realpath", argv[0]);
-		id_str1 = argv[1];
-		id_str2 = argv[2];
 	} else
 		usage_diff();
 
