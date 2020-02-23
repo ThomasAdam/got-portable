@@ -3475,9 +3475,10 @@ cmd_diff(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
 	struct got_reflist_head refs;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
-	char *repo_path = NULL;
+	char *repo_path = NULL, *cwd = NULL;
 	char *id_str1 = NULL, *id_str2 = NULL;
 	int ch;
 	struct tog_view *view;
@@ -3504,9 +3505,6 @@ cmd_diff(int argc, char *argv[])
 	if (argc == 0) {
 		usage_diff(); /* TODO show local worktree changes */
 	} else if (argc == 2) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno("getcwd");
 		id_str1 = argv[0];
 		id_str2 = argv[1];
 	} else if (argc == 3) {
@@ -3518,11 +3516,31 @@ cmd_diff(int argc, char *argv[])
 	} else
 		usage_diff();
 
-	init_curses();
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+
+	if (repo_path == NULL) {
+		if (worktree)
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+		else
+			repo_path = strdup(cwd);
+	}
+	if (repo_path == NULL) {
+		error = got_error_from_errno("strdup");
+		goto done;
+	}
 
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
+
+	init_curses();
 
 	error = apply_unveil(got_repo_get_path(repo), NULL);
 	if (error)
@@ -3553,8 +3571,11 @@ cmd_diff(int argc, char *argv[])
 	error = view_loop(view);
 done:
 	free(repo_path);
+	free(cwd);
 	if (repo)
 		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
 	got_ref_list_free(&refs);
 	return error;
 }
