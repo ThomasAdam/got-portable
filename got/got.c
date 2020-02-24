@@ -5362,6 +5362,7 @@ cmd_rebase(int argc, char *argv[])
 	struct got_object_id *branch_head_commit_id = NULL, *yca_id = NULL;
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
+	int histedit_in_progress = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
@@ -5419,6 +5420,15 @@ cmd_rebase(int argc, char *argv[])
 	    got_worktree_get_root_path(worktree));
 	if (error)
 		goto done;
+
+	error = got_worktree_histedit_in_progress(&histedit_in_progress,
+	    worktree);
+	if (error)
+		goto done;
+	if (histedit_in_progress) {
+		error = got_error(GOT_ERR_HISTEDIT_BUSY);
+		goto done;
+	}
 
 	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
 	if (error)
