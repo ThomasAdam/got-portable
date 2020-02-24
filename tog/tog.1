@@ -165,6 +165,9 @@ if invoked in a work tree, or to the repository's HEAD reference.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .El
 .It Cm diff Oo Fl r Ar repository-path Oc Ar object1 object2
 Display the differences between two objects in the repository.
@@ -215,6 +218,9 @@ are as follows:
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .El
 .It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.
@@ -274,6 +280,9 @@ automatically, provided the abbreviation is unique.
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
 .El
 .It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Op Ar path
 Display the repository tree.
