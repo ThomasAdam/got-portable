@@ -988,13 +988,17 @@ If this option is used, no other command-line arguments are allowed.
 .It Cm rb
 Short alias for
 .Cm rebase .
-.It Cm histedit Oo Fl a Oc Oo Fl c Oc Op Fl F Ar histedit-script
+.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
 Editing of commit history is controlled via a
 .Ar histedit script
-which can be edited interactively or passed on the command line.
+which can be edited interactively, passed on the command line,
+or generated with the
+.Fl m
+option if only log messages need to be edited.
+.Pp
 The format of the histedit script is line-based.
 Each line in the script begins with a command name, followed by
 whitespace and an argument.
@@ -1087,6 +1091,14 @@ Abort an interrupted histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl c
 Continue an interrupted histedit operation.
+If this option is used, no other command-line arguments are allowed.
+.It Fl m
+Edit log messages only.
+This option is a quick equivalent to a histedit script which edits
+only log messages but otherwise uses every commit as-is.
+The
+.Fl m
+option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .El
 .It Cm he
@@ -1581,6 +1593,15 @@ This will also merge local changes, if any, with the incoming changes:
 .Pp
 .Dl $ got update -b origin/master
 .Dl $ got rebase master
+.Pp
+On the
+.Dq master
+branch, log messages for local changes can now be amended with
+.Dq OK
+by other developers and any other important new information:
+.Pp
+.Dl $ got update -c origin/master
+.Dl $ got histedit -m
 .Pp
 Local changes on the
 .Dq master
