@@ -23,7 +23,7 @@ function test_tag_create {
 	local tag2=2.0.0
 
 	# Create a tag based on repository's HEAD reference
-	got tag -m 'test' -r $testroot/repo $tag HEAD > $testroot/stdout
+	got tag -m 'test' -r $testroot/repo -c HEAD $tag > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref command failed unexpectedly"
@@ -88,7 +88,7 @@ function test_tag_create {
 
 	# Attempt to create a tag pointing at a non-commit
 	local tree_id=`git_show_tree $testroot/repo`
-	(cd $testroot/wt && got tag -m 'test' foobar $tree_id \
+	(cd $testroot/wt && got tag -m 'test' -c $tree_id foobar \
 		2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" == "0" ]; then

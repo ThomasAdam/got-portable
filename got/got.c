@@ -3650,8 +3650,8 @@ __dead static void
 usage_tag(void)
 {
 	fprintf(stderr,
-	    "usage: %s tag [-r repository] | -l | "
-	        "[-m message] name [commit]\n", getprogname());
+	    "usage: %s tag [-c commit] [-r repository] [-l] "
+	        "[-m message] name\n", getprogname());
 	exit(1);
 }
 
@@ -4002,8 +4002,11 @@ cmd_tag(int argc, char *argv[])
 	const char *tag_name, *commit_id_arg = NULL, *tagmsg = NULL;
 	int ch, do_list = 0;
 
-	while ((ch = getopt(argc, argv, "m:r:l")) != -1) {
+	while ((ch = getopt(argc, argv, "c:m:r:l")) != -1) {
 		switch (ch) {
+		case 'c':
+			commit_id_arg = optarg;
+			break;
 		case 'm':
 			tagmsg = optarg;
 			break;
@@ -4027,14 +4030,15 @@ cmd_tag(int argc, char *argv[])
 	argv += optind;
 
 	if (do_list) {
+		if (commit_id_arg != NULL)
+			errx(1, "-c option can only be used when creating a tag");
 		if (tagmsg)
-			errx(1, "-l and -m options are mutually exclusive\n");
+			errx(1, "-l and -m options are mutually exclusive");
 		if (argc > 0)
 			usage_tag();
-	} else if (argc < 1 || argc > 2)
+	} else if (argc != 1)
 		usage_tag();
-	else if (argc > 1)
-		commit_id_arg = argv[1];
+
 	tag_name = argv[0];
 
 #ifndef PROFILE
