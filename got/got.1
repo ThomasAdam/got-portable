@@ -1450,6 +1450,20 @@ via the repository's HEAD reference, respectively:
 .Pp
 .Dl $ got log -p -l 3
 .Pp
+In a work tree or a git repository directory, log the history of a subdirectory:
+.Pp
+.Dl $ got log sys/uvm
+.Pp
+While operating inside a work tree, paths are specified relative to the current
+working directory, so this command will log the subdirectory
+.Pa sys/uvm :
+.Pp
+.Dl $ cd sys/uvm && got log '.'
+.Pp
+And this command has the same effect:
+.Pp
+.Dl $ cd sys/dev/usb && got log ../../uvm
+.Pp
 Add new files and remove obsolete files in a work tree directory:
 .Pp
 .Dl $ got add sys/uvm/uvm_ubc.c
