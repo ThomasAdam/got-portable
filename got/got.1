@@ -1016,6 +1016,26 @@ Short alias for
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
+Before starting a
+.Cm histedit
+operation the work tree's current branch must be set with
+.Cm got update -b
+to the branch which should be edited, unless this branch is already the
+current branch of the work tree.
+The tip of this branch represents the upper bound (inclusive) of commits
+touched by the
+.Cm histedit
+operation.
+.Pp
+Furthermore, the work tree's base commit
+must be set with
+.Cm got update -c
+to a point in this branch's commit history where editing should begin.
+This commit represents the lower bound (non-inclusive) of commits touched
+by the
+.Cm histedit
+operation.
+.Pp
 Editing of commit history is controlled via a
 .Ar histedit script
 which can be edited interactively, passed on the command line,
