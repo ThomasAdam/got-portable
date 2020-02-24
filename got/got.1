@@ -936,6 +936,21 @@ of the specified
 .Ar branch
 has been rebased.
 .Pp
+When
+.Cm got rebase
+is used as intended, the specified
+.Ar branch
+contains changes made in local commits that are not yet visible in any
+other repositories.
+The work tree's current branch, which must be set with
+.Cm got update -b
+before starting the
+.Cm rebase
+operation, represents a branch from a remote repository which shares
+a common history with the specified
+.Ar branch
+but has at some point diverged due to commits added to the remote repository.
+.Pp
 Rebased commits are accumulated on a temporary branch which the work tree
 will remain switched to throughout the entire rebase operation.
 Commits on this branch represent the same changes with the same log
