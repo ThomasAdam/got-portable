@@ -532,8 +532,8 @@ which must be an existing reference.
 Care should be taken not to create loops between references when
 this option is used.
 .El
-.It Cm branch Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Op Ar name
-Manage branches in a repository.
+.It Cm branch Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Oo Fl n Oc Op Ar name
+Create, list, or delete branches.
 .Pp
 Branches are managed via references which live in the
 .Dq refs/heads/
@@ -544,12 +544,29 @@ command operates on references in this namespace only.
 .Pp
 If invoked in a work tree without any arguments, print the name of the
 work tree's current branch.
+.Pp
 If a
 .Ar name
 argument is passed, attempt to create a branch reference with the given name.
 By default the new branch reference will point at the latest commit on the
 work tree's current branch if invoked in a work tree, and otherwise to a commit
 resolved via the repository's HEAD reference.
+.Pp
+If invoked in a work tree, once the branch was created successfully
+switch the work tree's head reference to the newly created branch and
+update files across the entire work tree, just like
+.Cm got update -b Ar name
+would do.
+Show the status of each affected file, using the following status codes:
+.Bl -column YXZ description
+.It U Ta file was updated and contained no local changes
+.It G Ta file was updated and local changes were merged cleanly
+.It C Ta file was updated and conflicts occurred during merge
+.It D Ta file was deleted
+.It A Ta new file was added
+.It \(a~ Ta versioned file is obstructed by a non-regular file
+.It ! Ta a missing versioned file was restored
+.El
 .Pp
 The options for
 .Cm got branch
@@ -583,6 +600,8 @@ Only the branch reference is deleted.
 Any commit, tree, and blob objects belonging to the branch
 remain in the repository and may be removed separately with
 Git's garbage collector.
+.It Fl n
+Do not switch and update the work tree after creating a new branch.
 .El
 .It Cm br
 Short alias for

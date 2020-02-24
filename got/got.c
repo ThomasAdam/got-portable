@@ -3284,8 +3284,8 @@ __dead static void
 usage_branch(void)
 {
 	fprintf(stderr,
-	    "usage: %s branch [-c commit] [-r repository] [-l] | -d name | "
-	    "[name]\n", getprogname());
+	    "usage: %s branch [-c commit] [-d] [-r repository] [-l] [-n] "
+	        "[name]\n", getprogname());
 	exit(1);
 }
 
@@ -3470,10 +3470,17 @@ cmd_branch(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0, do_show = 0;
+	int ch, do_list = 0, do_show = 0, do_update = 1;
 	const char *delref = NULL, *commit_id_arg = NULL;
+	struct got_reference *ref = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	struct got_object_id *commit_id = NULL;
+	char *commit_id_str = NULL;
 
-	while ((ch = getopt(argc, argv, "c:d:r:l")) != -1) {
+	TAILQ_INIT(&paths);
+
+	while ((ch = getopt(argc, argv, "c:d:r:ln")) != -1) {
 		switch (ch) {
 		case 'c':
 			commit_id_arg = optarg;
@@ -3490,6 +3497,9 @@ cmd_branch(int argc, char *argv[])
 			break;
 		case 'l':
 			do_list = 1;
+			break;
+		case 'n':
+			do_update = 0;
 			break;
 		default:
 			usage_branch();
@@ -3570,7 +3580,6 @@ cmd_branch(int argc, char *argv[])
 	else if (delref)
 		error = delete_branch(repo, worktree, delref);
 	else {
-		struct got_object_id *commit_id;
 		if (commit_id_arg == NULL)
 			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
@@ -3580,15 +3589,59 @@ cmd_branch(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = add_branch(repo, argv[0], commit_id);
-		free(commit_id);
+		if (error)
+			goto done;
+		if (worktree && do_update) {
+			int did_something = 0;
+			char *branch_refname = NULL;
+
+			error = got_object_id_str(&commit_id_str, commit_id);
+			if (error)
+				goto done;
+			error = get_worktree_paths_from_argv(&paths, 0, NULL,
+			    worktree);
+			if (error)
+				goto done;
+			if (asprintf(&branch_refname, "refs/heads/%s", argv[0])
+			    == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			error = got_ref_open(&ref, repo, branch_refname, 0);
+			free(branch_refname);
+			if (error)
+				goto done;
+			error = switch_head_ref(ref, commit_id, worktree,
+			    repo);
+			if (error)
+				goto done;
+			error = got_worktree_set_base_commit_id(worktree, repo,
+			    commit_id);
+			if (error)
+				goto done;
+			error = got_worktree_checkout_files(worktree, &paths,
+			    repo, update_progress, &did_something,
+			    check_cancelled, NULL);
+			if (error)
+				goto done;
+			if (did_something)
+				printf("Updated to commit %s\n", commit_id_str);
+		}
 	}
 done:
+	if (ref)
+		got_ref_close(ref);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
 	free(repo_path);
+	free(commit_id);
+	free(commit_id_str);
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
 	return error;
 }
 

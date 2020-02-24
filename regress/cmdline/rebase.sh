@@ -741,7 +741,7 @@ function test_rebase_no_commits_to_rebase {
 		return 1
 	fi
 
-	(cd $testroot/wt && got branch newbranch)
+	(cd $testroot/wt && got branch -n newbranch)
 
 	echo "modified alpha on master" > $testroot/wt/alpha
 	(cd $testroot/wt && got commit -m 'test rebase_no_commits_to_rebase' \
@@ -848,7 +848,7 @@ function test_rebase_forward {
 		return 1
 	fi
 
-	(cd $testroot/wt && got branch > $testroot/stdout)
+	(cd $testroot/wt && got branch -n > $testroot/stdout)
 	echo "master" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

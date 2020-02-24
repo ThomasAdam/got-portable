@@ -18,6 +18,7 @@
 
 function test_branch_create {
 	local testroot=`test_init branch_create`
+	local commit_id0=`git_show_head $testroot/repo`
 
 	# Create a branch based on repository's HEAD reference
 	got branch -r $testroot/repo newbranch
@@ -58,7 +59,7 @@ function test_branch_create {
 	fi
 
 	# Create a branch based on the work tree's branch
-	(cd $testroot/wt && got branch anotherbranch)
+	(cd $testroot/wt && got branch -n anotherbranch)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -74,7 +75,7 @@ function test_branch_create {
 	fi
 
 	# Create a branch based on another specific branch
-	(cd $testroot/wt && got branch -c master yetanotherbranch)
+	(cd $testroot/wt && got branch -n -c master yetanotherbranch)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -103,6 +104,24 @@ function test_branch_create {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "git checkout command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a branch and let the work tree be updated to it
+	(cd $testroot/wt && got branch -c $commit_id0 updatebranch \
+		> $testroot/stdout)
+
+	echo -n "Switching work tree from refs/heads/newbranch to " \
+		> $testroot/stdout.expected
+	echo "refs/heads/updatebranch" >> $testroot/stdout.expected
+	echo "U  gamma/delta" >> $testroot/stdout.expected
+	echo "Updated to commit $commit_id0" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
