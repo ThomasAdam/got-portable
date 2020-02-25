@@ -940,8 +940,8 @@ When
 .Cm got rebase
 is used as intended, the specified
 .Ar branch
-contains changes made in local commits that are not yet visible in any
-other repositories.
+represents a local commit history and may already contain changes
+that are not yet visible in any other repositories.
 The work tree's current branch, which must be set with
 .Cm got update -b
 before starting the
@@ -949,7 +949,8 @@ before starting the
 operation, represents a branch from a remote repository which shares
 a common history with the specified
 .Ar branch
-but has at some point diverged due to commits added to the remote repository.
+but has progressed, and perhaps diverged, due to commits added to the
+remote repository.
 .Pp
 Rebased commits are accumulated on a temporary branch which the work tree
 will remain switched to throughout the entire rebase operation.
