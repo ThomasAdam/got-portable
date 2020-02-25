@@ -1,3 +1,16 @@
+* got 0.28; 2020-02-25
+- improve man page documentation of rebase and histedit
+- disallow 'got rebase' while a histedit operation is in progress
+- switch 'got tag' commit argument to a new -c option
+- let 'got branch' switch and update the work tree
+- improve documentation of -r flags in tog man page (naddy)
+- add 'got histedit -m' option which makes it easy to edit log messages
+- switch 'tog diff' repository path argument to a new -r option (naddy)
+- fix 'tog diff object1 object2' when run inside a work tree (naddy)
+- document semantics of got log and tog log path arguments
+- add ^B/^F key bindings (page up/down) to 'tog blame' and 'tog tree' (naddy)
+- disable compiler warnings in release builds to avoid -Werror build breakage
+
 * got 0.27; 2020-02-21
 - fix gotweb build with -O2 on sparc64 (tracey; reported by kmos)
 - add next/prev navigation to gotweb commit briefs and commits pages (tracey)
