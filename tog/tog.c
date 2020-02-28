@@ -5432,7 +5432,13 @@ main(int argc, char *argv[])
 		error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
 
 	endwin();
-	free(cmd_argv);
+	if (cmd_argv) {
+		int i;
+		for (i = 0; i < argc; i++)
+			free(cmd_argv[i]);
+		free(cmd_argv);
+	}
+
 	if (error && error->code != GOT_ERR_CANCELLED)
 		fprintf(stderr, "%s: %s\n", getprogname(), error->msg);
 	return 0;
