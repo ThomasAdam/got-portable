@@ -5409,7 +5409,7 @@ main(int argc, char *argv[])
 	} else {
 		int i;
 
-		/* Did the user specific a command? */
+		/* Did the user specify a command? */
 		for (i = 0; i < nitems(tog_commands); i++) {
 			if (strncmp(tog_commands[i].name, argv[0],
 			    strlen(argv[0])) == 0) {
