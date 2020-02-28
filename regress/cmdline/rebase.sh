@@ -182,6 +182,7 @@ function test_rebase_continue {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -199,6 +200,9 @@ function test_rebase_continue {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> merge conflict" \
+		>> $testroot/stdout.expected
+	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -276,8 +280,6 @@ function test_rebase_continue {
 
 	(cd $testroot/repo && git checkout -q newbranch)
 	local new_commit1=`git_show_head $testroot/repo`
-
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 
 	echo -n "$short_orig_commit1 -> $short_new_commit1" \
@@ -315,6 +317,7 @@ function test_rebase_abort {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -332,6 +335,9 @@ function test_rebase_abort {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> merge conflict" \
+		>> $testroot/stdout.expected
+	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -427,6 +433,7 @@ function test_rebase_no_op_change {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -444,6 +451,9 @@ function test_rebase_no_op_change {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> merge conflict" \
+		>> $testroot/stdout.expected
+	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -499,8 +509,6 @@ function test_rebase_no_op_change {
 	(cd $testroot/repo && git checkout -q newbranch)
 	local new_commit1=`git_show_head $testroot/repo`
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
-
 	echo -n "$short_orig_commit1 -> no-op change" \
 		> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
@@ -536,6 +544,7 @@ function test_rebase_in_progress {
 	echo "modified alpha on branch" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "committing to alpha on newbranch"
 	local orig_commit1=`git_show_head $testroot/repo`
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -553,6 +562,9 @@ function test_rebase_in_progress {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> merge conflict" \
+		>> $testroot/stdout.expected
+	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

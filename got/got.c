@@ -5139,6 +5139,35 @@ done:
 }
 
 static const struct got_error *
+show_rebase_merge_conflict(struct got_object_id *id, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_commit_object *commit = NULL;
+	char *id_str = NULL, *logmsg = NULL;
+
+	err = got_object_open_as_commit(&commit, repo, id);
+	if (err)
+		return err;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		goto done;
+
+	id_str[12] = '\0';
+
+	err = get_short_logmsg(&logmsg, 42, commit);
+	if (err)
+		goto done;
+
+	printf("%s -> merge conflict: %s\n", id_str, logmsg);
+done:
+	free(id_str);
+	got_object_commit_close(commit);
+	free(logmsg);
+	return err;
+}
+
+static const struct got_error *
 show_rebase_progress(struct got_commit_object *commit,
     struct got_object_id *old_id, struct got_object_id *new_id)
 {
@@ -5586,6 +5615,9 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 
 		if (rebase_status == GOT_STATUS_CONFLICT) {
+			error = show_rebase_merge_conflict(qid->id, repo);
+			if (error)
+				goto done;
 			got_worktree_rebase_pathlist_free(&merged_paths);
 			break;
 		}
@@ -6761,6 +6793,10 @@ cmd_histedit(int argc, char *argv[])
 		commit = NULL;
 
 		if (rebase_status == GOT_STATUS_CONFLICT) {
+			error = show_rebase_merge_conflict(hle->commit_id,
+			    repo);
+			if (error)
+				goto done;
 			got_worktree_rebase_pathlist_free(&merged_paths);
 			break;
 		}
