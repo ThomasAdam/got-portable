@@ -5168,6 +5168,7 @@ show_rebase_progress(struct got_commit_object *commit,
 done:
 	free(old_id_str);
 	free(new_id_str);
+	free(logmsg);
 	return err;
 }
 
