@@ -26,6 +26,7 @@
 #include <locale.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
@@ -5333,32 +5334,131 @@ list_commands(void)
 __dead static void
 usage(int hflag)
 {
-	fprintf(stderr, "usage: %s [-h] [-V | --version] [command] [arg ...]\n",
-	    getprogname());
-	if (hflag)
+	fprintf(stderr, "usage: %s [-h] [-V | --version] [command] "
+	    "[arg ...]\n", getprogname());
+	if (hflag) {
+		fprintf(stderr, "lazy usage: %s path\n", getprogname());
 		list_commands();
+	}
 	exit(1);
 }
 
 static char **
-make_argv(const char *arg0, const char *arg1)
+make_argv(int argc, ...)
 {
+	va_list ap;
 	char **argv;
-	int argc = (arg1 == NULL ? 1 : 2);
+	int i;
+
+	va_start(ap, argc);
 
 	argv = calloc(argc, sizeof(char *));
 	if (argv == NULL)
 		err(1, "calloc");
-	argv[0] = strdup(arg0);
-	if (argv[0] == NULL)
-		err(1, "strdup");
-	if (arg1) {
-		argv[1] = strdup(arg1);
-		if (argv[1] == NULL)
+	for (i = 0; i < argc; i++) {
+		argv[i] = strdup(va_arg(ap, char *));
+		if (argv[i] == NULL)
 			err(1, "strdup");
 	}
 
+	va_end(ap);
 	return argv;
+}
+
+/*
+ * Try to convert 'tog path' into a 'tog log path' command.
+ * The user could simply have mistyped the command rather than knowingly
+ * provided a path. So check whether argv[0] can in fact be resolved
+ * to a path in the HEAD commit and print a special error if not.
+ * This hack is for mpi@ <3
+ */
+static const struct got_error *
+tog_log_with_path(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct tog_cmd *cmd = NULL;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_object_id *commit_id = NULL, *id = NULL;
+	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	char *commit_id_str = NULL, **cmd_argv = NULL;
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+
+	if (worktree)
+		repo_path = strdup(got_worktree_get_repo_path(worktree));
+	else
+		repo_path = strdup(cwd);
+	if (repo_path == NULL) {
+		error = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	error = got_repo_open(&repo, repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	error = get_in_repo_path_from_argv0(&in_repo_path, argc, argv,
+	    repo, worktree);
+	if (error)
+		goto done;
+
+	error = got_repo_match_object_id(&commit_id, NULL, worktree ?
+	    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
+	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	if (error)
+		goto done;
+
+	if (worktree) {
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
+
+	error = got_object_id_by_path(&id, repo, commit_id, in_repo_path);
+	if (error) {
+		if (error->code != GOT_ERR_NO_TREE_ENTRY)
+			goto done;
+		fprintf(stderr, "%s: '%s' is no known command or path\n",
+		    getprogname(), argv[0]);
+		usage(1);
+		/* not reached */
+	}
+
+	got_repo_close(repo);
+	repo = NULL;
+
+	error = got_object_id_str(&commit_id_str, commit_id);
+	if (error)
+		goto done;
+
+	cmd = &tog_commands[0]; /* log */
+	argc = 4;
+	cmd_argv = make_argv(argc, cmd->name, "-c", commit_id_str, argv[0]);
+	error = cmd->cmd_main(argc, cmd_argv);
+done:
+	if (repo)
+		got_repo_close(repo);
+	if (worktree)
+		got_worktree_close(worktree);
+	free(id);
+	free(commit_id_str);
+	free(commit_id);
+	free(cwd);
+	free(repo_path);
+	free(in_repo_path);
+	if (cmd_argv) {
+		int i;
+		for (i = 0; i < argc; i++)
+			free(cmd_argv[i]);
+		free(cmd_argv);
+	}
+	return error;
 }
 
 int
@@ -5404,8 +5504,8 @@ main(int argc, char *argv[])
 			usage(hflag);
 		/* Build an argument vector which runs a default command. */
 		cmd = &tog_commands[0];
-		cmd_argv = make_argv(cmd->name, NULL);
 		argc = 1;
+		cmd_argv = make_argv(argc, cmd->name);
 	} else {
 		int i;
 
@@ -5417,19 +5517,19 @@ main(int argc, char *argv[])
 				break;
 			}
 		}
-
-		if (cmd == NULL) {
-			fprintf(stderr, "%s: unknown command '%s'\n",
-			    getprogname(), argv[0]);
-			list_commands();
-			return 1;
-		}
 	}
 
-	if (hflag)
-		cmd->cmd_usage();
-	else
-		error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
+	if (cmd == NULL) {
+		if (argc != 1)
+			usage(0);
+		/* No command specified; try log with a path */
+		error = tog_log_with_path(argc, argv);
+	} else {
+		if (hflag)
+			cmd->cmd_usage();
+		else
+			error = cmd->cmd_main(argc, cmd_argv ? cmd_argv : argv);
+	}
 
 	endwin();
 	if (cmd_argv) {

@@ -21,9 +21,13 @@
 .Nd Git repository browser
 .Sh SYNOPSIS
 .Nm
-.Ar command
+.Op Ar command
 .Op Fl h
 .Op Ar arg ...
+.Pp
+.Nm
+.Ar path
+.El
 .Sh DESCRIPTION
 .Nm
 is an interactive read-only browser for Git repositories.
@@ -37,6 +41,8 @@ supports several types of views which display repository data:
 Displays commits in the repository's history.
 This view is displayed initially if no
 .Ar command
+is specified, or if just a
+.Ar path
 is specified.
 .It Diff view
 Displays changes made in a particular commit.
