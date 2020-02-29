@@ -18,7 +18,7 @@
 #define GOT_ERR_OK		0
 #define GOT_ERR_ERRNO		1
 #define GOT_ERR_NOT_GIT_REPO	2
-#define GOT_ERR_NOT_ABSPATH	3
+/* 3 is currently unused */
 #define GOT_ERR_BAD_PATH	4
 #define GOT_ERR_NOT_REF		5
 #define GOT_ERR_IO		6
@@ -139,7 +139,7 @@ static const struct got_error {
 	{ GOT_ERR_OK,		"no error occured?!?" },
 	{ GOT_ERR_ERRNO,	"see errno" },
 	{ GOT_ERR_NOT_GIT_REPO, "no git repository found" },
-	{ GOT_ERR_NOT_ABSPATH,	"absolute path expected" },
+	{ 3,			"unused error code" },
 	{ GOT_ERR_BAD_PATH,	"bad path" },
 	{ GOT_ERR_NOT_REF,	"no such reference found" },
 	{ GOT_ERR_IO,		"input/output error" },

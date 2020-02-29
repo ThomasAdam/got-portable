@@ -446,16 +446,13 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 
 	*changed = 0;
 
-	/* We are expecting an absolute in-repository path. */
-	if (path[0] != '/')
-		return got_error(GOT_ERR_NOT_ABSPATH);
-
 	/* We not do support comparing the root path. */
-	if (path[1] == '\0')
+	if (got_path_is_root_dir(path))
 		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	s = path;
-	s++; /* skip leading '/' */
+	while (*s == '/')
+		s++;
 	seg = s;
 	seglen = 0;
 	while (*s) {
