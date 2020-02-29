@@ -2833,7 +2833,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 
 	if (strncmp(got_worktree_get_root_path(worktree), resolved,
 	    strlen(got_worktree_get_root_path(worktree)))) {
-		err = got_error(GOT_ERR_BAD_PATH);
+		err = got_error_path(resolved, GOT_ERR_BAD_PATH);
 		goto done;
 	}
 
@@ -2996,7 +2996,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(relpath, GOT_ERR_BAD_PATH);
 
 	staged_status = get_staged_status(ie);
 	if (staged_status != GOT_STATUS_NO_CHANGE) {
@@ -3465,7 +3465,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(relpath, GOT_ERR_BAD_PATH);
 
 	/* Construct in-repository path of tree which contains this blob. */
 	err = got_path_dirname(&parent_path, ie->path);

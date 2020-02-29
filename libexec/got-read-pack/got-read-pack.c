@@ -452,7 +452,7 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 
 	/* We not do support comparing the root path. */
 	if (path[1] == '\0')
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	s = path;
 	s++; /* skip leading '/' */

@@ -112,11 +112,11 @@ got_path_skip_common_ancestor(char **child, const char *parent_abspath,
 	len_parent = strlen(parent_abspath);
 	len = strlen(abspath);
 	if (len_parent >= len)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(abspath, GOT_ERR_BAD_PATH);
 	if (strncmp(parent_abspath, abspath, len_parent) != 0)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(abspath, GOT_ERR_BAD_PATH);
 	if (!got_path_is_root_dir(parent_abspath) && abspath[len_parent] != '/')
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(abspath, GOT_ERR_BAD_PATH);
 	while (abspath[len_parent] == '/')
 		abspath++;
 	bufsize = len - len_parent + 1;
@@ -363,7 +363,7 @@ got_path_dirname(char **parent, const char *path)
 		return got_error_from_errno2("dirname", path);
 
 	if (p[0] == '.' && p[1] == '\0')
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	*parent = strdup(p);
 	if (*parent == NULL)

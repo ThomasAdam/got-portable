@@ -152,7 +152,7 @@ get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 	/* Packfile path contains ".pack" instead of ".idx", so add one byte. */
 	size = strlen(packidx->path_packidx) + 2;
 	if (size < GOT_PACKFILE_NAMELEN + 1)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(packidx->path_packidx, GOT_ERR_BAD_PATH);
 
 	*path_packfile = malloc(size);
 	if (*path_packfile == NULL)
@@ -1643,7 +1643,7 @@ got_object_tree_path_changed(int *changed,
 
 	/* We not do support comparing the root path. */
 	if (path[1] == '\0')
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	tree1 = tree01;
 	tree2 = tree02;

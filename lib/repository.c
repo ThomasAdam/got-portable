@@ -543,7 +543,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 	else
 		abspath = got_path_get_absolute(path);
 	if (abspath == NULL)
-		return got_error(GOT_ERR_BAD_PATH);
+		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
