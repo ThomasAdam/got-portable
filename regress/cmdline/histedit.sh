@@ -1289,6 +1289,57 @@ function test_histedit_split_commit {
 
 }
 
+function test_histedit_duplicate_commit_in_script {
+	local testroot=`test_init histedit_duplicate_commit_in_script`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing changes 1"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing changes 2"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# This histedit script lists commit1 more than once
+	echo "p $old_commit1" > $testroot/histedit-script
+	echo "p $old_commit1" >> $testroot/histedit-script
+	echo "p $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "histedit succeeded unexpectedly:" >&2
+		cat $testroot/stdout >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: commit $old_commit1 is listed more than once " \
+		> $testroot/stderr.expected
+	echo "in histedit script" >> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -1302,3 +1353,4 @@ run_test test_histedit_path_prefix_edit
 run_test test_histedit_outside_refs_heads
 run_test test_histedit_fold_last_commit_swap
 run_test test_histedit_split_commit
+run_test test_histedit_duplicate_commit_in_script

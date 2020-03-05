@@ -6082,7 +6082,7 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
 	struct got_histedit_list_entry *hle;
-	static char msg[80];
+	static char msg[92];
 	char *id_str;
 
 	if (TAILQ_EMPTY(histedit_cmds))
@@ -6090,6 +6090,24 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 		    "histedit script contains no commands");
 	if (SIMPLEQ_EMPTY(commits))
 		return got_error(GOT_ERR_EMPTY_HISTEDIT);
+
+	TAILQ_FOREACH(hle, histedit_cmds, entry) {
+		struct got_histedit_list_entry *hle2;
+		TAILQ_FOREACH(hle2, histedit_cmds, entry) {
+			if (hle == hle2)
+				continue;
+			if (got_object_id_cmp(hle->commit_id,
+			    hle2->commit_id) != 0)
+				continue;
+			err = got_object_id_str(&id_str, hle->commit_id);
+			if (err)
+				return err;
+			snprintf(msg, sizeof(msg), "commit %s is listed "
+			    "more than once in histedit script", id_str);
+			free(id_str);
+			return got_error_msg(GOT_ERR_HISTEDIT_CMD, msg);
+		}
+	}
 
 	SIMPLEQ_FOREACH(qid, commits, entry) {
 		TAILQ_FOREACH(hle, histedit_cmds, entry) {
