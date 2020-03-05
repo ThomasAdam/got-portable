@@ -2992,7 +2992,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie = NULL;
 	struct stat sb;
-	char *ondisk_path;
+	char *ondisk_path, *parent = NULL;
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
@@ -3038,6 +3038,26 @@ schedule_for_deletion(void *arg, unsigned char status,
 		} else if (unlink(ondisk_path) != 0) {
 			err = got_error_from_errno2("unlink", ondisk_path);
 			goto done;
+		}
+
+		parent = dirname(ondisk_path);
+
+		if (parent == NULL) {
+			err = got_error_from_errno2("dirname", ondisk_path);
+			goto done;
+		}
+		while (parent && strcmp(parent, a->worktree->root_path) != 0) {
+			if (rmdir(parent) == -1) {
+				if (errno != ENOTEMPTY)
+					err = got_error_from_errno2("rmdir",
+					    parent);
+				break;
+			}
+			parent = dirname(parent);
+			if (parent == NULL) {
+				err = got_error_from_errno2("dirname", parent);
+				goto done;
+			}
 		}
 	}
 

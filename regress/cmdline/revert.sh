@@ -990,6 +990,69 @@ function test_revert_added_subtree {
 	test_done "$testroot" "$ret"
 }
 
+function test_revert_deleted_subtree {
+	local testroot=`test_init revert_deleted_subtree`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/epsilon/foo/bar/baz
+	mkdir -p $testroot/wt/epsilon/foo/bar/bax
+	echo "new file" > $testroot/wt/epsilon/foo/a.o
+	echo "new file" > $testroot/wt/epsilon/foo/a.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/b.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/b.d
+	echo "new file" > $testroot/wt/epsilon/foo/bar/baz/f.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/baz/f.d
+	echo "new file" > $testroot/wt/epsilon/foo/bar/baz/c.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/baz/c.d
+	echo "new file" > $testroot/wt/epsilon/foo/bar/bax/e.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/bax/e.d
+	echo "new file" > $testroot/wt/epsilon/foo/bar/bax/x.o
+	echo "new file" > $testroot/wt/epsilon/foo/bar/bax/x.d
+	(cd $testroot/wt && got add -R epsilon >/dev/null)
+	(cd $testroot/wt && got commit -m "add subtree" >/dev/null)
+
+	# now delete and revert the entire subtree
+	(cd $testroot/wt && got rm -R epsilon/foo >/dev/null)
+
+	echo "R  epsilon/foo/a.o" > $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/b.d" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/b.o" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/bax/e.d" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/bax/e.o" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/bax/x.d" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/bax/x.o" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/baz/c.d" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/baz/c.o" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/baz/f.d" >> $testroot/stdout.expected
+	echo "R  epsilon/foo/bar/baz/f.o" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got revert -R . > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
@@ -1003,3 +1066,4 @@ run_test test_revert_patch_added
 run_test test_revert_patch_removed
 run_test test_revert_patch_one_change
 run_test test_revert_added_subtree
+run_test test_revert_deleted_subtree
