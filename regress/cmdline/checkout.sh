@@ -197,8 +197,14 @@ function test_checkout_commit_from_wrong_branch {
 		return 1
 	fi
 
-	echo  "got: target commit is on a different branch" \
+	echo -n "got: target commit is not contained in branch 'master'; " \
 		> $testroot/stderr.expected
+	echo -n "the branch to use must be specified with -b; if necessary " \
+		>> $testroot/stderr.expected
+	echo -n "a new branch can be created for this commit with "\
+		>> $testroot/stderr.expected
+	echo "'got branch -c $head_rev BRANCH_NAME'" \
+		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

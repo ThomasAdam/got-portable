@@ -177,6 +177,20 @@ An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
 If this option is not specified, the most recent commit on the selected
 branch will be used.
+.Pp
+If the specified
+.Ar commit
+is not contained in the selected branch, a different branch which contains
+this commit must be specified with the
+.Fl b
+option.
+If no such branch is known a new branch must be created for this
+commit with
+.Cm got branch
+before
+.Cm got checkout
+can be used.
+Checking out work trees with an unknown branch is intentionally not supported.
 .It Fl p Ar path-prefix
 Restrict the work tree to a subset of the repository's tree hierarchy.
 Only files beneath the specified

@@ -957,6 +957,30 @@ done:
 }
 
 static const struct got_error *
+checkout_ancestry_error(struct got_reference *ref, const char *commit_id_str)
+{
+	static char msg[512];
+	const char *branch_name;
+
+	if (got_ref_is_symbolic(ref))
+		branch_name = got_ref_get_symref_target(ref);
+	else
+		branch_name = got_ref_get_name(ref);
+
+	if (strncmp("refs/heads/", branch_name, 11) == 0)
+		branch_name += 11;
+
+	snprintf(msg, sizeof(msg),
+	    "target commit is not contained in branch '%s'; "
+	    "the branch to use must be specified with -b; "
+	    "if necessary a new branch can be created for "
+	    "this commit with 'got branch -c %s BRANCH_NAME'",
+	    branch_name, commit_id_str);
+
+	return got_error_msg(GOT_ERR_ANCESTRY, msg);
+}
+
+static const struct got_error *
 cmd_checkout(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1116,11 +1140,20 @@ cmd_checkout(int argc, char *argv[])
 		    got_worktree_get_base_commit_id(worktree), 0, repo);
 		if (error != NULL) {
 			free(commit_id);
+			if (error->code == GOT_ERR_ANCESTRY) {
+				error = checkout_ancestry_error(
+				    head_ref, commit_id_str);
+			}
 			goto done;
 		}
 		error = check_same_branch(commit_id, head_ref, NULL, repo);
-		if (error)
+		if (error) {
+			if (error->code == GOT_ERR_ANCESTRY) {
+				error = checkout_ancestry_error(
+				    head_ref, commit_id_str);
+			}
 			goto done;
+		}
 		error = got_worktree_set_base_commit_id(worktree, repo,
 		    commit_id);
 		free(commit_id);
