@@ -4980,7 +4980,7 @@ got_worktree_rebase_pathlist_free(struct got_pathlist_head *merged_paths)
 
 static const struct got_error *
 store_commit_id(const char *commit_ref_name, struct got_object_id *commit_id,
-    struct got_repository *repo)
+    int is_rebase, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reference *commit_ref = NULL;
@@ -4995,7 +4995,7 @@ store_commit_id(const char *commit_ref_name, struct got_object_id *commit_id,
 		err = got_ref_write(commit_ref, repo);
 		if (err)
 			goto done;
-	} else {
+	} else if (is_rebase) {
 		struct got_object_id *stored_id;
 		int cmp;
 
@@ -5060,7 +5060,7 @@ got_worktree_rebase_merge_files(struct got_pathlist_head *merged_paths,
 	if (err)
 		return err;
 
-	err = store_commit_id(commit_ref_name, commit_id, repo);
+	err = store_commit_id(commit_ref_name, commit_id, 1, repo);
 	if (err)
 		goto done;
 
@@ -5087,7 +5087,7 @@ got_worktree_histedit_merge_files(struct got_pathlist_head *merged_paths,
 	if (err)
 		return err;
 
-	err = store_commit_id(commit_ref_name, commit_id, repo);
+	err = store_commit_id(commit_ref_name, commit_id, 0, repo);
 	if (err)
 		goto done;
 
@@ -5263,7 +5263,6 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
 	const struct got_error *err;
 	char *commit_ref_name;
 	struct got_reference *commit_ref = NULL;
-	struct got_object_id *commit_id = NULL;
 
 	err = get_histedit_commit_ref_name(&commit_ref_name, worktree);
 	if (err)
@@ -5272,13 +5271,6 @@ got_worktree_histedit_commit(struct got_object_id **new_commit_id,
 	err = got_ref_open(&commit_ref, repo, commit_ref_name, 0);
 	if (err)
 		goto done;
-	err = got_ref_resolve(&commit_id, repo, commit_ref);
-	if (err)
-		goto done;
-	if (got_object_id_cmp(commit_id, orig_commit_id) != 0) {
-		err = got_error(GOT_ERR_HISTEDIT_COMMITID);
-		goto done;
-	}
 
 	err = rebase_commit(new_commit_id, merged_paths, commit_ref,
 	    worktree, fileindex, tmp_branch, orig_commit, new_logmsg, repo);
@@ -5286,7 +5278,6 @@ done:
 	if (commit_ref)
 		got_ref_close(commit_ref);
 	free(commit_ref_name);
-	free(commit_id);
 	return err;
 }
 
@@ -5882,7 +5873,7 @@ got_worktree_histedit_skip_commit(struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	err = store_commit_id(commit_ref_name, commit_id, repo);
+	err = store_commit_id(commit_ref_name, commit_id, 0, repo);
 	if (err)
 		goto done;
 

@@ -1183,6 +1183,112 @@ function test_histedit_fold_last_commit_swap {
 	test_done "$testroot" "$ret"
 }
 
+function test_histedit_split_commit {
+	local testroot=`test_init histedit_split_commit`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing changes 1"
+	local old_commit1=`git_show_head $testroot/repo`
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing changes 2"
+	local old_commit2=`git_show_head $testroot/repo`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# split commit1 into commitA and commitB and commitC
+	echo "e $old_commit1" > $testroot/histedit-script
+	echo "p $old_commit2" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "histedit failed unexpectedly:" >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
+	echo "Stopping histedit for amending commit $old_commit1" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got ci -m "commitA" alpha >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got ci -m "commitB" beta >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got ci -m "commitC" epsilon/new >/dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -c \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "histedit failed unexpectedly:" >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	local new_commit2=`git_show_head $testroot/repo`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "$short_old_commit1 -> no-op change: committing changes 1" \
+		> $testroot/stdout.expected
+	echo "G  epsilon/zeta" >> $testroot/stdout.expected
+	echo "$short_old_commit2 -> $short_new_commit2: committing changes 2" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop
@@ -1195,3 +1301,4 @@ run_test test_histedit_path_prefix_drop
 run_test test_histedit_path_prefix_edit
 run_test test_histedit_outside_refs_heads
 run_test test_histedit_fold_last_commit_swap
+run_test test_histedit_split_commit

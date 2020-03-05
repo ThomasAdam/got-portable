@@ -108,7 +108,7 @@
 #define GOT_ERR_NO_HISTEDIT_CMD	92
 #define GOT_ERR_HISTEDIT_SYNTAX	93
 #define GOT_ERR_HISTEDIT_CANCEL	94
-#define GOT_ERR_HISTEDIT_COMMITID 95
+/* 95 is currently unused */
 #define GOT_ERR_HISTEDIT_BUSY	96
 #define GOT_ERR_HISTEDIT_CMD	97
 #define GOT_ERR_HISTEDIT_PATH	98
@@ -238,7 +238,7 @@ static const struct got_error {
 	{ GOT_ERR_NO_HISTEDIT_CMD,"no histedit commands provided" },
 	{ GOT_ERR_HISTEDIT_SYNTAX,"syntax error in histedit command list" },
 	{ GOT_ERR_HISTEDIT_CANCEL,"histedit operation cancelled" },
-	{ GOT_ERR_HISTEDIT_COMMITID,"histedit commit ID mismatch" },
+	{ 95, "unused error code" },
 	{ GOT_ERR_HISTEDIT_BUSY,"histedit operation is in progress in this "
 	    "work tree and must be continued or aborted first" },
 	{ GOT_ERR_HISTEDIT_CMD, "bad histedit command" },
