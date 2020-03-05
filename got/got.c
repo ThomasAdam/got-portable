@@ -6867,7 +6867,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = got_error_msg(GOT_ERR_CONFLICTS,
-		    "conflicts must be resolved before rebasing can continue");
+		    "conflicts must be resolved before histedit can continue");
 	} else
 		error = histedit_complete(worktree, fileindex, tmp_branch,
 		    branch, repo);
