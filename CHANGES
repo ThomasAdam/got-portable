@@ -1,3 +1,12 @@
+* got 0.29; 2020-03-06
+- trim directories in got remove -R (tracey)
+- prevent commits from being listed more than once in a histedit script
+- fix histedit 'rebase commit ID mismatch' error when splitting a commit
+- be helpful when users try to check out work trees without a known branch
+- map 'tog path' to 'tog log path' if possible (requested by mpi)
+- when "bad path" errors occur always show the path in question
+- show merged commit ID upon merge conflict during rebase and histedit
+
 * got 0.28; 2020-02-25
 - improve man page documentation of rebase and histedit
 - disallow 'got rebase' while a histedit operation is in progress
