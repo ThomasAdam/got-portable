@@ -125,8 +125,7 @@ got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_fileindex_entry_alloc(struct got_fileindex_entry **ie,
-    const char *ondisk_path, const char *relpath, uint8_t *blob_sha1,
-    uint8_t *commit_sha1)
+    const char *relpath)
 {
 	size_t len;
 
@@ -147,8 +146,7 @@ got_fileindex_entry_alloc(struct got_fileindex_entry **ie,
 		len = GOT_FILEIDX_F_PATH_LEN;
 	(*ie)->flags |= len;
 
-	return got_fileindex_entry_update(*ie, ondisk_path, blob_sha1,
-	    commit_sha1, 1);
+	return NULL;
 }
 
 void

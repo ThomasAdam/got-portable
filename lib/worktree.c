@@ -910,10 +910,18 @@ update_blob_fileindex_entry(struct got_worktree *worktree,
 		    update_timestamps);
 	else {
 		struct got_fileindex_entry *new_ie;
-		err = got_fileindex_entry_alloc(&new_ie, ondisk_path,
-		    path, blob->id.sha1, worktree->base_commit_id->sha1);
-		if (!err)
-			err = got_fileindex_entry_add(fileindex, new_ie);
+		err = got_fileindex_entry_alloc(&new_ie, path);
+		if (err)
+			return err;
+		err = got_fileindex_entry_update(new_ie, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1, 1);
+		if (err) {
+			got_fileindex_entry_free(new_ie);
+			return err;
+		}
+		err = got_fileindex_entry_add(fileindex, new_ie);
+		if (err)
+			got_fileindex_entry_free(new_ie);
 	}
 	return err;
 }
@@ -2198,10 +2206,15 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
-			err = got_fileindex_entry_alloc(&ie,
-			    ondisk_path, path2, NULL, NULL);
+			err = got_fileindex_entry_alloc(&ie, path2);
 			if (err)
 				goto done;
+			err = got_fileindex_entry_update(ie, ondisk_path,
+			    NULL, NULL, 1);
+			if (err) {
+				got_fileindex_entry_free(ie);
+				goto done;
+			}
 			err = got_fileindex_entry_add(a->fileindex, ie);
 			if (err) {
 				got_fileindex_entry_free(ie);
@@ -2909,10 +2922,14 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 		goto done;
 	}
 
-	err = got_fileindex_entry_alloc(&ie, ondisk_path, relpath, NULL, NULL);
+	err = got_fileindex_entry_alloc(&ie, relpath);
 	if (err)
 		goto done;
-
+	err = got_fileindex_entry_update(ie, ondisk_path, NULL, NULL, 1);
+	if (err) {
+		got_fileindex_entry_free(ie);
+		goto done;
+	}
 	err = got_fileindex_entry_add(a->fileindex, ie);
 	if (err) {
 		got_fileindex_entry_free(ie);
@@ -4291,14 +4308,20 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				    new_base_commit_id->sha1,
 				    !have_staged_files);
 		} else {
-			err = got_fileindex_entry_alloc(&ie,
-			    ct->ondisk_path, pe->path, ct->blob_id->sha1,
-			    new_base_commit_id->sha1);
+			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
 				break;
+			err = got_fileindex_entry_update(ie, ct->ondisk_path,
+			    ct->blob_id->sha1, new_base_commit_id->sha1, 1);
+			if (err) {
+				got_fileindex_entry_free(ie);
+				break;
+			}
 			err = got_fileindex_entry_add(fileindex, ie);
-			if (err)
+			if (err) {
+				got_fileindex_entry_free(ie);
 				break;
+			}
 		}
 	}
 	return err;
