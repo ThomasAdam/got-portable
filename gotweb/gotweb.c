@@ -1680,6 +1680,7 @@ gw_tags(struct gw_trans *gw_trans)
 		goto done;
 
 	if (gw_trans->action == GW_SUMMARY) {
+		gw_trans->next_id = NULL;
 		error = gw_output_repo_tags(gw_trans, header,
 		    D_MAXSLCOMMDISP, TAGBRIEF);
 		if (error)
