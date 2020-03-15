@@ -146,7 +146,7 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp)
 		ret = inflate(z, Z_SYNC_FLUSH);
 	} while (ret == Z_OK && z->avail_out > 0);
 
-	if (ret == Z_OK) {
+	if (ret == Z_OK || ret == Z_BUF_ERROR) {
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
@@ -188,7 +188,7 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 		*consumed += z->total_in - last_total_in;
 	} while (ret == Z_OK && z->avail_out > 0);
 
-	if (ret == Z_OK) {
+	if (ret == Z_OK || ret == Z_BUF_ERROR) {
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
