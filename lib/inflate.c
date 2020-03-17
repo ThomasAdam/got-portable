@@ -107,7 +107,7 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 		ret = inflate(z, Z_SYNC_FLUSH);
 	} while (ret == Z_OK && z->avail_out > 0);
 
-	if (ret == Z_OK) {
+	if (ret == Z_OK || ret == Z_BUF_ERROR) {
 		zb->flags |= GOT_INFLATE_F_HAVE_MORE;
 	} else {
 		if (ret != Z_STREAM_END)
