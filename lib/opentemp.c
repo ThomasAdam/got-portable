@@ -34,7 +34,8 @@ got_opentempfd(void)
 		return -1;
 
 	fd = mkstemp(name);
-	unlink(name);
+	if (fd != -1)
+		unlink(name);
 	return fd;
 }
 
