@@ -181,8 +181,7 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 				break;
 			}
 			z->next_in = map + offset + *consumed;
-			z->avail_in = MIN(zb->inlen, len);
-			len -= z->avail_in;
+			z->avail_in = len - *consumed;
 		}
 		ret = inflate(z, Z_SYNC_FLUSH);
 		*consumed += z->total_in - last_total_in;
