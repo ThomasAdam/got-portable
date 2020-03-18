@@ -419,6 +419,71 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd)
 }
 
 const struct got_error *
+got_privsep_send_fetch_symrefs(struct imsgbuf *ibuf,
+    struct got_pathlist_head *symrefs)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t len, nsymrefs = 0;
+	struct got_pathlist_entry *pe;
+
+	len = sizeof(struct got_imsg_fetch_symrefs);
+	TAILQ_FOREACH(pe, symrefs, entry) {
+		const char *target = pe->data;
+		len += sizeof(struct got_imsg_fetch_symref) +
+		    pe->path_len + strlen(target);
+		nsymrefs++;
+	}
+
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_SYMREFS, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create FETCH_SYMREFS");
+
+	/* Keep in sync with struct got_imsg_fetch_symrefs definition! */
+	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	TAILQ_FOREACH(pe, symrefs, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+		const char *target = pe->data;
+		size_t target_len = strlen(target);
+
+		/* Keep in sync with struct got_imsg_fetch_symref definition! */
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, &target_len, sizeof(target_len)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, name, name_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, target, target_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_fetch_progress(struct imsgbuf *ibuf,
     struct got_object_id *refid, const char *refname)
 {
@@ -463,14 +528,18 @@ got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 
 const struct got_error *
 got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
-    char **refname, struct imsgbuf *ibuf)
+    char **refname, struct got_pathlist_head *symrefs, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
 	const size_t min_datalen =
-	    MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_fetch_progress));
+	    MIN(MIN(sizeof(struct got_imsg_error),
+	    sizeof(struct got_imsg_fetch_progress)),
+	    sizeof(struct got_imsg_fetch_symrefs));
+	struct got_imsg_fetch_symrefs *isymrefs = NULL;
+	size_t n, remain;
+	off_t off;
 
 	*done = 0;
 	*id = NULL;
@@ -484,6 +553,60 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_ERROR:
 		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_FETCH_SYMREFS:
+		if (datalen < sizeof(*isymrefs)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		if (isymrefs != NULL) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		isymrefs = (struct got_imsg_fetch_symrefs *)imsg.data;
+		off = sizeof(*isymrefs);
+		remain = datalen - off;
+		for (n = 0; n < isymrefs->nsymrefs; n++) {
+			struct got_imsg_fetch_symref *s;
+			char *name, *target;
+			if (remain < sizeof(struct got_imsg_fetch_symref)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				goto done;
+			}
+			s = (struct got_imsg_fetch_symref *)(imsg.data + off);
+			off += sizeof(*s);
+			remain -= sizeof(*s);
+			if (remain < s->name_len) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				goto done;
+			}
+			name = strndup(imsg.data + off, s->name_len);
+			if (name == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+			off += s->name_len;
+			remain -= s->name_len;
+			if (remain < s->target_len) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				free(name);
+				goto done;
+			}
+			target = strndup(imsg.data + off, s->target_len);
+			if (target == NULL) {
+				err = got_error_from_errno("strndup");
+				free(name);
+				goto done;
+			}
+			off += s->target_len;
+			remain -= s->target_len;
+			err = got_pathlist_append(symrefs, name, target);
+			if (err) {
+				free(name);
+				free(target);
+				goto done;
+			}
+		}
 		break;
 	case GOT_IMSG_FETCH_PROGRESS:
 		*id = malloc(sizeof(**id));
@@ -520,7 +643,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		break;
 	}
-
+done:
 	if (err) {
 		free(*id);
 		*id = NULL;

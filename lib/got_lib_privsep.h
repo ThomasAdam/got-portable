@@ -110,6 +110,7 @@ enum got_imsg_type {
 
 	/* Messages related to networking. */
 	GOT_IMSG_FETCH_REQUEST,
+	GOT_IMSG_FETCH_SYMREFS,
 	GOT_IMSG_FETCH_PROGRESS,
 	GOT_IMSG_FETCH_DONE,
 	GOT_IMSG_IDXPACK_REQUEST,
@@ -233,9 +234,25 @@ struct got_imsg_tag_object {
 	 */
 } __attribute__((__packed__));
 
+/* Structures for GOT_IMSG_FETCH_SYMREFS data. */
+struct got_imsg_fetch_symref {
+	size_t name_len;
+	size_t target_len;
+
+	/*
+	 * Followed by name_len + target_len gata bytes.
+	 */
+} __attribute__((__packed__));
+
+struct got_imsg_fetch_symrefs {
+	size_t nsymrefs;
+
+	/* Followed by nsymrefs times of got_imsg_fetch_symref data. */
+} __attribute__((__packed__));
+
 /* Structure for GOT_IMSG_FETCH_PROGRESS data. */
 struct got_imsg_fetch_progress {
-	/* Descirbes a reference which will be fetched. */
+	/* Describes a reference which will be fetched. */
 	uint8_t refid[SHA1_DIGEST_LENGTH];
 	/* Followed by reference name in remaining data of imsg buffer. */
 };
@@ -323,10 +340,13 @@ const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
+    struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_progress(struct imsgbuf *,
     struct got_object_id *, const char *);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
-    struct got_object_id **, char **, struct imsgbuf *);
+    struct got_object_id **, char **, struct got_pathlist_head *,
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
     struct got_object_id);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,

@@ -298,6 +298,10 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	pid_t pid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL, *default_destdir = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
+	struct got_pathlist_head symrefs;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&symrefs);
 
 	fetchfd = -1;
 	if (got_parse_uri(uri, proto, host, port, path, repo) == -1)
@@ -365,7 +369,7 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		struct got_object_id *id;
 		char *refname;
 		err = got_privsep_recv_fetch_progress(&done,
-		    &id, &refname, &ibuf);
+		    &id, &refname, &symrefs, &ibuf);
 		if (err != NULL)
 			return err;
 		if (done) {
@@ -373,7 +377,13 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 			if (packhash == NULL)
 				return got_error_from_errno(
 				    "got_object_id_dup");
-		} else {
+			printf("symrefs:");
+			TAILQ_FOREACH(pe, &symrefs, entry) {
+				printf(" %s:%s", pe->path,
+				    (const char *)pe->data);
+			}
+			printf("\n");
+		} else if (id) {
 			char *id_str;
 			/* TODO Use a progress callback */
 			err = got_object_id_str(&id_str, id);
@@ -431,6 +441,11 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	free(packpath);
 	free(default_destdir);
 	free(packhash);
+	TAILQ_FOREACH(pe, &symrefs, entry) {
+		free((void *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&symrefs);
 
 	return NULL;
 }

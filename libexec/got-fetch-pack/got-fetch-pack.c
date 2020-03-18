@@ -37,6 +37,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_path.h"
 #include "got_version.h"
 
 #include "got_lib_sha1.h"
@@ -353,10 +354,46 @@ match_capability(char **my_capabilities, const char *capa,
 }
 
 static const struct got_error *
-match_capabilities(char **my_capabilities, char *server_capabilities)
+add_symref(struct got_pathlist_head *symrefs, const char *capa)
 {
 	const struct got_error *err = NULL;
-	char *capa;
+	char *colon, *name = NULL, *target = NULL;
+
+	/* Need at least "A:B" */
+	if (strlen(capa) < 3)
+		return NULL;
+
+	colon = strchr(capa, ':');
+	if (colon == NULL)
+		return NULL;
+
+	*colon = '\0';
+	name = strdup(capa);
+	if (name == NULL)
+		return got_error_from_errno("strdup");
+
+	target = strdup(colon + 1);
+	if (target == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	/* We can't validate the ref itself here. The main process will. */
+	err = got_pathlist_append(symrefs, name, target);
+done:
+	if (err) {
+		free(name);
+		free(target);
+	}
+	return err;
+}
+
+static const struct got_error *
+match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
+    char *server_capabilities)
+{
+	const struct got_error *err = NULL;
+	char *capa, *equalsign;
 	int i;
 
 	*my_capabilities = NULL;
@@ -364,6 +401,15 @@ match_capabilities(char **my_capabilities, char *server_capabilities)
 		capa = strsep(&server_capabilities, " ");
 		if (capa == NULL)
 			return NULL;
+
+		equalsign = strchr(capa, '=');
+		if (equalsign != NULL &&
+		    strncmp(capa, "symref", equalsign - capa) == 0) {
+			err = add_symref(symrefs, equalsign + 1);
+			if (err)
+				break;
+			continue;
+		}
 
 		for (i = 0; i < nitems(got_capabilities); i++) {
 			err = match_capability(my_capabilities,
@@ -375,7 +421,7 @@ match_capabilities(char **my_capabilities, char *server_capabilities)
 
 	return err;
 }
-			
+
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct imsgbuf *ibuf)
@@ -388,6 +434,10 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	int i, n, req;
 	off_t packsz;
 	char *my_capabilities = NULL;
+	struct got_pathlist_head symrefs;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&symrefs);
 
 	have = malloc(refsz * sizeof(have[0]));
 	if (have == NULL)
@@ -426,12 +476,16 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (chattygit && sp[2][0] != '\0')
 			fprintf(stderr, "server capabilities: %s\n", sp[2]);
 		if (is_firstpkt) {
-			err = match_capabilities(&my_capabilities, sp[2]);
+			err = match_capabilities(&my_capabilities, &symrefs,
+			    sp[2]);
 			if (err)
 				goto done;
 			if (chattygit && my_capabilities)
 				fprintf(stderr, "my matched capabilities: %s\n",
 				    my_capabilities);
+			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
+			if (err)
+				goto done;
 		}
 		is_firstpkt = 0;
 		if (strstr(sp[1], "^{}"))
@@ -549,6 +603,11 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	if (got_check_pack_hash(packfd, packsz, packid->sha1) == -1)
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 done:
+	TAILQ_FOREACH(pe, &symrefs, entry) {
+		free((void *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&symrefs);
 	free(have);
 	free(want);
 	return err;
