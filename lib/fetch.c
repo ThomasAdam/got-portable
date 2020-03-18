@@ -339,7 +339,7 @@ got_clone(char *uri, char *branch_filter, char *destdir)
 		return got_error_from_errno("close");
 	imsg_init(&ibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&ibuf, npackfd, packhash);
+	err = got_privsep_send_index_pack_req(&ibuf, npackfd, &packhash);
 	if (err != NULL)
 		return err;
 	err = got_privsep_send_tmpfd(&ibuf, nidxfd);

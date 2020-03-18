@@ -446,12 +446,12 @@ got_privsep_wait_fetch_done(struct imsgbuf *ibuf, struct got_object_id *hash)
 
 
 const struct got_error *
-got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_id hash)
+got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_id *hash)
 {
 	const struct got_error *err = NULL;
 
 	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_REQUEST, 0, 0, fd,
-	    hash.sha1, SHA1_DIGEST_LENGTH) == -1) {
+	    hash->sha1, SHA1_DIGEST_LENGTH) == -1) {
 		err = got_error_from_errno("imsg_compose INDEX_REQUEST");
 		close(fd);
 		return err;

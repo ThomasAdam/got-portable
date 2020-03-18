@@ -311,7 +311,7 @@ const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
 const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
-    struct got_object_id);
+    struct got_object_id *);
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);

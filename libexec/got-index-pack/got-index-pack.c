@@ -1085,7 +1085,7 @@ objectcrc(FILE *f, Object *o)
 }
 
 int
-indexpack(int packfd, int idxfd, struct got_object_id packhash)
+indexpack(int packfd, int idxfd, struct got_object_id *packhash)
 {
 	char hdr[4*3], buf[8];
 	int nobj, nvalid, nbig, n, i, step;
@@ -1192,7 +1192,7 @@ indexpack(int packfd, int idxfd, struct got_object_id packhash)
 			hwrite(f, buf, 8, &ctx);
 		}
 	}
-	hwrite(f, packhash.sha1, sizeof(packhash.sha1), &ctx);
+	hwrite(f, packhash->sha1, sizeof(packhash->sha1), &ctx);
 	SHA1Final(h.sha1, &ctx);
 	fwrite(h.sha1, 1, sizeof(h.sha1), f);
 
@@ -1254,7 +1254,7 @@ main(int argc, char **argv)
 	}
 	idxfd = imsg.fd;
 
-	indexpack(packfd, idxfd, packhash);
+	indexpack(packfd, idxfd, &packhash);
 done:
 	if(err != NULL)
 		got_privsep_send_error(&ibuf, err);
