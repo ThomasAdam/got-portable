@@ -96,25 +96,36 @@ static const struct got_error *
 readpkt(int *outlen, int fd, char *buf, int nbuf)
 {
 	const struct got_error *err = NULL;
-	char len[5];
+	char lenstr[5];
+	long len;
 	char *e;
 	int n;
 	ssize_t r;
 
 	*outlen = 0;
 
-	err = readn(&r, fd, len, 4);
+	err = readn(&r, fd, lenstr, 4);
 	if (err)
 		return err;
+	if (r != 4)
+		return got_error(GOT_ERR_IO);
 
-	len[4] = 0;
-	n = strtol(len, &e, 16);
+	lenstr[4] = '\0';
+	errno = 0;
+	len = strtol(lenstr, &e, 16);
+	if (lenstr[0] == '\0' || *e != '\0')
+		return got_error(GOT_ERR_BAD_PACKET);
+	if (errno == ERANGE && (len == LONG_MAX || len == LONG_MIN))
+		return got_error(GOT_ERR_BAD_PACKET);
+	if (len > INT_MAX || len < INT_MIN)
+		return got_error(GOT_ERR_BAD_PACKET);
+	n = len;
 	if (n == 0) {
 		if (chattygit)
 			fprintf(stderr, "readpkt: 0000\n");
 		return NULL;
 	}
-	if (e != len + 4 || n <= 4)
+	if (n <= 4)
 		return got_error(GOT_ERR_BAD_PACKET);
 	n  -= 4;
 	if (n >= nbuf)
@@ -127,7 +138,7 @@ readpkt(int *outlen, int fd, char *buf, int nbuf)
 		return got_error(GOT_ERR_BAD_PACKET);
 	buf[n] = 0;
 	if (chattygit)
-		fprintf(stderr, "readpkt: %s:\t%.*s\n", len, nbuf, buf);
+		fprintf(stderr, "readpkt: %s:\t%.*s\n", lenstr, nbuf, buf);
 
 	*outlen = n;
 	return NULL;
