@@ -514,6 +514,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 	int have_sidebands = 0;
+	uint32_t nobjects = 0;
 
 	TAILQ_INIT(&symrefs);
 
@@ -734,6 +735,32 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				goto done;
 			if (r <= 0)
 				break;
+		}
+
+		/* Check pack file header. */
+		if (nobjects == 0) {
+			struct got_packfile_hdr *hdr = (void *)buf;
+			if (r < sizeof(*hdr)) {
+				err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+				    "short packfile header");
+				goto done;
+			}
+			if (hdr->signature != htobe32(GOT_PACKFILE_SIGNATURE)) {
+				err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+				    "bad packfile signature");
+				goto done;
+			}
+			if (hdr->version != htobe32(GOT_PACKFILE_VERSION)) {
+				err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+				    "bad packfile version");
+				goto done;
+			}
+			nobjects = betoh32(hdr->nobjects);
+			if (nobjects == 0) {
+				err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+				    "bad packfile with zero objects");
+				goto done;
+			}
 		}
 
 		/* Write packfile data to temporary pack file. */
