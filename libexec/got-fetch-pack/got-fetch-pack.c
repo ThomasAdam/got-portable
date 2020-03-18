@@ -58,21 +58,21 @@ static int chattygit;
 static char *fetchbranch;
 static struct got_object_id zhash = {.sha1={0}};
 
-static int
-readn(int fd, void *buf, size_t n)
+static const struct got_error *
+readn(ssize_t *off, int fd, void *buf, size_t n)
 {
-	ssize_t r, off;
+	ssize_t r;
 
-	off = 0;
-	while (off != n) {
-		r = read(fd, buf + off, n - off);
-		if (r < 0)
-			return -1;
+	*off = 0;
+	while (*off != n) {
+		r = read(fd, buf + *off, n - *off);
+		if (r == -1)
+			return got_error_from_errno("read");
 		if (r == 0)
-			return off;
-		off += r;
+			return NULL;
+		*off += r;
 	}
-	return off;
+	return NULL;
 }
 
 static int
@@ -84,34 +84,45 @@ flushpkt(int fd)
 }
 
 
-static int
-readpkt(int fd, char *buf, int nbuf)
+static const struct got_error *
+readpkt(int *outlen, int fd, char *buf, int nbuf)
 {
+	const struct got_error *err = NULL;
 	char len[5];
 	char *e;
-	int n, r;
+	int n;
+	ssize_t r;
 
-	if (readn(fd, len, 4) == -1) {
-		return -1;
-	}
+	*outlen = 0;
+
+	err = readn(&r, fd, len, 4);
+	if (err)
+		return err;
+
 	len[4] = 0;
 	n = strtol(len, &e, 16);
 	if (n == 0) {
 		if (chattygit)
 			fprintf(stderr, "readpkt: 0000\n");
-		return 0;
+		return NULL;
 	}
 	if (e != len + 4 || n <= 4)
-		err(1, "invalid packet line length");
+		return got_error(GOT_ERR_BAD_PACKET);
 	n  -= 4;
 	if (n >= nbuf)
-		err(1, "buffer too small");
-	if ((r = readn(fd, buf, n)) != n)
-		return -1;
+		return got_error(GOT_ERR_NO_SPACE);
+
+	err = readn(&r, fd, buf, n);
+	if (err)
+		return err;
+	if (r != n)
+		return got_error(GOT_ERR_BAD_PACKET);
 	buf[n] = 0;
 	if (chattygit)
 		fprintf(stderr, "readpkt: %s:\t%.*s\n", len, nbuf, buf);
-	return n;
+
+	*outlen = n;
+	return NULL;
 }
 
 static int
@@ -159,6 +170,7 @@ match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
 static const struct got_error *
 check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 {
+	const struct got_error *err = NULL;
 	SHA1_CTX ctx;
 	uint8_t hexpect[SHA1_DIGEST_LENGTH];
 	char s1[SHA1_DIGEST_STRING_LENGTH + 1];
@@ -175,7 +187,9 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 		nr = sizeof(buf);
 		if (sz - n - 20 < sizeof(buf))
 			nr = sz - n - 20;
-		r = readn(fd, buf, nr);
+		err = readn(&r, fd, buf, nr);
+		if (err)
+			return err;
 		if (r != nr)
 			return got_error(GOT_ERR_BAD_PACKFILE);
 		SHA1Update(&ctx, buf, nr);
@@ -183,7 +197,10 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	}
 	SHA1Final(hcomp, &ctx);
 
-	if (readn(fd, hexpect, sizeof(hexpect)) != sizeof(hexpect))
+	err = readn(&r, fd, hexpect, sizeof(hexpect));
+	if (err)
+		return err;
+	if (r != sizeof(hexpect))
 		return got_error(GOT_ERR_BAD_PACKFILE);
 	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0) {
 		got_sha1_digest_to_str(hcomp, s1, sizeof(s1));
@@ -414,11 +431,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	if (chattygit)
 		fprintf(stderr, "starting fetch\n");
 	while (1) {
-		n = readpkt(fd, buf, sizeof(buf));
-		if (n == -1) {
-			err = got_error_from_errno("readpkt");
+		err = readpkt(&n, fd, buf, sizeof(buf));
+		if (err)
 			goto done;
-		}
 		if (n == 0)
 			break;
 		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
@@ -534,34 +549,31 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	if (!req)
 		return 0;
 
-	if ((n = readpkt(fd, buf, sizeof(buf))) == -1) {
-		err = got_error_from_errno("readpkt");
+	err = readpkt(&n, fd, buf, sizeof(buf));
+	if (err)
 		goto done;
-	}
 	buf[n] = 0;
 
 	if (chattygit)
 		fprintf(stderr, "fetching...\n");
 	packsz = 0;
 	while (1) {
-		ssize_t w;
-		n = readn(fd, buf, sizeof buf);
-		if (n == 0)
-			break;
-		if (n == -1) {
-			err = got_error_from_errno("readn");
+		ssize_t r, w;
+		err = readn(&r, fd, buf, sizeof buf);
+		if (err)
 			goto done;
-		}
-		w = write(packfd, buf, n);
+		if (r == 0)
+			break;
+		w = write(packfd, buf, r);
 		if (w == -1) {
 			err = got_error_from_errno("write");
 			goto done;
 		}
-		if (w != n) {
+		if (w != r) {
 			err = got_error(GOT_ERR_IO);
 			goto done;
 		}
-		packsz += n;
+		packsz += r;
 	}
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
