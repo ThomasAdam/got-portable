@@ -230,10 +230,13 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 	void *newbuf;
 	int nbuf = 1;
 
-	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
-	if (*outbuf == NULL)
-		return got_error_from_errno("malloc");
-	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+	if (outbuf) {
+		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
+		if (*outbuf == NULL)
+			return got_error_from_errno("malloc");
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+	} else
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
 	if (err)
 		return err;
 
@@ -249,6 +252,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 		if (consumed_total)
 			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
+			if (outbuf == NULL)
+				continue;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			   GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
@@ -260,7 +266,6 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_INFLATE_F_HAVE_MORE);
 
@@ -279,10 +284,13 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 	void *newbuf;
 	int nbuf = 1;
 
-	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
-	if (*outbuf == NULL)
-		return got_error_from_errno("malloc");
-	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+	if (outbuf) {
+		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
+		if (*outbuf == NULL)
+			return got_error_from_errno("malloc");
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+	} else
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
 	if (err)
 		goto done;
 
@@ -298,6 +306,9 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 		if (consumed_total)
 			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
+			if (outbuf == NULL)
+				continue;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
@@ -309,7 +320,6 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 			}
 			*outbuf = newbuf;
 			zb.outbuf = newbuf + *outlen;
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 		}
 	} while (zb.flags & GOT_INFLATE_F_HAVE_MORE);
 
