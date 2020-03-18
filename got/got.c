@@ -808,7 +808,7 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone repo-url [target-directory]\n",
+	fprintf(stderr, "usage: %s clone repository-url [target-directory]\n",
 	    getprogname());
 	exit(1);
 }
