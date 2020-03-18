@@ -82,7 +82,8 @@ hassuffix(char *base, char *suf)
 }
 
 static const struct got_error *
-dial_ssh(int *fetchfd, char *host, char *port, char *path, char *direction)
+dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
+    const char *direction)
 {
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
@@ -118,7 +119,8 @@ dial_ssh(int *fetchfd, char *host, char *port, char *path, char *direction)
 }
 
 static const struct got_error *
-dial_git(int *fetchfd, char *host, char *port, char *path, char *direction)
+dial_git(int *fetchfd, const char *host, const char *port, const char *path,
+    const char *direction)
 {
 	const struct got_error *err = NULL;
 	struct addrinfo hints, *servinfo, *p;
@@ -277,9 +279,10 @@ done:
 }
 
 const struct got_error*
-got_fetch(char *uri, char *branch_filter, char *destdir)
+got_fetch(const char *proto, const char *host, const char *port,
+    const char *server_path, const char *repo_name,
+    const char *branch_filter, const char *destdir)
 {
-	char *proto, *host, *port, *repo_name, *server_path;
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
 	int status, done = 0;
@@ -298,10 +301,6 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	TAILQ_INIT(&symrefs);
 
 	fetchfd = -1;
-	err = got_fetch_parse_uri(&proto, &host, &port, &server_path,
-	    &repo_name, uri);
-	if (err)
-		return err;
 	if (destdir == NULL) {
 		if (asprintf(&default_destdir, "%s.git", repo_name) == -1)
 			return got_error_from_errno("asprintf");

@@ -971,7 +971,9 @@ done:
 static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
-	char *uri, *branch_filter, *dirname;
+	const struct got_error *err = NULL;
+	const char *uri, *branch_filter, *dirname;
+	char *proto, *host, *port, *repo_name, *server_path;
 	int ch;
 
 	while ((ch = getopt(argc, argv, "b:")) != -1) {
@@ -993,7 +995,21 @@ cmd_clone(int argc, char *argv[])
 		dirname = argv[1];
 	else
 		usage_clone();
-	return got_fetch(argv[0], branch_filter, dirname);
+
+	err = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	    &repo_name, argv[0]);
+	if (err)
+		goto done;
+
+	err = got_fetch(proto, host, port, server_path, repo_name,
+	    branch_filter, dirname);
+done:
+	free(proto);
+	free(host);
+	free(port);
+	free(server_path);
+	free(repo_name);
+	return err;
 }
 
 static const struct got_error *
