@@ -725,6 +725,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		goto done;
 	}
 done:
+	free(objects);
 	free(packidx.hdr.magic);
 	free(packidx.hdr.version);
 	free(packidx.hdr.fanout_table);
