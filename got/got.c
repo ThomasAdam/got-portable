@@ -85,8 +85,8 @@ struct got_cmd {
 __dead static void	usage(int);
 __dead static void	usage_init(void);
 __dead static void	usage_import(void);
-__dead static void	usage_checkout(void);
 __dead static void	usage_clone(void);
+__dead static void	usage_checkout(void);
 __dead static void	usage_update(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
@@ -138,8 +138,8 @@ static const struct got_error*		cmd_cat(int, char *[]);
 static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"in" },
 	{ "import",	cmd_import,	usage_import,	"im" },
-	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
 	{ "clone",	cmd_clone,	usage_clone,	"cl" },
+	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
 	{ "update",	cmd_update,	usage_update,	"up" },
 	{ "log",	cmd_log,	usage_log,	"" },
 	{ "diff",	cmd_diff,	usage_diff,	"di" },
@@ -813,163 +813,6 @@ usage_clone(void)
 	exit(1);
 }
 
-__dead static void
-usage_checkout(void)
-{
-	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
-	    "[-p prefix] repository-path [worktree-path]\n", getprogname());
-	exit(1);
-}
-
-static void
-show_worktree_base_ref_warning(void)
-{
-	fprintf(stderr, "%s: warning: could not create a reference "
-	    "to the work tree's base commit; the commit could be "
-	    "garbage-collected by Git; making the repository "
-	    "writable and running 'got update' will prevent this\n",
-	    getprogname());
-}
-
-struct got_checkout_progress_arg {
-	const char *worktree_path;
-	int had_base_commit_ref_error;
-};
-
-static const struct got_error *
-checkout_progress(void *arg, unsigned char status, const char *path)
-{
-	struct got_checkout_progress_arg *a = arg;
-
-	/* Base commit bump happens silently. */
-	if (status == GOT_STATUS_BUMP_BASE)
-		return NULL;
-
-	if (status == GOT_STATUS_BASE_REF_ERR) {
-		a->had_base_commit_ref_error = 1;
-		return NULL;
-	}
-
-	while (path[0] == '/')
-		path++;
-
-	printf("%c  %s/%s\n", status, a->worktree_path, path);
-	return NULL;
-}
-
-static const struct got_error *
-check_cancelled(void *arg)
-{
-	if (sigint_received || sigpipe_received)
-		return got_error(GOT_ERR_CANCELLED);
-	return NULL;
-}
-
-static const struct got_error *
-check_linear_ancestry(struct got_object_id *commit_id,
-    struct got_object_id *base_commit_id, int allow_forwards_in_time_only,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_object_id *yca_id;
-
-	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    commit_id, base_commit_id, repo, check_cancelled, NULL);
-	if (err)
-		return err;
-
-	if (yca_id == NULL)
-		return got_error(GOT_ERR_ANCESTRY);
-
-	/*
-	 * Require a straight line of history between the target commit
-	 * and the work tree's base commit.
-	 *
-	 * Non-linear situations such as this require a rebase:
-	 *
-	 * (commit) D       F (base_commit)
-	 *           \     /
-	 *            C   E
-	 *             \ /
-	 *              B (yca)
-	 *              |
-	 *              A
-	 *
-	 * 'got update' only handles linear cases:
-	 * Update forwards in time:  A (base/yca) - B - C - D (commit)
-	 * Update backwards in time: D (base) - C - B - A (commit/yca)
-	 */
-	if (allow_forwards_in_time_only) {
-	    if (got_object_id_cmp(base_commit_id, yca_id) != 0)
-		return got_error(GOT_ERR_ANCESTRY);
-	} else if (got_object_id_cmp(commit_id, yca_id) != 0 &&
-	    got_object_id_cmp(base_commit_id, yca_id) != 0)
-		return got_error(GOT_ERR_ANCESTRY);
-
-	free(yca_id);
-	return NULL;
-}
-
-static const struct got_error *
-check_same_branch(struct got_object_id *commit_id,
-    struct got_reference *head_ref, struct got_object_id *yca_id,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_commit_graph *graph = NULL;
-	struct got_object_id *head_commit_id = NULL;
-	int is_same_branch = 0;
-
-	err = got_ref_resolve(&head_commit_id, repo, head_ref);
-	if (err)
-		goto done;
-
-	if (got_object_id_cmp(head_commit_id, commit_id) == 0) {
-		is_same_branch = 1;
-		goto done;
-	}
-	if (yca_id && got_object_id_cmp(commit_id, yca_id) == 0) {
-		is_same_branch = 1;
-		goto done;
-	}
-
-	err = got_commit_graph_open(&graph, "/", 1);
-	if (err)
-		goto done;
-
-	err = got_commit_graph_iter_start(graph, head_commit_id, repo,
-	    check_cancelled, NULL);
-	if (err)
-		goto done;
-
-	for (;;) {
-		struct got_object_id *id;
-		err = got_commit_graph_iter_next(&id, graph, repo,
-		    check_cancelled, NULL);
-		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED)
-				err = NULL;
-			break;
-		}
-
-		if (id) {
-			if (yca_id && got_object_id_cmp(id, yca_id) == 0)
-				break;
-			if (got_object_id_cmp(id, commit_id) == 0) {
-				is_same_branch = 1;
-				break;
-			}
-		}
-	}
-done:
-	if (graph)
-		got_commit_graph_close(graph);
-	free(head_commit_id);
-	if (!err && !is_same_branch)
-		err = got_error(GOT_ERR_ANCESTRY);
-	return err;
-}
-
 struct got_fetch_progress_arg {
 	char last_scaled_size[FMT_SCALED_STRSIZE];
 	int last_p_indexed;
@@ -1310,6 +1153,163 @@ done:
 	free(gitconfig_path);
 	free(git_url);
 	return error;
+}
+
+__dead static void
+usage_checkout(void)
+{
+	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
+	    "[-p prefix] repository-path [worktree-path]\n", getprogname());
+	exit(1);
+}
+
+static void
+show_worktree_base_ref_warning(void)
+{
+	fprintf(stderr, "%s: warning: could not create a reference "
+	    "to the work tree's base commit; the commit could be "
+	    "garbage-collected by Git; making the repository "
+	    "writable and running 'got update' will prevent this\n",
+	    getprogname());
+}
+
+struct got_checkout_progress_arg {
+	const char *worktree_path;
+	int had_base_commit_ref_error;
+};
+
+static const struct got_error *
+checkout_progress(void *arg, unsigned char status, const char *path)
+{
+	struct got_checkout_progress_arg *a = arg;
+
+	/* Base commit bump happens silently. */
+	if (status == GOT_STATUS_BUMP_BASE)
+		return NULL;
+
+	if (status == GOT_STATUS_BASE_REF_ERR) {
+		a->had_base_commit_ref_error = 1;
+		return NULL;
+	}
+
+	while (path[0] == '/')
+		path++;
+
+	printf("%c  %s/%s\n", status, a->worktree_path, path);
+	return NULL;
+}
+
+static const struct got_error *
+check_cancelled(void *arg)
+{
+	if (sigint_received || sigpipe_received)
+		return got_error(GOT_ERR_CANCELLED);
+	return NULL;
+}
+
+static const struct got_error *
+check_linear_ancestry(struct got_object_id *commit_id,
+    struct got_object_id *base_commit_id, int allow_forwards_in_time_only,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *yca_id;
+
+	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
+	    commit_id, base_commit_id, repo, check_cancelled, NULL);
+	if (err)
+		return err;
+
+	if (yca_id == NULL)
+		return got_error(GOT_ERR_ANCESTRY);
+
+	/*
+	 * Require a straight line of history between the target commit
+	 * and the work tree's base commit.
+	 *
+	 * Non-linear situations such as this require a rebase:
+	 *
+	 * (commit) D       F (base_commit)
+	 *           \     /
+	 *            C   E
+	 *             \ /
+	 *              B (yca)
+	 *              |
+	 *              A
+	 *
+	 * 'got update' only handles linear cases:
+	 * Update forwards in time:  A (base/yca) - B - C - D (commit)
+	 * Update backwards in time: D (base) - C - B - A (commit/yca)
+	 */
+	if (allow_forwards_in_time_only) {
+	    if (got_object_id_cmp(base_commit_id, yca_id) != 0)
+		return got_error(GOT_ERR_ANCESTRY);
+	} else if (got_object_id_cmp(commit_id, yca_id) != 0 &&
+	    got_object_id_cmp(base_commit_id, yca_id) != 0)
+		return got_error(GOT_ERR_ANCESTRY);
+
+	free(yca_id);
+	return NULL;
+}
+
+static const struct got_error *
+check_same_branch(struct got_object_id *commit_id,
+    struct got_reference *head_ref, struct got_object_id *yca_id,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_graph *graph = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	int is_same_branch = 0;
+
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	if (got_object_id_cmp(head_commit_id, commit_id) == 0) {
+		is_same_branch = 1;
+		goto done;
+	}
+	if (yca_id && got_object_id_cmp(commit_id, yca_id) == 0) {
+		is_same_branch = 1;
+		goto done;
+	}
+
+	err = got_commit_graph_open(&graph, "/", 1);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_iter_start(graph, head_commit_id, repo,
+	    check_cancelled, NULL);
+	if (err)
+		goto done;
+
+	for (;;) {
+		struct got_object_id *id;
+		err = got_commit_graph_iter_next(&id, graph, repo,
+		    check_cancelled, NULL);
+		if (err) {
+			if (err->code == GOT_ERR_ITER_COMPLETED)
+				err = NULL;
+			break;
+		}
+
+		if (id) {
+			if (yca_id && got_object_id_cmp(id, yca_id) == 0)
+				break;
+			if (got_object_id_cmp(id, commit_id) == 0) {
+				is_same_branch = 1;
+				break;
+			}
+		}
+	}
+done:
+	if (graph)
+		got_commit_graph_close(graph);
+	free(head_commit_id);
+	if (!err && !is_same_branch)
+		err = got_error(GOT_ERR_ANCESTRY);
+	return err;
 }
 
 static const struct got_error *

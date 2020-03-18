@@ -136,6 +136,63 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
+.It Cm clone Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar target-directory
+Clone a Git repository at the specified
+.Ar repository-URL
+into the specified
+.Ar target-directory .
+If no
+.Ar target-directory
+is specified the directory name will be derived from the name of the
+cloned repository.
+.Cm got clone
+will refuse to run if the
+.Ar target-directory
+already exists.
+.Pp
+The
+.Ar repository-URL
+specifies a protocol scheme, a server hostname, and a path to the repository
+on the server:
+.Lk scheme://hostname/path/to/repository
+.Pp
+The following protocol schemes are supported:
+.Bl -tag -width git+ssh
+.It git
+The Git protocol as implemented by the
+.Xr git-daemon 1
+server.
+This protocol is discouraged since it supports neither authentication nor
+encryption.
+.It git+ssh
+The Git protocol wrapped in an authenticated and encrypted
+.Xr ssh 1
+tunnel.
+With this protocol the hostname may contain an embedded username for
+.Xr ssh 1
+to use:
+.Mt user@hostname
+.It ssh
+Short alias for git+ssh.
+.El
+.Pp
+The options for
+.Cm got clone
+are as follows:
+.Bl -tag -width Ds
+.It Fl q
+Suppress progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+.It Fl v
+Increase the verbosity of progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+Multiple -v options increase the verbosity.
+The maximum is 3.
+.El
 .It Cm checkout  Oo Fl E Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
 Copy files from a repository into a new work tree.
 Show the status of each affected file, using the following status codes:
@@ -200,63 +257,6 @@ will be checked out.
 .It Cm co
 Short alias for
 .Cm checkout .
-.It Cm clone Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar target-directory
-Clone a Git repository at the specified
-.Ar repository-URL
-into the specified
-.Ar target-directory .
-If no
-.Ar target-directory
-is specified the directory name will be derived from the name of the
-cloned repository.
-.Cm got clone
-will refuse to run if the
-.Ar target-directory
-already exists.
-.Pp
-The
-.Ar repository-URL
-specifies a protocol scheme, a server hostname, and a path to the repository
-on the server:
-.Lk scheme://hostname/path/to/repository
-.Pp
-The following protocol schemes are supported:
-.Bl -tag -width git+ssh
-.It git
-The Git protocol as implemented by the
-.Xr git-daemon 1
-server.
-This protocol is discouraged since it supports neither authentication nor
-encryption.
-.It git+ssh
-The Git protocol wrapped in an authenticated and encrypted
-.Xr ssh 1
-tunnel.
-With this protocol the hostname may contain an embedded username for
-.Xr ssh 1
-to use:
-.Mt user@hostname
-.It ssh
-Short alias for git+ssh.
-.El
-.Pp
-The options for
-.Cm got clone
-are as follows:
-.Bl -tag -width Ds
-.It Fl q
-Suppress progress reporting output.
-The same option will be passed to
-.Xr ssh 1
-if applicable.
-.It Fl v
-Increase the verbosity of progress reporting output.
-The same option will be passed to
-.Xr ssh 1
-if applicable.
-Multiple -v options increase the verbosity.
-The maximum is 3.
-.El
 .It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
 Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
