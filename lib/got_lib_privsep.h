@@ -110,6 +110,7 @@ enum got_imsg_type {
 
 	/* Messages related to networking. */
 	GOT_IMSG_FETCH_REQUEST,
+	GOT_IMSG_FETCH_PROGRESS,
 	GOT_IMSG_FETCH_DONE,
 	GOT_IMSG_IDXPACK_REQUEST,
 	GOT_IMSG_IDXPACK_DONE,
@@ -232,6 +233,13 @@ struct got_imsg_tag_object {
 	 */
 } __attribute__((__packed__));
 
+/* Structure for GOT_IMSG_FETCH_PROGRESS data. */
+struct got_imsg_fetch_progress {
+	/* Descirbes a reference which will be fetched. */
+	uint8_t refid[SHA1_DIGEST_LENGTH];
+	/* Followed by reference name in remaining data of imsg buffer. */
+};
+
 /* Structure for GOT_IMSG_PACKIDX. */
 struct got_imsg_packidx {
 	size_t len;
@@ -315,6 +323,10 @@ const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_fetch_progress(struct imsgbuf *,
+    struct got_object_id *, const char *);
+const struct got_error *got_privsep_recv_fetch_progress(struct got_object_id **,
+    char **, struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
     struct got_object_id);
 const struct got_error *got_privsep_wait_fetch_done(struct imsgbuf *,

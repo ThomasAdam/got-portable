@@ -419,12 +419,95 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd)
 }
 
 const struct got_error *
+got_privsep_send_fetch_progress(struct imsgbuf *ibuf,
+    struct got_object_id *refid, const char *refname)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t len, reflen = strlen(refname);
+
+	len = sizeof(struct got_imsg_fetch_progress) + reflen;
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_PROGRESS, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create FETCH_PROGRESS");
+
+	/* Keep in sync with struct got_imsg_fetch_progress definition! */
+	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_PROGRESS");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, refname, reflen) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_PROGRESS");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
 	    hash.sha1, SHA1_DIGEST_LENGTH) == -1)
 		return got_error_from_errno("imsg_compose FETCH");
 	return flush_imsg(ibuf);
+}
+
+
+const struct got_error *
+got_privsep_recv_fetch_progress(struct got_object_id **refid,
+    char **refname, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error),
+	    sizeof(struct got_imsg_fetch_progress));
+
+	*refid = NULL;
+	*refname = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_FETCH_PROGRESS:
+		*refid = malloc(sizeof(**refid));
+		if (*refid == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		memcpy((*refid)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
+		if (datalen <= SHA1_DIGEST_LENGTH) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		*refname = strndup(imsg.data + SHA1_DIGEST_LENGTH,
+		    datalen - SHA1_DIGEST_LENGTH);
+		if (*refname == NULL) {
+			err = got_error_from_errno("strndup");
+			break;
+		}
+		break;
+	default:
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	}
+
+	imsg_free(&imsg);
+	return err;
 }
 
 const struct got_error *
