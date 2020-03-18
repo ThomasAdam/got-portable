@@ -66,6 +66,10 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 static int
 hassuffix(char *base, char *suf)
 {
@@ -80,13 +84,29 @@ hassuffix(char *base, char *suf)
 
 static const struct got_error *
 dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
-    const char *direction)
+    const char *direction, int verbosity)
 {
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
+	char *argv[9];
+	int i = 0;
 
 	*fetchfd = -1;
+
+	argv[0] = GOT_FETCH_PATH_SSH;
+	if (verbosity == -1) {
+		argv[1 + i++] = "-q";
+	} else {
+		/* ssh(1) allows up to 3 "-v" options. */
+		for (i = 0; i < MIN(3, verbosity); i++)
+			argv[1 + i] = "-v";
+	}
+	argv[1 + i] = "--";
+	argv[2 + i] = (char *)host;
+	argv[3 + i] = (char *)cmd;
+	argv[4 + i] = (char *)path;
+	argv[5 + i] = NULL;
 
 	if (pipe(pfd) == -1)
 		return got_error_from_errno("pipe");
@@ -105,8 +125,7 @@ dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
 		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
 		if (n < 0 || n >= sizeof(cmd))
 			err(1, "snprintf");
-		if (execl(GOT_FETCH_PATH_SSH, GOT_FETCH_PATH_SSH, "--",
-		    host, cmd, path, NULL) == -1)
+		if (execv(GOT_FETCH_PATH_SSH, argv) == -1)
 			err(1, "execl");
 		abort(); /* not reached */
 	} else {
@@ -186,14 +205,15 @@ done:
 
 const struct got_error *
 got_fetch_connect(int *fetchfd, const char *proto, const char *host,
-    const char *port, const char *server_path)
+    const char *port, const char *server_path, int verbosity)
 {
 	const struct got_error *err = NULL;
 
 	*fetchfd = -1;
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
-		err = dial_ssh(fetchfd, host, port, server_path, "upload");
+		err = dial_ssh(fetchfd, host, port, server_path, "upload",
+		    verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = dial_git(fetchfd, host, port, server_path, "upload");
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)

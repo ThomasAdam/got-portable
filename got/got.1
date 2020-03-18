@@ -200,7 +200,7 @@ will be checked out.
 .It Cm co
 Short alias for
 .Cm checkout .
-.It Cm clone Ar repository-URL Op Ar target-directory
+.It Cm clone Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar target-directory
 Clone a Git repository at the specified
 .Ar repository-URL
 into the specified
@@ -238,6 +238,24 @@ to use:
 .Mt user@hostname
 .It ssh
 Short alias for git+ssh.
+.El
+.Pp
+The options for
+.Cm got clone
+are as follows:
+.Bl -tag -width Ds
+.It Fl q
+Suppress progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+.It Fl v
+Increase the verbosity of progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+Multiple -v options increase the verbosity.
+The maximum is 3.
 .El
 .It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
 Update an existing work tree to a different commit.

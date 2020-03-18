@@ -808,7 +808,7 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone repository-url [target-directory]\n",
+	fprintf(stderr, "usage: %s clone [-q] [-v] repository-url [target-directory]\n",
 	    getprogname());
 	exit(1);
 }
@@ -974,6 +974,7 @@ struct got_fetch_progress_arg {
 	char last_scaled_size[FMT_SCALED_STRSIZE];
 	int last_p_indexed;
 	int last_p_resolved;
+	int verbosity;
 };
 
 static const struct got_error *
@@ -984,6 +985,9 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	char scaled_size[FMT_SCALED_STRSIZE];
 	int p_indexed, p_resolved;
 	int print_size = 0, print_indexed = 0, print_resolved = 0;
+
+	if (a->verbosity < 0)
+		return NULL;
 
 	if (message && message[0] != '\0' && message[0] != '\n') {
 		printf("\rserver: %s", message);
@@ -1025,10 +1029,17 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 		printf("\r");
 	if (print_size)
 		printf("%*s fetched", FMT_SCALED_STRSIZE, scaled_size);
-	if (print_indexed)
+	if (print_indexed) {
 		printf("; indexing %d%%", p_indexed);
-	if (print_resolved)
+		if (a->verbosity > 0)
+			printf(" (%d/%d)", nobj_indexed, nobj_total);
+	}
+	if (print_resolved) {
 		printf("; resolving deltas %d%%", p_resolved);
+		if (a->verbosity > 0)
+			printf(" (%d/%d)", nobj_resolved,
+			    nobj_total - nobj_loose);
+	}
 	if (print_size || print_indexed || print_resolved)
 		fflush(stdout);
 
@@ -1058,12 +1069,22 @@ cmd_clone(int argc, char *argv[])
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
 	ssize_t n;
+	int verbosity = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "vq")) != -1) {
 		switch (ch) {
+		case 'v':
+			if (verbosity < 0)
+				verbosity = 0;
+			else if (verbosity < 3)
+				verbosity++;
+			break;
+		case 'q':
+			verbosity = -1;
+			break;
 		default:
 			usage_clone();
 			break;
@@ -1148,15 +1169,18 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_fetch_connect(&fetchfd, proto, host, port, server_path);
+	error = got_fetch_connect(&fetchfd, proto, host, port, server_path,
+	    verbosity);
 	if (error)
 		goto done;
 
-	printf("Connected to %s:%s\n", host, port);
+	if (verbosity >= 0)
+		printf("Connected to %s:%s\n", host, port);
 
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
+	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
 	    repo, fetch_progress, &fpa);
 	if (error)
@@ -1165,7 +1189,8 @@ cmd_clone(int argc, char *argv[])
 	error = got_object_id_str(&id_str, pack_hash);
 	if (error)
 		goto done;
-	printf("Fetched %s.pack\n", id_str);
+	if (verbosity >= 0)
+		printf("Fetched %s.pack\n", id_str);
 	free(id_str);
 
 	/* Set up references provided with the pack file. */
@@ -1222,8 +1247,10 @@ cmd_clone(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		printf("Setting %s to %s\n", GOT_REF_HEAD,
-		    got_ref_get_symref_target(symref));
+		if (verbosity > 1) {
+			printf("Setting %s to %s\n", GOT_REF_HEAD,
+			    got_ref_get_symref_target(symref));
+		}
 
 		error = got_ref_write(symref, repo);
 		got_ref_close(symref);

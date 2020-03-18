@@ -38,11 +38,14 @@ const struct got_error *got_fetch_parse_uri(char **, char **, char **,
 /*
  * Attempt to open a connection to a server using the provided protocol
  * scheme, hostname port number (as a string) and server-side path.
+ * A verbosity level can be specified; it currently controls the amount
+ * of -v options passed to ssh(1). If the level is -1 ssh(1) will be run
+ * with the -q option.
  * If successful return an open file descriptor for the connection which can
  * be passed to other functions below, and must be disposed of with close(2).
  */
 const struct got_error *got_fetch_connect(int *, const char *, const char *,
-    const char *, const char *);
+    const char *, const char *, int);
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_fetch_progress_cb)(void *,
