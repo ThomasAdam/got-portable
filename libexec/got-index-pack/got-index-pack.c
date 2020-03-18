@@ -476,6 +476,7 @@ add_indexed_object(struct got_packidx *packidx, uint32_t idx,
 
 	memcpy(packidx->hdr.sorted_ids[idx].sha1, obj->id.sha1,
 	    SHA1_DIGEST_LENGTH);
+	packidx->hdr.crc32[idx] = htobe32(obj->crc);
 	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 		packidx->hdr.offsets[idx] = htobe32(obj->off);
 	else {
@@ -618,6 +619,11 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	packidx.hdr.sorted_ids = calloc(nobj,
 	    sizeof(struct got_packidx_object_id));
 	if (packidx.hdr.sorted_ids == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	packidx.hdr.crc32 = calloc(nobj, sizeof(uint32_t));
+	if (packidx.hdr.crc32 == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
@@ -795,6 +801,9 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 
 	make_packidx(&packidx, nobj, objects);
 
+	free(objects);
+	objects = NULL;
+
 	SHA1Init(&ctx);
 	putbe32(buf, GOT_PACKIDX_V2_MAGIC);
 	putbe32(buf + 4, GOT_PACKIDX_VERSION);
@@ -809,12 +818,9 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	    nobj * SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
-	for(i = 0; i < nobj; i++){
-		putbe32(buf, objects[i].crc);
-		err = hwrite(idxfd, buf, 4, &ctx);
-		if (err)
-			goto done;
-	}
+	err = hwrite(idxfd, packidx.hdr.crc32, nobj * sizeof(uint32_t), &ctx);
+	if (err)
+		goto done;
 	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t),
 	    &ctx);
 	if (err)
