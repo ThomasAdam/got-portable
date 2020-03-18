@@ -99,7 +99,7 @@ readpkt(int *outlen, int fd, char *buf, int nbuf)
 	char lenstr[5];
 	long len;
 	char *e;
-	int n;
+	int n, i;
 	ssize_t r;
 
 	*outlen = 0;
@@ -111,6 +111,10 @@ readpkt(int *outlen, int fd, char *buf, int nbuf)
 		return got_error(GOT_ERR_IO);
 
 	lenstr[4] = '\0';
+	for (i = 0; i < 4; i++) {
+		if (!isxdigit(lenstr[i]))
+			return got_error(GOT_ERR_BAD_PACKET);
+	}
 	errno = 0;
 	len = strtol(lenstr, &e, 16);
 	if (lenstr[0] == '\0' || *e != '\0')
