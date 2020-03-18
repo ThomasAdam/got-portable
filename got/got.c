@@ -808,7 +808,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone repo-url\n", getprogname());
+	fprintf(stderr, "usage: %s clone repo-url [target-directory]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -1042,7 +1043,7 @@ static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
-	const char *uri, *branch_filter, *dirname;
+	const char *uri, *dirname;
 	char *proto, *host, *port, *repo_name, *server_path;
 	char *default_destdir = NULL, *id_str = NULL;
 	const char *repo_path;
@@ -1056,11 +1057,8 @@ cmd_clone(int argc, char *argv[])
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 
-	while ((ch = getopt(argc, argv, "b:")) != -1) {
+	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
-		case 'b':
-			branch_filter = optarg;
-			break;
 		default:
 			usage_clone();
 			break;
@@ -1069,9 +1067,10 @@ cmd_clone(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	uri = argv[0];
-	if(argc == 1)
+
+	if (argc == 1)
 		dirname = NULL;
-	else if(argc == 2)
+	else if (argc == 2)
 		dirname = argv[1];
 	else
 		usage_clone();
