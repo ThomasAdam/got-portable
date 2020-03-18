@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 
 #include <errno.h>
+#include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,42 +136,58 @@ grab(char *dst, int n, char *p, char *e)
 	return strlcpy(dst, p, l + 1);
 }
 
-static int
-got_dial_ssh(char *host, char *port, char *path, char *direction)
+static const struct got_error *
+dial_ssh(int *fetchfd, char *host, char *port, char *path, char *direction)
 {
+	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
 
+	*fetchfd = -1;
+
 	if (pipe(pfd) == -1)
-		return -1;
+		return got_error_from_errno("pipe");
+
 	pid = fork();
-	if (pid == -1)
-		return -1;
-	if (pid == 0) {
+	if (pid == -1) {
+		error = got_error_from_errno("fork");
+		close(pfd[0]);
+		close(pfd[1]);
+		return error;
+	} else if (pid == 0) {
+		int n;
 		close(pfd[1]);
 		dup2(pfd[0], 0);
 		dup2(pfd[0], 1);
-		snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
-		execlp("ssh", "ssh", host, cmd, path, NULL);
-		abort();
-	}else{
+		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
+		if (n < 0 || n >= sizeof(cmd))
+			err(1, "snprintf");
+		if (execlp("ssh", "ssh", host, cmd, path, NULL) == -1)
+			err(1, "execlp");
+		abort(); /* not reached */
+	} else {
 		close(pfd[0]);
-		return pfd[1];
+		*fetchfd = pfd[1];
+		return NULL;
 	}
 }
 
-static int
-got_dial_git(char *host, char *port, char *path, char *direction)
+static const struct got_error *
+dial_git(int *fetchfd, char *host, char *port, char *path, char *direction)
 {
+	const struct got_error *err = NULL;
 	struct addrinfo hints, *servinfo, *p;
-	char *cmd, *pkt;
-	int fd, l, r;
+	char *cmd = NULL, *pkt = NULL;
+	int fd = -1, l, r, eaicode;
+
+	*fetchfd = -1;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	if (getaddrinfo(host, port, &hints, &servinfo) != 0)
-		return -1;
+	eaicode = getaddrinfo(host, port, &hints, &servinfo);
+	if (eaicode)
+		return got_error_msg(GOT_ERR_ADDRINFO, gai_strerror(eaicode));
 
 	for (p = servinfo; p != NULL; p = p->ai_next) {
 		if ((fd = socket(p->ai_family, p->ai_socktype,
@@ -178,23 +195,32 @@ got_dial_git(char *host, char *port, char *path, char *direction)
 			continue;
 		if (connect(fd, p->ai_addr, p->ai_addrlen) == 0)
 			break;
+		err = got_error_from_errno("connect");
 		close(fd);
 	}
 	if (p == NULL)
-		return -1;
+		goto done;
 
-	if ((l = asprintf(&cmd, "git-%s-pack %s\n", direction, path)) == -1)
-		return -1;
-	if ((l = asprintf(&pkt, "%04x%s", l+4, cmd)) == -1)
-		return -1;
+	if ((l = asprintf(&cmd, "git-%s-pack %s\n", direction, path)) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	if ((l = asprintf(&pkt, "%04x%s", l + 4, cmd)) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 	r = write(fd, pkt, l);
+	if (r == -1)
+		err = got_error_from_errno("write");
+done:
 	free(cmd);
 	free(pkt);
-	if (r == -1) {
-		close(fd);
-		return -1;
-	}
-	return fd;
+	if (err) {
+		if (fd != -1)
+			close(fd);
+	} else
+		*fetchfd = fd;
+	return err;
 }
 
 int
@@ -291,9 +317,9 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		return got_error_from_errno("dup");
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
-		fetchfd = got_dial_ssh(host, port, path, "upload");
+		err = dial_ssh(&fetchfd, host, port, path, "upload");
 	else if (strcmp(proto, "git") == 0)
-		fetchfd = got_dial_git(host, port, path, "upload");
+		err = dial_git(&fetchfd, host, port, path, "upload");
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
 		err = got_error(GOT_ERR_BAD_PROTO);
 	else

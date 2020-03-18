@@ -135,6 +135,7 @@
 #define GOT_ERR_REBASE_OUT_OF_DATE 118
 #define GOT_ERR_CACHE_DUP_ENTRY	119
 #define GOT_ERR_QUERYSTRING	120
+#define GOT_ERR_ADDRINFO	121
 
 static const struct got_error {
 	int code;
@@ -276,6 +277,7 @@ static const struct got_error {
 	{ GOT_ERR_FETCH_FAILED, "fetch failed" },
 	{ GOT_ERR_PARSE_URI, "failed to parse uri" },
 	{ GOT_ERR_BAD_PROTO, "unknown protocol" },
+	{ GOT_ERR_ADDRINFO, "getaddrinfo failed" },
 };
 
 /*
