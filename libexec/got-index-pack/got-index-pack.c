@@ -459,7 +459,7 @@ applydelta(Object *dst, Object *base, char *d, int nd)
 	b = base->data;
 	n = readvint(d, &d);
 	if(n != base->size){
-		fprintf(stderr, "mismatched source size");
+		fprintf(stderr, "mismatched source size\n");
 		return -1;
 	}
 
@@ -478,7 +478,7 @@ applydelta(Object *dst, Object *base, char *d, int nd)
 			break;
 		c = *d++;
 		if(!c){
-			fprintf(stderr, "bad delta encoding");
+			fprintf(stderr, "bad delta encoding\n");
 			return -1;
 		}
 		/* copy from base */
@@ -509,7 +509,7 @@ applydelta(Object *dst, Object *base, char *d, int nd)
 
 	}
 	if(r != er){
-		fprintf(stderr, "truncated delta (%zd)", er - r);
+		fprintf(stderr, "truncated delta (%zd)\n", er - r);
 		return -1;
 	}
 
@@ -568,7 +568,7 @@ readodelta(FILE *f, Object *o, off_t nd, off_t p, int flag)
 	}while(c & 0x80);
 
 	if(r > p){
-		fprintf(stderr, "junk offset -%lld (from %lld)", r, p);
+		fprintf(stderr, "junk offset -%lld (from %lld)\n", r, p);
 		goto error;
 	}
 
@@ -609,7 +609,7 @@ readpacked(FILE *f, Object *o, int flag)
 	s = 4;
 	t = (c >> 4) & 0x7;
 	if(!t){
-		fprintf(stderr, "unknown type for byte %x", c);
+		fprintf(stderr, "unknown type for byte %x\n", c);
 		return -1;
 	}
 	while(c & 0x80){
@@ -695,11 +695,11 @@ readloose(FILE *f, Object *o, int flag)
 	}
 	sz = strtol(s, &e, 0);
 	if(e == s || *e++ != 0){
-		fprintf(stderr, "malformed object header");
+		fprintf(stderr, "malformed object header\n");
 		goto error;
 	}
 	if(sz != n - (e - (char *)d)){
-		fprintf(stderr, "mismatched sizes");
+		fprintf(stderr, "mismatched sizes\n");
 		goto error;
 	}
 	o->size = sz;
@@ -993,7 +993,7 @@ readidxobject(FILE *idx, struct got_object_id h, int flag)
 		fclose(f);
 		parseobject(obj);
 		hashfmt(hbuf, sizeof(hbuf), &obj->hash);
-		fprintf(stderr, "object %s cached", hbuf);
+		fprintf(stderr, "object %s cached\n", hbuf);
 		cache(obj);
 		return obj;
 	}
@@ -1101,11 +1101,11 @@ indexpack(int packfd, int idxfd, struct got_object_id *packhash)
 	if (fseek(f, 0, SEEK_SET) == -1)
 		return -1;
 	if (fread(hdr, 1, sizeof(hdr), f) != sizeof(hdr)) {
-		fprintf(stderr, "short read on header");
+		fprintf(stderr, "short read on header\n");
 		return -1;
 	}
 	if (memcmp(hdr, "PACK\0\0\0\2", 8) != 0) {
-		fprintf(stderr, "invalid header");
+		fprintf(stderr, "invalid header\n");
 		return -1;
 	}
 
