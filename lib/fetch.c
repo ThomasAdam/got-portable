@@ -297,6 +297,48 @@ done:
 	return err;
 }
 
+static const struct got_error *
+check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
+{
+	SHA1_CTX ctx;
+	uint8_t hexpect[SHA1_DIGEST_LENGTH];
+	uint8_t buf[32 * 1024];
+	ssize_t n, r, nr;
+
+	if (sz < sizeof(struct got_packfile_hdr) + SHA1_DIGEST_LENGTH)
+		return got_error_msg(GOT_ERR_BAD_PACKFILE, "short packfile");
+
+	n = 0;
+	SHA1Init(&ctx);
+	while (n < sz - 20) {
+		nr = sizeof(buf);
+		if (sz - n - 20 < sizeof(buf))
+			nr = sz - n - 20;
+		r = read(fd, buf, nr);
+		if (r == -1)
+			return got_error_from_errno("read");
+		if (r != nr)
+			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "short pack file");
+		SHA1Update(&ctx, buf, nr);
+		n += r;
+	}
+	SHA1Final(hcomp, &ctx);
+
+	r = read(fd, hexpect, sizeof(hexpect));
+	if (r == -1)
+		return got_error_from_errno("read");
+	if (r != sizeof(hexpect))
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "short pack file");
+
+	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0)
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "packfile checksum mismatch");
+
+	return NULL;
+}
+
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, int fetchfd, struct got_repository *repo,
@@ -428,6 +470,14 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("waitpid");
 		goto done;
 	}
+
+	if (lseek(packfd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+	err = check_pack_hash(packfd, packfile_size, (*pack_hash)->sha1);
+	if (err)
+		goto done;
  
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1) {
 		err = got_error_from_errno("socketpair");

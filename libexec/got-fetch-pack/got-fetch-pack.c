@@ -214,44 +214,6 @@ match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
 	return NULL;
 }
 
-static const struct got_error *
-check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
-{
-	const struct got_error *err = NULL;
-	SHA1_CTX ctx;
-	uint8_t hexpect[SHA1_DIGEST_LENGTH];
-	uint8_t buf[32 * 1024];
-	ssize_t n, r, nr;
-
-	if (sz < sizeof(struct got_packfile_hdr) + SHA1_DIGEST_LENGTH)
-		return got_error_msg(GOT_ERR_BAD_PACKFILE, "short packfile");
-
-	n = 0;
-	SHA1Init(&ctx);
-	while (n < sz - 20) {
-		nr = sizeof(buf);
-		if (sz - n - 20 < sizeof(buf))
-			nr = sz - n - 20;
-		err = readn(&r, fd, buf, nr);
-		if (err)
-			return err;
-		if (r != nr)
-			return got_error(GOT_ERR_BAD_PACKFILE);
-		SHA1Update(&ctx, buf, nr);
-		n += r;
-	}
-	SHA1Final(hcomp, &ctx);
-
-	err = readn(&r, fd, hexpect, sizeof(hexpect));
-	if (err)
-		return err;
-	if (r != sizeof(hexpect))
-		return got_error(GOT_ERR_BAD_PACKFILE);
-	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0)
-		return got_error(GOT_ERR_BAD_PACKFILE);
-	return NULL;
-}
-
 static int
 match_branch(char *br, char *pat)
 {
@@ -778,11 +740,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (err)
 			goto done;
 	}
-	if (lseek(packfd, 0, SEEK_SET) == -1) {
-		err = got_error_from_errno("lseek");
-		goto done;
-	}
-	err = check_pack_hash(packfd, packsz, packid->sha1);
 done:
 	TAILQ_FOREACH(pe, &symrefs, entry) {
 		free((void *)pe->path);
