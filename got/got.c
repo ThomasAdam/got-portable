@@ -1173,19 +1173,28 @@ cmd_clone(int argc, char *argv[])
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		struct got_reference *ref;
-
+		char *remote_refname;
 
 		error = got_ref_alloc(&ref, refname, id);
 		if (error)
 			goto done;
-
-		#if 0
-		error = got_object_id_str(&id_str, id);
+		error = got_ref_write(ref, repo);
+		got_ref_close(ref);
 		if (error)
 			goto done;
-		printf("%s: %s\n", got_ref_get_name(ref), id_str);
-		free(id_str);
-		#endif
+
+		if (strncmp("refs/heads/", refname, 11) != 0)
+			continue;
+
+		if (asprintf(&remote_refname,
+		    "refs/remotes/%s/%s", GOT_FETCH_DEFAULT_REMOTE_NAME,
+		    refname + 11) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		error = got_ref_alloc(&ref, remote_refname, id);
+		if (error)
+			goto done;
 		error = got_ref_write(ref, repo);
 		got_ref_close(ref);
 		if (error)
@@ -1236,10 +1245,11 @@ cmd_clone(int argc, char *argv[])
 	    "[core]\n"
 	    "\trepositoryformatversion = 0\n"
 	    "\tbare = true\n"
-	    "[remote \"origin\"]\n"
+	    "[remote \"%s\"]\n"
 	    "\turl = %s\n"
-	    "\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
-	    git_url) == -1) {
+	    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+	    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
 	}

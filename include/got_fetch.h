@@ -22,6 +22,8 @@
 #define GOT_FETCH_PATH_SSH	"/usr/bin/ssh"
 #endif
 
+#define GOT_FETCH_DEFAULT_REMOTE_NAME	"origin"
+
 /*
  * Attempt to parse a URI into the following parts:
  * A protocol scheme, hostname, port number (as a string), path on server,
