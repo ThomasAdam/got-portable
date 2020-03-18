@@ -57,7 +57,7 @@ static int chattygit;
 static char *fetchbranch;
 static struct got_object_id zhash = {.sha1={0}};
 
-int
+static int
 readn(int fd, void *buf, size_t n)
 {
 	ssize_t r, off;
@@ -74,7 +74,7 @@ readn(int fd, void *buf, size_t n)
 	return off;
 }
 
-int
+static int
 flushpkt(int fd)
 {
 	if (chattygit)
@@ -83,7 +83,7 @@ flushpkt(int fd)
 }
 
 
-int
+static int
 readpkt(int fd, char *buf, int nbuf)
 {
 	char len[5];
@@ -113,7 +113,7 @@ readpkt(int fd, char *buf, int nbuf)
 	return n;
 }
 
-int
+static int
 writepkt(int fd, char *buf, int nbuf)
 {
 	char len[5];
