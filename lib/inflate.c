@@ -370,8 +370,9 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
-    size_t offset, size_t len)
+got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen,
+    size_t *consumed_total, uint32_t *input_crc, uint8_t *map, size_t offset,
+    size_t len)
 {
 	const struct got_error *err;
 	size_t avail, consumed;
@@ -379,29 +380,40 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 	void *newbuf;
 	int nbuf = 1;
 
-	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
-	if (*outbuf == NULL)
-		return got_error_from_errno("malloc");
-	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE, NULL);
-	if (err) {
-		free(*outbuf);
-		*outbuf = NULL;
-		return err;
+	if (outbuf) {
+		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
+		if (*outbuf == NULL)
+			return got_error_from_errno("malloc");
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE,
+		    input_crc);
+		if (err) {
+			free(*outbuf);
+			*outbuf = NULL;
+			return err;
+		}
+	} else {
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE,
+		    input_crc);
 	}
 
 	*outlen = 0;
-
+	if (consumed_total)
+		*consumed_total = 0;
 	do {
 		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
 		    &consumed);
 		if (err)
 			goto done;
 		offset += consumed;
+		if (consumed_total)
+			*consumed_total += consumed;
 		len -= consumed;
 		*outlen += avail;
 		if (len == 0)
 			break;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
+			if (outbuf == NULL)
+				continue;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {

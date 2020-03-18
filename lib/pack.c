@@ -714,8 +714,9 @@ read_delta_data(uint8_t **delta_buf, size_t *delta_len,
 	if (pack->map) {
 		if (delta_data_offset >= pack->filesize)
 			return got_error(GOT_ERR_PACK_OFFSET);
-		err = got_inflate_to_mem_mmap(delta_buf, delta_len, pack->map,
-		    delta_data_offset, pack->filesize - delta_data_offset);
+		err = got_inflate_to_mem_mmap(delta_buf, delta_len,
+		    NULL, NULL, pack->map, delta_data_offset,
+		    pack->filesize - delta_data_offset);
 	} else {
 		if (lseek(pack->fd, delta_data_offset, SEEK_SET) == -1)
 			return got_error_from_errno("lseek");
@@ -1097,7 +1098,8 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 				if (pack->map) {
 					mapoff = (size_t)delta_data_offset;
 					err = got_inflate_to_mem_mmap(&base_buf,
-					    &base_bufsz, pack->map, mapoff,
+					    &base_bufsz, NULL, NULL,
+					    pack->map, mapoff,
 					    pack->filesize - mapoff);
 				} else
 					err = got_inflate_to_mem_fd(&base_buf,
@@ -1240,8 +1242,8 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 			if (pack->map) {
 				size_t mapoff = (size_t)delta_data_offset;
 				err = got_inflate_to_mem_mmap(&base_buf,
-				    &base_bufsz, pack->map, mapoff,
-				    pack->filesize - mapoff);
+				    &base_bufsz, NULL, NULL, pack->map,
+				    mapoff, pack->filesize - mapoff);
 			} else {
 				if (lseek(pack->fd, delta_data_offset, SEEK_SET)
 				    == -1) {
@@ -1365,8 +1367,8 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 			return got_error(GOT_ERR_PACK_OFFSET);
 		if (pack->map) {
 			size_t mapoff = (size_t)obj->pack_offset;
-			err = got_inflate_to_mem_mmap(buf, len, pack->map,
-			    mapoff, pack->filesize - mapoff);
+			err = got_inflate_to_mem_mmap(buf, len, NULL, NULL,
+			    pack->map, mapoff, pack->filesize - mapoff);
 		} else {
 			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
 				return got_error_from_errno("lseek");
