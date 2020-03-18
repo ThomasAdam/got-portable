@@ -419,7 +419,7 @@ indexed_obj_cmp(const void *pa, const void *pb)
 }
 
 static void
-make_initial_packidx(struct got_packidx *packidx, int nobj,
+make_packidx(struct got_packidx *packidx, int nobj,
     struct got_indexed_object **objects)
 {
 	struct got_indexed_object *obj;
@@ -429,11 +429,14 @@ make_initial_packidx(struct got_packidx *packidx, int nobj,
 	mergesort(objects, nobj, sizeof(struct got_indexed_object *),
 	    indexed_obj_cmp);
 
+	memset(packidx->hdr.fanout_table, 0,
+	    GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS * sizeof(uint32_t));
+	packidx->nlargeobj = 0;
+
 	for (i = 0; i < nobj; i++) {
 		obj = objects[i];
-		if (!obj->valid)
-			continue;
-		add_indexed_object(packidx, idx++, obj);
+		if (obj->valid)
+			add_indexed_object(packidx, idx++, obj);
 	}
 }
 
@@ -473,7 +476,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	SHA1_CTX ctx;
 	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
 	ssize_t r, w;
-	int pass;
+	int pass, have_ref_deltas = 0;
 
 	/* Check pack file header. */
 	r = read(pack->fd, &hdr, sizeof(hdr));
@@ -590,11 +593,14 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		    obj->type == GOT_OBJ_TYPE_TAG) {
 			objects[i]->valid = 1;
 			nloose++;
-		}
+		} else if (obj->type == GOT_OBJ_TYPE_REF_DELTA)
+			have_ref_deltas = 1;
 	}
 	nvalid = nloose;
 
-	make_initial_packidx(&packidx, nobj, objects);
+	/* In order to resolve ref deltas we need an in-progress pack index. */
+	if (have_ref_deltas)
+		make_packidx(&packidx, nobj, objects);
 
 	/*
 	 * Second pass: We can now resolve deltas to compute the IDs of
@@ -632,7 +638,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 			objects[i]->valid = 1;
 			n++;
-			update_packidx(&packidx, nobj, obj);
+			if (have_ref_deltas)
+				update_packidx(&packidx, nobj, obj);
 			err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
 			    nloose, nresolved + n);
 			if (err)
@@ -666,8 +673,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		goto done;
 	}
 
-	/* We may have seen duplicates. Update our total object count. */
-	nobj = betoh32(packidx.hdr.fanout_table[0xff]);
+	make_packidx(&packidx, nobj, objects);
 
 	SHA1Init(&ctx);
 	err = hwrite(idxfd, "\xfftOc\x00\x00\x00\x02", 8, &ctx);
@@ -681,8 +687,6 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	    nobj * SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
-	mergesort(objects, nobj, sizeof(struct got_indexed_object *),
-	    indexed_obj_cmp);
 	for(i = 0; i < nobj; i++){
 		PUTBE32(buf, objects[i]->crc);
 		err = hwrite(idxfd, buf, 4, &ctx);
