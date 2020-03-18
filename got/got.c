@@ -832,10 +832,8 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	if (a->verbosity < 0)
 		return NULL;
 
-	if (message && message[0] != '\0' && message[0] != '\n') {
+	if (message && message[0] != '\0') {
 		printf("\rserver: %s", message);
-		if (strchr(message, '\n') == 0)
-			printf("\n");
 		fflush(stdout);
 	}
 
