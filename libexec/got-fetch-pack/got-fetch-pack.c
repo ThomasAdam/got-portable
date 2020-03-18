@@ -203,8 +203,6 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	const struct got_error *err = NULL;
 	SHA1_CTX ctx;
 	uint8_t hexpect[SHA1_DIGEST_LENGTH];
-	char s1[SHA1_DIGEST_STRING_LENGTH + 1];
-	char s2[SHA1_DIGEST_STRING_LENGTH + 1];
 	uint8_t buf[32 * 1024];
 	ssize_t n, r, nr;
 
@@ -232,11 +230,8 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 		return err;
 	if (r != sizeof(hexpect))
 		return got_error(GOT_ERR_BAD_PACKFILE);
-	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0) {
-		got_sha1_digest_to_str(hcomp, s1, sizeof(s1));
-		got_sha1_digest_to_str(hexpect, s2, sizeof(s2));
+	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0)
 		return got_error(GOT_ERR_BAD_PACKFILE);
-	}
 	return NULL;
 }
 
