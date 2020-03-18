@@ -133,8 +133,12 @@ dial_git(int *fetchfd, const char *host, const char *port, const char *path,
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	eaicode = getaddrinfo(host, port, &hints, &servinfo);
-	if (eaicode)
-		return got_error_msg(GOT_ERR_ADDRINFO, gai_strerror(eaicode));
+	if (eaicode) {
+		char msg[512];
+		snprintf(msg, sizeof(msg), "%s: %s", host,
+		    gai_strerror(eaicode));
+		return got_error_msg(GOT_ERR_ADDRINFO, msg);
+	}
 
 	for (p = servinfo; p != NULL; p = p->ai_next) {
 		if ((fd = socket(p->ai_family, p->ai_socktype,
