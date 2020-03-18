@@ -214,12 +214,11 @@ match_branch(char *br, char *pat)
 }
 
 static const struct got_error *
-tokenize_refline(char **tokens, char *line, int len)
+tokenize_refline(char **tokens, char *line, int len, int maxtokens)
 {
 	const struct got_error *err = NULL;
 	char *p;
 	size_t i, n = 0;
-	const int maxtokens = 3;
 
 	for (i = 0; i < maxtokens; i++)
 		tokens[i] = NULL;
@@ -256,6 +255,27 @@ done:
 			tokens[j] = NULL;
 	}
 	return err;
+}
+
+static const struct got_error *
+parse_refline(char **id_str, char **refname, char **server_capabilities,
+    char *line, int len)
+{
+	const struct got_error *err = NULL;
+	char *tokens[3];
+
+	err = tokenize_refline(tokens, line, len, nitems(tokens));
+	if (err)
+		return err;
+
+	if (tokens[0])
+		*id_str = tokens[0];
+	if (tokens[1])
+		*refname = tokens[1];
+	if (tokens[2])
+		*server_capabilities = tokens[2];
+	
+	return NULL;
 }
 
 struct got_capability {
@@ -370,13 +390,14 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	char buf[GOT_PKTMAX], *sp[3];
+	char buf[GOT_PKTMAX];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;
 	int i, n, req;
 	off_t packsz;
-	char *my_capabilities = NULL;
+	char *id_str = NULL, *refname = NULL;
+	char *server_capabilities = NULL, *my_capabilities = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 
@@ -413,14 +434,16 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
 			goto done;
 		}
-		err = tokenize_refline(sp, buf, n);
+		err = parse_refline(&id_str, &refname, &server_capabilities,
+		    buf, n);
 		if (err)
 			goto done;
-		if (chattygit && sp[2][0] != '\0')
-			fprintf(stderr, "server capabilities: %s\n", sp[2]);
+		if (chattygit && server_capabilities[0] != '\0')
+			fprintf(stderr, "server capabilities: %s\n",
+			    server_capabilities);
 		if (is_firstpkt) {
 			err = match_capabilities(&my_capabilities, &symrefs,
-			    sp[2]);
+			    server_capabilities);
 			if (err)
 				goto done;
 			if (chattygit && my_capabilities)
@@ -431,9 +454,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				goto done;
 		}
 		is_firstpkt = 0;
-		if (strstr(sp[1], "^{}"))
+		if (strstr(refname, "^{}"))
 			continue;
-		if (fetchbranch && !match_branch(sp[1], fetchbranch))
+		if (fetchbranch && !match_branch(refname, fetchbranch))
 			continue;
 		if (refsz == nref + 1) {
 			refsz *= 2;
@@ -448,20 +471,21 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				goto done;
 			}
 		}
-		if (!got_parse_sha1_digest(want[nref].sha1, sp[0])) {
+		if (!got_parse_sha1_digest(want[nref].sha1, id_str)) {
 			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
 		}
 
-		err = match_remote_ref(have_refs, &have[nref], sp[0], sp[1]);
+		err = match_remote_ref(have_refs, &have[nref], id_str, refname);
 		if (err)
 			goto done;
 
-		err = got_privsep_send_fetch_progress(ibuf, &want[nref], sp[1]);
+		err = got_privsep_send_fetch_progress(ibuf, &want[nref],
+		    refname);
 		if (err)
 			goto done;
 		if (chattygit)
-			fprintf(stderr, "remote %s\n", sp[1]);
+			fprintf(stderr, "remote %s\n", refname);
 		nref++;
 	}
 
@@ -553,6 +577,9 @@ done:
 	got_pathlist_free(&symrefs);
 	free(have);
 	free(want);
+	free(id_str);
+	free(refname);
+	free(server_capabilities);
 	return err;
 }
 
