@@ -78,7 +78,7 @@ readn(int fd, void *buf, size_t n)
 int
 flushpkt(int fd)
 {
-	if(chattygit)
+	if (chattygit)
 		fprintf(stderr, "writepkt: 0000\n");
 	return write(fd, "0000", 4);
 }
@@ -91,25 +91,25 @@ readpkt(int fd, char *buf, int nbuf)
 	char *e;
 	int n, r;
 
-	if(readn(fd, len, 4) == -1){
+	if (readn(fd, len, 4) == -1) {
 		return -1;
 	}
 	len[4] = 0;
 	n = strtol(len, &e, 16);
-	if(n == 0){
-		if(chattygit)
+	if (n == 0) {
+		if (chattygit)
 			fprintf(stderr, "readpkt: 0000\n");
 		return 0;
 	}
-	if(e != len + 4 || n <= 4)
+	if (e != len + 4 || n <= 4)
 		err(1, "invalid packet line length");
 	n  -= 4;
-	if(n >= nbuf)
+	if (n >= nbuf)
 		err(1, "buffer too small");
-	if((r = readn(fd, buf, n)) != n)
+	if ((r = readn(fd, buf, n)) != n)
 		return -1;
 	buf[n] = 0;
-	if(chattygit)
+	if (chattygit)
 		fprintf(stderr, "readpkt: %s:\t%.*s\n", len, nbuf, buf);
 	return n;
 }
@@ -122,15 +122,15 @@ writepkt(int fd, char *buf, int nbuf)
 
 	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
 		return -1;
-	if(write(fd, len, 4) != 4)
+	if (write(fd, len, 4) != 4)
 		return -1;
-	if(write(fd, buf, nbuf) != nbuf)
+	if (write(fd, buf, nbuf) != nbuf)
 		return -1;
-	if(chattygit){
+	if (chattygit) {
 		fprintf(stderr, "writepkt: %s:\t", len);
 		fwrite(buf, 1, nbuf, stderr);
-		for(i = 0; i < nbuf; i++){
-			if(isprint(buf[i]))
+		for (i = 0; i < nbuf; i++) {
+			if (isprint(buf[i]))
 				fputc(buf[i], stderr);
 		}
 	}
@@ -144,21 +144,21 @@ got_resolve_remote_ref(struct got_object_id *id, char *ref)
 	char buf[128], *s;
 	int r, f;
 
-	if(!got_parse_sha1_digest(id->sha1, ref))
+	if (!got_parse_sha1_digest(id->sha1, ref))
 		return 0;
 
 	/* Slightly special handling: translate remote refs to local ones. */
 	if (strcmp(ref, "HEAD") == 0) {
-		if(snprintf(buf, sizeof(buf), ".git/HEAD") >= sizeof(buf))
+		if (snprintf(buf, sizeof(buf), ".git/HEAD") >= sizeof(buf))
 			return -1;
-	} else if(strstr(ref, "refs/heads") == ref) {
+	} else if (strstr(ref, "refs/heads") == ref) {
 		ref += strlen("refs/heads");
-		if(snprintf(buf, sizeof(buf),
+		if (snprintf(buf, sizeof(buf),
 		    ".git/refs/remotes/%s/%s", upstream, ref) >= sizeof(buf))
 			return -1;
-	} else if(strstr(ref, "refs/tags") == ref) {
+	} else if (strstr(ref, "refs/tags") == ref) {
 		ref += strlen("refs/tags");
-		if(snprintf(buf, sizeof(buf),
+		if (snprintf(buf, sizeof(buf),
 		    ".git/refs/tags/%s/%s", upstream, ref) >= sizeof(buf))
 			return -1;
 	} else {
@@ -167,15 +167,15 @@ got_resolve_remote_ref(struct got_object_id *id, char *ref)
 
 	r = -1;
 	s = buf;
-	if((f = open(s, O_RDONLY)) == -1)
+	if ((f = open(s, O_RDONLY)) == -1)
 		goto err;
-	if(readn(f, buf, sizeof(buf)) < 40)
+	if (readn(f, buf, sizeof(buf)) < 40)
 		goto err;
-	if(!got_parse_sha1_digest(id->sha1, buf))
+	if (!got_parse_sha1_digest(id->sha1, buf))
 		goto err;
 err:
 	close(f);
-	if(r == -1 && strstr(buf, "ref:") == buf)
+	if (r == -1 && strstr(buf, "ref:") == buf)
 		return got_resolve_remote_ref(id, buf + strlen("ref:"));
 	return r;
 }
@@ -190,26 +190,26 @@ got_check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	uint8_t buf[32*1024];
 	ssize_t n, r, nr;
 
-	if(sz < 28)
+	if (sz < 28)
 		return -1;
 
 	n = 0;
 	SHA1Init(&ctx);
-	while(n < sz - 20){
+	while (n < sz - 20) {
 		nr = sizeof(buf);
-		if(sz - n - 20 < sizeof(buf))
+		if (sz - n - 20 < sizeof(buf))
 			nr = sz - n - 20;
 		r = readn(fd, buf, nr);
-		if(r != nr)
+		if (r != nr)
 			return -1;
 		SHA1Update(&ctx, buf, nr);
 		n += r;
 	}
 	SHA1Final(hcomp, &ctx);
 
-	if(readn(fd, hexpect, sizeof(hexpect)) != sizeof(hexpect))
+	if (readn(fd, hexpect, sizeof(hexpect)) != sizeof(hexpect))
 		errx(1, "truncated packfile");
-	if(memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0){
+	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0) {
 		got_sha1_digest_to_str(hcomp, s1, sizeof(s1));
 		got_sha1_digest_to_str(hexpect, s2, sizeof(s2));
 		printf("hash mismatch %s != %s\n", s1, s2);
@@ -230,12 +230,12 @@ got_make_pack_dir(char *path)
 	char s[128];
 	char *p;
 
-	if(snprintf(s, sizeof(s), "%s", path) >= sizeof(s))
+	if (snprintf(s, sizeof(s), "%s", path) >= sizeof(s))
 		return -1;
-	for(p=strchr(s+1, '/'); p; p=strchr(p+1, '/')){
+	for (p = strchr(s + 1, '/'); p; p = strchr(p + 1, '/')) {
 		*p = 0;
 		if (mkdir(s, 0755) == -1)
-			if(errno != EEXIST)
+			if (errno != EEXIST)
 				return -1;
 		*p = '/';
 	}
@@ -247,14 +247,16 @@ got_match_branch(char *br, char *pat)
 {
 	char name[128];
 
-	if(strstr(pat, "refs/heads") == pat) {
+	if (strstr(pat, "refs/heads") == pat) {
 		if (snprintf(name, sizeof(name), "%s", pat) >= sizeof(name))
 			return -1;
-	} else if(strstr(pat, "heads")) {
-		if (snprintf(name, sizeof(name), "refs/%s", pat) >= sizeof(name))
+	} else if (strstr(pat, "heads")) {
+		if (snprintf(name, sizeof(name), "refs/%s", pat)
+		    >= sizeof(name))
 			return -1;
 	} else {
-		if (snprintf(name, sizeof(name), "refs/heads/%s", pat) >= sizeof(name))
+		if (snprintf(name, sizeof(name), "refs/heads/%s", pat)
+		    >= sizeof(name))
 			return -1;
 	}
 	return strcmp(br, name) == 0;
@@ -443,7 +445,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		fprintf(stderr, "starting fetch\n");
 	while (1) {
 		n = readpkt(fd, buf, sizeof(buf));
-		if (n == -1){
+		if (n == -1) {
 			err = got_error_from_errno("readpkt");
 			goto done;
 		}
@@ -484,7 +486,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			continue;
 		if (fetchbranch && !got_match_branch(sp[1], fetchbranch))
 			continue;
-		if (refsz == nref + 1){
+		if (refsz == nref + 1) {
 			refsz *= 2;
 			have = realloc(have, refsz * sizeof(have[0]));
 			if (have == NULL) {
@@ -513,7 +515,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	}
 
 	req = 0;
-	for (i = 0; i < nref; i++){
+	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
 			continue;
 		if (got_has_object(&want[i]))
@@ -533,7 +535,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		req = 1;
 	}
 	flushpkt(fd);
-	for (i = 0; i < nref; i++){
+	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &zhash) == 0)
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
@@ -547,7 +549,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 	}
-	if (!req){
+	if (!req) {
 		fprintf(stderr, "up to date\n");
 		flushpkt(fd);
 	}
@@ -615,13 +617,13 @@ main(int argc, char **argv)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 
-	if(getenv("GOT_DEBUG") != NULL){
+	if (getenv("GOT_DEBUG") != NULL) {
 		fprintf(stderr, "fetch-pack being chatty!\n");
 		chattygit = 1;
 	}
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
-	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
 		goto done;
@@ -638,7 +640,7 @@ main(int argc, char **argv)
 	}
 	fetchfd = imsg.fd;
 
-	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
 		goto done;
@@ -665,7 +667,7 @@ done:
 		got_privsep_send_error(&ibuf, err);
 	else
 		err = got_privsep_send_fetch_done(&ibuf, packid);
-	if(err != NULL) {
+	if (err != NULL) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);
 	}
