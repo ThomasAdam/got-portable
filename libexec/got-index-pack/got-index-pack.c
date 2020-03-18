@@ -208,7 +208,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
-		n = read(pack->fd, &obj->delta.ref.ref_id.sha1,
+		n = read(pack->fd, obj->delta.ref.ref_id.sha1,
 		    SHA1_DIGEST_LENGTH);
 		if (n == -1) {
 			err = got_error_from_errno("read");

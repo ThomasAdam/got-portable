@@ -314,7 +314,9 @@ struct got_capability {
 };
 static const struct got_capability got_capabilities[] = {
 	{ GOT_CAPA_AGENT, "got/" GOT_VERSION_STR },
+	#if 0
 	{ GOT_CAPA_OFS_DELTA, NULL },
+	#endif
 	{ GOT_CAPA_SIDE_BAND_64K, NULL },
 };
 
