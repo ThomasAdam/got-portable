@@ -588,6 +588,17 @@ got_privsep_send_fetch_server_progress(struct imsgbuf *ibuf, const char *msg,
 }
 
 const struct got_error *
+got_privsep_send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DOWNLOAD_PROGRESS, 0, 0, -1,
+	    &bytes, sizeof(bytes)) == -1)
+		return got_error_from_errno(
+		    "imsg_compose FETCH_DOWNLOAD_PROGRESS");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
@@ -600,7 +611,7 @@ got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 const struct got_error *
 got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
     char **refname, struct got_pathlist_head *symrefs, char **server_progress,
-    struct imsgbuf *ibuf)
+    off_t *packfile_size, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -719,6 +730,13 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 				goto done;
 			}
 		}
+		break;
+	case GOT_IMSG_FETCH_DOWNLOAD_PROGRESS:
+		if (datalen < sizeof(*packfile_size)) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		memcpy(packfile_size, imsg.data, sizeof(*packfile_size));
 		break;
 	case GOT_IMSG_FETCH_DONE:
 		*id = malloc(sizeof(**id));

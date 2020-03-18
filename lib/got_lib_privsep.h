@@ -113,6 +113,7 @@ enum got_imsg_type {
 	GOT_IMSG_FETCH_SYMREFS,
 	GOT_IMSG_FETCH_REF,
 	GOT_IMSG_FETCH_SERVER_PROGRESS,
+	GOT_IMSG_FETCH_DOWNLOAD_PROGRESS,
 	GOT_IMSG_FETCH_DONE,
 	GOT_IMSG_IDXPACK_REQUEST,
 	GOT_IMSG_IDXPACK_DONE,
@@ -269,6 +270,12 @@ struct got_imsg_fetch_ref {
 	/* Followed by reference name in remaining data of imsg buffer. */
 };
 
+/* Structure for GOT_IMSG_FETCH_DOWNLOAD_PROGRESS data. */
+struct got_imsg_fetch_download_progress {
+	/* Number of packfile data bytes downloaded so far. */
+	off_t packfile_bytes;
+};
+
 /* Structure for GOT_IMSG_PACKIDX. */
 struct got_imsg_packidx {
 	size_t len;
@@ -359,9 +366,11 @@ const struct got_error *got_privsep_send_fetch_ref(struct imsgbuf *,
     struct got_object_id *, const char *);
 const struct got_error *got_privsep_send_fetch_server_progress(struct imsgbuf *,
     const char *, size_t);
+const struct got_error *got_privsep_send_fetch_download_progress(struct imsgbuf *,
+    off_t);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *,
-    char **, struct imsgbuf *);
+    char **, off_t *, struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
     struct got_object_id);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,

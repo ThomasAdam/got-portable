@@ -774,6 +774,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 		packsz += w;
+		err = got_privsep_send_fetch_download_progress(ibuf, packsz);
+		if (err)
+			goto done;
 	}
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");

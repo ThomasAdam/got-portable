@@ -313,6 +313,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	const char *repo_path = got_repo_get_path(repo);
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
+	off_t packfile_size = 0;
 	char *path;
 
 	*pack_hash = NULL;
@@ -385,13 +386,16 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 
+	packfile_size = 0;
 	while (!done) {
 		struct got_object_id *id = NULL;
 		char *refname = NULL;
 		char *server_progress = NULL;
+		off_t packfile_size_cur;
 
 		err = got_privsep_recv_fetch_progress(&done,
-		    &id, &refname, symrefs, &server_progress, &ibuf);
+		    &id, &refname, symrefs, &server_progress,
+		    &packfile_size_cur, &ibuf);
 		if (err != NULL)
 			goto done;
 		if (done)
@@ -405,13 +409,19 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			while ((s = strsep(&s0, "\r")) != NULL) {
 				if (*s == '\0')
 					continue;
-				err = progress_cb(progress_arg, s);
+				err = progress_cb(progress_arg, s, 0);
 				if (err)
 					break;
 			}
 			free(server_progress);
 			if (err)
 				goto done;
+		} else if (packfile_size_cur != packfile_size) {
+			err = progress_cb(progress_arg, NULL,
+			    packfile_size_cur);
+			if (err)
+				break;
+			packfile_size = packfile_size_cur;
 		}
 	}
 	if (waitpid(pid, &status, 0) == -1) {
