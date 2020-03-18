@@ -568,7 +568,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 	}
 	if (!req) {
-		fprintf(stderr, "up to date\n");
+		if (chattygit)
+			fprintf(stderr, "up to date\n");
 		err = flushpkt(fd);
 		if (err)
 			goto done;
