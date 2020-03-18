@@ -231,12 +231,11 @@ object_crc(int packfd, struct got_indexed_object *obj)
 	size_t n;
 	ssize_t r;
 
-	obj->crc = 0;
-	if (lseek(packfd, obj->off + obj->tslen, SEEK_SET) == -1)
+	if (lseek(packfd, obj->off, SEEK_SET) == -1)
 		return got_error_from_errno("lseek");
 
 	obj->crc = crc32(0L, NULL, 0);
-	for (n = obj->len; n > 0; n -= r){
+	for (n = obj->tslen + obj->len; n > 0; n -= r){
 		r = read(packfd, buf, n > sizeof(buf) ? sizeof(buf) : n);
 		if (r == -1)
 			return got_error_from_errno("read");
@@ -414,6 +413,16 @@ update_packidx(int *nlarge, struct got_packidx *packidx, int nobj,
 		n = be32toh(packidx->hdr.fanout_table[i]);
 		packidx->hdr.fanout_table[i] = htobe32(n + 1);
 	}
+}
+
+static int
+indexed_obj_cmp(const void *pa, const void *pb)
+{
+	struct got_indexed_object *a, *b;
+
+	a = *(struct got_indexed_object **)pa;
+	b = *(struct got_indexed_object **)pb;
+	return got_object_id_cmp(&a->id, &b->id);
 }
 
 static const struct got_error *
@@ -639,6 +648,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	    nobj * SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
+	mergesort(objects, nobj, sizeof(struct got_indexed_object *),
+	    indexed_obj_cmp);
 	for(i = 0; i < nobj; i++){
 		PUTBE32(buf, objects[i]->crc);
 		err = hwrite(idxfd, buf, 4, &ctx);
