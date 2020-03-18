@@ -246,18 +246,6 @@ object_crc(int packfd, struct got_indexed_object *obj)
 	return 0;
 }
 
-#if 0
-static int
-indexed_obj_cmp(const void *pa, const void *pb)
-{
-	struct got_indexed_object *a, *b;
-
-	a = *(struct got_indexed_object **)pa;
-	b = *(struct got_indexed_object **)pb;
-	return got_object_id_cmp(&a->id, &b->id);
-}
-#endif
-
 static const struct got_error *
 resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
     struct got_indexed_object *obj)
