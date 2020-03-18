@@ -405,16 +405,68 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 }
 
 const struct got_error *
-got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd)
+got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
+   struct got_pathlist_head *have_refs)
 {
 	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t len, n_have_refs = 0;
+	struct got_pathlist_entry *pe;
 
-	if (imsg_compose(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, fd,
-	    NULL, 0) == -1) {
-		err = got_error_from_errno("imsg_compose FETCH_REQUEST");
+	len = sizeof(struct got_imsg_fetch_symrefs);
+	TAILQ_FOREACH(pe, have_refs, entry) {
+		struct got_object_id *id = pe->data;
+		len += sizeof(struct got_imsg_fetch_have_ref) +
+		    pe->path_len + sizeof(id->sha1);
+		n_have_refs++;
+	}
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
+		close(fd);
+		return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, len);
+	if (wbuf == NULL) {
+		close(fd);
+		return got_error_from_errno("imsg_create FETCH_REQUEST");
+	}
+
+	/* Keep in sync with struct got_imsg_fetch_have_refs definition! */
+	if (imsg_add(wbuf, &n_have_refs, sizeof(n_have_refs)) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_REQUEST");
+		ibuf_free(wbuf);
 		close(fd);
 		return err;
 	}
+
+	TAILQ_FOREACH(pe, have_refs, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+		struct got_object_id *id = pe->data;
+
+		/* Keep in sync with struct got_imsg_fetch_have_ref! */
+		if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			ibuf_free(wbuf);
+			close(fd);
+			return err;
+		}
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			ibuf_free(wbuf);
+			close(fd);
+			return err;
+		}
+		if (imsg_add(wbuf, name, name_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			ibuf_free(wbuf);
+			close(fd);
+			return err;
+		}
+	}
+
+	wbuf->fd = fd;
+	imsg_close(ibuf, wbuf);
 	return flush_imsg(ibuf);
 }
 

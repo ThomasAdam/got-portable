@@ -234,6 +234,17 @@ struct got_imsg_tag_object {
 	 */
 } __attribute__((__packed__));
 
+/* Structures for GOT_IMSG_FETCH_REQUEST data. */
+struct got_imsg_fetch_have_ref {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	size_t name_len;
+	/* Followed by name_len data bytes. */
+};
+struct got_imsg_fetch_have_refs {
+	size_t n_have_refs;
+	/* Followed by n_have_refs times of got_imsg_fetch_have_ref data. */
+};
+
 /* Structures for GOT_IMSG_FETCH_SYMREFS data. */
 struct got_imsg_fetch_symref {
 	size_t name_len;
@@ -339,7 +350,8 @@ const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
     struct got_object_id *);
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
-const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
+    struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
     struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_progress(struct imsgbuf *,

@@ -55,7 +55,6 @@
 struct got_object *indexed;
 static int chattygit;
 static char *fetchbranch;
-static char *upstream = "origin";
 static struct got_object_id zhash = {.sha1={0}};
 
 int
@@ -137,47 +136,22 @@ writepkt(int fd, char *buf, int nbuf)
 	return 0;
 }
 
-/* TODO: This should not access the file system! */
-int
-got_resolve_remote_ref(struct got_object_id *id, char *ref)
+static const struct got_error *
+match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
+    char *refname, char *id_str)
 {
-	char buf[128], *s;
-	int r, f;
+	struct got_pathlist_entry *pe;
 
-	if (!got_parse_sha1_digest(id->sha1, ref))
-		return 0;
+	memset(id, 0, sizeof(*id));
 
-	/* Slightly special handling: translate remote refs to local ones. */
-	if (strcmp(ref, "HEAD") == 0) {
-		if (snprintf(buf, sizeof(buf), ".git/HEAD") >= sizeof(buf))
-			return -1;
-	} else if (strstr(ref, "refs/heads") == ref) {
-		ref += strlen("refs/heads");
-		if (snprintf(buf, sizeof(buf),
-		    ".git/refs/remotes/%s/%s", upstream, ref) >= sizeof(buf))
-			return -1;
-	} else if (strstr(ref, "refs/tags") == ref) {
-		ref += strlen("refs/tags");
-		if (snprintf(buf, sizeof(buf),
-		    ".git/refs/tags/%s/%s", upstream, ref) >= sizeof(buf))
-			return -1;
-	} else {
-		return -1;
+	TAILQ_FOREACH(pe, have_refs, entry) {
+		if (strcmp(pe->path, refname) == 0) {
+			if (!got_parse_sha1_digest(id->sha1, id_str))
+				return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+			break;
+		}
 	}
-
-	r = -1;
-	s = buf;
-	if ((f = open(s, O_RDONLY)) == -1)
-		goto err;
-	if (readn(f, buf, sizeof(buf)) < 40)
-		goto err;
-	if (!got_parse_sha1_digest(id->sha1, buf))
-		goto err;
-err:
-	close(f);
-	if (r == -1 && strstr(buf, "ref:") == buf)
-		return got_resolve_remote_ref(id, buf + strlen("ref:"));
-	return r;
+	return NULL;
 }
 
 static int
@@ -399,7 +373,7 @@ match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
 
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
-    struct imsgbuf *ibuf)
+    struct got_pathlist_head *have_refs, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKTMAX], *sp[3];
@@ -485,8 +459,10 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 
-		if (got_resolve_remote_ref(&have[nref], sp[1]) == -1)
-			memset(&have[nref], 0, sizeof(have[nref]));
+		err = match_remote_ref(have_refs, &have[nref], sp[0], sp[1]);
+		if (err)
+			goto done;
+
 		err = got_privsep_send_fetch_progress(ibuf, &want[nref], sp[1]);
 		if (err)
 			goto done;
@@ -597,6 +573,11 @@ main(int argc, char **argv)
 	struct got_object_id packid;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
+	struct got_pathlist_head have_refs;
+	struct got_imsg_fetch_have_refs *fetch_have_refs = NULL;
+	size_t datalen;
+
+	TAILQ_INIT(&have_refs);
 
 	if (getenv("GOT_DEBUG") != NULL) {
 		fprintf(stderr, "fetch-pack being chatty!\n");
@@ -615,8 +596,21 @@ main(int argc, char **argv)
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		goto done;
 	}
-	if (imsg.hdr.len - IMSG_HEADER_SIZE != 0) {
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	if (datalen < sizeof(struct got_imsg_fetch_have_refs)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	fetch_have_refs = (struct got_imsg_fetch_have_refs *)imsg.data;
+	if (datalen != sizeof(struct got_imsg_fetch_have_refs) +
+	    sizeof(struct got_imsg_fetch_have_ref) *
+	    fetch_have_refs->n_have_refs) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	if (fetch_have_refs->n_have_refs != 0) {
+		/* TODO: Incremental fetch support */
+		err = got_error(GOT_ERR_NOT_IMPL);
 		goto done;
 	}
 	fetchfd = imsg.fd;
@@ -638,7 +632,7 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	err = fetch_pack(fetchfd, packfd, &packid, &ibuf);
+	err = fetch_pack(fetchfd, packfd, &packid, &have_refs, &ibuf);
 	if (err)
 		goto done;
 done:

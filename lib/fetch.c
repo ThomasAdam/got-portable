@@ -310,10 +310,13 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
 	const char *repo_path = got_repo_get_path(repo);
+	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
 	char *path;
 
 	*pack_hash = NULL;
+
+	TAILQ_INIT(&have_refs);
 
 	if (asprintf(&path, "%s/%s/fetching.pack",
 	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
@@ -368,7 +371,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_fetch_req(&ibuf, nfetchfd);
+	err = got_privsep_send_fetch_req(&ibuf, nfetchfd, &have_refs);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
