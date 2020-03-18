@@ -346,10 +346,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
-	int status, done = 0;
+	int fetchstatus, idxstatus, done = 0;
 	const struct got_error *err;
-	struct imsgbuf ibuf;
-	pid_t pid;
+	struct imsgbuf fetchibuf, idxibuf;
+	pid_t fetchpid, idxpid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
 	const char *repo_path = got_repo_get_path(repo);
@@ -396,11 +396,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 
-	pid = fork();
-	if (pid == -1) {
+	fetchpid = fork();
+	if (fetchpid == -1) {
 		err = got_error_from_errno("fork");
 		goto done;
-	} else if (pid == 0){
+	} else if (fetchpid == 0){
 		got_privsep_exec_child(imsg_fetchfds,
 		    GOT_PATH_PROG_FETCH_PACK, ".");
 	}
@@ -409,17 +409,17 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	imsg_init(&ibuf, imsg_fetchfds[0]);
+	imsg_init(&fetchibuf, imsg_fetchfds[0]);
 	nfetchfd = dup(fetchfd);
 	if (nfetchfd == -1) {
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_fetch_req(&ibuf, nfetchfd, &have_refs);
+	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
-	err = got_privsep_send_tmpfd(&ibuf, npackfd);
+	err = got_privsep_send_tmpfd(&fetchibuf, npackfd);
 	if (err != NULL)
 		goto done;
 	npackfd = dup(packfd);
@@ -437,7 +437,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 
 		err = got_privsep_recv_fetch_progress(&done,
 		    &id, &refname, symrefs, &server_progress,
-		    &packfile_size_cur, &ibuf);
+		    &packfile_size_cur, &fetchibuf);
 		if (err != NULL)
 			goto done;
 		if (done)
@@ -466,7 +466,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			packfile_size = packfile_size_cur;
 		}
 	}
-	if (waitpid(pid, &status, 0) == -1) {
+	if (waitpid(fetchpid, &fetchstatus, 0) == -1) {
 		err = got_error_from_errno("waitpid");
 		goto done;
 	}
@@ -483,36 +483,36 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("socketpair");
 		goto done;
 	}
-	pid = fork();
-	if (pid == -1) {
+	idxpid = fork();
+	if (idxpid == -1) {
 		err= got_error_from_errno("fork");
 		goto done;
-	} else if (pid == 0)
+	} else if (idxpid == 0)
 		got_privsep_exec_child(imsg_idxfds,
 		    GOT_PATH_PROG_INDEX_PACK, ".");
 	if (close(imsg_idxfds[1]) != 0) {
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	imsg_init(&ibuf, imsg_idxfds[0]);
+	imsg_init(&idxibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&ibuf, npackfd, *pack_hash);
+	err = got_privsep_send_index_pack_req(&idxibuf, npackfd, *pack_hash);
 	if (err != NULL)
 		goto done;
 	npackfd = -1;
-	err = got_privsep_send_tmpfd(&ibuf, nidxfd);
+	err = got_privsep_send_tmpfd(&idxibuf, nidxfd);
 	if (err != NULL)
 		goto done;
 	nidxfd = -1;
-	err = got_privsep_wait_index_pack_done(&ibuf);
+	err = got_privsep_wait_index_pack_done(&idxibuf);
 	if (err != NULL)
 		goto done;
-	imsg_clear(&ibuf);
+	imsg_clear(&idxibuf);
 	if (close(imsg_idxfds[0]) == -1) {
 		err = got_error_from_errno("close");
 		goto done;
 	}
-	if (waitpid(pid, &status, 0) == -1) {
+	if (waitpid(idxpid, &idxstatus, 0) == -1) {
 		err = got_error_from_errno("waitpid");
 		goto done;
 	}
