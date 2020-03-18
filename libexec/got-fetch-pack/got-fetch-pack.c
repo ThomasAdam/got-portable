@@ -51,7 +51,6 @@ struct got_object *indexed;
 static int chattygit;
 static char *fetchbranch;
 static char *upstream = "origin";
-static char *packtmp = ".git/objects/pack/fetch.tmp";
 static struct got_object_id zhash = {.sha1={0}};
 
 static char*
@@ -283,9 +282,9 @@ got_tokenize_refline(char *line, char **sp, size_t nsp)
 }
 
 static int
-got_fetch_pack(int fd, int packfd, char *packtmp, struct got_object_id *packid)
+got_fetch_pack(int fd, int packfd, struct got_object_id *packid)
 {
-	char buf[GOT_PKTMAX], idxtmp[256], *sp[3];
+	char buf[GOT_PKTMAX], *sp[3];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int nref, refsz;
@@ -391,9 +390,6 @@ got_fetch_pack(int fd, int packfd, char *packtmp, struct got_object_id *packid)
 	if(got_check_pack_hash(packfd, packsz, packid->sha1) == -1)
 		errx(1, "corrupt packfile");
 	close(packfd);
-	n = strlen(packtmp) - strlen(".tmp");
-	memcpy(idxtmp, packtmp, n);
-	memcpy(idxtmp + n, ".idx", strlen(".idx") + 1);
 	return 0;
 }
 
@@ -447,7 +443,7 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	if(got_fetch_pack(fetchfd, packfd, packtmp, &packid) == -1) {
+	if (got_fetch_pack(fetchfd, packfd, &packid) == -1) {
 		err = got_error(GOT_ERR_FETCH_FAILED);
 		goto done;
 	}
