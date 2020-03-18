@@ -58,12 +58,6 @@ static char *fetchbranch;
 static char *upstream = "origin";
 static struct got_object_id zhash = {.sha1={0}};
 
-static char*
-strip(char *ref)
-{
-	return ref;
-}
-
 int
 readn(int fd, void *buf, size_t n)
 {
@@ -150,7 +144,6 @@ got_resolve_remote_ref(struct got_object_id *id, char *ref)
 	char buf[128], *s;
 	int r, f;
 
-	ref = strip(ref);
 	if(!got_parse_sha1_digest(id->sha1, ref))
 		return 0;
 
@@ -173,7 +166,7 @@ got_resolve_remote_ref(struct got_object_id *id, char *ref)
 	}
 
 	r = -1;
-	s = strip(buf);
+	s = buf;
 	if((f = open(s, O_RDONLY)) == -1)
 		goto err;
 	if(readn(f, buf, sizeof(buf)) < 40)
