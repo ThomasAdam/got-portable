@@ -75,12 +75,20 @@ readn(ssize_t *off, int fd, void *buf, size_t n)
 	return NULL;
 }
 
-static int
+static const struct got_error *
 flushpkt(int fd)
 {
+	ssize_t w;
+
 	if (chattygit)
 		fprintf(stderr, "writepkt: 0000\n");
-	return write(fd, "0000", 4);
+
+	 w = write(fd, "0000", 4);
+	 if (w == -1)
+		return got_error_from_errno("write");
+	if (w != 4)
+		return got_error(GOT_ERR_IO);
+	return NULL;
 }
 
 
@@ -528,7 +536,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		req = 1;
 	}
-	flushpkt(fd);
+	err = flushpkt(fd);
+	if (err)
+		goto done;
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &zhash) == 0)
 			continue;
@@ -544,7 +554,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	}
 	if (!req) {
 		fprintf(stderr, "up to date\n");
-		flushpkt(fd);
+		err = flushpkt(fd);
+		if (err)
+			goto done;
 	}
 	n = snprintf(buf, sizeof(buf), "done\n");
 	err = writepkt(fd, buf, n);
