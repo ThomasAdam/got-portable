@@ -973,13 +973,16 @@ static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
     int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
-	int *did_something = arg, p;
+	int p;
 	char scaled[FMT_SCALED_STRSIZE];
-	
-	if (message) {
+
+	if (message && message[0] != '\0' && message[0] != '\n') {
 		printf("\rserver: %s", message);
-		*did_something = 1;
-	} else if (packfile_size > 0 || nobj_indexed > 0) {
+		if (strchr(message, '\n') == 0)
+			printf("\n");
+	}
+
+	if (packfile_size > 0 || nobj_indexed > 0) {
 		printf("\r");
 		if (fmt_scaled(packfile_size, scaled) == 0)
 			printf(" %*s fetched", FMT_SCALED_STRSIZE, scaled);
@@ -992,7 +995,10 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 			printf("; resolving deltas %d%% (%d)",
 			    p, nobj_resolved);
 		}
-		*did_something = 1;
+		if (nobj_indexed > 0 && nobj_indexed == nobj_total &&
+		    nobj_resolved == nobj_total - nobj_loose)
+			printf("\nWriting pack index...\n");
+	
 	}
 	fflush(stdout);
 	return NULL;
@@ -1011,7 +1017,6 @@ cmd_clone(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int ch, fetchfd = -1;
-	int did_something = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1069,11 +1074,9 @@ cmd_clone(int argc, char *argv[])
 	printf("Connected to %s:%s\n", host, port);
 
 	err = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
-	    repo, fetch_progress, &did_something);
+	    repo, fetch_progress, NULL);
 	if (err)
 		goto done;
-	if (did_something)
-		printf("\n");
 
 	err = got_object_id_str(&id_str, pack_hash);
 	if (err)
