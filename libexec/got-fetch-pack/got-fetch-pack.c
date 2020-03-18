@@ -473,7 +473,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (got_has_object(&want[i]))
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
-		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
+		n = snprintf(buf, sizeof(buf), "want %s%s%s\n", hashstr,
+		   i == 0 && my_capabilities ? " " : "",
 		   i == 0 && my_capabilities ? my_capabilities : "");
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
