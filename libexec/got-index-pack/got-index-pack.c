@@ -711,14 +711,6 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			goto done;
 			
 		}
-		if (nloose + nresolved == nobj) {
-			static char msg[64];
-			snprintf(msg, sizeof(msg),
-			    "fix point reached too early: %d/%d/%d",
-			    nvalid, nresolved, nobj);
-			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
-			goto done;
-		}
 		nresolved += n;
 		nvalid += nresolved;
 	}
