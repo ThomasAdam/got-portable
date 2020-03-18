@@ -193,13 +193,6 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	return 0;
 }
 
-int
-got_has_object(struct got_object_id *obj)
-{
-	/* TODO */
-	return 0;
-}
-
 static int
 match_branch(char *br, char *pat)
 {
@@ -475,8 +468,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	req = 0;
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
-			continue;
-		if (got_has_object(&want[i]))
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "want %s%s%s\n", hashstr,
