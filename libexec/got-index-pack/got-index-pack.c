@@ -706,6 +706,13 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	pass++;
 	while (nvalid != nobj) {
 		int n = 0;
+		/*
+		 * This loop will only run once unless the pack file
+		 * contains ref deltas which refer to objects located
+		 * later in the pack file, which is unusual.
+		 * Offset deltas can always be resolved in one pass
+		 * unless the packfile is corrupt.
+		 */
 		for (i = 0; i < nobj; i++) {
 			obj = &objects[i];
 			if (obj->type != GOT_OBJ_TYPE_REF_DELTA &&
