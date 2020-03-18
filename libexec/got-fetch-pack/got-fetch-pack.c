@@ -132,6 +132,7 @@ writepkt(int fd, char *buf, int nbuf)
 			if (isprint(buf[i]))
 				fputc(buf[i], stderr);
 		}
+		fputc('\n', stderr);
 	}
 	return 0;
 }
