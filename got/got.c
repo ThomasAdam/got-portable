@@ -980,7 +980,7 @@ cmd_clone(int argc, char *argv[])
 	struct got_pathlist_head refs, symrefs;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
-	int ch;
+	int ch, fetchfd = -1;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1010,6 +1010,10 @@ cmd_clone(int argc, char *argv[])
 	if (err)
 		goto done;
 
+	err = got_fetch_connect(&fetchfd, proto, host, port, server_path);
+	if (err)
+		goto done;
+
 	if (dirname == NULL) {
 		if (asprintf(&default_destdir, "%s.git", repo_name) == -1) {
 			err = got_error_from_errno("asprintf");
@@ -1031,7 +1035,7 @@ cmd_clone(int argc, char *argv[])
 	if (err)
 		goto done;
 
-	err = got_fetch(&pack_hash, &refs, &symrefs,
+	err = got_fetch(&pack_hash, &refs, &symrefs, fetchfd,
 	    proto, host, port, server_path, repo_name, branch_filter, repo);
 	if (err)
 		goto done;
@@ -1096,6 +1100,8 @@ cmd_clone(int argc, char *argv[])
 	}
 
 done:
+	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (repo)
 		got_repo_close(repo);
 	TAILQ_FOREACH(pe, &refs, entry) {

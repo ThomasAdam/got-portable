@@ -21,7 +21,10 @@
 const struct got_error *got_fetch_parse_uri(char **, char **, char **,
     char **, char **, const char *);
 
+const struct got_error *got_fetch_connect(int *, const char *, const char *,
+    const char *, const char *);
+
 const struct got_error *got_fetch(struct got_object_id **,
-	struct got_pathlist_head *, struct got_pathlist_head *,
+	struct got_pathlist_head *, struct got_pathlist_head *, int,
 	const char *, const char *, const char *, const char *,
 	const char *, const char *, struct got_repository *);
