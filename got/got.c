@@ -988,12 +988,11 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 			printf(" %*s fetched", FMT_SCALED_STRSIZE, scaled);
 		if (nobj_indexed > 0) {
 			p = (nobj_indexed * 100) / nobj_total;
-			printf("; indexing %d%% (%d)", p, nobj_indexed);
+			printf("; indexing %d%%", p);
 		}
 		if (nobj_resolved > 0) {
 			p = (nobj_resolved * 100) / (nobj_total - nobj_loose);
-			printf("; resolving deltas %d%% (%d)",
-			    p, nobj_resolved);
+			printf("; resolving deltas %d%%", p);
 		}
 		if (nobj_indexed > 0 && nobj_indexed == nobj_total &&
 		    nobj_resolved == nobj_total - nobj_loose)
