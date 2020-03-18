@@ -676,11 +676,10 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			if (obj->valid)
 				continue;
 
-			if (pack->map == NULL &&
-			    lseek(pack->fd, obj->off + obj->tslen, SEEK_SET)
-			    == -1) {
-					err = got_error_from_errno("lseek");
-					goto done;
+			if (pack->map == NULL && lseek(pack->fd,
+			    obj->off + obj->tslen, SEEK_SET) == -1) {
+				err = got_error_from_errno("lseek");
+				goto done;
 			}
 
 			err = resolve_deltified_object(pack, &packidx, obj);
