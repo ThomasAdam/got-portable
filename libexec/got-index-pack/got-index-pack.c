@@ -75,12 +75,17 @@ struct got_indexed_object {
 
 	uint32_t crc;
 
-	/* For ref deltas. */
-	struct got_object_id ref_id;
-
-	/* For offset deltas. */
-	off_t base_offset;
-	size_t base_offsetlen;
+	union {
+		struct {
+			/* For ref deltas. */
+			struct got_object_id ref_id;
+		} ref;
+		struct {
+			/* For offset deltas. */
+			off_t base_offset;
+			size_t base_offsetlen;
+		} ofs;
+	} delta;
 };
 
 #define PUTBE32(b, n)\
@@ -201,7 +206,8 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		break;
 	case GOT_OBJ_TYPE_REF_DELTA:
 		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
-		n = read(pack->fd, &obj->ref_id.sha1, SHA1_DIGEST_LENGTH);
+		n = read(pack->fd, &obj->delta.ref.ref_id.sha1,
+		    SHA1_DIGEST_LENGTH);
 		if (n == -1) {
 			err = got_error_from_errno("read");
 			break;
@@ -210,7 +216,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 			err = got_error(GOT_ERR_BAD_PACKFILE);
 			break;
 		}
-		obj->crc = crc32(obj->crc, obj->ref_id.sha1,
+		obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.sha1,
 		    SHA1_DIGEST_LENGTH);
 		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
 		    &obj->crc, obj->size, pack->fd);
@@ -220,8 +226,9 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
-		err = got_pack_parse_offset_delta(&obj->base_offset,
-		    &obj->base_offsetlen, pack, obj->off, obj->tslen);
+		err = got_pack_parse_offset_delta(&obj->delta.ofs.base_offset,
+		    &obj->delta.ofs.base_offsetlen, pack, obj->off,
+		    obj->tslen);
 		if (err)
 			break;
 
@@ -230,7 +237,8 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 			err = got_error_from_errno("lseek");
 			break;
 		}
-		err = read_crc(&obj->crc, pack->fd, obj->base_offsetlen);
+		err = read_crc(&obj->crc, pack->fd,
+		    obj->delta.ofs.base_offsetlen);
 		if (err)
 			break;
 
@@ -238,7 +246,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		    &obj->crc, obj->size, pack->fd);
 		if (err)
 			break;
-		obj->len += obj->base_offsetlen;
+		obj->len += obj->delta.ofs.base_offsetlen;
 		break;
 	default:
 		err = got_error(GOT_ERR_OBJ_TYPE);
