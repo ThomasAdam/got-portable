@@ -240,7 +240,7 @@ struct got_imsg_fetch_symref {
 	size_t target_len;
 
 	/*
-	 * Followed by name_len + target_len gata bytes.
+	 * Followed by name_len + target_len data bytes.
 	 */
 } __attribute__((__packed__));
 
