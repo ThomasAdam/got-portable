@@ -572,7 +572,7 @@ readodelta(FILE *f, Object *o, off_t nd, off_t p, int flag)
 		goto error;
 	}
 
-	if (got_inflate_to_mem(&d, &n, f) == NULL)
+	if (got_inflate_to_mem(&d, &n, f) != NULL)
 		goto error;
 	o->len = ftello(f) - o->off;
 	if(d == NULL || n != nd)
