@@ -287,9 +287,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 		if (consumed_total)
 			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			if (outbuf == NULL)
 				continue;
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			   GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
@@ -343,9 +343,9 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 		if (consumed_total)
 			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
-			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			if (outbuf == NULL)
 				continue;
+			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
