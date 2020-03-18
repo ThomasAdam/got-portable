@@ -221,7 +221,7 @@ got_object_read_header(struct got_object **obj, int fd)
 	if (buf == NULL)
 		return got_error_from_errno("malloc");
 
-	err = got_inflate_init(&zb, buf, zbsize);
+	err = got_inflate_init(&zb, buf, zbsize, NULL);
 	if (err)
 		return err;
 

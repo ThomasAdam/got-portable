@@ -130,6 +130,24 @@ get_obj_type_label(const char **label, int obj_type)
 	return err;
 }
 
+static const struct got_error *
+read_crc(uint32_t *crc, int fd, size_t len)
+{
+	uint8_t buf[8192];
+	size_t n;
+	ssize_t r;
+
+	for (n = len; n > 0; n -= r){
+		r = read(fd, buf, n > sizeof(buf) ? sizeof(buf) : n);
+		if (r == -1)
+			return got_error_from_errno("read");
+		if (r == 0)
+			break;
+		*crc = crc32(*crc, buf, r);
+	}
+
+	return NULL;
+}
 
 static const struct got_error *
 read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
@@ -148,13 +166,21 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 	if (err)
 		return err;
 
+	/* XXX Seek back and get the CRC of on-disk type+size bytes. */
+	if (lseek(pack->fd, obj->off, SEEK_SET) == -1)
+		return got_error_from_errno("lseek");
+	err = read_crc(&obj->crc, pack->fd, obj->tslen);
+	if (err)
+		return err;
+
 	switch (obj->type) {
 	case GOT_OBJ_TYPE_BLOB:
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_TAG:
 		/* XXX TODO reading large objects into memory is bad! */
-		err = got_inflate_to_mem_fd(&data, &datalen, &obj->len, pack->fd);
+		err = got_inflate_to_mem_fd(&data, &datalen, &obj->len,
+		    &obj->crc, pack->fd);
 		if (err)
 			break;
 		SHA1Init(&ctx);
@@ -184,7 +210,10 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 			err = got_error(GOT_ERR_BAD_PACKFILE);
 			break;
 		}
-		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len, pack->fd);
+		obj->crc = crc32(obj->crc, obj->ref_id.sha1,
+		    SHA1_DIGEST_LENGTH);
+		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
+		    &obj->crc, pack->fd);
 		if (err)
 			break;
 		obj->len += SHA1_DIGEST_LENGTH;
@@ -195,7 +224,18 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		    &obj->base_offsetlen, pack, obj->off, obj->tslen);
 		if (err)
 			break;
-		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len, pack->fd);
+
+		/* XXX Seek back and get the CRC of on-disk offset bytes. */
+		if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET) == -1) {
+			err = got_error_from_errno("lseek");
+			break;
+		}
+		err = read_crc(&obj->crc, pack->fd, obj->base_offsetlen);
+		if (err)
+			break;
+
+		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
+		    &obj->crc, pack->fd);
 		if (err)
 			break;
 		obj->len += obj->base_offsetlen;
@@ -222,28 +262,6 @@ hwrite(int fd, void *buf, int len, SHA1_CTX *ctx)
 		return got_error(GOT_ERR_IO);
 
 	return NULL;
-}
-
-static const struct got_error *
-object_crc(int packfd, struct got_indexed_object *obj)
-{
-	char buf[8096];
-	size_t n;
-	ssize_t r;
-
-	if (lseek(packfd, obj->off, SEEK_SET) == -1)
-		return got_error_from_errno("lseek");
-
-	obj->crc = crc32(0L, NULL, 0);
-	for (n = obj->tslen + obj->len; n > 0; n -= r){
-		r = read(packfd, buf, n > sizeof(buf) ? sizeof(buf) : n);
-		if (r == -1)
-			return got_error_from_errno("read");
-		if (r == 0)
-			return NULL;
-		obj->crc = crc32(obj->crc, buf, r);
-	}
-	return 0;
 }
 
 static const struct got_error *
@@ -517,6 +535,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			err = got_error_from_errno("calloc");
 			goto done;
 		}
+		obj->crc = crc32(0L, NULL, 0);
 
 		/* Store offset to type+size information for this object. */
 		obj->off = lseek(pack->fd, 0, SEEK_CUR);
@@ -531,9 +550,11 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 		objects[i] = obj;
 
-		err = object_crc(pack->fd, obj);
-		if (err)
+		if (lseek(pack->fd, obj->off + obj->tslen + obj->len,
+		    SEEK_SET) == -1) {
+			err = got_error_from_errno("lseek");
 			goto done;
+		}
 
 		if (obj->type == GOT_OBJ_TYPE_BLOB ||
 		    obj->type == GOT_OBJ_TYPE_TREE ||

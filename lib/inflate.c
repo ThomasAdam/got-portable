@@ -35,7 +35,8 @@
 #endif
 
 const struct got_error *
-got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
+got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize,
+    uint32_t *input_crc)
 {
 	const struct got_error *err = NULL;
 	int zerr;
@@ -74,6 +75,7 @@ got_inflate_init(struct got_inflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	} else
 		zb->outbuf = outbuf;
 
+	zb->input_crc = input_crc;
 done:
 	if (err)
 		got_inflate_end(zb);
@@ -96,6 +98,9 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
 	if (consumed)
 		*consumed = 0;
 	do {
+		char *crc_in = NULL;
+		size_t crc_avail = 0;
+
 		if (z->avail_in == 0) {
 			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
 			if (n == 0) {
@@ -108,7 +113,15 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
 		}
+		if (zb->input_crc) {
+			crc_in = z->next_in;
+			crc_avail = z->avail_in;
+		}
 		ret = inflate(z, Z_SYNC_FLUSH);
+		if (zb->input_crc) {
+			*zb->input_crc = crc32(*zb->input_crc,
+			    crc_in, crc_avail - z->avail_in);
+		}
 	} while (ret == Z_OK && z->avail_out > 0);
 
 	if (ret == Z_OK || ret == Z_BUF_ERROR) {
@@ -141,6 +154,9 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
 	if (consumed)
 		*consumed = 0;
 	do {
+		char *crc_in = NULL;
+		size_t crc_avail = 0;
+
 		if (z->avail_in == 0) {
 			ssize_t n = read(fd, zb->inbuf, zb->inlen);
 			if (n < 0)
@@ -153,7 +169,15 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
 		}
+		if (zb->input_crc) {
+			crc_in = z->next_in;
+			crc_avail = z->avail_in;
+		}
 		ret = inflate(z, Z_SYNC_FLUSH);
+		if (zb->input_crc) {
+			*zb->input_crc = crc32(*zb->input_crc,
+			    crc_in, crc_avail - z->avail_in);
+		}
 	} while (ret == Z_OK && z->avail_out > 0);
 
 	if (ret == Z_OK || ret == Z_BUF_ERROR) {
@@ -185,7 +209,10 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 	*consumed = 0;
 
 	do {
+		char *crc_in = NULL;
+		size_t crc_avail = 0;
 		size_t last_total_in = zb->z.total_in;
+
 		if (z->avail_in == 0) {
 			if (len == 0) {
 				/* EOF */
@@ -195,7 +222,15 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 			z->next_in = map + offset + *consumed;
 			z->avail_in = len - *consumed;
 		}
+		if (zb->input_crc) {
+			crc_in = z->next_in;
+			crc_avail = z->avail_in;
+		}
 		ret = inflate(z, Z_SYNC_FLUSH);
+		if (zb->input_crc) {
+			*zb->input_crc = crc32(*zb->input_crc,
+			    crc_in, crc_avail - z->avail_in);
+		}
 		*consumed += z->total_in - last_total_in;
 	} while (ret == Z_OK && z->avail_out > 0);
 
@@ -234,9 +269,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 		if (*outbuf == NULL)
 			return got_error_from_errno("malloc");
-		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE, NULL);
 	} else
-		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
 	if (err)
 		return err;
 
@@ -276,7 +311,7 @@ done:
 
 const struct got_error *
 got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
-    size_t *consumed_total, int infd)
+    size_t *consumed_total, uint32_t *input_crc, int infd)
 {
 	const struct got_error *err;
 	size_t avail, consumed;
@@ -288,9 +323,11 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 		if (*outbuf == NULL)
 			return got_error_from_errno("malloc");
-		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE,
+		    input_crc);
 	} else
-		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE,
+		    input_crc);
 	if (err)
 		goto done;
 
@@ -341,7 +378,7 @@ got_inflate_to_mem_mmap(uint8_t **outbuf, size_t *outlen, uint8_t *map,
 	*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 	if (*outbuf == NULL)
 		return got_error_from_errno("malloc");
-	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE);
+	err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE, NULL);
 	if (err) {
 		free(*outbuf);
 		*outbuf = NULL;
@@ -387,7 +424,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 	size_t avail;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
 	if (err)
 		goto done;
 
@@ -424,7 +461,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	size_t avail;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
 	if (err)
 		goto done;
 
@@ -459,7 +496,7 @@ got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
 	size_t avail;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
 	if (err)
 		goto done;
 
@@ -496,7 +533,7 @@ got_inflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
 	struct got_inflate_buf zb;
 	size_t consumed;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
 	if (err)
 		goto done;
 
