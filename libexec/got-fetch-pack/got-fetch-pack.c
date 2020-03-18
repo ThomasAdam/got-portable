@@ -224,7 +224,7 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	ssize_t n, r, nr;
 
 	if (sz < sizeof(struct got_packfile_hdr) + SHA1_DIGEST_LENGTH)
-		return got_error(GOT_ERR_BAD_PACKFILE);
+		return got_error_msg(GOT_ERR_BAD_PACKFILE, "short packfile");
 
 	n = 0;
 	SHA1Init(&ctx);
