@@ -40,7 +40,7 @@ void got_inflate_end(struct got_inflate_buf *);
 const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, size_t *,
     FILE *);
 const struct got_error *got_inflate_to_mem_fd(uint8_t **, size_t *, size_t *,
-    uint32_t *, int);
+    uint32_t *, size_t, int);
 const struct got_error *got_inflate_to_mem_mmap(uint8_t **, size_t *, uint8_t *,
     size_t, size_t);
 const struct got_error *got_inflate_to_file(size_t *, FILE *, FILE *);

@@ -180,7 +180,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 	case GOT_OBJ_TYPE_TAG:
 		/* XXX TODO reading large objects into memory is bad! */
 		err = got_inflate_to_mem_fd(&data, &datalen, &obj->len,
-		    &obj->crc, pack->fd);
+		    &obj->crc, obj->size, pack->fd);
 		if (err)
 			break;
 		SHA1Init(&ctx);
@@ -213,7 +213,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		obj->crc = crc32(obj->crc, obj->ref_id.sha1,
 		    SHA1_DIGEST_LENGTH);
 		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
-		    &obj->crc, pack->fd);
+		    &obj->crc, obj->size, pack->fd);
 		if (err)
 			break;
 		obj->len += SHA1_DIGEST_LENGTH;
@@ -235,7 +235,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 			break;
 
 		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
-		    &obj->crc, pack->fd);
+		    &obj->crc, obj->size, pack->fd);
 		if (err)
 			break;
 		obj->len += obj->base_offsetlen;

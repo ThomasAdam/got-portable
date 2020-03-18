@@ -311,23 +311,27 @@ done:
 
 const struct got_error *
 got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
-    size_t *consumed_total, uint32_t *input_crc, int infd)
+    size_t *consumed_total, uint32_t *input_crc, size_t expected_size, int infd)
 {
 	const struct got_error *err;
 	size_t avail, consumed;
 	struct got_inflate_buf zb;
 	void *newbuf;
 	int nbuf = 1;
+	size_t bufsize = GOT_INFLATE_BUFSIZE;
 
+	/* Optimize buffer size in case short reads should suffice. */
+	if (expected_size > 0 && expected_size < bufsize)
+		bufsize = expected_size;
+		
 	if (outbuf) {
-		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
+		*outbuf = malloc(bufsize);
 		if (*outbuf == NULL)
 			return got_error_from_errno("malloc");
 		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE,
 		    input_crc);
 	} else
-		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE,
-		    input_crc);
+		err = got_inflate_init(&zb, NULL, bufsize, input_crc);
 	if (err)
 		goto done;
 
