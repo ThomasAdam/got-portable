@@ -224,24 +224,6 @@ got_has_object(struct got_object_id *obj)
 	return 0;
 }
 
-/*static */int
-got_make_pack_dir(char *path)
-{
-	char s[128];
-	char *p;
-
-	if (snprintf(s, sizeof(s), "%s", path) >= sizeof(s))
-		return -1;
-	for (p = strchr(s + 1, '/'); p; p = strchr(p + 1, '/')) {
-		*p = 0;
-		if (mkdir(s, 0755) == -1)
-			if (errno != EEXIST)
-				return -1;
-		*p = '/';
-	}
-	return 0;
-}
-
 static int
 got_match_branch(char *br, char *pat)
 {
