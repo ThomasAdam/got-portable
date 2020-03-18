@@ -423,20 +423,20 @@ indexed_obj_cmp(const void *pa, const void *pb)
 {
 	struct got_indexed_object *a, *b;
 
-	a = *(struct got_indexed_object **)pa;
-	b = *(struct got_indexed_object **)pb;
+	a = (struct got_indexed_object *)pa;
+	b = (struct got_indexed_object *)pb;
 	return got_object_id_cmp(&a->id, &b->id);
 }
 
 static void
 make_packidx(struct got_packidx *packidx, int nobj,
-    struct got_indexed_object **objects)
+    struct got_indexed_object *objects)
 {
 	struct got_indexed_object *obj;
 	int i;
 	uint32_t idx = 0;
 
-	mergesort(objects, nobj, sizeof(struct got_indexed_object *),
+	mergesort(objects, nobj, sizeof(struct got_indexed_object),
 	    indexed_obj_cmp);
 
 	memset(packidx->hdr.fanout_table, 0,
@@ -444,7 +444,7 @@ make_packidx(struct got_packidx *packidx, int nobj,
 	packidx->nlargeobj = 0;
 
 	for (i = 0; i < nobj; i++) {
-		obj = objects[i];
+		obj = &objects[i];
 		if (obj->valid)
 			add_indexed_object(packidx, idx++, obj);
 	}
@@ -482,7 +482,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	struct got_packidx packidx;
 	char buf[8];
 	int nobj, nvalid, nloose, nresolved = 0, i;
-	struct got_indexed_object **objects = NULL, *obj;
+	struct got_indexed_object *objects = NULL, *obj;
 	SHA1_CTX ctx;
 	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
 	ssize_t r, w;
@@ -552,7 +552,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 	nvalid = 0;
 	nloose = 0;
-	objects = calloc(nobj, sizeof(struct got_indexed_object *));
+	objects = calloc(nobj, sizeof(struct got_indexed_object));
 	if (objects == NULL)
 		return got_error_from_errno("calloc");
 
@@ -571,11 +571,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		if (err)
 			goto done;
 
-		obj = calloc(1, sizeof(*obj));
-		if (obj == NULL) {
-			err = got_error_from_errno("calloc");
-			goto done;
-		}
+		obj = &objects[i];
 		obj->crc = crc32(0L, NULL, 0);
 
 		/* Store offset to type+size information for this object. */
@@ -589,8 +585,6 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		if (err)
 			goto done;
 
-		objects[i] = obj;
-
 		if (lseek(pack->fd, obj->off + obj->tslen + obj->len,
 		    SEEK_SET) == -1) {
 			err = got_error_from_errno("lseek");
@@ -601,7 +595,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		    obj->type == GOT_OBJ_TYPE_TREE ||
 		    obj->type == GOT_OBJ_TYPE_COMMIT ||
 		    obj->type == GOT_OBJ_TYPE_TAG) {
-			objects[i]->valid = 1;
+			obj->valid = 1;
 			nloose++;
 		} else if (obj->type == GOT_OBJ_TYPE_REF_DELTA)
 			have_ref_deltas = 1;
@@ -622,14 +616,14 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	while (nvalid != nobj) {
 		int n = 0;
 		for (i = 0; i < nobj; i++) {
-			if (objects[i]->type != GOT_OBJ_TYPE_REF_DELTA &&
-			    objects[i]->type != GOT_OBJ_TYPE_OFFSET_DELTA)
+			obj = &objects[i];
+			if (obj->type != GOT_OBJ_TYPE_REF_DELTA &&
+			    obj->type != GOT_OBJ_TYPE_OFFSET_DELTA)
 				continue;
 
-			if (objects[i]->valid)
+			if (obj->valid)
 				continue;
 
-			obj = objects[i];
 			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET)
 			    == -1) {
 				err = got_error_from_errno("lseek");
@@ -647,7 +641,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 				continue;
 			}
 
-			objects[i]->valid = 1;
+			obj->valid = 1;
 			n++;
 			if (have_ref_deltas)
 				update_packidx(&packidx, nobj, obj);
@@ -701,7 +695,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	if (err)
 		goto done;
 	for(i = 0; i < nobj; i++){
-		PUTBE32(buf, objects[i]->crc);
+		PUTBE32(buf, objects[i].crc);
 		err = hwrite(idxfd, buf, 4, &ctx);
 		if (err)
 			goto done;
