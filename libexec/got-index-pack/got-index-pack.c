@@ -560,7 +560,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	SHA1_CTX ctx;
 	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
 	ssize_t r, w;
-	int pass, have_ref_deltas = 0;
+	int pass, have_ref_deltas = 0, first_delta_idx = -1;
 	size_t mapoff = 0;
 
 	/* Check pack file header. */
@@ -688,10 +688,17 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		    obj->type == GOT_OBJ_TYPE_TAG) {
 			obj->valid = 1;
 			nloose++;
-		} else if (obj->type == GOT_OBJ_TYPE_REF_DELTA)
-			have_ref_deltas = 1;
+		} else {
+			if (first_delta_idx == -1)
+				first_delta_idx = i;
+			if (obj->type == GOT_OBJ_TYPE_REF_DELTA)
+				have_ref_deltas = 1;
+		}
 	}
 	nvalid = nloose;
+
+	if (first_delta_idx == -1)
+		first_delta_idx = 0;
 
 	/* In order to resolve ref deltas we need an in-progress pack index. */
 	if (have_ref_deltas)
@@ -713,7 +720,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		 * Offset deltas can always be resolved in one pass
 		 * unless the packfile is corrupt.
 		 */
-		for (i = 0; i < nobj; i++) {
+		for (i = first_delta_idx; i < nobj; i++) {
 			obj = &objects[i];
 			if (obj->type != GOT_OBJ_TYPE_REF_DELTA &&
 			    obj->type != GOT_OBJ_TYPE_OFFSET_DELTA)
