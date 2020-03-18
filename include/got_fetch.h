@@ -18,6 +18,10 @@
 #define GOT_DEFAULT_GIT_PORT		9418
 #define GOT_DEFAULT_GIT_PORT_STR	"9418"
 
+#ifndef GOT_FETCH_PATH_SSH
+#define GOT_FETCH_PATH_SSH	"/usr/bin/ssh"
+#endif
+
 /*
  * Attempt to parse a URI into the following parts:
  * A protocol scheme, hostname, port number (as a string), path on server,

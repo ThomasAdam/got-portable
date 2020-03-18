@@ -108,8 +108,9 @@ dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
 		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
 		if (n < 0 || n >= sizeof(cmd))
 			err(1, "snprintf");
-		if (execlp("ssh", "ssh", host, cmd, path, NULL) == -1)
-			err(1, "execlp");
+		if (execl(GOT_FETCH_PATH_SSH, GOT_FETCH_PATH_SSH,
+		    host, cmd, path, NULL) == -1)
+			err(1, "execl");
 		abort(); /* not reached */
 	} else {
 		close(pfd[0]);

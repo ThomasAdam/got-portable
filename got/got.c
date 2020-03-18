@@ -1121,6 +1121,17 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
+		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
+			error = got_error_from_errno2("unveil",
+			    GOT_FETCH_PATH_SSH);
+			goto done;
+		}
+	}
+	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+	if (error)
+		goto done;
+
 	error = got_fetch_connect(&fetchfd, proto, host, port, server_path);
 	if (error)
 		goto done;

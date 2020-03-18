@@ -2216,6 +2216,8 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_READ_BLOB,
 	    GOT_PATH_PROG_READ_TAG,
 	    GOT_PATH_PROG_READ_GITCONFIG,
+	    GOT_PATH_PROG_FETCH_PACK,
+	    GOT_PATH_PROG_INDEX_PACK,
 	};
 	int i;
 
