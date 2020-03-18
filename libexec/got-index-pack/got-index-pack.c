@@ -190,8 +190,10 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 			break;
 		SHA1Init(&ctx);
 		err = get_obj_type_label(&obj_label, obj->type);
-		if (err)
+		if (err) {
+			free(data);
 			break;
+		}
 		if (asprintf(&header, "%s %lld", obj_label, obj->size) == -1) {
 			err = got_error_from_errno("asprintf");
 			free(data);
