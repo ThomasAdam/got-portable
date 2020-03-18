@@ -300,15 +300,8 @@ got_fetch(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 
 	fetchfd = -1;
 
-	if (asprintf(&path, "%s/objects/path", repo_path) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	err = got_path_mkdir(path);
-	free(path);
-	if (err)
-		goto done;
-	if (asprintf(&path, "%s/objects/path/fetching.pack", repo_path) == -1) {
+	if (asprintf(&path, "%s/%s/fetching.pack",
+	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -321,7 +314,8 @@ got_fetch(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	if (asprintf(&path, "%s/objects/path/fetching.idx", repo_path) == -1) {
+	if (asprintf(&path, "%s/%s/fetching.idx",
+	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -441,14 +435,14 @@ got_fetch(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	err = got_object_id_str(&id_str, *pack_hash);
 	if (err)
 		goto done;
-	if (asprintf(&packpath, "%s/objects/pack/pack-%s.pack",
-	    repo_path, id_str) == -1) {
+	if (asprintf(&packpath, "%s/%s/pack-%s.pack",
+	    repo_path, GOT_OBJECTS_PACK_DIR, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
-	if (asprintf(&idxpath, "%s/objects/pack/pack-%s.idx",
-	    repo_path, id_str) == -1) {
+	if (asprintf(&idxpath, "%s/%s/pack-%s.idx",
+	    repo_path, GOT_OBJECTS_PACK_DIR, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}

@@ -63,20 +63,6 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
-#define GOT_GIT_DIR	".git"
-
-/* Mandatory files and directories inside the git directory. */
-#define GOT_OBJECTS_DIR		"objects"
-#define GOT_REFS_DIR		"refs"
-#define GOT_HEAD_FILE		"HEAD"
-#define GOT_GITCONFIG		"config"
-
-/* Other files and directories inside the git directory. */
-#define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
-#define GOT_ORIG_HEAD_FILE	"ORIG_HEAD"
-#define GOT_OBJECTS_PACK_DIR	"objects/pack"
-#define GOT_PACKED_REFS_FILE	"packed-refs"
-
 const char *
 got_repo_get_path(struct got_repository *repo)
 {
