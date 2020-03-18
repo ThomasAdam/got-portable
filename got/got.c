@@ -993,7 +993,7 @@ cmd_clone(int argc, char *argv[])
 		dirname = argv[1];
 	else
 		usage_clone();
-	return got_clone(argv[0], branch_filter, dirname);
+	return got_fetch(argv[0], branch_filter, dirname);
 }
 
 static const struct got_error *

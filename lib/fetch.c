@@ -248,7 +248,7 @@ got_parse_uri(char *uri, char *proto, char *host, char *port, char *path, char *
 }
 
 const struct got_error*
-got_clone(char *uri, char *branch_filter, char *destdir)
+got_fetch(char *uri, char *branch_filter, char *destdir)
 {
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
 	char repo[GOT_REPOMAX], path[GOT_PATHMAX];

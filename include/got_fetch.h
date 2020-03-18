@@ -14,4 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-const struct got_error* got_clone(char *, char *, char *);
+const struct got_error* got_fetch(char *, char *, char *);
