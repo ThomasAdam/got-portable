@@ -533,11 +533,9 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 		objects[i] = obj;
 
-		if (0) {
 		err = object_crc(pack->fd, obj);
 		if (err)
 			goto done;
-		}
 
 		if (obj->type == GOT_OBJ_TYPE_BLOB ||
 		    obj->type == GOT_OBJ_TYPE_TREE ||
