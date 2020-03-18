@@ -137,7 +137,7 @@ writepkt(int fd, char *buf, int nbuf)
 	return 0;
 }
 
-
+/* TODO: This should not access the file system! */
 int
 got_resolve_remote_ref(struct got_object_id *id, char *ref)
 {
