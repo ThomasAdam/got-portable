@@ -969,37 +969,72 @@ done:
 	return err;
 }
 
+struct got_fetch_progress_arg {
+	char last_scaled_size[FMT_SCALED_STRSIZE];
+	int last_p_indexed;
+	int last_p_resolved;
+};
+
 static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
     int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
-	int p;
-	char scaled[FMT_SCALED_STRSIZE];
+	struct got_fetch_progress_arg *a = arg;
+	char scaled_size[FMT_SCALED_STRSIZE];
+	int p_indexed, p_resolved;
+	int print_size = 0, print_indexed = 0, print_resolved = 0;
 
 	if (message && message[0] != '\0' && message[0] != '\n') {
 		printf("\rserver: %s", message);
 		if (strchr(message, '\n') == 0)
 			printf("\n");
+		fflush(stdout);
 	}
 
 	if (packfile_size > 0 || nobj_indexed > 0) {
-		printf("\r");
-		if (fmt_scaled(packfile_size, scaled) == 0)
-			printf(" %*s fetched", FMT_SCALED_STRSIZE, scaled);
+		if (fmt_scaled(packfile_size, scaled_size) == 0 &&
+		    (a->last_scaled_size[0] == '\0' ||
+		    strcmp(scaled_size, a->last_scaled_size)) != 0) {
+			print_size = 1;
+			if (strlcpy(a->last_scaled_size, scaled_size,
+			    FMT_SCALED_STRSIZE) >= FMT_SCALED_STRSIZE)
+				return got_error(GOT_ERR_NO_SPACE);
+		}
 		if (nobj_indexed > 0) {
-			p = (nobj_indexed * 100) / nobj_total;
-			printf("; indexing %d%%", p);
+			p_indexed = (nobj_indexed * 100) / nobj_total;
+			if (p_indexed != a->last_p_indexed) {
+				a->last_p_indexed = p_indexed;
+				print_indexed = 1;
+				print_size = 1;
+			}
 		}
 		if (nobj_resolved > 0) {
-			p = (nobj_resolved * 100) / (nobj_total - nobj_loose);
-			printf("; resolving deltas %d%%", p);
+			p_resolved = (nobj_resolved * 100) /
+			    (nobj_total - nobj_loose);
+			if (p_resolved != a->last_p_resolved) {
+				a->last_p_resolved = p_resolved;
+				print_resolved = 1;
+				print_indexed = 1;
+				print_size = 1;
+			}
 		}
-		if (nobj_indexed > 0 && nobj_indexed == nobj_total &&
-		    nobj_resolved == nobj_total - nobj_loose)
-			printf("\nWriting pack index...\n");
 	
 	}
-	fflush(stdout);
+	if (print_size || print_indexed || print_resolved)
+		printf("\r");
+	if (print_size)
+		printf("%*s fetched", FMT_SCALED_STRSIZE, scaled_size);
+	if (print_indexed)
+		printf("; indexing %d%%", p_indexed);
+	if (print_resolved)
+		printf("; resolving deltas %d%%", p_resolved);
+	if (print_size || print_indexed || print_resolved)
+		fflush(stdout);
+
+	if (nobj_indexed > 0 && nobj_indexed == nobj_total &&
+	    nobj_resolved == nobj_total - nobj_loose)
+		printf("\nWriting pack index...\n");
+
 	return NULL;
 }
 
@@ -1016,6 +1051,7 @@ cmd_clone(int argc, char *argv[])
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int ch, fetchfd = -1;
+	struct got_fetch_progress_arg fpa;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1072,8 +1108,11 @@ cmd_clone(int argc, char *argv[])
 
 	printf("Connected to %s:%s\n", host, port);
 
+	fpa.last_scaled_size[0] = '\0';
+	fpa.last_p_indexed = -1;
+	fpa.last_p_resolved = -1;
 	err = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
-	    repo, fetch_progress, NULL);
+	    repo, fetch_progress, &fpa);
 	if (err)
 		goto done;
 
