@@ -410,7 +410,7 @@ preadbe32(FILE *b, int *v, off_t off)
 {
 	char buf[4];
 
-	if(fseek(b, off, 0) == -1)
+	if(fseek(b, off, SEEK_SET) == -1)
 		return -1;
 	if(fread(buf, 1, sizeof(buf), b) == -1)
 		return -1;
@@ -423,7 +423,7 @@ preadbe64(FILE *b, off_t *v, off_t off)
 {
 	char buf[8];
 
-	if(fseek(b, off, 0) == -1)
+	if(fseek(b, off, SEEK_SET) == -1)
 		return -1;
 	if(fread(buf, 1, sizeof(buf), b) == -1)
 		return -1;
@@ -577,7 +577,7 @@ readodelta(FILE *f, Object *o, off_t nd, off_t p, int flag)
 	o->len = ftello(f) - o->off;
 	if(d == NULL || n != nd)
 		goto error;
-	if(fseek(f, p - r, 0) == -1)
+	if(fseek(f, p - r, SEEK_SET) == -1)
 		goto error;
 	if(readpacked(f, &b, flag) == -1)
 		goto error;
@@ -752,7 +752,7 @@ searchindex(FILE *f, struct got_object_id h)
 	 * a bsearch.
 	 */
 	idx = -1;
-	fseek(f, Hashsz*lo + 8 + 256*4, 0);
+	fseek(f, Hashsz*lo + 8 + 256*4, SEEK_SET);
 	for(i = 0; i < hi - lo; i++){
 		if(fread(hh.sha1, 1, sizeof(hh.sha1), f) == -1)
 			goto err;
@@ -968,11 +968,11 @@ readidxobject(FILE *idx, struct got_object_id h, int flag)
 		if(obj->flag & Cidx){
 			assert(idx != NULL);
 			o = ftello(idx);
-			if(fseek(idx, obj->off, 0) == -1)
+			if(fseek(idx, obj->off, SEEK_SET) == -1)
 				errx(1, "could not seek to object offset");
 			if(readpacked(idx, obj, flag) == -1)
 				errx(1, "could not reload object");
-			if(fseek(idx, o, 0) == -1)
+			if(fseek(idx, o, SEEK_SET) == -1)
 				errx(1, "could not restore offset");
 			cache(obj);
 			return obj;
@@ -1024,7 +1024,7 @@ readidxobject(FILE *idx, struct got_object_id h, int flag)
 	memcpy(path + n - 4, ".pack", 6);
 	if((f = fopen(path, "r")) == NULL)
 		goto error;
-	if(fseek(f, o, 0) == -1)
+	if(fseek(f, o, SEEK_SET) == -1)
 		goto error;
 	if(readpacked(f, obj, flag) == -1)
 		goto error;
@@ -1072,7 +1072,7 @@ objectcrc(FILE *f, Object *o)
 	int n, r;
 
 	o->crc = 0;
-	fseek(f, o->off, 0);
+	fseek(f, o->off, SEEK_SET);
 	for(n = o->len; n > 0; n -= r){
 		r = fread(buf, 1, n > sizeof(buf) ? sizeof(buf) : n, f);
 		if(r == -1)
@@ -1132,7 +1132,7 @@ indexpack(int packfd, int idxfd, struct got_object_id *packhash)
 				objects[i] = o;
 			}
 			o = objects[i];
-			fseek(f, o->off, 0);
+			fseek(f, o->off, SEEK_SET);
 			if (readpacked(f, o, Cidx) == 0){
 				SHA1Init(&objctx);
 				SHA1Update(&objctx, (uint8_t*)o->all, o->size + strlen(o->all) + 1);
