@@ -506,20 +506,22 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
+got_inflate_to_file_fd(size_t *outlen, size_t *consumed_total,
+    uint32_t *input_crc, int infd, FILE *outfile)
 {
 	const struct got_error *err;
-	size_t avail;
+	size_t avail, consumed;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, input_crc);
 	if (err)
 		goto done;
 
 	*outlen = 0;
-
+	if (consumed_total)
+		*consumed_total = 0;
 	do {
-		err = got_inflate_read_fd(&zb, infd, &avail, NULL);
+		err = got_inflate_read_fd(&zb, infd, &avail, &consumed);
 		if (err)
 			goto done;
 		if (avail > 0) {
@@ -530,6 +532,8 @@ got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
 				goto done;
 			}
 			*outlen += avail;
+			if (consumed_total)
+				*consumed_total += consumed;
 		}
 	} while (zb.flags & GOT_INFLATE_F_HAVE_MORE);
 
@@ -541,26 +545,29 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_file_mmap(size_t *outlen, uint8_t *map, size_t offset,
-    size_t len, FILE *outfile)
+got_inflate_to_file_mmap(size_t *outlen, size_t *consumed_total,
+    uint32_t *input_crc, uint8_t *map, size_t offset, size_t len,
+    FILE *outfile)
 {
 	const struct got_error *err;
-	size_t avail;
+	size_t avail, consumed;
 	struct got_inflate_buf zb;
-	size_t consumed;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, input_crc);
 	if (err)
 		goto done;
 
 	*outlen = 0;
-
+	if (consumed_total)
+		*consumed_total = 0;
 	do {
 		err = got_inflate_read_mmap(&zb, map, offset, len, &avail,
 		    &consumed);
 		if (err)
 			goto done;
 		offset += consumed;
+		if (consumed_total)
+			*consumed_total += consumed;
 		len -= consumed;
 		if (avail > 0) {
 			size_t n;

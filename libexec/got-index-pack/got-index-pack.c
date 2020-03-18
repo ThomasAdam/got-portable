@@ -145,11 +145,31 @@ read_crc(uint32_t *crc, int fd, size_t len)
 }
 
 static const struct got_error *
-read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
+read_file_sha1(SHA1_CTX *ctx, FILE *f)
+{
+	uint8_t buf[8192];
+	size_t r;
+
+	for (;;) {
+		r = fread(buf, 1, sizeof(buf), f);
+		if (r == 0) {
+			if (feof(f))
+				return NULL;
+			return got_ferror(f, GOT_ERR_IO);
+		}
+		SHA1Update(ctx, buf, r);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
+    FILE *tmpfile)
 {
 	const struct got_error *err = NULL;
 	SHA1_CTX ctx;
-	uint8_t *data;
+	uint8_t *data = NULL;
 	size_t datalen;
 	ssize_t n;
 	char *header;
@@ -179,14 +199,28 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 	case GOT_OBJ_TYPE_COMMIT:
 	case GOT_OBJ_TYPE_TREE:
 	case GOT_OBJ_TYPE_TAG:
-		/* XXX TODO reading large objects into memory is bad! */
-		if (pack->map) {
-			err = got_inflate_to_mem_mmap(&data, &datalen,
-			    &obj->len, &obj->crc, pack->map, mapoff,
-			    pack->filesize - mapoff);
+		if (obj->size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+			if (fseek(tmpfile, 0L, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseek");
+				break;
+			}
+			if (pack->map) {
+				err = got_inflate_to_file_mmap(&datalen,
+				    &obj->len, &obj->crc, pack->map, mapoff,
+				    pack->filesize - mapoff, tmpfile);
+			} else {
+				err = got_inflate_to_file_fd(&datalen,
+				    &obj->len, &obj->crc, pack->fd, tmpfile);
+			}
 		} else {
-			err = got_inflate_to_mem_fd(&data, &datalen,
-			    &obj->len, &obj->crc, obj->size, pack->fd);
+			if (pack->map) {
+				err = got_inflate_to_mem_mmap(&data, &datalen,
+				    &obj->len, &obj->crc, pack->map, mapoff,
+				    pack->filesize - mapoff);
+			} else {
+				err = got_inflate_to_mem_fd(&data, &datalen,
+				    &obj->len, &obj->crc, obj->size, pack->fd);
+			}
 		}
 		if (err)
 			break;
@@ -203,7 +237,12 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 		}
 		headerlen = strlen(header) + 1;
 		SHA1Update(&ctx, header, headerlen);
-		SHA1Update(&ctx, data, datalen);
+		if (obj->size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+			err = read_file_sha1(&ctx, tmpfile);
+			if (err)
+				break;
+		} else
+			SHA1Update(&ctx, data, datalen);
 		SHA1Final(obj->id.sha1, &ctx);
 		free(header);
 		free(data);
@@ -509,8 +548,8 @@ update_packidx(struct got_packidx *packidx, int nobj,
 }
 
 static const struct got_error *
-index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
-    struct imsgbuf *ibuf)
+index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
+    uint8_t *pack_hash, struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
 	struct got_packfile_hdr hdr;
@@ -629,7 +668,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			}
 		}
 
-		err = read_packed_object(pack, obj);
+		err = read_packed_object(pack, obj, tmpfile);
 		if (err)
 			goto done;
 
@@ -786,7 +825,8 @@ main(int argc, char **argv)
 	const struct got_error *err = NULL, *close_err;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
-	int idxfd = -1;
+	int idxfd = -1, tmpfd = -1;
+	FILE *tmpfile = NULL;
 	struct got_pack pack;
 	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
 	off_t packfile_size;
@@ -845,6 +885,27 @@ main(int argc, char **argv)
 	}
 	idxfd = imsg.fd;
 
+	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+	if (err)
+		goto done;
+	if (imsg.hdr.type == GOT_IMSG_STOP)
+		goto done;
+	if (imsg.hdr.type != GOT_IMSG_TMPFD) {
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		goto done;
+	}
+	if (imsg.hdr.len - IMSG_HEADER_SIZE != 0) {
+		err = got_error(GOT_ERR_PRIVSEP_LEN);
+		goto done;
+	}
+	tmpfd = imsg.fd;
+	tmpfile = fdopen(tmpfd, "w+");
+	if (tmpfile == NULL) {
+		err = got_error_from_errno("fdopen");
+		goto done;
+	}
+	tmpfd = -1;
+
 	if (lseek(pack.fd, 0, SEEK_END) == -1) {
 		err = got_error_from_errno("lseek");
 		goto done;
@@ -867,12 +928,14 @@ main(int argc, char **argv)
 	if (pack.map == MAP_FAILED)
 		pack.map = NULL; /* fall back to read(2) */
 #endif
-	err = index_pack(&pack, idxfd, pack_hash, &ibuf);
+	err = index_pack(&pack, idxfd, tmpfile, pack_hash, &ibuf);
 done:
 	close_err = got_pack_close(&pack);
 	if (close_err && err == NULL)
 		err = close_err;
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (tmpfd != -1 && close(tmpfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 
 	if (err == NULL)

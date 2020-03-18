@@ -1030,8 +1030,9 @@ got_pack_get_max_delta_object_size(uint64_t *size, struct got_object *obj,
 }
 
 const struct got_error *
-dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
-    struct got_pack *pack, FILE *outfile, FILE *base_file, FILE *accum_file)
+got_pack_dump_delta_chain_to_file(size_t *result_size,
+    struct got_delta_chain *deltas, struct got_pack *pack, FILE *outfile,
+    FILE *base_file, FILE *accum_file)
 {
 	const struct got_error *err = NULL;
 	struct got_delta *delta;
@@ -1089,11 +1090,13 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 				if (pack->map) {
 					mapoff = (size_t)delta_data_offset;
 					err = got_inflate_to_file_mmap(
-					    &base_bufsz, pack->map, mapoff,
-					    pack->filesize - mapoff, base_file);
+					    &base_bufsz, NULL, NULL, pack->map,
+					    mapoff, pack->filesize - mapoff,
+					    base_file);
 				} else
 					err = got_inflate_to_file_fd(
-					    &base_bufsz, pack->fd, base_file);
+					    &base_bufsz, NULL, NULL, pack->fd,
+					    base_file);
 			} else {
 				if (pack->map) {
 					mapoff = (size_t)delta_data_offset;
@@ -1338,17 +1341,18 @@ got_packfile_extract_object(struct got_pack *pack, struct got_object *obj,
 
 		if (pack->map) {
 			size_t mapoff = (size_t)obj->pack_offset;
-			err = got_inflate_to_file_mmap(&obj->size, pack->map,
-			    mapoff, pack->filesize - mapoff, outfile);
+			err = got_inflate_to_file_mmap(&obj->size, NULL, NULL,
+			    pack->map, mapoff, pack->filesize - mapoff,
+			    outfile);
 		} else {
 			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
 				return got_error_from_errno("lseek");
-			err = got_inflate_to_file_fd(&obj->size, pack->fd,
-			    outfile);
+			err = got_inflate_to_file_fd(&obj->size, NULL, NULL,
+			    pack->fd, outfile);
 		}
 	} else
-		err = dump_delta_chain_to_file(&obj->size, &obj->deltas, pack,
-		    outfile, base_file, accum_file);
+		err = got_pack_dump_delta_chain_to_file(&obj->size,
+		    &obj->deltas, pack, outfile, base_file, accum_file);
 
 	return err;
 }

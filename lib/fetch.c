@@ -346,6 +346,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
+	int tmpfd = -1;
 	int fetchstatus, idxstatus, done = 0;
 	const struct got_error *err;
 	struct imsgbuf fetchibuf, idxibuf;
@@ -388,6 +389,12 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	nidxfd = dup(idxfd);
 	if (nidxfd == -1) {
 		err = got_error_from_errno("dup");
+		goto done;
+	}
+
+	tmpfd = got_opentempfd();
+	if (tmpfd == -1) {
+		err = got_error_from_errno("got_opentempfd");
 		goto done;
 	}
 
@@ -506,6 +513,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (err != NULL)
 		goto done;
 	nidxfd = -1;
+	err = got_privsep_send_tmpfd(&idxibuf, tmpfd);
+	if (err != NULL)
+		goto done;
+	tmpfd = -1;
 	done = 0;
 	while (!done) {
 		int nobj_total, nobj_indexed, nobj_loose, nobj_resolved;
@@ -565,6 +576,8 @@ done:
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (tmpfd != -1 && close(tmpfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(tmppackpath);
 	free(tmpidxpath);
