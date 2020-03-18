@@ -161,8 +161,8 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 	size_t headerlen;
 	const char *obj_label;
 
-	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size, &obj->tslen,
-	    pack, obj->off);
+	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size,
+	    &obj->tslen, pack, obj->off);
 	if (err)
 		return err;
 
@@ -620,7 +620,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 				continue;
 
 			obj = objects[i];
-			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET) == -1) {
+			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET)
+			    == -1) {
 				err = got_error_from_errno("lseek");
 				goto done;
 			}
@@ -640,8 +641,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			n++;
 			if (have_ref_deltas)
 				update_packidx(&packidx, nobj, obj);
-			err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
-			    nloose, nresolved + n);
+			err = got_privsep_send_index_pack_progress(ibuf,
+			    nobj, nobj, nloose, nresolved + n);
 			if (err)
 				goto done;
 
@@ -657,7 +658,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		if (nloose + nresolved == nobj) {
 			static char msg[64];
 			snprintf(msg, sizeof(msg),
-			    "fix point reached too early: %d/%d/%d", nvalid, nresolved, nobj);
+			    "fix point reached too early: %d/%d/%d",
+			    nvalid, nresolved, nobj);
 			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
 			goto done;
 		}
@@ -668,7 +670,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	if (nloose + nresolved != nobj) {
 		static char msg[64];
 		snprintf(msg, sizeof(msg),
-		    "discovered only %d of %d objects", nloose + nresolved, nobj);
+		    "discovered only %d of %d objects",
+		    nloose + nresolved, nobj);
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
 		goto done;
 	}
@@ -693,7 +696,8 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		if (err)
 			goto done;
 	}
-	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t), &ctx);
+	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t),
+	    &ctx);
 	if (err)
 		goto done;
 	if (packidx.nlargeobj > 0) {
