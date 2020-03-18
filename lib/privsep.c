@@ -781,6 +781,22 @@ got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_
 }
 
 const struct got_error *
+got_privsep_send_index_pack_progress(struct imsgbuf *ibuf, int nobjects_total,
+    int nobjects_indexed)
+{
+	struct got_imsg_index_pack_progress iprogress;
+
+	iprogress.nobjects_total = nobjects_total;
+	iprogress.nobjects_indexed = nobjects_indexed;
+
+	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_PROGRESS, 0, 0, -1,
+	    &iprogress, sizeof(iprogress)) == -1)
+		return got_error_from_errno("imsg_compose IDXPACK_PROGRESS");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_index_pack_done(struct imsgbuf *ibuf)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_DONE, 0, 0, -1, NULL, 0) == -1)
@@ -789,19 +805,54 @@ got_privsep_send_index_pack_done(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_wait_index_pack_done(struct imsgbuf *ibuf)
+got_privsep_recv_index_progress(int *done, int *nobjects_total,
+    int *nobjects_indexed, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
+	struct got_imsg_index_pack_progress *iprogress;
+	size_t datalen;
+
+	*done = 0;
+	*nobjects_total = 0;
+	*nobjects_indexed = 0;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
-	if (imsg.hdr.type == GOT_IMSG_IDXPACK_DONE)
-		return NULL;
-	else
-		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		if (datalen < sizeof(struct got_imsg_error)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_IDXPACK_PROGRESS:
+		if (datalen < sizeof(*iprogress)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		iprogress = (struct got_imsg_index_pack_progress *)imsg.data;
+		*nobjects_total = iprogress->nobjects_total;
+		*nobjects_indexed = iprogress->nobjects_indexed;
+		break;
+	case GOT_IMSG_IDXPACK_DONE:
+		if (datalen != 0) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		*done = 1;
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
 	imsg_free(&imsg);
+	return err;
 }
 
 const struct got_error *

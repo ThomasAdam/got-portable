@@ -1085,7 +1085,8 @@ objectcrc(FILE *f, Object *o)
 }
 
 int
-indexpack(int packfd, int idxfd, struct got_object_id *packhash)
+indexpack(int packfd, int idxfd, struct got_object_id *packhash,
+    struct imsgbuf *ibuf)
 {
 	char hdr[4*3], buf[8];
 	int nobj, nvalid, nbig, n, i, step;
@@ -1117,15 +1118,13 @@ indexpack(int packfd, int idxfd, struct got_object_id *packhash)
 	if(!step)
 		step++;
 	while (nvalid != nobj) {
-		fprintf(stderr, "indexing (%d/%d):", nvalid, nobj);
+		got_privsep_send_index_pack_progress(ibuf, nobj, nvalid);
 		n = 0;
 		for (i = 0; i < nobj; i++) {
 			if (valid[i]) {
 				n++;
 				continue;
 			}
-			if (i % step == 0)
-				fprintf(stderr, ".");
 			if (!objects[i]) {
 				o = emalloc(sizeof(Object));
 				o->off = ftello(f);
@@ -1144,7 +1143,6 @@ indexpack(int packfd, int idxfd, struct got_object_id *packhash)
 			if(objectcrc(f, o) == -1)
 				return -1;
 		}
-		fprintf(stderr, "\n");
 		if (n == nvalid) {
 			errx(1, "fix point reached too early: %d/%d", nvalid, nobj);
 			goto error;
@@ -1254,7 +1252,7 @@ main(int argc, char **argv)
 	}
 	idxfd = imsg.fd;
 
-	indexpack(packfd, idxfd, &packhash);
+	indexpack(packfd, idxfd, &packhash, &ibuf);
 done:
 	if(err != NULL)
 		got_privsep_send_error(&ibuf, err);

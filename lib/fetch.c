@@ -451,7 +451,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			while ((s = strsep(&s0, "\r")) != NULL) {
 				if (*s == '\0')
 					continue;
-				err = progress_cb(progress_arg, s, 0);
+				err = progress_cb(progress_arg, s, 0, 0, 0);
 				if (err)
 					break;
 			}
@@ -460,7 +460,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 				goto done;
 		} else if (packfile_size_cur != packfile_size) {
 			err = progress_cb(progress_arg, NULL,
-			    packfile_size_cur);
+			    packfile_size_cur, 0, 0);
 			if (err)
 				break;
 			packfile_size = packfile_size_cur;
@@ -504,10 +504,22 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (err != NULL)
 		goto done;
 	nidxfd = -1;
-	err = got_privsep_wait_index_pack_done(&idxibuf);
-	if (err != NULL)
-		goto done;
-	imsg_clear(&idxibuf);
+	done = 0;
+	while (!done) {
+		int nobjects_total, nobjects_indexed;
+		err = got_privsep_recv_index_progress(&done, &nobjects_total,
+		    &nobjects_indexed, &idxibuf);
+		if (err != NULL)
+			goto done;
+		if (nobjects_indexed != 0) {
+			err = progress_cb(progress_arg, NULL,
+			    packfile_size, nobjects_total,
+			    nobjects_indexed);
+			if (err)
+				break;
+		}
+		imsg_clear(&idxibuf);
+	}
 	if (close(imsg_idxfds[0]) == -1) {
 		err = got_error_from_errno("close");
 		goto done;

@@ -970,7 +970,8 @@ done:
 }
 
 static const struct got_error *
-fetch_progress(void *arg, const char *message, off_t packfile_size)
+fetch_progress(void *arg, const char *message, off_t packfile_size,
+    int nobjects_total, int nobjects_indexed)
 {
 	int *did_something = arg;
 	char scaled[FMT_SCALED_STRSIZE];
@@ -978,8 +979,13 @@ fetch_progress(void *arg, const char *message, off_t packfile_size)
 	if (message) {
 		printf("\rserver: %s", message);
 		*did_something = 1;
-	} else if (packfile_size > 0 && fmt_scaled(packfile_size, scaled) == 0) {
-		printf("\rfetching... %*s", FMT_SCALED_STRSIZE, scaled);
+	} else if (packfile_size > 0 || nobjects_indexed > 0) {
+		printf("\rfetching...");
+		if (fmt_scaled(packfile_size, scaled) == 0)
+			printf(" %*s", FMT_SCALED_STRSIZE, scaled);
+		if (nobjects_indexed > 0)
+			printf(" indexed %d/%d objects", nobjects_indexed,
+			    nobjects_total);
 		*did_something = 1;
 	}
 	fflush(stdout);
