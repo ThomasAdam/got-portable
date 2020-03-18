@@ -282,7 +282,7 @@ got_tokenize_refline(char *line, char **sp, size_t nsp)
 }
 
 static const struct got_error *
-got_fetch_pack(int fd, int packfd, struct got_object_id *packid)
+fetch_pack(int fd, int packfd, struct got_object_id *packid)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKTMAX], *sp[3];
@@ -487,7 +487,7 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	err = got_fetch_pack(fetchfd, packfd, &packid);
+	err = fetch_pack(fetchfd, packfd, &packid);
 	if (err)
 		goto done;
 done:
