@@ -284,7 +284,7 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 	uint8_t *buf = NULL;
 	size_t len;
 	SHA1_CTX ctx;
-	char *header;
+	char *header = NULL;
 	size_t headerlen;
 	int base_obj_type;
 	const char *obj_label;
@@ -321,6 +321,7 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 	SHA1Final(obj->id.sha1, &ctx);
 done:
 	free(buf);
+	free(header);
 	while (!SIMPLEQ_EMPTY(&deltas.entries)) {
 		delta = SIMPLEQ_FIRST(&deltas.entries);
 		SIMPLEQ_REMOVE_HEAD(&deltas.entries, entry);
