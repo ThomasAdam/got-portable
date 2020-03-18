@@ -385,10 +385,63 @@ print_packidx(struct got_packidx *packidx)
 #endif
 
 static void
+add_indexed_object(struct got_packidx *packidx, uint32_t idx,
+    struct got_indexed_object *obj)
+{
+	int i;
+
+	memcpy(packidx->hdr.sorted_ids[idx].sha1, obj->id.sha1,
+	    SHA1_DIGEST_LENGTH);
+	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
+		packidx->hdr.offsets[idx] = htobe32(obj->off);
+	else {
+		packidx->hdr.offsets[idx] = htobe32(packidx->nlargeobj |
+		    GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX);
+		packidx->hdr.large_offsets[packidx->nlargeobj] =
+		    htobe64(obj->off);
+		packidx->nlargeobj++;
+	}
+
+	for (i = obj->id.sha1[0]; i <= 0xff; i++) {
+		uint32_t n = be32toh(packidx->hdr.fanout_table[i]);
+		packidx->hdr.fanout_table[i] = htobe32(n + 1);
+	}
+}
+
+static int
+indexed_obj_cmp(const void *pa, const void *pb)
+{
+	struct got_indexed_object *a, *b;
+
+	a = *(struct got_indexed_object **)pa;
+	b = *(struct got_indexed_object **)pb;
+	return got_object_id_cmp(&a->id, &b->id);
+}
+
+static void
+make_initial_packidx(struct got_packidx *packidx, int nobj,
+    struct got_indexed_object **objects)
+{
+	struct got_indexed_object *obj;
+	int i;
+	uint32_t idx = 0;
+
+	mergesort(objects, nobj, sizeof(struct got_indexed_object *),
+	    indexed_obj_cmp);
+
+	for (i = 0; i < nobj; i++) {
+		obj = objects[i];
+		if (!obj->valid)
+			continue;
+		add_indexed_object(packidx, idx++, obj);
+	}
+}
+
+static void
 update_packidx(struct got_packidx *packidx, int nobj,
     struct got_indexed_object *obj)
 {
-	int i, n, idx;
+	uint32_t idx;
 	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
 
 	idx = find_object_idx(packidx, obj->id.sha1);
@@ -404,32 +457,7 @@ update_packidx(struct got_packidx *packidx, int nobj,
 	memmove(&packidx->hdr.offsets[idx + 1], &packidx->hdr.offsets[idx],
 	    sizeof(uint32_t) * (nindexed - idx));
 
-	memcpy(packidx->hdr.sorted_ids[idx].sha1, obj->id.sha1,
-	    SHA1_DIGEST_LENGTH);
-	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
-		packidx->hdr.offsets[idx] = htobe32(obj->off);
-	else {
-		packidx->hdr.offsets[idx] = htobe32(packidx->nlargeobj |
-		    GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX);
-		packidx->hdr.large_offsets[packidx->nlargeobj] =
-		    htobe64(obj->off);
-		packidx->nlargeobj++;
-	}
-
-	for (i = obj->id.sha1[0]; i <= 0xff; i++) {
-		n = be32toh(packidx->hdr.fanout_table[i]);
-		packidx->hdr.fanout_table[i] = htobe32(n + 1);
-	}
-}
-
-static int
-indexed_obj_cmp(const void *pa, const void *pb)
-{
-	struct got_indexed_object *a, *b;
-
-	a = *(struct got_indexed_object **)pa;
-	b = *(struct got_indexed_object **)pb;
-	return got_object_id_cmp(&a->id, &b->id);
+	add_indexed_object(packidx, idx, obj);
 }
 
 static const struct got_error *
@@ -562,10 +590,11 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		    obj->type == GOT_OBJ_TYPE_TAG) {
 			objects[i]->valid = 1;
 			nloose++;
-			update_packidx(&packidx, nobj, obj);
 		}
 	}
 	nvalid = nloose;
+
+	make_initial_packidx(&packidx, nobj, objects);
 
 	/*
 	 * Second pass: We can now resolve deltas to compute the IDs of
