@@ -1053,6 +1053,11 @@ cmd_clone(int argc, char *argv[])
 	struct got_object_id *pack_hash = NULL;
 	int ch, fetchfd = -1;
 	struct got_fetch_progress_arg fpa;
+	char *git_url = NULL;
+	char *gitconfig_path = NULL;
+	char *gitconfig = NULL;
+	FILE *gitconfig_file = NULL;
+	ssize_t n;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1081,16 +1086,28 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
-#ifndef PROFILE
 	if (strcmp(proto, "git") == 0) {
+#ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
 		    "sendfd dns inet unveil", NULL) == -1)
 			err(1, "pledge");
+#endif
+		git_url = strdup(argv[0]);
+		if (git_url == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	} else if (strcmp(proto, "git+ssh") == 0 ||
 	    strcmp(proto, "ssh") == 0) {
+#ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
 		    "sendfd unveil", NULL) == -1)
 			err(1, "pledge");
+#endif
+		if (asprintf(&git_url, "%s:%s", host, server_path) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 	} else if (strcmp(proto, "http") == 0 ||
 	    strcmp(proto, "git+http") == 0) {
 		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
@@ -1099,7 +1116,6 @@ cmd_clone(int argc, char *argv[])
 		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
 		goto done;
 	}
-#endif
 	if (dirname == NULL) {
 		if (asprintf(&default_destdir, "%s.git", repo_name) == -1) {
 			error = got_error_from_errno("asprintf");
@@ -1205,9 +1221,36 @@ cmd_clone(int argc, char *argv[])
 		break;
 	}
 
+	/* Create a config file so Git can understand this repository. */
+	gitconfig_path = got_repo_get_path_gitconfig(repo);
+	if (gitconfig_path == NULL) {
+		error = got_error_from_errno("got_repo_get_path_gitconfig");
+		goto done;
+	}
+	gitconfig_file = fopen(gitconfig_path, "w");
+	if (gitconfig_file == NULL) {
+		error = got_error_from_errno2("fopen", gitconfig_path);
+		goto done;
+	}
+	if (asprintf(&gitconfig,
+	    "[core]\n"
+	    "\trepositoryformatversion = 0\n"
+	    "\tbare = true\n"
+	    "[remote \"origin\"]\n"
+	    "\turl = %s\n"
+	    "\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
+	    git_url) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
+	if (n != strlen(gitconfig))
+		error = got_ferror(gitconfig_file, GOT_ERR_IO);
 done:
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
+	if (gitconfig_file && fclose(gitconfig_file) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	if (repo)
 		got_repo_close(repo);
 	TAILQ_FOREACH(pe, &refs, entry) {
@@ -1227,6 +1270,8 @@ done:
 	free(server_path);
 	free(repo_name);
 	free(default_destdir);
+	free(gitconfig_path);
+	free(git_url);
 	return error;
 }
 

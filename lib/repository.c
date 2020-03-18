@@ -153,13 +153,10 @@ get_path_head(struct got_repository *repo)
 	return get_path_git_child(repo, GOT_HEAD_FILE);
 }
 
-static const struct got_error *
-get_path_gitconfig(char **p, struct got_repository *repo)
+char *
+got_repo_get_path_gitconfig(struct got_repository *repo)
 {
-	*p = get_path_git_child(repo, GOT_GITCONFIG);
-	if (*p == NULL)
-		return got_error_from_errno("asprintf");
-	return NULL;
+	return get_path_git_child(repo, GOT_GITCONFIG);
 }
 
 void
@@ -498,9 +495,9 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 	}
 
 	/* Read repository's .git/config file. */
-	err = get_path_gitconfig(&repo_gitconfig_path, repo);
-	if (err)
-		return err;
+	repo_gitconfig_path = got_repo_get_path_gitconfig(repo);
+	if (repo_gitconfig_path == NULL)
+		return got_error_from_errno("got_repo_get_path_gitconfig");
 
 	err = parse_gitconfig_file(&repo->gitconfig_repository_format_version,
 	    &repo->gitconfig_author_name, &repo->gitconfig_author_email,
