@@ -407,9 +407,16 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		}
 		if (n == 0)
 			break;
-		if (strncmp(buf, "ERR ", 4) == 0) {
+		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
 			static char msg[1024];
-			strlcpy(msg, buf + 4, sizeof(msg));
+			for (i = 0; i < n && i < sizeof(msg) - 1; i++) {
+				if (!isprint(buf[i])) {
+					err = got_error(GOT_ERR_FETCH_FAILED);
+					goto done;
+				}
+				msg[i] = buf[i];
+			}
+			msg[i] = '\0';
 			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
 			goto done;
 		}
