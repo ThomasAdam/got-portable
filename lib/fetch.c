@@ -324,9 +324,9 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		err = got_error(GOT_ERR_BAD_PROTO);
 	else
 		err = got_error(GOT_ERR_BAD_PROTO);
+	if (err)
+		return err;
 
-	if (fetchfd == -1)
-		err = got_error_from_errno("dial uri");
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fetchfds) == -1)
 		return got_error_from_errno("socketpair");
 
