@@ -367,7 +367,7 @@ print_packidx(struct got_packidx *packidx)
 #endif
 
 static void
-update_packidx(int *nlarge, struct got_packidx *packidx, int nobj,
+update_packidx(struct got_packidx *packidx, int nobj,
     struct got_indexed_object *obj)
 {
 	int i, n, idx;
@@ -391,10 +391,11 @@ update_packidx(int *nlarge, struct got_packidx *packidx, int nobj,
 	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 		packidx->hdr.offsets[idx] = htobe32(obj->off);
 	else {
-		packidx->hdr.offsets[idx] = htobe32(*nlarge |
+		packidx->hdr.offsets[idx] = htobe32(packidx->nlargeobj |
 		    GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX);
-		packidx->hdr.large_offsets[*nlarge] = htobe64(obj->off);
-		(*nlarge)++;
+		packidx->hdr.large_offsets[packidx->nlargeobj] =
+		    htobe64(obj->off);
+		packidx->nlargeobj++;
 	}
 
 	for (i = obj->id.sha1[0]; i <= 0xff; i++) {
@@ -421,7 +422,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	struct got_packfile_hdr hdr;
 	struct got_packidx packidx;
 	char buf[8];
-	int nobj, nvalid, nloose, nlarge = 0, nresolved = 0, i;
+	int nobj, nvalid, nloose, nresolved = 0, i;
 	struct got_indexed_object **objects = NULL, *obj;
 	SHA1_CTX ctx;
 	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
@@ -540,7 +541,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 		    obj->type == GOT_OBJ_TYPE_TAG) {
 			objects[i]->valid = 1;
 			nloose++;
-			update_packidx(&nlarge, &packidx, nobj, obj);
+			update_packidx(&packidx, nobj, obj);
 		}
 	}
 	nvalid = nloose;
@@ -581,7 +582,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 			objects[i]->valid = 1;
 			n++;
-			update_packidx(&nlarge, &packidx, nobj, obj);
+			update_packidx(&packidx, nobj, obj);
 			err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
 			    nloose, nresolved + n);
 			if (err)
@@ -641,9 +642,9 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t), &ctx);
 	if (err)
 		goto done;
-	if (nlarge > 0) {
+	if (packidx.nlargeobj > 0) {
 		err = hwrite(idxfd, packidx.hdr.large_offsets,
-		    nlarge * sizeof(uint64_t), &ctx);
+		    packidx.nlargeobj * sizeof(uint64_t), &ctx);
 		if (err)
 			goto done;
 	}
