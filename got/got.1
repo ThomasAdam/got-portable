@@ -200,6 +200,45 @@ will be checked out.
 .It Cm co
 Short alias for
 .Cm checkout .
+.It Cm clone Ar repository-URL Op Ar target-directory
+Clone a Git repository at the specified
+.Ar repository-URL
+into the specified
+.Ar target-directory .
+If no
+.Ar target-directory
+is specified the directory name will be derived from the name of the
+cloned repository.
+.Cm got clone
+will refuse to run if the
+.Ar target-directory
+already exists.
+.Pp
+The
+.Ar repository-URL
+specifies a protocol scheme, a server hostname, and a path to the repository
+on the server:
+.Lk scheme://hostname/path/to/repository
+.Pp
+The following protocol schemes are supported:
+.Bl -tag -width git+ssh
+.It git
+The Git protocol as implemented by the
+.Xr git-daemon 1
+server.
+This protocol is discouraged since it supports neither authentication nor
+encryption.
+.It git+ssh
+The Git protocol wrapped in an authenticated and encrypted
+.Xr ssh 1
+tunnel.
+With this protocol the hostname may contain an embedded username for
+.Xr ssh 1
+to use:
+.Mt user@hostname
+.It ssh
+Short alias for git+ssh.
+.El
 .It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
 Update an existing work tree to a different commit.
 Show the status of each affected file, using the following status codes:
@@ -1488,7 +1527,11 @@ This variable will be silently ignored if it is set to a non-numeric value.
 .Sh EXAMPLES
 Clone an existing Git repository for use with
 .Nm .
-This step currently requires
+.Pp
+.Dl $ cd /var/git/
+.Dl $ got clone ssh://git@github.com/openbsd/src.git
+.Pp
+Use of HTTP URLs currently requires
 .Xr git 1 :
 .Pp
 .Dl $ cd /var/git/
