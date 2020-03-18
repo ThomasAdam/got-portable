@@ -421,7 +421,6 @@ fetch_progress(struct imsgbuf *ibuf, const char *buf, size_t len)
 {
 	int i;
 
-
 	if (len == 0)
 		return NULL;
 
@@ -470,7 +469,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;
 	int i, n, req;
-	off_t packsz;
+	off_t packsz = 0, last_reported_packsz = 0;
 	char *id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	struct got_pathlist_head symrefs;
@@ -621,7 +620,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	    strstr(my_capabilities, GOT_CAPA_SIDE_BAND_64K) != NULL)
 		have_sidebands = 1;
 
-	packsz = 0;
 	while (1) {
 		ssize_t r = 0, w;
 		int datalen = -1;
@@ -709,10 +707,19 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 		packsz += w;
-		err = got_privsep_send_fetch_download_progress(ibuf, packsz);
-		if (err)
-			goto done;
+
+		/* Don't send too many progress privsep messages. */
+		if (packsz > last_reported_packsz + 1024) {
+			err = got_privsep_send_fetch_download_progress(ibuf,
+			    packsz);
+			if (err)
+				goto done;
+			last_reported_packsz = packsz;
+		}
 	}
+	err = got_privsep_send_fetch_download_progress(ibuf, packsz);
+	if (err)
+		goto done;
 done:
 	TAILQ_FOREACH(pe, &symrefs, entry) {
 		free((void *)pe->path);

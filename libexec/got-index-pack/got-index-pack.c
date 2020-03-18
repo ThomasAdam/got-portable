@@ -562,6 +562,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	ssize_t r, w;
 	int pass, have_ref_deltas = 0, first_delta_idx = -1;
 	size_t mapoff = 0;
+	int p_indexed = 0, last_p_indexed = -1;
+	int p_resolved = 0, last_p_resolved = -1;
 
 	/* Check pack file header. */
 	if (pack->map) {
@@ -649,10 +651,15 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	 */
 	pass = 1;
 	for (i = 0; i < nobj; i++) {
-		err = got_privsep_send_index_pack_progress(ibuf, nobj, i + 1,
-		    nloose, 0);
-		if (err)
-			goto done;
+		/* Don't send too many progress privsep messages. */
+		p_indexed = ((i + 1) * 100) / nobj;
+		if (p_indexed != last_p_indexed) {
+			err = got_privsep_send_index_pack_progress(ibuf,
+			    nobj, i + 1, nloose, 0);
+			if (err)
+				goto done;
+			last_p_indexed = p_indexed;
+		}
 
 		obj = &objects[i];
 		obj->crc = crc32(0L, NULL, 0);
@@ -750,10 +757,15 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			n++;
 			if (have_ref_deltas)
 				update_packidx(&packidx, nobj, obj);
-			err = got_privsep_send_index_pack_progress(ibuf,
-			    nobj, nobj, nloose, nresolved + n);
-			if (err)
-				goto done;
+			/* Don't send too many progress privsep messages. */
+			p_resolved = ((nresolved + n) * 100) / nobj;
+			if (p_resolved != last_p_resolved) {
+				err = got_privsep_send_index_pack_progress(ibuf,
+				    nobj, nobj, nloose, nresolved + n);
+				if (err)
+					goto done;
+				last_p_resolved = p_resolved;
+			}
 
 		}
 		if (pass++ > 3 && n == 0) {
