@@ -621,7 +621,7 @@ readpacked(FILE *f, Object *o, int flag)
 
 	switch(t){
 	default:
-		fprintf(stderr, "invalid object at %lld", ftello(f));
+		fprintf(stderr, "invalid object at %lld\n", ftello(f));
 		return -1;
 	case GCommit:
 	case GTree:
