@@ -45,6 +45,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_pack.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -165,7 +166,7 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	uint8_t buf[32*1024];
 	ssize_t n, r, nr;
 
-	if (sz < 28)
+	if (sz < sizeof(struct got_packfile_hdr) + SHA1_DIGEST_LENGTH)
 		return got_error(GOT_ERR_BAD_PACKFILE);
 
 	n = 0;
