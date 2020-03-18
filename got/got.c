@@ -1036,7 +1036,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	err = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
-	    proto, host, port, server_path, repo_name, branch_filter, repo);
+	    repo);
 	if (err)
 		goto done;
 
