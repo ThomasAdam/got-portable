@@ -89,25 +89,14 @@ struct got_indexed_object {
 	} delta;
 };
 
-#define PUTBE32(b, n)\
-	do{ \
-		(b)[0] = (n) >> 24; \
-		(b)[1] = (n) >> 16; \
-		(b)[2] = (n) >> 8; \
-		(b)[3] = (n) >> 0; \
-	} while(0)
-
-#define PUTBE64(b, n)\
-	do{ \
-		(b)[0] = (n) >> 56; \
-		(b)[1] = (n) >> 48; \
-		(b)[2] = (n) >> 40; \
-		(b)[3] = (n) >> 32; \
-		(b)[4] = (n) >> 24; \
-		(b)[5] = (n) >> 16; \
-		(b)[6] = (n) >> 8; \
-		(b)[7] = (n) >> 0; \
-	} while(0)
+static void
+putbe32(char *b, uint32_t n)
+{
+	b[0] = n >> 24;
+	b[1] = n >> 16;
+	b[2] = n >> 8;
+	b[3] = n >> 0;
+}
 
 static const struct got_error *
 get_obj_type_label(const char **label, int obj_type)
@@ -747,7 +736,9 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	make_packidx(&packidx, nobj, objects);
 
 	SHA1Init(&ctx);
-	err = hwrite(idxfd, "\xfftOc\x00\x00\x00\x02", 8, &ctx);
+	putbe32(buf, GOT_PACKIDX_V2_MAGIC);
+	putbe32(buf + 4, GOT_PACKIDX_VERSION);
+	err = hwrite(idxfd, buf, 8, &ctx);
 	if (err)
 		goto done;
 	err = hwrite(idxfd, packidx.hdr.fanout_table,
@@ -759,7 +750,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 	if (err)
 		goto done;
 	for(i = 0; i < nobj; i++){
-		PUTBE32(buf, objects[i].crc);
+		putbe32(buf, objects[i].crc);
 		err = hwrite(idxfd, buf, 4, &ctx);
 		if (err)
 			goto done;
