@@ -14,4 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/* IANA assigned */
+#define GOT_DEFAULT_GIT_PORT		9418
+#define GOT_DEFAULT_GIT_PORT_STR	"9418"
+
+const struct got_error *got_fetch_parse_uri(char **, char **, char **,
+    char **, char **, const char *);
 const struct got_error* got_fetch(char *, char *, char *);

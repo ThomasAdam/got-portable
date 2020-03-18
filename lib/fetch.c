@@ -49,6 +49,7 @@
 #include "got_worktree.h"
 #include "got_object.h"
 #include "got_opentemp.h"
+#include "got_fetch.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
@@ -78,19 +79,6 @@ hassuffix(char *base, char *suf)
 	if (ns <= nb && strcmp(base + (nb - ns), suf) == 0)
 		return 1;
 	return 0;
-}
-
-static int
-grab(char *dst, int n, char *p, char *e)
-{
-	int l;
-
-	l = e - p;
-	if (l >= n) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	return strlcpy(dst, p, l + 1);
 }
 
 static const struct got_error *
@@ -192,20 +180,28 @@ done:
 	return err;
 }
 
-int
-got_parse_uri(char *uri, char *proto, char *host, char *port, char *path, char *repo)
+const struct got_error *
+got_fetch_parse_uri(char **proto, char **host, char **port,
+    char **server_path, char **repo_name, const char *uri)
 {
+	const struct got_error *err = NULL;
 	char *s, *p, *q;
 	int n, hasport;
 
+	*proto = *host = *port = *server_path = *repo_name = NULL;
+
 	p = strstr(uri, "://");
 	if (!p) {
-		//werrstr("missing protocol");
-		return -1;
+		return got_error(GOT_ERR_PARSE_URI);
 	}
-	if (grab(proto, GOT_PROTOMAX, uri, p) == -1)
-		return -1;
-	hasport = (strcmp(proto, "git") == 0 || strstr(proto, "http") == proto);
+	*proto = strndup(uri, p - uri);
+	if (proto == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+
+	hasport = (strcmp(*proto, "git") == 0 ||
+	    strstr(*proto, "http") == *proto);
 	s = p + 3;
 	p = NULL;
 	if (!hasport) {
@@ -216,37 +212,74 @@ got_parse_uri(char *uri, char *proto, char *host, char *port, char *path, char *
 	if (p == NULL)
 		p = strstr(s, "/");
 	if (p == NULL || strlen(p) == 1) {
-		//werrstr("missing path");
-		return -1;
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
 	}
 
 	q = memchr(s, ':', p - s);
 	if (q) {
-		grab(host, GOT_HOSTMAX, s, q);
-		grab(port, GOT_PORTMAX, q + 1, p);
-	}else{
-		grab(host, GOT_HOSTMAX, s, p);
-		snprintf(port, GOT_PORTMAX, "9418");
+		*host = strndup(s, q - s);
+		if (*host == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		*port = strndup(q + 1, p - (q + 1));
+		if (*port == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+	} else {
+		*host = strndup(s, p - s);
+		if (*host == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		if (asprintf(port, "%u", GOT_DEFAULT_GIT_PORT) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
 	}
 
-	snprintf(path, GOT_PATHMAX, "%s", p);
+	*server_path = strdup(p);
+	if (*server_path == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
 	p = strrchr(p, '/') + 1;
 	if (!p || strlen(p) == 0) {
 		//werrstr("missing repository in uri");
-		return -1;
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
 	}
 	n = strlen(p);
 	if (hassuffix(p, ".git"))
 		n -= 4;
-	grab(repo, GOT_REPOMAX, p, p + n);
-	return 0;
+	*repo_name = strndup(p, (p + n) - p);
+	if (*repo_name == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+done:
+	if (err) {
+		free(*proto);
+		*proto = NULL;
+		free(*host);
+		*host = NULL;
+		free(*port);
+		*port = NULL;
+		free(*server_path);
+		*server_path = NULL;
+		free(*repo_name);
+		*repo_name = NULL;
+	}
+	return err;
 }
 
 const struct got_error*
 got_fetch(char *uri, char *branch_filter, char *destdir)
 {
-	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
-	char repo_name[GOT_REPOMAX], server_path[GOT_PATHMAX];
+	char *proto, *host, *port, *repo_name, *server_path;
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
 	int status, done = 0;
@@ -265,8 +298,10 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	TAILQ_INIT(&symrefs);
 
 	fetchfd = -1;
-	if (got_parse_uri(uri, proto, host, port, server_path, repo_name) == -1)
-		return got_error(GOT_ERR_PARSE_URI);
+	err = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	    &repo_name, uri);
+	if (err)
+		return err;
 	if (destdir == NULL) {
 		if (asprintf(&default_destdir, "%s.git", repo_name) == -1)
 			return got_error_from_errno("asprintf");
