@@ -537,29 +537,29 @@ got_privsep_send_fetch_symrefs(struct imsgbuf *ibuf,
 }
 
 const struct got_error *
-got_privsep_send_fetch_progress(struct imsgbuf *ibuf,
+got_privsep_send_fetch_ref(struct imsgbuf *ibuf,
     struct got_object_id *refid, const char *refname)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, reflen = strlen(refname);
 
-	len = sizeof(struct got_imsg_fetch_progress) + reflen;
+	len = sizeof(struct got_imsg_fetch_ref) + reflen;
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
 		return got_error(GOT_ERR_NO_SPACE);
 
-	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_PROGRESS, 0, 0, len);
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REF, 0, 0, len);
 	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create FETCH_PROGRESS");
+		return got_error_from_errno("imsg_create FETCH_REF");
 
-	/* Keep in sync with struct got_imsg_fetch_progress definition! */
+	/* Keep in sync with struct got_imsg_fetch_ref definition! */
 	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_PROGRESS");
+		err = got_error_from_errno("imsg_add FETCH_REF");
 		ibuf_free(wbuf);
 		return err;
 	}
 	if (imsg_add(wbuf, refname, reflen) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_PROGRESS");
+		err = got_error_from_errno("imsg_add FETCH_REF");
 		ibuf_free(wbuf);
 		return err;
 	}
@@ -682,7 +682,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 			}
 		}
 		break;
-	case GOT_IMSG_FETCH_PROGRESS:
+	case GOT_IMSG_FETCH_REF:
 		if (datalen <= SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;

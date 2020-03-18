@@ -584,7 +584,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (err)
 			goto done;
 
-		err = got_privsep_send_fetch_progress(ibuf, &want[nref],
+		err = got_privsep_send_fetch_ref(ibuf, &want[nref],
 		    refname);
 		if (err)
 			goto done;
