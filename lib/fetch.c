@@ -178,7 +178,7 @@ dial_git(int *fetchfd, char *host, char *port, char *path, char *direction)
 	const struct got_error *err = NULL;
 	struct addrinfo hints, *servinfo, *p;
 	char *cmd = NULL, *pkt = NULL;
-	int fd = -1, l, r, eaicode;
+	int fd = -1, totlen, r, eaicode;
 
 	*fetchfd = -1;
 
@@ -201,17 +201,29 @@ dial_git(int *fetchfd, char *host, char *port, char *path, char *direction)
 	if (p == NULL)
 		goto done;
 
-	if ((l = asprintf(&cmd, "git-%s-pack %s\n", direction, path)) == -1) {
+	if (asprintf(&cmd, "git-%s-pack %s", direction, path) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	if ((l = asprintf(&pkt, "%04x%s", l + 4, cmd)) == -1) {
+	totlen = 4 + strlen(cmd) + 1 + strlen("host=") + strlen(host) + 1;
+	if (asprintf(&pkt, "%04x%s", totlen, cmd) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	r = write(fd, pkt, l);
-	if (r == -1)
+	r = write(fd, pkt, strlen(pkt) + 1);
+	if (r == -1) {
 		err = got_error_from_errno("write");
+		goto done;
+	}
+	if (asprintf(&pkt, "host=%s", host) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	r = write(fd, pkt, strlen(pkt) + 1);
+	if (r == -1) {
+		err = got_error_from_errno("write");
+		goto done;
+	}
 done:
 	free(cmd);
 	free(pkt);
