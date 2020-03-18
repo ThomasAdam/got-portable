@@ -290,8 +290,9 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 {
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
 	char repo[GOT_REPOMAX], path[GOT_PATHMAX];
-	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd;
-	int packfd = -1, npackfd, idxfd = -1, nidxfd, status, done = 0;
+	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
+	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
+	int status, done = 0;
 	struct got_object_id *packhash = NULL;
 	const struct got_error *err;
 	struct imsgbuf ibuf;
@@ -312,25 +313,33 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	}
 	err = got_repo_init(destdir ? destdir : default_destdir);
 	if (err != NULL)
-		return err;
-	if (chdir(destdir ? destdir : default_destdir))
-		return got_error_from_errno("enter new repo");
-	if (mkpath("objects/pack") == -1)
-		return got_error_from_errno("mkpath");
+		goto done;
+	if (chdir(destdir ? destdir : default_destdir)) {
+		err = got_error_from_errno("enter new repo");
+		goto done;
+	}
+	if (mkpath("objects/pack") == -1) {
+		err = got_error_from_errno("mkpath");
+		goto done;
+	}
 	err = got_opentemp_named_fd(&tmppackpath, &packfd,
 	    "objects/pack/fetching.pack");
 	if (err)
-		return err;
+		goto done;
 	npackfd = dup(packfd);
-	if (npackfd == -1)
-		return got_error_from_errno("dup");
+	if (npackfd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
 	err = got_opentemp_named_fd(&tmpidxpath, &idxfd,
 	    "objects/pack/fetching.idx");
 	if (err)
-		return err;
+		goto done;
 	nidxfd = dup(idxfd);
-	if (nidxfd == -1)
-		return got_error_from_errno("dup");
+	if (nidxfd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
 		err = dial_ssh(&fetchfd, host, port, path, "upload");
@@ -341,42 +350,55 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	else
 		err = got_error(GOT_ERR_BAD_PROTO);
 	if (err)
-		return err;
+		goto done;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fetchfds) == -1)
-		return got_error_from_errno("socketpair");
-
-	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno("fork");
-	else if (pid == 0){
-		got_privsep_exec_child(imsg_fetchfds, GOT_PATH_PROG_FETCH_PACK, ".");
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fetchfds) == -1) {
+		err = got_error_from_errno("socketpair");
+		goto done;
 	}
 
-	if (close(imsg_fetchfds[1]) != 0)
-		return got_error_from_errno("close");
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno("fork");
+		goto done;
+	} else if (pid == 0){
+		got_privsep_exec_child(imsg_fetchfds,
+		    GOT_PATH_PROG_FETCH_PACK, ".");
+	}
+
+	if (close(imsg_fetchfds[1]) != 0) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
 	imsg_init(&ibuf, imsg_fetchfds[0]);
 	err = got_privsep_send_fetch_req(&ibuf, fetchfd);
 	if (err != NULL)
-		return err;
+		goto done;
+	fetchfd = -1;
 	err = got_privsep_send_tmpfd(&ibuf, npackfd);
 	if (err != NULL)
-		return err;
+		goto done;
 	npackfd = dup(packfd);
-	if (npackfd == -1)
-		return got_error_from_errno("dup");
+	if (npackfd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
+
 	while (!done) {
 		struct got_object_id *id;
 		char *refname;
+
 		err = got_privsep_recv_fetch_progress(&done,
 		    &id, &refname, &symrefs, &ibuf);
 		if (err != NULL)
-			return err;
+			goto done;
 		if (done) {
 			packhash = got_object_id_dup(id);
-			if (packhash == NULL)
-				return got_error_from_errno(
+			if (packhash == NULL) {
+				err = got_error_from_errno(
 				    "got_object_id_dup");
+				goto done;
+			}
 			printf("symrefs:");
 			TAILQ_FOREACH(pe, &symrefs, entry) {
 				printf(" %s:%s", pe->path,
@@ -388,53 +410,83 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 			/* TODO Use a progress callback */
 			err = got_object_id_str(&id_str, id);
 			if (err)
-				return err;
+				goto done;
 			printf( "%.12s %s\n", id_str, refname);
 		}
 	}
-	if (waitpid(pid, &status, 0) == -1)
-		return got_error_from_errno("child exit");
+	if (waitpid(pid, &status, 0) == -1) {
+		err = got_error_from_errno("waitpid");
+		goto done;
+	}
 
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1)
-		return got_error_from_errno("socketpair");
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1) {
+		err = got_error_from_errno("socketpair");
+		goto done;
+	}
 	pid = fork();
-	if (pid == -1)
-		return got_error_from_errno("fork");
-	else if (pid == 0)
-		got_privsep_exec_child(imsg_idxfds, GOT_PATH_PROG_INDEX_PACK, ".");
-	if (close(imsg_idxfds[1]) != 0)
-		return got_error_from_errno("close");
+	if (pid == -1) {
+		err= got_error_from_errno("fork");
+		goto done;
+	} else if (pid == 0)
+		got_privsep_exec_child(imsg_idxfds,
+		    GOT_PATH_PROG_INDEX_PACK, ".");
+	if (close(imsg_idxfds[1]) != 0) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
 	imsg_init(&ibuf, imsg_idxfds[0]);
 
 	err = got_privsep_send_index_pack_req(&ibuf, npackfd, packhash);
 	if (err != NULL)
-		return err;
+		goto done;
+	npackfd = -1;
 	err = got_privsep_send_tmpfd(&ibuf, nidxfd);
 	if (err != NULL)
-		return err;
+		goto done;
+	nidxfd = -1;
 	err = got_privsep_wait_index_pack_done(&ibuf);
 	if (err != NULL)
-		return err;
+		goto done;
 	imsg_clear(&ibuf);
-	if (close(imsg_idxfds[0]) == -1)
-		return got_error_from_errno("close child");
-	if (waitpid(pid, &status, 0) == -1)
-		return got_error_from_errno("child exit");
+	if (close(imsg_idxfds[0]) == -1) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
+	if (waitpid(pid, &status, 0) == -1) {
+		err = got_error_from_errno("waitpid");
+		goto done;
+	}
 
 	err = got_object_id_str(&id_str, packhash);
 	if (err)
-		return err;
-	if (asprintf(&packpath, "objects/pack/pack-%s.pack", id_str) == -1)
-		return got_error_from_errno("asprintf");
+		goto done;
+	if (asprintf(&packpath, "objects/pack/pack-%s.pack", id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
-	if (asprintf(&idxpath, "objects/pack/pack-%s.idx", id_str) == -1)
-		return got_error_from_errno("asprintf");
+	if (asprintf(&idxpath, "objects/pack/pack-%s.idx", id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
-	if (rename(tmppackpath, packpath) == -1)
-		return got_error_from_errno3("rename", tmppackpath, packpath);
-	if (rename(tmpidxpath, idxpath) == -1)
-		return got_error_from_errno3("rename", tmpidxpath, idxpath);
-
+	if (rename(tmppackpath, packpath) == -1) {
+		err = got_error_from_errno3("rename", tmppackpath, packpath);
+		goto done;
+	}
+	if (rename(tmpidxpath, idxpath) == -1) {
+		err = got_error_from_errno3("rename", tmpidxpath, idxpath);
+		goto done;
+	}
+done:
+	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (packfd != -1 && close(packfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	free(tmppackpath);
 	free(tmpidxpath);
 	free(idxpath);
@@ -447,5 +499,5 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	}
 	got_pathlist_free(&symrefs);
 
-	return NULL;
+	return err;
 }
