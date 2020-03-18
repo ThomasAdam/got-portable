@@ -298,10 +298,11 @@ done:
 }
 
 const struct got_error*
-got_fetch(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
+got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, int fetchfd, const char *proto,
     const char *host, const char *port, const char *server_path,
-    const char *repo_name, const char *branch_filter, struct got_repository *repo)
+    const char *repo_name, const char *branch_filter,
+    struct got_repository *repo)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
