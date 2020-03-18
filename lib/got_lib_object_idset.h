@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2019 Ori Bernstein <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +26,8 @@ void *got_object_idset_get(struct got_object_idset *, struct got_object_id *);
 const struct got_error *got_object_idset_remove(void **,
     struct got_object_idset *, struct got_object_id *);
 int got_object_idset_contains(struct got_object_idset *,
+    struct got_object_id *);
+void *got_object_idset_lookup_data(struct got_object_idset *,
     struct got_object_id *);
 const struct got_error *got_object_idset_for_each(struct got_object_idset *,
     const struct got_error *(*cb)(struct got_object_id *, void *, void *),

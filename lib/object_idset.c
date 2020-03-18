@@ -168,6 +168,14 @@ got_object_idset_contains(struct got_object_idset *set,
 	return entry ? 1 : 0;
 }
 
+void *
+got_object_idset_lookup_data(struct got_object_idset *set,
+    struct got_object_id *id)
+{
+	struct got_object_idset_element *entry = find_element(set, id);
+	return entry ? entry->data : NULL;
+}
+
 const struct got_error *
 got_object_idset_for_each(struct got_object_idset *set,
     const struct got_error *(*cb)(struct got_object_id *, void *, void *),

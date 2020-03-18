@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2019, 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2020 Ori Bernstein <ori@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -230,6 +231,31 @@ got_privsep_send_stop(int fd)
 }
 
 const struct got_error *
+got_privsep_send_ack(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_ACK, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose ACK");
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_wait_ack(struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+	if (imsg.hdr.type == GOT_IMSG_ACK && imsg.hdr.len - IMSG_HEADER_SIZE == 0)
+		return NULL;
+	else
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	imsg_free(&imsg);
+}
+
+
+const struct got_error *
 got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
@@ -401,6 +427,85 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 		return got_error_from_errno("imsg_compose OBJECT");
 
 	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, fd,
+	    NULL, 0) == -1) {
+		err = got_error_from_errno("imsg_compose FETCH_REQUEST");
+		close(fd);
+		return err;
+	}
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
+	    hash.sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_compose FETCH");
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_wait_fetch_done(struct imsgbuf *ibuf, struct got_object_id *hash)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+	if (imsg.hdr.type == GOT_IMSG_FETCH_DONE &&
+	    imsg.hdr.len - sizeof(imsg.hdr) == SHA1_DIGEST_LENGTH)
+		return NULL;
+	else
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	imsg_free(&imsg);
+}
+
+
+const struct got_error *
+got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_id hash)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_REQUEST, 0, 0, fd,
+	    hash.sha1, SHA1_DIGEST_LENGTH) == -1) {
+		err = got_error_from_errno("imsg_compose INDEX_REQUEST");
+		close(fd);
+		return err;
+	}
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_index_pack_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_DONE, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose FETCH");
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_wait_index_pack_done(struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+	if (imsg.hdr.type == GOT_IMSG_IDXPACK_DONE)
+		return NULL;
+	else
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	imsg_free(&imsg);
 }
 
 const struct got_error *

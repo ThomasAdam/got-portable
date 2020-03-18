@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2017 Martin Pieuchot <mpi@openbsd.org>
  * Copyright (c) 2018, 2019, 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2020 Ori Bernstein <ori@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,6 +49,7 @@
 #include "got_worktree.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"
+#include "got_lib_fetch.h"
 #include "got_blame.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
@@ -83,6 +85,7 @@ __dead static void	usage(int);
 __dead static void	usage_init(void);
 __dead static void	usage_import(void);
 __dead static void	usage_checkout(void);
+__dead static void	usage_clone(void);
 __dead static void	usage_update(void);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
@@ -107,6 +110,7 @@ __dead static void	usage_cat(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
+static const struct got_error*		cmd_clone(int, char *[]);
 static const struct got_error*		cmd_checkout(int, char *[]);
 static const struct got_error*		cmd_update(int, char *[]);
 static const struct got_error*		cmd_log(int, char *[]);
@@ -134,6 +138,7 @@ static struct got_cmd got_commands[] = {
 	{ "init",	cmd_init,	usage_init,	"in" },
 	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "checkout",	cmd_checkout,	usage_checkout,	"co" },
+	{ "clone",	cmd_clone,	usage_clone,	"cl" },
 	{ "update",	cmd_update,	usage_update,	"up" },
 	{ "log",	cmd_log,	usage_log,	"" },
 	{ "diff",	cmd_diff,	usage_diff,	"di" },
@@ -800,6 +805,13 @@ done:
 }
 
 __dead static void
+usage_clone(void)
+{
+	fprintf(stderr, "usage: %s clone repo-url\n", getprogname());
+	exit(1);
+}
+
+__dead static void
 usage_checkout(void)
 {
 	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
@@ -954,6 +966,34 @@ done:
 	if (!err && !is_same_branch)
 		err = got_error(GOT_ERR_ANCESTRY);
 	return err;
+}
+
+static const struct got_error *
+cmd_clone(int argc, char *argv[])
+{
+	char *uri, *branch_filter, *dirname;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "b:")) != -1) {
+		switch (ch) {
+		case 'b':
+			branch_filter = optarg;
+			break;
+		default:
+			usage_clone();
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+	uri = argv[0];
+	if(argc == 1)
+		dirname = NULL;
+	else if(argc == 2)
+		dirname = argv[1];
+	else
+		usage_clone();
+	return got_clone(argv[0], branch_filter, dirname);
 }
 
 static const struct got_error *

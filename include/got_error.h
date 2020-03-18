@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2019, 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2020 Ori Bernstein <ori@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -128,9 +129,12 @@
 #define GOT_ERR_REGEX		112
 #define GOT_ERR_REF_NAME_MINUS	113
 #define GOT_ERR_GITCONFIG_SYNTAX 114
-#define GOT_ERR_REBASE_OUT_OF_DATE 115
-#define GOT_ERR_CACHE_DUP_ENTRY	116
-#define GOT_ERR_QUERYSTRING	117
+#define GOT_ERR_FETCH_FAILED	115
+#define GOT_ERR_PARSE_URI	116
+#define GOT_ERR_BAD_PROTO	117
+#define GOT_ERR_REBASE_OUT_OF_DATE 118
+#define GOT_ERR_CACHE_DUP_ENTRY	119
+#define GOT_ERR_QUERYSTRING	120
 
 static const struct got_error {
 	int code;
@@ -269,6 +273,9 @@ static const struct got_error {
 	    "can be used to rebase a branch" },
 	{ GOT_ERR_CACHE_DUP_ENTRY, "duplicate cache entry" },
 	{ GOT_ERR_QUERYSTRING, "bad querystring" },
+	{ GOT_ERR_FETCH_FAILED, "fetch failed" },
+	{ GOT_ERR_PARSE_URI, "failed to parse uri" },
+	{ GOT_ERR_BAD_PROTO, "unknown protocol" },
 };
 
 /*

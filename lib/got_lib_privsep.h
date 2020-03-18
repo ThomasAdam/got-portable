@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2019 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2019, Ori Bernstein <ori@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,6 +43,9 @@
 #define GOT_PROG_READ_TAG	got-read-tag
 #define GOT_PROG_READ_PACK	got-read-pack
 #define GOT_PROG_READ_GITCONFIG	got-read-gitconfig
+#define GOT_PROG_FETCH_PACK	got-fetch-pack
+#define GOT_PROG_INDEX_PACK	got-index-pack
+#define GOT_PROG_SEND_PACK	got-send-pack
 
 #define GOT_STRINGIFY(x) #x
 #define GOT_STRINGVAL(x) GOT_STRINGIFY(x)
@@ -61,6 +65,12 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PACK)
 #define GOT_PATH_PROG_READ_GITCONFIG \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GITCONFIG)
+#define GOT_PATH_PROG_FETCH_PACK \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_FETCH_PACK)
+#define GOT_PATH_PROG_SEND_PACK \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_SEND_PACK)
+#define GOT_PATH_PROG_INDEX_PACK \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_INDEX_PACK)
 
 struct got_privsep_child {
 	int imsg_fd;
@@ -74,6 +84,9 @@ enum got_imsg_type {
 
 	/* Stop the child process. */
 	GOT_IMSG_STOP,
+
+	/* We got a message as part of a sequence */
+	GOT_IMSG_ACK,
 
 	/*
 	 * Messages concerned with read access to objects in a repository.
@@ -97,6 +110,12 @@ enum got_imsg_type {
 	GOT_IMSG_TAG_REQUEST,
 	GOT_IMSG_TAG,
 	GOT_IMSG_TAG_TAGMSG,
+
+	/* Messages related to networking. */
+	GOT_IMSG_FETCH_REQUEST,
+	GOT_IMSG_FETCH_DONE,
+	GOT_IMSG_IDXPACK_REQUEST,
+	GOT_IMSG_IDXPACK_DONE,
 
 	/* Messages related to pack files. */
 	GOT_IMSG_PACKIDX,
@@ -273,11 +292,14 @@ struct got_pack;
 struct got_packidx;
 struct got_pathlist_head;
 
+const struct got_error *got_send_ack(pid_t);
 const struct got_error *got_privsep_wait_for_child(pid_t);
 const struct got_error *got_privsep_send_stop(int);
 const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
     size_t);
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
+const struct got_error *got_privsep_send_ack(struct imsgbuf *);
+const struct got_error *got_privsep_wait_ack(struct imsgbuf *);
 const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
     struct got_object_id *, int);
@@ -291,6 +313,15 @@ const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
+const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
+    struct got_object_id);
+const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
+const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
+const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
+    struct got_object_id);
+const struct got_error *got_privsep_wait_fetch_done(struct imsgbuf *,
+    struct got_object_id*);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,

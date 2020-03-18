@@ -86,12 +86,16 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 	size_t last_total_out = zb->z.total_out;
 	z_stream *z = &zb->z;
 	int ret = Z_ERRNO;
+	off_t off, consumed;
 
 	z->next_out = zb->outbuf;
 	z->avail_out = zb->outlen;
 
 	*outlenp = 0;
+	off = ftello(f);
+	consumed = 0;
 	do {
+		size_t last_total_in = zb->z.total_in;
 		if (z->avail_in == 0) {
 			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
 			if (n == 0) {
@@ -105,6 +109,7 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 			z->avail_in = n;
 		}
 		ret = inflate(z, Z_SYNC_FLUSH);
+		consumed += z->total_in - last_total_in;
 	} while (ret == Z_OK && z->avail_out > 0);
 
 	if (ret == Z_OK || ret == Z_BUF_ERROR) {
@@ -116,6 +121,7 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 	}
 
 	*outlenp = z->total_out - last_total_out;
+	fseek(f, off + consumed, SEEK_SET);
 	return NULL;
 }
 
