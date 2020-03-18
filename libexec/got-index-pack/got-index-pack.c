@@ -875,7 +875,7 @@ main(int argc, char **argv)
 
 	memset(&pack, 0, sizeof(pack));
 	pack.fd = -1;
-	pack.delta_cache = got_delta_cache_alloc(1000,
+	pack.delta_cache = got_delta_cache_alloc(500,
 	    GOT_DELTA_RESULT_SIZE_CACHED_MAX);
 	if (pack.delta_cache == NULL) {
 		err = got_error_from_errno("got_delta_cache_alloc");
