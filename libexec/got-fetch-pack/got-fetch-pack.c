@@ -155,7 +155,7 @@ match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
 	return NULL;
 }
 
-static int
+static const struct got_error *
 check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 {
 	SHA1_CTX ctx;
@@ -166,7 +166,7 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	ssize_t n, r, nr;
 
 	if (sz < 28)
-		return -1;
+		return got_error(GOT_ERR_BAD_PACKFILE);
 
 	n = 0;
 	SHA1Init(&ctx);
@@ -176,21 +176,20 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 			nr = sz - n - 20;
 		r = readn(fd, buf, nr);
 		if (r != nr)
-			return -1;
+			return got_error(GOT_ERR_BAD_PACKFILE);
 		SHA1Update(&ctx, buf, nr);
 		n += r;
 	}
 	SHA1Final(hcomp, &ctx);
 
 	if (readn(fd, hexpect, sizeof(hexpect)) != sizeof(hexpect))
-		errx(1, "truncated packfile");
+		return got_error(GOT_ERR_BAD_PACKFILE);
 	if (memcmp(hcomp, hexpect, SHA1_DIGEST_LENGTH) != 0) {
 		got_sha1_digest_to_str(hcomp, s1, sizeof(s1));
 		got_sha1_digest_to_str(hexpect, s2, sizeof(s2));
-		printf("hash mismatch %s != %s\n", s1, s2);
-		return -1;
+		return got_error(GOT_ERR_BAD_PACKFILE);
 	}
-	return 0;
+	return NULL;
 }
 
 static int
@@ -567,8 +566,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
-	if (check_pack_hash(packfd, packsz, packid->sha1) == -1)
-		err = got_error(GOT_ERR_BAD_PACKFILE);
+	err = check_pack_hash(packfd, packsz, packid->sha1);
 done:
 	TAILQ_FOREACH(pe, &symrefs, entry) {
 		free((void *)pe->path);
