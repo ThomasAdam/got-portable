@@ -502,7 +502,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (err != NULL)
 		goto done;
 	npackfd = -1;
-	err = got_privsep_send_tmpfd(&idxibuf, nidxfd);
+	err = got_privsep_send_index_pack_outfd(&idxibuf, nidxfd);
 	if (err != NULL)
 		goto done;
 	nidxfd = -1;

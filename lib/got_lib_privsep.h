@@ -116,6 +116,7 @@ enum got_imsg_type {
 	GOT_IMSG_FETCH_DOWNLOAD_PROGRESS,
 	GOT_IMSG_FETCH_DONE,
 	GOT_IMSG_IDXPACK_REQUEST,
+	GOT_IMSG_IDXPACK_OUTFD,
 	GOT_IMSG_IDXPACK_PROGRESS,
 	GOT_IMSG_IDXPACK_DONE,
 
@@ -377,6 +378,8 @@ const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
 const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *,
     uint8_t *, int);
+const struct got_error *got_privsep_send_index_pack_outfd(struct imsgbuf *,
+    int);
 const struct got_error *got_privsep_send_index_pack_progress(struct imsgbuf *,
     int, int, int, int);
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);

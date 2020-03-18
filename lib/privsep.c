@@ -368,19 +368,24 @@ got_privsep_send_blob_outfd(struct imsgbuf *ibuf, int outfd)
 	return flush_imsg(ibuf);
 }
 
-const struct got_error *
-got_privsep_send_tmpfd(struct imsgbuf *ibuf, int fd)
+static const struct got_error *
+send_fd(struct imsgbuf *ibuf, int imsg_code, int fd)
 {
 	const struct got_error *err = NULL;
 
-	if (imsg_compose(ibuf, GOT_IMSG_TMPFD, 0, 0, fd, NULL, 0)
-	    == -1) {
+	if (imsg_compose(ibuf, imsg_code, 0, 0, fd, NULL, 0) == -1) {
 		err = got_error_from_errno("imsg_compose TMPFD");
 		close(fd);
 		return err;
 	}
 
 	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_tmpfd(struct imsgbuf *ibuf, int fd)
+{
+	return send_fd(ibuf, GOT_IMSG_TMPFD, fd);
 }
 
 const struct got_error *
@@ -780,6 +785,12 @@ got_privsep_send_index_pack_req(struct imsgbuf *ibuf, uint8_t *pack_hash,
 		return err;
 	}
 	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_index_pack_outfd(struct imsgbuf *ibuf, int fd)
+{
+	return send_fd(ibuf, GOT_IMSG_IDXPACK_OUTFD, fd);
 }
 
 const struct got_error *
