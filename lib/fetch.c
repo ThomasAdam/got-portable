@@ -253,8 +253,8 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
 	char repo[GOT_REPOMAX], path[GOT_PATHMAX];
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd;
-	int packfd = -1, npackfd, idxfd = -1, nidxfd, status;
-	struct got_object_id packhash;
+	int packfd = -1, npackfd, idxfd = -1, nidxfd, status, done = 0;
+	struct got_object_id *packhash = NULL;
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
@@ -323,9 +323,27 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	npackfd = dup(packfd);
 	if (npackfd == -1)
 		return got_error_from_errno("dup");
-	err = got_privsep_wait_fetch_done(&ibuf, &packhash);
-	if (err != NULL)
-		return err;
+	while (!done) {
+		struct got_object_id *id;
+		char *refname;
+		err = got_privsep_recv_fetch_progress(&done,
+		    &id, &refname, &ibuf);
+		if (err != NULL)
+			return err;
+		if (done) {
+			packhash = got_object_id_dup(id);
+			if (packhash == NULL)
+				return got_error_from_errno(
+				    "got_object_id_dup");
+		} else {
+			char *id_str;
+			/* TODO Use a progress callback */
+			err = got_object_id_str(&id_str, id);
+			if (err)
+				return err;
+			printf( "%.12s %s\n", id_str, refname);
+		}
+	}
 	if (waitpid(pid, &status, 0) == -1)
 		return got_error_from_errno("child exit");
 
@@ -340,7 +358,7 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		return got_error_from_errno("close");
 	imsg_init(&ibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&ibuf, npackfd, &packhash);
+	err = got_privsep_send_index_pack_req(&ibuf, npackfd, packhash);
 	if (err != NULL)
 		return err;
 	err = got_privsep_send_tmpfd(&ibuf, nidxfd);
@@ -355,7 +373,7 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	if (waitpid(pid, &status, 0) == -1)
 		return got_error_from_errno("child exit");
 
-	err = got_object_id_str(&id_str, &packhash);
+	err = got_object_id_str(&id_str, packhash);
 	if (err)
 		return err;
 	if (asprintf(&packpath, "objects/pack/pack-%s.pack", id_str) == -1)
@@ -374,6 +392,7 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	free(idxpath);
 	free(packpath);
 	free(default_destdir);
+	free(packhash);
 
 	return NULL;
 }

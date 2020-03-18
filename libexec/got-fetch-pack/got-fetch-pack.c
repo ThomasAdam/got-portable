@@ -282,7 +282,8 @@ got_tokenize_refline(char *line, char **sp, size_t nsp)
 }
 
 static const struct got_error *
-fetch_pack(int fd, int packfd, struct got_object_id *packid)
+fetch_pack(int fd, int packfd, struct got_object_id *packid,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_PKTMAX], *sp[3];
@@ -346,7 +347,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid)
 
 		if (got_resolve_remote_ref(&have[nref], sp[1]) == -1)
 			memset(&have[nref], 0, sizeof(have[nref]));
-		// TODO: send IMSG with progress.
+		err = got_privsep_send_fetch_progress(ibuf, &want[nref], sp[1]);
+		if (err)
+			goto done;
 		if (chattygit)
 			fprintf(stderr, "remote %s\n", sp[1]);
 		nref++;
@@ -403,7 +406,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid)
 	}
 	buf[n] = 0;
 
-	fprintf(stderr, "fetching...\n");
+	if (chattygit)
+		fprintf(stderr, "fetching...\n");
 	packsz = 0;
 	while (1) {
 		ssize_t w;
@@ -434,7 +438,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid)
 done:
 	free(have);
 	free(want);
-	return 0;
+	return err;
 }
 
 
@@ -487,7 +491,7 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	err = fetch_pack(fetchfd, packfd, &packid);
+	err = fetch_pack(fetchfd, packfd, &packid, &ibuf);
 	if (err)
 		goto done;
 done:

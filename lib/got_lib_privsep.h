@@ -325,12 +325,10 @@ const struct got_error *got_privsep_wait_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_fetch_progress(struct imsgbuf *,
     struct got_object_id *, const char *);
-const struct got_error *got_privsep_recv_fetch_progress(struct got_object_id **,
-    char **, struct imsgbuf *);
+const struct got_error *got_privsep_recv_fetch_progress(int *,
+    struct got_object_id **, char **, struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
     struct got_object_id);
-const struct got_error *got_privsep_wait_fetch_done(struct imsgbuf *,
-    struct got_object_id*);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,

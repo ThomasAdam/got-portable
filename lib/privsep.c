@@ -462,7 +462,7 @@ got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 
 
 const struct got_error *
-got_privsep_recv_fetch_progress(struct got_object_id **refid,
+got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
     char **refname, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -472,7 +472,8 @@ got_privsep_recv_fetch_progress(struct got_object_id **refid,
 	    MIN(sizeof(struct got_imsg_error),
 	    sizeof(struct got_imsg_fetch_progress));
 
-	*refid = NULL;
+	*done = 0;
+	*id = NULL;
 	*refname = NULL;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
@@ -485,12 +486,12 @@ got_privsep_recv_fetch_progress(struct got_object_id **refid,
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_FETCH_PROGRESS:
-		*refid = malloc(sizeof(**refid));
-		if (*refid == NULL) {
+		*id = malloc(sizeof(**id));
+		if (*id == NULL) {
 			err = got_error_from_errno("malloc");
 			break;
 		}
-		memcpy((*refid)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
+		memcpy((*id)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
 		if (datalen <= SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
@@ -502,41 +503,33 @@ got_privsep_recv_fetch_progress(struct got_object_id **refid,
 			break;
 		}
 		break;
+	case GOT_IMSG_FETCH_DONE:
+		*id = malloc(sizeof(**id));
+		if (*id == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		if (datalen != SHA1_DIGEST_LENGTH) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		memcpy((*id)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
+		*done = 1;
+		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		break;
 	}
 
 	if (err) {
-		free(*refid);
-		*refid = NULL;
+		free(*id);
+		*id = NULL;
 		free(*refname);
 		*refname = NULL;
 	}
 	imsg_free(&imsg);
 	return err;
 }
-
-const struct got_error *
-got_privsep_wait_fetch_done(struct imsgbuf *ibuf, struct got_object_id *hash)
-{
-	const struct got_error *err = NULL;
-	struct imsg imsg;
-
-	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-	if (err)
-		return err;
-	if (imsg.hdr.type == GOT_IMSG_FETCH_DONE &&
-	    imsg.hdr.len - sizeof(imsg.hdr) == SHA1_DIGEST_LENGTH) {
-		memcpy(hash->sha1, imsg.data, SHA1_DIGEST_LENGTH);
-		imsg_free(&imsg);
-		return NULL;
-	}
-
-	imsg_free(&imsg);
-	return got_error(GOT_ERR_PRIVSEP_MSG);
-}
-
 
 const struct got_error *
 got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_id *hash)
