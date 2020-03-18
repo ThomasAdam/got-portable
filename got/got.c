@@ -974,6 +974,9 @@ cmd_clone(int argc, char *argv[])
 	const struct got_error *err = NULL;
 	const char *uri, *branch_filter, *dirname;
 	char *proto, *host, *port, *repo_name, *server_path;
+	char *default_destdir = NULL;
+	const char *repo_path;
+	struct got_repository *repo = NULL;
 	int ch;
 
 	while ((ch = getopt(argc, argv, "b:")) != -1) {
@@ -1001,14 +1004,38 @@ cmd_clone(int argc, char *argv[])
 	if (err)
 		goto done;
 
+	if (dirname == NULL) {
+		if (asprintf(&default_destdir, "%s.git", repo_name) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		repo_path = default_destdir;
+	} else
+		repo_path = dirname;
+
+	err = got_path_mkdir(repo_path);
+	if (err)
+		goto done;
+
+	err = got_repo_init(repo_path);
+	if (err != NULL)
+		goto done;
+
+	err = got_repo_open(&repo, repo_path, NULL);
+	if (err)
+		goto done;
+
 	err = got_fetch(proto, host, port, server_path, repo_name,
-	    branch_filter, dirname);
+	    branch_filter, repo);
 done:
+	if (repo)
+		got_repo_close(repo);
 	free(proto);
 	free(host);
 	free(port);
 	free(server_path);
 	free(repo_name);
+	free(default_destdir);
 	return err;
 }
 

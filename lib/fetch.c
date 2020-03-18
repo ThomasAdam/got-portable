@@ -281,7 +281,7 @@ done:
 const struct got_error*
 got_fetch(const char *proto, const char *host, const char *port,
     const char *server_path, const char *repo_name,
-    const char *branch_filter, const char *destdir)
+    const char *branch_filter, struct got_repository *repo)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
@@ -290,26 +290,17 @@ got_fetch(const char *proto, const char *host, const char *port,
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
-	char *tmppackpath = NULL, *tmpidxpath = NULL, *default_destdir = NULL;
+	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
-	const char *repo_path;
+	const char *repo_path = got_repo_get_path(repo);
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
-	struct got_repository *repo = NULL;
 	char *path;
 
 	TAILQ_INIT(&symrefs);
 
 	fetchfd = -1;
-	if (destdir == NULL) {
-		if (asprintf(&default_destdir, "%s.git", repo_name) == -1)
-			return got_error_from_errno("asprintf");
-		repo_path = default_destdir;
-	} else
-		repo_path = destdir;
-	err = got_repo_init(repo_path);
-	if (err != NULL)
-		goto done;
+
 	if (asprintf(&path, "%s/objects/path", repo_path) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -387,10 +378,6 @@ got_fetch(const char *proto, const char *host, const char *port,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-
-	err = got_repo_open(&repo, repo_path, NULL);
-	if (err)
-		goto done;
 
 	while (!done) {
 		struct got_object_id *id;
@@ -536,13 +523,10 @@ done:
 		err = got_error_from_errno("close");
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (repo)
-		got_repo_close(repo);
 	free(tmppackpath);
 	free(tmpidxpath);
 	free(idxpath);
 	free(packpath);
-	free(default_destdir);
 	free(packhash);
 	TAILQ_FOREACH(pe, &symrefs, entry) {
 		free((void *)pe->path);
