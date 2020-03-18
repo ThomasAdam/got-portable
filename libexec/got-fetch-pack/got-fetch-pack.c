@@ -469,14 +469,14 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			continue;
 		if (refsz == nref + 1) {
 			refsz *= 2;
-			have = realloc(have, refsz * sizeof(have[0]));
+			have = reallocarray(have, refsz, sizeof(have[0]));
 			if (have == NULL) {
-				err = got_error_from_errno("realloc");
+				err = got_error_from_errno("reallocarray");
 				goto done;
 			}
-			want = realloc(want, refsz * sizeof(want[0]));
+			want = reallocarray(want, refsz, sizeof(want[0]));
 			if (want == NULL) {
-				err = got_error_from_errno("realloc");
+				err = got_error_from_errno("reallocarray");
 				goto done;
 			}
 		}
