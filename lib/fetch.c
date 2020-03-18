@@ -279,25 +279,24 @@ done:
 }
 
 const struct got_error*
-got_fetch(const char *proto, const char *host, const char *port,
-    const char *server_path, const char *repo_name,
+got_fetch(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
+    struct got_pathlist_head *symrefs, const char *proto, const char *host,
+    const char *port, const char *server_path, const char *repo_name,
     const char *branch_filter, struct got_repository *repo)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
 	int status, done = 0;
-	struct got_object_id *packhash = NULL;
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
 	const char *repo_path = got_repo_get_path(repo);
-	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 	char *path;
 
-	TAILQ_INIT(&symrefs);
+	*pack_hash = NULL;
 
 	fetchfd = -1;
 
@@ -380,44 +379,21 @@ got_fetch(const char *proto, const char *host, const char *port,
 	}
 
 	while (!done) {
-		struct got_object_id *id;
-		char *refname;
+		struct got_object_id *id = NULL;
+		char *refname = NULL;
 
 		err = got_privsep_recv_fetch_progress(&done,
-		    &id, &refname, &symrefs, &ibuf);
+		    &id, &refname, symrefs, &ibuf);
 		if (err != NULL)
 			goto done;
-		if (done) {
-			packhash = got_object_id_dup(id);
-			if (packhash == NULL) {
-				err = got_error_from_errno(
-				    "got_object_id_dup");
-				goto done;
-			}
-			printf("symrefs:");
-			TAILQ_FOREACH(pe, &symrefs, entry) {
-				printf(" %s:%s", pe->path,
-				    (const char *)pe->data);
-			}
-			printf("\n");
-		} else if (refname && id) {
-			struct got_reference *ref;
-			char *id_str;
-			/* TODO Use a progress callback */
-			err = got_object_id_str(&id_str, id);
-			if (err)
-				goto done;
-			printf( "%.12s %s\n", id_str, refname);
-
-			err = got_ref_alloc(&ref, refname, id);
-			if (err)
-				goto done;
-
-			err = got_ref_write(ref, repo);
-			got_ref_close(ref);
+		if (done)
+			*pack_hash = id;
+		else if (refname && id) {
+			err = got_pathlist_append(refs, refname, id);
 			if (err)
 				goto done;
 		}
+		/* TODO remote status / download progress callback */
 	}
 	if (waitpid(pid, &status, 0) == -1) {
 		err = got_error_from_errno("waitpid");
@@ -441,7 +417,7 @@ got_fetch(const char *proto, const char *host, const char *port,
 	}
 	imsg_init(&ibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&ibuf, npackfd, packhash);
+	err = got_privsep_send_index_pack_req(&ibuf, npackfd, *pack_hash);
 	if (err != NULL)
 		goto done;
 	npackfd = -1;
@@ -462,7 +438,7 @@ got_fetch(const char *proto, const char *host, const char *port,
 		goto done;
 	}
 
-	err = got_object_id_str(&id_str, packhash);
+	err = got_object_id_str(&id_str, *pack_hash);
 	if (err)
 		goto done;
 	if (asprintf(&packpath, "%s/objects/pack/pack-%s.pack",
@@ -486,34 +462,6 @@ got_fetch(const char *proto, const char *host, const char *port,
 		goto done;
 	}
 
-	/* Set the HEAD reference if the server provided one. */
-	TAILQ_FOREACH(pe, &symrefs, entry) {
-		struct got_reference *symref, *target_ref;
-		const char *refname = pe->path;
-		const char *target = pe->data;
-
-		if (strcmp(refname, GOT_REF_HEAD) != 0)
-			continue;
-
-		err = got_ref_open(&target_ref, repo, target, 0);
-		if (err) {
-			if (err->code == GOT_ERR_NOT_REF)
-				continue;
-			goto done;
-		}
-
-		err = got_ref_alloc_symref(&symref, GOT_REF_HEAD, target_ref);
-		got_ref_close(target_ref);
-		if (err)
-			goto done;
-
-		err = got_ref_write(symref, repo);
-		got_ref_close(symref);
-		if (err)
-			goto done;
-		break;
-	}
-
 done:
 	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -527,12 +475,20 @@ done:
 	free(tmpidxpath);
 	free(idxpath);
 	free(packpath);
-	free(packhash);
-	TAILQ_FOREACH(pe, &symrefs, entry) {
-		free((void *)pe->path);
-		free(pe->data);
-	}
-	got_pathlist_free(&symrefs);
 
+	if (err) {
+		free(*pack_hash);
+		*pack_hash = NULL;
+		TAILQ_FOREACH(pe, refs, entry) {
+			free((void *)pe->path);
+			free(pe->data);
+		}
+		got_pathlist_free(refs);
+		TAILQ_FOREACH(pe, symrefs, entry) {
+			free((void *)pe->path);
+			free(pe->data);
+		}
+		got_pathlist_free(symrefs);
+	}
 	return err;
 }

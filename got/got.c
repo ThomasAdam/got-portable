@@ -974,10 +974,16 @@ cmd_clone(int argc, char *argv[])
 	const struct got_error *err = NULL;
 	const char *uri, *branch_filter, *dirname;
 	char *proto, *host, *port, *repo_name, *server_path;
-	char *default_destdir = NULL;
+	char *default_destdir = NULL, *id_str = NULL;
 	const char *repo_path;
 	struct got_repository *repo = NULL;
+	struct got_pathlist_head refs, symrefs;
+	struct got_pathlist_entry *pe;
+	struct got_object_id *pack_hash = NULL;
 	int ch;
+
+	TAILQ_INIT(&refs);
+	TAILQ_INIT(&symrefs);
 
 	while ((ch = getopt(argc, argv, "b:")) != -1) {
 		switch (ch) {
@@ -1025,11 +1031,84 @@ cmd_clone(int argc, char *argv[])
 	if (err)
 		goto done;
 
-	err = got_fetch(proto, host, port, server_path, repo_name,
-	    branch_filter, repo);
+	err = got_fetch(&pack_hash, &refs, &symrefs,
+	    proto, host, port, server_path, repo_name, branch_filter, repo);
+	if (err)
+		goto done;
+
+	err = got_object_id_str(&id_str, pack_hash);
+	if (err)
+		goto done;
+	printf("Fetched %s.pack\n", id_str);
+	free(id_str);
+
+	/* Set up references provided with the pack file. */
+	TAILQ_FOREACH(pe, &refs, entry) {
+		const char *refname = pe->path;
+		struct got_object_id *id = pe->data;
+		struct got_reference *ref;
+
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			goto done;
+
+		err = got_ref_alloc(&ref, refname, id);
+		if (err) {
+			free(id_str);
+			goto done;
+		}
+
+		printf("%s: %s\n", got_ref_get_name(ref), id_str);
+		free(id_str);
+		err = got_ref_write(ref, repo);
+		got_ref_close(ref);
+		if (err)
+			goto done;
+	}
+
+	/* Set the HEAD reference if the server provided one. */
+	TAILQ_FOREACH(pe, &symrefs, entry) {
+		struct got_reference *symref, *target_ref;
+		const char *refname = pe->path;
+		const char *target = pe->data;
+
+		if (strcmp(refname, GOT_REF_HEAD) != 0)
+			continue;
+
+		err = got_ref_open(&target_ref, repo, target, 0);
+		if (err) {
+			if (err->code == GOT_ERR_NOT_REF)
+				continue;
+			goto done;
+		}
+
+		err = got_ref_alloc_symref(&symref, GOT_REF_HEAD, target_ref);
+		got_ref_close(target_ref);
+		if (err)
+			goto done;
+
+		printf("Setting %s to %s\n", GOT_REF_HEAD,
+		    got_ref_get_symref_target(symref));
+
+		err = got_ref_write(symref, repo);
+		got_ref_close(symref);
+		break;
+	}
+
 done:
 	if (repo)
 		got_repo_close(repo);
+	TAILQ_FOREACH(pe, &refs, entry) {
+		free((void *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&refs);
+	TAILQ_FOREACH(pe, &symrefs, entry) {
+		free((void *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&symrefs);
+	free(pack_hash);
 	free(proto);
 	free(host);
 	free(port);
