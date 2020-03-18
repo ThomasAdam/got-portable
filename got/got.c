@@ -1092,6 +1092,8 @@ cmd_clone(int argc, char *argv[])
 			printf("Setting %s to %s\n", GOT_REF_HEAD,
 			    got_ref_get_symref_target(symref));
 		}
+		if (verbosity >= 0)
+			printf("Created cloned repository '%s'\n", repo_path);
 
 		error = got_ref_write(symref, repo);
 		got_ref_close(symref);
