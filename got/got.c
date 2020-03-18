@@ -1040,10 +1040,6 @@ cmd_clone(int argc, char *argv[])
 	if (err)
 		goto done;
 
-	err = got_fetch_connect(&fetchfd, proto, host, port, server_path);
-	if (err)
-		goto done;
-
 	if (dirname == NULL) {
 		if (asprintf(&default_destdir, "%s.git", repo_name) == -1) {
 			err = got_error_from_errno("asprintf");
@@ -1058,12 +1054,18 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	err = got_repo_init(repo_path);
-	if (err != NULL)
+	if (err)
 		goto done;
 
 	err = got_repo_open(&repo, repo_path, NULL);
 	if (err)
 		goto done;
+
+	err = got_fetch_connect(&fetchfd, proto, host, port, server_path);
+	if (err)
+		goto done;
+
+	printf("Connected to %s:%s\n", host, port);
 
 	err = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
 	    repo, fetch_progress, &did_something);
