@@ -281,9 +281,10 @@ got_tokenize_refline(char *line, char **sp, size_t nsp)
 	return i;
 }
 
-static int
+static const struct got_error *
 got_fetch_pack(int fd, int packfd, struct got_object_id *packid)
 {
+	const struct got_error *err = NULL;
 	char buf[GOT_PKTMAX], *sp[3];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
@@ -294,40 +295,55 @@ got_fetch_pack(int fd, int packfd, struct got_object_id *packid)
 	nref = 0;
 	refsz = 16;
 	have = malloc(refsz * sizeof(have[0]));
-	if(have == NULL)
-		err(1, "malloc packs");
+	if (have == NULL)
+		return got_error_from_errno("malloc");
 	want = malloc(refsz * sizeof(want[0]));
-	if(want == NULL)
-		err(1, "malloc packs");
-	if(chattygit)
+	if (want == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	if (chattygit)
 		fprintf(stderr, "starting fetch\n");
-	while(1){
+	while (1) {
 		n = readpkt(fd, buf, sizeof(buf));
-		if(n == -1){
-			err(1, "readpkt:");
-			return -1;
+		if (n == -1){
+			err = got_error_from_errno("readpkt:");
+			goto done;
 		}
-		if(n == 0)
+		if (n == 0)
 			break;
-		if(strncmp(buf, "ERR ", 4) == 0)
-			err(1, "%s", buf + 4);
-		if(got_tokenize_refline(buf, sp, 3) <= 2)
-			err(1, "malformed ref line");
-		if(strstr(sp[1], "^{}"))
+		if (strncmp(buf, "ERR ", 4) == 0) {
+			static char msg[1024];
+			strlcpy(msg, buf + 4, sizeof(msg));
+			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
+			goto done;
+		}
+		if (got_tokenize_refline(buf, sp, 3) <= 2) {
+			err = got_error(GOT_ERR_NOT_REF);
+			goto done;
+		}
+		if (strstr(sp[1], "^{}"))
 			continue;
-		if(fetchbranch && !got_match_branch(sp[1], fetchbranch))
+		if (fetchbranch && !got_match_branch(sp[1], fetchbranch))
 			continue;
-		if(refsz == nref + 1){
+		if (refsz == nref + 1){
 			refsz *= 2;
 			have = realloc(have, refsz * sizeof(have[0]));
-			if (have == NULL)
-				err(1, "realloc have");
+			if (have == NULL) {
+				err = got_error_from_errno("realloc");
+				goto done;
+			}
 			want = realloc(want, refsz * sizeof(want[0]));
-			if (want == NULL)
-				err(1, "realloc want");
+			if (want == NULL) {
+				err = got_error_from_errno("realloc");
+				goto done;
+			}
 		}
-		if(!got_parse_sha1_digest(want[nref].sha1, sp[0]))
-			errx(1, "invalid hash %s", sp[0]);
+		if (!got_parse_sha1_digest(want[nref].sha1, sp[0])) {
+			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
+			goto done;
+		}
+
 		if (got_resolve_remote_ref(&have[nref], sp[1]) == -1)
 			memset(&have[nref], 0, sizeof(have[nref]));
 		// TODO: send IMSG with progress.
@@ -337,59 +353,87 @@ got_fetch_pack(int fd, int packfd, struct got_object_id *packid)
 	}
 
 	req = 0;
-	for(i = 0; i < nref; i++){
+	for (i = 0; i < nref; i++){
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
 			continue;
 		if (got_has_object(&want[i]))
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "want %s\n", hashstr);
-		if (n >= sizeof(buf))
-			errx(1, "undersized buffer");
-		if(writepkt(fd, buf, n) == -1)
-			errx(1, "could not send want");
+		if (n >= sizeof(buf)) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+		if (writepkt(fd, buf, n) == -1) {
+			err = got_error_from_errno("writepkt");
+			goto done;
+		}
 		req = 1;
 	}
 	flushpkt(fd);
-	for(i = 0; i < nref; i++){
+	for (i = 0; i < nref; i++){
 		if (got_object_id_cmp(&have[i], &zhash) == 0)
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
-		if (n >= sizeof(buf))
-			errx(1, "undersized buffer");
-		if (writepkt(fd, buf, n + 1) == -1)
-			errx(1, "could not send have");
+		if (n >= sizeof(buf)) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+		if (writepkt(fd, buf, n + 1) == -1) {
+			err = got_error_from_errno("writepkt");
+			goto done;
+		}
 	}
-	if(!req){
+	if (!req){
 		fprintf(stderr, "up to date\n");
 		flushpkt(fd);
 	}
 	n = snprintf(buf, sizeof(buf), "done\n");
-	if(writepkt(fd, buf, n) == -1)
-		errx(1, "lost connection write");
-	if(!req)
+	if (writepkt(fd, buf, n) == -1) {
+		err = got_error_from_errno("writepkt");
+		goto done;
+	}
+	if (!req)
 		return 0;
 
-	if((n = readpkt(fd, buf, sizeof(buf))) == -1)
-		errx(1, "lost connection read");
+	if ((n = readpkt(fd, buf, sizeof(buf))) == -1) {
+		err = got_error_from_errno("readpkt");
+		goto done;
+	}
 	buf[n] = 0;
 
 	fprintf(stderr, "fetching...\n");
 	packsz = 0;
-	while(1){
+	while (1) {
+		ssize_t w;
 		n = readn(fd, buf, sizeof buf);
-		if(n == 0)
+		if (n == 0)
 			break;
-		if(n == -1 || write(packfd, buf, n) != n)
-			err(1, "could not fetch packfile:");
+		if (n == -1) {
+			err = got_error_from_errno("readn");
+			goto done;
+		}
+		w = write(packfd, buf, n);
+		if (w == -1) {
+			err = got_error_from_errno("write");
+			goto done;
+		}
+		if (w != n) {
+			err = got_error(GOT_ERR_IO);
+			goto done;
+		}
 		packsz += n;
 	}
-	if(lseek(packfd, 0, SEEK_SET) == -1)
-		err(1, "packfile seek:");
-	if(got_check_pack_hash(packfd, packsz, packid->sha1) == -1)
-		errx(1, "corrupt packfile");
-	close(packfd);
+	if (lseek(packfd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+	if (got_check_pack_hash(packfd, packsz, packid->sha1) == -1)
+		err = got_error(GOT_ERR_BAD_PACKFILE);
+done:
+	free(have);
+	free(want);
 	return 0;
 }
 
@@ -398,7 +442,7 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int fetchfd, packfd;
+	int fetchfd, packfd = -1;
 	struct got_object_id packid;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
@@ -443,12 +487,13 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	if (got_fetch_pack(fetchfd, packfd, &packid) == -1) {
-		err = got_error(GOT_ERR_FETCH_FAILED);
+	err = got_fetch_pack(fetchfd, packfd, &packid);
+	if (err)
 		goto done;
-	}
 done:
-	if(err != NULL)
+	if (packfd != -1 && close(packfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (err != NULL)
 		got_privsep_send_error(&ibuf, err);
 	else
 		err = got_privsep_send_fetch_done(&ibuf, packid);
