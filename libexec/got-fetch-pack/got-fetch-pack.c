@@ -793,7 +793,7 @@ main(int argc, char **argv)
 	}
 	if (imsg.hdr.type == GOT_IMSG_STOP)
 		goto done;
-	if (imsg.hdr.type != GOT_IMSG_TMPFD) {
+	if (imsg.hdr.type != GOT_IMSG_FETCH_OUTFD) {
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		goto done;
 	}

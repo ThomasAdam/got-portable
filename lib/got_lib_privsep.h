@@ -110,6 +110,7 @@ enum got_imsg_type {
 
 	/* Messages related to networking. */
 	GOT_IMSG_FETCH_REQUEST,
+	GOT_IMSG_FETCH_OUTFD,
 	GOT_IMSG_FETCH_SYMREFS,
 	GOT_IMSG_FETCH_REF,
 	GOT_IMSG_FETCH_SERVER_PROGRESS,
@@ -387,6 +388,7 @@ const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
     int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
     struct got_pathlist_head *);
+const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
     struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_ref(struct imsgbuf *,

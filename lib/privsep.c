@@ -477,6 +477,13 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 }
 
 const struct got_error *
+got_privsep_send_fetch_outfd(struct imsgbuf *ibuf, int fd)
+{
+	return send_fd(ibuf, GOT_IMSG_FETCH_OUTFD, fd);
+}
+
+
+const struct got_error *
 got_privsep_send_fetch_symrefs(struct imsgbuf *ibuf,
     struct got_pathlist_head *symrefs)
 {

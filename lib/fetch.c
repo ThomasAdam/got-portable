@@ -419,7 +419,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
-	err = got_privsep_send_tmpfd(&fetchibuf, npackfd);
+	err = got_privsep_send_fetch_outfd(&fetchibuf, npackfd);
 	if (err != NULL)
 		goto done;
 	npackfd = dup(packfd);
