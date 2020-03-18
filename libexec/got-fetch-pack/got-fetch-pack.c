@@ -221,6 +221,7 @@ got_check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 int
 got_has_object(struct got_object_id *obj)
 {
+	/* TODO */
 	return 0;
 }
 
