@@ -177,6 +177,8 @@ const struct got_error *got_packidx_match_id_str_prefix(
 
 const struct got_error *got_packfile_open_object(struct got_object **,
     struct got_pack *, struct got_packidx *, int, struct got_object_id *);
+const struct got_error *got_pack_get_delta_chain_max_size(uint64_t *,
+    struct got_delta_chain *, struct got_pack *);
 const struct got_error *got_pack_get_max_delta_object_size(uint64_t *,
     struct got_object *, struct got_pack *);
 const struct got_error *got_pack_dump_delta_chain_to_file(size_t *,

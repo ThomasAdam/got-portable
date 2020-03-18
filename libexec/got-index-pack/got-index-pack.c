@@ -52,6 +52,10 @@
 #include "got_lib_pack.h"
 #include "got_lib_delta_cache.h"
 
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
 struct got_indexed_object {
 	struct got_object_id id;
 
@@ -145,13 +149,13 @@ read_crc(uint32_t *crc, int fd, size_t len)
 }
 
 static const struct got_error *
-read_file_sha1(SHA1_CTX *ctx, FILE *f)
+read_file_sha1(SHA1_CTX *ctx, FILE *f, size_t len)
 {
 	uint8_t buf[8192];
-	size_t r;
+	size_t n, r;
 
-	for (;;) {
-		r = fread(buf, 1, sizeof(buf), f);
+	for (n = len; n > 0; n -= r) {
+		r = fread(buf, 1, n > sizeof(buf) ? sizeof(buf) : n, f);
 		if (r == 0) {
 			if (feof(f))
 				return NULL;
@@ -170,7 +174,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	const struct got_error *err = NULL;
 	SHA1_CTX ctx;
 	uint8_t *data = NULL;
-	size_t datalen;
+	size_t datalen = 0;
 	ssize_t n;
 	char *header;
 	size_t headerlen;
@@ -238,7 +242,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		headerlen = strlen(header) + 1;
 		SHA1Update(&ctx, header, headerlen);
 		if (obj->size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
-			err = read_file_sha1(&ctx, tmpfile);
+			err = read_file_sha1(&ctx, tmpfile, datalen);
 			if (err)
 				break;
 		} else
@@ -349,16 +353,18 @@ hwrite(int fd, void *buf, int len, SHA1_CTX *ctx)
 
 static const struct got_error *
 resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
-    struct got_indexed_object *obj)
+    struct got_indexed_object *obj, FILE *tmpfile, FILE *delta_base_file,
+    FILE *delta_accum_file)
 {
 	const struct got_error *err = NULL;
 	struct got_delta_chain deltas;
 	struct got_delta *delta;
 	uint8_t *buf = NULL;
-	size_t len;
+	size_t len = 0;
 	SHA1_CTX ctx;
 	char *header = NULL;
 	size_t headerlen;
+	uint64_t max_size;
 	int base_obj_type;
 	const char *obj_label;
 
@@ -371,12 +377,23 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 	if (err)
 		goto done;
 
-	/* XXX TODO reading large objects into memory is bad! */
-	err = got_pack_dump_delta_chain_to_mem(&buf, &len, &deltas, pack);
+	err = got_pack_get_delta_chain_max_size(&max_size, &deltas, pack);
 	if (err)
 		goto done;
-
-	SHA1Init(&ctx);
+	if (max_size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+		rewind(tmpfile);
+		rewind(delta_base_file);
+		rewind(delta_accum_file);
+		err = got_pack_dump_delta_chain_to_file(&len, &deltas,
+		    pack, tmpfile, delta_base_file, delta_accum_file);
+		if (err)
+			goto done;
+	} else {
+		err = got_pack_dump_delta_chain_to_mem(&buf, &len,
+		    &deltas, pack);
+	}
+	if (err)
+		goto done;
 
 	err = got_delta_chain_get_base_type(&base_obj_type, &deltas);
 	if (err)
@@ -389,8 +406,14 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 		goto done;
 	}
 	headerlen = strlen(header) + 1;
+	SHA1Init(&ctx);
 	SHA1Update(&ctx, header, headerlen);
-	SHA1Update(&ctx, buf, len);
+	if (max_size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
+		err = read_file_sha1(&ctx, tmpfile, len);
+		if (err)
+			goto done;
+	} else
+		SHA1Update(&ctx, buf, len);
 	SHA1Final(obj->id.sha1, &ctx);
 done:
 	free(buf);
@@ -550,7 +573,8 @@ update_packidx(struct got_packidx *packidx, int nobj,
 
 static const struct got_error *
 index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
-    uint8_t *pack_hash, struct imsgbuf *ibuf)
+    FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_hash,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
 	struct got_packfile_hdr hdr;
@@ -748,7 +772,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 				goto done;
 			}
 
-			err = resolve_deltified_object(pack, &packidx, obj);
+			err = resolve_deltified_object(pack, &packidx, obj,
+			    tmpfile, delta_base_file, delta_accum_file);
 			if (err) {
 				if (err->code != GOT_ERR_NO_OBJ)
 					goto done;
@@ -862,8 +887,8 @@ main(int argc, char **argv)
 	const struct got_error *err = NULL, *close_err;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
-	int idxfd = -1, tmpfd = -1;
-	FILE *tmpfile = NULL;
+	int idxfd = -1, tmpfd = -1, i;
+	FILE *tmpfiles[3];
 	struct got_pack pack;
 	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
 	off_t packfile_size;
@@ -872,6 +897,9 @@ main(int argc, char **argv)
 	while (!attached)
 		sleep(1);
 #endif
+
+	for (i = 0; i < nitems(tmpfiles); i++)
+		tmpfiles[i] = NULL;
 
 	memset(&pack, 0, sizeof(pack));
 	pack.fd = -1;
@@ -922,26 +950,28 @@ main(int argc, char **argv)
 	}
 	idxfd = imsg.fd;
 
-	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
-	if (err)
-		goto done;
-	if (imsg.hdr.type == GOT_IMSG_STOP)
-		goto done;
-	if (imsg.hdr.type != GOT_IMSG_TMPFD) {
-		err = got_error(GOT_ERR_PRIVSEP_MSG);
-		goto done;
+	for (i = 0; i < nitems(tmpfiles); i++) {
+		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+		if (err)
+			goto done;
+		if (imsg.hdr.type == GOT_IMSG_STOP)
+			goto done;
+		if (imsg.hdr.type != GOT_IMSG_TMPFD) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			goto done;
+		}
+		if (imsg.hdr.len - IMSG_HEADER_SIZE != 0) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		tmpfd = imsg.fd;
+		tmpfiles[i] = fdopen(tmpfd, "w+");
+		if (tmpfiles[i] == NULL) {
+			err = got_error_from_errno("fdopen");
+			goto done;
+		}
+		tmpfd = -1;
 	}
-	if (imsg.hdr.len - IMSG_HEADER_SIZE != 0) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-	tmpfd = imsg.fd;
-	tmpfile = fdopen(tmpfd, "w+");
-	if (tmpfile == NULL) {
-		err = got_error_from_errno("fdopen");
-		goto done;
-	}
-	tmpfd = -1;
 
 	if (lseek(pack.fd, 0, SEEK_END) == -1) {
 		err = got_error_from_errno("lseek");
@@ -965,7 +995,8 @@ main(int argc, char **argv)
 	if (pack.map == MAP_FAILED)
 		pack.map = NULL; /* fall back to read(2) */
 #endif
-	err = index_pack(&pack, idxfd, tmpfile, pack_hash, &ibuf);
+	err = index_pack(&pack, idxfd, tmpfiles[0], tmpfiles[1], tmpfiles[2],
+	    pack_hash, &ibuf);
 done:
 	close_err = got_pack_close(&pack);
 	if (close_err && err == NULL)
@@ -974,6 +1005,11 @@ done:
 		err = got_error_from_errno("close");
 	if (tmpfd != -1 && close(tmpfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	for (i = 0; i < nitems(tmpfiles); i++) {
+		if (tmpfiles[i] != NULL && fclose(tmpfiles[i]) == EOF &&
+		    err == NULL)
+			err = got_error_from_errno("close");
+	}
 
 	if (err == NULL)
 		err = got_privsep_send_index_pack_done(&ibuf);
