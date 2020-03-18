@@ -163,7 +163,7 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 	uint8_t hexpect[SHA1_DIGEST_LENGTH];
 	char s1[SHA1_DIGEST_STRING_LENGTH + 1];
 	char s2[SHA1_DIGEST_STRING_LENGTH + 1];
-	uint8_t buf[32*1024];
+	uint8_t buf[32 * 1024];
 	ssize_t n, r, nr;
 
 	if (sz < sizeof(struct got_packfile_hdr) + SHA1_DIGEST_LENGTH)
