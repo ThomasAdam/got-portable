@@ -723,7 +723,8 @@ read_delta_data(uint8_t **delta_buf, size_t *delta_len,
 	} else {
 		if (lseek(pack->fd, delta_data_offset, SEEK_SET) == -1)
 			return got_error_from_errno("lseek");
-		err = got_inflate_to_mem_fd(delta_buf, delta_len, pack->fd);
+		err = got_inflate_to_mem_fd(delta_buf, delta_len, NULL,
+		    pack->fd);
 	}
 	return err;
 }
@@ -823,6 +824,10 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 		delta_data_offset = lseek(pack->fd, 0, SEEK_CUR);
 		if (delta_data_offset == -1)
 			return got_error_from_errno("lseek");
+		err = got_inflate_to_mem_fd(&delta_buf, &delta_len, NULL,
+		    pack->fd);
+		if (err)
+			return err;
 	}
 
 	err = add_delta(deltas, delta_offset, tslen, delta_type, delta_size,
@@ -1102,7 +1107,7 @@ dump_delta_chain_to_file(size_t *result_size, struct got_delta_chain *deltas,
 					    pack->filesize - mapoff);
 				} else
 					err = got_inflate_to_mem_fd(&base_buf,
-					    &base_bufsz, pack->fd);
+					    &base_bufsz, NULL, pack->fd);
 			}
 			if (err)
 				goto done;
@@ -1249,7 +1254,7 @@ dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 					goto done;
 				}
 				err = got_inflate_to_mem_fd(&base_buf,
-				    &base_bufsz, pack->fd);
+				    &base_bufsz, NULL, pack->fd);
 			}
 			if (err)
 				goto done;
@@ -1369,7 +1374,7 @@ got_packfile_extract_object_to_mem(uint8_t **buf, size_t *len,
 		} else {
 			if (lseek(pack->fd, obj->pack_offset, SEEK_SET) == -1)
 				return got_error_from_errno("lseek");
-			err = got_inflate_to_mem_fd(buf, len, pack->fd);
+			err = got_inflate_to_mem_fd(buf, len, NULL, pack->fd);
 		}
 	} else
 		err = dump_delta_chain_to_mem(buf, len, &obj->deltas, pack);

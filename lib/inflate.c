@@ -126,9 +126,11 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
 }
 
 const struct got_error *
-got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp)
+got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
+    size_t *consumed)
 {
 	size_t last_total_out = zb->z.total_out;
+	size_t last_total_in = zb->z.total_in;
 	z_stream *z = &zb->z;
 	int ret = Z_ERRNO;
 
@@ -136,6 +138,8 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp)
 	z->avail_out = zb->outlen;
 
 	*outlenp = 0;
+	if (consumed)
+		*consumed = 0;
 	do {
 		if (z->avail_in == 0) {
 			ssize_t n = read(fd, zb->inbuf, zb->inlen);
@@ -161,6 +165,8 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp)
 	}
 
 	*outlenp = z->total_out - last_total_out;
+	if (consumed)
+		*consumed += z->total_in - last_total_in;
 	return NULL;
 }
 
@@ -264,10 +270,11 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
+got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
+    size_t *consumed_total, int infd)
 {
 	const struct got_error *err;
-	size_t avail;
+	size_t avail, consumed;
 	struct got_inflate_buf zb;
 	void *newbuf;
 	int nbuf = 1;
@@ -280,12 +287,16 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen, int infd)
 		goto done;
 
 	*outlen = 0;
+	if (consumed_total)
+		*consumed_total = 0;
 
 	do {
-		err = got_inflate_read_fd(&zb, infd, &avail);
+		err = got_inflate_read_fd(&zb, infd, &avail, &consumed);
 		if (err)
 			goto done;
 		*outlen += avail;
+		if (consumed_total)
+			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			    GOT_INFLATE_BUFSIZE);
@@ -445,7 +456,7 @@ got_inflate_to_file_fd(size_t *outlen, int infd, FILE *outfile)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read_fd(&zb, infd, &avail);
+		err = got_inflate_read_fd(&zb, infd, &avail, NULL);
 		if (err)
 			goto done;
 		if (avail > 0) {

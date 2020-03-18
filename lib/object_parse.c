@@ -227,7 +227,7 @@ got_object_read_header(struct got_object **obj, int fd)
 
 	totlen = 0;
 	do {
-		err = got_inflate_read_fd(&zb, fd, &outlen);
+		err = got_inflate_read_fd(&zb, fd, &outlen, NULL);
 		if (err)
 			goto done;
 		if (outlen == 0)
