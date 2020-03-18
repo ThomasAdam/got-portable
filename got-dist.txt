@@ -72,6 +72,7 @@
 /include/got_commit_graph.h
 /include/got_diff.h
 /include/got_error.h
+/include/got_fetch.h
 /include/got_object.h
 /include/got_opentemp.h
 /include/got_path.h
@@ -93,6 +94,7 @@
 /lib/diff3.c
 /lib/diffreg.c
 /lib/error.c
+/lib/fetch.c
 /lib/fileindex.c
 /lib/gitconfig.c
 /lib/got_lib_deflate.h
@@ -135,6 +137,12 @@
 /libexec
 /libexec/Makefile
 /libexec/Makefile.inc
+/libexec/got-fetch-pack
+/libexec/got-fetch-pack/Makefile
+/libexec/got-fetch-pack/got-fetch-pack.c
+/libexec/got-index-pack
+/libexec/got-index-pack/Makefile
+/libexec/got-index-pack/got-index-pack.c
 /libexec/got-read-blob
 /libexec/got-read-blob/Makefile
 /libexec/got-read-blob/got-read-blob.c
@@ -187,6 +195,9 @@
 /regress/delta
 /regress/delta/Makefile
 /regress/delta/delta_test.c
+/regress/fetch
+/regress/fetch/Makefile
+/regress/fetch/fetch_test.c
 /regress/idset
 /regress/idset/Makefile
 /regress/idset/idset_test.c
