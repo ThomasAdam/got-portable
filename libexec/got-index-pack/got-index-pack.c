@@ -788,6 +788,11 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		goto done;
 	}
 
+	err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
+	    nloose, nresolved);
+	if (err)
+		goto done;
+
 	make_packidx(&packidx, nobj, objects);
 
 	SHA1Init(&ctx);
