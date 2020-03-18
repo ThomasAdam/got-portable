@@ -295,9 +295,7 @@ struct got_capability {
 	const char *value;
 };
 static const struct got_capability got_capabilities[] = {
-#if 0 /* got-index-pack is not ready for this */
 	{ "ofs-delta", NULL },
-#endif
 	{ "agent", "got/" GOT_VERSION_STR },
 };
 
