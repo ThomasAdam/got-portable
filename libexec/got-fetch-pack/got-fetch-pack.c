@@ -156,7 +156,7 @@ match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
 }
 
 static int
-got_check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
+check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 {
 	SHA1_CTX ctx;
 	uint8_t hexpect[SHA1_DIGEST_LENGTH];
@@ -201,7 +201,7 @@ got_has_object(struct got_object_id *obj)
 }
 
 static int
-got_match_branch(char *br, char *pat)
+match_branch(char *br, char *pat)
 {
 	char name[128];
 
@@ -221,7 +221,7 @@ got_match_branch(char *br, char *pat)
 }
 
 static const struct got_error *
-got_tokenize_refline(char **tokens, char *line, int len)
+tokenize_refline(char **tokens, char *line, int len)
 {
 	const struct got_error *err = NULL;
 	char *p;
@@ -420,7 +420,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
 			goto done;
 		}
-		err = got_tokenize_refline(sp, buf, n);
+		err = tokenize_refline(sp, buf, n);
 		if (err)
 			goto done;
 		if (chattygit && sp[2][0] != '\0')
@@ -440,7 +440,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		is_firstpkt = 0;
 		if (strstr(sp[1], "^{}"))
 			continue;
-		if (fetchbranch && !got_match_branch(sp[1], fetchbranch))
+		if (fetchbranch && !match_branch(sp[1], fetchbranch))
 			continue;
 		if (refsz == nref + 1) {
 			refsz *= 2;
@@ -552,7 +552,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
-	if (got_check_pack_hash(packfd, packsz, packid->sha1) == -1)
+	if (check_pack_hash(packfd, packsz, packid->sha1) == -1)
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 done:
 	TAILQ_FOREACH(pe, &symrefs, entry) {
