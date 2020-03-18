@@ -37,6 +37,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_version.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
@@ -44,6 +45,10 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+
+#ifndef nitems
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
 
 #define GOT_PKTMAX	65536
 
@@ -307,6 +312,70 @@ done:
 	return err;
 }
 
+struct got_capability {
+	const char *key;
+	const char *value;
+};
+static const struct got_capability got_capabilities[] = {
+#if 0 /* got-index-pack is not ready for this */
+	{ "ofs-delta", NULL },
+#endif
+	{ "agent", "got/" GOT_VERSION_STR },
+};
+
+static const struct got_error *
+match_capability(char **my_capabilities, const char *capa,
+    const struct got_capability *mycapa)
+{
+	char *equalsign;
+	char *s;
+
+	equalsign = strchr(capa, '=');
+	if (equalsign) {
+		if (strncmp(capa, mycapa->key, equalsign - capa) != 0)
+			return NULL;
+	} else {
+		if (strcmp(capa, mycapa->key) != 0)
+			return NULL;
+	}
+
+	if (asprintf(&s, "%s%s%s%s%s",
+	    *my_capabilities != NULL ? *my_capabilities : "",
+	    *my_capabilities != NULL ? " " : "",
+	    mycapa->key,
+	    mycapa->value != NULL ? "=" : "",
+	    mycapa->value != NULL? mycapa->value : "") == -1)
+		return got_error_from_errno("asprintf");
+
+	free(*my_capabilities);
+	*my_capabilities = s;
+	return NULL;
+}
+
+static const struct got_error *
+match_capabilities(char **my_capabilities, char *server_capabilities)
+{
+	const struct got_error *err = NULL;
+	char *capa;
+	int i;
+
+	*my_capabilities = NULL;
+	do {
+		capa = strsep(&server_capabilities, " ");
+		if (capa == NULL)
+			return NULL;
+
+		for (i = 0; i < nitems(got_capabilities); i++) {
+			err = match_capability(my_capabilities,
+			    capa, &got_capabilities[i]);
+			if (err)
+				break;
+		}
+	} while (capa);
+
+	return err;
+}
+			
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct imsgbuf *ibuf)
@@ -315,12 +384,11 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	char buf[GOT_PKTMAX], *sp[3];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
-	int nref, refsz;
+	int is_firstpkt = 1, nref = 0, refsz = 16;
 	int i, n, req;
 	off_t packsz;
+	char *my_capabilities = NULL;
 
-	nref = 0;
-	refsz = 16;
 	have = malloc(refsz * sizeof(have[0]));
 	if (have == NULL)
 		return got_error_from_errno("malloc");
@@ -349,7 +417,16 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (err)
 			goto done;
 		if (chattygit && sp[2][0] != '\0')
-			fprintf(stderr, "server capabilites: %s\n", sp[2]);
+			fprintf(stderr, "server capabilities: %s\n", sp[2]);
+		if (is_firstpkt) {
+			err = match_capabilities(&my_capabilities, sp[2]);
+			if (err)
+				goto done;
+			if (chattygit && my_capabilities)
+				fprintf(stderr, "my matched capabilities: %s\n",
+				    my_capabilities);
+		}
+		is_firstpkt = 0;
 		if (strstr(sp[1], "^{}"))
 			continue;
 		if (fetchbranch && !got_match_branch(sp[1], fetchbranch))
@@ -389,7 +466,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (got_has_object(&want[i]))
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
-		n = snprintf(buf, sizeof(buf), "want %s\n", hashstr);
+		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
+		   i == 0 && my_capabilities ? my_capabilities : "");
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
