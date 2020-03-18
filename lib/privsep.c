@@ -437,11 +437,14 @@ got_privsep_wait_fetch_done(struct imsgbuf *ibuf, struct got_object_id *hash)
 	if (err)
 		return err;
 	if (imsg.hdr.type == GOT_IMSG_FETCH_DONE &&
-	    imsg.hdr.len - sizeof(imsg.hdr) == SHA1_DIGEST_LENGTH)
+	    imsg.hdr.len - sizeof(imsg.hdr) == SHA1_DIGEST_LENGTH) {
+		memcpy(hash->sha1, imsg.data, SHA1_DIGEST_LENGTH);
+		imsg_free(&imsg);
 		return NULL;
-	else
-		return got_error(GOT_ERR_PRIVSEP_MSG);
+	}
+
 	imsg_free(&imsg);
+	return got_error(GOT_ERR_PRIVSEP_MSG);
 }
 
 

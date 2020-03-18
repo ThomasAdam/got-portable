@@ -258,7 +258,8 @@ got_clone(char *uri, char *branch_filter, char *destdir)
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
-	char *packpath = NULL, *idxpath = NULL, *default_destdir = NULL;
+	char *tmppackpath = NULL, *tmpidxpath = NULL, *default_destdir = NULL;
+	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
 
 	fetchfd = -1;
 	if (got_parse_uri(uri, proto, host, port, path, repo) == -1)
@@ -272,17 +273,17 @@ got_clone(char *uri, char *branch_filter, char *destdir)
 		return err;
 	if (chdir(destdir ? destdir : default_destdir))
 		return got_error_from_errno("enter new repo");
-	if (mkpath(".git/objects/pack") == -1)
+	if (mkpath("objects/pack") == -1)
 		return got_error_from_errno("mkpath");
-	err = got_opentemp_named_fd(&packpath, &packfd,
-	    ".git/objects/pack/fetching.pack");
+	err = got_opentemp_named_fd(&tmppackpath, &packfd,
+	    "objects/pack/fetching.pack");
 	if (err)
 		return err;
 	npackfd = dup(packfd);
 	if (npackfd == -1)
 		return got_error_from_errno("dup");
-	err = got_opentemp_named_fd(&idxpath, &idxfd,
-	    ".git/objects/pack/fetching.idx");
+	err = got_opentemp_named_fd(&tmpidxpath, &idxfd,
+	    "objects/pack/fetching.idx");
 	if (err)
 		return err;
 	nidxfd = dup(idxfd);
@@ -354,11 +355,25 @@ got_clone(char *uri, char *branch_filter, char *destdir)
 	if (waitpid(pid, &status, 0) == -1)
 		return got_error_from_errno("child exit");
 
+	err = got_object_id_str(&id_str, &packhash);
+	if (err)
+		return err;
+	if (asprintf(&packpath, "objects/pack/pack-%s.pack", id_str) == -1)
+		return got_error_from_errno("asprintf");
 
-	free(packpath);
+	if (asprintf(&idxpath, "objects/pack/pack-%s.idx", id_str) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (rename(tmppackpath, packpath) == -1)
+		return got_error_from_errno3("rename", tmppackpath, packpath);
+	if (rename(tmpidxpath, idxpath) == -1)
+		return got_error_from_errno3("rename", tmpidxpath, idxpath);
+
+	free(tmppackpath);
+	free(tmpidxpath);
 	free(idxpath);
+	free(packpath);
 	free(default_destdir);
 
 	return NULL;
-
 }
