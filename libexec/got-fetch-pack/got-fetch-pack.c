@@ -262,23 +262,49 @@ got_match_branch(char *br, char *pat)
 	return strcmp(br, name) == 0;
 }
 
-static int
-got_tokenize_refline(char *line, char **sp, size_t nsp)
+static const struct got_error *
+got_tokenize_refline(char **tokens, char *line, int len)
 {
+	const struct got_error *err = NULL;
 	char *p;
-	size_t i, j;
+	size_t i, n = 0;
+	const int maxtokens = 3;
 
-	for (i = 0; i < nsp; i++) {
-		while (isspace(*line))
+	for (i = 0; i < maxtokens; i++)
+		tokens[i] = NULL;
+
+	for (i = 0; n < len && i < maxtokens; i++) {
+		while (isspace(*line)) {
 			line++;
+			n++;
+		}
 		p = line;
-		while (*line != '\0' && (!isspace(*line) || i == nsp - 1))
+		while (*line != '\0' &&
+		    (!isspace(*line) || i == maxtokens - 1)) {
 			line++;
-		sp[i] = strndup(p, line - p);
+			n++;
+		}
+		tokens[i] = strndup(p, line - p);
+		if (tokens[i] == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		/* Skip \0 field-delimiter at end of token. */
+		while (line[0] == '\0' && n < len) {
+			line++;
+			n++;
+		}
 	}
-	for (j = i; j < nsp; j++)
-		sp[j] = NULL;
-	return i;
+	if (i <= 2)
+		err = got_error(GOT_ERR_NOT_REF);
+done:
+	if (err) {
+		int j;
+		for (j = 0; j < i; j++)
+			free(tokens[j]);
+			tokens[j] = NULL;
+	}
+	return err;
 }
 
 static const struct got_error *
@@ -319,10 +345,11 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
 			goto done;
 		}
-		if (got_tokenize_refline(buf, sp, 3) <= 2) {
-			err = got_error(GOT_ERR_NOT_REF);
+		err = got_tokenize_refline(sp, buf, n);
+		if (err)
 			goto done;
-		}
+		if (chattygit && sp[2][0] != '\0')
+			fprintf(stderr, "server capabilites: %s\n", sp[2]);
 		if (strstr(sp[1], "^{}"))
 			continue;
 		if (fetchbranch && !got_match_branch(sp[1], fetchbranch))
