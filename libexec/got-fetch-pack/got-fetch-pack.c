@@ -317,7 +317,7 @@ match_capability(char **my_capabilities, const char *capa,
 }
 
 static const struct got_error *
-add_symref(struct got_pathlist_head *symrefs, const char *capa)
+add_symref(struct got_pathlist_head *symrefs, char *capa)
 {
 	const struct got_error *err = NULL;
 	char *colon, *name = NULL, *target = NULL;
