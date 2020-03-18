@@ -503,9 +503,16 @@ got_privsep_recv_fetch_progress(struct got_object_id **refid,
 		}
 		break;
 	default:
-		return got_error(GOT_ERR_PRIVSEP_MSG);
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
 	}
 
+	if (err) {
+		free(*refid);
+		*refid = NULL;
+		free(*refname);
+		*refname = NULL;
+	}
 	imsg_free(&imsg);
 	return err;
 }
