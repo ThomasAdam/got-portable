@@ -248,7 +248,7 @@ got_parse_uri(char *uri, char *proto, char *host, char *port, char *path, char *
 }
 
 const struct got_error*
-got_clone(char *uri, char *branch_filter, char *dirname)
+got_clone(char *uri, char *branch_filter, char *destdir)
 {
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
 	char repo[GOT_REPOMAX], path[GOT_PATHMAX];
@@ -258,17 +258,19 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
-	char *packpath = NULL, *idxpath = NULL;
+	char *packpath = NULL, *idxpath = NULL, *default_destdir = NULL;
 
 	fetchfd = -1;
 	if (got_parse_uri(uri, proto, host, port, path, repo) == -1)
 		return got_error(GOT_ERR_PARSE_URI);
-	if (dirname == NULL)
-		dirname = repo;
-	err = got_repo_init(dirname);
+	if (destdir == NULL) {
+		if (asprintf(&default_destdir, "%s.git", repo) == -1)
+			return got_error_from_errno("asprintf");
+	}
+	err = got_repo_init(destdir ? destdir : default_destdir);
 	if (err != NULL)
 		return err;
-	if (chdir(dirname))
+	if (chdir(destdir ? destdir : default_destdir))
 		return got_error_from_errno("enter new repo");
 	if (mkpath(".git/objects/pack") == -1)
 		return got_error_from_errno("mkpath");
@@ -355,6 +357,7 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 
 	free(packpath);
 	free(idxpath);
+	free(default_destdir);
 
 	return NULL;
 
