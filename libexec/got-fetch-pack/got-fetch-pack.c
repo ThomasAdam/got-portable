@@ -308,7 +308,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	while (1) {
 		n = readpkt(fd, buf, sizeof(buf));
 		if (n == -1){
-			err = got_error_from_errno("readpkt:");
+			err = got_error_from_errno("readpkt");
 			goto done;
 		}
 		if (n == 0)
