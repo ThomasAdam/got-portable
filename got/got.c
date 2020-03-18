@@ -49,7 +49,7 @@
 #include "got_worktree.h"
 #include "got_diff.h"
 #include "got_commit_graph.h"
-#include "got_lib_fetch.h"
+#include "got_fetch.h"
 #include "got_blame.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
