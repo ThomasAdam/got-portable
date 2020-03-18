@@ -705,8 +705,6 @@ main(int argc, char **argv)
 	packfd = imsg.fd;
 
 	err = fetch_pack(fetchfd, packfd, &packid, &have_refs, &ibuf);
-	if (err)
-		goto done;
 done:
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
