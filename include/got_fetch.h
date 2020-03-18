@@ -40,7 +40,7 @@ const struct got_error *got_fetch_connect(int *, const char *, const char *,
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_fetch_progress_cb)(void *,
-    const char *, off_t, int, int);
+    const char *, off_t, int, int, int, int);
 
 /*
  * Attempt to fetch a packfile from a server. This pack file will contain

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 Ori Bernstein <ori@openbsd.org>
+ * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,145 +48,40 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_privsep.h"
+#include "got_lib_pack.h"
+#include "got_lib_delta_cache.h"
 
-typedef struct Cinfo	Cinfo;
-typedef struct Tinfo	Tinfo;
-typedef struct Object	Object;
-typedef struct Pack	Pack;
-typedef struct Buf	Buf;
-typedef struct Dirent	Dirent;
-typedef struct Idxent	Idxent;
-typedef struct Ols	Ols;
+struct got_indexed_object {
+	struct got_object_id id;
 
-enum {
-	/* 5k objects should be enough */
-	Cachemax	= 5*1024,
-	Pathmax		= 512,
-	Hashsz		= 20,
-	Pktmax		= 65536,
+	/*
+	 * Has this object been fully resolved?
+	 * If so, we know its ID, otherwise we don't and 'id' is invalid.
+	 */
+	int valid;
 
-	Nproto	= 16,
-	Nport	= 16,
-	Nhost	= 256,
-	Npath	= 128,
-	Nrepo	= 64,
-	Nbranch	= 32,
+	/* Offset of type+size field for this object in pack file. */
+	off_t off;
+
+	/* Type+size values parsed from pack file. */
+	uint8_t type;
+	uint64_t size;
+
+	/* Length of on-disk type+size data. */
+	size_t tslen; 
+
+	/* Length of object data following type+size. */
+	size_t len; 
+
+	uint32_t crc;
+
+	/* For ref deltas. */
+	struct got_object_id ref_id;
+
+	/* For offset deltas. */
+	off_t base_offset;
+	size_t base_offsetlen;
 };
-
-typedef enum Type {
-	GNone	= 0,
-	GCommit	= 1,
-	GTree	= 2,
-	GBlob	= 3,
-	GTag	= 4,
-	GOdelta	= 6,
-	GRdelta	= 7,
-} Type;
-
-enum {
-	Cloaded	= 1 << 0,
-	Cidx	= 1 << 1,
-	Ccache	= 1 << 2,
-	Cexist	= 1 << 3,
-	Cparsed	= 1 << 5,
-};
-
-struct Dirent {
-	char *name;
-	int modref;
-	int mode;
-	struct got_object_id h;
-};
-
-struct Object {
-	/* Git data */
-	struct got_object_id	hash;
-	Type	type;
-
-	/* Cache */
-	int	id;
-	int	flag;
-	int	refs;
-	Object	*next;
-	Object	*prev;
-
-	/* For indexing */
-	off_t	off;
-	off_t	len;
-	uint32_t	crc;
-
-	/* Everything below here gets cleared */
-	char	*all;
-	char	*data;
-	/* size excludes header */
-	off_t	size;
-
-	union {
-		Cinfo *commit;
-		Tinfo *tree;
-	};
-};
-
-struct Tinfo {
-	/* Tree */
-	Dirent	*ent;
-	int	nent;
-};
-
-struct Cinfo {
-	/* Commit */
-	struct got_object_id	*parent;
-	int	nparent;
-	struct got_object_id	tree;
-	char	*author;
-	char	*committer;
-	char	*msg;
-	int	nmsg;
-	off_t	ctime;
-	off_t	mtime;
-};
-
-typedef struct Buf Buf;
-
-struct Buf {
-	int len;
-	int sz;
-	char *data;
-};
-
-static int	readpacked(FILE *, Object *, int);
-static Object	*readidxobject(FILE *, struct got_object_id, int);
-
-struct got_object_idset *objcache;
-int	next_object_id;
-Object *lruhead;
-Object *lrutail;
-int	ncache;
-
-#define GETBE16(b)\
-		((((b)[0] & 0xFFul) <<  8) | \
-		 (((b)[1] & 0xFFul) <<  0))
-
-#define GETBE32(b)\
-		((((b)[0] & 0xFFul) << 24) | \
-		 (((b)[1] & 0xFFul) << 16) | \
-		 (((b)[2] & 0xFFul) <<  8) | \
-		 (((b)[3] & 0xFFul) <<  0))
-#define GETBE64(b)\
-		((((b)[0] & 0xFFull) << 56) | \
-		 (((b)[1] & 0xFFull) << 48) | \
-		 (((b)[2] & 0xFFull) << 40) | \
-		 (((b)[3] & 0xFFull) << 32) | \
-		 (((b)[4] & 0xFFull) << 24) | \
-		 (((b)[5] & 0xFFull) << 16) | \
-		 (((b)[6] & 0xFFull) <<  8) | \
-		 (((b)[7] & 0xFFull) <<  0))
-
-#define PUTBE16(b, n)\
-	do{ \
-		(b)[0] = (n) >> 8; \
-		(b)[1] = (n) >> 0; \
-	} while(0)
 
 #define PUTBE32(b, n)\
 	do{ \
@@ -207,1039 +103,629 @@ int	ncache;
 		(b)[7] = (n) >> 0; \
 	} while(0)
 
-static int
-charval(int c, int *err)
+static const struct got_error *
+get_obj_type_label(const char **label, int obj_type)
 {
-	if(c >= '0' && c <= '9')
-		return c - '0';
-	if(c >= 'a' && c <= 'f')
-		return c - 'a' + 10;
-	if(c >= 'A' && c <= 'F')
-		return c - 'A' + 10;
-	*err = 1;
-	return -1;
-}
+	const struct got_error *err = NULL;
 
-static int
-hparse(struct got_object_id *h, char *b)
-{
-	int i, err;
-
-	err = 0;
-	for(i = 0; i < sizeof(h->sha1); i++){
-		err = 0;
-		h->sha1[i] = 0;
-		h->sha1[i] |= ((charval(b[2*i], &err) & 0xf) << 4);
-		h->sha1[i] |= ((charval(b[2*i+1], &err)& 0xf) << 0);
-		if(err)
-			return -1;
-	}
-	return 0;
-}
-
-static void *
-emalloc(size_t n)
-{
-	void *v;
-
-	v = calloc(n, 1);
-	if(v == NULL)
-		err(1, "malloc:");
-	return v;
-}
-
-static void *
-erealloc(void *p, ulong n)
-{
-	void *v;
-
-	v = realloc(p, n);
-	if(v == NULL)
-		err(1, "realloc:");
-	memset(v, 0, n);
-	return v;
-}
-
-static int
-hasheq(struct got_object_id *a, struct got_object_id *b)
-{
-	return memcmp(a->sha1, b->sha1, sizeof(a->sha1)) == 0;
-}
-
-static char *
-typestr(int t)
-{
-	char *types[] = {
-		"???",
-		"commit",
-		"tree",
-		"blob",
-		"tag",
-		"odelta",
-		"rdelta",
-	};
-	if (t < 0 || t >= sizeof(types)/sizeof(types[0]))
-		abort();
-	return types[t];
-}
-
-static char *
-hashfmt(char *out, size_t nout, struct got_object_id *h)
-{
-	int i, n, c0, c1;
-	char *p;
-
-	if (nout < 2*sizeof(h->sha1) + 1)
-		return NULL;
-	p = out;
-	for(i = 0; i < sizeof(h->sha1); i++){
-		n = (h->sha1[i] >> 4) & 0xf;
-		c0 = (n >= 10) ? n-10 + 'a' : n + '0';
-		n = h->sha1[i] & 0xf;
-		c1 = (n >= 10) ? n-10 + 'a' : n + '0';
-		*p++ = c0;
-		*p++ = c1;
-	}
-	*p++ = 0;
-	return out;
-}
-
-static void
-clear(Object *o)
-{
-	if(!o)
-		return;
-
-	assert(o->refs == 0);
-	assert((o->flag & Ccache) == 0);
-	assert(o->flag & Cloaded);
-	switch(o->type){
-	case GCommit:
-		if(!o->commit)
-			break;
-		free(o->commit->parent);
-		free(o->commit->author);
-		free(o->commit->committer);
-		free(o->commit);
-		o->commit = NULL;
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_BLOB:
+		*label = GOT_OBJ_LABEL_BLOB;
 		break;
-	case GTree:
-		if(!o->tree)
-			break;
-		free(o->tree->ent);
-		free(o->tree);
-		o->tree = NULL;
+	case GOT_OBJ_TYPE_TREE:
+		*label = GOT_OBJ_LABEL_TREE;
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		*label = GOT_OBJ_LABEL_COMMIT;
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		*label = GOT_OBJ_LABEL_TAG;
 		break;
 	default:
+		*label = NULL;
+		err = got_error(GOT_ERR_OBJ_TYPE);
 		break;
 	}
 
-	free(o->all);
-	o->all = NULL;
-	o->data = NULL;
-	o->flag &= ~Cloaded;
+	return err;
 }
 
-static void
-unref(Object *o)
+
+static const struct got_error *
+read_packed_object(struct got_pack *pack, struct got_indexed_object *obj)
 {
-	if(!o)
-		return;
-	o->refs--;
-	if(!o->refs)
-		clear(o);
-}
-
-static Object*
-ref(Object *o)
-{
-	o->refs++;
-	return o;
-}
-
-static void
-cache(Object *o)
-{
-	char buf[41];
-	Object *p;
-
-	hashfmt(buf, sizeof(buf), &o->hash);
-	if(o == lruhead)
-		return;
-	if(o == lrutail)
-		lrutail = lrutail->prev;
-	if(!(o->flag & Cexist)){
-		got_object_idset_add(objcache, &o->hash, o);
-		o->id = next_object_id++;
-		o->flag |= Cexist;
-	}
-	if(o->prev)
-		o->prev->next = o->next;
-	if(o->next)
-		o->next->prev = o->prev;
-	if(lrutail == o){
-		lrutail = o->prev;
-		lrutail->next = NULL;
-	}else if(!lrutail)
-		lrutail = o;
-	if(lruhead)
-		lruhead->prev = o;
-	o->next = lruhead;
-	o->prev = NULL;
-	lruhead = o;
-
-	if(!(o->flag & Ccache)){
-		o->flag |= Ccache;
-		ref(o);
-		ncache++;
-	}
-	while(ncache > Cachemax){
-		p = lrutail;
-		lrutail = p->prev;
-		lrutail->next = NULL;
-		p->flag &= ~Ccache;
-		p->prev = NULL;
-		p->next = NULL;
-		unref(p);
-		ncache--;
-	}
-}
-
-static int
-preadbe32(FILE *b, int *v, off_t off)
-{
-	char buf[4];
-
-	if(fseek(b, off, SEEK_SET) == -1)
-		return -1;
-	if(fread(buf, 1, sizeof(buf), b) == -1)
-		return -1;
-	*v = GETBE32(buf);
-
-	return 0;
-}
-static int
-preadbe64(FILE *b, off_t *v, off_t off)
-{
-	char buf[8];
-
-	if(fseek(b, off, SEEK_SET) == -1)
-		return -1;
-	if(fread(buf, 1, sizeof(buf), b) == -1)
-		return -1;
-	*v = GETBE64(buf);
-	return 0;
-}
-
-static int
-readvint(char *p, char **pp)
-{
-	int i, n, c;
-
-	i = 0;
-	n = 0;
-	do {
-		c = *p++;
-		n |= (c & 0x7f) << i;
-		i += 7;
-	} while (c & 0x80);
-	*pp = p;
-
-	return n;
-}
-
-static int
-applydelta(Object *dst, Object *base, char *d, int nd)
-{
-	char *r, *b, *ed, *er;
-	int n, nr, c;
-	off_t o, l;
-
-	ed = d + nd;
-	b = base->data;
-	n = readvint(d, &d);
-	if(n != base->size){
-		fprintf(stderr, "mismatched source size\n");
-		return -1;
-	}
-
-	nr = readvint(d, &d);
-	r = emalloc(nr + 64);
-	n = snprintf(r, 64, "%s %d", typestr(base->type), nr) + 1;
-	dst->all = r;
-	dst->type = base->type;
-	dst->data = r + n;
-	dst->size = nr;
-	er = dst->data + nr;
-	r = dst->data;
-
-	while(1){
-		if(d == ed)
-			break;
-		c = *d++;
-		if(!c){
-			fprintf(stderr, "bad delta encoding\n");
-			return -1;
-		}
-		/* copy from base */
-		if(c & 0x80){
-			o = 0;
-			l = 0;
-			/* Offset in base */
-			if(c & 0x01 && d != ed) o |= (*d++ <<  0) & 0x000000ff;
-			if(c & 0x02 && d != ed) o |= (*d++ <<  8) & 0x0000ff00;
-			if(c & 0x04 && d != ed) o |= (*d++ << 16) & 0x00ff0000;
-			if(c & 0x08 && d != ed) o |= (*d++ << 24) & 0xff000000;
-
-			/* Length to copy */
-			if(c & 0x10 && d != ed) l |= (*d++ <<  0) & 0x0000ff;
-			if(c & 0x20 && d != ed) l |= (*d++ <<  8) & 0x00ff00;
-			if(c & 0x40 && d != ed) l |= (*d++ << 16) & 0xff0000;
-			if(l == 0) l = 0x10000;
-
-			assert(o + l <= base->size);
-			memmove(r, b + o, l);
-			r += l;
-		/* inline data */
-		}else{
-			memmove(r, d, c);
-			d += c;
-			r += c;
-		}
-
-	}
-	if(r != er){
-		fprintf(stderr, "truncated delta (%zd)\n", er - r);
-		return -1;
-	}
-
-	return nr;
-}
-
-static int
-readrdelta(FILE *f, Object *o, int nd, int flag)
-{
-	const struct got_error *e;
-	struct got_object_id h;
-	Object *b;
-	uint8_t *d;
-	size_t n;
-
-	d = NULL;
-	if(fread(h.sha1, 1, sizeof(h.sha1), f) != sizeof(h.sha1))
-		goto error;
-	if(hasheq(&o->hash, &h))
-		goto error;
-	if ((e = got_inflate_to_mem(&d, &n, NULL, f)) != NULL)
-		goto error;
-	o->len = ftello(f) - o->off;
-	if(d == NULL || n != nd)
-		goto error;
-	if((b = readidxobject(f, h, flag)) == NULL)
-		goto error;
-	if(applydelta(o, b, d, n) == -1)
-		goto error;
-	free(d);
-	return 0;
-error:
-	free(d);
-	return -1;
-}
-
-static int
-readodelta(FILE *f, Object *o, off_t nd, off_t p, int flag)
-{
-	Object b;
-	uint8_t *d;
-	off_t r;
-	size_t n;
-	int c;
-
-	r = 0;
-	d = NULL;
-	while(1){
-		if((c = fgetc(f)) == -1)
-			goto error;
-		r |= c & 0x7f;
-		if (!(c & 0x80))
-			break;
-		r++;
-		r <<= 7;
-	}while(c & 0x80);
-
-	if(r > p){
-		fprintf(stderr, "junk offset -%lld (from %lld)\n", r, p);
-		goto error;
-	}
-
-	if (got_inflate_to_mem(&d, &n, NULL, f) != NULL)
-		goto error;
-	o->len = ftello(f) - o->off;
-	if(d == NULL || n != nd)
-		goto error;
-	if(fseek(f, p - r, SEEK_SET) == -1)
-		goto error;
-	if(readpacked(f, &b, flag) == -1)
-		goto error;
-	if(applydelta(o, &b, d, nd) == -1)
-		goto error;
-	free(d);
-	return 0;
-error:
-	free(d);
-	return -1;
-}
-
-static int
-readpacked(FILE *f, Object *o, int flag)
-{
-	const struct got_error *e;
-	int c, s, n;
-	off_t l, p;
-	size_t ndata;
+	const struct got_error *err = NULL;
+	SHA1_CTX ctx;
 	uint8_t *data;
-	Type t;
-	Buf b;
+	size_t datalen;
+	ssize_t n;
+	char *header;
+	size_t headerlen;
+	const char *obj_label;
 
-	p = ftello(f);
-	c = fgetc(f);
-	if(c == -1)
-		return -1;
-	l = c & 0xf;
-	s = 4;
-	t = (c >> 4) & 0x7;
-	if(!t){
-		fprintf(stderr, "unknown type for byte %x\n", c);
-		return -1;
-	}
-	while(c & 0x80){
-		if((c = fgetc(f)) == -1)
-			return -1;
-		l |= (c & 0x7f) << s;
-		s += 7;
-	}
+	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size, &obj->tslen,
+	    pack, obj->off);
+	if (err)
+		return err;
 
-	switch(t){
-	default:
-		fprintf(stderr, "invalid object at %lld\n", ftello(f));
-		return -1;
-	case GCommit:
-	case GTree:
-	case GTag:
-	case GBlob:
-		b.sz = 64 + l;
-
-		b.data = emalloc(b.sz);
-		n = snprintf(b.data, 64, "%s %lld", typestr(t), l) + 1;
-		b.len = n;
-		e = got_inflate_to_mem(&data, &ndata, NULL, f);
-		if (e != NULL || n + ndata >= b.sz) {
-			free(b.data);
-			return -1;
+	switch (obj->type) {
+	case GOT_OBJ_TYPE_BLOB:
+	case GOT_OBJ_TYPE_COMMIT:
+	case GOT_OBJ_TYPE_TREE:
+	case GOT_OBJ_TYPE_TAG:
+		/* XXX TODO reading large objects into memory is bad! */
+		err = got_inflate_to_mem_fd(&data, &datalen, &obj->len, pack->fd);
+		if (err)
+			break;
+		SHA1Init(&ctx);
+		err = get_obj_type_label(&obj_label, obj->type);
+		if (err)
+			break;
+		if (asprintf(&header, "%s %lld", obj_label, obj->size) == -1) {
+			err = got_error_from_errno("asprintf");
+			free(data);
+			break;
 		}
-		memcpy(b.data + n, data, ndata);
-		o->len = ftello(f) - o->off;
-		o->type = t;
-		o->all = b.data;
-		o->data = b.data + n;
-		o->size = ndata;
+		headerlen = strlen(header) + 1;
+		SHA1Update(&ctx, header, headerlen);
+		SHA1Update(&ctx, data, datalen);
+		SHA1Final(obj->id.sha1, &ctx);
+		free(header);
 		free(data);
 		break;
-	case GOdelta:
-		if(readodelta(f, o, l, p, flag) == -1)
-			return -1;
-		break;
-	case GRdelta:
-		if(readrdelta(f, o, l, flag) == -1)
-			return -1;
-		break;
-	}
-	o->flag |= Cloaded|flag;
-	return 0;
-}
-
-static int
-readloose(FILE *f, Object *o, int flag)
-{
-	struct { char *tag; int type; } *p, types[] = {
-		{"blob", GBlob},
-		{"tree", GTree},
-		{"commit", GCommit},
-		{"tag", GTag},
-		{NULL},
-	};
-	char *s, *e;
-	uint8_t *d;
-	off_t sz;
-	size_t n;
-	int l;
-
-	if (got_inflate_to_mem(&d, &n, NULL, f) != NULL)
-		return -1;
-
-	s = (char *)d;
-	o->type = GNone;
-	for(p = types; p->tag; p++){
-		l = strlen(p->tag);
-		if(strncmp(s, p->tag, l) == 0){
-			s += l;
-			o->type = p->type;
-			while(!isspace(*s))
-				s++;
+	case GOT_OBJ_TYPE_REF_DELTA:
+		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
+		n = read(pack->fd, &obj->ref_id.sha1, SHA1_DIGEST_LENGTH);
+		if (n == -1) {
+			err = got_error_from_errno("read");
 			break;
 		}
-	}
-	if(o->type == GNone){
-		free(o->data);
-		return -1;
-	}
-	sz = strtol(s, &e, 0);
-	if(e == s || *e++ != 0){
-		fprintf(stderr, "malformed object header\n");
-		goto error;
-	}
-	if(sz != n - (e - (char *)d)){
-		fprintf(stderr, "mismatched sizes\n");
-		goto error;
-	}
-	o->size = sz;
-	o->data = e;
-	o->all = d;
-	o->flag |= Cloaded|flag;
-	return 0;
-
-error:
-	free(d);
-	return -1;
-}
-
-static off_t
-searchindex(FILE *f, struct got_object_id h)
-{
-	int lo, hi, idx, i, nent;
-	off_t o, oo;
-	struct got_object_id hh;
-
-	o = 8;
-	/*
-	 * Read the fanout table. The fanout table
-	 * contains 256 entries, corresponsding to
-	 * the first byte of the hash. Each entry
-	 * is a 4 byte big endian integer, containing
-	 * the total number of entries with a leading
-	 * byte <= the table index, allowing us to
-	 * rapidly do a binary search on them.
-	 */
-	if (h.sha1[0] == 0){
-		lo = 0;
-		if(preadbe32(f, &hi, o) == -1)
-			goto err;
-	} else {
-		o += h.sha1[0]*4 - 4;
-		if(preadbe32(f, &lo, o + 0) == -1)
-			goto err;
-		if(preadbe32(f, &hi, o + 4) == -1)
-			goto err;
-	}
-	if(hi == lo)
-		goto notfound;
-	if(preadbe32(f, &nent, 8 + 255*4) == -1)
-		goto err;
-
-	/*
-	 * Now that we know the range of hashes that the
-	 * entry may exist in, read them in so we can do
-	 * a bsearch.
-	 */
-	idx = -1;
-	fseek(f, Hashsz*lo + 8 + 256*4, SEEK_SET);
-	for(i = 0; i < hi - lo; i++){
-		if(fread(hh.sha1, 1, sizeof(hh.sha1), f) == -1)
-			goto err;
-		if(hasheq(&hh, &h))
-			idx = lo + i;
-	}
-	if(idx == -1)
-		goto notfound;
-
-
-	/*
-	 * We found the entry. If it's 32 bits, then we
-	 * can just return the oset, otherwise the 32
-	 * bit entry contains the oset to the 64 bit
-	 * entry.
-	 */
-	oo = 8;			/* Header */
-	oo += 256*4;		/* Fanout table */
-	oo += Hashsz*nent;	/* Hashes */
-	oo += 4*nent;		/* Checksums */
-	oo += 4*idx;		/* Offset offset */
-	if(preadbe32(f, &i, oo) == -1)
-		goto err;
-	o = i & 0xffffffff;
-	if(o & (1ull << 31)){
-		o &= 0x7fffffff;
-		if(preadbe64(f, &o, o) == -1)
-			goto err;
-	}
-	return o;
-
-err:
-	fprintf(stderr, "unable to read packfile\n");
-	return -1;
-notfound:
-	{
-		char hstr[41];
-		hashfmt(hstr, sizeof(hstr), &h);
-		fprintf(stdout, "could not find object %s\n", hstr);
-	}
-	return -1;
-}
-
-/*
- * Scans for non-empty word, copying it into buf.
- * Strips off word, leading, and trailing space
- * from input.
- *
- * Returns -1 on empty string or error, leaving
- * input unmodified.
- */
-static int
-scanword(char **str, int *nstr, char *buf, int nbuf)
-{
-	char *p;
-	int n, r;
-
-	r = -1;
-	p = *str;
-	n = *nstr;
-	while(n && isblank(*p)){
-		n--;
-		p++;
-	}
-
-	for(; n && *p && !isspace(*p); p++, n--){
-		r = 0;
-		*buf++ = *p;
-		nbuf--;
-		if(nbuf == 0)
-			return -1;
-	}
-	while(n && isblank(*p)){
-		n--;
-		p++;
-	}
-	*buf = 0;
-	*str = p;
-	*nstr = n;
-	return r;
-}
-
-static void
-nextline(char **str, int *nstr)
-{
-	char *s;
-
-	if((s = strchr(*str, '\n')) != NULL){
-		*nstr -= s - *str + 1;
-		*str = s + 1;
-	}
-}
-
-static int
-parseauthor(char **str, int *nstr, char **name, off_t *time)
-{
-	return 0;
-}
-
-static void
-parsecommit(Object *o)
-{
-	char *p, *t, buf[128];
-	int np;
-
-	p = o->data;
-	np = o->size;
-	o->commit = emalloc(sizeof(Cinfo));
-	while(1){
-		if(scanword(&p, &np, buf, sizeof(buf)) == -1)
+		if (n < sizeof(obj->id)) {
+			err = got_error(GOT_ERR_BAD_PACKFILE);
 			break;
-		if(strcmp(buf, "tree") == 0){
-			if(scanword(&p, &np, buf, sizeof(buf)) == -1)
-				errx(1, "invalid commit: tree missing");
-			if(hparse(&o->commit->tree, buf) == -1)
-				errx(1, "invalid commit: garbled tree");
-		}else if(strcmp(buf, "parent") == 0){
-			if(scanword(&p, &np, buf, sizeof(buf)) == -1)
-				errx(1, "invalid commit: missing parent");
-			o->commit->parent = realloc(o->commit->parent, ++o->commit->nparent * sizeof(struct got_object_id));
-			if(!o->commit->parent)
-				err(1, "unable to malloc: ");
-			if(hparse(&o->commit->parent[o->commit->nparent - 1], buf) == -1)
-				errx(1, "invalid commit: garbled parent");
-		}else if(strcmp(buf, "author") == 0){
-			parseauthor(&p, &np, &o->commit->author, &o->commit->mtime);
-		}else if(strcmp(buf, "committer") == 0){
-			parseauthor(&p, &np, &o->commit->committer, &o->commit->ctime);
-		}else if(strcmp(buf, "gpgsig") == 0){
-			/* just drop it */
-			if((t = strstr(p, "-----END PGP SIGNATURE-----")) == NULL)
-				errx(1, "malformed gpg signature");
-			np -= t - p;
-			p = t;
 		}
-		nextline(&p, &np);
-	}
-	while (np && isspace(*p)) {
-		p++;
-		np--;
-	}
-	o->commit->msg = p;
-	o->commit->nmsg = np;
-}
-
-static void
-parsetree(Object *o)
-{
-	char *p, buf[256];
-	int np, nn, m;
-	Dirent *t;
-
-	p = o->data;
-	np = o->size;
-	o->tree = emalloc(sizeof(Tinfo));
-	while(np > 0){
-		if(scanword(&p, &np, buf, sizeof(buf)) == -1)
+		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len, pack->fd);
+		if (err)
 			break;
-		o->tree->ent = erealloc(o->tree->ent, ++o->tree->nent * sizeof(Dirent));
-		t = &o->tree->ent[o->tree->nent - 1];
-		memset(t, 0, sizeof(Dirent));
-		m = strtol(buf, NULL, 8);
-		/* FIXME: symlinks and other BS */
-		if(m == 0160000){
-			t->mode |= S_IFDIR;
-			t->modref = 1;
-		}
-		t->mode = m & 0777;
-		if(m & 0040000)
-			t->mode |= S_IFDIR;
-		t->name = p;
-		nn = strlen(p) + 1;
-		p += nn;
-		np -= nn;
-		if(np < sizeof(t->h.sha1))
-			errx(1, "malformed tree, remaining %d (%s)", np, p);
-		memcpy(t->h.sha1, p, sizeof(t->h.sha1));
-		p += sizeof(t->h.sha1);
-		np -= sizeof(t->h.sha1);
-	}
-}
-
-void
-parseobject(Object *o)
-{
-	if(o->flag & Cparsed)
-		return;
-	switch(o->type){
-	case GTree:	parsetree(o);	break;
-	case GCommit:	parsecommit(o);	break;
-	//case GTag:	parsetag(o);	break;
-	default:	break;
-	}
-	o->flag |= Cparsed;
-}
-
-static Object*
-readidxobject(FILE *idx, struct got_object_id h, int flag)
-{
-	char path[Pathmax];
-	char hbuf[41];
-	FILE *f;
-	Object *obj;
-	int l, n;
-	off_t o;
-	struct dirent *ent;
-	DIR *d;
-
-
-	if ((obj = got_object_idset_lookup_data(objcache, &h))) {
-		if(obj->flag & Cloaded)
-			return obj;
-		if(obj->flag & Cidx){
-			assert(idx != NULL);
-			o = ftello(idx);
-			if(fseek(idx, obj->off, SEEK_SET) == -1)
-				errx(1, "could not seek to object offset");
-			if(readpacked(idx, obj, flag) == -1)
-				errx(1, "could not reload object");
-			if(fseek(idx, o, SEEK_SET) == -1)
-				errx(1, "could not restore offset");
-			cache(obj);
-			return obj;
-		}
-	}
-
-	d = NULL;
-	/* We're not putting it in the cache yet... */
-	obj = emalloc(sizeof(Object));
-	obj->id = next_object_id + 1;
-	obj->hash = h;
-
-	hashfmt(hbuf, sizeof(hbuf), &h);
-	snprintf(path, sizeof(path), ".git/objects/%c%c/%s", hbuf[0], hbuf[1], hbuf + 2);
-	if((f = fopen(path, "r")) != NULL){
-		if(readloose(f, obj, flag) == -1)
-			goto error;
-		fclose(f);
-		parseobject(obj);
-		hashfmt(hbuf, sizeof(hbuf), &obj->hash);
-		fprintf(stderr, "object %s cached\n", hbuf);
-		cache(obj);
-		return obj;
-	}
-
-	o = -1;
-	if ((d = opendir(".git/objects/pack")) == NULL)
-		err(1, "open pack dir");
-	while ((ent = readdir(d)) != NULL) {
-		l = strlen(ent->d_name);
-		if(l > 4 && strcmp(ent->d_name + l - 4, ".idx") != 0)
-			continue;
-		snprintf(path, sizeof(path), ".git/objects/pack/%s", ent->d_name);
-		if((f = fopen(path, "r")) == NULL)
-			continue;
-		o = searchindex(f, h);
-		fclose(f);
-		if(o == -1)
-			continue;
+		obj->len += SHA1_DIGEST_LENGTH;
+		break;
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		memset(obj->id.sha1, 0xff, SHA1_DIGEST_LENGTH);
+		err = got_pack_parse_offset_delta(&obj->base_offset,
+		    &obj->base_offsetlen, pack, obj->off, obj->tslen);
+		if (err)
+			break;
+		err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len, pack->fd);
+		if (err)
+			break;
+		obj->len += obj->base_offsetlen;
+		break;
+	default:
+		err = got_error(GOT_ERR_OBJ_TYPE);
 		break;
 	}
-	closedir(d);
 
-	if (o == -1)
-		goto error;
+	return err;
+}
 
-	if((n = snprintf(path, sizeof(path), "%s", path)) >= sizeof(path) - 4)
-		goto error;
-	memcpy(path + n - 4, ".pack", 6);
-	if((f = fopen(path, "r")) == NULL)
-		goto error;
-	if(fseek(f, o, SEEK_SET) == -1)
-		goto error;
-	if(readpacked(f, obj, flag) == -1)
-		goto error;
-	fclose(f);
-	parseobject(obj);
-	cache(obj);
-	return obj;
-error:
-	free(obj);
+static const struct got_error *
+hwrite(int fd, void *buf, int len, SHA1_CTX *ctx)
+{
+	ssize_t w;
+
+	SHA1Update(ctx, buf, len);
+
+	w = write(fd, buf, len);
+	if (w == -1)
+		return got_error_from_errno("write");
+	if (w != len)
+		return got_error(GOT_ERR_IO);
+
 	return NULL;
 }
 
-Object*
-readobject(struct got_object_id h)
-{
-	Object *o;
-
-	o = readidxobject(NULL, h, 0);
-	if(o)
-		ref(o);
-	return o;
-}
-
-int
-objcmp(const void *pa, const void *pb)
-{
-	Object *a, *b;
-
-	a = *(Object**)pa;
-	b = *(Object**)pb;
-	return memcmp(a->hash.sha1, b->hash.sha1, sizeof(a->hash.sha1));
-}
-
-static int
-hwrite(FILE *b, void *buf, int len, SHA1_CTX *ctx)
-{
-	SHA1Update(ctx, buf, len);
-	return fwrite(buf, 1, len, b);
-}
-
-static uint32_t
-objectcrc(FILE *f, Object *o)
+static const struct got_error *
+object_crc(int packfd, struct got_indexed_object *obj)
 {
 	char buf[8096];
-	int n, r;
+	size_t n;
+	ssize_t r;
 
-	o->crc = 0;
-	fseek(f, o->off, SEEK_SET);
-	for(n = o->len; n > 0; n -= r){
-		r = fread(buf, 1, n > sizeof(buf) ? sizeof(buf) : n, f);
-		if(r == -1)
-			return -1;
-		if(r == 0)
-			return 0;
-		o->crc = crc32(o->crc, buf, r);
+	obj->crc = 0;
+	if (lseek(packfd, obj->off + obj->tslen, SEEK_SET) == -1)
+		return got_error_from_errno("lseek");
+
+	obj->crc = crc32(0L, NULL, 0);
+	for (n = obj->len; n > 0; n -= r){
+		r = read(packfd, buf, n > sizeof(buf) ? sizeof(buf) : n);
+		if (r == -1)
+			return got_error_from_errno("read");
+		if (r == 0)
+			return NULL;
+		obj->crc = crc32(obj->crc, buf, r);
 	}
 	return 0;
 }
 
-int
-indexpack(int packfd, int idxfd, struct got_object_id *packhash,
+#if 0
+static int
+indexed_obj_cmp(const void *pa, const void *pb)
+{
+	struct got_indexed_object *a, *b;
+
+	a = *(struct got_indexed_object **)pa;
+	b = *(struct got_indexed_object **)pb;
+	return got_object_id_cmp(&a->id, &b->id);
+}
+#endif
+
+static const struct got_error *
+resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
+    struct got_indexed_object *obj)
+{
+	const struct got_error *err = NULL;
+	struct got_delta_chain deltas;
+	struct got_delta *delta;
+	uint8_t *buf = NULL;
+	size_t len;
+	SHA1_CTX ctx;
+	char *header;
+	size_t headerlen;
+	int base_obj_type;
+	const char *obj_label;
+
+	deltas.nentries = 0;
+	SIMPLEQ_INIT(&deltas.entries);
+
+	err = got_pack_resolve_delta_chain(&deltas, packidx, pack,
+	    obj->off, obj->tslen, obj->type, obj->size,
+	    GOT_DELTA_CHAIN_RECURSION_MAX);
+	if (err)
+		goto done;
+
+	/* XXX TODO reading large objects into memory is bad! */
+	err = got_pack_dump_delta_chain_to_mem(&buf, &len, &deltas, pack);
+	if (err)
+		goto done;
+
+	SHA1Init(&ctx);
+
+	err = got_delta_chain_get_base_type(&base_obj_type, &deltas);
+	if (err)
+		goto done;
+	err = get_obj_type_label(&obj_label, base_obj_type);
+	if (err)
+		goto done;
+	if (asprintf(&header, "%s %zd", obj_label, len) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	headerlen = strlen(header) + 1;
+	SHA1Update(&ctx, header, headerlen);
+	SHA1Update(&ctx, buf, len);
+	SHA1Final(obj->id.sha1, &ctx);
+done:
+	free(buf);
+	while (!SIMPLEQ_EMPTY(&deltas.entries)) {
+		delta = SIMPLEQ_FIRST(&deltas.entries);
+		SIMPLEQ_REMOVE_HEAD(&deltas.entries, entry);
+		free(delta);
+	}
+	return err;
+}
+
+/* Determine the slot in the pack index a given object ID should use. */
+static int
+find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
+{
+	u_int8_t id0 = sha1[0];
+	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+	int left = 0, right = nindexed - 1;
+	int cmp = 0, i = 0;
+
+	if (id0 > 0)
+		left = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+
+	while (left <= right) {
+		struct got_packidx_object_id *oid;
+
+		i = ((left + right) / 2);
+		oid = &packidx->hdr.sorted_ids[i];
+
+		cmp = memcmp(sha1, oid->sha1, SHA1_DIGEST_LENGTH);
+		if (cmp == 0)
+			return -1; /* object already indexed */
+		else if (cmp > 0)
+			left = i + 1;
+		else if (cmp < 0)
+			right = i - 1;
+	}
+
+	return left;
+}
+
+#if 0
+static void
+print_packidx(struct got_packidx *packidx)
+{
+	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+	int i;
+
+	fprintf(stderr, "object IDs:\n");
+	for (i = 0; i < nindexed; i++) {
+		char hex[SHA1_DIGEST_STRING_LENGTH];
+		got_sha1_digest_to_str(packidx->hdr.sorted_ids[i].sha1,
+		    hex, sizeof(hex));
+		fprintf(stderr, "%s\n", hex);
+	}
+	fprintf(stderr, "\n");
+
+	fprintf(stderr, "object offsets:\n");
+	for (i = 0; i < nindexed; i++) {
+		uint32_t offset = be32toh(packidx->hdr.offsets[i]);
+		if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
+			int j = offset & GOT_PACKIDX_OFFSET_VAL_MASK;
+			fprintf(stderr, "%u -> %llu\n", offset, 
+			    be64toh(packidx->hdr.large_offsets[j]));
+		} else
+			fprintf(stderr, "%u\n", offset);
+	}
+	fprintf(stderr, "\n");
+
+	fprintf(stderr, "fanout table:");
+	for (i = 0; i <= 0xff; i++)
+		fprintf(stderr, " %u", be32toh(packidx->hdr.fanout_table[i]));
+	fprintf(stderr, "\n");
+}
+#endif
+
+static void
+update_packidx(int *nlarge, struct got_packidx *packidx, int nobj,
+    struct got_indexed_object *obj)
+{
+	int i, n, idx;
+	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+
+	idx = find_object_idx(packidx, obj->id.sha1);
+	if (idx == -1) {
+		char hex[SHA1_DIGEST_STRING_LENGTH];
+		got_sha1_digest_to_str(obj->id.sha1, hex, sizeof(hex));
+		return; /* object already indexed */
+	}
+
+	memmove(&packidx->hdr.sorted_ids[idx + 1],
+	    &packidx->hdr.sorted_ids[idx],
+	    sizeof(struct got_packidx_object_id) * (nindexed - idx));
+	memmove(&packidx->hdr.offsets[idx + 1], &packidx->hdr.offsets[idx],
+	    sizeof(uint32_t) * (nindexed - idx));
+
+	memcpy(packidx->hdr.sorted_ids[idx].sha1, obj->id.sha1,
+	    SHA1_DIGEST_LENGTH);
+	if (obj->off < GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
+		packidx->hdr.offsets[idx] = htobe32(obj->off);
+	else {
+		packidx->hdr.offsets[idx] = htobe32(*nlarge |
+		    GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX);
+		packidx->hdr.large_offsets[*nlarge] = htobe64(obj->off);
+		(*nlarge)++;
+	}
+
+	for (i = obj->id.sha1[0]; i <= 0xff; i++) {
+		n = be32toh(packidx->hdr.fanout_table[i]);
+		packidx->hdr.fanout_table[i] = htobe32(n + 1);
+	}
+}
+
+static const struct got_error *
+index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
     struct imsgbuf *ibuf)
 {
-	char hdr[4*3], buf[8];
-	int nobj, nvalid, nbig, n, i, step;
-	Object *o, **objects;
-	char *valid;
-	SHA1_CTX ctx, objctx;
-	FILE *f;
-	struct got_object_id h;
-	int c;
+	const struct got_error *err;
+	struct got_packfile_hdr hdr;
+	struct got_packidx packidx;
+	char buf[8];
+	int nobj, nvalid, nloose, nlarge = 0, nresolved = 0, i;
+	struct got_indexed_object **objects = NULL, *obj;
+	SHA1_CTX ctx;
+	uint8_t packidx_hash[SHA1_DIGEST_LENGTH];
+	ssize_t r, w;
+	int pass;
 
-	if ((f = fdopen(packfd, "r")) == NULL)
-		return -1;
-	if (fseek(f, 0, SEEK_SET) == -1)
-		return -1;
-	if (fread(hdr, 1, sizeof(hdr), f) != sizeof(hdr)) {
-		fprintf(stderr, "short read on header\n");
-		return -1;
+	/* Check pack file header. */
+	r = read(pack->fd, &hdr, sizeof(hdr));
+	if (r == -1)
+		return got_error_from_errno("read");
+	if (r < sizeof(hdr))
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "short packfile header");
+
+	if (hdr.signature != htobe32(GOT_PACKFILE_SIGNATURE))
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "bad packfile signature");
+	if (hdr.version != htobe32(GOT_PACKFILE_VERSION))
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "bad packfile version");
+	nobj = betoh32(hdr.nobjects);
+	if (nobj == 0)
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "bad packfile with zero objects");
+
+	/*
+	 * Create an in-memory pack index which will grow as objects
+	 * IDs in the pack file are discovered. Only fields used to
+	 * read deltified objects will be needed by the pack.c library
+	 * code, so setting up just a pack index header is sufficient.
+	 */
+	memset(&packidx, 0, sizeof(packidx));
+	packidx.hdr.magic = malloc(sizeof(uint32_t));
+	if (packidx.hdr.magic == NULL)
+		return got_error_from_errno("calloc");
+	*packidx.hdr.magic = htobe32(GOT_PACKIDX_V2_MAGIC);
+	packidx.hdr.version = malloc(sizeof(uint32_t));
+	if (packidx.hdr.version == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
 	}
-	if (memcmp(hdr, "PACK\0\0\0\2", 8) != 0) {
-		fprintf(stderr, "invalid header\n");
-		return -1;
+	*packidx.hdr.version = htobe32(GOT_PACKIDX_VERSION);
+	packidx.hdr.fanout_table = calloc(GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS,
+	    sizeof(uint32_t));
+	if (packidx.hdr.fanout_table == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	packidx.hdr.sorted_ids = calloc(nobj,
+	    sizeof(struct got_packidx_object_id));
+	if (packidx.hdr.sorted_ids == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	packidx.hdr.offsets = calloc(nobj, sizeof(uint32_t));
+	if (packidx.hdr.offsets == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	/* Large offsets table is empty for pack files < 2 GB. */
+	if (pack->filesize >= GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
+		packidx.hdr.large_offsets = calloc(nobj, sizeof(uint64_t));
+		if (packidx.hdr.large_offsets == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
 	}
 
 	nvalid = 0;
-	nobj = GETBE32(hdr + 8);
-	objects = calloc(nobj, sizeof(Object*));
-	valid = calloc(nobj, sizeof(char));
-	step = nobj/100;
-	if(!step)
-		step++;
+	nloose = 0;
+	objects = calloc(nobj, sizeof(struct got_indexed_object *));
+	if (objects == NULL)
+		return got_error_from_errno("calloc");
+
+	/*
+	 * First pass: locate all objects and identify un-deltified objects.
+	 *
+	 * When this pass has completed we will know offset, type, size, and
+	 * CRC information for all objects in this pack file. We won't know
+	 * any of the actual object IDs of deltified objects yet since we
+	 * will not yet attempt to combine deltas.
+	 */
+	pass = 1;
+	for (i = 0; i < nobj; i++) {
+		err = got_privsep_send_index_pack_progress(ibuf, nobj, i + 1,
+		    nloose, 0);
+		if (err)
+			goto done;
+
+		obj = calloc(1, sizeof(*obj));
+		if (obj == NULL) {
+			err = got_error_from_errno("calloc");
+			goto done;
+		}
+
+		/* Store offset to type+size information for this object. */
+		obj->off = lseek(pack->fd, 0, SEEK_CUR);
+		if (obj->off == -1) {
+			err = got_error_from_errno("lseek");
+			goto done;
+		}
+
+		err = read_packed_object(pack, obj);
+		if (err)
+			goto done;
+
+		objects[i] = obj;
+
+		if (0) {
+		err = object_crc(pack->fd, obj);
+		if (err)
+			goto done;
+		}
+
+		if (obj->type == GOT_OBJ_TYPE_BLOB ||
+		    obj->type == GOT_OBJ_TYPE_TREE ||
+		    obj->type == GOT_OBJ_TYPE_COMMIT ||
+		    obj->type == GOT_OBJ_TYPE_TAG) {
+			objects[i]->valid = 1;
+			nloose++;
+			update_packidx(&nlarge, &packidx, nobj, obj);
+		}
+
+		if (lseek(pack->fd, obj->off + obj->tslen + obj->len,
+		    SEEK_SET) == -1) {
+			err = got_error_from_errno("lseek");
+			goto done;
+		}
+	}
+	nvalid = nloose;
+
+	/*
+	 * Second pass: We can now resolve deltas to compute the IDs of
+	 * objects which appear in deltified form. Because deltas can be
+	 * chained this pass may require a couple of iterations until all
+	 * IDs of deltified objects have been discovered.
+	 */
+	pass++;
 	while (nvalid != nobj) {
-		got_privsep_send_index_pack_progress(ibuf, nobj, nvalid);
-		n = 0;
+		int n = 0;
 		for (i = 0; i < nobj; i++) {
-			if (valid[i]) {
-				n++;
+			if (objects[i]->type != GOT_OBJ_TYPE_REF_DELTA &&
+			    objects[i]->type != GOT_OBJ_TYPE_OFFSET_DELTA)
+				continue;
+
+			if (objects[i]->valid)
+				continue;
+
+			obj = objects[i];
+			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET) == -1) {
+				err = got_error_from_errno("lseek");
+				goto done;
+			}
+
+			err = resolve_deltified_object(pack, &packidx, obj);
+			if (err) {
+				if (err->code != GOT_ERR_NO_OBJ)
+					goto done;
+				/*
+				 * We cannot resolve this object yet because
+				 * a delta base is unknown. Try again later.
+				 */
 				continue;
 			}
-			if (!objects[i]) {
-				o = emalloc(sizeof(Object));
-				o->off = ftello(f);
-				objects[i] = o;
-			}
-			o = objects[i];
-			fseek(f, o->off, SEEK_SET);
-			if (readpacked(f, o, Cidx) == 0){
-				SHA1Init(&objctx);
-				SHA1Update(&objctx, (uint8_t*)o->all, o->size + strlen(o->all) + 1);
-				SHA1Final(o->hash.sha1, &objctx);
-				cache(o);
-				valid[i] = 1;
-				n++;
-			}
-			if(objectcrc(f, o) == -1)
-				return -1;
+
+			objects[i]->valid = 1;
+			n++;
+			update_packidx(&nlarge, &packidx, nobj, obj);
+			err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
+			    nloose, nresolved + n);
+			if (err)
+				goto done;
+
 		}
-		if (n == nvalid) {
-			errx(1, "fix point reached too early: %d/%d", nvalid, nobj);
-			goto error;
+		if (pass++ > 3 && n == 0) {
+			static char msg[64];
+			snprintf(msg, sizeof(msg), "could not resolve "
+			    "any of deltas; packfile could be corrupt");
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
+			goto done;
+			
 		}
-		nvalid = n;
+		if (nloose + nresolved == nobj) {
+			static char msg[64];
+			snprintf(msg, sizeof(msg),
+			    "fix point reached too early: %d/%d/%d", nvalid, nresolved, nobj);
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
+			goto done;
+		}
+		nresolved += n;
+		nvalid += nresolved;
 	}
-	fclose(f);
+
+	if (nloose + nresolved != nobj) {
+		static char msg[64];
+		snprintf(msg, sizeof(msg),
+		    "discovered only %d of %d objects", nloose + nresolved, nobj);
+		err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
+		goto done;
+	}
+
+	/* We may have seen duplicates. Update our total object count. */
+	nobj = betoh32(packidx.hdr.fanout_table[0xff]);
 
 	SHA1Init(&ctx);
-	qsort(objects, nobj, sizeof(Object*), objcmp);
-	if((f = fdopen(idxfd, "w")) == NULL)
-		return -1;
-	if(hwrite(f, "\xfftOc\x00\x00\x00\x02", 8, &ctx) != 8)
-		goto error;
-	/* fanout table */
-	c = 0;
-	for(i = 0; i < 256; i++){
-		while(c < nobj && (objects[c]->hash.sha1[0] & 0xff) <= i)
-			c++;
-		PUTBE32(buf, c);
-		hwrite(f, buf, 4, &ctx);
-	}
-	for(i = 0; i < nobj; i++){
-		o = objects[i];
-		hwrite(f, o->hash.sha1, sizeof(o->hash.sha1), &ctx);
-	}
-
-	/* pointless, nothing uses this */
+	err = hwrite(idxfd, "\xfftOc\x00\x00\x00\x02", 8, &ctx);
+	if (err)
+		goto done;
+	err = hwrite(idxfd, packidx.hdr.fanout_table,
+	    GOT_PACKIDX_V2_FANOUT_TABLE_ITEMS * sizeof(uint32_t), &ctx);
+	if (err)
+		goto done;
+	err = hwrite(idxfd, packidx.hdr.sorted_ids,
+	    nobj * SHA1_DIGEST_LENGTH, &ctx);
+	if (err)
+		goto done;
 	for(i = 0; i < nobj; i++){
 		PUTBE32(buf, objects[i]->crc);
-		hwrite(f, buf, 4, &ctx);
+		err = hwrite(idxfd, buf, 4, &ctx);
+		if (err)
+			goto done;
 	}
-
-	nbig = 0;
-	for(i = 0; i < nobj; i++){
-		if(objects[i]->off <= (1ull<<31))
-			PUTBE32(buf, objects[i]->off);
-		else
-			PUTBE32(buf, (1ull << 31) | nbig++);
-		hwrite(f, buf, 4, &ctx);
+	err = hwrite(idxfd, packidx.hdr.offsets, nobj * sizeof(uint32_t), &ctx);
+	if (err)
+		goto done;
+	if (nlarge > 0) {
+		err = hwrite(idxfd, packidx.hdr.large_offsets,
+		    nlarge * sizeof(uint64_t), &ctx);
+		if (err)
+			goto done;
 	}
-	for(i = 0; i < nobj; i++){
-		if(objects[i]->off > (1ull<<31)){
-			PUTBE64(buf, objects[i]->off);
-			hwrite(f, buf, 8, &ctx);
-		}
+	err = hwrite(idxfd, pack_hash, SHA1_DIGEST_LENGTH, &ctx);
+	if (err)
+		goto done;
+
+	SHA1Final(packidx_hash, &ctx);
+	w = write(idxfd, packidx_hash, sizeof(packidx_hash));
+	if (w == -1) {
+		err = got_error_from_errno("write");
+		goto done;
 	}
-	hwrite(f, packhash->sha1, sizeof(packhash->sha1), &ctx);
-	SHA1Final(h.sha1, &ctx);
-	fwrite(h.sha1, 1, sizeof(h.sha1), f);
-
-	free(objects);
-	free(valid);
-	fclose(f);
-	return 0;
-
-error:
-	free(objects);
-	free(valid);
-	fclose(f);
-	return -1;
+	if (w != sizeof(packidx_hash)) {
+		err = got_error(GOT_ERR_IO);
+		goto done;
+	}
+done:
+	free(packidx.hdr.magic);
+	free(packidx.hdr.version);
+	free(packidx.hdr.fanout_table);
+	free(packidx.hdr.sorted_ids);
+	free(packidx.hdr.offsets);
+	free(packidx.hdr.large_offsets);
+	return err;
 }
 
 int
 main(int argc, char **argv)
 {
-	const struct got_error *err = NULL;
-	struct got_object_id packhash;
+	const struct got_error *err = NULL, *close_err;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
-	int packfd, idxfd;
+	int idxfd = -1;
+	struct got_pack pack;
+	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
+	off_t packfile_size;
+#if 0
+	static int attached;
+	while (!attached)
+		sleep(1);
+#endif
 
-	objcache = got_object_idset_alloc();
-	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
-	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
-		if (err->code == GOT_ERR_PRIVSEP_PIPE)
-			err = NULL;
+	memset(&pack, 0, sizeof(pack));
+	pack.fd = -1;
+	pack.delta_cache = got_delta_cache_alloc(100,
+	    GOT_DELTA_RESULT_SIZE_CACHED_MAX);
+	if (pack.delta_cache == NULL) {
+		err = got_error_from_errno("got_delta_cache_alloc");
 		goto done;
 	}
+
+	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
+
+	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+	if (err)
+		goto done;
 	if (imsg.hdr.type == GOT_IMSG_STOP)
 		goto done;
 	if (imsg.hdr.type != GOT_IMSG_IDXPACK_REQUEST) {
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
 		goto done;
 	}
-	if (imsg.hdr.len - IMSG_HEADER_SIZE != SHA1_DIGEST_LENGTH) {
+	if (imsg.hdr.len - IMSG_HEADER_SIZE != sizeof(pack_hash)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	packfd = imsg.fd;
-	memcpy(packhash.sha1, imsg.data, SHA1_DIGEST_LENGTH);
+	memcpy(pack_hash, imsg.data, sizeof(pack_hash));
+	pack.fd = imsg.fd;
 
-	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
-		if (err->code == GOT_ERR_PRIVSEP_PIPE)
-			err = NULL;
+	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+	if (err)
 		goto done;
-	}
 	if (imsg.hdr.type == GOT_IMSG_STOP)
 		goto done;
 	if (imsg.hdr.type != GOT_IMSG_TMPFD) {
@@ -1252,15 +738,37 @@ main(int argc, char **argv)
 	}
 	idxfd = imsg.fd;
 
-	indexpack(packfd, idxfd, &packhash, &ibuf);
+	if (lseek(pack.fd, 0, SEEK_END) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+	packfile_size = lseek(pack.fd, 0, SEEK_CUR);
+	if (packfile_size == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+	pack.filesize = packfile_size; /* XXX off_t vs size_t */
+
+	if (lseek(pack.fd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+
+	err = index_pack(&pack, idxfd, pack_hash, &ibuf);
 done:
-	if(err != NULL)
-		got_privsep_send_error(&ibuf, err);
-	else
+	close_err = got_pack_close(&pack);
+	if (close_err && err == NULL)
+		err = close_err;
+	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+
+	if (err == NULL)
 		err = got_privsep_send_index_pack_done(&ibuf);
-	if(err != NULL) {
+	if (err) {
+		got_privsep_send_error(&ibuf, err);
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);
+		exit(1);
 	}
 
 	exit(0);

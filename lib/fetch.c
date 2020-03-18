@@ -451,7 +451,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			while ((s = strsep(&s0, "\r")) != NULL) {
 				if (*s == '\0')
 					continue;
-				err = progress_cb(progress_arg, s, 0, 0, 0);
+				err = progress_cb(progress_arg, s,
+				    packfile_size_cur, 0, 0, 0, 0);
 				if (err)
 					break;
 			}
@@ -460,7 +461,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 				goto done;
 		} else if (packfile_size_cur != packfile_size) {
 			err = progress_cb(progress_arg, NULL,
-			    packfile_size_cur, 0, 0);
+			    packfile_size_cur, 0, 0, 0, 0);
 			if (err)
 				break;
 			packfile_size = packfile_size_cur;
@@ -496,7 +497,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 	imsg_init(&idxibuf, imsg_idxfds[0]);
 
-	err = got_privsep_send_index_pack_req(&idxibuf, npackfd, *pack_hash);
+	err = got_privsep_send_index_pack_req(&idxibuf, (*pack_hash)->sha1,
+	    npackfd);
 	if (err != NULL)
 		goto done;
 	npackfd = -1;
@@ -506,15 +508,17 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	nidxfd = -1;
 	done = 0;
 	while (!done) {
-		int nobjects_total, nobjects_indexed;
-		err = got_privsep_recv_index_progress(&done, &nobjects_total,
-		    &nobjects_indexed, &idxibuf);
+		int nobj_total, nobj_indexed, nobj_loose, nobj_resolved;
+
+		err = got_privsep_recv_index_progress(&done, &nobj_total,
+		    &nobj_indexed, &nobj_loose, &nobj_resolved,
+		    &idxibuf);
 		if (err != NULL)
 			goto done;
-		if (nobjects_indexed != 0) {
+		if (nobj_indexed != 0) {
 			err = progress_cb(progress_arg, NULL,
-			    packfile_size, nobjects_total,
-			    nobjects_indexed);
+			    packfile_size, nobj_total,
+			    nobj_indexed, nobj_loose, nobj_resolved);
 			if (err)
 				break;
 		}

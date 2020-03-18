@@ -767,12 +767,14 @@ done:
 }
 
 const struct got_error *
-got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_id *hash)
+got_privsep_send_index_pack_req(struct imsgbuf *ibuf, uint8_t *pack_hash,
+    int fd)
 {
 	const struct got_error *err = NULL;
 
+	/* Keep in sync with struct got_imsg_index_pack_request */
 	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_REQUEST, 0, 0, fd,
-	    hash->sha1, SHA1_DIGEST_LENGTH) == -1) {
+	    pack_hash, SHA1_DIGEST_LENGTH) == -1) {
 		err = got_error_from_errno("imsg_compose INDEX_REQUEST");
 		close(fd);
 		return err;
@@ -781,13 +783,15 @@ got_privsep_send_index_pack_req(struct imsgbuf *ibuf, int fd, struct got_object_
 }
 
 const struct got_error *
-got_privsep_send_index_pack_progress(struct imsgbuf *ibuf, int nobjects_total,
-    int nobjects_indexed)
+got_privsep_send_index_pack_progress(struct imsgbuf *ibuf, int nobj_total,
+    int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
 	struct got_imsg_index_pack_progress iprogress;
 
-	iprogress.nobjects_total = nobjects_total;
-	iprogress.nobjects_indexed = nobjects_indexed;
+	iprogress.nobj_total = nobj_total;
+	iprogress.nobj_indexed = nobj_indexed;
+	iprogress.nobj_loose = nobj_loose;
+	iprogress.nobj_resolved = nobj_resolved;
 
 	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_PROGRESS, 0, 0, -1,
 	    &iprogress, sizeof(iprogress)) == -1)
@@ -805,8 +809,9 @@ got_privsep_send_index_pack_done(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_recv_index_progress(int *done, int *nobjects_total,
-    int *nobjects_indexed, struct imsgbuf *ibuf)
+got_privsep_recv_index_progress(int *done, int *nobj_total,
+    int *nobj_indexed, int *nobj_loose, int *nobj_resolved,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -814,8 +819,9 @@ got_privsep_recv_index_progress(int *done, int *nobjects_total,
 	size_t datalen;
 
 	*done = 0;
-	*nobjects_total = 0;
-	*nobjects_indexed = 0;
+	*nobj_total = 0;
+	*nobj_indexed = 0;
+	*nobj_resolved = 0;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
@@ -836,8 +842,10 @@ got_privsep_recv_index_progress(int *done, int *nobjects_total,
 			break;
 		}
 		iprogress = (struct got_imsg_index_pack_progress *)imsg.data;
-		*nobjects_total = iprogress->nobjects_total;
-		*nobjects_indexed = iprogress->nobjects_indexed;
+		*nobj_total = iprogress->nobj_total;
+		*nobj_indexed = iprogress->nobj_indexed;
+		*nobj_loose = iprogress->nobj_loose;
+		*nobj_resolved = iprogress->nobj_resolved;
 		break;
 	case GOT_IMSG_IDXPACK_DONE:
 		if (datalen != 0) {

@@ -277,12 +277,24 @@ struct got_imsg_fetch_download_progress {
 	off_t packfile_bytes;
 };
 
+/* Structure for GOT_IMSG_IDXPACK_REQUEST data. */
+struct got_imsg_index_pack_request {
+	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
+} __attribute__((__packed__));
+
 /* Structure for GOT_IMSG_IDXPACK_PROGRESS data. */
 struct got_imsg_index_pack_progress {
 	/* Total number of objects in pack file. */
-	int nobjects_total;
+	int nobj_total;
+
 	/* Number of objects indexed so far. */
-	int nobjects_indexed;
+	int nobj_indexed;
+
+	/* Number of non-deltified objects in pack file. */
+	int nobj_loose;
+
+	/* Number of deltified objects resolved so far. */
+	int nobj_resolved;
 };
 
 /* Structure for GOT_IMSG_PACKIDX. */
@@ -363,13 +375,13 @@ const struct got_error *got_privsep_send_blob_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_tmpfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_obj(struct imsgbuf *,
     struct got_object *);
-const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *, int,
-    struct got_object_id *);
+const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *,
+    uint8_t *, int);
 const struct got_error *got_privsep_send_index_pack_progress(struct imsgbuf *,
-    int, int);
+    int, int, int, int);
 const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
-    struct imsgbuf *ibuf);
+    int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
     struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,

@@ -971,7 +971,7 @@ done:
 
 static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
-    int nobjects_total, int nobjects_indexed)
+    int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
 	int *did_something = arg;
 	char scaled[FMT_SCALED_STRSIZE];
@@ -979,13 +979,16 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	if (message) {
 		printf("\rserver: %s", message);
 		*did_something = 1;
-	} else if (packfile_size > 0 || nobjects_indexed > 0) {
-		printf("\rfetching...");
+	} else if (packfile_size > 0 || nobj_indexed > 0) {
+		printf("\r");
 		if (fmt_scaled(packfile_size, scaled) == 0)
-			printf(" %*s", FMT_SCALED_STRSIZE, scaled);
-		if (nobjects_indexed > 0)
-			printf(" indexed %d/%d objects", nobjects_indexed,
-			    nobjects_total);
+			printf(" %*s fetched", FMT_SCALED_STRSIZE, scaled);
+		if (nobj_indexed > 0)
+			printf("; indexed %d/%d objects", nobj_indexed,
+			    nobj_total);
+		if (nobj_resolved > 0)
+			printf("; resolved %d/%d deltified objects ",
+			    nobj_resolved, nobj_total - nobj_loose);
 		*did_something = 1;
 	}
 	fflush(stdout);
@@ -1079,18 +1082,18 @@ cmd_clone(int argc, char *argv[])
 		struct got_object_id *id = pe->data;
 		struct got_reference *ref;
 
-		err = got_object_id_str(&id_str, id);
+
+		err = got_ref_alloc(&ref, refname, id);
 		if (err)
 			goto done;
 
-		err = got_ref_alloc(&ref, refname, id);
-		if (err) {
-			free(id_str);
+		#if 0
+		err = got_object_id_str(&id_str, id);
+		if (err)
 			goto done;
-		}
-
 		printf("%s: %s\n", got_ref_get_name(ref), id_str);
 		free(id_str);
+		#endif
 		err = got_ref_write(ref, repo);
 		got_ref_close(ref);
 		if (err)
