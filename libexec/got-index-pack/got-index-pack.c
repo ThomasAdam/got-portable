@@ -511,7 +511,7 @@ make_packidx(struct got_packidx *packidx, int nobj,
 	int i;
 	uint32_t idx = 0;
 
-	mergesort(objects, nobj, sizeof(struct got_indexed_object),
+	qsort(objects, nobj, sizeof(struct got_indexed_object),
 	    indexed_obj_cmp);
 
 	memset(packidx->hdr.fanout_table, 0,
