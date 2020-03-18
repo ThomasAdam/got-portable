@@ -973,7 +973,7 @@ static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
     int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
-	int *did_something = arg;
+	int *did_something = arg, p;
 	char scaled[FMT_SCALED_STRSIZE];
 	
 	if (message) {
@@ -983,12 +983,14 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 		printf("\r");
 		if (fmt_scaled(packfile_size, scaled) == 0)
 			printf(" %*s fetched", FMT_SCALED_STRSIZE, scaled);
-		if (nobj_indexed > 0)
-			printf("; indexed %d/%d objects", nobj_indexed,
-			    nobj_total);
-		if (nobj_resolved > 0)
-			printf("; resolved %d/%d deltified objects ",
-			    nobj_resolved, nobj_total - nobj_loose);
+		if (nobj_indexed > 0) {
+			p = (nobj_indexed * 100) / nobj_total;
+			printf("; indexing %d%%", p);
+		}
+		if (nobj_resolved > 0) {
+			p = (nobj_resolved * 100) / (nobj_total - nobj_loose);
+			printf("; resolving deltas %d%%", p);
+		}
 		*did_something = 1;
 	}
 	fflush(stdout);
