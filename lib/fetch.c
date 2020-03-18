@@ -314,9 +314,6 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 	err = got_privsep_send_fetch_req(&ibuf, fetchfd);
 	if (err != NULL)
 		return err;
-	err = got_privsep_wait_ack(&ibuf);
-	if (err != NULL)
-		return err;
 	err = got_privsep_send_tmpfd(&ibuf, npackfd);
 	if (err != NULL)
 		return err;
@@ -341,9 +338,6 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 	imsg_init(&ibuf, imsg_idxfds[0]);
 
 	err = got_privsep_send_index_pack_req(&ibuf, npackfd, packhash);
-	if (err != NULL)
-		return err;
-	err = got_privsep_wait_ack(&ibuf);
 	if (err != NULL)
 		return err;
 	err = got_privsep_send_tmpfd(&ibuf, nidxfd);

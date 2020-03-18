@@ -1236,7 +1236,6 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 	memcpy(packhash.sha1, imsg.data, SHA1_DIGEST_LENGTH);
-	got_privsep_send_ack(&ibuf);
 
 	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)

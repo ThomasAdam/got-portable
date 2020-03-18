@@ -429,7 +429,6 @@ main(int argc, char **argv)
 		goto done;
 	}
 	fetchfd = imsg.fd;
-	got_privsep_send_ack(&ibuf);
 
 	if((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)

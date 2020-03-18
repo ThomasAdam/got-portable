@@ -231,31 +231,6 @@ got_privsep_send_stop(int fd)
 }
 
 const struct got_error *
-got_privsep_send_ack(struct imsgbuf *ibuf)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_ACK, 0, 0, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose ACK");
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_wait_ack(struct imsgbuf *ibuf)
-{
-	const struct got_error *err = NULL;
-	struct imsg imsg;
-
-	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
-	if (err)
-		return err;
-	if (imsg.hdr.type == GOT_IMSG_ACK && imsg.hdr.len - IMSG_HEADER_SIZE == 0)
-		return NULL;
-	else
-		return got_error(GOT_ERR_PRIVSEP_MSG);
-	imsg_free(&imsg);
-}
-
-
-const struct got_error *
 got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd, NULL, 0)

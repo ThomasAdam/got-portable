@@ -85,9 +85,6 @@ enum got_imsg_type {
 	/* Stop the child process. */
 	GOT_IMSG_STOP,
 
-	/* We got a message as part of a sequence */
-	GOT_IMSG_ACK,
-
 	/*
 	 * Messages concerned with read access to objects in a repository.
 	 * Object and pack files are opened by the main process, where
