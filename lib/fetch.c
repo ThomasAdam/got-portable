@@ -47,6 +47,7 @@
 #include "got_cancel.h"
 #include "got_worktree.h"
 #include "got_object.h"
+#include "got_opentemp.h"
 
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
@@ -252,11 +253,12 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
 	char repo[GOT_REPOMAX], path[GOT_PATHMAX];
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd;
-	int packfd, npackfd, idxfd, nidxfd, status;
+	int packfd = -1, npackfd, idxfd = -1, nidxfd, status;
 	struct got_object_id packhash;
 	const struct got_error *err;
 	struct imsgbuf ibuf;
 	pid_t pid;
+	char *packpath = NULL, *idxpath = NULL;
 
 	fetchfd = -1;
 	if (got_parse_uri(uri, proto, host, port, path, repo) == -1)
@@ -270,15 +272,17 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 		return got_error_from_errno("enter new repo");
 	if (mkpath(".git/objects/pack") == -1)
 		return got_error_from_errno("mkpath");
-	packfd = open(".git/objects/pack/fetching.pack", O_CREAT|O_RDWR, 0644);
-	if (packfd == -1)
-		return got_error_from_errno("open pack");
+	err = got_opentemp_named_fd(&packpath, &packfd,
+	    ".git/objects/pack/fetching.pack");
+	if (err)
+		return err;
 	npackfd = dup(packfd);
 	if (npackfd == -1)
 		return got_error_from_errno("dup");
-	idxfd = open(".git/objects/pack/fetching.idx", O_CREAT|O_RDWR, 0644);
-	if (idxfd == -1)
-		return got_error_from_errno("open pack");
+	err = got_opentemp_named_fd(&idxpath, &idxfd,
+	    ".git/objects/pack/fetching.idx");
+	if (err)
+		return err;
 	nidxfd = dup(idxfd);
 	if (nidxfd == -1)
 		return got_error_from_errno("dup");
@@ -354,6 +358,9 @@ got_clone(char *uri, char *branch_filter, char *dirname)
 	if (waitpid(pid, &status, 0) == -1)
 		return got_error_from_errno("child exit");
 
+
+	free(packpath);
+	free(idxpath);
 
 	return NULL;
 
