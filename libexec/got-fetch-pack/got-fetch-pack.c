@@ -91,58 +91,75 @@ flushpkt(int fd)
 	return NULL;
 }
 
-
+/*
+ * Packet header contains a 4-byte hexstring which specifies the length
+ * of data which follows.
+ */
 static const struct got_error *
-readpkt(int *outlen, int fd, char *buf, int nbuf)
+read_pkthdr(int *datalen, int fd)
 {
-	const struct got_error *err = NULL;
+	static const struct got_error *err = NULL;
 	char lenstr[5];
 	long len;
 	char *e;
 	int n, i;
 	ssize_t r;
 
-	*outlen = 0;
+	*datalen = 0;
 
 	err = readn(&r, fd, lenstr, 4);
 	if (err)
 		return err;
+	if (r == 0) /* implicit "0000" */
+		return NULL;
 	if (r != 4)
-		return got_error(GOT_ERR_IO);
+		return got_error_msg(GOT_ERR_BAD_PACKET,
+		    "wrong packet header length");
 
 	lenstr[4] = '\0';
 	for (i = 0; i < 4; i++) {
 		if (!isxdigit(lenstr[i]))
-			return got_error(GOT_ERR_BAD_PACKET);
+			return got_error_msg(GOT_ERR_BAD_PACKET,
+			    "packet length not specified in hex");
 	}
 	errno = 0;
 	len = strtol(lenstr, &e, 16);
 	if (lenstr[0] == '\0' || *e != '\0')
 		return got_error(GOT_ERR_BAD_PACKET);
 	if (errno == ERANGE && (len == LONG_MAX || len == LONG_MIN))
-		return got_error(GOT_ERR_BAD_PACKET);
+		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
 	if (len > INT_MAX || len < INT_MIN)
-		return got_error(GOT_ERR_BAD_PACKET);
+		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
 	n = len;
-	if (n == 0) {
-		if (chattygit)
-			fprintf(stderr, "readpkt: 0000\n");
+	if (n == 0)
 		return NULL;
-	}
 	if (n <= 4)
-		return got_error(GOT_ERR_BAD_PACKET);
+		return got_error_msg(GOT_ERR_BAD_PACKET, "packet too short");
 	n  -= 4;
-	if (n >= nbuf)
-		return got_error(GOT_ERR_NO_SPACE);
 
-	err = readn(&r, fd, buf, n);
+	*datalen = n;
+	return NULL;
+}
+
+static const struct got_error *
+readpkt(int *outlen, int fd, char *buf, int buflen)
+{
+	const struct got_error *err = NULL;
+	int datalen;
+	ssize_t n;
+
+	err = read_pkthdr(&datalen, fd);
 	if (err)
 		return err;
-	if (r != n)
-		return got_error(GOT_ERR_BAD_PACKET);
-	buf[n] = 0;
-	if (chattygit)
-		fprintf(stderr, "readpkt: %s:\t%.*s\n", lenstr, nbuf, buf);
+
+	if (datalen > buflen)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	err = readn(&n, fd, buf, datalen);
+	if (err)
+		return err;
+	if (n != datalen)
+		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
 
 	*outlen = n;
 	return NULL;
@@ -320,13 +337,23 @@ parse_refline(char **id_str, char **refname, char **server_capabilities,
 	return NULL;
 }
 
+#define GOT_CAPA_AGENT			"agent"
+#define GOT_CAPA_OFS_DELTA		"ofs-delta"
+#define GOT_CAPA_SIDE_BAND_64K		"side-band-64k"
+
+#define GOT_SIDEBAND_PACKFILE_DATA	1
+#define GOT_SIDEBAND_PROGRESS_INFO	2
+#define GOT_SIDEBAND_ERROR_INFO		3
+
+
 struct got_capability {
 	const char *key;
 	const char *value;
 };
 static const struct got_capability got_capabilities[] = {
-	{ "ofs-delta", NULL },
-	{ "agent", "got/" GOT_VERSION_STR },
+	{ GOT_CAPA_AGENT, "got/" GOT_VERSION_STR },
+	{ GOT_CAPA_OFS_DELTA, NULL },
+	{ GOT_CAPA_SIDE_BAND_64K, NULL },
 };
 
 static const struct got_error *
@@ -428,6 +455,50 @@ match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
 }
 
 static const struct got_error *
+fetch_progress(struct imsgbuf *ibuf, const char *buf, size_t len)
+{
+	int i;
+
+
+	if (len == 0)
+		return NULL;
+
+	/*
+	 * Truncate messages which exceed the maximum imsg payload size.
+	 * Server may send up to 64k.
+	 */
+	if (len > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		len = MAX_IMSGSIZE - IMSG_HEADER_SIZE;
+
+	/* Only allow printable ASCII. */
+	for (i = 0; i < len; i++) {
+		if (isprint((unsigned char)buf[i]) ||
+		    isspace((unsigned char)buf[i]))
+			continue;
+		return got_error_msg(GOT_ERR_BAD_PACKET,
+		    "non-printable progress message received from server");
+	}
+
+	return got_privsep_send_fetch_server_progress(ibuf, buf, len);
+}
+
+static const struct got_error *
+fetch_error(const char *buf, size_t len)
+{
+	static char msg[1024];
+	int i;
+
+	for (i = 0; i < len && i < sizeof(msg) - 1; i++) {
+		if (!isprint(buf[i]))
+			return got_error_msg(GOT_ERR_BAD_PACKET,
+			    "non-printable error message received from server");
+		msg[i] = buf[i];
+	}
+	msg[i] = '\0';
+	return got_error_msg(GOT_ERR_FETCH_FAILED, msg);
+}
+
+static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, struct imsgbuf *ibuf)
 {
@@ -442,6 +513,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
+	int have_sidebands = 0;
 
 	TAILQ_INIT(&symrefs);
 
@@ -462,16 +534,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (n == 0)
 			break;
 		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
-			static char msg[1024];
-			for (i = 0; i < n && i < sizeof(msg) - 1; i++) {
-				if (!isprint(buf[i])) {
-					err = got_error(GOT_ERR_FETCH_FAILED);
-					goto done;
-				}
-				msg[i] = buf[i];
-			}
-			msg[i] = '\0';
-			err = got_error_msg(GOT_ERR_FETCH_FAILED, msg);
+			err = fetch_error(&buf[4], n - 4);
 			goto done;
 		}
 		err = parse_refline(&id_str, &refname, &server_capabilities,
@@ -584,20 +647,96 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	 * will now send a "NAK" (meaning no common objects were found).
 	 */
 	if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
-		err = got_error(GOT_ERR_BAD_PACKET);
+		err = got_error_msg(GOT_ERR_BAD_PACKET,
+		    "unexpected message from server");
 		goto done;
 	}
 
 	if (chattygit)
 		fprintf(stderr, "fetching...\n");
+
+	if (my_capabilities != NULL &&
+	    strstr(my_capabilities, GOT_CAPA_SIDE_BAND_64K) != NULL)
+		have_sidebands = 1;
+
 	packsz = 0;
 	while (1) {
-		ssize_t r, w;
-		err = readn(&r, fd, buf, sizeof buf);
-		if (err)
-			goto done;
-		if (r == 0)
-			break;
+		ssize_t r = 0, w;
+		int datalen = -1;
+
+		if (have_sidebands) {
+			err = read_pkthdr(&datalen, fd);
+			if (err)
+				goto done;
+			if (datalen <= 0)
+				break;
+
+			/* Read sideband channel ID (one byte). */
+			r = read(fd, buf, 1);
+			if (r == -1) {
+				err = got_error_from_errno("read");
+				goto done;
+			}
+			if (r != 1) {
+				err = got_error_msg(GOT_ERR_BAD_PACKET,
+				    "short packet");
+				goto done;
+			}
+			if (datalen > sizeof(buf) - 5) {
+				err = got_error_msg(GOT_ERR_BAD_PACKET,
+				    "bad packet length");
+				goto done;
+			}
+			datalen--; /* sideband ID has been read */
+			if (buf[0] == GOT_SIDEBAND_PACKFILE_DATA) {
+				/* Read packfile data. */
+				err = readn(&r, fd, buf, datalen);
+				if (err)
+					goto done;
+				if (r != datalen) {
+					err = got_error_msg(GOT_ERR_BAD_PACKET,
+					    "packet too short");
+					goto done;
+				}
+			} else if (buf[0] == GOT_SIDEBAND_PROGRESS_INFO) {
+				err = readn(&r, fd, buf, datalen);
+				if (err)
+					goto done;
+				if (r != datalen) {
+					err = got_error_msg(GOT_ERR_BAD_PACKET,
+					    "packet too short");
+					goto done;
+				}
+				err = fetch_progress(ibuf, buf, r);
+				if (err)
+					goto done;
+				continue;
+			} else if (buf[0] == GOT_SIDEBAND_ERROR_INFO) {
+				err = readn(&r, fd, buf, datalen);
+				if (err)
+					goto done;
+				if (r != datalen) {
+					err = got_error_msg(GOT_ERR_BAD_PACKET,
+					    "packet too short");
+					goto done;
+				}
+				err = fetch_error(buf, r);
+				goto done;
+			} else {
+				err = got_error_msg(GOT_ERR_BAD_PACKET,
+				    "unknown side-band received from server");
+				goto done;
+			}
+		} else {
+			/* No sideband channel. Every byte is packfile data. */
+			err = readn(&r, fd, buf, sizeof buf);
+			if (err)
+				goto done;
+			if (r <= 0)
+				break;
+		}
+
+		/* Write packfile data to temporary pack file. */
 		w = write(packfd, buf, r);
 		if (w == -1) {
 			err = got_error_from_errno("write");
@@ -607,7 +746,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error(GOT_ERR_IO);
 			goto done;
 		}
-		packsz += r;
+		packsz += w;
 	}
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");

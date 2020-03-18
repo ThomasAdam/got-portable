@@ -21,6 +21,7 @@
 #include <sys/syslimits.h>
 #include <sys/wait.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -569,6 +570,24 @@ got_privsep_send_fetch_progress(struct imsgbuf *ibuf,
 }
 
 const struct got_error *
+got_privsep_send_fetch_server_progress(struct imsgbuf *ibuf, const char *msg,
+    size_t msglen)
+{
+	if (msglen > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (msglen == 0)
+		return NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_SERVER_PROGRESS, 0, 0, -1,
+	    msg, msglen) == -1)
+		return got_error_from_errno(
+		    "imsg_compose FETCH_SERVER_PROGRESS");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
@@ -580,30 +599,33 @@ got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
 
 const struct got_error *
 got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
-    char **refname, struct got_pathlist_head *symrefs, struct imsgbuf *ibuf)
+    char **refname, struct got_pathlist_head *symrefs, char **server_progress,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
 	size_t datalen;
-	const size_t min_datalen =
-	    MIN(MIN(sizeof(struct got_imsg_error),
-	    sizeof(struct got_imsg_fetch_progress)),
-	    sizeof(struct got_imsg_fetch_symrefs));
 	struct got_imsg_fetch_symrefs *isymrefs = NULL;
 	size_t n, remain;
 	off_t off;
+	int i;
 
 	*done = 0;
 	*id = NULL;
 	*refname = NULL;
+	*server_progress = NULL;
 
-	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
 		return err;
 
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 	switch (imsg.hdr.type) {
 	case GOT_IMSG_ERROR:
+		if (datalen < sizeof(struct got_imsg_error)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
 		err = recv_imsg_error(&imsg, datalen);
 		break;
 	case GOT_IMSG_FETCH_SYMREFS:
@@ -661,21 +683,41 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 		}
 		break;
 	case GOT_IMSG_FETCH_PROGRESS:
+		if (datalen <= SHA1_DIGEST_LENGTH) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
 		*id = malloc(sizeof(**id));
 		if (*id == NULL) {
 			err = got_error_from_errno("malloc");
 			break;
 		}
 		memcpy((*id)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
-		if (datalen <= SHA1_DIGEST_LENGTH) {
-			err = got_error(GOT_ERR_PRIVSEP_MSG);
-			break;
-		}
 		*refname = strndup(imsg.data + SHA1_DIGEST_LENGTH,
 		    datalen - SHA1_DIGEST_LENGTH);
 		if (*refname == NULL) {
 			err = got_error_from_errno("strndup");
 			break;
+		}
+		break;
+	case GOT_IMSG_FETCH_SERVER_PROGRESS:
+		if (datalen == 0) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		*server_progress = strndup(imsg.data, datalen);
+		if (*server_progress == NULL) {
+			err = got_error_from_errno("strndup");
+			break;
+		}
+		for (i = 0; i < datalen; i++) {
+			if (!isprint((unsigned char)(*server_progress)[i]) &&
+			    !isspace((unsigned char)(*server_progress)[i])) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				free(*server_progress);
+				*server_progress = NULL;
+				goto done;
+			}
 		}
 		break;
 	case GOT_IMSG_FETCH_DONE:

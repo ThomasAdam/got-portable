@@ -38,6 +38,10 @@ const struct got_error *got_fetch_parse_uri(char **, char **, char **,
 const struct got_error *got_fetch_connect(int *, const char *, const char *,
     const char *, const char *);
 
+/* A callback function which gets invoked with progress information to print. */
+typedef const struct got_error *(*got_fetch_progress_cb)(void *,
+    const char *);
+
 /*
  * Attempt to fetch a packfile from a server. This pack file will contain
  * objects which that are not yet contained in the provided repository.
@@ -46,4 +50,4 @@ const struct got_error *got_fetch_connect(int *, const char *, const char *,
  */
 const struct got_error *got_fetch_pack(struct got_object_id **,
 	struct got_pathlist_head *, struct got_pathlist_head *, int,
-	struct got_repository *);
+	struct got_repository *, got_fetch_progress_cb, void *);

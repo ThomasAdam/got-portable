@@ -969,6 +969,15 @@ done:
 }
 
 static const struct got_error *
+fetch_progress(void *arg, const char *message)
+{
+	char *servername = arg;
+	printf("\rserver %s: %s", servername, message);
+	fflush(stdout);
+	return NULL;
+}
+
+static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
@@ -1036,7 +1045,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	err = got_fetch_pack(&pack_hash, &refs, &symrefs, fetchfd,
-	    repo);
+	    repo, fetch_progress, host);
 	if (err)
 		goto done;
 

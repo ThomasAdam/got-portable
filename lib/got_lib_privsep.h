@@ -112,6 +112,7 @@ enum got_imsg_type {
 	GOT_IMSG_FETCH_REQUEST,
 	GOT_IMSG_FETCH_SYMREFS,
 	GOT_IMSG_FETCH_PROGRESS,
+	GOT_IMSG_FETCH_SERVER_PROGRESS,
 	GOT_IMSG_FETCH_DONE,
 	GOT_IMSG_IDXPACK_REQUEST,
 	GOT_IMSG_IDXPACK_DONE,
@@ -356,9 +357,11 @@ const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
     struct got_pathlist_head *);
 const struct got_error *got_privsep_send_fetch_progress(struct imsgbuf *,
     struct got_object_id *, const char *);
+const struct got_error *got_privsep_send_fetch_server_progress(struct imsgbuf *,
+    const char *, size_t);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *,
-    struct imsgbuf *);
+    char **, struct imsgbuf *);
 const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
     struct got_object_id);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,

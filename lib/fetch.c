@@ -299,7 +299,8 @@ done:
 
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
-    struct got_pathlist_head *symrefs, int fetchfd, struct got_repository *repo)
+    struct got_pathlist_head *symrefs, int fetchfd, struct got_repository *repo,
+    got_fetch_progress_cb progress_cb, void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
@@ -387,9 +388,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	while (!done) {
 		struct got_object_id *id = NULL;
 		char *refname = NULL;
+		char *server_progress = NULL;
 
 		err = got_privsep_recv_fetch_progress(&done,
-		    &id, &refname, symrefs, &ibuf);
+		    &id, &refname, symrefs, &server_progress, &ibuf);
 		if (err != NULL)
 			goto done;
 		if (done)
@@ -398,14 +400,25 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			err = got_pathlist_append(refs, refname, id);
 			if (err)
 				goto done;
+		} else if (server_progress) {
+			char *s, *s0 = server_progress;
+			while ((s = strsep(&s0, "\r")) != NULL) {
+				if (*s == '\0')
+					continue;
+				err = progress_cb(progress_arg, s);
+				if (err)
+					break;
+			}
+			free(server_progress);
+			if (err)
+				goto done;
 		}
-		/* TODO remote status / download progress callback */
 	}
 	if (waitpid(pid, &status, 0) == -1) {
 		err = got_error_from_errno("waitpid");
 		goto done;
 	}
-
+ 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1) {
 		err = got_error_from_errno("socketpair");
 		goto done;
