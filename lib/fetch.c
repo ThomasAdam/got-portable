@@ -66,13 +66,6 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
-#define GOT_PROTOMAX	64
-#define GOT_HOSTMAX	256
-#define GOT_PATHMAX	512
-#define GOT_REPOMAX	256
-#define GOT_PORTMAX	16
-#define GOT_URIMAX	1024
-
 static int
 hassuffix(char *base, char *suf)
 {
