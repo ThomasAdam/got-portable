@@ -125,18 +125,25 @@ readpkt(int *outlen, int fd, char *buf, int nbuf)
 	return NULL;
 }
 
-static int
+static const struct got_error *
 writepkt(int fd, char *buf, int nbuf)
 {
 	char len[5];
 	int i;
+	ssize_t w;
 
 	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
-		return -1;
-	if (write(fd, len, 4) != 4)
-		return -1;
-	if (write(fd, buf, nbuf) != nbuf)
-		return -1;
+		return got_error(GOT_ERR_NO_SPACE);
+	w = write(fd, len, 4);
+	if (w == -1)
+		return got_error_from_errno("write");
+	if (w != 4)
+		return got_error(GOT_ERR_IO);
+	w = write(fd, buf, nbuf);
+	if (w == -1)
+		return got_error_from_errno("write");
+	if (w != nbuf)
+		return got_error(GOT_ERR_IO);
 	if (chattygit) {
 		fprintf(stderr, "writepkt: %s:\t", len);
 		fwrite(buf, 1, nbuf, stderr);
@@ -146,7 +153,7 @@ writepkt(int fd, char *buf, int nbuf)
 		}
 		fputc('\n', stderr);
 	}
-	return 0;
+	return NULL;
 }
 
 static const struct got_error *
@@ -516,10 +523,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		if (writepkt(fd, buf, n) == -1) {
-			err = got_error_from_errno("writepkt");
+		err = writepkt(fd, buf, n);
+		if (err)
 			goto done;
-		}
 		req = 1;
 	}
 	flushpkt(fd);
@@ -532,20 +538,18 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		if (writepkt(fd, buf, n + 1) == -1) {
-			err = got_error_from_errno("writepkt");
+		err = writepkt(fd, buf, n + 1);
+		if (err)
 			goto done;
-		}
 	}
 	if (!req) {
 		fprintf(stderr, "up to date\n");
 		flushpkt(fd);
 	}
 	n = snprintf(buf, sizeof(buf), "done\n");
-	if (writepkt(fd, buf, n) == -1) {
-		err = got_error_from_errno("writepkt");
+	err = writepkt(fd, buf, n);
+	if (err)
 		goto done;
-	}
 	if (!req)
 		return 0;
 
