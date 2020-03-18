@@ -584,7 +584,14 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	err = readpkt(&n, fd, buf, sizeof(buf));
 	if (err)
 		goto done;
-	buf[n] = 0;
+	/*
+	 * For now, we only support a full clone, in which case the server
+	 * will now send a "NAK" (meaning no common objects were found).
+	 */
+	if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
+		err = got_error(GOT_ERR_BAD_PACKET);
+		goto done;
+	}
 
 	if (chattygit)
 		fprintf(stderr, "fetching...\n");
