@@ -69,49 +69,6 @@
 #define GOT_URIMAX	1024
 
 static int
-mkpath(char *path)
-{
-	char *p, namebuf[PATH_MAX];
-	struct stat sb;
-	int done;
-
-	while (*path == '/')
-		path++;
-	if (strlcpy(namebuf, path, sizeof(namebuf)) >= sizeof(namebuf)) {
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-
-	p = namebuf;
-	for (;;) {
-		p += strspn(p, "/");
-		p += strcspn(p, "/");
-		done = (*p == '\0');
-		*p = '\0';
-
-		if (mkdir(namebuf, 0755) != 0) {
-			int mkdir_errno = errno;
-			if (stat(path, &sb) == -1) {
-				/* Not there; use mkdir()s errno */
-				errno = mkdir_errno;
-				return -1;
-			}
-			if (!S_ISDIR(sb.st_mode)) {
-				/* Is there, but isn't a directory */
-				errno = ENOTDIR;
-				return -1;
-			}
-		}
-
-		if (done)
-			break;
-		*p = '/';
-	}
-
-	return 0;
-}
-
-static int
 hassuffix(char *base, char *suf)
 {
 	int nb, ns;
@@ -289,7 +246,7 @@ const struct got_error*
 got_fetch(char *uri, char *branch_filter, char *destdir)
 {
 	char proto[GOT_PROTOMAX], host[GOT_HOSTMAX], port[GOT_PORTMAX];
-	char repo[GOT_REPOMAX], path[GOT_PATHMAX];
+	char repo_name[GOT_REPOMAX], server_path[GOT_PATHMAX];
 	int imsg_fetchfds[2], imsg_idxfds[2], fetchfd = -1;
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1;
 	int status, done = 0;
@@ -299,31 +256,40 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	pid_t pid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL, *default_destdir = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
+	const char *repo_path;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
+	struct got_repository *repo = NULL;
+	char *path;
 
 	TAILQ_INIT(&symrefs);
 
 	fetchfd = -1;
-	if (got_parse_uri(uri, proto, host, port, path, repo) == -1)
+	if (got_parse_uri(uri, proto, host, port, server_path, repo_name) == -1)
 		return got_error(GOT_ERR_PARSE_URI);
 	if (destdir == NULL) {
-		if (asprintf(&default_destdir, "%s.git", repo) == -1)
+		if (asprintf(&default_destdir, "%s.git", repo_name) == -1)
 			return got_error_from_errno("asprintf");
-	}
-	err = got_repo_init(destdir ? destdir : default_destdir);
+		repo_path = default_destdir;
+	} else
+		repo_path = destdir;
+	err = got_repo_init(repo_path);
 	if (err != NULL)
 		goto done;
-	if (chdir(destdir ? destdir : default_destdir)) {
-		err = got_error_from_errno("enter new repo");
+	if (asprintf(&path, "%s/objects/path", repo_path) == -1) {
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	if (mkpath("objects/pack") == -1) {
-		err = got_error_from_errno("mkpath");
+	err = got_path_mkdir(path);
+	free(path);
+	if (err)
+		goto done;
+	if (asprintf(&path, "%s/objects/path/fetching.pack", repo_path) == -1) {
+		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	err = got_opentemp_named_fd(&tmppackpath, &packfd,
-	    "objects/pack/fetching.pack");
+	err = got_opentemp_named_fd(&tmppackpath, &packfd, path);
+	free(path);
 	if (err)
 		goto done;
 	npackfd = dup(packfd);
@@ -331,8 +297,12 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_opentemp_named_fd(&tmpidxpath, &idxfd,
-	    "objects/pack/fetching.idx");
+	if (asprintf(&path, "%s/objects/path/fetching.idx", repo_path) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path);
+	free(path);
 	if (err)
 		goto done;
 	nidxfd = dup(idxfd);
@@ -342,9 +312,9 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	}
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
-		err = dial_ssh(&fetchfd, host, port, path, "upload");
+		err = dial_ssh(&fetchfd, host, port, server_path, "upload");
 	else if (strcmp(proto, "git") == 0)
-		err = dial_git(&fetchfd, host, port, path, "upload");
+		err = dial_git(&fetchfd, host, port, server_path, "upload");
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
 		err = got_error(GOT_ERR_BAD_PROTO);
 	else
@@ -384,6 +354,10 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		goto done;
 	}
 
+	err = got_repo_open(&repo, repo_path, NULL);
+	if (err)
+		goto done;
+
 	while (!done) {
 		struct got_object_id *id;
 		char *refname;
@@ -405,13 +379,23 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 				    (const char *)pe->data);
 			}
 			printf("\n");
-		} else if (id) {
+		} else if (refname && id) {
+			struct got_reference *ref;
 			char *id_str;
 			/* TODO Use a progress callback */
 			err = got_object_id_str(&id_str, id);
 			if (err)
 				goto done;
 			printf( "%.12s %s\n", id_str, refname);
+
+			err = got_ref_alloc(&ref, refname, id);
+			if (err)
+				goto done;
+
+			err = got_ref_write(ref, repo);
+			got_ref_close(ref);
+			if (err)
+				goto done;
 		}
 	}
 	if (waitpid(pid, &status, 0) == -1) {
@@ -460,12 +444,14 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 	err = got_object_id_str(&id_str, packhash);
 	if (err)
 		goto done;
-	if (asprintf(&packpath, "objects/pack/pack-%s.pack", id_str) == -1) {
+	if (asprintf(&packpath, "%s/objects/pack/pack-%s.pack",
+	    repo_path, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
-	if (asprintf(&idxpath, "objects/pack/pack-%s.idx", id_str) == -1) {
+	if (asprintf(&idxpath, "%s/objects/pack/pack-%s.idx",
+	    repo_path, id_str) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -478,6 +464,35 @@ got_fetch(char *uri, char *branch_filter, char *destdir)
 		err = got_error_from_errno3("rename", tmpidxpath, idxpath);
 		goto done;
 	}
+
+	/* Set the HEAD reference if the server provided one. */
+	TAILQ_FOREACH(pe, &symrefs, entry) {
+		struct got_reference *symref, *target_ref;
+		const char *refname = pe->path;
+		const char *target = pe->data;
+
+		if (strcmp(refname, GOT_REF_HEAD) != 0)
+			continue;
+
+		err = got_ref_open(&target_ref, repo, target, 0);
+		if (err) {
+			if (err->code == GOT_ERR_NOT_REF)
+				continue;
+			goto done;
+		}
+
+		err = got_ref_alloc_symref(&symref, GOT_REF_HEAD, target_ref);
+		got_ref_close(target_ref);
+		if (err)
+			goto done;
+
+		err = got_ref_write(symref, repo);
+		got_ref_close(symref);
+		if (err)
+			goto done;
+		break;
+	}
+
 done:
 	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
@@ -487,6 +502,8 @@ done:
 		err = got_error_from_errno("close");
 	if (idxfd != -1 && close(idxfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	if (repo)
+		got_repo_close(repo);
 	free(tmppackpath);
 	free(tmpidxpath);
 	free(idxpath);
