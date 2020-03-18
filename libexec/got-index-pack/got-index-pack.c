@@ -554,12 +554,6 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 			nloose++;
 			update_packidx(&nlarge, &packidx, nobj, obj);
 		}
-
-		if (lseek(pack->fd, obj->off + obj->tslen + obj->len,
-		    SEEK_SET) == -1) {
-			err = got_error_from_errno("lseek");
-			goto done;
-		}
 	}
 	nvalid = nloose;
 
