@@ -55,7 +55,7 @@ read_tag_object(struct got_tag_object **tag, FILE *f)
 	size_t len;
 	uint8_t *p;
 
-	err = got_inflate_to_mem(&p, &len, f);
+	err = got_inflate_to_mem(&p, &len, NULL, f);
 	if (err)
 		return err;
 

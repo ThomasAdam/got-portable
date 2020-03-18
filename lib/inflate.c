@@ -81,9 +81,11 @@ done:
 }
 
 const struct got_error *
-got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
+got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
+   size_t *consumed)
 {
 	size_t last_total_out = zb->z.total_out;
+	size_t last_total_in = zb->z.total_in;
 	z_stream *z = &zb->z;
 	int ret = Z_ERRNO;
 
@@ -91,6 +93,8 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 	z->avail_out = zb->outlen;
 
 	*outlenp = 0;
+	if (consumed)
+		*consumed = 0;
 	do {
 		if (z->avail_in == 0) {
 			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
@@ -116,6 +120,8 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp)
 	}
 
 	*outlenp = z->total_out - last_total_out;
+	if (consumed)
+		*consumed += z->total_in - last_total_in;
 	return NULL;
 }
 
@@ -209,10 +215,11 @@ got_inflate_end(struct got_inflate_buf *zb)
 }
 
 const struct got_error *
-got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
+got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
+    size_t *consumed_total, FILE *f)
 {
 	const struct got_error *err;
-	size_t avail;
+	size_t avail, consumed;
 	struct got_inflate_buf zb;
 	void *newbuf;
 	int nbuf = 1;
@@ -225,12 +232,16 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen, FILE *f)
 		return err;
 
 	*outlen = 0;
+	if (consumed_total)
+		*consumed_total = 0;
 
 	do {
-		err = got_inflate_read(&zb, f, &avail);
+		err = got_inflate_read(&zb, f, &avail, &consumed);
 		if (err)
 			goto done;
 		*outlen += avail;
+		if (consumed_total)
+			*consumed_total += consumed;
 		if (zb.flags & GOT_INFLATE_F_HAVE_MORE) {
 			newbuf = reallocarray(*outbuf, ++nbuf,
 			   GOT_INFLATE_BUFSIZE);
@@ -362,7 +373,7 @@ got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, infile, &avail);
+		err = got_inflate_read(&zb, infile, &avail, NULL);
 		if (err)
 			goto done;
 		if (avail > 0) {
@@ -399,7 +410,7 @@ got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	*outlen = 0;
 
 	do {
-		err = got_inflate_read(&zb, infile, &avail);
+		err = got_inflate_read(&zb, infile, &avail, NULL);
 		if (err)
 			goto done;
 		if (avail > 0) {

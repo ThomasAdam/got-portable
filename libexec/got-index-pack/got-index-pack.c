@@ -530,7 +530,7 @@ readrdelta(FILE *f, Object *o, int nd, int flag)
 		goto error;
 	if(hasheq(&o->hash, &h))
 		goto error;
-	if ((e = got_inflate_to_mem(&d, &n, f)) != NULL)
+	if ((e = got_inflate_to_mem(&d, &n, NULL, f)) != NULL)
 		goto error;
 	o->len = ftello(f) - o->off;
 	if(d == NULL || n != nd)
@@ -572,7 +572,7 @@ readodelta(FILE *f, Object *o, off_t nd, off_t p, int flag)
 		goto error;
 	}
 
-	if (got_inflate_to_mem(&d, &n, f) != NULL)
+	if (got_inflate_to_mem(&d, &n, NULL, f) != NULL)
 		goto error;
 	o->len = ftello(f) - o->off;
 	if(d == NULL || n != nd)
@@ -632,7 +632,7 @@ readpacked(FILE *f, Object *o, int flag)
 		b.data = emalloc(b.sz);
 		n = snprintf(b.data, 64, "%s %lld", typestr(t), l) + 1;
 		b.len = n;
-		e = got_inflate_to_mem(&data, &ndata, f);
+		e = got_inflate_to_mem(&data, &ndata, NULL, f);
 		if (e != NULL || n + ndata >= b.sz) {
 			free(b.data);
 			return -1;
@@ -674,7 +674,7 @@ readloose(FILE *f, Object *o, int flag)
 	size_t n;
 	int l;
 
-	if (got_inflate_to_mem(&d, &n, f) != NULL)
+	if (got_inflate_to_mem(&d, &n, NULL, f) != NULL)
 		return -1;
 
 	s = (char *)d;

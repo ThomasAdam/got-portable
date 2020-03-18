@@ -30,13 +30,14 @@ struct got_inflate_buf {
 const struct got_error *got_inflate_init(struct got_inflate_buf *, uint8_t *,
     size_t);
 const struct got_error *got_inflate_read(struct got_inflate_buf *, FILE *,
-    size_t *);
+    size_t *, size_t *);
 const struct got_error *got_inflate_read_fd(struct got_inflate_buf *, int,
     size_t *);
 const struct got_error *got_inflate_read_mmap(struct got_inflate_buf *,
     uint8_t *, size_t, size_t, size_t *, size_t *);
 void got_inflate_end(struct got_inflate_buf *);
-const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, FILE *);
+const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, size_t *,
+    FILE *);
 const struct got_error *got_inflate_to_mem_fd(uint8_t **, size_t *, int);
 const struct got_error *got_inflate_to_mem_mmap(uint8_t **, size_t *, uint8_t *,
     size_t, size_t);

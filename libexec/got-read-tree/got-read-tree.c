@@ -56,7 +56,7 @@ read_tree_object(struct got_pathlist_head *entries, int *nentries,
 	struct got_object *obj;
 	size_t len;
 
-	err = got_inflate_to_mem(p, &len, f);
+	err = got_inflate_to_mem(p, &len, NULL, f);
 	if (err)
 		return err;
 
