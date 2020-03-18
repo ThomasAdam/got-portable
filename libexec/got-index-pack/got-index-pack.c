@@ -717,8 +717,7 @@ index_pack(struct got_pack *pack, int idxfd, uint8_t *pack_hash,
 
 	if (nloose + nresolved != nobj) {
 		static char msg[64];
-		snprintf(msg, sizeof(msg),
-		    "discovered only %d of %d objects",
+		snprintf(msg, sizeof(msg), "discovered only %d of %d objects",
 		    nloose + nresolved, nobj);
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
 		goto done;
