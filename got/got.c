@@ -873,17 +873,10 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 		printf("\r");
 	if (print_size)
 		printf("%*s fetched", FMT_SCALED_STRSIZE, scaled_size);
-	if (print_indexed) {
+	if (print_indexed)
 		printf("; indexing %d%%", p_indexed);
-		if (a->verbosity > 0)
-			printf(" (%d/%d)", nobj_indexed, nobj_total);
-	}
-	if (print_resolved) {
+	if (print_resolved)
 		printf("; resolving deltas %d%%", p_resolved);
-		if (a->verbosity > 0)
-			printf(" (%d/%d)", nobj_resolved,
-			    nobj_total - nobj_loose);
-	}
 	if (print_size || print_indexed || print_resolved)
 		fflush(stdout);
 
@@ -1092,12 +1085,9 @@ cmd_clone(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		if (verbosity > 1) {
+		if (verbosity >= 0)
 			printf("Setting %s to %s\n", GOT_REF_HEAD,
 			    got_ref_get_symref_target(symref));
-		}
-		if (verbosity >= 0)
-			printf("Created cloned repository '%s'\n", repo_path);
 
 		error = got_ref_write(symref, repo);
 		got_ref_close(symref);
@@ -1128,8 +1118,13 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 	}
 	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
-	if (n != strlen(gitconfig))
+	if (n != strlen(gitconfig)) {
 		error = got_ferror(gitconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+
+	if (verbosity >= 0)
+		printf("Created cloned repository '%s'\n", repo_path);
 done:
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
