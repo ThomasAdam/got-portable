@@ -421,9 +421,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 
 	len = sizeof(struct got_imsg_fetch_symrefs);
 	TAILQ_FOREACH(pe, have_refs, entry) {
-		struct got_object_id *id = pe->data;
-		len += sizeof(struct got_imsg_fetch_have_ref) +
-		    pe->path_len + sizeof(id->sha1);
+		len += sizeof(struct got_imsg_fetch_have_ref) + pe->path_len;
 		n_have_refs++;
 	}
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {

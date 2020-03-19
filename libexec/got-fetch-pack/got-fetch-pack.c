@@ -145,7 +145,7 @@ static const struct got_error *
 readpkt(int *outlen, int fd, char *buf, int buflen)
 {
 	const struct got_error *err = NULL;
-	int datalen;
+	int datalen, i;
 	ssize_t n;
 
 	err = read_pkthdr(&datalen, fd);
@@ -160,6 +160,16 @@ readpkt(int *outlen, int fd, char *buf, int buflen)
 		return err;
 	if (n != datalen)
 		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
+
+	if (chattygit) {
+		fprintf(stderr, "readpkt: %zd:\t", n);
+		fwrite(buf, 1, n, stderr);
+		for (i = 0; i < n; i++) {
+			if (isprint(buf[i]))
+				fputc(buf[i], stderr);
+		}
+		fputc('\n', stderr);
+	}
 
 	*outlen = n;
 	return NULL;
@@ -196,22 +206,23 @@ writepkt(int fd, char *buf, int nbuf)
 	return NULL;
 }
 
-static const struct got_error *
-match_remote_ref(struct got_pathlist_head *have_refs, struct got_object_id *id,
-    char *refname, char *id_str)
+static void
+match_remote_ref(struct got_pathlist_head *have_refs,
+    struct got_object_id *my_id, char *refname)
 {
 	struct got_pathlist_entry *pe;
 
-	memset(id, 0, sizeof(*id));
+	/* XXX zero-hash signifies we don't have this ref;
+	 * we should use a flag instead */
+	memset(my_id, 0, sizeof(*my_id));
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
-		if (strcmp(pe->path, refname) == 0) {
-			if (!got_parse_sha1_digest(id->sha1, id_str))
-				return got_error(GOT_ERR_BAD_OBJ_ID_STR);
+		struct got_object_id *id = pe->data;
+		if (strcmp(pe->path, refname) == 0) { 
+			memcpy(my_id, id, sizeof(*my_id));
 			break;
 		}
 	}
-	return NULL;
 }
 
 static int
@@ -468,7 +479,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;
-	int i, n, req;
+	int i, n, nwant = 0, nhave = 0, acked = 0;
 	off_t packsz = 0, last_reported_packsz = 0;
 	char *id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
@@ -516,8 +527,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
 				goto done;
+			is_firstpkt = 0;
+			continue;
 		}
-		is_firstpkt = 0;
 		if (strstr(refname, "^{}"))
 			continue;
 		if (fetchbranch && !match_branch(refname, fetchbranch))
@@ -539,21 +551,17 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error(GOT_ERR_BAD_OBJ_ID_STR);
 			goto done;
 		}
-
-		err = match_remote_ref(have_refs, &have[nref], id_str, refname);
-		if (err)
-			goto done;
-
+		match_remote_ref(have_refs, &have[nref], refname);
 		err = got_privsep_send_fetch_ref(ibuf, &want[nref],
 		    refname);
 		if (err)
 			goto done;
+
 		if (chattygit)
 			fprintf(stderr, "remote %s\n", refname);
 		nref++;
 	}
 
-	req = 0;
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
 			continue;
@@ -568,15 +576,22 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = writepkt(fd, buf, n);
 		if (err)
 			goto done;
-		req = 1;
+		nwant++;
 	}
 	err = flushpkt(fd);
 	if (err)
 		goto done;
+
+	if (nwant == 0) {
+		if (chattygit)
+			fprintf(stderr, "up to date\n");
+		goto done;
+	}
+
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &zhash) == 0)
 			continue;
-		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
+		got_sha1_digest_to_str(have[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
@@ -585,32 +600,52 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = writepkt(fd, buf, n + 1);
 		if (err)
 			goto done;
+		nhave++;
 	}
-	if (!req) {
-		if (chattygit)
-			fprintf(stderr, "up to date\n");
-		err = flushpkt(fd);
+
+	while (nhave > 0 && !acked) {
+		struct got_object_id common_id;
+
+		/* The server should ACK the object IDs we need. */
+		err = readpkt(&n, fd, buf, sizeof(buf));
 		if (err)
 			goto done;
+		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
+			err = fetch_error(&buf[4], n - 4);
+			goto done;
+		}
+		if (n >= 4 && strncmp(buf, "NAK\n", 4) == 0) {
+			/* Server has not located our objects yet. */
+			continue;
+		}
+		if (n < 4 + SHA1_DIGEST_STRING_LENGTH ||
+		    strncmp(buf, "ACK ", 4) != 0) {
+			err = got_error_msg(GOT_ERR_BAD_PACKET,
+			    "unexpected message from server");
+			goto done;
+		}
+		if (!got_parse_sha1_digest(common_id.sha1, buf + 4)) {
+			err = got_error_msg(GOT_ERR_BAD_PACKET,
+			    "bad object ID in ACK packet from server");
+			goto done;
+		}
+		acked++;
 	}
+
 	n = snprintf(buf, sizeof(buf), "done\n");
 	err = writepkt(fd, buf, n);
 	if (err)
 		goto done;
-	if (!req)
-		return 0;
 
-	err = readpkt(&n, fd, buf, sizeof(buf));
-	if (err)
-		goto done;
-	/*
-	 * For now, we only support a full clone, in which case the server
-	 * will now send a "NAK" (meaning no common objects were found).
-	 */
-	if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
-		err = got_error_msg(GOT_ERR_BAD_PACKET,
-		    "unexpected message from server");
-		goto done;
+	if (nhave == 0) {
+		err = readpkt(&n, fd, buf, sizeof(buf));
+		if (err)
+			goto done;
+		if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
+			err = got_error_msg(GOT_ERR_BAD_PACKET,
+			    "unexpected message from server");
+			goto done;
+		}
 	}
 
 	if (chattygit)
@@ -739,13 +774,20 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int fetchfd, packfd = -1;
+	int fetchfd, packfd = -1, i;
 	struct got_object_id packid;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 	struct got_pathlist_head have_refs;
+	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_have_refs *fetch_have_refs = NULL;
+	struct got_imsg_fetch_have_ref *href = NULL;
 	size_t datalen;
+#if 0
+	static int attached;
+	while (!attached)
+		sleep (1);
+#endif
 
 	TAILQ_INIT(&have_refs);
 
@@ -780,17 +822,45 @@ main(int argc, char **argv)
 		goto done;
 	}
 	fetch_have_refs = (struct got_imsg_fetch_have_refs *)imsg.data;
-	if (datalen != sizeof(struct got_imsg_fetch_have_refs) +
+	if (datalen < sizeof(struct got_imsg_fetch_have_refs) +
 	    sizeof(struct got_imsg_fetch_have_ref) *
 	    fetch_have_refs->n_have_refs) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	if (fetch_have_refs->n_have_refs != 0) {
-		/* TODO: Incremental fetch support */
-		err = got_error(GOT_ERR_NOT_IMPL);
-		goto done;
-	}
+	href = (struct got_imsg_fetch_have_ref *)(
+	    (uint8_t *)fetch_have_refs + sizeof(fetch_have_refs->n_have_refs));
+	for (i = 0; i < fetch_have_refs->n_have_refs; i++) {
+		struct got_object_id *id;
+		char *refname;
+
+		if (datalen < sizeof(*href) + href->name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		datalen -= sizeof(*href) + href->name_len;
+		refname = strndup((uint8_t *)href + sizeof(href->id) +
+		    sizeof(href->name_len), href->name_len);
+		if (refname == NULL) {
+			err = got_error_from_errno("strndump");
+			goto done;
+		}
+		id = malloc(sizeof(*id));
+		if (id == NULL) {
+			free(refname);
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		memcpy(id->sha1, href->id, SHA1_DIGEST_LENGTH);
+		err = got_pathlist_append(&have_refs, refname, id);
+		if (err) {
+			free(refname);
+			free(id);
+			goto done;
+		}
+		href = (struct got_imsg_fetch_have_ref *)(
+		    (uint8_t *)href + sizeof(*href) + href->name_len);
+		}
 	fetchfd = imsg.fd;
 
 	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
@@ -812,6 +882,11 @@ main(int argc, char **argv)
 
 	err = fetch_pack(fetchfd, packfd, &packid, &have_refs, &ibuf);
 done:
+	TAILQ_FOREACH(pe, &have_refs, entry) {
+		free((char *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&have_refs);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err != NULL)

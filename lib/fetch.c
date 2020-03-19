@@ -387,8 +387,9 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
-    struct got_pathlist_head *symrefs, int fetchfd, struct got_repository *repo,
-    got_fetch_progress_cb progress_cb, void *progress_arg)
+    struct got_pathlist_head *symrefs, const char *remote_name, int fetchfd,
+    struct got_repository *repo, got_fetch_progress_cb progress_cb,
+    void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
@@ -402,7 +403,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	const char *repo_path = got_repo_get_path(repo);
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
+	struct got_reflist_head my_refs;
+	struct got_reflist_entry *re;
 	off_t packfile_size = 0;
+	char *ref_prefix = NULL;
+	size_t ref_prefixlen = 0;
 	char *path;
 
 	*pack_hash = NULL;
@@ -410,6 +415,61 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		tmpfds[i] = -1;
 
 	TAILQ_INIT(&have_refs);
+	SIMPLEQ_INIT(&my_refs);
+
+	if (asprintf(&ref_prefix, "refs/remotes/%s/", remote_name) == -1)
+		return got_error_from_errno("asprintf");
+	ref_prefixlen = strlen(ref_prefix);
+
+	err = got_ref_list(&my_refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+
+	SIMPLEQ_FOREACH(re, &my_refs, entry) {
+		struct got_object_id *id;
+		const char *refname;
+
+		if (got_ref_is_symbolic(re->ref))
+			continue;
+
+		refname = got_ref_get_name(re->ref);
+		if (strncmp("refs/tags/", refname, 10) == 0) {
+			char *tagname;
+
+			err = got_ref_resolve(&id, repo, re->ref);
+			if (err)
+				goto done;
+			tagname = strdup(refname);
+			if (tagname == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+			err = got_pathlist_append(&have_refs, tagname, id);
+			if (err) {
+				free(tagname);
+				goto done;
+			}
+		}
+
+		if (strncmp(ref_prefix, refname, ref_prefixlen) == 0) {
+			char *branchname;
+
+			err = got_ref_resolve(&id, repo, re->ref);
+			if (err)
+				goto done;
+
+			if (asprintf(&branchname, "refs/heads/%s",
+			    refname + ref_prefixlen) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			err = got_pathlist_append(&have_refs, branchname, id);
+			if (err) {
+				free(branchname);
+				goto done;
+			}
+		}
+	}
 
 	if (asprintf(&path, "%s/%s/fetching.pack",
 	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
@@ -490,15 +550,19 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		struct got_object_id *id = NULL;
 		char *refname = NULL;
 		char *server_progress = NULL;
-		off_t packfile_size_cur;
+		off_t packfile_size_cur = 0;
 
 		err = got_privsep_recv_fetch_progress(&done,
 		    &id, &refname, symrefs, &server_progress,
 		    &packfile_size_cur, &fetchibuf);
 		if (err != NULL)
 			goto done;
-		if (done)
-			*pack_hash = id;
+		if (done) {
+			if (packfile_size > 0)
+				*pack_hash = id;
+			else
+				free(id);
+		}
 		else if (refname && id) {
 			err = got_pathlist_append(refs, refname, id);
 			if (err)
@@ -528,6 +592,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("waitpid");
 		goto done;
 	}
+
+	/* If zero data was fetched without error we are already up-to-date. */
+	if (packfile_size == 0)
+		goto done;
 
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
@@ -615,12 +683,20 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno3("rename", tmppackpath, packpath);
 		goto done;
 	}
+	free(tmppackpath);
+	tmppackpath = NULL;
 	if (rename(tmpidxpath, idxpath) == -1) {
 		err = got_error_from_errno3("rename", tmpidxpath, idxpath);
 		goto done;
 	}
+	free(tmpidxpath);
+	tmpidxpath = NULL;
 
 done:
+	if (tmppackpath && unlink(tmppackpath) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tmppackpath);
+	if (tmpidxpath && unlink(tmpidxpath) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tmpidxpath);
 	if (nfetchfd != -1 && close(nfetchfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (npackfd != -1 && close(npackfd) == -1 && err == NULL)
@@ -637,7 +713,14 @@ done:
 	free(tmpidxpath);
 	free(idxpath);
 	free(packpath);
+	free(ref_prefix);
 
+	TAILQ_FOREACH(pe, &have_refs, entry) {
+		free((char *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&have_refs);
+	got_ref_list_free(&my_refs);
 	if (err) {
 		free(*pack_hash);
 		*pack_hash = NULL;

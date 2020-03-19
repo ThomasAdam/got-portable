@@ -244,7 +244,8 @@ struct got_imsg_fetch_have_ref {
 	uint8_t id[SHA1_DIGEST_LENGTH];
 	size_t name_len;
 	/* Followed by name_len data bytes. */
-};
+} __attribute__((__packed__));
+
 struct got_imsg_fetch_have_refs {
 	size_t n_have_refs;
 	/* Followed by n_have_refs times of got_imsg_fetch_have_ref data. */

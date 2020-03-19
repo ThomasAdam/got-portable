@@ -176,6 +176,16 @@ to use:
 Short alias for git+ssh.
 .El
 .Pp
+.Cm got clone
+creates a remote repository entry in the
+.Pa config
+file of the cloned repository to store the
+.Ar repository-url
+for future use by
+.Cm got fetch
+and
+.Xr git-fetch 1 .
+.Pp
 The options for
 .Cm got clone
 are as follows:
@@ -196,6 +206,58 @@ The maximum is 3.
 .It Cm cl
 Short alias for
 .Cm clone .
+.It Cm fetch Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository-name
+Fetch new changes from a remote repository.
+If no
+.Ar remote-repository-name
+is specified the name
+.Dq origin
+will be used.
+The remote repository's URL is obtained from the corresponding entry in the
+.Pa config
+file of the repository, as created by
+.Cm got clone .
+.Pp
+Branch references in the
+.Dq refs/remotes/
+reference namespace will be updated to point at the newly fetched commits.
+The
+.Cm got rebase
+command can then be used to make new changes visible on branches in the
+.Dq refs/heads/
+reference namespace.
+.Pp
+Existing references in the
+.Dq refs/tags/
+namespace will be changed to match tags contained in the remote repository.
+.Pp
+The options for
+.Cm got fetch
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Nm
+work tree, use the repository path associated with this work tree.
+.It Fl q
+Suppress progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+.It Fl v
+Increase the verbosity of progress reporting output.
+The same option will be passed to
+.Xr ssh 1
+if applicable.
+Multiple -v options increase the verbosity.
+The maximum is 3.
+.El
+.It Cm fe
+Short alias for
+.Cm fetch .
 .It Cm checkout  Oo Fl E Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Ar repository-path Op Ar work-tree-path
 Copy files from a repository into a new work tree.
 Show the status of each affected file, using the following status codes:
@@ -1681,11 +1743,11 @@ branch:
 .Pp
 Additional steps are necessary if local changes need to be pushed back
 to the remote repository, which currently requires
-.Cm git fetch
-and
 .Cm git push .
 Before working against existing branches in a repository cloned with
-.Dq git clone --bare ,
+.Dq git clone --bare
+instead of
+.Cm got clone ,
 a Git
 .Dq refspec
 must be configured to map all references in the remote repository
@@ -1724,10 +1786,10 @@ Branches in the
 .Dq remotes/origin
 namespace can be updated with incoming changes from the remote
 repository with
-.Cm git fetch :
+.Cm got fetch :
 .Pp
 .Dl $ cd /var/git/repo
-.Dl $ git fetch
+.Dl $ got fetch
 .Pp
 To make changes fetched from the remote repository appear on the
 .Dq master

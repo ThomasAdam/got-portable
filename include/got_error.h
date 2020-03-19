@@ -137,6 +137,7 @@
 #define GOT_ERR_BAD_PROTO	120
 #define GOT_ERR_ADDRINFO	121
 #define GOT_ERR_BAD_PACKET	122
+#define GOT_ERR_NO_REMOTE	123
 
 static const struct got_error {
 	int code;
@@ -280,6 +281,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_PROTO, "unknown protocol" },
 	{ GOT_ERR_ADDRINFO, "getaddrinfo failed" },
 	{ GOT_ERR_BAD_PACKET, "bad packet received" },
+	{ GOT_ERR_NO_REMOTE, "remote repository not found" },
 };
 
 /*
