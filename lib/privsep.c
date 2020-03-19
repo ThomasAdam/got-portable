@@ -637,6 +637,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 	*id = NULL;
 	*refname = NULL;
 	*server_progress = NULL;
+	*packfile_size = 0;
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
