@@ -1051,7 +1051,7 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 	if (verbosity >= 0)
-		printf("Fetched %s.pack\n", id_str);
+		printf("\nFetched %s.pack\n", id_str);
 	free(id_str);
 
 	/* Set up references provided with the pack file. */
@@ -1386,7 +1386,7 @@ cmd_fetch(int argc, char *argv[])
 		error = got_object_id_str(&id_str, pack_hash);
 		if (error)
 			goto done;
-		printf("Fetched %s.pack\n", id_str);
+		printf("\nFetched %s.pack\n", id_str);
 		free(id_str);
 		id_str = NULL;
 	}
