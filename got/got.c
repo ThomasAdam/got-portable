@@ -1382,13 +1382,14 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_object_id_str(&id_str, pack_hash);
-	if (error)
-		goto done;
-	if (verbosity >= 0)
+	if (verbosity >= 0) {
+		error = got_object_id_str(&id_str, pack_hash);
+		if (error)
+			goto done;
 		printf("Fetched %s.pack\n", id_str);
-	free(id_str);
-	id_str = NULL;
+		free(id_str);
+		id_str = NULL;
+	}
 
 	/* Update references provided with the pack file. */
 	TAILQ_FOREACH(pe, &refs, entry) {
