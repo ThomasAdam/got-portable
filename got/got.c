@@ -838,6 +838,7 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	if (message && message[0] != '\0') {
 		printf("\rserver: %s", message);
 		fflush(stdout);
+		return NULL;
 	}
 
 	if (packfile_size > 0 || nobj_indexed > 0) {
