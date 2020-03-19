@@ -83,35 +83,42 @@ fetch_parse_uri(void)
 		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
 
 		{ "git://127.0.0.1/git/myrepo",
-		    "git", "localhost", GOT_DEFAULT_GIT_PORT_STR, "git",
-		    "myrepo", GOT_ERR_OK },
+		    "git", "127.0.0.1", GOT_DEFAULT_GIT_PORT_STR,
+		    "/git/myrepo", "myrepo", GOT_ERR_OK },
 		{ "http://127.0.0.1/git/myrepo",
-		    "http", "localhost", GOT_DEFAULT_GIT_PORT_STR, "git",
-		    "myrepo", GOT_ERR_OK },
+		    "http", "127.0.0.1", GOT_DEFAULT_GIT_PORT_STR,
+		    "/git/myrepo", "myrepo", GOT_ERR_OK },
 		{ "gopher://127.0.0.1/git/myrepo",
-		    "gopher", "localhost", GOT_DEFAULT_GIT_PORT_STR, "git",
-		    "myrepo", GOT_ERR_OK },
+		    "gopher", "127.0.0.1", GOT_DEFAULT_GIT_PORT_STR,
+		    "/git/myrepo", "myrepo", GOT_ERR_OK },
 
 		{ "git://127.0.0.1:22/git/myrepo",
-		    "git", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
-
+		    "git", "127.0.0.1", "22", "/git/myrepo", "myrepo",
+		    GOT_ERR_OK },
 		{ "git://127.0.0.1/git/repos/foo/bar/myrepo.git",
-		    "git", "localhost", GOT_DEFAULT_GIT_PORT_STR,
-		    "git/repos/foo/bar", "myrepo", GOT_ERR_OK },
+		    "git", "127.0.0.1", GOT_DEFAULT_GIT_PORT_STR,
+		    "/git/repos/foo/bar/myrepo.git", "myrepo", GOT_ERR_OK },
 		{ "https://127.0.0.1/git/repos/foo/../bar/myrepo.git",
-		    "https", "localhost", GOT_DEFAULT_GIT_PORT_STR,
-		    "git/repos/foo/../bar", "myrepo", GOT_ERR_OK },
+		    "https", "127.0.0.1", GOT_DEFAULT_GIT_PORT_STR,
+		    "/git/repos/foo/../bar/myrepo.git", "myrepo",
+		    GOT_ERR_OK },
 
 		{ "git+ssh://127.0.0.1:22/git/myrepo",
-		    "git+ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		    "git+ssh", "127.0.0.1", "22", "/git/myrepo", "myrepo",
+		    GOT_ERR_OK },
 		{ "ssh://127.0.0.1:22/git/myrepo",
-		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		    "ssh", "127.0.0.1", "22", "/git/myrepo", "myrepo",
+		    GOT_ERR_OK },
+
 		{ "127.0.0.1:git/myrepo",
-		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		    "ssh", "127.0.0.1", "22", "git/myrepo", "myrepo",
+		    GOT_ERR_OK },
 		{ "127.0.0.1:/git/myrepo",
-		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		    "ssh", "127.0.0.1", "22", "/git/myrepo", "myrepo",
+		    GOT_ERR_OK },
 		{ "127.0.0.1:22/git/myrepo",
-		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		    "ssh", "127.0.0.1", "22", "22/git/myrepo", "myrepo",
+		    GOT_ERR_OK },
 	};
 	int i;
 
@@ -184,6 +191,32 @@ fetch_parse_uri(void)
 		if (expected_proto != NULL && strcmp(expected_proto, proto)) {
 			test_printf("%d: proto %s; expected %s\n", i, proto,
 			    expected_proto);
+			return 0;
+		}
+
+		if (expected_host != NULL && strcmp(expected_host, host)) {
+			test_printf("%d: host %s; expected %s\n", i, host,
+			    expected_host);
+			return 0;
+		}
+
+		if (expected_port != NULL && strcmp(expected_port, port)) {
+			test_printf("%d: port %s; expected %s\n", i, port,
+			    expected_port);
+			return 0;
+		}
+
+		if (expected_server_path != NULL &&
+		    strcmp(expected_server_path, server_path)) {
+			test_printf("%d: server_path %s; expected %s\n", i,
+			    server_path, expected_server_path);
+			return 0;
+		}
+
+		if (expected_repo_name != NULL &&
+		    strcmp(expected_repo_name, repo_name)) {
+			test_printf("%d: repo_name %s; expected %s\n", i,
+			    repo_name, expected_repo_name);
 			return 0;
 		}
 
