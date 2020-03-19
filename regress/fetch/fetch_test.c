@@ -79,6 +79,8 @@ fetch_parse_uri(void)
 		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
 		{ "git:///127.0.0.1/git/",
 		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
+		{ "/127.0.0.1:/git/",
+		    NULL, NULL, NULL, NULL, NULL, GOT_ERR_PARSE_URI },
 
 		{ "git://127.0.0.1/git/myrepo",
 		    "git", "localhost", GOT_DEFAULT_GIT_PORT_STR, "git",
@@ -100,6 +102,16 @@ fetch_parse_uri(void)
 		    "https", "localhost", GOT_DEFAULT_GIT_PORT_STR,
 		    "git/repos/foo/../bar", "myrepo", GOT_ERR_OK },
 
+		{ "git+ssh://127.0.0.1:22/git/myrepo",
+		    "git+ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		{ "ssh://127.0.0.1:22/git/myrepo",
+		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		{ "127.0.0.1:git/myrepo",
+		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		{ "127.0.0.1:/git/myrepo",
+		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
+		{ "127.0.0.1:22/git/myrepo",
+		    "ssh", "localhost", "22", "git", "myrepo", GOT_ERR_OK },
 	};
 	int i;
 
