@@ -409,6 +409,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	char *ref_prefix = NULL;
 	size_t ref_prefixlen = 0;
 	char *path;
+	char *progress = NULL;
 
 	*pack_hash = NULL;
 	for (i = 0; i < nitems(tmpfds); i++)
@@ -546,6 +547,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 
 	packfile_size = 0;
+	progress = calloc(GOT_FETCH_PKTMAX, 1);
+	if (progress == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
 	while (!done) {
 		struct got_object_id *id = NULL;
 		char *refname = NULL;
@@ -562,20 +568,45 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 				*pack_hash = id;
 			else
 				free(id);
-		}
-		else if (refname && id) {
+		} else if (refname && id) {
 			err = got_pathlist_append(refs, refname, id);
 			if (err)
 				goto done;
 		} else if (server_progress) {
-			char *s, *s0 = server_progress;
-			while ((s = strsep(&s0, "\r")) != NULL) {
-				if (*s == '\0')
-					continue;
+			char *p;
+			/*
+			 * XXX git-daemon tends to send batched output with
+			 * lines spanning separate packets. Buffer progress
+			 * output until we see a CR or LF to avoid giving
+			 * partial lines of progress output to the callback.
+			 */
+			if (strlcat(progress, server_progress,
+			    GOT_FETCH_PKTMAX) >= GOT_FETCH_PKTMAX) {
+				progress[0] = '\0'; /* discard */
+				continue;
+			}
+			while ((p = strchr(progress, '\r')) != NULL ||
+			    (p = strchr(progress, '\n')) != NULL) {
+				char *s;
+				size_t n;
+				char c = *p;
+				*p = '\0';
+				if (asprintf(&s, "%s%s", progress,
+				    c == '\n' ? "\n" : "") == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
 				err = progress_cb(progress_arg, s,
 				    packfile_size_cur, 0, 0, 0, 0);
+				free(s);
 				if (err)
 					break;
+				n = strlen(progress);
+				if (n < GOT_FETCH_PKTMAX - 1) {
+					memmove(progress, &progress[n + 1],
+					    GOT_FETCH_PKTMAX - n - 1);
+				} else
+					progress[0] = '\0';
 			}
 			free(server_progress);
 			if (err)
@@ -714,6 +745,7 @@ done:
 	free(idxpath);
 	free(packpath);
 	free(ref_prefix);
+	free(progress);
 
 	TAILQ_FOREACH(pe, &have_refs, entry) {
 		free((char *)pe->path);

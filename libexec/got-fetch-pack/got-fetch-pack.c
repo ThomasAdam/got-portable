@@ -39,6 +39,7 @@
 #include "got_object.h"
 #include "got_path.h"
 #include "got_version.h"
+#include "got_fetch.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
@@ -50,8 +51,6 @@
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
-
-#define GOT_PKTMAX	65536
 
 struct got_object *indexed;
 static char *fetchbranch;
@@ -451,7 +450,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	char buf[GOT_PKTMAX];
+	char buf[GOT_FETCH_PKTMAX];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;
