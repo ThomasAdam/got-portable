@@ -868,7 +868,6 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	struct got_reflist_entry *new;
 
 	if (ref_namespace == NULL || ref_namespace[0] == '\0') {
-		/* HEAD ref should always exist. */
 		path_refs = get_refs_dir_path(repo, GOT_REF_HEAD);
 		if (path_refs == NULL) {
 			err = got_error_from_errno("get_refs_dir_path");
@@ -877,10 +876,11 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
 		if (err)
 			goto done;
-		err = insert_ref(&new, refs, ref, repo, cmp_cb, cmp_arg);
+		err = insert_ref(&new, refs, ref, repo,
+		    cmp_cb, cmp_arg);
 		if (err || new == NULL /* duplicate */)
 			got_ref_close(ref);
-		if (err)
+		if (err && err->code != GOT_ERR_NOT_REF)
 			goto done;
 	}
 
