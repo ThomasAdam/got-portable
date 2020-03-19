@@ -400,7 +400,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	pid_t fetchpid, idxpid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
-	const char *repo_path = got_repo_get_path(repo);
+	const char *repo_path = got_repo_get_path_git_dir(repo);
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
 	struct got_reflist_head my_refs;
