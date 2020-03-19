@@ -54,7 +54,6 @@
 #define GOT_PKTMAX	65536
 
 struct got_object *indexed;
-static int chattygit;
 static char *fetchbranch;
 static struct got_object_id zhash = {.sha1={0}};
 
@@ -79,9 +78,6 @@ static const struct got_error *
 flushpkt(int fd)
 {
 	ssize_t w;
-
-	if (chattygit)
-		fprintf(stderr, "writepkt: 0000\n");
 
 	 w = write(fd, "0000", 4);
 	 if (w == -1)
@@ -145,7 +141,7 @@ static const struct got_error *
 readpkt(int *outlen, int fd, char *buf, int buflen)
 {
 	const struct got_error *err = NULL;
-	int datalen, i;
+	int datalen;
 	ssize_t n;
 
 	err = read_pkthdr(&datalen, fd);
@@ -161,16 +157,6 @@ readpkt(int *outlen, int fd, char *buf, int buflen)
 	if (n != datalen)
 		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
 
-	if (chattygit) {
-		fprintf(stderr, "readpkt: %zd:\t", n);
-		fwrite(buf, 1, n, stderr);
-		for (i = 0; i < n; i++) {
-			if (isprint(buf[i]))
-				fputc(buf[i], stderr);
-		}
-		fputc('\n', stderr);
-	}
-
 	*outlen = n;
 	return NULL;
 }
@@ -179,7 +165,6 @@ static const struct got_error *
 writepkt(int fd, char *buf, int nbuf)
 {
 	char len[5];
-	int i;
 	ssize_t w;
 
 	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
@@ -194,15 +179,6 @@ writepkt(int fd, char *buf, int nbuf)
 		return got_error_from_errno("write");
 	if (w != nbuf)
 		return got_error(GOT_ERR_IO);
-	if (chattygit) {
-		fprintf(stderr, "writepkt: %s:\t", len);
-		fwrite(buf, 1, nbuf, stderr);
-		for (i = 0; i < nbuf; i++) {
-			if (isprint(buf[i]))
-				fputc(buf[i], stderr);
-		}
-		fputc('\n', stderr);
-	}
 	return NULL;
 }
 
@@ -497,8 +473,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = got_error_from_errno("malloc");
 		goto done;
 	}
-	if (chattygit)
-		fprintf(stderr, "starting fetch\n");
 	while (1) {
 		err = readpkt(&n, fd, buf, sizeof(buf));
 		if (err)
@@ -513,17 +487,11 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		    buf, n);
 		if (err)
 			goto done;
-		if (chattygit && server_capabilities[0] != '\0')
-			fprintf(stderr, "server capabilities: %s\n",
-			    server_capabilities);
 		if (is_firstpkt) {
 			err = match_capabilities(&my_capabilities, &symrefs,
 			    server_capabilities);
 			if (err)
 				goto done;
-			if (chattygit && my_capabilities)
-				fprintf(stderr, "my matched capabilities: %s\n",
-				    my_capabilities);
 			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
 				goto done;
@@ -556,9 +524,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		    refname);
 		if (err)
 			goto done;
-
-		if (chattygit)
-			fprintf(stderr, "remote %s\n", refname);
 		nref++;
 	}
 
@@ -582,11 +547,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	if (err)
 		goto done;
 
-	if (nwant == 0) {
-		if (chattygit)
-			fprintf(stderr, "up to date\n");
+	if (nwant == 0)
 		goto done;
-	}
 
 	for (i = 0; i < nref; i++) {
 		if (got_object_id_cmp(&have[i], &zhash) == 0)
@@ -647,9 +609,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 	}
-
-	if (chattygit)
-		fprintf(stderr, "fetching...\n");
 
 	if (my_capabilities != NULL &&
 	    strstr(my_capabilities, GOT_CAPA_SIDE_BAND_64K) != NULL)
@@ -790,11 +749,6 @@ main(int argc, char **argv)
 #endif
 
 	TAILQ_INIT(&have_refs);
-
-	if (getenv("GOT_DEBUG") != NULL) {
-		fprintf(stderr, "fetch-pack being chatty!\n");
-		chattygit = 1;
-	}
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 #ifndef PROFILE
