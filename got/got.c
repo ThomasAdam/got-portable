@@ -880,10 +880,6 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	if (print_size || print_indexed || print_resolved)
 		fflush(stdout);
 
-	if (nobj_indexed > 0 && nobj_indexed == nobj_total &&
-	    nobj_resolved == nobj_total - nobj_loose)
-		printf("\nWriting pack index...\n");
-
 	return NULL;
 }
 
