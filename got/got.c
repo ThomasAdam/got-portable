@@ -1011,6 +1011,32 @@ cmd_clone(int argc, char *argv[])
 	if (verbosity >= 0)
 		printf("Connected to %s:%s\n", host, port);
 
+	/* Create a config file git-fetch(1) can understand. */
+	gitconfig_path = got_repo_get_path_gitconfig(repo);
+	if (gitconfig_path == NULL) {
+		error = got_error_from_errno("got_repo_get_path_gitconfig");
+		goto done;
+	}
+	gitconfig_file = fopen(gitconfig_path, "a");
+	if (gitconfig_file == NULL) {
+		error = got_error_from_errno2("fopen", gitconfig_path);
+		goto done;
+	}
+	if (asprintf(&gitconfig,
+	    "[remote \"%s\"]\n"
+	    "\turl = %s\n"
+	    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+	    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
+	if (n != strlen(gitconfig)) {
+		error = got_ferror(gitconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
@@ -1089,32 +1115,6 @@ cmd_clone(int argc, char *argv[])
 		error = got_ref_write(symref, repo);
 		got_ref_close(symref);
 		break;
-	}
-
-	/* Create a config file so Git can understand this repository. */
-	gitconfig_path = got_repo_get_path_gitconfig(repo);
-	if (gitconfig_path == NULL) {
-		error = got_error_from_errno("got_repo_get_path_gitconfig");
-		goto done;
-	}
-	gitconfig_file = fopen(gitconfig_path, "a");
-	if (gitconfig_file == NULL) {
-		error = got_error_from_errno2("fopen", gitconfig_path);
-		goto done;
-	}
-	if (asprintf(&gitconfig,
-	    "[remote \"%s\"]\n"
-	    "\turl = %s\n"
-	    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
-	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
-	    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
-	if (n != strlen(gitconfig)) {
-		error = got_ferror(gitconfig_file, GOT_ERR_IO);
-		goto done;
 	}
 
 	if (verbosity >= 0)
