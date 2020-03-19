@@ -811,8 +811,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-q] [-v] repository-url [target-directory]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s clone [-q] [-v] repository-url "
+	    "[target-directory]\n", getprogname());
 	exit(1);
 }
 
