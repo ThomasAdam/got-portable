@@ -1096,15 +1096,12 @@ cmd_clone(int argc, char *argv[])
 		error = got_error_from_errno("got_repo_get_path_gitconfig");
 		goto done;
 	}
-	gitconfig_file = fopen(gitconfig_path, "w");
+	gitconfig_file = fopen(gitconfig_path, "a");
 	if (gitconfig_file == NULL) {
 		error = got_error_from_errno2("fopen", gitconfig_path);
 		goto done;
 	}
 	if (asprintf(&gitconfig,
-	    "[core]\n"
-	    "\trepositoryformatversion = 0\n"
-	    "\tbare = true\n"
 	    "[remote \"%s\"]\n"
 	    "\turl = %s\n"
 	    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
