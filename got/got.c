@@ -962,7 +962,8 @@ cmd_clone(int argc, char *argv[])
 		    "sendfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		if (asprintf(&git_url, "%s:%s", host, server_path) == -1) {
+		if (asprintf(&git_url, "ssh://%s:%s/%s", host, port,
+		    server_path) == -1) {
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
