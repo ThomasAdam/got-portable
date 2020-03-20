@@ -1451,6 +1451,17 @@ cmd_fetch(int argc, char *argv[])
 		struct got_reference *ref;
 		char *remote_refname;
 
+		if (remote->mirror_references) {
+			error = got_ref_alloc(&ref, refname, id);
+			if (error)
+				goto done;
+			error = got_ref_write(ref, repo);
+			got_ref_close(ref);
+			if (error)
+				goto done;
+			continue;
+		}
+
 		error = got_object_id_str(&id_str, id);
 		if (error)
 			goto done;
