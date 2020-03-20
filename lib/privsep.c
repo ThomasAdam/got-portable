@@ -1992,7 +1992,7 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 
 	imsg_free(&imsg);
 
-	*remotes = recallocarray(NULL, 0, iremotes.nremotes, sizeof(iremote));
+	*remotes = recallocarray(NULL, 0, iremotes.nremotes, sizeof(**remotes));
 	if (*remotes == NULL)
 		return got_error_from_errno("recallocarray");
 
