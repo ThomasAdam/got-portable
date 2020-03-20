@@ -1913,6 +1913,7 @@ got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
 		size_t len = sizeof(iremote);
 		struct ibuf *wbuf;
 
+		iremote.mirror_references = remotes[i].mirror_references;
 		iremote.name_len = strlen(remotes[i].name);
 		len += iremote.name_len;
 		iremote.url_len = strlen(remotes[i].url);
@@ -1937,13 +1938,6 @@ got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
 			return err;
 		}
 		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
-			err = got_error_from_errno(
-			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &remotes[i].mirror_references,
-		    sizeof(iremote.mirror_references)) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
 			ibuf_free(wbuf);
