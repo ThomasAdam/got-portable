@@ -79,8 +79,7 @@ Loose objects files are compressed with
 Multiple objects can be bundled in a
 .Em pack file
 for better disk space efficiency and increased run-time performance.
-The pack file format knows two additional types of objects in addition
-to blobs, trees, and commits:
+The pack file format introduces two additional types of objects:
 .Bl -tag -width Ds
 .It Offset Delta Objects
 This object is represented as a delta against another object in the
