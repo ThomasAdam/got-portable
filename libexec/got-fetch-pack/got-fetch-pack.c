@@ -320,9 +320,8 @@ match_capability(char **my_capabilities, const char *capa,
 			return NULL;
 	}
 
-	if (asprintf(&s, "%s%s%s%s%s",
+	if (asprintf(&s, "%s %s%s%s",
 	    *my_capabilities != NULL ? *my_capabilities : "",
-	    *my_capabilities != NULL ? " " : "",
 	    mycapa->key,
 	    mycapa->value != NULL ? "=" : "",
 	    mycapa->value != NULL? mycapa->value : "") == -1)
@@ -399,6 +398,11 @@ match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
 		}
 	} while (capa);
 
+	if (*my_capabilities == NULL) {
+		*my_capabilities = strdup("");
+		if (*my_capabilities == NULL)
+			err = got_error_from_errno("strdup");
+	}
 	return err;
 }
 
@@ -460,7 +464,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	char *server_capabilities = NULL, *my_capabilities = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
-	int have_sidebands = 0;
+	int sent_my_capabilites = 0, have_sidebands = 0;
 
 	TAILQ_INIT(&symrefs);
 
@@ -530,9 +534,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (got_object_id_cmp(&have[i], &want[i]) == 0)
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
-		n = snprintf(buf, sizeof(buf), "want %s%s%s\n", hashstr,
-		   i == 0 && my_capabilities ? " " : "",
-		   i == 0 && my_capabilities ? my_capabilities : "");
+		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
+		   sent_my_capabilites ? "" : my_capabilities);
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
