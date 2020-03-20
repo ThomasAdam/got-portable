@@ -944,17 +944,19 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (asprintf(&git_url, "%s://%s%s%s%s%s", proto,
+	    host, port ? ":" : "", port ? port : "",
+	    server_path[0] != '/' ? "/" : "", server_path) == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+
 	if (strcmp(proto, "git") == 0) {
 #ifndef PROFILE
 		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
 		    "sendfd dns inet unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		git_url = strdup(argv[0]);
-		if (git_url == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 	} else if (strcmp(proto, "git+ssh") == 0 ||
 	    strcmp(proto, "ssh") == 0) {
 #ifndef PROFILE
@@ -962,11 +964,6 @@ cmd_clone(int argc, char *argv[])
 		    "sendfd unveil", NULL) == -1)
 			err(1, "pledge");
 #endif
-		if (asprintf(&git_url, "ssh://%s:%s/%s", host, port,
-		    server_path) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
 	} else if (strcmp(proto, "http") == 0 ||
 	    strcmp(proto, "git+http") == 0) {
 		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
