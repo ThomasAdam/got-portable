@@ -412,14 +412,14 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 
 const struct got_error *
 got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
-   struct got_pathlist_head *have_refs)
+   struct got_pathlist_head *have_refs, int fetch_all_branches)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
 	size_t len, n_have_refs = 0;
 	struct got_pathlist_entry *pe;
 
-	len = sizeof(struct got_imsg_fetch_have_refs);
+	len = sizeof(struct got_imsg_fetch_request);
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		len += sizeof(struct got_imsg_fetch_have_ref) + pe->path_len;
 		n_have_refs++;
@@ -435,7 +435,14 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		return got_error_from_errno("imsg_create FETCH_REQUEST");
 	}
 
-	/* Keep in sync with struct got_imsg_fetch_have_refs definition! */
+	/* Keep in sync with struct got_imsg_fetch_request definition! */
+	if (imsg_add(wbuf, &fetch_all_branches, sizeof(fetch_all_branches))
+	    == -1) {
+		err = got_error_from_errno("imsg_add FETCH_REQUEST");
+		ibuf_free(wbuf);
+		close(fd);
+		return err;
+	}
 	if (imsg_add(wbuf, &n_have_refs, sizeof(n_have_refs)) == -1) {
 		err = got_error_from_errno("imsg_add FETCH_REQUEST");
 		ibuf_free(wbuf);

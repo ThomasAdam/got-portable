@@ -387,7 +387,8 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, const char *remote_name,
-    int mirror_references, int fetchfd, struct got_repository *repo,
+    int mirror_references, int fetch_all_branches, int fetchfd,
+    struct got_repository *repo,
     got_fetch_progress_cb progress_cb, void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
@@ -552,7 +553,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs);
+	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs,
+	    fetch_all_branches);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;

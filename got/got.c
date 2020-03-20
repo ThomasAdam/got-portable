@@ -811,7 +811,7 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-m] [-q] [-v] repository-url "
+	fprintf(stderr, "usage: %s clone [-a] [-m] [-q] [-v] repository-url "
 	    "[target-directory]\n", getprogname());
 	exit(1);
 }
@@ -903,13 +903,17 @@ cmd_clone(int argc, char *argv[])
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
 	ssize_t n;
-	int verbosity = 0, mirror_references = 0;
+	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
+	struct got_reference *head_symref = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 
-	while ((ch = getopt(argc, argv, "mvq")) != -1) {
+	while ((ch = getopt(argc, argv, "amvq")) != -1) {
 		switch (ch) {
+		case 'a':
+			fetch_all_branches = 1;
+			break;
 		case 'm':
 			mirror_references = 1;
 			break;
@@ -1013,50 +1017,13 @@ cmd_clone(int argc, char *argv[])
 		printf("Connected to %s%s%s\n", host,
 		    port ? ":" : "", port ? port : "");
 
-	/* Create a config file git-fetch(1) can understand. */
-	gitconfig_path = got_repo_get_path_gitconfig(repo);
-	if (gitconfig_path == NULL) {
-		error = got_error_from_errno("got_repo_get_path_gitconfig");
-		goto done;
-	}
-	gitconfig_file = fopen(gitconfig_path, "a");
-	if (gitconfig_file == NULL) {
-		error = got_error_from_errno2("fopen", gitconfig_path);
-		goto done;
-	}
-	if (mirror_references) {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tmirror = true\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	} else {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
-		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	}
-	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
-	if (n != strlen(gitconfig)) {
-		error = got_ferror(gitconfig_file, GOT_ERR_IO);
-		goto done;
-	}
-
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
-	    fetchfd, repo, fetch_progress, &fpa);
+	    fetch_all_branches, fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1105,7 +1072,7 @@ cmd_clone(int argc, char *argv[])
 
 	/* Set the HEAD reference if the server provided one. */
 	TAILQ_FOREACH(pe, &symrefs, entry) {
-		struct got_reference *symref, *target_ref;
+		struct got_reference *target_ref;
 		const char *refname = pe->path;
 		const char *target = pe->data;
 
@@ -1119,19 +1086,80 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		error = got_ref_alloc_symref(&symref, GOT_REF_HEAD, target_ref);
+		error = got_ref_alloc_symref(&head_symref,
+		    GOT_REF_HEAD, target_ref);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
 
 		if (verbosity >= 0)
 			printf("Setting %s to %s\n", GOT_REF_HEAD,
-			    got_ref_get_symref_target(symref));
+			    got_ref_get_symref_target(head_symref));
 
-		error = got_ref_write(symref, repo);
-		got_ref_close(symref);
+		error = got_ref_write(head_symref, repo);
 		break;
 	}
+
+	/* Create a config file git-fetch(1) can understand. */
+	gitconfig_path = got_repo_get_path_gitconfig(repo);
+	if (gitconfig_path == NULL) {
+		error = got_error_from_errno("got_repo_get_path_gitconfig");
+		goto done;
+	}
+	gitconfig_file = fopen(gitconfig_path, "a");
+	if (gitconfig_file == NULL) {
+		error = got_error_from_errno2("fopen", gitconfig_path);
+		goto done;
+	}
+	if (mirror_references) {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tmirror = true\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else if (fetch_all_branches) {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else {
+		const char *branchname;
+
+		/*
+		 * If the server specified a default branch, use just that one.
+		 * Otherwise fall back to fetching all branches on next fetch.
+		 */
+		if (head_symref) {
+			branchname = got_ref_get_symref_target(head_symref);
+			if (strncmp(branchname, "refs/heads/", 11) == 0)
+				branchname += 11;
+		} else
+			branchname = "*"; /* fall back to all branches */
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+		    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
+		    branchname) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+	}
+	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
+	if (n != strlen(gitconfig)) {
+		error = got_ferror(gitconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+
 
 	if (verbosity >= 0)
 		printf("Created %s repository '%s'\n",
@@ -1143,6 +1171,8 @@ done:
 		error = got_error_from_errno("fclose");
 	if (repo)
 		got_repo_close(repo);
+	if (head_symref)
+		got_ref_close(head_symref);
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
 		free(pe->data);
@@ -1234,7 +1264,7 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-r repository-path] [-q] [-v] "
+	fprintf(stderr, "usage: %s fetch [-a] [-r repository-path] [-q] [-v] "
 	    "[remote-repository-name]\n", getprogname());
 	exit(1);
 }
@@ -1257,13 +1287,16 @@ cmd_fetch(int argc, char *argv[])
 	struct got_object_id *pack_hash = NULL;
 	int i, ch, fetchfd = -1;
 	struct got_fetch_progress_arg fpa;
-	int verbosity = 0;
+	int verbosity = 0, fetch_all_branches = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 
-	while ((ch = getopt(argc, argv, "r:vq")) != -1) {
+	while ((ch = getopt(argc, argv, "ar:vq")) != -1) {
 		switch (ch) {
+		case 'a':
+			fetch_all_branches = 1;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
@@ -1390,7 +1423,8 @@ cmd_fetch(int argc, char *argv[])
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
-	    remote->mirror_references, fetchfd, repo, fetch_progress, &fpa);
+	    remote->mirror_references, fetch_all_branches, fetchfd, repo,
+	    fetch_progress, &fpa);
 	if (error)
 		goto done;
 

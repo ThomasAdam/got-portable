@@ -246,10 +246,11 @@ struct got_imsg_fetch_have_ref {
 	/* Followed by name_len data bytes. */
 } __attribute__((__packed__));
 
-struct got_imsg_fetch_have_refs {
+struct got_imsg_fetch_request {
+	int fetch_all_branches;
 	size_t n_have_refs;
 	/* Followed by n_have_refs times of got_imsg_fetch_have_ref data. */
-};
+} __attribute__((__packed__));
 
 /* Structures for GOT_IMSG_FETCH_SYMREFS data. */
 struct got_imsg_fetch_symref {
@@ -389,7 +390,7 @@ const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
     int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
-    struct got_pathlist_head *);
+    struct got_pathlist_head *, int);
 const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
     struct got_pathlist_head *);

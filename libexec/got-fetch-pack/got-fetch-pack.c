@@ -40,6 +40,7 @@
 #include "got_path.h"
 #include "got_version.h"
 #include "got_fetch.h"
+#include "got_reference.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"
@@ -54,7 +55,6 @@
 
 struct got_object *indexed;
 static int chattygot;
-static char *fetchbranch;
 static struct got_object_id zhash = {.sha1={0}};
 
 static const struct got_error *
@@ -240,23 +240,15 @@ match_remote_ref(struct got_pathlist_head *have_refs,
 }
 
 static int
-match_branch(char *br, char *pat)
+match_branch(const char *branch, const char *wanted_branch)
 {
-	char name[128];
+	if (strncmp(branch, "refs/heads/", 11) != 0)
+		return 0;
 
-	if (strstr(pat, "refs/heads") == pat) {
-		if (snprintf(name, sizeof(name), "%s", pat) >= sizeof(name))
-			return -1;
-	} else if (strstr(pat, "heads")) {
-		if (snprintf(name, sizeof(name), "refs/%s", pat)
-		    >= sizeof(name))
-			return -1;
-	} else {
-		if (snprintf(name, sizeof(name), "refs/heads/%s", pat)
-		    >= sizeof(name))
-			return -1;
-	}
-	return strcmp(br, name) == 0;
+	if (strncmp(wanted_branch, "refs/heads/", 11) == 0)
+		wanted_branch += 11;
+
+	return (strcmp(branch + 11, wanted_branch) == 0);
 }
 
 static const struct got_error *
@@ -490,7 +482,8 @@ fetch_error(const char *buf, size_t len)
 
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
-    struct got_pathlist_head *have_refs, struct imsgbuf *ibuf)
+    struct got_pathlist_head *have_refs, int fetch_all_branches,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_FETCH_PKTMAX];
@@ -501,9 +494,11 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	off_t packsz = 0, last_reported_packsz = 0;
 	char *id_str = NULL, *refname = NULL;
 	char *server_capabilities = NULL, *my_capabilities = NULL;
+	const char *default_branch = NULL;
 	struct got_pathlist_head symrefs;
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0, have_sidebands = 0;
+	int found_branch = 0;
 
 	TAILQ_INIT(&symrefs);
 
@@ -546,12 +541,39 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			if (err)
 				goto done;
 			is_firstpkt = 0;
+			if (!fetch_all_branches) {
+				TAILQ_FOREACH(pe, &symrefs, entry) {
+					const char *name = pe->path;
+					const char *symref_target = pe->data;
+					if (strcmp(name, GOT_REF_HEAD) != 0)
+						continue;
+					default_branch = symref_target;
+					break;
+				}
+			}
 			continue;
 		}
 		if (strstr(refname, "^{}"))
 			continue;
-		if (fetchbranch && !match_branch(refname, fetchbranch))
+
+		if (chattygot)
+			fprintf(stderr, "%s: discovered remote ref %s\n",
+			    getprogname(), refname);
+
+		if (strncmp(refname, "refs/heads/", 11) == 0) {
+			if (default_branch != NULL &&
+			    !match_branch(refname, default_branch))
+				continue;
+			found_branch = 1;
+		} else if (strncmp(refname, "refs/tags/", 10) != 0) {
+			if (chattygot) {
+				fprintf(stderr, "%s: ignoring '%s' which is "
+				    "neither a branch nor a tag\n",
+				    getprogname(), refname);
+			}
 			continue;
+		}
+
 		if (refsz == nref + 1) {
 			refsz *= 2;
 			have = reallocarray(have, refsz, sizeof(have[0]));
@@ -585,14 +607,20 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				free(theirs);
 				goto done;
 			}
-			fprintf(stderr, "%s: discovered remote ref %s\n",
+			fprintf(stderr, "%s: %s will be fetched\n",
 			    getprogname(), refname);
 			fprintf(stderr, "%s: theirs=%s\n%s: mine=%s\n",
-			getprogname(), theirs, getprogname(), mine);
+			    getprogname(), theirs, getprogname(), mine);
 			free(theirs);
 			free(mine);
 		}
 		nref++;
+	}
+
+	/* Abort if we haven't found any branch to fetch. */
+	if (!found_branch) {
+		err = got_error(GOT_ERR_FETCH_NO_BRANCH);
+		goto done;
 	}
 
 	for (i = 0; i < nref; i++) {
@@ -810,9 +838,10 @@ main(int argc, char **argv)
 	struct imsg imsg;
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
-	struct got_imsg_fetch_have_refs *fetch_have_refs = NULL;
-	struct got_imsg_fetch_have_ref *href = NULL;
-	size_t datalen;
+	struct got_imsg_fetch_request *fetch_req = NULL;
+	struct got_imsg_fetch_have_ref href;
+	size_t datalen, remain;
+	size_t offset;
 #if 0
 	static int attached;
 	while (!attached)
@@ -847,50 +876,58 @@ main(int argc, char **argv)
 		goto done;
 	}
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(struct got_imsg_fetch_have_refs)) {
+	if (datalen < sizeof(struct got_imsg_fetch_request)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	fetch_have_refs = (struct got_imsg_fetch_have_refs *)imsg.data;
-	if (datalen < sizeof(struct got_imsg_fetch_have_refs) +
+	fetch_req = (struct got_imsg_fetch_request *)imsg.data;
+	if (datalen < sizeof(*fetch_req) +
 	    sizeof(struct got_imsg_fetch_have_ref) *
-	    fetch_have_refs->n_have_refs) {
+	    fetch_req->n_have_refs) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	href = (struct got_imsg_fetch_have_ref *)(
-	    (uint8_t *)fetch_have_refs + sizeof(fetch_have_refs->n_have_refs));
-	for (i = 0; i < fetch_have_refs->n_have_refs; i++) {
+	offset = sizeof(*fetch_req);
+	remain = datalen;
+	for (i = 0; i < fetch_req->n_have_refs; i++) {
 		struct got_object_id *id;
 		char *refname;
 
-		if (datalen < sizeof(*href) + href->name_len) {
+		if (remain < sizeof(href) || offset > datalen) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		datalen -= sizeof(*href) + href->name_len;
-		refname = strndup((uint8_t *)href + sizeof(href->id) +
-		    sizeof(href->name_len), href->name_len);
-		if (refname == NULL) {
-			err = got_error_from_errno("strndump");
+		memcpy(&href, imsg.data + offset, sizeof(href));
+		remain -= sizeof(href);
+		if (remain < href.name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
+		remain -= href.name_len;
+		refname = malloc(href.name_len + 1);
+		if (refname == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		offset += sizeof(href);
+		memcpy(refname, imsg.data + offset, href.name_len);
+		refname[href.name_len] = '\0';
+		offset += href.name_len;
+
 		id = malloc(sizeof(*id));
 		if (id == NULL) {
 			free(refname);
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
-		memcpy(id->sha1, href->id, SHA1_DIGEST_LENGTH);
+		memcpy(id->sha1, href.id, SHA1_DIGEST_LENGTH);
 		err = got_pathlist_append(&have_refs, refname, id);
 		if (err) {
 			free(refname);
 			free(id);
 			goto done;
 		}
-		href = (struct got_imsg_fetch_have_ref *)(
-		    (uint8_t *)href + sizeof(*href) + href->name_len);
-		}
+	}
 	fetchfd = imsg.fd;
 
 	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
@@ -910,7 +947,8 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	err = fetch_pack(fetchfd, packfd, &packid, &have_refs, &ibuf);
+	err = fetch_pack(fetchfd, packfd, &packid, &have_refs,
+	    fetch_req->fetch_all_branches, &ibuf);
 done:
 	TAILQ_FOREACH(pe, &have_refs, entry) {
 		free((char *)pe->path);
