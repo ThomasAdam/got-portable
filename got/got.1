@@ -136,18 +136,18 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
-.It Cm clone Oo Fl a Oc Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar target-directory
+.It Cm clone Oo Fl a Oc Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar directory
 Clone a Git repository at the specified
 .Ar repository-URL
 into the specified
-.Ar target-directory .
+.Ar directory .
 If no
-.Ar target-directory
+.Ar directory
 is specified the directory name will be derived from the name of the
 cloned repository.
 .Cm got clone
 will refuse to run if the
-.Ar target-directory
+.Ar directory
 already exists.
 .Pp
 The
