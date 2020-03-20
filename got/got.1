@@ -1804,6 +1804,36 @@ branch:
 .Dl $ got update -c master
 .Dl $ got histedit
 .Pp
+In order to merge changes committed to the
+.Dq unified-buffer-cache
+branch back into the
+.Dq master
+branch, the
+.Dq unified-buffer-cache
+branch must first be rebased onto the
+.Dq master
+branch:
+.Pp
+.Dl $ got update -b master
+.Dl $ got rebase unified-buffer-cache
+.Pp
+Changes on the
+.Dq unified-buffer-cache
+branch can now be made visible on the
+.Dq master
+branch with
+.Cm got integrate .
+Because the rebase operation switched the work tree to the
+.Dq unified-buffer-cache
+branch, the work tree must be switched back to the
+.Dq master
+branch before the
+.Dq unified-buffer-cache
+branch can be integrated into
+.Dq master :
+.Pp
+.Dl $ got update -b master
+.Dl $ got integrate unified-buffer-cache
 .Pp
 Additional steps may be necessary if local changes need to be pushed back
 to the remote repository, which currently requires
@@ -1894,37 +1924,6 @@ repository with
 .Pp
 .Dl $ cd /var/git/repo
 .Dl $ git push origin master
-.Pp
-In order to merge changes committed to the
-.Dq unified-buffer-cache
-branch back into the
-.Dq master
-branch, the
-.Dq unified-buffer-cache
-branch must first be rebased onto the
-.Dq master
-branch:
-.Pp
-.Dl $ got update -b master
-.Dl $ got rebase unified-buffer-cache
-.Pp
-Changes on the
-.Dq unified-buffer-cache
-branch can now be made visible on the
-.Dq master
-branch with
-.Cm got integrate .
-Because the rebase operation switched the work tree to the
-.Dq unified-buffer-cache
-branch, the work tree must be switched back to the
-.Dq master
-branch before the
-.Dq unified-buffer-cache
-branch can be integrated into
-.Dq master :
-.Pp
-.Dl $ got update -b master
-.Dl $ got integrate unified-buffer-cache
 .Sh SEE ALSO
 .Xr tog 1 ,
 .Xr git-repository 5 ,
