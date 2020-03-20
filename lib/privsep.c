@@ -1918,20 +1918,20 @@ got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
 
 		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
 			err = got_error_from_errno(
-			    "imsg_add GIITCONFIG_REMOTE");
+			    "imsg_add GITCONFIG_REMOTE");
 			ibuf_free(wbuf);
 			return err;
 		}
 
 		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1) {
 			err = got_error_from_errno(
-			    "imsg_add GIITCONFIG_REMOTE");
+			    "imsg_add GITCONFIG_REMOTE");
 			ibuf_free(wbuf);
 			return err;
 		}
 		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
 			err = got_error_from_errno(
-			    "imsg_add GIITCONFIG_REMOTE");
+			    "imsg_add GITCONFIG_REMOTE");
 			ibuf_free(wbuf);
 			return err;
 		}
