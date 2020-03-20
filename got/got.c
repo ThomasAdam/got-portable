@@ -1081,8 +1081,10 @@ cmd_clone(int argc, char *argv[])
 
 		error = got_ref_open(&target_ref, repo, target, 0);
 		if (error) {
-			if (error->code == GOT_ERR_NOT_REF)
+			if (error->code == GOT_ERR_NOT_REF) {
+				error = NULL;
 				continue;
+			}
 			goto done;
 		}
 
@@ -1097,7 +1099,8 @@ cmd_clone(int argc, char *argv[])
 			    got_ref_get_symref_target(head_symref));
 
 		error = got_ref_write(head_symref, repo);
-		break;
+		if (error)
+			goto done;
 	}
 
 	/* Create a config file git-fetch(1) can understand. */
