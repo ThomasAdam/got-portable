@@ -280,9 +280,9 @@ be updated as needed to match the corresponding references in the remote
 repository, including branches in the
 .Dq refs/heads/
 reference namespace.
-If those branches contained local commits, these will no longer be reachable
-via a reference and will therefore be at risk of being discarded by Git's
-garbage collector.
+If those branches contained local commits, these commits will no longer be
+reachable via a reference and will therefore be at risk of being discarded
+by Git's garbage collector.
 .Pp
 In any case, existing references in the
 .Dq refs/tags/
