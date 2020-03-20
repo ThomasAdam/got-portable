@@ -561,7 +561,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		err = writepkt(fd, buf, n + 1);
+		err = writepkt(fd, buf, n);
 		if (err)
 			goto done;
 		nhave++;
