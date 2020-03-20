@@ -89,24 +89,29 @@ dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
 	char cmd[64];
-	char *argv[9];
+	char *argv[11];
 	int i = 0;
 
 	*fetchfd = -1;
 
+	if (port == NULL)
+		port = "22";
+
 	argv[0] = GOT_FETCH_PATH_SSH;
+	argv[1] = "-p";
+	argv[2] = (char *)port;
 	if (verbosity == -1) {
-		argv[1 + i++] = "-q";
+		argv[3 + i++] = "-q";
 	} else {
 		/* ssh(1) allows up to 3 "-v" options. */
 		for (i = 0; i < MIN(3, verbosity); i++)
-			argv[1 + i] = "-v";
+			argv[3 + i] = "-v";
 	}
-	argv[1 + i] = "--";
-	argv[2 + i] = (char *)host;
-	argv[3 + i] = (char *)cmd;
-	argv[4 + i] = (char *)path;
-	argv[5 + i] = NULL;
+	argv[3 + i] = "--";
+	argv[4 + i] = (char *)host;
+	argv[5 + i] = (char *)cmd;
+	argv[6 + i] = (char *)path;
+	argv[7 + i] = NULL;
 
 	if (pipe(pfd) == -1)
 		return got_error_from_errno("pipe");
@@ -145,6 +150,9 @@ dial_git(int *fetchfd, const char *host, const char *port, const char *path,
 	int fd = -1, totlen, r, eaicode;
 
 	*fetchfd = -1;
+
+	if (port == NULL)
+		port = GOT_DEFAULT_GIT_PORT_STR;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -241,11 +249,6 @@ got_fetch_parse_uri(char **proto, char **host, char **port,
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
-		*port = strdup("22");
-		if (*port == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
 		s = (char *)uri;
 		q = strchr(s, ':');
 		if (q == NULL) {
@@ -294,10 +297,6 @@ got_fetch_parse_uri(char **proto, char **host, char **port,
 			*host = strndup(s, p - s);
 			if (*host == NULL) {
 				err = got_error_from_errno("strndup");
-				goto done;
-			}
-			if (asprintf(port, "%u", GOT_DEFAULT_GIT_PORT) == -1) {
-				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 		}

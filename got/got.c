@@ -1013,7 +1013,8 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	if (verbosity >= 0)
-		printf("Connected to %s:%s\n", host, port);
+		printf("Connected to %s%s%s\n", host,
+		    port ? ":" : "", port ? port : "");
 
 	/* Create a config file git-fetch(1) can understand. */
 	gitconfig_path = got_repo_get_path_gitconfig(repo);
@@ -1384,7 +1385,8 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 
 	if (verbosity >= 0)
-		printf("Connected to \"%s\" %s:%s\n", remote->name, host, port);
+		printf("Connected to \"%s\" %s%s%s\n", remote->name, host,
+		    port ? ":" : "", port ? port : "");
 
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
