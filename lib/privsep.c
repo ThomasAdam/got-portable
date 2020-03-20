@@ -419,7 +419,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 	size_t len, n_have_refs = 0;
 	struct got_pathlist_entry *pe;
 
-	len = sizeof(struct got_imsg_fetch_symrefs);
+	len = sizeof(struct got_imsg_fetch_have_refs);
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		len += sizeof(struct got_imsg_fetch_have_ref) + pe->path_len;
 		n_have_refs++;
