@@ -53,6 +53,7 @@
 #endif
 
 struct got_object *indexed;
+static int chattygot;
 static char *fetchbranch;
 static struct got_object_id zhash = {.sha1={0}};
 
@@ -77,6 +78,9 @@ static const struct got_error *
 flushpkt(int fd)
 {
 	ssize_t w;
+
+	if (chattygot)
+		fprintf(stderr, "%s: writepkt: 0000\n", getprogname());
 
 	 w = write(fd, "0000", 4);
 	 if (w == -1)
@@ -105,17 +109,30 @@ read_pkthdr(int *datalen, int fd)
 	err = readn(&r, fd, lenstr, 4);
 	if (err)
 		return err;
-	if (r == 0) /* implicit "0000" */
+	if (r == 0) {
+		/* implicit "0000" */
+		if (chattygot)
+			fprintf(stderr, "%s: readpkt: 0000\n", getprogname());
 		return NULL;
+	}
 	if (r != 4)
 		return got_error_msg(GOT_ERR_BAD_PACKET,
 		    "wrong packet header length");
 
 	lenstr[4] = '\0';
 	for (i = 0; i < 4; i++) {
-		if (!isxdigit(lenstr[i]))
+		if (!isprint((unsigned char)lenstr[i]))
+			return got_error_msg(GOT_ERR_BAD_PACKET,
+			    "unprintable character in packet length field");
+	}
+	for (i = 0; i < 4; i++) {
+		if (!isxdigit((unsigned char)lenstr[i])) {
+			if (chattygot)
+				fprintf(stderr, "%s: bad length: '%s'\n",
+				    getprogname(), lenstr);
 			return got_error_msg(GOT_ERR_BAD_PACKET,
 			    "packet length not specified in hex");
+		}
 	}
 	errno = 0;
 	len = strtol(lenstr, &e, 16);
@@ -140,7 +157,7 @@ static const struct got_error *
 readpkt(int *outlen, int fd, char *buf, int buflen)
 {
 	const struct got_error *err = NULL;
-	int datalen;
+	int datalen, i;
 	ssize_t n;
 
 	err = read_pkthdr(&datalen, fd);
@@ -156,6 +173,17 @@ readpkt(int *outlen, int fd, char *buf, int buflen)
 	if (n != datalen)
 		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
 
+	if (chattygot) {
+		fprintf(stderr, "%s: readpkt: %zd:\t", getprogname(), n);
+		for (i = 0; i < n; i++) {
+			if (isprint(buf[i]))
+				fputc(buf[i], stderr);
+			else
+				fprintf(stderr, "[0x%.2x]", buf[i]);
+		}
+		fputc('\n', stderr);
+	}
+
 	*outlen = n;
 	return NULL;
 }
@@ -164,6 +192,7 @@ static const struct got_error *
 writepkt(int fd, char *buf, int nbuf)
 {
 	char len[5];
+	int i;
 	ssize_t w;
 
 	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
@@ -178,6 +207,16 @@ writepkt(int fd, char *buf, int nbuf)
 		return got_error_from_errno("write");
 	if (w != nbuf)
 		return got_error(GOT_ERR_IO);
+	if (chattygot) {
+		fprintf(stderr, "%s: writepkt: %s:\t", getprogname(), len);
+		for (i = 0; i < nbuf; i++) {
+			if (isprint(buf[i]))
+				fputc(buf[i], stderr);
+			else
+				fprintf(stderr, "[0x%.2x]", buf[i]);
+		}
+		fputc('\n', stderr);
+	}
 	return NULL;
 }
 
@@ -476,6 +515,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = got_error_from_errno("malloc");
 		goto done;
 	}
+	if (chattygot)
+		fprintf(stderr, "%s: starting fetch\n", getprogname());
 	while (1) {
 		err = readpkt(&n, fd, buf, sizeof(buf));
 		if (err)
@@ -491,10 +532,16 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (err)
 			goto done;
 		if (is_firstpkt) {
+			if (chattygot && server_capabilities[0] != '\0')
+				fprintf(stderr, "%s: server capabilities: %s\n",
+				    getprogname(), server_capabilities);
 			err = match_capabilities(&my_capabilities, &symrefs,
 			    server_capabilities);
 			if (err)
 				goto done;
+			if (chattygot)
+				fprintf(stderr, "%s: my capabilities: %s\n",
+				    getprogname(), my_capabilities);
 			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
 				goto done;
@@ -527,6 +574,24 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		    refname);
 		if (err)
 			goto done;
+
+		if (chattygot) {
+			char *theirs, *mine;
+			err = got_object_id_str(&theirs, &want[nref]);
+			if (err)
+				goto done;
+			err = got_object_id_str(&mine, &have[nref]);
+			if (err) {
+				free(theirs);
+				goto done;
+			}
+			fprintf(stderr, "%s: discovered remote ref %s\n",
+			    getprogname(), refname);
+			fprintf(stderr, "%s: theirs=%s\n%s: mine=%s\n",
+			getprogname(), theirs, getprogname(), mine);
+			free(theirs);
+			free(mine);
+		}
 		nref++;
 	}
 
@@ -543,6 +608,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = writepkt(fd, buf, n);
 		if (err)
 			goto done;
+		sent_my_capabilites = 1;
 		nwant++;
 	}
 	err = flushpkt(fd);
@@ -611,6 +677,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 	}
+
+	if (chattygot)
+		fprintf(stderr, "%s: fetching...\n", getprogname());
 
 	if (my_capabilities != NULL &&
 	    strstr(my_capabilities, GOT_CAPA_SIDE_BAND_64K) != NULL)
@@ -751,6 +820,11 @@ main(int argc, char **argv)
 #endif
 
 	TAILQ_INIT(&have_refs);
+
+	if (getenv("GOT_FETCH_DEBUG") != NULL) {
+		fprintf(stderr, "%s being chatty!\n", getprogname());
+		chattygot = 1;
+	}
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 #ifndef PROFILE

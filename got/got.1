@@ -1604,6 +1604,11 @@ The default limit on the number of commits traversed by
 .Cm got log .
 If set to zero, the limit is unbounded.
 This variable will be silently ignored if it is set to a non-numeric value.
+.It Ev GOT_FETCH_DEBUG
+Enables protocol tracing on standard error output during
+.Cm got clone
+and
+.Cm got fetch .
 .El
 .Sh EXIT STATUS
 .Ex -std got
