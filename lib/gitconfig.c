@@ -514,6 +514,15 @@ got_gitconfig_get_section_list(struct got_gitconfig_list **sections,
 	for (i = 0; i < nitems(conf->bindings); i++) {
 		for (cb = LIST_FIRST(&conf->bindings[i]); cb;
 		    cb = LIST_NEXT(cb, link)) {
+			int section_present = 0;
+			TAILQ_FOREACH(node, &list->fields, link) {
+				if (strcmp(node->field, cb->section) == 0) {
+					section_present = 1;
+					break;
+				}
+			}
+			if (section_present)
+				continue;
 			list->cnt++;
 			node = calloc(1, sizeof *node);
 			if (!node) {
