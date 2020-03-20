@@ -1115,6 +1115,7 @@ cmd_clone(int argc, char *argv[])
 		if (asprintf(&gitconfig,
 		    "[remote \"%s\"]\n"
 		    "\turl = %s\n"
+		    "\tfetch = +refs/*:refs/*\n"
 		    "\tmirror = true\n",
 		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
 			error = got_error_from_errno("asprintf");
