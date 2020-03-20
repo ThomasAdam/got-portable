@@ -3079,17 +3079,13 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
-	error = got_worktree_open(&worktree, cwd);
-	if (error && error->code != GOT_ERR_NOT_WORKTREE)
-		goto done;
 	if (argc <= 1) {
-		if (worktree == NULL) {
-			error = got_error(GOT_ERR_NOT_WORKTREE);
-			goto done;
-		}
 		if (repo_path)
 			errx(1,
 			    "-r option can't be used when diffing a work tree");
+		error = got_worktree_open(&worktree, cwd);
+		if (error)
+			goto done;
 		repo_path = strdup(got_worktree_get_repo_path(worktree));
 		if (repo_path == NULL) {
 			error = got_error_from_errno("strdup");
@@ -3113,22 +3109,27 @@ cmd_diff(int argc, char *argv[])
 			    "objects in repository");
 		id_str1 = argv[0];
 		id_str2 = argv[1];
-		if (worktree && repo_path == NULL) {
-			repo_path =
-			    strdup(got_worktree_get_repo_path(worktree));
-			if (repo_path == NULL) {
-				error = got_error_from_errno("strdup");
+		if (repo_path == NULL) {
+			error = got_worktree_open(&worktree, cwd);
+			if (error && error->code != GOT_ERR_NOT_WORKTREE)
 				goto done;
+			if (worktree) {
+				repo_path = strdup(
+				    got_worktree_get_repo_path(worktree));
+				if (repo_path == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
+			} else {
+				repo_path = strdup(cwd);
+				if (repo_path == NULL) {
+					error = got_error_from_errno("strdup");
+					goto done;
+				}
 			}
 		}
 	} else
 		usage_diff();
-
-	if (repo_path == NULL) {
-		repo_path = getcwd(NULL, 0);
-		if (repo_path == NULL)
-			return got_error_from_errno("getcwd");
-	}
 
 	error = got_repo_open(&repo, repo_path, NULL);
 	free(repo_path);
@@ -3415,10 +3416,11 @@ cmd_blame(int argc, char *argv[])
 		if (worktree) {
 			repo_path =
 			    strdup(got_worktree_get_repo_path(worktree));
-			if (repo_path == NULL)
+			if (repo_path == NULL) {
 				error = got_error_from_errno("strdup");
-			if (error)
-				goto done;
+				if (error)
+					goto done;
+			}
 		} else {
 			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
