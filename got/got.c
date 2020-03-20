@@ -1454,22 +1454,12 @@ cmd_fetch(int argc, char *argv[])
 		struct got_reference *ref;
 		char *remote_refname;
 
-		if (remote->mirror_references) {
-			error = got_ref_alloc(&ref, refname, id);
-			if (error)
-				goto done;
-			error = got_ref_write(ref, repo);
-			got_ref_close(ref);
-			if (error)
-				goto done;
-			continue;
-		}
-
 		error = got_object_id_str(&id_str, id);
 		if (error)
 			goto done;
 
-		if (strncmp("refs/tags/", refname, 10) == 0) {
+		if (remote->mirror_references ||
+		    strncmp("refs/tags/", refname, 10) == 0) {
 			error = got_ref_open(&ref, repo, refname, 0);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
