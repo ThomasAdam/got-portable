@@ -152,9 +152,10 @@ already exists.
 .Pp
 The
 .Ar repository-URL
-specifies a protocol scheme, a server hostname, and a path to the repository
-on the server:
-.Lk scheme://hostname/path/to/repository
+specifies a protocol scheme, a server hostname, an optional port number
+separated from the hostname by a colon, and a path to the repository on
+the server:
+.Lk scheme://hostname:port/path/to/repository
 .Pp
 The following protocol schemes are supported:
 .Bl -tag -width git+ssh
