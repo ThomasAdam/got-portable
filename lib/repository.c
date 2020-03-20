@@ -375,6 +375,12 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 	*gitconfig_repository_format_version = 0;
 	*gitconfig_author_name = NULL;
 	*gitconfig_author_email = NULL;
+	if (remotes)
+		*remotes = NULL;
+	if (nremotes)
+		*nremotes = 0;
+	if (gitconfig_owner)
+		*gitconfig_owner = NULL;
 
 	fd = open(gitconfig_path, O_RDONLY);
 	if (fd == -1) {
