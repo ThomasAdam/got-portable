@@ -1427,7 +1427,8 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(refname, id, id_str, repo);
+				error = create_ref(remote_refname, id, id_str,
+				    repo);
 				if (error)
 					goto done;
 			} else {
