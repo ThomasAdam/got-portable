@@ -190,6 +190,35 @@ The options for
 .Cm got clone
 are as follows:
 .Bl -tag -width Ds
+.It Fl m
+Create the cloned repository as a mirror of the original repository.
+This is useful if the cloned repository will not be used to store
+local changes as created by
+.Cm got commit .
+.Pp
+The repository's
+.Pa config
+file will be set up with the
+.Dq mirror
+option enabled, such that
+.Cm got fetch
+or
+.Xr git-fetch 1
+will write incoming changes directly to branches in the
+.Dq refs/heads/
+reference namespace, rather than to branches in the
+.Dq refs/remotes/
+namespace.
+This avoids the usual requirement of having to run
+.Cm got rebase
+after
+.Cm got fetch
+in order to make incoming changes appear on branches in the
+.Dq refs/heads/
+namespace.
+But maintaining custom branches with local changes in the cloned
+repository becomes difficult since local changes are at risk of
+being discarded whenever incoming changes are fetched.
 .It Fl q
 Suppress progress reporting output.
 The same option will be passed to
@@ -220,16 +249,26 @@ file of the repository, as created by
 .Pp
 Branch references in the
 .Dq refs/remotes/
-reference namespace will be updated to point at the newly fetched commits.
-The
+reference namespace will be updated to point at the newly fetched commits,
+and the
 .Cm got rebase
 command can then be used to make new changes visible on branches in the
 .Dq refs/heads/
-reference namespace.
+reference namespace, merging incoming changes with local changes as necessary.
 .Pp
-Existing references in the
+However, if the repository is configured as a mirror then all references will
+be updated as needed to match the corresponding references in the remote
+repository, including branches in the
+.Dq refs/heads/
+reference namespace.
+If those branches contained local commits, these will no longer be reachable
+via a reference and will therefore be at risk of being discarded by Git's
+garbage collector.
+.Pp
+In any case, existing references in the
 .Dq refs/tags/
-namespace will be changed to match tags contained in the remote repository.
+namespace will always be changed to match tags contained in the remote
+repository.
 .Pp
 The options for
 .Cm got fetch
@@ -1715,12 +1754,31 @@ to be amended and perhaps committed again:
 .Dl $ # now back out the previous backout :-)
 .Dl $ got backout unified-buffer-cache
 .Pp
-Fetch new upstream commits into the local repository's master branch.
-This step currently requires
-.Xr git 1 :
+Fetch new upstream commits into the local repository's
+.Dq origin/master
+branch:
+.Pp
+.Dl $ cd /usr/src
+.Dl $ got fetch
+.Pp
+In a repository created with a HTTP URL and
+.Cm git clone --bare
+the
+.Xr git-fetch 1
+command must be used instead:
 .Pp
 .Dl $ cd /var/git/src.git
-.Dl $ git fetch origin master:master
+.Dl $ git fetch origin master:refs/remotes/origin/master
+.Pp
+Rebase the local
+.Dq master
+branch to merge the new changes that are now visible on the
+.Dq origin/master
+branch:
+.Pp
+.Dl $ cd /usr/src
+.Dl $ got update -b origin/master
+.Dl $ got rebase master
 .Pp
 Rebase the
 .Dq unified-buffer-cache
@@ -1746,11 +1804,12 @@ branch:
 .Dl $ got update -c master
 .Dl $ got histedit
 .Pp
-Additional steps are necessary if local changes need to be pushed back
+.Pp
+Additional steps may be necessary if local changes need to be pushed back
 to the remote repository, which currently requires
 .Cm git push .
 Before working against existing branches in a repository cloned with
-.Dq git clone --bare
+.Cm git clone --bare
 instead of
 .Cm got clone ,
 a Git
@@ -1769,9 +1828,15 @@ command:
 .Pp
 .Dl $ cd /var/git/repo
 .Dl $ git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+Additionally, the
+.Dq mirror
+option must be disabled:
+.Pp
+.Dl $ cd /var/git/repo
+.Dl $ git config remote.origin.mirror false
 .Pp
 Alternatively, the following
-.Pa fetch
+.Xr git-fetch 1
 configuration item can be added manually to the Git repository's
 .Pa config
 file:
@@ -1779,6 +1844,7 @@ file:
 .Dl [remote "origin"]
 .Dl url = ...
 .Dl fetch = +refs/heads/*:refs/remotes/origin/*
+.Dl mirror = false
 .Pp
 This configuration leaves the local repository's
 .Dq refs/heads
@@ -1789,12 +1855,15 @@ and, if needed, created with
 .Pp
 Branches in the
 .Dq remotes/origin
-namespace can be updated with incoming changes from the remote
+namespace can now be updated with incoming changes from the remote
 repository with
-.Cm got fetch :
+.Cm got fetch
+or
+.Xr git-fetch 1
+without extra command line arguments:
 .Pp
 .Dl $ cd /var/git/repo
-.Dl $ got fetch
+.Dl $ git fetch
 .Pp
 To make changes fetched from the remote repository appear on the
 .Dq master

@@ -341,6 +341,7 @@ struct got_imsg_traversed_commits {
 struct got_imsg_remote {
 	size_t name_len;
 	size_t url_len;
+	int mirror_references;
 
 	/* Followed by name_len + url_len data bytes. */
 };

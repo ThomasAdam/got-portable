@@ -1935,6 +1935,13 @@ got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
 			ibuf_free(wbuf);
 			return err;
 		}
+		if (imsg_add(wbuf, &remotes[i].mirror_references,
+		    sizeof(iremote.mirror_references)) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
 
 		wbuf->fd = -1;
 		imsg_close(ibuf, wbuf);
@@ -2023,6 +2030,7 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 				free(remote->name);
 				break;
 			}
+			remote->mirror_references = iremote.mirror_references;
 			(*nremotes)++;
 			break;
 		default:

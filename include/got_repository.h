@@ -51,6 +51,12 @@ const char *got_repo_get_gitconfig_owner(struct got_repository *);
 struct got_remote_repo {
 	char *name;
 	char *url;
+	
+	/*
+	 * If set, references are mirrored 1:1 into the local repository.
+	 * If not set, references are mapped into "refs/remotes/$name/".
+	 */
+	int mirror_references;
 };
 
 /* Obtain the list of remote repositories parsed from gitconfig. */ 

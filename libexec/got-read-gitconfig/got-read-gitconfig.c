@@ -108,7 +108,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 
 	i = 0;
 	TAILQ_FOREACH(node, &sections->fields, link) {
-		char *name, *end;
+		char *name, *end, *mirror;
 
 		if (strncasecmp("remote \"", node->field, 8) != 0)
 			continue;
@@ -129,6 +129,16 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
 			goto done;
 		}
+
+		remotes[i].mirror_references = 0;
+		mirror = got_gitconfig_get_str(gitconfig, node->field,
+		    "mirror");
+		if (mirror != NULL &&
+		    (strcasecmp(mirror, "true") == 0 ||
+		    strcasecmp(mirror, "on") == 0 ||
+		    strcasecmp(mirror, "yes") == 0 ||
+		    strcmp(mirror, "1") == 0))
+			remotes[i].mirror_references = 1;
 
 		i++;
 	}

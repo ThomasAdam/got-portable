@@ -387,9 +387,9 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
-    struct got_pathlist_head *symrefs, const char *remote_name, int fetchfd,
-    struct got_repository *repo, got_fetch_progress_cb progress_cb,
-    void *progress_arg)
+    struct got_pathlist_head *symrefs, const char *remote_name,
+    int mirror_references, int fetchfd, struct got_repository *repo,
+    got_fetch_progress_cb progress_cb, void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
@@ -418,9 +418,12 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	TAILQ_INIT(&have_refs);
 	SIMPLEQ_INIT(&my_refs);
 
-	if (asprintf(&ref_prefix, "refs/remotes/%s/", remote_name) == -1)
-		return got_error_from_errno("asprintf");
-	ref_prefixlen = strlen(ref_prefix);
+	if (!mirror_references) {
+		if (asprintf(&ref_prefix, "refs/remotes/%s/",
+		    remote_name) == -1)
+			return got_error_from_errno("asprintf");
+		ref_prefixlen = strlen(ref_prefix);
+	}
 
 	err = got_ref_list(&my_refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (err)
@@ -434,6 +437,23 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			continue;
 
 		refname = got_ref_get_name(re->ref);
+
+		if (mirror_references) {
+			char *name;
+			err = got_ref_resolve(&id, repo, re->ref);
+			if (err)
+				goto done;
+			name = strdup(refname);
+			if (name == NULL) {
+				err = got_error_from_errno("strdup");
+				goto done;
+			}
+			err = got_pathlist_append(&have_refs, name, id);
+			if (err)
+				goto done;
+			continue;
+		}
+
 		if (strncmp("refs/tags/", refname, 10) == 0) {
 			char *tagname;
 

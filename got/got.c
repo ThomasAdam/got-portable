@@ -811,7 +811,7 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-q] [-v] repository-url "
+	fprintf(stderr, "usage: %s clone [-m] [-q] [-v] repository-url "
 	    "[target-directory]\n", getprogname());
 	exit(1);
 }
@@ -903,13 +903,16 @@ cmd_clone(int argc, char *argv[])
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
 	ssize_t n;
-	int verbosity = 0;
+	int verbosity = 0, mirror_references = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 
-	while ((ch = getopt(argc, argv, "vq")) != -1) {
+	while ((ch = getopt(argc, argv, "mvq")) != -1) {
 		switch (ch) {
+		case 'm':
+			mirror_references = 1;
+			break;
 		case 'v':
 			if (verbosity < 0)
 				verbosity = 0;
@@ -1022,14 +1025,25 @@ cmd_clone(int argc, char *argv[])
 		error = got_error_from_errno2("fopen", gitconfig_path);
 		goto done;
 	}
-	if (asprintf(&gitconfig,
-	    "[remote \"%s\"]\n"
-	    "\turl = %s\n"
-	    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
-	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
-	    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
+	if (mirror_references) {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tmirror = true\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
 	}
 	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
 	if (n != strlen(gitconfig)) {
@@ -1042,8 +1056,8 @@ cmd_clone(int argc, char *argv[])
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
-	    GOT_FETCH_DEFAULT_REMOTE_NAME, fetchfd, repo,
-	    fetch_progress, &fpa);
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
+	    fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1068,6 +1082,9 @@ cmd_clone(int argc, char *argv[])
 		got_ref_close(ref);
 		if (error)
 			goto done;
+
+		if (mirror_references)
+			continue;
 
 		if (strncmp("refs/heads/", refname, 11) != 0)
 			continue;
@@ -1118,7 +1135,8 @@ cmd_clone(int argc, char *argv[])
 	}
 
 	if (verbosity >= 0)
-		printf("Created cloned repository '%s'\n", repo_path);
+		printf("Created %s repository '%s'\n",
+		    mirror_references ? "mirrored" : "cloned", repo_path);
 done:
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
@@ -1372,7 +1390,7 @@ cmd_fetch(int argc, char *argv[])
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
-	    fetchfd, repo, fetch_progress, &fpa);
+	    remote->mirror_references, fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
