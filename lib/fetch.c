@@ -387,7 +387,8 @@ check_pack_hash(int fd, size_t sz, uint8_t *hcomp)
 const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, const char *remote_name,
-    int mirror_references, int fetch_all_branches, int fetchfd,
+    int mirror_references, int fetch_all_branches,
+    struct got_pathlist_head *wanted_branches, int fetchfd,
     struct got_repository *repo,
     got_fetch_progress_cb progress_cb, void *progress_arg)
 {
@@ -554,7 +555,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs,
-	    fetch_all_branches);
+	    fetch_all_branches, wanted_branches);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;

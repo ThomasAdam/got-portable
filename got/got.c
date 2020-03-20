@@ -811,8 +811,8 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-a] [-m] [-q] [-v] repository-url "
-	    "[directory]\n", getprogname());
+	fprintf(stderr, "usage: %s clone [-a] [-b branch] [-m] [-q] [-v] "
+	    "repository-url [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -885,6 +885,21 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 }
 
 static const struct got_error *
+create_head_ref(struct got_reference *target_ref, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *head_symref;
+
+	err = got_ref_alloc_symref(&head_symref, GOT_REF_HEAD, target_ref);
+	if (err)
+		return err;
+
+	err = got_ref_write(head_symref, repo);
+	got_ref_close(head_symref);
+	return err;
+}
+
+static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -893,7 +908,7 @@ cmd_clone(int argc, char *argv[])
 	char *default_destdir = NULL, *id_str = NULL;
 	const char *repo_path;
 	struct got_repository *repo = NULL;
-	struct got_pathlist_head refs, symrefs;
+	struct got_pathlist_head refs, symrefs, wanted_branches;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int ch, fetchfd = -1;
@@ -908,11 +923,18 @@ cmd_clone(int argc, char *argv[])
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
+	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "amvq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:mvq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
+			break;
+		case 'b':
+			error = got_pathlist_append(&wanted_branches,
+			    optarg, NULL);
+			if (error)
+				return error;
 			break;
 		case 'm':
 			mirror_references = 1;
@@ -933,6 +955,9 @@ cmd_clone(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
+		errx(1, "-a and -b options are mutually exclusive\n");
 
 	uri = argv[0];
 
@@ -1023,7 +1048,8 @@ cmd_clone(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
-	    fetch_all_branches, fetchfd, repo, fetch_progress, &fpa);
+	    fetch_all_branches, &wanted_branches, fetchfd,
+	    repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1088,19 +1114,41 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		error = got_ref_alloc_symref(&head_symref,
-		    GOT_REF_HEAD, target_ref);
+		if (verbosity >= 0)
+			printf("Setting %s to %s\n", refname, target);
+		error = create_head_ref(target_ref, repo);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
+	}
+	if (pe == NULL) {
+		/*
+		 * We failed to set the HEAD reference. If we asked for
+		 * a set of wanted branches use the first of one of those
+		 * which could be fetched instead.
+		 */
+		 TAILQ_FOREACH(pe, &wanted_branches, entry) {
+			const char *target = pe->path;
+			struct got_reference *target_ref;
 
-		if (verbosity >= 0)
-			printf("Setting %s to %s\n", GOT_REF_HEAD,
-			    got_ref_get_symref_target(head_symref));
+			error = got_ref_open(&target_ref, repo, target, 0);
+			if (error) {
+				if (error->code == GOT_ERR_NOT_REF) {
+					error = NULL;
+					continue;
+				}
+				goto done;
+			}
 
-		error = got_ref_write(head_symref, repo);
-		if (error)
-			goto done;
+			if (verbosity >= 0)
+				printf("Setting %s to %s\n", GOT_REF_HEAD,
+				    got_ref_get_name(target_ref));
+			error = create_head_ref(target_ref, repo);
+			got_ref_close(target_ref);
+			if (error)
+				goto done;
+			break;
+		}
 	}
 
 	/* Create a config file git-fetch(1) can understand. */
@@ -1187,6 +1235,7 @@ done:
 		free(pe->data);
 	}
 	got_pathlist_free(&symrefs);
+	got_pathlist_free(&wanted_branches);
 	free(pack_hash);
 	free(proto);
 	free(host);
@@ -1268,8 +1317,8 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-a] [-r repository-path] [-q] [-v] "
-	    "[remote-repository-name]\n", getprogname());
+	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-r repository-path] "
+	    "[-q] [-v] [remote-repository-name]\n", getprogname());
 	exit(1);
 }
 
@@ -1286,7 +1335,7 @@ cmd_fetch(int argc, char *argv[])
 	char *id_str = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_pathlist_head refs, symrefs;
+	struct got_pathlist_head refs, symrefs, wanted_branches;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int i, ch, fetchfd = -1;
@@ -1295,11 +1344,18 @@ cmd_fetch(int argc, char *argv[])
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
+	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "ar:vq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:r:vq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
+			break;
+		case 'b':
+			error = got_pathlist_append(&wanted_branches,
+			    optarg, NULL);
+			if (error)
+				return error;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -1324,6 +1380,9 @@ cmd_fetch(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
+		errx(1, "-a and -b options are mutually exclusive\n");
 
 	if (argc == 0)
 		remote_name = GOT_FETCH_DEFAULT_REMOTE_NAME;
@@ -1427,8 +1486,8 @@ cmd_fetch(int argc, char *argv[])
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
-	    remote->mirror_references, fetch_all_branches, fetchfd, repo,
-	    fetch_progress, &fpa);
+	    remote->mirror_references, fetch_all_branches, &wanted_branches,
+	    fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1526,6 +1585,7 @@ done:
 		free(pe->data);
 	}
 	got_pathlist_free(&symrefs);
+	got_pathlist_free(&wanted_branches);
 	free(id_str);
 	free(cwd);
 	free(repo_path);

@@ -412,73 +412,107 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 
 const struct got_error *
 got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
-   struct got_pathlist_head *have_refs, int fetch_all_branches)
+   struct got_pathlist_head *have_refs, int fetch_all_branches,
+   struct got_pathlist_head *wanted_branches)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
-	size_t len, n_have_refs = 0;
+	size_t len;
 	struct got_pathlist_entry *pe;
+	struct got_imsg_fetch_request fetchreq;
 
+	memset(&fetchreq, 0, sizeof(fetchreq));
+	fetchreq.fetch_all_branches = fetch_all_branches;
+	TAILQ_FOREACH(pe, have_refs, entry)
+		fetchreq.n_have_refs++;
+	TAILQ_FOREACH(pe, wanted_branches, entry)
+		fetchreq.n_wanted_branches++;
 	len = sizeof(struct got_imsg_fetch_request);
-	TAILQ_FOREACH(pe, have_refs, entry) {
-		len += sizeof(struct got_imsg_fetch_have_ref) + pe->path_len;
-		n_have_refs++;
-	}
 	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE) {
 		close(fd);
 		return got_error(GOT_ERR_NO_SPACE);
 	}
 
-	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, len);
-	if (wbuf == NULL) {
-		close(fd);
-		return got_error_from_errno("imsg_create FETCH_REQUEST");
-	}
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_REQUEST, 0, 0, fd,
+	    &fetchreq, sizeof(fetchreq)) == -1)
+		return got_error_from_errno(
+		    "imsg_compose FETCH_SERVER_PROGRESS");
 
-	/* Keep in sync with struct got_imsg_fetch_request definition! */
-	if (imsg_add(wbuf, &fetch_all_branches, sizeof(fetch_all_branches))
-	    == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REQUEST");
-		ibuf_free(wbuf);
+	err = flush_imsg(ibuf);
+	if (err) {
 		close(fd);
 		return err;
 	}
-	if (imsg_add(wbuf, &n_have_refs, sizeof(n_have_refs)) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REQUEST");
-		ibuf_free(wbuf);
-		close(fd);
-		return err;
-	}
+	fd = -1;
 
 	TAILQ_FOREACH(pe, have_refs, entry) {
 		const char *name = pe->path;
 		size_t name_len = pe->path_len;
 		struct got_object_id *id = pe->data;
 
+		len = sizeof(struct got_imsg_fetch_have_ref) + name_len;
+		wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_HAVE_REF, 0, 0, len);
+		if (wbuf == NULL)
+			return got_error_from_errno("imsg_create FETCH_HAVE_REF");
+
 		/* Keep in sync with struct got_imsg_fetch_have_ref! */
 		if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
 			ibuf_free(wbuf);
-			close(fd);
 			return err;
 		}
 		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
 			ibuf_free(wbuf);
-			close(fd);
 			return err;
 		}
 		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_REQUEST");
+			err = got_error_from_errno("imsg_add FETCH_HAVE_REF");
 			ibuf_free(wbuf);
-			close(fd);
 			return err;
 		}
+
+		wbuf->fd = -1;
+		imsg_close(ibuf, wbuf);
+		err = flush_imsg(ibuf);
+		if (err)
+			return err;
 	}
 
-	wbuf->fd = fd;
-	imsg_close(ibuf, wbuf);
-	return flush_imsg(ibuf);
+	TAILQ_FOREACH(pe, wanted_branches, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+
+		len = sizeof(struct got_imsg_fetch_wanted_branch) + name_len;
+		wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_WANTED_BRANCH, 0, 0,
+		    len);
+		if (wbuf == NULL)
+			return got_error_from_errno(
+			     "imsg_create FETCH_WANTED_BRANCH");
+
+		/* Keep in sync with struct got_imsg_fetch_wanted_branch! */
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add FETCH_WANTED_BRANCH");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, name, name_len) == -1) {
+			err = got_error_from_errno(
+			     "imsg_add FETCH_WANTED_BRANCH");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		wbuf->fd = -1;
+		imsg_close(ibuf, wbuf);
+		err = flush_imsg(ibuf);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+
 }
 
 const struct got_error *

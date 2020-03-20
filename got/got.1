@@ -136,7 +136,7 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
-.It Cm clone Oo Fl a Oc Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar directory
+.It Cm clone Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar directory
 Clone a Git repository at the specified
 .Ar repository-URL
 into the specified
@@ -203,8 +203,25 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Fetch all branches from the remote repository.
-If this option is not specified, a branch resolved via the repository's HEAD
-reference will be fetched.
+If this option is not specified, a branch resolved via the remote
+repository's HEAD reference will be fetched.
+Cannot be used together with the
+.Fl b
+option.
+.It Fl b Ar branch
+Fetch the specified
+.Ar branch
+from the remote repository.
+This option may be specified multiple times to build a list of branches
+to fetch.
+If the branch corresponding to the remote repository's HEAD reference is not
+in this list, the cloned repository's HEAD reference will be set to the first
+branch which was fetched.
+If this option is not specified, a branch resolved via the remote
+repository's HEAD reference will be fetched.
+Cannot be used together with the
+.Fl a
+option.
 .It Fl m
 Create the cloned repository as a mirror of the original repository.
 This is useful if the cloned repository will not be used to store
@@ -250,11 +267,11 @@ The maximum is 3.
 .It Cm cl
 Short alias for
 .Cm clone .
-.It Cm fetch Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository-name
+.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
 Fetch new changes from a remote repository.
 If no
-.Ar remote-repository-name
-is specified the name
+.Ar remote-repository
+is specified,
 .Dq origin
 will be used.
 The remote repository's URL is obtained from the corresponding entry in the
@@ -295,8 +312,22 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Fetch all branches from the remote repository.
-If this option is not specified, a branch resolved via the repository's HEAD
-reference will be fetched.
+If this option is not specified, a branch resolved via the remote
+repository's HEAD reference will be fetched.
+Cannot be used together with the
+.Fl b
+option.
+.It Fl b Ar branch
+Fetch the specified
+.Ar branch
+from the remote repository.
+This option may be specified multiple times to build a list of branches
+to fetch.
+If this option is not specified, a branch resolved via the remote
+repository's HEAD reference will be fetched.
+Cannot be used together with the
+.Fl a
+option.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current

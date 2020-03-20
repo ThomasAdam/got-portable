@@ -483,7 +483,7 @@ fetch_error(const char *buf, size_t len)
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
-    struct imsgbuf *ibuf)
+    struct got_pathlist_head *wanted_branches, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_FETCH_PKTMAX];
@@ -561,10 +561,21 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			    getprogname(), refname);
 
 		if (strncmp(refname, "refs/heads/", 11) == 0) {
-			if (default_branch != NULL &&
-			    !match_branch(refname, default_branch))
-				continue;
-			found_branch = 1;
+			if (fetch_all_branches) {
+				found_branch = 1;
+			} else if (!TAILQ_EMPTY(wanted_branches)) {
+				TAILQ_FOREACH(pe, wanted_branches, entry) {
+					if (match_branch(refname, pe->path))
+						break;
+				}
+				if (pe == NULL)
+					continue;
+				found_branch = 1;
+			} else if (default_branch != NULL) {
+				if (!match_branch(refname, default_branch))
+					continue;
+				found_branch = 1;
+			}
 		} else if (strncmp(refname, "refs/tags/", 10) != 0) {
 			if (chattygot) {
 				fprintf(stderr, "%s: ignoring '%s' which is "
@@ -837,11 +848,12 @@ main(int argc, char **argv)
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 	struct got_pathlist_head have_refs;
+	struct got_pathlist_head wanted_branches;
 	struct got_pathlist_entry *pe;
-	struct got_imsg_fetch_request *fetch_req = NULL;
+	struct got_imsg_fetch_request fetch_req;
 	struct got_imsg_fetch_have_ref href;
-	size_t datalen, remain;
-	size_t offset;
+	struct got_imsg_fetch_wanted_branch wbranch;
+	size_t datalen;
 #if 0
 	static int attached;
 	while (!attached)
@@ -849,6 +861,7 @@ main(int argc, char **argv)
 #endif
 
 	TAILQ_INIT(&have_refs);
+	TAILQ_INIT(&wanted_branches);
 
 	if (getenv("GOT_FETCH_DEBUG") != NULL) {
 		fprintf(stderr, "%s being chatty!\n", getprogname());
@@ -876,43 +889,46 @@ main(int argc, char **argv)
 		goto done;
 	}
 	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-	if (datalen < sizeof(struct got_imsg_fetch_request)) {
+	if (datalen < sizeof(fetch_req)) {
 		err = got_error(GOT_ERR_PRIVSEP_LEN);
 		goto done;
 	}
-	fetch_req = (struct got_imsg_fetch_request *)imsg.data;
-	if (datalen < sizeof(*fetch_req) +
-	    sizeof(struct got_imsg_fetch_have_ref) *
-	    fetch_req->n_have_refs) {
-		err = got_error(GOT_ERR_PRIVSEP_LEN);
-		goto done;
-	}
-	offset = sizeof(*fetch_req);
-	remain = datalen;
-	for (i = 0; i < fetch_req->n_have_refs; i++) {
+	memcpy(&fetch_req, imsg.data, sizeof(fetch_req));
+	fetchfd = imsg.fd;
+	imsg_free(&imsg);
+
+	for (i = 0; i < fetch_req.n_have_refs; i++) {
 		struct got_object_id *id;
 		char *refname;
 
-		if (remain < sizeof(href) || offset > datalen) {
+		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+			if (err->code == GOT_ERR_PRIVSEP_PIPE)
+				err = NULL;
+			goto done;
+		}
+		if (imsg.hdr.type == GOT_IMSG_STOP)
+			goto done;
+		if (imsg.hdr.type != GOT_IMSG_FETCH_HAVE_REF) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			goto done;
+		}
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (datalen < sizeof(href)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		memcpy(&href, imsg.data + offset, sizeof(href));
-		remain -= sizeof(href);
-		if (remain < href.name_len) {
+		memcpy(&href, imsg.data, sizeof(href));
+		if (datalen - sizeof(href) < href.name_len) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
-		remain -= href.name_len;
 		refname = malloc(href.name_len + 1);
 		if (refname == NULL) {
 			err = got_error_from_errno("malloc");
 			goto done;
 		}
-		offset += sizeof(href);
-		memcpy(refname, imsg.data + offset, href.name_len);
+		memcpy(refname, imsg.data + sizeof(href), href.name_len);
 		refname[href.name_len] = '\0';
-		offset += href.name_len;
 
 		id = malloc(sizeof(*id));
 		if (id == NULL) {
@@ -927,8 +943,50 @@ main(int argc, char **argv)
 			free(id);
 			goto done;
 		}
+
+		imsg_free(&imsg);
 	}
-	fetchfd = imsg.fd;
+
+	for (i = 0; i < fetch_req.n_wanted_branches; i++) {
+		char *refname;
+
+		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+			if (err->code == GOT_ERR_PRIVSEP_PIPE)
+				err = NULL;
+			goto done;
+		}
+		if (imsg.hdr.type == GOT_IMSG_STOP)
+			goto done;
+		if (imsg.hdr.type != GOT_IMSG_FETCH_WANTED_BRANCH) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			goto done;
+		}
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (datalen < sizeof(wbranch)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		memcpy(&wbranch, imsg.data, sizeof(wbranch));
+		if (datalen - sizeof(wbranch) < wbranch.name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		refname = malloc(wbranch.name_len + 1);
+		if (refname == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		memcpy(refname, imsg.data + sizeof(wbranch), wbranch.name_len);
+		refname[wbranch.name_len] = '\0';
+
+		err = got_pathlist_append(&wanted_branches, refname, NULL);
+		if (err) {
+			free(refname);
+			goto done;
+		}
+
+		imsg_free(&imsg);
+	}
 
 	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
@@ -948,13 +1006,16 @@ main(int argc, char **argv)
 	packfd = imsg.fd;
 
 	err = fetch_pack(fetchfd, packfd, &packid, &have_refs,
-	    fetch_req->fetch_all_branches, &ibuf);
+	    fetch_req.fetch_all_branches, &wanted_branches, &ibuf);
 done:
 	TAILQ_FOREACH(pe, &have_refs, entry) {
 		free((char *)pe->path);
 		free(pe->data);
 	}
 	got_pathlist_free(&have_refs);
+	TAILQ_FOREACH(pe, &wanted_branches, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&wanted_branches);
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err != NULL)
