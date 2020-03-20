@@ -1494,6 +1494,17 @@ cmd_fetch(int argc, char *argv[])
 				if (error)
 					goto done;
 			}
+
+			/* Also create a local branch if none exists yet. */
+			error = got_ref_open(&ref, repo, refname, 0);
+			if (error) {
+				if (error->code != GOT_ERR_NOT_REF)
+					goto done;
+				error = create_ref(refname, id, id_str, repo);
+				if (error)
+					goto done;
+			} else
+				got_ref_close(ref);
 		}
 		free(id_str);
 		id_str = NULL;
