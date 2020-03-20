@@ -177,6 +177,14 @@ to use:
 Short alias for git+ssh.
 .El
 .Pp
+Objects in the cloned repository are stored in a pack file which is downloaded
+from the server.
+This pack file will then be indexed to facilitate access to the objects stored
+within.
+If any objects in the pack file are stored in deltified form, all deltas will
+be fully resolved in order to compute the ID of such objects.
+This can take some time.
+.Pp
 .Cm got clone
 creates a remote repository entry in the
 .Pa config
@@ -251,6 +259,10 @@ The remote repository's URL is obtained from the corresponding entry in the
 .Pa config
 file of the repository, as created by
 .Cm got clone .
+.Pp
+New changes will be stored in a separate pack file downloaded from the server.
+Optionally, separate pack files stored in the repository can be combined with
+.Xr git-repack 1 .
 .Pp
 Branch references in the
 .Dq refs/remotes/
