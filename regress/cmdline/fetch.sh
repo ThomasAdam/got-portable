@@ -676,7 +676,7 @@ function test_fetch_reference {
 	ret="$?"
 	if [ "$ret" == "0" ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
-		test_done "$testroot" "$ret"
+		test_done "$testroot" "1"
 		return 1
 	fi
 
