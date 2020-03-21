@@ -583,7 +583,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				    "neither a branch nor a tag\n",
 				    getprogname(), refname);
 			}
-			continue;
+			if (!list_refs_only)
+				continue;
 		}
 
 		if (refsz == nref + 1) {
