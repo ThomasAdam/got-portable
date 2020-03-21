@@ -410,6 +410,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	struct got_reflist_head my_refs;
 	struct got_reflist_entry *re;
 	off_t packfile_size = 0;
+	struct got_packfile_hdr pack_hdr;
+	uint32_t nobj = 0;
 	char *ref_prefix = NULL;
 	size_t ref_prefixlen = 0;
 	char *path;
@@ -519,11 +521,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		if (err)
 			goto done;
 	}
-	npackfd = dup(packfd);
-	if (npackfd == -1) {
-		err = got_error_from_errno("dup");
-		goto done;
-	}
 	if (list_refs_only) {
 		idxfd = got_opentempfd();
 		if (idxfd == -1) {
@@ -584,14 +581,15 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
-	err = got_privsep_send_fetch_outfd(&fetchibuf, npackfd);
-	if (err != NULL)
-		goto done;
 	npackfd = dup(packfd);
 	if (npackfd == -1) {
 		err = got_error_from_errno("dup");
 		goto done;
 	}
+	err = got_privsep_send_fetch_outfd(&fetchibuf, npackfd);
+	if (err != NULL)
+		goto done;
+	npackfd = -1;
 
 	packfile_size = 0;
 	progress = calloc(GOT_FETCH_PKTMAX, 1);
@@ -671,17 +669,70 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 
+	if (lseek(packfd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
+
 	/* If zero data was fetched without error we are already up-to-date. */
 	if (packfile_size == 0)
+		goto done;
+	else if (packfile_size < sizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+		err = got_error_msg(GOT_ERR_BAD_PACKFILE, "short pack file");
+		goto done;
+	} else {
+		ssize_t n;
+
+		n = read(packfd, &pack_hdr, sizeof(pack_hdr));
+		if (n == -1) {
+			err = got_error_from_errno("read");
+			goto done;
+		}
+		if (n != sizeof(pack_hdr)) {
+			err = got_error(GOT_ERR_IO);
+			goto done;
+		}
+		if (pack_hdr.signature != htobe32(GOT_PACKFILE_SIGNATURE)) {
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "bad pack file signature");
+			goto done;
+		}
+		if (pack_hdr.version != htobe32(GOT_PACKFILE_VERSION)) {
+			err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "bad pack file version");
+			goto done;
+		}
+		nobj = betoh32(pack_hdr.nobjects);
+		if (nobj == 0 &&
+		    packfile_size > sizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
+			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "bad pack file with zero objects");
+		if (nobj != 0 &&
+		    packfile_size <= sizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
+			return got_error_msg(GOT_ERR_BAD_PACKFILE,
+			    "empty pack file with non-zero object count");
+	}
+
+	/*
+	 * If the pack file contains no objects, we may only need to update
+	 * references in our repository. The caller will take care of that.
+	 */
+	if (nobj == 0)
 		goto done;
 
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
 		goto done;
 	}
+
 	err = check_pack_hash(packfd, packfile_size, (*pack_hash)->sha1);
 	if (err)
 		goto done;
+
+	if (lseek(packfd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno("lseek");
+		goto done;
+	}
  
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_idxfds) == -1) {
 		err = got_error_from_errno("socketpair");
@@ -700,6 +751,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 	imsg_init(&idxibuf, imsg_idxfds[0]);
 
+	npackfd = dup(packfd);
+	if (npackfd == -1) {
+		err = got_error_from_errno("dup");
+		goto done;
+	}
 	err = got_privsep_send_index_pack_req(&idxibuf, (*pack_hash)->sha1,
 	    npackfd);
 	if (err != NULL)
