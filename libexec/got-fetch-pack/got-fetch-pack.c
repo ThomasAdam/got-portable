@@ -483,7 +483,8 @@ fetch_error(const char *buf, size_t len)
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
-    struct got_pathlist_head *wanted_branches, struct imsgbuf *ibuf)
+    struct got_pathlist_head *wanted_branches, int list_refs_only,
+    struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	char buf[GOT_FETCH_PKTMAX];
@@ -561,7 +562,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			    getprogname(), refname);
 
 		if (strncmp(refname, "refs/heads/", 11) == 0) {
-			if (fetch_all_branches) {
+			if (fetch_all_branches || list_refs_only) {
 				found_branch = 1;
 			} else if (!TAILQ_EMPTY(wanted_branches)) {
 				TAILQ_FOREACH(pe, wanted_branches, entry) {
@@ -627,6 +628,9 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		}
 		nref++;
 	}
+
+	if (list_refs_only)
+		goto done;
 
 	/* Abort if we haven't found any branch to fetch. */
 	if (!found_branch) {
@@ -1006,7 +1010,8 @@ main(int argc, char **argv)
 	packfd = imsg.fd;
 
 	err = fetch_pack(fetchfd, packfd, &packid, &have_refs,
-	    fetch_req.fetch_all_branches, &wanted_branches, &ibuf);
+	    fetch_req.fetch_all_branches, &wanted_branches,
+	    fetch_req.list_refs_only, &ibuf);
 done:
 	TAILQ_FOREACH(pe, &have_refs, entry) {
 		free((char *)pe->path);

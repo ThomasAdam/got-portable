@@ -388,8 +388,8 @@ const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, const char *remote_name,
     int mirror_references, int fetch_all_branches,
-    struct got_pathlist_head *wanted_branches, int fetchfd,
-    struct got_repository *repo,
+    struct got_pathlist_head *wanted_branches, int list_refs_only,
+    int fetchfd, struct got_repository *repo,
     got_fetch_progress_cb progress_cb, void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
@@ -401,7 +401,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	pid_t fetchpid, idxpid;
 	char *tmppackpath = NULL, *tmpidxpath = NULL;
 	char *packpath = NULL, *idxpath = NULL, *id_str = NULL;
-	const char *repo_path = got_repo_get_path_git_dir(repo);
+	const char *repo_path = NULL;
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_entry *pe;
 	struct got_reflist_head my_refs;
@@ -411,6 +411,9 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	size_t ref_prefixlen = 0;
 	char *path;
 	char *progress = NULL;
+
+	if (!list_refs_only)
+		repo_path = got_repo_get_path_git_dir(repo);
 
 	*pack_hash = NULL;
 	for (i = 0; i < nitems(tmpfds); i++)
@@ -426,9 +429,12 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		ref_prefixlen = strlen(ref_prefix);
 	}
 
-	err = got_ref_list(&my_refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (err)
-		goto done;
+	if (!list_refs_only) {
+		err = got_ref_list(&my_refs, repo, NULL,
+		    got_ref_cmp_by_name, NULL);
+		if (err)
+			goto done;
+	}
 
 	SIMPLEQ_FOREACH(re, &my_refs, entry) {
 		struct got_object_id *id;
@@ -493,29 +499,45 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		}
 	}
 
-	if (asprintf(&path, "%s/%s/fetching.pack",
-	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
+	if (list_refs_only) {
+		packfd = got_opentempfd();
+		if (packfd == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+	} else {
+		if (asprintf(&path, "%s/%s/fetching.pack",
+		    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		err = got_opentemp_named_fd(&tmppackpath, &packfd, path);
+		free(path);
+		if (err)
+			goto done;
 	}
-	err = got_opentemp_named_fd(&tmppackpath, &packfd, path);
-	free(path);
-	if (err)
-		goto done;
 	npackfd = dup(packfd);
 	if (npackfd == -1) {
 		err = got_error_from_errno("dup");
 		goto done;
 	}
-	if (asprintf(&path, "%s/%s/fetching.idx",
-	    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
+	if (list_refs_only) {
+		idxfd = got_opentempfd();
+		if (idxfd == -1) {
+			err = got_error_from_errno("got_opentempfd");
+			goto done;
+		}
+	} else {
+		if (asprintf(&path, "%s/%s/fetching.idx",
+		    repo_path, GOT_OBJECTS_PACK_DIR) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path);
+		free(path);
+		if (err)
+			goto done;
 	}
-	err = got_opentemp_named_fd(&tmpidxpath, &idxfd, path);
-	free(path);
-	if (err)
-		goto done;
 	nidxfd = dup(idxfd);
 	if (nidxfd == -1) {
 		err = got_error_from_errno("dup");
@@ -555,7 +577,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs,
-	    fetch_all_branches, wanted_branches);
+	    fetch_all_branches, wanted_branches, list_refs_only);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
@@ -591,7 +613,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			else
 				free(id);
 		} else if (refname && id) {
-			err = got_pathlist_append(refs, refname, id);
+			err = got_pathlist_insert(NULL, refs, refname, id);
 			if (err)
 				goto done;
 		} else if (server_progress) {

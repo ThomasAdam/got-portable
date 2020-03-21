@@ -257,6 +257,7 @@ struct got_imsg_fetch_wanted_branch {
 /* Structure for GOT_IMSG_FETCH_REQUEST data. */
 struct got_imsg_fetch_request {
 	int fetch_all_branches;
+	int list_refs_only;
 	size_t n_have_refs;
 	size_t n_wanted_branches;
 	/* Followed by n_have_refs GOT_IMSG_FETCH_HAVE_REF messages. */
@@ -401,7 +402,7 @@ const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
     int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
-    struct got_pathlist_head *, int, struct got_pathlist_head *);
+    struct got_pathlist_head *, int, struct got_pathlist_head *, int);
 const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
     struct got_pathlist_head *);

@@ -900,6 +900,35 @@ create_head_ref(struct got_reference *target_ref, struct got_repository *repo)
 }
 
 static const struct got_error *
+list_remote_refs(struct got_pathlist_head *symrefs,
+    struct got_pathlist_head *refs)
+{
+	const struct got_error *err;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, symrefs, entry) {
+		const char *refname = pe->path;
+		const char *targetref = pe->data;
+
+		printf("%s: %s\n", refname, targetref);
+	}
+
+	TAILQ_FOREACH(pe, refs, entry) {
+		const char *refname = pe->path;
+		struct got_object_id *id = pe->data;
+		char *id_str;
+
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			return err;
+		printf("%s: %s\n", refname, id_str);
+		free(id_str);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -919,13 +948,14 @@ cmd_clone(int argc, char *argv[])
 	FILE *gitconfig_file = NULL;
 	ssize_t n;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
+	int list_refs_only = 0;
 	struct got_reference *head_symref = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "ab:mvq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:lmvq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -935,6 +965,9 @@ cmd_clone(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			break;
+		case 'l':
+			list_refs_only = 1;
 			break;
 		case 'm':
 			mirror_references = 1;
@@ -957,7 +990,17 @@ cmd_clone(int argc, char *argv[])
 	argv += optind;
 
 	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
-		errx(1, "-a and -b options are mutually exclusive\n");
+		errx(1, "-a and -b options are mutually exclusive");
+	if (list_refs_only) {
+		if (!TAILQ_EMPTY(&wanted_branches))
+			errx(1, "-l and -b options are mutually exclusive");
+		if (fetch_all_branches)
+			errx(1, "-l and -a options are mutually exclusive");
+		if (mirror_references)
+			errx(1, "-l and -m options are mutually exclusive");
+		if (verbosity == -1)
+			errx(1, "-l and -q options are mutually exclusive");
+	}
 
 	uri = argv[0];
 
@@ -1010,17 +1053,18 @@ cmd_clone(int argc, char *argv[])
 	} else
 		repo_path = dirname;
 
-	error = got_path_mkdir(repo_path);
-	if (error)
-		goto done;
+	if (!list_refs_only) {
+		error = got_path_mkdir(repo_path);
+		if (error)
+			goto done;
 
-	error = got_repo_init(repo_path);
-	if (error)
-		goto done;
-
-	error = got_repo_open(&repo, repo_path, NULL);
-	if (error)
-		goto done;
+		error = got_repo_init(repo_path);
+		if (error)
+			goto done;
+		error = got_repo_open(&repo, repo_path, NULL);
+		if (error)
+			goto done;
+	}
 
 	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
 		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
@@ -1029,7 +1073,7 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 	}
-	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+	error = apply_unveil(repo ? got_repo_get_path(repo) : NULL, 0, NULL);
 	if (error)
 		goto done;
 
@@ -1048,10 +1092,15 @@ cmd_clone(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
-	    fetch_all_branches, &wanted_branches, fetchfd,
-	    repo, fetch_progress, &fpa);
+	    fetch_all_branches, &wanted_branches, list_refs_only,
+	    fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
+
+	if (list_refs_only) {
+		error = list_remote_refs(&symrefs, &refs);
+		goto done;
+	}
 
 	error = got_object_id_str(&id_str, pack_hash);
 	if (error)
@@ -1340,13 +1389,13 @@ cmd_fetch(int argc, char *argv[])
 	struct got_object_id *pack_hash = NULL;
 	int i, ch, fetchfd = -1;
 	struct got_fetch_progress_arg fpa;
-	int verbosity = 0, fetch_all_branches = 0;
+	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "ab:r:vq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:lr:vq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1356,6 +1405,9 @@ cmd_fetch(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			break;
+		case 'l':
+			list_refs_only = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -1382,7 +1434,15 @@ cmd_fetch(int argc, char *argv[])
 	argv += optind;
 
 	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
-		errx(1, "-a and -b options are mutually exclusive\n");
+		errx(1, "-a and -b options are mutually exclusive");
+	if (list_refs_only) {
+		if (!TAILQ_EMPTY(&wanted_branches))
+			errx(1, "-l and -b options are mutually exclusive");
+		if (fetch_all_branches)
+			errx(1, "-l and -a options are mutually exclusive");
+		if (verbosity == -1)
+			errx(1, "-l and -q options are mutually exclusive");
+	}
 
 	if (argc == 0)
 		remote_name = GOT_FETCH_DEFAULT_REMOTE_NAME;
@@ -1487,9 +1547,14 @@ cmd_fetch(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
-	    fetchfd, repo, fetch_progress, &fpa);
+	    list_refs_only, fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
+
+	if (list_refs_only) {
+		error = list_remote_refs(&symrefs, &refs);
+		goto done;
+	}
 
 	if (pack_hash == NULL) {
 		if (verbosity >= 0)
