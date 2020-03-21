@@ -940,7 +940,8 @@ cmd_clone(int argc, char *argv[])
 	struct got_pathlist_head refs, symrefs, wanted_branches;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
-	int ch, fetchfd = -1;
+	int ch, fetchfd = -1, fetchstatus;
+	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
 	char *gitconfig_path = NULL;
@@ -1077,8 +1078,8 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_fetch_connect(&fetchfd, proto, host, port, server_path,
-	    verbosity);
+	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
+	    server_path, verbosity);
 	if (error)
 		goto done;
 
@@ -1266,6 +1267,12 @@ cmd_clone(int argc, char *argv[])
 		printf("Created %s repository '%s'\n",
 		    mirror_references ? "mirrored" : "cloned", repo_path);
 done:
+	if (fetchpid > 0) {
+		if (kill(fetchpid, SIGTERM) == -1)
+			error = got_error_from_errno("kill");
+		if (waitpid(fetchpid, &fetchstatus, 0) == -1 && error == NULL)
+			error = got_error_from_errno("waitpid");
+	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (gitconfig_file && fclose(gitconfig_file) == EOF && error == NULL)
@@ -1387,7 +1394,8 @@ cmd_fetch(int argc, char *argv[])
 	struct got_pathlist_head refs, symrefs, wanted_branches;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
-	int i, ch, fetchfd = -1;
+	int i, ch, fetchfd = -1, fetchstatus;
+	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
 
@@ -1532,8 +1540,8 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_fetch_connect(&fetchfd, proto, host, port, server_path,
-	    verbosity);
+	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
+	    server_path, verbosity);
 	if (error)
 		goto done;
 
@@ -1634,6 +1642,12 @@ cmd_fetch(int argc, char *argv[])
 		id_str = NULL;
 	}
 done:
+	if (fetchpid > 0) {
+		if (kill(fetchpid, SIGTERM) == -1)
+			error = got_error_from_errno("kill");
+		if (waitpid(fetchpid, &fetchstatus, 0) == -1 && error == NULL)
+			error = got_error_from_errno("waitpid");
+	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
 	if (repo)

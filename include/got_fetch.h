@@ -43,11 +43,16 @@ const struct got_error *got_fetch_parse_uri(char **, char **, char **,
  * A verbosity level can be specified; it currently controls the amount
  * of -v options passed to ssh(1). If the level is -1 ssh(1) will be run
  * with the -q option.
+ *
  * If successful return an open file descriptor for the connection which can
  * be passed to other functions below, and must be disposed of with close(2).
+ *
+ * If an ssh(1) process was started return its PID as well, in which case
+ * the caller should eventually send SIGTERM to the procress and wait for
+ * the process to exit with waitpid(2). Otherwise, return PID -1.
  */
-const struct got_error *got_fetch_connect(int *, const char *, const char *,
-    const char *, const char *, int);
+const struct got_error *got_fetch_connect(pid_t *, int *, const char *,
+    const char *, const char *, const char *, int);
 
 /* A callback function which gets invoked with progress information to print. */
 typedef const struct got_error *(*got_fetch_progress_cb)(void *,

@@ -83,8 +83,8 @@ hassuffix(char *base, char *suf)
 }
 
 static const struct got_error *
-dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
-    const char *direction, int verbosity)
+dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
+    const char *path, const char *direction, int verbosity)
 {
 	const struct got_error *error = NULL;
 	int pid, pfd[2];
@@ -92,6 +92,7 @@ dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
 	char *argv[11];
 	int i = 0;
 
+	*fetchpid = -1;
 	*fetchfd = -1;
 
 	if (port == NULL)
@@ -135,6 +136,7 @@ dial_ssh(int *fetchfd, const char *host, const char *port, const char *path,
 		abort(); /* not reached */
 	} else {
 		close(pfd[0]);
+		*fetchpid = pid;
 		*fetchfd = pfd[1];
 		return NULL;
 	}
@@ -212,16 +214,17 @@ done:
 }
 
 const struct got_error *
-got_fetch_connect(int *fetchfd, const char *proto, const char *host,
-    const char *port, const char *server_path, int verbosity)
+got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
+    const char *host, const char *port, const char *server_path, int verbosity)
 {
 	const struct got_error *err = NULL;
 
+	*fetchpid = -1;
 	*fetchfd = -1;
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
-		err = dial_ssh(fetchfd, host, port, server_path, "upload",
-		    verbosity);
+		err = dial_ssh(fetchpid, fetchfd, host, port, server_path,
+		    "upload", verbosity);
 	else if (strcmp(proto, "git") == 0)
 		err = dial_git(fetchfd, host, port, server_path, "upload");
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
