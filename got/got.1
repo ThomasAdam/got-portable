@@ -262,8 +262,11 @@ The same option will be passed to
 .Xr ssh 1
 if applicable.
 .It Fl v
-Increase the verbosity of progress reporting output.
-The same option will be passed to
+Verbose mode.
+Causes
+.Cm got clone
+to print debugging messages to standard error output.
+This option will be passed to
 .Xr ssh 1
 if applicable.
 Multiple -v options increase the verbosity.
@@ -360,7 +363,10 @@ The same option will be passed to
 .Xr ssh 1
 if applicable.
 .It Fl v
-Increase the verbosity of progress reporting output.
+Verbose mode.
+Causes
+.Cm got fetch
+to print debugging messages to standard error output.
 The same option will be passed to
 .Xr ssh 1
 if applicable.
@@ -1716,11 +1722,6 @@ The default limit on the number of commits traversed by
 .Cm got log .
 If set to zero, the limit is unbounded.
 This variable will be silently ignored if it is set to a non-numeric value.
-.It Ev GOT_FETCH_DEBUG
-Enables protocol tracing on standard error output during
-.Cm got clone
-and
-.Cm got fetch .
 .El
 .Sh EXIT STATUS
 .Ex -std got

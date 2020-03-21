@@ -79,7 +79,7 @@ flushpkt(int fd)
 {
 	ssize_t w;
 
-	if (chattygot)
+	if (chattygot > 1)
 		fprintf(stderr, "%s: writepkt: 0000\n", getprogname());
 
 	 w = write(fd, "0000", 4);
@@ -111,7 +111,7 @@ read_pkthdr(int *datalen, int fd)
 		return err;
 	if (r == 0) {
 		/* implicit "0000" */
-		if (chattygot)
+		if (chattygot > 1)
 			fprintf(stderr, "%s: readpkt: 0000\n", getprogname());
 		return NULL;
 	}
@@ -173,7 +173,7 @@ readpkt(int *outlen, int fd, char *buf, int buflen)
 	if (n != datalen)
 		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
 
-	if (chattygot) {
+	if (chattygot > 1) {
 		fprintf(stderr, "%s: readpkt: %zd:\t", getprogname(), n);
 		for (i = 0; i < n; i++) {
 			if (isprint(buf[i]))
@@ -207,7 +207,7 @@ writepkt(int fd, char *buf, int nbuf)
 		return got_error_from_errno("write");
 	if (w != nbuf)
 		return got_error(GOT_ERR_IO);
-	if (chattygot) {
+	if (chattygot > 1) {
 		fprintf(stderr, "%s: writepkt: %s:\t", getprogname(), len);
 		for (i = 0; i < nbuf; i++) {
 			if (isprint(buf[i]))
@@ -310,8 +310,13 @@ parse_refline(char **id_str, char **refname, char **server_capabilities,
 		*id_str = tokens[0];
 	if (tokens[1])
 		*refname = tokens[1];
-	if (tokens[2])
+	if (tokens[2]) {
+		char *p;
 		*server_capabilities = tokens[2];
+		p = strrchr(*server_capabilities, '\n');
+		if (p)
+			*p = '\0';
+	}
 	
 	return NULL;
 }
@@ -511,8 +516,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		err = got_error_from_errno("malloc");
 		goto done;
 	}
-	if (chattygot)
-		fprintf(stderr, "%s: starting fetch\n", getprogname());
 	while (1) {
 		err = readpkt(&n, fd, buf, sizeof(buf));
 		if (err)
@@ -536,7 +539,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			if (err)
 				goto done;
 			if (chattygot)
-				fprintf(stderr, "%s: my capabilities: %s\n",
+				fprintf(stderr, "%s: my capabilities:%s\n",
 				    getprogname(), my_capabilities);
 			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
@@ -554,12 +557,13 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			}
 			continue;
 		}
-		if (strstr(refname, "^{}"))
+		if (strstr(refname, "^{}")) {
+			if (chattygot) {
+				fprintf(stderr, "%s: ignoring %s\n",
+				    getprogname(), refname);
+			}
 			continue;
-
-		if (chattygot)
-			fprintf(stderr, "%s: discovered remote ref %s\n",
-			    getprogname(), refname);
+		}
 
 		if (strncmp(refname, "refs/heads/", 11) == 0) {
 			if (fetch_all_branches || list_refs_only) {
@@ -569,22 +573,34 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 					if (match_branch(refname, pe->path))
 						break;
 				}
-				if (pe == NULL)
+				if (pe == NULL) {
+					if (chattygot) {
+						fprintf(stderr,
+						    "%s: ignoring %s\n",
+						    getprogname(), refname);
+					}
 					continue;
+				}
 				found_branch = 1;
 			} else if (default_branch != NULL) {
-				if (!match_branch(refname, default_branch))
+				if (!match_branch(refname, default_branch)) {
+					if (chattygot) {
+						fprintf(stderr,
+						    "%s: ignoring %s\n",
+						    getprogname(), refname);
+					}
 					continue;
+				}
 				found_branch = 1;
 			}
 		} else if (strncmp(refname, "refs/tags/", 10) != 0) {
-			if (chattygot) {
-				fprintf(stderr, "%s: ignoring '%s' which is "
-				    "neither a branch nor a tag\n",
-				    getprogname(), refname);
-			}
-			if (!list_refs_only)
+			if (!list_refs_only) {
+				if (chattygot) {
+					fprintf(stderr, "%s: ignoring %s\n",
+					    getprogname(), refname);
+				}
 				continue;
+			}
 		}
 
 		if (refsz == nref + 1) {
@@ -610,7 +626,10 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		if (err)
 			goto done;
 
-		if (chattygot) {
+		if (chattygot)
+			fprintf(stderr, "%s: %s will be fetched\n",
+			    getprogname(), refname);
+		if (chattygot > 1) {
 			char *theirs, *mine;
 			err = got_object_id_str(&theirs, &want[nref]);
 			if (err)
@@ -620,9 +639,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				free(theirs);
 				goto done;
 			}
-			fprintf(stderr, "%s: %s will be fetched\n",
-			    getprogname(), refname);
-			fprintf(stderr, "%s: theirs=%s\n%s: mine=%s\n",
+			fprintf(stderr, "%s: remote: %s\n%s: local:  %s\n",
 			    getprogname(), theirs, getprogname(), mine);
 			free(theirs);
 			free(mine);
@@ -868,11 +885,6 @@ main(int argc, char **argv)
 	TAILQ_INIT(&have_refs);
 	TAILQ_INIT(&wanted_branches);
 
-	if (getenv("GOT_FETCH_DEBUG") != NULL) {
-		fprintf(stderr, "%s being chatty!\n", getprogname());
-		chattygot = 1;
-	}
-
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 #ifndef PROFILE
 	/* revoke access to most system calls */
@@ -901,6 +913,9 @@ main(int argc, char **argv)
 	memcpy(&fetch_req, imsg.data, sizeof(fetch_req));
 	fetchfd = imsg.fd;
 	imsg_free(&imsg);
+
+	if (fetch_req.verbosity > 0)
+		chattygot += fetch_req.verbosity;
 
 	for (i = 0; i < fetch_req.n_have_refs; i++) {
 		struct got_object_id *id;

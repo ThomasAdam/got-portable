@@ -1094,7 +1094,7 @@ cmd_clone(int argc, char *argv[])
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, list_refs_only,
-	    fetchfd, repo, fetch_progress, &fpa);
+	    verbosity, fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1622,7 +1622,7 @@ cmd_fetch(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
-	    list_refs_only, fetchfd, repo, fetch_progress, &fpa);
+	    list_refs_only, verbosity, fetchfd, repo, fetch_progress, &fpa);
 	if (error)
 		goto done;
 
