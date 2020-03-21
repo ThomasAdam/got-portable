@@ -227,7 +227,7 @@ Cannot be used together with the
 .Fl a
 option.
 .It Fl l
-List branches and tags available for cloning from the remote repository
+List branches and tags available for fetching from the remote repository
 and exit immediately.
 Cannot be used together with any of the other options except
 .Fl v .
@@ -283,7 +283,7 @@ This option may be specified multiple times to build a list of additional
 references to fetch.
 The specified
 .Ar reference
-may either be a full path to a specific reference, or a reference namespace
+may either be a path to a specific reference, or a reference namespace
 which will cause all references in this namespace to be fetched.
 .Pp
 Each reference will be mapped into the cloned repository's
@@ -422,13 +422,17 @@ This option may be specified multiple times to build a list of additional
 references to fetch.
 The specified
 .Ar reference
-may either be a full path to a specific reference, or a reference namespace
+may either be a path to a specific reference, or a reference namespace
 which will cause all references in this namespace to be fetched.
 .Pp
 Each reference will be mapped into the local repository's
 .Dq refs/remotes/
 namespace, unless the local repository was created as a mirror with
-.Cm got clone -m .
+.Cm got clone -m
+in which case references will be mapped directly into the local repository's
+.Dq refs/
+namespace.
+.Pp
 Once a reference has been fetched, a local branch based on it can be
 created with
 .Cm got branch
