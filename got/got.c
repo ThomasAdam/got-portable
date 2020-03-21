@@ -1414,6 +1414,11 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 
 	if (!replace_tags &&
 	    strncmp(got_ref_get_name(ref), "refs/tags/", 10) == 0) {
+		err = got_ref_resolve(&old_id, repo, ref);
+		if (err)
+			goto done;
+		if (got_object_id_cmp(old_id, new_id) == 0)
+			goto done;
 		if (verbosity >= 0) {
 			printf("Rejecting update of existing tag %s: %s\n",
 			    got_ref_get_name(ref), new_id_str);
