@@ -891,16 +891,16 @@ create_head_ref(struct got_reference *target_ref, int verbosity,
 	const struct got_error *err;
 	struct got_reference *head_symref;
 
-	if (verbosity >= 0)
-		printf("Setting %s to %s\n", GOT_REF_HEAD,
-		    got_ref_get_name(target_ref));
-
 	err = got_ref_alloc_symref(&head_symref, GOT_REF_HEAD, target_ref);
 	if (err)
 		return err;
 
 	err = got_ref_write(head_symref, repo);
 	got_ref_close(head_symref);
+	if (err == NULL && verbosity > 0) {
+		printf("Created reference %s: %s\n", GOT_REF_HEAD,
+		    got_ref_get_name(target_ref));
+	}
 	return err;
 }
 
@@ -931,6 +931,32 @@ list_remote_refs(struct got_pathlist_head *symrefs,
 	}
 
 	return NULL;
+}
+
+static const struct got_error *
+create_ref(const char *refname, struct got_object_id *id,
+    int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_ref_alloc(&ref, refname, id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+	got_ref_close(ref);
+
+	if (err == NULL && verbosity >= 0)
+		printf("Created reference %s: %s\n", refname, id_str);
+done:
+	free(id_str);
+	return err;
 }
 
 static const struct got_error *
@@ -1119,14 +1145,9 @@ cmd_clone(int argc, char *argv[])
 	TAILQ_FOREACH(pe, &refs, entry) {
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
-		struct got_reference *ref;
 		char *remote_refname;
 
-		error = got_ref_alloc(&ref, refname, id);
-		if (error)
-			goto done;
-		error = got_ref_write(ref, repo);
-		got_ref_close(ref);
+		error = create_ref(refname, id, verbosity - 1, repo);
 		if (error)
 			goto done;
 
@@ -1142,11 +1163,7 @@ cmd_clone(int argc, char *argv[])
 			error = got_error_from_errno("asprintf");
 			goto done;
 		}
-		error = got_ref_alloc(&ref, remote_refname, id);
-		if (error)
-			goto done;
-		error = got_ref_write(ref, repo);
-		got_ref_close(ref);
+		error = create_ref(remote_refname, id, verbosity - 1, repo);
 		if (error)
 			goto done;
 	}
@@ -1262,7 +1279,6 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 	}
 
-
 	if (verbosity >= 0)
 		printf("Created %s repository '%s'\n",
 		    mirror_references ? "mirrored" : "cloned", repo_path);
@@ -1305,25 +1321,6 @@ done:
 }
 
 static const struct got_error *
-create_ref(const char *refname, struct got_object_id *id,
-    const char *id_str, int verbosity, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_reference *ref;
-
-	if (verbosity >= 0)
-		printf("Creating %s: %s\n", refname, id_str);
-
-	err = got_ref_alloc(&ref, refname, id);
-	if (err)
-		return err;
-
-	err = got_ref_write(ref, repo);
-	got_ref_close(ref);
-	return err;
-}
-
-static const struct got_error *
 update_ref(struct got_reference *ref, struct got_object_id *new_id,
     int verbosity, struct got_repository *repo)
 {
@@ -1340,17 +1337,13 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 		err = got_ref_alloc(&new_ref, got_ref_get_name(ref), new_id);
 		if (err)
 			goto done;
-		if (verbosity >= 0) {
-			printf("Deleting symbolic reference %s -> %s\n",
-			    got_ref_get_name(ref),
-			    got_ref_get_symref_target(ref));
-		}
 		err = got_ref_delete(ref, repo);
 		if (err)
 			goto done;
 		if (verbosity >= 0) {
-			printf("Setting %s to %s\n", got_ref_get_name(ref),
-			    new_id_str);
+			printf("Deleted reference %s: %s\n",
+			    got_ref_get_name(ref),
+			    got_ref_get_symref_target(ref));
 		}
 		err = got_ref_write(new_ref, repo);
 		if (err)
@@ -1359,19 +1352,20 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 		err = got_ref_resolve(&old_id, repo, ref);
 		if (err)
 			goto done;
-		if (got_object_id_cmp(old_id, new_id) != 0) {
-			if (verbosity >= 0) {
-				printf("Setting %s to %s\n",
-				    got_ref_get_name(ref), new_id_str);
-			}
-			err = got_ref_change_ref(ref, new_id);
-			if (err)
-				goto done;
-			err = got_ref_write(ref, repo);
-			if (err)
-				goto done;
-		}
+		if (got_object_id_cmp(old_id, new_id) == 0)
+			goto done;
+
+		err = got_ref_change_ref(ref, new_id);
+		if (err)
+			goto done;
+		err = got_ref_write(ref, repo);
+		if (err)
+			goto done;
 	}
+
+	if (verbosity >= 0)
+		printf("Updated reference %s: %s\n", got_ref_get_name(ref),
+		    new_id_str);
 done:
 	free(old_id);
 	free(new_id_str);
@@ -1426,14 +1420,14 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 		if (err)
 			break;
 
-		if (verbosity >= 0) {
-			printf("Deleting %s: %s\n",
-			    got_ref_get_name(re->ref), id_str);
-		}
 		free(id_str);
 		err = got_ref_delete(re->ref, repo);
 		if (err)
 			break;
+		if (verbosity >= 0) {
+			printf("Deleted reference %s: %s\n",
+			    got_ref_get_name(re->ref), id_str);
+		}
 	}
 
 	return err;
@@ -1655,18 +1649,14 @@ cmd_fetch(int argc, char *argv[])
 		struct got_reference *ref;
 		char *remote_refname;
 
-		error = got_object_id_str(&id_str, id);
-		if (error)
-			goto done;
-
 		if (remote->mirror_references ||
 		    strncmp("refs/tags/", refname, 10) == 0) {
 			error = got_ref_open(&ref, repo, refname, 0);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(refname, id, id_str,
-				    verbosity, repo);
+				error = create_ref(refname, id, verbosity,
+				    repo);
 				if (error)
 					goto done;
 			} else {
@@ -1686,7 +1676,7 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(remote_refname, id, id_str,
+				error = create_ref(remote_refname, id, 
 				    verbosity, repo);
 				if (error)
 					goto done;
@@ -1702,15 +1692,13 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(refname, id, id_str,
-				    verbosity, repo);
+				error = create_ref(refname, id, verbosity,
+				    repo);
 				if (error)
 					goto done;
 			} else
 				got_ref_close(ref);
 		}
-		free(id_str);
-		id_str = NULL;
 	}
 	if (delete_refs)
 		error = delete_missing_refs(&refs, verbosity, repo);
