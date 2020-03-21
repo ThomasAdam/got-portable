@@ -811,7 +811,7 @@ done:
 __dead static void
 usage_clone(void)
 {
-	fprintf(stderr, "usage: %s clone [-a] [-b branch] [-m] [-q] [-v] "
+	fprintf(stderr, "usage: %s clone [-a] [-b branch] [-l] [-m] [-q] [-v] "
 	    "repository-url [directory]\n", getprogname());
 	exit(1);
 }
@@ -1373,8 +1373,9 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-r repository-path] "
-	    "[-q] [-v] [remote-repository-name]\n", getprogname());
+	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-l] "
+	    "[-r repository-path] [-q] [-v] [remote-repository-name]\n",
+	    getprogname());
 	exit(1);
 }
 
