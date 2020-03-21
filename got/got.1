@@ -275,7 +275,7 @@ The maximum is 3.
 .It Cm cl
 Short alias for
 .Cm clone .
-.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
+.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl t Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
 Fetch new changes from a remote repository.
 If no
 .Ar remote-repository
@@ -309,10 +309,10 @@ If those branches contained local commits, these commits will no longer be
 reachable via a reference and will therefore be at risk of being discarded
 by Git's garbage collector.
 .Pp
-In any case, existing references in the
+In any case, references in the
 .Dq refs/tags/
-namespace will always be changed to match tags contained in the remote
-repository.
+namespace will always be fetched and mapped directly to local references
+in the same namespace.
 .Pp
 The options for
 .Cm got fetch
@@ -350,6 +350,11 @@ Cannot be used together with any of the other options except
 .Fl v
 and
 .Fl r .
+.It Fl t
+Allow existing references in the
+.Dq refs/tags
+namespace to be updated if they have changed on the server.
+If not specified, only new tag references will be created.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current

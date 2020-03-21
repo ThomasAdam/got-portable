@@ -1322,7 +1322,7 @@ done:
 
 static const struct got_error *
 update_ref(struct got_reference *ref, struct got_object_id *new_id,
-    int verbosity, struct got_repository *repo)
+    int replace_tags, int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *new_id_str = NULL;
@@ -1331,6 +1331,15 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 	err = got_object_id_str(&new_id_str, new_id);
 	if (err)
 		goto done;
+
+	if (!replace_tags &&
+	    strncmp(got_ref_get_name(ref), "refs/tags/", 10) == 0) {
+		if (verbosity >= 0) {
+			printf("Rejecting update of existing tag %s: %s\n",
+			    got_ref_get_name(ref), new_id_str);
+		}
+		goto done;
+	}
 
 	if (got_ref_is_symbolic(ref)) {
 		struct got_reference *new_ref;
@@ -1376,7 +1385,7 @@ __dead static void
 usage_fetch(void)
 {
 	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-d] [-l] "
-	    "[-r repository-path] [-q] [-v] [remote-repository-name]\n",
+	    "[-r repository-path] [-t] [-q] [-v] [remote-repository-name]\n",
 	    getprogname());
 	exit(1);
 }
@@ -1453,13 +1462,13 @@ cmd_fetch(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
-	int delete_refs = 0;
+	int delete_refs = 0, replace_tags = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "ab:dlr:vq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dlr:tvq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1482,6 +1491,9 @@ cmd_fetch(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 't':
+			replace_tags = 1;
 			break;
 		case 'v':
 			if (verbosity < 0)
@@ -1660,7 +1672,8 @@ cmd_fetch(int argc, char *argv[])
 				if (error)
 					goto done;
 			} else {
-				error = update_ref(ref, id, verbosity, repo);
+				error = update_ref(ref, id, replace_tags,
+				    verbosity, repo);
 				got_ref_close(ref);
 				if (error)
 					goto done;
@@ -1681,7 +1694,8 @@ cmd_fetch(int argc, char *argv[])
 				if (error)
 					goto done;
 			} else {
-				error = update_ref(ref, id, verbosity, repo);
+				error = update_ref(ref, id, replace_tags,
+				    verbosity, repo);
 				got_ref_close(ref);
 				if (error)
 					goto done;
