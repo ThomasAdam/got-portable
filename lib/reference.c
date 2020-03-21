@@ -1007,6 +1007,19 @@ got_ref_change_symref(struct got_reference *ref, char *refname)
 }
 
 const struct got_error *
+got_ref_change_symref_to_ref(struct got_reference *symref,
+    struct got_object_id *id)
+{
+	if ((symref->flags & GOT_REF_IS_SYMBOLIC) == 0)
+		return got_error(GOT_ERR_BAD_REF_TYPE);
+
+	symref->ref.ref.name = symref->ref.symref.name;
+	memcpy(symref->ref.ref.sha1, id->sha1, SHA1_DIGEST_LENGTH);
+	symref->flags &= ~GOT_REF_IS_SYMBOLIC;
+	return NULL;
+}
+
+const struct got_error *
 got_ref_write(struct got_reference *ref, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;

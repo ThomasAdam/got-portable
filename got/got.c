@@ -1422,19 +1422,15 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 	}
 
 	if (got_ref_is_symbolic(ref)) {
-		struct got_reference *new_ref;
-		err = got_ref_alloc(&new_ref, got_ref_get_name(ref), new_id);
-		if (err)
-			goto done;
-		err = got_ref_delete(ref, repo);
-		if (err)
-			goto done;
 		if (verbosity >= 0) {
-			printf("Deleted reference %s: %s\n",
+			printf("Replacing reference %s: %s\n",
 			    got_ref_get_name(ref),
 			    got_ref_get_symref_target(ref));
 		}
-		err = got_ref_write(new_ref, repo);
+		err = got_ref_change_symref_to_ref(ref, new_id);
+		if (err)
+			goto done;
+		err = got_ref_write(ref, repo);
 		if (err)
 			goto done;
 	} else {

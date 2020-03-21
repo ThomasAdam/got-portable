@@ -123,6 +123,13 @@ got_ref_change_ref(struct got_reference *, struct got_object_id *);
 const struct got_error *got_ref_change_symref(struct got_reference *,
     char *);
 
+/*
+ * Change a symbolic reference into a regular reference which points to
+ * the provided object ID.
+ */
+const struct got_error *got_ref_change_symref_to_ref(struct got_reference *,
+    struct got_object_id *);
+
 /* Write a reference to its on-disk path in the repository. */
 const struct got_error *got_ref_write(struct got_reference *,
     struct got_repository *);

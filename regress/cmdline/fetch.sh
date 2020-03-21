@@ -728,6 +728,71 @@ function test_fetch_reference {
 
 }
 
+function test_fetch_replace_symref {
+	local testroot=`test_init fetch_replace_symref`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -m -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo-clone -s refs/hoo/boo/zoo refs/heads/master
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/hoo/boo/zoo: refs/heads/master" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got fetch -r $testroot/repo-clone -R refs/hoo \
+		2> $testroot/stderr | grep ^Replacing > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Replacing reference refs/hoo/boo/zoo: refs/heads/master" \
+		> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/hoo/boo/zoo: $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_fetch_basic
 run_test test_fetch_list
 run_test test_fetch_branch
@@ -736,3 +801,4 @@ run_test test_fetch_empty_packfile
 run_test test_fetch_delete_branch
 run_test test_fetch_update_tag
 run_test test_fetch_reference
+run_test test_fetch_replace_symref
