@@ -1527,7 +1527,7 @@ static const struct got_error *
 update_wanted_ref(const char *refname, struct got_object_id *id,
     const char *remote_repo_name, int verbosity, struct got_repository *repo)
 {
-	const struct got_error *err;
+	const struct got_error *err, *unlock_err;
 	char *remote_refname;
 	struct got_reference *ref;
 
@@ -1538,13 +1538,16 @@ update_wanted_ref(const char *refname, struct got_object_id *id,
 	    remote_repo_name, refname) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_ref_open(&ref, repo, remote_refname, 0);
+	err = got_ref_open(&ref, repo, remote_refname, 1);
 	if (err) {
 		if (err->code != GOT_ERR_NOT_REF)
 			goto done;
 		err = create_ref(remote_refname, id, verbosity, repo);
 	} else {
 		err = update_ref(ref, id, 0, verbosity, repo);
+		unlock_err = got_ref_unlock(ref);
+		if (unlock_err && err == NULL)
+			err = unlock_err;
 		got_ref_close(ref);
 	}
 done:
@@ -1555,7 +1558,7 @@ done:
 static const struct got_error *
 cmd_fetch(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *unlock_err;
 	char *cwd = NULL, *repo_path = NULL;
 	const char *remote_name;
 	char *proto = NULL, *host = NULL, *port = NULL;
@@ -1790,7 +1793,7 @@ cmd_fetch(int argc, char *argv[])
 
 		if (remote->mirror_references ||
 		    strncmp("refs/tags/", refname, 10) == 0) {
-			error = got_ref_open(&ref, repo, refname, 0);
+			error = got_ref_open(&ref, repo, refname, 1);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
@@ -1801,6 +1804,9 @@ cmd_fetch(int argc, char *argv[])
 			} else {
 				error = update_ref(ref, id, replace_tags,
 				    verbosity, repo);
+				unlock_err = got_ref_unlock(ref);
+				if (unlock_err && error == NULL)
+					error = unlock_err;
 				got_ref_close(ref);
 				if (error)
 					goto done;
@@ -1812,7 +1818,7 @@ cmd_fetch(int argc, char *argv[])
 				goto done;
 			}
 
-			error = got_ref_open(&ref, repo, remote_refname, 0);
+			error = got_ref_open(&ref, repo, remote_refname, 1);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
@@ -1823,13 +1829,16 @@ cmd_fetch(int argc, char *argv[])
 			} else {
 				error = update_ref(ref, id, replace_tags,
 				    verbosity, repo);
+				unlock_err = got_ref_unlock(ref);
+				if (unlock_err && error == NULL)
+					error = unlock_err;
 				got_ref_close(ref);
 				if (error)
 					goto done;
 			}
 
 			/* Also create a local branch if none exists yet. */
-			error = got_ref_open(&ref, repo, refname, 0);
+			error = got_ref_open(&ref, repo, refname, 1);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
@@ -1837,8 +1846,12 @@ cmd_fetch(int argc, char *argv[])
 				    repo);
 				if (error)
 					goto done;
-			} else
+			} else {
+				unlock_err = got_ref_unlock(ref);
+				if (unlock_err && error == NULL)
+					error = unlock_err;
 				got_ref_close(ref);
+			}
 		}
 	}
 	if (delete_refs)

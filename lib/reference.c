@@ -173,8 +173,11 @@ parse_ref_file(struct got_reference **ref, const char *name,
 
 	if (lock) {
 		err = got_lockfile_lock(&lf, abspath);
-		if (err)
-			return (err);
+		if (err) {
+			if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
+				err = got_error(GOT_ERR_NOT_REF);
+			return err;
+		}
 	}
 
 	f = fopen(abspath, "rb");
