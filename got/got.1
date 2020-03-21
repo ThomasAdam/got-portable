@@ -241,7 +241,7 @@ option enabled, such that
 .Cm got fetch
 or
 .Xr git-fetch 1
-will write incoming changes directly to branches in the
+will write incoming changes directly to local branches in the
 .Dq refs/heads/
 reference namespace, rather than to branches in the
 .Dq refs/remotes/
@@ -250,12 +250,10 @@ This avoids the usual requirement of having to run
 .Cm got rebase
 after
 .Cm got fetch
-in order to make incoming changes appear on branches in the
-.Dq refs/heads/
-namespace.
-But maintaining custom branches with local changes in the cloned
-repository becomes difficult since local changes are at risk of
-being discarded whenever incoming changes are fetched.
+in order to make incoming changes appear on local branches.
+But maintaining local changes in the cloned repository becomes difficult
+since local changes will be at risk of being discarded whenever incoming
+changes are fetched.
 .It Fl q
 Suppress progress reporting output.
 The same option will be passed to
@@ -291,23 +289,25 @@ New changes will be stored in a separate pack file downloaded from the server.
 Optionally, separate pack files stored in the repository can be combined with
 .Xr git-repack 1 .
 .Pp
-Branch references in the
+By default, branch references in the
 .Dq refs/remotes/
-reference namespace will be updated to point at the newly fetched commits,
-and the
+reference namespace will be updated to point at the newly fetched commits.
+The
 .Cm got rebase
-command can then be used to make new changes visible on branches in the
+command can then be used to make new changes visible on local branches in the
 .Dq refs/heads/
-reference namespace, merging incoming changes with local changes as necessary.
+namespace, merging incoming changes with local changes as necessary.
 .Pp
-However, if the repository is configured as a mirror then all references will
-be updated as needed to match the corresponding references in the remote
-repository, including branches in the
+If the repository was created as a mirror with
+.Cm got clone -m
+then all branches in the
 .Dq refs/heads/
-reference namespace.
+namespace will be updated directly to match the corresponding branches in
+the remote repository.
 If those branches contained local commits, these commits will no longer be
 reachable via a reference and will therefore be at risk of being discarded
 by Git's garbage collector.
+Maintaining local changes in a mirror repository is therefore discouraged.
 .Pp
 In any case, references in the
 .Dq refs/tags/
