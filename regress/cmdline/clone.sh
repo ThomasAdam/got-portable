@@ -259,9 +259,120 @@ function test_clone_mirror_all {
 	test_done "$testroot" "$ret"
 }
 
+function test_clone_reference {
+	local testroot=`test_init clone_reference`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+
+	got clone -q -R hoo $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo/boo/zoo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_clone_branch_and_reference {
+	local testroot=`test_init clone_reference`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+
+	got clone -q -R hoo/boo/zoo -b foo $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo/boo/zoo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_clone_reference_mirror {
+	local testroot=`test_init clone_reference_mirror`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+
+	got clone -q -R hoo -m $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/hoo/boo/zoo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_clone_basic
 run_test test_clone_list
 run_test test_clone_branch
 run_test test_clone_all
 run_test test_clone_mirror
 run_test test_clone_mirror_all
+run_test test_clone_reference
+run_test test_clone_branch_and_reference
+run_test test_clone_reference_mirror

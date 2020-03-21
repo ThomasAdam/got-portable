@@ -812,7 +812,7 @@ __dead static void
 usage_clone(void)
 {
 	fprintf(stderr, "usage: %s clone [-a] [-b branch] [-l] [-m] [-q] [-v] "
-	    "repository-url [directory]\n", getprogname());
+	    "[-R reference] repository-url [directory]\n", getprogname());
 	exit(1);
 }
 
@@ -959,6 +959,65 @@ done:
 	return err;
 }
 
+static int
+match_wanted_ref(const char *refname, const char *wanted_ref)
+{
+	if (strncmp(refname, "refs/", 5) != 0)
+		return 0;
+	refname += 5;
+
+	/*
+	 * Prevent fetching of references that won't make any
+	 * sense outside of the remote repository's context.
+	 */
+	if (strncmp(refname, "got/", 4) == 0)
+		return 0;
+	if (strncmp(refname, "remotes/", 8) == 0)
+		return 0;
+
+	if (strncmp(wanted_ref, "refs/", 5) == 0)
+		wanted_ref += 5;
+
+	/* Allow prefix match. */
+	if (got_path_is_child(refname, wanted_ref, strlen(wanted_ref)))
+		return 1;
+
+	/* Allow exact match. */
+	return (strcmp(refname, wanted_ref) == 0);
+}
+
+static int
+is_wanted_ref(struct got_pathlist_head *wanted_refs, const char *refname)
+{
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, wanted_refs, entry) {
+		if (match_wanted_ref(refname, pe->path))
+			return 1;
+	}
+
+	return 0;
+}
+
+static const struct got_error *
+create_wanted_ref(const char *refname, struct got_object_id *id,
+    const char *remote_repo_name, int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *remote_refname;
+
+	if (strncmp("refs/", refname, 5) == 0)
+		refname += 5;
+
+	if (asprintf(&remote_refname, "refs/remotes/%s/%s",
+	    remote_repo_name, refname) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = create_ref(remote_refname, id, verbosity, repo);
+	free(remote_refname);
+	return err;
+}
+
 static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
@@ -968,7 +1027,7 @@ cmd_clone(int argc, char *argv[])
 	char *default_destdir = NULL, *id_str = NULL;
 	const char *repo_path;
 	struct got_repository *repo = NULL;
-	struct got_pathlist_head refs, symrefs, wanted_branches;
+	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int ch, fetchfd = -1, fetchstatus;
@@ -986,8 +1045,9 @@ cmd_clone(int argc, char *argv[])
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
+	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:lmvq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:lmvqR:")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1013,6 +1073,12 @@ cmd_clone(int argc, char *argv[])
 		case 'q':
 			verbosity = -1;
 			break;
+		case 'R':
+			error = got_pathlist_append(&wanted_refs,
+			    optarg, NULL);
+			if (error)
+				return error;
+			break;
 		default:
 			usage_clone();
 			break;
@@ -1032,6 +1098,8 @@ cmd_clone(int argc, char *argv[])
 			errx(1, "-l and -m options are mutually exclusive");
 		if (verbosity == -1)
 			errx(1, "-l and -q options are mutually exclusive");
+		if (!TAILQ_EMPTY(&wanted_refs))
+			errx(1, "-l and -R options are mutually exclusive");
 	}
 
 	uri = argv[0];
@@ -1124,8 +1192,9 @@ cmd_clone(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
-	    fetch_all_branches, &wanted_branches, list_refs_only,
-	    verbosity, fetchfd, repo, fetch_progress, &fpa);
+	    fetch_all_branches, &wanted_branches, &wanted_refs,
+	    list_refs_only, verbosity, fetchfd, repo,
+	    fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1146,6 +1215,16 @@ cmd_clone(int argc, char *argv[])
 		const char *refname = pe->path;
 		struct got_object_id *id = pe->data;
 		char *remote_refname;
+
+		if (is_wanted_ref(&wanted_refs, refname) &&
+		    !mirror_references) {
+			error = create_wanted_ref(refname, id,
+			    GOT_FETCH_DEFAULT_REMOTE_NAME,
+			    verbosity - 1, repo);
+			if (error)
+				goto done;
+			continue;
+		}
 
 		error = create_ref(refname, id, verbosity - 1, repo);
 		if (error)
@@ -1308,6 +1387,7 @@ done:
 	}
 	got_pathlist_free(&symrefs);
 	got_pathlist_free(&wanted_branches);
+	got_pathlist_free(&wanted_refs);
 	free(pack_hash);
 	free(proto);
 	free(host);
@@ -1385,7 +1465,8 @@ __dead static void
 usage_fetch(void)
 {
 	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-d] [-l] "
-	    "[-r repository-path] [-t] [-q] [-v] [remote-repository-name]\n",
+	    "[-r repository-path] [-t] [-q] [-v] [-R reference] "
+	    "[remote-repository-name]\n",
 	    getprogname());
 	exit(1);
 }
@@ -1443,6 +1524,35 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 }
 
 static const struct got_error *
+update_wanted_ref(const char *refname, struct got_object_id *id,
+    const char *remote_repo_name, int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *remote_refname;
+	struct got_reference *ref;
+
+	if (strncmp("refs/", refname, 5) == 0)
+		refname += 5;
+
+	if (asprintf(&remote_refname, "refs/remotes/%s/%s",
+	    remote_repo_name, refname) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = got_ref_open(&ref, repo, remote_refname, 0);
+	if (err) {
+		if (err->code != GOT_ERR_NOT_REF)
+			goto done;
+		err = create_ref(remote_refname, id, verbosity, repo);
+	} else {
+		err = update_ref(ref, id, 0, verbosity, repo);
+		got_ref_close(ref);
+	}
+done:
+	free(remote_refname);
+	return err;
+}
+
+static const struct got_error *
 cmd_fetch(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1455,7 +1565,7 @@ cmd_fetch(int argc, char *argv[])
 	char *id_str = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_pathlist_head refs, symrefs, wanted_branches;
+	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
 	int i, ch, fetchfd = -1, fetchstatus;
@@ -1467,8 +1577,9 @@ cmd_fetch(int argc, char *argv[])
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
+	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:dlr:tvq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dlr:tvqR:")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1503,6 +1614,12 @@ cmd_fetch(int argc, char *argv[])
 			break;
 		case 'q':
 			verbosity = -1;
+			break;
+		case 'R':
+			error = got_pathlist_append(&wanted_refs,
+			    optarg, NULL);
+			if (error)
+				return error;
 			break;
 		default:
 			usage_fetch();
@@ -1628,7 +1745,8 @@ cmd_fetch(int argc, char *argv[])
 	fpa.verbosity = verbosity;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
-	    list_refs_only, verbosity, fetchfd, repo, fetch_progress, &fpa);
+	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
+	    fetch_progress, &fpa);
 	if (error)
 		goto done;
 
@@ -1660,6 +1778,15 @@ cmd_fetch(int argc, char *argv[])
 		struct got_object_id *id = pe->data;
 		struct got_reference *ref;
 		char *remote_refname;
+
+		if (is_wanted_ref(&wanted_refs, refname) &&
+		    !remote->mirror_references) {
+			error = update_wanted_ref(refname, id,
+			    remote->name, verbosity, repo);
+			if (error)
+				goto done;
+			continue;
+		}
 
 		if (remote->mirror_references ||
 		    strncmp("refs/tags/", refname, 10) == 0) {
@@ -1740,6 +1867,7 @@ done:
 	}
 	got_pathlist_free(&symrefs);
 	got_pathlist_free(&wanted_branches);
+	got_pathlist_free(&wanted_refs);
 	free(id_str);
 	free(cwd);
 	free(repo_path);

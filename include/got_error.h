@@ -139,6 +139,7 @@
 #define GOT_ERR_BAD_PACKET	122
 #define GOT_ERR_NO_REMOTE	123
 #define GOT_ERR_FETCH_NO_BRANCH	124
+#define GOT_ERR_FETCH_BAD_REF	125
 
 static const struct got_error {
 	int code;
@@ -284,6 +285,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_PACKET, "bad packet received" },
 	{ GOT_ERR_NO_REMOTE, "remote repository not found" },
 	{ GOT_ERR_FETCH_NO_BRANCH, "could not find any branches to fetch" },
+	{ GOT_ERR_FETCH_BAD_REF, "reference cannot be fetched" },
 };
 
 /*

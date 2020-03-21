@@ -136,7 +136,7 @@ follows the globbing rules documented in
 .It Cm im
 Short alias for
 .Cm import .
-.It Cm clone Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl l Oc Oo Fl m Oc Oo Fl q Oc Oo Fl v Oc Ar repository-URL Op Ar directory
+.It Cm clone Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl l Oc Oo Fl m Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Ar repository-URL Op Ar directory
 Clone a Git repository at the specified
 .Ar repository-URL
 into the specified
@@ -273,6 +273,29 @@ This option will be passed to
 if applicable.
 Multiple -v options increase the verbosity.
 The maximum is 3.
+.It Fl R Ar reference
+In addition to the branches and tags that will be fetched, fetch an arbitrary
+.Ar reference
+from the remote repository's
+.Dq refs/
+namespace.
+This option may be specified multiple times to build a list of additional
+references to fetch.
+.Pp
+The references will be mapped into the cloned repository's
+.Dq refs/remotes/
+namespace, unless the
+.Fl m
+option is used to mirror references directly into the cloned repository's
+.Dq refs/
+namespace.
+.Pp
+.Cm got clone
+will refuse to fetch references from the remote repository's
+.Dq refs/remotes/
+or
+.Dq refs/got/
+namespace.
 .El
 .It Cm cl
 Short alias for
@@ -385,6 +408,30 @@ The same option will be passed to
 if applicable.
 Multiple -v options increase the verbosity.
 The maximum is 3.
+.It Fl R Ar reference
+In addition to the branches and tags that will be fetched, fetch an arbitrary
+.Ar reference
+from the remote repository's
+.Dq refs/
+namespace.
+This option may be specified multiple times to build a list of additional
+references to fetch.
+.Pp
+Each reference will be mapped into the local repository's
+.Dq refs/remotes/
+namespace, unless the local repository was created as a mirror with
+.Cm got clone -m .
+Once a reference has been fetched, a local branch based on it can be
+created with
+.Cm got branch
+if needed.
+.Pp
+.Cm got fetch
+will refuse to fetch references from the remote repository's
+.Dq refs/remotes/
+or
+.Dq refs/got/
+namespace.
 .El
 .It Cm fe
 Short alias for

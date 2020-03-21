@@ -251,6 +251,33 @@ match_branch(const char *branch, const char *wanted_branch)
 	return (strcmp(branch + 11, wanted_branch) == 0);
 }
 
+static int
+match_wanted_ref(const char *refname, const char *wanted_ref)
+{
+	if (strncmp(refname, "refs/", 5) != 0)
+		return 0;
+	refname += 5;
+
+	/*
+	 * Prevent fetching of references that won't make any
+	 * sense outside of the remote repository's context.
+	 */
+	if (strncmp(refname, "got/", 4) == 0)
+		return 0;
+	if (strncmp(refname, "remotes/", 8) == 0)
+		return 0;
+
+	if (strncmp(wanted_ref, "refs/", 5) == 0)
+		wanted_ref += 5;
+
+	/* Allow prefix match. */
+	if (got_path_is_child(refname, wanted_ref, strlen(wanted_ref)))
+		return 1;
+
+	/* Allow exact match. */
+	return (strcmp(refname, wanted_ref) == 0);
+}
+
 static const struct got_error *
 tokenize_refline(char **tokens, char *line, int len, int maxtokens)
 {
@@ -488,7 +515,8 @@ fetch_error(const char *buf, size_t len)
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
-    struct got_pathlist_head *wanted_branches, int list_refs_only,
+    struct got_pathlist_head *wanted_branches,
+    struct got_pathlist_head *wanted_refs, int list_refs_only,
     struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -594,7 +622,21 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				found_branch = 1;
 			}
 		} else if (strncmp(refname, "refs/tags/", 10) != 0) {
-			if (!list_refs_only) {
+			if (!TAILQ_EMPTY(wanted_refs)) {
+				TAILQ_FOREACH(pe, wanted_refs, entry) {
+					if (match_wanted_ref(refname, pe->path))
+						break;
+				}
+				if (pe == NULL) {
+					if (chattygot) {
+						fprintf(stderr,
+						    "%s: ignoring %s\n",
+						    getprogname(), refname);
+					}
+					continue;
+				}
+				found_branch = 1;
+			} else if (!list_refs_only) {
 				if (chattygot) {
 					fprintf(stderr, "%s: ignoring %s\n",
 					    getprogname(), refname);
@@ -871,10 +913,12 @@ main(int argc, char **argv)
 	struct imsg imsg;
 	struct got_pathlist_head have_refs;
 	struct got_pathlist_head wanted_branches;
+	struct got_pathlist_head wanted_refs;
 	struct got_pathlist_entry *pe;
 	struct got_imsg_fetch_request fetch_req;
 	struct got_imsg_fetch_have_ref href;
 	struct got_imsg_fetch_wanted_branch wbranch;
+	struct got_imsg_fetch_wanted_ref wref;
 	size_t datalen;
 #if 0
 	static int attached;
@@ -884,6 +928,7 @@ main(int argc, char **argv)
 
 	TAILQ_INIT(&have_refs);
 	TAILQ_INIT(&wanted_branches);
+	TAILQ_INIT(&wanted_refs);
 
 	imsg_init(&ibuf, GOT_IMSG_FD_CHILD);
 #ifndef PROFILE
@@ -1008,6 +1053,47 @@ main(int argc, char **argv)
 		imsg_free(&imsg);
 	}
 
+	for (i = 0; i < fetch_req.n_wanted_refs; i++) {
+		char *refname;
+
+		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+			if (err->code == GOT_ERR_PRIVSEP_PIPE)
+				err = NULL;
+			goto done;
+		}
+		if (imsg.hdr.type == GOT_IMSG_STOP)
+			goto done;
+		if (imsg.hdr.type != GOT_IMSG_FETCH_WANTED_REF) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			goto done;
+		}
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (datalen < sizeof(wref)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		memcpy(&wref, imsg.data, sizeof(wref));
+		if (datalen - sizeof(wref) < wref.name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		refname = malloc(wref.name_len + 1);
+		if (refname == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		memcpy(refname, imsg.data + sizeof(wref), wref.name_len);
+		refname[wref.name_len] = '\0';
+
+		err = got_pathlist_append(&wanted_refs, refname, NULL);
+		if (err) {
+			free(refname);
+			goto done;
+		}
+
+		imsg_free(&imsg);
+	}
+
 	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
@@ -1027,7 +1113,7 @@ main(int argc, char **argv)
 
 	err = fetch_pack(fetchfd, packfd, &packid, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,
-	    fetch_req.list_refs_only, &ibuf);
+	    &wanted_refs, fetch_req.list_refs_only, &ibuf);
 done:
 	TAILQ_FOREACH(pe, &have_refs, entry) {
 		free((char *)pe->path);

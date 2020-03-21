@@ -391,8 +391,9 @@ const struct got_error*
 got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     struct got_pathlist_head *symrefs, const char *remote_name,
     int mirror_references, int fetch_all_branches,
-    struct got_pathlist_head *wanted_branches, int list_refs_only,
-    int verbosity, int fetchfd, struct got_repository *repo,
+    struct got_pathlist_head *wanted_branches,
+    struct got_pathlist_head *wanted_refs, int list_refs_only, int verbosity,
+    int fetchfd, struct got_repository *repo,
     got_fetch_progress_cb progress_cb, void *progress_arg)
 {
 	int imsg_fetchfds[2], imsg_idxfds[2];
@@ -416,6 +417,19 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	size_t ref_prefixlen = 0;
 	char *path;
 	char *progress = NULL;
+
+	/*
+	 * Prevent fetching of references that won't make any
+	 * sense outside of the remote repository's context.
+	 */
+	TAILQ_FOREACH(pe, wanted_refs, entry) {
+		const char *refname = pe->path;
+		if (strncmp(refname, "refs/got/", 9) == 0 ||
+		    strncmp(refname, "got/", 4) == 0 ||
+		    strncmp(refname, "refs/remotes/", 13) == 0 ||
+		    strncmp(refname, "remotes/", 8) == 0)
+			return got_error_path(refname, GOT_ERR_FETCH_BAD_REF);
+	}
 
 	if (!list_refs_only)
 		repo_path = got_repo_get_path_git_dir(repo);
@@ -577,7 +591,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		goto done;
 	}
 	err = got_privsep_send_fetch_req(&fetchibuf, nfetchfd, &have_refs,
-	    fetch_all_branches, wanted_branches, list_refs_only, verbosity);
+	    fetch_all_branches, wanted_branches, wanted_refs,
+	    list_refs_only, verbosity);
 	if (err != NULL)
 		goto done;
 	nfetchfd = -1;
