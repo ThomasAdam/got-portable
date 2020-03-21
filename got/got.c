@@ -1373,10 +1373,59 @@ done:
 __dead static void
 usage_fetch(void)
 {
-	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-l] "
+	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-d] [-l] "
 	    "[-r repository-path] [-q] [-v] [remote-repository-name]\n",
 	    getprogname());
 	exit(1);
+}
+
+static const struct got_error *
+delete_missing_refs(struct got_pathlist_head *their_refs,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_head my_refs;
+	struct got_reflist_entry *re;
+	struct got_pathlist_entry *pe;
+	struct got_object_id *id;
+	char *id_str;
+
+	SIMPLEQ_INIT(&my_refs);
+
+	err = got_ref_list(&my_refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		return err;
+
+	SIMPLEQ_FOREACH(re, &my_refs, entry) {
+		const char *refname = got_ref_get_name(re->ref);
+
+		if (strncmp(refname, "refs/heads/", 11) != 0 &&
+		    strncmp(refname, "refs/tags/", 10) != 0)
+			continue;
+
+		TAILQ_FOREACH(pe, their_refs, entry) {
+			if (strcmp(refname, pe->path) == 0)
+				break;
+		}
+		if (pe != NULL)
+			continue;
+
+		err = got_ref_resolve(&id, repo, re->ref);
+		if (err)
+			break;
+		err = got_object_id_str(&id_str, id);
+		free(id);
+		if (err)
+			break;
+
+		printf("Deleting %s: %s\n", got_ref_get_name(re->ref), id_str);
+		free(id_str);
+		err = got_ref_delete(re->ref, repo);
+		if (err)
+			break;
+	}
+
+	return err;
 }
 
 static const struct got_error *
@@ -1399,12 +1448,13 @@ cmd_fetch(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
+	int delete_refs = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 
-	while ((ch = getopt(argc, argv, "ab:lr:vq")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dlr:vq")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -1414,6 +1464,9 @@ cmd_fetch(int argc, char *argv[])
 			    optarg, NULL);
 			if (error)
 				return error;
+			break;
+		case 'd':
+			delete_refs = 1;
 			break;
 		case 'l':
 			list_refs_only = 1;
@@ -1449,6 +1502,8 @@ cmd_fetch(int argc, char *argv[])
 			errx(1, "-l and -b options are mutually exclusive");
 		if (fetch_all_branches)
 			errx(1, "-l and -a options are mutually exclusive");
+		if (delete_refs)
+			errx(1, "-l and -d options are mutually exclusive");
 		if (verbosity == -1)
 			errx(1, "-l and -q options are mutually exclusive");
 	}
@@ -1568,6 +1623,8 @@ cmd_fetch(int argc, char *argv[])
 	if (pack_hash == NULL) {
 		if (verbosity >= 0)
 			printf("Already up-to-date\n");
+		if (delete_refs)
+			error = delete_missing_refs(&refs, repo);
 		goto done;
 	}
 
@@ -1642,6 +1699,8 @@ cmd_fetch(int argc, char *argv[])
 		free(id_str);
 		id_str = NULL;
 	}
+	if (delete_refs)
+		error = delete_missing_refs(&refs, repo);
 done:
 	if (fetchpid > 0) {
 		if (kill(fetchpid, SIGTERM) == -1)

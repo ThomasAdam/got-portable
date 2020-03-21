@@ -272,7 +272,7 @@ The maximum is 3.
 .It Cm cl
 Short alias for
 .Cm clone .
-.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
+.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
 Fetch new changes from a remote repository.
 If no
 .Ar remote-repository
@@ -333,6 +333,13 @@ repository's HEAD reference will be fetched.
 Cannot be used together with the
 .Fl a
 option.
+.It Fl d
+Delete branches and tags from the local repository which are no longer
+present in the remote repository.
+Only references are deleted.
+Any commit, tree, and blob objects belonging to deleted branches or
+tags remain in the repository and may be removed separately with
+Git's garbage collector.
 .It Fl l
 List branches and tags available for fetching from the remote repository
 and exit immediately.
