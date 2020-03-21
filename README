@@ -29,6 +29,8 @@ A build started in Got's Git repository will install files under ~/bin.
 
 Tests will pass only after 'make install' because they rely on installed
 binaries in $PATH. Tests in the cmdline directory currently depend on git(1).
+Tests in 'clone.sh' and 'fetch.sh' will fail if 'ssh 127.0.0.1' does not
+succeed non-interactively.
 
  $ doas pkg_add git
  $ make regress

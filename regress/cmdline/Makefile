@@ -1,6 +1,6 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	ref commit revert cherrypick backout rebase import histedit \
-	integrate stage unstage cat
+	integrate stage unstage cat clone fetch
 NOOBJ=Yes
 
 checkout:
@@ -68,4 +68,11 @@ unstage:
 
 cat:
 	./cat.sh
+
+clone:
+	./clone.sh
+
+fetch:
+	./fetch.sh
+
 .include <bsd.regress.mk>

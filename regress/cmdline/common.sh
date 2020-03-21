@@ -153,6 +153,7 @@ function test_init
 		(cd $repo && git add .)
 		git_commit $testroot/repo -m "adding the test tree"
 	fi
+	touch $testroot/repo/.git/git-daemon-export-ok
 	echo "$testroot"
 }
 
