@@ -1306,12 +1306,13 @@ done:
 
 static const struct got_error *
 create_ref(const char *refname, struct got_object_id *id,
-    const char *id_str, struct got_repository *repo)
+    const char *id_str, int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_reference *ref;
 
-	printf("Creating %s: %s\n", refname, id_str);
+	if (verbosity >= 0)
+		printf("Creating %s: %s\n", refname, id_str);
 
 	err = got_ref_alloc(&ref, refname, id);
 	if (err)
@@ -1324,7 +1325,7 @@ create_ref(const char *refname, struct got_object_id *id,
 
 static const struct got_error *
 update_ref(struct got_reference *ref, struct got_object_id *new_id,
-    struct got_repository *repo)
+    int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *new_id_str = NULL;
@@ -1339,13 +1340,18 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 		err = got_ref_alloc(&new_ref, got_ref_get_name(ref), new_id);
 		if (err)
 			goto done;
-		printf("Deleting symbolic reference %s -> %s\n",
-		    got_ref_get_name(ref), got_ref_get_symref_target(ref));
+		if (verbosity >= 0) {
+			printf("Deleting symbolic reference %s -> %s\n",
+			    got_ref_get_name(ref),
+			    got_ref_get_symref_target(ref));
+		}
 		err = got_ref_delete(ref, repo);
 		if (err)
 			goto done;
-		printf("Setting %s to %s\n", got_ref_get_name(ref),
-		    new_id_str);
+		if (verbosity >= 0) {
+			printf("Setting %s to %s\n", got_ref_get_name(ref),
+			    new_id_str);
+		}
 		err = got_ref_write(new_ref, repo);
 		if (err)
 			goto done;
@@ -1354,8 +1360,10 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 		if (err)
 			goto done;
 		if (got_object_id_cmp(old_id, new_id) != 0) {
-			printf("Setting %s to %s\n",
-			    got_ref_get_name(ref), new_id_str);
+			if (verbosity >= 0) {
+				printf("Setting %s to %s\n",
+				    got_ref_get_name(ref), new_id_str);
+			}
 			err = got_ref_change_ref(ref, new_id);
 			if (err)
 				goto done;
@@ -1381,7 +1389,7 @@ usage_fetch(void)
 
 static const struct got_error *
 delete_missing_refs(struct got_pathlist_head *their_refs,
-    struct got_repository *repo)
+    int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_reflist_head my_refs;
@@ -1418,7 +1426,10 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 		if (err)
 			break;
 
-		printf("Deleting %s: %s\n", got_ref_get_name(re->ref), id_str);
+		if (verbosity >= 0) {
+			printf("Deleting %s: %s\n",
+			    got_ref_get_name(re->ref), id_str);
+		}
 		free(id_str);
 		err = got_ref_delete(re->ref, repo);
 		if (err)
@@ -1624,7 +1635,7 @@ cmd_fetch(int argc, char *argv[])
 		if (verbosity >= 0)
 			printf("Already up-to-date\n");
 		if (delete_refs)
-			error = delete_missing_refs(&refs, repo);
+			error = delete_missing_refs(&refs, verbosity, repo);
 		goto done;
 	}
 
@@ -1654,11 +1665,12 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(refname, id, id_str, repo);
+				error = create_ref(refname, id, id_str,
+				    verbosity, repo);
 				if (error)
 					goto done;
 			} else {
-				error = update_ref(ref, id, repo);
+				error = update_ref(ref, id, verbosity, repo);
 				got_ref_close(ref);
 				if (error)
 					goto done;
@@ -1675,11 +1687,11 @@ cmd_fetch(int argc, char *argv[])
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
 				error = create_ref(remote_refname, id, id_str,
-				    repo);
+				    verbosity, repo);
 				if (error)
 					goto done;
 			} else {
-				error = update_ref(ref, id, repo);
+				error = update_ref(ref, id, verbosity, repo);
 				got_ref_close(ref);
 				if (error)
 					goto done;
@@ -1690,7 +1702,8 @@ cmd_fetch(int argc, char *argv[])
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF)
 					goto done;
-				error = create_ref(refname, id, id_str, repo);
+				error = create_ref(refname, id, id_str,
+				    verbosity, repo);
 				if (error)
 					goto done;
 			} else
@@ -1700,7 +1713,7 @@ cmd_fetch(int argc, char *argv[])
 		id_str = NULL;
 	}
 	if (delete_refs)
-		error = delete_missing_refs(&refs, repo);
+		error = delete_missing_refs(&refs, verbosity, repo);
 done:
 	if (fetchpid > 0) {
 		if (kill(fetchpid, SIGTERM) == -1)
