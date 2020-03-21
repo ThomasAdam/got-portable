@@ -281,8 +281,12 @@ from the remote repository's
 namespace.
 This option may be specified multiple times to build a list of additional
 references to fetch.
+The specified
+.Ar reference
+may either be a full path to a specific reference, or a reference namespace
+which will cause all references in this namespace to be fetched.
 .Pp
-The references will be mapped into the cloned repository's
+Each reference will be mapped into the cloned repository's
 .Dq refs/remotes/
 namespace, unless the
 .Fl m
@@ -416,6 +420,10 @@ from the remote repository's
 namespace.
 This option may be specified multiple times to build a list of additional
 references to fetch.
+The specified
+.Ar reference
+may either be a full path to a specific reference, or a reference namespace
+which will cause all references in this namespace to be fetched.
 .Pp
 Each reference will be mapped into the local repository's
 .Dq refs/remotes/
