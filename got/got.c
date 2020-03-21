@@ -885,10 +885,15 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 }
 
 static const struct got_error *
-create_head_ref(struct got_reference *target_ref, struct got_repository *repo)
+create_head_ref(struct got_reference *target_ref, int verbosity,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reference *head_symref;
+
+	if (verbosity >= 0)
+		printf("Setting %s to %s\n", GOT_REF_HEAD,
+		    got_ref_get_name(target_ref));
 
 	err = got_ref_alloc_symref(&head_symref, GOT_REF_HEAD, target_ref);
 	if (err)
@@ -1164,9 +1169,7 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		if (verbosity >= 0)
-			printf("Setting %s to %s\n", refname, target);
-		error = create_head_ref(target_ref, repo);
+		error = create_head_ref(target_ref, verbosity, repo);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
@@ -1190,10 +1193,7 @@ cmd_clone(int argc, char *argv[])
 				goto done;
 			}
 
-			if (verbosity >= 0)
-				printf("Setting %s to %s\n", GOT_REF_HEAD,
-				    got_ref_get_name(target_ref));
-			error = create_head_ref(target_ref, repo);
+			error = create_head_ref(target_ref, verbosity, repo);
 			got_ref_close(target_ref);
 			if (error)
 				goto done;
