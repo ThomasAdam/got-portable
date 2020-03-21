@@ -202,7 +202,9 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl a
-Fetch all branches from the remote repository.
+Fetch all branches from the remote repository's
+.Dq refs/heads/
+reference namespace.
 If this option is not specified, a branch resolved via the remote
 repository's HEAD reference will be fetched.
 Cannot be used together with the
@@ -211,7 +213,9 @@ option.
 .It Fl b Ar branch
 Fetch the specified
 .Ar branch
-from the remote repository.
+from the remote repository's
+.Dq refs/heads/
+reference namespace.
 This option may be specified multiple times to build a list of branches
 to fetch.
 If the branch corresponding to the remote repository's HEAD reference is not
@@ -319,7 +323,9 @@ The options for
 are as follows:
 .Bl -tag -width Ds
 .It Fl a
-Fetch all branches from the remote repository.
+Fetch all branches from the remote repository's
+.Dq refs/heads/
+reference namespace.
 If this option is not specified, a branch resolved via the remote
 repository's HEAD reference will be fetched.
 Cannot be used together with the
@@ -328,7 +334,9 @@ option.
 .It Fl b Ar branch
 Fetch the specified
 .Ar branch
-from the remote repository.
+from the remote repository's
+.Dq refs/heads/
+reference namespace.
 This option may be specified multiple times to build a list of branches
 to fetch.
 If this option is not specified, a branch resolved via the remote
