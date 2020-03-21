@@ -1022,6 +1022,8 @@ done:
 	TAILQ_FOREACH(pe, &wanted_branches, entry)
 		free((char *)pe->path);
 	got_pathlist_free(&wanted_branches);
+	if (fetchfd != -1 && close(fetchfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	if (packfd != -1 && close(packfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err != NULL)
