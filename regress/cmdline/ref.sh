@@ -242,5 +242,135 @@ function test_ref_delete {
 	test_done "$testroot" "$ret"
 }
 
+function test_ref_list {
+	local testroot=`test_init ref_list`
+	local commit_id=`git_show_head $testroot/repo`
+
+	# Create a tag pointing at a commit ID
+	got tag -r $testroot/repo -c $commit_id -m "1.0" "1.0" >/dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got tag command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
+
+	# Create a ref based on repository's HEAD reference
+	got ref -r $testroot/repo -c HEAD refs/foo/zoo
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create a head ref based on another specific ref
+	(cd $testroot/repo && got ref -c refs/heads/master refs/foo/bar/baz)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -l > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/foo/bar/baz: $commit_id" >> $testroot/stdout.expected
+	echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -l refs > $testroot/stdout
+
+	echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
+	echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -l refs/tags > $testroot/stdout
+
+	echo "refs/tags/1.0: $tag_id" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	for r in refs/foo/bar/baz refs/foo/bar/baz foo/bar/baz foo/bar; do
+		got ref -r $testroot/repo -l $r > $testroot/stdout
+
+		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	for r in refs/foo foo; do
+		got ref -r $testroot/repo -l $r > $testroot/stdout
+
+		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
+		echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	for r in refs//foo/bar refs//foo//bar refs////////foo//bar; do
+		got ref -r $testroot/repo -l $r > $testroot/stdout
+
+		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	# attempt to list non-existing references
+	for r in refs/fo bar baz moo riffs /refs/abc refs/foo/bar/baz/moo; do
+		got ref -r $testroot/repo -l $r > $testroot/stdout
+
+		echo -n > $testroot/stdout.expected
+		cmp -s $testroot/stdout $testroot/stdout.expected
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done	
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_ref_create
 run_test test_ref_delete
+run_test test_ref_list

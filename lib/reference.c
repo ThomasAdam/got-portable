@@ -162,7 +162,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 
 static const struct got_error *
 parse_ref_file(struct got_reference **ref, const char *name,
-    const char *abspath, int lock)
+    const char *absname, const char *abspath, int lock)
 {
 	const struct got_error *err = NULL;
 	FILE *f;
@@ -175,24 +175,34 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		err = got_lockfile_lock(&lf, abspath);
 		if (err) {
 			if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
-				err = got_error(GOT_ERR_NOT_REF);
+				err = got_error_not_ref(name);
 			return err;
 		}
 	}
 
 	f = fopen(abspath, "rb");
 	if (f == NULL) {
+		if (errno != ENOTDIR && errno != ENOENT)
+			err = got_error_from_errno2("fopen", abspath);
+		else
+			err = got_error_not_ref(name);
 		if (lock)
 			got_lockfile_unlock(lf);
-		return NULL;
+		return err;
 	}
 
 	linelen = getline(&line, &linesize, f);
 	if (linelen == -1) {
 		if (feof(f))
 			err = NULL; /* ignore empty files (could be locks) */
-		else
-			err = got_error_from_errno2("getline", abspath);
+		else {
+			if (errno == EISDIR)
+				err = got_error(GOT_ERR_NOT_REF);
+			else if (ferror(f))
+				err = got_ferror(f, GOT_ERR_IO);
+			else
+				err = got_error_from_errno2("getline", abspath);
+		}
 		if (lock)
 			got_lockfile_unlock(lf);
 		goto done;
@@ -202,7 +212,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		linelen--;
 	}
 
-	err = parse_ref_line(ref, name, line);
+	err = parse_ref_line(ref, absname, line);
 	if (lock) {
 		if (err)
 			got_lockfile_unlock(lf);
@@ -411,7 +421,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 		}
 	}
 
-	err = parse_ref_file(ref, absname, path, lock);
+	err = parse_ref_file(ref, name, absname, path, lock);
 done:
 	if (!ref_is_absolute && !ref_is_well_known)
 		free(absname);
@@ -449,7 +459,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		for (i = 0; i < nitems(subdirs); i++) {
 			err = open_ref(ref, path_refs, subdirs[i], refname,
 			    lock);
-			if (err || *ref)
+			if ((err && err->code != GOT_ERR_NOT_REF) || *ref)
 				goto done;
 		}
 
@@ -802,6 +812,9 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 	DIR *d = NULL;
 	char *path_subdir;
 
+	while (subdir[0] == '/')
+		subdir++;
+
 	if (asprintf(&path_subdir, "%s/%s", path_refs, subdir) == -1)
 		return got_error_from_errno("asprintf");
 
@@ -865,7 +878,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 {
 	const struct got_error *err;
 	char *packed_refs_path, *path_refs = NULL;
-	const char *ondisk_ref_namespace = NULL;
+	char *abs_namespace = NULL;
+	char *buf = NULL, *ondisk_ref_namespace = NULL;
 	FILE *f = NULL;
 	struct got_reference *ref;
 	struct got_reflist_entry *new;
@@ -885,11 +899,52 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			got_ref_close(ref);
 		if (err && err->code != GOT_ERR_NOT_REF)
 			goto done;
+	} else {
+		/* Try listing a single reference. */
+		const char *refname = ref_namespace;
+		path_refs = get_refs_dir_path(repo, refname);
+		if (path_refs == NULL) {
+			err = got_error_from_errno("get_refs_dir_path");
+			goto done;
+		}
+		err = open_ref(&ref, path_refs, "", refname, 0);
+		if (err) {
+			if (err->code != GOT_ERR_NOT_REF)
+				goto done;
+			/* Try to look up references in a given namespace. */
+		} else {
+			err = insert_ref(&new, refs, ref, repo,
+			    cmp_cb, cmp_arg);
+			if (err || new == NULL /* duplicate */)
+				got_ref_close(ref);
+			return err;
+		}
 	}
 
-	ondisk_ref_namespace = ref_namespace;
-	if (ref_namespace && strncmp(ref_namespace, "refs/", 5) == 0)
-		ondisk_ref_namespace += 5;
+	if (ref_namespace) {
+		size_t len;
+		/* Canonicalize the path to eliminate double-slashes if any. */
+		if (asprintf(&abs_namespace, "/%s", ref_namespace) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		len = strlen(abs_namespace) + 1;
+		buf = malloc(len);
+		if (buf == NULL) {
+			err = got_error_from_errno("malloc");
+			goto done;
+		}
+		err = got_canonpath(abs_namespace, buf, len);
+		if (err)
+			goto done;
+		ondisk_ref_namespace = buf;
+		while (ondisk_ref_namespace[0] == '/')
+			ondisk_ref_namespace++;
+		if (strncmp(ondisk_ref_namespace, "refs/", 5) == 0)
+			ondisk_ref_namespace += 5;
+		else if (strcmp(ondisk_ref_namespace, "refs") == 0)
+			ondisk_ref_namespace = "";
+	}
 
 	/* Gather on-disk refs before parsing packed-refs. */
 	free(path_refs);
@@ -936,8 +991,9 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 				if (ref_namespace) {
 					const char *name;
 					name = got_ref_get_name(ref);
-					if (strncmp(name, ref_namespace,
-					    strlen(ref_namespace)) != 0) {
+					if (!got_path_is_child(name,
+					    ref_namespace,
+					    strlen(ref_namespace))) {
 						got_ref_close(ref);
 						continue;
 					}
@@ -952,6 +1008,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		}
 	}
 done:
+	free(abs_namespace);
+	free(buf);
 	free(path_refs);
 	if (f && fclose(f) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");

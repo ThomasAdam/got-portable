@@ -843,7 +843,15 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .It Fl l
-List all existing references in the repository.
+List references in the repository.
+If no
+.Ar name
+is specified, list all existing references in the repository.
+If
+.Ar name
+is a reference namespace, list all references in this namespace.
+Otherwise, show only the reference with the given
+.Ar name .
 Cannot be used together with any other options except
 .Fl r .
 .It Fl c Ar object

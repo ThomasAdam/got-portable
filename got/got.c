@@ -4182,14 +4182,14 @@ usage_ref(void)
 }
 
 static const struct got_error *
-list_refs(struct got_repository *repo)
+list_refs(struct got_repository *repo, const char *refname)
 {
 	static const struct got_error *err = NULL;
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 
 	SIMPLEQ_INIT(&refs);
-	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	err = got_ref_list(&refs, repo, refname, got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 
@@ -4304,7 +4304,8 @@ cmd_ref(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
 	int ch, do_list = 0, do_delete = 0;
-	const char *refname = NULL, *obj_arg = NULL, *symref_target= NULL;
+	const char *obj_arg = NULL, *symref_target= NULL;
+	char *refname = NULL;
 
 	while ((ch = getopt(argc, argv, "c:dr:ls:")) != -1) {
 		switch (ch) {
@@ -4350,13 +4351,27 @@ cmd_ref(int argc, char *argv[])
 	argv += optind;
 
 	if (do_list) {
-		if (argc > 0)
+		if (argc != 0 && argc != 1)
 			usage_ref();
+		if (argc == 1) {
+			refname = strdup(argv[0]);
+			if (refname == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
 	} else {
 		if (argc != 1)
 			usage_ref();
-		refname = argv[0];
+		refname = strdup(argv[0]);
+		if (refname == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
 	}
+
+	if (refname)
+		got_path_strip_trailing_slashes(refname);
 
 #ifndef PROFILE
 	if (do_list) {
@@ -4407,7 +4422,7 @@ cmd_ref(int argc, char *argv[])
 		goto done;
 
 	if (do_list)
-		error = list_refs(repo);
+		error = list_refs(repo, refname);
 	else if (do_delete)
 		error = delete_ref(repo, refname);
 	else if (symref_target)
@@ -4418,6 +4433,7 @@ cmd_ref(int argc, char *argv[])
 		error = add_ref(repo, refname, obj_arg);
 	}
 done:
+	free(refname);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
