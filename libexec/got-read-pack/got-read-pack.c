@@ -537,6 +537,52 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 }
 
 static const struct got_error *
+send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err;
+	struct ibuf *wbuf;
+	int i;
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_TRAVERSED_COMMITS, 0, 0,
+	    sizeof(struct got_imsg_traversed_commits) +
+	    ncommits * SHA1_DIGEST_LENGTH);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create TRAVERSED_COMMITS");
+
+	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1) {
+		err = got_error_from_errno("imsg_add TRAVERSED_COMMITS");
+		ibuf_free(wbuf);
+		return err;
+	}
+	for (i = 0; i < ncommits; i++) {
+		struct got_object_id *id = &commit_ids[i];
+		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add TRAVERSED_COMMITS");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_commit_traversal_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_TRAVERSAL_DONE, 0, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose TRAVERSAL_DONE");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+
+static const struct got_error *
 commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
     struct got_pack *pack, struct got_packidx *packidx,
     struct got_object_cache *objcache)
@@ -602,8 +648,8 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 
 		if (sizeof(struct got_imsg_traversed_commits) +
 		    ncommits * SHA1_DIGEST_LENGTH >= max_datalen) {
-			err = got_privsep_send_traversed_commits(commit_ids,
-			    ncommits, ibuf);
+			err = send_traversed_commits(commit_ids, ncommits,
+			    ibuf);
 			if (err)
 				goto done;
 			ncommits = 0;
@@ -697,8 +743,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 	} while (!changed);
 
 	if (ncommits > 0) {
-		err = got_privsep_send_traversed_commits(commit_ids,
-		    ncommits, ibuf);
+		err = send_traversed_commits(commit_ids, ncommits, ibuf);
 		if (err)
 			goto done;
 
@@ -708,7 +753,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 				goto done;
 		}
 	}
-	err = got_privsep_send_commit_traversal_done(ibuf);
+	err = send_commit_traversal_done(ibuf);
 done:
 	free(commit_ids);
 	if (commit)

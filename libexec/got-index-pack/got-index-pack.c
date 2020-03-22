@@ -572,6 +572,33 @@ update_packidx(struct got_packidx *packidx, int nobj,
 }
 
 static const struct got_error *
+send_index_pack_progress(struct imsgbuf *ibuf, int nobj_total,
+    int nobj_indexed, int nobj_loose, int nobj_resolved)
+{
+	struct got_imsg_index_pack_progress iprogress;
+
+	iprogress.nobj_total = nobj_total;
+	iprogress.nobj_indexed = nobj_indexed;
+	iprogress.nobj_loose = nobj_loose;
+	iprogress.nobj_resolved = nobj_resolved;
+
+	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_PROGRESS, 0, 0, -1,
+	    &iprogress, sizeof(iprogress)) == -1)
+		return got_error_from_errno("imsg_compose IDXPACK_PROGRESS");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_index_pack_done(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_DONE, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose FETCH");
+	return got_privsep_flush_imsg(ibuf);
+}
+
+
+static const struct got_error *
 index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
     FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_hash,
     struct imsgbuf *ibuf)
@@ -684,8 +711,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		/* Don't send too many progress privsep messages. */
 		p_indexed = ((i + 1) * 100) / nobj;
 		if (p_indexed != last_p_indexed) {
-			err = got_privsep_send_index_pack_progress(ibuf,
-			    nobj, i + 1, nloose, 0);
+			err = send_index_pack_progress(ibuf, nobj, i + 1,
+			    nloose, 0);
 			if (err)
 				goto done;
 			last_p_indexed = p_indexed;
@@ -791,8 +818,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			/* Don't send too many progress privsep messages. */
 			p_resolved = ((nresolved + n) * 100) / nobj;
 			if (p_resolved != last_p_resolved) {
-				err = got_privsep_send_index_pack_progress(ibuf,
-				    nobj, nobj, nloose, nresolved + n);
+				err = send_index_pack_progress(ibuf, nobj,
+				    nobj, nloose, nresolved + n);
 				if (err)
 					goto done;
 				last_p_resolved = p_resolved;
@@ -819,8 +846,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		goto done;
 	}
 
-	err = got_privsep_send_index_pack_progress(ibuf, nobj, nobj,
-	    nloose, nresolved);
+	err = send_index_pack_progress(ibuf, nobj, nobj, nloose, nresolved);
 	if (err)
 		goto done;
 
@@ -1012,7 +1038,7 @@ done:
 	}
 
 	if (err == NULL)
-		err = got_privsep_send_index_pack_done(&ibuf);
+		err = send_index_pack_done(&ibuf);
 	if (err) {
 		got_privsep_send_error(&ibuf, err);
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);

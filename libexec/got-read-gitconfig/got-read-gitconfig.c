@@ -48,6 +48,16 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
+send_gitconfig_int(struct imsgbuf *ibuf, int value)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_INT_VAL, 0, 0, -1,
+	    &value, sizeof(value)) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_INT_VAL");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
 gitconfig_num_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
     char *section, char *tag, int def)
 {
@@ -57,7 +67,19 @@ gitconfig_num_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	value = got_gitconfig_get_num(gitconfig, section, tag, def);
-	return got_privsep_send_gitconfig_int(ibuf, value);
+	return send_gitconfig_int(ibuf, value);
+}
+
+static const struct got_error *
+send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
+{
+	size_t len = value ? strlen(value) + 1 : 0;
+
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_STR_VAL, 0, 0, -1,
+	    value, len) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_STR_VAL");
+
+	return got_privsep_flush_imsg(ibuf);
 }
 
 static const struct got_error *
@@ -70,8 +92,73 @@ gitconfig_str_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
 		return got_error(GOT_ERR_PRIVSEP_MSG);
 
 	value = got_gitconfig_get_str(gitconfig, section, tag);
-	return got_privsep_send_gitconfig_str(ibuf, value);
+	return send_gitconfig_str(ibuf, value);
 }
+
+static const struct got_error *
+send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
+    int nremotes)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_remotes iremotes;
+	int i;
+
+	iremotes.nremotes = nremotes;
+	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_REMOTES, 0, 0, -1,
+	    &iremotes, sizeof(iremotes)) == -1)
+		return got_error_from_errno("imsg_compose GITCONFIG_REMOTES");
+
+	err = got_privsep_flush_imsg(ibuf);
+	imsg_clear(ibuf);
+	if (err)
+		return err;
+
+	for (i = 0; i < nremotes; i++) {
+		struct got_imsg_remote iremote;
+		size_t len = sizeof(iremote);
+		struct ibuf *wbuf;
+
+		iremote.mirror_references = remotes[i].mirror_references;
+		iremote.name_len = strlen(remotes[i].name);
+		len += iremote.name_len;
+		iremote.url_len = strlen(remotes[i].url);
+		len += iremote.url_len;
+
+		wbuf = imsg_create(ibuf, GOT_IMSG_GITCONFIG_REMOTE, 0, 0, len);
+		if (wbuf == NULL)
+			return got_error_from_errno(
+			    "imsg_create GITCONFIG_REMOTE");
+
+		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+
+		wbuf->fd = -1;
+		imsg_close(ibuf, wbuf);
+		err = got_privsep_flush_imsg(ibuf);
+		if (err)
+			return err;
+	}
+
+	return NULL;
+}
+
 
 static const struct got_error *
 gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
@@ -96,7 +183,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 	}
 
 	if (nremotes == 0) {
-		err = got_privsep_send_gitconfig_remotes(ibuf, NULL, 0);
+		err = send_gitconfig_remotes(ibuf, NULL, 0);
 		goto done;
 	}
 
@@ -143,7 +230,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 		i++;
 	}
 
-	err = got_privsep_send_gitconfig_remotes(ibuf, remotes, nremotes);
+	err = send_gitconfig_remotes(ibuf, remotes, nremotes);
 done:
 	for (i = 0; i < nremotes; i++)
 		free(remotes[i].name);
@@ -162,9 +249,9 @@ gitconfig_owner_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 
 	value = got_gitconfig_get_str(gitconfig, "gotweb", "owner");
 	if (value)
-		return got_privsep_send_gitconfig_str(ibuf, value);
+		return send_gitconfig_str(ibuf, value);
 	value = got_gitconfig_get_str(gitconfig, "gitweb", "owner");
-	return got_privsep_send_gitconfig_str(ibuf, value);
+	return send_gitconfig_str(ibuf, value);
 }
 
 int

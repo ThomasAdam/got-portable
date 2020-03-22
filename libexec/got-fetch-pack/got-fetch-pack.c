@@ -470,6 +470,45 @@ match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
 }
 
 static const struct got_error *
+send_fetch_server_progress(struct imsgbuf *ibuf, const char *msg, size_t msglen)
+{
+	if (msglen > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (msglen == 0)
+		return NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_SERVER_PROGRESS, 0, 0, -1,
+	    msg, msglen) == -1)
+		return got_error_from_errno(
+		    "imsg_compose FETCH_SERVER_PROGRESS");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DOWNLOAD_PROGRESS, 0, 0, -1,
+	    &bytes, sizeof(bytes)) == -1)
+		return got_error_from_errno(
+		    "imsg_compose FETCH_DOWNLOAD_PROGRESS");
+
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
+	    hash.sha1, SHA1_DIGEST_LENGTH) == -1)
+		return got_error_from_errno("imsg_compose FETCH");
+	return got_privsep_flush_imsg(ibuf);
+}
+
+
+
+static const struct got_error *
 fetch_progress(struct imsgbuf *ibuf, const char *buf, size_t len)
 {
 	int i;
@@ -493,7 +532,7 @@ fetch_progress(struct imsgbuf *ibuf, const char *buf, size_t len)
 		    "non-printable progress message received from server");
 	}
 
-	return got_privsep_send_fetch_server_progress(ibuf, buf, len);
+	return send_fetch_server_progress(ibuf, buf, len);
 }
 
 static const struct got_error *
@@ -511,6 +550,104 @@ fetch_error(const char *buf, size_t len)
 	msg[i] = '\0';
 	return got_error_msg(GOT_ERR_FETCH_FAILED, msg);
 }
+
+static const struct got_error *
+send_fetch_symrefs(struct imsgbuf *ibuf, struct got_pathlist_head *symrefs)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t len, nsymrefs = 0;
+	struct got_pathlist_entry *pe;
+
+	len = sizeof(struct got_imsg_fetch_symrefs);
+	TAILQ_FOREACH(pe, symrefs, entry) {
+		const char *target = pe->data;
+		len += sizeof(struct got_imsg_fetch_symref) +
+		    pe->path_len + strlen(target);
+		nsymrefs++;
+	}
+
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_SYMREFS, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create FETCH_SYMREFS");
+
+	/* Keep in sync with struct got_imsg_fetch_symrefs definition! */
+	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	TAILQ_FOREACH(pe, symrefs, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+		const char *target = pe->data;
+		size_t target_len = strlen(target);
+
+		/* Keep in sync with struct got_imsg_fetch_symref definition! */
+		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, &target_len, sizeof(target_len)) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, name, name_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, target, target_len) == -1) {
+			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return got_privsep_flush_imsg(ibuf);
+}
+
+static const struct got_error *
+send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
+    const char *refname)
+{
+	const struct got_error *err = NULL;
+	struct ibuf *wbuf;
+	size_t len, reflen = strlen(refname);
+
+	len = sizeof(struct got_imsg_fetch_ref) + reflen;
+	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REF, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create FETCH_REF");
+
+	/* Keep in sync with struct got_imsg_fetch_ref definition! */
+	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, refname, reflen) == -1) {
+		err = got_error_from_errno("imsg_add FETCH_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return got_privsep_flush_imsg(ibuf);
+}
+
 
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
@@ -569,7 +706,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			if (chattygot)
 				fprintf(stderr, "%s: my capabilities:%s\n",
 				    getprogname(), my_capabilities);
-			err = got_privsep_send_fetch_symrefs(ibuf, &symrefs);
+			err = send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
 				goto done;
 			is_firstpkt = 0;
@@ -663,8 +800,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 			goto done;
 		}
 		match_remote_ref(have_refs, &have[nref], refname);
-		err = got_privsep_send_fetch_ref(ibuf, &want[nref],
-		    refname);
+		err = send_fetch_ref(ibuf, &want[nref], refname);
 		if (err)
 			goto done;
 
@@ -878,14 +1014,13 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 
 		/* Don't send too many progress privsep messages. */
 		if (packsz > last_reported_packsz + 1024) {
-			err = got_privsep_send_fetch_download_progress(ibuf,
-			    packsz);
+			err = send_fetch_download_progress(ibuf, packsz);
 			if (err)
 				goto done;
 			last_reported_packsz = packsz;
 		}
 	}
-	err = got_privsep_send_fetch_download_progress(ibuf, packsz);
+	err = send_fetch_download_progress(ibuf, packsz);
 	if (err)
 		goto done;
 done:
@@ -1130,7 +1265,7 @@ done:
 	if (err != NULL)
 		got_privsep_send_error(&ibuf, err);
 	else
-		err = got_privsep_send_fetch_done(&ibuf, packid);
+		err = send_fetch_done(&ibuf, packid);
 	if (err != NULL) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);

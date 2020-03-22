@@ -216,6 +216,12 @@ flush_imsg(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_flush_imsg(struct imsgbuf *ibuf)
+{
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
 got_privsep_send_stop(int fd)
 {
 	const struct got_error *err = NULL;
@@ -559,144 +565,6 @@ got_privsep_send_fetch_outfd(struct imsgbuf *ibuf, int fd)
 	return send_fd(ibuf, GOT_IMSG_FETCH_OUTFD, fd);
 }
 
-
-const struct got_error *
-got_privsep_send_fetch_symrefs(struct imsgbuf *ibuf,
-    struct got_pathlist_head *symrefs)
-{
-	const struct got_error *err = NULL;
-	struct ibuf *wbuf;
-	size_t len, nsymrefs = 0;
-	struct got_pathlist_entry *pe;
-
-	len = sizeof(struct got_imsg_fetch_symrefs);
-	TAILQ_FOREACH(pe, symrefs, entry) {
-		const char *target = pe->data;
-		len += sizeof(struct got_imsg_fetch_symref) +
-		    pe->path_len + strlen(target);
-		nsymrefs++;
-	}
-
-	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_SYMREFS, 0, 0, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create FETCH_SYMREFS");
-
-	/* Keep in sync with struct got_imsg_fetch_symrefs definition! */
-	if (imsg_add(wbuf, &nsymrefs, sizeof(nsymrefs)) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-		ibuf_free(wbuf);
-		return err;
-	}
-
-	TAILQ_FOREACH(pe, symrefs, entry) {
-		const char *name = pe->path;
-		size_t name_len = pe->path_len;
-		const char *target = pe->data;
-		size_t target_len = strlen(target);
-
-		/* Keep in sync with struct got_imsg_fetch_symref definition! */
-		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, &target_len, sizeof(target_len)) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, name, name_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, target, target_len) == -1) {
-			err = got_error_from_errno("imsg_add FETCH_SYMREFS");
-			ibuf_free(wbuf);
-			return err;
-		}
-	}
-
-	wbuf->fd = -1;
-	imsg_close(ibuf, wbuf);
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_fetch_ref(struct imsgbuf *ibuf,
-    struct got_object_id *refid, const char *refname)
-{
-	const struct got_error *err = NULL;
-	struct ibuf *wbuf;
-	size_t len, reflen = strlen(refname);
-
-	len = sizeof(struct got_imsg_fetch_ref) + reflen;
-	if (len >= MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	wbuf = imsg_create(ibuf, GOT_IMSG_FETCH_REF, 0, 0, len);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create FETCH_REF");
-
-	/* Keep in sync with struct got_imsg_fetch_ref definition! */
-	if (imsg_add(wbuf, refid->sha1, SHA1_DIGEST_LENGTH) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-	if (imsg_add(wbuf, refname, reflen) == -1) {
-		err = got_error_from_errno("imsg_add FETCH_REF");
-		ibuf_free(wbuf);
-		return err;
-	}
-
-	wbuf->fd = -1;
-	imsg_close(ibuf, wbuf);
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_fetch_server_progress(struct imsgbuf *ibuf, const char *msg,
-    size_t msglen)
-{
-	if (msglen > MAX_IMSGSIZE - IMSG_HEADER_SIZE)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	if (msglen == 0)
-		return NULL;
-
-	if (imsg_compose(ibuf, GOT_IMSG_FETCH_SERVER_PROGRESS, 0, 0, -1,
-	    msg, msglen) == -1)
-		return got_error_from_errno(
-		    "imsg_compose FETCH_SERVER_PROGRESS");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DOWNLOAD_PROGRESS, 0, 0, -1,
-	    &bytes, sizeof(bytes)) == -1)
-		return got_error_from_errno(
-		    "imsg_compose FETCH_DOWNLOAD_PROGRESS");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
-	    hash.sha1, SHA1_DIGEST_LENGTH) == -1)
-		return got_error_from_errno("imsg_compose FETCH");
-	return flush_imsg(ibuf);
-}
-
-
 const struct got_error *
 got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
     char **refname, struct got_pathlist_head *symrefs, char **server_progress,
@@ -876,32 +744,6 @@ const struct got_error *
 got_privsep_send_index_pack_outfd(struct imsgbuf *ibuf, int fd)
 {
 	return send_fd(ibuf, GOT_IMSG_IDXPACK_OUTFD, fd);
-}
-
-const struct got_error *
-got_privsep_send_index_pack_progress(struct imsgbuf *ibuf, int nobj_total,
-    int nobj_indexed, int nobj_loose, int nobj_resolved)
-{
-	struct got_imsg_index_pack_progress iprogress;
-
-	iprogress.nobj_total = nobj_total;
-	iprogress.nobj_indexed = nobj_indexed;
-	iprogress.nobj_loose = nobj_loose;
-	iprogress.nobj_resolved = nobj_resolved;
-
-	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_PROGRESS, 0, 0, -1,
-	    &iprogress, sizeof(iprogress)) == -1)
-		return got_error_from_errno("imsg_compose IDXPACK_PROGRESS");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
-got_privsep_send_index_pack_done(struct imsgbuf *ibuf)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_IDXPACK_DONE, 0, 0, -1, NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose FETCH");
-	return flush_imsg(ibuf);
 }
 
 const struct got_error *
@@ -1872,18 +1714,6 @@ got_privsep_send_gitconfig_owner_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
-{
-	size_t len = value ? strlen(value) + 1 : 0;
-
-	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_STR_VAL, 0, 0, -1,
-	    value, len) == -1)
-		return got_error_from_errno("imsg_compose GITCONFIG_STR_VAL");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
 got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -1920,16 +1750,6 @@ got_privsep_recv_gitconfig_str(char **str, struct imsgbuf *ibuf)
 }
 
 const struct got_error *
-got_privsep_send_gitconfig_int(struct imsgbuf *ibuf, int value)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_INT_VAL, 0, 0, -1,
-	    &value, sizeof(value)) == -1)
-		return got_error_from_errno("imsg_compose GITCONFIG_INT_VAL");
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
 got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -1960,70 +1780,6 @@ got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 
 	imsg_free(&imsg);
 	return err;
-}
-
-const struct got_error *
-got_privsep_send_gitconfig_remotes(struct imsgbuf *ibuf,
-    struct got_remote_repo *remotes, int nremotes)
-{
-	const struct got_error *err = NULL;
-	struct got_imsg_remotes iremotes;
-	int i;
-
-	iremotes.nremotes = nremotes;
-	if (imsg_compose(ibuf, GOT_IMSG_GITCONFIG_REMOTES, 0, 0, -1,
-	    &iremotes, sizeof(iremotes)) == -1)
-		return got_error_from_errno("imsg_compose GITCONFIG_REMOTES");
-
-	err = flush_imsg(ibuf);
-	imsg_clear(ibuf);
-	if (err)
-		return err;
-
-	for (i = 0; i < nremotes; i++) {
-		struct got_imsg_remote iremote;
-		size_t len = sizeof(iremote);
-		struct ibuf *wbuf;
-
-		iremote.mirror_references = remotes[i].mirror_references;
-		iremote.name_len = strlen(remotes[i].name);
-		len += iremote.name_len;
-		iremote.url_len = strlen(remotes[i].url);
-		len += iremote.url_len;
-
-		wbuf = imsg_create(ibuf, GOT_IMSG_GITCONFIG_REMOTE, 0, 0, len);
-		if (wbuf == NULL)
-			return got_error_from_errno(
-			    "imsg_create GITCONFIG_REMOTE");
-
-		if (imsg_add(wbuf, &iremote, sizeof(iremote)) == -1) {
-			err = got_error_from_errno(
-			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-
-		if (imsg_add(wbuf, remotes[i].name, iremote.name_len) == -1) {
-			err = got_error_from_errno(
-			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
-			err = got_error_from_errno(
-			    "imsg_add GITCONFIG_REMOTE");
-			ibuf_free(wbuf);
-			return err;
-		}
-
-		wbuf->fd = -1;
-		imsg_close(ibuf, wbuf);
-		err = flush_imsg(ibuf);
-		if (err)
-			return err;
-	}
-
-	return NULL;
 }
 
 const struct got_error *
@@ -2165,41 +1921,6 @@ got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
 }
 
 const struct got_error *
-got_privsep_send_traversed_commits(struct got_object_id *commit_ids, 
-    size_t ncommits, struct imsgbuf *ibuf)
-{
-	const struct got_error *err;
-	struct ibuf *wbuf;
-	int i;
-
-	wbuf = imsg_create(ibuf, GOT_IMSG_TRAVERSED_COMMITS, 0, 0,
-	    sizeof(struct got_imsg_traversed_commits) +
-	    ncommits * SHA1_DIGEST_LENGTH);
-	if (wbuf == NULL)
-		return got_error_from_errno("imsg_create TRAVERSED_COMMITS");
-
-	if (imsg_add(wbuf, &ncommits, sizeof(ncommits)) == -1) {
-		err = got_error_from_errno("imsg_add TRAVERSED_COMMITS");
-		ibuf_free(wbuf);
-		return err;
-	}
-	for (i = 0; i < ncommits; i++) {
-		struct got_object_id *id = &commit_ids[i];
-		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-			err = got_error_from_errno(
-			    "imsg_add TRAVERSED_COMMITS");
-			ibuf_free(wbuf);
-			return err;
-		}
-	}
-
-	wbuf->fd = -1;
-	imsg_close(ibuf, wbuf);
-
-	return flush_imsg(ibuf);
-}
-
-const struct got_error *
 got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
     struct got_object_id **changed_commit_id,
     struct got_object_id_queue *commit_ids, struct imsgbuf *ibuf)
@@ -2273,16 +1994,6 @@ got_privsep_recv_traversed_commits(struct got_commit_object **changed_commit,
 	if (err)
 		got_object_id_queue_free(commit_ids);
 	return err;
-}
-
-const struct got_error *
-got_privsep_send_commit_traversal_done(struct imsgbuf *ibuf)
-{
-	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_TRAVERSAL_DONE, 0, 0, -1,
-	    NULL, 0) == -1)
-		return got_error_from_errno("imsg_compose TRAVERSAL_DONE");
-
-	return flush_imsg(ibuf);
 }
 
 const struct got_error *

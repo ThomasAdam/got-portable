@@ -383,6 +383,7 @@ struct got_pathlist_head;
 
 const struct got_error *got_send_ack(pid_t);
 const struct got_error *got_privsep_wait_for_child(pid_t);
+const struct got_error *got_privsep_flush_imsg(struct imsgbuf *);
 const struct got_error *got_privsep_send_stop(int);
 const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
     size_t);
@@ -406,28 +407,15 @@ const struct got_error *got_privsep_send_index_pack_req(struct imsgbuf *,
     uint8_t *, int);
 const struct got_error *got_privsep_send_index_pack_outfd(struct imsgbuf *,
     int);
-const struct got_error *got_privsep_send_index_pack_progress(struct imsgbuf *,
-    int, int, int, int);
-const struct got_error *got_privsep_send_index_pack_done(struct imsgbuf *);
 const struct got_error *got_privsep_recv_index_progress(int *, int *, int *,
     int *, int *, struct imsgbuf *ibuf);
 const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
     struct got_pathlist_head *, int, struct got_pathlist_head *,
     struct got_pathlist_head *, int, int);
 const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
-const struct got_error *got_privsep_send_fetch_symrefs(struct imsgbuf *,
-    struct got_pathlist_head *);
-const struct got_error *got_privsep_send_fetch_ref(struct imsgbuf *,
-    struct got_object_id *, const char *);
-const struct got_error *got_privsep_send_fetch_server_progress(struct imsgbuf *,
-    const char *, size_t);
-const struct got_error *got_privsep_send_fetch_download_progress(struct imsgbuf *,
-    off_t);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *,
     char **, off_t *, struct imsgbuf *);
-const struct got_error *got_privsep_send_fetch_done(struct imsgbuf *,
-    struct got_object_id);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
@@ -465,14 +453,9 @@ const struct got_error *got_privsep_send_gitconfig_author_email_req(
 const struct got_error *got_privsep_send_gitconfig_remotes_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_owner_req(struct imsgbuf *);
-const struct got_error *got_privsep_send_gitconfig_str(struct imsgbuf *,
-    const char *);
 const struct got_error *got_privsep_recv_gitconfig_str(char **,
     struct imsgbuf *);
-const struct got_error *got_privsep_send_gitconfig_int(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_gitconfig_int(int *, struct imsgbuf *);
-const struct got_error *got_privsep_send_gitconfig_remotes(struct imsgbuf *,
-    struct got_remote_repo *, int);
 const struct got_error *got_privsep_recv_gitconfig_remotes(
     struct got_remote_repo **, int *, struct imsgbuf *);
 
@@ -481,9 +464,5 @@ const struct got_error *got_privsep_send_commit_traversal_request(
 const struct got_error *got_privsep_recv_traversed_commits(
     struct got_commit_object **, struct got_object_id **,
     struct got_object_id_queue *, struct imsgbuf *);
-const struct got_error *got_privsep_send_traversed_commits(
-    struct got_object_id *, size_t, struct imsgbuf *);
-const struct got_error *got_privsep_send_commit_traversal_done(
-    struct imsgbuf *);
 
 void got_privsep_exec_child(int[2], const char *, const char *);
