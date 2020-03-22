@@ -1065,28 +1065,31 @@ function test_rebase_delete_missing_file {
 	git_commit $testroot/repo -m "adding a subdir"
 	local commit0=`git_show_head $testroot/repo`
 
-	(cd $testroot/repo && git checkout -q -b newbranch)
-	echo "modified delta on branch" > $testroot/repo/gamma/delta
-	git_commit $testroot/repo -m "committing to delta on newbranch"
+	got br -r $testroot/repo -c master newbranch
 
-	(cd $testroot/repo && git rm -q beta d/f/g/new)
-	git_commit $testroot/repo -m "deleting beta and d/f/g/new on newbranch"
+	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
 
+	echo "modified delta on branch" > $testroot/wt/gamma/delta
+	(cd $testroot/wt && got commit \
+		-m "committing to delta on newbranch" > /dev/null)
+
+	(cd $testroot/wt && got rm beta d/f/g/new > /dev/null)
+	(cd $testroot/wt && got commit \
+		-m "removing beta and d/f/g/new on newbranch" > /dev/null)
+
+	(cd $testroot/repo && git checkout -q newbranch)
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
+	(cd $testroot/wt && got update -b master > /dev/null)
+	(cd $testroot/wt && got rm beta d/f/g/new > /dev/null)
+	(cd $testroot/wt && got commit \
+		-m "removing beta and d/f/g/new on master" > /dev/null)
+
 	(cd $testroot/repo && git checkout -q master)
-	(cd $testroot/repo && git rm -q beta d/f/g/new)
-	git_commit $testroot/repo -m "removing beta and d/f/g/new on master"
 	local master_commit=`git_show_head $testroot/repo`
 
-	got checkout $testroot/repo $testroot/wt > /dev/null
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
+	(cd $testroot/wt && got update -b master > /dev/null)
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
 
 	(cd $testroot/repo && git checkout -q newbranch)
@@ -1104,7 +1107,7 @@ function test_rebase_delete_missing_file {
 	echo "!  d/f/g/new" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit2 -> no-op change" \
 		>> $testroot/stdout.expected
-	echo ": deleting beta and d/f/g/new on newbranch" \
+	echo ": removing beta and d/f/g/new on newbranch" \
 		>> $testroot/stdout.expected
 	echo "Switching work tree to refs/heads/newbranch" \
 		>> $testroot/stdout.expected
