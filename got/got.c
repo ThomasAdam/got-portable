@@ -5194,7 +5194,8 @@ cmd_tag(int argc, char *argv[])
 
 	if (do_list) {
 		if (commit_id_arg != NULL)
-			errx(1, "-c option can only be used when creating a tag");
+			errx(1,
+			    "-c option can only be used when creating a tag");
 		if (tagmsg)
 			errx(1, "-l and -m options are mutually exclusive");
 		if (argc > 0)
