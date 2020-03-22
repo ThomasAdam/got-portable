@@ -267,7 +267,7 @@ function test_rm_directory {
 }
 
 function test_rm_directory_keep_files {
-	local testroot=`test_init rm_directory`
+	local testroot=`test_init rm_directory_keep_files`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
