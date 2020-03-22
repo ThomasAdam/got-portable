@@ -4335,17 +4335,17 @@ cmd_ref(int argc, char *argv[])
 	}
 
 	if (obj_arg && do_list)
-		errx(1, "-c and -l options are mutually exclusive\n");
+		errx(1, "-c and -l options are mutually exclusive");
 	if (obj_arg && do_delete)
-		errx(1, "-c and -d options are mutually exclusive\n");
+		errx(1, "-c and -d options are mutually exclusive");
 	if (obj_arg && symref_target)
-		errx(1, "-c and -s options are mutually exclusive\n");
+		errx(1, "-c and -s options are mutually exclusive");
 	if (symref_target && do_delete)
-		errx(1, "-s and -d options are mutually exclusive\n");
+		errx(1, "-s and -d options are mutually exclusive");
 	if (symref_target && do_list)
-		errx(1, "-s and -l options are mutually exclusive\n");
+		errx(1, "-s and -l options are mutually exclusive");
 	if (do_delete && do_list)
-		errx(1, "-d and -l options are mutually exclusive\n");
+		errx(1, "-d and -l options are mutually exclusive");
 
 	argc -= optind;
 	argv += optind;
@@ -4671,7 +4671,7 @@ cmd_branch(int argc, char *argv[])
 	}
 
 	if (do_list && delref)
-		errx(1, "-l and -d options are mutually exclusive\n");
+		errx(1, "-l and -d options are mutually exclusive");
 
 	argc -= optind;
 	argv += optind;
