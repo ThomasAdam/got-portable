@@ -93,7 +93,7 @@ function test_clone_list {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 
 	got clone -l $testurl/repo > $testroot/stdout 2>$testroot/stderr
@@ -121,7 +121,7 @@ function test_clone_branch {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -157,7 +157,7 @@ function test_clone_all {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -195,7 +195,7 @@ function test_clone_mirror {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -230,7 +230,7 @@ function test_clone_mirror_all {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -265,7 +265,7 @@ function test_clone_reference {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -302,7 +302,7 @@ function test_clone_branch_and_reference {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -339,7 +339,7 @@ function test_clone_reference_mirror {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`

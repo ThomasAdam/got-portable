@@ -20,8 +20,8 @@ function test_ref_create {
 	local testroot=`test_init ref_create`
 	local commit_id=`git_show_head $testroot/repo`
 
-	# Create a ref based on a commit ID
-	got ref -r $testroot/repo refs/heads/commitref $commit_id
+	# Create a ref pointing at a commit ID
+	got ref -r $testroot/repo -c $commit_id refs/heads/commitref
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref command failed unexpectedly"
@@ -30,7 +30,7 @@ function test_ref_create {
 	fi
 
 	# Create a ref based on repository's HEAD reference
-	got ref -r $testroot/repo refs/heads/newref HEAD
+	got ref -r $testroot/repo -c HEAD refs/heads/newref
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref command failed unexpectedly"
@@ -57,7 +57,7 @@ function test_ref_create {
 	fi
 
 	# Create a head ref based on another specific ref
-	(cd $testroot/wt && got ref refs/heads/anotherref refs/heads/master)
+	(cd $testroot/wt && got ref -c refs/heads/master refs/heads/anotherref)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -72,7 +72,7 @@ function test_ref_create {
 	fi
 
 	# Create a symbolic ref
-	(cd $testroot/wt && got ref -s refs/heads/symbolicref refs/heads/master)
+	(cd $testroot/wt && got ref -s refs/heads/master refs/heads/symbolicref)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -88,7 +88,7 @@ function test_ref_create {
 	fi
 
 	# Attempt to create a symbolic ref pointing at a non-reference
-	(cd $testroot/wt && got ref -s refs/heads/symbolicref $commit_id \
+	(cd $testroot/wt && got ref -s $commit_id refs/heads/symbolicref \
 		2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" == "0" ]; then
@@ -106,8 +106,45 @@ function test_ref_create {
 		return 1
 	fi
 
+	# Attempt to create a reference without specifying a name
+	(cd $testroot/wt && got ref -c $commit_id 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "git ref command succeeded unexpectedly"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	grep -q '^usage: got ref' $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "unexpected usage error message: " >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Attempt to create a symbolic reference without specifying a name
+	(cd $testroot/wt && got ref -s refs/heads/symbolicref \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "git ref command succeeded unexpectedly"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	grep -q '^usage: got ref' $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "unexpected usage error message: " >&2
+		cat $testroot/stderr >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	# Change HEAD
-	got ref -r $testroot/repo -s HEAD refs/heads/newref
+	got ref -r $testroot/repo -s refs/heads/newref HEAD
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref command failed unexpectedly"
@@ -156,7 +193,7 @@ function test_ref_delete {
 	local commit_id=`git_show_head $testroot/repo`
 
 	for b in ref1 ref2 ref3; do
-		got ref -r $testroot/repo refs/heads/$b refs/heads/master
+		got ref -r $testroot/repo -c refs/heads/master refs/heads/$b
 		ret="$?"
 		if [ "$ret" != "0" ]; then
 			echo "got ref command failed unexpectedly"
@@ -165,7 +202,7 @@ function test_ref_delete {
 		fi
 	done
 
-	got ref -d refs/heads/ref2 -r $testroot/repo > $testroot/stdout
+	got ref -d -r $testroot/repo refs/heads/ref2 > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref command failed unexpectedly"
@@ -186,7 +223,7 @@ function test_ref_delete {
 		return 1
 	fi
 
-	got ref -d refs/heads/bogus_ref_name -r $testroot/repo \
+	got ref -r $testroot/repo -d refs/heads/bogus_ref_name \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" == "0" ]; then

@@ -4175,7 +4175,8 @@ __dead static void
 usage_ref(void)
 {
 	fprintf(stderr,
-	    "usage: %s ref [-r repository] -l | -d name | [-s] name target\n",
+	    "usage: %s ref [-r repository] [-l] [-c object] [-s reference] "
+	        "[-d] [name]\n",
 	    getprogname());
 	exit(1);
 }
@@ -4302,14 +4303,16 @@ cmd_ref(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	int ch, do_list = 0, create_symref = 0;
-	const char *delref = NULL;
+	int ch, do_list = 0, do_delete = 0;
+	const char *refname = NULL, *obj_arg = NULL, *symref_target= NULL;
 
-	/* TODO: Add -s option for adding symbolic references. */
-	while ((ch = getopt(argc, argv, "d:r:ls")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dr:ls:")) != -1) {
 		switch (ch) {
+		case 'c':
+			obj_arg = optarg;
+			break;
 		case 'd':
-			delref = optarg;
+			do_delete = 1;
 			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
@@ -4322,7 +4325,7 @@ cmd_ref(int argc, char *argv[])
 			do_list = 1;
 			break;
 		case 's':
-			create_symref = 1;
+			symref_target = optarg;
 			break;
 		default:
 			usage_ref();
@@ -4330,20 +4333,30 @@ cmd_ref(int argc, char *argv[])
 		}
 	}
 
-	if (do_list && delref)
-		errx(1, "-l and -d options are mutually exclusive\n");
+	if (obj_arg && do_list)
+		errx(1, "-c and -l options are mutually exclusive\n");
+	if (obj_arg && do_delete)
+		errx(1, "-c and -d options are mutually exclusive\n");
+	if (obj_arg && symref_target)
+		errx(1, "-c and -s options are mutually exclusive\n");
+	if (symref_target && do_delete)
+		errx(1, "-s and -d options are mutually exclusive\n");
+	if (symref_target && do_list)
+		errx(1, "-s and -l options are mutually exclusive\n");
+	if (do_delete && do_list)
+		errx(1, "-d and -l options are mutually exclusive\n");
 
 	argc -= optind;
 	argv += optind;
 
-	if (do_list || delref) {
-		if (create_symref)
-			errx(1, "-s option cannot be used together with the "
-			    "-l or -d options");
+	if (do_list) {
 		if (argc > 0)
 			usage_ref();
-	} else if (argc != 2)
-		usage_ref();
+	} else {
+		if (argc != 1)
+			usage_ref();
+		refname = argv[0];
+	}
 
 #ifndef PROFILE
 	if (do_list) {
@@ -4395,12 +4408,15 @@ cmd_ref(int argc, char *argv[])
 
 	if (do_list)
 		error = list_refs(repo);
-	else if (delref)
-		error = delete_ref(repo, delref);
-	else if (create_symref)
-		error = add_symref(repo, argv[0], argv[1]);
-	else
-		error = add_ref(repo, argv[0], argv[1]);
+	else if (do_delete)
+		error = delete_ref(repo, refname);
+	else if (symref_target)
+		error = add_symref(repo, refname, symref_target);
+	else {
+		if (obj_arg == NULL)
+			usage_ref();
+		error = add_ref(repo, refname, obj_arg);
+	}
 done:
 	if (repo)
 		got_repo_close(repo);

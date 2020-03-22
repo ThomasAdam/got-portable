@@ -819,9 +819,8 @@ function test_rebase_forward {
 	# commit ffcffcd102cf1af6572fbdbb4cf07a0f1fd2d840 (master)
 	# commit 87a6a8a2263a15b61c016ff1720b24741d455eb5
 	(cd $testroot/repo && got ref -d master)
-	(cd $testroot/repo && got ref refs/heads/master $commit1)
-	(cd $testroot/repo && got ref refs/remotes/origin/master $commit2)
-
+	(cd $testroot/repo && got ref -c $commit1 refs/heads/master)
+	(cd $testroot/repo && got ref -c $commit2 refs/remotes/origin/master)
 
 	(cd $testroot/wt && got up -b origin/master > /dev/null)
 

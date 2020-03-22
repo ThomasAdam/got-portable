@@ -1086,7 +1086,7 @@ function test_histedit_outside_refs_heads {
 	fi
 	local commit2=`git_show_head $testroot/repo`
 
-	got ref -r $testroot/repo refs/remotes/origin/master master
+	got ref -r $testroot/repo -c master refs/remotes/origin/master
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got ref failed unexpectedly" >&2

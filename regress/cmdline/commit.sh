@@ -499,7 +499,7 @@ function test_commit_selected_paths {
 function test_commit_outside_refs_heads {
 	local testroot=`test_init commit_outside_refs_heads`
 
-	got ref -r $testroot/repo refs/remotes/origin/master master
+	got ref -r $testroot/repo -c master refs/remotes/origin/master
 
 	got checkout -b refs/remotes/origin/master \
 	    $testroot/repo $testroot/wt > /dev/null

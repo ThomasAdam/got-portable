@@ -123,7 +123,7 @@ function test_fetch_list {
 	local commit_id=`git_show_head $testroot/repo`
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 
 	got clone -q $testurl/repo $testroot/repo-clone
@@ -168,7 +168,7 @@ function test_fetch_branch {
 	fi
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -271,7 +271,7 @@ function test_fetch_all {
 	fi
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -337,7 +337,7 @@ function test_fetch_empty_packfile {
 	fi
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
@@ -390,7 +390,7 @@ function test_fetch_delete_branch {
 
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -497,7 +497,7 @@ function test_fetch_update_tag {
 
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -656,7 +656,7 @@ function test_fetch_reference {
 	fi
 
 	got branch -r $testroot/repo -c $commit_id foo
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
 	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
 	local tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
@@ -741,8 +741,8 @@ function test_fetch_replace_symref {
 		return 1
 	fi
 
-	got ref -r $testroot/repo refs/hoo/boo/zoo $commit_id
-	got ref -r $testroot/repo-clone -s refs/hoo/boo/zoo refs/heads/master
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
+	got ref -r $testroot/repo-clone -s refs/heads/master refs/hoo/boo/zoo
 
 	got ref -l -r $testroot/repo-clone > $testroot/stdout
 
