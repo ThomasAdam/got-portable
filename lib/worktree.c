@@ -3843,13 +3843,13 @@ done:
 	return err;
 }
 
-static const struct got_error *write_tree(struct got_object_id **,
+static const struct got_error *write_tree(struct got_object_id **, int *,
     struct got_tree_object *, const char *, struct got_pathlist_head *,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *);
 
 static const struct got_error *
-write_subtree(struct got_object_id **new_subtree_id,
+write_subtree(struct got_object_id **new_subtree_id, int *nentries,
     struct got_tree_entry *te, const char *parent_path,
     struct got_pathlist_head *commitable_paths,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -3867,8 +3867,8 @@ write_subtree(struct got_object_id **new_subtree_id,
 	if (err)
 		return err;
 
-	err = write_tree(new_subtree_id, subtree, subpath, commitable_paths,
-	    status_cb, status_arg, repo);
+	err = write_tree(new_subtree_id, nentries, subtree, subpath,
+	    commitable_paths, status_cb, status_arg, repo);
 	got_object_tree_close(subtree);
 	free(subpath);
 	return err;
@@ -4088,6 +4088,7 @@ make_subtree_for_added_blob(struct got_tree_entry **new_tep,
 	struct got_tree_entry *new_te;
 	char *subtree_path;
 	struct got_object_id *id = NULL;
+	int nentries;
 
 	*new_tep = NULL;
 
@@ -4106,7 +4107,7 @@ make_subtree_for_added_blob(struct got_tree_entry **new_tep,
 		err = got_error(GOT_ERR_NO_SPACE);
 		goto done;
 	}
-	err = write_tree(&id, NULL, subtree_path,
+	err = write_tree(&id, &nentries, NULL, subtree_path,
 	    commitable_paths, status_cb, status_arg, repo);
 	if (err) {
 		free(new_te);
@@ -4122,7 +4123,7 @@ done:
 }
 
 static const struct got_error *
-write_tree(struct got_object_id **new_tree_id,
+write_tree(struct got_object_id **new_tree_id, int *nentries,
     struct got_tree_object *base_tree, const char *path_base_tree,
     struct got_pathlist_head *commitable_paths,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -4132,9 +4133,9 @@ write_tree(struct got_object_id **new_tree_id,
 	struct got_pathlist_head paths;
 	struct got_tree_entry *te, *new_te = NULL;
 	struct got_pathlist_entry *pe;
-	int nentries = 0;
 
 	TAILQ_INIT(&paths);
+	*nentries = 0;
 
 	/* Insert, and recurse into, newly added entries first. */
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
@@ -4167,7 +4168,7 @@ write_tree(struct got_object_id **new_tree_id,
 			err = insert_tree_entry(new_te, &paths);
 			if (err)
 				goto done;
-			nentries++;
+			(*nentries)++;
 		} else {
 			*slash = '\0'; /* trim trailing path components */
 			if (base_tree == NULL ||
@@ -4182,7 +4183,7 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
-				nentries++;
+				(*nentries)++;
 			}
 		}
 	}
@@ -4203,7 +4204,7 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
-				nentries++;
+				(*nentries)++;
 				continue;
 			}
 
@@ -4219,11 +4220,18 @@ write_tree(struct got_object_id **new_tree_id,
 				/* Avoid recursion into unmodified subtrees. */
 				if (modified) {
 					struct got_object_id *new_id;
-					err = write_subtree(&new_id, te,
+					int nsubentries;
+					err = write_subtree(&new_id,
+					    &nsubentries, te,
 					    path_base_tree, commitable_paths,
 					    status_cb, status_arg, repo);
 					if (err)
 						goto done;
+					if (nsubentries == 0) {
+						/* All entries were deleted. */
+						free(new_id);
+						continue;
+					}
 					memcpy(&new_te->id, new_id,
 					    sizeof(new_te->id));
 					free(new_id);
@@ -4231,7 +4239,7 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
-				nentries++;
+				(*nentries)++;
 				continue;
 			}
 
@@ -4251,7 +4259,7 @@ write_tree(struct got_object_id **new_tree_id,
 					err = insert_tree_entry(new_te, &paths);
 					if (err)
 						goto done;
-					nentries++;
+					(*nentries)++;
 				}
 				err = report_ct_status(ct, status_cb,
 				    status_arg);
@@ -4265,13 +4273,13 @@ write_tree(struct got_object_id **new_tree_id,
 				err = insert_tree_entry(new_te, &paths);
 				if (err)
 					goto done;
-				nentries++;
+				(*nentries)++;
 			}
 		}
 	}
 
 	/* Write new list of entries; deleted entries have been dropped. */
-	err = got_object_tree_create(new_tree_id, &paths, nentries, repo);
+	err = got_object_tree_create(new_tree_id, &paths, *nentries, repo);
 done:
 	got_pathlist_free(&paths);
 	return err;
@@ -4384,6 +4392,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	struct got_object_id *head_commit_id2 = NULL;
 	struct got_tree_object *head_tree = NULL;
 	struct got_object_id *new_tree_id = NULL;
+	int nentries;
 	struct got_object_id_queue parent_ids;
 	struct got_object_qid *pid = NULL;
 	char *logmsg = NULL;
@@ -4438,8 +4447,8 @@ commit_worktree(struct got_object_id **new_commit_id,
 	}
 
 	/* Recursively write new tree objects. */
-	err = write_tree(&new_tree_id, head_tree, "/", commitable_paths,
-	    status_cb, status_arg, repo);
+	err = write_tree(&new_tree_id, &nentries, head_tree, "/",
+	    commitable_paths, status_cb, status_arg, repo);
 	if (err)
 		goto done;
 

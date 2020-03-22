@@ -238,6 +238,47 @@ function test_commit_added_subdirs {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_deleted_subdirs {
+	local testroot=`test_init commit_deleted_subdirs`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm -R $testroot/wt/{epsilon,gamma} >/dev/null)
+
+	(cd $testroot/wt && got commit -m 'test commit_deleted_subdirs' \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "D  epsilon/zeta" > $testroot/stdout.expected
+	echo "D  gamma/delta" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tree -r $testroot/repo > $testroot/stdout
+
+	echo "alpha" > $testroot/stdout.expected
+	echo "beta" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_commit_rejects_conflicted_file {
 	local testroot=`test_init commit_rejects_conflicted_file`
 
@@ -749,6 +790,7 @@ run_test test_commit_subdir
 run_test test_commit_single_file
 run_test test_commit_out_of_date
 run_test test_commit_added_subdirs
+run_test test_commit_deleted_subdirs
 run_test test_commit_rejects_conflicted_file
 run_test test_commit_single_file_multiple
 run_test test_commit_added_and_modified_in_same_dir
