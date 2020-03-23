@@ -1,3 +1,13 @@
+* got 0.30; 2020-03-22
+- add support for git and git+ssh network protocols (patch by ori@)
+- add 'got clone' and 'got fetch' commands
+- don't error out if rebase sees no merged paths; elide the commit instead
+- prevent 'got commit' from committing empty sub-directories (found by tracey)
+- allow limiting the output of 'got ref -l' to a single ref or a namespace
+- add -c option to 'got ref' which now expects just one argument after options
+- plug a memory leak in got-read-pack
+- remove 'Next' link from tags on gotweb summary page if no tags exist (tracey)
+
 * got 0.29; 2020-03-06
 - trim directories in got remove -R (tracey)
 - prevent commits from being listed more than once in a histedit script
