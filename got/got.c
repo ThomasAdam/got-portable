@@ -3950,7 +3950,7 @@ cmd_tree(int argc, char *argv[])
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	const char *path;
+	const char *path, *refname = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
@@ -4057,7 +4057,11 @@ cmd_tree(int argc, char *argv[])
 
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		if (worktree)
+			refname = got_worktree_get_head_ref_name(worktree);
+		else
+			refname = GOT_REF_HEAD;
+		error = got_ref_open(&head_ref, repo, refname, 0);
 		if (error != NULL)
 			goto done;
 		error = got_ref_resolve(&commit_id, repo, head_ref);
