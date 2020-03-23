@@ -648,6 +648,7 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 	return got_privsep_flush_imsg(ibuf);
 }
 
+
 static const struct got_error *
 fetch_pack(int fd, int packfd, struct got_object_id *packid,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
@@ -669,14 +670,8 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	struct got_pathlist_entry *pe;
 	int sent_my_capabilites = 0, have_sidebands = 0;
 	int found_branch = 0;
-	SHA1_CTX sha1_ctx;
-	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
-	uint8_t sha1_buf[SHA1_DIGEST_LENGTH];
-	size_t sha1_buf_len = 0;
-	ssize_t w;
 
 	TAILQ_INIT(&symrefs);
-	SHA1Init(&sha1_ctx);
 
 	have = malloc(refsz * sizeof(have[0]));
 	if (have == NULL)
@@ -930,7 +925,7 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 		have_sidebands = 1;
 
 	while (1) {
-		ssize_t r = 0;
+		ssize_t r = 0, w;
 		int datalen = -1;
 
 		if (have_sidebands) {
@@ -1005,42 +1000,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 				break;
 		}
 
-		/*
-		 * An expected SHA1 checksum sits at the end of the pack file.
-		 * Since we don't know the file size ahead of time we have to
-		 * keep SHA1_DIGEST_LENGTH bytes buffered and avoid mixing
-		 * those bytes into our SHA1 checksum computation until we
-		 * know for sure that additional pack file data bytes follow.
-		 *
-		 * We can assume r > 0 since otherwise the loop would exit.
-		 */
-		if (r >= SHA1_DIGEST_LENGTH) {
-			/* Mix in any previously buffered bytes. */
-			SHA1Update(&sha1_ctx, sha1_buf, sha1_buf_len);
-
-			/* Mix in bytes read minus potential checksum bytes. */
-			SHA1Update(&sha1_ctx, buf, r - SHA1_DIGEST_LENGTH);
-
-			/* Buffer potential checksum bytes. */
-			memcpy(sha1_buf, buf + r - SHA1_DIGEST_LENGTH,
-			    SHA1_DIGEST_LENGTH);
-			sha1_buf_len = SHA1_DIGEST_LENGTH;
-		} else if (sha1_buf_len > r) {
-			/*
-			 * Mix in previously buffered bytes which
-			 * are not part of the checksum after all.
-			 */
-			SHA1Update(&sha1_ctx, sha1_buf, r);
-
-			/* Update potential checksum buffer. */
-			memmove(sha1_buf, sha1_buf + r, sha1_buf_len - r);
-			memcpy(sha1_buf + sha1_buf_len - r, buf, r);
-		} else {
-			/* Short initial packet. Just buffer data for now. */
-			memcpy(sha1_buf, buf, r);
-			sha1_buf_len = r;
-		}
-	
 		/* Write packfile data to temporary pack file. */
 		w = write(packfd, buf, r);
 		if (w == -1) {
@@ -1064,13 +1023,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	err = send_fetch_download_progress(ibuf, packsz);
 	if (err)
 		goto done;
-
-	SHA1Final(pack_sha1, &sha1_ctx);
-	if (sha1_buf_len != SHA1_DIGEST_LENGTH ||
-	    memcmp(pack_sha1, sha1_buf, sha1_buf_len) != 0) {
-		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
-		    "pack file checksum mismatch");
-	}
 done:
 	TAILQ_FOREACH(pe, &symrefs, entry) {
 		free((void *)pe->path);
