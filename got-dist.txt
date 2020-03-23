@@ -176,9 +176,11 @@
 /regress/cmdline/cat.sh
 /regress/cmdline/checkout.sh
 /regress/cmdline/cherrypick.sh
+/regress/cmdline/clone.sh
 /regress/cmdline/commit.sh
 /regress/cmdline/common.sh
 /regress/cmdline/diff.sh
+/regress/cmdline/fetch.sh
 /regress/cmdline/histedit.sh
 /regress/cmdline/import.sh
 /regress/cmdline/integrate.sh
