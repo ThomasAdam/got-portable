@@ -2273,7 +2273,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		}
 		scroll_up(view, &s->first_displayed_entry,
-		    view->nlines, &s->commits);
+		    view->nlines - 1, &s->commits);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -2299,7 +2299,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (first == NULL)
 			break;
 		err = scroll_down(view, &s->first_displayed_entry,
-		    view->nlines, &s->last_displayed_entry,
+		    view->nlines - 1, &s->last_displayed_entry,
 		    &s->commits, &s->thread_args.log_complete,
 		    &s->thread_args.commits_needed,
 		    &s->thread_args.need_commits);
