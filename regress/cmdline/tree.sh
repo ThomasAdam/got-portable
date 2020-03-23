@@ -24,7 +24,7 @@ function test_tree_basic {
 	echo "new file" > $testroot/wt/foo
 
 	(cd $testroot/wt && got add foo > /dev/null)
-	(cd $testroot/wt && got commit -m "add foo" foo >/dev/null)
+	(cd $testroot/wt && got commit -m "add foo" foo > /dev/null)
 
 	echo 'alpha' > $testroot/stdout.expected
 	echo 'beta' >> $testroot/stdout.expected
@@ -58,7 +58,7 @@ function test_tree_branch {
 	echo "new file" > $testroot/wt/foo
 
 	(cd $testroot/wt && got add foo > /dev/null)
-	(cd $testroot/wt && got commit -m "add foo" foo >/dev/null)
+	(cd $testroot/wt && got commit -m "add foo" foo > /dev/null)
 
 	echo 'alpha' > $testroot/stdout.expected
 	echo 'beta' >> $testroot/stdout.expected
