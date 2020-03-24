@@ -130,7 +130,7 @@ get_obj_type_label(const char **label, int obj_type)
 }
 
 static const struct got_error *
-read_crc(uint32_t *crc, int fd, size_t len)
+read_checksum(uint32_t *crc, SHA1_CTX *sha1_ctx, int fd, size_t len)
 {
 	uint8_t buf[8192];
 	size_t n;
@@ -142,7 +142,10 @@ read_crc(uint32_t *crc, int fd, size_t len)
 			return got_error_from_errno("read");
 		if (r == 0)
 			break;
-		*crc = crc32(*crc, buf, r);
+		if (crc)
+			*crc = crc32(*crc, buf, r);
+		if (sha1_ctx)
+			SHA1Update(sha1_ctx, buf, r);
 	}
 
 	return NULL;
@@ -169,7 +172,7 @@ read_file_sha1(SHA1_CTX *ctx, FILE *f, size_t len)
 
 static const struct got_error *
 read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
-    FILE *tmpfile)
+    FILE *tmpfile, SHA1_CTX *pack_sha1_ctx)
 {
 	const struct got_error *err = NULL;
 	SHA1_CTX ctx;
@@ -180,6 +183,10 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	size_t headerlen;
 	const char *obj_label;
 	size_t mapoff = obj->off;
+	struct got_inflate_checksum csum;
+
+	csum.input_sha1 = pack_sha1_ctx;
+	csum.input_crc = &obj->crc;
 
 	err = got_pack_parse_object_type_and_size(&obj->type, &obj->size,
 	    &obj->tslen, pack, obj->off);
@@ -188,12 +195,14 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 
 	if (pack->map) {
 		obj->crc = crc32(obj->crc, pack->map + mapoff, obj->tslen);
+		SHA1Update(pack_sha1_ctx, pack->map + mapoff, obj->tslen);
 		mapoff += obj->tslen;
 	} else {
 		/* XXX Seek back and get the CRC of on-disk type+size bytes. */
 		if (lseek(pack->fd, obj->off, SEEK_SET) == -1)
 			return got_error_from_errno("lseek");
-		err = read_crc(&obj->crc, pack->fd, obj->tslen);
+		err = read_checksum(&obj->crc, pack_sha1_ctx,
+		    pack->fd, obj->tslen);
 		if (err)
 			return err;
 	}
@@ -210,20 +219,20 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			}
 			if (pack->map) {
 				err = got_inflate_to_file_mmap(&datalen,
-				    &obj->len, &obj->crc, pack->map, mapoff,
+				    &obj->len, &csum, pack->map, mapoff,
 				    pack->filesize - mapoff, tmpfile);
 			} else {
 				err = got_inflate_to_file_fd(&datalen,
-				    &obj->len, &obj->crc, pack->fd, tmpfile);
+				    &obj->len, &csum, pack->fd, tmpfile);
 			}
 		} else {
 			if (pack->map) {
 				err = got_inflate_to_mem_mmap(&data, &datalen,
-				    &obj->len, &obj->crc, pack->map, mapoff,
+				    &obj->len, &csum, pack->map, mapoff,
 				    pack->filesize - mapoff);
 			} else {
 				err = got_inflate_to_mem_fd(&data, &datalen,
-				    &obj->len, &obj->crc, obj->size, pack->fd);
+				    &obj->len, &csum, obj->size, pack->fd);
 			}
 		}
 		if (err)
@@ -262,9 +271,11 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			    SHA1_DIGEST_LENGTH);
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    SHA1_DIGEST_LENGTH);
+			SHA1Update(pack_sha1_ctx, pack->map + mapoff,
+			    SHA1_DIGEST_LENGTH);
 			mapoff += SHA1_DIGEST_LENGTH;
 			err = got_inflate_to_mem_mmap(NULL, &datalen,
-			    &obj->len, &obj->crc, pack->map, mapoff,
+			    &obj->len, &csum, pack->map, mapoff,
 			    pack->filesize - mapoff);
 			if (err)
 				break;
@@ -281,8 +292,10 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 			}
 			obj->crc = crc32(obj->crc, obj->delta.ref.ref_id.sha1,
 			    SHA1_DIGEST_LENGTH);
+			SHA1Update(pack_sha1_ctx, obj->delta.ref.ref_id.sha1,
+			    SHA1_DIGEST_LENGTH);
 			err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
-			    &obj->crc, obj->size, pack->fd);
+			    &csum, obj->size, pack->fd);
 			if (err)
 				break;
 		}
@@ -299,15 +312,17 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		if (pack->map) {
 			obj->crc = crc32(obj->crc, pack->map + mapoff,
 			    obj->delta.ofs.base_offsetlen);
+			SHA1Update(pack_sha1_ctx, pack->map + mapoff,
+			    obj->delta.ofs.base_offsetlen);
 			mapoff += obj->delta.ofs.base_offsetlen;
 			err = got_inflate_to_mem_mmap(NULL, &datalen,
-			    &obj->len, &obj->crc, pack->map, mapoff,
+			    &obj->len, &csum, pack->map, mapoff,
 			    pack->filesize - mapoff);
 			if (err)
 				break;
 		} else {
 			/*
-			 * XXX Seek back and get the CRC of on-disk
+			 * XXX Seek back and get CRC and SHA1 of on-disk
 			 * offset bytes.
 			 */
 			if (lseek(pack->fd, obj->off + obj->tslen, SEEK_SET)
@@ -315,13 +330,13 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 				err = got_error_from_errno("lseek");
 				break;
 			}
-			err = read_crc(&obj->crc, pack->fd,
-			    obj->delta.ofs.base_offsetlen);
+			err = read_checksum(&obj->crc, pack_sha1_ctx,
+			    pack->fd, obj->delta.ofs.base_offsetlen);
 			if (err)
 				break;
 
 			err = got_inflate_to_mem_fd(NULL, &datalen, &obj->len,
-			    &obj->crc, obj->size, pack->fd);
+			    &csum, obj->size, pack->fd);
 			if (err)
 				break;
 		}
@@ -607,6 +622,8 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	struct got_packfile_hdr hdr;
 	struct got_packidx packidx;
 	char buf[8];
+	char pack_sha1[SHA1_DIGEST_LENGTH];
+	char pack_sha1_expected[SHA1_DIGEST_LENGTH];
 	int nobj, nvalid, nloose, nresolved = 0, i;
 	struct got_indexed_object *objects = NULL, *obj;
 	SHA1_CTX ctx;
@@ -617,11 +634,12 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	int p_indexed = 0, last_p_indexed = -1;
 	int p_resolved = 0, last_p_resolved = -1;
 
-	/* Check pack file header. */
+	/* Require that pack file header and SHA1 trailer are present. */
+	if (pack->filesize < sizeof(hdr) + SHA1_DIGEST_LENGTH)
+		return got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "short pack file");
+
 	if (pack->map) {
-		if (pack->filesize < sizeof(hdr))
-			return got_error_msg(GOT_ERR_BAD_PACKFILE,
-			    "short packfile header");
 		memcpy(&hdr, pack->map, sizeof(hdr));
 		mapoff += sizeof(hdr);
 	} else {
@@ -630,7 +648,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			return got_error_from_errno("read");
 		if (r < sizeof(hdr))
 			return got_error_msg(GOT_ERR_BAD_PACKFILE,
-			    "short packfile header");
+			    "short pack file");
 	}
 
 	if (hdr.signature != htobe32(GOT_PACKFILE_SIGNATURE))
@@ -643,6 +661,10 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	if (nobj == 0)
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile with zero objects");
+
+	/* We compute the SHA1 of pack file contents and verify later on. */
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, (void *)&hdr, sizeof(hdr));
 
 	/*
 	 * Create an in-memory pack index which will grow as objects
@@ -732,7 +754,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			}
 		}
 
-		err = read_packed_object(pack, obj, tmpfile);
+		err = read_packed_object(pack, obj, tmpfile, &ctx);
 		if (err)
 			goto done;
 
@@ -760,6 +782,37 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		}
 	}
 	nvalid = nloose;
+
+	/*
+	 * Having done a full pass over the pack file and can now
+	 * verify its checksum.
+	 */
+	SHA1Final(pack_sha1, &ctx);
+	if (pack->map) {
+		memcpy(pack_sha1_expected, pack->map +
+		    pack->filesize - SHA1_DIGEST_LENGTH,
+		    SHA1_DIGEST_LENGTH);
+	} else {
+		ssize_t n;
+		if (lseek(pack->fd, -SHA1_DIGEST_LENGTH, SEEK_END) == -1) {
+			err = got_error_from_errno("lseek");
+			goto done;
+		}
+		n = read(pack->fd, pack_sha1_expected, SHA1_DIGEST_LENGTH);
+		if (n == -1) {
+			err = got_error_from_errno("read");
+			goto done;
+		}
+		if (n != SHA1_DIGEST_LENGTH) {
+			err = got_error(GOT_ERR_IO);
+			goto done;
+		}
+	}
+	if (memcmp(pack_sha1, pack_sha1_expected, SHA1_DIGEST_LENGTH) != 0) {
+		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "pack file checksum mismatch");
+		goto done;
+	}
 
 	if (first_delta_idx == -1)
 		first_delta_idx = 0;
