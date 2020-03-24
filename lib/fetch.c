@@ -418,6 +418,8 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	char *path;
 	char *progress = NULL;
 
+	*pack_hash = NULL;
+
 	/*
 	 * Prevent fetching of references that won't make any
 	 * sense outside of the remote repository's context.
@@ -434,7 +436,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	if (!list_refs_only)
 		repo_path = got_repo_get_path_git_dir(repo);
 
-	*pack_hash = NULL;
 	for (i = 0; i < nitems(tmpfds); i++)
 		tmpfds[i] = -1;
 
