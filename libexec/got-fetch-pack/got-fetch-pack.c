@@ -498,10 +498,10 @@ send_fetch_download_progress(struct imsgbuf *ibuf, off_t bytes)
 }
 
 static const struct got_error *
-send_fetch_done(struct imsgbuf *ibuf, struct got_object_id hash)
+send_fetch_done(struct imsgbuf *ibuf, uint8_t *pack_sha1)
 {
 	if (imsg_compose(ibuf, GOT_IMSG_FETCH_DONE, 0, 0, -1,
-	    hash.sha1, SHA1_DIGEST_LENGTH) == -1)
+	    pack_sha1, SHA1_DIGEST_LENGTH) == -1)
 		return got_error_from_errno("imsg_compose FETCH");
 	return got_privsep_flush_imsg(ibuf);
 }
@@ -649,7 +649,7 @@ send_fetch_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 }
 
 static const struct got_error *
-fetch_pack(int fd, int packfd, struct got_object_id *packid,
+fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
     struct got_pathlist_head *have_refs, int fetch_all_branches,
     struct got_pathlist_head *wanted_branches,
     struct got_pathlist_head *wanted_refs, int list_refs_only,
@@ -670,7 +670,6 @@ fetch_pack(int fd, int packfd, struct got_object_id *packid,
 	int sent_my_capabilites = 0, have_sidebands = 0;
 	int found_branch = 0;
 	SHA1_CTX sha1_ctx;
-	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
 	uint8_t sha1_buf[SHA1_DIGEST_LENGTH];
 	size_t sha1_buf_len = 0;
 	ssize_t w;
@@ -1107,7 +1106,7 @@ main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
 	int fetchfd, packfd = -1, i;
-	struct got_object_id packid;
+	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 	struct got_pathlist_head have_refs;
@@ -1310,7 +1309,7 @@ main(int argc, char **argv)
 	}
 	packfd = imsg.fd;
 
-	err = fetch_pack(fetchfd, packfd, &packid, &have_refs,
+	err = fetch_pack(fetchfd, packfd, pack_sha1, &have_refs,
 	    fetch_req.fetch_all_branches, &wanted_branches,
 	    &wanted_refs, fetch_req.list_refs_only, &ibuf);
 done:
@@ -1329,7 +1328,7 @@ done:
 	if (err != NULL)
 		got_privsep_send_error(&ibuf, err);
 	else
-		err = send_fetch_done(&ibuf, packid);
+		err = send_fetch_done(&ibuf, pack_sha1);
 	if (err != NULL) {
 		fprintf(stderr, "%s: %s\n", getprogname(), err->msg);
 		got_privsep_send_error(&ibuf, err);

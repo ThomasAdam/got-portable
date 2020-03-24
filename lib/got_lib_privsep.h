@@ -414,8 +414,8 @@ const struct got_error *got_privsep_send_fetch_req(struct imsgbuf *, int,
     struct got_pathlist_head *, int, int);
 const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
-    struct got_object_id **, char **, struct got_pathlist_head *,
-    char **, off_t *, struct imsgbuf *);
+    struct got_object_id **, char **, struct got_pathlist_head *, char **,
+    off_t *, uint8_t *, struct imsgbuf *);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,

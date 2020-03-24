@@ -613,6 +613,13 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		err = got_error_from_errno("calloc");
 		goto done;
 	}
+
+	*pack_hash = calloc(1, sizeof(**pack_hash));
+	if (*pack_hash == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
 	while (!done) {
 		struct got_object_id *id = NULL;
 		char *refname = NULL;
@@ -621,19 +628,14 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 
 		err = got_privsep_recv_fetch_progress(&done,
 		    &id, &refname, symrefs, &server_progress,
-		    &packfile_size_cur, &fetchibuf);
+		    &packfile_size_cur, (*pack_hash)->sha1, &fetchibuf);
 		if (err != NULL)
 			goto done;
-		if (done) {
-			if (packfile_size > 0)
-				*pack_hash = id;
-			else
-				free(id);
-		} else if (refname && id) {
+		if (!done && refname && id) {
 			err = got_pathlist_insert(NULL, refs, refname, id);
 			if (err)
 				goto done;
-		} else if (server_progress) {
+		} else if (!done && server_progress) {
 			char *p;
 			/*
 			 * XXX git-daemon tends to send batched output with
@@ -672,7 +674,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			free(server_progress);
 			if (err)
 				goto done;
-		} else if (packfile_size_cur != packfile_size) {
+		} else if (!done && packfile_size_cur != packfile_size) {
 			err = progress_cb(progress_arg, NULL,
 			    packfile_size_cur, 0, 0, 0, 0);
 			if (err)
@@ -691,9 +693,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 
 	/* If zero data was fetched without error we are already up-to-date. */
-	if (packfile_size == 0)
+	if (packfile_size == 0) {
+		free(*pack_hash);
+		*pack_hash = NULL;
 		goto done;
-	else if (packfile_size < sizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+	} else if (packfile_size < sizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE, "short pack file");
 		goto done;
 	} else {

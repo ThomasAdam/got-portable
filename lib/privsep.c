@@ -568,7 +568,7 @@ got_privsep_send_fetch_outfd(struct imsgbuf *ibuf, int fd)
 const struct got_error *
 got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
     char **refname, struct got_pathlist_head *symrefs, char **server_progress,
-    off_t *packfile_size, struct imsgbuf *ibuf)
+    off_t *packfile_size, uint8_t *pack_sha1, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	struct imsg imsg;
@@ -583,6 +583,7 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 	*refname = NULL;
 	*server_progress = NULL;
 	*packfile_size = 0;
+	memset(pack_sha1, 0, SHA1_DIGEST_LENGTH);
 
 	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
 	if (err)
@@ -697,16 +698,11 @@ got_privsep_recv_fetch_progress(int *done, struct got_object_id **id,
 		memcpy(packfile_size, imsg.data, sizeof(*packfile_size));
 		break;
 	case GOT_IMSG_FETCH_DONE:
-		*id = malloc(sizeof(**id));
-		if (*id == NULL) {
-			err = got_error_from_errno("malloc");
-			break;
-		}
 		if (datalen != SHA1_DIGEST_LENGTH) {
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			break;
 		}
-		memcpy((*id)->sha1, imsg.data, SHA1_DIGEST_LENGTH);
+		memcpy(pack_sha1, imsg.data, SHA1_DIGEST_LENGTH);
 		*done = 1;
 		break;
 	default:
