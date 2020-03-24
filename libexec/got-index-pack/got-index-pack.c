@@ -615,7 +615,7 @@ send_index_pack_done(struct imsgbuf *ibuf)
 
 static const struct got_error *
 index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
-    FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_hash,
+    FILE *delta_base_file, FILE *delta_accum_file, uint8_t *pack_sha1_expected,
     struct imsgbuf *ibuf)
 {
 	const struct got_error *err;
@@ -623,7 +623,6 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	struct got_packidx packidx;
 	char buf[8];
 	char pack_sha1[SHA1_DIGEST_LENGTH];
-	char pack_sha1_expected[SHA1_DIGEST_LENGTH];
 	int nobj, nvalid, nloose, nresolved = 0, i;
 	struct got_indexed_object *objects = NULL, *obj;
 	SHA1_CTX ctx;
@@ -788,6 +787,13 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	 * verify its checksum.
 	 */
 	SHA1Final(pack_sha1, &ctx);
+	if (memcmp(pack_sha1_expected, pack_sha1, SHA1_DIGEST_LENGTH) != 0) {
+		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
+		    "pack file checksum mismatch");
+		goto done;
+	}
+
+	/* Verify the SHA1 checksum stored at the end of the pack file. */
 	if (pack->map) {
 		memcpy(pack_sha1_expected, pack->map +
 		    pack->filesize - SHA1_DIGEST_LENGTH,
@@ -810,7 +816,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	}
 	if (memcmp(pack_sha1, pack_sha1_expected, SHA1_DIGEST_LENGTH) != 0) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE,
-		    "pack file checksum mismatch");
+		    "bad checksum in pack file trailer");
 		goto done;
 	}
 
@@ -935,7 +941,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 		if (err)
 			goto done;
 	}
-	err = hwrite(idxfd, pack_hash, SHA1_DIGEST_LENGTH, &ctx);
+	err = hwrite(idxfd, pack_sha1, SHA1_DIGEST_LENGTH, &ctx);
 	if (err)
 		goto done;
 
