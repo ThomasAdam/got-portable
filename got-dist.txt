@@ -192,6 +192,7 @@
 /regress/cmdline/stage.sh
 /regress/cmdline/status.sh
 /regress/cmdline/tag.sh
+/regress/cmdline/tree.sh
 /regress/cmdline/unstage.sh
 /regress/cmdline/update.sh
 /regress/delta
