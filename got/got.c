@@ -1502,6 +1502,41 @@ done:
 	return err;
 }
 
+static const struct got_error *
+update_symref(const char *refname, struct got_reference *target_ref,
+    int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err;
+	struct got_reference *symref;
+
+	err = got_ref_open(&symref, repo, refname, 1);
+	if (err)
+		return err;
+
+	if (strcmp(got_ref_get_symref_target(symref),
+	    got_ref_get_name(target_ref)) == 0)
+		goto done;
+
+	err = got_ref_change_symref(symref, got_ref_get_name(target_ref));
+	if (err)
+		goto done;
+
+	err = got_ref_write(symref, repo);
+	if (err)
+		goto done;
+
+	if (verbosity >= 0)
+		printf("Updated reference %s: %s\n", got_ref_get_name(symref),
+		    got_ref_get_symref_target(symref));
+done:
+	unlock_err = got_ref_unlock(symref);
+	if (unlock_err && err == NULL)
+		err = unlock_err;
+	got_ref_close(symref);
+	return err;
+	return NULL;
+}
+
 __dead static void
 usage_fetch(void)
 {
@@ -1895,8 +1930,58 @@ cmd_fetch(int argc, char *argv[])
 			}
 		}
 	}
-	if (delete_refs)
+	if (delete_refs) {
 		error = delete_missing_refs(&refs, verbosity, repo);
+		if (error)
+			goto done;
+	}
+
+	if (!remote->mirror_references) {
+		/* Update remote HEAD reference if the server provided one. */
+		TAILQ_FOREACH(pe, &symrefs, entry) {
+			struct got_reference *target_ref;
+			const char *refname = pe->path;
+			const char *target = pe->data;
+			char *remote_refname = NULL, *remote_target = NULL;
+
+			if (strcmp(refname, GOT_REF_HEAD) != 0)
+				continue;
+
+			if (strncmp("refs/heads/", target, 11) != 0)
+				continue;
+
+			if (asprintf(&remote_refname, "refs/remotes/%s/%s",
+			    remote->name, refname) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (asprintf(&remote_target, "refs/remotes/%s/%s",
+			    remote->name, target + 11) == -1) {
+				error = got_error_from_errno("asprintf");
+				free(remote_refname);
+				goto done;
+			}
+
+			error = got_ref_open(&target_ref, repo, remote_target,
+			    0);
+			if (error) {
+				free(remote_refname);
+				free(remote_target);
+				if (error->code == GOT_ERR_NOT_REF) {
+					error = NULL;
+					continue;
+				}
+				goto done;
+			}
+			error = update_symref(remote_refname, target_ref,
+			    verbosity, repo);
+			free(remote_refname);
+			free(remote_target);
+			got_ref_close(target_ref);
+			if (error)
+				goto done;
+		}
+	}
 done:
 	if (fetchpid > 0) {
 		if (kill(fetchpid, SIGTERM) == -1)

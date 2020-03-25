@@ -207,7 +207,7 @@ function test_fetch_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id3" >> $testroot/stdout.expected
 	# refs/remotes/origin/master is umodified because it wasn't fetched
@@ -247,7 +247,7 @@ function test_fetch_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
-	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
@@ -823,6 +823,75 @@ function test_fetch_replace_symref {
 
 }
 
+function test_fetch_update_headref {
+	local testroot=`test_init fetch_update_headref`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -c refs/heads/master refs/heads/foo
+	got ref -r $testroot/repo -s refs/heads/foo HEAD
+	got ref -l -r $testroot/repo > $testroot/stdout
+
+	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/foo" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_fetch_basic
 run_test test_fetch_list
 run_test test_fetch_branch
@@ -832,3 +901,4 @@ run_test test_fetch_delete_branch
 run_test test_fetch_update_tag
 run_test test_fetch_reference
 run_test test_fetch_replace_symref
+run_test test_fetch_update_headref
