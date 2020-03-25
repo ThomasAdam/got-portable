@@ -1,3 +1,13 @@
+* got 0.31; 2020-03-25
+- take status line into account during page up/down in 'tog log' (naddy)
+- make 'got tree' use the current branch if invoked in a work tree (tracey)
+- compute pack file's checksum during download and check it in got-fetch-pack
+- make got-index-pack compute and verify the pack file's checksum as well
+- stop verifying pack file checksum in the main process during clone/fetch
+- fix bogus 'reference HEAD not found' error (reported by Matthias aka _xhr_)
+- make 'got clone' create refs/remotes/origin/HEAD, as 'git clone' does
+- make 'got fetch' handle updates to refs/remotes/*/HEAD
+
 * got 0.30; 2020-03-22
 - add support for git and git+ssh network protocols (patch by ori@)
 - add 'got clone' and 'got fetch' commands
