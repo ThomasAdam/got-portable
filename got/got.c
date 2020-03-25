@@ -885,13 +885,13 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 }
 
 static const struct got_error *
-create_head_ref(struct got_reference *target_ref, int verbosity,
-    struct got_repository *repo)
+create_symref(const char *refname, struct got_reference *target_ref,
+    int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reference *head_symref;
 
-	err = got_ref_alloc_symref(&head_symref, GOT_REF_HEAD, target_ref);
+	err = got_ref_alloc_symref(&head_symref, refname, target_ref);
 	if (err)
 		return err;
 
@@ -1243,6 +1243,7 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 		error = create_ref(remote_refname, id, verbosity - 1, repo);
+		free(remote_refname);
 		if (error)
 			goto done;
 	}
@@ -1252,6 +1253,7 @@ cmd_clone(int argc, char *argv[])
 		struct got_reference *target_ref;
 		const char *refname = pe->path;
 		const char *target = pe->data;
+		char *remote_refname = NULL, *remote_target = NULL;
 
 		if (strcmp(refname, GOT_REF_HEAD) != 0)
 			continue;
@@ -1265,7 +1267,44 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		error = create_head_ref(target_ref, verbosity, repo);
+		error = create_symref(refname, target_ref, verbosity, repo);
+		got_ref_close(target_ref);
+		if (error)
+			goto done;
+
+		if (mirror_references)
+			continue;
+
+		if (strncmp("refs/heads/", target, 11) != 0)
+			continue;
+
+		if (asprintf(&remote_refname,
+		    "refs/remotes/%s/%s", GOT_FETCH_DEFAULT_REMOTE_NAME,
+		    refname) == -1) {
+			error = got_error_from_errno("asprintf");
+			goto done;
+		}
+		if (asprintf(&remote_target,
+		    "refs/remotes/%s/%s", GOT_FETCH_DEFAULT_REMOTE_NAME,
+		    target + 11) == -1) {
+			error = got_error_from_errno("asprintf");
+			free(remote_refname);
+			goto done;
+		}
+		error = got_ref_open(&target_ref, repo, remote_target, 0);
+		if (error) {
+			free(remote_refname);
+			free(remote_target);
+			if (error->code == GOT_ERR_NOT_REF) {
+				error = NULL;
+				continue;
+			}
+			goto done;
+		}
+		error = create_symref(remote_refname, target_ref,
+		    verbosity - 1, repo);
+		free(remote_refname);
+		free(remote_target);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
@@ -1289,7 +1328,8 @@ cmd_clone(int argc, char *argv[])
 				goto done;
 			}
 
-			error = create_head_ref(target_ref, verbosity, repo);
+			error = create_symref(GOT_REF_HEAD, target_ref,
+			    verbosity, repo);
 			got_ref_close(target_ref);
 			if (error)
 				goto done;

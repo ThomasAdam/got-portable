@@ -76,6 +76,8 @@ function test_clone_basic {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 
@@ -175,6 +177,8 @@ function test_clone_all {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -282,6 +286,8 @@ function test_clone_reference {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo/boo/zoo: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \

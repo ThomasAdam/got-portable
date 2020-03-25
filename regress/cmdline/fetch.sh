@@ -106,6 +106,8 @@ function test_fetch_basic {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
 
@@ -205,6 +207,8 @@ function test_fetch_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id3" >> $testroot/stdout.expected
 	# refs/remotes/origin/master is umodified because it wasn't fetched
 	echo "refs/remotes/origin/master: $commit_id" \
@@ -243,6 +247,8 @@ function test_fetch_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id3" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -280,6 +286,8 @@ function test_fetch_all {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
@@ -305,6 +313,8 @@ function test_fetch_all {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -343,6 +353,8 @@ function test_fetch_empty_packfile {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
@@ -369,6 +381,8 @@ function test_fetch_empty_packfile {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -408,6 +422,8 @@ function test_fetch_delete_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
@@ -438,6 +454,8 @@ function test_fetch_delete_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -475,6 +493,8 @@ function test_fetch_delete_branch {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	# refs/heads/foo is now deleted
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
@@ -524,6 +544,8 @@ function test_fetch_update_tag {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id" \
@@ -552,6 +574,8 @@ function test_fetch_update_tag {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -591,6 +615,8 @@ function test_fetch_update_tag {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -628,6 +654,8 @@ function test_fetch_update_tag {
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
 		>> $testroot/stdout.expected
@@ -713,6 +741,8 @@ function test_fetch_reference {
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/hoo/boo/zoo: $commit_id" \
 		>> $testroot/stdout.expected
 	echo "refs/remotes/origin/master: $commit_id2" \
