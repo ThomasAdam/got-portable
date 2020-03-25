@@ -274,12 +274,23 @@ function test_ref_list {
 		return 1
 	fi
 
+	# Create a HEAD ref in the namespace of a remote repository
+	(cd $testroot/repo && got ref -s refs/heads/master \
+		refs/remotes/origin/HEAD)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	got ref -r $testroot/repo -l > $testroot/stdout
 
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
 	echo "refs/foo/bar/baz: $commit_id" >> $testroot/stdout.expected
 	echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/heads/master" \
+		>> $testroot/stdout.expected
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"
@@ -294,6 +305,8 @@ function test_ref_list {
 	echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
 	echo "refs/foo/zoo: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/heads/master" \
+		>> $testroot/stdout.expected
 	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"

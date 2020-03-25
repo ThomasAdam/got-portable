@@ -401,7 +401,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 	char *path = NULL;
 	char *absname = NULL;
 	int ref_is_absolute = (strncmp(name, "refs/", 5) == 0);
-	int ref_is_well_known = is_well_known_ref(name);
+	int ref_is_well_known = (subdir[0] == '\0' && is_well_known_ref(name));
 
 	*ref = NULL;
 
