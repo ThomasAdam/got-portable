@@ -1048,7 +1048,7 @@ got_ref_change_ref(struct got_reference *ref, struct got_object_id *id)
 }
 
 const struct got_error *
-got_ref_change_symref(struct got_reference *ref, char *refname)
+got_ref_change_symref(struct got_reference *ref, const char *refname)
 {
 	char *new_name;
 
@@ -1059,8 +1059,8 @@ got_ref_change_symref(struct got_reference *ref, char *refname)
 	if (new_name == NULL)
 		return got_error_from_errno("strdup");
 
-	free(ref->ref.symref.name);
-	ref->ref.symref.name = new_name;
+	free(ref->ref.symref.ref);
+	ref->ref.symref.ref = new_name;
 	return NULL;
 }
 

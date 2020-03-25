@@ -121,7 +121,7 @@ got_ref_change_ref(struct got_reference *, struct got_object_id *);
 
 /* Change the reference name a symbolic reference points to. */
 const struct got_error *got_ref_change_symref(struct got_reference *,
-    char *);
+    const char *);
 
 /*
  * Change a symbolic reference into a regular reference which points to
