@@ -1508,33 +1508,54 @@ update_symref(const char *refname, struct got_reference *target_ref,
 {
 	const struct got_error *err = NULL, *unlock_err;
 	struct got_reference *symref;
+	int symref_is_locked = 0;
 
 	err = got_ref_open(&symref, repo, refname, 1);
-	if (err)
-		return err;
+	if (err) {
+		if (err->code != GOT_ERR_NOT_REF)
+			return err;
+		err = got_ref_alloc_symref(&symref, refname, target_ref);
+		if (err)
+			goto done;
 
-	if (strcmp(got_ref_get_symref_target(symref),
-	    got_ref_get_name(target_ref)) == 0)
-		goto done;
+		err = got_ref_write(symref, repo);
+		if (err)
+			goto done;
 
-	err = got_ref_change_symref(symref, got_ref_get_name(target_ref));
-	if (err)
-		goto done;
+		if (verbosity >= 0)
+			printf("Created reference %s: %s\n",
+			    got_ref_get_name(symref),
+			    got_ref_get_symref_target(symref));
+	} else {
+		symref_is_locked = 1;
 
-	err = got_ref_write(symref, repo);
-	if (err)
-		goto done;
+		if (strcmp(got_ref_get_symref_target(symref),
+		    got_ref_get_name(target_ref)) == 0)
+			goto done;
 
-	if (verbosity >= 0)
-		printf("Updated reference %s: %s\n", got_ref_get_name(symref),
-		    got_ref_get_symref_target(symref));
+		err = got_ref_change_symref(symref,
+		    got_ref_get_name(target_ref));
+		if (err)
+			goto done;
+
+		err = got_ref_write(symref, repo);
+		if (err)
+			goto done;
+
+		if (verbosity >= 0)
+			printf("Updated reference %s: %s\n",
+			    got_ref_get_name(symref),
+			    got_ref_get_symref_target(symref));
+
+	}
 done:
-	unlock_err = got_ref_unlock(symref);
-	if (unlock_err && err == NULL)
-		err = unlock_err;
+	if (symref_is_locked) {
+		unlock_err = got_ref_unlock(symref);
+		if (unlock_err && err == NULL)
+			err = unlock_err;
+	}
 	got_ref_close(symref);
 	return err;
-	return NULL;
 }
 
 __dead static void
@@ -1912,13 +1933,7 @@ cmd_fetch(int argc, char *argv[])
 	if (pack_hash == NULL) {
 		if (verbosity >= 0)
 			printf("Already up-to-date\n");
-		if (delete_refs)
-			error = delete_missing_refs(&refs, &symrefs,
-			    remote, verbosity, repo);
-		goto done;
-	}
-
-	if (verbosity >= 0) {
+	} else if (verbosity >= 0) {
 		error = got_object_id_str(&id_str, pack_hash);
 		if (error)
 			goto done;
