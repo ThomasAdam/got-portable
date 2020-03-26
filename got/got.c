@@ -1548,54 +1548,129 @@ usage_fetch(void)
 }
 
 static const struct got_error *
-delete_missing_refs(struct got_pathlist_head *their_refs,
+delete_missing_ref(struct got_reference *ref,
     int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	struct got_object_id *id = NULL;
+	char *id_str = NULL;
+
+	if (got_ref_is_symbolic(ref)) {
+		err = got_ref_delete(ref, repo);
+		if (err)
+			return err;
+		if (verbosity >= 0) {
+			printf("Deleted reference %s: %s\n",
+			    got_ref_get_name(ref),
+			    got_ref_get_symref_target(ref));
+		}
+	} else {
+		err = got_ref_resolve(&id, repo, ref);
+		if (err)
+			return err;
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			goto done;
+			
+		err = got_ref_delete(ref, repo);
+		if (err)
+			goto done;
+		if (verbosity >= 0) {
+			printf("Deleted reference %s: %s\n",
+			    got_ref_get_name(ref), id_str);
+		}
+	}
+done:
+	free(id);
+	free(id_str);
+	return NULL;
+}
+
+static const struct got_error *
+delete_missing_refs(struct got_pathlist_head *their_refs,
+    struct got_pathlist_head *their_symrefs, struct got_remote_repo *remote,
+    int verbosity, struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *unlock_err;
 	struct got_reflist_head my_refs;
 	struct got_reflist_entry *re;
 	struct got_pathlist_entry *pe;
-	struct got_object_id *id;
-	char *id_str;
+	char *remote_namespace = NULL;
+	char *local_refname = NULL;
 
 	SIMPLEQ_INIT(&my_refs);
 
+	if (asprintf(&remote_namespace, "refs/remotes/%s/", remote->name)
+	    == -1)
+		return got_error_from_errno("asprintf");
+
 	err = got_ref_list(&my_refs, repo, NULL, got_ref_cmp_by_name, NULL);
 	if (err)
-		return err;
+		goto done;
 
 	SIMPLEQ_FOREACH(re, &my_refs, entry) {
 		const char *refname = got_ref_get_name(re->ref);
 
-		if (strncmp(refname, "refs/heads/", 11) != 0 &&
-		    strncmp(refname, "refs/tags/", 10) != 0)
-			continue;
+		if (!remote->mirror_references) {
+			if (strncmp(refname, remote_namespace,
+			    strlen(remote_namespace)) == 0) {
+				if (strcmp(refname + strlen(remote_namespace),
+				    GOT_REF_HEAD) == 0)
+					continue;
+				if (asprintf(&local_refname, "refs/heads/%s",
+				    refname + strlen(remote_namespace)) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
+			} else if (strncmp(refname, "refs/tags/", 10) != 0)
+				continue;
+		}
 
 		TAILQ_FOREACH(pe, their_refs, entry) {
-			if (strcmp(refname, pe->path) == 0)
+			if (strcmp(local_refname, pe->path) == 0)
 				break;
 		}
 		if (pe != NULL)
 			continue;
 
-		err = got_ref_resolve(&id, repo, re->ref);
-		if (err)
-			break;
-		err = got_object_id_str(&id_str, id);
-		free(id);
+		TAILQ_FOREACH(pe, their_symrefs, entry) {
+			if (strcmp(local_refname, pe->path) == 0)
+				break;
+		}
+		if (pe != NULL)
+			continue;
+
+		err = delete_missing_ref(re->ref, verbosity, repo);
 		if (err)
 			break;
 
-		free(id_str);
-		err = got_ref_delete(re->ref, repo);
-		if (err)
-			break;
-		if (verbosity >= 0) {
-			printf("Deleted reference %s: %s\n",
-			    got_ref_get_name(re->ref), id_str);
+		if (local_refname) {
+			struct got_reference *ref;
+			err = got_ref_open(&ref, repo, local_refname, 1);
+			if (err) {
+				if (err->code != GOT_ERR_NOT_REF)
+					break;
+				free(local_refname);
+				local_refname = NULL;
+				continue;
+			}
+			err = delete_missing_ref(ref, verbosity, repo);
+			if (err)
+				break;
+			unlock_err = got_ref_unlock(ref);
+			got_ref_close(ref);
+			if (unlock_err && err == NULL) {
+				err = unlock_err;
+				break;
+			}
+
+			free(local_refname);
+			local_refname = NULL;
 		}
 	}
-
+done:
+	free(remote_namespace);
+	free(local_refname);
 	return err;
 }
 
@@ -1838,7 +1913,8 @@ cmd_fetch(int argc, char *argv[])
 		if (verbosity >= 0)
 			printf("Already up-to-date\n");
 		if (delete_refs)
-			error = delete_missing_refs(&refs, verbosity, repo);
+			error = delete_missing_refs(&refs, &symrefs,
+			    remote, verbosity, repo);
 		goto done;
 	}
 
@@ -1931,7 +2007,8 @@ cmd_fetch(int argc, char *argv[])
 		}
 	}
 	if (delete_refs) {
-		error = delete_missing_refs(&refs, verbosity, repo);
+		error = delete_missing_refs(&refs, &symrefs, remote,
+		    verbosity, repo);
 		if (error)
 			goto done;
 	}

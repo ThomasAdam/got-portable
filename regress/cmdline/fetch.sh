@@ -495,7 +495,7 @@ function test_fetch_delete_branch {
 	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
 	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
 		>> $testroot/stdout.expected
-	echo "refs/remotes/origin/foo: $commit_id" >> $testroot/stdout.expected
+	# refs/remotes/origin/foo is now deleted
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 	# refs/hoo/boo/zoo is missing because it is outside of refs/heads
