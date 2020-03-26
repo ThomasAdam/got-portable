@@ -437,6 +437,8 @@ struct tog_view {
 #define TOG_SEARCH_FORWARD	1
 #define TOG_SEARCH_BACKWARD	2
 	int search_next_done;
+#define TOG_SEARCH_HAVE_MORE	1
+#define TOG_SEARCH_NO_MORE	2
 	regex_t regex;
 };
 
@@ -752,6 +754,10 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	*dead = NULL;
 	*focus = NULL;
 
+	/* Clear "no more matches" indicator. */
+	if (view->search_next_done == TOG_SEARCH_NO_MORE)
+		view->search_next_done = TOG_SEARCH_HAVE_MORE;
+
 	if (view->searching && !view->search_next_done) {
 		errcode = pthread_mutex_unlock(&tog_mutex);
 		if (errcode)
@@ -848,7 +854,7 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		break;
 	case 'N':
 	case 'n':
-		if (view->search_next && view->searching) {
+		if (view->search_next) {
 			view->searching = (ch == 'n' ?
 			    TOG_SEARCH_FORWARD : TOG_SEARCH_BACKWARD);
 			view->search_next_done = 0;
@@ -1443,7 +1449,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			if (err)
 				break;
 			if (have_match)
-				*search_next_done = 1;
+				*search_next_done = TOG_SEARCH_HAVE_MORE;
 		}
 
 		errcode = pthread_mutex_unlock(&tog_mutex);
@@ -1501,14 +1507,21 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	if (commits_needed == 0)
 		halfdelay(10); /* disable fast refresh */
 
-	if (asprintf(&ncommits_str, " [%d/%d] %s",
-	    entry ? entry->idx + 1 : 0, commits->ncommits,
-	    commits_needed > 0 ?
-	    (view->searching && view->search_next_done == 0
-	    ? "searching..." : "loading... ") :
-	    (refs_str ? refs_str : "")) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
+	if (commits_needed > 0) {
+		if (asprintf(&ncommits_str, " [%d/%d] %s",
+		    entry ? entry->idx + 1 : 0, commits->ncommits,
+		    view->searching ? "searching..." : "loading...") == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else {
+		if (asprintf(&ncommits_str, " [%d/%d] %s",
+		    entry ? entry->idx + 1 : 0, commits->ncommits,
+		    view->search_next_done == TOG_SEARCH_NO_MORE ?
+		    "no more matches" : (refs_str ? refs_str : "")) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
 	}
 
 	if (path && strcmp(path, "/") != 0) {
@@ -2043,11 +2056,6 @@ search_next_log_view(struct tog_view *view)
 	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
 
-	if (!view->searching) {
-		view->search_next_done = 1;
-		return NULL;
-	}
-
 	if (s->search_entry) {
 		int errcode, ch;
 		errcode = pthread_mutex_unlock(&tog_mutex);
@@ -2060,7 +2068,7 @@ search_next_log_view(struct tog_view *view)
 			return got_error_set_errno(errcode,
 			    "pthread_mutex_lock");
 		if (ch == KEY_BACKSPACE) {
-			view->search_next_done = 1;
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			return NULL;
 		}
 		if (view->searching == TOG_SEARCH_FORWARD)
@@ -2070,9 +2078,9 @@ search_next_log_view(struct tog_view *view)
 			    commit_queue_head, entry);
 	} else if (s->matched_entry) {
 		if (view->searching == TOG_SEARCH_FORWARD)
-			entry = TAILQ_NEXT(s->selected_entry, entry);
+			entry = TAILQ_NEXT(s->matched_entry, entry);
 		else
-			entry = TAILQ_PREV(s->selected_entry,
+			entry = TAILQ_PREV(s->matched_entry,
 			    commit_queue_head, entry);
 	} else {
 		if (view->searching == TOG_SEARCH_FORWARD)
@@ -2087,7 +2095,8 @@ search_next_log_view(struct tog_view *view)
 		if (entry == NULL) {
 			if (s->thread_args.log_complete ||
 			    view->searching == TOG_SEARCH_BACKWARD) {
-				view->search_next_done = 1;
+				view->search_next_done = TOG_SEARCH_NO_MORE;
+				s->search_entry = NULL;
 				return NULL;
 			}
 			/*
@@ -2108,7 +2117,7 @@ search_next_log_view(struct tog_view *view)
 		if (err)
 			break;
 		if (have_match) {
-			view->search_next_done = 1;
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_entry = entry;
 			break;
 		}
@@ -3114,7 +3123,7 @@ search_next_diff_view(struct tog_view *view)
 	int lineno;
 
 	if (!view->searching) {
-		view->search_next_done = 1;
+		view->search_next_done = TOG_SEARCH_HAVE_MORE;
 		return NULL;
 	}
 
@@ -3137,7 +3146,7 @@ search_next_diff_view(struct tog_view *view)
 
 		if (lineno <= 0 || lineno > s->nlines) {
 			if (s->matched_line == 0) {
-				view->search_next_done = 1;
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
 				free(line);
 				break;
 			}
@@ -3156,7 +3165,7 @@ search_next_diff_view(struct tog_view *view)
 		free(line);
 		line = parse_next_line(s->f, &len);
 		if (line && match_line(line, &view->regex)) {
-			view->search_next_done = 1;
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			free(line);
 			break;
@@ -4095,7 +4104,7 @@ search_next_blame_view(struct tog_view *view)
 	int lineno;
 
 	if (!view->searching) {
-		view->search_next_done = 1;
+		view->search_next_done = TOG_SEARCH_HAVE_MORE;
 		return NULL;
 	}
 
@@ -4118,7 +4127,7 @@ search_next_blame_view(struct tog_view *view)
 
 		if (lineno <= 0 || lineno > s->blame.nlines) {
 			if (s->matched_line == 0) {
-				view->search_next_done = 1;
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
 				free(line);
 				break;
 			}
@@ -4137,7 +4146,7 @@ search_next_blame_view(struct tog_view *view)
 		free(line);
 		line = parse_next_line(s->blame.f, &len);
 		if (line && match_line(line, &view->regex)) {
-			view->search_next_done = 1;
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			free(line);
 			break;
@@ -4956,7 +4965,7 @@ search_next_tree_view(struct tog_view *view)
 	struct got_tree_entry *te = NULL;
 
 	if (!view->searching) {
-		view->search_next_done = 1;
+		view->search_next_done = TOG_SEARCH_HAVE_MORE;
 		return NULL;
 	}
 
@@ -4984,7 +4993,7 @@ search_next_tree_view(struct tog_view *view)
 	while (1) {
 		if (te == NULL) {
 			if (s->matched_entry == NULL) {
-				view->search_next_done = 1;
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
 				return NULL;
 			}
 			if (view->searching == TOG_SEARCH_FORWARD)
@@ -4994,7 +5003,7 @@ search_next_tree_view(struct tog_view *view)
 		}
 
 		if (match_tree_entry(te, &view->regex)) {
-			view->search_next_done = 1;
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_entry = te;
 			break;
 		}
