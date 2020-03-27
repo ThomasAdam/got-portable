@@ -1517,12 +1517,21 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 			goto done;
 		}
 	} else {
+		const char *search_str = NULL;
+
+		if (view->searching) {
+			if (view->search_next_done == TOG_SEARCH_NO_MORE)
+				search_str = "no more matches";
+			else if (view->search_next_done == TOG_SEARCH_HAVE_NONE)
+				search_str = "no matches found";
+			else if (!view->search_next_done)
+				search_str = "searching...";
+		}
+
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
 		    entry ? entry->idx + 1 : 0, commits->ncommits,
-		    view->search_next_done == TOG_SEARCH_NO_MORE ?
-		    "no more matches" :
-		    (view->search_next_done == TOG_SEARCH_HAVE_NONE ?
-		    "no matches found" : (refs_str ? refs_str : ""))) == -1) {
+		    search_str ? search_str :
+		    (refs_str ? refs_str : "")) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2059,6 +2068,11 @@ search_next_log_view(struct tog_view *view)
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
+
+	/* Display progress update in log view. */
+	show_log_view(view);
+	update_panels();
+	doupdate();
 
 	if (s->search_entry) {
 		int errcode, ch;
