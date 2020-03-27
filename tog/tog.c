@@ -439,6 +439,7 @@ struct tog_view {
 	int search_next_done;
 #define TOG_SEARCH_HAVE_MORE	1
 #define TOG_SEARCH_NO_MORE	2
+#define TOG_SEARCH_HAVE_NONE	3
 	regex_t regex;
 };
 
@@ -754,8 +755,9 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	*dead = NULL;
 	*focus = NULL;
 
-	/* Clear "no more matches" indicator. */
-	if (view->search_next_done == TOG_SEARCH_NO_MORE)
+	/* Clear "no matches" indicator. */
+	if (view->search_next_done == TOG_SEARCH_NO_MORE ||
+	    view->search_next_done == TOG_SEARCH_HAVE_NONE)
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
 
 	if (view->searching && !view->search_next_done) {
@@ -1518,7 +1520,9 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
 		    entry ? entry->idx + 1 : 0, commits->ncommits,
 		    view->search_next_done == TOG_SEARCH_NO_MORE ?
-		    "no more matches" : (refs_str ? refs_str : "")) == -1) {
+		    "no more matches" :
+		    (view->search_next_done == TOG_SEARCH_HAVE_NONE ?
+		    "no matches found" : (refs_str ? refs_str : ""))) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -2095,7 +2099,9 @@ search_next_log_view(struct tog_view *view)
 		if (entry == NULL) {
 			if (s->thread_args.log_complete ||
 			    view->searching == TOG_SEARCH_BACKWARD) {
-				view->search_next_done = TOG_SEARCH_NO_MORE;
+				view->search_next_done =
+				    (s->matched_entry == NULL ?
+				    TOG_SEARCH_HAVE_NONE : TOG_SEARCH_NO_MORE);
 				s->search_entry = NULL;
 				return NULL;
 			}
