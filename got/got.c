@@ -2615,6 +2615,28 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 }
 
 static const struct got_error *
+wrap_not_worktree_error(const struct got_error *orig_err,
+    const char *cmdname, const char *path)
+{
+	const struct got_error *err;
+	struct got_repository *repo;
+	static char msg[512];
+
+	err = got_repo_open(&repo, path, NULL);
+	if (err)
+		return orig_err;
+
+	snprintf(msg, sizeof(msg),
+	    "'got %s' needs a work tree in addition to a git repository\n"
+	    "Work trees can be checked out from this Git repository with "
+	    "'got checkout'.\n"
+	    "The got(1) manual page contains more information.", cmdname);
+	err = got_error_msg(GOT_ERR_NOT_WORKTREE, msg);
+	got_repo_close(repo);
+	return err;
+}
+
+static const struct got_error *
 cmd_update(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -2661,8 +2683,12 @@ cmd_update(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, worktree_path);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "update",
+			    worktree_path);
 		goto done;
+	}
 
 	error = check_rebase_or_histedit_in_progress(worktree);
 	if (error)
@@ -3597,8 +3623,12 @@ cmd_diff(int argc, char *argv[])
 			errx(1,
 			    "-r option can't be used when diffing a work tree");
 		error = got_worktree_open(&worktree, cwd);
-		if (error)
+		if (error) {
+			if (error->code == GOT_ERR_NOT_WORKTREE)
+				error = wrap_not_worktree_error(error, "diff",
+				    cwd);
 			goto done;
+		}
 		repo_path = strdup(got_worktree_get_repo_path(worktree));
 		if (repo_path == NULL) {
 			error = got_error_from_errno("strdup");
@@ -4365,8 +4395,11 @@ cmd_status(int argc, char *argv[])
 	}
 
 	error = got_worktree_open(&worktree, cwd);
-	if (error != NULL)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "status", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -5582,8 +5615,11 @@ cmd_add(int argc, char *argv[])
 	}
 
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "add", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -5718,8 +5754,11 @@ cmd_remove(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "remove", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -5963,8 +6002,11 @@ cmd_revert(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "revert", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -6154,8 +6196,11 @@ cmd_commit(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "commit", cwd);
 		goto done;
+	}
 
 	error = got_worktree_rebase_in_progress(&rebase_in_progress, worktree);
 	if (error)
@@ -6288,8 +6333,12 @@ cmd_cherrypick(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "cherrypick",
+			    cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -6404,8 +6453,11 @@ cmd_backout(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "backout", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -6823,8 +6875,11 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "rebase", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -7936,8 +7991,11 @@ cmd_histedit(int argc, char *argv[])
 		goto done;
 	}
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "histedit", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -8306,8 +8364,12 @@ cmd_integrate(int argc, char *argv[])
 	}
 
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "integrate",
+			    cwd);
 		goto done;
+	}
 
 	error = check_rebase_or_histedit_in_progress(worktree);
 	if (error)
@@ -8482,8 +8544,11 @@ cmd_stage(int argc, char *argv[])
 	}
 
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "stage", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
@@ -8590,8 +8655,11 @@ cmd_unstage(int argc, char *argv[])
 	}
 
 	error = got_worktree_open(&worktree, cwd);
-	if (error)
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "unstage", cwd);
 		goto done;
+	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
 	    NULL);
