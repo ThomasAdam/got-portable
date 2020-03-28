@@ -1,3 +1,12 @@
+* got 0.32; 2020-03-28
+- be nice to unaware users who attempt to use got commands in a Git work tree
+- show 'searching...' during 'tog log' search even if no new commits are loaded
+- display "no matches found" if no commit matches a 'tog log' search
+- display "no more matches" if 'tog log' search cannot find any more matches
+- make 'tog log' consistently scroll a page upon page-down key (found by naddy)
+- make 'got fetch' create or restore remote HEAD reference if it is missing
+- make 'got fetch -d' delete branches from both refs/heads and refs/remotes
+
 * got 0.31; 2020-03-25
 - take status line into account during page up/down in 'tog log' (naddy)
 - make 'got tree' use the current branch if invoked in a work tree (tracey)
