@@ -513,7 +513,13 @@ will be checked out.
 Short alias for
 .Cm checkout .
 .It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Op Ar path ...
-Update an existing work tree to a different commit.
+Update an existing work tree to a different
+.Ar commit .
+Change existing files in the work tree as necessary to match file contents
+of this commit.
+Preserve any local changes in the work tree and merge them with the
+incoming changes.
+.Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
 .It U Ta file was updated and contained no local changes
@@ -564,6 +570,18 @@ Switch the work tree's branch reference to the specified
 .Ar branch
 before updating the work tree.
 This option requires that all paths in the work tree are updated.
+.Pp
+As usual, any local changes in the work tree will be preserved.
+This can be useful when switching to a newly created branch in order
+to commit existing local changes to this branch.
+.Pp
+Any local changes must be dealt with separately in order to obtain a
+work tree with pristine file contents corresponding exactly to the specified
+.Ar branch .
+Such changes could first be committed to a different branch with
+.Cm got commit ,
+or could be discarded with
+.Cm got revert .
 .It Fl c Ar commit
 Update the work tree to the specified
 .Ar commit .
