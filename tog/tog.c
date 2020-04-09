@@ -1512,7 +1512,8 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	if (commits_needed > 0) {
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
 		    entry ? entry->idx + 1 : 0, commits->ncommits,
-		    view->searching ? "searching..." : "loading...") == -1) {
+		    (view->searching && !view->search_next_done) ?
+		    "searching..." : "loading...") == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
