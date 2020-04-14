@@ -837,6 +837,7 @@ function test_commit_normalizes_filemodes {
 	modes="600 400 460 640 440 660 444 666"
 	for m in $modes; do
 		commit_check_mode "$m" "0100644"
+		ret="$?"
 		if [ "$ret" != "0" ]; then
 			break
 		fi
@@ -848,6 +849,7 @@ function test_commit_normalizes_filemodes {
 	modes="700 500 570 750 550 770 555 777"
 	for m in $modes; do
 		commit_check_mode "$m" "0100755"
+		ret="$?"
 		if [ "$ret" != "0" ]; then
 			break
 		fi
