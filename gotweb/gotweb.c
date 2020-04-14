@@ -3755,12 +3755,9 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		if (kerr != KCGI_OK)
 			goto err;
 
-		if (asprintf(&href_diff,
-		    "?path=%s&action=diff&commit=%s",
-		    a->gw_trans->repo_name, bline->id_str) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto err;
-		}
+		href_diff = khttp_urlpart(NULL, NULL, "gotweb", "path",
+		    a->gw_trans->repo_name, "action", "diff", "commit",
+		    bline->id_str, NULL);
 		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_diff, KATTR__MAX);
 		if (kerr != KCGI_OK)
