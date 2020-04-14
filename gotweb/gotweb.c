@@ -635,11 +635,8 @@ gw_index(struct gw_trans *gw_trans)
 		    "index_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return gw_kcgi_error(kerr);
-		kerr = khtml_puts(gw_trans->gw_html_req,
-		    "No repositories found in ");
-		if (kerr != KCGI_OK)
-			return gw_kcgi_error(kerr);
-		kerr = khtml_puts(gw_trans->gw_html_req,
+		kerr = khtml_printf(gw_trans->gw_html_req,
+		    "No repositories found in %s",
 		    gw_trans->gw_conf->got_repos_path);
 		if (kerr != KCGI_OK)
 			return gw_kcgi_error(kerr);
@@ -1259,14 +1256,8 @@ gw_briefs(struct gw_trans *gw_trans)
 			    KATTR_ID, "refs_str", KATTR__MAX);
 			if (kerr != KCGI_OK)
 			goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req, "(");
-			if (kerr != KCGI_OK)
-				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req,
+			kerr = khtml_printf(gw_trans->gw_html_req, "(%s)",
 			    n_header->refs_str);
-			if (kerr != KCGI_OK)
-				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req, ")");
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2385,10 +2376,7 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 	    KATTR_ID, "header_commit", KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, str1);
-	if (kerr != KCGI_OK)
-		goto done;
-	kerr = khtml_puts(gw_trans->gw_html_req, " ");
+	kerr = khtml_printf(gw_trans->gw_html_req, "%s ", str1);
 	if (kerr != KCGI_OK)
 		goto done;
 	if (str2 != NULL) {
@@ -2396,13 +2384,7 @@ gw_gen_commit_header(struct gw_trans *gw_trans, char *str1, char *str2)
 		    KATTR_ID, "refs_str", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, "(");
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, str2);
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, ")");
+		kerr = khtml_printf(gw_trans->gw_html_req, "(%s)", str2);
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -3205,8 +3187,7 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    KATTR_HREF, href_commits, KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req,
-			    "commits");
+			kerr = khtml_puts(gw_trans->gw_html_req, "commits");
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
@@ -3778,7 +3759,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 
 	while (bline->annotated) {
 		char *smallerthan, *at, *nl, *committer;
-		char *lineno = NULL, *href_diff = NULL, *href_link = NULL;
+		char *href_diff = NULL;
 		size_t len;
 
 		if (getline(&line, &linesize, a->f) == -1) {
@@ -3810,10 +3791,8 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		    "blame_number", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto err;
-		if (asprintf(&lineno, "%.*d", a->nlines_prec,
-		    a->lineno_cur) == -1)
-			goto err;
-		kerr = khtml_puts(a->gw_trans->gw_html_req, lineno);
+		kerr = khtml_printf(a->gw_trans->gw_html_req, "%.*d",
+		    a->nlines_prec, a->lineno_cur);
 		if (kerr != KCGI_OK)
 			goto err;
 		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 1);
@@ -3831,15 +3810,12 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 			err = got_error_from_errno("asprintf");
 			goto err;
 		}
-		if (asprintf(&href_link, "%.8s", bline->id_str) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto err;
-		}
 		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_diff, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_puts(a->gw_trans->gw_html_req, href_link);
+		kerr = khtml_printf(a->gw_trans->gw_html_req, "%.8s",
+		    bline->id_str);
 		if (kerr != KCGI_OK)
 			goto err;
 		kerr = khtml_closeelem(a->gw_trans->gw_html_req, 2);
@@ -3886,9 +3862,7 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		a->lineno_cur++;
 		bline = &a->lines[a->lineno_cur - 1];
 err:
-		free(lineno);
 		free(href_diff);
-		free(href_link);
 	}
 done:
 	if (commit)
@@ -4221,11 +4195,8 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			    "diff_directory", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req,
-			    got_tree_entry_get_name(te));
-			if (kerr != KCGI_OK)
-				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req, modestr);
+			kerr = khtml_printf(gw_trans->gw_html_req, "%s%s",
+			    got_tree_entry_get_name(te), modestr);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
@@ -4276,11 +4247,8 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			    KATTR_HREF, href_blob, KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req,
-			    got_tree_entry_get_name(te));
-			if (kerr != KCGI_OK)
-				goto done;
-			kerr = khtml_puts(gw_trans->gw_html_req, modestr);
+			kerr = khtml_printf(gw_trans->gw_html_req, "%s%s",
+			    got_tree_entry_get_name(te), modestr);
 			if (kerr != KCGI_OK)
 				goto done;
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
@@ -4559,10 +4527,7 @@ gw_output_site_link(struct gw_trans *gw_trans)
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req, " / ");
-		if (kerr != KCGI_OK)
-			goto done;
-		kerr = khtml_puts(gw_trans->gw_html_req,
+		kerr = khtml_printf(gw_trans->gw_html_req, " / %s",
 		    gw_get_action_name(gw_trans));
 		if (kerr != KCGI_OK)
 			goto done;
