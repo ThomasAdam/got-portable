@@ -1,3 +1,8 @@
+* got 0.33; 2020-04-14
+- normalize tree entry modes to 0100644 or 0100755 when writing tree objects
+- fix "searching..." displayed in tog log view while merely scrolling down
+- in got.1, clarify how 'got update' deals with local (aka uncommitted) changes
+
 * got 0.32; 2020-03-28
 - be nice to unaware users who attempt to use got commands in a Git work tree
 - show 'searching...' during 'tog log' search even if no new commits are loaded
