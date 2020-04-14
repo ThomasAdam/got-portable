@@ -1657,15 +1657,13 @@ gw_tags(struct gw_trans *gw_trans)
 	}
 
 	if (gw_trans->page > 0 && gw_trans->prev_id) {
-		if (asprintf(&href_prev,
-		    "?path=%s&page=%d&action=tags&commit=%s&prev=%s",
-		    gw_trans->repo_name, gw_trans->page - 1,
-		    gw_trans->prev_id ? gw_trans->prev_id : "",
-		    gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "") == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
+		href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "path",
+		    KATTRX_STRING, gw_trans->repo_name, "page",
+		    KATTRX_INT, (int64_t) (gw_trans->page - 1), "action",
+		    KATTRX_STRING, "tags", "commit", KATTRX_STRING,
+		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
+		    KATTRX_STRING, gw_trans->prev_prev_id ?
+		    gw_trans->prev_prev_id : "", NULL);
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_prev, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1689,17 +1687,14 @@ gw_tags(struct gw_trans *gw_trans)
 		    KATTR_ID, "nav_next", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&href_next,
-		    "?path=%s&page=%d&action=tags" \
-		    "&commit=%s&prev=%s&prev_prev=%s",
-		    gw_trans->repo_name, gw_trans->page + 1,
-		    gw_trans->next_id,
+		href_next = khttp_urlpartx(NULL, NULL, "gotweb", "path",
+		    KATTRX_STRING, gw_trans->repo_name, "page",
+		    KATTRX_INT, (int64_t) (gw_trans->page + 1), "action",
+		    KATTRX_STRING, "tags", "commit", KATTRX_STRING,
+		    gw_trans->next_id, "prev", KATTRX_STRING,
 		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
-		    gw_trans->prev_id ?
-		    gw_trans->prev_id : "") == -1) {
-			error = got_error_from_errno("calloc");
-			goto done;
-		}
+		    "prev_prev", KATTRX_STRING, gw_trans->prev_id ?
+		    gw_trans->prev_id : "", NULL);
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_next, KATTR__MAX);
 		if (kerr != KCGI_OK)
