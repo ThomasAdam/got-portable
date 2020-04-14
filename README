@@ -50,7 +50,8 @@ EXAMPLES in got.1 contains a quick-start guide for OpenBSD developers.
 
 
 Game of Trees Web (Gotweb) is a CGI program which displays repository data
-and is designed to work with httpd(8) and slowcgi(8).
+and is designed to work with httpd(8) and slowcgi(8). It requires the Kristaps
+Dzonsons kcgi library, version 0.12.0 or greater.
 
 To compile gotweb on OpenBSD, run:
 
