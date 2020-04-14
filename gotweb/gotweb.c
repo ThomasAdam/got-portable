@@ -3073,11 +3073,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			    KATTR_ID, "tag_name", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				goto done;
-			if (asprintf(&href_tag, "?path=%s&action=tag&commit=%s",
-			    gw_trans->repo_name, id_str) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
+
+			href_tag = khttp_urlpart(NULL, NULL, "gotweb", "path",
+			    gw_trans->repo_name, "action", "tag", "commit",
+			    id_str, NULL);
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_tag, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -3112,12 +3111,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			kerr = khtml_puts(gw_trans->gw_html_req, " | ");
 			if (kerr != KCGI_OK)
 				goto done;
-			if (asprintf(&href_briefs,
-			    "?path=%s&action=briefs&commit=%s",
-			    gw_trans->repo_name, id_str) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
+
+			href_briefs = khttp_urlpart(NULL, NULL, "gotweb",
+			    "path", gw_trans->repo_name, "action", "briefs",
+			    "commit", id_str, NULL);
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_briefs, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -3134,12 +3131,9 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			if (kerr != KCGI_OK)
 				goto done;
 
-			if (asprintf(&href_commits,
-			    "?path=%s&action=commits&commit=%s",
-			    gw_trans->repo_name, id_str) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
+			href_commits = khttp_urlpart(NULL, NULL, "gotweb",
+			    "path", gw_trans->repo_name, "action", "commits",
+			    "commit", id_str, NULL);
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_commits, KATTR__MAX);
 			if (kerr != KCGI_OK)
