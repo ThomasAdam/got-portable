@@ -784,6 +784,81 @@ function test_commit_xbit_change {
 	test_done "$testroot" "$ret"
 }
 
+function commit_check_mode {
+	local mode="$1"
+	local expected_mode="$2"
+
+	chmod 644 $testroot/wt/alpha
+	echo a >> $testroot/wt/alpha
+	chmod $mode $testroot/wt/alpha
+
+	(cd $testroot/wt && got commit -mm > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo "Created commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	local tree_id=$(got cat -r $testroot/repo $commit_id | \
+		grep ^tree | cut -d' ' -f2)
+	local alpha_id=$(got cat -r $testroot/repo $tree_id | \
+		grep 'alpha$' | cut -d' ' -f1)
+	echo "$alpha_id $expected_mode alpha" > $testroot/stdout.expected
+	got cat -r $testroot/repo $tree_id | grep 'alpha$' > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	return $ret
+}
+
+function test_commit_normalizes_filemodes {
+	local testroot=`test_init commit_normalizes_filemodes`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	modes="600 400 460 640 440 660 444 666"
+	for m in $modes; do
+		commit_check_mode "$m" "0100644"
+		if [ "$ret" != "0" ]; then
+			break
+		fi
+	done
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	modes="700 500 570 750 550 770 555 777"
+	for m in $modes; do
+		commit_check_mode "$m" "0100755"
+		if [ "$ret" != "0" ]; then
+			break
+		fi
+	done
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -802,3 +877,4 @@ run_test test_commit_no_email
 run_test test_commit_tree_entry_sorting
 run_test test_commit_gitconfig_author
 run_test test_commit_xbit_change
+run_test test_commit_normalizes_filemodes

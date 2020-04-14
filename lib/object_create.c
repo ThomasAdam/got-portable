@@ -202,9 +202,25 @@ done:
 }
 
 static const struct got_error *
-mode2str(char *buf, size_t len, mode_t mode)
+te_mode2str(char *buf, size_t len, mode_t te_mode)
 {
 	int ret;
+	mode_t mode;
+
+	/*
+	 * Some Git implementations are picky about modes seen in tree entries.
+	 * For best compatibility we normalize the file/directory mode here.
+	 * Note that we do not support committing symlinks or submodules.
+	 */
+	if (S_ISREG(te_mode))
+		mode = GOT_DEFAULT_FILE_MODE;
+	else if (S_ISDIR(te_mode))
+		mode = GOT_DEFAULT_DIR_MODE;
+	else
+		return got_error(GOT_ERR_BAD_FILETYPE);
+	if (te_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+		mode |= S_IXUSR | S_IXGRP | S_IXOTH;
+
 	ret = snprintf(buf, len, "%o ", mode);
 	if (ret == -1 || ret >= len)
 		return got_error(GOT_ERR_NO_SPACE);
@@ -265,7 +281,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	for (i = 0; i < nentries; i++) {
 		te = sorted_entries[i];
-		err = mode2str(modebuf, sizeof(modebuf), te->mode);
+		err = te_mode2str(modebuf, sizeof(modebuf), te->mode);
 		if (err)
 			goto done;
 		len += strlen(modebuf) + strlen(te->name) + 1 +
@@ -293,7 +309,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	for (i = 0; i < nentries; i++) {
 		te = sorted_entries[i];
-		err = mode2str(modebuf, sizeof(modebuf), te->mode);
+		err = te_mode2str(modebuf, sizeof(modebuf), te->mode);
 		if (err)
 			goto done;
 		len = strlen(modebuf);
