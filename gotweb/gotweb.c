@@ -2350,10 +2350,8 @@ gw_template(size_t key, void *arg)
 			    KATTR_ID, "tmpl_err", KATTR__MAX);
 			if (kerr != KCGI_OK)
 				return 0;
-			kerr = khttp_puts(gw_trans->gw_req, "Error: ");
-			if (kerr != KCGI_OK)
-				return 0;
-			kerr = khttp_puts(gw_trans->gw_req, error->msg);
+			kerr = khttp_printf(gw_trans->gw_req, "Error: %s",
+			    error->msg);
 			if (kerr != KCGI_OK)
 				return 0;
 			kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
