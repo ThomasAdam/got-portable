@@ -925,7 +925,7 @@ gw_commits(struct gw_trans *gw_trans)
 {
 	const struct got_error *error = NULL;
 	struct gw_header *header = NULL, *n_header = NULL;
-	char *age = NULL, *href_diff = NULL, *href_blob = NULL;
+	char *age = NULL, *href_diff = NULL, *href_tree = NULL;
 	char *href_prev = NULL, *href_next = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
@@ -992,11 +992,9 @@ gw_commits(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 
-		if (asprintf(&href_diff, "?path=%s&action=diff&commit=%s",
-		    gw_trans->repo_name, n_header->commit_id) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
+		href_diff = khttp_urlpart(NULL, NULL, "gotweb", "path",
+		    gw_trans->repo_name, "action", "diff", "commit",
+		    n_header->commit_id, NULL);
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "navs_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1020,13 +1018,11 @@ gw_commits(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 
-		if (asprintf(&href_blob, "?path=%s&action=tree&commit=%s",
-		    gw_trans->repo_name, n_header->commit_id) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
+		href_tree = khttp_urlpart(NULL, NULL, "gotweb", "path",
+		    gw_trans->repo_name, "action", "tree", "commit",
+		    n_header->commit_id, NULL),
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
-		    KATTR_HREF, href_blob, KATTR__MAX);
+		    KATTR_HREF, href_tree, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
 		khtml_puts(gw_trans->gw_html_req, "tree");
@@ -1061,15 +1057,13 @@ gw_commits(struct gw_trans *gw_trans)
 	}
 
 	if (gw_trans->page > 0 && gw_trans->prev_id) {
-		if (asprintf(&href_prev,
-		    "?path=%s&page=%d&action=commits&commit=%s&prev=%s",
-		    gw_trans->repo_name, gw_trans->page - 1,
-		    gw_trans->prev_id ? gw_trans->prev_id : "",
-		    gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "") == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
+		href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "path",
+		    KATTRX_STRING, gw_trans->repo_name, "page",
+		    KATTRX_INT, (int64_t) (gw_trans->page - 1), "action",
+		    KATTRX_STRING, "commits", "commit", KATTRX_STRING,
+		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
+		    KATTRX_STRING, gw_trans->prev_prev_id ?
+		    gw_trans->prev_prev_id : "", NULL);
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_prev, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1093,17 +1087,14 @@ gw_commits(struct gw_trans *gw_trans)
 		    KATTR_ID, "nav_next", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&href_next,
-		    "?path=%s&page=%d&action=commits" \
-		    "&commit=%s&prev=%s&prev_prev=%s",
-		    gw_trans->repo_name, gw_trans->page + 1,
-		    gw_trans->next_id,
+		href_next = khttp_urlpartx(NULL, NULL, "gotweb", "path",
+		    KATTRX_STRING, gw_trans->repo_name, "page",
+		    KATTRX_INT, (int64_t) (gw_trans->page + 1), "action",
+		    KATTRX_STRING, "commits", "commit", KATTRX_STRING,
+		    gw_trans->next_id, "prev", KATTRX_STRING,
 		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
-		    gw_trans->prev_id ?
-		    gw_trans->prev_id : "") == -1) {
-			error = got_error_from_errno("calloc");
-			goto done;
-		}
+		    "prev_prev", KATTRX_STRING, gw_trans->prev_prev_id ?
+		    gw_trans->prev_prev_id : "", NULL),
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_next, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1129,7 +1120,7 @@ done:
 	free(href_next);
 	free(href_prev);
 	free(href_diff);
-	free(href_blob);
+	free(href_tree);
 	if (error == NULL && kerr != KCGI_OK)
 		error = gw_kcgi_error(kerr);
 	return error;
