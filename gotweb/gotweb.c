@@ -4121,14 +4121,11 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
-			if (asprintf(&href_blob,
-			    "?path=%s&action=%s&commit=%s&folder=%s",
-			    gw_trans->repo_name, gw_get_action_name(gw_trans),
-			    gw_trans->commit_id, build_folder) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
 
+			href_blob = khttp_urlpart(NULL, NULL, "gotweb", "path",
+			    gw_trans->repo_name, "action",
+			    gw_get_action_name(gw_trans), "commit",
+			    gw_trans->commit_id, "folder", build_folder, NULL);
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "tree_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -4163,25 +4160,18 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			if (kerr != KCGI_OK)
 				goto done;
 		} else {
-			if (asprintf(&href_blob,
-			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
-			    gw_trans->repo_name, "blob", gw_trans->commit_id,
-			    got_tree_entry_get_name(te),
-			    gw_trans->repo_folder ?
-			    gw_trans->repo_folder : "") == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			if (asprintf(&href_blame,
-			    "?path=%s&action=%s&commit=%s&file=%s&folder=%s",
-			    gw_trans->repo_name, "blame", gw_trans->commit_id,
-			    got_tree_entry_get_name(te),
-			    gw_trans->repo_folder ?
-			    gw_trans->repo_folder : "") == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-
+			href_blob = khttp_urlpart(NULL, NULL, "gotweb", "path",
+			    gw_trans->repo_name, "action", "blob", "commit",
+			    gw_trans->commit_id, "file",
+			    got_tree_entry_get_name(te), "folder",
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+			    NULL);
+			href_blame = khttp_urlpart(NULL, NULL, "gotweb", "path",
+			    gw_trans->repo_name, "action", "blame", "commit",
+			    gw_trans->commit_id, "file",
+			    got_tree_entry_get_name(te), "folder", 
+			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
+			    NULL);
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "tree_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
