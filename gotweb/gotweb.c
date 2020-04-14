@@ -672,6 +672,10 @@ gw_index(struct gw_trans *gw_trans)
 
 		href_summary = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_dir->name, "action", "summary", NULL);
+		if (href_summary == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 		    "index_project", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -752,6 +756,10 @@ gw_index(struct gw_trans *gw_trans)
 
 		href_briefs = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_dir->name, "action", "briefs", NULL);
+		if (href_briefs == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_briefs, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -769,6 +777,10 @@ gw_index(struct gw_trans *gw_trans)
 
 		href_commits = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_dir->name, "action", "commits", NULL);
+		if (href_commits == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_commits, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -786,6 +798,10 @@ gw_index(struct gw_trans *gw_trans)
 
 		href_tags = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_dir->name, "action", "tags", NULL);
+		if (href_tags == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_tags, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -803,6 +819,10 @@ gw_index(struct gw_trans *gw_trans)
 
 		href_tree = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_dir->name, "action", "tree", NULL);
+		if (href_tree == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_tree, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -857,6 +877,10 @@ gw_index(struct gw_trans *gw_trans)
 		    prev_disp == gw_trans->repos_total)) {
 			href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "page",
 			    KATTRX_INT, (int64_t)(gw_trans->page - 1), NULL);
+			if (href_prev == NULL) {
+				error = got_error_from_errno("khttp_urlpartx");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_prev, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -883,6 +907,10 @@ gw_index(struct gw_trans *gw_trans)
 				goto done;
 			href_next = khttp_urlpartx(NULL, NULL, "gotweb", "page",
 			    KATTRX_INT, (int64_t)(gw_trans->page + 1), NULL);
+			if (href_next == NULL) {
+				error = got_error_from_errno("khttp_urlpartx");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_next, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -995,6 +1023,10 @@ gw_commits(struct gw_trans *gw_trans)
 		href_diff = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "diff", "commit",
 		    n_header->commit_id, NULL);
+		if (href_diff == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "navs_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1020,7 +1052,11 @@ gw_commits(struct gw_trans *gw_trans)
 
 		href_tree = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "tree", "commit",
-		    n_header->commit_id, NULL),
+		    n_header->commit_id, NULL);
+		if (href_tree == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_tree, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1064,6 +1100,10 @@ gw_commits(struct gw_trans *gw_trans)
 		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
 		    KATTRX_STRING, gw_trans->prev_prev_id ?
 		    gw_trans->prev_prev_id : "", NULL);
+		if (href_prev == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_prev, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1094,7 +1134,11 @@ gw_commits(struct gw_trans *gw_trans)
 		    gw_trans->next_id, "prev", KATTRX_STRING,
 		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
 		    "prev_prev", KATTRX_STRING, gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "", NULL),
+		    gw_trans->prev_prev_id : "", NULL);
+		if (href_next == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_next, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1198,6 +1242,10 @@ gw_briefs(struct gw_trans *gw_trans)
 		href_diff = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "diff", "commit",
 		    n_header->commit_id, NULL);
+		if (href_diff == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "briefs_log", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1263,6 +1311,10 @@ gw_briefs(struct gw_trans *gw_trans)
 		href_tree = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "tree", "commit",
 		    n_header->commit_id, NULL);
+		if (href_tree == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_tree, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1310,6 +1362,10 @@ gw_briefs(struct gw_trans *gw_trans)
 		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
 		    KATTRX_STRING, gw_trans->prev_prev_id ?
 		    gw_trans->prev_prev_id : "", NULL);
+		if (href_prev == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_prev, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1341,7 +1397,11 @@ gw_briefs(struct gw_trans *gw_trans)
 		    gw_trans->next_id, "prev", KATTRX_STRING,
 		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
 		    "prev_prev", KATTRX_STRING, gw_trans->prev_id ?
-		    gw_trans->prev_id : "", NULL),
+		    gw_trans->prev_id : "", NULL);
+		if (href_next == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_next, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1664,6 +1724,10 @@ gw_tags(struct gw_trans *gw_trans)
 		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
 		    KATTRX_STRING, gw_trans->prev_prev_id ?
 		    gw_trans->prev_prev_id : "", NULL);
+		if (href_prev == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_prev, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1695,6 +1759,10 @@ gw_tags(struct gw_trans *gw_trans)
 		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
 		    "prev_prev", KATTRX_STRING, gw_trans->prev_id ?
 		    gw_trans->prev_id : "", NULL);
+		if (href_next == NULL) {
+			error = got_error_from_errno("khttp_urlpartx");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_next, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -3077,6 +3145,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			href_tag = khttp_urlpart(NULL, NULL, "gotweb", "path",
 			    gw_trans->repo_name, "action", "tag", "commit",
 			    id_str, NULL);
+			if (href_tag == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_tag, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -3115,6 +3187,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			href_briefs = khttp_urlpart(NULL, NULL, "gotweb",
 			    "path", gw_trans->repo_name, "action", "briefs",
 			    "commit", id_str, NULL);
+			if (href_briefs == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_briefs, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -3134,6 +3210,10 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			href_commits = khttp_urlpart(NULL, NULL, "gotweb",
 			    "path", gw_trans->repo_name, "action", "commits",
 			    "commit", id_str, NULL);
+			if (href_commits == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A,
 			    KATTR_HREF, href_commits, KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -3758,6 +3838,10 @@ gw_blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 		href_diff = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    a->gw_trans->repo_name, "action", "diff", "commit",
 		    bline->id_str, NULL);
+		if (href_diff == NULL) {
+			err = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(a->gw_trans->gw_html_req, KELEM_A,
 		    KATTR_HREF, href_diff, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -4126,6 +4210,10 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			    gw_trans->repo_name, "action",
 			    gw_get_action_name(gw_trans), "commit",
 			    gw_trans->commit_id, "folder", build_folder, NULL);
+			if (href_blob == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "tree_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -4166,12 +4254,20 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 			    got_tree_entry_get_name(te), "folder",
 			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 			    NULL);
+			if (href_blob == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			href_blame = khttp_urlpart(NULL, NULL, "gotweb", "path",
 			    gw_trans->repo_name, "action", "blame", "commit",
 			    gw_trans->commit_id, "file",
 			    got_tree_entry_get_name(te), "folder", 
 			    gw_trans->repo_folder ? gw_trans->repo_folder : "",
 			    NULL);
+			if (href_blame == NULL) {
+				error = got_error_from_errno("khttp_urlpart");
+				goto done;
+			}
 			kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 			    KATTR_ID, "tree_wrapper", KATTR__MAX);
 			if (kerr != KCGI_OK)
@@ -4331,7 +4427,11 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 
 		href_summary = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "summary", "headref",
-		    refname, NULL),
+		    refname, NULL);
+		if (href_summary == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_summary, KATTR__MAX);
 		kerr = khtml_puts(gw_trans->gw_html_req, refname);
@@ -4368,6 +4468,10 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 		href_briefs = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "briefs", "headref",
 		    refname, NULL);
+		if (href_briefs == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_briefs, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -4385,7 +4489,11 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 
 		href_commits = khttp_urlpart(NULL, NULL, "gotweb", "path",
 		    gw_trans->repo_name, "action", "commits", "headref",
-		    refname, NULL),
+		    refname, NULL);
+		if (href_commits == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_commits, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -4448,7 +4556,11 @@ gw_output_site_link(struct gw_trans *gw_trans)
 			goto done;
 
 		href_summary = khttp_urlpart(NULL, NULL, "gotweb", "path",
-		    gw_trans->repo_name, "action", "summary", NULL),
+		    gw_trans->repo_name, "action", "summary", NULL);
+		if (href_summary == NULL) {
+			error = got_error_from_errno("khttp_urlpart");
+			goto done;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_summary, KATTR__MAX);
 		if (kerr != KCGI_OK)
