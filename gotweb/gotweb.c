@@ -4446,9 +4446,9 @@ gw_output_site_link(struct gw_trans *gw_trans)
 		kerr = khtml_puts(gw_trans->gw_html_req, " / ");
 		if (kerr != KCGI_OK)
 			goto done;
-		if (asprintf(&href_summary, "?path=%s&action=summary",
-		    gw_trans->repo_name) == -1)
-			goto done;
+
+		href_summary = khttp_urlpart(NULL, NULL, "gotweb", "path",
+		    gw_trans->repo_name, "action", "summary", NULL),
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_A, KATTR_HREF,
 		    href_summary, KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -4470,6 +4470,8 @@ gw_output_site_link(struct gw_trans *gw_trans)
 		goto done;
 done:
 	free(href_summary);
+	if (error == NULL && kerr != KCGI_OK)
+		error = gw_kcgi_error(kerr);
 	return error;
 }
 
