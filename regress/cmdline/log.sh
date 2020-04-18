@@ -317,6 +317,160 @@ function test_log_nonexistent_path {
 	test_done "$testroot" "$ret"
 }
 
+function test_log_end_at_commit {
+	local testroot=`test_init log_end_at_commit`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got rm beta >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo`
+
+	# Print commit 3 only
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	(cd $testroot/wt && got log -x $commit_id3 | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Print commit 3 up to commit 1 inclusive
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	(cd $testroot/wt && got log -c $commit_id3 -x $commit_id1 | \
+		grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Create commits on an unrelated branch
+	(cd $testroot/wt && got br foo > /dev/null)
+	echo bar >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m "change on branch foo" >/dev/null)
+	local commit_id4=`git_show_branch_head $testroot/repo foo`
+
+	# Print commit 4 only (in work tree)
+	echo "commit $commit_id4 (foo)" > $testroot/stdout.expected
+	(cd $testroot/wt && got log -x foo | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Print commit 4 only (in repository)
+	echo "commit $commit_id4 (foo)" > $testroot/stdout.expected
+	(cd $testroot/repo && got log -c foo -x foo | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Repository's HEAD is on master branch so -x foo without an explicit
+	# '-c foo' start commit has no effect there
+	echo "commit $commit_id3 (master)" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	echo "commit $commit_id0" >> $testroot/stdout.expected
+	(cd $testroot/repo && got log -x foo | grep ^commit \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# got will refuse -x with a non-existent commit
+	(cd $testroot/wt && got log -x nonexistent \
+		> $testroot/stdout 2> $testroot/stderr) 
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "log command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	echo "got: nonexistent: bad object id string" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# try the same with the hash of an empty string which is very
+	# unlikely to match any object
+	(cd $testroot/wt && \
+		got log -x da39a3ee5e6b4b0d3255bfef95601890afd80709 \
+		> $testroot/stdout 2> $testroot/stderr) 
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "log command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	echo "got: object not found" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
@@ -324,3 +478,4 @@ run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
 run_test test_log_nonexistent_path
+run_test test_log_end_at_commit

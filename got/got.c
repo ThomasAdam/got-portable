@@ -3099,9 +3099,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 }
 
 static const struct got_error *
-print_commits(struct got_object_id *root_id, struct got_repository *repo,
-    const char *path, int show_patch, const char *search_pattern,
-    int diff_context, int limit, int log_branches,
+print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
+    struct got_repository *repo, const char *path, int show_patch,
+    const char *search_pattern, int diff_context, int limit, int log_branches,
     struct got_reflist_head *refs)
 {
 	const struct got_error *err;
@@ -3156,7 +3156,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 		err = print_commit(commit, id, repo, path, show_patch,
 		    diff_context, refs);
 		got_object_commit_close(commit);
-		if (err || (limit && --limit == 0))
+		if (err || (limit && --limit == 0) ||
+		    (end_id != NULL && got_object_id_cmp(id, end_id) == 0))
 			break;
 	}
 done:
@@ -3169,8 +3170,9 @@ done:
 __dead static void
 usage_log(void)
 {
-	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] [-p] "
-	    "[-s search-pattern] [-r repository-path] [path]\n", getprogname());
+	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] "
+	    "[-p] [-x commit] [-s search-pattern] [-r repository-path] "
+	    "[path]\n", getprogname());
 	exit(1);
 }
 
@@ -3191,15 +3193,63 @@ get_default_log_limit(void)
 }
 
 static const struct got_error *
+resolve_commit_arg(struct got_object_id **id, const char *commit_arg,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref;
+
+	*id = NULL;
+
+	err = got_ref_open(&ref, repo, commit_arg, 0);
+	if (err == NULL) {
+		int obj_type;
+		err = got_ref_resolve(id, repo, ref);
+		got_ref_close(ref);
+		if (err)
+			return err;
+		err = got_object_get_type(&obj_type, repo, *id);
+		if (err)
+			return err;
+		if (obj_type == GOT_OBJ_TYPE_TAG) {
+			struct got_tag_object *tag;
+			err = got_object_open_as_tag(&tag, repo, *id);
+			if (err)
+				return err;
+			if (got_object_tag_get_object_type(tag) !=
+			    GOT_OBJ_TYPE_COMMIT) {
+				got_object_tag_close(tag);
+				return got_error(GOT_ERR_OBJ_TYPE);
+			}
+			free(*id);
+			*id = got_object_id_dup(
+			    got_object_tag_get_object_id(tag));
+			if (*id == NULL)
+				err = got_error_from_errno(
+				    "got_object_id_dup");
+			got_object_tag_close(tag);
+			if (err)
+				return err;
+		} else if (obj_type != GOT_OBJ_TYPE_COMMIT)
+			return got_error(GOT_ERR_OBJ_TYPE);
+	} else {
+		err = got_repo_match_object_id_prefix(id, commit_arg,
+		    GOT_OBJ_TYPE_COMMIT, repo);
+	}
+
+	return err;
+}
+
+static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_commit_object *commit = NULL;
-	struct got_object_id *id = NULL;
+	struct got_object_id *start_id = NULL, *end_id = NULL;
 	char *repo_path = NULL, *path = NULL, *cwd = NULL, *in_repo_path = NULL;
-	const char *start_commit = NULL, *search_pattern = NULL;
+	const char *start_commit = NULL, *end_commit = NULL;
+	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
 	int show_patch = 0, limit = 0, log_branches = 0;
 	const char *errstr;
@@ -3216,7 +3266,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bpc:C:l:r:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "bpc:C:l:r:s:x:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -3247,6 +3297,9 @@ cmd_log(int argc, char *argv[])
 			break;
 		case 's':
 			search_pattern = optarg;
+			break;
+		case 'x':
+			end_commit = optarg;
 			break;
 		default:
 			usage_log();
@@ -3315,65 +3368,31 @@ cmd_log(int argc, char *argv[])
 
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
+		struct got_commit_object *commit = NULL;
 		error = got_ref_open(&head_ref, repo,
 		    worktree ? got_worktree_get_head_ref_name(worktree)
 		    : GOT_REF_HEAD, 0);
 		if (error != NULL)
-			return error;
-		error = got_ref_resolve(&id, repo, head_ref);
+			goto done;
+		error = got_ref_resolve(&start_id, repo, head_ref);
 		got_ref_close(head_ref);
 		if (error != NULL)
-			return error;
-		error = got_object_open_as_commit(&commit, repo, id);
+			goto done;
+		error = got_object_open_as_commit(&commit, repo,
+		    start_id);
+		if (error != NULL)
+			goto done;
+		got_object_commit_close(commit);
 	} else {
-		struct got_reference *ref;
-		error = got_ref_open(&ref, repo, start_commit, 0);
-		if (error == NULL) {
-			int obj_type;
-			error = got_ref_resolve(&id, repo, ref);
-			got_ref_close(ref);
-			if (error != NULL)
-				goto done;
-			error = got_object_get_type(&obj_type, repo, id);
-			if (error != NULL)
-				goto done;
-			if (obj_type == GOT_OBJ_TYPE_TAG) {
-				struct got_tag_object *tag;
-				error = got_object_open_as_tag(&tag, repo, id);
-				if (error != NULL)
-					goto done;
-				if (got_object_tag_get_object_type(tag) !=
-				    GOT_OBJ_TYPE_COMMIT) {
-					got_object_tag_close(tag);
-					error = got_error(GOT_ERR_OBJ_TYPE);
-					goto done;
-				}
-				free(id);
-				id = got_object_id_dup(
-				    got_object_tag_get_object_id(tag));
-				if (id == NULL)
-					error = got_error_from_errno(
-					    "got_object_id_dup");
-				got_object_tag_close(tag);
-				if (error)
-					goto done;
-			} else if (obj_type != GOT_OBJ_TYPE_COMMIT) {
-				error = got_error(GOT_ERR_OBJ_TYPE);
-				goto done;
-			}
-			error = got_object_open_as_commit(&commit, repo, id);
-			if (error != NULL)
-				goto done;
-		}
-		if (commit == NULL) {
-			error = got_repo_match_object_id_prefix(&id,
-			    start_commit, GOT_OBJ_TYPE_COMMIT, repo);
-			if (error != NULL)
-				return error;
-		}
+		error = resolve_commit_arg(&start_id, start_commit, repo);
+		if (error != NULL)
+			goto done;
 	}
-	if (error != NULL)
-		goto done;
+	if (end_commit != NULL) {
+		error = resolve_commit_arg(&end_id, end_commit, repo);
+		if (error != NULL)
+			goto done;
+	}
 
 	if (worktree) {
 		const char *prefix = got_worktree_get_path_prefix(worktree);
@@ -3398,13 +3417,12 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = print_commits(id, repo, path, show_patch, search_pattern,
-	    diff_context, limit, log_branches, &refs);
+	error = print_commits(start_id, end_id, repo, path, show_patch,
+	    search_pattern, diff_context, limit, log_branches, &refs);
 done:
 	free(path);
 	free(repo_path);
 	free(cwd);
-	free(id);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
