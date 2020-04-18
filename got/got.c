@@ -3109,8 +3109,8 @@ print_commits(struct got_object_id *root_id, struct got_repository *repo,
 	regex_t regex;
 	int have_match;
 
-	if (search_pattern &&
-	    regcomp(&regex, search_pattern, REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
+	if (search_pattern && regcomp(&regex, search_pattern,
+	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
 		return got_error_msg(GOT_ERR_REGEX, search_pattern);
 
 	err = got_commit_graph_open(&graph, path, !log_branches);
