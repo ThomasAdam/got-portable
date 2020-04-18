@@ -155,5 +155,85 @@ function test_cherrypick_root_commit {
 	test_done "$testroot" "$ret"
 }
 
+function test_cherrypick_into_work_tree_with_conflicts {
+	local testroot=`test_init cherrypick_into_work_tree_with_conflicts`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local branch_rev=`git_show_head $testroot/repo`
+
+	# fake a merge conflict
+	echo '<<<<<<<' > $testroot/wt/alpha
+	echo 'alpha' >> $testroot/wt/alpha
+	echo '=======' >> $testroot/wt/alpha
+	echo 'alpha, too' >> $testroot/wt/alpha
+	echo '>>>>>>>' >> $testroot/wt/alpha
+	cp $testroot/wt/alpha $testroot/content.expected
+
+	echo "C  alpha" > $testroot/stdout.expected
+	(cd $testroot/wt && got status  > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cherrypick $branch_rev \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "cherrypick succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo -n "got: work tree contains conflicted files; " \
+		> $testroot/stderr.expected
+	echo "these conflicts must be resolved first" \
+		>> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/wt/alpha
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/wt/alpha
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
+run_test test_cherrypick_into_work_tree_with_conflicts
