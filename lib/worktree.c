@@ -1303,6 +1303,11 @@ update_blob(struct got_worktree *worktree,
 		err = (*progress_cb)(progress_arg, status, path);
 		goto done;
 	}
+	if (status == GOT_STATUS_CONFLICT) {
+		err = (*progress_cb)(progress_arg, GOT_STATUS_CANNOT_UPDATE,
+		    path);
+		goto done;
+	}
 
 	if (ie && status != GOT_STATUS_MISSING &&
 	    (te->mode & S_IXUSR) == (sb.st_mode & S_IXUSR)) {

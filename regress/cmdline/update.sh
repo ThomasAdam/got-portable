@@ -1647,6 +1647,61 @@ function test_update_toggles_xbit {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_preserves_conflicted_file {
+	local testroot=`test_init update_preserves_conflicted_file`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout -c $commit_id0 $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# fake a merge conflict
+	echo '<<<<<<<' > $testroot/wt/alpha
+	echo 'alpha' >> $testroot/wt/alpha
+	echo '=======' >> $testroot/wt/alpha
+	echo 'alpha, too' >> $testroot/wt/alpha
+	echo '>>>>>>>' >> $testroot/wt/alpha
+	cp $testroot/wt/alpha $testroot/content.expected
+
+	echo "C  alpha" > $testroot/stdout.expected
+	(cd $testroot/wt && got status  > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "#  alpha" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/wt/alpha
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/wt/alpha
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1678,3 +1733,4 @@ run_test test_update_to_commit_on_wrong_branch
 run_test test_update_bumps_base_commit_id
 run_test test_update_tag
 run_test test_update_toggles_xbit
+run_test test_update_preserves_conflicted_file

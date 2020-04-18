@@ -520,6 +520,18 @@ of this commit.
 Preserve any local changes in the work tree and merge them with the
 incoming changes.
 .Pp
+Files which already contain merge conflicts will not be updated to avoid
+further complications.
+Such files will be updated when
+.Cm got update
+is run again after merge conflicts have been resolved.
+If the conflicting changes are no longer needed affected files can be
+reverted with
+.Cm got revert
+before running
+.Cm got update
+again.
+.Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
 .It U Ta file was updated and contained no local changes
@@ -529,6 +541,7 @@ Show the status of each affected file, using the following status codes:
 .It A Ta new file was added
 .It \(a~ Ta versioned file is obstructed by a non-regular file
 .It ! Ta a missing versioned file was restored
+.It # Ta file was not updated because it contains merge conflicts
 .El
 .Pp
 If no
