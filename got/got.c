@@ -3135,12 +3135,17 @@ static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_patch,
     const char *search_pattern, int diff_context, int limit, int log_branches,
-    struct got_reflist_head *refs)
+    int reverse_display_order, struct got_reflist_head *refs)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
 	regex_t regex;
 	int have_match;
+	struct got_object_id_queue reversed_commits;
+	struct got_object_qid *qid;
+	struct got_commit_object *commit;
+
+	SIMPLEQ_INIT(&reversed_commits);
 
 	if (search_pattern && regcomp(&regex, search_pattern,
 	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
@@ -3154,7 +3159,6 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	if (err)
 		goto done;
 	for (;;) {
-		struct got_commit_object *commit;
 		struct got_object_id *id;
 
 		if (sigint_received || sigpipe_received)
@@ -3186,14 +3190,41 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			}
 		}
 
-		err = print_commit(commit, id, repo, path, show_patch,
-		    diff_context, refs);
-		got_object_commit_close(commit);
-		if (err || (limit && --limit == 0) ||
-		    (end_id != NULL && got_object_id_cmp(id, end_id) == 0))
+		if (reverse_display_order) {
+			err = got_object_qid_alloc(&qid, id);
+			if (err)
+				break;
+			SIMPLEQ_INSERT_HEAD(&reversed_commits, qid, entry);
+			got_object_commit_close(commit);
+		} else {
+			err = print_commit(commit, id, repo, path, show_patch,
+			    diff_context, refs);
+			got_object_commit_close(commit);
+			if (err)
+				break;
+		}
+		if ((limit && --limit == 0) ||
+		    (end_id && got_object_id_cmp(id, end_id) == 0))
 			break;
 	}
+	if (reverse_display_order) {
+		SIMPLEQ_FOREACH(qid, &reversed_commits, entry) {
+			err = got_object_open_as_commit(&commit, repo, qid->id);
+			if (err)
+				break;
+			err = print_commit(commit, qid->id, repo, path,
+			    show_patch, diff_context, refs);
+			got_object_commit_close(commit);
+			if (err)
+				break;
+		}
+	}
 done:
+	while (!SIMPLEQ_EMPTY(&reversed_commits)) {
+		qid = SIMPLEQ_FIRST(&reversed_commits);
+		SIMPLEQ_REMOVE_HEAD(&reversed_commits, entry);
+		got_object_qid_free(qid);
+	}
 	if (search_pattern)
 		regfree(&regex);
 	got_commit_graph_close(graph);
@@ -3204,7 +3235,7 @@ __dead static void
 usage_log(void)
 {
 	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] "
-	    "[-p] [-x commit] [-s search-pattern] [-r repository-path] "
+	    "[-p] [-x commit] [-s search-pattern] [-r repository-path] [-R] "
 	    "[path]\n", getprogname());
 	exit(1);
 }
@@ -3285,6 +3316,7 @@ cmd_log(int argc, char *argv[])
 	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
 	int show_patch = 0, limit = 0, log_branches = 0;
+	int reverse_display_order = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
 
@@ -3299,7 +3331,7 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bpc:C:l:r:s:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "bpc:C:l:r:Rs:x:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
@@ -3327,6 +3359,9 @@ cmd_log(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'R':
+			reverse_display_order = 1;
 			break;
 		case 's':
 			search_pattern = optarg;
@@ -3451,7 +3486,8 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	error = print_commits(start_id, end_id, repo, path, show_patch,
-	    search_pattern, diff_context, limit, log_branches, &refs);
+	    search_pattern, diff_context, limit, log_branches,
+	    reverse_display_order, &refs);
 done:
 	free(path);
 	free(repo_path);

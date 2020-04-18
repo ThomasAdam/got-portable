@@ -682,7 +682,7 @@ in a pattern.
 .It Cm st
 Short alias for
 .Cm status .
-.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar commit Oc Op Ar path
+.It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl R Oc Oo Fl x Ar commit Oc Op Ar path
 Display history of a repository.
 If a
 .Ar path
@@ -741,6 +741,9 @@ working directory.
 If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
+.It Fl R
+Determine a set of commits to display as usual, but display these commits
+in reverse order.
 .It Fl x Ar commit
 Stop traversing commit history as soon as the specified
 .Ar commit

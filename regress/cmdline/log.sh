@@ -471,6 +471,82 @@ function test_log_end_at_commit {
 	test_done "$testroot" "0"
 }
 
+function test_log_reverse_display {
+	local testroot=`test_init log_reverse_display`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'commit1' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got rm beta >/dev/null)
+	(cd $testroot/wt && got commit -m 'commit2' > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'commit3' > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo`
+
+	# -R alone should display all commits in reverse
+	echo "commit $commit_id0" > $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
+	(cd $testroot/wt && got log -R | grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -R takes effect after the -l commit traversal limit
+	echo "commit $commit_id2" > $testroot/stdout.expected
+	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
+	(cd $testroot/wt && got log -R -l2 | grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -R works with commit ranges specified via -c and -x
+	echo "commit $commit_id1" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
+	(cd $testroot/wt && got log -R -c $commit_id3 -x $commit_id1 | \
+		grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	# commit matching with -s applies before -R
+	echo "commit $commit_id1" > $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	(cd $testroot/wt && got log -R -s 'commit[12]' | \
+		grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
@@ -479,3 +555,4 @@ run_test test_log_tag
 run_test test_log_limit
 run_test test_log_nonexistent_path
 run_test test_log_end_at_commit
+run_test test_log_reverse_display
