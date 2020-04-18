@@ -666,6 +666,7 @@ function test_update_merges_file_edits {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
@@ -875,6 +876,8 @@ function test_update_conflict_wt_add_vs_repo_add {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1354,6 +1357,7 @@ function test_update_to_another_branch {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -b newbranch > $testroot/stdout)
 
@@ -1492,6 +1496,8 @@ function test_update_bumps_base_commit_id {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1684,6 +1690,8 @@ function test_update_preserves_conflicted_file {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files not updated because of existing merge conflicts: 1" \
+		>> $testroot/stdout.expected
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout

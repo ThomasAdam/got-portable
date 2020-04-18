@@ -200,6 +200,7 @@ function test_rebase_continue {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> merge conflict" \
 		>> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
@@ -335,6 +336,7 @@ function test_rebase_abort {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> merge conflict" \
 		>> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
@@ -451,6 +453,7 @@ function test_rebase_no_op_change {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> merge conflict" \
 		>> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected
@@ -562,6 +565,7 @@ function test_rebase_in_progress {
 		2> $testroot/stderr)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit1 -> merge conflict" \
 		>> $testroot/stdout.expected
 	echo ": committing to alpha on newbranch" >> $testroot/stdout.expected

@@ -2495,6 +2495,29 @@ done:
 	return error;
 }
 
+struct got_update_progress_arg {
+	int did_something;
+	int conflicts;
+	int obstructed;
+	int not_updated;
+};
+
+void
+print_update_progress_stats(struct got_update_progress_arg *upa)
+{
+	if (!upa->did_something)
+		return;
+
+	if (upa->conflicts > 0)
+		printf("Files with new merge conflicts: %d\n", upa->conflicts);
+	if (upa->obstructed > 0)
+		printf("File paths obstructed by a non-regular file: %d\n",
+		    upa->obstructed);
+	if (upa->not_updated > 0)
+		printf("Files not updated because of existing merge "
+		    "conflicts: %d\n", upa->not_updated);
+}
+
 __dead static void
 usage_update(void)
 {
@@ -2506,17 +2529,24 @@ usage_update(void)
 static const struct got_error *
 update_progress(void *arg, unsigned char status, const char *path)
 {
-	int *did_something = arg;
+	struct got_update_progress_arg *upa = arg;
 
 	if (status == GOT_STATUS_EXISTS ||
 	    status == GOT_STATUS_BASE_REF_ERR)
 		return NULL;
 
-	*did_something = 1;
+	upa->did_something = 1;
 
 	/* Base commit bump happens silently. */
 	if (status == GOT_STATUS_BUMP_BASE)
 		return NULL;
+
+	if (status == GOT_STATUS_CONFLICT)
+		upa->conflicts++;
+	if (status == GOT_STATUS_OBSTRUCTED)
+		upa->obstructed++;
+	if (status == GOT_STATUS_CANNOT_UPDATE)
+		upa->not_updated++;
 
 	while (path[0] == '/')
 		path++;
@@ -2649,7 +2679,8 @@ cmd_update(int argc, char *argv[])
 	struct got_reference *head_ref = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, did_something = 0;
+	int ch;
+	struct got_update_progress_arg upa;
 
 	TAILQ_INIT(&paths);
 
@@ -2776,15 +2807,17 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	}
 
+	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_checkout_files(worktree, &paths, repo,
-	    update_progress, &did_something, check_cancelled, NULL);
+	    update_progress, &upa, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
-	if (did_something)
+	if (upa.did_something)
 		printf("Updated to commit %s\n", commit_id_str);
 	else
 		printf("Already up-to-date\n");
+	print_update_progress_stats(&upa);
 done:
 	free(worktree_path);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -5027,7 +5060,7 @@ cmd_branch(int argc, char *argv[])
 		if (error)
 			goto done;
 		if (worktree && do_update) {
-			int did_something = 0;
+			struct got_update_progress_arg upa;
 			char *branch_refname = NULL;
 
 			error = got_object_id_str(&commit_id_str, commit_id);
@@ -5054,13 +5087,15 @@ cmd_branch(int argc, char *argv[])
 			    commit_id);
 			if (error)
 				goto done;
+			memset(&upa, 0, sizeof(upa));
 			error = got_worktree_checkout_files(worktree, &paths,
-			    repo, update_progress, &did_something,
-			    check_cancelled, NULL);
+			    repo, update_progress, &upa, check_cancelled,
+			    NULL);
 			if (error)
 				goto done;
-			if (did_something)
+			if (upa.did_something)
 				printf("Updated to commit %s\n", commit_id_str);
+			print_update_progress_stats(&upa);
 		}
 	}
 done:
@@ -6324,7 +6359,8 @@ cmd_cherrypick(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
 	struct got_reference *head_ref = NULL;
-	int ch, did_something = 0;
+	int ch;
+	struct got_update_progress_arg upa;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -6405,14 +6441,16 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_merge_files(worktree, pid ? pid->id : NULL,
-	    commit_id, repo, update_progress, &did_something, check_cancelled,
+	    commit_id, repo, update_progress, &upa, check_cancelled,
 	    NULL);
 	if (error != NULL)
 		goto done;
 
-	if (did_something)
+	if (upa.did_something)
 		printf("Merged commit %s\n", commit_id_str);
+	print_update_progress_stats(&upa);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -6444,7 +6482,8 @@ cmd_backout(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
 	struct got_reference *head_ref = NULL;
-	int ch, did_something = 0;
+	int ch;
+	struct got_update_progress_arg upa;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -6523,13 +6562,15 @@ cmd_backout(int argc, char *argv[])
 		goto done;
 	}
 
+	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_merge_files(worktree, commit_id, pid->id, repo,
-	    update_progress, &did_something, check_cancelled, NULL);
+	    update_progress, &upa, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
-	if (did_something)
+	if (upa.did_something)
 		printf("Backed out commit %s\n", commit_id_str);
+	print_update_progress_stats(&upa);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -6654,22 +6695,6 @@ done:
 	free(new_id_str);
 	free(logmsg);
 	return err;
-}
-
-static const struct got_error *
-rebase_progress(void *arg, unsigned char status, const char *path)
-{
-	unsigned char *rebase_status = arg;
-
-	while (path[0] == '/')
-		path++;
-	printf("%c  %s\n", status, path);
-
-	if (*rebase_status == GOT_STATUS_CONFLICT)
-		return NULL;
-	if (status == GOT_STATUS_CONFLICT || status == GOT_STATUS_MERGE)
-		*rebase_status = status;
-	return NULL;
 }
 
 static const struct got_error *
@@ -6923,7 +6948,7 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 
 	if (abort_rebase) {
-		int did_something;
+		struct got_update_progress_arg upa;
 		if (!rebase_in_progress) {
 			error = got_error(GOT_ERR_NOT_REBASING);
 			goto done;
@@ -6935,11 +6960,13 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(new_base_branch));
+		memset(&upa, 0, sizeof(upa));
 		error = got_worktree_rebase_abort(worktree, fileindex, repo,
-		    new_base_branch, update_progress, &did_something);
+		    new_base_branch, update_progress, &upa);
 		if (error)
 			goto done;
 		printf("Rebase of %s aborted\n", got_ref_get_name(branch));
+		print_update_progress_stats(&upa);
 		goto done; /* nothing else to do */
 	}
 
@@ -7016,14 +7043,16 @@ cmd_rebase(int argc, char *argv[])
 	pid = SIMPLEQ_FIRST(parent_ids);
 	if (pid == NULL) {
 		if (!continue_rebase) {
-			int did_something;
+			struct got_update_progress_arg upa;
+			memset(&upa, 0, sizeof(upa));
 			error = got_worktree_rebase_abort(worktree, fileindex,
-			    repo, new_base_branch, update_progress,
-			    &did_something);
+			    repo, new_base_branch, update_progress, &upa);
 			if (error)
 				goto done;
 			printf("Rebase of %s aborted\n",
 			    got_ref_get_name(branch));
+			print_update_progress_stats(&upa);
+
 		}
 		error = got_error(GOT_ERR_EMPTY_REBASE);
 		goto done;
@@ -7062,15 +7091,22 @@ cmd_rebase(int argc, char *argv[])
 
 	pid = NULL;
 	SIMPLEQ_FOREACH(qid, &commits, entry) {
+		struct got_update_progress_arg upa;
+
 		commit_id = qid->id;
 		parent_id = pid ? pid->id : yca_id;
 		pid = qid;
 
+		memset(&upa, 0, sizeof(upa));
 		error = got_worktree_rebase_merge_files(&merged_paths,
 		    worktree, fileindex, parent_id, commit_id, repo,
-		    rebase_progress, &rebase_status, check_cancelled, NULL);
+		    update_progress, &upa, check_cancelled, NULL);
 		if (error)
 			goto done;
+
+		print_update_progress_stats(&upa);
+		if (upa.conflicts > 0)
+			rebase_status = GOT_STATUS_CONFLICT;
 
 		if (rebase_status == GOT_STATUS_CONFLICT) {
 			error = show_rebase_merge_conflict(qid->id, repo);
@@ -7939,7 +7975,8 @@ cmd_histedit(int argc, char *argv[])
 	struct got_object_id *base_commit_id = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_commit_object *commit = NULL;
-	int ch, rebase_in_progress = 0, did_something;
+	int ch, rebase_in_progress = 0;
+	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	int edit_logmsg_only = 0;
 	const char *edit_script_path = NULL;
@@ -7954,6 +7991,7 @@ cmd_histedit(int argc, char *argv[])
 	SIMPLEQ_INIT(&commits);
 	TAILQ_INIT(&histedit_cmds);
 	TAILQ_INIT(&merged_paths);
+	memset(&upa, 0, sizeof(upa));
 
 	while ((ch = getopt(argc, argv, "acF:m")) != -1) {
 		switch (ch) {
@@ -8049,11 +8087,12 @@ cmd_histedit(int argc, char *argv[])
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(branch));
 		error = got_worktree_histedit_abort(worktree, fileindex, repo,
-		    branch, base_commit_id, update_progress, &did_something);
+		    branch, base_commit_id, update_progress, &upa);
 		if (error)
 			goto done;
 		printf("Histedit of %s aborted\n",
 		    got_ref_get_symref_target(branch));
+		print_update_progress_stats(&upa);
 		goto done; /* nothing else to do */
 	} else if (abort_edit) {
 		error = got_error(GOT_ERR_NOT_HISTEDIT);
@@ -8163,7 +8202,8 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    update_progress, &did_something);
+				    update_progress, &upa);
+				print_update_progress_stats(&upa);
 				goto done;
 			}
 		} else {
@@ -8176,7 +8216,8 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    update_progress, &did_something);
+				    update_progress, &upa);
+				print_update_progress_stats(&upa);
 				goto done;
 			}
 
@@ -8187,7 +8228,8 @@ cmd_histedit(int argc, char *argv[])
 		if (error) {
 			got_worktree_histedit_abort(worktree, fileindex,
 			    repo, branch, base_commit_id,
-			    update_progress, &did_something);
+			    update_progress, &upa);
+			print_update_progress_stats(&upa);
 			goto done;
 		}
 
@@ -8265,11 +8307,15 @@ cmd_histedit(int argc, char *argv[])
 
 		error = got_worktree_histedit_merge_files(&merged_paths,
 		    worktree, fileindex, pid->id, hle->commit_id, repo,
-		    rebase_progress, &rebase_status, check_cancelled, NULL);
+		    update_progress, &upa, check_cancelled, NULL);
 		if (error)
 			goto done;
 		got_object_commit_close(commit);
 		commit = NULL;
+
+		print_update_progress_stats(&upa);
+		if (upa.conflicts > 0)
+			rebase_status = GOT_STATUS_CONFLICT;
 
 		if (rebase_status == GOT_STATUS_CONFLICT) {
 			error = show_rebase_merge_conflict(hle->commit_id,
@@ -8354,7 +8400,8 @@ cmd_integrate(int argc, char *argv[])
 	struct got_reference *branch_ref = NULL, *base_branch_ref = NULL;
 	struct got_fileindex *fileindex = NULL;
 	struct got_object_id *commit_id = NULL, *base_commit_id = NULL;
-	int ch, did_something = 0;
+	int ch;
+	struct got_update_progress_arg upa;
 
 	while ((ch = getopt(argc, argv, "")) != -1) {
 		switch (ch) {
@@ -8453,13 +8500,15 @@ cmd_integrate(int argc, char *argv[])
 		goto done;
 	}
 
+	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_integrate_continue(worktree, fileindex, repo,
-	    branch_ref, base_branch_ref, update_progress, &did_something,
+	    branch_ref, base_branch_ref, update_progress, &upa,
 	    check_cancelled, NULL);
 	if (error)
 		goto done;
 
 	printf("Integrated %s into %s\n", refname, base_refname);
+	print_update_progress_stats(&upa);
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -8634,7 +8683,8 @@ cmd_unstage(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, did_something = 0, pflag = 0;
+	int ch, pflag = 0;
+	struct got_update_progress_arg upa;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
@@ -8704,8 +8754,11 @@ cmd_unstage(int argc, char *argv[])
 
 	cpa.patch_script_file = patch_script_file;
 	cpa.action = "unstage";
+	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_unstage(worktree, &paths, update_progress,
-	    &did_something, pflag ? choose_patch : NULL, &cpa, repo);
+	    &upa, pflag ? choose_patch : NULL, &cpa, repo);
+	if (!error)
+		print_update_progress_stats(&upa);
 done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)

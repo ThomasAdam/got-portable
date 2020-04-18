@@ -123,6 +123,7 @@ function test_diff_shows_conflict {
 	echo "C  numbers" > $testroot/stdout.expected
 	echo -n "Updated to commit $head_rev" >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 

@@ -252,6 +252,7 @@ function test_stage_conflict {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
