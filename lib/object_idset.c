@@ -150,7 +150,7 @@ got_object_idset_remove(void **data, struct got_object_idset *set,
 	else
 		entry = find_element(set, id);
 	if (entry == NULL)
-		return got_error(GOT_ERR_NO_OBJ);
+		return got_error_no_obj(id);
 
 	RB_REMOVE(got_object_idset_tree, &set->entries, entry);
 	if (data)

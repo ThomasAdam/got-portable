@@ -1432,7 +1432,7 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 
 	got_ref_list_free(&refs);
 	if (err == NULL && *tag == NULL)
-		err = got_error(GOT_ERR_NO_OBJ);
+		err = got_error_path(name, GOT_ERR_NO_OBJ);
 	return err;
 }
 

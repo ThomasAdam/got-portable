@@ -497,13 +497,13 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 			struct got_object_id id1, id2;
 			int idx;
 
+			memcpy(id1.sha1, pte1->id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx_sha1(packidx,
 			    pte1->id);
 			if (idx == -1) {
-				err = got_error(GOT_ERR_NO_OBJ);
+				err = got_error_no_obj(&id1);
 				break;
 			}
-			memcpy(id1.sha1, pte1->id, SHA1_DIGEST_LENGTH);
 			got_object_parsed_tree_entries_free(entries1);
 			*nentries1 = 0;
 			free(*buf1);
@@ -514,13 +514,13 @@ tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
 			if (err)
 				break;
 
+			memcpy(id2.sha1, pte2->id, SHA1_DIGEST_LENGTH);
 			idx = got_packidx_get_object_idx_sha1(packidx,
 			    pte2->id);
 			if (idx == -1) {
-				err = got_error(GOT_ERR_NO_OBJ);
+				err = got_error_no_obj(&id2);
 				break;
 			}
-			memcpy(id2.sha1, pte2->id, SHA1_DIGEST_LENGTH);
 			got_object_parsed_tree_entries_free(entries2);
 			*nentries2 = 0;
 			free(*buf2);
