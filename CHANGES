@@ -1,3 +1,12 @@
+* got 0.34; 2020-04-19
+- make use of new convenience API functions of kcgi 0.12 in gotweb
+- make 'got update' skip conflicted files (prevents loss of local changes)
+- show a summary of conflicts and related problems after updating/merging files
+- add 'got log' -x option to stop logging when a specific commit was traversed
+- add 'got log' -R option to reverse commit display order
+- clarify wording in got.1 related to local changes/commits/branches
+- show bad object ID in "object not found" error messages where possible
+
 * got 0.33; 2020-04-14
 - normalize tree entry modes to 0100644 or 0100755 when writing tree objects
 - fix "searching..." displayed in tog log view while merely scrolling down
