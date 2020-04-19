@@ -1325,7 +1325,7 @@ done:
 		free(*id);
 		*id = NULL;
 	} else if (*id == NULL)
-		err = got_error(GOT_ERR_NO_OBJ);
+		err = got_error_path(id_str_prefix, GOT_ERR_NO_OBJ);
 
 	return err;
 }
