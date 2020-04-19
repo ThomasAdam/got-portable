@@ -1177,14 +1177,14 @@ cmd_clone(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (verbosity >= 0)
+		printf("Connecting to %s%s%s\n", host,
+		    port ? ":" : "", port ? port : "");
+
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
 	    server_path, verbosity);
 	if (error)
 		goto done;
-
-	if (verbosity >= 0)
-		printf("Connecting to %s%s%s\n", host,
-		    port ? ":" : "", port ? port : "");
 
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
@@ -1905,14 +1905,14 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	if (verbosity >= 0)
+		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
+		    port ? ":" : "", port ? port : "");
+
 	error = got_fetch_connect(&fetchpid, &fetchfd, proto, host, port,
 	    server_path, verbosity);
 	if (error)
 		goto done;
-
-	if (verbosity >= 0)
-		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
-		    port ? ":" : "", port ? port : "");
 
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
