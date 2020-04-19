@@ -1911,7 +1911,7 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 
 	if (verbosity >= 0)
-		printf("Connected to \"%s\" %s%s%s\n", remote->name, host,
+		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
 		    port ? ":" : "", port ? port : "");
 
 	fpa.last_scaled_size[0] = '\0';
