@@ -212,4 +212,5 @@
 /tog/tog.1
 /tog/tog.c
 /util
+/util/got-build-regress.sh
 /util/uncompress-loose-object.sh
