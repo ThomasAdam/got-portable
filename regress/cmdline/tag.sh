@@ -97,7 +97,7 @@ function test_tag_create {
 		return 1
 	fi
 
-	echo "got: object not found" > $testroot/stderr.expected
+	echo "got: $tree_id: object not found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
 	ret="$?"
 	if [ "$ret" != "0" ]; then

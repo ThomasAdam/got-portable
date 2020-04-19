@@ -442,8 +442,8 @@ function test_log_end_at_commit {
 
 	# try the same with the hash of an empty string which is very
 	# unlikely to match any object
-	(cd $testroot/wt && \
-		got log -x da39a3ee5e6b4b0d3255bfef95601890afd80709 \
+	local empty_sha1=da39a3ee5e6b4b0d3255bfef95601890afd80709 
+	(cd $testroot/wt && got log -x $empty_sha1 \
 		> $testroot/stdout 2> $testroot/stderr) 
 	ret="$?"
 	if [ "$ret" == "0" ]; then
@@ -452,7 +452,7 @@ function test_log_end_at_commit {
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
-	echo "got: object not found" > $testroot/stderr.expected
+	echo "got: $empty_sha1: object not found" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
