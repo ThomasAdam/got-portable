@@ -1183,7 +1183,7 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 
 	if (verbosity >= 0)
-		printf("Connected to %s%s%s\n", host,
+		printf("Connecting to %s%s%s\n", host,
 		    port ? ":" : "", port ? port : "");
 
 	fpa.last_scaled_size[0] = '\0';
