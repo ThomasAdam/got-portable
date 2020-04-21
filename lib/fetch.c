@@ -90,29 +90,28 @@ dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
 	int pid, pfd[2];
 	char cmd[64];
 	char *argv[11];
-	int i = 0;
+	int i = 0, j;
 
 	*fetchpid = -1;
 	*fetchfd = -1;
 
-	if (port == NULL)
-		port = "22";
-
-	argv[0] = GOT_FETCH_PATH_SSH;
-	argv[1] = "-p";
-	argv[2] = (char *)port;
+	argv[i++] = GOT_FETCH_PATH_SSH;
+	if (port != NULL) {
+		argv[i++] = "-p";
+		argv[i++] = (char *)port;
+	}
 	if (verbosity == -1) {
-		argv[3 + i++] = "-q";
+		argv[i++] = "-q";
 	} else {
 		/* ssh(1) allows up to 3 "-v" options. */
-		for (i = 0; i < MIN(3, verbosity); i++)
-			argv[3 + i] = "-v";
+		for (j = 0; j < MIN(3, verbosity); j++)
+			argv[i++] = "-v";
 	}
-	argv[3 + i] = "--";
-	argv[4 + i] = (char *)host;
-	argv[5 + i] = (char *)cmd;
-	argv[6 + i] = (char *)path;
-	argv[7 + i] = NULL;
+	argv[i++] = "--";
+	argv[i++] = (char *)host;
+	argv[i++] = (char *)cmd;
+	argv[i++] = (char *)path;
+	argv[i++] = NULL;
 
 	if (pipe(pfd) == -1)
 		return got_error_from_errno("pipe");
