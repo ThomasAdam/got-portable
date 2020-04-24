@@ -3389,10 +3389,12 @@ cmd_log(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_worktree_open(&worktree, cwd);
-	if (error && error->code != GOT_ERR_NOT_WORKTREE)
-		goto done;
-	error = NULL;
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		error = NULL;
+	}
 
 	if (argc == 0) {
 		path = strdup("");

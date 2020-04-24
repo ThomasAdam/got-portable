@@ -547,6 +547,71 @@ function test_log_reverse_display {
 	test_done "$testroot" "$ret"
 }
 
+function test_log_in_worktree_different_repo {
+	local testroot=`test_init log_in_worktree_different_repo 1`
+
+	make_test_tree $testroot/repo
+	mkdir -p $testroot/repo/epsilon/d
+	echo foo > $testroot/repo/epsilon/d/foo
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding the test tree"
+	local head_commit=`git_show_head $testroot/repo`
+
+	got init $testroot/other-repo
+	mkdir -p $testroot/tree
+	make_test_tree $testroot/tree
+	got import -mm -b foo -r $testroot/other-repo $testroot/tree >/dev/null
+	got checkout -b foo $testroot/other-repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "commit $head_commit (master)" > $testroot/stdout.expected
+
+	# 'got log' used to fail with "reference refs/heads/foo not found"
+	# even though that reference belongs to an unrelated repository
+	# found via a worktree via the current working directory
+	for p in "" alpha epsilon; do
+		(cd $testroot/wt && got log -r $testroot/repo $p | \
+			grep ^commit > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	for p in "" epsilon/zeta; do
+		(cd $testroot/wt/epsilon && got log -r $testroot/repo $p | \
+			grep ^commit > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	for p in "" foo; do
+		(cd $testroot/wt/epsilon && got log -r $testroot/repo epsilon/d/$p | \
+			grep ^commit > $testroot/stdout)
+		cmp -s $testroot/stdout.expected $testroot/stdout
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stdout.expected $testroot/stdout
+			test_done "$testroot" "$ret"
+			return 1
+		fi
+	done
+
+	test_done "$testroot" "0"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
@@ -556,3 +621,4 @@ run_test test_log_limit
 run_test test_log_nonexistent_path
 run_test test_log_end_at_commit
 run_test test_log_reverse_display
+run_test test_log_in_worktree_different_repo
