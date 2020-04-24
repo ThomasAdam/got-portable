@@ -222,8 +222,8 @@ got_fileindex_entry_remove(struct got_fileindex *fileindex,
 	/*
 	 * Removing an entry from the RB tree immediately breaks
 	 * in-progress iterations over file index entries.
-	 * So flag this entry for removal and skip it once the index
-	 * is written out to disk, and pretend this entry no longer
+	 * So flag this entry for removal and remove it once the index
+	 * is written out to disk. Meanwhile, pretend this entry no longer
 	 * exists if we get queried for it again before then.
 	 */
 	ie->flags |= GOT_FILEIDX_F_REMOVE_ON_FLUSH;
@@ -423,7 +423,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	SHA1_CTX ctx;
 	uint8_t sha1[SHA1_DIGEST_LENGTH];
 	size_t n;
-	struct got_fileindex_entry *ie;
+	struct got_fileindex_entry *ie, *tmp;
 
 	SHA1Init(&ctx);
 
@@ -444,10 +444,13 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 	if (n != sizeof(hdr.nentries))
 		return got_ferror(outfile, GOT_ERR_IO);
 
-	RB_FOREACH(ie, got_fileindex_tree, &fileindex->entries) {
+	RB_FOREACH_SAFE(ie, got_fileindex_tree, &fileindex->entries, tmp) {
 		ie->flags &= ~GOT_FILEIDX_F_NOT_FLUSHED;
-		if (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH)
+		if (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH) {
+			RB_REMOVE(got_fileindex_tree, &fileindex->entries, ie);
+			got_fileindex_entry_free(ie);
 			continue;
+		}
 		err = write_fileindex_entry(&ctx, ie, outfile);
 		if (err)
 			return err;
