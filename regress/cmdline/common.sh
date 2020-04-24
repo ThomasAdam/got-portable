@@ -84,7 +84,8 @@ function git_show_tagger_time
 function git_show_parent_commit
 {
 	local repo="$1"
-	(cd $repo && git show --no-patch --pretty='format:%P')
+	local commit="$2"
+	(cd $repo && git show --no-patch --pretty='format:%P' $commit)
 }
 
 function git_show_tree

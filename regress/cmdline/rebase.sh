@@ -1163,6 +1163,113 @@ function test_rebase_delete_missing_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_rebase_rm_add_rm_file {
+	local testroot=`test_init rebase_rm_add_rm_file`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	(cd $testroot/repo && git rm -q beta)
+	git_commit $testroot/repo -m "removing beta from newbranch"
+	local orig_commit1=`git_show_head $testroot/repo`
+
+	echo 'restored beta' > $testroot/repo/beta
+	(cd $testroot/repo && git add beta)
+	git_commit $testroot/repo -m "restoring beta on newbranch"
+	local orig_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git rm -q beta)
+	git_commit $testroot/repo -m "removing beta from newbranch again"
+	local orig_commit3=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
+
+	# this would error out with 'got: file index is corrupt'
+	(cd $testroot/wt && got status > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got status command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit3=`git_show_head $testroot/repo`
+	local new_commit2=`git_show_parent_commit $testroot/repo`
+	local new_commit1=`git_show_parent_commit $testroot/repo $new_commit2`
+
+	(cd $testroot/repo && git checkout -q newbranch)
+
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+	local short_orig_commit3=`trim_obj_id 28 $orig_commit3`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+	local short_new_commit3=`trim_obj_id 28 $new_commit3`
+
+	echo "D  beta" > $testroot/stdout.expected
+	echo -n "$short_orig_commit1 -> $short_new_commit1" \
+		>> $testroot/stdout.expected
+	echo ": removing beta from newbranch" >> $testroot/stdout.expected
+	echo "A  beta" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit2 -> $short_new_commit2" \
+		>> $testroot/stdout.expected
+	echo ": restoring beta on newbranch" >> $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo -n "$short_orig_commit3 -> $short_new_commit3" \
+		>> $testroot/stdout.expected
+	echo ": removing beta from newbranch again" >> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/newbranch" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got status command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l4 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit3 (newbranch)" > $testroot/stdout.expected
+	echo "commit $new_commit2" >> $testroot/stdout.expected
+	echo "commit $new_commit1" >> $testroot/stdout.expected
+	echo "commit $master_commit (master)" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue
@@ -1176,3 +1283,4 @@ run_test test_rebase_forward
 run_test test_rebase_out_of_date
 run_test test_rebase_trims_empty_dir
 run_test test_rebase_delete_missing_file
+run_test test_rebase_rm_add_rm_file
