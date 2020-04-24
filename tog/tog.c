@@ -1173,8 +1173,12 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			continue;
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
-		if (strncmp(name, "remotes/", 8) == 0)
+		if (strncmp(name, "remotes/", 8) == 0) {
 			name += 8;
+			s = strstr(name, "/" GOT_REF_HEAD);
+			if (s != NULL && s[strlen(s)] == '\0')
+				continue;
+		}
 		if (strncmp(name, "tags/", 5) == 0) {
 			err = got_object_open_as_tag(&tag, repo, re->id);
 			if (err) {
