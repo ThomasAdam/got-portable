@@ -1,3 +1,9 @@
+* got 0.35; 2020-04-25
+- don't pass "-p 22" to ssh; makes ssh_config's Port option work (semarie)
+- fix a file index corruption problem with 'got rebase' (found by tracey)
+- fix 'got log -r' loading refs from the wrong repo if invoked in a work tree
+- filter out "remotes/*/HEAD" references in got/tog log output
+
 * got 0.34; 2020-04-19
 - make use of new convenience API functions of kcgi 0.12 in gotweb
 - make 'got update' skip conflicted files (prevents loss of local changes)
