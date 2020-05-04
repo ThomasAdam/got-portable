@@ -283,6 +283,40 @@ function test_log_limit {
 	test_done "$testroot" "0"
 }
 
+function test_log_patch_added_file {
+	local testroot=`test_init log_patch_added_file`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_limit' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	echo "commit $commit_id1 (master)" > $testroot/stdout.expected
+	# This used to fail with 'got: no such entry found in tree'
+	(cd $testroot/wt && got log -l1 -p new > $testroot/stdout.patch)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got log command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	grep ^commit $testroot/stdout.patch > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_log_nonexistent_path {
 	local testroot=`test_init log_nonexistent_path`
 	local head_rev=`git_show_head $testroot/repo`
@@ -618,6 +652,7 @@ run_test test_log_in_worktree
 run_test test_log_in_worktree_with_path_prefix
 run_test test_log_tag
 run_test test_log_limit
+run_test test_log_patch_added_file
 run_test test_log_nonexistent_path
 run_test test_log_end_at_commit
 run_test test_log_reverse_display

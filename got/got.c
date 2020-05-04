@@ -2923,13 +2923,16 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 			err = got_object_id_by_path(&obj_id1, repo,
 			    qid->id, path);
 			if (err) {
-				free(obj_id2);
-				goto done;
-			}
-			err = got_object_id_str(&id_str1, obj_id1);
-			if (err) {
-				free(obj_id2);
-				goto done;
+				if (err->code != GOT_ERR_NO_TREE_ENTRY) {
+					free(obj_id2);
+					goto done;
+				}
+			} else {
+				err = got_object_id_str(&id_str1, obj_id1);
+				if (err) {
+					free(obj_id2);
+					goto done;
+				}
 			}
 		}
 		err = got_object_get_type(&obj_type, repo, obj_id2);
