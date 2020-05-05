@@ -212,14 +212,14 @@ te_mode2str(char *buf, size_t len, mode_t te_mode)
 	 * For best compatibility we normalize the file/directory mode here.
 	 * Note that we do not support committing symlinks or submodules.
 	 */
-	if (S_ISREG(te_mode))
+	if (S_ISREG(te_mode)) {
 		mode = GOT_DEFAULT_FILE_MODE;
-	else if (S_ISDIR(te_mode))
-		mode = GOT_DEFAULT_DIR_MODE;
+		if (te_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+			mode |= S_IXUSR | S_IXGRP | S_IXOTH;
+	} else if (S_ISDIR(te_mode))
+		mode = S_IFDIR; /* Git leaves all the other bits unset. */
 	else
 		return got_error(GOT_ERR_BAD_FILETYPE);
-	if (te_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
-		mode |= S_IXUSR | S_IXGRP | S_IXOTH;
 
 	ret = snprintf(buf, len, "%o ", mode);
 	if (ret == -1 || ret >= len)
