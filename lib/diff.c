@@ -30,6 +30,8 @@
 #include "got_diff.h"
 #include "got_opentemp.h"
 #include "got_path.h"
+#include "got_cancel.h"
+#include "got_worktree.h"
 
 #include "got_lib_diff.h"
 #include "got_lib_delta.h"
@@ -591,6 +593,48 @@ diff_entry_new_old(struct got_tree_entry *te2,
 
 	return cb(cb_arg, NULL, NULL, NULL, &te2->id, NULL, label2, 0,
 	    te2->mode, repo);
+}
+
+const struct got_error *
+got_diff_tree_collect_changed_paths(void *arg, struct got_blob_object *blob1,
+    struct got_blob_object *blob2, struct got_object_id *id1,
+    struct got_object_id *id2, const char *label1, const char *label2,
+    mode_t mode1, mode_t mode2, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_head *paths = arg;
+	struct got_diff_changed_path *change = NULL;
+	char *path = NULL;
+
+	path = strdup(label2 ? label2 : label1);
+	if (path == NULL)
+		return got_error_from_errno("malloc");
+
+	change = malloc(sizeof(*change));
+	if (change == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+
+	change->status = GOT_STATUS_NO_CHANGE;
+	if (id1 == NULL)
+		change->status = GOT_STATUS_ADD;
+	else if (id2 == NULL)
+		change->status = GOT_STATUS_DELETE;
+	else {
+		if (got_object_id_cmp(id1, id2) != 0)
+			change->status = GOT_STATUS_MODIFY;
+		else if (mode1 != mode2)
+			change->status = GOT_STATUS_MODE_CHANGE;
+	}
+
+	err = got_pathlist_insert(NULL, paths, path, change);
+done:
+	if (err) {
+		free(path);
+		free(change);
+	}
+	return err;
 }
 
 const struct got_error *

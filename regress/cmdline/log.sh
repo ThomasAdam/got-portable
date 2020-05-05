@@ -646,6 +646,50 @@ function test_log_in_worktree_different_repo {
 	test_done "$testroot" "0"
 }
 
+function test_log_changed_paths {
+	local testroot=`test_init log_changed_paths`
+	local commit_id0=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test log_changed_paths' > /dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got rm beta >/dev/null)
+	(cd $testroot/wt && chmod +x epsilon/zeta >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_changed_paths' > /dev/null)
+	local commit_id2=`git_show_head $testroot/repo`
+
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'test log_changed_paths' > /dev/null)
+	local commit_id3=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got log -P | grep '^ [MDmA]' > $testroot/stdout)
+
+	echo " A  new" > $testroot/stdout.expected
+	echo " D  beta" >> $testroot/stdout.expected
+	echo " m  epsilon/zeta" >> $testroot/stdout.expected
+	echo " M  alpha" >> $testroot/stdout.expected
+	echo " A  alpha" >> $testroot/stdout.expected
+	echo " A  beta" >> $testroot/stdout.expected
+	echo " A  epsilon/zeta" >> $testroot/stdout.expected
+	echo " A  gamma/delta" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
@@ -657,3 +701,4 @@ run_test test_log_nonexistent_path
 run_test test_log_end_at_commit
 run_test test_log_reverse_display
 run_test test_log_in_worktree_different_repo
+run_test test_log_changed_paths

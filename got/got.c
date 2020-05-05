@@ -2892,6 +2892,49 @@ done:
 }
 
 static const struct got_error *
+get_changed_paths(struct got_pathlist_head *paths,
+    struct got_commit_object *commit, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_object_qid *qid;
+
+	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (qid != NULL) {
+		struct got_commit_object *pcommit;
+		err = got_object_open_as_commit(&pcommit, repo,
+		    qid->id);
+		if (err)
+			return err;
+
+		tree_id1 = got_object_commit_get_tree_id(pcommit);
+		got_object_commit_close(pcommit);
+
+	}
+
+	if (tree_id1) {
+		err = got_object_open_as_tree(&tree1, repo, tree_id1);
+		if (err)
+			goto done;
+	}
+
+	tree_id2 = got_object_commit_get_tree_id(commit);
+	err = got_object_open_as_tree(&tree2, repo, tree_id2);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(tree1, tree2, "", "", repo,
+	    got_diff_tree_collect_changed_paths, paths, 0);
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
 print_patch(struct got_commit_object *commit, struct got_object_id *id,
     const char *path, int diff_context, struct got_repository *repo)
 {
@@ -3020,11 +3063,29 @@ done:
 	return err;
 }
 
+static void
+match_changed_paths(int *have_match, struct got_pathlist_head *changed_paths,
+    regex_t *regex)
+{
+	regmatch_t regmatch;
+	struct got_pathlist_entry *pe;
+
+	*have_match = 0;
+
+	TAILQ_FOREACH(pe, changed_paths, entry) {
+		if (regexec(regex, pe->path, 1, &regmatch, 0) == 0) {
+			*have_match = 1;
+			break;
+		}
+	}
+}
+
 #define GOT_COMMIT_SEP_STR "-----------------------------------------------\n"
 
 static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, const char *path, int show_patch,
+    struct got_repository *repo, const char *path,
+    struct got_pathlist_head *changed_paths, int show_patch,
     int diff_context, struct got_reflist_head *refs)
 {
 	const struct got_error *err = NULL;
@@ -3127,6 +3188,14 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	} while (line);
 	free(logmsg0);
 
+	if (changed_paths) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, changed_paths, entry) {
+			struct got_diff_changed_path *cp = pe->data;
+			printf(" %c  %s\n", cp->status, pe->path);
+		}
+		printf("\n");
+	}
 	if (show_patch) {
 		err = print_patch(commit, id, path, diff_context, repo);
 		if (err == 0)
@@ -3140,9 +3209,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
-    struct got_repository *repo, const char *path, int show_patch,
-    const char *search_pattern, int diff_context, int limit, int log_branches,
-    int reverse_display_order, struct got_reflist_head *refs)
+    struct got_repository *repo, const char *path, int show_changed_paths,
+    int show_patch, const char *search_pattern, int diff_context, int limit,
+    int log_branches, int reverse_display_order, struct got_reflist_head *refs)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -3151,8 +3220,11 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	struct got_object_id_queue reversed_commits;
 	struct got_object_qid *qid;
 	struct got_commit_object *commit;
+	struct got_pathlist_head changed_paths;
+	struct got_pathlist_entry *pe;
 
 	SIMPLEQ_INIT(&reversed_commits);
+	TAILQ_INIT(&changed_paths);
 
 	if (search_pattern && regcomp(&regex, search_pattern,
 	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE))
@@ -3185,14 +3257,28 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		if (err)
 			break;
 
+		if (show_changed_paths) {
+			err = get_changed_paths(&changed_paths, commit, repo);
+			if (err)
+				break;
+		}
+
 		if (search_pattern) {
 			err = match_logmsg(&have_match, id, commit, &regex);
 			if (err) {
 				got_object_commit_close(commit);
 				break;
 			}
+			if (have_match == 0 && show_changed_paths)
+				match_changed_paths(&have_match,
+				    &changed_paths, &regex);
 			if (have_match == 0) {
 				got_object_commit_close(commit);
+				TAILQ_FOREACH(pe, &changed_paths, entry) {
+					free((char *)pe->path);
+					free(pe->data);
+				}
+				got_pathlist_free(&changed_paths);
 				continue;
 			}
 		}
@@ -3204,8 +3290,9 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			SIMPLEQ_INSERT_HEAD(&reversed_commits, qid, entry);
 			got_object_commit_close(commit);
 		} else {
-			err = print_commit(commit, id, repo, path, show_patch,
-			    diff_context, refs);
+			err = print_commit(commit, id, repo, path,
+			    show_changed_paths ? &changed_paths : NULL,
+			    show_patch, diff_context, refs);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -3213,6 +3300,12 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		if ((limit && --limit == 0) ||
 		    (end_id && got_object_id_cmp(id, end_id) == 0))
 			break;
+
+		TAILQ_FOREACH(pe, &changed_paths, entry) {
+			free((char *)pe->path);
+			free(pe->data);
+		}
+		got_pathlist_free(&changed_paths);
 	}
 	if (reverse_display_order) {
 		SIMPLEQ_FOREACH(qid, &reversed_commits, entry) {
@@ -3220,6 +3313,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			if (err)
 				break;
 			err = print_commit(commit, qid->id, repo, path,
+			    show_changed_paths ? &changed_paths : NULL,
 			    show_patch, diff_context, refs);
 			got_object_commit_close(commit);
 			if (err)
@@ -3232,6 +3326,11 @@ done:
 		SIMPLEQ_REMOVE_HEAD(&reversed_commits, entry);
 		got_object_qid_free(qid);
 	}
+	TAILQ_FOREACH(pe, &changed_paths, entry) {
+		free((char *)pe->path);
+		free(pe->data);
+	}
+	got_pathlist_free(&changed_paths);
 	if (search_pattern)
 		regfree(&regex);
 	got_commit_graph_close(graph);
@@ -3242,8 +3341,8 @@ __dead static void
 usage_log(void)
 {
 	fprintf(stderr, "usage: %s log [-b] [-c commit] [-C number] [ -l N ] "
-	    "[-p] [-x commit] [-s search-pattern] [-r repository-path] [-R] "
-	    "[path]\n", getprogname());
+	    "[-p] [-P] [-x commit] [-s search-pattern] [-r repository-path] "
+	    "[-R] [path]\n", getprogname());
 	exit(1);
 }
 
@@ -3322,7 +3421,7 @@ cmd_log(int argc, char *argv[])
 	const char *start_commit = NULL, *end_commit = NULL;
 	const char *search_pattern = NULL;
 	int diff_context = -1, ch;
-	int show_patch = 0, limit = 0, log_branches = 0;
+	int show_changed_paths = 0, show_patch = 0, limit = 0, log_branches = 0;
 	int reverse_display_order = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
@@ -3338,10 +3437,13 @@ cmd_log(int argc, char *argv[])
 
 	limit = get_default_log_limit();
 
-	while ((ch = getopt(argc, argv, "bpc:C:l:r:Rs:x:")) != -1) {
+	while ((ch = getopt(argc, argv, "bpPc:C:l:r:Rs:x:")) != -1) {
 		switch (ch) {
 		case 'p':
 			show_patch = 1;
+			break;
+		case 'P':
+			show_changed_paths = 1;
 			break;
 		case 'c':
 			start_commit = optarg;
@@ -3494,8 +3596,8 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = print_commits(start_id, end_id, repo, path, show_patch,
-	    search_pattern, diff_context, limit, log_branches,
+	error = print_commits(start_id, end_id, repo, path, show_changed_paths,
+	    show_patch, search_pattern, diff_context, limit, log_branches,
 	    reverse_display_order, &refs);
 done:
 	free(path);

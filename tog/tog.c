@@ -2894,6 +2894,49 @@ get_datestr(time_t *time, char *datebuf)
 }
 
 static const struct got_error *
+get_changed_paths(struct got_pathlist_head *paths,
+    struct got_commit_object *commit, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
+	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct got_object_qid *qid;
+
+	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (qid != NULL) {
+		struct got_commit_object *pcommit;
+		err = got_object_open_as_commit(&pcommit, repo,
+		    qid->id);
+		if (err)
+			return err;
+
+		tree_id1 = got_object_commit_get_tree_id(pcommit);
+		got_object_commit_close(pcommit);
+
+	}
+
+	if (tree_id1) {
+		err = got_object_open_as_tree(&tree1, repo, tree_id1);
+		if (err)
+			goto done;
+	}
+
+	tree_id2 = got_object_commit_get_tree_id(commit);
+	err = got_object_open_as_tree(&tree2, repo, tree_id2);
+	if (err)
+		goto done;
+
+	err = got_diff_tree(tree1, tree2, "", "", repo,
+	    got_diff_tree_collect_changed_paths, paths, 0);
+done:
+	if (tree1)
+		got_object_tree_close(tree1);
+	if (tree2)
+		got_object_tree_close(tree2);
+	return err;
+}
+
+static const struct got_error *
 write_commit_info(struct got_object_id *commit_id,
     struct got_reflist_head *refs, struct got_repository *repo, FILE *outfile)
 {
@@ -2904,6 +2947,10 @@ write_commit_info(struct got_object_id *commit_id,
 	time_t committer_time;
 	const char *author, *committer;
 	char *refs_str = NULL;
+	struct got_pathlist_head changed_paths;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_INIT(&changed_paths);
 
 	if (refs) {
 		err = build_refs_str(&refs_str, refs, commit_id, repo);
@@ -2951,7 +2998,18 @@ write_commit_info(struct got_object_id *commit_id,
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}
+	err = get_changed_paths(&changed_paths, commit, repo);
+	if (err)
+		goto done;
+	TAILQ_FOREACH(pe, &changed_paths, entry) {
+		struct got_diff_changed_path *cp = pe->data;
+		fprintf(outfile, "%c  %s\n", cp->status, pe->path);
+		free((char *)pe->path);
+		free(pe->data);
+	}
+	fputc('\n', outfile);
 done:
+	got_pathlist_free(&changed_paths);
 	free(id_str);
 	free(logmsg);
 	free(refs_str);
@@ -3089,7 +3147,7 @@ create_diff(struct tog_diff_view_state *s)
 			goto done;
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
-			err =write_commit_info(s->id2, s->refs, s->repo, s->f);
+			err = write_commit_info(s->id2, s->refs, s->repo, s->f);
 			if (err)
 				goto done;
 		} else {
@@ -3282,7 +3340,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 
 		err = add_color(&s->colors,
-		    "^(commit|(blob|file) [-+] )", TOG_COLOR_DIFF_META,
+		    "^(commit|(blob|file) [-+] |[MDmA]  [^ ])",
+		    TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
 			free_colors(&s->colors);

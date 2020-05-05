@@ -79,6 +79,27 @@ const struct got_error *got_diff_tree(struct got_tree_object *,
     struct got_repository *, got_diff_blob_cb cb, void *cb_arg, int);
 
 /*
+ * A pre-defined implementation of got_diff_blob_cb() which collects a list
+ * of file paths that differ between two trees.
+ * The caller must allocate and initialize a got_pathlist_head * argument.
+ * Data pointers of entries added to the path list will point to a struct
+ * got_diff_changed_path object.
+ * The caller is expected to free both the path and data pointers of all
+ * entries on the path list.
+ */
+struct got_diff_changed_path {
+	/*
+	 * The modification status of this path. It can be GOT_STATUS_ADD,
+	 * GOT_STATUS_DELETE, GOT_STATUS_MODIFY, or GOT_STATUS_MODE_CHANGE.
+	 */
+	int status;
+};
+const struct got_error *got_diff_tree_collect_changed_paths(void *,
+    struct got_blob_object *, struct got_blob_object *,
+    struct got_object_id *, struct got_object_id *,
+    const char *, const char *, mode_t, mode_t, struct got_repository *);
+
+/*
  * Diff two objects, assuming both objects are blobs. Two const char * diff
  * header labels may be provided which will be used to identify each blob in
  * the diff output. If a label is NULL, use the blob's SHA1 checksum instead.
