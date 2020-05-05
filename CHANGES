@@ -1,3 +1,9 @@
+* got 0.36; 2020-05-05
+- fix "no such entry found in tree" error with got log -p and an added path
+- show a list of paths changed in a commit with 'got log -P' and in tog
+- prevent false positive tree entry differences due to bogus file mode bits
+- write directory tree entry mode bits in the same way as Git does (0040000)
+
 * got 0.35; 2020-04-25
 - don't pass "-p 22" to ssh; makes ssh_config's Port option work (semarie)
 - fix a file index corruption problem with 'got rebase' (found by tracey)
