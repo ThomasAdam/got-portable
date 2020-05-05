@@ -128,8 +128,8 @@ fi
 printf "\n\n\tTesting a release build\n\n" >> build.log
 log_cmd build.log make clean
 log_cmd build.log make obj
-log_cmd build.log make -j $ncpu GOT_RELEASE=1
-log_cmd build.log make -j $ncpu GOT_RELEASE=1 web
+log_cmd build.log make -j $ncpu GOT_RELEASE=Yes
+log_cmd build.log make -j $ncpu GOT_RELEASE=Yes web
 build_status="$?"
 if [ "$build_status" != "0" ]; then
 	mail -s "$prog release mode build failure" $recipients < build.log
