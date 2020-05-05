@@ -1624,6 +1624,25 @@ done:
 	return err;
 }
 
+/*
+ * Normalize file mode bits to avoid false positive tree entry differences
+ * in case tree entries have unexpected mode bits set.
+ */
+static mode_t
+normalize_mode_for_comparison(mode_t mode)
+{
+	/*
+	 * For directories, the only relevant bit is the IFDIR bit.
+	 * This allows us to detect paths changing from a directory
+	 * to a file and vice versa.
+	 */
+	if (S_ISDIR(mode))
+		return mode & S_IFDIR;
+
+	/* For files, the only change we care about is the executable bit. */
+	return mode & S_IXUSR;
+}
+
 const struct got_error *
 got_object_tree_path_changed(int *changed,
     struct got_tree_object *tree01, struct got_tree_object *tree02,
@@ -1650,6 +1669,7 @@ got_object_tree_path_changed(int *changed,
 	seglen = 0;
 	while (*s) {
 		struct got_tree_object *next_tree1, *next_tree2;
+		mode_t mode1, mode2;
 
 		if (*s != '/') {
 			s++;
@@ -1670,7 +1690,9 @@ got_object_tree_path_changed(int *changed,
 			goto done;
 		}
 
-		if (te1->mode != te2->mode) {
+		mode1 = normalize_mode_for_comparison(te1->mode);
+		mode2 = normalize_mode_for_comparison(te2->mode);
+		if (mode1 != mode2) {
 			*changed = 1;
 			goto done;
 		}
