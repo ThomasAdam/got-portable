@@ -129,6 +129,27 @@ function make_test_tree
 	echo zeta > $repo/epsilon/zeta
 }
 
+function make_single_file_repo
+{
+	repo="$1"
+	file="$2"
+
+	mkdir $repo
+	git_init $repo
+	echo "this is file $file" > $repo/$file
+	(cd $repo && git add .)
+	git_commit $repo -m "intialize $repo with file $file"
+}
+
+function get_loose_object_path
+{
+	local repo="$1"
+	local id="$2"
+	local id0=`trim_obj_id 38 $id`
+	local idrest=`echo ${id#[0-9a-f][0-9a-f]}`
+	echo "$repo/.git/objects/$id0/$idrest"
+}
+
 function get_blob_id
 {
 	repo="$1"

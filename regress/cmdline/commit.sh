@@ -862,6 +862,43 @@ function test_commit_normalizes_filemodes {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_with_unrelated_submodule {
+	local testroot=`test_init commit_with_unrelated_submodule`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+
+	# Currently fails with "bad file type" error
+	(cd $testroot/wt && got commit -m 'modify alpha' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "commit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: bad file type" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -881,3 +918,4 @@ run_test test_commit_tree_entry_sorting
 run_test test_commit_gitconfig_author
 run_test test_commit_xbit_change
 run_test test_commit_normalizes_filemodes
+run_test test_commit_with_unrelated_submodule

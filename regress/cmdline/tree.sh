@@ -77,5 +77,65 @@ function test_tree_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_tree_submodule {
+	local testroot=`test_init tree_submodule`
+
+	make_single_file_repo $testroot/repo2 foo
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	local submodule_id=$(got tree -r $testroot/repo -i | \
+		grep 'repo2\$$' | cut -d ' ' -f1)
+	local objpath=`get_loose_object_path $testroot/repo $submodule_id`
+
+	# Currently fails in open(2)
+	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "tree command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: open: $objpath: No such file or directory" \
+		> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_tree_submodule_of_same_repo {
+	local testroot=`test_init tree_submodule_of_same_repo`
+
+	(cd $testroot && git clone -q repo repo2 >/dev/null)
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	# Currently fails with "bad object data"
+	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "tree command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got-read-tree: bad object data" > $testroot/stderr.expected
+	echo "got: bad object data" >> $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_tree_basic
 run_test test_tree_branch
+run_test test_tree_submodule
+run_test test_tree_submodule_of_same_repo

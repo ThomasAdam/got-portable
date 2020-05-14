@@ -731,6 +731,37 @@ function test_blame_added_on_branch {
 	test_done "$testroot" "$ret"
 }
 
+function test_blame_submodule {
+	local testroot=`test_init blame_submodule`
+	local commit_id0=`git_show_head $testroot/repo`
+	local author_time=`git_show_author_time $testroot/repo`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	# Attempt a (nonsensical) blame of a submodule.
+	got blame -r $testroot/repo repo2 \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local submodule_id=$(got tree -r $testroot/repo -i | \
+		grep 'repo2\$$' | cut -d ' ' -f1)
+	echo "got: object $submodule_id not found" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_blame_basic
 run_test test_blame_tag
 run_test test_blame_file_single_line
@@ -741,3 +772,4 @@ run_test test_blame_lines_shifted_down
 run_test test_blame_commit_subsumed
 run_test test_blame_blame_h
 run_test test_blame_added_on_branch
+run_test test_blame_submodule

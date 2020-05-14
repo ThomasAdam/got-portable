@@ -249,9 +249,57 @@ function test_add_directory {
 	test_done "$testroot" "$ret"
 }
 
+function test_add_clashes_with_submodule {
+	local testroot=`test_init add_clashes_with_submodule`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	# Atttempt to add a file clashes with a submodule
+	echo "This is a file called repo2" > $testroot/wt/repo2
+	(cd $testroot/wt && got add repo2 > /dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "A  repo2" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Update for good measure; see the error below.
+	(cd $testroot/wt && got update > /dev/null)
+
+	# This currently fails with "work tree must be updated"...
+	(cd $testroot/wt && got commit -m 'add file repo2' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "commit succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "got: work tree must be updated " > $testroot/stderr.expected
+	echo "before these changes can be committed" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple
 run_test test_add_file_in_new_subdir
 run_test test_add_deleted
 run_test test_add_directory
+run_test test_add_clashes_with_submodule

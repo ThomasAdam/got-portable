@@ -329,8 +329,42 @@ function test_diff_ignore_whitespace {
 	test_done "$testroot" "$ret"
 }
 
+function test_diff_submodule_of_same_repo {
+	local testroot=`test_init diff_submodule_of_same_repo`
+
+	(cd $testroot && git clone -q repo repo2 >/dev/null)
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	epsilon_id=$(got tree -r $testroot/repo -i | grep 'epsilon/$' | \
+		cut -d ' ' -f 1)
+	submodule_id=$(got tree -r $testroot/repo -i | grep 'repo2\$$' | \
+		cut -d ' ' -f 1)
+
+	# Attempt a (nonsensical) diff between a tree object and a submodule.
+	# Currently fails with "wrong type of object" error
+	got diff -r $testroot/repo $epsilon_id $submodule_id \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: wrong type of object" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_diff_basic
 run_test test_diff_shows_conflict
 run_test test_diff_tag
 run_test test_diff_lightweight_tag
 run_test test_diff_ignore_whitespace
+run_test test_diff_submodule_of_same_repo

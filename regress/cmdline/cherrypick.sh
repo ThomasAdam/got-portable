@@ -234,6 +234,120 @@ function test_cherrypick_into_work_tree_with_conflicts {
 	test_done "$testroot" "$ret"
 }
 
+function test_cherrypick_modified_submodule {
+	local testroot=`test_init cherrypick_modified_submodules`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	echo "modified foo" > $testroot/repo2/foo
+	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	# Update the repo/repo2 submodule link on newbranch
+	(cd $testroot/repo && git -C repo2 pull -q)
+	(cd $testroot/repo && git add repo2)
+	git_commit $testroot/repo -m "modified submodule link"
+	local commit_id=`git_show_head $testroot/repo`
+
+	# This cherrypick is a no-op because Got's file index
+	# does not track submodules.
+	(cd $testroot/wt && got cherrypick $commit_id > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_cherrypick_added_submodule {
+	local testroot=`test_init cherrypick_added_submodules`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	make_single_file_repo $testroot/repo2 foo
+
+	# Add the repo/repo2 submodule on newbranch
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	local commit_id=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick $commit_id > $testroot/stdout)
+
+	echo "A  .gitmodules" > $testroot/stdout.expected
+	echo "Merged commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_cherrypick_conflict_wt_file_vs_repo_submodule {
+	local testroot=`test_init cherrypick_conflict_wt_file_vs_repo_submodule`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	# Add a file which will clash with the submodule
+	echo "This is a file called repo2" > $testroot/wt/repo2
+	(cd $testroot/wt && got add repo2 > /dev/null)
+	(cd $testroot/wt && got commit -m 'add file repo2' > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	make_single_file_repo $testroot/repo2 foo
+
+	# Add the repo/repo2 submodule on newbranch
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	local commit_id=`git_show_head $testroot/repo`
+
+	# Modify the clashing file such that any modifications brought
+	# in by 'got cherrypick' would require a merge.
+	echo "This file was changed" > $testroot/wt/repo2
+
+	(cd $testroot/wt && got update >/dev/null)
+	(cd $testroot/wt && got cherrypick $commit_id > $testroot/stdout)
+
+	echo "A  .gitmodules" > $testroot/stdout.expected
+	echo "Merged commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "A  .gitmodules" > $testroot/stdout.expected
+	echo "M  repo2" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
 run_test test_cherrypick_into_work_tree_with_conflicts
+run_test test_cherrypick_modified_submodule
+run_test test_cherrypick_added_submodule
+run_test test_cherrypick_conflict_wt_file_vs_repo_submodule

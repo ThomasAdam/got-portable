@@ -1710,6 +1710,122 @@ function test_update_preserves_conflicted_file {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_modified_submodules {
+	local testroot=`test_init update_modified_submodules`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	echo "modified foo" > $testroot/repo2/foo
+	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+
+	# Update the repo/repo2 submodule link
+	(cd $testroot/repo && git -C repo2 pull -q)
+	(cd $testroot/repo && git add repo2)
+	git_commit $testroot/repo -m "modified submodule link"
+
+	# This update only records the new base commit. Otherwise it is a
+	# no-op change because Got's file index does not track submodules.
+	echo -n "Updated to commit " > $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_update_adds_submodule {
+	local testroot=`test_init update_adds_submodule`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	make_single_file_repo $testroot/repo2 foo
+
+	echo "modified foo" > $testroot/repo2/foo
+	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	echo "A  .gitmodules" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_update_conflict_wt_file_vs_repo_submodule {
+	local testroot=`test_init update_conflict_wt_file_vs_repo_submodule`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	make_single_file_repo $testroot/repo2 foo
+
+	# Add a file which will clash with the submodule
+	echo "This is a file called repo2" > $testroot/wt/repo2
+	(cd $testroot/wt && got add repo2 > /dev/null)
+	(cd $testroot/wt && got commit -m 'add file repo2' > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	# Modify the clashing file such that any modifications brought
+	# in by 'got update' would require a merge.
+	echo "This file was changed" > $testroot/wt/repo2
+
+	# No conflict occurs because 'got update' ignores the submodule
+	# and leaves the clashing file as it was.
+	echo "A  .gitmodules" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "M  repo2" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1742,3 +1858,6 @@ run_test test_update_bumps_base_commit_id
 run_test test_update_tag
 run_test test_update_toggles_xbit
 run_test test_update_preserves_conflicted_file
+run_test test_update_modified_submodules
+run_test test_update_adds_submodule
+run_test test_update_conflict_wt_file_vs_repo_submodule

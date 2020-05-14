@@ -690,6 +690,85 @@ function test_log_changed_paths {
 	test_done "$testroot" "$ret"
 }
 
+function test_log_submodule {
+	local testroot=`test_init log_submodule`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	local head_commit=`git_show_head $testroot/repo`
+
+	echo "commit $head_commit (master)" > $testroot/stdout.expected
+
+	got log -r $testroot/repo -l1 repo2 | grep ^commit > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo " A  .gitmodules" > $testroot/stdout.expected
+
+	got log -r $testroot/repo -l1 -P repo2 | grep '^ [MDmA]' \
+		> $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got log -p -r $testroot/repo -l1 repo2 \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "log command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local submodule_id=$(got tree -r $testroot/repo -i | \
+		grep 'repo2\$$' | cut -d ' ' -f1)
+	echo "got: object $submodule_id not found" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified foo" > $testroot/repo2/foo
+	(cd $testroot/repo2 && git commit -q -a -m 'modified a submodule')
+
+	# Update the repo/repo2 submodule link
+	(cd $testroot/repo && git -C repo2 pull -q)
+	(cd $testroot/repo && git add repo2)
+	git_commit $testroot/repo -m "changed submodule link"
+
+	# log -P does not show the changed submodule path
+	got log -P -r $testroot/repo -l1 repo2 > $testroot/stdout.full
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "log command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	grep '^ [MDmA]' $testroot/stdout.full > $testroot/stdout
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree
@@ -702,3 +781,4 @@ run_test test_log_end_at_commit
 run_test test_log_reverse_display
 run_test test_log_in_worktree_different_repo
 run_test test_log_changed_paths
+run_test test_log_submodule

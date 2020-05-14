@@ -202,5 +202,64 @@ function test_cat_path {
 	test_done "$testroot" "$ret"
 }
 
+function test_cat_submodule {
+	local testroot=`test_init cat_submodule`
+
+	make_single_file_repo $testroot/repo2 foo
+
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	got cat -r $testroot/repo repo2 > $testroot/stdout \
+		> $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "cat command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	local submodule_id=$(got tree -r $testroot/repo -i | \
+		grep 'repo2\$$' | cut -d ' ' -f1)
+	echo "got: object $submodule_id not found" > $testroot/stderr.expected
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
+function test_cat_submodule_of_same_repo {
+	local testroot=`test_init cat_submodule_of_same_repo`
+	local commit_id0=`git_show_head $testroot/repo`
+	local author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot && git clone -q repo repo2 >/dev/null)
+	(cd $testroot/repo && git submodule -q add ../repo2)
+	(cd $testroot/repo && git commit -q -m 'adding submodule')
+
+	# 'got cat' shows the commit object which the submodule points to
+	# because a commit with the same ID exists in the outer repository
+	got cat -r $testroot/repo $commit_id0 | grep ^tree > $testroot/stdout.expected
+	echo "numparents 0" >> $testroot/stdout.expected
+	echo "author $GOT_AUTHOR $author_time +0000" >> $testroot/stdout.expected
+	echo "committer $GOT_AUTHOR $author_time +0000" \
+		>> $testroot/stdout.expected
+	echo "messagelen 22" >> $testroot/stdout.expected
+	printf "\nadding the test tree\n" >> $testroot/stdout.expected
+
+	got cat -r $testroot/repo repo2 > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cat_basic
 run_test test_cat_path
+run_test test_cat_submodule
+run_test test_cat_submodule_of_same_repo
