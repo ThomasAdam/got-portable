@@ -1494,7 +1494,7 @@ update_ref(struct got_reference *ref, struct got_object_id *new_id,
 	}
 
 	if (verbosity >= 0)
-		printf("Updated reference %s: %s\n", got_ref_get_name(ref),
+		printf("Updated %s: %s\n", got_ref_get_name(ref),
 		    new_id_str);
 done:
 	free(old_id);
@@ -1543,8 +1543,7 @@ update_symref(const char *refname, struct got_reference *target_ref,
 			goto done;
 
 		if (verbosity >= 0)
-			printf("Updated reference %s: %s\n",
-			    got_ref_get_name(symref),
+			printf("Updated %s: %s\n", got_ref_get_name(symref),
 			    got_ref_get_symref_target(symref));
 
 	}
