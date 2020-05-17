@@ -202,7 +202,7 @@ done:
 }
 
 static const struct got_error *
-te_mode2str(char *buf, size_t len, mode_t te_mode)
+te_mode2str(char *buf, size_t len, struct got_tree_entry *te)
 {
 	int ret;
 	mode_t mode;
@@ -210,13 +210,15 @@ te_mode2str(char *buf, size_t len, mode_t te_mode)
 	/*
 	 * Some Git implementations are picky about modes seen in tree entries.
 	 * For best compatibility we normalize the file/directory mode here.
-	 * Note that we do not support committing symlinks or submodules.
+	 * Note that we do not support committing symlinks.
 	 */
-	if (S_ISREG(te_mode)) {
+	if (S_ISREG(te->mode)) {
 		mode = GOT_DEFAULT_FILE_MODE;
-		if (te_mode & (S_IXUSR | S_IXGRP | S_IXOTH))
+		if (te->mode & (S_IXUSR | S_IXGRP | S_IXOTH))
 			mode |= S_IXUSR | S_IXGRP | S_IXOTH;
-	} else if (S_ISDIR(te_mode))
+	} else if (got_object_tree_entry_is_submodule(te))
+		mode = S_IFDIR | S_IFLNK;
+	else if (S_ISDIR(te->mode))
 		mode = S_IFDIR; /* Git leaves all the other bits unset. */
 	else
 		return got_error(GOT_ERR_BAD_FILETYPE);
@@ -281,7 +283,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	for (i = 0; i < nentries; i++) {
 		te = sorted_entries[i];
-		err = te_mode2str(modebuf, sizeof(modebuf), te->mode);
+		err = te_mode2str(modebuf, sizeof(modebuf), te);
 		if (err)
 			goto done;
 		len += strlen(modebuf) + strlen(te->name) + 1 +
@@ -309,7 +311,7 @@ got_object_tree_create(struct got_object_id **id,
 
 	for (i = 0; i < nentries; i++) {
 		te = sorted_entries[i];
-		err = te_mode2str(modebuf, sizeof(modebuf), te->mode);
+		err = te_mode2str(modebuf, sizeof(modebuf), te);
 		if (err)
 			goto done;
 		len = strlen(modebuf);

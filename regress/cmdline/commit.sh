@@ -873,28 +873,31 @@ function test_commit_with_unrelated_submodule {
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
+		echo "checkout failed unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
 	echo "modified alpha" > $testroot/wt/alpha
 
-	# Currently fails with "bad file type" error
-	(cd $testroot/wt && got commit -m 'modify alpha' \
-		> $testroot/stdout 2> $testroot/stderr)
-	ret="$?"
-	if [ "$ret" == "0" ]; then
-		echo "commit succeeded unexpectedly" >&2
-		test_done "$testroot" "1"
-		return 1
-	fi
-	echo "got: bad file type" > $testroot/stderr.expected
+	echo "" > $testroot/stdout.expected
 
-	cmp -s $testroot/stderr.expected $testroot/stderr
+	cd $testroot/wt && got commit -m 'modify alpha' > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
+		echo "commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
 		return 1
+	fi
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
