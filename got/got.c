@@ -4294,7 +4294,7 @@ __dead static void
 usage_tree(void)
 {
 	fprintf(stderr,
-	    "usage: %s tree [-c commit] [-r repository-path] [-iR] path\n",
+	    "usage: %s tree [-c commit] [-r repository-path] [-iR] [path]\n",
 	    getprogname());
 	exit(1);
 }
