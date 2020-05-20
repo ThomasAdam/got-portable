@@ -1972,6 +1972,19 @@ with a pre-defined log message.
 .Pp
 .Dl $ got commit -m 'unify the buffer cache'
 .Pp
+Alternatively, create a new commit from local changes in a work tree
+directory with a log message that has been prepared in the file
+.Pa /tmp/msg .
+If
+.Xr vi 1
+is set as the
+.Ev EDITOR ,
+.Pa /tmp/msg
+can be read into the buffer for review:
+.Pp
+.Dl $ got commit
+.Dl :r /tmp/msg
+.Pp
 Update any work tree checked out from the
 .Dq unified-buffer-cache
 branch to the latest commit on this branch:
