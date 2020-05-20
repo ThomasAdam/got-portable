@@ -4299,13 +4299,15 @@ usage_tree(void)
 	exit(1);
 }
 
-static void
+static const struct got_error *
 print_entry(struct got_tree_entry *te, const char *id, const char *path,
-    const char *root_path)
+    const char *root_path, struct got_repository *repo)
 {
+	const struct got_error *err = NULL;
 	int is_root_path = (strcmp(path, root_path) == 0);
 	const char *modestr = "";
 	mode_t mode = got_tree_entry_get_mode(te);
+	char *link_target = NULL;
 
 	path += strlen(root_path);
 	while (path[0] == '/')
@@ -4313,15 +4315,30 @@ print_entry(struct got_tree_entry *te, const char *id, const char *path,
 
 	if (got_object_tree_entry_is_submodule(te))
 		modestr = "$";
-	else if (S_ISLNK(mode))
+	else if (S_ISLNK(mode)) {
+		int i;
+
+		err = got_tree_entry_get_symlink_target(&link_target, te, repo);
+		if (err)
+			return err;
+		for (i = 0; i < strlen(link_target); i++) {
+			if (!isprint((unsigned char)link_target[i]))
+				link_target[i] = '?';
+		}
+
 		modestr = "@";
+	}
 	else if (S_ISDIR(mode))
 		modestr = "/";
 	else if (mode & S_IXUSR)
 		modestr = "*";
 
-	printf("%s%s%s%s%s\n", id ? id : "", path,
-	    is_root_path ? "" : "/", got_tree_entry_get_name(te), modestr);
+	printf("%s%s%s%s%s%s%s\n", id ? id : "", path,
+	    is_root_path ? "" : "/", got_tree_entry_get_name(te), modestr,
+	    link_target ? " -> ": "", link_target ? link_target : "");
+
+	free(link_target);
+	return NULL;
 }
 
 static const struct got_error *
@@ -4363,8 +4380,10 @@ print_tree(const char *path, struct got_object_id *commit_id,
 			}
 			free(id_str);
 		}
-		print_entry(te, id, path, root_path);
+		err = print_entry(te, id, path, root_path, repo);
 		free(id);
+		if (err)
+			goto done;
 
 		if (recurse && S_ISDIR(got_tree_entry_get_mode(te))) {
 			char *child_path;

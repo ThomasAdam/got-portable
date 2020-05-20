@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 
+#include <ctype.h>
 #include <errno.h>
 #define _XOPEN_SOURCE_EXTENDED
 #include <curses.h>
@@ -4622,7 +4623,7 @@ draw_tree_entries(struct tog_view *view,
     struct got_tree_entry **selected_entry, int *ndisplayed,
     const char *label, int show_ids, const char *parent_path,
     struct got_tree_object *tree, int selected, int limit,
-    int isroot, struct tog_colors *colors)
+    int isroot, struct tog_colors *colors, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
@@ -4693,7 +4694,7 @@ draw_tree_entries(struct tog_view *view,
 
 	nentries = got_object_tree_get_nentries(tree);
 	for (i = got_tree_entry_get_index(te); i < nentries; i++) {
-		char *line = NULL, *id_str = NULL;
+		char *line = NULL, *id_str = NULL, *link_target = NULL;
 		const char *modestr = "";
 		mode_t mode;
 
@@ -4709,18 +4710,35 @@ draw_tree_entries(struct tog_view *view,
 		}
 		if (got_object_tree_entry_is_submodule(te))
 			modestr = "$";
-		else if (S_ISLNK(mode))
+		else if (S_ISLNK(mode)) {
+			int i;
+
+			err = got_tree_entry_get_symlink_target(&link_target,
+			    te, repo);
+			if (err) {
+				free(id_str);
+				return err;
+			}
+			for (i = 0; i < strlen(link_target); i++) {
+				if (!isprint((unsigned char)link_target[i]))
+					link_target[i] = '?';
+			}
 			modestr = "@";
+		}
 		else if (S_ISDIR(mode))
 			modestr = "/";
 		else if (mode & S_IXUSR)
 			modestr = "*";
-		if (asprintf(&line, "%s  %s%s", id_str ? id_str : "",
-		    got_tree_entry_get_name(te), modestr) == -1) {
+		if (asprintf(&line, "%s  %s%s%s%s", id_str ? id_str : "",
+		    got_tree_entry_get_name(te), modestr,
+		    link_target ? " -> ": "",
+		    link_target ? link_target : "") == -1) {
 			free(id_str);
+			free(link_target);
 			return got_error_from_errno("asprintf");
 		}
 		free(id_str);
+		free(link_target);
 		err = format_line(&wline, &width, line, view->ncols, 0);
 		if (err) {
 			free(line);
@@ -5121,7 +5139,7 @@ show_tree_view(struct tog_view *view)
 	    &s->last_displayed_entry, &s->selected_entry,
 	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
 	    s->tree, s->selected, view->nlines, s->tree == s->root,
-	    &s->colors);
+	    &s->colors, s->repo);
 	free(parent_path);
 
 	view_vborder(view);

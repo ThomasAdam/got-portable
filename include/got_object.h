@@ -191,6 +191,13 @@ const char *got_tree_entry_get_name(struct got_tree_entry *);
 /* Get the object ID of a tree entry. */
 struct got_object_id *got_tree_entry_get_id(struct got_tree_entry *);
 
+/*
+ * Get a string containing the target path of a given a symlink tree entry.
+ * The caller should dispose of it with free(3).
+ */
+const struct got_error *got_tree_entry_get_symlink_target(char **,
+    struct got_tree_entry *, struct got_repository *);
+
 /* Get the index of a tree entry. */
 int got_tree_entry_get_index(struct got_tree_entry *);
 

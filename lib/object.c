@@ -862,6 +862,42 @@ got_tree_entry_get_id(struct got_tree_entry *te)
 	return &te->id;
 }
 
+const struct got_error *
+got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_blob_object *blob = NULL;
+	size_t len;
+
+	*link_target = NULL;
+
+	/* S_IFDIR check avoids confusing symlinks with submodules. */
+	if ((te->mode & (S_IFDIR | S_IFLNK)) != S_IFLNK)
+		return got_error(GOT_ERR_TREE_ENTRY_TYPE);
+
+	err = got_object_open_as_blob(&blob, repo,
+	    got_tree_entry_get_id(te), PATH_MAX);
+	if (err)
+		return err;
+	
+	err = got_object_blob_read_block(&len, blob);
+	if (err)
+		goto done;
+
+	*link_target = malloc(len + 1);
+	if (*link_target == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+	memcpy(*link_target, got_object_blob_get_read_buf(blob), len);
+	(*link_target)[len] = '\0';
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	return err;
+}
+
 int
 got_tree_entry_get_index(struct got_tree_entry *te)
 {
