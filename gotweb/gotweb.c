@@ -2099,7 +2099,7 @@ gw_init_gw_dir(struct gw_dir **gw_dir, const char *dir)
 		error = got_error_from_errno("asprintf");
 		free(*gw_dir);
 		*gw_dir = NULL;
-		return NULL;
+		return error;
 	}
 
 	return NULL;
