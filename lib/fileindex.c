@@ -95,7 +95,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		ie->uid = sb.st_uid;
 		ie->gid = sb.st_gid;
 		ie->size = (sb.st_size & 0xffffffff);
-		if (sb.st_mode & S_IFLNK)
+		if (S_ISLNK(sb.st_mode))
 			ie->mode = GOT_FILEIDX_MODE_SYMLINK;
 		else
 			ie->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
