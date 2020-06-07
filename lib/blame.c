@@ -133,7 +133,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
 		goto done;
 
 	if (obj->type != GOT_OBJ_TYPE_BLOB) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
+		err = got_error_path(path, GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
@@ -205,7 +205,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 
 	if (obj->type != GOT_OBJ_TYPE_BLOB) {
-		err = got_error(GOT_ERR_OBJ_TYPE);
+		err = got_error_path(path, GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
