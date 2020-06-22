@@ -31,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <got_error.h>
 #include <got_object.h>
 #include <got_reference.h>
 #include <got_repository.h>
@@ -57,7 +58,7 @@ struct gw_trans {
 	TAILQ_HEAD(dirs, gw_dir)	 gw_dirs;
 	struct got_repository	*repo;
 	struct gw_dir		*gw_dir;
-	struct gotweb_conf	*gw_conf;
+	struct gotweb_config	*gw_conf;
 	struct ktemplate	*gw_tmpl;
 	struct khtmlreq		*gw_html_req;
 	struct kreq		*gw_req;
@@ -4656,7 +4657,7 @@ main(int argc, char *argv[])
 	}
 
 	if ((gw_trans->gw_conf =
-	    malloc(sizeof(struct gotweb_conf))) == NULL) {
+	    malloc(sizeof(struct gotweb_config))) == NULL) {
 		gw_malloc = 0;
 		error = got_error_from_errno("malloc");
 		goto done;
@@ -4680,7 +4681,8 @@ main(int argc, char *argv[])
 	gw_trans->gw_tmpl->keysz = TEMPL__MAX;
 	gw_trans->gw_tmpl->arg = gw_trans;
 	gw_trans->gw_tmpl->cb = gw_template;
-	error = parse_conf(GOTWEB_CONF, gw_trans->gw_conf);
+
+	error = parse_gotweb_config(&gw_trans->gw_conf, GOTWEB_CONF);
 	if (error)
 		goto done;
 
@@ -4700,7 +4702,6 @@ done:
 		free(gw_trans->gw_conf->got_site_link);
 		free(gw_trans->gw_conf->got_logo);
 		free(gw_trans->gw_conf->got_logo_url);
-		free(gw_trans->gw_conf);
 		free(gw_trans->commit_id);
 		free(gw_trans->next_id);
 		free(gw_trans->next_prev_id);

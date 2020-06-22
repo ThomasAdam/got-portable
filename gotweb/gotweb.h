@@ -20,8 +20,6 @@
 
 #include <stdbool.h>
 
-#include <got_error.h>
-
 #define	GOTWEB_CONF	 "/etc/gotweb.conf"
 #define GOTWEB_TMPL_DIR	 "/cgi-bin/gw_tmpl"
 #define GOTWEB		 "/cgi-bin/gotweb/gotweb"
@@ -48,7 +46,7 @@
 
 #define BUFFER_SIZE	 2048
 
-struct gotweb_conf {
+struct gotweb_config {
 	char		*got_repos_path;
 	char		*got_site_name;
 	char		*got_site_owner;
@@ -67,6 +65,11 @@ struct gotweb_conf {
 	bool		 got_show_repo_cloneurl;
 };
 
-const struct got_error*	 parse_conf(const char *, struct gotweb_conf *);
+/*
+ * Parse gotweb config file, if it exists
+ * Load gotweb_config struct
+ */
+const struct got_error*	 parse_gotweb_config(struct gotweb_config **,
+    const char *);
 
 #endif /* GOTWEB_H */
