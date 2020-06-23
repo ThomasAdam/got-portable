@@ -1450,33 +1450,32 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, repo);
 	if (err)
-		return err;
+		goto done;
 
 	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_CONFLICT ||
 	    status == GOT_STATUS_ADD) {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, ie->path);
 		if (err)
-			return err;
+			goto done;
 		/*
 		 * Preserve the working file and change the deleted blob's
 		 * entry into a schedule-add entry.
 		 */
 		err = got_fileindex_entry_update(ie, ondisk_path, NULL, NULL,
 		    0);
-		if (err)
-			return err;
 	} else {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
 		if (err)
-			return err;
+			goto done;
 		if (status == GOT_STATUS_NO_CHANGE) {
 			err = remove_ondisk_file(worktree->root_path, ie->path);
 			if (err)
-				return err;
+				goto done;
 		}
 		got_fileindex_entry_remove(fileindex, ie);
 	}
-
+done:
+	free(ondisk_path);
 	return err;
 }
 
