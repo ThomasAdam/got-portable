@@ -882,7 +882,7 @@ function test_commit_with_unrelated_submodule {
 
 	echo "" > $testroot/stdout.expected
 
-	cd $testroot/wt && got commit -m 'modify alpha' > $testroot/stdout
+	(cd $testroot/wt && got commit -m 'modify alpha' > $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "commit failed unexpectedly" >&2
