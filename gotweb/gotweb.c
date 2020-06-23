@@ -4656,13 +4656,6 @@ main(int argc, char *argv[])
 		goto done;
 	}
 
-	if ((gw_trans->gw_conf =
-	    malloc(sizeof(struct gotweb_config))) == NULL) {
-		gw_malloc = 0;
-		error = got_error_from_errno("malloc");
-		goto done;
-	}
-
 	TAILQ_INIT(&gw_trans->gw_dirs);
 	TAILQ_INIT(&gw_trans->gw_headers);
 
@@ -4702,6 +4695,7 @@ done:
 		free(gw_trans->gw_conf->got_site_link);
 		free(gw_trans->gw_conf->got_logo);
 		free(gw_trans->gw_conf->got_logo_url);
+		free(gw_trans->gw_conf);
 		free(gw_trans->commit_id);
 		free(gw_trans->next_id);
 		free(gw_trans->next_prev_id);

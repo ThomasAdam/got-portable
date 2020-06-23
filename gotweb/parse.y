@@ -84,7 +84,7 @@ int	 symset(const char *, const char *, int);
 char	*symget(const char *);
 
 const struct got_error* gerror = NULL;
-struct gotweb_config		 gw_conf;
+struct gotweb_config		*gw_conf;
 
 typedef struct {
 	union {
@@ -129,8 +129,8 @@ boolean		: STRING {
 		| ON { $$ = 1; }
 		;
 main		: GOT_REPOS_PATH STRING {
-			gw_conf.got_repos_path = strdup($2);
-			if (gw_conf.got_repos_path== NULL) {
+			gw_conf->got_repos_path = strdup($2);
+			if (gw_conf->got_repos_path== NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -138,70 +138,70 @@ main		: GOT_REPOS_PATH STRING {
 		}
 		| GOT_MAX_REPOS NUMBER {
 			if ($2 > 0)
-				gw_conf.got_max_repos = $2;
+				gw_conf->got_max_repos = $2;
 		}
 		| GOT_SITE_NAME STRING {
-			gw_conf.got_site_name = strdup($2);
-			if (gw_conf.got_site_name == NULL) {
+			gw_conf->got_site_name = strdup($2);
+			if (gw_conf->got_site_name == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 		}
 		| GOT_SITE_OWNER STRING {
-			gw_conf.got_site_owner = strdup($2);
-			if (gw_conf.got_site_owner == NULL) {
+			gw_conf->got_site_owner = strdup($2);
+			if (gw_conf->got_site_owner == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 		}
 		| GOT_SITE_LINK STRING {
-			gw_conf.got_site_link = strdup($2);
-			if (gw_conf.got_site_link == NULL) {
+			gw_conf->got_site_link = strdup($2);
+			if (gw_conf->got_site_link == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 		}
 		| GOT_LOGO STRING {
-			gw_conf.got_logo = strdup($2);
-			if (gw_conf.got_logo== NULL) {
+			gw_conf->got_logo = strdup($2);
+			if (gw_conf->got_logo== NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 		}
 		| GOT_LOGO_URL STRING {
-			gw_conf.got_logo_url = strdup($2);
-			if (gw_conf.got_logo_url== NULL) {
+			gw_conf->got_logo_url = strdup($2);
+			if (gw_conf->got_logo_url== NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 		}
 		| GOT_SHOW_SITE_OWNER boolean {
-			gw_conf.got_show_site_owner = $2;
+			gw_conf->got_show_site_owner = $2;
 		}
 		| GOT_SHOW_REPO_OWNER boolean {
-			gw_conf.got_show_repo_owner = $2;
+			gw_conf->got_show_repo_owner = $2;
 		}
 		| GOT_SHOW_REPO_AGE boolean {
-			gw_conf.got_show_repo_age = $2;
+			gw_conf->got_show_repo_age = $2;
 		}
 		| GOT_SHOW_REPO_DESCRIPTION boolean {
-			gw_conf.got_show_repo_description = $2;
+			gw_conf->got_show_repo_description = $2;
 		}
 		| GOT_SHOW_REPO_CLONEURL boolean {
-			gw_conf.got_show_repo_cloneurl = $2;
+			gw_conf->got_show_repo_cloneurl = $2;
 		}
 		| GOT_MAX_REPOS_DISPLAY NUMBER {
 			if ($2 > 0)
-				gw_conf.got_max_repos_display = $2;
+				gw_conf->got_max_repos_display = $2;
 		}
 		| GOT_MAX_COMMITS_DISPLAY NUMBER {
 			if ($2 > 0)
-				gw_conf.got_max_commits_display = $2;
+				gw_conf->got_max_commits_display = $2;
 		}
 		;
 %%
@@ -581,44 +581,49 @@ popfile(void)
 const struct got_error*
 parse_gotweb_config(struct gotweb_config **gconf, const char *filename)
 {
-	gw_conf.got_repos_path = strdup(D_GOTPATH);
-	if (gw_conf.got_repos_path == NULL) {
+	gw_conf = malloc(sizeof(struct gotweb_config));
+	if (gw_conf == NULL) {
+		gerror = got_error_from_errno("malloc");
+		goto done;
+	}
+	gw_conf->got_repos_path = strdup(D_GOTPATH);
+	if (gw_conf->got_repos_path == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_site_name = strdup(D_SITENAME);
-	if (gw_conf.got_site_name == NULL) {
+	gw_conf->got_site_name = strdup(D_SITENAME);
+	if (gw_conf->got_site_name == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_site_owner = strdup(D_SITEOWNER);
-	if (gw_conf.got_site_owner == NULL) {
+	gw_conf->got_site_owner = strdup(D_SITEOWNER);
+	if (gw_conf->got_site_owner == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_site_link = strdup(D_SITELINK);
-	if (gw_conf.got_site_link == NULL) {
+	gw_conf->got_site_link = strdup(D_SITELINK);
+	if (gw_conf->got_site_link == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_logo = strdup(D_GOTLOGO);
-	if (gw_conf.got_logo == NULL) {
+	gw_conf->got_logo = strdup(D_GOTLOGO);
+	if (gw_conf->got_logo == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_logo_url = strdup(D_GOTURL);
-	if (gw_conf.got_logo_url == NULL) {
+	gw_conf->got_logo_url = strdup(D_GOTURL);
+	if (gw_conf->got_logo_url == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
-	gw_conf.got_show_site_owner = D_SHOWSOWNER;
-	gw_conf.got_show_repo_owner = D_SHOWROWNER;
-	gw_conf.got_show_repo_age = D_SHOWAGE;
-	gw_conf.got_show_repo_description = D_SHOWDESC;
-	gw_conf.got_show_repo_cloneurl = D_SHOWURL;
-	gw_conf.got_max_repos = D_MAXREPO;
-	gw_conf.got_max_repos_display = D_MAXREPODISP;
-	gw_conf.got_max_commits_display = D_MAXCOMMITDISP;
+	gw_conf->got_show_site_owner = D_SHOWSOWNER;
+	gw_conf->got_show_repo_owner = D_SHOWROWNER;
+	gw_conf->got_show_repo_age = D_SHOWAGE;
+	gw_conf->got_show_repo_description = D_SHOWDESC;
+	gw_conf->got_show_repo_cloneurl = D_SHOWURL;
+	gw_conf->got_max_repos = D_MAXREPO;
+	gw_conf->got_max_repos_display = D_MAXREPODISP;
+	gw_conf->got_max_commits_display = D_MAXCOMMITDISP;
 
 	/*
 	 * We don't require that the gotweb config file exists
@@ -635,7 +640,7 @@ parse_gotweb_config(struct gotweb_config **gconf, const char *filename)
 	yyparse();
 	popfile();
 done:
-	*gconf = &gw_conf;
+	*gconf = gw_conf;
 	return gerror;
 }
 
