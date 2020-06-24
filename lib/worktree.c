@@ -895,34 +895,26 @@ done:
 }
 
 static const struct got_error *
-update_blob_fileindex_entry(struct got_worktree *worktree,
-    struct got_fileindex *fileindex, struct got_fileindex_entry *ie,
-    const char *ondisk_path, const char *path, struct got_blob_object *blob,
-    int update_timestamps)
+create_fileindex_entry(struct got_fileindex *fileindex,
+    struct got_object_id *base_commit_id, const char *ondisk_path,
+    const char *path, struct got_object_id *blob_id)
 {
 	const struct got_error *err = NULL;
+	struct got_fileindex_entry *new_ie;
 
-	if (ie == NULL)
-		ie = got_fileindex_entry_get(fileindex, path, strlen(path));
-	if (ie)
-		err = got_fileindex_entry_update(ie, ondisk_path,
-		    blob->id.sha1, worktree->base_commit_id->sha1,
-		    update_timestamps);
-	else {
-		struct got_fileindex_entry *new_ie;
-		err = got_fileindex_entry_alloc(&new_ie, path);
-		if (err)
-			return err;
-		err = got_fileindex_entry_update(new_ie, ondisk_path,
-		    blob->id.sha1, worktree->base_commit_id->sha1, 1);
-		if (err) {
-			got_fileindex_entry_free(new_ie);
-			return err;
-		}
-		err = got_fileindex_entry_add(fileindex, new_ie);
-		if (err)
-			got_fileindex_entry_free(new_ie);
-	}
+	err = got_fileindex_entry_alloc(&new_ie, path);
+	if (err)
+		return err;
+
+	err = got_fileindex_entry_update(new_ie, ondisk_path,
+	    blob_id->sha1, base_commit_id->sha1, 1);
+	if (err)
+		goto done;
+
+	err = got_fileindex_entry_add(fileindex, new_ie);
+done:
+	if (err)
+		got_fileindex_entry_free(new_ie);
 	return err;
 }
 
@@ -1382,8 +1374,8 @@ update_blob(struct got_worktree *worktree,
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		if (err)
 			goto done;
-		err = update_blob_fileindex_entry(worktree, fileindex, ie,
-		    ondisk_path, path, blob, 0);
+		err = got_fileindex_entry_update(ie, ondisk_path,
+		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
 		if (err)
 			goto done;
 	} else {
@@ -1392,8 +1384,14 @@ update_blob(struct got_worktree *worktree,
 		    repo, progress_cb, progress_arg);
 		if (err)
 			goto done;
-		err = update_blob_fileindex_entry(worktree, fileindex, ie,
-		    ondisk_path, path, blob, 1);
+		if (ie) {
+			err = got_fileindex_entry_update(ie, ondisk_path,
+			    blob->id.sha1, worktree->base_commit_id->sha1, 1);
+		} else {
+			err = create_fileindex_entry(fileindex,
+			    worktree->base_commit_id, ondisk_path, path,
+			    &blob->id);
+		}
 		if (err)
 			goto done;
 	}
@@ -2195,9 +2193,9 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    a->progress_cb,
 			    a->progress_arg);
 			if (status == GOT_STATUS_DELETE) {
-				err = update_blob_fileindex_entry(a->worktree,
-				    a->fileindex, ie, ondisk_path, ie->path,
-				    blob2, 0);
+				err = got_fileindex_entry_update(ie,
+				    ondisk_path, blob2->id.sha1,
+				    a->worktree->base_commit_id->sha1, 0);
 				if (err)
 					goto done;
 			}
@@ -3638,9 +3636,9 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				goto done;
 			if (status == GOT_STATUS_DELETE ||
 			    status == GOT_STATUS_MODE_CHANGE) {
-				err = update_blob_fileindex_entry(a->worktree,
-				    a->fileindex, ie, ondisk_path, ie->path,
-				    blob, 1);
+				err = got_fileindex_entry_update(ie,
+				    ondisk_path, blob->id.sha1,
+				    a->worktree->base_commit_id->sha1, 1);
 				if (err)
 					goto done;
 			}
