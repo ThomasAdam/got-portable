@@ -144,10 +144,13 @@ typedef const struct got_error *(*got_fileindex_diff_dir_old_cb)(void *,
     struct got_fileindex_entry *, const char *);
 typedef const struct got_error *(*got_fileindex_diff_dir_new_cb)(void *,
     struct dirent *, const char *, int);
+typedef const struct got_error *(*got_fileindex_diff_dir_traverse)(void *,
+    const char *, int);
 struct got_fileindex_diff_dir_cb {
 	got_fileindex_diff_dir_old_new_cb diff_old_new;
 	got_fileindex_diff_dir_old_cb diff_old;
 	got_fileindex_diff_dir_new_cb diff_new;
+	got_fileindex_diff_dir_traverse diff_traverse;
 };
 const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, int,
     const char *, const char *, struct got_repository *,

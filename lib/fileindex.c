@@ -1003,6 +1003,12 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	size_t path_len = strlen(path);
 	struct got_pathlist_entry *dle;
 
+	if (cb->diff_traverse) {
+		err = cb->diff_traverse(cb_arg, path, dirfd);
+		if (err)
+			return err;
+	}
+
 	dle = TAILQ_FIRST(dirlist);
 	while ((*ie && got_path_is_child((*ie)->path, path, path_len)) || dle) {
 		if (dle && *ie) {

@@ -2381,6 +2381,7 @@ struct diff_dir_cb_arg {
     /* A pathlist containing per-directory pathlists of ignore patterns. */
     struct got_pathlist_head ignores;
     int report_unchanged;
+    int no_ignores;
 };
 
 static const struct got_error *
@@ -2684,28 +2685,33 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 		path = de->d_name;
 	}
 
-	if (de->d_type == DT_DIR) {
-		int subdirfd = openat(dirfd, de->d_name,
-		    O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
-		if (subdirfd == -1) {
-			if (errno != ENOENT && errno != EACCES)
-				err = got_error_from_errno2("openat", path);
-		} else {
-			err = add_ignores(&a->ignores, a->worktree->root_path,
-			    path, subdirfd, ".cvsignore");
-			if (err == NULL)
-				err = add_ignores(&a->ignores,
-				    a->worktree->root_path, path,
-				    subdirfd, ".gitignore");
-			if (close(subdirfd) == -1 && err == NULL)
-				err = got_error_from_errno2("close", path);
-		}
-	} else if (got_path_is_child(path, a->status_path, a->status_path_len)
+	if (de->d_type != DT_DIR &&
+	    got_path_is_child(path, a->status_path, a->status_path_len)
 	    && !match_ignores(&a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 	if (parent_path[0])
 		free(path);
+	return err;
+}
+
+static const struct got_error *
+status_traverse(void *arg, const char *path, int dirfd)
+{
+	const struct got_error *err = NULL;
+	struct diff_dir_cb_arg *a = arg;
+
+	if (a->no_ignores)
+		return NULL;
+
+	err = add_ignores(&a->ignores, a->worktree->root_path,
+	    path, dirfd, ".cvsignore");
+	if (err)
+		return err;
+
+	err = add_ignores(&a->ignores, a->worktree->root_path, path,
+	    dirfd, ".gitignore");
+
 	return err;
 }
 
@@ -2738,6 +2744,50 @@ void *status_arg, struct got_repository *repo, int report_unchanged)
 }
 
 static const struct got_error *
+add_ignores_from_parent_paths(struct got_pathlist_head *ignores,
+    const char *root_path, const char *path)
+{
+	const struct got_error *err;
+	char *parent_path, *next_parent_path;
+
+	err = add_ignores(ignores, root_path, "", -1,
+	    ".cvsignore");
+	if (err)
+		return err;
+
+	err = add_ignores(ignores, root_path, "", -1,
+	    ".gitignore");
+	if (err)
+		return err;
+
+	err = got_path_dirname(&parent_path, path);
+	if (err) {
+		if (err->code == GOT_ERR_BAD_PATH)
+			return NULL; /* cannot traverse parent */
+		return err;
+	}
+	for (;;) {
+		err = add_ignores(ignores, root_path, parent_path, -1,
+		    ".cvsignore");
+		if (err)
+			break;
+		err = add_ignores(ignores, root_path, parent_path, -1,
+		    ".gitignore");
+		if (err)
+			break;
+		err = got_path_dirname(&next_parent_path, parent_path);
+		if (err) {
+			if (err->code != GOT_ERR_BAD_PATH)
+				return err;
+			err = NULL; /* traversed everything */
+			break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
 worktree_status(struct got_worktree *worktree, const char *path,
     struct got_fileindex *fileindex, struct got_repository *repo,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -2749,6 +2799,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
+
+	TAILQ_INIT(&arg.ignores);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
@@ -2766,6 +2818,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		fdiff_cb.diff_old_new = status_old_new;
 		fdiff_cb.diff_old = status_old;
 		fdiff_cb.diff_new = status_new;
+		fdiff_cb.diff_traverse = status_traverse;
 		arg.fileindex = fileindex;
 		arg.worktree = worktree;
 		arg.status_path = path;
@@ -2776,21 +2829,18 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.cancel_cb = cancel_cb;
 		arg.cancel_arg = cancel_arg;
 		arg.report_unchanged = report_unchanged;
-		TAILQ_INIT(&arg.ignores);
+		arg.no_ignores = no_ignores;
 		if (!no_ignores) {
-			err = add_ignores(&arg.ignores, worktree->root_path,
-			    path, fd, ".cvsignore");
-			if (err == NULL)
-				err = add_ignores(&arg.ignores,
-				    worktree->root_path, path, fd,
-				    ".gitignore");
+			err = add_ignores_from_parent_paths(&arg.ignores,
+			    worktree->root_path, path);
+			if (err)
+				goto done;
 		}
-		if (err == NULL)
-			err = got_fileindex_diff_dir(fileindex, fd,
-			    worktree->root_path, path, repo, &fdiff_cb, &arg);
-		free_ignores(&arg.ignores);
+		err = got_fileindex_diff_dir(fileindex, fd,
+		    worktree->root_path, path, repo, &fdiff_cb, &arg);
 	}
-
+done:
+	free_ignores(&arg.ignores);
 	if (fd != -1 && close(fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
 	free(ondisk_path);

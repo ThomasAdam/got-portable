@@ -496,10 +496,13 @@ function test_status_cvsignore {
 
 	echo "unversioned file" > $testroot/wt/foo
 	echo "unversioned file" > $testroot/wt/foop
+	echo "unversioned file" > $testroot/wt/epsilon/foo
 	echo "unversioned file" > $testroot/wt/epsilon/bar
 	echo "unversioned file" > $testroot/wt/epsilon/boo
 	echo "unversioned file" > $testroot/wt/epsilon/moo
-	echo "foo" > $testroot/wt/.cvsignore
+	mkdir -p $testroot/wt/epsilon/new/
+	echo "unversioned file" > $testroot/wt/epsilon/new/foo
+	echo "**/foo" > $testroot/wt/.cvsignore
 	echo "bar" > $testroot/wt/epsilon/.cvsignore
 	echo "moo" >> $testroot/wt/epsilon/.cvsignore
 
@@ -508,6 +511,29 @@ function test_status_cvsignore {
 	echo '?  epsilon/boo' >> $testroot/stdout.expected
 	echo '?  foop' >> $testroot/stdout.expected
 	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo '?  epsilon/.cvsignore' > $testroot/stdout.expected
+	echo '?  epsilon/boo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status epsilon > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+		
+	echo -n '' > $testroot/stdout.expected
+	(cd $testroot/wt && got status epsilon/new > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
