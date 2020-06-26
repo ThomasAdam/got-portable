@@ -2748,7 +2748,7 @@ add_ignores_from_parent_paths(struct got_pathlist_head *ignores,
     const char *root_path, const char *path)
 {
 	const struct got_error *err;
-	char *parent_path, *next_parent_path;
+	char *parent_path, *next_parent_path = NULL;
 
 	err = add_ignores(ignores, root_path, "", -1,
 	    ".cvsignore");
@@ -2777,13 +2777,17 @@ add_ignores_from_parent_paths(struct got_pathlist_head *ignores,
 			break;
 		err = got_path_dirname(&next_parent_path, parent_path);
 		if (err) {
-			if (err->code != GOT_ERR_BAD_PATH)
-				return err;
-			err = NULL; /* traversed everything */
+			if (err->code == GOT_ERR_BAD_PATH)
+				err = NULL; /* traversed everything */
 			break;
 		}
+		free(parent_path);
+		parent_path = next_parent_path;
+		next_parent_path = NULL;
 	}
 
+	free(parent_path);
+	free(next_parent_path);
 	return err;
 }
 
