@@ -39,7 +39,7 @@ struct got_fileindex_entry {
 #define GOT_FILEIDX_MODE_FILE_TYPE	0x000f
 #define GOT_FILEIDX_MODE_REGULAR_FILE	1
 #define GOT_FILEIDX_MODE_SYMLINK	2
-#define GOT_FILEIDX_MODE_PERMS		0xff10
+#define GOT_FILEIDX_MODE_PERMS		0xfff0
 #define GOT_FILEIDX_MODE_PERMS_SHIFT	4
 
 	/* SHA1 of corresponding blob in repository. */
