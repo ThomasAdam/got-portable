@@ -625,7 +625,7 @@ add_dir_on_disk(struct got_worktree *worktree, const char *path)
 			err = got_error_from_errno2("lstat", abspath);
 		} else if (!S_ISDIR(sb.st_mode)) {
 			/* TODO directory is obstructed; do something */
-			err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+			err = got_error_path(abspath, GOT_ERR_FILE_OBSTRUCTED);
 		}
 	}
 	free(abspath);
@@ -967,7 +967,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 		} else if (errno == EEXIST) {
 			if (!S_ISREG(st_mode)) {
 				/* TODO file is obstructed; do something */
-				err = got_error(GOT_ERR_FILE_OBSTRUCTED);
+				err = got_error_path(ondisk_path,
+				    GOT_ERR_FILE_OBSTRUCTED);
 				goto done;
 			} else {
 				err = got_opentemp_named_fd(&tmppath, &fd,
