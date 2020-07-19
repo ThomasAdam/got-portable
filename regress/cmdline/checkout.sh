@@ -489,7 +489,7 @@ function test_checkout_into_nonempty_dir {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
-		return
+		return 1
 	fi
 
 	echo 'M  alpha' > $testroot/stdout.expected
