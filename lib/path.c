@@ -375,6 +375,53 @@ got_path_dirname(char **parent, const char *path)
 }
 
 const struct got_error *
+got_path_dirent_type(int *type, const char *path_parent, struct dirent *dent)
+{
+	const struct got_error *err = NULL;
+	char *path_child;
+	struct stat sb;
+
+	if (dent->d_type != DT_UNKNOWN) {
+		*type = dent->d_type;
+		return NULL;
+	}
+
+	*type = DT_UNKNOWN;
+
+	/*
+	 * This is a fallback to accommodate filesystems which do not
+	 * provide directory entry type information. DT_UNKNOWN directory
+	 * entries occur on NFS mounts without "readdir plus" RPC.
+	 */
+
+	if (asprintf(&path_child, "%s/%s", path_parent, dent->d_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (lstat(path_child, &sb) == -1) {
+		err = got_error_from_errno2("lstat", path_child);
+		goto done;
+	}
+
+	if (S_ISFIFO(sb.st_mode))
+		*type = DT_FIFO;
+	else if (S_ISCHR(sb.st_mode))
+		*type = DT_CHR;
+	else if (S_ISDIR(sb.st_mode))
+		*type = DT_DIR;
+	else if (S_ISBLK(sb.st_mode))
+		*type = DT_BLK;
+	else if (S_ISLNK(sb.st_mode))
+		*type = DT_LNK;
+	else if (S_ISREG(sb.st_mode))
+		*type = DT_REG;
+	else if (S_ISSOCK(sb.st_mode))
+		*type = DT_SOCK;
+done:
+	free(path_child);
+	return err;
+}
+
+const struct got_error *
 got_path_basename(char **s, const char *path)
 {
 	char *base;

@@ -826,6 +826,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		struct dirent *dent;
 		struct got_reference *ref;
 		char *child;
+		int type;
 
 		dent = readdir(d);
 		if (dent == NULL)
@@ -835,7 +836,11 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 		    strcmp(dent->d_name, "..") == 0)
 			continue;
 
-		switch (dent->d_type) {
+		err = got_path_dirent_type(&type, path_subdir, dent);
+		if (err)
+			break;
+
+		switch (type) {
 		case DT_REG:
 			err = open_ref(&ref, path_refs, subdir, dent->d_name,
 			    0);

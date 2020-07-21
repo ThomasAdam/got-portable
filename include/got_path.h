@@ -21,6 +21,8 @@
 #define GOT_DEFAULT_DIR_MODE	(S_IFDIR | \
 	S_IRWXU | S_IRGRP|S_IXGRP | S_IROTH|S_IXOTH)
 
+struct dirent;
+
 /* Determine whether a path is an absolute path. */
 int got_path_is_absolute(const char *);
 
@@ -101,6 +103,20 @@ int got_path_dir_is_empty(const char *);
 
 /* dirname(3) with error handling and dynamically allocated result. */
 const struct got_error *got_path_dirname(char **, const char *);
+
+/*
+ * Obtain the file type of a given directory entry.
+ *
+ * If the entry has some type other than DT_UNKNOWN, resolve to this type.
+ *
+ * Otherwise, attempt to resolve the type of a DT_UNKNOWN directory
+ * entry with lstat(2), though the result may still be DT_UNKNOWN.
+ * This is a fallback to accommodate filesystems which do not provide
+ * directory entry type information.
+ * DT_UNKNOWN directory entries occur on NFS mounts without "readdir plus" RPC.
+ */
+const struct got_error *got_path_dirent_type(int *, const char *,
+    struct dirent *);
 
 /* basename(3) with dynamically allocated result. */
 const struct got_error *got_path_basename(char **, const char *);

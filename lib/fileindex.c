@@ -933,10 +933,23 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 	struct dirent *de = dle->data;
 	DIR *subdir = NULL;
 	int subdirfd = -1;
+	int type;
 
 	*next = NULL;
 
-	if (de->d_type == DT_DIR) {
+	if (de->d_type == DT_UNKNOWN) {
+		/* Occurs on NFS mounts without "readdir plus" RPC. */
+		char *dir_path;
+		if (asprintf(&dir_path, "%s/%s", rootpath, path) == -1)
+			return got_error_from_errno("asprintf");
+		err = got_path_dirent_type(&type, dir_path, de);
+		free(dir_path);
+		if (err)
+			return err;
+	} else
+		type = de->d_type;
+
+	if (type == DT_DIR) {
 		char *subpath;
 		char *subdirpath;
 		struct got_pathlist_head subdirlist;

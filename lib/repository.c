@@ -1579,6 +1579,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	nentries = 0;
 	while ((de = readdir(dir)) != NULL) {
 		int ignore = 0;
+		int type;
 
 		if (strcmp(de->d_name, ".") == 0 ||
 		    strcmp(de->d_name, "..") == 0)
@@ -1592,7 +1593,12 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 		}
 		if (ignore)
 			continue;
-		if (de->d_type == DT_DIR) {
+
+		err = got_path_dirent_type(&type, path_dir, de);
+		if (err)
+			goto done;
+
+		if (type == DT_DIR) {
 			err = import_subdir(&new_te, de, path_dir,
 			    ignores, repo, progress_cb, progress_arg);
 			if (err) {
@@ -1601,7 +1607,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 				err = NULL;
 				continue;
 			}
-		} else if (de->d_type == DT_REG) {
+		} else if (type == DT_REG) {
 			err = import_file(&new_te, de, path_dir, repo);
 			if (err)
 				goto done;
