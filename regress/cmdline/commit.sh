@@ -1034,6 +1034,97 @@ function test_commit_symlink {
 	test_done "$testroot" "0"
 }
 
+function test_commit_fix_bad_symlink {
+	local testroot=`test_init commit_fix_bad_symlink`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
+	(cd $testroot/wt && got add passwd.link > /dev/null)
+
+	(cd $testroot/wt && got commit -m 'commit bad symlink' > $testroot/stdout)
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo "passwd.link is a symlink but should be a regular file" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# create another work tree which will contain the "bad" symlink
+	got checkout $testroot/repo $testroot/wt2 > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# change "bad" symlink back into a "good" symlink
+	(cd $testroot/wt && ln -sfh alpha passwd.link)
+
+	(cd $testroot/wt && got commit -m 'fix bad symlink' \
+		> $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  passwd.link" > $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/passwd.link ]; then
+		echo 'passwd.link is not a symlink' >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	readlink $testroot/wt/passwd.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	# Update the other work tree; the bad symlink should be fixed
+	(cd $testroot/wt2 && got update > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt2/passwd.link ]; then
+		echo 'passwd.link is not a symlink' >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	readlink $testroot/wt2/passwd.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir
@@ -1055,3 +1146,4 @@ run_test test_commit_xbit_change
 run_test test_commit_normalizes_filemodes
 run_test test_commit_with_unrelated_submodule
 run_test test_commit_symlink
+run_test test_commit_fix_bad_symlink

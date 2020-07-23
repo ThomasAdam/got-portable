@@ -1029,6 +1029,48 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg);
 
+/*
+ * This function assumes that the provided symlink target points at a
+ * safe location in the work tree!
+ */
+static const struct got_error *
+replace_existing_symlink(const char *ondisk_path, const char *target_path,
+    size_t target_len)
+{
+	const struct got_error *err = NULL;
+	ssize_t elen;
+	char etarget[PATH_MAX];
+	int fd;
+
+	/*
+	 * "Bad" symlinks (those pointing outside the work tree or into the
+	 * .got directory) are installed in the work tree as a regular file
+	 * which contains the bad symlink target path.
+	 * The new symlink target has already been checked for safety by our
+	 * caller. If we can successfully open a regular file then we simply
+	 * replace this file with a symlink below.
+	 */
+	fd = open(ondisk_path, O_RDWR | O_EXCL | O_NOFOLLOW);
+	if (fd == -1) {
+		if (errno != ELOOP)
+			return got_error_from_errno2("open", ondisk_path);
+
+		/* We are updating an existing on-disk symlink. */
+		elen = readlink(ondisk_path, etarget, sizeof(etarget));
+		if (elen == -1)
+			return got_error_from_errno2("readlink", ondisk_path);
+
+		if (elen == target_len &&
+		    memcmp(etarget, target_path, target_len) == 0)
+			return NULL; /* nothing to do */
+	}
+
+	err = update_symlink(ondisk_path, target_path, target_len);
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", ondisk_path);
+	return err;
+}
+
 static const struct got_error *
 install_symlink(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
@@ -1131,40 +1173,15 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 
 	if (symlink(target_path, ondisk_path) == -1) {
 		if (errno == EEXIST) {
-			struct stat sb;
-			ssize_t elen;
-			char etarget[PATH_MAX];
-			if (lstat(ondisk_path, &sb) == -1) {
-				err = got_error_from_errno2("lstat",
-				    ondisk_path);
+			err = replace_existing_symlink(ondisk_path,
+			    target_path, target_len);
+			if (err)
 				goto done;
+			if (progress_cb) {
+				err = (*progress_cb)(progress_arg,
+				    GOT_STATUS_UPDATE, path);
 			}
-			if (!S_ISLNK(sb.st_mode)) {
-				err = got_error_path(ondisk_path,
-				    GOT_ERR_FILE_OBSTRUCTED);
-				goto done;
-			}
-			elen = readlink(ondisk_path, etarget, sizeof(etarget));
-			if (elen == -1) {
-				err = got_error_from_errno2("readlink",
-				    ondisk_path);
-				goto done;
-			}
-			if (elen == target_len &&
-			    memcmp(etarget, target_path, target_len) == 0) {
-				err = NULL; /* nothing to do */
-				goto done;
-			} else {
-				err = update_symlink(ondisk_path, target_path,
-				    target_len);
-				if (err)
-					goto done;
-				if (progress_cb) {
-					err = (*progress_cb)(progress_arg,
-					    GOT_STATUS_UPDATE, path);
-				}
-				goto done;
-			}
+			goto done; /* Nothing else to do. */
 		}
 
 		if (errno == ENOENT) {
