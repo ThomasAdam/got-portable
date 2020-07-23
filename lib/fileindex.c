@@ -178,6 +178,29 @@ got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t stage)
 }
 
 int
+got_fileindex_entry_filetype_get(struct got_fileindex_entry *ie)
+{
+	return (ie->mode & GOT_FILEIDX_MODE_FILE_TYPE);
+}
+
+const struct got_error *
+got_fileindex_entry_filetype_set(struct got_fileindex_entry *ie, int type)
+{
+	switch (type) {
+	case GOT_FILEIDX_MODE_REGULAR_FILE:
+	case GOT_FILEIDX_MODE_SYMLINK:
+	case GOT_FILEIDX_MODE_BAD_SYMLINK:
+		break;
+	default:
+		return got_error(GOT_ERR_BAD_FILETYPE);
+	}
+
+	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE;
+	ie->mode |= type;
+	return NULL;
+}
+
+int
 got_fileindex_entry_has_blob(struct got_fileindex_entry *ie)
 {
 	return (ie->flags & GOT_FILEIDX_F_NO_BLOB) == 0;

@@ -1197,10 +1197,10 @@ replace_existing_symlink(const char *ondisk_path, const char *target_path,
 }
 
 static const struct got_error *
-install_symlink(struct got_worktree *worktree, const char *ondisk_path,
-    const char *path, mode_t te_mode, mode_t st_mode,
-    struct got_blob_object *blob, int restoring_missing_file,
-    int reverting_versioned_file, struct got_repository *repo,
+install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
+    const char *ondisk_path, const char *path, struct got_blob_object *blob,
+    int restoring_missing_file, int reverting_versioned_file,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -1210,6 +1210,8 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	char *path_got = NULL;
 	const uint8_t *buf = got_object_blob_get_read_buf(blob);
 	size_t hdrlen = got_object_blob_get_hdrlen(blob);
+
+	*is_bad_symlink = 0;
 
 	/* 
 	 * Blob object content specifies the target path of the link.
@@ -1221,6 +1223,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		err = got_object_blob_read_block(&len, blob);
 		if (len + target_len >= sizeof(target_path)) {
 			/* Path too long; install as a regular file. */
+			*is_bad_symlink = 1;
 			got_object_blob_rewind(blob);
 			return install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
@@ -1271,6 +1274,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	    abspath : target_path), worktree->root_path,
 	    strlen(worktree->root_path))) {
 		/* install as a regular file */
+		*is_bad_symlink = 1;
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
@@ -1288,6 +1292,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	if (got_path_is_child(resolved_path ? resolved_path : (abspath ?
 	    abspath : target_path), path_got, strlen(path_got))) {
 		/* install as a regular file */
+		*is_bad_symlink = 1;
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
@@ -1332,6 +1337,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		/* Handle errors from first or second creation attempt. */
 		if (errno == ENAMETOOLONG) {
 			/* bad target path; install as a regular file */
+			*is_bad_symlink = 1;
 			got_object_blob_rewind(blob);
 			err = install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
@@ -1366,11 +1372,6 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
-
-	if (S_ISLNK(te_mode))
-		return install_symlink(worktree, ondisk_path, path, te_mode,
-		    st_mode, blob, restoring_missing_file,
-		    reverting_versioned_file, repo, progress_cb, progress_arg);
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);
@@ -1883,9 +1884,18 @@ update_blob(struct got_worktree *worktree,
 		if (err)
 			goto done;
 	} else {
-		err = install_blob(worktree, ondisk_path, path, te->mode,
-		    sb.st_mode, blob, status == GOT_STATUS_MISSING, 0, 0,
-		    repo, progress_cb, progress_arg);
+		int is_bad_symlink = 0;
+		if (S_ISLNK(te->mode)) {
+			err = install_symlink(&is_bad_symlink, worktree,
+			    ondisk_path, path, blob,
+			    status == GOT_STATUS_MISSING, 0, repo,
+			    progress_cb, progress_arg);
+		} else {
+			err = install_blob(worktree, ondisk_path, path,
+			    te->mode, sb.st_mode, blob,
+			    status == GOT_STATUS_MISSING, 0, 0, repo,
+			    progress_cb, progress_arg);
+		}
 		if (err)
 			goto done;
 		if (ie) {
@@ -1898,6 +1908,15 @@ update_blob(struct got_worktree *worktree,
 		}
 		if (err)
 			goto done;
+		if (is_bad_symlink) {
+			if (ie == NULL)
+				ie = got_fileindex_entry_get(fileindex, path,
+				    strlen(path));
+			err = got_fileindex_entry_filetype_set(ie,
+			    GOT_FILEIDX_MODE_BAD_SYMLINK);
+			if (err)
+				goto done;
+		}
 	}
 	got_object_blob_close(blob);
 done:
@@ -2742,10 +2761,17 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 					goto done;
 			}
 		} else {
+			int is_bad_symlink = 0;
 			sb.st_mode = GOT_DEFAULT_FILE_MODE;
-			err = install_blob(a->worktree, ondisk_path, path2,
-			    mode2, sb.st_mode, blob2, 0, 0, 0, repo,
-			    a->progress_cb, a->progress_arg);
+			if (S_ISLNK(mode2)) {
+				err = install_symlink(&is_bad_symlink,
+				    a->worktree, ondisk_path, path2, blob2, 0,
+				    0, repo, a->progress_cb, a->progress_arg);
+			} else {
+				err = install_blob(a->worktree, ondisk_path, path2,
+				    mode2, sb.st_mode, blob2, 0, 0, 0, repo,
+				    a->progress_cb, a->progress_arg);
+			}
 			if (err)
 				goto done;
 			err = got_fileindex_entry_alloc(&ie, path2);
@@ -2761,6 +2787,12 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
+			}
+			if (is_bad_symlink) {
+				err = got_fileindex_entry_filetype_set(ie,
+				    GOT_FILEIDX_MODE_BAD_SYMLINK);
+				if (err)
+					goto done;
 			}
 		}
 	}
@@ -4256,10 +4288,19 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				goto done;
 			}
 		} else {
-			err = install_blob(a->worktree, ondisk_path, ie->path,
-			    te ? te->mode : GOT_DEFAULT_FILE_MODE,
-			    got_fileindex_perms_to_st(ie), blob, 0, 1, 0,
-			    a->repo, a->progress_cb, a->progress_arg);
+			int is_bad_symlink = 0;
+			if (te && S_ISLNK(te->mode)) {
+				err = install_symlink(&is_bad_symlink,
+				    a->worktree, ondisk_path, ie->path,
+				    blob, 0, 1, a->repo,
+				    a->progress_cb, a->progress_arg);
+			} else {
+				err = install_blob(a->worktree, ondisk_path,
+				    ie->path,
+				    te ? te->mode : GOT_DEFAULT_FILE_MODE,
+				    got_fileindex_perms_to_st(ie), blob, 0, 1, 0,
+				    a->repo, a->progress_cb, a->progress_arg);
+			}
 			if (err)
 				goto done;
 			if (status == GOT_STATUS_DELETE ||
@@ -4267,6 +4308,12 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				err = got_fileindex_entry_update(ie,
 				    ondisk_path, blob->id.sha1,
 				    a->worktree->base_commit_id->sha1, 1);
+				if (err)
+					goto done;
+			}
+			if (is_bad_symlink) {
+				err = got_fileindex_entry_filetype_set(ie,
+				    GOT_FILEIDX_MODE_BAD_SYMLINK);
 				if (err)
 					goto done;
 			}
@@ -4919,6 +4966,106 @@ done:
 }
 
 static const struct got_error *
+reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
+    struct got_object_id *new_base_commit_id, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_blob_object *blob = NULL;
+	struct got_object_id *tree_id = NULL;
+	char *tree_path = NULL;
+	struct got_tree_object *tree = NULL;
+	struct got_tree_entry *te;
+	char *entry_name;
+
+	err = got_object_open_as_blob(&blob, repo, ct->blob_id, PATH_MAX);
+	if (err)
+		return err;
+
+	err = got_path_dirname(&tree_path, ct->in_repo_path);
+	if (err) {
+		if (err->code != GOT_ERR_BAD_PATH)
+			goto done;
+		err = got_object_id_by_path(&tree_id, repo,
+		    new_base_commit_id, "");
+		if (err)
+			goto done;
+	} else {
+		err = got_object_id_by_path(&tree_id, repo,
+		    new_base_commit_id, tree_path);
+		if (err)
+			goto done;
+	}
+
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		goto done;
+
+	entry_name = basename(ct->path);
+	if (entry_name == NULL) {
+		err = got_error_from_errno2("basename", ct->path);
+		goto done;
+	}
+
+	te = got_object_tree_find_entry(tree, entry_name);
+	if (te == NULL) {
+		err = got_error_path(ct->path, GOT_ERR_NO_TREE_ENTRY);
+		goto done;
+	}
+
+	err = install_symlink(is_bad_symlink, worktree, ct->ondisk_path,
+	    ct->path, blob, 0, 0, repo, NULL, NULL);
+done:
+	if (blob)
+		got_object_blob_close(blob);
+	if (tree)
+		got_object_tree_close(tree);
+	free(tree_id);
+	free(tree_path);
+	return err;
+}
+
+/*
+ * After comitting a symlink we have a chance to convert "bad" symlinks
+ * (those which point outside the work tree or into .got) to regular files.
+ * This way, the post-commit work tree state matches a fresh checkout of
+ * the tree which was just committed. We also mark such newly committed
+ * symlinks as "bad" in the work tree's fileindex.
+ */
+static const struct got_error *
+reinstall_symlinks_after_commit(struct got_pathlist_head *commitable_paths,
+    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+
+	TAILQ_FOREACH(pe, commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		struct got_fileindex_entry *ie;
+		int is_bad_symlink = 0;
+	
+		if (!S_ISLNK(get_ct_file_mode(ct)))
+			continue;
+
+		err = reinstall_symlink_after_commit(&is_bad_symlink,
+		    ct, new_base_commit_id, worktree, repo);
+		if (err)
+			break;
+		ie = got_fileindex_entry_get(fileindex, ct->path,
+		    strlen(ct->path));
+		if (ie && is_bad_symlink) {
+			err = got_fileindex_entry_filetype_set(ie,
+			    GOT_FILEIDX_MODE_BAD_SYMLINK);
+			if (err)
+				break;
+		}
+	}
+
+	return err;
+}
+
+static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
     struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
     int have_staged_files)
@@ -5074,35 +5221,9 @@ commit_worktree(struct got_object_id **new_commit_id,
 			goto done;
 		}
 		err = got_object_blob_create(&ct->blob_id, ondisk_path, repo);
-		if (err) {
-			free(ondisk_path);
-			goto done;
-		}
-
-		/*
-		 * When comitting a symlink we convert "bad" symlinks (those
-		 * which point outside the work tree or into .got) to regular
-		 * files. This way, the post-commit work tree state matches
-		 * a fresh checkout of the tree which was committed.
-		 */
-		if (S_ISLNK(get_ct_file_mode(ct))) {
-			struct got_blob_object *blob;
-			err = got_object_open_as_blob(&blob, repo, ct->blob_id,
-			    PATH_MAX); 
-			if (err) {
-				free(ondisk_path);
-				goto done;
-			}
-			err = install_symlink(worktree, ondisk_path, ct->path,
-			    get_ct_file_mode(ct), GOT_DEFAULT_FILE_MODE, blob,
-			    0, 0, repo, NULL, NULL);
-			got_object_blob_close(blob);
-			if (err) {
-				free(ondisk_path);
-				goto done;
-			}
-		}
 		free(ondisk_path);
+		if (err)
+			goto done;
 	}
 
 	/* Recursively write new tree objects. */
@@ -5321,6 +5442,10 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
 	    fileindex, have_staged_files);
+	if (err == NULL) {
+		err = reinstall_symlinks_after_commit(&commitable_paths,
+		    *new_commit_id, fileindex, worktree, repo);
+	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;

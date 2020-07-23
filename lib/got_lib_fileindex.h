@@ -39,6 +39,7 @@ struct got_fileindex_entry {
 #define GOT_FILEIDX_MODE_FILE_TYPE	0x000f
 #define GOT_FILEIDX_MODE_REGULAR_FILE	1
 #define GOT_FILEIDX_MODE_SYMLINK	2
+#define GOT_FILEIDX_MODE_BAD_SYMLINK	3
 #define GOT_FILEIDX_MODE_PERMS		0xfff0
 #define GOT_FILEIDX_MODE_PERMS_SHIFT	4
 
@@ -161,5 +162,8 @@ int got_fileindex_entry_has_commit(struct got_fileindex_entry *);
 int got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *);
 uint32_t got_fileindex_entry_stage_get(const struct got_fileindex_entry *);
 void got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t);
+int got_fileindex_entry_filetype_get(struct got_fileindex_entry *);
+const struct got_error *got_fileindex_entry_filetype_set(
+    struct got_fileindex_entry *, int);
 
 void got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *);
