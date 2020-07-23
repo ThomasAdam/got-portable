@@ -281,6 +281,16 @@ const struct got_error *got_object_blob_dump_to_file(size_t *, int *,
     off_t **, FILE *, struct got_blob_object *);
 
 /*
+ * Read the entire content of a blob into a newly allocated string buffer
+ * and terminate it with '\0'. This is intended for blobs which contain a
+ * symlink target path. It should not be used to process arbitrary blobs.
+ * Use got_object_blob_dump_to_file() or got_tree_entry_get_symlink_target()
+ * instead if possible. The caller must dispose of the string with free(3).
+ */
+const struct got_error *got_object_blob_read_to_str(char **,
+    struct got_blob_object *);
+
+/*
  * Attempt to open a tag object in a repository.
  * The caller must dispose of the tree with got_tag_object_close().
  */

@@ -830,6 +830,91 @@ done:
 	return err;
 }
 
+static const struct got_error *
+update_symlink(const char *ondisk_path, const char *target_path,
+    size_t target_len)
+{
+	/* This is not atomic but matches what 'ln -sf' does. */
+	if (unlink(ondisk_path) == -1)
+		return got_error_from_errno2("unlink", ondisk_path);
+	if (symlink(target_path, ondisk_path) == -1)
+		return got_error_from_errno3("symlink", target_path,
+		    ondisk_path);
+	return NULL;
+}
+
+/*
+ * Merge a symlink into the work tree, where blob_orig acts as the common
+ * ancestor, blob_deriv acts as the first derived version, and the symlink
+ * on disk acts as the second derived version.
+ * Assume that contents of both blobs represent symlinks.
+ */
+static const struct got_error *
+merge_symlink(struct got_worktree *worktree,
+    struct got_blob_object *blob_orig, const char *ondisk_path,
+    const char *path, uint16_t st_mode, const char *label_orig,
+    struct got_blob_object *blob_deriv,
+    struct got_object_id *deriv_base_commit_id, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	char *ancestor_target = NULL, *deriv_target = NULL;
+	struct stat sb;
+	ssize_t ondisk_len;
+	char ondisk_target[PATH_MAX];
+
+	if (lstat(ondisk_path, &sb) == -1)
+		return got_error_from_errno2("lstat", ondisk_path);
+
+	if (!S_ISLNK(sb.st_mode)) {
+		/* TODO symlink is obstructed; do something */
+		return got_error_path(ondisk_path, GOT_ERR_FILE_OBSTRUCTED);
+	}
+
+	ondisk_len = readlink(ondisk_path, ondisk_target,
+	    sizeof(ondisk_target));
+	if (ondisk_len == -1) {
+		err = got_error_from_errno2("readlink",
+		    ondisk_path);
+		goto done;
+	}
+
+	err = got_object_blob_read_to_str(&ancestor_target, blob_orig);
+	if (err)
+		goto done;
+
+	err = got_object_blob_read_to_str(&deriv_target, blob_deriv);
+	if (err)
+		goto done;
+
+	if (ondisk_len != strlen(ancestor_target) ||
+	    memcmp(ondisk_target, ancestor_target, ondisk_len) != 0) {
+		/*
+		 * The symlink has changed on-disk (second derived version).
+		 * Keep that change and discard the incoming change (first
+		 * derived version).
+		 * TODO: Need tree-conflict resolution to handle this.
+		 */
+		err = (*progress_cb)(progress_arg, GOT_STATUS_OBSTRUCTED,
+		    path);
+	} else if (ondisk_len == strlen(deriv_target) &&
+	    memcmp(ondisk_target, deriv_target, ondisk_len) == 0) {
+		/* Both versions made the same change. */
+		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+	} else {
+		/* Apply the incoming change. */
+		err = update_symlink(ondisk_path, deriv_target,
+		    strlen(deriv_target));
+		if (err)
+			goto done;
+		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+	}
+done:
+	free(ancestor_target);
+	free(deriv_target);
+	return err;
+}
+
 /*
  * Perform a 3-way merge where blob_orig acts as the common ancestor,
  * blob_deriv acts as the first derived version, and the file on disk
@@ -1069,17 +1154,10 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 				err = NULL; /* nothing to do */
 				goto done;
 			} else {
-				if (unlink(ondisk_path) == -1) {
-					err = got_error_from_errno2("unlink",
-					    ondisk_path);
+				err = update_symlink(ondisk_path, target_path,
+				    target_len);
+				if (err)
 					goto done;
-				}
-				if (symlink(target_path, ondisk_path) == -1) {
-					err = got_error_from_errno3("symlink",
-					    target_path, ondisk_path);
-					goto done;
-				}
-
 				err = (*progress_cb)(progress_arg,
 				    GOT_STATUS_UPDATE, path);
 				goto done;
@@ -2381,9 +2459,17 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			goto done;
 		}
 
-		err = merge_blob(&local_changes_subsumed, a->worktree, blob1,
-		    ondisk_path, path2, sb.st_mode, a->label_orig, blob2,
-		    a->commit_id2, repo, a->progress_cb, a->progress_arg);
+		if (S_ISLNK(mode1) && S_ISLNK(mode2)) {
+			err = merge_symlink(a->worktree, blob1,
+			    ondisk_path, path2, sb.st_mode, a->label_orig,
+			    blob2, a->commit_id2, repo, a->progress_cb,
+			    a->progress_arg);
+		} else {
+			err = merge_blob(&local_changes_subsumed, a->worktree,
+			    blob1, ondisk_path, path2, sb.st_mode,
+			    a->label_orig, blob2, a->commit_id2, repo,
+			    a->progress_cb, a->progress_arg);
+		}
 	} else if (blob1) {
 		ie = got_fileindex_entry_get(a->fileindex, path1,
 		    strlen(path1));

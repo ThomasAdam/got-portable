@@ -864,12 +864,50 @@ got_tree_entry_get_id(struct got_tree_entry *te)
 }
 
 const struct got_error *
+got_object_blob_read_to_str(char **s, struct got_blob_object *blob)
+{
+	const struct got_error *err = NULL;
+	size_t len, totlen, hdrlen, offset;
+
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	totlen = 0;
+	offset = 0;
+	do {
+		char *p;
+
+		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			return err;
+
+		if (len == 0)
+			break;
+
+		totlen += len - hdrlen;
+		p = realloc(*s, totlen + 1);
+		if (p == NULL) {
+			err = got_error_from_errno("realloc");
+			free(*s);
+			*s = NULL;
+			return err;
+		}
+		*s = p;
+		/* Skip blob object header first time around. */
+		memcpy(*s + offset,
+		    got_object_blob_get_read_buf(blob) + hdrlen, len - hdrlen);
+		hdrlen = 0;
+		offset = totlen;
+	} while (len > 0);
+
+	(*s)[totlen] = '\0';
+	return NULL;
+}
+
+const struct got_error *
 got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
-	size_t len, totlen, hdrlen, offset;
 
 	*link_target = NULL;
 
@@ -880,36 +918,9 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 	    got_tree_entry_get_id(te), PATH_MAX);
 	if (err)
 		return err;
-	hdrlen = got_object_blob_get_hdrlen(blob);
-	totlen = 0;
-	offset = 0;
-	do {
-		char *p;
 
-		err = got_object_blob_read_block(&len, blob);
-		if (err)
-			goto done;
-
-		if (len == 0)
-			break;
-
-		totlen += len - hdrlen;
-		p = realloc(*link_target, totlen + 1);
-		if (p == NULL) {
-			err = got_error_from_errno("realloc");
-			goto done;
-		}
-		*link_target = p;
-		/* Skip blob object header first time around. */
-		memcpy(*link_target + offset,
-		    got_object_blob_get_read_buf(blob) + hdrlen, len - hdrlen);
-		hdrlen = 0;
-		offset = totlen;
-	} while (len > 0);
-	(*link_target)[totlen] = '\0';
-done:
-	if (blob)
-		got_object_blob_close(blob);
+	err = got_object_blob_read_to_str(link_target, blob);
+	got_object_blob_close(blob);
 	if (err) {
 		free(*link_target);
 		*link_target = NULL;
