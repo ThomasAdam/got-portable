@@ -954,6 +954,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	char target_path[PATH_MAX];
 	size_t len, target_len = 0;
 	char *resolved_path = NULL, *abspath = NULL;
+	char *path_got = NULL;
 	const uint8_t *buf = got_object_blob_get_read_buf(blob);
 	size_t hdrlen = got_object_blob_get_hdrlen(blob);
 
@@ -1016,6 +1017,23 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	if (!got_path_is_child(resolved_path ? resolved_path : (abspath ?
 	    abspath : target_path), worktree->root_path,
 	    strlen(worktree->root_path))) {
+		/* install as a regular file */
+		got_object_blob_rewind(blob);
+		err = install_blob(worktree, ondisk_path, path,
+		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+		    restoring_missing_file, reverting_versioned_file,
+		    repo, progress_cb, progress_arg);
+		goto done;
+	}
+
+	/* Do not allow symlinks pointing into the .got directory. */
+	if (asprintf(&path_got, "%s/%s", worktree->root_path,
+	    GOT_WORKTREE_GOT_DIR) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	if (got_path_is_child(resolved_path ? resolved_path : (abspath ?
+	    abspath : target_path), path_got, strlen(path_got))) {
 		/* install as a regular file */
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
@@ -1108,6 +1126,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 done:
 	free(resolved_path);
 	free(abspath);
+	free(path_got);
 	return err;
 }
 
