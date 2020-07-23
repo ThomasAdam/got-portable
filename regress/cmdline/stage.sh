@@ -2641,6 +2641,299 @@ EOF
 	test_done "$testroot" "0"
 }
 
+function test_stage_patch_symlink {
+	local testroot=`test_init stage_patch_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local head_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -sf beta alpha.link)
+	(cd $testroot/wt && ln -sfh gamma epsilon.link)
+	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
+	echo 'this is regular file foo' > $testroot/wt/dotgotfoo.link
+	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
+	(cd $testroot/wt && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
+	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
+	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
+	(cd $testroot/wt && got add zeta.link > /dev/null)
+
+	printf "y\nn\ny\nn\ny\ny\ny" > $testroot/patchscript
+	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
+		> $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1 +1 @@
+-alpha
+\ No newline at end of file
++beta
+\ No newline at end of file
+-----------------------------------------------
+M  alpha.link (change 1 of 1)
+stage this change? [y/n/q] y
+A  dotgotbar.link
+stage this addition? [y/n] n
+A  dotgotfoo.link
+stage this addition? [y/n] y
+-----------------------------------------------
+@@ -1 +1 @@
+-../beta
+\ No newline at end of file
++../gamma/delta
+\ No newline at end of file
+-----------------------------------------------
+M  epsilon/beta.link (change 1 of 1)
+stage this change? [y/n/q] n
+-----------------------------------------------
+@@ -1 +1 @@
+-epsilon
+\ No newline at end of file
++gamma
+\ No newline at end of file
+-----------------------------------------------
+M  epsilon.link (change 1 of 1)
+stage this change? [y/n/q] y
+D  nonexistent.link
+stage this deletion? [y/n] y
+A  zeta.link
+stage this addition? [y/n] y
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/wt/alpha.link
+	echo 'this is regular file alpha.link' > $testroot/wt/alpha.link
+
+	(cd $testroot/wt && got diff -s > $testroot/stdout)
+
+	echo "diff $head_commit $testroot/wt (staged changes)" \
+		> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l alpha.link) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- alpha.link' >> $testroot/stdout.expected
+	echo '+++ alpha.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+beta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l dotgotfoo.link) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ dotgotfoo.link' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+this is regular file foo' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'epsilon.link@ -> epsilon$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l epsilon.link) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- epsilon.link' >> $testroot/stdout.expected
+	echo '+++ epsilon.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-epsilon' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+gamma' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'nonexistent.link@ -> nonexistent$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- nonexistent.link' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-nonexistent' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	(cd $testroot/wt && got stage -l zeta.link) | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ zeta.link' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+gamma/delta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "staged symlink" \
+		> $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	local commit_id=`git_show_head $testroot/repo`
+	echo "A  dotgotfoo.link" > $testroot/stdout.expected
+	echo "A  zeta.link" >> $testroot/stdout.expected
+	echo "M  alpha.link" >> $testroot/stdout.expected
+	echo "M  epsilon.link" >> $testroot/stdout.expected
+	echo "D  nonexistent.link" >> $testroot/stdout.expected
+	echo "Created commit $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tree -r $testroot/repo -c $commit_id > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got tree command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+alpha
+alpha.link@ -> beta
+beta
+dotgotfoo.link
+epsilon/
+epsilon.link@ -> gamma
+gamma/
+passwd.link@ -> /etc/passwd
+zeta.link@ -> gamma/delta
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	if [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo 'this is regular file alpha.link' > $testroot/content.expected
+	cp $testroot/wt/alpha.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+	readlink $testroot/wt/dotgotbar.link > $testroot/stdout
+	echo ".got/bar" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "this is regular file foo" > $testroot/content.expected
+	cp $testroot/wt/dotgotfoo.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "gamma" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo "passwd.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/zeta.link ]; then
+		echo "zeta.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/zeta.link > $testroot/stdout
+	echo "gamma/delta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_unversioned
@@ -2669,3 +2962,4 @@ run_test test_stage_patch_removed_twice
 run_test test_stage_patch_quit
 run_test test_stage_patch_incomplete_script
 run_test test_stage_symlink
+run_test test_stage_patch_symlink

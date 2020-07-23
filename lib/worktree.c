@@ -4067,6 +4067,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	struct got_blob_object *blob = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
 	int fd2 = -1;
+	char link_target[PATH_MAX];
+	ssize_t link_len = 0;
 	char *path1 = NULL, *id_str = NULL;
 	struct stat sb1, sb2;
 	struct got_diff_changes *changes = NULL;
@@ -4085,27 +4087,62 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (dirfd2 != -1) {
 		fd2 = openat(dirfd2, de_name2, O_RDONLY | O_NOFOLLOW);
 		if (fd2 == -1) {
-			err = got_error_from_errno2("openat", path2);
-			goto done;
+			if (errno != ELOOP) {
+				err = got_error_from_errno2("openat", path2);
+				goto done;
+			}
+			link_len = readlinkat(dirfd2, de_name2,
+			    link_target, sizeof(link_target));
+			if (link_len == -1)
+				return got_error_from_errno2("readlinkat", path2);
+			sb2.st_mode = S_IFLNK;
+			sb2.st_size = link_len;
 		}
 	} else {
 		fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
 		if (fd2 == -1) {
-			err = got_error_from_errno2("open", path2);
-			goto done;
+			if (errno != ELOOP) {
+				err = got_error_from_errno2("open", path2);
+				goto done;
+			}
+			link_len = readlink(path2, link_target,
+			    sizeof(link_target));
+			if (link_len == -1)
+				return got_error_from_errno2("readlink", path2);
+			sb2.st_mode = S_IFLNK;
+			sb2.st_size = link_len;
 		}
 	}
-	if (fstat(fd2, &sb2) == -1) {
-		err = got_error_from_errno2("fstat", path2);
-		goto done;
-	}
+	if (fd2 != -1) {
+		if (fstat(fd2, &sb2) == -1) {
+			err = got_error_from_errno2("fstat", path2);
+			goto done;
+		}
 
-	f2 = fdopen(fd2, "r");
-	if (f2 == NULL) {
-		err = got_error_from_errno2("fdopen", path2);
-		goto done;
+		f2 = fdopen(fd2, "r");
+		if (f2 == NULL) {
+			err = got_error_from_errno2("fdopen", path2);
+			goto done;
+		}
+		fd2 = -1;
+	} else {
+		size_t n;
+		f2 = got_opentemp();
+		if (f2 == NULL) {
+			err = got_error_from_errno2("got_opentemp", path2);
+			goto done;
+		}
+		n = fwrite(link_target, 1, link_len, f2);
+		if (n != link_len) {
+			err = got_ferror(f2, GOT_ERR_IO);
+			goto done;
+		}
+		if (fflush(f2) == EOF) {
+			err = got_error_from_errno("fflush");
+			goto done;
+		}
+		rewind(f2);
 	}
-	fd2 = -1;
 
 	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
 	if (err)
@@ -4159,9 +4196,11 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		if (err)
 			goto done;
 
-		if (chmod(*path_outfile, sb2.st_mode) == -1) {
-			err = got_error_from_errno2("chmod", path2);
-			goto done;
+		if (!S_ISLNK(sb2.st_mode)) {
+			if (chmod(*path_outfile, sb2.st_mode) == -1) {
+				err = got_error_from_errno2("chmod", path2);
+				goto done;
+			}
 		}
 	}
 done:
