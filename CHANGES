@@ -1,3 +1,15 @@
+* got 0.37; 2020-07-23
+- cope with directory entries returned from readdir(3) with type DT_UNKNOWN
+- fix merging with files that do not contain a newline character
+- heed .{cvs,git}ignore if a path is given on the 'got status' command line
+- plug memory leak that occurred when files were deleted during checkout/update
+- add new parse.y code for future use and restructure gotweb's parse.y
+- fix an error return in gotweb (by Martin Vahlensieck)
+- document how to use commit messages prepared in a file (by Scott Bennett)
+- make 'got/tog tree' show symlink targets like 'ls -lF' does: link@ -> target
+- allow creation of commits which carry unmodified submodule tree entries along
+- some error, usage, and progress message improvements
+
 * got 0.36; 2020-05-05
 - fix "no such entry found in tree" error with got log -p and an added path
 - show a list of paths changed in a commit with 'got log -P' and in tog
