@@ -259,7 +259,86 @@ function test_cat_submodule_of_same_repo {
 	test_done "$testroot" "$ret"
 }
 
+function test_cat_symlink {
+	local testroot=`test_init cat_symlink`
+	local commit_id=`git_show_head $testroot/repo`
+	local author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+
+	local epsilon_id=`got tree -r $testroot/repo -i | grep 'epsilon/$' | cut -d' ' -f 1`
+	local alpha_link_id=`got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | cut -d' ' -f 1`
+	local epsilon_link_id=`got tree -r $testroot/repo -i | grep 'epsilon.link@ -> epsilon$' | cut -d' ' -f 1`
+
+	local passwd_link_id=`got tree -r $testroot/repo -i | grep 'passwd.link@ -> /etc/passwd$' | cut -d' ' -f 1`
+	local epsilon_beta_link_id=`got tree -r $testroot/repo -i epsilon | grep 'beta.link@ -> ../beta$' | cut -d' ' -f 1`
+	local nonexistent_link_id=`got tree -r $testroot/repo -i | grep 'nonexistent.link@ -> nonexistent$' | cut -d' ' -f 1`
+
+	# cat symlink to regular file
+	echo -n "alpha" > $testroot/stdout.expected
+	got cat -r $testroot/repo $alpha_link_id > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat symlink with relative path to regular file
+	echo -n "../beta" > $testroot/stdout.expected
+	got cat -r $testroot/repo $epsilon_beta_link_id > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat symlink to a tree
+	echo -n "epsilon" > $testroot/stdout.expected
+	got cat -r $testroot/repo $epsilon_link_id > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cat symlink to paths which don't exist in repository
+	echo -n "/etc/passwd" > $testroot/stdout.expected
+	got cat -r $testroot/repo $passwd_link_id > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "nonexistent" > $testroot/stdout.expected
+	got cat -r $testroot/repo $nonexistent_link_id > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cat_basic
 run_test test_cat_path
 run_test test_cat_submodule
 run_test test_cat_submodule_of_same_repo
+run_test test_cat_symlink
