@@ -1025,7 +1025,8 @@ static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
-    int reverting_versioned_file, struct got_repository *repo,
+    int reverting_versioned_file, int installing_bad_symlink,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg);
 
 static const struct got_error *
@@ -1057,7 +1058,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			return install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
 			    restoring_missing_file, reverting_versioned_file,
-			    repo, progress_cb, progress_arg);
+			    1, repo, progress_cb, progress_arg);
 		}
 		if (len > 0) {
 			/* Skip blob object header first time around. */
@@ -1106,7 +1107,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
-		    restoring_missing_file, reverting_versioned_file,
+		    restoring_missing_file, reverting_versioned_file, 1,
 		    repo, progress_cb, progress_arg);
 		goto done;
 	}
@@ -1123,7 +1124,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
-		    restoring_missing_file, reverting_versioned_file,
+		    restoring_missing_file, reverting_versioned_file, 1,
 		    repo, progress_cb, progress_arg);
 		goto done;
 	}
@@ -1158,8 +1159,10 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 				    target_len);
 				if (err)
 					goto done;
-				err = (*progress_cb)(progress_arg,
-				    GOT_STATUS_UPDATE, path);
+				if (progress_cb) {
+					err = (*progress_cb)(progress_arg,
+					    GOT_STATUS_UPDATE, path);
+				}
 				goto done;
 			}
 		}
@@ -1190,7 +1193,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			got_object_blob_rewind(blob);
 			err = install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
-			    restoring_missing_file, reverting_versioned_file,
+			    restoring_missing_file, reverting_versioned_file, 1,
 			    repo, progress_cb, progress_arg);
 		} else if (errno == ENOTDIR) {
 			err = got_error_path(ondisk_path,
@@ -1199,7 +1202,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			err = got_error_from_errno3("symlink",
 			    target_path, ondisk_path);
 		}
-	} else
+	} else if (progress_cb)
 		err = (*progress_cb)(progress_arg, GOT_STATUS_ADD, path);
 done:
 	free(resolved_path);
@@ -1212,8 +1215,9 @@ static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
-    int reverting_versioned_file, struct got_repository *repo,
-    got_worktree_checkout_cb progress_cb, void *progress_arg)
+    int reverting_versioned_file, int installing_bad_symlink,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
@@ -1243,7 +1247,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				return got_error_from_errno2("open",
 				    ondisk_path);
 		} else if (errno == EEXIST) {
-			if (!S_ISREG(st_mode)) {
+			if (!S_ISREG(st_mode) && !installing_bad_symlink) {
 				/* TODO file is obstructed; do something */
 				err = got_error_path(ondisk_path,
 				    GOT_ERR_FILE_OBSTRUCTED);
@@ -1259,15 +1263,19 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			return got_error_from_errno2("open", ondisk_path);
 	}
 
-	if (restoring_missing_file)
-		err = (*progress_cb)(progress_arg, GOT_STATUS_MISSING, path);
-	else if (reverting_versioned_file)
-		err = (*progress_cb)(progress_arg, GOT_STATUS_REVERT, path);
-	else
-		err = (*progress_cb)(progress_arg,
-		    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
-	if (err)
-		goto done;
+	if (progress_cb) {
+		if (restoring_missing_file)
+			err = (*progress_cb)(progress_arg, GOT_STATUS_MISSING,
+			    path);
+		else if (reverting_versioned_file)
+			err = (*progress_cb)(progress_arg, GOT_STATUS_REVERT,
+			    path);
+		else
+			err = (*progress_cb)(progress_arg,
+			    update ? GOT_STATUS_UPDATE : GOT_STATUS_ADD, path);
+		if (err)
+			goto done;
+	}
 
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	do {
@@ -1727,7 +1735,7 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 	} else {
 		err = install_blob(worktree, ondisk_path, path, te->mode,
-		    sb.st_mode, blob, status == GOT_STATUS_MISSING, 0,
+		    sb.st_mode, blob, status == GOT_STATUS_MISSING, 0, 0,
 		    repo, progress_cb, progress_arg);
 		if (err)
 			goto done;
@@ -2559,7 +2567,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			err = install_blob(a->worktree, ondisk_path, path2,
 			    /* XXX get this from parent tree! */
 			    GOT_DEFAULT_FILE_MODE,
-			    sb.st_mode, blob2, 0, 0, repo,
+			    sb.st_mode, blob2, 0, 0, 0, repo,
 			    a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
@@ -4073,7 +4081,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		} else {
 			err = install_blob(a->worktree, ondisk_path, ie->path,
 			    te ? te->mode : GOT_DEFAULT_FILE_MODE,
-			    got_fileindex_perms_to_st(ie), blob, 0, 1,
+			    got_fileindex_perms_to_st(ie), blob, 0, 1, 0,
 			    a->repo, a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
@@ -4889,9 +4897,35 @@ commit_worktree(struct got_object_id **new_commit_id,
 			goto done;
 		}
 		err = got_object_blob_create(&ct->blob_id, ondisk_path, repo);
-		free(ondisk_path);
-		if (err)
+		if (err) {
+			free(ondisk_path);
 			goto done;
+		}
+
+		/*
+		 * When comitting a symlink we convert "bad" symlinks (those
+		 * which point outside the work tree or into .got) to regular
+		 * files. This way, the post-commit work tree state matches
+		 * a fresh checkout of the tree which was committed.
+		 */
+		if (S_ISLNK(get_ct_file_mode(ct))) {
+			struct got_blob_object *blob;
+			err = got_object_open_as_blob(&blob, repo, ct->blob_id,
+			    PATH_MAX); 
+			if (err) {
+				free(ondisk_path);
+				goto done;
+			}
+			err = install_symlink(worktree, ondisk_path, ct->path,
+			    get_ct_file_mode(ct), GOT_DEFAULT_FILE_MODE, blob,
+			    0, 0, repo, NULL, NULL);
+			got_object_blob_close(blob);
+			if (err) {
+				free(ondisk_path);
+				goto done;
+			}
+		}
+		free(ondisk_path);
 	}
 
 	/* Recursively write new tree objects. */

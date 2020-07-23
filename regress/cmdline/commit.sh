@@ -902,6 +902,78 @@ function test_commit_with_unrelated_submodule {
 	test_done "$testroot" "$ret"
 }
 
+function check_symlinks {
+	local wtpath="$1"
+	if ! [ -h $wtpath/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		return 1
+	fi
+
+	readlink $wtpath/alpha.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	if ! [ -h $wtpath/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		return 1
+	fi
+
+	readlink $wtpath/epsilon.link > $testroot/stdout
+	echo "epsilon" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	if [ -h $wtpath/passwd.link ]; then
+		echo -n "passwd.link is a symlink and points outside of work tree: " >&2
+		readlink $wtpath/passwd.link >&2
+		return 1
+	fi
+
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $wtpath/passwd.link $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "cp command failed unexpectedly" >&2
+		return 1
+	fi
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		return 1
+	fi
+
+	readlink $wtpath/epsilon/beta.link > $testroot/stdout
+	echo "../beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	readlink $wtpath/nonexistent.link > $testroot/stdout
+	echo "nonexistent" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+
+	return 0
+}
+
 function test_commit_symlink {
 	local testroot=`test_init commit_symlink`
 
@@ -921,6 +993,7 @@ function test_commit_symlink {
 		epsilon/beta.link nonexistent.link > /dev/null)
 
 	(cd $testroot/wt && got commit -m 'test commit_symlink' > $testroot/stdout)
+	#(cd $testroot/wt && egdb --args got commit -m 'test commit_symlink')
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "A  alpha.link" > $testroot/stdout.expected
@@ -938,81 +1011,28 @@ function test_commit_symlink {
 		return 1
 	fi
 
+	# verify created in-repository tree
 	got checkout $testroot/repo $testroot/wt2 > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-
-	if ! [ -h $testroot/wt2/alpha.link ]; then
-		echo "alpha.link is not a symlink"
-		test_done "$testroot" "1"
-		return 1
-	fi
-
-	readlink $testroot/wt2/alpha.link > $testroot/stdout
-	echo "alpha" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	check_symlinks $testroot/wt2
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	if ! [ -h $testroot/wt2/epsilon.link ]; then
-		echo "epsilon.link is not a symlink"
-		test_done "$testroot" "1"
-		return 1
-	fi
-
-	readlink $testroot/wt2/epsilon.link > $testroot/stdout
-	echo "epsilon" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	# verify post-commit work tree state matches a fresh checkout
+	check_symlinks $testroot/wt
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-
-	if [ -h $testroot/wt2/passwd.link ]; then
-		echo -n "passwd.link symlink points outside of work tree: " >&2
-		readlink $testroot/wt2/passwd.link >&2
-		test_done "$testroot" "1"
-		return 1
-	fi
-
-	echo -n "/etc/passwd" > $testroot/content.expected
-	cp $testroot/wt2/passwd.link $testroot/content
-
-	cmp -s $testroot/content.expected $testroot/content
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/content.expected $testroot/content
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	readlink $testroot/wt2/epsilon/beta.link > $testroot/stdout
-	echo "../beta" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-		test_done "$testroot" "$ret"
-		return 1
-	fi
-
-	readlink $testroot/wt2/nonexistent.link > $testroot/stdout
-	echo "nonexistent" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
-	ret="$?"
-	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
-	fi
-	test_done "$testroot" "$ret"
+	test_done "$testroot" "0"
 }
 
 run_test test_commit_basic
