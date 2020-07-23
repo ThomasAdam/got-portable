@@ -762,6 +762,126 @@ function test_blame_submodule {
 	test_done "$testroot" "$ret"
 }
 
+function test_blame_symlink {
+	local testroot=`test_init blame_symlink`
+	local commit_id0=`git_show_head $testroot/repo`
+	local short_commit0=`trim_obj_id 32 $commit_id0`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+
+	local commit_id1=`git_show_head $testroot/repo`
+	local short_commit1=`trim_obj_id 32 $commit_id1`
+	local author_time=`git_show_author_time $testroot/repo`
+
+	# got blame dereferences symlink to a regular file
+	got blame -r $testroot/repo alpha.link > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	d=`date -r $author_time +"%G-%m-%d"`
+	echo "1) $short_commit0 $d $GOT_AUTHOR_8 alpha" \
+		> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" -a "$xfail" == "" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# got blame dereferences symlink with relative path
+	got blame -r $testroot/repo epsilon/beta.link > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "blame command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	d=`date -r $author_time +"%G-%m-%d"`
+	echo "1) $short_commit0 $d $GOT_AUTHOR_8 beta" \
+		> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" -a "$xfail" == "" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got blame -r $testroot/repo epsilon.link > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# blame dereferences symlink to a directory
+	echo "got: wrong type of object" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# got blame fails if symlink target does not exist in repo
+	got blame -r $testroot/repo passwd.link > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: /etc/passwd: no such entry found in tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	got blame -r $testroot/repo nonexistent.link > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "blame command succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: /nonexistent: no such entry found in tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 run_test test_blame_basic
 run_test test_blame_tag
 run_test test_blame_file_single_line
@@ -773,3 +893,4 @@ run_test test_blame_commit_subsumed
 run_test test_blame_blame_h
 run_test test_blame_added_on_branch
 run_test test_blame_submodule
+run_test test_blame_symlink

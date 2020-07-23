@@ -4499,6 +4499,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_reflist_head refs;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	char *link_target = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_str = NULL;
 	int ch;
@@ -4594,7 +4595,14 @@ cmd_blame(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_blame_view(view, in_repo_path, commit_id, &refs, repo);
+
+	error = got_object_resolve_symlinks(&link_target, in_repo_path,
+	    commit_id, repo);
+	if (error)
+		goto done;
+
+	error = open_blame_view(view, link_target ? link_target : in_repo_path,
+	    commit_id, &refs, repo);
 	if (error)
 		goto done;
 	if (worktree) {
@@ -4606,6 +4614,7 @@ cmd_blame(int argc, char *argv[])
 done:
 	free(repo_path);
 	free(in_repo_path);
+	free(link_target);
 	free(cwd);
 	free(commit_id);
 	if (worktree)

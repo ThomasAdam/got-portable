@@ -4100,6 +4100,7 @@ cmd_blame(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *path, *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
+	char *link_target = NULL;
 	struct got_object_id *obj_id = NULL;
 	struct got_object_id *commit_id = NULL;
 	struct got_blob_object *blob = NULL;
@@ -4214,7 +4215,13 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_object_id_by_path(&obj_id, repo, commit_id, in_repo_path);
+	error = got_object_resolve_symlinks(&link_target, in_repo_path,
+	    commit_id, repo);
+	if (error)
+		goto done;
+
+	error = got_object_id_by_path(&obj_id, repo, commit_id,
+	    link_target ? link_target : in_repo_path);
 	if (error)
 		goto done;
 
@@ -4258,10 +4265,11 @@ cmd_blame(int argc, char *argv[])
 	}
 	bca.repo = repo;
 
-	error = got_blame(in_repo_path, commit_id, repo, blame_cb, &bca,
-	    check_cancelled, NULL);
+	error = got_blame(link_target ? link_target : in_repo_path, commit_id,
+	    repo, blame_cb, &bca, check_cancelled, NULL);
 done:
 	free(in_repo_path);
+	free(link_target);
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
