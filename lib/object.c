@@ -901,7 +901,7 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 		*link_target = p;
 		/* Skip blob object header first time around. */
 		memcpy(*link_target,
-		    got_object_blob_get_read_buf(blob) + hdrlen, len);
+		    got_object_blob_get_read_buf(blob) + hdrlen, len - hdrlen);
 		hdrlen = 0;
 	} while (len > 0);
 	(*link_target)[totlen] = '\0';
