@@ -1007,8 +1007,9 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	}
 
 	/* Only allow symlinks pointing at paths within the work tree. */
-	if (!got_path_is_child(resolved_path ? resolved_path : target_path,
-	        worktree->root_path, strlen(worktree->root_path))) {
+	if (!got_path_is_child(resolved_path ? resolved_path : (abspath ?
+	    abspath : target_path), worktree->root_path,
+	    strlen(worktree->root_path))) {
 		/* install as a regular file */
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,

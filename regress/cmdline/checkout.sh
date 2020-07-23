@@ -509,8 +509,10 @@ function test_checkout_symlink {
 	(cd $testroot/repo && ln -s alpha alpha.link)
 	(cd $testroot/repo && ln -s epsilon epsilon.link)
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && git add .)
-	git_commit $testroot/repo -m "add a symlink"
+	git_commit $testroot/repo -m "add symlinks"
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -565,9 +567,28 @@ function test_checkout_symlink {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
+	echo "../beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/nonexistent.link > $testroot/stdout
+	echo "nonexistent" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
-
 }
 
 run_test test_checkout_basic
