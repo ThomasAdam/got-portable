@@ -1105,12 +1105,14 @@ done:
 }
 
 static const struct got_error *
-create_fileindex_entry(struct got_fileindex *fileindex,
-    struct got_object_id *base_commit_id, const char *ondisk_path,
-    const char *path, struct got_object_id *blob_id)
+create_fileindex_entry(struct got_fileindex_entry **new_iep,
+    struct got_fileindex *fileindex, struct got_object_id *base_commit_id,
+    const char *ondisk_path, const char *path, struct got_object_id *blob_id)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *new_ie;
+
+	*new_iep = NULL;
 
 	err = got_fileindex_entry_alloc(&new_ie, path);
 	if (err)
@@ -1125,6 +1127,8 @@ create_fileindex_entry(struct got_fileindex *fileindex,
 done:
 	if (err)
 		got_fileindex_entry_free(new_ie);
+	else
+		*new_iep = new_ie;
 	return err;
 }
 
@@ -1898,20 +1902,19 @@ update_blob(struct got_worktree *worktree,
 		}
 		if (err)
 			goto done;
+
 		if (ie) {
 			err = got_fileindex_entry_update(ie, ondisk_path,
 			    blob->id.sha1, worktree->base_commit_id->sha1, 1);
 		} else {
-			err = create_fileindex_entry(fileindex,
+			err = create_fileindex_entry(&ie, fileindex,
 			    worktree->base_commit_id, ondisk_path, path,
 			    &blob->id);
 		}
 		if (err)
 			goto done;
+
 		if (is_bad_symlink) {
-			if (ie == NULL)
-				ie = got_fileindex_entry_get(fileindex, path,
-				    strlen(path));
 			err = got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_BAD_SYMLINK);
 			if (err)
