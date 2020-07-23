@@ -924,12 +924,7 @@ install_symlink_conflict(const char *deriv_target,
 	if (err)
 		goto done;
 
-	if (fprintf(f, "%s: Could not install symbolic link because of merge "
-	    "conflict.\nln(1) may be used to fix the situation. If this is "
-	    "intended to be a\nregular file instead then its expected "
-	    "contents may be filled in.\nThe following conflicting symlink "
-	    "target paths were found:\n"
-	    "%s %s\n%s\n%s%s%s%s%s\n%s\n%s\n", getprogname(),
+	if (fprintf(f, "%s %s\n%s\n%s%s%s%s%s\n%s\n%s\n",
 	    GOT_DIFF_CONFLICT_MARKER_BEGIN, label_deriv,
 	    deriv_target ? deriv_target : "(symlink was deleted)",
 	    orig_target ? label_orig : "",

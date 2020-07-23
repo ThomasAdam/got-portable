@@ -541,15 +541,8 @@ function test_cherrypick_symlink_conflicts {
 		return 1
 	fi
 
-	cat > $testroot/symlink-conflict-header <<EOF
-got: Could not install symbolic link because of merge conflict.
-ln(1) may be used to fix the situation. If this is intended to be a
-regular file instead then its expected contents may be filled in.
-The following conflicting symlink target paths were found:
-EOF
-	cp $testroot/symlink-conflict-header $testroot/content.expected
 	echo "<<<<<<< merged change: commit $commit_id2" \
-		>> $testroot/content.expected
+		> $testroot/content.expected
 	echo "beta" >> $testroot/content.expected
 	echo "3-way merge base: commit $commit_id1" \
 		>> $testroot/content.expected
@@ -590,9 +583,8 @@ EOF
 		return 1
 	fi
 
-	cp $testroot/symlink-conflict-header $testroot/content.expected
 	echo "<<<<<<< merged change: commit $commit_id2" \
-		>> $testroot/content.expected
+		> $testroot/content.expected
 	echo "gamma" >> $testroot/content.expected
 	echo "3-way merge base: commit $commit_id1" \
 		>> $testroot/content.expected
@@ -635,9 +627,8 @@ EOF
 		return 1
 	fi
 
-	cp $testroot/symlink-conflict-header $testroot/content.expected
 	echo "<<<<<<< merged change: commit $commit_id2" \
-		>> $testroot/content.expected
+		> $testroot/content.expected
 	echo "../gamma/delta" >> $testroot/content.expected
 	echo "3-way merge base: commit $commit_id1" \
 		>> $testroot/content.expected
@@ -711,9 +702,8 @@ EOF
 		return 1
 	fi
 
-	cp $testroot/symlink-conflict-header $testroot/content.expected
 	echo "<<<<<<< merged change: commit $commit_id2" \
-		>> $testroot/content.expected
+		> $testroot/content.expected
 	echo "alpha" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
 	echo "beta" >> $testroot/content.expected
