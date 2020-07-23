@@ -1701,6 +1701,14 @@ normalize_mode_for_comparison(mode_t mode)
 	if (S_ISDIR(mode))
 		return mode & S_IFDIR;
 
+	/*
+	 * For symlinks, the only relevant bit is the IFLNK bit.
+	 * This allows us to detect paths changing from a symlinks
+	 * to a file or directory and vice versa.
+	 */
+	if (S_ISLNK(mode))
+		return mode & S_IFLNK;
+
 	/* For files, the only change we care about is the executable bit. */
 	return mode & S_IXUSR;
 }

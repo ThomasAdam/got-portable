@@ -114,16 +114,25 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 
 	if (outfile) {
 		char *modestr1 = NULL, *modestr2 = NULL;
+		int modebits;
 		if (mode1 && mode1 != mode2) {
+			if (S_ISLNK(mode1))
+				modebits = S_IFLNK;
+			else
+				modebits = (S_IRWXU | S_IRWXG | S_IRWXO);
 			if (asprintf(&modestr1, " (mode %o)",
-			    mode1 & (S_IRWXU | S_IRWXG | S_IRWXO)) == -1) {
+			    mode1 & modebits) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 		}
 		if (mode2 && mode1 != mode2) {
+			if (S_ISLNK(mode2))
+				modebits = S_IFLNK;
+			else
+				modebits = (S_IRWXU | S_IRWXG | S_IRWXO);
 			if (asprintf(&modestr2, " (mode %o)",
-			    mode2 & (S_IRWXU | S_IRWXG | S_IRWXO)) == -1) {
+			    mode2 & modebits) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -550,9 +559,11 @@ diff_entry_old_new(struct got_tree_entry *te1,
 		if (!id_match)
 			return diff_modified_tree(&te1->id, &te2->id,
 			    label1, label2, repo, cb, cb_arg, diff_content);
-	} else if (S_ISREG(te1->mode) && S_ISREG(te2->mode)) {
+	} else if ((S_ISREG(te1->mode) || S_ISLNK(te1->mode)) &&
+	    (S_ISREG(te2->mode) || S_ISLNK(te2->mode))) {
 		if (!id_match ||
-		    (te1->mode & S_IXUSR) != (te2->mode & S_IXUSR)) {
+		    ((te1->mode & (S_IFLNK | S_IXUSR))) !=
+		    (te2->mode & (S_IFLNK | S_IXUSR))) {
 			if (diff_content)
 				return diff_modified_blob(&te1->id, &te2->id,
 				    label1, label2, te1->mode, te2->mode,
