@@ -831,7 +831,7 @@ function test_blame_symlink {
 	fi
 
 	# blame dereferences symlink to a directory
-	echo "got: wrong type of object" > $testroot/stderr.expected
+	echo "got: /epsilon: wrong type of object" > $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

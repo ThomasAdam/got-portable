@@ -4230,7 +4230,8 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 
 	if (obj_type != GOT_OBJ_TYPE_BLOB) {
-		error = got_error(GOT_ERR_OBJ_TYPE);
+		error = got_error_path(link_target ? link_target : in_repo_path,
+		    GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
 
