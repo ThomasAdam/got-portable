@@ -1006,8 +1006,10 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	 */
 	resolved_path = realpath(abspath ? abspath : target_path, NULL);
 	if (resolved_path == NULL) {
-		if (errno != ENOENT)
-			return got_error_from_errno2("realpath", target_path);
+		if (errno != ENOENT) {
+			err = got_error_from_errno2("realpath", target_path);
+			goto done;
+		}
 	}
 
 	/* Only allow symlinks pointing at paths within the work tree. */
