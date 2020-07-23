@@ -1645,7 +1645,7 @@ get_symlink_status(unsigned char *status, struct stat *sb,
 	} else {
 		elen = readlink(abspath, etarget, sizeof(etarget));
 		if (elen == -1)
-			return got_error_from_errno2("readlinkat", abspath);
+			return got_error_from_errno2("readlink", abspath);
 	}
 
 	if (elen != target_len || memcmp(etarget, target_path, target_len) != 0)
