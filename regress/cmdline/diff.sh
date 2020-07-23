@@ -383,7 +383,7 @@ function test_diff_symlinks_in_work_tree {
 	fi
 
 	(cd $testroot/wt && ln -sf beta alpha.link)
-	(cd $testroot/wt && ln -sf gamma epsilon.link)
+	(cd $testroot/wt && ln -sfh gamma epsilon.link)
 	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
 	echo -n '.got/bar' > $testroot/wt/dotgotfoo.link
 	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
@@ -427,6 +427,18 @@ function test_diff_symlinks_in_work_tree {
 	echo '-../beta' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo '+../gamma/delta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id1 -i | \
+		grep 'epsilon.link@ -> epsilon$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + epsilon.link' >> $testroot/stdout.expected
+	echo '--- epsilon.link' >> $testroot/stdout.expected
+	echo '+++ epsilon.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-epsilon' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+gamma' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -c $commit_id1 -i | \
