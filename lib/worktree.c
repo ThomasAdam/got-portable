@@ -1736,11 +1736,6 @@ get_file_status(unsigned char *status, struct stat *sb,
 		goto done;
 
 	if (S_ISLNK(sb->st_mode)) {
-		/* Staging changes to symlinks is not yet(?) supported. */
-		if (staged_status != GOT_STATUS_NO_CHANGE) {
-			err = got_error_path(abspath, GOT_ERR_FILE_STATUS);
-			goto done;
-		}
 		err = get_symlink_status(status, sb, ie, abspath, dirfd,
 		    de_name, blob);
 		goto done;
@@ -5041,9 +5036,18 @@ reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
 	struct got_tree_entry *te;
 	char *entry_name;
 
-	err = got_object_open_as_blob(&blob, repo, ct->blob_id, PATH_MAX);
-	if (err)
-		return err;
+	if (ct->staged_status == GOT_STATUS_ADD ||
+	    ct->staged_status == GOT_STATUS_MODIFY) {
+		err = got_object_open_as_blob(&blob, repo, ct->staged_blob_id,
+		    PATH_MAX);
+		if (err)
+			return err;
+	} else {
+		err = got_object_open_as_blob(&blob, repo, ct->blob_id,
+		    PATH_MAX);
+		if (err)
+			return err;
+	}
 
 	err = got_path_dirname(&tree_path, ct->in_repo_path);
 	if (err) {
@@ -5108,7 +5112,9 @@ reinstall_symlinks_after_commit(struct got_pathlist_head *commitable_paths,
 		struct got_fileindex_entry *ie;
 		int is_bad_symlink = 0;
 	
-		if (!S_ISLNK(get_ct_file_mode(ct)))
+		if (!S_ISLNK(get_ct_file_mode(ct)) ||
+		    ct->staged_status == GOT_STATUS_DELETE ||
+		    ct->status == GOT_STATUS_DELETE)
 			continue;
 
 		err = reinstall_symlink_after_commit(&is_bad_symlink,
