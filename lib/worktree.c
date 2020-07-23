@@ -4375,15 +4375,28 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 
 		if (a->patch_cb && (status == GOT_STATUS_MODIFY ||
 		    status == GOT_STATUS_CONFLICT)) {
+			int is_bad_symlink = 0;
 			err = create_patched_content(&path_content, 1, &id,
 			    ondisk_path, dirfd, de_name, ie->path, a->repo,
 			    a->patch_cb, a->patch_arg);
 			if (err || path_content == NULL)
 				break;
-			if (rename(path_content, ondisk_path) == -1) {
-				err = got_error_from_errno3("rename",
-				    path_content, ondisk_path);
-				goto done;
+			if (te && S_ISLNK(te->mode)) {
+				if (unlink(path_content) == -1) {
+					err = got_error_from_errno2("unlink",
+					    path_content);
+					break;
+				}
+				err = install_symlink(&is_bad_symlink,
+				    a->worktree, ondisk_path, ie->path,
+				    blob, 0, 1, 0, a->repo,
+				    a->progress_cb, a->progress_arg);
+			} else {
+				if (rename(path_content, ondisk_path) == -1) {
+					err = got_error_from_errno3("rename",
+					    path_content, ondisk_path);
+					goto done;
+				}
 			}
 		} else {
 			int is_bad_symlink = 0;
