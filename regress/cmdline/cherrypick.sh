@@ -495,6 +495,7 @@ function test_cherrypick_symlink_conflicts {
 	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
 	# added regular file A vs added bad symlink to file A
 	(cd $testroot/wt && ln -sf .got/bar dotgotfoo.link)
+	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
 	# added bad symlink to file A vs added regular file A
 	echo 'this is regular file bar' > $testroot/wt/dotgotbar.link
 	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
@@ -520,12 +521,12 @@ function test_cherrypick_symlink_conflicts {
 	echo "?  boo.link" >> $testroot/stdout.expected
 	echo "C  epsilon.link" >> $testroot/stdout.expected
 	echo "C  dotgotbar.link" >> $testroot/stdout.expected
-	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
+	echo "C  dotgotfoo.link" >> $testroot/stdout.expected
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	echo "!  zeta.link" >> $testroot/stdout.expected
 	echo "C  new.link" >> $testroot/stdout.expected
 	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
-	echo "Files with new merge conflicts: 5" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 6" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -668,7 +669,12 @@ EOF
 		return 1
 	fi
 
-	echo "this is regular file foo" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		> $testroot/content.expected
+	echo "this is regular file foo" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo -n ".got/bar" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"

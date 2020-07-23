@@ -2016,8 +2016,10 @@ function test_update_symlink_conflicts {
 	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
 	# added regular file A vs added bad symlink to file A
 	(cd $testroot/wt && ln -sf .got/bar dotgotfoo.link)
+	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
 	# added bad symlink to file A vs added regular file A
 	echo 'this is regular file bar' > $testroot/wt/dotgotbar.link
+	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
 	# removed symlink to non-existent file A vs modified symlink
 	# to nonexistent file B
 	(cd $testroot/wt && ln -sf nonexistent2 nonexistent.link)
@@ -2030,8 +2032,8 @@ function test_update_symlink_conflicts {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "C  alpha.link" >> $testroot/stdout.expected
-	echo "U  dotgotbar.link" >> $testroot/stdout.expected
-	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
+	echo "C  dotgotbar.link" >> $testroot/stdout.expected
+	echo "C  dotgotfoo.link" >> $testroot/stdout.expected
 	echo "C  epsilon/beta.link" >> $testroot/stdout.expected
 	echo "C  epsilon.link" >> $testroot/stdout.expected
 	echo "C  new.link" >> $testroot/stdout.expected
@@ -2040,7 +2042,7 @@ function test_update_symlink_conflicts {
 	echo -n "Updated to commit " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
-	echo "Files with new merge conflicts: 5" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 7" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -2186,7 +2188,14 @@ EOF
 		return 1
 	fi
 
-	echo "this is regular file foo" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		> $testroot/content.expected
+	echo "this is regular file foo" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo -n ".got/bar" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
@@ -2201,7 +2210,14 @@ EOF
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo -n ".got/bar" > $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		> $testroot/content.expected
+	echo -n ".got/bar" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "this is regular file bar" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
 	cp $testroot/wt/dotgotbar.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"

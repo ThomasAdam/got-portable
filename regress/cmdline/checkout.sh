@@ -397,10 +397,10 @@ function test_checkout_into_nonempty_dir {
 		return 1
 	fi
 
-	echo "U  $testroot/wt/alpha" > $testroot/stdout.expected
-	echo "U  $testroot/wt/beta" >> $testroot/stdout.expected
-	echo "U  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
-	echo "U  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "?  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "?  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "?  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "?  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout

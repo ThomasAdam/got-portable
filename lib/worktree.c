@@ -742,6 +742,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	char *merged_path = NULL, *base_path = NULL;
 	int overlapcnt = 0;
 	char *parent;
+	char *symlink_path = NULL;
+	FILE *symlinkf = NULL;
 
 	*local_changes_subsumed = 0;
 
@@ -779,8 +781,45 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		 */
 	}
 
+	/* 
+	 * In order the run a 3-way merge with a symlink we copy the symlink's
+	 * target path into a temporary file and use that file with diff3.
+	 */
+	if (S_ISLNK(st_mode)) {
+		char target_path[PATH_MAX];
+		ssize_t target_len;
+		size_t n;
+
+		free(base_path);
+		if (asprintf(&base_path, "%s/got-symlink-merge",
+		    parent) == -1) {
+			err = got_error_from_errno("asprintf");
+			base_path = NULL;
+			goto done;
+		}
+		err = got_opentemp_named(&symlink_path, &symlinkf, base_path);
+		if (err)
+			goto done;
+		target_len = readlink(ondisk_path, target_path,
+		    sizeof(target_path));
+		if (target_len == -1) {
+			err = got_error_from_errno2("readlink", ondisk_path);
+			goto done;
+		}
+		n = fwrite(target_path, 1, target_len, symlinkf);
+		if (n != target_len) {
+			err = got_ferror(symlinkf, GOT_ERR_IO);
+			goto done;
+		}
+		if (fflush(symlinkf) == EOF) {
+			err = got_error_from_errno2("fflush", symlink_path);
+			goto done;
+		}
+	}
+
 	err = got_merge_diff3(&overlapcnt, merged_fd, deriv_path,
-	    blob_orig_path, ondisk_path, label_deriv, label_orig, NULL);
+	    blob_orig_path, symlink_path ? symlink_path : ondisk_path,
+	    label_deriv, label_orig, NULL);
 	if (err)
 		goto done;
 
@@ -817,6 +856,13 @@ done:
 		if (merged_path)
 			unlink(merged_path);
 	}
+	if (symlink_path) {
+		if (unlink(symlink_path) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink", symlink_path);
+	}
+	if (symlinkf && fclose(symlinkf) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", symlink_path);
+	free(symlink_path);
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
 	if (f_orig && fclose(f_orig) != 0 && err == NULL)
@@ -1155,7 +1201,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
     int reverting_versioned_file, int installing_bad_symlink,
-    struct got_repository *repo,
+    int path_is_unversioned, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg);
 
 /*
@@ -1232,7 +1278,8 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			return install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file,
-			    1, repo, progress_cb, progress_arg);
+			    1, path_is_unversioned, repo, progress_cb,
+			    progress_arg);
 		}
 		if (len > 0) {
 			/* Skip blob object header first time around. */
@@ -1283,7 +1330,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
-		    repo, progress_cb, progress_arg);
+		    path_is_unversioned, repo, progress_cb, progress_arg);
 		goto done;
 	}
 
@@ -1301,7 +1348,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		err = install_blob(worktree, ondisk_path, path,
 		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
-		    repo, progress_cb, progress_arg);
+		    path_is_unversioned, repo, progress_cb, progress_arg);
 		goto done;
 	}
 
@@ -1351,7 +1398,8 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			err = install_blob(worktree, ondisk_path, path,
 			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file, 1,
-			    repo, progress_cb, progress_arg);
+			    path_is_unversioned, repo,
+			    progress_cb, progress_arg);
 		} else if (errno == ENOTDIR) {
 			err = got_error_path(ondisk_path,
 			    GOT_ERR_FILE_OBSTRUCTED);
@@ -1373,8 +1421,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
     struct got_blob_object *blob, int restoring_missing_file,
     int reverting_versioned_file, int installing_bad_symlink,
-    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
-    void *progress_arg)
+    int path_is_unversioned, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int fd = -1;
@@ -1399,6 +1447,11 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				return got_error_from_errno2("open",
 				    ondisk_path);
 		} else if (errno == EEXIST) {
+			if (path_is_unversioned) {
+				err = (*progress_cb)(progress_arg,
+				    GOT_STATUS_UNVERSIONED, path);
+				goto done;
+			}
 			if (!S_ISREG(st_mode) && !installing_bad_symlink) {
 				/* TODO file is obstructed; do something */
 				err = got_error_path(ondisk_path,
@@ -1905,7 +1958,8 @@ update_blob(struct got_worktree *worktree,
 		} else {
 			err = install_blob(worktree, ondisk_path, path,
 			    te->mode, sb.st_mode, blob,
-			    status == GOT_STATUS_MISSING, 0, 0, repo,
+			    status == GOT_STATUS_MISSING, 0, 0,
+			    status == GOT_STATUS_UNVERSIONED, repo,
 			    progress_cb, progress_arg);
 		}
 		if (err)
@@ -2780,7 +2834,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				    0, 1, repo, a->progress_cb, a->progress_arg);
 			} else {
 				err = install_blob(a->worktree, ondisk_path, path2,
-				    mode2, sb.st_mode, blob2, 0, 0, 0, repo,
+				    mode2, sb.st_mode, blob2, 0, 0, 0, 1, repo,
 				    a->progress_cb, a->progress_arg);
 			}
 			if (err)
@@ -4309,8 +4363,9 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				err = install_blob(a->worktree, ondisk_path,
 				    ie->path,
 				    te ? te->mode : GOT_DEFAULT_FILE_MODE,
-				    got_fileindex_perms_to_st(ie), blob, 0, 1, 0,
-				    a->repo, a->progress_cb, a->progress_arg);
+				    got_fileindex_perms_to_st(ie), blob,
+				    0, 1, 0, 0, a->repo,
+				    a->progress_cb, a->progress_arg);
 			}
 			if (err)
 				goto done;
