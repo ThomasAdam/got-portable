@@ -5139,128 +5139,6 @@ done:
 }
 
 static const struct got_error *
-reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
-    struct got_object_id *new_base_commit_id, struct got_worktree *worktree,
-    struct got_fileindex_entry *ie, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_blob_object *blob = NULL;
-	struct got_object_id *tree_id = NULL;
-	char *tree_path = NULL;
-	struct got_tree_object *tree = NULL;
-	struct got_tree_entry *te;
-	char *entry_name;
-	unsigned char status;
-	struct stat sb;
-
-	err = get_file_status(&status, &sb, ie, ct->ondisk_path,
-	    -1, NULL, repo);
-	if (err)
-		return err;
-	if (status != GOT_STATUS_NO_CHANGE)
-		return NULL;
-
-	if (ct->staged_status == GOT_STATUS_ADD ||
-	    ct->staged_status == GOT_STATUS_MODIFY) {
-		err = got_object_open_as_blob(&blob, repo, ct->staged_blob_id,
-		    PATH_MAX);
-		if (err)
-			return err;
-	} else {
-		err = got_object_open_as_blob(&blob, repo, ct->blob_id,
-		    PATH_MAX);
-		if (err)
-			return err;
-	}
-
-	err = got_path_dirname(&tree_path, ct->in_repo_path);
-	if (err) {
-		if (err->code != GOT_ERR_BAD_PATH)
-			goto done;
-		err = got_object_id_by_path(&tree_id, repo,
-		    new_base_commit_id, "");
-		if (err)
-			goto done;
-	} else {
-		err = got_object_id_by_path(&tree_id, repo,
-		    new_base_commit_id, tree_path);
-		if (err)
-			goto done;
-	}
-
-	err = got_object_open_as_tree(&tree, repo, tree_id);
-	if (err)
-		goto done;
-
-	entry_name = basename(ct->path);
-	if (entry_name == NULL) {
-		err = got_error_from_errno2("basename", ct->path);
-		goto done;
-	}
-
-	te = got_object_tree_find_entry(tree, entry_name);
-	if (te == NULL) {
-		err = got_error_path(ct->path, GOT_ERR_NO_TREE_ENTRY);
-		goto done;
-	}
-
-	err = install_symlink(is_bad_symlink, worktree, ct->ondisk_path,
-	    ct->path, blob, 0, 0, 0, repo, NULL, NULL);
-done:
-	if (blob)
-		got_object_blob_close(blob);
-	if (tree)
-		got_object_tree_close(tree);
-	free(tree_id);
-	free(tree_path);
-	return err;
-}
-
-/*
- * After comitting a symlink we have a chance to convert "bad" symlinks
- * (those which point outside the work tree or into .got) to regular files.
- * This way, the post-commit work tree state matches a fresh checkout of
- * the tree which was just committed. We also mark such newly committed
- * symlinks as "bad" in the work tree's fileindex.
- */
-static const struct got_error *
-reinstall_symlinks_after_commit(struct got_pathlist_head *commitable_paths,
-    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
-    struct got_worktree *worktree, struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_pathlist_entry *pe;
-
-	TAILQ_FOREACH(pe, commitable_paths, entry) {
-		struct got_commitable *ct = pe->data;
-		struct got_fileindex_entry *ie;
-		int is_bad_symlink = 0;
-	
-		if (!S_ISLNK(get_ct_file_mode(ct)) ||
-		    ct->staged_status == GOT_STATUS_DELETE ||
-		    ct->status == GOT_STATUS_DELETE)
-			continue;
-
-		ie = got_fileindex_entry_get(fileindex, ct->path,
-		    strlen(ct->path));
-		if (ie == NULL) {
-			err = got_error_path(ct->path, GOT_ERR_BAD_PATH);
-			break;
-		}
-		err = reinstall_symlink_after_commit(&is_bad_symlink,
-		    ct, new_base_commit_id, worktree, ie, repo);
-		if (err)
-			break;
-		if (ie && is_bad_symlink) {
-			got_fileindex_entry_filetype_set(ie,
-			    GOT_FILEIDX_MODE_BAD_SYMLINK);
-		}
-	}
-
-	return err;
-}
-
-static const struct got_error *
 update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
     struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
     int have_staged_files)
@@ -5639,10 +5517,6 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
 	    fileindex, have_staged_files);
-	if (err == NULL) {
-		err = reinstall_symlinks_after_commit(&commitable_paths,
-		    *new_commit_id, fileindex, worktree, repo);
-	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;

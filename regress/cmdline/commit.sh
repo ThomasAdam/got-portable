@@ -1044,7 +1044,14 @@ function test_commit_symlink {
 		return 1
 	fi
 
-	# verify post-commit work tree state matches a fresh checkout
+	if ! [ -h $testroot/wt/passwd.link ]; then
+		echo 'passwd.link is not a symlink' >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+
+	# 'got update' should reinstall passwd.link as a regular file
+	(cd $testroot/wt && got update > /dev/null)
 	check_symlinks $testroot/wt
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1142,6 +1149,12 @@ function test_commit_fix_bad_symlink {
 	(cd $testroot/wt && got commit -S -m 'commit bad symlink' \
 		> $testroot/stdout)
 
+	if ! [ -h $testroot/wt/passwd.link ]; then
+		echo 'passwd.link is not a symlink' >&2
+		test_done "$testroot" 1
+		return 1
+	fi
+	(cd $testroot/wt && got update >/dev/null)
 	if [ -h $testroot/wt/passwd.link ]; then
 		echo "passwd.link is a symlink but should be a regular file" >&2
 		test_done "$testroot" "1"

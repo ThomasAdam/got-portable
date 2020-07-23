@@ -2579,6 +2579,12 @@ EOF
 		return 1
 	fi
 
+	if [ ! -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+	(cd $testroot/wt && got update > /dev/null)
 	if [ -h $testroot/wt/dotgotbar.link ]; then
 		echo "dotgotbar.link is a symlink"
 		test_done "$testroot" "1"
