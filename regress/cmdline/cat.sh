@@ -272,10 +272,8 @@ function test_cat_symlink {
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "add symlinks"
 
-	local epsilon_id=`got tree -r $testroot/repo -i | grep 'epsilon/$' | cut -d' ' -f 1`
 	local alpha_link_id=`got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | cut -d' ' -f 1`
 	local epsilon_link_id=`got tree -r $testroot/repo -i | grep 'epsilon.link@ -> epsilon$' | cut -d' ' -f 1`
-
 	local passwd_link_id=`got tree -r $testroot/repo -i | grep 'passwd.link@ -> /etc/passwd$' | cut -d' ' -f 1`
 	local epsilon_beta_link_id=`got tree -r $testroot/repo -i epsilon | grep 'beta.link@ -> ../beta$' | cut -d' ' -f 1`
 	local nonexistent_link_id=`got tree -r $testroot/repo -i | grep 'nonexistent.link@ -> nonexistent$' | cut -d' ' -f 1`
