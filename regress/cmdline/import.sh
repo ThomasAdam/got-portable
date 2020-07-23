@@ -241,7 +241,58 @@ function test_import_empty_dir {
 	test_done "$testroot" "$ret"
 }
 
+function test_import_symlink {
+	local testname=import_symlink
+	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
+
+	got init $testroot/repo
+
+	mkdir $testroot/tree
+	echo 'this is file alpha' > $testroot/tree/alpha
+	ln -s alpha $testroot/tree/alpha.link
+
+	got import -m 'init' -r $testroot/repo $testroot/tree \
+		> $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local head_commit=`git_show_head $testroot/repo`
+	echo "A  $testroot/tree/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/tree/alpha.link" >> $testroot/stdout.expected
+	echo "Created branch refs/heads/main with commit $head_commit" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	id_alpha=`get_blob_id $testroot/repo "" alpha`
+	id_alpha_link=$(got tree -r $testroot/repo -i | grep 'alpha.link@ -> alpha$' | cut -d' ' -f 1)
+	tree_id=`(cd $testroot/repo && got cat $head_commit | \
+		grep ^tree | cut -d ' ' -f 2)`
+
+	got tree -i -r $testroot/repo -c $head_commit > $testroot/stdout
+
+	echo "$id_alpha alpha" > $testroot/stdout.expected
+	echo "$id_alpha_link alpha.link@ -> alpha" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_import_basic
 run_test test_import_requires_new_branch
 run_test test_import_ignores
 run_test test_import_empty_dir
+run_test test_import_symlink

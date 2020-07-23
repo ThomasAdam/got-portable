@@ -1454,7 +1454,12 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 		goto done;
 	}
 
-	(*new_te)->mode = S_IFREG | (mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
+	if (S_ISLNK(mode)) {
+		(*new_te)->mode = S_IFLNK;
+	} else {
+		(*new_te)->mode = S_IFREG;
+		(*new_te)->mode |= (mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+	}
 	memcpy(&(*new_te)->id, blob_id, sizeof((*new_te)->id));
 done:
 	if (err && *new_te) {
@@ -1607,7 +1612,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 				err = NULL;
 				continue;
 			}
-		} else if (type == DT_REG) {
+		} else if (type == DT_REG || type == DT_LNK) {
 			err = import_file(&new_te, de, path_dir, repo);
 			if (err)
 				goto done;
@@ -1628,7 +1633,7 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	TAILQ_FOREACH(pe, &paths, entry) {
 		struct got_tree_entry *te = pe->data;
 		char *path;
-		if (!S_ISREG(te->mode))
+		if (!S_ISREG(te->mode) && !S_ISLNK(te->mode))
 			continue;
 		if (asprintf(&path, "%s/%s", path_dir, pe->path) == -1) {
 			err = got_error_from_errno("asprintf");

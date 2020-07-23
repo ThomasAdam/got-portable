@@ -156,7 +156,8 @@ function get_blob_id
 	tree_path="$2"
 	filename="$3"
 
-	got tree -r $repo -i $tree_path | grep ${filename}$ | cut -d' ' -f 1
+	got tree -r $repo -i $tree_path | grep "[0-9a-f] ${filename}$" | \
+		cut -d' ' -f 1
 }
 
 function test_init
