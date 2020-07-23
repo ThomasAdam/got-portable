@@ -979,7 +979,7 @@ merge_blob(int *, struct got_worktree *, struct got_blob_object *,
 static const struct got_error *
 merge_symlink(struct got_worktree *worktree,
     struct got_blob_object *blob_orig, const char *ondisk_path,
-    const char *path, uint16_t st_mode, const char *label_orig,
+    const char *path, const char *label_orig,
     struct got_blob_object *blob_deriv,
     struct got_object_id *deriv_base_commit_id, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
@@ -994,24 +994,6 @@ merge_symlink(struct got_worktree *worktree,
 
 	if (lstat(ondisk_path, &sb) == -1)
 		return got_error_from_errno2("lstat", ondisk_path);
-
-	if (!S_ISLNK(sb.st_mode)) {
-		/*
-		 * If there is a regular file on disk, merge the symlink
-		 * target path into this file, which will usually cause
-		 * a merge conflict.
-		 */
-		if (S_ISREG(sb.st_mode)) {
-			int local_changes_subsumed;
-			return merge_blob(&local_changes_subsumed, worktree,
-			    NULL, ondisk_path, path, sb.st_mode, label_orig,
-			    blob_deriv, deriv_base_commit_id,
-			    repo, progress_cb, progress_arg);
-		}
-
-		/* TODO symlink is obstructed; do something */
-		return got_error_path(ondisk_path, GOT_ERR_FILE_OBSTRUCTED);
-	}
 
 	ondisk_len = readlink(ondisk_path, ondisk_target,
 	    sizeof(ondisk_target));
@@ -1930,10 +1912,10 @@ update_blob(struct got_worktree *worktree,
 				goto done;
 			}
 		}
-		if (S_ISLNK(te->mode)) {
+		if (S_ISLNK(te->mode) && S_ISLNK(sb.st_mode)) {
 			err = merge_symlink(worktree, blob2,
-			    ondisk_path, path, sb.st_mode, label_orig,
-			    blob, worktree->base_commit_id, repo,
+			    ondisk_path, path, label_orig, blob,
+			    worktree->base_commit_id, repo,
 			    progress_cb, progress_arg);
 		} else {
 			err = merge_blob(&update_timestamps, worktree, blob2,
@@ -2736,10 +2718,9 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		}
 
 		if (S_ISLNK(mode1) && S_ISLNK(mode2)) {
-			err = merge_symlink(a->worktree, blob1,
-			    ondisk_path, path2, sb.st_mode, a->label_orig,
-			    blob2, a->commit_id2, repo, a->progress_cb,
-			    a->progress_arg);
+			err = merge_symlink(a->worktree, blob1, ondisk_path,
+			    path2, a->label_orig, blob2, a->commit_id2, repo,
+			    a->progress_cb, a->progress_arg);
 		} else {
 			err = merge_blob(&local_changes_subsumed, a->worktree,
 			    blob1, ondisk_path, path2, sb.st_mode,
@@ -2818,22 +2799,23 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				    status, path2);
 				goto done;
 			}
-			if (S_ISLNK(mode2)) {
+			if (S_ISLNK(mode2) && S_ISLNK(sb.st_mode)) {
 				err = merge_symlink(a->worktree, NULL,
-				    ondisk_path, path2, sb.st_mode,
-				    a->label_orig, blob2, a->commit_id2,
-				    repo, a->progress_cb, a->progress_arg);
-				if (err)
-					goto done;
-			} else {
+				    ondisk_path, path2, a->label_orig,
+				    blob2, a->commit_id2, repo,
+				    a->progress_cb, a->progress_arg);
+			} else if (S_ISREG(sb.st_mode)) {
 				err = merge_blob(&local_changes_subsumed,
 				    a->worktree, NULL, ondisk_path, path2,
 				    sb.st_mode, a->label_orig, blob2,
 				    a->commit_id2, repo, a->progress_cb,
 				    a->progress_arg);
-				if (err)
-					goto done;
+			} else {
+				err = got_error_path(ondisk_path,
+				    GOT_ERR_FILE_OBSTRUCTED);
 			}
+			if (err)
+				goto done;
 			if (status == GOT_STATUS_DELETE) {
 				err = got_fileindex_entry_update(ie,
 				    ondisk_path, blob2->id.sha1,
@@ -7503,10 +7485,21 @@ unstage_path(void *arg, unsigned char status,
 			    a->progress_cb, a->progress_arg);
 			break;
 		case GOT_FILEIDX_MODE_SYMLINK:
-			err = merge_symlink(a->worktree, blob_base, ondisk_path,
-			    relpath, got_fileindex_perms_to_st(ie), label_orig,
-			    blob_staged, a->worktree->base_commit_id, a->repo,
-			    a->progress_cb, a->progress_arg);
+			if (S_ISLNK(got_fileindex_perms_to_st(ie))) {
+				err = merge_symlink(a->worktree, blob_base,
+				    ondisk_path, relpath, label_orig,
+				    blob_staged, commit_id ? commit_id :
+				    a->worktree->base_commit_id,
+				    a->repo, a->progress_cb, a->progress_arg);
+			} else {
+				err = merge_blob(&local_changes_subsumed,
+				    a->worktree, blob_base, ondisk_path,
+				    relpath, got_fileindex_perms_to_st(ie),
+				    label_orig, blob_staged,
+				    commit_id ? commit_id :
+				    a->worktree->base_commit_id, a->repo,
+				    a->progress_cb, a->progress_arg);
+			}
 			break;
 		default:
 			err = got_error_path(relpath, GOT_ERR_BAD_FILETYPE);
