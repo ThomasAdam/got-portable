@@ -223,10 +223,13 @@ typedef const struct got_error *(*got_worktree_commit_msg_cb)(
  * current base commit.
  * An author and a non-empty log message must be specified.
  * The name of the committer is optional (may be NULL).
+ * If a path to be committed contains a symlink which points outside
+ * of the path space under version control, raise an error unless
+ * committing of such paths is being forced by the caller.
  */
 const struct got_error *got_worktree_commit(struct got_object_id **,
     struct got_worktree *, struct got_pathlist_head *, const char *,
-    const char *, got_worktree_commit_msg_cb, void *,
+    const char *, int, got_worktree_commit_msg_cb, void *,
     got_worktree_status_cb, void *, struct got_repository *);
 
 /* Get the path of a commitable worktree item. */
@@ -424,10 +427,13 @@ const struct got_error *got_worktree_integrate_abort(struct got_worktree *,
  * Stage the specified paths for commit.
  * If the patch callback is not NULL, call it to select patch hunks for
  * staging. Otherwise, stage the full file content found at each path.
-*/
+ * If a path being staged contains a symlink which points outside
+ * of the path space under version control, raise an error unless
+ * staging of such paths is being forced by the caller.
+ */
 const struct got_error *got_worktree_stage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_status_cb, void *,
-    got_worktree_patch_cb, void *, struct got_repository *);
+    got_worktree_patch_cb, void *, int, struct got_repository *);
 
 /*
  * Merge staged changes for the specified paths back into the work tree

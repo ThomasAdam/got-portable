@@ -6366,7 +6366,7 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-m msg] [path ...]\n",
+	fprintf(stderr, "usage: %s commit [-m msg] [-S] [path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -6453,15 +6453,19 @@ cmd_commit(int argc, char *argv[])
 	struct collect_commit_logmsg_arg cl_arg;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
+	int allow_bad_symlinks = 0;
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
-	while ((ch = getopt(argc, argv, "m:")) != -1) {
+	while ((ch = getopt(argc, argv, "m:S")) != -1) {
 		switch (ch) {
 		case 'm':
 			logmsg = optarg;
+			break;
+		case 'S':
+			allow_bad_symlinks = 1;
 			break;
 		default:
 			usage_commit();
@@ -6543,7 +6547,8 @@ cmd_commit(int argc, char *argv[])
 	}
 	cl_arg.repo_path = got_repo_get_path(repo);
 	error = got_worktree_commit(&id, worktree, &paths, author, NULL,
-	    collect_commit_logmsg, &cl_arg, print_status, NULL, repo);
+	    allow_bad_symlinks, collect_commit_logmsg, &cl_arg,
+	    print_status, NULL, repo);
 	if (error) {
 		if (error->code != GOT_ERR_COMMIT_MSG_EMPTY &&
 		    cl_arg.logmsg_path != NULL)
@@ -8760,7 +8765,7 @@ __dead static void
 usage_stage(void)
 {
 	fprintf(stderr, "usage: %s stage [-l] | [-p] [-F response-script] "
-	    "[file-path ...]\n",
+	    "[-S] [file-path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -8801,14 +8806,14 @@ cmd_stage(int argc, char *argv[])
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, list_stage = 0, pflag = 0;
+	int ch, list_stage = 0, pflag = 0, allow_bad_symlinks = 0;
 	FILE *patch_script_file = NULL;
 	const char *patch_script_path = NULL;
 	struct choose_patch_arg cpa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "lpF:")) != -1) {
+	while ((ch = getopt(argc, argv, "lpF:S")) != -1) {
 		switch (ch) {
 		case 'l':
 			list_stage = 1;
@@ -8818,6 +8823,9 @@ cmd_stage(int argc, char *argv[])
 			break;
 		case 'F':
 			patch_script_path = optarg;
+			break;
+		case 'S':
+			allow_bad_symlinks = 1;
 			break;
 		default:
 			usage_stage();
@@ -8881,7 +8889,8 @@ cmd_stage(int argc, char *argv[])
 		cpa.action = "stage";
 		error = got_worktree_stage(worktree, &paths,
 		    pflag ? NULL : print_status, NULL,
-		    pflag ? choose_patch : NULL, &cpa, repo);
+		    pflag ? choose_patch : NULL, &cpa,
+		    allow_bad_symlinks, repo);
 	}
 done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&

@@ -983,7 +983,7 @@ function test_unstage_symlink {
 	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
-	(cd $testroot/wt && got stage > /dev/null)
+	(cd $testroot/wt && got stage -S > /dev/null)
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 	cat > $testroot/stdout.expected <<EOF

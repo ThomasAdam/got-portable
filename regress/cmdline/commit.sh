@@ -992,7 +992,27 @@ function test_commit_symlink {
 	(cd $testroot/wt && got add alpha.link epsilon.link passwd.link \
 		epsilon/beta.link nonexistent.link > /dev/null)
 
-	(cd $testroot/wt && got commit -m 'test commit_symlink' > $testroot/stdout)
+	(cd $testroot/wt && got commit -m 'test commit_symlink' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got commit succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n "got: $testroot/wt/passwd.link: " > $testroot/stderr.expected
+	echo "symbolic link points outside of paths under version control" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -S -m 'test commit_symlink' \
+		> $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "A  alpha.link" > $testroot/stdout.expected
@@ -1037,15 +1057,37 @@ function test_commit_symlink {
 	rm $testroot/wt/epsilon/beta.link
 	echo "this is a regular file" > $testroot/wt/epsilon/beta.link
 	(cd $testroot/wt && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
 	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
 	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
 	(cd $testroot/wt && ln -sf alpha new.link)
 	(cd $testroot/wt && got add new.link > /dev/null)
 
-	(cd $testroot/wt && got commit -m 'test commit_symlink' > $testroot/stdout)
+	(cd $testroot/wt && got commit -m 'test commit_symlink' \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got commit succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n "got: $testroot/wt/dotgotbar.link: " > $testroot/stderr.expected
+	echo "symbolic link points outside of paths under version control" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -S -m 'test commit_symlink' \
+		> $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
-	echo "A  new.link" > $testroot/stdout.expected
+	echo "A  dotgotbar.link" > $testroot/stdout.expected
+	echo "A  new.link" >> $testroot/stdout.expected
 	echo "M  alpha.link" >> $testroot/stdout.expected
 	echo "M  epsilon/beta.link" >> $testroot/stdout.expected
 	echo "M  epsilon.link" >> $testroot/stdout.expected
@@ -1065,6 +1107,7 @@ function test_commit_symlink {
 alpha
 alpha.link@ -> beta
 beta
+dotgotbar.link@ -> .got/bar
 epsilon/
 epsilon/beta.link
 epsilon/zeta
@@ -1096,7 +1139,8 @@ function test_commit_fix_bad_symlink {
 	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
 	(cd $testroot/wt && got add passwd.link > /dev/null)
 
-	(cd $testroot/wt && got commit -m 'commit bad symlink' > $testroot/stdout)
+	(cd $testroot/wt && got commit -S -m 'commit bad symlink' \
+		> $testroot/stdout)
 
 	if [ -h $testroot/wt/passwd.link ]; then
 		echo "passwd.link is a symlink but should be a regular file" >&2

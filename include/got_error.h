@@ -143,6 +143,7 @@
 #define GOT_ERR_TREE_ENTRY_TYPE	126
 #define GOT_ERR_PARSE_Y_YY	127
 #define GOT_ERR_NO_CONFIG_FILE	128
+#define GOT_ERR_BAD_SYMLINK	129
 
 static const struct got_error {
 	int code;
@@ -292,6 +293,8 @@ static const struct got_error {
 	{ GOT_ERR_TREE_ENTRY_TYPE, "unexpected tree entry type" },
 	{ GOT_ERR_PARSE_Y_YY, "yyerror error" },
 	{ GOT_ERR_NO_CONFIG_FILE, "configuration file doesn't exit" },
+	{ GOT_ERR_BAD_SYMLINK, "symbolic link points outside of paths under "
+	    "version control" },
 };
 
 /*

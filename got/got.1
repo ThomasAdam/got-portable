@@ -1169,7 +1169,7 @@ is a directory.
 .It Cm rv
 Short alias for
 .Cm revert .
-.It Cm commit Oo Fl m Ar message Oc Op Ar path ...
+.It Cm commit Oo Fl m Ar message Oc Oo Fl S Oc Op Ar path ...
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
 If no
@@ -1227,6 +1227,15 @@ Without the
 option,
 .Cm got commit
 opens a temporary file in an editor where a log message can be written.
+.It Fl S
+Allow symbolic links which point somewhere outside of the path space
+managed by
+.Nm .
+As a precaution,
+when such a symbolic link gets installed in a work tree
+.Nm
+may decide to represent the symbolic link as a regular file which contains
+the link's target path, rather than creating an actual symbolic link.
 .El
 .Pp
 .Cm got commit
@@ -1637,7 +1646,7 @@ or reverted with
 .It Cm ig
 Short alias for
 .Cm integrate .
-.It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
+.It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl S Oc Op Ar path ...
 Stage local changes for inclusion in the next commit.
 If no
 .Ar path
@@ -1713,6 +1722,15 @@ and
 responses line-by-line from the specified
 .Ar response-script
 file instead of prompting interactively.
+.It Fl S
+Allow symbolic links which point somewhere outside of the path space
+managed by
+.Nm .
+As a precaution,
+when such a symbolic link gets installed in a work tree
+.Nm
+may decide to represent the symbolic link as a regular file which contains
+the link's target path, rather than creating an actual symbolic link.
 .El
 .Pp
 .Cm got stage

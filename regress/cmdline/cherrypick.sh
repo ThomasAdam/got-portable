@@ -509,7 +509,7 @@ function test_cherrypick_symlink_conflicts {
 	# added symlink to file A vs added symlink to file B
 	(cd $testroot/wt && ln -sf beta new.link)
 	(cd $testroot/wt && got add new.link > /dev/null)
-	(cd $testroot/wt && got commit -m  "change on symlinks on branch foo" \
+	(cd $testroot/wt && got commit -S -m  "change symlinks on foo" \
 		> /dev/null)
 
 	(cd $testroot/wt && got update >/dev/null)

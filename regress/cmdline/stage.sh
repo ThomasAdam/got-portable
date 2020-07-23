@@ -2383,7 +2383,25 @@ function test_stage_symlink {
 	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
 	(cd $testroot/wt && got add zeta.link > /dev/null)
 
-	(cd $testroot/wt && got stage > $testroot/stdout)
+	(cd $testroot/wt && got stage > $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got stage succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n "got: $testroot/wt/dotgotbar.link: " > $testroot/stderr.expected
+	echo "symbolic link points outside of paths under version control" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage -S > $testroot/stdout)
 
 	cat > $testroot/stdout.expected <<EOF
  M alpha.link

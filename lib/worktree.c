@@ -4533,6 +4533,7 @@ struct collect_commitables_arg {
 	struct got_worktree *worktree;
 	struct got_fileindex *fileindex;
 	int have_staged_files;
+	int allow_bad_symlinks;
 };
 
 static const struct got_error *
@@ -4629,6 +4630,30 @@ collect_commitables(void *arg, unsigned char status,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
+
+	if (S_ISLNK(ct->mode) && staged_status == GOT_STATUS_NO_CHANGE &&
+	    status == GOT_STATUS_ADD && !a->allow_bad_symlinks) {
+		int is_bad_symlink;
+		char target_path[PATH_MAX];
+		ssize_t target_len;
+		target_len = readlink(ct->ondisk_path, target_path,
+		    sizeof(target_path));
+		if (target_len == -1) {
+			err = got_error_from_errno2("readlink",
+			    ct->ondisk_path);
+			goto done;
+		}
+		err = is_bad_symlink_target(&is_bad_symlink, target_path,
+		    target_len, ct->ondisk_path, a->worktree->root_path);
+		if (err)
+			goto done;
+		if (is_bad_symlink) {
+			err = got_error_path(ct->ondisk_path,
+			    GOT_ERR_BAD_SYMLINK);
+			goto done;
+		}
+	}
+
 
 	ct->status = status;
 	ct->staged_status = staged_status;
@@ -5523,7 +5548,7 @@ check_non_staged_files(struct got_fileindex *fileindex,
 const struct got_error *
 got_worktree_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_pathlist_head *paths,
-    const char *author, const char *committer,
+    const char *author, const char *committer, int allow_bad_symlinks,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
     struct got_repository *repo)
@@ -5573,6 +5598,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.fileindex = fileindex;
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = have_staged_files;
+	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
@@ -7110,6 +7136,7 @@ struct stage_path_arg {
 	got_worktree_patch_cb patch_cb;
 	void *patch_arg;
 	int staged_something;
+	int allow_bad_symlinks;
 };
 
 static const struct got_error *
@@ -7175,8 +7202,34 @@ stage_path(void *arg, unsigned char status,
 			stage = GOT_FILEIDX_STAGE_MODIFY;
 		got_fileindex_entry_stage_set(ie, stage);
 		if (S_ISLNK(sb.st_mode)) {
-			got_fileindex_entry_staged_filetype_set(ie,
-			    GOT_FILEIDX_MODE_SYMLINK);
+			int is_bad_symlink = 0;
+			if (!a->allow_bad_symlinks) {
+				char target_path[PATH_MAX];
+				ssize_t target_len;
+				target_len = readlink(ondisk_path, target_path,
+				    sizeof(target_path));
+				if (target_len == -1) {
+					err = got_error_from_errno2("readlink",
+					    ondisk_path);
+					break;
+				}
+				err = is_bad_symlink_target(&is_bad_symlink,
+				    target_path, target_len, ondisk_path,
+				    a->worktree->root_path);
+				if (err)
+					break;
+				if (is_bad_symlink) {
+					err = got_error_path(ondisk_path,
+					    GOT_ERR_BAD_SYMLINK);
+					break;
+				}
+			}
+			if (is_bad_symlink)
+				got_fileindex_entry_staged_filetype_set(ie,
+				    GOT_FILEIDX_MODE_BAD_SYMLINK);
+			else
+				got_fileindex_entry_staged_filetype_set(ie,
+				    GOT_FILEIDX_MODE_SYMLINK);
 		} else {
 			got_fileindex_entry_staged_filetype_set(ie,
 			    GOT_FILEIDX_MODE_REGULAR_FILE);
@@ -7239,7 +7292,7 @@ got_worktree_stage(struct got_worktree *worktree,
     struct got_pathlist_head *paths,
     got_worktree_status_cb status_cb, void *status_arg,
     got_worktree_patch_cb patch_cb, void *patch_arg,
-    struct got_repository *repo)
+    int allow_bad_symlinks, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *sync_err, *unlockerr;
 	struct got_pathlist_entry *pe;
@@ -7290,6 +7343,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.status_cb = status_cb;
 	spa.status_arg = status_arg;
 	spa.staged_something = 0;
+	spa.allow_bad_symlinks = allow_bad_symlinks;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    stage_path, &spa, NULL, NULL, 0, 0);
