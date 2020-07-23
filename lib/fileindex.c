@@ -180,7 +180,7 @@ got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t stage)
 int
 got_fileindex_entry_filetype_get(struct got_fileindex_entry *ie)
 {
-	return (ie->mode & GOT_FILEIDX_MODE_FILE_TYPE);
+	return (ie->mode & GOT_FILEIDX_MODE_FILE_TYPE_ONDISK);
 }
 
 const struct got_error *
@@ -195,7 +195,7 @@ got_fileindex_entry_filetype_set(struct got_fileindex_entry *ie, int type)
 		return got_error(GOT_ERR_BAD_FILETYPE);
 	}
 
-	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE;
+	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE_ONDISK;
 	ie->mode |= type;
 	return NULL;
 }
