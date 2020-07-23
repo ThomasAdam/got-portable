@@ -609,6 +609,112 @@ function test_checkout_symlink {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_symlink_relative_wtpath {
+	local testroot=`test_init checkout_symlink_with_wtpath`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+
+	(cd $testroot && got checkout $testroot/repo wt > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "epsilon" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo -n "passwd.link symlink points outside of work tree: " >&2
+		readlink $testroot/wt/passwd.link >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
+	echo "../beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/nonexistent.link > $testroot/stdout
+	echo "nonexistent" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	if [ -h $testroot/wt/dotgotfoo.link ]; then
+		echo -n "dotgotfoo.link symlink points into .got dir: " >&2
+		readlink $testroot/wt/dotgotfoo.link >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n ".got/foo" > $testroot/content.expected
+	cp $testroot/wt/dotgotfoo.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty
@@ -619,3 +725,4 @@ run_test test_checkout_ignores_submodules
 run_test test_checkout_read_only
 run_test test_checkout_into_nonempty_dir
 run_test test_checkout_symlink
+run_test test_checkout_symlink_relative_wtpath

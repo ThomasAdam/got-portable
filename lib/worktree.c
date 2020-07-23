@@ -376,9 +376,9 @@ open_worktree(struct got_worktree **worktree, const char *path)
 	}
 	(*worktree)->lockfd = -1;
 
-	(*worktree)->root_path = strdup(path);
+	(*worktree)->root_path = realpath(path, NULL);
 	if ((*worktree)->root_path == NULL) {
-		err = got_error_from_errno("strdup");
+		err = got_error_from_errno2("realpath", path);
 		goto done;
 	}
 	err = read_meta_file(&(*worktree)->repo_path, path_got,
