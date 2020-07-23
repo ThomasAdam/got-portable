@@ -166,8 +166,7 @@ int got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *);
 uint32_t got_fileindex_entry_stage_get(const struct got_fileindex_entry *);
 void got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t);
 int got_fileindex_entry_filetype_get(struct got_fileindex_entry *);
-const struct got_error *got_fileindex_entry_filetype_set(
-    struct got_fileindex_entry *, int);
+void got_fileindex_entry_filetype_set(struct got_fileindex_entry *, int);
 void got_fileindex_entry_staged_filetype_set(struct got_fileindex_entry *, int);
 int got_fileindex_entry_staged_filetype_get(struct got_fileindex_entry *);
 

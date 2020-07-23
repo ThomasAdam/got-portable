@@ -183,21 +183,11 @@ got_fileindex_entry_filetype_get(struct got_fileindex_entry *ie)
 	return (ie->mode & GOT_FILEIDX_MODE_FILE_TYPE_ONDISK);
 }
 
-const struct got_error *
+void
 got_fileindex_entry_filetype_set(struct got_fileindex_entry *ie, int type)
 {
-	switch (type) {
-	case GOT_FILEIDX_MODE_REGULAR_FILE:
-	case GOT_FILEIDX_MODE_SYMLINK:
-	case GOT_FILEIDX_MODE_BAD_SYMLINK:
-		break;
-	default:
-		return got_error(GOT_ERR_BAD_FILETYPE);
-	}
-
 	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE_ONDISK;
-	ie->mode |= type;
-	return NULL;
+	ie->mode |= (type & GOT_FILEIDX_MODE_FILE_TYPE_ONDISK);
 }
 
 void

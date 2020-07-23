@@ -1980,10 +1980,8 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 
 		if (is_bad_symlink) {
-			err = got_fileindex_entry_filetype_set(ie,
+			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_BAD_SYMLINK);
-			if (err)
-				goto done;
 		}
 	}
 	got_object_blob_close(blob);
@@ -2857,10 +2855,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				goto done;
 			}
 			if (is_bad_symlink) {
-				err = got_fileindex_entry_filetype_set(ie,
+				got_fileindex_entry_filetype_set(ie,
 				    GOT_FILEIDX_MODE_BAD_SYMLINK);
-				if (err)
-					goto done;
 			}
 		}
 	}
@@ -4381,10 +4377,8 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 					goto done;
 			}
 			if (is_bad_symlink) {
-				err = got_fileindex_entry_filetype_set(ie,
+				got_fileindex_entry_filetype_set(ie,
 				    GOT_FILEIDX_MODE_BAD_SYMLINK);
-				if (err)
-					goto done;
 			}
 		}
 		break;
@@ -5124,10 +5118,8 @@ reinstall_symlinks_after_commit(struct got_pathlist_head *commitable_paths,
 		ie = got_fileindex_entry_get(fileindex, ct->path,
 		    strlen(ct->path));
 		if (ie && is_bad_symlink) {
-			err = got_fileindex_entry_filetype_set(ie,
+			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_BAD_SYMLINK);
-			if (err)
-				break;
 		}
 	}
 
