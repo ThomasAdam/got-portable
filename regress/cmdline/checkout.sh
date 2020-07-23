@@ -628,6 +628,7 @@ function test_checkout_symlink {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ -h $testroot/wt/dotgotfoo.link ]; then
@@ -734,6 +735,7 @@ function test_checkout_symlink_relative_wtpath {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ -h $testroot/wt/dotgotfoo.link ]; then
