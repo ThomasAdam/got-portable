@@ -879,16 +879,18 @@ merge_symlink(struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_object_blob_read_to_str(&ancestor_target, blob_orig);
-	if (err)
-		goto done;
+	if (blob_orig) {
+		err = got_object_blob_read_to_str(&ancestor_target, blob_orig);
+		if (err)
+			goto done;
+	}
 
 	err = got_object_blob_read_to_str(&deriv_target, blob_deriv);
 	if (err)
 		goto done;
 
-	if (ondisk_len != strlen(ancestor_target) ||
-	    memcmp(ondisk_target, ancestor_target, ondisk_len) != 0) {
+	if (ancestor_target && (ondisk_len != strlen(ancestor_target) ||
+	    memcmp(ondisk_target, ancestor_target, ondisk_len) != 0)) {
 		/*
 		 * The symlink has changed on-disk (second derived version).
 		 * Keep that change and discard the incoming change (first
@@ -2567,11 +2569,22 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				    status, path2);
 				goto done;
 			}
-			err = merge_blob(&local_changes_subsumed, a->worktree,
-			    NULL, ondisk_path, path2, sb.st_mode,
-			    a->label_orig, blob2, a->commit_id2, repo,
-			    a->progress_cb,
-			    a->progress_arg);
+			if (S_ISLNK(mode2)) {
+				err = merge_symlink(a->worktree, NULL,
+				    ondisk_path, path2, sb.st_mode,
+				    a->label_orig, blob2, a->commit_id2,
+				    repo, a->progress_cb, a->progress_arg);
+				if (err)
+					goto done;
+			} else {
+				err = merge_blob(&local_changes_subsumed,
+				    a->worktree, NULL, ondisk_path, path2,
+				    sb.st_mode, a->label_orig, blob2,
+				    a->commit_id2, repo, a->progress_cb,
+				    a->progress_arg);
+				if (err)
+					goto done;
+			}
 			if (status == GOT_STATUS_DELETE) {
 				err = got_fileindex_entry_update(ie,
 				    ondisk_path, blob2->id.sha1,
