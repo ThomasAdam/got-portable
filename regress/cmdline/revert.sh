@@ -1053,6 +1053,176 @@ function test_revert_deleted_subtree {
 	test_done "$testroot" "$ret"
 }
 
+function test_revert_symlink {
+	local testroot=`test_init revert_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	# symlink to file A now points to file B
+	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
+	# symlink to a directory A now points to file B
+	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	# "bad" symlink now contains a different target path
+	echo "foo" > $testroot/wt/passwd.link
+	# relative symlink to directory A now points to relative directory B
+	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	# an unversioned symlink
+	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
+	# symlink to file A now points to non-existent file B
+	(cd $testroot/wt && ln -sf nonexistent2 nonexistent.link)
+	# removed symlink
+	(cd $testroot/wt && got rm zeta.link > /dev/null)
+	# added symlink
+	(cd $testroot/wt && ln -sf beta new.link)
+	(cd $testroot/wt && got add new.link > /dev/null)
+
+	(cd $testroot/wt && got revert alpha.link epsilon.link \
+		passwd.link epsilon/beta.link dotgotfoo.link \
+		nonexistent.link zeta.link new.link > $testroot/stdout)
+
+	cat > $testroot/stdout.expected <<EOF
+R  alpha.link
+R  epsilon.link
+R  passwd.link
+R  epsilon/beta.link
+R  nonexistent.link
+R  zeta.link
+R  new.link
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "epsilon" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo "passwd.link should not be a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
+	echo "../beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/nonexistent.link > $testroot/stdout
+	echo "nonexistent" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	if [ ! -h $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is not a symlink " >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
+	echo ".got/foo" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+
+	if [ ! -h $testroot/wt/zeta.link ]; then
+		echo -n "zeta.link is not a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/zeta.link > $testroot/stdout
+	echo "epsilon/zeta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	if [ ! -h $testroot/wt/new.link ]; then
+		echo -n "new.link is not a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "?  dotgotfoo.link" > $testroot/stdout.expected
+	echo "?  new.link" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add
@@ -1067,3 +1237,4 @@ run_test test_revert_patch_removed
 run_test test_revert_patch_one_change
 run_test test_revert_added_subtree
 run_test test_revert_deleted_subtree
+run_test test_revert_symlink
