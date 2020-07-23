@@ -1933,6 +1933,322 @@ function test_update_adds_symlink {
 	test_done "$testroot" "$ret"
 }
 
+function test_update_deletes_symlink {
+	local testroot=`test_init update_deletes_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlink"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git rm -q alpha.link)
+	git_commit $testroot/repo -m "delete symlink"
+
+	echo "D  alpha.link" > $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/alpha.link ]; then
+		echo "alpha.link still exists on disk"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
+function test_update_symlink_conflicts {
+	local testroot=`test_init update_symlink_conflicts`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && ln -sf beta alpha.link)
+	(cd $testroot/repo && ln -sfh gamma epsilon.link)
+	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
+	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
+	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/repo && git rm -q nonexistent.link)
+	(cd $testroot/repo && ln -sf gamma/delta zeta.link)
+	(cd $testroot/repo && ln -sf alpha new.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "change symlinks"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	# modified symlink to file A vs modified symlink to file B
+	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
+	# modified symlink to dir A vs modified symlink to file B
+	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	# modeified symlink to file A vs modified symlink to dir B
+	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	# added regular file A vs added bad symlink to file A
+	(cd $testroot/wt && ln -sf .got/bar dotgotfoo.link)
+	# added bad symlink to file A vs added regular file A
+	echo 'this is regular file bar' > $testroot/wt/dotgotbar.link
+	# removed symlink to non-existent file A vs modified symlink
+	# to nonexistent file B
+	(cd $testroot/wt && ln -sf nonexistent2 nonexistent.link)
+	# modified symlink to file A vs removed symlink to file A
+	(cd $testroot/wt && got rm zeta.link > /dev/null)
+	# added symlink to file A vs added symlink to file B
+	(cd $testroot/wt && ln -sf beta new.link)
+	(cd $testroot/wt && got add new.link > /dev/null)
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "C  alpha.link" >> $testroot/stdout.expected
+	echo "U  dotgotbar.link" >> $testroot/stdout.expected
+	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
+	echo "C  epsilon/beta.link" >> $testroot/stdout.expected
+	echo "C  epsilon.link" >> $testroot/stdout.expected
+	echo "C  new.link" >> $testroot/stdout.expected
+	echo "C  nonexistent.link" >> $testroot/stdout.expected
+	echo "G  zeta.link" >> $testroot/stdout.expected
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 5" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/symlink-conflict-header <<EOF
+got: Could not install symbolic link because of merge conflict.
+ln(1) may be used to fix the situation. If this is intended to be a
+regular file instead then its expected contents may be filled in.
+The following conflicting symlink target paths were found:
+EOF
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "gamma/delta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/alpha.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "gamma" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "epsilon" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/epsilon.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo -n "passwd.link symlink points outside of work tree: " >&2
+		readlink $testroot/wt/passwd.link >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/epsilon/beta.link ]; then
+		echo "epsilon/beta.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "../gamma/delta" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "../beta" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "../gamma" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/epsilon/beta.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/nonexistent.link ]; then
+		echo -n "nonexistent.link still exists on disk: " >&2
+		readlink $testroot/wt/nonexistent.link >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "(symlink was deleted)" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "nonexistent2" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/nonexistent.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "this is regular file foo" > $testroot/content.expected
+	cp $testroot/wt/dotgotfoo.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo -n ".got/bar" > $testroot/content.expected
+	cp $testroot/wt/dotgotbar.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/new.link ]; then
+		echo "new.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/new.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  dotgotfoo.link" > $testroot/stdout.expected
+	echo "M  new.link" >> $testroot/stdout.expected
+	echo "D  nonexistent.link" >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+
+}
+
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file
@@ -1969,3 +2285,5 @@ run_test test_update_modified_submodules
 run_test test_update_adds_submodule
 run_test test_update_conflict_wt_file_vs_repo_submodule
 run_test test_update_adds_symlink
+run_test test_update_deletes_symlink
+run_test test_update_symlink_conflicts

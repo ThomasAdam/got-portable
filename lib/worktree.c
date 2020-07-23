@@ -846,8 +846,14 @@ update_symlink(const char *ondisk_path, const char *target_path,
 /*
  * Overwrite a symlink (or a regular file in case there was a "bad" symlink)
  * in the work tree with a file that contains conflict markers and the
- * conflicting target paths of the original version and two derived versions
- * of a symlink.
+ * conflicting target paths of the original version, a "derived version"
+ * of a symlink from an incoming change, and a local version of the symlink.
+ *
+ * The original versions's target path can be NULL if it is not available,
+ * such as if both derived versions added a new symlink at the same path.
+ *
+ * The incoming derived symlink target is NULL in case the incoming change
+ * has deleted this symlink.
  */
 static const struct got_error *
 install_symlink_conflict(const char *deriv_target,
@@ -878,7 +884,8 @@ install_symlink_conflict(const char *deriv_target,
 	    "contents may be filled in.\nThe following conflicting symlink "
 	    "target paths were found:\n"
 	    "%s %s\n%s\n%s%s%s%s%s\n%s\n%s\n", getprogname(),
-	    GOT_DIFF_CONFLICT_MARKER_BEGIN, label_deriv, deriv_target,
+	    GOT_DIFF_CONFLICT_MARKER_BEGIN, label_deriv,
+	    deriv_target ? deriv_target : "(symlink was deleted)",
 	    orig_target ? label_orig : "",
 	    orig_target ? "\n" : "",
 	    orig_target ? orig_target : "",
@@ -1820,10 +1827,17 @@ update_blob(struct got_worktree *worktree,
 				goto done;
 			}
 		}
-		err = merge_blob(&update_timestamps, worktree, blob2,
-		    ondisk_path, path, sb.st_mode, label_orig, blob,
-		    worktree->base_commit_id, repo,
-		    progress_cb, progress_arg);
+		if (S_ISLNK(te->mode)) {
+			err = merge_symlink(worktree, blob2,
+			    ondisk_path, path, sb.st_mode, label_orig,
+			    blob, worktree->base_commit_id, repo,
+			    progress_cb, progress_arg);
+		} else {
+			err = merge_blob(&update_timestamps, worktree, blob2,
+			    ondisk_path, path, sb.st_mode, label_orig, blob,
+			    worktree->base_commit_id, repo,
+			    progress_cb, progress_arg);
+		}
 		free(label_orig);
 		if (blob2)
 			got_object_blob_close(blob2);
@@ -1919,6 +1933,25 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, repo);
 	if (err)
 		goto done;
+
+	if (S_ISLNK(sb.st_mode) && status != GOT_STATUS_NO_CHANGE) {
+		char ondisk_target[PATH_MAX];
+		ssize_t ondisk_len = readlink(ondisk_path, ondisk_target,
+		    sizeof(ondisk_target));
+		if (ondisk_len == -1) {
+			err = got_error_from_errno2("readlink", ondisk_path);
+			goto done;
+		}
+		ondisk_target[ondisk_len] = '\0';
+		err = install_symlink_conflict(NULL, worktree->base_commit_id,
+		    NULL, NULL, /* XXX pass common ancestor info? */
+		    ondisk_target, ondisk_path);
+		if (err)
+			goto done;
+		err = (*progress_cb)(progress_arg, GOT_STATUS_CONFLICT,
+		    ie->path);
+		goto done;
+	}
 
 	if (status == GOT_STATUS_MODIFY || status == GOT_STATUS_CONFLICT ||
 	    status == GOT_STATUS_ADD) {
