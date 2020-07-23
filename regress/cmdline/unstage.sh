@@ -1135,6 +1135,288 @@ EOF
 	test_done "$testroot" "0"
 }
 
+function test_unstage_patch_symlink {
+	local testroot=`test_init unstage_patch_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
+	(cd $testroot/repo && ln -sf epsilon/zeta zeta2.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# symlink to file A now points to file B
+	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
+	# symlink to a directory A now points to file B
+	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	# "bad" symlink now contains a different target path
+	echo "foo" > $testroot/wt/passwd.link
+	# relative symlink to directory A now points to relative directory B
+	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	# an unversioned symlink
+	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
+	# symlink to file A now points to non-existent file B
+	(cd $testroot/wt && ln -sf nonexistent2 nonexistent.link)
+	# removed symlink
+	(cd $testroot/wt && got rm zeta.link > /dev/null)
+	(cd $testroot/wt && got rm zeta2.link > /dev/null)
+	# added symlink
+	(cd $testroot/wt && ln -sf beta new.link)
+	(cd $testroot/wt && got add new.link > /dev/null)
+	(cd $testroot/wt && ln -sf beta zeta3.link)
+	(cd $testroot/wt && got add zeta3.link > /dev/null)
+
+	(cd $testroot/wt && got stage -S > /dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cat > $testroot/stdout.expected <<EOF
+ M alpha.link
+?  dotgotfoo.link
+ M epsilon/beta.link
+ M epsilon.link
+ A new.link
+ M nonexistent.link
+ M passwd.link
+ D zeta.link
+ D zeta2.link
+ A zeta3.link
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf "y\nn\ny\nn\ny\ny\nn\ny\ny\n" > $testroot/patchscript
+	(cd $testroot/wt && got unstage -F $testroot/patchscript -p \
+		> $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+@@ -1 +1 @@
+-alpha
+\ No newline at end of file
++gamma/delta
+\ No newline at end of file
+-----------------------------------------------
+M  alpha.link (change 1 of 1)
+unstage this change? [y/n/q] y
+G  alpha.link
+-----------------------------------------------
+@@ -1 +1 @@
+-../beta
+\ No newline at end of file
++../gamma
+\ No newline at end of file
+-----------------------------------------------
+M  epsilon/beta.link (change 1 of 1)
+unstage this change? [y/n/q] n
+-----------------------------------------------
+@@ -1 +1 @@
+-epsilon
+\ No newline at end of file
++beta
+\ No newline at end of file
+-----------------------------------------------
+M  epsilon.link (change 1 of 1)
+unstage this change? [y/n/q] y
+G  epsilon.link
+A  new.link
+unstage this addition? [y/n] n
+-----------------------------------------------
+@@ -1 +1 @@
+-nonexistent
+\ No newline at end of file
++nonexistent2
+\ No newline at end of file
+-----------------------------------------------
+M  nonexistent.link (change 1 of 1)
+unstage this change? [y/n/q] y
+G  nonexistent.link
+-----------------------------------------------
+@@ -1 +1 @@
+-/etc/passwd
+\ No newline at end of file
++foo
+-----------------------------------------------
+M  passwd.link (change 1 of 1)
+unstage this change? [y/n/q] y
+G  passwd.link
+D  zeta.link
+unstage this deletion? [y/n] n
+D  zeta2.link
+unstage this deletion? [y/n] y
+D  zeta2.link
+A  zeta3.link
+unstage this addition? [y/n] y
+G  zeta3.link
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha.link > $testroot/stdout
+	echo "gamma/delta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo "passwd.link should not be a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "foo" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
+	echo "../gamma" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	readlink $testroot/wt/nonexistent.link > $testroot/stdout
+	echo "nonexistent2" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is not a symlink " >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
+	echo ".got/foo" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+
+	if [ -e $testroot/wt/zeta.link ]; then
+		echo -n "zeta.link should not exist on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/zeta2.link ]; then
+		echo -n "zeta2.link exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/zeta3.link ]; then
+		echo -n "zeta3.link is not a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/zeta3.link > $testroot/stdout
+	echo "beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/new.link ]; then
+		echo -n "new.link is not a symlink" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	echo "M  alpha.link" > $testroot/stdout.expected
+	echo "?  dotgotfoo.link" >> $testroot/stdout.expected
+	echo " M epsilon/beta.link" >> $testroot/stdout.expected
+	echo "M  epsilon.link" >> $testroot/stdout.expected
+	echo " A new.link" >> $testroot/stdout.expected
+	echo "M  nonexistent.link" >> $testroot/stdout.expected
+	echo "M  passwd.link" >> $testroot/stdout.expected
+	echo " D zeta.link" >> $testroot/stdout.expected
+	echo "D  zeta2.link" >> $testroot/stdout.expected
+	echo "A  zeta3.link" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_unstage_basic
 run_test test_unstage_unversioned
 run_test test_unstage_nonexistent
@@ -1143,3 +1425,4 @@ run_test test_unstage_patch_added
 run_test test_unstage_patch_removed
 run_test test_unstage_patch_quit
 run_test test_unstage_symlink
+run_test test_unstage_patch_symlink

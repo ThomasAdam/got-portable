@@ -972,20 +972,19 @@ merge_blob(int *, struct got_worktree *, struct got_blob_object *,
 
 /*
  * Merge a symlink into the work tree, where blob_orig acts as the common
- * ancestor, blob_deriv acts as the first derived version, and the symlink
- * on disk acts as the second derived version.
+ * ancestor, deriv_target is the link target of the first derived version,
+ * and the symlink on disk acts as the second derived version.
  * Assume that contents of both blobs represent symlinks.
  */
 static const struct got_error *
 merge_symlink(struct got_worktree *worktree,
     struct got_blob_object *blob_orig, const char *ondisk_path,
-    const char *path, const char *label_orig,
-    struct got_blob_object *blob_deriv,
+    const char *path, const char *label_orig, const char *deriv_target,
     struct got_object_id *deriv_base_commit_id, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
-	char *ancestor_target = NULL, *deriv_target = NULL;
+	char *ancestor_target = NULL;
 	struct stat sb;
 	ssize_t ondisk_len, deriv_len;
 	char ondisk_target[PATH_MAX];
@@ -1009,10 +1008,6 @@ merge_symlink(struct got_worktree *worktree,
 		if (err)
 			goto done;
 	}
-
-	err = got_object_blob_read_to_str(&deriv_target, blob_deriv);
-	if (err)
-		goto done;
 
 	if (ancestor_target == NULL ||
 	    (ondisk_len != strlen(ancestor_target) ||
@@ -1071,7 +1066,6 @@ merge_symlink(struct got_worktree *worktree,
 
 done:
 	free(ancestor_target);
-	free(deriv_target);
 	return err;
 }
 
@@ -1913,10 +1907,14 @@ update_blob(struct got_worktree *worktree,
 			}
 		}
 		if (S_ISLNK(te->mode) && S_ISLNK(sb.st_mode)) {
-			err = merge_symlink(worktree, blob2,
-			    ondisk_path, path, label_orig, blob,
-			    worktree->base_commit_id, repo,
-			    progress_cb, progress_arg);
+			char *link_target;
+			err = got_object_blob_read_to_str(&link_target, blob);
+			if (err)
+				goto done;
+			err = merge_symlink(worktree, blob2, ondisk_path, path,
+			    label_orig, link_target, worktree->base_commit_id,
+			    repo, progress_cb, progress_arg);
+			free(link_target);
 		} else {
 			err = merge_blob(&update_timestamps, worktree, blob2,
 			    ondisk_path, path, sb.st_mode, label_orig, blob,
@@ -2718,9 +2716,14 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		}
 
 		if (S_ISLNK(mode1) && S_ISLNK(mode2)) {
+			char *link_target2;
+			err = got_object_blob_read_to_str(&link_target2, blob2);
+			if (err)
+				goto done;
 			err = merge_symlink(a->worktree, blob1, ondisk_path,
-			    path2, a->label_orig, blob2, a->commit_id2, repo,
-			    a->progress_cb, a->progress_arg);
+			    path2, a->label_orig, link_target2, a->commit_id2,
+			    repo, a->progress_cb, a->progress_arg);
+			free(link_target2);
 		} else {
 			err = merge_blob(&local_changes_subsumed, a->worktree,
 			    blob1, ondisk_path, path2, sb.st_mode,
@@ -2800,10 +2803,16 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				goto done;
 			}
 			if (S_ISLNK(mode2) && S_ISLNK(sb.st_mode)) {
+				char *link_target2;
+				err = got_object_blob_read_to_str(&link_target2,
+				    blob2);
+				if (err)
+					goto done;
 				err = merge_symlink(a->worktree, NULL,
 				    ondisk_path, path2, a->label_orig,
-				    blob2, a->commit_id2, repo,
+				    link_target2, a->commit_id2, repo,
 				    a->progress_cb, a->progress_arg);
+				free(link_target2);
 			} else if (S_ISREG(sb.st_mode)) {
 				err = merge_blob(&local_changes_subsumed,
 				    a->worktree, NULL, ondisk_path, path2,
@@ -7457,12 +7466,51 @@ unstage_path(void *arg, unsigned char status,
 					    staged_blob_id->sha1,
 					    SHA1_DIGEST_LENGTH);
 				}
-				err = merge_file(&local_changes_subsumed,
-				    a->worktree, blob_base, ondisk_path,
-				    relpath, got_fileindex_perms_to_st(ie),
-				    path_unstaged_content, label_orig,
-				    "unstaged", a->repo, a->progress_cb,
-				    a->progress_arg);
+				if (got_fileindex_entry_staged_filetype_get(ie)
+				    == GOT_FILEIDX_MODE_SYMLINK) {
+					char unstaged_target[PATH_MAX];
+					FILE *f;
+					size_t r;
+					f = fopen(path_unstaged_content, "r");
+					if (f == NULL) {
+						err = got_error_from_errno2(
+						    "fopen",
+						    path_unstaged_content);
+						goto done;
+					}
+					r = fread(unstaged_target, 1,
+					    sizeof(unstaged_target), f);
+					if (r == 0 && ferror(f)) {
+						err = got_error_from_errno(
+						    "fread");
+						fclose(f);
+						break;
+					}
+					if (fclose(f) == EOF) {
+						err = got_error_from_errno2(
+						    "fclose",
+						    path_unstaged_content);
+					}
+					if (r >= sizeof(unstaged_target)) {
+						err = got_error(
+						    GOT_ERR_NO_SPACE);
+						goto done;
+					}
+					unstaged_target[r] = '\0';
+					err = merge_symlink(a->worktree,
+					    blob_base, ondisk_path, relpath,
+					    label_orig, unstaged_target,
+					    a->worktree->base_commit_id,
+					    a->repo, a->progress_cb,
+					    a->progress_arg);
+				} else {
+					err = merge_file(&local_changes_subsumed,
+					    a->worktree, blob_base, ondisk_path,
+					    relpath, got_fileindex_perms_to_st(ie),
+					    path_unstaged_content, label_orig,
+					    "unstaged", a->repo, a->progress_cb,
+					    a->progress_arg);
+				}
 				if (err == NULL &&
 				    path_new_staged_content == NULL)
 					got_fileindex_entry_stage_set(ie,
@@ -7486,11 +7534,17 @@ unstage_path(void *arg, unsigned char status,
 			break;
 		case GOT_FILEIDX_MODE_SYMLINK:
 			if (S_ISLNK(got_fileindex_perms_to_st(ie))) {
+				char *staged_target;
+				err = got_object_blob_read_to_str(
+				    &staged_target, blob_staged);
+				if (err)
+					goto done;
 				err = merge_symlink(a->worktree, blob_base,
 				    ondisk_path, relpath, label_orig,
-				    blob_staged, commit_id ? commit_id :
+				    staged_target, commit_id ? commit_id :
 				    a->worktree->base_commit_id,
 				    a->repo, a->progress_cb, a->progress_arg);
+				free(staged_target);
 			} else {
 				err = merge_blob(&local_changes_subsumed,
 				    a->worktree, blob_base, ondisk_path,
