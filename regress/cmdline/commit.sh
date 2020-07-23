@@ -993,7 +993,6 @@ function test_commit_symlink {
 		epsilon/beta.link nonexistent.link > /dev/null)
 
 	(cd $testroot/wt && got commit -m 'test commit_symlink' > $testroot/stdout)
-	#(cd $testroot/wt && egdb --args got commit -m 'test commit_symlink')
 
 	local head_rev=`git_show_head $testroot/repo`
 	echo "A  alpha.link" > $testroot/stdout.expected
