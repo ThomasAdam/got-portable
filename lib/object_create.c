@@ -128,10 +128,15 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	SHA1Init(&sha1_ctx);
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
-	if (fd == -1)
-		return got_error_from_errno2("open", ondisk_path);
+	if (fd == -1) {
+		if (errno != ELOOP)
+			return got_error_from_errno2("open", ondisk_path);
 
-	if (fstat(fd, &sb) == -1) {
+		if (lstat(ondisk_path, &sb) == -1) {
+			err = got_error_from_errno2("lstat", ondisk_path);
+			goto done;
+		}
+	} else if (fstat(fd, &sb) == -1) {
 		err = got_error_from_errno2("fstat", ondisk_path);
 		goto done;
 	}
@@ -156,13 +161,21 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		goto done;
 	}
 	for (;;) {
-		char buf[8192];
+		char buf[PATH_MAX];
 		ssize_t inlen;
 
-		inlen = read(fd, buf, sizeof(buf));
-		if (inlen == -1) {
-			err = got_error_from_errno("read");
-			goto done;
+		if (S_ISLNK(sb.st_mode)) {
+			inlen = readlink(ondisk_path, buf, sizeof(buf));
+			if (inlen == -1) {
+				err = got_error_from_errno("readlink");
+				goto done;
+			}
+		} else {
+			inlen = read(fd, buf, sizeof(buf));
+			if (inlen == -1) {
+				err = got_error_from_errno("read");
+				goto done;
+			}
 		}
 		if (inlen == 0)
 			break; /* EOF */
@@ -172,6 +185,8 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 			err = got_ferror(blobfile, GOT_ERR_IO);
 			goto done;
 		}
+		if (S_ISLNK(sb.st_mode))
+			break;
 	}
 
 	*id = malloc(sizeof(**id));
@@ -218,6 +233,8 @@ te_mode2str(char *buf, size_t len, struct got_tree_entry *te)
 			mode |= S_IXUSR | S_IXGRP | S_IXOTH;
 	} else if (got_object_tree_entry_is_submodule(te))
 		mode = S_IFDIR | S_IFLNK;
+	else if (S_ISLNK(te->mode))
+		mode = S_IFLNK; /* Git leaves all the other bits unset. */
 	else if (S_ISDIR(te->mode))
 		mode = S_IFDIR; /* Git leaves all the other bits unset. */
 	else

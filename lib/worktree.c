@@ -4343,6 +4343,9 @@ match_ct_parent_path(int *match, struct got_commitable *ct, const char *path)
 static mode_t
 get_ct_file_mode(struct got_commitable *ct)
 {
+	if (S_ISLNK(ct->mode))
+		return S_IFLNK;
+
 	return S_IFREG | (ct->mode & ((S_IRWXU | S_IRWXG | S_IRWXO)));
 }
 
