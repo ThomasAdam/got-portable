@@ -1020,27 +1020,6 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	}
 
 	if (symlink(target_path, ondisk_path) == -1) {
-		if (errno == ENOENT) {
-			char *parent = dirname(ondisk_path);
-			if (parent == NULL) {
-				err = got_error_from_errno2("dirname",
-				    ondisk_path);
-				goto done;
-			}
-			err = add_dir_on_disk(worktree, parent);
-			if (err)
-				goto done;
-			/*
-			 * Retry, and fall through to error handling
-			 * below if this second attempt fails.
-			 */
-			if (symlink(target_path, ondisk_path) != -1) {
-				err = NULL; /* success */
-				goto done;
-			}
-		}
-
-		/* Handle errors from first or second creation attempt. */
 		if (errno == EEXIST) {
 			struct stat sb;
 			ssize_t elen;
@@ -1062,12 +1041,49 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 				goto done;
 			}
 			if (elen == target_len &&
-			    memcmp(etarget, target_path, target_len) == 0)
-				err = NULL;
-			else
-				err = got_error_path(ondisk_path,
-				    GOT_ERR_FILE_OBSTRUCTED);
-		} else if (errno == ENAMETOOLONG) {
+			    memcmp(etarget, target_path, target_len) == 0) {
+				err = NULL; /* nothing to do */
+				goto done;
+			} else {
+				if (unlink(ondisk_path) == -1) {
+					err = got_error_from_errno2("unlink",
+					    ondisk_path);
+					goto done;
+				}
+				if (symlink(target_path, ondisk_path) == -1) {
+					err = got_error_from_errno3("symlink",
+					    target_path, ondisk_path);
+					goto done;
+				}
+
+				err = (*progress_cb)(progress_arg,
+				    GOT_STATUS_UPDATE, path);
+				goto done;
+			}
+		}
+
+		if (errno == ENOENT) {
+			char *parent = dirname(ondisk_path);
+			if (parent == NULL) {
+				err = got_error_from_errno2("dirname",
+				    ondisk_path);
+				goto done;
+			}
+			err = add_dir_on_disk(worktree, parent);
+			if (err)
+				goto done;
+			/*
+			 * Retry, and fall through to error handling
+			 * below if this second attempt fails.
+			 */
+			if (symlink(target_path, ondisk_path) != -1) {
+				err = NULL; /* success */
+				goto done;
+			}
+		}
+
+		/* Handle errors from first or second creation attempt. */
+		if (errno == ENAMETOOLONG) {
 			/* bad target path; install as a regular file */
 			got_object_blob_rewind(blob);
 			err = install_blob(worktree, ondisk_path, path,
@@ -1081,7 +1097,8 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			err = got_error_from_errno3("symlink",
 			    target_path, ondisk_path);
 		}
-	}
+	} else
+		err = (*progress_cb)(progress_arg, GOT_STATUS_ADD, path);
 done:
 	free(resolved_path);
 	free(abspath);
