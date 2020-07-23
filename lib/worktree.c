@@ -947,6 +947,7 @@ merge_symlink(struct got_worktree *worktree,
 		    ondisk_path);
 		goto done;
 	}
+	ondisk_target[ondisk_len] = '\0';
 
 	if (blob_orig) {
 		err = got_object_blob_read_to_str(&ancestor_target, blob_orig);
