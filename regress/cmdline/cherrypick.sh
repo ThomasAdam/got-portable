@@ -517,8 +517,7 @@ function test_cherrypick_symlink_conflicts {
 	echo -n > $testroot/stdout.expected
 	echo "C  alpha.link" >> $testroot/stdout.expected
 	echo "C  epsilon/beta.link" >> $testroot/stdout.expected
-	# TODO: This is wrong! Unversioned file boo.link should be preserved.
-	echo "U  boo.link" >> $testroot/stdout.expected
+	echo "?  boo.link" >> $testroot/stdout.expected
 	echo "C  epsilon.link" >> $testroot/stdout.expected
 	echo "C  dotgotbar.link" >> $testroot/stdout.expected
 	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
@@ -568,14 +567,13 @@ EOF
 		return 1
 	fi
 
-	# TODO: This is wrong! Unversioned file boo.link should be preserved.
-	if [ ! -h $testroot/wt/boo.link ]; then
-		echo "boo.link is not a symlink"
+	if [ -h $testroot/wt/boo.link ]; then
+		echo "boo.link is a symlink"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
-	echo "beta" > $testroot/content.expected
+	echo "this is unversioned file boo" > $testroot/content.expected
 	cp $testroot/wt/boo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"

@@ -1204,7 +1204,7 @@ static const struct got_error *
 install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
     const char *ondisk_path, const char *path, struct got_blob_object *blob,
     int restoring_missing_file, int reverting_versioned_file,
-    struct got_repository *repo,
+    int path_is_unversioned, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -1307,6 +1307,11 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 
 	if (symlink(target_path, ondisk_path) == -1) {
 		if (errno == EEXIST) {
+			if (path_is_unversioned) {
+				err = (*progress_cb)(progress_arg,
+				    GOT_STATUS_UNVERSIONED, path);
+				goto done;
+			}
 			err = replace_existing_symlink(ondisk_path,
 			    target_path, target_len);
 			if (err)
@@ -1790,8 +1795,10 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 		if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
 			sb.st_mode = got_fileindex_perms_to_st(ie);
-	} else
+	} else {
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
+		status = GOT_STATUS_UNVERSIONED;
+	}
 
 	if (status == GOT_STATUS_OBSTRUCTED) {
 		err = (*progress_cb)(progress_arg, status, path);
@@ -1892,7 +1899,8 @@ update_blob(struct got_worktree *worktree,
 		if (S_ISLNK(te->mode)) {
 			err = install_symlink(&is_bad_symlink, worktree,
 			    ondisk_path, path, blob,
-			    status == GOT_STATUS_MISSING, 0, repo,
+			    status == GOT_STATUS_MISSING, 0,
+			    status == GOT_STATUS_UNVERSIONED, repo,
 			    progress_cb, progress_arg);
 		} else {
 			err = install_blob(worktree, ondisk_path, path,
@@ -2769,7 +2777,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (S_ISLNK(mode2)) {
 				err = install_symlink(&is_bad_symlink,
 				    a->worktree, ondisk_path, path2, blob2, 0,
-				    0, repo, a->progress_cb, a->progress_arg);
+				    0, 1, repo, a->progress_cb, a->progress_arg);
 			} else {
 				err = install_blob(a->worktree, ondisk_path, path2,
 				    mode2, sb.st_mode, blob2, 0, 0, 0, repo,
@@ -4295,7 +4303,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			if (te && S_ISLNK(te->mode)) {
 				err = install_symlink(&is_bad_symlink,
 				    a->worktree, ondisk_path, ie->path,
-				    blob, 0, 1, a->repo,
+				    blob, 0, 1, 0, a->repo,
 				    a->progress_cb, a->progress_arg);
 			} else {
 				err = install_blob(a->worktree, ondisk_path,
@@ -5017,7 +5025,7 @@ reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
 	}
 
 	err = install_symlink(is_bad_symlink, worktree, ct->ondisk_path,
-	    ct->path, blob, 0, 0, repo, NULL, NULL);
+	    ct->path, blob, 0, 0, 0, repo, NULL, NULL);
 done:
 	if (blob)
 		got_object_blob_close(blob);

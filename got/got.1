@@ -1262,6 +1262,7 @@ Show the status of each affected file, using the following status codes:
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
 .It \(a~ Ta changes destined for a non-regular file were not merged
+.It ? Ta changes destined for an unversioned file were not merged
 .El
 .Pp
 The merged changes will appear as local changes in the work tree, which
@@ -1305,6 +1306,7 @@ Show the status of each affected file, using the following status codes:
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
 .It \(a~ Ta changes destined for a non-regular file were not merged
+.It ? Ta changes destined for an unversioned file were not merged
 .El
 .Pp
 The reverse-merged changes will appear as local changes in the work tree,
@@ -1380,6 +1382,7 @@ using the following status codes:
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
 .It \(a~ Ta changes destined for a non-regular file were not merged
+.It ? Ta changes destined for an unversioned file were not merged
 .El
 .Pp
 If merge conflicts occur the rebase operation is interrupted and may
@@ -1509,6 +1512,7 @@ using the following status codes:
 .It d Ta file's deletion was obstructed by local modifications
 .It A Ta new file was added
 .It \(a~ Ta changes destined for a non-regular file were not merged
+.It ? Ta changes destined for an unversioned file were not merged
 .El
 .Pp
 If merge conflicts occur the histedit operation is interrupted and may
