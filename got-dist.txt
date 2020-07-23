@@ -12,6 +12,8 @@
 /got/got-worktree.5
 /got/got.1
 /got/got.c
+/got/got.h
+/got/parse.y
 /gotweb
 /gotweb/Makefile
 /gotweb/Makefile.inc
