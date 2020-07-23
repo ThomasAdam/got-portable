@@ -53,15 +53,15 @@ struct got_fileindex {
 #define GOT_FILEIDX_MAX_ENTRIES INT_MAX
 };
 
-mode_t
-got_fileindex_entry_perms_get(struct got_fileindex_entry *ie)
+static mode_t
+fileindex_entry_perms_get(struct got_fileindex_entry *ie)
 {
 	return ((ie->mode & GOT_FILEIDX_MODE_PERMS) >>
 	    GOT_FILEIDX_MODE_PERMS_SHIFT);
 }
 
-void
-got_fileindex_entry_perms_set(struct got_fileindex_entry *ie, mode_t mode)
+static void
+fileindex_entry_perms_set(struct got_fileindex_entry *ie, mode_t mode)
 {
 	ie->mode &= ~GOT_FILEIDX_MODE_PERMS;
 	ie->mode |= ((mode << GOT_FILEIDX_MODE_PERMS_SHIFT) &
@@ -71,7 +71,7 @@ got_fileindex_entry_perms_set(struct got_fileindex_entry *ie, mode_t mode)
 mode_t
 got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 {
-	mode_t perms = got_fileindex_entry_perms_get(ie);
+	mode_t perms = fileindex_entry_perms_get(ie);
 	int type = got_fileindex_entry_filetype_get(ie);
 	uint32_t ftype;
 
@@ -115,11 +115,11 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		if (S_ISLNK(sb.st_mode)) {
 			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_SYMLINK);
-			got_fileindex_entry_perms_set(ie, 0);
+			fileindex_entry_perms_set(ie, 0);
 		} else {
 			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_REGULAR_FILE);
-			got_fileindex_entry_perms_set(ie,
+			fileindex_entry_perms_set(ie,
 			    sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 		}
 	}
