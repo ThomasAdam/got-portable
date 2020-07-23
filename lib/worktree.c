@@ -989,6 +989,10 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 	 */
 	if (!got_path_is_absolute(target_path)) {
 		char *parent = dirname(ondisk_path);
+		if (parent == NULL) {
+			err = got_error_from_errno2("dirname", ondisk_path);
+			goto done;
+		}
 		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
