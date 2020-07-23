@@ -1721,6 +1721,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 	if (!stat_info_differs(ie, sb))
 		goto done;
 
+	if (S_ISLNK(sb->st_mode) &&
+	    got_fileindex_entry_filetype_get(ie) != GOT_FILEIDX_MODE_SYMLINK) {
+		*status = GOT_STATUS_MODIFY;
+		goto done;
+	}
+
 	if (staged_status == GOT_STATUS_MODIFY ||
 	    staged_status == GOT_STATUS_ADD)
 		memcpy(id.sha1, ie->staged_blob_sha1, sizeof(id.sha1));
