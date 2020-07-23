@@ -263,6 +263,9 @@ function test_status_symlink {
 
 	mkdir $testroot/repo/ramdisk/
 	touch $testroot/repo/ramdisk/Makefile
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "first commit"
 
@@ -287,18 +290,19 @@ function test_status_symlink {
 		return 1
 	fi
 
-	(cd $testroot/wt && ln -s alpha alpha.link)
-	(cd $testroot/wt && ln -s epsilon epsilon.link)
+	(cd $testroot/wt && ln -sf beta alpha.link)
+	(cd $testroot/wt && ln -sfh gamma epsilon.link)
+
 	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
 	(cd $testroot/wt && ln -s ../beta epsilon/beta.link)
-	(cd $testroot/wt && ln -s nonexistent nonexistent.link)
-	(cd $testroot/wt && got add alpha.link epsilon.link \
-		passwd.link epsilon/beta.link nonexistent.link > /dev/null)
+	(cd $testroot/wt && got add passwd.link epsilon/beta.link > /dev/null)
 
-	echo 'A  alpha.link' > $testroot/stdout.expected
+	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
+
+	echo 'M  alpha.link' > $testroot/stdout.expected
 	echo 'A  epsilon/beta.link' >> $testroot/stdout.expected
-	echo 'A  epsilon.link' >> $testroot/stdout.expected
-	echo 'A  nonexistent.link' >> $testroot/stdout.expected
+	echo 'M  epsilon.link' >> $testroot/stdout.expected
+	echo 'D  nonexistent.link' >> $testroot/stdout.expected
 	echo 'A  passwd.link' >> $testroot/stdout.expected
 	echo "?  ramdisk/obj" >> $testroot/stdout.expected
 
