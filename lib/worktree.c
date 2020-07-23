@@ -1071,13 +1071,20 @@ merge_symlink(struct got_worktree *worktree,
 			goto done;
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 	} else if (have_local_change && have_incoming_change) {
-		err = install_symlink_conflict(deriv_target,
-		    deriv_base_commit_id, ancestor_target, label_orig,
-		    ondisk_target, ondisk_path);
-		if (err)
-			goto done;
-		err = (*progress_cb)(progress_arg, GOT_STATUS_CONFLICT,
-		    path);
+		if (deriv_len == ondisk_len &&
+		    memcmp(deriv_target, ondisk_target, deriv_len) == 0) {
+			/* Both sides made the same change. */
+			err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE,
+			    path);
+		} else {
+			err = install_symlink_conflict(deriv_target,
+			    deriv_base_commit_id, ancestor_target, label_orig,
+			    ondisk_target, ondisk_path);
+			if (err)
+				goto done;
+			err = (*progress_cb)(progress_arg, GOT_STATUS_CONFLICT,
+			    path);
+		}
 	}
 
 done:
@@ -4578,7 +4585,6 @@ collect_commitables(void *arg, unsigned char status,
 			ct->mode = S_IFLNK;
 			break;
 		default:
-			fprintf(stderr, "got: ie mode is 0x%x\n", ie->mode);
 			err = got_error_path(path, GOT_ERR_BAD_FILETYPE);
 			goto done;
 		}
@@ -7540,11 +7546,26 @@ unstage_path(void *arg, unsigned char status,
 		    staged_blob_id, 8192);
 		if (err)
 			break;
-		err = merge_blob(&local_changes_subsumed, a->worktree,
-		    blob_base, ondisk_path, relpath,
-		    got_fileindex_perms_to_st(ie), label_orig, blob_staged,
-		    commit_id ? commit_id : a->worktree->base_commit_id,
-		    a->repo, a->progress_cb, a->progress_arg);
+		switch (got_fileindex_entry_staged_filetype_get(ie)) {
+		case GOT_FILEIDX_MODE_BAD_SYMLINK:
+		case GOT_FILEIDX_MODE_REGULAR_FILE:
+			err = merge_blob(&local_changes_subsumed, a->worktree,
+			    blob_base, ondisk_path, relpath,
+			    got_fileindex_perms_to_st(ie), label_orig,
+			    blob_staged, commit_id ? commit_id :
+			    a->worktree->base_commit_id, a->repo,
+			    a->progress_cb, a->progress_arg);
+			break;
+		case GOT_FILEIDX_MODE_SYMLINK:
+			err = merge_symlink(a->worktree, blob_base, ondisk_path,
+			    relpath, got_fileindex_perms_to_st(ie), label_orig,
+			    blob_staged, a->worktree->base_commit_id, a->repo,
+			    a->progress_cb, a->progress_arg);
+			break;
+		default:
+			err = got_error_path(relpath, GOT_ERR_BAD_FILETYPE);
+			break;
+		}
 		if (err == NULL)
 			got_fileindex_entry_stage_set(ie,
 			    GOT_FILEIDX_STAGE_NONE);

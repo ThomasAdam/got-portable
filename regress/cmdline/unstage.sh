@@ -953,6 +953,188 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+function test_unstage_symlink {
+	local testroot=`test_init unstage_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local head_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -sf beta alpha.link)
+	(cd $testroot/wt && ln -sfh gamma epsilon.link)
+	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
+	echo 'this is regular file foo' > $testroot/wt/dotgotfoo.link
+	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
+	(cd $testroot/wt && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
+	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
+	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
+	(cd $testroot/wt && got add zeta.link > /dev/null)
+
+	(cd $testroot/wt && got stage > /dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cat > $testroot/stdout.expected <<EOF
+ M alpha.link
+ A dotgotbar.link
+ A dotgotfoo.link
+ M epsilon/beta.link
+ M epsilon.link
+ D nonexistent.link
+ A zeta.link
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got unstage > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got unstage command failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+G  alpha.link
+G  dotgotbar.link
+G  dotgotfoo.link
+G  epsilon/beta.link
+G  epsilon.link
+D  nonexistent.link
+G  zeta.link
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha.link > $testroot/stdout
+	echo "beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "gamma" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/epsilon/beta.link ]; then
+		echo "epsilon/beta.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
+	echo "../gamma/delta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ ! -f $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "this is regular file foo" > $testroot/content.expected
+	cp $testroot/wt/dotgotfoo.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# bad symlinks are allowed as-is for commit and stage/unstage
+	if [ ! -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/dotgotbar.link > $testroot/stdout
+	echo ".got/bar" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/nonexistent.link ]; then
+		echo "nonexistent.link exists on disk"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ ! -h $testroot/wt/zeta.link ]; then
+		echo "zeta.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/zeta.link > $testroot/stdout
+	echo "gamma/delta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+}
+
 run_test test_unstage_basic
 run_test test_unstage_unversioned
 run_test test_unstage_nonexistent
@@ -960,3 +1142,4 @@ run_test test_unstage_patch
 run_test test_unstage_patch_added
 run_test test_unstage_patch_removed
 run_test test_unstage_patch_quit
+run_test test_unstage_symlink
