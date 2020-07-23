@@ -511,17 +511,16 @@ function test_cherrypick_symlink_conflicts {
 	(cd $testroot/wt && got cherrypick $commit_id2 > $testroot/stdout)
 
 	echo -n > $testroot/stdout.expected
-	echo "~  alpha.link" >> $testroot/stdout.expected
-	echo "~  epsilon/beta.link" >> $testroot/stdout.expected
+	echo "C  alpha.link" >> $testroot/stdout.expected
+	echo "C  epsilon/beta.link" >> $testroot/stdout.expected
 	echo "U  dotgotbar.link" >> $testroot/stdout.expected
-	echo "~  epsilon.link" >> $testroot/stdout.expected
+	echo "C  epsilon.link" >> $testroot/stdout.expected
 	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	echo "!  zeta.link" >> $testroot/stdout.expected
-	echo "G  new.link" >> $testroot/stdout.expected
+	echo "C  new.link" >> $testroot/stdout.expected
 	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
-	echo "File paths obstructed by a non-regular file: 3" \
-		>> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 4" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -530,34 +529,62 @@ function test_cherrypick_symlink_conflicts {
 		return 1
 	fi
 
-	if ! [ -h $testroot/wt/alpha.link ]; then
-		echo "alpha.link is not a symlink"
+	if [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is a symlink"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
-	readlink $testroot/wt/alpha.link > $testroot/stdout
-	echo "gamma/delta" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cat > $testroot/symlink-conflict-header <<EOF
+got: Could not install symbolic link because of merge conflict.
+ln(1) may be used to fix the situation. If this is intended to be a
+regular file instead then its expected contents may be filled in.
+The following conflicting symlink target paths were found:
+EOF
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "gamma/delta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/alpha.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
 	fi
 
-	if ! [ -h $testroot/wt/epsilon.link ]; then
-		echo "epsilon.link is not a symlink"
+	if [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is a symlink"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
-	readlink $testroot/wt/epsilon.link > $testroot/stdout
-	echo "beta" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "gamma" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "epsilon" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/epsilon.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -580,12 +607,29 @@ function test_cherrypick_symlink_conflicts {
 		return 1
 	fi
 
-	readlink $testroot/wt/epsilon/beta.link > $testroot/stdout
-	echo "../gamma" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	if [ -h $testroot/wt/epsilon/beta.link ]; then
+		echo "epsilon/beta.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "../gamma/delta" >> $testroot/content.expected
+	echo "3-way merge base: commit $commit_id1" \
+		>> $testroot/content.expected
+	echo "../beta" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "../gamma" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/epsilon/beta.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -628,18 +672,26 @@ function test_cherrypick_symlink_conflicts {
 		return 1
 	fi
 
-	if ! [ -h $testroot/wt/new.link ]; then
-		echo "new.link is not a symlink"
+	if [ -h $testroot/wt/new.link ]; then
+		echo "new.link is a symlink"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
-	readlink $testroot/wt/new.link > $testroot/stdout
-	echo "alpha" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	cp $testroot/symlink-conflict-header $testroot/content.expected
+	echo "<<<<<<< merged change: commit $commit_id2" \
+		>> $testroot/content.expected
+	echo "alpha" >> $testroot/content.expected
+	echo "=======" >> $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo '>>>>>>>' >> $testroot/content.expected
+	echo -n "" >> $testroot/content.expected
+
+	cp $testroot/wt/new.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
 	fi

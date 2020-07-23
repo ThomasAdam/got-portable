@@ -844,6 +844,73 @@ update_symlink(const char *ondisk_path, const char *target_path,
 }
 
 /*
+ * Overwrite a symlink (or a regular file in case there was a "bad" symlink)
+ * in the work tree with a file that contains conflict markers and the
+ * conflicting target paths of the original version and two derived versions
+ * of a symlink.
+ */
+static const struct got_error *
+install_symlink_conflict(const char *deriv_target,
+    struct got_object_id *deriv_base_commit_id, const char *orig_target,
+    const char *label_orig, const char *local_target, const char *ondisk_path)
+{
+	const struct got_error *err;
+	char *id_str = NULL, *label_deriv = NULL, *path = NULL;
+	FILE *f = NULL;
+
+	err = got_object_id_str(&id_str, deriv_base_commit_id);
+	if (err)
+		return got_error_from_errno("asprintf");
+
+	if (asprintf(&label_deriv, "%s: commit %s",
+	    GOT_MERGE_LABEL_MERGED, id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_opentemp_named(&path, &f, "got-symlink-conflict");
+	if (err)
+		goto done;
+
+	if (fprintf(f, "%s: Could not install symbolic link because of merge "
+	    "conflict.\nln(1) may be used to fix the situation. If this is "
+	    "intended to be a\nregular file instead then its expected "
+	    "contents may be filled in.\nThe following conflicting symlink "
+	    "target paths were found:\n"
+	    "%s %s\n%s\n%s%s%s%s%s\n%s\n%s\n", getprogname(),
+	    GOT_DIFF_CONFLICT_MARKER_BEGIN, label_deriv, deriv_target,
+	    orig_target ? label_orig : "",
+	    orig_target ? "\n" : "",
+	    orig_target ? orig_target : "",
+	    orig_target ? "\n" : "",
+	    GOT_DIFF_CONFLICT_MARKER_SEP,
+	    local_target, GOT_DIFF_CONFLICT_MARKER_END) < 0) {
+		err = got_error_from_errno2("fprintf", path);
+		goto done;
+	}
+
+	if (unlink(ondisk_path) == -1) {
+		err = got_error_from_errno2("unlink", ondisk_path);
+		goto done;
+	}
+	if (rename(path, ondisk_path) == -1) {
+		err = got_error_from_errno3("rename", path, ondisk_path);
+		goto done;
+	}
+	if (chmod(ondisk_path, GOT_DEFAULT_FILE_MODE) == -1) {
+		err = got_error_from_errno2("chmod", ondisk_path);
+		goto done;
+	}
+done:
+	if (f != NULL && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path);
+	free(path);
+	free(id_str);
+	free(label_deriv);
+	return err;
+}
+
+/*
  * Merge a symlink into the work tree, where blob_orig acts as the common
  * ancestor, blob_deriv acts as the first derived version, and the symlink
  * on disk acts as the second derived version.
@@ -860,8 +927,10 @@ merge_symlink(struct got_worktree *worktree,
 	const struct got_error *err = NULL;
 	char *ancestor_target = NULL, *deriv_target = NULL;
 	struct stat sb;
-	ssize_t ondisk_len;
+	ssize_t ondisk_len, deriv_len;
 	char ondisk_target[PATH_MAX];
+	int have_local_change = 0;
+	int have_incoming_change = 0;
 
 	if (lstat(ondisk_path, &sb) == -1)
 		return got_error_from_errno2("lstat", ondisk_path);
@@ -889,28 +958,54 @@ merge_symlink(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	if (ancestor_target && (ondisk_len != strlen(ancestor_target) ||
-	    memcmp(ondisk_target, ancestor_target, ondisk_len) != 0)) {
-		/*
-		 * The symlink has changed on-disk (second derived version).
-		 * Keep that change and discard the incoming change (first
-		 * derived version).
-		 * TODO: Need tree-conflict resolution to handle this.
-		 */
-		err = (*progress_cb)(progress_arg, GOT_STATUS_OBSTRUCTED,
-		    path);
-	} else if (ondisk_len == strlen(deriv_target) &&
-	    memcmp(ondisk_target, deriv_target, ondisk_len) == 0) {
-		/* Both versions made the same change. */
-		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
-	} else {
+	if (ancestor_target == NULL ||
+	    (ondisk_len != strlen(ancestor_target) ||
+	    memcmp(ondisk_target, ancestor_target, ondisk_len) != 0))
+		have_local_change = 1;
+
+	deriv_len = strlen(deriv_target);
+	if (ancestor_target == NULL ||
+	    (deriv_len != strlen(ancestor_target) ||
+	    memcmp(deriv_target, ancestor_target, deriv_len) != 0))
+		have_incoming_change = 1;
+
+	if (!have_local_change && !have_incoming_change) {
+		if (ancestor_target) {
+			/* Both sides made the same change. */
+			err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE,
+			    path);
+		} else if (deriv_len == ondisk_len &&
+		    memcmp(ondisk_target, deriv_target, deriv_len) == 0) {
+			/* Both sides added the same symlink. */
+			err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE,
+			    path);
+		} else {
+			/* Both sides added symlinks which don't match. */
+			err = install_symlink_conflict(deriv_target,
+			    deriv_base_commit_id, ancestor_target,
+			    label_orig, ondisk_target, ondisk_path);
+			if (err)
+				goto done;
+			err = (*progress_cb)(progress_arg, GOT_STATUS_CONFLICT,
+			    path);
+		}
+	} else if (!have_local_change && have_incoming_change) {
 		/* Apply the incoming change. */
 		err = update_symlink(ondisk_path, deriv_target,
 		    strlen(deriv_target));
 		if (err)
 			goto done;
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
+	} else if (have_local_change && have_incoming_change) {
+		err = install_symlink_conflict(deriv_target,
+		    deriv_base_commit_id, ancestor_target, label_orig,
+		    ondisk_target, ondisk_path);
+		if (err)
+			goto done;
+		err = (*progress_cb)(progress_arg, GOT_STATUS_CONFLICT,
+		    path);
 	}
+
 done:
 	free(ancestor_target);
 	free(deriv_target);
