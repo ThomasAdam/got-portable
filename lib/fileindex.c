@@ -200,6 +200,21 @@ got_fileindex_entry_filetype_set(struct got_fileindex_entry *ie, int type)
 	return NULL;
 }
 
+void
+got_fileindex_entry_staged_filetype_set(struct got_fileindex_entry *ie, int type)
+{
+	ie->mode &= ~GOT_FILEIDX_MODE_FILE_TYPE_STAGED;
+	ie->mode |= ((type << GOT_FILEIDX_MODE_FILE_TYPE_STAGED_SHIFT) &
+	    GOT_FILEIDX_MODE_FILE_TYPE_STAGED);
+}
+
+int
+got_fileindex_entry_staged_filetype_get(struct got_fileindex_entry *ie)
+{
+	return (ie->mode & GOT_FILEIDX_MODE_FILE_TYPE_STAGED) >>
+	    GOT_FILEIDX_MODE_FILE_TYPE_STAGED_SHIFT;
+}
+
 int
 got_fileindex_entry_has_blob(struct got_fileindex_entry *ie)
 {
