@@ -103,6 +103,7 @@ struct got_fileindex_hdr {
 	uint8_t sha1[SHA1_DIGEST_LENGTH]; /* checksum of above on-disk data */
 };
 
+mode_t got_fileindex_entry_perms_get(struct got_fileindex_entry *);
 uint16_t got_fileindex_perms_from_st(struct stat *);
 mode_t got_fileindex_perms_to_st(struct got_fileindex_entry *);
 

@@ -2402,6 +2402,9 @@ EOF
 		return 1
 	fi
 
+	rm $testroot/wt/alpha.link
+	echo 'this is regular file alpha.link' > $testroot/wt/alpha.link
+
 	(cd $testroot/wt && got diff -s > $testroot/stdout)
 
 	echo "diff $head_commit $testroot/wt (staged changes)" \
@@ -2542,18 +2545,18 @@ EOF
 		return 1
 	fi
 
-	if ! [ -h $testroot/wt/alpha.link ]; then
-		echo "alpha.link is not a symlink"
+	if [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is a symlink"
 		test_done "$testroot" "1"
 		return 1
 	fi
 
-	readlink $testroot/wt/alpha.link > $testroot/stdout
-	echo "beta" > $testroot/stdout.expected
-	cmp -s $testroot/stdout.expected $testroot/stdout
+	echo 'this is regular file alpha.link' > $testroot/content.expected
+	cp $testroot/wt/alpha.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stdout.expected $testroot/stdout
+		diff -u $testroot/content.expected $testroot/content
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -2563,7 +2566,7 @@ EOF
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo -n ".got/bar" >> $testroot/content.expected
+	echo -n ".got/bar" > $testroot/content.expected
 	cp $testroot/wt/dotgotbar.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"

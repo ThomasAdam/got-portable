@@ -4459,6 +4459,7 @@ struct collect_commitables_arg {
 	struct got_pathlist_head *commitable_paths;
 	struct got_repository *repo;
 	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
 	int have_staged_files;
 };
 
@@ -4516,9 +4517,27 @@ collect_commitables(void *arg, unsigned char status,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	if (status == GOT_STATUS_DELETE || staged_status == GOT_STATUS_DELETE) {
-		sb.st_mode = GOT_DEFAULT_FILE_MODE;
-	} else {
+
+	if (staged_status == GOT_STATUS_ADD ||
+	    staged_status == GOT_STATUS_MODIFY) {
+		struct got_fileindex_entry *ie;
+		ie = got_fileindex_entry_get(a->fileindex, path, strlen(path));
+		switch (got_fileindex_entry_staged_filetype_get(ie)) {
+		case GOT_FILEIDX_MODE_REGULAR_FILE:
+		case GOT_FILEIDX_MODE_BAD_SYMLINK:
+			ct->mode = S_IFREG;
+			break;
+		case GOT_FILEIDX_MODE_SYMLINK:
+			ct->mode = S_IFLNK;
+			break;
+		default:
+			fprintf(stderr, "got: ie mode is 0x%x\n", ie->mode);
+			err = got_error_path(path, GOT_ERR_BAD_FILETYPE);
+			goto done;
+		}
+		ct->mode |= got_fileindex_entry_perms_get(ie);
+	} else if (status != GOT_STATUS_DELETE &&
+	    staged_status != GOT_STATUS_DELETE) {
 		if (dirfd != -1) {
 			if (fstatat(dirfd, de_name, &sb,
 			    AT_SYMLINK_NOFOLLOW) == -1) {
@@ -5026,7 +5045,7 @@ done:
 static const struct got_error *
 reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
     struct got_object_id *new_base_commit_id, struct got_worktree *worktree,
-    struct got_repository *repo)
+    struct got_fileindex_entry *ie, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
@@ -5035,6 +5054,15 @@ reinstall_symlink_after_commit(int *is_bad_symlink, struct got_commitable *ct,
 	struct got_tree_object *tree = NULL;
 	struct got_tree_entry *te;
 	char *entry_name;
+	unsigned char status;
+	struct stat sb;
+
+	err = get_file_status(&status, &sb, ie, ct->ondisk_path,
+	    -1, NULL, repo);
+	if (err)
+		return err;
+	if (status != GOT_STATUS_NO_CHANGE)
+		return NULL;
 
 	if (ct->staged_status == GOT_STATUS_ADD ||
 	    ct->staged_status == GOT_STATUS_MODIFY) {
@@ -5117,12 +5145,16 @@ reinstall_symlinks_after_commit(struct got_pathlist_head *commitable_paths,
 		    ct->status == GOT_STATUS_DELETE)
 			continue;
 
-		err = reinstall_symlink_after_commit(&is_bad_symlink,
-		    ct, new_base_commit_id, worktree, repo);
-		if (err)
-			break;
 		ie = got_fileindex_entry_get(fileindex, ct->path,
 		    strlen(ct->path));
+		if (ie == NULL) {
+			err = got_error_path(ct->path, GOT_ERR_BAD_PATH);
+			break;
+		}
+		err = reinstall_symlink_after_commit(&is_bad_symlink,
+		    ct, new_base_commit_id, worktree, ie, repo);
+		if (err)
+			break;
 		if (ie && is_bad_symlink) {
 			got_fileindex_entry_filetype_set(ie,
 			    GOT_FILEIDX_MODE_BAD_SYMLINK);
@@ -5467,6 +5499,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 
 	cc_arg.commitable_paths = &commitable_paths;
 	cc_arg.worktree = worktree;
+	cc_arg.fileindex = fileindex;
 	cc_arg.repo = repo;
 	cc_arg.have_staged_files = have_staged_files;
 	TAILQ_FOREACH(pe, paths, entry) {
@@ -7020,6 +7053,7 @@ stage_path(void *arg, unsigned char status,
 	char *ondisk_path = NULL, *path_content = NULL;
 	uint32_t stage;
 	struct got_object_id *new_staged_blob_id = NULL;
+	struct stat sb;
 
 	if (status == GOT_STATUS_UNVERSIONED)
 		return NULL;
@@ -7035,6 +7069,11 @@ stage_path(void *arg, unsigned char status,
 	switch (status) {
 	case GOT_STATUS_ADD:
 	case GOT_STATUS_MODIFY:
+		/* XXX could sb.st_mode be passed in by our caller? */
+		if (lstat(ondisk_path, &sb) == -1) {
+			err = got_error_from_errno2("lstat", ondisk_path);
+			break;
+		}
 		if (a->patch_cb) {
 			if (status == GOT_STATUS_ADD) {
 				int choice = GOT_PATCH_CHOICE_NONE;
@@ -7064,6 +7103,13 @@ stage_path(void *arg, unsigned char status,
 		else
 			stage = GOT_FILEIDX_STAGE_MODIFY;
 		got_fileindex_entry_stage_set(ie, stage);
+		if (S_ISLNK(sb.st_mode)) {
+			got_fileindex_entry_staged_filetype_set(ie,
+			    GOT_FILEIDX_MODE_SYMLINK);
+		} else {
+			got_fileindex_entry_staged_filetype_set(ie,
+			    GOT_FILEIDX_MODE_REGULAR_FILE);
+		}
 		a->staged_something = 1;
 		if (a->status_cb == NULL)
 			break;

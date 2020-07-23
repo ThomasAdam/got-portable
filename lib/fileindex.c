@@ -53,8 +53,8 @@ struct got_fileindex {
 #define GOT_FILEIDX_MAX_ENTRIES INT_MAX
 };
 
-static mode_t
-fileindex_entry_perms_get(struct got_fileindex_entry *ie)
+mode_t
+got_fileindex_entry_perms_get(struct got_fileindex_entry *ie)
 {
 	return ((ie->mode & GOT_FILEIDX_MODE_PERMS) >>
 	    GOT_FILEIDX_MODE_PERMS_SHIFT);
@@ -71,7 +71,7 @@ fileindex_entry_perms_set(struct got_fileindex_entry *ie, mode_t mode)
 mode_t
 got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 {
-	mode_t perms = fileindex_entry_perms_get(ie);
+	mode_t perms = got_fileindex_entry_perms_get(ie);
 	int type = got_fileindex_entry_filetype_get(ie);
 	uint32_t ftype;
 
