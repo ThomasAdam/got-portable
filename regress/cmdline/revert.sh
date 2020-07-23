@@ -1452,8 +1452,8 @@ EOF
 		return 1
 	fi
 
-	readlink $testroot/wt/zeta2.link > $testroot/stdout
-	echo "epsilon/zeta" > $testroot/stdout.expected
+	readlink $testroot/wt/zeta3.link > $testroot/stdout
+	echo "beta" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
