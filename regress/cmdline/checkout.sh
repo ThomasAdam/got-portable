@@ -503,6 +503,73 @@ function test_checkout_into_nonempty_dir {
 	test_done "$testroot" "$ret"
 }
 
+function test_checkout_symlink {
+	local testroot=`test_init checkout_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add a symlink"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha.link > $testroot/stdout
+	echo "alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/epsilon.link ]; then
+		echo "epsilon.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/epsilon.link > $testroot/stdout
+	echo "epsilon" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/passwd.link ]; then
+		echo -n "passwd.link symlink points outside of work tree: " >&2
+		readlink $testroot/wt/passwd.link >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "/etc/passwd" > $testroot/content.expected
+	cp $testroot/wt/passwd.link $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty
@@ -512,3 +579,4 @@ run_test test_checkout_tag
 run_test test_checkout_ignores_submodules
 run_test test_checkout_read_only
 run_test test_checkout_into_nonempty_dir
+run_test test_checkout_symlink

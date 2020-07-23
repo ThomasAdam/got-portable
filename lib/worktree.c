@@ -935,6 +935,158 @@ get_ondisk_perms(int executable, mode_t st_mode)
 	return (st_mode & ~(S_IXUSR | S_IXGRP | S_IXOTH));
 }
 
+/* forward declaration */
+static const struct got_error *
+install_blob(struct got_worktree *worktree, const char *ondisk_path,
+    const char *path, mode_t te_mode, mode_t st_mode,
+    struct got_blob_object *blob, int restoring_missing_file,
+    int reverting_versioned_file, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg);
+
+static const struct got_error *
+install_symlink(struct got_worktree *worktree, const char *ondisk_path,
+    const char *path, mode_t te_mode, mode_t st_mode,
+    struct got_blob_object *blob, int restoring_missing_file,
+    int reverting_versioned_file, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	size_t len, target_len = 0;
+	char *resolved_path = NULL, *abspath = NULL;
+	const uint8_t *buf = got_object_blob_get_read_buf(blob);
+	size_t hdrlen = got_object_blob_get_hdrlen(blob);
+
+	/* 
+	 * Blob object content specifies the target path of the link.
+	 * If a symbolic link cannot be installed we instead create
+	 * a regular file which contains the link target path stored
+	 * in the blob object.
+	 */
+	do {
+		err = got_object_blob_read_block(&len, blob);
+		if (len + target_len >= sizeof(target_path)) {
+			/* Path too long; install as a regular file. */
+			got_object_blob_rewind(blob);
+			return install_blob(worktree, ondisk_path, path,
+			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+			    restoring_missing_file, reverting_versioned_file,
+			    repo, progress_cb, progress_arg);
+		}
+		if (len > 0) {
+			/* Skip blob object header first time around. */
+			memcpy(target_path + target_len, buf + hdrlen,
+			    len - hdrlen);
+			target_len += len - hdrlen;
+			hdrlen = 0;
+		}
+	} while (len != 0);
+	target_path[target_len] = '\0';
+
+	/*
+	 * Relative symlink target lookup should begin at the directory
+	 * in which the blob object is being installed.
+	 */
+	if (!got_path_is_absolute(target_path)) {
+		char *parent = dirname(ondisk_path);
+		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	}
+
+	/*
+	 * unveil(2) restricts our view of paths in the filesystem.
+	 * ENOENT will occur if a link target path does not exist or
+	 * if it points outside our unveiled path space.
+	 */
+	resolved_path = realpath(abspath ? abspath : target_path, NULL);
+	if (resolved_path == NULL) {
+		if (errno != ENOENT)
+			return got_error_from_errno2("realpath", target_path);
+	}
+
+	/* Only allow symlinks pointing at paths within the work tree. */
+	if (!got_path_is_child(resolved_path ? resolved_path : target_path,
+	        worktree->root_path, strlen(worktree->root_path))) {
+		/* install as a regular file */
+		got_object_blob_rewind(blob);
+		err = install_blob(worktree, ondisk_path, path,
+		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+		    restoring_missing_file, reverting_versioned_file,
+		    repo, progress_cb, progress_arg);
+		goto done;
+	}
+
+	if (symlink(target_path, ondisk_path) == -1) {
+		if (errno == ENOENT) {
+			char *parent = dirname(ondisk_path);
+			if (parent == NULL) {
+				err = got_error_from_errno2("dirname",
+				    ondisk_path);
+				goto done;
+			}
+			err = add_dir_on_disk(worktree, parent);
+			if (err)
+				goto done;
+			/*
+			 * Retry, and fall through to error handling
+			 * below if this second attempt fails.
+			 */
+			if (symlink(target_path, ondisk_path) != -1) {
+				err = NULL; /* success */
+				goto done;
+			}
+		}
+
+		/* Handle errors from first or second creation attempt. */
+		if (errno == EEXIST) {
+			struct stat sb;
+			ssize_t elen;
+			char etarget[PATH_MAX];
+			if (lstat(ondisk_path, &sb) == -1) {
+				err = got_error_from_errno2("lstat",
+				    ondisk_path);
+				goto done;
+			}
+			if (!S_ISLNK(sb.st_mode)) {
+				err = got_error_path(ondisk_path,
+				    GOT_ERR_FILE_OBSTRUCTED);
+				goto done;
+			}
+			elen = readlink(ondisk_path, etarget, sizeof(etarget));
+			if (elen == -1) {
+				err = got_error_from_errno2("readlink",
+				    ondisk_path);
+				goto done;
+			}
+			if (elen == target_len &&
+			    memcmp(etarget, target_path, target_len) == 0)
+				err = NULL;
+			else
+				err = got_error_path(ondisk_path,
+				    GOT_ERR_FILE_OBSTRUCTED);
+		} else if (errno == ENAMETOOLONG) {
+			/* bad target path; install as a regular file */
+			got_object_blob_rewind(blob);
+			err = install_blob(worktree, ondisk_path, path,
+			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+			    restoring_missing_file, reverting_versioned_file,
+			    repo, progress_cb, progress_arg);
+		} else if (errno == ENOTDIR) {
+			err = got_error_path(ondisk_path,
+			    GOT_ERR_FILE_OBSTRUCTED);
+		} else {
+			err = got_error_from_errno3("symlink",
+			    target_path, ondisk_path);
+		}
+	}
+done:
+	free(resolved_path);
+	free(abspath);
+	return err;
+}
+
 static const struct got_error *
 install_blob(struct got_worktree *worktree, const char *ondisk_path,
     const char *path, mode_t te_mode, mode_t st_mode,
@@ -947,6 +1099,11 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	size_t len, hdrlen;
 	int update = 0;
 	char *tmppath = NULL;
+
+	if (S_ISLNK(te_mode))
+		return install_symlink(worktree, ondisk_path, path, te_mode,
+		    st_mode, blob, restoring_missing_file,
+		    reverting_versioned_file, repo, progress_cb, progress_arg);
 
 	fd = open(ondisk_path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
 	    GOT_DEFAULT_FILE_MODE);

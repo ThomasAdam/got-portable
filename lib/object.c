@@ -1204,6 +1204,13 @@ got_object_blob_close(struct got_blob_object *blob)
 	return err;
 }
 
+void
+got_object_blob_rewind(struct got_blob_object *blob)
+{
+	if (blob->f)
+		rewind(blob->f);
+}
+
 char *
 got_object_blob_id_str(struct got_blob_object *blob, char *buf, size_t size)
 {

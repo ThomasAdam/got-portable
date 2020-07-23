@@ -254,6 +254,9 @@ const uint8_t *got_object_blob_get_read_buf(struct got_blob_object *);
 const struct got_error *got_object_blob_read_block(size_t *,
     struct got_blob_object *);
 
+/* Rewind an open blob's data stream back to the beginning. */
+void got_object_blob_rewind(struct got_blob_object *);
+
 /*
  * Read the entire content of a blob and write it to the specified file.
  * Flush and rewind the file as well. Indicate the amount of bytes
