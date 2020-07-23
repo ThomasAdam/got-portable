@@ -2744,9 +2744,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		} else {
 			sb.st_mode = GOT_DEFAULT_FILE_MODE;
 			err = install_blob(a->worktree, ondisk_path, path2,
-			    /* XXX get this from parent tree! */
-			    GOT_DEFAULT_FILE_MODE,
-			    sb.st_mode, blob2, 0, 0, 0, repo,
+			    mode2, sb.st_mode, blob2, 0, 0, 0, repo,
 			    a->progress_cb, a->progress_arg);
 			if (err)
 				goto done;
