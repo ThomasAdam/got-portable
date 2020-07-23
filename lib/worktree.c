@@ -1333,7 +1333,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 		}
 	}
 
-	if (!S_ISREG(sb->st_mode)) {
+	if (!S_ISREG(sb->st_mode) && !S_ISLNK(sb->st_mode)) {
 		*status = GOT_STATUS_OBSTRUCTED;
 		goto done;
 	}
@@ -2850,10 +2850,6 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
 
-	/* XXX ignore symlinks for now */
-	if (de->d_type == DT_LNK)
-		return NULL;
-
 	if (parent_path[0]) {
 		if (asprintf(&path, "%s/%s", parent_path, de->d_name) == -1)
 			return got_error_from_errno("asprintf");
@@ -2912,7 +2908,7 @@ void *status_arg, struct got_repository *repo, int report_unchanged)
 		return NULL;
 	}
 
-	if (S_ISREG(sb.st_mode))
+	if (S_ISREG(sb.st_mode) || S_ISLNK(sb.st_mode))
 		return (*status_cb)(status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 
@@ -2988,7 +2984,8 @@ worktree_status(struct got_worktree *worktree, const char *path,
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
 	if (fd == -1) {
-		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES)
+		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES &&
+		    errno != ELOOP)
 			err = got_error_from_errno2("open", ondisk_path);
 		else
 			err = report_single_file_status(path, ondisk_path,
@@ -3058,21 +3055,58 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
     const char *arg)
 {
 	const struct got_error *err = NULL;
-	char *resolved, *cwd = NULL, *path = NULL;
+	char *resolved = NULL, *cwd = NULL, *path = NULL;
 	size_t len;
+	struct stat sb;
 
 	*wt_path = NULL;
 
-	resolved = realpath(arg, NULL);
-	if (resolved == NULL) {
-		if (errno != ENOENT)
-			return got_error_from_errno2("realpath", arg);
-		cwd = getcwd(NULL, 0);
-		if (cwd == NULL)
-			return got_error_from_errno("getcwd");
-		if (asprintf(&resolved, "%s/%s", cwd, arg) == -1) {
-			err = got_error_from_errno("asprintf");
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	if (lstat(arg, &sb) == -1) {
+		if (errno != ENOENT) {
+			err = got_error_from_errno2("lstat", arg);
 			goto done;
+		}
+	}
+	if (S_ISLNK(sb.st_mode)) {
+		/*
+		 * We cannot use realpath(3) with symlinks since we want to
+		 * operate on the symlink itself.
+		 * But we can make the path absolute, assuming it is relative
+		 * to the current working directory, and then canonicalize it.
+		 */
+		char *abspath = NULL;
+		char canonpath[PATH_MAX];
+		if (!got_path_is_absolute(arg)) {
+			if (asprintf(&abspath, "%s/%s", cwd, arg) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+		}
+		err = got_canonpath(abspath ? abspath : arg, canonpath,
+		    sizeof(canonpath));
+		if (err)
+			goto done;
+		resolved = strdup(canonpath);
+		if (resolved == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		resolved = realpath(arg, NULL);
+		if (resolved == NULL) {
+			if (errno != ENOENT) {
+				err = got_error_from_errno2("realpath", arg);
+				goto done;
+			}
+			if (asprintf(&resolved, "%s/%s", cwd, arg) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
 		}
 	}
 

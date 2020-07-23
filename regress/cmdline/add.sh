@@ -296,6 +296,71 @@ function test_add_clashes_with_submodule {
 	test_done "$testroot" "$ret"
 }
 
+function test_add_symlink {
+	local testroot=`test_init add_symlink`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -s alpha alpha.link)
+	(cd $testroot/wt && ln -s epsilon epsilon.link)
+	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
+	(cd $testroot/wt && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/wt && ln -s nonexistent nonexistent.link)
+
+	echo "A  alpha.link" > $testroot/stdout.expected
+	(cd $testroot/wt && got add alpha.link > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  epsilon.link" > $testroot/stdout.expected
+	(cd $testroot/wt && got add epsilon.link > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  passwd.link" > $testroot/stdout.expected
+	(cd $testroot/wt && got add passwd.link > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  epsilon/beta.link" > $testroot/stdout.expected
+	(cd $testroot/wt && got add epsilon/beta.link > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  nonexistent.link" > $testroot/stdout.expected
+	(cd $testroot/wt && got add nonexistent.link > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple
@@ -303,3 +368,4 @@ run_test test_add_file_in_new_subdir
 run_test test_add_deleted
 run_test test_add_directory
 run_test test_add_clashes_with_submodule
+run_test test_add_symlink

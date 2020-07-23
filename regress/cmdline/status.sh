@@ -258,9 +258,8 @@ function test_status_unversioned_subdirs {
 	test_done "$testroot" "$ret"
 }
 
-# 'got status' ignores symlinks at present; this might change eventually
-function test_status_ignores_symlink {
-	local testroot=`test_init status_ignores_symlink 1`
+function test_status_symlink {
+	local testroot=`test_init status_symlink`
 
 	mkdir $testroot/repo/ramdisk/
 	touch $testroot/repo/ramdisk/Makefile
@@ -276,7 +275,32 @@ function test_status_ignores_symlink {
 
 	ln -s /usr/obj/distrib/i386/ramdisk $testroot/wt/ramdisk/obj
 
-	echo -n > $testroot/stdout.expected
+	echo "?  ramdisk/obj" > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -s alpha alpha.link)
+	(cd $testroot/wt && ln -s epsilon epsilon.link)
+	(cd $testroot/wt && ln -s /etc/passwd passwd.link)
+	(cd $testroot/wt && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/wt && ln -s nonexistent nonexistent.link)
+	(cd $testroot/wt && got add alpha.link epsilon.link \
+		passwd.link epsilon/beta.link nonexistent.link > /dev/null)
+
+	echo 'A  alpha.link' > $testroot/stdout.expected
+	echo 'A  epsilon/beta.link' >> $testroot/stdout.expected
+	echo 'A  epsilon.link' >> $testroot/stdout.expected
+	echo 'A  nonexistent.link' >> $testroot/stdout.expected
+	echo 'A  passwd.link' >> $testroot/stdout.expected
+	echo "?  ramdisk/obj" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
@@ -612,7 +636,7 @@ run_test test_status_subdir_no_mods2
 run_test test_status_obstructed
 run_test test_status_shows_local_mods_after_update
 run_test test_status_unversioned_subdirs
-run_test test_status_ignores_symlink
+run_test test_status_symlink
 run_test test_status_shows_no_mods_after_complete_merge
 run_test test_status_shows_conflict
 run_test test_status_empty_dir
