@@ -509,15 +509,38 @@ function test_checkout_symlink {
 	(cd $testroot/repo && ln -s alpha alpha.link)
 	(cd $testroot/repo && ln -s epsilon epsilon.link)
 	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s passwd.link passwd2.link)
 	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
 	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "add symlinks"
 
-	got checkout $testroot/repo $testroot/wt > /dev/null
+	got checkout $testroot/repo $testroot/wt > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
+	echo "A  $testroot/wt/alpha.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/dotgotfoo.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/beta.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/epsilon.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/nonexistent.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/passwd.link" >> $testroot/stdout.expected
+	echo "A  $testroot/wt/passwd2.link" >> $testroot/stdout.expected
+	echo "Now shut up and hack" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -568,6 +591,22 @@ function test_checkout_symlink {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/passwd2.link ]; then
+		echo "passwd2.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/passwd2.link > $testroot/stdout
+	echo "passwd.link" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi

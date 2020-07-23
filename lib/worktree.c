@@ -1255,8 +1255,8 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	char target_path[PATH_MAX];
+	char canonpath[PATH_MAX];
 	size_t len, target_len = 0;
-	char *resolved_path = NULL, *abspath = NULL;
 	char *path_got = NULL;
 	const uint8_t *buf = got_object_blob_get_read_buf(blob);
 	size_t hdrlen = got_object_blob_get_hdrlen(blob);
@@ -1292,10 +1292,14 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	target_path[target_len] = '\0';
 
 	/*
+	 * We do not use realpath(3) to resolve the symlink's target path
+	 * because we don't want to resolve symlinks recursively. Instead
+	 * we make the path absolute and then canonicalize it.
 	 * Relative symlink target lookup should begin at the directory
 	 * in which the blob object is being installed.
 	 */
 	if (!got_path_is_absolute(target_path)) {
+		char *abspath;
 		char *parent = dirname(ondisk_path);
 		if (parent == NULL) {
 			err = got_error_from_errno2("dirname", ondisk_path);
@@ -1305,24 +1309,18 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
-	}
-
-	/*
-	 * unveil(2) restricts our view of paths in the filesystem.
-	 * ENOENT will occur if a link target path does not exist or
-	 * if it points outside our unveiled path space.
-	 */
-	resolved_path = realpath(abspath ? abspath : target_path, NULL);
-	if (resolved_path == NULL) {
-		if (errno != ENOENT) {
-			err = got_error_from_errno2("realpath", target_path);
+		err = got_canonpath(abspath, canonpath, sizeof(canonpath));
+		free(abspath);
+		if (err)
 			goto done;
-		}
+	} else {
+		err = got_canonpath(target_path, canonpath, sizeof(canonpath));
+		if (err)
+			goto done;
 	}
 
 	/* Only allow symlinks pointing at paths within the work tree. */
-	if (!got_path_is_child(resolved_path ? resolved_path : (abspath ?
-	    abspath : target_path), worktree->root_path,
+	if (!got_path_is_child(canonpath, worktree->root_path,
 	    strlen(worktree->root_path))) {
 		/* install as a regular file */
 		*is_bad_symlink = 1;
@@ -1340,8 +1338,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	if (got_path_is_child(resolved_path ? resolved_path : (abspath ?
-	    abspath : target_path), path_got, strlen(path_got))) {
+	if (got_path_is_child(canonpath, path_got, strlen(path_got))) {
 		/* install as a regular file */
 		*is_bad_symlink = 1;
 		got_object_blob_rewind(blob);
@@ -1413,8 +1410,6 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		err = (*progress_cb)(progress_arg, reverting_versioned_file ?
 		    GOT_STATUS_REVERT : GOT_STATUS_ADD, path);
 done:
-	free(resolved_path);
-	free(abspath);
 	free(path_got);
 	return err;
 }
