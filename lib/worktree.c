@@ -1254,6 +1254,67 @@ replace_existing_symlink(const char *ondisk_path, const char *target_path,
 }
 
 static const struct got_error *
+is_bad_symlink_target(int *is_bad_symlink, const char *target_path,
+    size_t target_len, const char *ondisk_path, const char *wtroot_path)
+{
+	const struct got_error *err = NULL;
+	char canonpath[PATH_MAX];
+	char *path_got = NULL;
+
+	*is_bad_symlink = 0;
+
+	if (target_len >= sizeof(canonpath)) {
+		*is_bad_symlink = 1;
+		return NULL;
+	}
+
+	/*
+	 * We do not use realpath(3) to resolve the symlink's target
+	 * path because we don't want to resolve symlinks recursively.
+	 * Instead we make the path absolute and then canonicalize it.
+	 * Relative symlink target lookup should begin at the directory
+	 * in which the blob object is being installed.
+	 */
+	if (!got_path_is_absolute(target_path)) {
+		char *abspath;
+		char *parent = dirname(ondisk_path);
+		if (parent == NULL)
+			return got_error_from_errno2("dirname", ondisk_path);
+		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1)
+			return got_error_from_errno("asprintf");
+		if (strlen(abspath) >= sizeof(canonpath)) {
+			err = got_error_path(abspath, GOT_ERR_BAD_PATH);
+			free(abspath);
+			return err;
+		}
+		err = got_canonpath(abspath, canonpath, sizeof(canonpath));
+		free(abspath);
+		if (err)
+			return err;
+	} else {
+		err = got_canonpath(target_path, canonpath, sizeof(canonpath));
+		if (err)
+			return err;
+	}
+
+	/* Only allow symlinks pointing at paths within the work tree. */
+	if (!got_path_is_child(canonpath, wtroot_path, strlen(wtroot_path))) {
+		*is_bad_symlink = 1;
+		return NULL;
+	}
+
+	/* Do not allow symlinks pointing into the .got directory. */
+	if (asprintf(&path_got, "%s/%s", wtroot_path,
+	    GOT_WORKTREE_GOT_DIR) == -1)
+		return got_error_from_errno("asprintf");
+	if (got_path_is_child(canonpath, path_got, strlen(path_got)))
+		*is_bad_symlink = 1;
+
+	free(path_got);
+	return NULL;
+}
+
+static const struct got_error *
 install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
     const char *ondisk_path, const char *path, struct got_blob_object *blob,
     int restoring_missing_file, int reverting_versioned_file,
@@ -1262,7 +1323,6 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	char target_path[PATH_MAX];
-	char canonpath[PATH_MAX];
 	size_t len, target_len = 0;
 	char *path_got = NULL;
 	const uint8_t *buf = got_object_blob_get_read_buf(blob);
@@ -1298,54 +1358,12 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	} while (len != 0);
 	target_path[target_len] = '\0';
 
-	/*
-	 * We do not use realpath(3) to resolve the symlink's target path
-	 * because we don't want to resolve symlinks recursively. Instead
-	 * we make the path absolute and then canonicalize it.
-	 * Relative symlink target lookup should begin at the directory
-	 * in which the blob object is being installed.
-	 */
-	if (!got_path_is_absolute(target_path)) {
-		char *abspath;
-		char *parent = dirname(ondisk_path);
-		if (parent == NULL) {
-			err = got_error_from_errno2("dirname", ondisk_path);
-			goto done;
-		}
-		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		err = got_canonpath(abspath, canonpath, sizeof(canonpath));
-		free(abspath);
-		if (err)
-			goto done;
-	} else {
-		err = got_canonpath(target_path, canonpath, sizeof(canonpath));
-		if (err)
-			goto done;
-	}
+	err = is_bad_symlink_target(is_bad_symlink, target_path, target_len,
+	    ondisk_path, worktree->root_path);
+	if (err)
+		return err;
 
-	/* Only allow symlinks pointing at paths within the work tree. */
-	if (!got_path_is_child(canonpath, worktree->root_path,
-	    strlen(worktree->root_path))) {
-		/* install as a regular file */
-		*is_bad_symlink = 1;
-		got_object_blob_rewind(blob);
-		err = install_blob(worktree, ondisk_path, path,
-		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
-		    restoring_missing_file, reverting_versioned_file, 1,
-		    path_is_unversioned, repo, progress_cb, progress_arg);
-		goto done;
-	}
-
-	/* Do not allow symlinks pointing into the .got directory. */
-	if (asprintf(&path_got, "%s/%s", worktree->root_path,
-	    GOT_WORKTREE_GOT_DIR) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	if (got_path_is_child(canonpath, path_got, strlen(path_got))) {
+	if (*is_bad_symlink) {
 		/* install as a regular file */
 		*is_bad_symlink = 1;
 		got_object_blob_rewind(blob);
