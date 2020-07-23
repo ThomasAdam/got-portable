@@ -1598,7 +1598,7 @@ get_staged_status(struct got_fileindex_entry *ie)
 }
 
 static const struct got_error *
-get_symlink_status(unsigned char *status, struct stat *sb,
+get_symlink_modification_status(unsigned char *status,
     struct got_fileindex_entry *ie, const char *abspath,
     int dirfd, const char *de_name, struct got_blob_object *blob)
 {
@@ -1738,11 +1738,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 		goto done;
 
 	if (S_ISLNK(sb->st_mode)) {
-		err = get_symlink_status(status, sb, ie, abspath, dirfd,
-		    de_name, blob);
+		err = get_symlink_modification_status(status, ie,
+		    abspath, dirfd, de_name, blob);
 		goto done;
 	}
-
 
 	if (dirfd != -1) {
 		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
