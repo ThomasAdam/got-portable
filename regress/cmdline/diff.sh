@@ -362,9 +362,102 @@ function test_diff_submodule_of_same_repo {
 	test_done "$testroot" "$ret"
 }
 
+function test_diff_symlinks_in_work_tree {
+	local testroot=`test_init diff_symlinks_in_work_tree`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && ln -s ../beta epsilon/beta.link)
+	(cd $testroot/repo && ln -s nonexistent nonexistent.link)
+	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add symlinks"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -sf beta alpha.link)
+	(cd $testroot/wt && ln -sf gamma epsilon.link)
+	(cd $testroot/wt && ln -sf ../gamma/delta epsilon/beta.link)
+	echo -n '.got/bar' > $testroot/wt/dotgotfoo.link
+	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
+	(cd $testroot/wt && ln -sf epsilon/zeta zeta.link)
+	(cd $testroot/wt && got add zeta.link > /dev/null)
+	(cd $testroot/wt && got diff > $testroot/stdout)
+
+	echo "diff $commit_id1 $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id1 -i | \
+		grep 'alpha.link@ -> alpha$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + alpha.link' >> $testroot/stdout.expected
+	echo '--- alpha.link' >> $testroot/stdout.expected
+	echo '+++ alpha.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+beta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id1 -i | \
+		grep 'dotgotfoo.link@ -> .got/foo$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + dotgotfoo.link' >> $testroot/stdout.expected
+	echo '--- dotgotfoo.link' >> $testroot/stdout.expected
+	echo '+++ dotgotfoo.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-.got/foo' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+.got/bar' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id1 -i epsilon | \
+		grep 'beta.link@ -> ../beta$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + epsilon/beta.link' >> $testroot/stdout.expected
+	echo '--- epsilon/beta.link' >> $testroot/stdout.expected
+	echo '+++ epsilon/beta.link' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-../beta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo '+../gamma/delta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit_id1 -i | \
+		grep 'nonexistent.link@ -> nonexistent$' | \
+		cut -d' ' -f 1 >> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- nonexistent.link' >> $testroot/stdout.expected
+	echo '+++ nonexistent.link' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-nonexistent' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + zeta.link' >> $testroot/stdout.expected
+	echo '--- zeta.link' >> $testroot/stdout.expected
+	echo '+++ zeta.link' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+epsilon/zeta' >> $testroot/stdout.expected
+	echo '\ No newline at end of file' >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_diff_basic
 run_test test_diff_shows_conflict
 run_test test_diff_tag
 run_test test_diff_lightweight_tag
 run_test test_diff_ignore_whitespace
 run_test test_diff_submodule_of_same_repo
+run_test test_diff_symlinks_in_work_tree

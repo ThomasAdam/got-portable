@@ -3632,6 +3632,52 @@ struct print_diff_arg {
 	int ignore_whitespace;
 };
 
+/*
+ * Create a file which contains the target path of a symlink so we can feed
+ * it as content to the diff engine.
+ */
+static const struct got_error *
+get_symlink_target_file(int *fd, int dirfd, const char *de_name,
+    const char *abspath)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	ssize_t target_len, outlen;
+
+	*fd = -1;
+
+	if (dirfd != -1) {
+		target_len = readlinkat(dirfd, de_name, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlinkat", abspath);
+	} else {
+		target_len = readlink(abspath, target_path, PATH_MAX);
+		if (target_len == -1)
+			return got_error_from_errno2("readlink", abspath);
+	}
+
+	*fd = got_opentempfd();
+	if (*fd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	outlen = write(*fd, target_path, target_len);
+	if (outlen == -1) {
+		err = got_error_from_errno("got_opentempfd");
+		goto done;
+	}
+
+	if (lseek(*fd, 0, SEEK_SET) == -1) {
+		err = got_error_from_errno2("lseek", abspath);
+		goto done;
+	}
+done:
+	if (err) {
+		close(*fd);
+		*fd = -1;
+	}
+	return err;
+}
+
 static const struct got_error *
 print_diff(void *arg, unsigned char status, unsigned char staged_status,
     const char *path, struct got_object_id *blob_id,
@@ -3723,14 +3769,28 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		if (dirfd != -1) {
 			fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);
 			if (fd == -1) {
-				err = got_error_from_errno2("openat", abspath);
-				goto done;
+				if (errno != ELOOP) {
+					err = got_error_from_errno2("openat",
+					    abspath);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd, dirfd,
+				    de_name, abspath);
+				if (err)
+					goto done;
 			}
 		} else {
 			fd = open(abspath, O_RDONLY | O_NOFOLLOW);
 			if (fd == -1) {
-				err = got_error_from_errno2("open", abspath);
-				goto done;
+				if (errno != ELOOP) {
+					err = got_error_from_errno2("open",
+					    abspath);
+					goto done;
+				}
+				err = get_symlink_target_file(&fd, dirfd,
+				    de_name, abspath);
+				if (err)
+					goto done;
 			}
 		}
 		if (fstat(fd, &sb) == -1) {
