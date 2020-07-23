@@ -7371,7 +7371,7 @@ done:
 		free(*path_unstaged_content);
 		*path_unstaged_content = NULL;
 	}
-	if (err || !have_rejected_content) {
+	if (err || !have_content || !have_rejected_content) {
 		if (*path_new_staged_content &&
 		    unlink(*path_new_staged_content) == -1 && err == NULL)
 			err = got_error_from_errno2("unlink",
@@ -7392,6 +7392,97 @@ done:
 }
 
 static const struct got_error *
+unstage_hunks(struct got_object_id *staged_blob_id,
+    struct got_blob_object *blob_base,
+    struct got_object_id *blob_id, struct got_fileindex_entry *ie,
+    const char *ondisk_path, const char *label_orig,
+    struct got_worktree *worktree, struct got_repository *repo,
+    got_worktree_patch_cb patch_cb, void *patch_arg,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err = NULL;
+	char *path_unstaged_content = NULL;
+	char *path_new_staged_content = NULL;
+	struct got_object_id *new_staged_blob_id = NULL;
+	FILE *f = NULL;
+	struct stat sb;
+
+	err = create_unstaged_content(&path_unstaged_content,
+	    &path_new_staged_content, blob_id, staged_blob_id,
+	    ie->path, repo, patch_cb, patch_arg);
+	if (err)
+		return err;
+
+	if (path_unstaged_content == NULL)
+		return NULL;
+
+	if (path_new_staged_content) {
+		err = got_object_blob_create(&new_staged_blob_id,
+		    path_new_staged_content, repo);
+		if (err)
+			goto done;
+	}
+
+	f = fopen(path_unstaged_content, "r");
+	if (f == NULL) {
+		err = got_error_from_errno2("fopen",
+		    path_unstaged_content);
+		goto done;
+	}
+	if (fstat(fileno(f), &sb) == -1) {
+		err = got_error_from_errno2("fstat", path_unstaged_content);
+		goto done;
+	}
+	if (got_fileindex_entry_staged_filetype_get(ie) ==
+	    GOT_FILEIDX_MODE_SYMLINK && sb.st_size < PATH_MAX) {
+		char link_target[PATH_MAX];
+		size_t r;
+		r = fread(link_target, 1, sizeof(link_target), f);
+		if (r == 0 && ferror(f)) {
+			err = got_error_from_errno("fread");
+			goto done;
+		}
+		if (r >= sizeof(link_target)) { /* should not happen */
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+		link_target[r] = '\0';
+		err = merge_symlink(worktree, blob_base,
+		    ondisk_path, ie->path, label_orig, link_target,
+		    worktree->base_commit_id, repo, progress_cb,
+		    progress_arg);
+	} else {
+		int local_changes_subsumed;
+		err = merge_file(&local_changes_subsumed, worktree,
+		    blob_base, ondisk_path, ie->path,
+		    got_fileindex_perms_to_st(ie),
+		    path_unstaged_content, label_orig, "unstaged",
+		    repo, progress_cb, progress_arg);
+	}
+	if (err)
+		goto done;
+
+	if (new_staged_blob_id) {
+		memcpy(ie->staged_blob_sha1, new_staged_blob_id->sha1,
+		    SHA1_DIGEST_LENGTH);
+	} else
+		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
+done:
+	free(new_staged_blob_id);
+	if (path_unstaged_content &&
+	    unlink(path_unstaged_content) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path_unstaged_content);
+	if (path_new_staged_content &&
+	    unlink(path_new_staged_content) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", path_new_staged_content);
+	if (f && fclose(f) != 0 && err == NULL)
+		err = got_error_from_errno2("fclose", path_unstaged_content);
+	free(path_unstaged_content);
+	free(path_new_staged_content);
+	return err;
+}
+
+static const struct got_error *
 unstage_path(void *arg, unsigned char status,
     unsigned char staged_status, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
@@ -7401,8 +7492,7 @@ unstage_path(void *arg, unsigned char status,
 	struct unstage_path_arg *a = arg;
 	struct got_fileindex_entry *ie;
 	struct got_blob_object *blob_base = NULL, *blob_staged = NULL;
-	char *ondisk_path = NULL, *path_unstaged_content = NULL;
-	char *path_new_staged_content = NULL;
+	char *ondisk_path = NULL;
 	char *id_str = NULL, *label_orig = NULL;
 	int local_changes_subsumed;
 	struct stat sb;
@@ -7448,73 +7538,11 @@ unstage_path(void *arg, unsigned char status,
 				if (choice != GOT_PATCH_CHOICE_YES)
 					break;
 			} else {
-				err = create_unstaged_content(
-				    &path_unstaged_content,
-				    &path_new_staged_content, blob_id,
-				    staged_blob_id, ie->path, a->repo,
-				    a->patch_cb, a->patch_arg);
-				if (err || path_unstaged_content == NULL)
-					break;
-				if (path_new_staged_content) {
-					err = got_object_blob_create(
-					    &staged_blob_id,
-					    path_new_staged_content,
-					    a->repo);
-					if (err)
-						break;
-					memcpy(ie->staged_blob_sha1,
-					    staged_blob_id->sha1,
-					    SHA1_DIGEST_LENGTH);
-				}
-				if (got_fileindex_entry_staged_filetype_get(ie)
-				    == GOT_FILEIDX_MODE_SYMLINK) {
-					char unstaged_target[PATH_MAX];
-					FILE *f;
-					size_t r;
-					f = fopen(path_unstaged_content, "r");
-					if (f == NULL) {
-						err = got_error_from_errno2(
-						    "fopen",
-						    path_unstaged_content);
-						goto done;
-					}
-					r = fread(unstaged_target, 1,
-					    sizeof(unstaged_target), f);
-					if (r == 0 && ferror(f)) {
-						err = got_error_from_errno(
-						    "fread");
-						fclose(f);
-						break;
-					}
-					if (fclose(f) == EOF) {
-						err = got_error_from_errno2(
-						    "fclose",
-						    path_unstaged_content);
-					}
-					if (r >= sizeof(unstaged_target)) {
-						err = got_error(
-						    GOT_ERR_NO_SPACE);
-						goto done;
-					}
-					unstaged_target[r] = '\0';
-					err = merge_symlink(a->worktree,
-					    blob_base, ondisk_path, relpath,
-					    label_orig, unstaged_target,
-					    a->worktree->base_commit_id,
-					    a->repo, a->progress_cb,
-					    a->progress_arg);
-				} else {
-					err = merge_file(&local_changes_subsumed,
-					    a->worktree, blob_base, ondisk_path,
-					    relpath, got_fileindex_perms_to_st(ie),
-					    path_unstaged_content, label_orig,
-					    "unstaged", a->repo, a->progress_cb,
-					    a->progress_arg);
-				}
-				if (err == NULL &&
-				    path_new_staged_content == NULL)
-					got_fileindex_entry_stage_set(ie,
-					    GOT_FILEIDX_STAGE_NONE);
+				err = unstage_hunks(staged_blob_id,
+				    blob_base, blob_id, ie, ondisk_path,
+				    label_orig, a->worktree, a->repo,
+				    a->patch_cb, a->patch_arg,
+				    a->progress_cb, a->progress_arg);
 				break; /* Done with this file. */
 			}
 		}
@@ -7587,14 +7615,6 @@ unstage_path(void *arg, unsigned char status,
 	}
 done:
 	free(ondisk_path);
-	if (path_unstaged_content &&
-	    unlink(path_unstaged_content) == -1 && err == NULL)
-		err = got_error_from_errno2("unlink", path_unstaged_content);
-	if (path_new_staged_content &&
-	    unlink(path_new_staged_content) == -1 && err == NULL)
-		err = got_error_from_errno2("unlink", path_new_staged_content);
-	free(path_unstaged_content);
-	free(path_new_staged_content);
 	if (blob_base)
 		got_object_blob_close(blob_base);
 	if (blob_staged)
