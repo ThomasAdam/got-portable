@@ -161,7 +161,7 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		goto done;
 	}
 	for (;;) {
-		char buf[PATH_MAX];
+		char buf[PATH_MAX * 8];
 		ssize_t inlen;
 
 		if (S_ISLNK(sb.st_mode)) {
