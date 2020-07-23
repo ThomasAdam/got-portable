@@ -1031,7 +1031,55 @@ function test_commit_symlink {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	test_done "$testroot" "0"
+
+	(cd $testroot/wt && ln -sf beta alpha.link)
+	(cd $testroot/wt && ln -sfh gamma epsilon.link)
+	rm $testroot/wt/epsilon/beta.link
+	echo "this is a regular file" > $testroot/wt/epsilon/beta.link
+	(cd $testroot/wt && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/wt && got rm nonexistent.link > /dev/null)
+	(cd $testroot/wt && ln -sf gamma/delta zeta.link)
+	(cd $testroot/wt && ln -sf alpha new.link)
+	(cd $testroot/wt && got add new.link > /dev/null)
+
+	(cd $testroot/wt && got commit -m 'test commit_symlink' > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  new.link" > $testroot/stdout.expected
+	echo "M  alpha.link" >> $testroot/stdout.expected
+	echo "M  epsilon/beta.link" >> $testroot/stdout.expected
+	echo "M  epsilon.link" >> $testroot/stdout.expected
+	echo "D  nonexistent.link" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tree -r $testroot/repo -c $head_rev -R > $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+alpha
+alpha.link@ -> beta
+beta
+epsilon/
+epsilon/beta.link
+epsilon/zeta
+epsilon.link@ -> gamma
+gamma/
+gamma/delta
+new.link@ -> alpha
+passwd.link@ -> /etc/passwd
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
 }
 
 function test_commit_fix_bad_symlink {
