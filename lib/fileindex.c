@@ -97,9 +97,10 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		ie->size = (sb.st_size & 0xffffffff);
 		if (S_ISLNK(sb.st_mode))
 			ie->mode = GOT_FILEIDX_MODE_SYMLINK;
-		else
+		else {
 			ie->mode = GOT_FILEIDX_MODE_REGULAR_FILE;
-		ie->mode |= got_fileindex_perms_from_st(&sb);
+			ie->mode |= got_fileindex_perms_from_st(&sb);
+		}
 	}
 
 	if (blob_sha1) {
