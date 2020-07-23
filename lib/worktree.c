@@ -917,6 +917,13 @@ done:
 	return err;
 }
 
+/* forward declaration */
+static const struct got_error *
+merge_blob(int *, struct got_worktree *, struct got_blob_object *,
+    const char *, const char *, uint16_t, const char *,
+    struct got_blob_object *, struct got_object_id *,
+    struct got_repository *, got_worktree_checkout_cb, void *);
+
 /*
  * Merge a symlink into the work tree, where blob_orig acts as the common
  * ancestor, blob_deriv acts as the first derived version, and the symlink
@@ -943,6 +950,19 @@ merge_symlink(struct got_worktree *worktree,
 		return got_error_from_errno2("lstat", ondisk_path);
 
 	if (!S_ISLNK(sb.st_mode)) {
+		/*
+		 * If there is a regular file on disk, merge the symlink
+		 * target path into this file, which will usually cause
+		 * a merge conflict.
+		 */
+		if (S_ISREG(sb.st_mode)) {
+			int local_changes_subsumed;
+			return merge_blob(&local_changes_subsumed, worktree,
+			    NULL, ondisk_path, path, sb.st_mode, label_orig,
+			    blob_deriv, deriv_base_commit_id,
+			    repo, progress_cb, progress_arg);
+		}
+
 		/* TODO symlink is obstructed; do something */
 		return got_error_path(ondisk_path, GOT_ERR_FILE_OBSTRUCTED);
 	}
