@@ -1283,6 +1283,59 @@ get_staged_status(struct got_fileindex_entry *ie)
 }
 
 static const struct got_error *
+get_symlink_status(unsigned char *status, struct stat *sb,
+    struct got_fileindex_entry *ie, const char *abspath,
+    int dirfd, const char *de_name, struct got_blob_object *blob)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	char etarget[PATH_MAX];
+	ssize_t elen;
+	size_t len, target_len = 0;
+	const uint8_t *buf = got_object_blob_get_read_buf(blob);
+	size_t hdrlen = got_object_blob_get_hdrlen(blob);
+
+	*status = GOT_STATUS_NO_CHANGE;
+
+	/* Blob object content specifies the target path of the link. */
+	do {
+		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			return err;
+		if (len + target_len >= sizeof(target_path)) {
+			/*
+			 * Should not happen. The blob contents were OK
+			 * when this symlink was installed.
+			 */
+			return got_error(GOT_ERR_NO_SPACE);
+		}
+		if (len > 0) {
+			/* Skip blob object header first time around. */
+			memcpy(target_path + target_len, buf + hdrlen,
+			    len - hdrlen);
+			target_len += len - hdrlen;
+			hdrlen = 0;
+		}
+	} while (len != 0);
+	target_path[target_len] = '\0';
+
+	if (dirfd != -1) {
+		elen = readlinkat(dirfd, de_name, etarget, sizeof(etarget));
+		if (elen == -1)
+			return got_error_from_errno2("readlinkat", abspath);
+	} else {
+		elen = readlink(abspath, etarget, sizeof(etarget));
+		if (elen == -1)
+			return got_error_from_errno2("readlinkat", abspath);
+	}
+
+	if (elen != target_len || memcmp(etarget, target_path, target_len) != 0)
+		*status = GOT_STATUS_MODIFY;
+
+	return NULL;
+}
+
+static const struct got_error *
 get_file_status(unsigned char *status, struct stat *sb,
     struct got_fileindex_entry *ie, const char *abspath,
     int dirfd, const char *de_name, struct got_repository *repo)
@@ -1318,9 +1371,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 		}
 	} else {
 		fd = open(abspath, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1 && errno != ENOENT)
+		if (fd == -1 && errno != ENOENT && errno != ELOOP)
 			return got_error_from_errno2("open", abspath);
-		if (fd == -1 || fstat(fd, sb) == -1) {
+		else if (fd == -1 && errno == ELOOP) {
+			if (lstat(abspath, sb) == -1)
+				return got_error_from_errno2("lstat", abspath);
+		} else if (fd == -1 || fstat(fd, sb) == -1) {
 			if (errno == ENOENT) {
 				if (got_fileindex_entry_has_file_on_disk(ie))
 					*status = GOT_STATUS_MISSING;
@@ -1359,6 +1415,18 @@ get_file_status(unsigned char *status, struct stat *sb,
 	err = got_object_open_as_blob(&blob, repo, &id, sizeof(fbuf));
 	if (err)
 		goto done;
+
+	if (S_ISLNK(sb->st_mode)) {
+		/* Staging changes to symlinks is not yet(?) supported. */
+		if (staged_status != GOT_STATUS_NO_CHANGE) {
+			err = got_error_path(abspath, GOT_ERR_FILE_STATUS);
+			goto done;
+		}
+		err = get_symlink_status(status, sb, ie, abspath, dirfd,
+		    de_name, blob);
+		goto done;
+	}
+
 
 	if (dirfd != -1) {
 		fd = openat(dirfd, de_name, O_RDONLY | O_NOFOLLOW);

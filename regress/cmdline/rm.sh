@@ -404,6 +404,39 @@ function test_rm_subtree {
 	test_done "$testroot" "$ret"
 }
 
+function test_rm_symlink {
+	local testroot=`test_init rm_symlink`
+
+	(cd $testroot/repo && ln -s alpha alpha.link)
+	(cd $testroot/repo && ln -s epsilon epsilon.link)
+	(cd $testroot/repo && ln -s /etc/passwd passwd.link)
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add a symlink"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'D  alpha.link' > $testroot/stdout.expected
+	echo 'D  epsilon.link' >> $testroot/stdout.expected
+	echo 'D  passwd.link' >> $testroot/stdout.expected
+	(cd $testroot/wt && got rm alpha.link epsilon.link passwd.link > \
+	    $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 run_test test_rm_basic
 run_test test_rm_with_local_mods
 run_test test_double_rm
@@ -411,3 +444,4 @@ run_test test_rm_and_add_elsewhere
 run_test test_rm_directory
 run_test test_rm_directory_keep_files
 run_test test_rm_subtree
+run_test test_rm_symlink
