@@ -869,6 +869,8 @@ got_object_blob_read_to_str(char **s, struct got_blob_object *blob)
 	const struct got_error *err = NULL;
 	size_t len, totlen, hdrlen, offset;
 
+	*s = NULL;
+
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	totlen = 0;
 	offset = 0;
