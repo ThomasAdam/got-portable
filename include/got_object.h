@@ -212,6 +212,19 @@ struct got_tree_entry *got_tree_entry_get_prev(struct got_tree_object *,
 /* Return non-zero if the specified tree entry is a Git submodule. */
 int got_object_tree_entry_is_submodule(struct got_tree_entry *);
 
+/* Return non-zero if the specified tree entry is a symbolic link. */
+int got_object_tree_entry_is_symlink(struct got_tree_entry *);
+
+/*
+ * Resolve an in-repository symlink at the specified path in the tree
+ * corresponding to the specified commit. If the specified path is not
+ * a symlink then set *link_target to NULL.
+ * Otherwise, resolve symlinks recursively and return the final link
+ * target path. The caller must dispose of it with free(3). 
+ */
+const struct got_error *got_object_resolve_symlinks(char **, const char *,
+    struct got_object_id *, struct got_repository *);
+
 /*
  * Compare two trees and indicate whether the entry at the specified path
  * differs between them. The path must not be the root path "/"; the function

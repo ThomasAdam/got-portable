@@ -32,6 +32,7 @@
 #include <sha1.h>
 #include <zlib.h>
 #include <ctype.h>
+#include <libgen.h>
 #include <limits.h>
 #include <imsg.h>
 #include <time.h>
@@ -872,8 +873,7 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 
 	*link_target = NULL;
 
-	/* S_IFDIR check avoids confusing symlinks with submodules. */
-	if ((te->mode & (S_IFDIR | S_IFLNK)) != S_IFLNK)
+	if (!got_object_tree_entry_is_symlink(te))
 		return got_error(GOT_ERR_TREE_ENTRY_TYPE);
 
 	err = got_object_open_as_blob(&blob, repo,
@@ -1818,6 +1818,116 @@ int
 got_object_tree_entry_is_submodule(struct got_tree_entry *te)
 {
 	return (te->mode & S_IFMT) == (S_IFDIR | S_IFLNK);
+}
+
+int
+got_object_tree_entry_is_symlink(struct got_tree_entry *te)
+{
+	/* S_IFDIR check avoids confusing symlinks with submodules. */
+	return ((te->mode & (S_IFDIR | S_IFLNK)) == S_IFLNK);
+}
+
+static const struct got_error *
+resolve_symlink(char **link_target, const char *path,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *name, *parent_path = NULL;
+	struct got_object_id *tree_obj_id = NULL;
+	struct got_tree_object *tree = NULL;
+	struct got_tree_entry *te = NULL;
+
+	*link_target = NULL;
+	
+	name = basename(path);
+	if (name == NULL)
+		return got_error_from_errno2("basename", path);
+
+	err = got_path_dirname(&parent_path, path);
+	if (err)
+		return err;
+
+	err = got_object_id_by_path(&tree_obj_id, repo, commit_id,
+	    parent_path);
+	if (err) {
+		if (err->code == GOT_ERR_NO_TREE_ENTRY) {
+			/* Display the complete path in error message. */
+			err = got_error_path(path, err->code);
+		}
+		goto done;
+	}
+
+	err = got_object_open_as_tree(&tree, repo, tree_obj_id);
+	if (err)
+		goto done;
+
+	te = got_object_tree_find_entry(tree, name);
+	if (te == NULL) {
+		err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
+		goto done;
+	}
+
+	if (got_object_tree_entry_is_symlink(te)) {
+		err = got_tree_entry_get_symlink_target(link_target, te, repo);
+		if (err)
+			goto done;
+		if (!got_path_is_absolute(*link_target)) {
+			char *abspath;
+			if (asprintf(&abspath, "%s/%s", parent_path,
+			    *link_target) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(*link_target);
+			*link_target = malloc(PATH_MAX);
+			if (*link_target == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+			err = got_canonpath(abspath, *link_target, PATH_MAX);
+			free(abspath);
+			if (err)
+				goto done;
+		}
+	}
+done:
+	free(tree_obj_id);
+	if (tree)
+		got_object_tree_close(tree);
+	if (err) {
+		free(*link_target);
+		*link_target = NULL;
+	}
+	return err;
+}
+
+const struct got_error *
+got_object_resolve_symlinks(char **link_target, const char *path,
+    struct got_object_id *commit_id, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *next_target = NULL;
+	int max_recursion = 40; /* matches Git */
+
+	*link_target = NULL;
+
+	do {
+		err = resolve_symlink(&next_target,
+		    *link_target ? *link_target : path, commit_id, repo);
+		if (err)
+			break;
+		if (next_target) {
+			free(*link_target);
+			if (--max_recursion == 0) {
+				err = got_error_path(path, GOT_ERR_RECURSION);
+				*link_target = NULL;
+				break;
+			}
+			*link_target = next_target;
+		}
+	} while (next_target);
+
+	return err;
 }
 
 const struct got_error *
