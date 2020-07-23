@@ -1365,7 +1365,9 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 				goto done;
 			if (progress_cb) {
 				err = (*progress_cb)(progress_arg,
-				    GOT_STATUS_UPDATE, path);
+				    reverting_versioned_file ?
+				    GOT_STATUS_REVERT : GOT_STATUS_UPDATE,
+				    path);
 			}
 			goto done; /* Nothing else to do. */
 		}
@@ -1408,7 +1410,8 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 			    target_path, ondisk_path);
 		}
 	} else if (progress_cb)
-		err = (*progress_cb)(progress_arg, GOT_STATUS_ADD, path);
+		err = (*progress_cb)(progress_arg, reverting_versioned_file ?
+		    GOT_STATUS_REVERT : GOT_STATUS_ADD, path);
 done:
 	free(resolved_path);
 	free(abspath);
