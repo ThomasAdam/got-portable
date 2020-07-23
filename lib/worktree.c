@@ -1223,7 +1223,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			/* Path too long; install as a regular file. */
 			got_object_blob_rewind(blob);
 			return install_blob(worktree, ondisk_path, path,
-			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file,
 			    1, repo, progress_cb, progress_arg);
 		}
@@ -1273,7 +1273,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		/* install as a regular file */
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
-		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
 		    repo, progress_cb, progress_arg);
 		goto done;
@@ -1290,7 +1290,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 		/* install as a regular file */
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
-		    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+		    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 		    restoring_missing_file, reverting_versioned_file, 1,
 		    repo, progress_cb, progress_arg);
 		goto done;
@@ -1334,7 +1334,7 @@ install_symlink(struct got_worktree *worktree, const char *ondisk_path,
 			/* bad target path; install as a regular file */
 			got_object_blob_rewind(blob);
 			err = install_blob(worktree, ondisk_path, path,
-			    GOT_DEFAULT_FILE_MODE, st_mode, blob,
+			    GOT_DEFAULT_FILE_MODE, GOT_DEFAULT_FILE_MODE, blob,
 			    restoring_missing_file, reverting_versioned_file, 1,
 			    repo, progress_cb, progress_arg);
 		} else if (errno == ENOTDIR) {
