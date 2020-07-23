@@ -472,6 +472,7 @@ function test_cherrypick_symlink_conflicts {
 	local commit_id1=`git_show_head $testroot/repo`
 
 	(cd $testroot/repo && ln -sf beta alpha.link)
+	(cd $testroot/repo && ln -sf beta boo.link)
 	(cd $testroot/repo && ln -sfh gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
@@ -497,6 +498,8 @@ function test_cherrypick_symlink_conflicts {
 	# added bad symlink to file A vs added regular file A
 	echo 'this is regular file bar' > $testroot/wt/dotgotbar.link
 	(cd $testroot/wt && got add dotgotbar.link > /dev/null)
+	# added symlink to file A vs unversioned file A
+	echo 'this is unversioned file boo' > $testroot/wt/boo.link
 	# removed symlink to non-existent file A vs modified symlink
 	# to nonexistent file B
 	(cd $testroot/wt && ln -sf nonexistent2 nonexistent.link)
@@ -514,8 +517,10 @@ function test_cherrypick_symlink_conflicts {
 	echo -n > $testroot/stdout.expected
 	echo "C  alpha.link" >> $testroot/stdout.expected
 	echo "C  epsilon/beta.link" >> $testroot/stdout.expected
-	echo "C  dotgotbar.link" >> $testroot/stdout.expected
+	# TODO: This is wrong! Unversioned file boo.link should be preserved.
+	echo "U  boo.link" >> $testroot/stdout.expected
 	echo "C  epsilon.link" >> $testroot/stdout.expected
+	echo "C  dotgotbar.link" >> $testroot/stdout.expected
 	echo "U  dotgotfoo.link" >> $testroot/stdout.expected
 	echo "D  nonexistent.link" >> $testroot/stdout.expected
 	echo "!  zeta.link" >> $testroot/stdout.expected
@@ -555,6 +560,23 @@ EOF
 	echo -n "" >> $testroot/content.expected
 
 	cp $testroot/wt/alpha.link $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# TODO: This is wrong! Unversioned file boo.link should be preserved.
+	if [ ! -h $testroot/wt/boo.link ]; then
+		echo "boo.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "beta" > $testroot/content.expected
+	cp $testroot/wt/boo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
