@@ -1228,14 +1228,20 @@ option,
 .Cm got commit
 opens a temporary file in an editor where a log message can be written.
 .It Fl S
-Allow symbolic links which point somewhere outside of the path space
-managed by
-.Nm .
+Allow the addition of symbolic links which point outside of the path space
+that is under version control.
+By default,
+.Cm got commit
+will reject such symbolic links due to safety concerns.
 As a precaution,
-when such a symbolic link gets installed in a work tree
 .Nm
-may decide to represent the symbolic link as a regular file which contains
-the link's target path, rather than creating an actual symbolic link.
+may decide to represent such a symbolic link as a regular file which contains
+the link's target path, rather than creating an actual symbolic link which
+points outside of the work tree.
+Use of this option is discouraged because external mechanisms such as
+.Dq make obj
+are better suited for managing symbolic links to paths not under
+version control.
 .El
 .Pp
 .Cm got commit
@@ -1723,14 +1729,20 @@ responses line-by-line from the specified
 .Ar response-script
 file instead of prompting interactively.
 .It Fl S
-Allow symbolic links which point somewhere outside of the path space
-managed by
-.Nm .
+Allow staging of symbolic links which point outside of the path space
+that is under version control.
+By default,
+.Cm got stage
+will reject such symbolic links due to safety concerns.
 As a precaution,
-when such a symbolic link gets installed in a work tree
 .Nm
-may decide to represent the symbolic link as a regular file which contains
-the link's target path, rather than creating an actual symbolic link.
+may decide to represent such a symbolic link as a regular file which contains
+the link's target path, rather than creating an actual symbolic link which
+points outside of the work tree.
+Use of this option is discouraged because external mechanisms such as
+.Dq make obj
+are better suited for managing symbolic links to paths not under
+version control.
 .El
 .Pp
 .Cm got stage
