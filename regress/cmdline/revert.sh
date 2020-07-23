@@ -1173,6 +1173,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ ! -h $testroot/wt/dotgotfoo.link ]; then
@@ -1187,8 +1188,8 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
-
 
 	if [ ! -h $testroot/wt/zeta.link ]; then
 		echo -n "zeta.link is not a symlink" >&2
@@ -1203,6 +1204,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ ! -h $testroot/wt/new.link ]; then
@@ -1403,6 +1405,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ ! -h $testroot/wt/dotgotfoo.link ]; then
@@ -1417,6 +1420,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 
@@ -1439,6 +1443,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ ! -h $testroot/wt/zeta3.link ]; then
@@ -1454,6 +1459,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	if [ ! -h $testroot/wt/new.link ]; then
