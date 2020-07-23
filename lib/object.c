@@ -1861,7 +1861,7 @@ resolve_symlink(char **link_target, const char *path,
 	struct got_tree_entry *te = NULL;
 
 	*link_target = NULL;
-	
+
 	name = basename(path);
 	if (name == NULL)
 		return got_error_from_errno2("basename", path);
