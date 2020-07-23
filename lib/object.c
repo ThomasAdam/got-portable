@@ -869,7 +869,7 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
-	size_t len, totlen, hdrlen;
+	size_t len, totlen, hdrlen, offset;
 
 	*link_target = NULL;
 
@@ -882,6 +882,7 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 		return err;
 	hdrlen = got_object_blob_get_hdrlen(blob);
 	totlen = 0;
+	offset = 0;
 	do {
 		char *p;
 
@@ -900,9 +901,10 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 		}
 		*link_target = p;
 		/* Skip blob object header first time around. */
-		memcpy(*link_target,
+		memcpy(*link_target + offset,
 		    got_object_blob_get_read_buf(blob) + hdrlen, len - hdrlen);
 		hdrlen = 0;
+		offset = totlen;
 	} while (len > 0);
 	(*link_target)[totlen] = '\0';
 done:
