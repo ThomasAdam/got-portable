@@ -868,7 +868,7 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 {
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
-	size_t len;
+	size_t len, totlen, hdrlen;
 
 	*link_target = NULL;
 
@@ -880,21 +880,38 @@ got_tree_entry_get_symlink_target(char **link_target, struct got_tree_entry *te,
 	    got_tree_entry_get_id(te), PATH_MAX);
 	if (err)
 		return err;
-	
-	err = got_object_blob_read_block(&len, blob);
-	if (err)
-		goto done;
+	hdrlen = got_object_blob_get_hdrlen(blob);
+	totlen = 0;
+	do {
+		char *p;
 
-	*link_target = malloc(len + 1);
-	if (*link_target == NULL) {
-		err = got_error_from_errno("malloc");
-		goto done;
-	}
-	memcpy(*link_target, got_object_blob_get_read_buf(blob), len);
-	(*link_target)[len] = '\0';
+		err = got_object_blob_read_block(&len, blob);
+		if (err)
+			goto done;
+
+		if (len == 0)
+			break;
+
+		totlen += len - hdrlen;
+		p = realloc(*link_target, totlen + 1);
+		if (p == NULL) {
+			err = got_error_from_errno("realloc");
+			goto done;
+		}
+		*link_target = p;
+		/* Skip blob object header first time around. */
+		memcpy(*link_target,
+		    got_object_blob_get_read_buf(blob) + hdrlen, len);
+		hdrlen = 0;
+	} while (len > 0);
+	(*link_target)[totlen] = '\0';
 done:
 	if (blob)
 		got_object_blob_close(blob);
+	if (err) {
+		free(*link_target);
+		*link_target = NULL;
+	}
 	return err;
 }
 
