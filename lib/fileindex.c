@@ -95,6 +95,7 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 		if (!((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) &&
 		    errno == ENOENT))
 			return got_error_from_errno2("lstat", ondisk_path);
+		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	} else {
 		if (sb.st_mode & S_IFDIR)
 			return got_error_set_errno(EISDIR, ondisk_path);
