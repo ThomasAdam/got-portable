@@ -75,6 +75,12 @@ const char *got_worktree_get_repo_path(struct got_worktree *);
 const char *got_worktree_get_path_prefix(struct got_worktree *);
 
 /*
+ * Get the UUID of a work tree as a string.
+ * The caller must dispose of the returned UUID string with free(3).
+ */
+const struct got_error *got_worktree_get_uuid(char **, struct got_worktree *);
+
+/*
  * Check if a user-provided path prefix matches that of the worktree.
  */
 const struct got_error *got_worktree_match_path_prefix(int *,
@@ -442,3 +448,18 @@ const struct got_error *got_worktree_stage(struct got_worktree *,
 const struct got_error *got_worktree_unstage(struct got_worktree *,
     struct got_pathlist_head *, got_worktree_checkout_cb, void *,
     got_worktree_patch_cb, void *, struct got_repository *);
+
+/* A callback function which is invoked with per-path info. */
+typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
+    const char *path, mode_t mode, time_t mtime,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id);
+
+/* 
+ * Report work-tree meta data for paths in the work tree.
+ * The info callback will be invoked with the provided void * argument,
+ * a path, and meta-data arguments (see got_worktree_path_info_cb).
+ */
+const struct got_error *
+got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
+    got_worktree_path_info_cb, void *, got_cancel_cb , void *);

@@ -109,6 +109,7 @@ __dead static void	usage_integrate(void);
 __dead static void	usage_stage(void);
 __dead static void	usage_unstage(void);
 __dead static void	usage_cat(void);
+__dead static void	usage_info(void);
 
 static const struct got_error*		cmd_init(int, char *[]);
 static const struct got_error*		cmd_import(int, char *[]);
@@ -136,9 +137,10 @@ static const struct got_error*		cmd_integrate(int, char *[]);
 static const struct got_error*		cmd_stage(int, char *[]);
 static const struct got_error*		cmd_unstage(int, char *[]);
 static const struct got_error*		cmd_cat(int, char *[]);
+static const struct got_error*		cmd_info(int, char *[]);
 
 static struct got_cmd got_commands[] = {
-	{ "init",	cmd_init,	usage_init,	"in" },
+	{ "init",	cmd_init,	usage_init,	"" },
 	{ "import",	cmd_import,	usage_import,	"im" },
 	{ "clone",	cmd_clone,	usage_clone,	"cl" },
 	{ "fetch",	cmd_fetch,	usage_fetch,	"fe" },
@@ -164,6 +166,7 @@ static struct got_cmd got_commands[] = {
 	{ "stage",	cmd_stage,	usage_stage,	"sg" },
 	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
 	{ "cat",	cmd_cat,	usage_cat,	"" },
+	{ "info",	cmd_info,	usage_info,	"" },
 };
 
 static void
@@ -9315,5 +9318,186 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	return error;
+}
+
+__dead static void
+usage_info(void)
+{
+	fprintf(stderr, "usage: %s info [path ...]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+print_path_info(void *arg, const char *path, mode_t mode, time_t mtime,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id)
+{
+	const struct got_error *err = NULL;
+	char *id_str = NULL;
+	char datebuf[128];
+	struct tm mytm, *tm;
+	struct got_pathlist_head *paths = arg;
+	struct got_pathlist_entry *pe;
+
+	/*
+	 * Clear error indication from any of the path arguments which
+	 * would cause this file index entry to be displayed.
+	 */
+	TAILQ_FOREACH(pe, paths, entry) {
+		if (got_path_cmp(path, pe->path, strlen(path),
+		    pe->path_len) == 0 ||
+		    got_path_is_child(path, pe->path, pe->path_len))
+			pe->data = NULL; /* no error */
+	}
+
+	printf(GOT_COMMIT_SEP_STR);
+	if (S_ISLNK(mode))
+		printf("symlink: %s\n", path);
+	else if (S_ISREG(mode)) {
+		printf("file: %s\n", path);
+		printf("mode: %o\n", mode & (S_IRWXU | S_IRWXG | S_IRWXO));
+	} else if (S_ISDIR(mode))
+		printf("directory: %s\n", path);
+	else
+		printf("something: %s\n", path);
+
+	tm = localtime_r(&mtime, &mytm);
+	if (tm == NULL)
+		return NULL;
+	if (strftime(datebuf, sizeof(datebuf), "%c %Z", tm) >= sizeof(datebuf))
+		return got_error(GOT_ERR_NO_SPACE);
+	printf("timestamp: %s\n", datebuf);
+
+	if (blob_id) {
+		err = got_object_id_str(&id_str, blob_id);
+		if (err)
+			return err;
+		printf("based on blob: %s\n", id_str);
+		free(id_str);
+	}
+
+	if (staged_blob_id) {
+		err = got_object_id_str(&id_str, staged_blob_id);
+		if (err)
+			return err;
+		printf("based on staged blob: %s\n", id_str);
+		free(id_str);
+	}
+
+	if (commit_id) {
+		err = got_object_id_str(&id_str, commit_id);
+		if (err)
+			return err;
+		printf("based on commit: %s\n", id_str);
+		free(id_str);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+cmd_info(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *id_str = NULL;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
+	char *uuidstr = NULL;
+	int ch, show_files = 0;
+
+	TAILQ_INIT(&paths);
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_info();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error, "status", cwd);
+		goto done;
+	}
+
+	error = apply_unveil(NULL, 0, got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	if (argc >= 1) {
+		error = get_worktree_paths_from_argv(&paths, argc, argv,
+		    worktree);
+		if (error)
+			goto done;
+		show_files = 1;
+	}
+
+	error = got_object_id_str(&id_str,
+	    got_worktree_get_base_commit_id(worktree));
+	if (error)
+		goto done;
+
+	error = got_worktree_get_uuid(&uuidstr, worktree);
+	if (error)
+		goto done;
+
+	printf("work tree: %s\n", got_worktree_get_root_path(worktree));
+	printf("work tree base commit: %s\n", id_str);
+	printf("work tree path prefix: %s\n",
+	    got_worktree_get_path_prefix(worktree));
+	printf("work tree branch reference: %s\n",
+	    got_worktree_get_head_ref_name(worktree));
+	printf("work tree UUID: %s\n", uuidstr);
+	printf("repository: %s\n", got_worktree_get_repo_path(worktree));
+
+	if (show_files) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (pe->path_len == 0)
+				continue;
+			/*
+			 * Assume this path will fail. This will be corrected
+			 * in print_path_info() in case the path does suceeed.
+			 */
+			pe->data = (void *)got_error_path(pe->path,
+			    GOT_ERR_BAD_PATH);
+		}
+		error = got_worktree_path_info(worktree, &paths,
+		    print_path_info, &paths, check_cancelled, NULL);
+		if (error)
+			goto done;
+		TAILQ_FOREACH(pe, &paths, entry) {
+			if (pe->data != NULL) {
+				error = pe->data; /* bad path */
+				break;
+			}
+		}
+	}
+done:
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
+	free(cwd);
+	free(id_str);
+	free(uuidstr);
 	return error;
 }

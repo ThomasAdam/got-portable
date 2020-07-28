@@ -2143,21 +2143,33 @@ diff_new(void *arg, struct got_tree_entry *te, const char *parent_path)
 	return err;
 }
 
+const struct got_error *
+got_worktree_get_uuid(char **uuidstr, struct got_worktree *worktree)
+{
+	uint32_t uuid_status;
+
+	uuid_to_string(&worktree->uuid, uuidstr, &uuid_status);
+	if (uuid_status != uuid_s_ok) {
+		*uuidstr = NULL;
+		return got_error_uuid(uuid_status, "uuid_to_string");
+	}
+
+	return NULL;
+}
+
 static const struct got_error *
 get_ref_name(char **refname, struct got_worktree *worktree, const char *prefix)
 {
 	const struct got_error *err = NULL;
 	char *uuidstr = NULL;
-	uint32_t uuid_status;
 
 	*refname = NULL;
 
-	uuid_to_string(&worktree->uuid, &uuidstr, &uuid_status);
-	if (uuid_status != uuid_s_ok)
-		return got_error_uuid(uuid_status, "uuid_to_string");
+	err = got_worktree_get_uuid(&uuidstr, worktree);
+	if (err)
+		return err;
 
-	if (asprintf(refname, "%s-%s", prefix, uuidstr)
-	    == -1) {
+	if (asprintf(refname, "%s-%s", prefix, uuidstr) == -1) {
 		err = got_error_from_errno("asprintf");
 		*refname = NULL;
 	}
@@ -7667,6 +7679,95 @@ done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+struct report_file_info_arg {
+	struct got_worktree *worktree;
+	got_worktree_path_info_cb info_cb;
+	void *info_arg;
+	struct got_pathlist_head *paths;
+	got_cancel_cb cancel_cb;
+	void *cancel_arg;
+};
+
+static const struct got_error *
+report_file_info(void *arg, struct got_fileindex_entry *ie)
+{
+	struct report_file_info_arg *a = arg;
+	struct got_pathlist_entry *pe;
+	struct got_object_id blob_id, staged_blob_id, commit_id;
+	struct got_object_id *blob_idp = NULL, *staged_blob_idp = NULL;
+	struct got_object_id *commit_idp = NULL;
+	int stage;
+
+	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
+		return got_error(GOT_ERR_CANCELLED);
+
+	TAILQ_FOREACH(pe, a->paths, entry) {
+		if (pe->path_len == 0 || strcmp(pe->path, ie->path) == 0 ||
+		    got_path_is_child(ie->path, pe->path, pe->path_len))
+			break;
+	}
+	if (pe == NULL) /* not found */
+		return NULL;
+
+	if (got_fileindex_entry_has_blob(ie)) {
+		memcpy(blob_id.sha1, ie->blob_sha1, SHA1_DIGEST_LENGTH);
+		blob_idp = &blob_id;
+	}
+	stage = got_fileindex_entry_stage_get(ie);
+	if (stage == GOT_FILEIDX_STAGE_MODIFY ||
+	    stage == GOT_FILEIDX_STAGE_ADD) {
+		memcpy(staged_blob_id.sha1, ie->staged_blob_sha1,
+		    SHA1_DIGEST_LENGTH);
+		staged_blob_idp = &staged_blob_id;
+	}
+
+	if (got_fileindex_entry_has_commit(ie)) {
+		memcpy(commit_id.sha1, ie->commit_sha1, SHA1_DIGEST_LENGTH);
+		commit_idp = &commit_id;
+	}
+
+	return a->info_cb(a->info_arg, ie->path, got_fileindex_perms_to_st(ie),
+	    (time_t)ie->mtime_sec, blob_idp, staged_blob_idp, commit_idp);
+}
+
+const struct got_error *
+got_worktree_path_info(struct got_worktree *worktree,
+    struct got_pathlist_head *paths,
+    got_worktree_path_info_cb info_cb, void *info_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+
+{
+	const struct got_error *err = NULL, *unlockerr;
+	struct got_fileindex *fileindex = NULL;
+	char *fileindex_path = NULL;
+	struct report_file_info_arg arg;
+
+	err = lock_worktree(worktree, LOCK_SH);
+	if (err)
+		return err;
+
+	err = open_fileindex(&fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	arg.worktree = worktree;
+	arg.info_cb = info_cb;
+	arg.info_arg = info_arg;
+	arg.paths = paths;
+	arg.cancel_cb = cancel_cb;
+	arg.cancel_arg = cancel_arg;
+	err = got_fileindex_for_each_entry_safe(fileindex, report_file_info,
+	    &arg);
+done:
+	free(fileindex_path);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	unlockerr = lock_worktree(worktree, LOCK_UN);
 	if (unlockerr && err == NULL)
 		err = unlockerr;
 	return err;

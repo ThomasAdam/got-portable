@@ -73,9 +73,6 @@ the
 command must be used to populate the empty repository before
 .Cm got checkout
 can be used.
-.It Cm in
-Short alias for
-.Cm init .
 .It Cm import Oo Fl b Ar branch Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl I Ar pattern Oc Ar directory
 Create an initial commit in a repository from the file hierarchy
 within the specified
@@ -1862,6 +1859,23 @@ Interpret all arguments as paths only.
 This option can be used to resolve ambiguity in cases where paths
 look like tag names, reference names, or object IDs.
 .El
+.It Cm info Op Ar path ...
+Display meta-data stored in a work tree.
+See
+.Xr got-worktree 5
+for details.
+.Pp
+The work tree to use is resolved implicitly by walking upwards from the
+current working directory.
+.Pp
+If one or more
+.Ar path
+arguments are specified, show additional per-file information for tracked
+files located at or within these paths.
+If a
+.Ar path
+argument corresponds to the work tree's root directory, display information
+for all tracked files.
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width GOT_AUTHOR
@@ -1996,6 +2010,11 @@ working directory, so this command will log the subdirectory
 And this command has the same effect:
 .Pp
 .Dl $ cd sys/dev/usb && got log ../../uvm
+.Pp
+And this command displays work tree meta-data about all tracked files:
+.Pp
+.Dl $ cd /usr/src
+.Dl $ got info\ . | less
 .Pp
 Add new files and remove obsolete files in a work tree directory:
 .Pp
