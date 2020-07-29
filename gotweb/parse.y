@@ -135,6 +135,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_MAX_REPOS NUMBER {
 			if ($2 > 0)
@@ -147,6 +148,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_SITE_OWNER STRING {
 			gw_conf->got_site_owner = strdup($2);
@@ -155,6 +157,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_SITE_LINK STRING {
 			gw_conf->got_site_link = strdup($2);
@@ -163,6 +166,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_LOGO STRING {
 			gw_conf->got_logo = strdup($2);
@@ -171,6 +175,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_LOGO_URL STRING {
 			gw_conf->got_logo_url = strdup($2);
@@ -179,6 +184,7 @@ main		: GOT_REPOS_PATH STRING {
 				yyerror("strdup");
 				YYERROR;
 			}
+			free($2);
 		}
 		| GOT_SHOW_SITE_OWNER boolean {
 			gw_conf->got_show_site_owner = $2;
