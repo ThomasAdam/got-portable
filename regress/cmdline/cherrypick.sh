@@ -732,6 +732,53 @@ function test_cherrypick_symlink_conflicts {
 	test_done "$testroot" "0"
 }
 
+function test_cherrypick_with_path_prefix_and_empty_tree {
+	local testroot=`test_init cherrypick_with_path_prefix_and_empty_tree 1`
+
+	(cd $testroot/repo && git commit --allow-empty \
+		-m "initial empty commit" >/dev/null)
+
+	(cd $testroot/repo && got br bar >/dev/null)
+
+	mkdir -p $testroot/repo/epsilon
+	echo "file foo" > $testroot/repo/epsilon/foo
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "add file foo"
+	local commit_id=`git_show_head $testroot/repo`
+
+	got checkout -b bar $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	mkdir -p $testroot/wt/epsilon
+	echo "new file" > $testroot/wt/epsilon/new
+	(cd $testroot/wt && got add epsilon/new >/dev/null)
+	(cd $testroot/wt && got commit -m "add file on branch bar" > /dev/null)
+
+	got checkout -b bar -p epsilon $testroot/repo $testroot/wt2 > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	(cd $testroot/wt2 && got cherrypick $commit_id > $testroot/stdout)
+
+	echo "A  foo" > $testroot/stdout.expected
+	echo "Merged commit $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
 run_test test_cherrypick_into_work_tree_with_conflicts
@@ -740,3 +787,4 @@ run_test test_cherrypick_added_submodule
 run_test test_cherrypick_conflict_wt_file_vs_repo_submodule
 run_test test_cherrypick_modified_symlinks
 run_test test_cherrypick_symlink_conflicts
+run_test test_cherrypick_with_path_prefix_and_empty_tree

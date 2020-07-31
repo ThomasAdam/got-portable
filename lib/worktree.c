@@ -2930,12 +2930,13 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	char *label_orig = NULL;
 
 	if (commit_id1) {
-		char *id_str;
-
 		err = got_object_id_by_path(&tree_id1, repo, commit_id1,
 		    worktree->path_prefix);
-		if (err)
+		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
 			goto done;
+	}
+	if (tree_id1) {
+		char *id_str;
 
 		err = got_object_open_as_tree(&tree1, repo, tree_id1);
 		if (err)
