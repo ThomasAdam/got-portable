@@ -315,9 +315,10 @@ tokenize_refline(char **tokens, char *line, int len, int maxtokens)
 done:
 	if (err) {
 		int j;
-		for (j = 0; j < i; j++)
+		for (j = 0; j < i; j++) {
 			free(tokens[j]);
 			tokens[j] = NULL;
+		}
 	}
 	return err;
 }
