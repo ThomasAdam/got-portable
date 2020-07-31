@@ -577,6 +577,29 @@ function test_log_reverse_display {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -R works in combination with -P
+	echo "" > $testroot/stdout.expected
+	(cd $testroot/wt && got log -R -P | grep -E '^(commit| [MDmA])' \
+		> $testroot/stdout)
+	echo "commit $commit_id0" > $testroot/stdout.expected
+	echo " A  alpha" >> $testroot/stdout.expected
+	echo " A  beta" >> $testroot/stdout.expected
+	echo " A  epsilon/zeta" >> $testroot/stdout.expected
+	echo " A  gamma/delta" >> $testroot/stdout.expected
+	echo "commit $commit_id1" >> $testroot/stdout.expected
+	echo " M  alpha" >> $testroot/stdout.expected
+	echo "commit $commit_id2" >> $testroot/stdout.expected
+	echo " D  beta" >> $testroot/stdout.expected
+	echo "commit $commit_id3 (master)" >> $testroot/stdout.expected
+	echo " A  new" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }

@@ -3259,7 +3259,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		if (err)
 			break;
 
-		if (show_changed_paths) {
+		if (show_changed_paths && !reverse_display_order) {
 			err = get_changed_paths(&changed_paths, commit, repo);
 			if (err)
 				break;
@@ -3314,12 +3314,23 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			err = got_object_open_as_commit(&commit, repo, qid->id);
 			if (err)
 				break;
+			if (show_changed_paths) {
+				err = get_changed_paths(&changed_paths,
+				    commit, repo);
+				if (err)
+					break;
+			}
 			err = print_commit(commit, qid->id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
 			    show_patch, diff_context, refs);
 			got_object_commit_close(commit);
 			if (err)
 				break;
+			TAILQ_FOREACH(pe, &changed_paths, entry) {
+				free((char *)pe->path);
+				free(pe->data);
+			}
+			got_pathlist_free(&changed_paths);
 		}
 	}
 done:
