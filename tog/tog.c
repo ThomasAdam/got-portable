@@ -3341,7 +3341,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 
 		err = add_color(&s->colors,
-		    "^(commit|(blob|file) [-+] |[MDmA]  [^ ])",
+		    "^(commit [0-9a-f]|(blob|file) [-+] |[MDmA]  [^ ])",
 		    TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
