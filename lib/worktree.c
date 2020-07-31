@@ -2537,7 +2537,7 @@ checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 
 	if (entry_name &&
 	    got_object_tree_find_entry(tree, entry_name) == NULL) {
-		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		err = got_error_path(entry_name, GOT_ERR_NO_TREE_ENTRY);
 		goto done;
 	}
 
@@ -4341,7 +4341,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		te = got_object_tree_find_entry(tree, te_name);
 		if (te == NULL && status != GOT_STATUS_ADD &&
 		    staged_status != GOT_STATUS_ADD) {
-			err = got_error(GOT_ERR_NO_TREE_ENTRY);
+			err = got_error_path(ie->path, GOT_ERR_NO_TREE_ENTRY);
 			goto done;
 		}
 	}

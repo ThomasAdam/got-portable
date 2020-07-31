@@ -1626,7 +1626,8 @@ write_tree(struct got_object_id **new_tree_id, const char *path_dir,
 	}
 
 	if (TAILQ_EMPTY(&paths)) {
-		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		err = got_error_msg(GOT_ERR_NO_TREE_ENTRY,
+		    "cannot create tree without any entries");
 		goto done;
 	}
 

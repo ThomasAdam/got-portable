@@ -1664,7 +1664,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 
 		te = find_entry_by_name(tree, seg, seglen);
 		if (te == NULL) {
-			err = got_error(GOT_ERR_NO_TREE_ENTRY);
+			err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
 			goto done;
 		}
 
@@ -1690,7 +1690,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 		if (*id == NULL)
 			return got_error_from_errno("got_object_id_dup");
 	} else
-		err = got_error(GOT_ERR_NO_TREE_ENTRY);
+		err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
 done:
 	if (commit)
 		got_object_commit_close(commit);

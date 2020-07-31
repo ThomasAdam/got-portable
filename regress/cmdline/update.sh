@@ -1216,7 +1216,7 @@ function test_update_partial_rm {
 	(cd $testroot/repo && git rm -q alpha epsilon/zeta)
 	git_commit $testroot/repo -m "removed two files"
 
-	echo "got: no such entry found in tree" \
+	echo "got: /alpha: no such entry found in tree" \
 		> $testroot/stderr.expected
 
 	(cd $testroot/wt && got update alpha epsilon/zeta 2> $testroot/stderr)
