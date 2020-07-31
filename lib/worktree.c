@@ -5004,12 +5004,12 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 		    (ct->flags & GOT_COMMITABLE_ADDED))
 			continue;
 
-		 if (!got_path_is_child(pe->path, path_base_tree,
+		 if (!got_path_is_child(ct->in_repo_path, path_base_tree,
 		     strlen(path_base_tree)))
 			continue;
 
 		err = got_path_skip_common_ancestor(&child_path, path_base_tree,
-		    pe->path);
+		    ct->in_repo_path);
 		if (err)
 			goto done;
 

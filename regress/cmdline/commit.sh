@@ -444,8 +444,58 @@ function test_commit_path_prefix {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got rm delta > /dev/null)
+	echo new > $testroot/wt/new
+	(cd $testroot/wt && got add new > /dev/null)
+
+	(cd $testroot/wt && got commit -m 'remove gamma/delta; add gamma/new' \
+		> $testroot/stdout)
+
+	local commit3=`git_show_head $testroot/repo`
+	echo "A  new" > $testroot/stdout.expected
+	echo "D  delta" >> $testroot/stdout.expected
+	echo "Created commit $commit3" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $commit2 $commit3" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit2 -i gamma | grep 'delta$' \
+		| cut -d' ' -f 1 | sed -e 's/$/ (mode 644)/' \
+		>> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- gamma/delta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-modified delta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo -n 'blob + ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -c $commit3 -i gamma | grep 'new$' | \
+		cut -d' ' -f 1 | sed -e 's/$/ (mode 644)/' \
+		>> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ gamma/new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new' >> $testroot/stdout.expected
+
+	got diff -r $testroot/repo $commit2 $commit3 > $testroot/stdout
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
+	return "$ret"
 }
 
 function test_commit_dir_path {
