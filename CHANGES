@@ -1,3 +1,13 @@
+* got 0.38; 2020-08-02
+- add support for managing symbolic links under version control
+- new -S option for 'got commit' and 'got stage' to skip symlink safety checks
+- add a 'got info' command which displays work tree meta-data
+- display more context in "no such entry found in tree" error messages
+- fix spurious 'got cherrypick' error with a path prefix and an empty tree
+- fix committing file additions from a work tree with a path prefix
+- fix build error with clang 10 due to missing for-loop block grouping (naddy@)
+- make 'got log' -R and -P options work in combination
+
 * got 0.37; 2020-07-23
 - cope with directory entries returned from readdir(3) with type DT_UNKNOWN
 - fix merging with files that do not contain a newline character
