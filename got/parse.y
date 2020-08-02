@@ -265,7 +265,8 @@ lgetc(int quotec)
 	int		c, next;
 
 	if (quotec) {
-		if ((c = igetc()) == EOF) {
+		c = igetc();
+		if (c == EOF) {
 			yyerror("reached end of file while parsing "
 			    "quoted string");
 			if (file == topfile || popfile() == EOF)
@@ -275,7 +276,8 @@ lgetc(int quotec)
 		return (c);
 	}
 
-	while ((c = igetc()) == '\\') {
+	c = igetc();
+	while (c == '\\') {
 		next = igetc();
 		if (next != '\n') {
 			c = next;
@@ -348,16 +350,20 @@ yylex(void)
 
 top:
 	p = buf;
-	while ((c = lgetc(0)) == ' ' || c == '\t')
-		; /* nothing */
+	c = lgetc(0);
+	while (c == ' ' || c == '\t')
+		c = lgetc(0); /* nothing */
 
 	yylval.lineno = file->lineno;
-	if (c == '#')
-		while ((c = lgetc(0)) != '\n' && c != EOF)
-			; /* nothing */
+	if (c == '#') {
+		c = lgetc(0);
+		while (c != '\n' && c != EOF)
+			c = lgetc(0); /* nothing */
+	}
 	if (c == '$' && !expanding) {
 		while (1) {
-			if ((c = lgetc(0)) == EOF)
+			c = lgetc(0);
+			if (c == EOF)
 				return (0);
 
 			if (p + 1 >= buf + sizeof(buf) - 1) {
@@ -392,13 +398,15 @@ top:
 	case '"':
 		quotec = c;
 		while (1) {
-			if ((c = lgetc(quotec)) == EOF)
+			c = lgetc(quotec);
+			if (c == EOF)
 				return (0);
 			if (c == '\n') {
 				file->lineno++;
 				continue;
 			} else if (c == '\\') {
-				if ((next = lgetc(quotec)) == EOF)
+				next = lgetc(quotec);
+				if (next == EOF)
 					return (0);
 				if (next == quotec || c == ' ' || c == '\t')
 					c = next;
@@ -436,7 +444,8 @@ top:
 				yyerror("string too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && isdigit(c));
+			c = lgetc(0);
+		} while (c != EOF && isdigit(c));
 		lungetc(c);
 		if (p == buf + 1 && buf[0] == '-')
 			goto nodigits;
@@ -475,12 +484,16 @@ nodigits:
 				yyerror("string too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && (allowed_in_string(c)));
+			c = lgetc(0);
+		} while (c != EOF && (allowed_in_string(c)));
 		lungetc(c);
 		*p = '\0';
-		if ((token = lookup(buf)) == STRING)
-			if ((yylval.v.string = strdup(buf)) == NULL)
+		token = lookup(buf);
+		if (token == STRING) {
+			yylval.v.string = strdup(buf);
+			if (yylval.v.string == NULL)
 				err(1, "%s", __func__);
+		}
 		return (token);
 	}
 	if (c == '\n') {
@@ -497,13 +510,16 @@ pushfile(struct file **nfile, const char *name)
 {
 	const struct got_error* error = NULL;
 
-	if (((*nfile) = calloc(1, sizeof(struct file))) == NULL)
+	(*nfile) = calloc(1, sizeof(struct file));
+	if ((*nfile) == NULL)
 		return got_error_from_errno2(__func__, "calloc");
-	if (((*nfile)->name = strdup(name)) == NULL) {
+	(*nfile)->name = strdup(name);
+	if ((*nfile)->name == NULL) {
 		free(nfile);
 		return got_error_from_errno2(__func__, "strdup");
 	}
-	if (((*nfile)->stream = fopen((*nfile)->name, "r")) == NULL) {
+	(*nfile)->stream = fopen((*nfile)->name, "r");
+	if ((*nfile)->stream == NULL) {
 		char *msg = NULL;
 		if (asprintf(&msg, "%s", (*nfile)->name) == -1)
 			return got_error_from_errno("asprintf");
@@ -626,7 +642,8 @@ symset(const char *nam, const char *val, int persist)
 			free(sym);
 		}
 	}
-	if ((sym = calloc(1, sizeof(*sym))) == NULL)
+	sym = calloc(1, sizeof(*sym));
+	if (sym == NULL)
 		return (-1);
 
 	sym->nam = strdup(nam);
@@ -653,11 +670,13 @@ cmdline_symset(char *s)
 	int	ret;
 	size_t	len;
 
-	if ((val = strrchr(s, '=')) == NULL)
+	val = strrchr(s, '=');
+	if (val == NULL)
 		return (-1);
 
 	len = strlen(s) - strlen(val) + 1;
-	if ((sym = malloc(len)) == NULL)
+	sym = malloc(len);
+	if (sym == NULL)
 		errx(1, "cmdline_symset: malloc");
 
 	strlcpy(sym, s, len);
