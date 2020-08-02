@@ -14,19 +14,25 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct got_config_list_entry {
-	TAILQ_ENTRY(got_config_list_entry) entry;
-	const char	*remote;
-	const char	*repository;
-	const char	*server;
-	const char	*protocol;
-	const char	*user;
+struct gotconfig_remote_repo {
+	TAILQ_ENTRY(gotconfig_remote_repo) entry;
+	char	*name;
+	char	*repository;
+	char	*server;
+	char	*protocol;
+	char	*user;
 };
-TAILQ_HEAD(got_config_list, got_config_list_entry);
+TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
+
+struct gotconfig {
+	struct gotconfig_remote_repo_list remotes;
+	int nremotes;
+};
 
 /*
  * Parse individual gotconfig repository files
- * Load got_config_list_entry struct and insert to got_config_list TAILQ
  */
-const struct got_error* parse_got_config(struct got_config_list **,
-    char *filename);
+const struct got_error* gotconfig_parse(struct gotconfig **,
+    const char *filename);
+
+void gotconfig_free(struct gotconfig *);

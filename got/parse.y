@@ -84,9 +84,9 @@ int	 symset(const char *, const char *, int);
 char	*symget(const char *);
 
 const struct got_error* gerror = NULL;
-struct got_config_list_entry *gotconfig;
-struct got_config_list got_config_list;
-static const struct got_error*	new_remote(struct got_config_list_entry **);
+struct gotconfig_remote_repo *remote;
+struct gotconfig gotconfig;
+static const struct got_error* new_remote(struct gotconfig_remote_repo **);
 
 typedef struct {
 	union {
@@ -113,8 +113,8 @@ remoteopts2	: remoteopts2 remoteopts1 nl
 	    	| remoteopts1 optnl
 		;
 remoteopts1	: REPOSITORY STRING {
-	    		gotconfig->repository = strdup($2);
-			if (gotconfig->repository == NULL) {
+	    		remote->repository = strdup($2);
+			if (remote->repository == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -122,8 +122,8 @@ remoteopts1	: REPOSITORY STRING {
 			free($2);
 	    	}
 	    	| SERVER STRING {
-	    		gotconfig->server = strdup($2);
-			if (gotconfig->server == NULL) {
+	    		remote->server = strdup($2);
+			if (remote->server == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -131,8 +131,8 @@ remoteopts1	: REPOSITORY STRING {
 			free($2);
 		}
 		| PROTOCOL STRING {
-	    		gotconfig->protocol = strdup($2);
-			if (gotconfig->protocol == NULL) {
+	    		remote->protocol = strdup($2);
+			if (remote->protocol == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -140,8 +140,8 @@ remoteopts1	: REPOSITORY STRING {
 			free($2);
 		}
 		| USER STRING {
-	    		gotconfig->user = strdup($2);
-			if (gotconfig->user == NULL) {
+	    		remote->user = strdup($2);
+			if (remote->user == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -152,21 +152,22 @@ remoteopts1	: REPOSITORY STRING {
 remote		: REMOTE STRING {
 			static const struct got_error* error;
 
-			error = new_remote(&gotconfig);
+			error = new_remote(&remote);
 			if (error) {
 				free($2);
 				yyerror("%s", error->msg);
 				YYERROR;
 			}
-			gotconfig->remote = strdup($2);
-			if (gotconfig->remote == NULL) {
+			remote->name = strdup($2);
+			if (remote->name == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 			free($2);
 		} '{' optnl remoteopts2 '}' {
-			TAILQ_INSERT_TAIL(&got_config_list, gotconfig, entry);
+			TAILQ_INSERT_TAIL(&gotconfig.remotes, remote, entry);
+			gotconfig.nremotes++;
 		}
 		;
 optnl		: '\n' optnl
@@ -526,11 +527,12 @@ pushfile(struct file **nfile, const char *name)
 }
 
 static const struct got_error*
-new_remote(struct got_config_list_entry **gotconfig) {
-	const struct got_error* error = NULL;
+new_remote(struct gotconfig_remote_repo **remote)
+{
+	const struct got_error *error = NULL;
 
-	if (((*gotconfig) = calloc(1, sizeof(struct got_config_list_entry))) ==
-	    NULL)
+	*remote = calloc(1, sizeof(**remote));
+	if (*remote == NULL)
 	    error = got_error_from_errno("calloc");
 	return error;
 }
@@ -550,11 +552,11 @@ popfile(void)
 }
 
 const struct got_error*
-parse_got_config(struct got_config_list **conf_list, char *filename)
+gotconfig_parse(struct gotconfig **conf, const char *filename)
 {
 	struct sym	*sym, *next;
 
-	*conf_list = NULL;
+	*conf = NULL;
 
 	/*
 	 * We don't require that gotconfig exists
@@ -564,11 +566,10 @@ parse_got_config(struct got_config_list **conf_list, char *filename)
 	if (gerror && gerror->code == GOT_ERR_NO_CONFIG_FILE) {
 		gerror = NULL;
 		goto done;
-	}
-	else if (gerror)
+	} else if (gerror)
 		return gerror;
 
-	TAILQ_INIT(&got_config_list);
+	TAILQ_INIT(&gotconfig.remotes);
 	topfile = file;
 
 	yyparse();
@@ -584,8 +585,25 @@ parse_got_config(struct got_config_list **conf_list, char *filename)
 		}
 	}
 done:
-	*conf_list = &got_config_list;
+	*conf = &gotconfig;
 	return gerror;
+}
+
+void
+gotconfig_free(struct gotconfig *conf)
+{
+	struct gotconfig_remote_repo *remote;
+
+	while (!TAILQ_EMPTY(&conf->remotes)) {
+		remote = TAILQ_FIRST(&conf->remotes);
+		TAILQ_REMOVE(&conf->remotes, remote, entry);
+		free(remote->name);
+		free(remote->repository);
+		free(remote->server);
+		free(remote->protocol);
+		free(remote->user);
+		free(remote);
+	}
 }
 
 int
