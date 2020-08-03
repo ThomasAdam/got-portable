@@ -46,9 +46,7 @@
 #include "got_error.h"
 #include "got.h"
 
-TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
-	TAILQ_ENTRY(file)	 entry;
 	FILE			*stream;
 	char			*name;
 	size_t	 		 ungetpos;
@@ -56,9 +54,9 @@ static struct file {
 	u_char			*ungetbuf;
 	int			 eof_reached;
 	int			 lineno;
-} *file, *topfile;
-static const struct got_error*	pushfile(struct file**, const char *);
-int		 popfile(void);
+} *file;
+static const struct got_error*	newfile(struct file**, const char *);
+static void	closefile(struct file *);
 int		 yyparse(void);
 int		 yylex(void);
 int		 yyerror(const char *, ...)
@@ -269,9 +267,6 @@ lgetc(int quotec)
 		if (c == EOF) {
 			yyerror("reached end of file while parsing "
 			    "quoted string");
-			if (file == topfile || popfile() == EOF)
-				return (EOF);
-			return (quotec);
 		}
 		return (c);
 	}
@@ -287,22 +282,6 @@ lgetc(int quotec)
 		file->lineno++;
 	}
 
-	if (c == EOF) {
-		/*
-		 * Fake EOL when hit EOF for the first time. This gets line
-		 * count right if last line in included file is syntactically
-		 * invalid and has no newline.
-		 */
-		if (file->eof_reached == 0) {
-			file->eof_reached = 1;
-			return ('\n');
-		}
-		while (c == EOF) {
-			if (file == topfile || popfile() == EOF)
-				return (EOF);
-			c = igetc();
-		}
-	}
 	return (c);
 }
 
@@ -506,7 +485,7 @@ nodigits:
 }
 
 static const struct got_error*
-pushfile(struct file **nfile, const char *name)
+newfile(struct file **nfile, const char *name)
 {
 	const struct got_error* error = NULL;
 
@@ -529,7 +508,7 @@ pushfile(struct file **nfile, const char *name)
 		free(msg);
 		return error;
 	}
-	(*nfile)->lineno = TAILQ_EMPTY(&files) ? 1 : 0;
+	(*nfile)->lineno = 1;
 	(*nfile)->ungetsize = 16;
 	(*nfile)->ungetbuf = malloc((*nfile)->ungetsize);
 	if ((*nfile)->ungetbuf == NULL) {
@@ -538,7 +517,6 @@ pushfile(struct file **nfile, const char *name)
 		free((*nfile));
 		return got_error_from_errno2(__func__, "malloc");
 	}
-	TAILQ_INSERT_TAIL(&files, (*nfile), entry);
 	return error;
 }
 
@@ -553,18 +531,13 @@ new_remote(struct gotconfig_remote_repo **remote)
 	return error;
 }
 
-int
-popfile(void)
+static void
+closefile(struct file *file)
 {
-	struct file	*prev = NULL;
-
-	TAILQ_REMOVE(&files, file, entry);
 	fclose(file->stream);
 	free(file->name);
 	free(file->ungetbuf);
 	free(file);
-	file = prev;
-	return (file ? 0 : EOF);
 }
 
 const struct got_error*
@@ -578,7 +551,7 @@ gotconfig_parse(struct gotconfig **conf, const char *filename)
 	 * We don't require that gotconfig exists
 	 * So, null gerror and goto done
 	 */
-	gerror = pushfile(&file, filename);
+	gerror = newfile(&file, filename);
 	if (gerror && gerror->code == GOT_ERR_NO_CONFIG_FILE) {
 		gerror = NULL;
 		goto done;
@@ -586,10 +559,9 @@ gotconfig_parse(struct gotconfig **conf, const char *filename)
 		return gerror;
 
 	TAILQ_INIT(&gotconfig.remotes);
-	topfile = file;
 
 	yyparse();
-	popfile();
+	closefile(file);
 
 	/* Free macros and check which have not been used. */
 	TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
