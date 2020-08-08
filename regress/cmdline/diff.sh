@@ -583,6 +583,7 @@ function test_diff_symlinks_in_repo {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
 run_test test_diff_tag

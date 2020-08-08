@@ -21,6 +21,7 @@
 #include <string.h>
 #include <err.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "got_error.h"
 #include "got_opentemp.h"
@@ -117,19 +118,42 @@ delta_apply(void)
 	return (err == NULL);
 }
 
+static int quiet;
+
 #define RUN_TEST(expr, name) \
 	{ test_ok = (expr);  \
-	printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
+	if (!quiet) printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
+static void
+usage(void)
+{
+	fprintf(stderr, "usage: delta_test [-q]\n");
+}
+
 int
-main(int argc, const char *argv[])
+main(int argc, char *argv[])
 {
 	int test_ok;
 	int failure = 0;
+	int ch;
 
-	if (argc != 1) {
-		fprintf(stderr, "usage: delta_test [REPO_PATH]\n");
+	while ((ch = getopt(argc, argv, "q")) != -1) {
+		switch (ch) {
+		case 'q':
+			quiet = 1;
+			break;
+		default:
+			usage();
+			return 1;
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 0) {
+		usage();
 		return 1;
 	}
 

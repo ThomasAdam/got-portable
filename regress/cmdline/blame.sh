@@ -882,6 +882,7 @@ function test_blame_symlink {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_blame_basic
 run_test test_blame_tag
 run_test test_blame_file_single_line

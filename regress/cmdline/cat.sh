@@ -335,6 +335,7 @@ function test_cat_symlink {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_cat_basic
 run_test test_cat_path
 run_test test_cat_submodule

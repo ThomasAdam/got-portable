@@ -948,6 +948,7 @@ function test_fetch_headref_deleted_locally {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_fetch_basic
 run_test test_fetch_list
 run_test test_fetch_branch

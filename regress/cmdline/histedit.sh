@@ -1340,6 +1340,7 @@ function test_histedit_duplicate_commit_in_script {
 
 }
 
+test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
 run_test test_histedit_drop

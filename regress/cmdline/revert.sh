@@ -1483,6 +1483,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_revert_basic
 run_test test_revert_rm
 run_test test_revert_add

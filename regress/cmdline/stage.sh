@@ -2958,6 +2958,7 @@ EOF
 	test_done "$testroot" "0"
 }
 
+test_parseargs "$@"
 run_test test_stage_basic
 run_test test_stage_no_changes
 run_test test_stage_unversioned

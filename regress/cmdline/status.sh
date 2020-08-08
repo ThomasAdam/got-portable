@@ -634,6 +634,7 @@ function test_status_gitignore {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_status_basic
 run_test test_status_subdir_no_mods
 run_test test_status_subdir_no_mods2

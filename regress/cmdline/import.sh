@@ -291,6 +291,7 @@ function test_import_symlink {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_import_basic
 run_test test_import_requires_new_branch
 run_test test_import_ignores

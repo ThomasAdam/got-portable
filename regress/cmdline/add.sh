@@ -361,6 +361,7 @@ function test_add_symlink {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_add_basic
 run_test test_double_add
 run_test test_add_multiple

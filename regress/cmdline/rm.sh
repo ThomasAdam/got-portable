@@ -438,6 +438,7 @@ function test_rm_symlink {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_rm_basic
 run_test test_rm_with_local_mods
 run_test test_double_rm

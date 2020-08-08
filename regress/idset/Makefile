@@ -9,4 +9,7 @@ LDADD = -lutil -lz
 
 NOMAN = yes
 
+run-regress-idset_test:
+	${.OBJDIR}/idset_test -q
+
 .include <bsd.regress.mk>

@@ -792,6 +792,7 @@ function test_log_submodule {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_log_in_repo
 run_test test_log_in_bare_repo
 run_test test_log_in_worktree

@@ -197,10 +197,32 @@ function test_cleanup
 	rm -rf "$testroot"
 }
 
+function test_parseargs
+{
+	args=`getopt q $*`
+	if [ $? -ne 0 ]; then
+		echo "Supported options:"
+		echo "  -q: quiet mode"
+		exit 2
+	fi
+	set -- $args
+	while [ $# -ne 0 ]; do
+		case "$1"
+		in
+			-q)
+			   export GOT_TEST_QUIET=1; shift;;
+			--)
+			   shift; break;;
+		esac
+	done
+}
+
 function run_test
 {
 	testfunc="$1"
-	echo -n "$testfunc "
+	if [ -z "$GOT_TEST_QUIET" ]; then
+		echo -n "$testfunc "
+	fi
 	$testfunc
 }
 
@@ -210,7 +232,9 @@ function test_done
 	local result="$2"
 	if [ "$result" == "0" ]; then
 		test_cleanup "$testroot" || return 1
-		echo "ok"
+		if [ -z "$GOT_TEST_QUIET" ]; then
+			echo "ok"
+		fi
 	elif echo "$result" | grep -q "^xfail"; then
 		# expected test failure; test reproduces an unfixed bug
 		echo "$result"

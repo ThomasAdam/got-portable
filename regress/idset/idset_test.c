@@ -36,6 +36,7 @@
 #include "got_lib_object.h"
 
 static int verbose;
+static int quiet;
 
 void
 test_printf(char *fmt, ...)
@@ -169,13 +170,13 @@ done:
 
 #define RUN_TEST(expr, name) \
 	{ test_ok = (expr);  \
-	printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
+	if (!quiet) printf("test_%s %s\n", (name), test_ok ? "ok" : "failed"); \
 	failure = (failure || !test_ok); }
 
 void
 usage(void)
 {
-	fprintf(stderr, "usage: id_test [-v]\n");
+	fprintf(stderr, "usage: id_test [-v] [-q]\n");
 }
 
 int
@@ -189,10 +190,15 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "v")) != -1) {
+	while ((ch = getopt(argc, argv, "vq")) != -1) {
 		switch (ch) {
 		case 'v':
 			verbose = 1;
+			quiet = 0;
+			break;
+		case 'q':
+			quiet = 1;
+			verbose = 0;
 			break;
 		default:
 			usage();

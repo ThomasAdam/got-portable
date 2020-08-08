@@ -202,7 +202,7 @@ function test_backout_next_commit {
 	test_done "$testroot" "$ret"
 }
 
-
+test_parseargs "$@"
 run_test test_backout_basic
 run_test test_backout_edits_for_file_since_deleted
 run_test test_backout_next_commit

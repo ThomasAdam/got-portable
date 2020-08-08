@@ -779,6 +779,7 @@ function test_cherrypick_with_path_prefix_and_empty_tree {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
 run_test test_cherrypick_into_work_tree_with_conflicts

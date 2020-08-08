@@ -385,6 +385,7 @@ function test_integrate_backwards_in_time {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_integrate_basic
 run_test test_integrate_requires_rebase_first
 run_test test_integrate_path_prefix

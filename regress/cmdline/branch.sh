@@ -443,6 +443,7 @@ function test_branch_show {
 
 }
 
+test_parseargs "$@"
 run_test test_branch_create
 run_test test_branch_list
 run_test test_branch_delete

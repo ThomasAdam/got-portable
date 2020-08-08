@@ -373,6 +373,7 @@ function test_clone_reference_mirror {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_clone_basic
 run_test test_clone_list
 run_test test_clone_branch

@@ -384,6 +384,7 @@ function test_ref_list {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_ref_create
 run_test test_ref_delete
 run_test test_ref_list

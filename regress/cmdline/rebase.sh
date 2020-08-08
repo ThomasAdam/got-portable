@@ -1270,6 +1270,7 @@ function test_rebase_rm_add_rm_file {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_rebase_basic
 run_test test_rebase_ancestry_check
 run_test test_rebase_continue

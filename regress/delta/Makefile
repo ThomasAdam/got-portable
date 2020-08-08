@@ -8,4 +8,7 @@ LDADD = -lz
 
 NOMAN = yes
 
+run-regress-delta_test:
+	${.OBJDIR}/delta_test -q
+
 .include <bsd.regress.mk>

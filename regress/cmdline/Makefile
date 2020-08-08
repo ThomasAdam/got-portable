@@ -4,78 +4,78 @@ REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 NOOBJ=Yes
 
 checkout:
-	./checkout.sh
+	./checkout.sh -q
 
 update:
-	./update.sh
+	./update.sh -q
 
 status:
-	./status.sh
+	./status.sh -q
 
 log:
-	./log.sh
+	./log.sh -q
 
 add:
-	./add.sh
+	./add.sh -q
 
 rm:
-	./rm.sh
+	./rm.sh -q
 
 diff:
-	./diff.sh
+	./diff.sh -q
 
 blame:
-	./blame.sh
+	./blame.sh -q
 
 branch:
-	./branch.sh
+	./branch.sh -q
 
 tag:
-	./tag.sh
+	./tag.sh -q
 
 ref:
-	./ref.sh
+	./ref.sh -q
 
 commit:
-	./commit.sh
+	./commit.sh -q
 
 revert:
-	./revert.sh
+	./revert.sh -q
 
 cherrypick:
-	./cherrypick.sh
+	./cherrypick.sh -q
 
 backout:
-	./backout.sh
+	./backout.sh -q
 
 rebase:
-	./rebase.sh
+	./rebase.sh -q
 
 import:
-	./import.sh
+	./import.sh -q
 
 histedit:
-	./histedit.sh
+	./histedit.sh -q
 
 integrate:
-	./integrate.sh
+	./integrate.sh -q
 
 stage:
-	./stage.sh
+	./stage.sh -q
 
 unstage:
-	./unstage.sh
+	./unstage.sh -q
 
 cat:
-	./cat.sh
+	./cat.sh -q
 
 clone:
-	./clone.sh
+	./clone.sh -q
 
 fetch:
-	./fetch.sh
+	./fetch.sh -q
 
 tree:
-	./tree.sh
+	./tree.sh -q
 
 .include <bsd.regress.mk>

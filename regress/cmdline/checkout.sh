@@ -756,6 +756,7 @@ function test_checkout_symlink_relative_wtpath {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
 run_test test_checkout_dir_not_empty

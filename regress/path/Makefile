@@ -8,4 +8,7 @@ LDADD = -lutil -lz
 
 NOMAN = yes
 
+run-regress-path_test:
+	${.OBJDIR}/path_test -q
+
 .include <bsd.regress.mk>

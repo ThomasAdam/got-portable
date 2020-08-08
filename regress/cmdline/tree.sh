@@ -135,6 +135,7 @@ function test_tree_submodule_of_same_repo {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_tree_basic
 run_test test_tree_branch
 run_test test_tree_submodule

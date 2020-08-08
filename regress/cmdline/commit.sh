@@ -1280,6 +1280,7 @@ function test_commit_fix_bad_symlink {
 	test_done "$testroot" "0"
 }
 
+test_parseargs "$@"
 run_test test_commit_basic
 run_test test_commit_new_subdir
 run_test test_commit_subdir

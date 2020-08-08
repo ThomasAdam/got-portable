@@ -217,6 +217,7 @@ function test_tag_list_lightweight {
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_tag_create
 run_test test_tag_list
 run_test test_tag_list_lightweight

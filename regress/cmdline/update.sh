@@ -2254,6 +2254,7 @@ function test_update_symlink_conflicts {
 
 }
 
+test_parseargs "$@"
 run_test test_update_basic
 run_test test_update_adds_file
 run_test test_update_deletes_file

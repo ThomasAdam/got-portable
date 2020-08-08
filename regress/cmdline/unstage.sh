@@ -1417,6 +1417,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_parseargs "$@"
 run_test test_unstage_basic
 run_test test_unstage_unversioned
 run_test test_unstage_nonexistent
