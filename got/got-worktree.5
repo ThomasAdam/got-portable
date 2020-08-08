@@ -124,8 +124,13 @@ Only present if a file addition or modification has been staged with
 .Cm got stage .
 .El
 .Pp
-A corrupt or missing file index can be recreated on demand with
-.Cm got update .
+A corrupt or missing file index can be recreated on demand as follows:
+.Pp
+.Dl $ mv .got/file-index .got/file-index.bad
+.Dl $ got update # re-create .got/file-index
+.Dl $ find\ . -type f -exec touch {}\ \\\ ; # update timestamp of all files
+.Dl $ got update # sync timestamps
+.Pp
 When the file index is modified, it is read into memory in its entirety,
 modified in place, and written to a temporary file.
 This temporary file is then moved on top of the old file index with
