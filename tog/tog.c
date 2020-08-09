@@ -3049,8 +3049,10 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 		return got_error_from_errno("calloc");
 
 	fread(buf, 1, len, infile);
-	if (ferror(infile))
+	if (ferror(infile)) {
+		free(buf);
 		return got_error_from_errno("fread");
+	}
 
 	i = 0;
 	if (line_offsets && nlines) {
@@ -3059,8 +3061,12 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 			noffsets = 1;
 			*nlines = 1;
 			*line_offsets = calloc(1, sizeof(**line_offsets));
-			if (*line_offsets == NULL)
+			if (*line_offsets == NULL) {
+				free(buf);
+				free(*line_offsets);
+				*line_offsets = NULL;
 				return got_error_from_errno("calloc");
+			}
 				/* Skip forward over end of first line. */
 			while (i < len) {
 				if (buf[i] == '\n')
@@ -3094,13 +3100,18 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 		}
 	}
 
-	if (fflush(infile) != 0)
+	if (fflush(infile) != 0) {
+		free(buf);
+		free(*line_offsets);
 		return got_error_from_errno("fflush");
+	}
 	rewind(infile);
 
 	if (filesize)
 		*filesize = len;
 
+	free(buf);
+	free(*line_offsets);
 	return NULL;
 }
 
