@@ -3023,18 +3023,15 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
     FILE *infile)
 {
 	const struct got_error *err = NULL;
-	size_t len;
-	char *buf = NULL;
+	size_t len, remain;
+	char buf[32768];
 	int i;
-	size_t noffsets = 0;
+	size_t nalloc = 0;
 	off_t off = 0;
 
-	if (line_offsets)
-		*line_offsets = NULL;
-	if (filesize)
-		*filesize = 0;
-	if (nlines)
-		*nlines = 0;
+	*line_offsets = NULL;
+	*filesize = 0;
+	*nlines = 0;
 
 	if (fseek(infile, 0, SEEK_END) == -1)
 		return got_error_from_errno("fseek");
@@ -3046,22 +3043,26 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 
 	if (len == 0)
 		return NULL;
-	if ((buf = calloc(len, sizeof(char *))) == NULL)
-		return got_error_from_errno("calloc");
 
-	fread(buf, 1, len, infile);
-	if (ferror(infile)) {
-		err = got_error_from_errno("fread");
-		goto done;
-	}
+	remain = len;
+	while (remain > 0) {
+		size_t r, n = MIN(remain, sizeof(buf));
+		r = fread(buf, 1, n, infile);
+		if (r == 0) {
+			if (ferror(infile)) {
+				err = got_error_from_errno("fread");
+				goto done;
+			}
+			break;
+		}
+		i = 0;
+		remain -= r;
 
-	i = 0;
-	if (line_offsets && nlines) {
 		if (*line_offsets == NULL) {
 			/* Have some data but perhaps no '\n'. */
-			noffsets = 1;
 			*nlines = 1;
-			*line_offsets = calloc(1, sizeof(**line_offsets));
+			nalloc = len / 40; /* 40-char average line length */
+			*line_offsets = calloc(nalloc, sizeof(**line_offsets));
 			if (*line_offsets == NULL) {
 				err = got_error_from_errno("calloc");
 				goto done;
@@ -3073,24 +3074,25 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 				i++;
 			}
 		}
+
 		/* Scan '\n' offsets in remaining chunk of data. */
-		while (i < len) {
+		while (i < r) {
 			if (buf[i] != '\n') {
 				i++;
 				continue;
 			}
 			(*nlines)++;
-			if (noffsets < *nlines) {
+			if (nalloc < *nlines) {
+				size_t nallocnew = *nlines + (remain / 40);
 				off_t *o = recallocarray(*line_offsets,
-				    noffsets, *nlines,
-				    sizeof(**line_offsets));
+				    nalloc, nallocnew, sizeof(**line_offsets));
 				if (o == NULL) {
 					err = got_error_from_errno(
 					    "recallocarray");
 					goto done;
 				}
 				*line_offsets = o;
-				noffsets = *nlines;
+				nalloc = nallocnew;
 			}
 			off = i + 1;
 			(*line_offsets)[*nlines - 1] = off;
@@ -3104,19 +3106,13 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 	}
 	rewind(infile);
 
-	if (filesize)
-		*filesize = len;
+	*filesize = len;
 done:
-	free(buf);
 	if (err) {
-		if (line_offsets) {
-			free(*line_offsets);
-			*line_offsets = NULL;
-		}
-		if (filesize)
-			*filesize = 0;
-		if (nlines)
-			*nlines = 0;
+		free(*line_offsets);
+		*line_offsets = NULL;
+		*filesize = 0;
+		*nlines = 0;
 	}
 	return NULL;
 }
