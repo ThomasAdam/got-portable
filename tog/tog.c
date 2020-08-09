@@ -3103,6 +3103,7 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 	if (fflush(infile) != 0) {
 		free(buf);
 		free(*line_offsets);
+		*line_offsets = NULL;
 		return got_error_from_errno("fflush");
 	}
 	rewind(infile);
@@ -3112,6 +3113,7 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 
 	free(buf);
 	free(*line_offsets);
+	*line_offsets = NULL;
 	return NULL;
 }
 
