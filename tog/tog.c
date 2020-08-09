@@ -3022,6 +3022,7 @@ const struct got_error *
 get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
     FILE *infile)
 {
+	const struct got_error *err = NULL;
 	size_t len;
 	char *buf = NULL;
 	int i;
@@ -3050,8 +3051,8 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 
 	fread(buf, 1, len, infile);
 	if (ferror(infile)) {
-		free(buf);
-		return got_error_from_errno("fread");
+		err = got_error_from_errno("fread");
+		goto done;
 	}
 
 	i = 0;
@@ -3062,10 +3063,8 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 			*nlines = 1;
 			*line_offsets = calloc(1, sizeof(**line_offsets));
 			if (*line_offsets == NULL) {
-				free(buf);
-				free(*line_offsets);
-				*line_offsets = NULL;
-				return got_error_from_errno("calloc");
+				err = got_error_from_errno("calloc");
+				goto done;
 			}
 				/* Skip forward over end of first line. */
 			while (i < len) {
@@ -3086,10 +3085,9 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 				    noffsets, *nlines,
 				    sizeof(**line_offsets));
 				if (o == NULL) {
-					free(*line_offsets);
-					*line_offsets = NULL;
-					return got_error_from_errno(
+					err = got_error_from_errno(
 					    "recallocarray");
+					goto done;
 				}
 				*line_offsets = o;
 				noffsets = *nlines;
@@ -3101,19 +3099,25 @@ get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
 	}
 
 	if (fflush(infile) != 0) {
-		free(buf);
-		free(*line_offsets);
-		*line_offsets = NULL;
-		return got_error_from_errno("fflush");
+		err = got_error_from_errno("fflush");
+		goto done;
 	}
 	rewind(infile);
 
 	if (filesize)
 		*filesize = len;
-
+done:
 	free(buf);
-	free(*line_offsets);
-	*line_offsets = NULL;
+	if (err) {
+		if (line_offsets) {
+			free(*line_offsets);
+			*line_offsets = NULL;
+		}
+		if (filesize)
+			*filesize = 0;
+		if (nlines)
+			*nlines = 0;
+	}
 	return NULL;
 }
 
