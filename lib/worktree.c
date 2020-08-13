@@ -3742,6 +3742,7 @@ struct schedule_deletion_args {
 	struct got_repository *repo;
 	int delete_local_mods;
 	int keep_on_disk;
+	const char *status_codes;
 };
 
 static const struct got_error *
@@ -3775,6 +3776,28 @@ schedule_for_deletion(void *arg, unsigned char status,
 	    a->repo);
 	if (err)
 		goto done;
+
+	if (a->status_codes) {
+		size_t ncodes = strlen(a->status_codes);
+		int i;
+		for (i = 0; i < ncodes ; i++) {
+			if (status == a->status_codes[i])
+				break;
+		}
+		if (i == ncodes) { 
+			/* Do not delete files in non-matching status. */
+			free(ondisk_path);
+			return NULL;
+		}
+		if (a->status_codes[i] != GOT_STATUS_MODIFY &&
+		    a->status_codes[i] != GOT_STATUS_MISSING) {
+			static char msg[64];
+			snprintf(msg, sizeof(msg),
+			    "invalid status code '%c'", a->status_codes[i]);
+			err = got_error_msg(GOT_ERR_FILE_STATUS, msg);
+			goto done;
+		}
+	}
 
 	if (status != GOT_STATUS_NO_CHANGE) {
 		if (status == GOT_STATUS_DELETE)
@@ -3837,6 +3860,7 @@ done:
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *worktree,
     struct got_pathlist_head *paths, int delete_local_mods,
+    const char *status_codes,
     got_worktree_delete_cb progress_cb, void *progress_arg,
     struct got_repository *repo, int keep_on_disk)
 {
@@ -3861,6 +3885,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 	sda.repo = repo;
 	sda.delete_local_mods = delete_local_mods;
 	sda.keep_on_disk = keep_on_disk;
+	sda.status_codes = status_codes;
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,

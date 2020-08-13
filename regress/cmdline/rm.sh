@@ -438,6 +438,83 @@ function test_rm_symlink {
 	test_done "$testroot" "$ret"
 }
 
+function test_rm_status_code {
+	local testroot=`test_init rm_status_code`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified beta" > $testroot/wt/beta
+
+	echo "got: invalid status code 'x'" > $testroot/stderr.expected
+	(cd $testroot/wt && got rm -s Mx beta 2>$testroot/stderr)
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/wt/epsilon/zeta # put file into 'missing' status
+
+	echo 'D  epsilon/zeta' > $testroot/stdout.expected
+	(cd $testroot/wt && got rm -R -s '!' . >$testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	if [ ! -e $testroot/wt/beta ]; then
+		echo "file beta was unexpectedly removed from disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# put file into 'missing' status again
+	(cd $testroot/wt && got revert epsilon/zeta > /dev/null)
+	rm $testroot/wt/epsilon/zeta
+
+	echo 'D  beta' > $testroot/stdout.expected
+	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	(cd $testroot/wt && got rm -R -s 'M!' . >$testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/beta ]; then
+		echo "removed file beta still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo 'D  beta' > $testroot/stdout.expected
+	echo 'D  epsilon/zeta' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_rm_basic
 run_test test_rm_with_local_mods
@@ -447,3 +524,4 @@ run_test test_rm_directory
 run_test test_rm_directory_keep_files
 run_test test_rm_subtree
 run_test test_rm_symlink
+run_test test_rm_status_code

@@ -6022,8 +6022,8 @@ done:
 __dead static void
 usage_remove(void)
 {
-	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] path ...\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s remove [-f] [-k] [-R] [-s status-codes] "
+	    "path ...\n", getprogname());
 	exit(1);
 }
 
@@ -6047,14 +6047,15 @@ cmd_remove(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_worktree *worktree = NULL;
 	struct got_repository *repo = NULL;
+	const char *status_codes = NULL;
 	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0;
+	int ch, delete_local_mods = 0, can_recurse = 0, keep_on_disk = 0, i;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "fkR")) != -1) {
+	while ((ch = getopt(argc, argv, "fkRs:")) != -1) {
 		switch (ch) {
 		case 'f':
 			delete_local_mods = 1;
@@ -6064,6 +6065,21 @@ cmd_remove(int argc, char *argv[])
 			break;
 		case 'R':
 			can_recurse = 1;
+			break;
+		case 's':
+			for (i = 0; i < strlen(optarg); i++) {
+				switch (optarg[i]) {
+				case GOT_STATUS_MODIFY:
+					delete_local_mods = 1;
+					break;
+				case GOT_STATUS_MISSING:
+					break;
+				default:
+					errx(1, "invalid status code '%c'",
+					    optarg[i]);
+				}
+			}
+			status_codes = optarg;
 			break;
 		default:
 			usage_remove();
@@ -6138,7 +6154,8 @@ cmd_remove(int argc, char *argv[])
 	}
 
 	error = got_worktree_schedule_delete(worktree, &paths,
-	    delete_local_mods, print_remove_status, NULL, repo, keep_on_disk);
+	    delete_local_mods, status_codes, print_remove_status, NULL,
+	    repo, keep_on_disk);
 done:
 	if (repo)
 		got_repo_close(repo);

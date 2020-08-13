@@ -187,8 +187,8 @@ const struct got_error *got_worktree_schedule_add(struct got_worktree *,
  */
 const struct got_error *
 got_worktree_schedule_delete(struct got_worktree *,
-    struct got_pathlist_head *, int, got_worktree_delete_cb, void *,
-    struct got_repository *, int);
+    struct got_pathlist_head *, int, const char *,
+    got_worktree_delete_cb, void *, struct got_repository *, int);
 
 /* A callback function which is used to select or reject a patch. */
 typedef const struct got_error *(*got_worktree_patch_cb)(int *, void *,
