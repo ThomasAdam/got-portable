@@ -607,7 +607,7 @@ branch will be used.
 .It Cm up
 Short alias for
 .Cm update .
-.It Cm status Op Ar path ...
+.It Cm status Oo Fl s Ar status-codes Oc Op Ar path ...
 Show the current modification status of files in a work tree,
 using the following status codes:
 .Bl -column YXZ description
@@ -644,6 +644,20 @@ Changes created on top of staged changes are indicated in the first column:
 .Bl -column YXZ description
 .It MM Ta file was modified after earlier changes have been staged
 .It MA Ta file was modified after having been staged for addition
+.El
+.Pp
+The options for
+.Cm got status
+are as follows:
+.Bl -tag -width Ds
+.It Fl s Ar status-codes
+Only show files with a modification status matching any of the
+single-character status codes contained in the
+.Ar status-codes
+argument.
+Any combination of codes from the above list of possible status codes
+may be specified.
+For staged files, status codes displayed in either column will be matched.
 .El
 .Pp
 For compatibility with
@@ -1955,8 +1969,11 @@ Check out a work tree from the Git repository to /usr/src:
 .Pp
 View local changes in a work tree directory:
 .Pp
-.Dl $ got status
 .Dl $ got diff | less
+.Pp
+In a work tree, display files in a potentially problematic state:
+.Pp
+.Dl $ got status -s 'C!~?'
 .Pp
 Interactively revert selected local changes in a work tree directory:
 .Pp

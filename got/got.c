@@ -4642,7 +4642,8 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s status [-s status-codes ] [path ...]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -4654,6 +4655,18 @@ print_status(void *arg, unsigned char status, unsigned char staged_status,
 {
 	if (status == staged_status && (status == GOT_STATUS_DELETE))
 		status = GOT_STATUS_NO_CHANGE;
+	if (arg) {
+		char *status_codes = arg;
+		size_t ncodes = strlen(status_codes);
+		int i;
+		for (i = 0; i < ncodes ; i++) {
+			if (status == status_codes[i] ||
+			    staged_status == status_codes[i])
+				break;
+		}
+		if (i == ncodes)
+			return NULL;
+	}
 	printf("%c%c %s\n", status, staged_status, path);
 	return NULL;
 }
@@ -4664,15 +4677,35 @@ cmd_status(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *cwd = NULL;
+	char *cwd = NULL, *status_codes = NULL;;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch;
+	int ch, i;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "s:")) != -1) {
 		switch (ch) {
+		case 's':
+			for (i = 0; i < strlen(optarg); i++) {
+				switch (optarg[i]) {
+				case GOT_STATUS_MODIFY:
+				case GOT_STATUS_ADD:
+				case GOT_STATUS_DELETE:
+				case GOT_STATUS_CONFLICT:
+				case GOT_STATUS_MISSING:
+				case GOT_STATUS_OBSTRUCTED:
+				case GOT_STATUS_UNVERSIONED:
+				case GOT_STATUS_MODE_CHANGE:
+				case GOT_STATUS_NONEXISTENT:
+					break;
+				default:
+					errx(1, "invalid status code '%c'",
+					    optarg[i]);
+				}
+			}
+			status_codes = optarg;
+			break;
 		default:
 			usage_status();
 			/* NOTREACHED */
@@ -4714,8 +4747,8 @@ cmd_status(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_status(worktree, &paths, repo, print_status, NULL,
-	    check_cancelled, NULL);
+	error = got_worktree_status(worktree, &paths, repo, print_status,
+	    status_codes, check_cancelled, NULL);
 done:
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
