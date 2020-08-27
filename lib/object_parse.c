@@ -475,6 +475,15 @@ got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 
 	} while (line);
 
+	if (*logmsg == NULL) {
+		/* log message does not contain \n */
+		*logmsg = strdup(commit->logmsg);
+		if (*logmsg == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
+
 	/* Trim redundant trailing whitespace. */
 	len = strlen(*logmsg);
 	while (len > 1 && isspace((unsigned char)(*logmsg)[len - 2]) &&
