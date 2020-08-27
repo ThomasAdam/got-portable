@@ -1115,7 +1115,7 @@ cmd_clone(int argc, char *argv[])
 		usage_clone();
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
-	    &repo_name, argv[0]);
+	    &repo_name, uri);
 	if (error)
 		goto done;
 
