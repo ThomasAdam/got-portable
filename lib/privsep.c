@@ -1199,8 +1199,11 @@ get_more:
 			break;
 		}
 
-		if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen)
-			return got_error(GOT_ERR_PRIVSEP_LEN);
+		if (imsg.hdr.len < IMSG_HEADER_SIZE + min_datalen) {
+			imsg_free(&imsg);
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
 
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
 
