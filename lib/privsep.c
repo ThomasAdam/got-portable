@@ -1274,6 +1274,8 @@ get_more:
 		}
 
 		imsg_free(&imsg);
+		if (err)
+			break;
 	}
 done:
 	if (*tree && (*tree)->nentries != nentries) {
