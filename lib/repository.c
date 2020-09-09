@@ -23,6 +23,7 @@
 #include <sys/syslimits.h>
 
 #include <ctype.h>
+#include <endian.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <limits.h>
@@ -912,7 +913,7 @@ static const struct got_error *
 read_packfile_hdr(int fd, struct got_packidx *packidx)
 {
 	const struct got_error *err = NULL;
-	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	struct got_packfile_hdr hdr;
 	ssize_t n;
 
@@ -922,9 +923,9 @@ read_packfile_hdr(int fd, struct got_packidx *packidx)
 	if (n != sizeof(hdr))
 		return got_error(GOT_ERR_BAD_PACKFILE);
 
-	if (betoh32(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
-	    betoh32(hdr.version) != GOT_PACKFILE_VERSION ||
-	    betoh32(hdr.nobjects) != totobj)
+	if (be32toh(hdr.signature) != GOT_PACKFILE_SIGNATURE ||
+	    be32toh(hdr.version) != GOT_PACKFILE_VERSION ||
+	    be32toh(hdr.nobjects) != totobj)
 		err = got_error(GOT_ERR_BAD_PACKFILE);
 
 	return err;

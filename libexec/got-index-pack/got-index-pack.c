@@ -33,6 +33,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <sha1.h>
+#include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -447,12 +448,12 @@ static int
 find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
 {
 	u_int8_t id0 = sha1[0];
-	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = nindexed - 1;
 	int cmp = 0, i = 0;
 
 	if (id0 > 0)
-		left = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+		left = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 
 	while (left <= right) {
 		struct got_packidx_object_id *oid;
@@ -476,7 +477,7 @@ find_object_idx(struct got_packidx *packidx, uint8_t *sha1)
 static void
 print_packidx(struct got_packidx *packidx)
 {
-	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 	int i;
 
 	fprintf(stderr, "object IDs:\n");
@@ -569,7 +570,7 @@ update_packidx(struct got_packidx *packidx, int nobj,
     struct got_indexed_object *obj)
 {
 	uint32_t idx;
-	uint32_t nindexed = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 
 	idx = find_object_idx(packidx, obj->id.sha1);
 	if (idx == -1) {
@@ -657,7 +658,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	if (hdr.version != htobe32(GOT_PACKFILE_VERSION))
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile version");
-	nobj = betoh32(hdr.nobjects);
+	nobj = be32toh(hdr.nobjects);
 	if (nobj == 0)
 		return got_error_msg(GOT_ERR_BAD_PACKFILE,
 		    "bad packfile with zero objects");

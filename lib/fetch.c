@@ -24,6 +24,7 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 
+#include <endian.h>
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
@@ -680,7 +681,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			    "bad pack file version");
 			goto done;
 		}
-		nobj = betoh32(pack_hdr.nobjects);
+		nobj = be32toh(pack_hdr.nobjects);
 		if (nobj == 0 &&
 		    packfile_size > sizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
 			return got_error_msg(GOT_ERR_BAD_PACKFILE,

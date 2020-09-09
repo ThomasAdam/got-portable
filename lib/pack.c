@@ -106,7 +106,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 	}
-	if (betoh32(*h->magic) != GOT_PACKIDX_V2_MAGIC) {
+	if (be32toh(*h->magic) != GOT_PACKIDX_V2_MAGIC) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
@@ -137,7 +137,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 	}
-	if (betoh32(*h->version) != GOT_PACKIDX_VERSION) {
+	if (be32toh(*h->version) != GOT_PACKIDX_VERSION) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
@@ -178,7 +178,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	offset += len_fanout;
 	remain -= len_fanout;
 
-	nobj = betoh32(h->fanout_table[0xff]);
+	nobj = be32toh(h->fanout_table[0xff]);
 	len_ids = nobj * sizeof(*h->sorted_ids);
 	if (len_ids <= nobj || len_ids > remain) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
@@ -259,7 +259,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 
 	/* Large file offsets are contained only in files > 2GB. */
 	for (i = 0; i < nobj; i++) {
-		uint32_t o = betoh32(h->offsets[i]);
+		uint32_t o = be32toh(h->offsets[i]);
 		if (o & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
 			p->nlargeobj++;
 	}
@@ -417,14 +417,14 @@ got_packidx_close(struct got_packidx *packidx)
 static off_t
 get_object_offset(struct got_packidx *packidx, int idx)
 {
-	uint32_t offset = betoh32(packidx->hdr.offsets[idx]);
+	uint32_t offset = be32toh(packidx->hdr.offsets[idx]);
 	if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
 		uint64_t loffset;
 		idx = offset & GOT_PACKIDX_OFFSET_VAL_MASK;
 		if (idx < 0 || idx >= packidx->nlargeobj ||
 		    packidx->hdr.large_offsets == NULL)
 			return -1;
-		loffset = betoh64(packidx->hdr.large_offsets[idx]);
+		loffset = be64toh(packidx->hdr.large_offsets[idx]);
 		return (loffset > INT64_MAX ? -1 : (off_t)loffset);
 	}
 	return (off_t)(offset & GOT_PACKIDX_OFFSET_VAL_MASK);
@@ -434,11 +434,11 @@ int
 got_packidx_get_object_idx(struct got_packidx *packidx, struct got_object_id *id)
 {
 	u_int8_t id0 = id->sha1[0];
-	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	int left = 0, right = totobj - 1;
 
 	if (id0 > 0)
-		left = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+		left = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 
 	while (left <= right) {
 		struct got_packidx_object_id *oid;
@@ -464,7 +464,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 {
 	const struct got_error *err = NULL;
 	u_int8_t id0;
-	uint32_t totobj = betoh32(packidx->hdr.fanout_table[0xff]);
+	uint32_t totobj = be32toh(packidx->hdr.fanout_table[0xff]);
 	char hex[3];
 	size_t prefix_len = strlen(id_str_prefix);
 	struct got_packidx_object_id *oid;
@@ -481,7 +481,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	if (!got_parse_xdigit(&id0, hex))
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
-	i = betoh32(packidx->hdr.fanout_table[id0 - 1]);
+	i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
 	if (i == 0)
 		return NULL;
 
