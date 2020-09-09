@@ -161,12 +161,32 @@ got_repo_get_path_gitconfig(struct got_repository *repo)
 	return get_path_git_child(repo, GOT_GITCONFIG);
 }
 
+char *
+got_repo_get_path_gotconfig(struct got_repository *repo)
+{
+	return get_path_git_child(repo, GOT_GOTCONFIG);
+}
+
 void
 got_repo_get_gitconfig_remotes(int *nremotes, struct got_remote_repo **remotes,
     struct got_repository *repo)
 {
 	*nremotes = repo->ngitconfig_remotes;
 	*remotes = repo->gitconfig_remotes;
+}
+
+const char *
+got_repo_get_gotconfig_author(struct got_repository *repo)
+{
+	return repo->gotconfig_author;
+}
+
+void
+got_repo_get_gotconfig_remotes(int *nremotes, struct got_remote_repo **remotes,
+    struct got_repository *repo)
+{
+	*nremotes = repo->ngotconfig_remotes;
+	*remotes = repo->gotconfig_remotes;
 }
 
 static int
@@ -518,6 +538,124 @@ done:
 	return err;
 }
 
+static const struct got_error *
+parse_gotconfig_file(char **author,
+    struct got_remote_repo **remotes, int *nremotes,
+    const char *gotconfig_path)
+{
+	const struct got_error *err = NULL, *child_err = NULL;
+	int fd = -1;
+	int imsg_fds[2] = { -1, -1 };
+	pid_t pid;
+	struct imsgbuf *ibuf;
+
+	if (author)
+		*author = NULL;
+	if (remotes)
+		*remotes = NULL;
+	if (nremotes)
+		*nremotes = 0;
+
+	fd = open(gotconfig_path, O_RDONLY);
+	if (fd == -1) {
+		if (errno == ENOENT)
+			return NULL;
+		return got_error_from_errno2("open", gotconfig_path);
+	}
+
+	ibuf = calloc(1, sizeof(*ibuf));
+	if (ibuf == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_fds) == -1) {
+		err = got_error_from_errno("socketpair");
+		goto done;
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		err = got_error_from_errno("fork");
+		goto done;
+	} else if (pid == 0) {
+		got_privsep_exec_child(imsg_fds, GOT_PATH_PROG_READ_GOTCONFIG,
+		    gotconfig_path);
+		/* not reached */
+	}
+
+	if (close(imsg_fds[1]) == -1) {
+		err = got_error_from_errno("close");
+		goto done;
+	}
+	imsg_fds[1] = -1;
+	imsg_init(ibuf, imsg_fds[0]);
+
+	err = got_privsep_send_gotconfig_parse_req(ibuf, fd);
+	if (err)
+		goto done;
+	fd = -1;
+
+	if (author) {
+		err = got_privsep_send_gotconfig_author_req(ibuf);
+		if (err)
+			goto done;
+
+		err = got_privsep_recv_gotconfig_str(author, ibuf);
+		if (err)
+			goto done;
+	}
+
+	if (remotes && nremotes) {
+		err = got_privsep_send_gotconfig_remotes_req(ibuf);
+		if (err)
+			goto done;
+
+		err = got_privsep_recv_gotconfig_remotes(remotes,
+		    nremotes, ibuf);
+		if (err)
+			goto done;
+	}
+
+	imsg_clear(ibuf);
+	err = got_privsep_send_stop(imsg_fds[0]);
+	child_err = got_privsep_wait_for_child(pid);
+	if (child_err && err == NULL)
+		err = child_err;
+done:
+	if (imsg_fds[0] != -1 && close(imsg_fds[0]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (imsg_fds[1] != -1 && close(imsg_fds[1]) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", gotconfig_path);
+	if (err) {
+		if (author) {
+			free(*author);
+			*author = NULL;
+		}
+	}
+	free(ibuf);
+	return err;
+}
+
+static const struct got_error *
+read_gotconfig(struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *gotconfig_path;
+
+	gotconfig_path = got_repo_get_path_gotconfig(repo);
+	if (gotconfig_path == NULL)
+		return got_error_from_errno("got_repo_get_path_gotconfig");
+
+	err = parse_gotconfig_file(&repo->gotconfig_author,
+	    &repo->gotconfig_remotes, &repo->ngotconfig_remotes,
+	    gotconfig_path);
+	free(gotconfig_path);
+	return err;
+}
+
 const struct got_error *
 got_repo_open(struct got_repository **repop, const char *path,
     const char *global_gitconfig_path)
@@ -591,6 +729,10 @@ got_repo_open(struct got_repository **repop, const char *path,
 		}
 	} while (path);
 
+	err = read_gotconfig(repo);
+	if (err)
+		goto done;
+
 	err = read_gitconfig(repo, global_gitconfig_path);
 	if (err)
 		goto done;
@@ -646,6 +788,12 @@ got_repo_close(struct got_repository *repo)
 			err = got_error_from_errno("close");
 	}
 
+	free(repo->gotconfig_author);
+	for (i = 0; i < repo->ngotconfig_remotes; i++) {
+		free(repo->gotconfig_remotes[i].name);
+		free(repo->gotconfig_remotes[i].url);
+	}
+	free(repo->gotconfig_remotes);
 	free(repo->gitconfig_author_name);
 	free(repo->gitconfig_author_email);
 	for (i = 0; i < repo->ngitconfig_remotes; i++) {

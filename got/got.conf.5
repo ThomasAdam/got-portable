@@ -1,0 +1,156 @@
+.\"
+.\" Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOT.CONF 5
+.Os
+.Sh NAME
+.Nm got.conf
+.Nd Game of Trees configuration file
+.Sh DESCRIPTION
+.Nm
+is the run-time configuration file for
+.Xr got 1 .
+.Pp
+The file format is line-based, with one configuration directive per line.
+Any lines beginning with a
+.Sq #
+are treated as comments and ignored.
+.Pp
+The available configuration directives are as follows:
+.Bl -tag -width Ds
+.It Ic author Dq Real Name <email address>
+Configure the author's name and email address for
+.Cm got commit
+and
+.Cm got import
+when operating on this repository.
+Author information specified here overrides the
+.Ev GOT_AUTHOR
+environment variable.
+.Pp
+Because
+.Xr git 1
+may fail to parse commits without an email address in author data,
+.Xr got 1
+attempts to reject author information with a missing email address.
+.It Ic remote Ar name Brq ...
+Define a remote repository.
+The specified
+.Ar name
+can be used to refer to the remote repository on the command line of
+.Cm got fetch .
+.Pp
+Information about this repository is declared in a block of options
+enclosed in curly brackets:
+.Bl -tag -width Ds
+.It Ic server Ar hostname
+Defines the hostname to use for contacting the remote repository's server.
+.It Ic repository Ar path
+Defines the path to the repository on the remote repository's server.
+.It Ic protocol Ar scheme
+Defines the protocol to use for communicating with the remote repository's
+server.
+.Pp
+The following protocol schemes are supported:
+.Bl -tag -width git+ssh
+.It git
+The Git protocol as implemented by the
+.Xr git-daemon 1
+server.
+Use of this protocol is discouraged since it supports neither authentication
+nor encryption.
+.It git+ssh
+The Git protocol wrapped in an authenticated and encrypted
+.Xr ssh 1
+tunnel.
+With this protocol the hostname may contain an embedded username for
+.Xr ssh 1
+to use:
+.Mt user@hostname
+.It ssh
+Short alias for git+ssh.
+.El
+.It Ic port Ar port
+Defines the port to use for connecting to the remote repository's server.
+The
+.Ar port
+can be specified by number or name.
+The port name to number mappings are found in the file
+.Pa /etc/services ;
+see
+.Xr services 5
+for details.
+If not specified, the default port of the specified
+.Cm protocol
+will be used.
+.It Ic mirror-references Ar yes | no
+This option controls the behaviour of
+.Cm got fetch
+when updating references.
+.Sy Enabling this option can lead to the loss of local commits.
+Maintaining custom changes in a mirror repository is therefore discouraged.
+.Pp
+If this option is not specified or set to
+.Ar no ,
+.Cm got fetch
+will map references of the remote repository into the local repository's
+.Dq refs/remotes/
+namespace.
+.Pp
+If this option is set to
+.Ar yes ,
+all branches in the
+.Dq refs/heads/
+namespace will be updated directly to match the corresponding branches in
+the remote repository.
+.El
+.Sh EXAMPLES
+Configure author information:
+.Bd -literal -offset indent
+author "Flan Hacker <flan_hacker@openbsd.org>"
+.Ed
+.Pp
+Remote repository specification for the Game of Trees repository:
+.Bd -literal -offset indent
+remote "origin" {
+	server git.gameoftrees.org
+	protocol git
+	repository got
+}
+.Ed
+.Pp
+Mirror the OpenBSD src repository from Github:
+.Bd -literal -offset indent
+remote "origin" {
+	repository "openbsd/src"
+	server git@github.com
+	protocol git+ssh
+	mirror-references yes
+}
+.Ed
+.Sh FILES
+.Bl -tag -width Ds -compact
+.It Pa got.conf
+If present, the
+.Nm
+configuration file is located in the root directory of a Git repository
+and supersedes any relevant settings in Git's
+.Pa config
+file.
+.El
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr git-repository 5

@@ -1888,6 +1888,208 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 }
 
 const struct got_error *
+got_privsep_send_gotconfig_parse_req(struct imsgbuf *ibuf, int fd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_GOTCONFIG_PARSE_REQUEST, 0, 0, fd,
+	    NULL, 0) == -1) {
+		err = got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_PARSE_REQUEST");
+		close(fd);
+		return err;
+	}
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gotconfig_author_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GOTCONFIG_AUTHOR_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_AUTHOR_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_gotconfig_remotes_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GOTCONFIG_REMOTES_REQUEST, 0, 0, -1, NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GOTCONFIG_REMOTE_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	const size_t min_datalen = 0;
+
+	*str = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		if (datalen < sizeof(struct got_imsg_error)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_GOTCONFIG_STR_VAL:
+		if (datalen == 0)
+			break;
+		*str = malloc(datalen);
+		if (*str == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		if (strlcpy(*str, imsg.data, datalen) >= datalen)
+			err = got_error(GOT_ERR_NO_SPACE);
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
+got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
+    int *nremotes, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	struct got_imsg_remotes iremotes;
+	struct got_imsg_remote iremote;
+	const size_t min_datalen =
+	    MIN(sizeof(struct got_imsg_error), sizeof(iremotes));
+
+	*remotes = NULL;
+	*nremotes = 0;
+	iremotes.nremotes = 0;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+	if (err)
+		return err;
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		if (datalen < sizeof(struct got_imsg_error)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_GOTCONFIG_REMOTES:
+		if (datalen != sizeof(iremotes)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		memcpy(&iremotes, imsg.data, sizeof(iremotes));
+		if (iremotes.nremotes == 0) {
+			imsg_free(&imsg);
+			return NULL;
+		}
+		break;
+	default:
+		imsg_free(&imsg);
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+	}
+
+	imsg_free(&imsg);
+
+	*remotes = recallocarray(NULL, 0, iremotes.nremotes, sizeof(**remotes));
+	if (*remotes == NULL)
+		return got_error_from_errno("recallocarray");
+
+	while (*nremotes < iremotes.nremotes) {
+		struct got_remote_repo *remote;
+		const size_t min_datalen =
+		    MIN(sizeof(struct got_imsg_error), sizeof(iremote));
+
+		err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
+		if (err)
+			break;
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+		switch (imsg.hdr.type) {
+		case GOT_IMSG_ERROR:
+			if (datalen < sizeof(struct got_imsg_error)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			err = recv_imsg_error(&imsg, datalen);
+			break;
+		case GOT_IMSG_GOTCONFIG_REMOTE:
+			remote = &(*remotes)[*nremotes];
+			if (datalen < sizeof(iremote)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			memcpy(&iremote, imsg.data, sizeof(iremote));
+			if (iremote.name_len == 0 || iremote.url_len == 0 ||
+			    (sizeof(iremote) + iremote.name_len +
+			    iremote.url_len) > datalen) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				break;
+			}
+			remote->name = strndup(imsg.data + sizeof(iremote),
+			    iremote.name_len);
+			if (remote->name == NULL) {
+				err = got_error_from_errno("strndup");
+				break;
+			}
+			remote->url = strndup(imsg.data + sizeof(iremote) +
+			    iremote.name_len, iremote.url_len);
+			if (remote->url == NULL) {
+				err = got_error_from_errno("strndup");
+				free(remote->name);
+				break;
+			}
+			remote->mirror_references = iremote.mirror_references;
+			(*nremotes)++;
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+
+		imsg_free(&imsg);
+		if (err)
+			break;
+	}
+
+	if (err) {
+		int i;
+		for (i = 0; i < *nremotes; i++) {
+			free((*remotes)[i].name);
+			free((*remotes)[i].url);
+		}
+		free(*remotes);
+		*remotes = NULL;
+		*nremotes = 0;
+	}
+	return err;
+}
+
+const struct got_error *
 got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
      struct got_object_id *id, int idx, const char *path)
 {
@@ -2009,6 +2211,7 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_READ_BLOB,
 	    GOT_PATH_PROG_READ_TAG,
 	    GOT_PATH_PROG_READ_GITCONFIG,
+	    GOT_PATH_PROG_READ_GOTCONFIG,
 	    GOT_PATH_PROG_FETCH_PACK,
 	    GOT_PATH_PROG_INDEX_PACK,
 	};

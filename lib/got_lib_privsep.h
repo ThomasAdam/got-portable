@@ -43,6 +43,7 @@
 #define GOT_PROG_READ_TAG	got-read-tag
 #define GOT_PROG_READ_PACK	got-read-pack
 #define GOT_PROG_READ_GITCONFIG	got-read-gitconfig
+#define GOT_PROG_READ_GOTCONFIG	got-read-gotconfig
 #define GOT_PROG_FETCH_PACK	got-fetch-pack
 #define GOT_PROG_INDEX_PACK	got-index-pack
 #define GOT_PROG_SEND_PACK	got-send-pack
@@ -65,6 +66,8 @@
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_PACK)
 #define GOT_PATH_PROG_READ_GITCONFIG \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GITCONFIG)
+#define GOT_PATH_PROG_READ_GOTCONFIG \
+	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_READ_GOTCONFIG)
 #define GOT_PATH_PROG_FETCH_PACK \
 	GOT_STRINGVAL(GOT_LIBEXECDIR) "/" GOT_STRINGVAL(GOT_PROG_FETCH_PACK)
 #define GOT_PATH_PROG_SEND_PACK \
@@ -147,6 +150,15 @@ enum got_imsg_type {
 	GOT_IMSG_GITCONFIG_REMOTE,
 	GOT_IMSG_GITCONFIG_OWNER_REQUEST,
 	GOT_IMSG_GITCONFIG_OWNER,
+
+	/* Messages related to gotconfig files. */
+	GOT_IMSG_GOTCONFIG_PARSE_REQUEST,
+	GOT_IMSG_GOTCONFIG_AUTHOR_REQUEST,
+	GOT_IMSG_GOTCONFIG_REMOTES_REQUEST,
+	GOT_IMSG_GOTCONFIG_INT_VAL,
+	GOT_IMSG_GOTCONFIG_STR_VAL,
+	GOT_IMSG_GOTCONFIG_REMOTES,
+	GOT_IMSG_GOTCONFIG_REMOTE,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -457,6 +469,16 @@ const struct got_error *got_privsep_recv_gitconfig_str(char **,
     struct imsgbuf *);
 const struct got_error *got_privsep_recv_gitconfig_int(int *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_gitconfig_remotes(
+    struct got_remote_repo **, int *, struct imsgbuf *);
+
+const struct got_error *got_privsep_send_gotconfig_parse_req(struct imsgbuf *,
+    int);
+const struct got_error *got_privsep_send_gotconfig_author_req(struct imsgbuf *);
+const struct got_error *got_privsep_send_gotconfig_remotes_req(
+    struct imsgbuf *);
+const struct got_error *got_privsep_recv_gotconfig_str(char **,
+    struct imsgbuf *);
+const struct got_error *got_privsep_recv_gotconfig_remotes(
     struct got_remote_repo **, int *, struct imsgbuf *);
 
 const struct got_error *got_privsep_send_commit_traversal_request(

@@ -88,7 +88,9 @@ The
 command requires the
 .Ev GOT_AUTHOR
 environment variable to be set,
-unless Git's
+unless an author has been configured in
+.Xr got.conf 5
+or Git's
 .Dv user.name
 and
 .Dv user.email
@@ -186,8 +188,10 @@ More details about the pack file format are documented in
 .Pp
 .Cm got clone
 creates a remote repository entry in the
+.Xr got.conf 5
+and
 .Pa config
-file of the cloned repository to store the
+files of the cloned repository to store the
 .Ar repository-url
 for future use by
 .Cm got fetch
@@ -234,8 +238,10 @@ This is useful if the cloned repository will not be used to store
 locally created commits.
 .Pp
 The repository's
+.Xr got.conf 5
+and
 .Pa config
-file will be set up with the
+files will be set up with the
 .Dq mirror
 option enabled, such that
 .Cm got fetch
@@ -310,6 +316,8 @@ is specified,
 .Dq origin
 will be used.
 The remote repository's URL is obtained from the corresponding entry in the
+.Xr got.conf 5
+or
 .Pa config
 file of the local repository, as created by
 .Cm got clone .
@@ -1228,7 +1236,9 @@ The
 command requires the
 .Ev GOT_AUTHOR
 environment variable to be set,
-unless Git's
+unless an author has been configured in
+.Xr got.conf 5
+or Git's
 .Dv user.name
 and
 .Dv user.email
@@ -1920,25 +1930,29 @@ attempts to reject
 .Ev GOT_AUTHOR
 environment variables with a missing email address.
 .Pp
-If present, Git's
+If present,
+configuration settings in
+.Xr got.conf 5 ,
+or Git's
 .Dv user.name
 and
 .Dv user.email
 configuration settings in the repository's
 .Pa .git/config
-file will override the value of
+file,
+will override the value of
 .Ev GOT_AUTHOR .
-However, the
+The
 .Dv user.name
 and
 .Dv user.email
 configuration settings contained in Git's global
 .Pa ~/.gitconfig
-configuration file will be used only if the
+configuration file will only be used if neither
+.Xr got.conf 5
+nor the
 .Ev GOT_AUTHOR
-environment variable is
-.Em not
-set.
+environment variable provide author information.
 .It Ev VISUAL , EDITOR
 The editor spawned by
 .Cm got commit ,
@@ -1950,6 +1964,16 @@ The default limit on the number of commits traversed by
 .Cm got log .
 If set to zero, the limit is unbounded.
 This variable will be silently ignored if it is set to a non-numeric value.
+.El
+.Sh FILES
+.Bl -tag -width packed-refs -compact
+.It Pa got.conf
+Repository-wide configuration settings for
+.Nm .
+If present, this configuration file is located in the root directory
+of a Git repository and supersedes any relevant settings in Git's
+.Pa config
+file.
 .El
 .Sh EXIT STATUS
 .Ex -std got
@@ -2257,7 +2281,8 @@ repository with
 .Sh SEE ALSO
 .Xr tog 1 ,
 .Xr git-repository 5 ,
-.Xr got-worktree 5
+.Xr got-worktree 5 ,
+.Xr got.conf 5
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
 .An Martin Pieuchot Aq Mt mpi@openbsd.org

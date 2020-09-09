@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019, 2020 Tracey Emery <tracey@openbsd.org>
+ * Copyright (c) 2020 Tracey Emery <tracey@openbsd.org>
+ * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2004, 2005 Esben Norby <norby@openbsd.org>
  * Copyright (c) 2004 Ryan McBride <mcbride@openbsd.org>
  * Copyright (c) 2002, 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -30,6 +31,8 @@
 
 #include <arpa/inet.h>
 
+#include <netdb.h>
+
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -44,21 +47,19 @@
 #include <unistd.h>
 
 #include "got_error.h"
-#include "gotweb.h"
+#include "gotconfig.h"
 
-TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
-	TAILQ_ENTRY(file)	 entry;
 	FILE			*stream;
-	char			*name;
+	const char		*name;
 	size_t	 		 ungetpos;
 	size_t			 ungetsize;
 	u_char			*ungetbuf;
 	int			 eof_reached;
 	int			 lineno;
-} *file, *topfile;
-static const struct got_error*	pushfile(struct file**, const char *);
-int		 popfile(void);
+} *file;
+static const struct got_error*	newfile(struct file**, const char *, int *);
+static void	closefile(struct file *);
 int		 yyparse(void);
 int		 yylex(void);
 int		 yyerror(const char *, ...)
@@ -70,6 +71,7 @@ int		 igetc(void);
 int		 lgetc(int);
 void		 lungetc(int);
 int		 findeol(void);
+static int	 parseport(char *, long long *);
 
 TAILQ_HEAD(symhead, sym)	 symhead = TAILQ_HEAD_INITIALIZER(symhead);
 struct sym {
@@ -83,8 +85,12 @@ struct sym {
 int	 symset(const char *, const char *, int);
 char	*symget(const char *);
 
-const struct got_error* gerror = NULL;
-struct gotweb_config		*gw_conf;
+static int	 atoul(char *, u_long *);
+
+static const struct got_error* gerror;
+static struct gotconfig_remote_repo *remote;
+static struct gotconfig gotconfig;
+static const struct got_error* new_remote(struct gotconfig_remote_repo **);
 
 typedef struct {
 	union {
@@ -96,27 +102,25 @@ typedef struct {
 
 %}
 
-%token	GOT_WWW_PATH GOT_MAX_REPOS GOT_SITE_NAME GOT_SITE_OWNER GOT_SITE_LINK
-%token	GOT_LOGO GOT_LOGO_URL GOT_SHOW_REPO_OWNER GOT_SHOW_REPO_AGE
-%token	GOT_SHOW_REPO_DESCRIPTION GOT_MAX_REPOS_DISPLAY GOT_REPOS_PATH
-%token	GOT_MAX_COMMITS_DISPLAY ON ERROR GOT_SHOW_SITE_OWNER
-%token	GOT_SHOW_REPO_CLONEURL
+%token	ERROR
+%token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES AUTHOR
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
-%type	<v.number>	boolean
+%type	<v.number>	boolean portplain
+%type	<v.string>	numberstring
+
 %%
 
 grammar		: /* empty */
 		| grammar '\n'
-		| grammar main '\n'
+		| grammar author '\n'
+		| grammar remote '\n'
 		;
-
 boolean		: STRING {
 			if (strcasecmp($1, "true") == 0 ||
 			    strcasecmp($1, "yes") == 0)
 				$$ = 1;
 			else if (strcasecmp($1, "false") == 0 ||
-			    strcasecmp($1, "off") == 0 ||
 			    strcasecmp($1, "no") == 0)
 				$$ = 0;
 			else {
@@ -126,89 +130,97 @@ boolean		: STRING {
 			}
 			free($1);
 		}
-		| ON { $$ = 1; }
 		;
-main		: GOT_REPOS_PATH STRING {
-			gw_conf->got_repos_path = strdup($2);
-			if (gw_conf->got_repos_path== NULL) {
+numberstring	: NUMBER				{
+			char	*s;
+			if (asprintf(&s, "%lld", $1) == -1) {
+				yyerror("string: asprintf");
+				YYERROR;
+			}
+			$$ = s;
+		}
+		| STRING
+		;
+portplain	: numberstring	{
+			if (parseport($1, &$$) == -1) {
+				free($1);
+				YYERROR;
+			}
+			free($1);
+		}
+		;
+remoteopts2	: remoteopts2 remoteopts1 nl
+	   	| remoteopts1 optnl
+		;
+remoteopts1	: REPOSITORY STRING {
+	   		remote->repository = strdup($2);
+			if (remote->repository == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+	   	}
+	   	| SERVER STRING {
+	   		remote->server = strdup($2);
+			if (remote->server == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 			free($2);
 		}
-		| GOT_MAX_REPOS NUMBER {
-			if ($2 > 0)
-				gw_conf->got_max_repos = $2;
-		}
-		| GOT_SITE_NAME STRING {
-			gw_conf->got_site_name = strdup($2);
-			if (gw_conf->got_site_name == NULL) {
+		| PROTOCOL STRING {
+	   		remote->protocol = strdup($2);
+			if (remote->protocol == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 			free($2);
 		}
-		| GOT_SITE_OWNER STRING {
-			gw_conf->got_site_owner = strdup($2);
-			if (gw_conf->got_site_owner == NULL) {
+		| MIRROR_REFERENCES boolean {
+			remote->mirror_references = $2;
+		}
+		| PORT portplain {
+			remote->port = $2;
+		}
+	   	;
+remote		: REMOTE STRING {
+			static const struct got_error* error;
+
+			error = new_remote(&remote);
+			if (error) {
+				free($2);
+				yyerror("%s", error->msg);
+				YYERROR;
+			}
+			remote->name = strdup($2);
+			if (remote->name == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		} '{' optnl remoteopts2 '}' {
+			TAILQ_INSERT_TAIL(&gotconfig.remotes, remote, entry);
+			gotconfig.nremotes++;
+		}
+		;
+author		: AUTHOR STRING {
+	   		gotconfig.author = strdup($2);
+			if (gotconfig.author == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
 			}
 			free($2);
 		}
-		| GOT_SITE_LINK STRING {
-			gw_conf->got_site_link = strdup($2);
-			if (gw_conf->got_site_link == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
-		}
-		| GOT_LOGO STRING {
-			gw_conf->got_logo = strdup($2);
-			if (gw_conf->got_logo== NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
-		}
-		| GOT_LOGO_URL STRING {
-			gw_conf->got_logo_url = strdup($2);
-			if (gw_conf->got_logo_url== NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
-		}
-		| GOT_SHOW_SITE_OWNER boolean {
-			gw_conf->got_show_site_owner = $2;
-		}
-		| GOT_SHOW_REPO_OWNER boolean {
-			gw_conf->got_show_repo_owner = $2;
-		}
-		| GOT_SHOW_REPO_AGE boolean {
-			gw_conf->got_show_repo_age = $2;
-		}
-		| GOT_SHOW_REPO_DESCRIPTION boolean {
-			gw_conf->got_show_repo_description = $2;
-		}
-		| GOT_SHOW_REPO_CLONEURL boolean {
-			gw_conf->got_show_repo_cloneurl = $2;
-		}
-		| GOT_MAX_REPOS_DISPLAY NUMBER {
-			if ($2 > 0)
-				gw_conf->got_max_repos_display = $2;
-		}
-		| GOT_MAX_COMMITS_DISPLAY NUMBER {
-			if ($2 > 0)
-				gw_conf->got_max_commits_display = $2;
-		}
+		;
+optnl		: '\n' optnl
+		| /* empty */
+		;
+nl		: '\n' optnl
 		;
 %%
 
@@ -230,7 +242,8 @@ yyerror(const char *fmt, ...)
 		return 0;
 	}
 	va_end(ap);
-	if (asprintf(&err, "%s:%d: %s", file->name, yylval.lineno, msg) == -1) {
+	if (asprintf(&err, "%s: line %d: %s", file->name, yylval.lineno,
+	    msg) == -1) {
 		gerror = got_error_from_errno("asprintf");
 		return(0);
 	}
@@ -239,7 +252,6 @@ yyerror(const char *fmt, ...)
 	free(err);
 	return(0);
 }
-
 int
 kw_cmp(const void *k, const void *e)
 {
@@ -251,20 +263,13 @@ lookup(char *s)
 {
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
-		{ "got_logo",			GOT_LOGO },
-		{ "got_logo_url",		GOT_LOGO_URL },
-		{ "got_max_commits_display",	GOT_MAX_COMMITS_DISPLAY },
-		{ "got_max_repos",		GOT_MAX_REPOS },
-		{ "got_max_repos_display",	GOT_MAX_REPOS_DISPLAY },
-		{ "got_repos_path",		GOT_REPOS_PATH },
-		{ "got_show_repo_age",		GOT_SHOW_REPO_AGE },
-		{ "got_show_repo_cloneurl",	GOT_SHOW_REPO_CLONEURL },
-		{ "got_show_repo_description",	GOT_SHOW_REPO_DESCRIPTION },
-		{ "got_show_repo_owner",	GOT_SHOW_REPO_OWNER },
-		{ "got_show_site_owner",	GOT_SHOW_SITE_OWNER },
-		{ "got_site_link",		GOT_SITE_LINK },
-		{ "got_site_name",		GOT_SITE_NAME },
-		{ "got_site_owner",		GOT_SITE_OWNER },
+		{"author",		AUTHOR},
+		{"mirror-references",	MIRROR_REFERENCES},
+		{"port",		PORT},
+		{"protocol",		PROTOCOL},
+		{"remote",		REMOTE},
+		{"repository",		REPOSITORY},
+		{"server",		SERVER},
 	};
 	const struct keywords	*p;
 
@@ -309,17 +314,16 @@ lgetc(int quotec)
 	int		c, next;
 
 	if (quotec) {
-		if ((c = igetc()) == EOF) {
+		c = igetc();
+		if (c == EOF) {
 			yyerror("reached end of file while parsing "
 			    "quoted string");
-			if (file == topfile || popfile() == EOF)
-				return (EOF);
-			return (quotec);
 		}
 		return (c);
 	}
 
-	while ((c = igetc()) == '\\') {
+	c = igetc();
+	while (c == '\\') {
 		next = igetc();
 		if (next != '\n') {
 			c = next;
@@ -329,22 +333,6 @@ lgetc(int quotec)
 		file->lineno++;
 	}
 
-	if (c == EOF) {
-		/*
-		 * Fake EOL when hit EOF for the first time. This gets line
-		 * count right if last line in included file is syntactically
-		 * invalid and has no newline.
-		 */
-		if (file->eof_reached == 0) {
-			file->eof_reached = 1;
-			return ('\n');
-		}
-		while (c == EOF) {
-			if (file == topfile || popfile() == EOF)
-				return (EOF);
-			c = igetc();
-		}
-	}
 	return (c);
 }
 
@@ -382,6 +370,41 @@ findeol(void)
 	return (ERROR);
 }
 
+static long long
+getservice(char *n)
+{
+	struct servent	*s;
+	u_long		 ulval;
+
+	if (atoul(n, &ulval) == 0) {
+		if (ulval > 65535) {
+			yyerror("illegal port value %lu", ulval);
+			return (-1);
+		}
+		return ulval;
+	} else {
+		s = getservbyname(n, "tcp");
+		if (s == NULL)
+			s = getservbyname(n, "udp");
+		if (s == NULL) {
+			yyerror("unknown port %s", n);
+			return (-1);
+		}
+		return (s->s_port);
+	}
+}
+
+static int
+parseport(char *port, long long *pn)
+{
+	if ((*pn = getservice(port)) == -1) {
+		*pn = 0LL;
+		return (-1);
+	}
+	return (0);
+}
+
+
 int
 yylex(void)
 {
@@ -392,16 +415,20 @@ yylex(void)
 
 top:
 	p = buf;
-	while ((c = lgetc(0)) == ' ' || c == '\t')
-		; /* nothing */
+	c = lgetc(0);
+	while (c == ' ' || c == '\t')
+		c = lgetc(0); /* nothing */
 
 	yylval.lineno = file->lineno;
-	if (c == '#')
-		while ((c = lgetc(0)) != '\n' && c != EOF)
-			; /* nothing */
+	if (c == '#') {
+		c = lgetc(0);
+		while (c != '\n' && c != EOF)
+			c = lgetc(0); /* nothing */
+	}
 	if (c == '$' && !expanding) {
 		while (1) {
-			if ((c = lgetc(0)) == EOF)
+			c = lgetc(0);
+			if (c == EOF)
 				return (0);
 
 			if (p + 1 >= buf + sizeof(buf) - 1) {
@@ -436,13 +463,15 @@ top:
 	case '"':
 		quotec = c;
 		while (1) {
-			if ((c = lgetc(quotec)) == EOF)
+			c = lgetc(quotec);
+			if (c == EOF)
 				return (0);
 			if (c == '\n') {
 				file->lineno++;
 				continue;
 			} else if (c == '\\') {
-				if ((next = lgetc(quotec)) == EOF)
+				next = lgetc(quotec);
+				if (next == EOF)
 					return (0);
 				if (next == quotec || c == ' ' || c == '\t')
 					c = next;
@@ -480,7 +509,8 @@ top:
 				yyerror("string too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && isdigit(c));
+			c = lgetc(0);
+		} while (c != EOF && isdigit(c));
 		lungetc(c);
 		if (p == buf + 1 && buf[0] == '-')
 			goto nodigits;
@@ -519,12 +549,16 @@ nodigits:
 				yyerror("string too long");
 				return (findeol());
 			}
-		} while ((c = lgetc(0)) != EOF && (allowed_in_string(c)));
+			c = lgetc(0);
+		} while (c != EOF && (allowed_in_string(c)));
 		lungetc(c);
 		*p = '\0';
-		if ((token = lookup(buf)) == STRING)
-			if ((yylval.v.string = strdup(buf)) == NULL)
+		token = lookup(buf);
+		if (token == STRING) {
+			yylval.v.string = strdup(buf);
+			if (yylval.v.string == NULL)
 				err(1, "%s", __func__);
+		}
 		return (token);
 	}
 	if (c == '\n') {
@@ -537,117 +571,99 @@ nodigits:
 }
 
 static const struct got_error*
-pushfile(struct file **nfile, const char *name)
+newfile(struct file **nfile, const char *filename, int *fd)
 {
 	const struct got_error* error = NULL;
 
-	if (((*nfile) = calloc(1, sizeof(struct file))) == NULL)
-		return got_error_from_errno2(__func__, "calloc");
-	if (((*nfile)->name = strdup(name)) == NULL) {
-		free(nfile);
-		return got_error_from_errno2(__func__, "strdup");
-	}
-	if (((*nfile)->stream = fopen((*nfile)->name, "r")) == NULL) {
-		char *msg = NULL;
-		if (asprintf(&msg, "%s", (*nfile)->name) == -1)
-			return got_error_from_errno("asprintf");
-		error = got_error_msg(GOT_ERR_NO_CONFIG_FILE, msg);
-		free((*nfile)->name);
+	(*nfile) = calloc(1, sizeof(struct file));
+	if ((*nfile) == NULL)
+		return got_error_from_errno("calloc");
+	(*nfile)->stream = fdopen(*fd, "r");
+	if ((*nfile)->stream == NULL) {
+		error = got_error_from_errno("fdopen");
 		free((*nfile));
-		free(msg);
 		return error;
 	}
-	(*nfile)->lineno = TAILQ_EMPTY(&files) ? 1 : 0;
+	*fd = -1; /* Stream owns the file descriptor now. */
+	(*nfile)->name = filename;
+	(*nfile)->lineno = 1;
 	(*nfile)->ungetsize = 16;
 	(*nfile)->ungetbuf = malloc((*nfile)->ungetsize);
 	if ((*nfile)->ungetbuf == NULL) {
+		error = got_error_from_errno("malloc");
 		fclose((*nfile)->stream);
-		free((*nfile)->name);
 		free((*nfile));
-		return got_error_from_errno2(__func__, "malloc");
+		return error;
 	}
-	TAILQ_INSERT_TAIL(&files, (*nfile), entry);
+	return NULL;
+}
+
+static const struct got_error*
+new_remote(struct gotconfig_remote_repo **remote)
+{
+	const struct got_error *error = NULL;
+
+	*remote = calloc(1, sizeof(**remote));
+	if (*remote == NULL)
+		error = got_error_from_errno("calloc");
 	return error;
 }
 
-int
-popfile(void)
+static void
+closefile(struct file *file)
 {
-	struct file	*prev = NULL;
-
-	TAILQ_REMOVE(&files, file, entry);
 	fclose(file->stream);
-	free(file->name);
 	free(file->ungetbuf);
 	free(file);
-	file = prev;
-	return (file ? 0 : EOF);
 }
 
-const struct got_error*
-parse_gotweb_config(struct gotweb_config **gconf, const char *filename)
+const struct got_error *
+gotconfig_parse(struct gotconfig **conf, const char *filename, int *fd)
 {
-	gw_conf = malloc(sizeof(struct gotweb_config));
-	if (gw_conf == NULL) {
-		gerror = got_error_from_errno("malloc");
-		goto done;
-	}
-	gw_conf->got_repos_path = strdup(D_GOTPATH);
-	if (gw_conf->got_repos_path == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_site_name = strdup(D_SITENAME);
-	if (gw_conf->got_site_name == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_site_owner = strdup(D_SITEOWNER);
-	if (gw_conf->got_site_owner == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_site_link = strdup(D_SITELINK);
-	if (gw_conf->got_site_link == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_logo = strdup(D_GOTLOGO);
-	if (gw_conf->got_logo == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_logo_url = strdup(D_GOTURL);
-	if (gw_conf->got_logo_url == NULL) {
-		gerror = got_error_from_errno("strdup");
-		goto done;
-	}
-	gw_conf->got_show_site_owner = D_SHOWSOWNER;
-	gw_conf->got_show_repo_owner = D_SHOWROWNER;
-	gw_conf->got_show_repo_age = D_SHOWAGE;
-	gw_conf->got_show_repo_description = D_SHOWDESC;
-	gw_conf->got_show_repo_cloneurl = D_SHOWURL;
-	gw_conf->got_max_repos = D_MAXREPO;
-	gw_conf->got_max_repos_display = D_MAXREPODISP;
-	gw_conf->got_max_commits_display = D_MAXCOMMITDISP;
+	const struct got_error *err = NULL;
+	struct sym	*sym, *next;
 
-	/*
-	 * We don't require that the gotweb config file exists
-	 * So reset gerror if it doesn't exist and goto done.
-	 */
-	gerror = pushfile(&file, filename);
-	if (gerror && gerror->code == GOT_ERR_NO_CONFIG_FILE) {
-		gerror = NULL;
-		goto done;
-	} else if (gerror)
-		return gerror;
-	topfile = file;
+	*conf = NULL;
+
+	err = newfile(&file, filename, fd);
+	if (err)
+		return err;
+
+	TAILQ_INIT(&gotconfig.remotes);
 
 	yyparse();
-	popfile();
-done:
-	*gconf = gw_conf;
+	closefile(file);
+
+	/* Free macros and check which have not been used. */
+	TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
+		if (!sym->persist) {
+			free(sym->nam);
+			free(sym->val);
+			TAILQ_REMOVE(&symhead, sym, entry);
+			free(sym);
+		}
+	}
+
+	if (gerror == NULL)
+		*conf = &gotconfig;
 	return gerror;
+}
+
+void
+gotconfig_free(struct gotconfig *conf)
+{
+	struct gotconfig_remote_repo *remote;
+
+	free(conf->author);
+	while (!TAILQ_EMPTY(&conf->remotes)) {
+		remote = TAILQ_FIRST(&conf->remotes);
+		TAILQ_REMOVE(&conf->remotes, remote, entry);
+		free(remote->name);
+		free(remote->repository);
+		free(remote->server);
+		free(remote->protocol);
+		free(remote);
+	}
 }
 
 int
@@ -670,7 +686,8 @@ symset(const char *nam, const char *val, int persist)
 			free(sym);
 		}
 	}
-	if ((sym = calloc(1, sizeof(*sym))) == NULL)
+	sym = calloc(1, sizeof(*sym));
+	if (sym == NULL)
 		return (-1);
 
 	sym->nam = strdup(nam);
@@ -697,11 +714,13 @@ cmdline_symset(char *s)
 	int	ret;
 	size_t	len;
 
-	if ((val = strrchr(s, '=')) == NULL)
+	val = strrchr(s, '=');
+	if (val == NULL)
 		return (-1);
 
 	len = strlen(s) - strlen(val) + 1;
-	if ((sym = malloc(len)) == NULL)
+	sym = malloc(len);
+	if (sym == NULL)
 		errx(1, "cmdline_symset: malloc");
 
 	strlcpy(sym, s, len);
@@ -724,4 +743,20 @@ symget(const char *nam)
 		}
 	}
 	return (NULL);
+}
+
+static int
+atoul(char *s, u_long *ulvalp)
+{
+	u_long	 ulval;
+	char	*ep;
+
+	errno = 0;
+	ulval = strtoul(s, &ep, 0);
+	if (s[0] == '\0' || *ep != '\0')
+		return (-1);
+	if (errno == ERANGE && ulval == ULONG_MAX)
+		return (-1);
+	*ulvalp = ulval;
+	return (0);
 }

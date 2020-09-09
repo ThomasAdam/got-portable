@@ -523,25 +523,30 @@ get_author(char **author, struct got_repository *repo)
 
 	*author = NULL;
 
-	name = got_repo_get_gitconfig_author_name(repo);
-	email = got_repo_get_gitconfig_author_email(repo);
-	if (name && email) {
-		if (asprintf(author, "%s <%s>", name, email) == -1)
-			return got_error_from_errno("asprintf");
-		return NULL;
-	}
-
-	got_author = getenv("GOT_AUTHOR");
+	got_author = got_repo_get_gotconfig_author(repo);
 	if (got_author == NULL) {
-		name = got_repo_get_global_gitconfig_author_name(repo);
-		email = got_repo_get_global_gitconfig_author_email(repo);
+		name = got_repo_get_gitconfig_author_name(repo);
+		email = got_repo_get_gitconfig_author_email(repo);
 		if (name && email) {
 			if (asprintf(author, "%s <%s>", name, email) == -1)
 				return got_error_from_errno("asprintf");
 			return NULL;
 		}
-		/* TODO: Look up user in password database? */
-		return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+
+		got_author = getenv("GOT_AUTHOR");
+		if (got_author == NULL) {
+			name = got_repo_get_global_gitconfig_author_name(repo);
+			email = got_repo_get_global_gitconfig_author_email(
+			    repo);
+			if (name && email) {
+				if (asprintf(author, "%s <%s>", name, email)
+				    == -1)
+					return got_error_from_errno("asprintf");
+				return NULL;
+			}
+			/* TODO: Look up user in password database? */
+			return got_error(GOT_ERR_COMMIT_NO_AUTHOR);
+		}
 	}
 
 	*author = strdup(got_author);
@@ -1037,9 +1042,9 @@ cmd_clone(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
-	char *gitconfig_path = NULL;
-	char *gitconfig = NULL;
-	FILE *gitconfig_file = NULL;
+	char *gitconfig_path = NULL, *gotconfig_path = NULL;
+	char *gitconfig = NULL, *gotconfig = NULL;
+	FILE *gitconfig_file = NULL, *gotconfig_file = NULL;
 	ssize_t n;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int list_refs_only = 0;
@@ -1340,7 +1345,40 @@ cmd_clone(int argc, char *argv[])
 		}
 	}
 
-	/* Create a config file git-fetch(1) can understand. */
+	/* Create got.conf(5). */
+	gotconfig_path = got_repo_get_path_gotconfig(repo);
+	if (gotconfig_path == NULL) {
+		error = got_error_from_errno("got_repo_get_path_gotconfig");
+		goto done;
+	}
+	gotconfig_file = fopen(gotconfig_path, "a");
+	if (gotconfig_file == NULL) {
+		error = got_error_from_errno2("fopen", gotconfig_path);
+		goto done;
+	}
+	got_path_strip_trailing_slashes(server_path);
+	if (asprintf(&gotconfig,
+	    "remote \"%s\" {\n"
+	    "\tserver %s\n"
+	    "\tprotocol %s\n"
+	    "%s%s%s"
+	    "\trepository \"%s\"\n"
+	    "%s"
+	    "}\n",
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
+	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
+	    server_path,
+	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
+		error = got_error_from_errno("asprintf");
+		goto done;
+	}
+	n = fwrite(gotconfig, 1, strlen(gotconfig), gotconfig_file);
+	if (n != strlen(gotconfig)) {
+		error = got_ferror(gotconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+
+	/* Create a config file Git can understand. */
 	gitconfig_path = got_repo_get_path_gitconfig(repo);
 	if (gitconfig_path == NULL) {
 		error = got_error_from_errno("got_repo_get_path_gitconfig");
@@ -1413,6 +1451,8 @@ done:
 	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
+	if (gotconfig_file && fclose(gotconfig_file) == EOF && error == NULL)
+		error = got_error_from_errno("fclose");
 	if (gitconfig_file && fclose(gitconfig_file) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	if (repo)
@@ -1438,6 +1478,9 @@ done:
 	free(server_path);
 	free(repo_name);
 	free(default_destdir);
+	free(gotconfig);
+	free(gitconfig);
+	free(gotconfig_path);
 	free(gitconfig_path);
 	free(git_url);
 	return error;
@@ -1858,15 +1901,23 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
+	got_repo_get_gotconfig_remotes(&nremotes, &remotes, repo);
 	for (i = 0; i < nremotes; i++) {
 		remote = &remotes[i];
 		if (strcmp(remote->name, remote_name) == 0)
 			break;
 	}
 	if (i == nremotes) {
-		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
-		goto done;
+		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
+		for (i = 0; i < nremotes; i++) {
+			remote = &remotes[i];
+			if (strcmp(remote->name, remote_name) == 0)
+				break;
+		}
+		if (i == nremotes) {
+			error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
+			goto done;
+		}
 	}
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
