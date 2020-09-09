@@ -30,6 +30,7 @@
 #include <poll.h>
 #include <imsg.h>
 #include <sha1.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <time.h>
 

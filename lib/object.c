@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <sha1.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <ctype.h>
 #include <libgen.h>

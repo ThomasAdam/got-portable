@@ -32,6 +32,7 @@
 #include <ctype.h>
 #include <sha1.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <err.h>
 

@@ -29,6 +29,7 @@
 #include <limits.h>
 #include <sha1.h>
 #include <endian.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <imsg.h>
 
