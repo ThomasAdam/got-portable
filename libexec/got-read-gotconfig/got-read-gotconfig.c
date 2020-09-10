@@ -249,7 +249,7 @@ main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
-	struct gotconfig *gotconfig;
+	struct gotconfig *gotconfig = NULL;
 	size_t datalen;
 	const char *filename = "got.conf";
 #if 0
