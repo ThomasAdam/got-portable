@@ -329,7 +329,7 @@ got_inflate_to_mem_fd(uint8_t **outbuf, size_t *outlen,
 	/* Optimize buffer size in case short reads should suffice. */
 	if (expected_size > 0 && expected_size < bufsize)
 		bufsize = expected_size;
-		
+
 	if (outbuf) {
 		*outbuf = malloc(bufsize);
 		if (*outbuf == NULL)

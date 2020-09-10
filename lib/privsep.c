@@ -1828,7 +1828,7 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 
 	while (*nremotes < iremotes.nremotes) {
 		struct got_remote_repo *remote;
-	
+
 		err = got_privsep_recv_imsg(&imsg, ibuf, sizeof(iremote));
 		if (err)
 			break;

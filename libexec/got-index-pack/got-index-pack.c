@@ -893,7 +893,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 			    "any of deltas; packfile could be corrupt");
 			err = got_error_msg(GOT_ERR_BAD_PACKFILE, msg);
 			goto done;
-			
+
 		}
 		nresolved += n;
 		nvalid += nresolved;

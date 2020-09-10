@@ -117,7 +117,7 @@ static char *
 get_path_git_child(struct got_repository *repo, const char *basename)
 {
 	char *path_child;
-	
+
 	if (asprintf(&path_child, "%s/%s", repo->path_git_dir,
 	    basename) == -1)
 		return NULL;

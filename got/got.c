@@ -876,7 +876,7 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 				print_size = 1;
 			}
 		}
-	
+
 	}
 	if (print_size || print_indexed || print_resolved)
 		printf("\r");
@@ -1637,7 +1637,7 @@ delete_missing_ref(struct got_reference *ref,
 		err = got_object_id_str(&id_str, id);
 		if (err)
 			goto done;
-			
+
 		err = got_ref_delete(ref, repo);
 		if (err)
 			goto done;

@@ -346,7 +346,7 @@ parse_refline(char **id_str, char **refname, char **server_capabilities,
 		if (p)
 			*p = '\0';
 	}
-	
+
 	return NULL;
 }
 
@@ -1057,7 +1057,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			    SHA1_DIGEST_LENGTH);
 			sha1_buf_len = SHA1_DIGEST_LENGTH;
 		}
-	
+
 		/* Write packfile data to temporary pack file. */
 		w = write(packfd, buf, r);
 		if (w == -1) {

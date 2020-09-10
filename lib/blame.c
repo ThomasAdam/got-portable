@@ -63,7 +63,7 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 
 	if (lineno < 1 || lineno > blame->nlines)
 		return NULL;
-	
+
 	line = &blame->lines[lineno - 1];
 	if (line->annotated)
 		return NULL;
