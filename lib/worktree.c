@@ -1569,10 +1569,10 @@ xbit_differs(struct got_fileindex_entry *ie, uint16_t st_mode)
 static int
 stat_info_differs(struct got_fileindex_entry *ie, struct stat *sb)
 {
-	return !(ie->ctime_sec == sb->st_ctime &&
-	    ie->ctime_nsec == sb->st_ctimensec &&
-	    ie->mtime_sec == sb->st_mtime &&
-	    ie->mtime_nsec == sb->st_mtimensec &&
+	return !(ie->ctime_sec == sb->st_ctim.tv_sec &&
+	    ie->ctime_nsec == sb->st_ctim.tv_nsec &&
+	    ie->mtime_sec == sb->st_mtim.tv_sec &&
+	    ie->mtime_nsec == sb->st_mtim.tv_nsec &&
 	    ie->size == (sb->st_size & 0xffffffff) &&
 	    !xbit_differs(ie, sb->st_mode));
 }

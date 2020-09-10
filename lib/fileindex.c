@@ -105,10 +105,10 @@ got_fileindex_entry_update(struct got_fileindex_entry *ie,
 
 	if ((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0) {
 		if (update_timestamps) {
-			ie->ctime_sec = sb.st_ctime;
-			ie->ctime_nsec = sb.st_ctimensec;
-			ie->mtime_sec = sb.st_mtime;
-			ie->mtime_nsec = sb.st_mtimensec;
+			ie->ctime_sec = sb.st_ctim.tv_sec;
+			ie->ctime_nsec = sb.st_ctim.tv_nsec;
+			ie->mtime_sec = sb.st_mtim.tv_sec;
+			ie->mtime_nsec = sb.st_mtim.tv_nsec;
 		}
 		ie->uid = sb.st_uid;
 		ie->gid = sb.st_gid;
