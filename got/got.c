@@ -489,7 +489,7 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	char *initial_content = NULL;
 	const struct got_error *err = NULL;
 	int initial_content_len;
-	int fd;
+	int fd = -1;
 
 	initial_content_len = asprintf(&initial_content,
 	    "\n# %s to be imported to branch %s\n", path_dir,
@@ -502,11 +502,15 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	if (err)
 		goto done;
 
-	write(fd, initial_content, initial_content_len);
-	close(fd);
+	if (write(fd, initial_content, initial_content_len) == -1) {
+		err = got_error_from_errno2("write", *logmsg_path);
+		goto done;
+	}
 
 	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content);
 done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", *logmsg_path);
 	free(initial_content);
 	return err;
 }
@@ -5705,8 +5709,10 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	if (err)
 		goto done;
 
-	write(fd, initial_content, initial_content_len);
-	close(fd);
+	if (write(fd, initial_content, initial_content_len) == -1) {
+		err = got_error_from_errno2("write", *tagmsg_path);
+		goto done;
+	}
 
 	err = get_editor(&editor);
 	if (err)
@@ -5716,6 +5722,9 @@ done:
 	free(initial_content);
 	free(template);
 	free(editor);
+
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", *tagmsg_path);
 
 	/* Editor is done; we can now apply unveil(2) */
 	if (err == NULL) {
@@ -6551,7 +6560,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	char *template = NULL;
 	struct collect_commit_logmsg_arg *a = arg;
 	int initial_content_len;
-	int fd;
+	int fd = -1;
 	size_t len;
 
 	/* if a message was specified on the command line, just use it */
@@ -6577,7 +6586,10 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	if (err)
 		goto done;
 
-	write(fd, initial_content, initial_content_len);
+	if (write(fd, initial_content, initial_content_len) == -1) {
+		err = got_error_from_errno2("write", a->logmsg_path);
+		goto done;
+	}
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
@@ -6585,12 +6597,14 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		    got_commitable_get_status(ct),
 		    got_commitable_get_path(ct));
 	}
-	close(fd);
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content);
 done:
 	free(initial_content);
 	free(template);
+
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close", a->logmsg_path);
 
 	/* Editor is done; we can now apply unveil(2) */
 	if (err == NULL) {
