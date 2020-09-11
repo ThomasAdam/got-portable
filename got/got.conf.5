@@ -24,6 +24,15 @@
 is the run-time configuration file for
 .Xr got 1 .
 .Pp
+.Nm
+may be present in the root directory of a Git repository for
+repository-wide settings, or in the
+.Pa .got
+meta-data directory of a work tree to override repository-wide
+settings for
+.Xr got 1
+commands executed within this work tree.
+.Pp
 The file format is line-based, with one configuration directive per line.
 Any lines beginning with a
 .Sq #
@@ -144,13 +153,27 @@ remote "origin" {
 .Sh FILES
 .Bl -tag -width Ds -compact
 .It Pa got.conf
-If present, the
+If present,
 .Nm
-configuration file is located in the root directory of a Git repository
-and supersedes any relevant settings in Git's
+located in the root directory of a Git repository supersedes any relevant
+settings in Git's
+.Pa config
+file.
+.Pp
+.It Pa .got/got.conf
+If present,
+.Nm
+located in the
+.Pa .got
+meta-data directory of a
+.Xr got 1
+work tree supersedes any relevant settings in the repository's
+.Nm
+configuration file and Git's
 .Pa config
 file.
 .El
 .Sh SEE ALSO
 .Xr got 1 ,
-.Xr git-repository 5
+.Xr git-repository 5,
+.Xr got-worktree 5

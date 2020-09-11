@@ -948,6 +948,85 @@ function test_fetch_headref_deleted_locally {
 	test_done "$testroot" "$ret"
 }
 
+function test_fetch_gotconfig_remote_repo {
+	local testroot=`test_init fetch_gotconfig_remote_repo`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got ref -r $testroot/repo -c $commit_id refs/hoo/boo/zoo
+	got tag -r $testroot/repo -c $commit_id -m tag "1.0" >/dev/null
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+cat > $testroot/repo-clone/got.conf <<EOF
+remote "foobar" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/repo"
+}
+
+remote "barbaz" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/does-not-exist"
+}
+EOF
+	(cd $testroot/repo-clone && got fetch -l foobar \
+		> $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Connecting to \"foobar\" 127.0.0.1" > $testroot/stdout.expected
+	got ref -l -r $testroot/repo >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+cat > $testroot/wt/.got/got.conf <<EOF
+remote "barbaz" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/repo"
+}
+EOF
+	(cd $testroot/wt && got fetch -l barbaz > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "Connecting to \"barbaz\" 127.0.0.1" > $testroot/stdout.expected
+	got ref -l -r $testroot/repo >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 test_parseargs "$@"
 run_test test_fetch_basic
 run_test test_fetch_list
@@ -960,3 +1039,4 @@ run_test test_fetch_reference
 run_test test_fetch_replace_symref
 run_test test_fetch_update_headref
 run_test test_fetch_headref_deleted_locally
+run_test test_fetch_gotconfig_remote_repo

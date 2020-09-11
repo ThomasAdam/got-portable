@@ -11,7 +11,7 @@ SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
 		object_idset.c object_parse.c opentemp.c path.c pack.c \
 		privsep.c reference.c repository.c sha1.c worktree.c \
 		inflate.c buf.c rcsutil.c diff3.c lockfile.c \
-		deflate.c object_create.c delta_cache.c
+		deflate.c object_create.c delta_cache.c gotconfig.c
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \

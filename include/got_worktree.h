@@ -108,6 +108,12 @@ struct got_object_id *got_worktree_get_base_commit_id(struct got_worktree *);
 const struct got_error *got_worktree_set_base_commit_id(struct got_worktree *,
     struct got_repository *, struct got_object_id *);
 
+/*
+ * Obtain a parsed representation of this worktree's got.conf file.
+ * Return NULL if this configuration file could not be read.
+ */
+const struct got_gotconfig *got_worktree_get_gotconfig(struct got_worktree *);
+
 /* A callback function which is invoked when a path is checked out. */
 typedef const struct got_error *(*got_worktree_checkout_cb)(void *,
     unsigned char, const char *);

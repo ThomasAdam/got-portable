@@ -59,16 +59,15 @@ struct got_remote_repo {
 	int mirror_references;
 };
 
-/* Obtain the commit author if parsed from got.conf, else NULL. */
-const char *got_repo_get_gotconfig_author(struct got_repository *);
-
 /* Obtain the list of remote repositories parsed from gitconfig. */ 
-void got_repo_get_gitconfig_remotes(int *, struct got_remote_repo **,
+void got_repo_get_gitconfig_remotes(int *, const struct got_remote_repo **,
     struct got_repository *);
 
-/* Obtain the list of remote repositories parsed from got.conf. */ 
-void got_repo_get_gotconfig_remotes(int *, struct got_remote_repo **,
-    struct got_repository *);
+/*
+ * Obtain a parsed representation of this repository's got.conf file.
+ * Return NULL if this configuration file could not be read.
+ */
+const struct got_gotconfig *got_repo_get_gotconfig(struct got_repository *);
 
 /*
  * Obtain paths to various directories within a repository.

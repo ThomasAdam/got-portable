@@ -736,6 +736,45 @@ function test_commit_gotconfig_author {
 	test_done "$testroot" "$ret"
 }
 
+function test_commit_gotconfig_worktree_author {
+	local testroot=`test_init commit_gotconfig_worktree_author`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo 'author "Flan Luck <flan_luck@openbsd.org>"' \
+		> $testroot/repo/.git/got.conf
+	echo 'author "Flan Squee <flan_squee@openbsd.org>"' \
+		> $testroot/wt/.got/got.conf
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'test gotconfig author' > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && got log -l1 | grep ^from: > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "from: Flan Squee <flan_squee@openbsd.org>" \
+		> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 function test_commit_gitconfig_author {
 	local testroot=`test_init commit_gitconfig_author`
 
@@ -1335,6 +1374,7 @@ run_test test_commit_outside_refs_heads
 run_test test_commit_no_email
 run_test test_commit_tree_entry_sorting
 run_test test_commit_gotconfig_author
+run_test test_commit_gotconfig_worktree_author
 run_test test_commit_gitconfig_author
 run_test test_commit_xbit_change
 run_test test_commit_normalizes_filemodes

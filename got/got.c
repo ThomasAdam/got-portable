@@ -54,6 +54,7 @@
 #include "got_blame.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
+#include "got_gotconfig.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -518,14 +519,33 @@ import_progress(void *arg, const char *path)
 }
 
 static const struct got_error *
-get_author(char **author, struct got_repository *repo)
+get_author(char **author, struct got_repository *repo,
+    struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	const char *got_author, *name, *email;
+	const char *got_author = NULL, *name, *email;
+	const struct got_gotconfig *worktree_conf = NULL, *repo_conf = NULL;
 
 	*author = NULL;
 
-	got_author = got_repo_get_gotconfig_author(repo);
+	if (worktree)
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+	repo_conf = got_repo_get_gotconfig(repo);
+
+	/*
+	 * Priority of potential author information sources, from most
+	 * significant to least significant:
+	 * 1) work tree's .got/got.conf file
+	 * 2) repository's got.conf file
+	 * 3) repository's git config file
+	 * 4) environment variables
+	 * 5) global git config files (in user's home directory or /etc)
+	 */
+
+	if (worktree_conf)
+		got_author = got_gotconfig_get_author(worktree_conf);
+	if (got_author == NULL)
+		got_author = got_gotconfig_get_author(repo_conf);
 	if (got_author == NULL) {
 		name = got_repo_get_gitconfig_author_name(repo);
 		email = got_repo_get_gitconfig_author_email(repo);
@@ -674,7 +694,7 @@ cmd_import(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = get_author(&author, repo);
+	error = get_author(&author, repo, NULL);
 	if (error)
 		return error;
 
@@ -1656,7 +1676,8 @@ done:
 
 static const struct got_error *
 delete_missing_refs(struct got_pathlist_head *their_refs,
-    struct got_pathlist_head *their_symrefs, struct got_remote_repo *remote,
+    struct got_pathlist_head *their_symrefs,
+    const struct got_remote_repo *remote,
     int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err;
@@ -1782,11 +1803,12 @@ cmd_fetch(int argc, char *argv[])
 	const char *remote_name;
 	char *proto = NULL, *host = NULL, *port = NULL;
 	char *repo_name = NULL, *server_path = NULL;
-	struct got_remote_repo *remotes, *remote = NULL;
+	const struct got_remote_repo *remotes, *remote = NULL;
 	int nremotes;
 	char *id_str = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
+	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
 	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
 	struct got_object_id *pack_hash = NULL;
@@ -1903,23 +1925,41 @@ cmd_fetch(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	got_repo_get_gotconfig_remotes(&nremotes, &remotes, repo);
-	for (i = 0; i < nremotes; i++) {
-		remote = &remotes[i];
-		if (strcmp(remote->name, remote_name) == 0)
-			break;
+	if (worktree) {
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+		if (worktree_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    worktree_conf);
+			for (i = 0; i < nremotes; i++) {
+				remote = &remotes[i];
+				if (strcmp(remote->name, remote_name) == 0)
+					break;
+			}
+		}
 	}
-	if (i == nremotes) {
+	if (remote == NULL) {
+		repo_conf = got_repo_get_gotconfig(repo);
+		if (repo_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    repo_conf);
+			for (i = 0; i < nremotes; i++) {
+				remote = &remotes[i];
+				if (strcmp(remote->name, remote_name) == 0)
+					break;
+			}
+		}
+	}
+	if (remote == NULL) {
 		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
 		for (i = 0; i < nremotes; i++) {
 			remote = &remotes[i];
 			if (strcmp(remote->name, remote_name) == 0)
 				break;
 		}
-		if (i == nremotes) {
-			error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
-			goto done;
-		}
+	}
+	if (remote == NULL) {
+		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
+		goto done;
 	}
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
@@ -5689,8 +5729,8 @@ done:
 }
 
 static const struct got_error *
-add_tag(struct got_repository *repo, const char *tag_name,
-    const char *commit_arg, const char *tagmsg_arg)
+add_tag(struct got_repository *repo, struct got_worktree *worktree,
+    const char *tag_name, const char *commit_arg, const char *tagmsg_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL, *tag_id = NULL;
@@ -5708,7 +5748,7 @@ add_tag(struct got_repository *repo, const char *tag_name,
 	if (tag_name[0] == '-')
 		return got_error_path(tag_name, GOT_ERR_REF_NAME_MINUS);
 
-	err = get_author(&tagger, repo);
+	err = get_author(&tagger, repo, worktree);
 	if (err)
 		return err;
 
@@ -5928,7 +5968,7 @@ cmd_tag(int argc, char *argv[])
 				goto done;
 		}
 
-		error = add_tag(repo, tag_name,
+		error = add_tag(repo, worktree, tag_name,
 		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg);
 	}
 done:
@@ -6636,7 +6676,7 @@ cmd_commit(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = get_author(&author, repo);
+	error = get_author(&author, repo, worktree);
 	if (error)
 		return error;
 

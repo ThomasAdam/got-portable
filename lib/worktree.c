@@ -55,6 +55,7 @@
 #include "got_lib_object_create.h"
 #include "got_lib_object_idset.h"
 #include "got_lib_diff.h"
+#include "got_lib_gotconfig.h"
 
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
@@ -416,6 +417,18 @@ open_worktree(struct got_worktree **worktree, const char *path)
 
 	err = read_meta_file(&(*worktree)->head_ref_name, path_got,
 	    GOT_WORKTREE_HEAD_REF);
+	if (err)
+		goto done;
+
+	if (asprintf(&(*worktree)->gotconfig_path, "%s/%s/%s",
+	    (*worktree)->root_path,
+	    GOT_WORKTREE_GOT_DIR, GOT_GOTCONFIG_FILENAME) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_gotconfig_read(&(*worktree)->gotconfig,
+	    (*worktree)->gotconfig_path);
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -468,6 +481,8 @@ got_worktree_close(struct got_worktree *worktree)
 			err = got_error_from_errno2("close",
 			    got_worktree_get_root_path(worktree));
 	free(worktree->root_path);
+	free(worktree->gotconfig_path);
+	got_gotconfig_free(worktree->gotconfig);
 	free(worktree);
 	return err;
 }
@@ -483,7 +498,6 @@ got_worktree_get_repo_path(struct got_worktree *worktree)
 {
 	return worktree->repo_path;
 }
-
 const char *
 got_worktree_get_path_prefix(struct got_worktree *worktree)
 {
@@ -596,6 +610,12 @@ done:
 	free(id_str);
 	free(path_got);
 	return err;
+}
+
+const struct got_gotconfig *
+got_worktree_get_gotconfig(struct got_worktree *worktree)
+{
+	return worktree->gotconfig;
 }
 
 static const struct got_error *

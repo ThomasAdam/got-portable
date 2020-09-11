@@ -315,9 +315,9 @@ If no
 is specified,
 .Dq origin
 will be used.
-The remote repository's URL is obtained from the corresponding entry in the
+The remote repository's URL is obtained from the corresponding entry in
 .Xr got.conf 5
-or
+or Git's
 .Pa config
 file of the local repository, as created by
 .Cm got clone .
@@ -1930,18 +1930,15 @@ attempts to reject
 .Ev GOT_AUTHOR
 environment variables with a missing email address.
 .Pp
-If present,
-configuration settings in
-.Xr got.conf 5 ,
-or Git's
+.Ev GOT_AUTHOR will be overriden by configuration settings in
+.Xr got.conf 5
+or by Git's
 .Dv user.name
 and
 .Dv user.email
 configuration settings in the repository's
 .Pa .git/config
-file,
-will override the value of
-.Ev GOT_AUTHOR .
+file.
 The
 .Dv user.name
 and
@@ -1970,8 +1967,24 @@ This variable will be silently ignored if it is set to a non-numeric value.
 .It Pa got.conf
 Repository-wide configuration settings for
 .Nm .
-If present, this configuration file is located in the root directory
-of a Git repository and supersedes any relevant settings in Git's
+If present, a
+.Xr got.conf 5
+configuration file located in the root directory of a Git repository
+supersedes any relevant settings in Git's
+.Pa config
+file.
+.Pp
+.It Pa .got/got.conf
+Worktree-specific configuration settings for
+.Nm .
+If present, a
+.Xr got.conf
+configuration file in the
+.Pa .got
+meta-data directory of a work tree supersedes any relevant settings in
+the repository's
+.Xr got.conf 5
+configuration file and Git's
 .Pa config
 file.
 .El

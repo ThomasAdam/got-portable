@@ -33,6 +33,12 @@ struct got_worktree {
 	 * shared lock must be upgraded to an exclusive lock.
 	 */
 	int lockfd;
+
+	/* Absolute path to worktree's got.conf file. */
+	char *gotconfig_path;
+
+	/* Settings read from got.conf. */
+	struct got_gotconfig *gotconfig;
 };
 
 struct got_commitable {

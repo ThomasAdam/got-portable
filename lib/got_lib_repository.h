@@ -21,7 +21,6 @@
 #define GOT_REFS_DIR		"refs"
 #define GOT_HEAD_FILE		"HEAD"
 #define GOT_GITCONFIG		"config"
-#define GOT_GOTCONFIG		"got.conf"
 
 /* Other files and directories inside the git directory. */
 #define GOT_FETCH_HEAD_FILE	"FETCH_HEAD"
@@ -67,9 +66,7 @@ struct got_repository {
 	char *gitconfig_owner;
 
 	/* Settings read from got.conf. */
-	char *gotconfig_author;
-	int ngotconfig_remotes;
-	struct got_remote_repo *gotconfig_remotes;
+	struct got_gotconfig *gotconfig;
 };
 
 const struct got_error*got_repo_cache_object(struct got_repository *,
