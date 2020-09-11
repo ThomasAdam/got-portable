@@ -487,11 +487,13 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 {
 	char *initial_content = NULL;
 	const struct got_error *err = NULL;
+	int initial_content_len;
 	int fd;
 
-	if (asprintf(&initial_content,
+	initial_content_len = asprintf(&initial_content,
 	    "\n# %s to be imported to branch %s\n", path_dir,
-	    branch_name) == -1)
+	    branch_name);
+	if (initial_content_len == -1)
 		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(logmsg_path, &fd,
@@ -499,7 +501,7 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	if (err)
 		goto done;
 
-	dprintf(fd, initial_content);
+	write(fd, initial_content, initial_content_len);
 	close(fd);
 
 	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content);
@@ -5643,6 +5645,7 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	const struct got_error *err = NULL;
 	char *template = NULL, *initial_content = NULL;
 	char *editor = NULL;
+	int initial_content_len;
 	int fd = -1;
 
 	if (asprintf(&template, GOT_TMPDIR_STR "/got-tagmsg") == -1) {
@@ -5650,8 +5653,10 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 		goto done;
 	}
 
-	if (asprintf(&initial_content, "\n# tagging commit %s as %s\n",
-	    commit_id_str, tag_name) == -1) {
+	initial_content_len = asprintf(&initial_content,
+	    "\n# tagging commit %s as %s\n",
+	    commit_id_str, tag_name);
+	if (initial_content_len == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -5660,7 +5665,7 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	if (err)
 		goto done;
 
-	dprintf(fd, initial_content);
+	write(fd, initial_content, initial_content_len);
 	close(fd);
 
 	err = get_editor(&editor);
@@ -6505,6 +6510,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	const struct got_error *err = NULL;
 	char *template = NULL;
 	struct collect_commit_logmsg_arg *a = arg;
+	int initial_content_len;
 	int fd;
 	size_t len;
 
@@ -6521,16 +6527,17 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
 		return got_error_from_errno("asprintf");
 
-	if (asprintf(&initial_content,
+	initial_content_len = asprintf(&initial_content,
 	    "\n# changes to be committed on branch %s:\n",
-	    a->branch_name) == -1)
+	    a->branch_name);
+	if (initial_content_len == -1)
 		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
 	if (err)
 		goto done;
 
-	dprintf(fd, initial_content);
+	write(fd, initial_content, initial_content_len);
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_commitable *ct = pe->data;
@@ -7715,6 +7722,7 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	char *logmsg = NULL, *new_msg = NULL, *editor = NULL;
 	const struct got_error *err = NULL;
 	struct got_commit_object *commit = NULL;
+	int logmsg_len;
 	int fd;
 	struct got_histedit_list_entry *folded = NULL;
 
@@ -7745,9 +7753,10 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	err = got_object_commit_get_logmsg(&orig_logmsg, commit);
 	if (err)
 		goto done;
-	if (asprintf(&new_msg,
+	logmsg_len = asprintf(&new_msg,
 	    "%s\n# original log message of commit %s: %s",
-	    logmsg ? logmsg : "", id_str, orig_logmsg) == -1) {
+	    logmsg ? logmsg : "", id_str, orig_logmsg);
+	if (logmsg_len == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -7763,7 +7772,7 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err)
 		goto done;
 
-	dprintf(fd, logmsg);
+	write(fd, logmsg, logmsg_len);
 	close(fd);
 
 	err = get_editor(&editor);
