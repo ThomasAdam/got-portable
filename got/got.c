@@ -512,6 +512,10 @@ done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *logmsg_path);
 	free(initial_content);
+	if (err) {
+		free(*logmsg_path);
+		*logmsg_path = NULL;
+	}
 	return err;
 }
 
@@ -5727,12 +5731,11 @@ done:
 		err = got_error_from_errno2("close", *tagmsg_path);
 
 	/* Editor is done; we can now apply unveil(2) */
-	if (err == NULL) {
+	if (err == NULL)
 		err = apply_unveil(repo_path, 0, NULL);
-		if (err) {
-			free(*tagmsg);
-			*tagmsg = NULL;
-		}
+	if (err) {
+		free(*tagmsg);
+		*tagmsg = NULL;
 	}
 	return err;
 }
@@ -6607,12 +6610,11 @@ done:
 		err = got_error_from_errno2("close", a->logmsg_path);
 
 	/* Editor is done; we can now apply unveil(2) */
-	if (err == NULL) {
+	if (err == NULL)
 		err = apply_unveil(a->repo_path, 0, a->worktree_path);
-		if (err) {
-			free(*logmsg);
-			*logmsg = NULL;
-		}
+	if (err) {
+		free(*logmsg);
+		*logmsg = NULL;
 	}
 	return err;
 }
