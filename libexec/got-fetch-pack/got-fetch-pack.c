@@ -19,7 +19,6 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/syslimits.h>
 
 #include <stdint.h>
 #include <errno.h>

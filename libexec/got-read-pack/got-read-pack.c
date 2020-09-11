@@ -18,7 +18,6 @@
 #include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
-#include <sys/syslimits.h>
 #include <sys/mman.h>
 
 #include <limits.h>

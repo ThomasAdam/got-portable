@@ -18,10 +18,10 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
-#include <sys/syslimits.h>
 #include <sys/wait.h>
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

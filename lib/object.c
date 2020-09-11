@@ -20,7 +20,6 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <sys/syslimits.h>
 #include <sys/resource.h>
 
 #include <errno.h>
