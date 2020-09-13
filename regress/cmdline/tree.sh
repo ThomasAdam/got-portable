@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_tree_basic {
+test_tree_basic() {
 	local testroot=`test_init tree_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -43,7 +43,7 @@ function test_tree_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_tree_branch {
+test_tree_branch() {
 	local testroot=`test_init tree_branch`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -77,7 +77,7 @@ function test_tree_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_tree_submodule {
+test_tree_submodule() {
 	local testroot=`test_init tree_submodule`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -108,7 +108,7 @@ function test_tree_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_tree_submodule_of_same_repo {
+test_tree_submodule_of_same_repo() {
 	local testroot=`test_init tree_submodule_of_same_repo`
 
 	(cd $testroot && git clone -q repo repo2 >/dev/null)

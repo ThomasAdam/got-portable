@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_fetch_basic {
+test_fetch_basic() {
 	local testroot=`test_init fetch_basic`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -119,7 +119,7 @@ function test_fetch_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_list {
+test_fetch_list() {
 	local testroot=`test_init fetch_list`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -156,7 +156,7 @@ function test_fetch_list {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_branch {
+test_fetch_branch() {
 	local testroot=`test_init fetch_branch`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -263,7 +263,7 @@ function test_fetch_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_all {
+test_fetch_all() {
 	local testroot=`test_init fetch_all`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -329,7 +329,7 @@ function test_fetch_all {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_empty_packfile {
+test_fetch_empty_packfile() {
 	local testroot=`test_init fetch_empty_packfile`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -397,7 +397,7 @@ function test_fetch_empty_packfile {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_delete_branch {
+test_fetch_delete_branch() {
 	local testroot=`test_init fetch_delete_branch`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -510,7 +510,7 @@ function test_fetch_delete_branch {
 
 }
 
-function test_fetch_update_tag {
+test_fetch_update_tag() {
 	local testroot=`test_init fetch_update_tag`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -670,7 +670,7 @@ function test_fetch_update_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_reference {
+test_fetch_reference() {
 	local testroot=`test_init fetch_reference`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -758,7 +758,7 @@ function test_fetch_reference {
 
 }
 
-function test_fetch_replace_symref {
+test_fetch_replace_symref() {
 	local testroot=`test_init fetch_replace_symref`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -823,7 +823,7 @@ function test_fetch_replace_symref {
 
 }
 
-function test_fetch_update_headref {
+test_fetch_update_headref() {
 	local testroot=`test_init fetch_update_headref`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -891,7 +891,7 @@ function test_fetch_update_headref {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_headref_deleted_locally {
+test_fetch_headref_deleted_locally() {
 	local testroot=`test_init fetch_headref_deleted_locally`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -948,7 +948,7 @@ function test_fetch_headref_deleted_locally {
 	test_done "$testroot" "$ret"
 }
 
-function test_fetch_gotconfig_remote_repo {
+test_fetch_gotconfig_remote_repo() {
 	local testroot=`test_init fetch_gotconfig_remote_repo`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`

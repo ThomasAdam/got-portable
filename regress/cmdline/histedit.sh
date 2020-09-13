@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_histedit_no_op {
+test_histedit_no_op() {
 	local testroot=`test_init histedit_no_op`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -136,7 +136,7 @@ function test_histedit_no_op {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_swap {
+test_histedit_swap() {
 	local testroot=`test_init histedit_swap`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -256,7 +256,7 @@ function test_histedit_swap {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_drop {
+test_histedit_drop() {
 	local testroot=`test_init histedit_drop`
 	local orig_commit=`git_show_head $testroot/repo`
 
@@ -362,7 +362,7 @@ function test_histedit_drop {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_fold {
+test_histedit_fold() {
 	local testroot=`test_init histedit_fold`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -477,7 +477,7 @@ function test_histedit_fold {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_edit {
+test_histedit_edit() {
 	local testroot=`test_init histedit_edit`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -622,7 +622,7 @@ function test_histedit_edit {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_fold_last_commit {
+test_histedit_fold_last_commit() {
 	local testroot=`test_init histedit_fold_last_commit`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -670,7 +670,7 @@ function test_histedit_fold_last_commit {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_missing_commit {
+test_histedit_missing_commit() {
 	local testroot=`test_init histedit_missing_commit`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -717,7 +717,7 @@ function test_histedit_missing_commit {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_abort {
+test_histedit_abort() {
 	local testroot=`test_init histedit_abort`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -831,7 +831,7 @@ function test_histedit_abort {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_path_prefix_drop {
+test_histedit_path_prefix_drop() {
 	local testroot=`test_init histedit_path_prefix_drop`
 	local orig_commit=`git_show_head $testroot/repo`
 
@@ -931,7 +931,7 @@ function test_histedit_path_prefix_drop {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_path_prefix_edit {
+test_histedit_path_prefix_edit() {
 	local testroot=`test_init histedit_path_prefix_edit`
 	local orig_commit=`git_show_head $testroot/repo`
 
@@ -1062,7 +1062,7 @@ function test_histedit_path_prefix_edit {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_outside_refs_heads {
+test_histedit_outside_refs_heads() {
 	local testroot=`test_init histedit_outside_refs_heads`
 	local commit1=`git_show_head $testroot/repo`
 
@@ -1118,7 +1118,7 @@ function test_histedit_outside_refs_heads {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_fold_last_commit_swap {
+test_histedit_fold_last_commit_swap() {
 	local testroot=`test_init histedit_fold_last_commit_swap`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -1183,7 +1183,7 @@ function test_histedit_fold_last_commit_swap {
 	test_done "$testroot" "$ret"
 }
 
-function test_histedit_split_commit {
+test_histedit_split_commit() {
 	local testroot=`test_init histedit_split_commit`
 
 	local orig_commit=`git_show_head $testroot/repo`
@@ -1289,7 +1289,7 @@ function test_histedit_split_commit {
 
 }
 
-function test_histedit_duplicate_commit_in_script {
+test_histedit_duplicate_commit_in_script() {
 	local testroot=`test_init histedit_duplicate_commit_in_script`
 
 	local orig_commit=`git_show_head $testroot/repo`

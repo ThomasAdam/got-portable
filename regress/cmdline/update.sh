@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_update_basic {
+test_update_basic() {
 	local testroot=`test_init update_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -55,7 +55,7 @@ function test_update_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_adds_file {
+test_update_adds_file() {
 	local testroot=`test_init update_adds_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -95,7 +95,7 @@ function test_update_adds_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_deletes_file {
+test_update_deletes_file() {
 	local testroot=`test_init update_deletes_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -132,7 +132,7 @@ function test_update_deletes_file {
 	test_done "$testroot" "0"
 }
 
-function test_update_deletes_dir {
+test_update_deletes_dir() {
 	local testroot=`test_init update_deletes_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -169,7 +169,7 @@ function test_update_deletes_dir {
 	test_done "$testroot" "0"
 }
 
-function test_update_deletes_dir_with_path_prefix {
+test_update_deletes_dir_with_path_prefix() {
 	local testroot=`test_init update_deletes_dir_with_path_prefix`
 	local first_rev=`git_show_head $testroot/repo`
 
@@ -209,7 +209,7 @@ function test_update_deletes_dir_with_path_prefix {
 	test_done "$testroot" "0"
 }
 
-function test_update_deletes_dir_recursively {
+test_update_deletes_dir_recursively() {
 	local testroot=`test_init update_deletes_dir_recursively`
 	local first_rev=`git_show_head $testroot/repo`
 
@@ -252,7 +252,7 @@ function test_update_deletes_dir_recursively {
 	test_done "$testroot" "0"
 }
 
-function test_update_sibling_dirs_with_common_prefix {
+test_update_sibling_dirs_with_common_prefix() {
 	local testroot=`test_init update_sibling_dirs_with_common_prefix`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -315,7 +315,7 @@ function test_update_sibling_dirs_with_common_prefix {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_dir_with_dot_sibling {
+test_update_dir_with_dot_sibling() {
 	local testroot=`test_init update_dir_with_dot_sibling`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -373,7 +373,7 @@ function test_update_dir_with_dot_sibling {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_moves_files_upwards {
+test_update_moves_files_upwards() {
 	local testroot=`test_init update_moves_files_upwards`
 
 	mkdir $testroot/repo/epsilon/psi
@@ -427,7 +427,7 @@ function test_update_moves_files_upwards {
 	test_done "$testroot" "0"
 }
 
-function test_update_moves_files_to_new_dir {
+test_update_moves_files_to_new_dir() {
 	local testroot=`test_init update_moves_files_to_new_dir`
 
 	mkdir $testroot/repo/epsilon/psi
@@ -482,7 +482,7 @@ function test_update_moves_files_to_new_dir {
 	test_done "$testroot" "0"
 }
 
-function test_update_creates_missing_parent {
+test_update_creates_missing_parent() {
 	local testroot=`test_init update_creates_missing_parent 1`
 
 	touch $testroot/repo/Makefile
@@ -534,7 +534,7 @@ function test_update_creates_missing_parent {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_creates_missing_parent_with_subdir {
+test_update_creates_missing_parent_with_subdir() {
 	local testroot=`test_init update_creates_missing_parent_with_subdir 1`
 
 	touch $testroot/repo/Makefile
@@ -589,7 +589,7 @@ function test_update_creates_missing_parent_with_subdir {
 	test_done "$testroot" "0"
 }
 
-function test_update_file_in_subsubdir {
+test_update_file_in_subsubdir() {
 	local testroot=`test_init update_fle_in_subsubdir 1`
 
 	touch $testroot/repo/Makefile
@@ -629,7 +629,7 @@ function test_update_file_in_subsubdir {
 	test_done "$testroot" "0"
 }
 
-function test_update_merges_file_edits {
+test_update_merges_file_edits() {
 	local testroot=`test_init update_merges_file_edits`
 
 	echo "1" > $testroot/repo/numbers
@@ -710,7 +710,7 @@ function test_update_merges_file_edits {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_keeps_xbit {
+test_update_keeps_xbit() {
 	local testroot=`test_init update_keeps_xbit 1`
 
 	touch $testroot/repo/xfile
@@ -757,7 +757,7 @@ function test_update_keeps_xbit {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_clears_xbit {
+test_update_clears_xbit() {
 	local testroot=`test_init update_clears_xbit 1`
 
 	touch $testroot/repo/xfile
@@ -815,7 +815,7 @@ function test_update_clears_xbit {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_restores_missing_file {
+test_update_restores_missing_file() {
 	local testroot=`test_init update_restores_missing_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -853,7 +853,7 @@ function test_update_restores_missing_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_wt_add_vs_repo_add {
+test_update_conflict_wt_add_vs_repo_add() {
 	local testroot=`test_init update_conflict_wt_add_vs_repo_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -916,7 +916,7 @@ function test_update_conflict_wt_add_vs_repo_add {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_wt_edit_vs_repo_rm {
+test_update_conflict_wt_edit_vs_repo_rm() {
 	local testroot=`test_init update_conflict_wt_edit_vs_repo_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -968,7 +968,7 @@ function test_update_conflict_wt_edit_vs_repo_rm {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_wt_rm_vs_repo_edit {
+test_update_conflict_wt_rm_vs_repo_edit() {
 	local testroot=`test_init update_conflict_wt_rm_vs_repo_edit`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1029,7 +1029,7 @@ function test_update_conflict_wt_rm_vs_repo_edit {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_wt_rm_vs_repo_rm {
+test_update_conflict_wt_rm_vs_repo_rm() {
 	local testroot=`test_init update_conflict_wt_rm_vs_repo_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1087,7 +1087,7 @@ function test_update_conflict_wt_rm_vs_repo_rm {
 	test_done "$testroot" "0"
 }
 
-function test_update_partial {
+test_update_partial() {
 	local testroot=`test_init update_partial`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1159,7 +1159,7 @@ function test_update_partial {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_partial_add {
+test_update_partial_add() {
 	local testroot=`test_init update_partial_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1203,7 +1203,7 @@ function test_update_partial_add {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_partial_rm {
+test_update_partial_rm() {
 	local testroot=`test_init update_partial_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1237,7 +1237,7 @@ function test_update_partial_rm {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_partial_dir {
+test_update_partial_dir() {
 	local testroot=`test_init update_partial_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1281,7 +1281,7 @@ function test_update_partial_dir {
 
 }
 
-function test_update_moved_branch_ref {
+test_update_moved_branch_ref() {
 	local testroot=`test_init update_moved_branch_ref`
 
 	git clone -q --mirror $testroot/repo $testroot/repo2
@@ -1326,7 +1326,7 @@ function test_update_moved_branch_ref {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_to_another_branch {
+test_update_to_another_branch() {
 	local testroot=`test_init update_to_another_branch`
 	local base_commit=`git_show_head $testroot/repo`
 
@@ -1402,7 +1402,7 @@ function test_update_to_another_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_to_commit_on_wrong_branch {
+test_update_to_commit_on_wrong_branch() {
 	local testroot=`test_init update_to_commit_on_wrong_branch`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1443,7 +1443,7 @@ function test_update_to_commit_on_wrong_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_bumps_base_commit_id {
+test_update_bumps_base_commit_id() {
 	local testroot=`test_init update_bumps_base_commit_id`
 
 	echo "psi" > $testroot/repo/epsilon/psi
@@ -1525,7 +1525,7 @@ function test_update_bumps_base_commit_id {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_tag {
+test_update_tag() {
 	local testroot=`test_init update_tag`
 	local tag="1.0.0"
 
@@ -1566,7 +1566,7 @@ function test_update_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_toggles_xbit {
+test_update_toggles_xbit() {
 	local testroot=`test_init update_toggles_xbit 1`
 
 	touch $testroot/repo/xfile
@@ -1653,7 +1653,7 @@ function test_update_toggles_xbit {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_preserves_conflicted_file {
+test_update_preserves_conflicted_file() {
 	local testroot=`test_init update_preserves_conflicted_file`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -1710,7 +1710,7 @@ function test_update_preserves_conflicted_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_modified_submodules {
+test_update_modified_submodules() {
 	local testroot=`test_init update_modified_submodules`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -1744,7 +1744,7 @@ function test_update_modified_submodules {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_adds_submodule {
+test_update_adds_submodule() {
 	local testroot=`test_init update_adds_submodule`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1772,7 +1772,7 @@ function test_update_adds_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_conflict_wt_file_vs_repo_submodule {
+test_update_conflict_wt_file_vs_repo_submodule() {
 	local testroot=`test_init update_conflict_wt_file_vs_repo_submodule`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1825,7 +1825,7 @@ function test_update_conflict_wt_file_vs_repo_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_adds_symlink {
+test_update_adds_symlink() {
 	local testroot=`test_init update_adds_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1933,7 +1933,7 @@ function test_update_adds_symlink {
 	test_done "$testroot" "$ret"
 }
 
-function test_update_deletes_symlink {
+test_update_deletes_symlink() {
 	local testroot=`test_init update_deletes_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -1975,7 +1975,7 @@ function test_update_deletes_symlink {
 	test_done "$testroot" "0"
 }
 
-function test_update_symlink_conflicts {
+test_update_symlink_conflicts() {
 	local testroot=`test_init update_symlink_conflicts`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

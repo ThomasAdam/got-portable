@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_status_basic {
+test_status_basic() {
 	local testroot=`test_init status_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -53,7 +53,7 @@ function test_status_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_subdir_no_mods {
+test_status_subdir_no_mods() {
 	local testroot=`test_init status_subdir_no_mods 1`
 
 	mkdir $testroot/repo/Basic/
@@ -87,7 +87,7 @@ function test_status_subdir_no_mods {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_subdir_no_mods2 {
+test_status_subdir_no_mods2() {
 	local testroot=`test_init status_subdir_no_mods2 1`
 
 	mkdir $testroot/repo/AST
@@ -131,7 +131,7 @@ function test_status_subdir_no_mods2 {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_obstructed {
+test_status_obstructed() {
 	local testroot=`test_init status_obstructed`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -156,7 +156,7 @@ function test_status_obstructed {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_shows_local_mods_after_update {
+test_status_shows_local_mods_after_update() {
 	local testroot=`test_init status_shows_local_mods_after_update 1`
 
 	echo "1" > $testroot/repo/numbers
@@ -210,7 +210,7 @@ function test_status_shows_local_mods_after_update {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_unversioned_subdirs {
+test_status_unversioned_subdirs() {
 	local testroot=`test_init status_unversioned_subdirs 1`
 
 	mkdir $testroot/repo/cdfs/
@@ -258,7 +258,7 @@ function test_status_unversioned_subdirs {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_symlink {
+test_status_symlink() {
 	local testroot=`test_init status_symlink`
 
 	mkdir $testroot/repo/ramdisk/
@@ -316,7 +316,7 @@ function test_status_symlink {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_shows_no_mods_after_complete_merge {
+test_status_shows_no_mods_after_complete_merge() {
 	local testroot=`test_init status_shows_no_mods_after_complete_merge 1`
 
 	# make this file larger than the usual blob buffer size of 8192
@@ -369,7 +369,7 @@ function test_status_shows_no_mods_after_complete_merge {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_shows_conflict {
+test_status_shows_conflict() {
 	local testroot=`test_init status_shows_conflict 1`
 
 	echo "1" > $testroot/repo/numbers
@@ -424,7 +424,7 @@ function test_status_shows_conflict {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_empty_dir {
+test_status_empty_dir() {
 	local testroot=`test_init status_empty_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -448,7 +448,7 @@ function test_status_empty_dir {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_empty_dir_unversioned_file {
+test_status_empty_dir_unversioned_file() {
 	local testroot=`test_init status_empty_dir_unversioned_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -474,7 +474,7 @@ function test_status_empty_dir_unversioned_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_many_paths {
+test_status_many_paths() {
 	local testroot=`test_init status_many_paths`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -512,7 +512,7 @@ function test_status_many_paths {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_cvsignore {
+test_status_cvsignore() {
 	local testroot=`test_init status_cvsignore`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -585,7 +585,7 @@ function test_status_cvsignore {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_gitignore {
+test_status_gitignore() {
 	local testroot=`test_init status_gitignore`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -634,7 +634,7 @@ function test_status_gitignore {
 	test_done "$testroot" "$ret"
 }
 
-function test_status_status_code {
+test_status_status_code() {
 	local testroot=`test_init status_status_code`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

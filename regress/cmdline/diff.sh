@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_diff_basic {
+test_diff_basic() {
 	local testroot=`test_init diff_basic`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -89,7 +89,7 @@ function test_diff_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_shows_conflict {
+test_diff_shows_conflict() {
 	local testroot=`test_init diff_shows_conflict 1`
 
 	echo "1" > $testroot/repo/numbers
@@ -178,7 +178,7 @@ function test_diff_shows_conflict {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_tag {
+test_diff_tag() {
 	local testroot=`test_init diff_tag`
 	local commit_id0=`git_show_head $testroot/repo`
 	local tag1=1.0.0
@@ -239,7 +239,7 @@ function test_diff_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_lightweight_tag {
+test_diff_lightweight_tag() {
 	local testroot=`test_init diff_tag`
 	local commit_id0=`git_show_head $testroot/repo`
 	local tag1=1.0.0
@@ -300,7 +300,7 @@ function test_diff_lightweight_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_ignore_whitespace {
+test_diff_ignore_whitespace() {
 	local testroot=`test_init diff_ignore_whitespace`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -329,7 +329,7 @@ function test_diff_ignore_whitespace {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_submodule_of_same_repo {
+test_diff_submodule_of_same_repo() {
 	local testroot=`test_init diff_submodule_of_same_repo`
 
 	(cd $testroot && git clone -q repo repo2 >/dev/null)
@@ -362,7 +362,7 @@ function test_diff_submodule_of_same_repo {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_symlinks_in_work_tree {
+test_diff_symlinks_in_work_tree() {
 	local testroot=`test_init diff_symlinks_in_work_tree`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -466,7 +466,7 @@ function test_diff_symlinks_in_work_tree {
 	test_done "$testroot" "$ret"
 }
 
-function test_diff_symlinks_in_repo {
+test_diff_symlinks_in_repo() {
 	local testroot=`test_init diff_symlinks_in_repo`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function blame_cmp {
+blame_cmp() {
 	local testroot="$1"
 	local file="$2"
 	local xfail="$3"
@@ -36,7 +36,7 @@ function blame_cmp {
 	return "$ret"
 }
 
-function test_blame_basic {
+test_blame_basic() {
 	local testroot=`test_init blame_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -83,7 +83,7 @@ function test_blame_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_tag {
+test_blame_tag() {
 	local testroot=`test_init blame_tag`
 	local tag=1.0.0
 
@@ -130,7 +130,7 @@ function test_blame_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_file_single_line {
+test_blame_file_single_line() {
 	local testroot=`test_init blame_file_single_line`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -165,7 +165,7 @@ function test_blame_file_single_line {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_file_single_line_no_newline {
+test_blame_file_single_line_no_newline() {
 	local testroot=`test_init blame_file_single_line_no_newline`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -195,7 +195,7 @@ function test_blame_file_single_line_no_newline {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_all_lines_replaced {
+test_blame_all_lines_replaced() {
 	local testroot=`test_init blame_all_lines_replaced`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -232,7 +232,7 @@ function test_blame_all_lines_replaced {
 
 }
 
-function test_blame_lines_shifted_up {
+test_blame_lines_shifted_up() {
 	local testroot=`test_init blame_lines_shifted_up`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -288,7 +288,7 @@ function test_blame_lines_shifted_up {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_lines_shifted_down {
+test_blame_lines_shifted_down() {
 	local testroot=`test_init blame_lines_shifted_down`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -358,7 +358,7 @@ function test_blame_lines_shifted_down {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_commit_subsumed {
+test_blame_commit_subsumed() {
 	local testroot=`test_init blame_commit_subsumed`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -537,7 +537,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_blame_h {
+test_blame_blame_h() {
 	local testroot=`test_init blame_blame_h`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -681,7 +681,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_added_on_branch {
+test_blame_added_on_branch() {
 	local testroot=`test_init blame_added_on_branch`
 
 	got branch -r $testroot/repo -c master newbranch
@@ -731,7 +731,7 @@ function test_blame_added_on_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_submodule {
+test_blame_submodule() {
 	local testroot=`test_init blame_submodule`
 	local commit_id0=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
@@ -762,7 +762,7 @@ function test_blame_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_blame_symlink {
+test_blame_symlink() {
 	local testroot=`test_init blame_symlink`
 	local commit_id0=`git_show_head $testroot/repo`
 	local short_commit0=`trim_obj_id 32 $commit_id0`

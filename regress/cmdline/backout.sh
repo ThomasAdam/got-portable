@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_backout_basic {
+test_backout_basic() {
 	local testroot=`test_init backout_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -90,7 +90,7 @@ function test_backout_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_backout_edits_for_file_since_deleted {
+test_backout_edits_for_file_since_deleted() {
 	local testroot=`test_init backout_edits_for_file_since_deleted`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -141,7 +141,7 @@ function test_backout_edits_for_file_since_deleted {
 	test_done "$testroot" "$ret"
 }
 
-function test_backout_next_commit {
+test_backout_next_commit() {
 	local testroot=`test_init backout_next_commit`
 	local commit0=`git_show_head $testroot/repo`
 

@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_cat_basic {
+test_cat_basic() {
 	local testroot=`test_init cat_basic`
 	local commit_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
@@ -72,7 +72,7 @@ function test_cat_basic {
 	
 }
 
-function test_cat_path {
+test_cat_path() {
 	local testroot=`test_init cat_path`
 	local commit_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
@@ -202,7 +202,7 @@ function test_cat_path {
 	test_done "$testroot" "$ret"
 }
 
-function test_cat_submodule {
+test_cat_submodule() {
 	local testroot=`test_init cat_submodule`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -230,7 +230,7 @@ function test_cat_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_cat_submodule_of_same_repo {
+test_cat_submodule_of_same_repo() {
 	local testroot=`test_init cat_submodule_of_same_repo`
 	local commit_id0=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`
@@ -259,7 +259,7 @@ function test_cat_submodule_of_same_repo {
 	test_done "$testroot" "$ret"
 }
 
-function test_cat_symlink {
+test_cat_symlink() {
 	local testroot=`test_init cat_symlink`
 	local commit_id=`git_show_head $testroot/repo`
 	local author_time=`git_show_author_time $testroot/repo`

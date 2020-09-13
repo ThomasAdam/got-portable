@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_checkout_basic {
+test_checkout_basic() {
 	local testroot=`test_init checkout_basic`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
@@ -55,7 +55,7 @@ function test_checkout_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_dir_exists {
+test_checkout_dir_exists() {
 	local testroot=`test_init checkout_dir_exists`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
@@ -96,7 +96,7 @@ function test_checkout_dir_exists {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_dir_not_empty {
+test_checkout_dir_not_empty() {
 	local testroot=`test_init checkout_dir_not_empty`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
@@ -137,7 +137,7 @@ function test_checkout_dir_not_empty {
 
 }
 
-function test_checkout_sets_xbit {
+test_checkout_sets_xbit() {
 	local testroot=`test_init checkout_sets_xbit 1`
 
 	touch $testroot/repo/xfile
@@ -172,7 +172,7 @@ function test_checkout_sets_xbit {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_commit_from_wrong_branch {
+test_checkout_commit_from_wrong_branch() {
 	local testroot=`test_init checkout_commit_from_wrong_branch`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -216,7 +216,7 @@ function test_checkout_commit_from_wrong_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_tag {
+test_checkout_tag() {
 	local testroot=`test_init checkout_tag`
 	local tag="1.0.0"
 
@@ -258,7 +258,7 @@ function test_checkout_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_ignores_submodules {
+test_checkout_ignores_submodules() {
 	local testroot=`test_init checkout_ignores_submodules`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -303,7 +303,7 @@ function test_checkout_ignores_submodules {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_read_only {
+test_checkout_read_only() {
 	local testroot=`test_init checkout_read_only`
 
 	# Make the repostiory read-only
@@ -363,7 +363,7 @@ function test_checkout_read_only {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_into_nonempty_dir {
+test_checkout_into_nonempty_dir() {
 	local testroot=`test_init checkout_into_nonempty_dir`
 
 	mkdir -p $testroot/wt
@@ -503,7 +503,7 @@ function test_checkout_into_nonempty_dir {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_symlink {
+test_checkout_symlink() {
 	local testroot=`test_init checkout_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -649,7 +649,7 @@ function test_checkout_symlink {
 	test_done "$testroot" "$ret"
 }
 
-function test_checkout_symlink_relative_wtpath {
+test_checkout_symlink_relative_wtpath() {
 	local testroot=`test_init checkout_symlink_with_wtpath`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

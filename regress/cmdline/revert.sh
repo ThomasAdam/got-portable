@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_revert_basic {
+test_revert_basic() {
 	local testroot=`test_init revert_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -52,7 +52,7 @@ function test_revert_basic {
 
 }
 
-function test_revert_rm {
+test_revert_rm() {
 	local testroot=`test_init revert_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -87,7 +87,7 @@ function test_revert_rm {
 		test_done "$testroot" "$ret"
 }
 
-function test_revert_add {
+test_revert_add() {
 	local testroot=`test_init revert_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -135,7 +135,7 @@ function test_revert_add {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_multiple {
+test_revert_multiple() {
 	local testroot=`test_init revert_multiple`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -183,7 +183,7 @@ function test_revert_multiple {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_file_in_new_subdir {
+test_revert_file_in_new_subdir() {
 	local testroot=`test_init revert_file_in_new_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -221,7 +221,7 @@ function test_revert_file_in_new_subdir {
 
 }
 
-function test_revert_no_arguments {
+test_revert_no_arguments() {
 	local testroot=`test_init revert_no_arguments`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -260,7 +260,7 @@ function test_revert_no_arguments {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_directory {
+test_revert_directory() {
 	local testroot=`test_init revert_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -320,7 +320,7 @@ function test_revert_directory {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_directory_unknown {
+test_revert_directory_unknown() {
 	local testroot=`test_init revert_directory_unknown`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -369,7 +369,7 @@ function test_revert_directory_unknown {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_patch {
+test_revert_patch() {
 	local testroot=`test_init revert_patch`
 
 	jot 16 > $testroot/repo/numbers
@@ -718,7 +718,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_patch_added {
+test_revert_patch_added() {
 	local testroot=`test_init revert_patch_added`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -781,7 +781,7 @@ function test_revert_patch_added {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_patch_removed {
+test_revert_patch_removed() {
 	local testroot=`test_init revert_patch_removed`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -842,7 +842,7 @@ function test_revert_patch_removed {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_patch_one_change {
+test_revert_patch_one_change() {
 	local testroot=`test_init revert_patch_one_change`
 
 	jot 16 > $testroot/repo/numbers
@@ -920,7 +920,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_added_subtree {
+test_revert_added_subtree() {
 	local testroot=`test_init revert_added_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -990,7 +990,7 @@ function test_revert_added_subtree {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_deleted_subtree {
+test_revert_deleted_subtree() {
 	local testroot=`test_init revert_deleted_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1053,7 +1053,7 @@ function test_revert_deleted_subtree {
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_symlink {
+test_revert_symlink() {
 	local testroot=`test_init revert_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -1225,7 +1225,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_revert_patch_symlink {
+test_revert_patch_symlink() {
 	local testroot=`test_init revert_patch_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

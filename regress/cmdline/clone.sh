@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_clone_basic {
+test_clone_basic() {
 	local testroot=`test_init clone_basic`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -89,7 +89,7 @@ function test_clone_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_list {
+test_clone_list() {
 	local testroot=`test_init clone_list`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -117,7 +117,7 @@ function test_clone_list {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_branch {
+test_clone_branch() {
 	local testroot=`test_init clone_branch`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -153,7 +153,7 @@ function test_clone_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_all {
+test_clone_all() {
 	local testroot=`test_init clone_all`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -193,7 +193,7 @@ function test_clone_all {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_mirror {
+test_clone_mirror() {
 	local testroot=`test_init clone_mirror`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -228,7 +228,7 @@ function test_clone_mirror {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_mirror_all {
+test_clone_mirror_all() {
 	local testroot=`test_init clone_mirror_all`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -263,7 +263,7 @@ function test_clone_mirror_all {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_reference {
+test_clone_reference() {
 	local testroot=`test_init clone_reference`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -302,7 +302,7 @@ function test_clone_reference {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_branch_and_reference {
+test_clone_branch_and_reference() {
 	local testroot=`test_init clone_reference`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
@@ -339,7 +339,7 @@ function test_clone_branch_and_reference {
 	test_done "$testroot" "$ret"
 }
 
-function test_clone_reference_mirror {
+test_clone_reference_mirror() {
 	local testroot=`test_init clone_reference_mirror`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`

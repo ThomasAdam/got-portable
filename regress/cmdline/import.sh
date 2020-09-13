@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_import_basic {
+test_import_basic() {
 	local testname=import_basic
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
@@ -136,7 +136,7 @@ function test_import_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_import_requires_new_branch {
+test_import_requires_new_branch() {
 	local testroot=`test_init import_requires_new_branch`
 
 	mkdir $testroot/tree
@@ -168,7 +168,7 @@ function test_import_requires_new_branch {
 
 }
 
-function test_import_ignores {
+test_import_ignores() {
 	local testname=import_ignores
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
@@ -198,7 +198,7 @@ function test_import_ignores {
 	test_done "$testroot" "$ret"
 }
 
-function test_import_empty_dir {
+test_import_empty_dir() {
 	local testname=import_empty_dir
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 
@@ -241,7 +241,7 @@ function test_import_empty_dir {
 	test_done "$testroot" "$ret"
 }
 
-function test_import_symlink {
+test_import_symlink() {
 	local testname=import_symlink
 	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
 

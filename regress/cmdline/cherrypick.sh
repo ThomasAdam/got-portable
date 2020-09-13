@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_cherrypick_basic {
+test_cherrypick_basic() {
 	local testroot=`test_init cherrypick_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -93,7 +93,7 @@ function test_cherrypick_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_root_commit {
+test_cherrypick_root_commit() {
 	local testroot=`test_init cherrypick_root_commit`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -155,7 +155,7 @@ function test_cherrypick_root_commit {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_into_work_tree_with_conflicts {
+test_cherrypick_into_work_tree_with_conflicts() {
 	local testroot=`test_init cherrypick_into_work_tree_with_conflicts`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -234,7 +234,7 @@ function test_cherrypick_into_work_tree_with_conflicts {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_modified_submodule {
+test_cherrypick_modified_submodule() {
 	local testroot=`test_init cherrypick_modified_submodules`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -267,7 +267,7 @@ function test_cherrypick_modified_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_added_submodule {
+test_cherrypick_added_submodule() {
 	local testroot=`test_init cherrypick_added_submodules`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -292,7 +292,7 @@ function test_cherrypick_added_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_conflict_wt_file_vs_repo_submodule {
+test_cherrypick_conflict_wt_file_vs_repo_submodule() {
 	local testroot=`test_init cherrypick_conflict_wt_file_vs_repo_submodule`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -345,7 +345,7 @@ function test_cherrypick_conflict_wt_file_vs_repo_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_cherrypick_modified_symlinks {
+test_cherrypick_modified_symlinks() {
 	local testroot=`test_init cherrypick_modified_symlinks`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -458,7 +458,7 @@ function test_cherrypick_modified_symlinks {
 	test_done "$testroot" "0"
 }
 
-function test_cherrypick_symlink_conflicts {
+test_cherrypick_symlink_conflicts() {
 	local testroot=`test_init cherrypick_symlink_conflicts`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -732,7 +732,7 @@ function test_cherrypick_symlink_conflicts {
 	test_done "$testroot" "0"
 }
 
-function test_cherrypick_with_path_prefix_and_empty_tree {
+test_cherrypick_with_path_prefix_and_empty_tree() {
 	local testroot=`test_init cherrypick_with_path_prefix_and_empty_tree 1`
 
 	(cd $testroot/repo && git commit --allow-empty \

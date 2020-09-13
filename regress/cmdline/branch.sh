@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_branch_create {
+test_branch_create() {
 	local testroot=`test_init branch_create`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -126,7 +126,7 @@ function test_branch_create {
 	test_done "$testroot" "$ret"
 }
 
-function test_branch_list {
+test_branch_list() {
 	local testroot=`test_init branch_list`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -233,7 +233,7 @@ function test_branch_list {
 	test_done "$testroot" "$ret"
 }
 
-function test_branch_delete {
+test_branch_delete() {
 	local testroot=`test_init branch_delete`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -299,7 +299,7 @@ function test_branch_delete {
 	test_done "$testroot" "$ret"
 }
 
-function test_branch_delete_current_branch {
+test_branch_delete_current_branch() {
 	local testroot=`test_init branch_delete_current_branch`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -324,7 +324,7 @@ function test_branch_delete_current_branch {
 	test_done "$testroot" "$ret"
 }
 
-function test_branch_delete_packed {
+test_branch_delete_packed() {
 	local testroot=`test_init branch_delete_packed`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -392,7 +392,7 @@ function test_branch_delete_packed {
 	test_done "$testroot" "$ret"
 }
 
-function test_branch_show {
+test_branch_show() {
 	local testroot=`test_init branch_show`
 	local commit_id=`git_show_head $testroot/repo`
 

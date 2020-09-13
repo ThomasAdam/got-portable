@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_integrate_basic {
+test_integrate_basic() {
 	local testroot=`test_init integrate_basic`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -140,7 +140,7 @@ function test_integrate_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_integrate_requires_rebase_first {
+test_integrate_requires_rebase_first() {
 	local testroot=`test_init integrate_requires_rebase_first`
 	local init_commit=`git_show_head $testroot/repo`
 
@@ -245,7 +245,7 @@ function test_integrate_requires_rebase_first {
 	test_done "$testroot" "$ret"
 }
 
-function test_integrate_path_prefix {
+test_integrate_path_prefix() {
 	local testroot=`test_init integrate_path_prefix`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -308,7 +308,7 @@ function test_integrate_path_prefix {
 	test_done "$testroot" "$ret"
 }
 
-function test_integrate_backwards_in_time {
+test_integrate_backwards_in_time() {
 	local testroot=`test_init integrate_backwards_in_time`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)

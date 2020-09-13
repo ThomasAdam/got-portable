@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_commit_basic {
+test_commit_basic() {
 	local testroot=`test_init commit_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -47,7 +47,7 @@ function test_commit_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_new_subdir {
+test_commit_new_subdir() {
 	local testroot=`test_init commit_new_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -79,7 +79,7 @@ function test_commit_new_subdir {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_subdir {
+test_commit_subdir() {
 	local testroot=`test_init commit_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -107,7 +107,7 @@ function test_commit_subdir {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_single_file {
+test_commit_single_file() {
 	local testroot=`test_init commit_single_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -135,7 +135,7 @@ function test_commit_single_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_out_of_date {
+test_commit_out_of_date() {
 	local testroot=`test_init commit_out_of_date`
 	local first_commit=`git_show_head $testroot/repo`
 
@@ -199,7 +199,7 @@ function test_commit_out_of_date {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_added_subdirs {
+test_commit_added_subdirs() {
 	local testroot=`test_init commit_added_subdirs`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -238,7 +238,7 @@ function test_commit_added_subdirs {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_deleted_subdirs {
+test_commit_deleted_subdirs() {
 	local testroot=`test_init commit_deleted_subdirs`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -279,7 +279,7 @@ function test_commit_deleted_subdirs {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_rejects_conflicted_file {
+test_commit_rejects_conflicted_file() {
 	local testroot=`test_init commit_rejects_conflicted_file`
 
 	local initial_rev=`git_show_head $testroot/repo`
@@ -336,7 +336,7 @@ function test_commit_rejects_conflicted_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_single_file_multiple {
+test_commit_single_file_multiple() {
 	local testroot=`test_init commit_single_file_multiple`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -368,7 +368,7 @@ function test_commit_single_file_multiple {
 	test_done "$testroot" "0"
 }
 
-function test_commit_added_and_modified_in_same_dir {
+test_commit_added_and_modified_in_same_dir() {
 	local testroot=`test_init commit_added_and_modified_in_same_dir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -399,7 +399,7 @@ function test_commit_added_and_modified_in_same_dir {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_path_prefix {
+test_commit_path_prefix() {
 	local testroot=`test_init commit_path_prefix`
 	local commit1=`git_show_head $testroot/repo`
 
@@ -498,7 +498,7 @@ function test_commit_path_prefix {
 	return "$ret"
 }
 
-function test_commit_dir_path {
+test_commit_dir_path() {
 	local testroot=`test_init commit_dir_path`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -536,7 +536,7 @@ function test_commit_dir_path {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_selected_paths {
+test_commit_selected_paths() {
 	local testroot=`test_init commit_selected_paths`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -588,7 +588,7 @@ function test_commit_selected_paths {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_outside_refs_heads {
+test_commit_outside_refs_heads() {
 	local testroot=`test_init commit_outside_refs_heads`
 
 	got ref -r $testroot/repo -c master refs/remotes/origin/master
@@ -633,7 +633,7 @@ function test_commit_outside_refs_heads {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_no_email {
+test_commit_no_email() {
 	local testroot=`test_init commit_no_email`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -670,7 +670,7 @@ function test_commit_no_email {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_tree_entry_sorting {
+test_commit_tree_entry_sorting() {
 	local testroot=`test_init commit_tree_entry_sorting`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -699,7 +699,7 @@ function test_commit_tree_entry_sorting {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_gotconfig_author {
+test_commit_gotconfig_author() {
 	local testroot=`test_init commit_gotconfig_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -736,7 +736,7 @@ function test_commit_gotconfig_author {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_gotconfig_worktree_author {
+test_commit_gotconfig_worktree_author() {
 	local testroot=`test_init commit_gotconfig_worktree_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -775,7 +775,7 @@ function test_commit_gotconfig_worktree_author {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_gitconfig_author {
+test_commit_gitconfig_author() {
 	local testroot=`test_init commit_gitconfig_author`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -813,7 +813,7 @@ function test_commit_gitconfig_author {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_xbit_change {
+test_commit_xbit_change() {
 	local testroot=`test_init commit_xbit_change`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -911,7 +911,7 @@ function test_commit_xbit_change {
 	test_done "$testroot" "$ret"
 }
 
-function commit_check_mode {
+commit_check_mode() {
 	local mode="$1"
 	local expected_mode="$2"
 
@@ -951,7 +951,7 @@ function commit_check_mode {
 	return $ret
 }
 
-function test_commit_normalizes_filemodes {
+test_commit_normalizes_filemodes() {
 	local testroot=`test_init commit_normalizes_filemodes`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -988,7 +988,7 @@ function test_commit_normalizes_filemodes {
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_with_unrelated_submodule {
+test_commit_with_unrelated_submodule() {
 	local testroot=`test_init commit_with_unrelated_submodule`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -1028,7 +1028,7 @@ function test_commit_with_unrelated_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function check_symlinks {
+check_symlinks() {
 	local wtpath="$1"
 	if ! [ -h $wtpath/alpha.link ]; then
 		echo "alpha.link is not a symlink"
@@ -1100,7 +1100,7 @@ function check_symlinks {
 	return 0
 }
 
-function test_commit_symlink {
+test_commit_symlink() {
 	local testroot=`test_init commit_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1258,7 +1258,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_commit_fix_bad_symlink {
+test_commit_fix_bad_symlink() {
 	local testroot=`test_init commit_fix_bad_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

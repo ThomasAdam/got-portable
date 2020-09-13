@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_log_in_repo {
+test_log_in_repo() {
 	local testroot=`test_init log_in_repo`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -49,7 +49,7 @@ function test_log_in_repo {
 	test_done "$testroot" "0"
 }
 
-function test_log_in_bare_repo {
+test_log_in_bare_repo() {
 	local testroot=`test_init log_in_bare_repo`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -70,7 +70,7 @@ function test_log_in_bare_repo {
 	test_done "$testroot" "0"
 }
 
-function test_log_in_worktree {
+test_log_in_worktree() {
 	local testroot=`test_init log_in_worktree 1`
 
 	make_test_tree $testroot/repo
@@ -128,7 +128,7 @@ function test_log_in_worktree {
 	test_done "$testroot" "0"
 }
 
-function test_log_in_worktree_with_path_prefix {
+test_log_in_worktree_with_path_prefix() {
 	local testroot=`test_init log_in_prefixed_worktree`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -164,7 +164,7 @@ function test_log_in_worktree_with_path_prefix {
 	test_done "$testroot" "0"
 }
 
-function test_log_tag {
+test_log_tag() {
 	local testroot=`test_init log_tag`
 	local commit_id=`git_show_head $testroot/repo`
 	local tag="1.0.0"
@@ -205,7 +205,7 @@ function test_log_tag {
 	test_done "$testroot" "$ret"
 }
 
-function test_log_limit {
+test_log_limit() {
 	local testroot=`test_init log_limit`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -283,7 +283,7 @@ function test_log_limit {
 	test_done "$testroot" "0"
 }
 
-function test_log_patch_added_file {
+test_log_patch_added_file() {
 	local testroot=`test_init log_patch_added_file`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -317,7 +317,7 @@ function test_log_patch_added_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_log_nonexistent_path {
+test_log_nonexistent_path() {
 	local testroot=`test_init log_nonexistent_path`
 	local head_rev=`git_show_head $testroot/repo`
 
@@ -351,7 +351,7 @@ function test_log_nonexistent_path {
 	test_done "$testroot" "$ret"
 }
 
-function test_log_end_at_commit {
+test_log_end_at_commit() {
 	local testroot=`test_init log_end_at_commit`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -505,7 +505,7 @@ function test_log_end_at_commit {
 	test_done "$testroot" "0"
 }
 
-function test_log_reverse_display {
+test_log_reverse_display() {
 	local testroot=`test_init log_reverse_display`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -604,7 +604,7 @@ function test_log_reverse_display {
 	test_done "$testroot" "$ret"
 }
 
-function test_log_in_worktree_different_repo {
+test_log_in_worktree_different_repo() {
 	local testroot=`test_init log_in_worktree_different_repo 1`
 
 	make_test_tree $testroot/repo
@@ -669,7 +669,7 @@ function test_log_in_worktree_different_repo {
 	test_done "$testroot" "0"
 }
 
-function test_log_changed_paths {
+test_log_changed_paths() {
 	local testroot=`test_init log_changed_paths`
 	local commit_id0=`git_show_head $testroot/repo`
 
@@ -713,7 +713,7 @@ function test_log_changed_paths {
 	test_done "$testroot" "$ret"
 }
 
-function test_log_submodule {
+test_log_submodule() {
 	local testroot=`test_init log_submodule`
 
 	make_single_file_repo $testroot/repo2 foo

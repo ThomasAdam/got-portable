@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_rm_basic {
+test_rm_basic() {
 	local testroot=`test_init rm_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -59,7 +59,7 @@ function test_rm_basic {
 	test_done "$testroot" "0"
 }
 
-function test_rm_with_local_mods {
+test_rm_with_local_mods() {
 	local testroot=`test_init rm_with_local_mods`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -100,7 +100,7 @@ function test_rm_with_local_mods {
 	test_done "$testroot" "$ret"
 }
 
-function test_double_rm {
+test_double_rm() {
 	local testroot=`test_init double_rm`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -135,7 +135,7 @@ function test_double_rm {
 	test_done "$testroot" "0"
 }
 
-function test_rm_and_add_elsewhere {
+test_rm_and_add_elsewhere() {
 	local testroot=`test_init rm_and_add_elsewhere`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -193,7 +193,7 @@ function test_rm_and_add_elsewhere {
 	test_done "$testroot" "$ret"
 }
 
-function test_rm_directory {
+test_rm_directory() {
 	local testroot=`test_init rm_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -266,7 +266,7 @@ function test_rm_directory {
 	test_done "$testroot" "$ret"
 }
 
-function test_rm_directory_keep_files {
+test_rm_directory_keep_files() {
 	local testroot=`test_init rm_directory_keep_files`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -346,7 +346,7 @@ function test_rm_directory_keep_files {
 	test_done "$testroot" "$ret"
 }
 
-function test_rm_subtree {
+test_rm_subtree() {
 	local testroot=`test_init rm_subtree`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -404,7 +404,7 @@ function test_rm_subtree {
 	test_done "$testroot" "$ret"
 }
 
-function test_rm_symlink {
+test_rm_symlink() {
 	local testroot=`test_init rm_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -438,7 +438,7 @@ function test_rm_symlink {
 	test_done "$testroot" "$ret"
 }
 
-function test_rm_status_code {
+test_rm_status_code() {
 	local testroot=`test_init rm_status_code`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

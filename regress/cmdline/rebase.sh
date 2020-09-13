@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_rebase_basic {
+test_rebase_basic() {
 	local testroot=`test_init rebase_basic`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -136,7 +136,7 @@ function test_rebase_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_ancestry_check {
+test_rebase_ancestry_check() {
 	local testroot=`test_init rebase_ancestry_check`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -174,7 +174,7 @@ function test_rebase_ancestry_check {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_continue {
+test_rebase_continue() {
 	local testroot=`test_init rebase_continue`
 	local init_commit=`git_show_head $testroot/repo`
 
@@ -309,7 +309,7 @@ function test_rebase_continue {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_abort {
+test_rebase_abort() {
 	local testroot=`test_init rebase_abort`
 
 	local init_commit=`git_show_head $testroot/repo`
@@ -427,7 +427,7 @@ function test_rebase_abort {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_no_op_change {
+test_rebase_no_op_change() {
 	local testroot=`test_init rebase_no_op_change`
 	local init_commit=`git_show_head $testroot/repo`
 
@@ -539,7 +539,7 @@ function test_rebase_no_op_change {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_in_progress {
+test_rebase_in_progress() {
 	local testroot=`test_init rebase_in_progress`
 	local init_commit=`git_show_head $testroot/repo`
 
@@ -645,7 +645,7 @@ function test_rebase_in_progress {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_path_prefix {
+test_rebase_path_prefix() {
 	local testroot=`test_init rebase_path_prefix`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -690,7 +690,7 @@ function test_rebase_path_prefix {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_preserves_logmsg {
+test_rebase_preserves_logmsg() {
 	local testroot=`test_init rebase_preserves_logmsg`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -747,7 +747,7 @@ function test_rebase_preserves_logmsg {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_no_commits_to_rebase {
+test_rebase_no_commits_to_rebase() {
 	local testroot=`test_init rebase_no_commits_to_rebase`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -796,7 +796,7 @@ function test_rebase_no_commits_to_rebase {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_forward {
+test_rebase_forward() {
 	local testroot=`test_init rebase_forward`
 	local commit0=`git_show_head $testroot/repo`
 
@@ -885,7 +885,7 @@ function test_rebase_forward {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_out_of_date {
+test_rebase_out_of_date() {
 	local testroot=`test_init rebase_out_of_date`
 	local initial_commit=`git_show_head $testroot/repo`
 
@@ -955,7 +955,7 @@ function test_rebase_out_of_date {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_trims_empty_dir {
+test_rebase_trims_empty_dir() {
 	local testroot=`test_init rebase_trims_empty_dir`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -1060,7 +1060,7 @@ function test_rebase_trims_empty_dir {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_delete_missing_file {
+test_rebase_delete_missing_file() {
 	local testroot=`test_init rebase_delete_missing_file`
 
 	mkdir -p $testroot/repo/d/f/g
@@ -1163,7 +1163,7 @@ function test_rebase_delete_missing_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_rebase_rm_add_rm_file {
+test_rebase_rm_add_rm_file() {
 	local testroot=`test_init rebase_rm_add_rm_file`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)

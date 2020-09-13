@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_tag_create {
+test_tag_create() {
 	local testroot=`test_init tag_create`
 	local commit_id=`git_show_head $testroot/repo`
 	local tag=1.0.0
@@ -122,7 +122,7 @@ function test_tag_create {
 	test_done "$testroot" "$ret"
 }
 
-function test_tag_list {
+test_tag_list() {
 	local testroot=`test_init tag_list`
 	local commit_id=`git_show_head $testroot/repo`
 	local tag=1.0.0
@@ -170,7 +170,7 @@ function test_tag_list {
 	test_done "$testroot" "$ret"
 }
 
-function test_tag_list_lightweight {
+test_tag_list_lightweight() {
 	local testroot=`test_init tag_list_lightweight`
 	local commit_id=`git_show_head $testroot/repo`
 	local tag=1.0.0

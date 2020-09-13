@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_add_basic {
+test_add_basic() {
 	local testroot=`test_init add_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -39,7 +39,7 @@ function test_add_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_double_add {
+test_double_add() {
 	local testroot=`test_init double_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -69,7 +69,7 @@ function test_double_add {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_multiple {
+test_add_multiple() {
 	local testroot=`test_init multiple_add`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -102,7 +102,7 @@ function test_add_multiple {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_file_in_new_subdir {
+test_add_file_in_new_subdir() {
 	local testroot=`test_init add_file_in_new_subdir`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -126,7 +126,7 @@ function test_add_file_in_new_subdir {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_deleted {
+test_add_deleted() {
 	local testroot=`test_init add_deleted`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -157,7 +157,7 @@ function test_add_deleted {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_directory {
+test_add_directory() {
 	local testroot=`test_init add_directory`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -249,7 +249,7 @@ function test_add_directory {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_clashes_with_submodule {
+test_add_clashes_with_submodule() {
 	local testroot=`test_init add_clashes_with_submodule`
 
 	make_single_file_repo $testroot/repo2 foo
@@ -296,7 +296,7 @@ function test_add_clashes_with_submodule {
 	test_done "$testroot" "$ret"
 }
 
-function test_add_symlink {
+test_add_symlink() {
 	local testroot=`test_init add_symlink`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null

@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_unstage_basic {
+test_unstage_basic() {
 	local testroot=`test_init unstage_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -67,7 +67,7 @@ function test_unstage_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_unversioned {
+test_unstage_unversioned() {
 	local testroot=`test_init unstage_unversioned`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -145,7 +145,7 @@ function test_unstage_unversioned {
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_nonexistent {
+test_unstage_nonexistent() {
 	local testroot=`test_init unstage_nonexistent`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -183,7 +183,7 @@ function test_unstage_nonexistent {
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_patch {
+test_unstage_patch() {
 	local testroot=`test_init unstage_patch`
 
 	jot 16 > $testroot/repo/numbers
@@ -665,7 +665,7 @@ EOF
 
 }
 
-function test_unstage_patch_added {
+test_unstage_patch_added() {
 	local testroot=`test_init unstage_patch_added`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -733,7 +733,7 @@ function test_unstage_patch_added {
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_patch_removed {
+test_unstage_patch_removed() {
 	local testroot=`test_init unstage_patch_removed`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -802,7 +802,7 @@ function test_unstage_patch_removed {
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_patch_quit {
+test_unstage_patch_quit() {
 	local testroot=`test_init unstage_patch_quit`
 
 	jot 16 > $testroot/repo/numbers
@@ -953,7 +953,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_unstage_symlink {
+test_unstage_symlink() {
 	local testroot=`test_init unstage_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -1135,7 +1135,7 @@ EOF
 	test_done "$testroot" "0"
 }
 
-function test_unstage_patch_symlink {
+test_unstage_patch_symlink() {
 	local testroot=`test_init unstage_patch_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

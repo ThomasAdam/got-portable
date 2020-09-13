@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_ref_create {
+test_ref_create() {
 	local testroot=`test_init ref_create`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -188,7 +188,7 @@ function test_ref_create {
 	test_done "$testroot" "$ret"
 }
 
-function test_ref_delete {
+test_ref_delete() {
 	local testroot=`test_init ref_delete`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -242,7 +242,7 @@ function test_ref_delete {
 	test_done "$testroot" "$ret"
 }
 
-function test_ref_list {
+test_ref_list() {
 	local testroot=`test_init ref_list`
 	local commit_id=`git_show_head $testroot/repo`
 

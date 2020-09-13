@@ -16,7 +16,7 @@
 
 . ./common.sh
 
-function test_stage_basic {
+test_stage_basic() {
 	local testroot=`test_init stage_basic`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -44,7 +44,7 @@ function test_stage_basic {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_no_changes {
+test_stage_no_changes() {
 	local testroot=`test_init stage_no_changes`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -82,7 +82,7 @@ function test_stage_no_changes {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_unversioned {
+test_stage_unversioned() {
 	local testroot=`test_init stage_unversioned`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -144,7 +144,7 @@ function test_stage_unversioned {
 
 }
 
-function test_stage_nonexistent {
+test_stage_nonexistent() {
 	local testroot=`test_init stage_nonexistent`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -166,7 +166,7 @@ function test_stage_nonexistent {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_list {
+test_stage_list() {
 	local testroot=`test_init stage_list`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -230,7 +230,7 @@ function test_stage_list {
 
 }
 
-function test_stage_conflict {
+test_stage_conflict() {
 	local testroot=`test_init stage_conflict`
 	local initial_commit=`git_show_head $testroot/repo`
 
@@ -292,7 +292,7 @@ function test_stage_conflict {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_out_of_date {
+test_stage_out_of_date() {
 	local testroot=`test_init stage_out_of_date`
 	local initial_commit=`git_show_head $testroot/repo`
 
@@ -338,7 +338,7 @@ function test_stage_out_of_date {
 }
 
 
-function test_double_stage {
+test_double_stage() {
 	local testroot=`test_init double_stage`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -445,7 +445,7 @@ function test_double_stage {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_status {
+test_stage_status() {
 	local testroot=`test_init stage_status`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -525,7 +525,7 @@ function test_stage_status {
 
 }
 
-function test_stage_add_already_staged_file {
+test_stage_add_already_staged_file() {
 	local testroot=`test_init stage_add_already_staged_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -577,7 +577,7 @@ function test_stage_add_already_staged_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_rm_already_staged_file {
+test_stage_rm_already_staged_file() {
 	local testroot=`test_init stage_rm_already_staged_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -651,7 +651,7 @@ function test_stage_rm_already_staged_file {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_revert {
+test_stage_revert() {
 	local testroot=`test_init stage_revert`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -884,7 +884,7 @@ function test_stage_revert {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_diff {
+test_stage_diff() {
 	local testroot=`test_init stage_diff`
 	local head_commit=`git_show_head $testroot/repo`
 
@@ -1001,7 +1001,7 @@ function test_stage_diff {
 
 }
 
-function test_stage_histedit {
+test_stage_histedit() {
 	local testroot=`test_init stage_histedit`
 	local orig_commit=`git_show_head $testroot/repo`
 
@@ -1057,7 +1057,7 @@ function test_stage_histedit {
 
 }
 
-function test_stage_rebase {
+test_stage_rebase() {
 	local testroot=`test_init stage_rebase`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
@@ -1115,7 +1115,7 @@ function test_stage_rebase {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_update {
+test_stage_update() {
 	local testroot=`test_init stage_update`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1158,7 +1158,7 @@ function test_stage_update {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_commit_non_staged {
+test_stage_commit_non_staged() {
 	local testroot=`test_init stage_commit_non_staged`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1202,7 +1202,7 @@ function test_stage_commit_non_staged {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_commit_out_of_date {
+test_stage_commit_out_of_date() {
 	local testroot=`test_init stage_commit_out_of_date`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -1318,7 +1318,7 @@ function test_stage_commit_out_of_date {
 
 }
 
-function test_stage_commit {
+test_stage_commit() {
 	local testroot=`test_init stage_commit`
 	local first_commit=`git_show_head $testroot/repo`
 
@@ -1429,7 +1429,7 @@ function test_stage_commit {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch {
+test_stage_patch() {
 	local testroot=`test_init stage_patch`
 
 	jot 16 > $testroot/repo/numbers
@@ -1714,7 +1714,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_twice {
+test_stage_patch_twice() {
 	local testroot=`test_init stage_patch_twice`
 
 	jot 16 > $testroot/repo/numbers
@@ -1903,7 +1903,7 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_added {
+test_stage_patch_added() {
 	local testroot=`test_init stage_patch_added`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -1961,7 +1961,7 @@ function test_stage_patch_added {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_added_twice {
+test_stage_patch_added_twice() {
 	local testroot=`test_init stage_patch_added_twice`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2026,7 +2026,7 @@ function test_stage_patch_added_twice {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_removed {
+test_stage_patch_removed() {
 	local testroot=`test_init stage_patch_removed`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2085,7 +2085,7 @@ function test_stage_patch_removed {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_removed_twice {
+test_stage_patch_removed_twice() {
 	local testroot=`test_init stage_patch_removed_twice`
 	local commit_id=`git_show_head $testroot/repo`
 
@@ -2151,7 +2151,7 @@ function test_stage_patch_removed_twice {
 	test_done "$testroot" "$ret"
 }
 
-function test_stage_patch_quit {
+test_stage_patch_quit() {
 	local testroot=`test_init stage_patch_quit`
 
 	jot 16 > $testroot/repo/numbers
@@ -2259,7 +2259,7 @@ EOF
 
 }
 
-function test_stage_patch_incomplete_script {
+test_stage_patch_incomplete_script() {
 	local testroot=`test_init stage_incomplete_script`
 
 	jot 16 > $testroot/repo/numbers
@@ -2353,7 +2353,7 @@ EOF
 
 }
 
-function test_stage_symlink {
+test_stage_symlink() {
 	local testroot=`test_init stage_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)
@@ -2665,7 +2665,7 @@ EOF
 	test_done "$testroot" "0"
 }
 
-function test_stage_patch_symlink {
+test_stage_patch_symlink() {
 	local testroot=`test_init stage_patch_symlink`
 
 	(cd $testroot/repo && ln -s alpha alpha.link)

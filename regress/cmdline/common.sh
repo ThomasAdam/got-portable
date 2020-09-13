@@ -24,12 +24,12 @@ export GOT_LOG_DEFAULT_LIMIT=0
 
 export MALLOC_OPTIONS=S
 
-function git_init
+git_init()
 {
 	git init -q "$1"
 }
 
-function maybe_pack_repo
+maybe_pack_repo()
 {
 	local repo="$1"
 	if [ -n "$GOT_TEST_PACK" ]; then
@@ -37,7 +37,7 @@ function maybe_pack_repo
 	fi
 }
 
-function git_commit
+git_commit()
 {
 	local repo="$1"
 	shift
@@ -45,20 +45,20 @@ function git_commit
 	maybe_pack_repo $repo
 }
 
-function git_rm
+git_rm()
 {
 	local repo="$1"
 	shift
 	(cd $repo && git rm -q "$@")
 }
 
-function git_show_head
+git_show_head()
 {
 	local repo="$1"
 	(cd $repo && git show --no-patch --pretty='format:%H')
 }
 
-function git_show_branch_head
+git_show_branch_head()
 {
 	local repo="$1"
 	local branch="$2"
@@ -66,14 +66,14 @@ function git_show_branch_head
 }
 
 
-function git_show_author_time
+git_show_author_time()
 {
 	local repo="$1"
 	local object="$2"
 	(cd $repo && git show --no-patch --pretty='format:%at' $object)
 }
 
-function git_show_tagger_time
+git_show_tagger_time()
 {
 	local repo="$1"
 	local tag="$2"
@@ -81,20 +81,20 @@ function git_show_tagger_time
 		sed -e "s/^tagger $GOT_AUTHOR//" | cut -d' ' -f2)
 }
 
-function git_show_parent_commit
+git_show_parent_commit()
 {
 	local repo="$1"
 	local commit="$2"
 	(cd $repo && git show --no-patch --pretty='format:%P' $commit)
 }
 
-function git_show_tree
+git_show_tree()
 {
 	local repo="$1"
 	(cd $repo && git show --no-patch --pretty='format:%T')
 }
 
-function trim_obj_id
+trim_obj_id()
 {
 	let trimcount=$1
 	id=$2
@@ -108,7 +108,7 @@ function trim_obj_id
 	echo ${id%$pat}
 }
 
-function git_commit_tree
+git_commit_tree()
 {
 	local repo="$1"
 	local msg="$2"
@@ -117,7 +117,7 @@ function git_commit_tree
 	maybe_pack_repo $repo
 }
 
-function make_test_tree
+make_test_tree()
 {
 	repo="$1"
 
@@ -129,7 +129,7 @@ function make_test_tree
 	echo zeta > $repo/epsilon/zeta
 }
 
-function make_single_file_repo
+make_single_file_repo()
 {
 	repo="$1"
 	file="$2"
@@ -141,7 +141,7 @@ function make_single_file_repo
 	git_commit $repo -m "intialize $repo with file $file"
 }
 
-function get_loose_object_path
+get_loose_object_path()
 {
 	local repo="$1"
 	local id="$2"
@@ -150,7 +150,7 @@ function get_loose_object_path
 	echo "$repo/.git/objects/$id0/$idrest"
 }
 
-function get_blob_id
+get_blob_id()
 {
 	repo="$1"
 	tree_path="$2"
@@ -160,7 +160,7 @@ function get_blob_id
 		cut -d' ' -f 1
 }
 
-function test_init
+test_init()
 {
 	local testname="$1"
 	local no_tree="$2"
@@ -180,7 +180,7 @@ function test_init
 	echo "$testroot"
 }
 
-function test_cleanup
+test_cleanup()
 {
 	local testroot="$1"
 
@@ -197,7 +197,7 @@ function test_cleanup
 	rm -rf "$testroot"
 }
 
-function test_parseargs
+test_parseargs()
 {
 	args=`getopt q $*`
 	if [ $? -ne 0 ]; then
@@ -217,7 +217,7 @@ function test_parseargs
 	done
 }
 
-function run_test
+run_test()
 {
 	testfunc="$1"
 	if [ -z "$GOT_TEST_QUIET" ]; then
@@ -226,7 +226,7 @@ function run_test
 	$testfunc
 }
 
-function test_done
+test_done()
 {
 	local testroot="$1"
 	local result="$2"
