@@ -177,3 +177,19 @@ file.
 .Xr got 1 ,
 .Xr git-repository 5 ,
 .Xr got-worktree 5
+.Sh CAVEATS
+.Nm
+offers no way to configure the editor spawned by
+.Cm got commit ,
+.Cm got histedit ,
+.Cm got import ,
+or
+.Cm got tag .
+This is deliberate and prevents potential arbitrary command execution
+as another user when repositories or work trees are shared between users.
+Users should set their
+.Ev VISUAL
+or
+.Ev EDITOR
+environment variables instead.
+
