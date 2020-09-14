@@ -1,3 +1,20 @@
+* got 0.39; 2020-09-14
+- add -q option to tests for quiet output and use it for 'make regress'
+- document how to re-create a corrupt or missing file index in got-worktree(5)
+- fix some memory leaks in tog (tracey)
+- add workaround for a performance issue when 'tog diff' shows a large diff
+- add -s option to 'got status' which acts as a status code filter
+- add -s option to 'got remove' which deletes files in a particular status
+- plug a memory leak in got_privsep_recv_tree() in error case
+- in got_object_commit_get_logmsg(), handle log messages which lack '\n'
+- do not rely on <zlib.h> to pull in <unistd.h> (naddy)
+- use POSIX standard endian functions and include <endian.h> (naddy)
+- add got.conf(5) configuration file
+- use modern POSIX timestamp fields in struct stat (naddy)
+- use plain write() in place of dprintf() with a pre-formatted string (naddy)
+- stop including <sys/syslimits.h> directly (naddy)
+- switch regress function declarations from ksh to POSIX shell syntax (naddy)
+
 * got 0.38; 2020-08-02
 - add support for managing symbolic links under version control
 - new -S option for 'got commit' and 'got stage' to skip symlink safety checks
