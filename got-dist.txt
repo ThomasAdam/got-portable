@@ -12,8 +12,7 @@
 /got/got-worktree.5
 /got/got.1
 /got/got.c
-/got/got.h
-/got/parse.y
+/got/got.conf.5
 /gotweb
 /gotweb/Makefile
 /gotweb/Makefile.inc
@@ -75,6 +74,7 @@
 /include/got_diff.h
 /include/got_error.h
 /include/got_fetch.h
+/include/got_gotconfig.h
 /include/got_object.h
 /include/got_opentemp.h
 /include/got_path.h
@@ -105,6 +105,7 @@
 /lib/got_lib_diff.h
 /lib/got_lib_fileindex.h
 /lib/got_lib_gitconfig.h
+/lib/got_lib_gotconfig.h
 /lib/got_lib_inflate.h
 /lib/got_lib_lockfile.h
 /lib/got_lib_object.h
@@ -118,6 +119,7 @@
 /lib/got_lib_repository.h
 /lib/got_lib_sha1.h
 /lib/got_lib_worktree.h
+/lib/gotconfig.c
 /lib/inflate.c
 /lib/lockfile.c
 /lib/object.c
@@ -154,6 +156,11 @@
 /libexec/got-read-gitconfig
 /libexec/got-read-gitconfig/Makefile
 /libexec/got-read-gitconfig/got-read-gitconfig.c
+/libexec/got-read-gotconfig
+/libexec/got-read-gotconfig/Makefile
+/libexec/got-read-gotconfig/got-read-gotconfig.c
+/libexec/got-read-gotconfig/gotconfig.h
+/libexec/got-read-gotconfig/parse.y
 /libexec/got-read-object
 /libexec/got-read-object/Makefile
 /libexec/got-read-object/got-read-object.c
