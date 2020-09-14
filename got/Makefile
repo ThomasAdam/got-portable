@@ -10,7 +10,7 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		inflate.c buf.c rcsutil.c diff3.c lockfile.c \
 		deflate.c object_create.c delta_cache.c fetch.c \
 		gotconfig.c
-MAN =		${PROG}.1 got-worktree.5 git-repository.5
+MAN =		${PROG}.1 got-worktree.5 git-repository.5 got.conf.5
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 
