@@ -3604,7 +3604,7 @@ cmd_log(int argc, char *argv[])
 	if (diff_context == -1)
 		diff_context = 3;
 	else if (!show_patch)
-		errx(1, "-C reguires -p");
+		errx(1, "-C requires -p");
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
