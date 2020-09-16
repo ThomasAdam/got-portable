@@ -96,13 +96,13 @@ git_show_tree()
 
 trim_obj_id()
 {
-	let trimcount=$1
-	id=$2
+	local trimcount=$1
+	local id=$2
 
-	pat=""
-	while [ trimcount -gt 0 ]; do
+	local pat=""
+	while [ "$trimcount" -gt 0 ]; do
 		pat="[0-9a-f]$pat"
-		let trimcount--
+		trimcount=$((trimcount - 1))
 	done
 
 	echo ${id%$pat}
