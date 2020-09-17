@@ -104,7 +104,7 @@ done:
 static const struct got_error *
 send_gotconfig_str(struct imsgbuf *ibuf, const char *value)
 {
-	size_t len = value ? strlen(value) + 1 : 0;
+	size_t len = value ? strlen(value) : 0;
 
 	if (imsg_compose(ibuf, GOT_IMSG_GOTCONFIG_STR_VAL, 0, 0, -1,
 	    value, len) == -1)
