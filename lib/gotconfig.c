@@ -133,6 +133,9 @@ got_gotconfig_free(struct got_gotconfig *conf)
 {
 	int i;
 
+	if (conf == NULL)
+		return;
+
 	free(conf->author);
 
 	for (i = 0; i < conf->nremotes; i++) {
