@@ -1951,13 +1951,14 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	case GOT_IMSG_GOTCONFIG_STR_VAL:
 		if (datalen == 0)
 			break;
-		*str = malloc(datalen);
+		/* datalen does not include terminating \0 */
+		*str = malloc(datalen + 1);
 		if (*str == NULL) {
 			err = got_error_from_errno("malloc");
 			break;
 		}
-		if (strlcpy(*str, imsg.data, datalen) >= datalen)
-			err = got_error(GOT_ERR_NO_SPACE);
+		memcpy(*str, imsg.data, datalen);
+		(*str)[datalen] = '\0';
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
