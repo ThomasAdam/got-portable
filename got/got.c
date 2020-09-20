@@ -2408,6 +2408,7 @@ cmd_checkout(int argc, char *argv[])
 	const char *path_prefix = "";
 	const char *branch_name = GOT_REF_HEAD;
 	char *commit_id_str = NULL;
+	char *cwd = NULL, *path = NULL;
 	int ch, same_path_prefix, allow_nonempty = 0;
 	struct got_pathlist_head paths;
 	struct got_checkout_progress_arg cpa;
@@ -2445,7 +2446,7 @@ cmd_checkout(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 	if (argc == 1) {
-		char *cwd, *base, *dotgit;
+		char *base, *dotgit;
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL)
 			return got_error_from_errno2("realpath", argv[0]);
@@ -2454,30 +2455,26 @@ cmd_checkout(int argc, char *argv[])
 			error = got_error_from_errno("getcwd");
 			goto done;
 		}
-		if (path_prefix[0]) {
-			base = basename(path_prefix);
-			if (base == NULL) {
-				error = got_error_from_errno2("basename",
-				    path_prefix);
-				goto done;
-			}
-		} else {
-			base = basename(repo_path);
-			if (base == NULL) {
-				error = got_error_from_errno2("basename",
-				    repo_path);
-				goto done;
-			}
+		if (path_prefix[0])
+			path = strdup(path_prefix);
+		else
+			path = strdup(repo_path);
+		if (path == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+		base = basename(path);
+		if (base == NULL) {
+			error = got_error_from_errno2("basename", path);
+			goto done;
 		}
 		dotgit = strstr(base, ".git");
 		if (dotgit)
 			*dotgit = '\0';
 		if (asprintf(&worktree_path, "%s/%s", cwd, base) == -1) {
 			error = got_error_from_errno("asprintf");
-			free(cwd);
 			goto done;
 		}
-		free(cwd);
 	} else if (argc == 2) {
 		repo_path = realpath(argv[0], NULL);
 		if (repo_path == NULL) {
@@ -2595,6 +2592,8 @@ done:
 	free(commit_id_str);
 	free(repo_path);
 	free(worktree_path);
+	free(cwd);
+	free(path);
 	return error;
 }
 
