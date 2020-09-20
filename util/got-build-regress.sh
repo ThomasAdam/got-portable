@@ -15,12 +15,13 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 prog=`basename $0`
-usage="$prog [-b branch] [-f] [-w worktree ] email-address [email-address ...]"
+usage="$prog [-b branch] [-f] [-w worktree ] [ -r from-address ] email-address [email-address ...]"
 branch=master
 worktree=$HOME/got
+fromaddr_arg=
 force=0
 
-args=`getopt b:fw: $*`
+args=`getopt b:fw:r: $*`
 if [ $? -ne 0 ]
 then
 	echo "usage: $usage" >&2
@@ -36,6 +37,8 @@ while [ $# -ne 0 ]; do
 			force=1; shift;;
 		-w)
 			worktree="$2"; shift; shift;;
+		-r)	
+			fromaddr_arg="-r $2"; shift; shift;;
 		--)
 			shift; break;;
 	esac
@@ -82,7 +85,7 @@ old_basecommit=`cat .got/base-commit`
 log_cmd build.log /usr/local/bin/got update -b "$branch"
 update_status="$?"
 if [ "$update_status" != "0" ]; then
-	mail -s "$prog update failure" $recipients < build.log
+	mail $fromaddr_arg -s "$prog update failure" $recipients < build.log
 	rm -rf "$lockfile"
 	exit 0
 fi
@@ -98,7 +101,7 @@ log_cmd build.log make obj
 log_cmd build.log make -j $ncpu
 build_status="$?"
 if [ "$build_status" != "0" ]; then
-	mail -s "$prog build failure" $recipients < build.log
+	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	rm -rf "$lockfile"
 	exit 0
 fi
@@ -106,7 +109,7 @@ log_cmd build.log make install
 log_cmd build.log make -j $ncpu web
 build_status="$?"
 if [ "$build_status" != "0" ]; then
-	mail -s "$prog build failure" $recipients < build.log
+	mail $fromaddr_arg -s "$prog build failure" $recipients < build.log
 	rm -rf "$lockfile"
 	exit 0
 fi
@@ -120,7 +123,7 @@ regress_failure_grep="$?"
 if [ "$regress_status" != "0" -o "$regress_failure_grep" == "0" ]; then
 	printf "\n\n\t Test failures:\n\n" >> build.log
 	cat failures.log >> build.log
-	mail -s "$prog regress failure" $recipients < build.log
+	mail $fromaddr_arg -s "$prog regress failure" $recipients < build.log
 	rm -rf "$lockfile"
 	exit 0
 fi
@@ -132,7 +135,7 @@ log_cmd build.log make -j $ncpu GOT_RELEASE=Yes
 log_cmd build.log make -j $ncpu GOT_RELEASE=Yes web
 build_status="$?"
 if [ "$build_status" != "0" ]; then
-	mail -s "$prog release mode build failure" $recipients < build.log
+	mail $fromaddr_arg -s "$prog release mode build failure" $recipients < build.log
 	rm -rf "$lockfile"
 	exit 0
 fi
