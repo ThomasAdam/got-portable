@@ -5686,6 +5686,7 @@ main(int argc, char *argv[])
 	}
 
 	endwin();
+	putchar('\n');
 	if (cmd_argv) {
 		int i;
 		for (i = 0; i < argc; i++)
