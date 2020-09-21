@@ -1,3 +1,15 @@
+* got 0.40; 2020-09-21
+- do not rely on <zlib.h> to pull in <unistd.h> (naddy)
+- remove unused #includes from the new got-read-gotconfig/parse.y (naddy)
+- document our default choice of text editor (suggested by Ricky Cintron)
+- in tests, replace ksh syntax with POSIX arithmetic expressions (naddy)
+- fix got.conf overriding GOT_AUTHOR even if no author is set in got.conf
+- in tests, expand arguments in shell script for POSIX compatibility (naddy)
+- fix crash in got_free_gotconfig()
+- in cmd_checkout() handle basename(3) modifying its argument for portability
+- print newline to clear the bottom line when tog exits (naddy)
+- install got-read-gotconfig into gotweb's chroot environment
+
 * got 0.39; 2020-09-14
 - add -q option to tests for quiet output and use it for 'make regress'
 - document how to re-create a corrupt or missing file index in got-worktree(5)
