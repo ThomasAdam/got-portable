@@ -1333,16 +1333,13 @@ done:
 	return err ? err : unlock_err;
 }
 
-const struct got_error *
-got_ref_delete(struct got_reference *ref, struct got_repository *repo)
+static const struct got_error *
+delete_loose_ref(struct got_reference *ref, struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *unlock_err = NULL;
 	const char *name = got_ref_get_name(ref);
 	char *path_refs = NULL, *path = NULL;
 	struct got_lockfile *lf = NULL;
-
-	if (ref->flags & GOT_REF_IS_PACKED)
-		return delete_packed_ref(ref, repo);
 
 	path_refs = get_refs_dir_path(repo, name);
 	if (path_refs == NULL) {
@@ -1372,6 +1369,45 @@ done:
 	free(path_refs);
 	free(path);
 	return err ? err : unlock_err;
+}
+
+const struct got_error *
+got_ref_delete(struct got_reference *ref, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reference *ref2;
+
+	if (ref->flags & GOT_REF_IS_PACKED) {
+		err = delete_packed_ref(ref, repo);
+		if (err)
+			return err;
+
+		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 1);
+		if (err) {
+			if (err->code == GOT_ERR_NOT_REF)
+				return NULL;
+			return err;
+		}
+
+		err = delete_loose_ref(ref2, repo);
+		got_ref_close(ref2);
+		return err;
+	} else {
+		err = delete_loose_ref(ref, repo);
+		if (err)
+			return err;
+
+		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 1);
+		if (err) {
+			if (err->code == GOT_ERR_NOT_REF)
+				return NULL;
+			return err;
+		}
+
+		err = delete_packed_ref(ref2, repo);
+		got_ref_close(ref2);
+		return err;
+	}
 }
 
 const struct got_error *

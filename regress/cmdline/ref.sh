@@ -238,6 +238,40 @@ test_ref_delete() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git pack-refs --all)
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	# ref 'master' now exists in both packed and loose forms
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id2" >> $testroot/stdout.expected
+	echo "refs/heads/ref1: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -d master
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "refs/heads/ref1: $commit_id" > $testroot/stdout.expected
+	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
