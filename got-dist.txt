@@ -58,6 +58,8 @@
 /gotweb/libexec/got-read-commit/Makefile
 /gotweb/libexec/got-read-gitconfig
 /gotweb/libexec/got-read-gitconfig/Makefile
+/gotweb/libexec/got-read-gotconfig
+/gotweb/libexec/got-read-gotconfig/Makefile
 /gotweb/libexec/got-read-object
 /gotweb/libexec/got-read-object/Makefile
 /gotweb/libexec/got-read-pack
