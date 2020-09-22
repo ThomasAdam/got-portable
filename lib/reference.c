@@ -566,14 +566,6 @@ got_reflist_entry_dup(struct got_reflist_entry **newp,
 		return err;
 	}
 
-	new->id = got_object_id_dup(re->id);
-	if (new->id == NULL) {
-		err = got_error_from_errno("got_ref_dup");
-		free(new->id);
-		free(new);
-		return err;
-	}
-
 	*newp = new;
 	return NULL;
 }
@@ -752,23 +744,15 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
     got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
-	struct got_object_id *id;
 	struct got_reflist_entry *new, *re, *prev = NULL;
 	int cmp;
 
 	*newp = NULL;
 
-	err = got_ref_resolve(&id, repo, ref);
-	if (err)
-		return err;
-
 	new = malloc(sizeof(*new));
-	if (new == NULL) {
-		free(id);
+	if (new == NULL)
 		return got_error_from_errno("malloc");
-	}
 	new->ref = ref;
-	new->id = id;
 	*newp = new;
 
 	/*
@@ -784,7 +768,6 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 			return err;
 		if (cmp == 0) {
 			/* duplicate */
-			free(new->id);
 			free(new);
 			*newp = NULL;
 			return NULL;
@@ -1031,7 +1014,6 @@ got_ref_list_free(struct got_reflist_head *refs)
 		re = SIMPLEQ_FIRST(refs);
 		SIMPLEQ_REMOVE_HEAD(refs, entry);
 		got_ref_close(re->ref);
-		free(re->id);
 		free(re);
 	}
 

@@ -266,7 +266,8 @@ test_ref_delete() {
 	got ref -r $testroot/repo -d master
 
 	got ref -l -r $testroot/repo > $testroot/stdout
-	echo "refs/heads/ref1: $commit_id" > $testroot/stdout.expected
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/ref1: $commit_id" >> $testroot/stdout.expected
 	echo "refs/heads/ref3: $commit_id" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"

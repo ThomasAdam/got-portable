@@ -1163,6 +1163,7 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 
 	SIMPLEQ_FOREACH(re, refs, entry) {
 		struct got_tag_object *tag = NULL;
+		struct got_object_id *ref_id;
 		int cmp;
 
 		name = got_ref_get_name(re->ref);
@@ -1180,18 +1181,24 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 			if (s != NULL && s[strlen(s)] == '\0')
 				continue;
 		}
+		err = got_ref_resolve(&ref_id, repo, re->ref);
+		if (err)
+			break;
 		if (strncmp(name, "tags/", 5) == 0) {
-			err = got_object_open_as_tag(&tag, repo, re->id);
+			err = got_object_open_as_tag(&tag, repo, ref_id);
 			if (err) {
-				if (err->code != GOT_ERR_OBJ_TYPE)
+				if (err->code != GOT_ERR_OBJ_TYPE) {
+					free(ref_id);
 					break;
+				}
 				/* Ref points at something other than a tag. */
 				err = NULL;
 				tag = NULL;
 			}
 		}
 		cmp = got_object_id_cmp(tag ?
-		    got_object_tag_get_object_id(tag) : re->id, id);
+		    got_object_tag_get_object_id(tag) : ref_id, id);
+		free(ref_id);
 		if (tag)
 			got_object_tag_close(tag);
 		if (cmp != 0)
