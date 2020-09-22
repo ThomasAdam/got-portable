@@ -1063,7 +1063,7 @@ cmd_clone(int argc, char *argv[])
 	const char *uri, *dirname;
 	char *proto, *host, *port, *repo_name, *server_path;
 	char *default_destdir = NULL, *id_str = NULL;
-	const char *repo_path;
+	const char *repo_path, *remote_repo_path;
 	struct got_repository *repo = NULL;
 	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
@@ -1387,6 +1387,9 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 	}
 	got_path_strip_trailing_slashes(server_path);
+	remote_repo_path = server_path;
+	while (remote_repo_path[0] == '/')
+		remote_repo_path++;
 	if (asprintf(&gotconfig,
 	    "remote \"%s\" {\n"
 	    "\tserver %s\n"
@@ -1397,7 +1400,7 @@ cmd_clone(int argc, char *argv[])
 	    "}\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
-	    server_path,
+	    remote_repo_path,
 	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
