@@ -1364,7 +1364,7 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 		if (err)
 			return err;
 
-		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 1);
+		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 0);
 		if (err) {
 			if (err->code == GOT_ERR_NOT_REF)
 				return NULL;
@@ -1379,7 +1379,7 @@ got_ref_delete(struct got_reference *ref, struct got_repository *repo)
 		if (err)
 			return err;
 
-		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 1);
+		err = got_ref_open(&ref2, repo, got_ref_get_name(ref), 0);
 		if (err) {
 			if (err->code == GOT_ERR_NOT_REF)
 				return NULL;
