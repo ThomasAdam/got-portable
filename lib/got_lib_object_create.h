@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+const struct got_error *got_object_blob_file_create(struct got_object_id **,
+    FILE **, const char *);
 const struct got_error *got_object_blob_create(struct got_object_id **,
     const char *, struct got_repository *);
 

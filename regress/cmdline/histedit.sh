@@ -1388,8 +1388,8 @@ test_histedit_fold_add_delete() {
 	echo "G  epsilon/psi" >> $testroot/stdout.expected
 	echo "$short_old_commit2 ->  fold commit: editing psi" \
 		>> $testroot/stdout.expected
-	echo "d  epsilon/psi" >> $testroot/stdout.expected
-	echo "$short_old_commit3 -> $short_new_commit1: folded changes" \
+	echo "D  epsilon/psi" >> $testroot/stdout.expected
+	echo "$short_old_commit3 -> no-op change: folded changes" \
 		>> $testroot/stdout.expected
 	echo "Switching work tree to refs/heads/master" \
 		>> $testroot/stdout.expected
@@ -1403,9 +1403,8 @@ test_histedit_fold_add_delete() {
 	fi
 
 	if [ -e $testroot/wt/epsilon/psi ]; then
-		#echo "removed file psi still exists on disk" >&2
-		ret="xfail: removed file psi still exists on disk"
-		test_done "$testroot" "$ret"
+		echo "removed file psi still exists on disk" >&2
+		test_done "$testroot" "1"
 		return 1
 	fi
 
@@ -1422,7 +1421,6 @@ test_histedit_fold_add_delete() {
 
 	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
 	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
-	echo "commit $orig_commit" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

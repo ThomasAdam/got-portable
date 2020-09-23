@@ -112,18 +112,18 @@ done:
 }
 
 const struct got_error *
-got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
-    struct got_repository *repo)
+got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
+    const char *ondisk_path)
 {
 	const struct got_error *err = NULL;
 	char *header = NULL;
-	FILE *blobfile = NULL;
 	int fd = -1;
 	struct stat sb;
 	SHA1_CTX sha1_ctx;
 	size_t headerlen = 0, n;
 
 	*id = NULL;
+	*blobfile = NULL;
 
 	SHA1Init(&sha1_ctx);
 
@@ -149,15 +149,15 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	headerlen = strlen(header) + 1;
 	SHA1Update(&sha1_ctx, header, headerlen);
 
-	blobfile = got_opentemp();
-	if (blobfile == NULL) {
+	*blobfile = got_opentemp();
+	if (*blobfile == NULL) {
 		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
 
-	n = fwrite(header, 1, headerlen, blobfile);
+	n = fwrite(header, 1, headerlen, *blobfile);
 	if (n != headerlen) {
-		err = got_ferror(blobfile, GOT_ERR_IO);
+		err = got_ferror(*blobfile, GOT_ERR_IO);
 		goto done;
 	}
 	for (;;) {
@@ -180,9 +180,9 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 		if (inlen == 0)
 			break; /* EOF */
 		SHA1Update(&sha1_ctx, buf, inlen);
-		n = fwrite(buf, 1, inlen, blobfile);
+		n = fwrite(buf, 1, inlen, *blobfile);
 		if (n != inlen) {
-			err = got_ferror(blobfile, GOT_ERR_IO);
+			err = got_ferror(*blobfile, GOT_ERR_IO);
 			goto done;
 		}
 		if (S_ISLNK(sb.st_mode))
@@ -196,18 +196,39 @@ got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
 	}
 	SHA1Final((*id)->sha1, &sha1_ctx);
 
-	if (fflush(blobfile) != 0) {
+	if (fflush(*blobfile) != 0) {
 		err = got_error_from_errno("fflush");
 		goto done;
 	}
-	rewind(blobfile);
-
-	err = create_object_file(*id, blobfile, repo);
+	rewind(*blobfile);
 done:
 	free(header);
 	if (fd != -1 && close(fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
-	if (blobfile && fclose(blobfile) != 0 && err == NULL)
+	if (err) {
+		free(*id);
+		*id = NULL;
+		if (*blobfile) {
+			fclose(*blobfile);
+			*blobfile = NULL;
+		}
+	}
+	return err;
+}
+
+const struct got_error *
+got_object_blob_create(struct got_object_id **id, const char *ondisk_path,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	FILE *blobfile = NULL;
+
+	err = got_object_blob_file_create(id, &blobfile, ondisk_path);
+	if (err)
+		return err;
+
+	err = create_object_file(*id, blobfile, repo);
+	if (fclose(blobfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);

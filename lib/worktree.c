@@ -2799,7 +2799,39 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (ie)
 				got_fileindex_entry_mark_deleted_from_disk(ie);
 			break;
-		case GOT_STATUS_ADD:
+		case GOT_STATUS_ADD: {
+			struct got_object_id *id;
+			FILE *blob1_f;
+			/*
+			 * Delete the added file only if its content already
+			 * exists in the repository.
+			 */
+			err = got_object_blob_file_create(&id, &blob1_f, path1);
+			if (err)
+				goto done;
+			if (got_object_id_cmp(id, id1) == 0) {
+				err = (*a->progress_cb)(a->progress_arg,
+				    GOT_STATUS_DELETE, path1);
+				if (err)
+					goto done;
+				err = remove_ondisk_file(a->worktree->root_path,
+				    path1);
+				if (err)
+					goto done;
+				if (ie)
+					got_fileindex_entry_remove(a->fileindex,
+					    ie);
+			} else {
+				err = (*a->progress_cb)(a->progress_arg,
+				    GOT_STATUS_CANNOT_DELETE, path1);
+			}
+			if (fclose(blob1_f) == EOF && err == NULL)
+				err = got_error_from_errno("fclose");
+			free(id);
+			if (err)
+				goto done;
+			break;
+		}
 		case GOT_STATUS_MODIFY:
 		case GOT_STATUS_CONFLICT:
 			err = (*a->progress_cb)(a->progress_arg,
