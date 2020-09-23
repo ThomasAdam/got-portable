@@ -3512,6 +3512,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 		char *s;
 		const char *name;
 		struct got_tag_object *tag = NULL;
+		struct got_object_id *ref_id;
 		int cmp;
 
 		if (got_ref_is_symbolic(re->ref))
@@ -3526,12 +3527,17 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 			name += 6;
 		if (strncmp(name, "remotes/", 8) == 0)
 			name += 8;
+		error = got_ref_resolve(&ref_id, gw_trans->repo, re->ref);
+		if (error)
+			return error;
 		if (strncmp(name, "tags/", 5) == 0) {
 			error = got_object_open_as_tag(&tag, gw_trans->repo,
-			    re->id);
+			    ref_id);
 			if (error) {
-				if (error->code != GOT_ERR_OBJ_TYPE)
+				if (error->code != GOT_ERR_OBJ_TYPE) {
+					free(ref_id);
 					continue;
+				}
 				/*
 				 * Ref points at something other
 				 * than a tag.
@@ -3541,7 +3547,8 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 			}
 		}
 		cmp = got_object_id_cmp(tag ?
-		    got_object_tag_get_object_id(tag) : re->id, id);
+		    got_object_tag_get_object_id(tag) : ref_id, id);
+		free(ref_id);
 		if (tag)
 			got_object_tag_close(tag);
 		if (cmp != 0)
