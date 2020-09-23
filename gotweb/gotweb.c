@@ -3525,8 +3525,12 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 			continue;
 		if (strncmp(name, "heads/", 6) == 0)
 			name += 6;
-		if (strncmp(name, "remotes/", 8) == 0)
+		if (strncmp(name, "remotes/", 8) == 0) {
 			name += 8;
+			s = strstr(name, "/" GOT_REF_HEAD);
+			if (s != NULL && s[strlen(s)] == '\0')
+				continue;
+		}
 		error = got_ref_resolve(&ref_id, gw_trans->repo, re->ref);
 		if (error)
 			return error;
