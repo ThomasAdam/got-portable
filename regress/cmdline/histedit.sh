@@ -1340,6 +1340,98 @@ test_histedit_duplicate_commit_in_script() {
 
 }
 
+# if a previous commit introduces a new file, and it is folded into a commit
+# that deletes the same file, the file still exists after the histedit
+test_histedit_fold_add_delete() {
+	local testroot=`test_init histedit_fold`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "added new file epsilon/psi" > $testroot/repo/epsilon/psi
+	(cd $testroot/repo && git add epsilon/psi)
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified epsilon/psi" > $testroot/repo/epsilon/psi
+	git_commit $testroot/repo -m "editing psi"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	(cd $testroot/repo && git rm -q epsilon/psi)
+	git_commit $testroot/repo -m "removing psi"
+	local old_commit3=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "fold $old_commit1" > $testroot/histedit-script
+	echo "fold $old_commit2" >> $testroot/histedit-script
+	echo "pick $old_commit3" >> $testroot/histedit-script
+	echo "mesg folded changes" >> $testroot/histedit-script
+
+	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
+		> $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit3=`trim_obj_id 28 $old_commit3`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo "A  epsilon/psi" >> $testroot/stdout.expected
+	echo "$short_old_commit1 ->  fold commit: committing changes" \
+		>> $testroot/stdout.expected
+	echo "G  epsilon/psi" >> $testroot/stdout.expected
+	echo "$short_old_commit2 ->  fold commit: editing psi" \
+		>> $testroot/stdout.expected
+	echo "d  epsilon/psi" >> $testroot/stdout.expected
+	echo "$short_old_commit3 -> $short_new_commit1: folded changes" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/epsilon/psi ]; then
+		#echo "removed file psi still exists on disk" >&2
+		ret="xfail: removed file psi still exists on disk"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
+	echo "commit $orig_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -1355,3 +1447,4 @@ run_test test_histedit_outside_refs_heads
 run_test test_histedit_fold_last_commit_swap
 run_test test_histedit_split_commit
 run_test test_histedit_duplicate_commit_in_script
+run_test test_histedit_fold_add_delete
