@@ -1056,6 +1056,134 @@ create_wanted_ref(const char *refname, struct got_object_id *id,
 }
 
 static const struct got_error *
+create_gotconfig(const char *proto, const char *host, const char *port,
+    char *remote_repo_path, int fetch_all_branches, int mirror_references,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *gotconfig_path = NULL;
+	char *gotconfig = NULL;
+	FILE *gotconfig_file = NULL;
+	ssize_t n;
+
+	/* Create got.conf(5). */
+	gotconfig_path = got_repo_get_path_gotconfig(repo);
+	if (gotconfig_path == NULL) {
+		err = got_error_from_errno("got_repo_get_path_gotconfig");
+		goto done;
+	}
+	gotconfig_file = fopen(gotconfig_path, "a");
+	if (gotconfig_file == NULL) {
+		err = got_error_from_errno2("fopen", gotconfig_path);
+		goto done;
+	}
+	got_path_strip_trailing_slashes(remote_repo_path);
+	if (asprintf(&gotconfig,
+	    "remote \"%s\" {\n"
+	    "\tserver %s\n"
+	    "\tprotocol %s\n"
+	    "%s%s%s"
+	    "\trepository \"%s\"\n"
+	    "%s"
+	    "}\n",
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
+	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
+	    remote_repo_path,
+	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	n = fwrite(gotconfig, 1, strlen(gotconfig), gotconfig_file);
+	if (n != strlen(gotconfig)) {
+		err = got_ferror(gotconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+
+done:
+	if (gotconfig_file && fclose(gotconfig_file) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", gotconfig_path);
+	free(gotconfig_path);
+	return err;
+}
+
+static const struct got_error *
+create_gitconfig(const char *git_url, struct got_reference *default_head,
+    int fetch_all_branches, int mirror_references, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *gitconfig_path = NULL;
+	char *gitconfig = NULL;
+	FILE *gitconfig_file = NULL;
+	ssize_t n;
+
+	/* Create a config file Git can understand. */
+	gitconfig_path = got_repo_get_path_gitconfig(repo);
+	if (gitconfig_path == NULL) {
+		err = got_error_from_errno("got_repo_get_path_gitconfig");
+		goto done;
+	}
+	gitconfig_file = fopen(gitconfig_path, "a");
+	if (gitconfig_file == NULL) {
+		err = got_error_from_errno2("fopen", gitconfig_path);
+		goto done;
+	}
+	if (mirror_references) {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/*:refs/*\n"
+		    "\tmirror = true\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else if (fetch_all_branches) {
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	} else {
+		const char *branchname;
+
+		/*
+		 * If the server specified a default branch, use just that one.
+		 * Otherwise fall back to fetching all branches on next fetch.
+		 */
+		if (default_head) {
+			branchname = got_ref_get_symref_target(default_head);
+			if (strncmp(branchname, "refs/heads/", 11) == 0)
+				branchname += 11;
+		} else
+			branchname = "*"; /* fall back to all branches */
+		if (asprintf(&gitconfig,
+		    "[remote \"%s\"]\n"
+		    "\turl = %s\n"
+		    "\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
+		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
+		    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
+		    branchname) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+	}
+	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
+	if (n != strlen(gitconfig)) {
+		err = got_ferror(gitconfig_file, GOT_ERR_IO);
+		goto done;
+	}
+done:
+	if (gitconfig_file && fclose(gitconfig_file) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", gitconfig_path);
+	free(gitconfig_path);
+	return err;
+}
+
+static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1071,10 +1199,6 @@ cmd_clone(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	char *git_url = NULL;
-	char *gitconfig_path = NULL, *gotconfig_path = NULL;
-	char *gitconfig = NULL, *gotconfig = NULL;
-	FILE *gitconfig_file = NULL, *gotconfig_file = NULL;
-	ssize_t n;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int list_refs_only = 0;
 	struct got_reference *default_head = NULL;
@@ -1393,98 +1517,16 @@ cmd_clone(int argc, char *argv[])
 	}
 
 	/* Create got.conf(5). */
-	gotconfig_path = got_repo_get_path_gotconfig(repo);
-	if (gotconfig_path == NULL) {
-		error = got_error_from_errno("got_repo_get_path_gotconfig");
+	error = create_gotconfig(proto, host, port, server_path,
+	    fetch_all_branches, mirror_references, repo);
+	if (error)
 		goto done;
-	}
-	gotconfig_file = fopen(gotconfig_path, "a");
-	if (gotconfig_file == NULL) {
-		error = got_error_from_errno2("fopen", gotconfig_path);
-		goto done;
-	}
-	got_path_strip_trailing_slashes(server_path);
-	if (asprintf(&gotconfig,
-	    "remote \"%s\" {\n"
-	    "\tserver %s\n"
-	    "\tprotocol %s\n"
-	    "%s%s%s"
-	    "\trepository \"%s\"\n"
-	    "%s"
-	    "}\n",
-	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
-	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
-	    server_path,
-	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
-		error = got_error_from_errno("asprintf");
-		goto done;
-	}
-	n = fwrite(gotconfig, 1, strlen(gotconfig), gotconfig_file);
-	if (n != strlen(gotconfig)) {
-		error = got_ferror(gotconfig_file, GOT_ERR_IO);
-		goto done;
-	}
 
 	/* Create a config file Git can understand. */
-	gitconfig_path = got_repo_get_path_gitconfig(repo);
-	if (gitconfig_path == NULL) {
-		error = got_error_from_errno("got_repo_get_path_gitconfig");
+	error = create_gitconfig(git_url, default_head, fetch_all_branches,
+	    mirror_references, repo);
+	if (error)
 		goto done;
-	}
-	gitconfig_file = fopen(gitconfig_path, "a");
-	if (gitconfig_file == NULL) {
-		error = got_error_from_errno2("fopen", gitconfig_path);
-		goto done;
-	}
-	if (mirror_references) {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tfetch = +refs/*:refs/*\n"
-		    "\tmirror = true\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	} else if (fetch_all_branches) {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
-		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	} else {
-		const char *branchname;
-
-		/*
-		 * If the server specified a default branch, use just that one.
-		 * Otherwise fall back to fetching all branches on next fetch.
-		 */
-		if (default_head) {
-			branchname = got_ref_get_symref_target(default_head);
-			if (strncmp(branchname, "refs/heads/", 11) == 0)
-				branchname += 11;
-		} else
-			branchname = "*"; /* fall back to all branches */
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
-		    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
-		    branchname) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
-		}
-	}
-	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
-	if (n != strlen(gitconfig)) {
-		error = got_ferror(gitconfig_file, GOT_ERR_IO);
-		goto done;
-	}
 
 	if (verbosity >= 0)
 		printf("Created %s repository '%s'\n",
@@ -1498,10 +1540,6 @@ done:
 	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
-	if (gotconfig_file && fclose(gotconfig_file) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
-	if (gitconfig_file && fclose(gitconfig_file) == EOF && error == NULL)
-		error = got_error_from_errno("fclose");
 	if (repo)
 		got_repo_close(repo);
 	if (default_head)
@@ -1525,10 +1563,6 @@ done:
 	free(server_path);
 	free(repo_name);
 	free(default_destdir);
-	free(gotconfig);
-	free(gitconfig);
-	free(gotconfig_path);
-	free(gitconfig_path);
 	free(git_url);
 	return error;
 }
