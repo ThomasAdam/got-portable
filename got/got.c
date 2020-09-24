@@ -1193,15 +1193,15 @@ cmd_clone(int argc, char *argv[])
 
 	if (!list_refs_only) {
 		error = got_path_mkdir(repo_path);
-		if (error)
+		if (error &&
+		    (!(error->code == GOT_ERR_ERRNO && errno == EISDIR) &&
+		    !(error->code == GOT_ERR_ERRNO && errno == EEXIST)))
 			goto done;
-
-		error = got_repo_init(repo_path);
-		if (error)
+		if (!got_path_dir_is_empty(repo_path)) {
+			error = got_error_path(repo_path,
+			    GOT_ERR_DIR_NOT_EMPTY);
 			goto done;
-		error = got_repo_open(&repo, repo_path, NULL);
-		if (error)
-			goto done;
+		}
 	}
 
 	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
@@ -1223,6 +1223,15 @@ cmd_clone(int argc, char *argv[])
 	    server_path, verbosity);
 	if (error)
 		goto done;
+
+	if (!list_refs_only) {
+		error = got_repo_init(repo_path);
+		if (error)
+			goto done;
+		error = got_repo_open(&repo, repo_path, NULL);
+		if (error)
+			goto done;
+	}
 
 	fpa.last_scaled_size[0] = '\0';
 	fpa.last_p_indexed = -1;
