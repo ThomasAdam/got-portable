@@ -8972,11 +8972,11 @@ cmd_integrate(int argc, char *argv[])
 	if (argc != 1)
 		usage_integrate();
 	branch_arg = argv[0];
-
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
-
+#endif
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
 		error = got_error_from_errno("getcwd");
