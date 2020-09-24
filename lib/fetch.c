@@ -312,6 +312,7 @@ got_fetch_parse_uri(char **proto, char **host, char **port,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
+	got_path_strip_trailing_slashes(*server_path);
 
 	p = strrchr(p, '/');
 	if (!p || strlen(p) <= 1) {
