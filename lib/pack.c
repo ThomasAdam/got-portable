@@ -468,7 +468,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	char hex[3];
 	size_t prefix_len = strlen(id_str_prefix);
 	struct got_packidx_object_id *oid;
-	int i;
+	uint32_t i;
 
 	SIMPLEQ_INIT(matched_ids);
 
@@ -482,9 +482,6 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
 
 	i = be32toh(packidx->hdr.fanout_table[id0 - 1]);
-	if (i == 0)
-		return NULL;
-
 	oid = &packidx->hdr.sorted_ids[i];
 	while (i < totobj && oid->sha1[0] == id0) {
 		char id_str[SHA1_DIGEST_STRING_LENGTH];
