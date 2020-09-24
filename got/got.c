@@ -859,16 +859,61 @@ struct got_fetch_progress_arg {
 	int last_p_indexed;
 	int last_p_resolved;
 	int verbosity;
+
+	struct got_repository *repo;
+
+	int create_configs;
+	int configs_created;
+	struct {
+		struct got_pathlist_head *symrefs;
+		struct got_pathlist_head *wanted_branches;
+		const char *proto;
+		const char *host;
+		const char *port;
+		const char *remote_repo_path;
+		const char *git_url;
+		int fetch_all_branches;
+		int mirror_references;
+	} config_info;
 };
+
+/* XXX forward declaration */
+static const struct got_error *
+create_config_files(const char *proto, const char *host, const char *port,
+    const char *remote_repo_path, const char *git_url, int fetch_all_branches,
+    int mirror_references, struct got_pathlist_head *symrefs,
+    struct got_pathlist_head *wanted_branches, struct got_repository *repo);
 
 static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
     int nobj_total, int nobj_indexed, int nobj_loose, int nobj_resolved)
 {
+	const struct got_error *err = NULL;
 	struct got_fetch_progress_arg *a = arg;
 	char scaled_size[FMT_SCALED_STRSIZE];
 	int p_indexed, p_resolved;
 	int print_size = 0, print_indexed = 0, print_resolved = 0;
+
+	/*
+	 * In order to allow a failed clone to be resumed with 'got fetch'
+	 * we try to create configuration files as soon as possible.
+	 * Once the server has sent information about its default branch
+	 * we have all required information.
+	 */
+	if (a->create_configs && !a->configs_created &&
+	    !TAILQ_EMPTY(a->config_info.symrefs)) {
+		err = create_config_files(a->config_info.proto,
+		     a->config_info.host, a->config_info.port,
+		     a->config_info.remote_repo_path,
+		     a->config_info.git_url,
+		     a->config_info.fetch_all_branches,
+		     a->config_info.mirror_references,
+		     a->config_info.symrefs,
+		     a->config_info.wanted_branches, a->repo);
+		if (err)
+			return err;
+		a->configs_created = 1;
+	}
 
 	if (a->verbosity < 0)
 		return NULL;
@@ -923,21 +968,22 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 }
 
 static const struct got_error *
-create_symref(struct got_reference **head_symref, const char *refname,
-    struct got_reference *target_ref, int verbosity,
-    struct got_repository *repo)
+create_symref(const char *refname, struct got_reference *target_ref,
+    int verbosity, struct got_repository *repo)
 {
 	const struct got_error *err;
+	struct got_reference *head_symref;
 
-	err = got_ref_alloc_symref(head_symref, refname, target_ref);
+	err = got_ref_alloc_symref(&head_symref, refname, target_ref);
 	if (err)
 		return err;
 
-	err = got_ref_write(*head_symref, repo);
+	err = got_ref_write(head_symref, repo);
 	if (err == NULL && verbosity > 0) {
 		printf("Created reference %s: %s\n", GOT_REF_HEAD,
 		    got_ref_get_name(target_ref));
 	}
+	got_ref_close(head_symref);
 	return err;
 }
 
@@ -1057,7 +1103,7 @@ create_wanted_ref(const char *refname, struct got_object_id *id,
 
 static const struct got_error *
 create_gotconfig(const char *proto, const char *host, const char *port,
-    char *remote_repo_path, int fetch_all_branches, int mirror_references,
+    const char *remote_repo_path, int fetch_all_branches, int mirror_references,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -1077,7 +1123,6 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 		err = got_error_from_errno2("fopen", gotconfig_path);
 		goto done;
 	}
-	got_path_strip_trailing_slashes(remote_repo_path);
 	if (asprintf(&gotconfig,
 	    "remote \"%s\" {\n"
 	    "\tserver %s\n"
@@ -1107,7 +1152,7 @@ done:
 }
 
 static const struct got_error *
-create_gitconfig(const char *git_url, struct got_reference *default_head,
+create_gitconfig(const char *git_url, const char *default_branch,
     int fetch_all_branches, int mirror_references, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -1154,8 +1199,8 @@ create_gitconfig(const char *git_url, struct got_reference *default_head,
 		 * If the server specified a default branch, use just that one.
 		 * Otherwise fall back to fetching all branches on next fetch.
 		 */
-		if (default_head) {
-			branchname = got_ref_get_symref_target(default_head);
+		if (default_branch) {
+			branchname = default_branch;
 			if (strncmp(branchname, "refs/heads/", 11) == 0)
 				branchname += 11;
 		} else
@@ -1184,6 +1229,48 @@ done:
 }
 
 static const struct got_error *
+create_config_files(const char *proto, const char *host, const char *port,
+    const char *remote_repo_path, const char *git_url, int fetch_all_branches,
+    int mirror_references, struct got_pathlist_head *symrefs,
+    struct got_pathlist_head *wanted_branches, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	const char *default_branch = NULL;
+	struct got_pathlist_entry *pe;
+
+	/*
+	 * If we asked for a set of wanted branches then use the first
+	 * one of those.
+	 */
+	 if (!TAILQ_EMPTY(wanted_branches)) {
+		pe = TAILQ_FIRST(wanted_branches);
+		default_branch = pe->path;
+	} else {
+		/* First HEAD ref listed by server is the default branch. */
+		TAILQ_FOREACH(pe, symrefs, entry) {
+			const char *refname = pe->path;
+			const char *target = pe->data;
+
+			if (strcmp(refname, GOT_REF_HEAD) != 0)
+				continue;
+
+			default_branch = target;
+			break;
+		}
+	}
+
+	/* Create got.conf(5). */
+	err = create_gotconfig(proto, host, port, remote_repo_path,
+	    fetch_all_branches, mirror_references, repo);
+	if (err)
+		return err;
+
+	/* Create a config file Git can understand. */
+	return create_gitconfig(git_url, default_branch, fetch_all_branches,
+	    mirror_references, repo);
+}
+
+static const struct got_error *
 cmd_clone(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -1201,7 +1288,6 @@ cmd_clone(int argc, char *argv[])
 	char *git_url = NULL;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int list_refs_only = 0;
-	struct got_reference *default_head = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1360,6 +1446,18 @@ cmd_clone(int argc, char *argv[])
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
+	fpa.create_configs = 1;
+	fpa.configs_created = 0;
+	fpa.repo = repo;
+	fpa.config_info.symrefs = &symrefs;
+	fpa.config_info.wanted_branches = &wanted_branches;
+	fpa.config_info.proto = proto;
+	fpa.config_info.host = host;
+	fpa.config_info.port = port;
+	fpa.config_info.remote_repo_path = server_path;
+	fpa.config_info.git_url = git_url;
+	fpa.config_info.fetch_all_branches = fetch_all_branches;
+	fpa.config_info.mirror_references = mirror_references;
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs,
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, mirror_references,
 	    fetch_all_branches, &wanted_branches, &wanted_refs,
@@ -1424,7 +1522,6 @@ cmd_clone(int argc, char *argv[])
 		const char *refname = pe->path;
 		const char *target = pe->data;
 		char *remote_refname = NULL, *remote_target = NULL;
-		struct got_reference *head_symref;
 
 		if (strcmp(refname, GOT_REF_HEAD) != 0)
 			continue;
@@ -1438,17 +1535,10 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		error = create_symref(&head_symref, refname, target_ref,
-		    verbosity, repo);
+		error = create_symref(refname, target_ref, verbosity, repo);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
-
-		/* First HEAD reference listed is the default branch. */
-		if (default_head == NULL)
-			default_head = head_symref;
-		else
-			got_ref_close(head_symref);
 
 		if (mirror_references)
 			continue;
@@ -1479,12 +1569,11 @@ cmd_clone(int argc, char *argv[])
 			}
 			goto done;
 		}
-		error = create_symref(&head_symref, remote_refname,
-		    target_ref, verbosity - 1, repo);
+		error = create_symref(remote_refname, target_ref,
+		    verbosity - 1, repo);
 		free(remote_refname);
 		free(remote_target);
 		got_ref_close(target_ref);
-		got_ref_close(head_symref);
 		if (error)
 			goto done;
 	}
@@ -1507,26 +1596,14 @@ cmd_clone(int argc, char *argv[])
 				goto done;
 			}
 
-			error = create_symref(&default_head, GOT_REF_HEAD,
-			    target_ref, verbosity, repo);
+			error = create_symref(GOT_REF_HEAD, target_ref,
+			    verbosity, repo);
 			got_ref_close(target_ref);
 			if (error)
 				goto done;
 			break;
 		}
 	}
-
-	/* Create got.conf(5). */
-	error = create_gotconfig(proto, host, port, server_path,
-	    fetch_all_branches, mirror_references, repo);
-	if (error)
-		goto done;
-
-	/* Create a config file Git can understand. */
-	error = create_gitconfig(git_url, default_head, fetch_all_branches,
-	    mirror_references, repo);
-	if (error)
-		goto done;
 
 	if (verbosity >= 0)
 		printf("Created %s repository '%s'\n",
@@ -1542,8 +1619,6 @@ done:
 		error = got_error_from_errno("close");
 	if (repo)
 		got_repo_close(repo);
-	if (default_head)
-		got_ref_close(default_head);
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
 		free(pe->data);
@@ -2072,6 +2147,10 @@ cmd_fetch(int argc, char *argv[])
 	fpa.last_p_indexed = -1;
 	fpa.last_p_resolved = -1;
 	fpa.verbosity = verbosity;
+	fpa.repo = repo;
+	fpa.create_configs = 0;
+	fpa.configs_created = 0;
+	memset(&fpa.config_info, 0, sizeof(fpa.config_info));
 	error = got_fetch_pack(&pack_hash, &refs, &symrefs, remote->name,
 	    remote->mirror_references, fetch_all_branches, &wanted_branches,
 	    &wanted_refs, list_refs_only, verbosity, fetchfd, repo,
