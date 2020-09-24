@@ -305,6 +305,8 @@ got_fetch_parse_uri(char **proto, char **host, char **port,
 		}
 	}
 
+	while (p[0] == '/' && p[1] == '/')
+		p++;
 	*server_path = strdup(p);
 	if (*server_path == NULL) {
 		err = got_error_from_errno("strdup");
