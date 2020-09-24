@@ -2192,7 +2192,31 @@ gw_template(size_t key, void *arg)
 	const struct got_error *error = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 	struct gw_trans *gw_trans = arg;
-	char *img_src = NULL;
+	char *ati = NULL, *fic32 = NULL, *fic16 = NULL;
+	char *swm = NULL, *spt = NULL, *css = NULL, *logo = NULL;
+
+	if (asprintf(&ati, "%s%s", gw_trans->gw_conf->got_www_path,
+	    "/apple-touch-icon.png") == -1)
+		goto err;
+	if (asprintf(&fic32, "%s%s", gw_trans->gw_conf->got_www_path,
+	     "/favicon-32x32.png") == -1)
+		goto err;
+	if (asprintf(&fic16, "%s%s", gw_trans->gw_conf->got_www_path,
+	    "/favicon-16x16.png") == -1)
+		goto err;
+	if (asprintf(&swm, "%s%s", gw_trans->gw_conf->got_www_path,
+	    "/site.webmanifest") == -1)
+		goto err;
+	if (asprintf(&spt, "%s%s", gw_trans->gw_conf->got_www_path,
+	    "/safari-pinned-tab.svg") == -1)
+		goto err;
+	if (asprintf(&css, "%s%s", gw_trans->gw_conf->got_www_path,
+	    "/gotweb.css") == -1)
+		goto err;
+	if (asprintf(&logo, "%s%s%s", gw_trans->gw_conf->got_www_path,
+	    gw_trans->gw_conf->got_www_path ? "/" : "",
+	    gw_trans->gw_conf->got_logo) == -1)
+		goto err;
 
 	switch (key) {
 	case (TEMPL_HEAD):
@@ -2231,7 +2255,7 @@ gw_template(size_t key, void *arg)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
 		    KATTR_REL, "apple-touch-icon", KATTR_SIZES, "180x180",
-		    KATTR_HREF, "/apple-touch-icon.png", KATTR__MAX);
+		    KATTR_HREF, ati, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2239,7 +2263,7 @@ gw_template(size_t key, void *arg)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
 		    KATTR_REL, "icon", KATTR_TYPE, "image/png", KATTR_SIZES,
-		    "32x32", KATTR_HREF, "/favicon-32x32.png", KATTR__MAX);
+		    "32x32", KATTR_HREF, fic32, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2247,14 +2271,14 @@ gw_template(size_t key, void *arg)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
 		    KATTR_REL, "icon", KATTR_TYPE, "image/png", KATTR_SIZES,
-		    "16x16", KATTR_HREF, "/favicon-16x16.png", KATTR__MAX);
+		    "16x16", KATTR_HREF, fic16, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
-		    KATTR_REL, "manifest", KATTR_HREF, "/site.webmanifest",
+		    KATTR_REL, "manifest", KATTR_HREF, swm,
 		    KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
@@ -2263,7 +2287,7 @@ gw_template(size_t key, void *arg)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
 		    KATTR_REL, "mask-icon", KATTR_HREF,
-		    "/safari-pinned-tab.svg", KATTR__MAX);
+		    spt, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2271,7 +2295,7 @@ gw_template(size_t key, void *arg)
 			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_LINK,
 		    KATTR_REL, "stylesheet", KATTR_TYPE, "text/css",
-		    KATTR_HREF, "/gotweb.css", KATTR__MAX);
+		    KATTR_HREF, css, KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2288,20 +2312,13 @@ gw_template(size_t key, void *arg)
 		    KATTR_TARGET, "_sotd", KATTR__MAX);
 		if (kerr != KCGI_OK)
 			return 0;
-		if (asprintf(&img_src, "/%s",
-		    gw_trans->gw_conf->got_logo) == -1)
-			return 0;
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_IMG,
-		    KATTR_SRC, img_src, KATTR__MAX);
-		if (kerr != KCGI_OK) {
-			free(img_src);
+		    KATTR_SRC, logo, KATTR__MAX);
+		if (kerr != KCGI_OK)
 			return 0;
-		}
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 3);
-		if (kerr != KCGI_OK) {
-			free(img_src);
+		if (kerr != KCGI_OK)
 			return 0;
-		}
 		break;
 	case (TEMPL_SITEPATH):
 		error = gw_output_site_link(gw_trans);
@@ -2379,7 +2396,23 @@ gw_template(size_t key, void *arg)
 	default:
 		return 0;
 	}
+	free(ati);
+	free(fic32);
+	free(fic16);
+	free(swm);
+	free(spt);
+	free(css);
+	free(logo);
 	return 1;
+err:
+	free(ati);
+	free(fic32);
+	free(fic16);
+	free(swm);
+	free(spt);
+	free(css);
+	free(logo);
+	return 0;
 }
 
 static const struct got_error *
@@ -4701,6 +4734,7 @@ main(int argc, char *argv[])
 done:
 	if (gw_malloc) {
 		free(gw_trans->gw_conf->got_repos_path);
+		free(gw_trans->gw_conf->got_www_path);
 		free(gw_trans->gw_conf->got_site_name);
 		free(gw_trans->gw_conf->got_site_owner);
 		free(gw_trans->gw_conf->got_site_link);

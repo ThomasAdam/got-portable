@@ -27,6 +27,7 @@
 #define GOTWEB_GOT_DIR	 ".got"
 #define GOTWEB_GIT_DIR	 ".git"
 
+#define D_GOTWWW	 ""
 #define D_GOTPATH	 "/got/public"
 #define D_SITENAME	 "Gotweb"
 #define D_SITEOWNER	 "Got Owner"
@@ -48,6 +49,7 @@
 
 struct gotweb_config {
 	char		*got_repos_path;
+	char		*got_www_path;
 	char		*got_site_name;
 	char		*got_site_owner;
 	char		*got_site_link;

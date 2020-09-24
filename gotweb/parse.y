@@ -130,7 +130,16 @@ boolean		: STRING {
 		;
 main		: GOT_REPOS_PATH STRING {
 			gw_conf->got_repos_path = strdup($2);
-			if (gw_conf->got_repos_path== NULL) {
+			if (gw_conf->got_repos_path == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		}
+		| GOT_WWW_PATH STRING {
+			gw_conf->got_www_path = strdup($2);
+			if (gw_conf->got_www_path == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -265,6 +274,7 @@ lookup(char *s)
 		{ "got_site_link",		GOT_SITE_LINK },
 		{ "got_site_name",		GOT_SITE_NAME },
 		{ "got_site_owner",		GOT_SITE_OWNER },
+		{ "got_www_path",		GOT_WWW_PATH },
 	};
 	const struct keywords	*p;
 
@@ -594,6 +604,11 @@ parse_gotweb_config(struct gotweb_config **gconf, const char *filename)
 	}
 	gw_conf->got_repos_path = strdup(D_GOTPATH);
 	if (gw_conf->got_repos_path == NULL) {
+		gerror = got_error_from_errno("strdup");
+		goto done;
+	}
+	gw_conf->got_www_path = strdup(D_GOTWWW);
+	if (gw_conf->got_www_path == NULL) {
 		gerror = got_error_from_errno("strdup");
 		goto done;
 	}
