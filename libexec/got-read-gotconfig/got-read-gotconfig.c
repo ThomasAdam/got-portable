@@ -32,6 +32,7 @@
 
 #include "got_error.h"
 #include "got_object.h"
+#include "got_path.h"
 #include "got_repository.h"
 
 #include "got_lib_delta.h"
@@ -83,15 +84,20 @@ make_repo_url(char **url, struct gotconfig_remote_repo *repo)
 	}
 
 	if (repo->repository) {
+		char *repo_path = repo->repository;
+		while (repo_path[0] == '/')
+			repo_path++;
 		p = s;
 		s = NULL;
-		if (asprintf(&s, "%s/%s", p, repo->repository) == -1) {
+		if (asprintf(&s, "%s/%s", p, repo_path) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 		free(p);
 		p = NULL;
 	}
+
+	got_path_strip_trailing_slashes(s);
 done:
 	if (err) {
 		free(s);
