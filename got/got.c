@@ -923,18 +923,17 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 }
 
 static const struct got_error *
-create_symref(const char *refname, struct got_reference *target_ref,
-    int verbosity, struct got_repository *repo)
+create_symref(struct got_reference **head_symref, const char *refname,
+    struct got_reference *target_ref, int verbosity,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
-	struct got_reference *head_symref;
 
-	err = got_ref_alloc_symref(&head_symref, refname, target_ref);
+	err = got_ref_alloc_symref(head_symref, refname, target_ref);
 	if (err)
 		return err;
 
-	err = got_ref_write(head_symref, repo);
-	got_ref_close(head_symref);
+	err = got_ref_write(*head_symref, repo);
 	if (err == NULL && verbosity > 0) {
 		printf("Created reference %s: %s\n", GOT_REF_HEAD,
 		    got_ref_get_name(target_ref));
@@ -1063,7 +1062,7 @@ cmd_clone(int argc, char *argv[])
 	const char *uri, *dirname;
 	char *proto, *host, *port, *repo_name, *server_path;
 	char *default_destdir = NULL, *id_str = NULL;
-	const char *repo_path, *remote_repo_path;
+	const char *repo_path;
 	struct got_repository *repo = NULL;
 	struct got_pathlist_head refs, symrefs, wanted_branches, wanted_refs;
 	struct got_pathlist_entry *pe;
@@ -1078,7 +1077,7 @@ cmd_clone(int argc, char *argv[])
 	ssize_t n;
 	int verbosity = 0, fetch_all_branches = 0, mirror_references = 0;
 	int list_refs_only = 0;
-	struct got_reference *head_symref = NULL;
+	struct got_reference *default_head = NULL;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
@@ -1301,6 +1300,7 @@ cmd_clone(int argc, char *argv[])
 		const char *refname = pe->path;
 		const char *target = pe->data;
 		char *remote_refname = NULL, *remote_target = NULL;
+		struct got_reference *head_symref;
 
 		if (strcmp(refname, GOT_REF_HEAD) != 0)
 			continue;
@@ -1314,10 +1314,17 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 
-		error = create_symref(refname, target_ref, verbosity, repo);
+		error = create_symref(&head_symref, refname, target_ref,
+		    verbosity, repo);
 		got_ref_close(target_ref);
 		if (error)
 			goto done;
+
+		/* First HEAD reference listed is the default branch. */
+		if (default_head == NULL)
+			default_head = head_symref;
+		else
+			got_ref_close(head_symref);
 
 		if (mirror_references)
 			continue;
@@ -1348,11 +1355,12 @@ cmd_clone(int argc, char *argv[])
 			}
 			goto done;
 		}
-		error = create_symref(remote_refname, target_ref,
-		    verbosity - 1, repo);
+		error = create_symref(&head_symref, remote_refname,
+		    target_ref, verbosity - 1, repo);
 		free(remote_refname);
 		free(remote_target);
 		got_ref_close(target_ref);
+		got_ref_close(head_symref);
 		if (error)
 			goto done;
 	}
@@ -1375,8 +1383,8 @@ cmd_clone(int argc, char *argv[])
 				goto done;
 			}
 
-			error = create_symref(GOT_REF_HEAD, target_ref,
-			    verbosity, repo);
+			error = create_symref(&default_head, GOT_REF_HEAD,
+			    target_ref, verbosity, repo);
 			got_ref_close(target_ref);
 			if (error)
 				goto done;
@@ -1396,9 +1404,6 @@ cmd_clone(int argc, char *argv[])
 		goto done;
 	}
 	got_path_strip_trailing_slashes(server_path);
-	remote_repo_path = server_path;
-	while (remote_repo_path[0] == '/')
-		remote_repo_path++;
 	if (asprintf(&gotconfig,
 	    "remote \"%s\" {\n"
 	    "\tserver %s\n"
@@ -1409,7 +1414,7 @@ cmd_clone(int argc, char *argv[])
 	    "}\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
-	    remote_repo_path,
+	    server_path,
 	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
@@ -1458,8 +1463,8 @@ cmd_clone(int argc, char *argv[])
 		 * If the server specified a default branch, use just that one.
 		 * Otherwise fall back to fetching all branches on next fetch.
 		 */
-		if (head_symref) {
-			branchname = got_ref_get_symref_target(head_symref);
+		if (default_head) {
+			branchname = got_ref_get_symref_target(default_head);
 			if (strncmp(branchname, "refs/heads/", 11) == 0)
 				branchname += 11;
 		} else
@@ -1499,8 +1504,8 @@ done:
 		error = got_error_from_errno("fclose");
 	if (repo)
 		got_repo_close(repo);
-	if (head_symref)
-		got_ref_close(head_symref);
+	if (default_head)
+		got_ref_close(default_head);
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
 		free(pe->data);

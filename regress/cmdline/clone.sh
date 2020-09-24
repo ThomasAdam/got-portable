@@ -85,6 +85,41 @@ test_clone_basic() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/master:refs/remotes/origin/master
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -149,6 +184,41 @@ test_clone_branch() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/foo:refs/remotes/origin/foo
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -189,6 +259,41 @@ test_clone_all() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/*:refs/remotes/origin/*
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -224,6 +329,43 @@ test_clone_mirror() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+	mirror-references yes
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/*:refs/*
+	mirror = true
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -259,6 +401,43 @@ test_clone_mirror_all() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+	mirror-references yes
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/*:refs/*
+	mirror = true
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -298,6 +477,41 @@ test_clone_reference() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/master:refs/remotes/origin/master
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -335,6 +549,41 @@ test_clone_branch_and_reference() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/foo:refs/remotes/origin/foo
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -369,6 +618,43 @@ test_clone_reference_mirror() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+	mirror-references yes
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/*:refs/*
+	mirror = true
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
 	fi
 	test_done "$testroot" "$ret"
 }
