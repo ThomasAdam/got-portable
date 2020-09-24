@@ -171,8 +171,10 @@ dial_git(int *fetchfd, const char *host, const char *port, const char *path,
 		if ((fd = socket(p->ai_family, p->ai_socktype,
 		    p->ai_protocol)) == -1)
 			continue;
-		if (connect(fd, p->ai_addr, p->ai_addrlen) == 0)
+		if (connect(fd, p->ai_addr, p->ai_addrlen) == 0) {
+			err = NULL;
 			break;
+		}
 		err = got_error_from_errno("connect");
 		close(fd);
 	}
