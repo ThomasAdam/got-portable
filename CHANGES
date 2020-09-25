@@ -1,3 +1,16 @@
+* got 0.41; 2020-09-25
+- make 'got ref -d' delete both loose and packed representations of the ref
+- make dangling symbolic references show up in 'got ref -l'
+- fix handling of slashes in got.conf repository paths (found by naddy)
+- hide remote HEAD refs in gotweb in order to match got and tog output
+- make 'got histedit' collapse folded add+delete operations (found by jrick)
+- fix matching the first object ID listed in a pack index (found by jrick)
+- let 'got clone' try to connect to server before creating repository contents
+- fix default branch name written to Git config file by 'got clone'
+- allow an interrupted 'got clone' to be resumed by 'got fetch'
+- handle failed connection attempts to git:// servers (patch by jrick)
+- make gotweb work in subdirectories of the web space (found by uwerler)
+
 * got 0.40; 2020-09-21
 - do not rely on <zlib.h> to pull in <unistd.h> (naddy)
 - remove unused #includes from the new got-read-gotconfig/parse.y (naddy)
