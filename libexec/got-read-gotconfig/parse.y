@@ -86,6 +86,7 @@ typedef struct {
 	union {
 		int64_t		 number;
 		char		*string;
+		struct node_branch *branch;
 	} v;
 	int lineno;
 } YYSTYPE;
@@ -93,11 +94,13 @@ typedef struct {
 %}
 
 %token	ERROR
-%token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES AUTHOR
+%token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES BRANCH
+%token	AUTHOR
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean portplain
 %type	<v.string>	numberstring
+%type	<v.branch>	branch xbranch branch_list
 
 %%
 
@@ -139,6 +142,28 @@ portplain	: numberstring	{
 			free($1);
 		}
 		;
+branch		: /* empty */				{ $$ = NULL; }
+		| xbranch			{ $$ = $1; }
+		| '{' optnl branch_list '}'	{ $$ = $3; }
+		;
+xbranch		: STRING {
+			$$ = calloc(1, sizeof(struct node_branch));
+			if ($$ == NULL) {
+				yyerror("calloc");
+				YYERROR;
+			}
+			$$->branch_name = $1;
+			$$->tail = $$;
+		}
+		;
+branch_list	: xbranch optnl			{ $$ = $1; }
+		| branch_list comma xbranch optnl {
+			$1->tail->next = $3;
+			$1->tail = $3;
+			$$ = $1;
+		}
+		;
+
 remoteopts2	: remoteopts2 remoteopts1 nl
 	   	| remoteopts1 optnl
 		;
@@ -174,6 +199,9 @@ remoteopts1	: REPOSITORY STRING {
 		}
 		| PORT portplain {
 			remote->port = $2;
+		}
+		| BRANCH branch {
+			remote->branch = $2;
 		}
 	   	;
 remote		: REMOTE STRING {
@@ -211,6 +239,9 @@ optnl		: '\n' optnl
 		| /* empty */
 		;
 nl		: '\n' optnl
+		;
+comma		: ','
+		| /* empty */
 		;
 %%
 
@@ -254,6 +285,7 @@ lookup(char *s)
 	/* This has to be sorted always. */
 	static const struct keywords keywords[] = {
 		{"author",		AUTHOR},
+		{"branch",		BRANCH},
 		{"mirror-references",	MIRROR_REFERENCES},
 		{"port",		PORT},
 		{"protocol",		PROTOCOL},

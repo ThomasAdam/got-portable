@@ -142,7 +142,16 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		struct got_imsg_remote iremote;
 		size_t len = sizeof(iremote);
 		struct ibuf *wbuf;
+		struct node_branch *branch;
+		int nbranches = 0;
 
+		branch = repo->branch;
+		while (branch) {
+			branch = branch->next;
+			nbranches++;
+		}
+
+		iremote.nbranches = nbranches;
 		iremote.mirror_references = repo->mirror_references;
 
 		iremote.name_len = strlen(repo->name);
@@ -189,6 +198,14 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 
 		free(url);
 		url = NULL;
+
+		branch = repo->branch;
+		while (branch) {
+			err = send_gotconfig_str(ibuf, branch->branch_name);
+			if (err)
+				break;
+			branch = branch->next;
+		}
 	}
 
 	free(url);

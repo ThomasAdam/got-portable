@@ -51,15 +51,25 @@ const char *got_repo_get_gitconfig_owner(struct got_repository *);
 struct got_remote_repo {
 	char *name;
 	char *url;
-	
+
 	/*
 	 * If set, references are mirrored 1:1 into the local repository.
 	 * If not set, references are mapped into "refs/remotes/$name/".
 	 */
 	int mirror_references;
+
+	/* Branches to fetch by default. */
+	int nbranches;
+	char **branches;
 };
 
-/* Obtain the list of remote repositories parsed from gitconfig. */ 
+/*
+ * Free data allocated for the specified remote repository.
+ * Do not free the remote_repo pointer itself.
+ */
+void got_repo_free_remote_repo_data(struct got_remote_repo *);
+
+/* Obtain the list of remote repositories parsed from gitconfig. */
 void got_repo_get_gitconfig_remotes(int *, const struct got_remote_repo **,
     struct got_repository *);
 

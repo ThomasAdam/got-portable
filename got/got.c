@@ -2096,6 +2096,14 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 	}
 
+	if (TAILQ_EMPTY(&wanted_branches) && remote->nbranches > 0) {
+		for (i = 0; i < remote->nbranches; i++) {
+			got_pathlist_append(&wanted_branches,
+			    remote->branches[i], NULL);
+		}
+
+	}
+
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
 	    &repo_name, remote->url);
 	if (error)

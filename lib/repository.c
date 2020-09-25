@@ -681,14 +681,28 @@ got_repo_close(struct got_repository *repo)
 		got_gotconfig_free(repo->gotconfig);
 	free(repo->gitconfig_author_name);
 	free(repo->gitconfig_author_email);
-	for (i = 0; i < repo->ngitconfig_remotes; i++) {
-		free(repo->gitconfig_remotes[i].name);
-		free(repo->gitconfig_remotes[i].url);
-	}
+	for (i = 0; i < repo->ngitconfig_remotes; i++)
+		got_repo_free_remote_repo_data(&repo->gitconfig_remotes[i]);
 	free(repo->gitconfig_remotes);
 	free(repo);
 
 	return err;
+}
+
+void
+got_repo_free_remote_repo_data(struct got_remote_repo *repo)
+{
+	int i;
+
+	free(repo->name);
+	repo->name = NULL;
+	free(repo->url);
+	repo->url = NULL;
+	for (i = 0; i < repo->nbranches; i++)
+		free(repo->branches[i]);
+	free(repo->branches);
+	repo->branches = NULL;
+	repo->nbranches = 0;
 }
 
 const struct got_error *

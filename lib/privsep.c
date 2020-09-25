@@ -1785,6 +1785,18 @@ got_privsep_recv_gitconfig_int(int *val, struct imsgbuf *ibuf)
 	return err;
 }
 
+static void
+free_remote_data(struct got_remote_repo *remote)
+{
+	int i;
+
+	free(remote->name);
+	free(remote->url);
+	for (i = 0; i < remote->nbranches; i++)
+		free(remote->branches[i]);
+	free(remote->branches);
+}
+
 const struct got_error *
 got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
     int *nremotes, struct imsgbuf *ibuf)
@@ -1838,6 +1850,7 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_GITCONFIG_REMOTE:
 			remote = &(*remotes)[*nremotes];
+			memset(remote, 0, sizeof(*remote));
 			if (datalen < sizeof(iremote)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
@@ -1859,10 +1872,12 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 			    iremote.name_len, iremote.url_len);
 			if (remote->url == NULL) {
 				err = got_error_from_errno("strndup");
-				free(remote->name);
+				free_remote_data(remote);
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
+			remote->nbranches = 0;
+			remote->branches = NULL;
 			(*nremotes)++;
 			break;
 		default:
@@ -1877,10 +1892,8 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 
 	if (err) {
 		int i;
-		for (i = 0; i < *nremotes; i++) {
-			free((*remotes)[i].name);
-			free((*remotes)[i].url);
-		}
+		for (i = 0; i < *nremotes; i++)
+			free_remote_data(&(*remotes)[i]);
 		free(*remotes);
 		*remotes = NULL;
 		*nremotes = 0;
@@ -1970,6 +1983,7 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	return err;
 }
 
+
 const struct got_error *
 got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
     int *nremotes, struct imsgbuf *ibuf)
@@ -2025,6 +2039,7 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 		struct got_remote_repo *remote;
 		const size_t min_datalen =
 		    MIN(sizeof(struct got_imsg_error), sizeof(iremote));
+		int i;
 
 		err = got_privsep_recv_imsg(&imsg, ibuf, min_datalen);
 		if (err)
@@ -2041,6 +2056,7 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 			break;
 		case GOT_IMSG_GOTCONFIG_REMOTE:
 			remote = &(*remotes)[*nremotes];
+			memset(remote, 0, sizeof(*remote));
 			if (datalen < sizeof(iremote)) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
@@ -2062,10 +2078,31 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 			    iremote.name_len, iremote.url_len);
 			if (remote->url == NULL) {
 				err = got_error_from_errno("strndup");
-				free(remote->name);
+				free_remote_data(remote);
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
+			if (iremote.nbranches > 0) {
+				remote->branches = recallocarray(NULL, 0,
+				    iremote.nbranches, sizeof(char *));
+				if (remote->branches == NULL) {
+					err = got_error_from_errno("calloc");
+					free_remote_data(remote);
+					break;
+				}
+			}
+			remote->nbranches = 0;
+			for (i = 0; i < iremote.nbranches; i++) {
+				char *branch;
+				err = got_privsep_recv_gotconfig_str(&branch,
+				    ibuf);
+				if (err) {
+					free_remote_data(remote);
+					goto done;
+				}
+				remote->branches[i] = branch;
+				remote->nbranches++;
+			}
 			(*nremotes)++;
 			break;
 		default:
@@ -2077,13 +2114,11 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 		if (err)
 			break;
 	}
-
+done:
 	if (err) {
 		int i;
-		for (i = 0; i < *nremotes; i++) {
-			free((*remotes)[i].name);
-			free((*remotes)[i].url);
-		}
+		for (i = 0; i < *nremotes; i++)
+			free_remote_data(&(*remotes)[i]);
 		free(*remotes);
 		*remotes = NULL;
 		*nremotes = 0;

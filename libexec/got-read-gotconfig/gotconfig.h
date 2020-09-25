@@ -15,6 +15,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+struct node_branch {
+	char *branch_name;
+	struct node_branch *next;
+	struct node_branch *tail;
+};
+
 struct gotconfig_remote_repo {
 	TAILQ_ENTRY(gotconfig_remote_repo) entry;
 	char	*name;
@@ -23,6 +29,7 @@ struct gotconfig_remote_repo {
 	char	*protocol;
 	int	port;
 	int	mirror_references;
+	struct	node_branch *branch;
 };
 TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
 

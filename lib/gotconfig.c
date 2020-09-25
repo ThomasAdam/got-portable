@@ -138,10 +138,8 @@ got_gotconfig_free(struct got_gotconfig *conf)
 
 	free(conf->author);
 
-	for (i = 0; i < conf->nremotes; i++) {
-		free(conf->remotes[i].name);
-		free(conf->remotes[i].url);
-	}
+	for (i = 0; i < conf->nremotes; i++)
+		got_repo_free_remote_repo_data(&conf->remotes[i]);
 	free(conf->remotes);
 	free(conf);
 }

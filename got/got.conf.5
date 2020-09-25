@@ -105,6 +105,15 @@ for details.
 If not specified, the default port of the specified
 .Cm protocol
 will be used.
+.It Ic branch Brq Ar branch ...
+Specify one or more branches which
+.Cm got fetch
+should fetch from the remote repository by default.
+The list of branches specified here can be overridden at the
+.Cm got fetch
+command line with the
+.Fl b
+option.
 .It Ic mirror-references Ar yes | no
 This option controls the behaviour of
 .Cm got fetch
@@ -138,6 +147,7 @@ remote "origin" {
 	server git.gameoftrees.org
 	protocol git
 	repository got
+	branch { "main" }
 }
 .Ed
 .Pp
