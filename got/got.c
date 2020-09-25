@@ -77,7 +77,7 @@ catch_sigpipe(int signo)
 
 
 struct got_cmd {
-	const char	 *cmd_name;
+	const char	*cmd_name;
 	const struct got_error *(*cmd_main)(int, char *[]);
 	void		(*cmd_usage)(void);
 	const char	*cmd_alias;
@@ -192,7 +192,7 @@ main(int argc, char *argv[])
 	int hflag = 0, Vflag = 0;
 	static struct option longopts[] = {
 	     { "version", no_argument, NULL, 'V' },
-	     { NULL, 0, NULL, 0}
+	     { NULL, 0, NULL, 0 }
 	};
 
 	setlocale(LC_CTYPE, "");
