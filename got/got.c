@@ -9481,11 +9481,11 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	}
 	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_AUTHOR,
 	    got_object_commit_get_author(commit),
-	    got_object_commit_get_author_time(commit));
+	    (long long)got_object_commit_get_author_time(commit));
 
 	fprintf(outfile, "%s%s %lld +0000\n", GOT_COMMIT_LABEL_COMMITTER,
 	    got_object_commit_get_author(commit),
-	    got_object_commit_get_committer_time(commit));
+	    (long long)got_object_commit_get_committer_time(commit));
 
 	logmsg = got_object_commit_get_logmsg_raw(commit);
 	fprintf(outfile, "messagelen %zd\n", strlen(logmsg));
@@ -9540,7 +9540,7 @@ cat_tag(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 
 	fprintf(outfile, "%s%s %lld +0000\n", GOT_TAG_LABEL_TAGGER,
 	    got_object_tag_get_tagger(tag),
-	    got_object_tag_get_tagger_time(tag));
+	    (long long)got_object_tag_get_tagger_time(tag));
 
 	tagmsg = got_object_tag_get_message(tag);
 	fprintf(outfile, "messagelen %zd\n", strlen(tagmsg));

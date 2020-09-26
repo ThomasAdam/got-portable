@@ -84,7 +84,7 @@ static const struct got_error* new_remote(struct gotconfig_remote_repo **);
 
 typedef struct {
 	union {
-		int64_t		 number;
+		long long	 number;
 		char		*string;
 		struct node_branch *branch;
 	} v;
