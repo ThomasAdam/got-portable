@@ -422,14 +422,16 @@ doneediting:
 
 static const struct got_error *
 edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
-    const char *initial_content)
+    const char *initial_content, size_t initial_content_len)
 {
 	const struct got_error *err = NULL;
-	char buf[1024];
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 	struct stat st, st2;
-	FILE *fp;
-	int content_changed = 0;
-	size_t len;
+	FILE *fp = NULL;
+	size_t len, logmsg_len;
+	char *initial_content_stripped = NULL, *buf = NULL, *s;
 
 	*logmsg = NULL;
 
@@ -446,35 +448,83 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		return got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 
-	*logmsg = malloc(st2.st_size + 1);
+	/*
+	 * Set up a stripped version of the initial content without comments
+	 * and blank lines. We need this in order to check if the message
+	 * has in fact been edited.
+	 */
+	initial_content_stripped = malloc(initial_content_len + 1);
+	if (initial_content_stripped == NULL)
+		return got_error_from_errno("malloc");
+	initial_content_stripped[0] = '\0';
+
+	buf = strdup(initial_content);
+	if (buf == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	s = buf;
+	len = 0;
+	while ((line = strsep(&s, "\n")) != NULL) {
+		if ((line[0] == '#' || (len == 0 && line[0] == '\n')))
+			continue; /* remove comments and leading empty lines */
+		len = strlcat(initial_content_stripped, line,
+		    initial_content_len + 1);
+		if (len >= initial_content_len + 1) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+	}
+	while (len > 0 && initial_content_stripped[len - 1] == '\n') {
+		initial_content_stripped[len - 1] = '\0';
+		len--;
+	}
+
+	logmsg_len = st2.st_size;
+	*logmsg = malloc(logmsg_len + 1);
 	if (*logmsg == NULL)
 		return got_error_from_errno("malloc");
 	(*logmsg)[0] = '\0';
-	len = 0;
 
 	fp = fopen(logmsg_path, "r");
 	if (fp == NULL) {
 		err = got_error_from_errno("fopen");
 		goto done;
 	}
-	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		if (!content_changed && strcmp(buf, initial_content) != 0)
-			content_changed = 1;
-		if (buf[0] == '#' || (len == 0 && buf[0] == '\n'))
-			continue; /* remove comments and leading empty lines */
-		len = strlcat(*logmsg, buf, st2.st_size);
-	}
-	fclose(fp);
 
+	len = 0;
+	while ((linelen = getline(&line, &linesize, fp)) != -1) {
+		if ((line[0] == '#' || (len == 0 && line[0] == '\n')))
+			continue; /* remove comments and leading empty lines */
+		len = strlcat(*logmsg, line, logmsg_len + 1);
+		if (len >= logmsg_len + 1) {
+			err = got_error(GOT_ERR_NO_SPACE);
+			goto done;
+		}
+	}
+	free(line);
+	if (ferror(fp)) {
+		err = got_ferror(fp, GOT_ERR_IO);
+		goto done;
+	}
 	while (len > 0 && (*logmsg)[len - 1] == '\n') {
 		(*logmsg)[len - 1] = '\0';
 		len--;
 	}
 
-	if (len == 0 || !content_changed)
+	if (len == 0) {
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "commit message cannot be empty, aborting");
+		goto done;
+	}
+	if (strcmp(*logmsg, initial_content_stripped) == 0)
+		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
+		    "no changes made to commit message, aborting");
 done:
+	free(initial_content_stripped);
+	free(buf);
+	if (fp && fclose(fp) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*logmsg);
 		*logmsg = NULL;
@@ -507,7 +557,8 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 		goto done;
 	}
 
-	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content);
+	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content,
+	     initial_content_len);
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *logmsg_path);
@@ -5865,7 +5916,8 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	err = get_editor(&editor);
 	if (err)
 		goto done;
-	err = edit_logmsg(tagmsg, editor, *tagmsg_path, initial_content);
+	err = edit_logmsg(tagmsg, editor, *tagmsg_path, initial_content,
+	    initial_content_len);
 done:
 	free(initial_content);
 	free(template);
@@ -6745,7 +6797,8 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 		    got_commitable_get_path(ct));
 	}
 
-	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content);
+	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content,
+	    initial_content_len);
 done:
 	free(initial_content);
 	free(template);
@@ -7979,7 +8032,8 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err)
 		goto done;
 
-	err = edit_logmsg(&hle->logmsg, editor, logmsg_path, logmsg);
+	err = edit_logmsg(&hle->logmsg, editor, logmsg_path, logmsg,
+	    logmsg_len);
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_MSG_EMPTY)
 			goto done;
