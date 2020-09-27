@@ -213,7 +213,8 @@ main(int argc, char *argv[])
 
 	argc -= optind;
 	argv += optind;
-	optind = 0;
+	optind = 1;
+	optreset = 1;
 
 	if (Vflag) {
 		got_version_print_str();
