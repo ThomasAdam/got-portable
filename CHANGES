@@ -1,3 +1,10 @@
+* got 0.42; 2020-09-30
+- add "branch" keyword to got.conf which specifies a list of branches to fetch
+- rework got's commit-time log message modification check
+- fix potential type mismatches between format specifiers and arguments (naddy)
+- prefer the BSD extension to reset getopt over the GNU one (naddy)
+- fix 'bad path' error from 'got clone' by unveiling the repository path again
+
 * got 0.41; 2020-09-25
 - make 'got ref -d' delete both loose and packed representations of the ref
 - make dangling symbolic references show up in 'got ref -l'
