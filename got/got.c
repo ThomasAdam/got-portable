@@ -1472,7 +1472,7 @@ cmd_clone(int argc, char *argv[])
 			goto done;
 		}
 	}
-	error = apply_unveil(repo ? got_repo_get_path(repo) : NULL, 0, NULL);
+	error = apply_unveil(repo_path, 0, NULL);
 	if (error)
 		goto done;
 
