@@ -83,7 +83,7 @@ struct got_cmd {
 	const char	*cmd_alias;
 };
 
-__dead static void	usage(int);
+__dead static void	usage(int, int);
 __dead static void	usage_init(void);
 __dead static void	usage_import(void);
 __dead static void	usage_clone(void);
@@ -171,16 +171,16 @@ static struct got_cmd got_commands[] = {
 };
 
 static void
-list_commands(void)
+list_commands(FILE *fp)
 {
 	int i;
 
-	fprintf(stderr, "commands:");
+	fprintf(fp, "commands:");
 	for (i = 0; i < nitems(got_commands); i++) {
 		struct got_cmd *cmd = &got_commands[i];
-		fprintf(stderr, " %s", cmd->cmd_name);
+		fprintf(fp, " %s", cmd->cmd_name);
 	}
-	fputc('\n', stderr);
+	fputc('\n', fp);
 }
 
 int
@@ -206,7 +206,7 @@ main(int argc, char *argv[])
 			Vflag = 1;
 			break;
 		default:
-			usage(hflag);
+			usage(hflag, 1);
 			/* NOTREACHED */
 		}
 	}
@@ -218,11 +218,11 @@ main(int argc, char *argv[])
 
 	if (Vflag) {
 		got_version_print_str();
-		return 1;
+		return 0;
 	}
 
 	if (argc <= 0)
-		usage(hflag);
+		usage(hflag, hflag ? 0 : 1);
 
 	signal(SIGINT, catch_sigint);
 	signal(SIGPIPE, catch_sigpipe);
@@ -254,18 +254,20 @@ main(int argc, char *argv[])
 	}
 
 	fprintf(stderr, "%s: unknown command '%s'\n", getprogname(), argv[0]);
-	list_commands();
+	list_commands(stderr);
 	return 1;
 }
 
 __dead static void
-usage(int hflag)
+usage(int hflag, int status)
 {
-	fprintf(stderr, "usage: %s [-h] [-V | --version] command [arg ...]\n",
+	FILE *fp = (status == 0) ? stdout : stderr;
+
+	fprintf(fp, "usage: %s [-h] [-V | --version] command [arg ...]\n",
 	    getprogname());
 	if (hflag)
-		list_commands();
-	exit(1);
+		list_commands(fp);
+	exit(status);
 }
 
 static const struct got_error *

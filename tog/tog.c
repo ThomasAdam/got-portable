@@ -76,7 +76,7 @@ struct tog_cmd {
 	void (*cmd_usage)(void);
 };
 
-__dead static void	usage(int);
+__dead static void	usage(int, int);
 __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
@@ -5480,28 +5480,30 @@ done:
 }
 
 static void
-list_commands(void)
+list_commands(FILE *fp)
 {
 	int i;
 
-	fprintf(stderr, "commands:");
+	fprintf(fp, "commands:");
 	for (i = 0; i < nitems(tog_commands); i++) {
 		struct tog_cmd *cmd = &tog_commands[i];
-		fprintf(stderr, " %s", cmd->name);
+		fprintf(fp, " %s", cmd->name);
 	}
-	fputc('\n', stderr);
+	fputc('\n', fp);
 }
 
 __dead static void
-usage(int hflag)
+usage(int hflag, int status)
 {
-	fprintf(stderr, "usage: %s [-h] [-V | --version] [command] "
-	    "[arg ...]\n", getprogname());
+	FILE *fp = (status == 0) ? stdout : stderr;
+
+	fprintf(fp, "usage: %s [-h] [-V | --version] [command] [arg ...]\n",
+	    getprogname());
 	if (hflag) {
-		fprintf(stderr, "lazy usage: %s path\n", getprogname());
-		list_commands();
+		fprintf(fp, "lazy usage: %s path\n", getprogname());
+		list_commands(fp);
 	}
-	exit(1);
+	exit(status);
 }
 
 static char **
@@ -5587,7 +5589,7 @@ tog_log_with_path(int argc, char *argv[])
 			goto done;
 		fprintf(stderr, "%s: '%s' is no known command or path\n",
 		    getprogname(), argv[0]);
-		usage(1);
+		usage(1, 1);
 		/* not reached */
 	}
 
@@ -5645,7 +5647,7 @@ main(int argc, char *argv[])
 			Vflag = 1;
 			break;
 		default:
-			usage(hflag);
+			usage(hflag, 1);
 			/* NOTREACHED */
 		}
 	}
@@ -5657,12 +5659,12 @@ main(int argc, char *argv[])
 
 	if (Vflag) {
 		got_version_print_str();
-		return 1;
+		return 0;
 	}
 
 	if (argc == 0) {
 		if (hflag)
-			usage(hflag);
+			usage(hflag, 0);
 		/* Build an argument vector which runs a default command. */
 		cmd = &tog_commands[0];
 		argc = 1;
@@ -5682,7 +5684,7 @@ main(int argc, char *argv[])
 
 	if (cmd == NULL) {
 		if (argc != 1)
-			usage(0);
+			usage(0, 1);
 		/* No command specified; try log with a path */
 		error = tog_log_with_path(argc, argv);
 	} else {
