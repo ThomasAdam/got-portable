@@ -6156,7 +6156,7 @@ cmd_tag(int argc, char *argv[])
 			goto done;
 
 		if (tagmsg) {
-			error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+			error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 			if (error)
 				goto done;
 		}
