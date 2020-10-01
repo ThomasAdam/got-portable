@@ -169,7 +169,7 @@ test_init()
 		echo "No test name provided" >&2
 		return 1
 	fi
-	local testroot=`mktemp -p $GOT_TEST_ROOT -d got-test-$testname-XXXXXXXX`
+	local testroot=$(mktemp -d "$GOT_TEST_ROOT/got-test-$testname-XXXXXXXX")
 	mkdir $testroot/repo
 	git_init $testroot/repo
 	if [ -z "$no_tree" ]; then
