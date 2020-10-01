@@ -3,79 +3,81 @@ REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	integrate stage unstage cat clone fetch tree
 NOOBJ=Yes
 
+GOT_TEST_ROOT=/tmp
+
 checkout:
-	./checkout.sh -q
+	./checkout.sh -q -r $(GOT_TEST_ROOT)
 
 update:
-	./update.sh -q
+	./update.sh -q -r $(GOT_TEST_ROOT)
 
 status:
-	./status.sh -q
+	./status.sh -q -r $(GOT_TEST_ROOT)
 
 log:
-	./log.sh -q
+	./log.sh -q -r $(GOT_TEST_ROOT)
 
 add:
-	./add.sh -q
+	./add.sh -q -r $(GOT_TEST_ROOT)
 
 rm:
-	./rm.sh -q
+	./rm.sh -q -r $(GOT_TEST_ROOT)
 
 diff:
-	./diff.sh -q
+	./diff.sh -q -r $(GOT_TEST_ROOT)
 
 blame:
-	./blame.sh -q
+	./blame.sh -q -r $(GOT_TEST_ROOT)
 
 branch:
-	./branch.sh -q
+	./branch.sh -q -r $(GOT_TEST_ROOT)
 
 tag:
-	./tag.sh -q
+	./tag.sh -q -r $(GOT_TEST_ROOT)
 
 ref:
-	./ref.sh -q
+	./ref.sh -q -r $(GOT_TEST_ROOT)
 
 commit:
-	./commit.sh -q
+	./commit.sh -q -r $(GOT_TEST_ROOT)
 
 revert:
-	./revert.sh -q
+	./revert.sh -q -r $(GOT_TEST_ROOT)
 
 cherrypick:
-	./cherrypick.sh -q
+	./cherrypick.sh -q -r $(GOT_TEST_ROOT)
 
 backout:
-	./backout.sh -q
+	./backout.sh -q -r $(GOT_TEST_ROOT)
 
 rebase:
-	./rebase.sh -q
+	./rebase.sh -q -r $(GOT_TEST_ROOT)
 
 import:
-	./import.sh -q
+	./import.sh -q -r $(GOT_TEST_ROOT)
 
 histedit:
-	./histedit.sh -q
+	./histedit.sh -q -r $(GOT_TEST_ROOT)
 
 integrate:
-	./integrate.sh -q
+	./integrate.sh -q -r $(GOT_TEST_ROOT)
 
 stage:
-	./stage.sh -q
+	./stage.sh -q -r $(GOT_TEST_ROOT)
 
 unstage:
-	./unstage.sh -q
+	./unstage.sh -q -r $(GOT_TEST_ROOT)
 
 cat:
-	./cat.sh -q
+	./cat.sh -q -r $(GOT_TEST_ROOT)
 
 clone:
-	./clone.sh -q
+	./clone.sh -q -r $(GOT_TEST_ROOT)
 
 fetch:
-	./fetch.sh -q
+	./fetch.sh -q -r $(GOT_TEST_ROOT)
 
 tree:
-	./tree.sh -q
+	./tree.sh -q -r $(GOT_TEST_ROOT)
 
 .include <bsd.regress.mk>

@@ -21,6 +21,7 @@ export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 export GOT_AUTHOR="$GIT_AUTHOR_NAME <$GIT_AUTHOR_EMAIL>"
 export GOT_AUTHOR_8="flan_hac"
 export GOT_LOG_DEFAULT_LIMIT=0
+export GOT_TEST_ROOT="/tmp"
 
 export MALLOC_OPTIONS=S
 
@@ -168,7 +169,7 @@ test_init()
 		echo "No test name provided" >&2
 		return 1
 	fi
-	local testroot=`mktemp -p /tmp -d got-test-$testname-XXXXXXXX`
+	local testroot=`mktemp -p $GOT_TEST_ROOT -d got-test-$testname-XXXXXXXX`
 	mkdir $testroot/repo
 	git_init $testroot/repo
 	if [ -z "$no_tree" ]; then
@@ -199,10 +200,11 @@ test_cleanup()
 
 test_parseargs()
 {
-	args=`getopt q $*`
+	args=`getopt qr: $*`
 	if [ $? -ne 0 ]; then
 		echo "Supported options:"
 		echo "  -q: quiet mode"
+		echo "  -r PATH: use PATH as test data root directory"
 		exit 2
 	fi
 	set -- $args
@@ -211,6 +213,8 @@ test_parseargs()
 		in
 			-q)
 			   export GOT_TEST_QUIET=1; shift;;
+			-r)
+			   export GOT_TEST_ROOT="$2"; shift; shift;;
 			--)
 			   shift; break;;
 		esac
