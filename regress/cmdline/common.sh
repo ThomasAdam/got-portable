@@ -200,26 +200,20 @@ test_cleanup()
 
 test_parseargs()
 {
-	args=`getopt qr: $*`
-	if [ $? -ne 0 ]; then
-		echo "Supported options:"
-		echo "  -q: quiet mode"
-		echo "  -r PATH: use PATH as test data root directory"
-		exit 2
-	fi
-	set -- $args
-	while [ $# -ne 0 ]; do
-		case "$1"
-		in
-			-q)
-			   export GOT_TEST_QUIET=1; shift;;
-			-r)
-			   export GOT_TEST_ROOT="$2"; shift; shift;;
-			--)
-			   shift; break;;
+	while getopts qr: flag; do
+		case $flag in
+		q)	export GOT_TEST_QUIET=1
+			;;
+		r)	export GOT_TEST_ROOT=$OPTARG
+			;;
+		?)	echo "Supported options:"
+			echo "  -q: quiet mode"
+			echo "  -r PATH: use PATH as test data root directory"
+			exit 2
+			;;
 		esac
 	done
-}
+} >&2
 
 run_test()
 {
