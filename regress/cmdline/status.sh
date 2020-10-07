@@ -749,6 +749,59 @@ test_status_status_code() {
 	test_done "$testroot" "$ret"
 }
 
+test_status_empty_file() {
+	local testroot=`test_init status_empty_file`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "" > $testroot/wt/empty
+	(cd $testroot/wt && got add empty >/dev/null)
+
+	echo 'A  empty' > $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m "empty file" >/dev/null)
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# update the timestamp; this used to make the file show up as:
+	# M  empty
+	# which should not happen
+	touch $testroot/wt/empty
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
 
 test_parseargs "$@"
 run_test test_status_basic
@@ -766,3 +819,4 @@ run_test test_status_many_paths
 run_test test_status_cvsignore
 run_test test_status_gitignore
 run_test test_status_status_code
+run_test test_status_empty_file

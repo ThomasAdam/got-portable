@@ -1784,12 +1784,12 @@ get_file_status(unsigned char *status, struct stat *sb,
 			err = got_error_from_errno("fread");
 			goto done;
 		}
-		if (blen == 0) {
+		if (blen - hdrlen == 0) {
 			if (flen != 0)
 				*status = GOT_STATUS_MODIFY;
 			break;
 		} else if (flen == 0) {
-			if (blen != 0)
+			if (blen - hdrlen != 0)
 				*status = GOT_STATUS_MODIFY;
 			break;
 		} else if (blen - hdrlen == flen) {
