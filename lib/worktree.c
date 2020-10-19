@@ -4866,7 +4866,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
     struct got_commitable *ct)
 {
 	const struct got_error *err = NULL;
-	char *ct_name;
+	char *ct_name = NULL;
 
 	 *new_te = NULL;
 
@@ -4874,11 +4874,9 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 	if (*new_te == NULL)
 		return got_error_from_errno("calloc");
 
-	ct_name = basename(ct->path);
-	if (ct_name == NULL) {
-		err = got_error_from_errno2("basename", ct->path);
+	err = got_path_basename(&ct_name, ct->path);
+	if (err)
 		goto done;
-	}
 	if (strlcpy((*new_te)->name, ct_name, sizeof((*new_te)->name)) >=
 	    sizeof((*new_te)->name)) {
 		err = got_error(GOT_ERR_NO_SPACE);
@@ -4893,6 +4891,7 @@ alloc_added_blob_tree_entry(struct got_tree_entry **new_te,
 	else
 		memcpy(&(*new_te)->id, ct->blob_id, sizeof((*new_te)->id));
 done:
+	free(ct_name);
 	if (err && *new_te) {
 		free(*new_te);
 		*new_te = NULL;
