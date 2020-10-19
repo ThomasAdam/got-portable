@@ -424,9 +424,13 @@ done:
 const struct got_error *
 got_path_basename(char **s, const char *path)
 {
+	char buf[PATH_MAX];
 	char *base;
 
-	base = basename(path);
+	if (strlcpy(buf, path, sizeof(buf)) >= sizeof(buf))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	base = basename(buf);
 	if (base == NULL)
 		return got_error_from_errno2("basename", path);
 
