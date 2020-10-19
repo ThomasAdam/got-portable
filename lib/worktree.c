@@ -4995,12 +4995,15 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 		if (!path_matches)
 			continue;
 
-		ct_name = basename(pe->path);
-		if (ct_name == NULL)
-			return got_error_from_errno2("basename", pe->path);
+		err = got_path_basename(&ct_name, pe->path);
+		if (err)
+			return err;
 
-		if (strcmp(te->name, ct_name) != 0)
+		if (strcmp(te->name, ct_name) != 0) {
+			free(ct_name);
 			continue;
+		}
+		free(ct_name);
 
 		*ctp = ct;
 		break;
