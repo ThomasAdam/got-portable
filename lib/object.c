@@ -1855,6 +1855,7 @@ resolve_symlink(char **link_target, const char *path,
     struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
+	char buf[PATH_MAX];
 	char *name, *parent_path = NULL;
 	struct got_object_id *tree_obj_id = NULL;
 	struct got_tree_object *tree = NULL;
@@ -1862,7 +1863,10 @@ resolve_symlink(char **link_target, const char *path,
 
 	*link_target = NULL;
 
-	name = basename(path);
+	if (strlcpy(buf, path, sizeof(buf)) >= sizeof(buf))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	name = basename(buf);
 	if (name == NULL)
 		return got_error_from_errno2("basename", path);
 
