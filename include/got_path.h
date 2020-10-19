@@ -118,7 +118,7 @@ const struct got_error *got_path_dirname(char **, const char *);
 const struct got_error *got_path_dirent_type(int *, const char *,
     struct dirent *);
 
-/* basename(3) with dynamically allocated result. */
+/* basename(3) with dynamically allocated result and unmodified input. */
 const struct got_error *got_path_basename(char **, const char *);
 
 /* Strip trailing slashes from a path; path will be modified in-place. */
