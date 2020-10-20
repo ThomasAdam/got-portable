@@ -453,18 +453,39 @@ const struct got_error *
 got_worktree_open(struct got_worktree **worktree, const char *path)
 {
 	const struct got_error *err = NULL;
+	char *worktree_path;
 
-	do {
-		err = open_worktree(worktree, path);
-		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT))
+	worktree_path = strdup(path);
+	if (worktree_path == NULL)
+		return got_error_from_errno("strdup");
+
+	for (;;) {
+		char *parent_path;
+
+		err = open_worktree(worktree, worktree_path);
+		if (err && !(err->code == GOT_ERR_ERRNO && errno == ENOENT)) {
+			free(worktree_path);
 			return err;
-		if (*worktree)
+		}
+		if (*worktree) {
+			free(worktree_path);
 			return NULL;
-		path = dirname(path);
-		if (path == NULL)
-			return got_error_from_errno2("dirname", path);
-	} while (!((path[0] == '.' || path[0] == '/') && path[1] == '\0'));
+		}
+		if (worktree_path[0] == '/' && worktree_path[1] == '\0')
+			break;
+		err = got_path_dirname(&parent_path, worktree_path);
+		if (err) {
+			if (err->code != GOT_ERR_BAD_PATH) {
+				free(worktree_path);
+				return err;
+			}
+			break;
+		}
+		free(worktree_path);
+		worktree_path = parent_path;
+	}
 
+	free(worktree_path);
 	return got_error(GOT_ERR_NOT_WORKTREE);
 }
 
