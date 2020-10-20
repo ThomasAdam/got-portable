@@ -603,7 +603,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 		if (err == NULL)
 			break;
 		if (err->code != GOT_ERR_NOT_GIT_REPO)
-			break;
+			goto done;
 		if (path[0] == '/' && path[1] == '\0') {
 			if (tried_root) {
 				err = got_error(GOT_ERR_NOT_GIT_REPO);
