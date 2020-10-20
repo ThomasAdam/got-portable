@@ -2119,9 +2119,10 @@ cmd_fetch(int argc, char *argv[])
 			got_gotconfig_get_remotes(&nremotes, &remotes,
 			    worktree_conf);
 			for (i = 0; i < nremotes; i++) {
-				remote = &remotes[i];
-				if (strcmp(remote->name, remote_name) == 0)
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
 					break;
+				}
 			}
 		}
 	}
@@ -2131,18 +2132,20 @@ cmd_fetch(int argc, char *argv[])
 			got_gotconfig_get_remotes(&nremotes, &remotes,
 			    repo_conf);
 			for (i = 0; i < nremotes; i++) {
-				remote = &remotes[i];
-				if (strcmp(remote->name, remote_name) == 0)
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
 					break;
+				}
 			}
 		}
 	}
 	if (remote == NULL) {
 		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
 		for (i = 0; i < nremotes; i++) {
-			remote = &remotes[i];
-			if (strcmp(remote->name, remote_name) == 0)
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
 				break;
+			}
 		}
 	}
 	if (remote == NULL) {

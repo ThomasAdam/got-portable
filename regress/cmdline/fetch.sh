@@ -978,6 +978,18 @@ remote "barbaz" {
 	repository "$testroot/does-not-exist"
 }
 EOF
+	echo "got: nonexistent: remote repository not found" \
+		> $testroot/stderr.expected
+	(cd $testroot/repo-clone && got fetch nonexistent \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got fetch command succeeded unexpectedly" >&2
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	(cd $testroot/repo-clone && got fetch -l foobar \
 		> $testroot/stdout)
 	ret="$?"
