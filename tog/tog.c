@@ -2439,30 +2439,34 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			*new_view = tree_view;
 		break;
 	case KEY_BACKSPACE:
-		if (strcmp(s->in_repo_path, "/") == 0)
+		if (got_path_cmp(s->in_repo_path, "/",
+		    strlen(s->in_repo_path), 1) == 0)
 			break;
-		parent_path = dirname(s->in_repo_path);
-		if (parent_path && strcmp(parent_path, ".") != 0) {
-			err = stop_log_thread(s);
-			if (err)
-				return err;
-			lv = view_open(view->nlines, view->ncols,
-			    view->begin_y, view->begin_x, TOG_VIEW_LOG);
-			if (lv == NULL)
-				return got_error_from_errno(
-				    "view_open");
-			err = open_log_view(lv, s->start_id, s->refs,
-			    s->repo, s->head_ref_name, parent_path,
-			    s->log_branches);
-			if (err)
-				return err;;
-			if (view_is_parent_view(view))
-				*new_view = lv;
-			else {
-				view_set_child(view->parent, lv);
-				*focus_view = lv;
-			}
-			return NULL;
+		err = got_path_dirname(&parent_path, s->in_repo_path);
+		if (err)
+			return err;
+		err = stop_log_thread(s);
+		if (err) {
+			free(parent_path);
+			return err;
+		}
+		lv = view_open(view->nlines, view->ncols,
+		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
+		if (lv == NULL) {
+			free(parent_path);
+			return got_error_from_errno("view_open");
+		}
+		err = open_log_view(lv, s->start_id, s->refs,
+		    s->repo, s->head_ref_name, parent_path,
+		    s->log_branches);
+		free(parent_path);
+		if (err)
+			return err;;
+		if (view_is_parent_view(view))
+			*new_view = lv;
+		else {
+			view_set_child(view->parent, lv);
+			*focus_view = lv;
 		}
 		break;
 	case CTRL('l'):
