@@ -2047,16 +2047,22 @@ remove_ondisk_file(const char *root_path, const char *path)
 		if (errno != ENOENT)
 			err = got_error_from_errno2("unlink", ondisk_path);
 	} else {
-		char *parent = dirname(ondisk_path);
-		while (parent && strcmp(parent, root_path) != 0) {
-			if (rmdir(parent) == -1) {
+		size_t root_len = strlen(root_path);
+		do {
+			char *parent;
+			err = got_path_dirname(&parent, ondisk_path);
+			if (err)
+				return err;
+			free(ondisk_path);
+			ondisk_path = parent;
+			if (rmdir(ondisk_path) == -1) {
 				if (errno != ENOTEMPTY)
 					err = got_error_from_errno2("rmdir",
-					    parent);
+					    ondisk_path);
 				break;
 			}
-			parent = dirname(parent);
-		}
+		} while (got_path_cmp(ondisk_path, root_path,
+		    strlen(ondisk_path), root_len) != 0);
 	}
 	free(ondisk_path);
 	return err;
