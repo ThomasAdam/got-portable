@@ -296,7 +296,7 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 				continue;
 			zb.outlen = (nbuf * GOT_INFLATE_BUFSIZE) - *outlen;
 			newbuf = reallocarray(*outbuf, ++nbuf,
-			   GOT_INFLATE_BUFSIZE);
+			    GOT_INFLATE_BUFSIZE);
 			if (newbuf == NULL) {
 				err = got_error_from_errno("reallocarray");
 				free(*outbuf);

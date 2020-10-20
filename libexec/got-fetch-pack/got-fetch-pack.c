@@ -82,8 +82,8 @@ flushpkt(int fd)
 	if (chattygot > 1)
 		fprintf(stderr, "%s: writepkt: 0000\n", getprogname());
 
-	 w = write(fd, "0000", 4);
-	 if (w == -1)
+	w = write(fd, "0000", 4);
+	if (w == -1)
 		return got_error_from_errno("write");
 	if (w != 4)
 		return got_error(GOT_ERR_IO);
@@ -844,7 +844,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
-		   sent_my_capabilites ? "" : my_capabilities);
+		    sent_my_capabilites ? "" : my_capabilities);
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;

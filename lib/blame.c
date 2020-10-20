@@ -223,7 +223,7 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
-	   &blame->line_offsets, blame->f, blob);
+	    &blame->line_offsets, blame->f, blob);
 	if (err || blame->nlines == 0)
 		goto done;
 

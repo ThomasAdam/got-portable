@@ -234,7 +234,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
 
 	err = open_tree(&buf, &entries, &nentries, pack, packidx, iobj.idx,
-	     &id, objcache);
+	    &id, objcache);
 	if (err)
 		return err;
 
@@ -990,15 +990,15 @@ main(int argc, char *argv[])
 			break;
 		case GOT_IMSG_TREE_REQUEST:
 			err = tree_request(&imsg, &ibuf, pack, packidx,
-			   &objcache);
+			    &objcache);
 			break;
 		case GOT_IMSG_BLOB_REQUEST:
 			err = blob_request(&imsg, &ibuf, pack, packidx,
-			   &objcache);
+			    &objcache);
 			break;
 		case GOT_IMSG_TAG_REQUEST:
 			err = tag_request(&imsg, &ibuf, pack, packidx,
-			   &objcache);
+			    &objcache);
 			break;
 		case GOT_IMSG_COMMIT_TRAVERSAL_REQUEST:
 			err = commit_traversal_request(&imsg, &ibuf, pack,

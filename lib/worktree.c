@@ -2445,9 +2445,9 @@ sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
 	 * this program exits have a different time stamp from the one which
 	 * was recorded in the file index.
 	 */
-	 timeout.tv_sec = 0;
-	 timeout.tv_nsec = 1;
-	 nanosleep(&timeout,  NULL);
+	timeout.tv_sec = 0;
+	timeout.tv_nsec = 1;
+	nanosleep(&timeout,  NULL);
 done:
 	if (new_index)
 		fclose(new_index);
@@ -2582,7 +2582,7 @@ checkout_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	}
 
 	err = got_object_open_as_commit(&commit, repo,
-	   worktree->base_commit_id);
+	    worktree->base_commit_id);
 	if (err)
 		goto done;
 
@@ -4986,7 +4986,7 @@ match_modified_subtree(int *modified, struct got_tree_entry *te,
 		struct got_commitable *ct = pe->data;
 		*modified = got_path_is_child(ct->in_repo_path, te_path,
 		    strlen(te_path));
-		 if (*modified)
+		if (*modified)
 			break;
 	}
 
@@ -5023,8 +5023,8 @@ match_deleted_or_modified_ct(struct got_commitable **ctp,
 		if (got_object_id_cmp(ct->base_blob_id, &te->id) != 0)
 			continue;
 
-		 err = match_ct_parent_path(&path_matches, ct, base_tree_path);
-		 if (err)
+		err = match_ct_parent_path(&path_matches, ct, base_tree_path);
+		if (err)
 			return err;
 		if (!path_matches)
 			continue;
@@ -5116,8 +5116,8 @@ write_tree(struct got_object_id **new_tree_id, int *nentries,
 		    (ct->flags & GOT_COMMITABLE_ADDED))
 			continue;
 
-		 if (!got_path_is_child(ct->in_repo_path, path_base_tree,
-		     strlen(path_base_tree)))
+		if (!got_path_is_child(ct->in_repo_path, path_base_tree,
+		    strlen(path_base_tree)))
 			continue;
 
 		err = got_path_skip_common_ancestor(&child_path, path_base_tree,

@@ -2249,8 +2249,8 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	    !s->log_branches);
 	if (err)
 		goto done;
-	err = got_commit_graph_iter_start(thread_graph,
-	     s->start_id, s->repo, NULL, NULL);
+	err = got_commit_graph_iter_start(thread_graph, s->start_id,
+	    s->repo, NULL, NULL);
 	if (err)
 		goto done;
 
@@ -5636,8 +5636,8 @@ main(int argc, char *argv[])
 	int ch, hflag = 0, Vflag = 0;
 	char **cmd_argv = NULL;
 	static struct option longopts[] = {
-	     { "version", no_argument, NULL, 'V' },
-	     { NULL, 0, NULL, 0}
+	    { "version", no_argument, NULL, 'V' },
+	    { NULL, 0, NULL, 0}
 	};
 
 	setlocale(LC_CTYPE, "");

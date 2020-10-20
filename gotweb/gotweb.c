@@ -1497,7 +1497,7 @@ gw_summary(struct gw_trans *gw_trans)
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_puts(gw_trans->gw_html_req,
-		     gw_trans->gw_dir->owner);
+		    gw_trans->gw_dir->owner);
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 1);
@@ -2199,7 +2199,7 @@ gw_template(size_t key, void *arg)
 	    "/apple-touch-icon.png") == -1)
 		goto err;
 	if (asprintf(&fic32, "%s%s", gw_trans->gw_conf->got_www_path,
-	     "/favicon-32x32.png") == -1)
+	    "/favicon-32x32.png") == -1)
 		goto err;
 	if (asprintf(&fic16, "%s%s", gw_trans->gw_conf->got_www_path,
 	    "/favicon-16x16.png") == -1)
@@ -4588,7 +4588,7 @@ gw_output_site_link(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		goto done;
 	kerr = khtml_puts(gw_trans->gw_html_req,
-	   gw_trans->gw_conf->got_site_link);
+	    gw_trans->gw_conf->got_site_link);
 	if (kerr != KCGI_OK)
 		goto done;
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 1);

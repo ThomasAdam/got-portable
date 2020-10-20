@@ -191,8 +191,8 @@ main(int argc, char *argv[])
 	int ch;
 	int hflag = 0, Vflag = 0;
 	static struct option longopts[] = {
-	     { "version", no_argument, NULL, 'V' },
-	     { NULL, 0, NULL, 0 }
+	    { "version", no_argument, NULL, 'V' },
+	    { NULL, 0, NULL, 0 }
 	};
 
 	setlocale(LC_CTYPE, "");
@@ -561,7 +561,7 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	}
 
 	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content,
-	     initial_content_len);
+	    initial_content_len);
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *logmsg_path);
@@ -957,13 +957,13 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 	if (a->create_configs && !a->configs_created &&
 	    !TAILQ_EMPTY(a->config_info.symrefs)) {
 		err = create_config_files(a->config_info.proto,
-		     a->config_info.host, a->config_info.port,
-		     a->config_info.remote_repo_path,
-		     a->config_info.git_url,
-		     a->config_info.fetch_all_branches,
-		     a->config_info.mirror_references,
-		     a->config_info.symrefs,
-		     a->config_info.wanted_branches, a->repo);
+		    a->config_info.host, a->config_info.port,
+		    a->config_info.remote_repo_path,
+		    a->config_info.git_url,
+		    a->config_info.fetch_all_branches,
+		    a->config_info.mirror_references,
+		    a->config_info.symrefs,
+		    a->config_info.wanted_branches, a->repo);
 		if (err)
 			return err;
 		a->configs_created = 1;
@@ -1296,7 +1296,7 @@ create_config_files(const char *proto, const char *host, const char *port,
 	 * If we asked for a set of wanted branches then use the first
 	 * one of those.
 	 */
-	 if (!TAILQ_EMPTY(wanted_branches)) {
+	if (!TAILQ_EMPTY(wanted_branches)) {
 		pe = TAILQ_FIRST(wanted_branches);
 		default_branch = pe->path;
 	} else {
@@ -1637,7 +1637,7 @@ cmd_clone(int argc, char *argv[])
 		 * a set of wanted branches use the first of one of those
 		 * which could be fetched instead.
 		 */
-		 TAILQ_FOREACH(pe, &wanted_branches, entry) {
+		TAILQ_FOREACH(pe, &wanted_branches, entry) {
 			const char *target = pe->path;
 			struct got_reference *target_ref;
 
@@ -5486,8 +5486,8 @@ add_branch(struct got_repository *repo, const char *branch_name,
 		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
-		 err = got_error_from_errno("asprintf");
-		 goto done;
+		err = got_error_from_errno("asprintf");
+		goto done;
 	}
 
 	err = got_ref_open(&ref, repo, refname, 0);
@@ -5974,13 +5974,13 @@ add_tag(struct got_repository *repo, struct got_worktree *worktree,
 	if (strncmp("refs/tags/", tag_name, 10) == 0) {
 		refname = strdup(tag_name);
 		if (refname == NULL) {
-			 err = got_error_from_errno("strdup");
-			 goto done;
+			err = got_error_from_errno("strdup");
+			goto done;
 		}
 		tag_name += 10;
 	} else if (asprintf(&refname, "refs/tags/%s", tag_name) == -1) {
-		 err = got_error_from_errno("asprintf");
-		 goto done;
+		err = got_error_from_errno("asprintf");
+		goto done;
 	}
 
 	err = got_ref_open(&ref, repo, refname, 0);
@@ -6288,7 +6288,7 @@ cmd_add(int argc, char *argv[])
 		TAILQ_FOREACH(pe, &paths, entry) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
-			       pe->path) == -1) {
+			    pe->path) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -6436,7 +6436,7 @@ cmd_remove(int argc, char *argv[])
 		TAILQ_FOREACH(pe, &paths, entry) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
-			       pe->path) == -1) {
+			    pe->path) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -6693,7 +6693,7 @@ cmd_revert(int argc, char *argv[])
 		TAILQ_FOREACH(pe, &paths, entry) {
 			if (asprintf(&ondisk_path, "%s/%s",
 			    got_worktree_get_root_path(worktree),
-			       pe->path) == -1) {
+			    pe->path) == -1) {
 				error = got_error_from_errno("asprintf");
 				goto done;
 			}
@@ -8868,7 +8868,7 @@ cmd_histedit(int argc, char *argv[])
 			if (hle->cmd->code == GOT_HISTEDIT_DROP ||
 			    hle->cmd->code == GOT_HISTEDIT_FOLD) {
 				error = histedit_skip_commit(hle, worktree,
-				   repo);
+				    repo);
 				if (error)
 					goto done;
 			} else {

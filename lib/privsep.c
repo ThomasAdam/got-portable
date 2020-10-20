@@ -500,7 +500,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		    len);
 		if (wbuf == NULL)
 			return got_error_from_errno(
-			     "imsg_create FETCH_WANTED_BRANCH");
+			    "imsg_create FETCH_WANTED_BRANCH");
 
 		/* Keep in sync with struct got_imsg_fetch_wanted_branch! */
 		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
@@ -511,7 +511,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		}
 		if (imsg_add(wbuf, name, name_len) == -1) {
 			err = got_error_from_errno(
-			     "imsg_add FETCH_WANTED_BRANCH");
+			    "imsg_add FETCH_WANTED_BRANCH");
 			ibuf_free(wbuf);
 			return err;
 		}
@@ -532,7 +532,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		    len);
 		if (wbuf == NULL)
 			return got_error_from_errno(
-			     "imsg_create FETCH_WANTED_REF");
+			    "imsg_create FETCH_WANTED_REF");
 
 		/* Keep in sync with struct got_imsg_fetch_wanted_ref! */
 		if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
@@ -543,7 +543,7 @@ got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
 		}
 		if (imsg_add(wbuf, name, name_len) == -1) {
 			err = got_error_from_errno(
-			     "imsg_add FETCH_WANTED_REF");
+			    "imsg_add FETCH_WANTED_REF");
 			ibuf_free(wbuf);
 			return err;
 		}
@@ -1311,7 +1311,7 @@ got_privsep_send_blob(struct imsgbuf *ibuf, size_t size, size_t hdrlen,
 		memcpy(buf, &iblob, sizeof(iblob));
 		memcpy(buf + sizeof(iblob), data, size);
 		if (imsg_compose(ibuf, GOT_IMSG_BLOB, 0, 0, -1, buf,
-		   sizeof(iblob) + size) == -1) {
+		    sizeof(iblob) + size) == -1) {
 			free(buf);
 			return got_error_from_errno("imsg_compose BLOB");
 		}
