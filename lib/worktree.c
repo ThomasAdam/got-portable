@@ -1414,13 +1414,12 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 		}
 
 		if (errno == ENOENT) {
-			char *parent = dirname(ondisk_path);
-			if (parent == NULL) {
-				err = got_error_from_errno2("dirname",
-				    ondisk_path);
+			char *parent;
+			err = got_path_dirname(&parent, ondisk_path);
+			if (err)
 				goto done;
-			}
 			err = add_dir_on_disk(worktree, parent);
+			free(parent);
 			if (err)
 				goto done;
 			/*
