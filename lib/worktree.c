@@ -3842,7 +3842,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *ie = NULL;
 	struct stat sb;
-	char *ondisk_path, *parent = NULL;
+	char *ondisk_path;
 
 	ie = got_fileindex_entry_get(a->fileindex, relpath, strlen(relpath));
 	if (ie == NULL)
@@ -3901,6 +3901,8 @@ schedule_for_deletion(void *arg, unsigned char status,
 	}
 
 	if (!a->keep_on_disk && status != GOT_STATUS_MISSING) {
+		size_t root_len;
+
 		if (dirfd != -1) {
 			if (unlinkat(dirfd, de_name, 0) != 0) {
 				err = got_error_from_errno2("unlinkat",
@@ -3912,25 +3914,22 @@ schedule_for_deletion(void *arg, unsigned char status,
 			goto done;
 		}
 
-		parent = dirname(ondisk_path);
-
-		if (parent == NULL) {
-			err = got_error_from_errno2("dirname", ondisk_path);
-			goto done;
-		}
-		while (parent && strcmp(parent, a->worktree->root_path) != 0) {
-			if (rmdir(parent) == -1) {
+		root_len = strlen(a->worktree->root_path);
+		do {
+			char *parent;
+			err = got_path_dirname(&parent, ondisk_path);
+			if (err)
+				return err;
+			free(ondisk_path);
+			ondisk_path = parent;
+			if (rmdir(ondisk_path) == -1) {
 				if (errno != ENOTEMPTY)
 					err = got_error_from_errno2("rmdir",
-					    parent);
+					    ondisk_path);
 				break;
 			}
-			parent = dirname(parent);
-			if (parent == NULL) {
-				err = got_error_from_errno2("dirname", parent);
-				goto done;
-			}
-		}
+		} while (got_path_cmp(ondisk_path, a->worktree->root_path,
+		    strlen(ondisk_path), root_len) != 0);
 	}
 
 	got_fileindex_entry_mark_deleted_from_disk(ie);
