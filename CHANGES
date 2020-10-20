@@ -1,3 +1,13 @@
+* got 0.43; 2020-10-21
+- do not treat the -h and -V flags as errors (naddy)
+- allow regress test data to be stored in locations other than /tmp
+- unveil repositories read-write when adding tags with 'got tag'
+- rewrite test argument parsing with the POSIX getopts shell built-in (naddy)
+- in tests, accommodate ls -l implementations that print "total 0" (naddy)
+- fix a bug where 'got status' showed an unchanged empty file as changed
+- handle non-const basename(3) and dirname(3) for POSIX compatibility
+- properly handle nonexistent remote repository names given to 'got fetch'
+
 * got 0.42; 2020-09-30
 - add "branch" keyword to got.conf which specifies a list of branches to fetch
 - rework got's commit-time log message modification check
