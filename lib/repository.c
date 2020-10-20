@@ -551,7 +551,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath;
+	char *abspath, *repo_path = NULL;
 	int i, tried_root = 0;
 
 	*repop = NULL;
@@ -592,31 +592,33 @@ got_repo_open(struct got_repository **repop, const char *path,
 	if (err)
 		goto done;
 
-	path = realpath(abspath, NULL);
-	if (path == NULL) {
+	repo_path = realpath(abspath, NULL);
+	if (repo_path == NULL) {
 		err = got_error_from_errno2("realpath", abspath);
 		goto done;
 	}
 
-	do {
-		err = open_repo(repo, path);
+	for (;;) {
+		char *parent_path;
+
+		err = open_repo(repo, repo_path);
 		if (err == NULL)
 			break;
 		if (err->code != GOT_ERR_NOT_GIT_REPO)
 			goto done;
-		if (path[0] == '/' && path[1] == '\0') {
+		if (repo_path[0] == '/' && repo_path[1] == '\0') {
 			if (tried_root) {
 				err = got_error(GOT_ERR_NOT_GIT_REPO);
 				goto done;
 			}
 			tried_root = 1;
 		}
-		path = dirname(path);
-		if (path == NULL) {
-			err = got_error_from_errno2("dirname", path);
+		err = got_path_dirname(&parent_path, repo_path);
+		if (err)
 			goto done;
-		}
-	} while (path);
+		free(repo_path);
+		repo_path = parent_path;
+	}
 
 	err = read_gotconfig(repo);
 	if (err)
@@ -633,6 +635,7 @@ done:
 	else
 		*repop = repo;
 	free(abspath);
+	free(repo_path);
 	return err;
 }
 
