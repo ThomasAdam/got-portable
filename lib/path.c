@@ -358,9 +358,13 @@ got_path_dir_is_empty(const char *dir)
 const struct got_error *
 got_path_dirname(char **parent, const char *path)
 {
+	char buf[PATH_MAX];
 	char *p;
 
-	p = dirname(path);
+	if (strlcpy(buf, path, sizeof(buf)) >= sizeof(buf))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	p = dirname(buf);
 	if (p == NULL)
 		return got_error_from_errno2("dirname", path);
 

@@ -101,7 +101,10 @@ const struct got_error *got_path_mkdir(const char *);
 /* Determine whether a directory has no files or directories in it. */
 int got_path_dir_is_empty(const char *);
 
-/* dirname(3) with error handling and dynamically allocated result. */
+/*
+ * dirname(3) with error handling, dynamically allocated result, and
+ * unmodified input.
+ */
 const struct got_error *got_path_dirname(char **, const char *);
 
 /*
