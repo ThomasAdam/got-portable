@@ -1475,10 +1475,12 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	    GOT_DEFAULT_FILE_MODE);
 	if (fd == -1) {
 		if (errno == ENOENT) {
-			char *parent = dirname(path);
-			if (parent == NULL)
-				return got_error_from_errno2("dirname", path);
+			char *parent;
+			err = got_path_dirname(&parent, path);
+			if (err)
+				return err;
 			err = add_dir_on_disk(worktree, parent);
+			free(parent);
 			if (err)
 				return err;
 			fd = open(ondisk_path,
