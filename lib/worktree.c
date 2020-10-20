@@ -1292,12 +1292,15 @@ is_bad_symlink_target(int *is_bad_symlink, const char *target_path,
 	 * in which the blob object is being installed.
 	 */
 	if (!got_path_is_absolute(target_path)) {
-		char *abspath;
-		char *parent = dirname(ondisk_path);
-		if (parent == NULL)
-			return got_error_from_errno2("dirname", ondisk_path);
-		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1)
+		char *abspath, *parent;
+		err = got_path_dirname(&parent, ondisk_path);
+		if (err)
+			return err;
+		if (asprintf(&abspath, "%s/%s",  parent, target_path) == -1) {
+			free(parent);
 			return got_error_from_errno("asprintf");
+		}
+		free(parent);
 		if (strlen(abspath) >= sizeof(canonpath)) {
 			err = got_error_path(abspath, GOT_ERR_BAD_PATH);
 			free(abspath);
