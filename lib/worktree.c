@@ -1124,13 +1124,13 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	const struct got_error *err = NULL;
 	FILE *f_deriv = NULL;
 	char *blob_deriv_path = NULL, *base_path = NULL, *id_str = NULL;
-	char *label_deriv = NULL, *parent;
+	char *label_deriv = NULL, *parent = NULL;
 
 	*local_changes_subsumed = 0;
 
-	parent = dirname(ondisk_path);
-	if (parent == NULL)
-		return got_error_from_errno2("dirname", ondisk_path);
+	err = got_path_dirname(&parent, ondisk_path);
+	if (err)
+		return err;
 
 	free(base_path);
 	if (asprintf(&base_path, "%s/got-merge-blob-deriv", parent) == -1) {
@@ -1169,6 +1169,7 @@ done:
 	}
 	free(id_str);
 	free(label_deriv);
+	free(parent);
 	return err;
 }
 
