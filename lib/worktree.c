@@ -782,18 +782,20 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	char *blob_orig_path = NULL;
 	char *merged_path = NULL, *base_path = NULL;
 	int overlapcnt = 0;
-	char *parent;
+	char *parent = NULL;
 	char *symlink_path = NULL;
 	FILE *symlinkf = NULL;
 
 	*local_changes_subsumed = 0;
 
-	parent = dirname(ondisk_path);
-	if (parent == NULL)
-		return got_error_from_errno2("dirname", ondisk_path);
+	err = got_path_dirname(&parent, ondisk_path);
+	if (err)
+		return err;
 
-	if (asprintf(&base_path, "%s/got-merged", parent) == -1)
-		return got_error_from_errno("asprintf");
+	if (asprintf(&base_path, "%s/got-merged", parent) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	err = got_opentemp_named_fd(&merged_path, &merged_fd, base_path);
 	if (err)
@@ -914,6 +916,7 @@ done:
 		unlink(blob_orig_path);
 		free(blob_orig_path);
 	}
+	free(parent);
 	return err;
 }
 
