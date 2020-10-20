@@ -2052,7 +2052,7 @@ remove_ondisk_file(const char *root_path, const char *path)
 			char *parent;
 			err = got_path_dirname(&parent, ondisk_path);
 			if (err)
-				return err;
+				break;
 			free(ondisk_path);
 			ondisk_path = parent;
 			if (rmdir(ondisk_path) == -1) {
@@ -3919,7 +3919,7 @@ schedule_for_deletion(void *arg, unsigned char status,
 			char *parent;
 			err = got_path_dirname(&parent, ondisk_path);
 			if (err)
-				return err;
+				goto done;
 			free(ondisk_path);
 			ondisk_path = parent;
 			if (rmdir(ondisk_path) == -1) {
