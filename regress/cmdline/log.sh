@@ -138,6 +138,7 @@ test_log_in_worktree_with_path_prefix() {
 
 	echo "modified delta" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "modified delta"
+	local delta_rev=`git_show_head $testroot/repo`
 
 	got checkout -p epsilon $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -146,10 +147,23 @@ test_log_in_worktree_with_path_prefix() {
 		return 1
 	fi
 
+	echo "commit $delta_rev (master)" > $testroot/stdout.expected
+	echo "commit $zeta_rev" >> $testroot/stdout.expected
+	echo "commit $head_rev" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log | grep ^commit > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	echo "commit $zeta_rev" > $testroot/stdout.expected
 	echo "commit $head_rev" >> $testroot/stdout.expected
 
-	for p in "" "." zeta; do
+	for p in "." zeta; do
 		(cd $testroot/wt && got log $p | \
 			grep ^commit > $testroot/stdout)
 		cmp -s $testroot/stdout.expected $testroot/stdout

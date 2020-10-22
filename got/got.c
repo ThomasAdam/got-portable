@@ -3816,13 +3816,7 @@ cmd_log(int argc, char *argv[])
 		error = NULL;
 	}
 
-	if (argc == 0) {
-		path = strdup("");
-		if (path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else if (argc == 1) {
+	if (argc == 1) {
 		if (worktree) {
 			error = got_worktree_resolve_path(&path, worktree,
 			    argv[0]);
@@ -3835,7 +3829,7 @@ cmd_log(int argc, char *argv[])
 				goto done;
 			}
 		}
-	} else
+	} else if (argc != 0)
 		usage_log();
 
 	if (repo_path == NULL) {
@@ -3885,17 +3879,23 @@ cmd_log(int argc, char *argv[])
 	}
 
 	if (worktree) {
-		const char *prefix = got_worktree_get_path_prefix(worktree);
-		char *p;
-		if (asprintf(&p, "%s%s%s", prefix,
-		    (strcmp(prefix, "/") != 0) ? "/" : "", path) == -1) {
-			error = got_error_from_errno("asprintf");
-			goto done;
+		/*
+		 * If a path was specified on the command line it was resolved
+		 * to a path in the work tree above. Prepend the work tree's
+		 * path prefix to obtain the corresponding in-repository path.
+		 */
+		if (path) {
+			const char *prefix;
+			prefix = got_worktree_get_path_prefix(worktree);
+			if (asprintf(&in_repo_path, "%s%s%s", prefix,
+			    (path[0] != '\0') ? "/" : "", path) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
 		}
-		error = got_repo_map_path(&in_repo_path, repo, p, 0);
-		free(p);
 	} else
-		error = got_repo_map_path(&in_repo_path, repo, path, 1);
+		error = got_repo_map_path(&in_repo_path, repo,
+		    path ? path : "", 1);
 	if (error != NULL)
 		goto done;
 	if (in_repo_path) {
@@ -3907,9 +3907,9 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = print_commits(start_id, end_id, repo, path, show_changed_paths,
-	    show_patch, search_pattern, diff_context, limit, log_branches,
-	    reverse_display_order, &refs);
+	error = print_commits(start_id, end_id, repo, path ? path : "",
+	    show_changed_paths, show_patch, search_pattern, diff_context,
+	    limit, log_branches, reverse_display_order, &refs);
 done:
 	free(path);
 	free(repo_path);
