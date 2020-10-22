@@ -824,8 +824,11 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			if (got_repo_is_bare(repo)) {
 				/*
 				 * Matched an on-disk path inside repository
-				 * database. Treat as repository-relative.
+				 * database. Treat input as repository-relative.
 				 */
+				 free(path);
+				 path = canonpath;
+				 canonpath = NULL;
 			} else {
 				char *child;
 				/* Strip common prefix with repository path. */
@@ -839,8 +842,11 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 		} else {
 			/*
 			 * Matched unrelated on-disk path.
-			 * Treat it as repository-relative.
+			 * Treat input as repository-relative.
 			 */
+			 free(path);
+			 path = canonpath;
+			 canonpath = NULL;
 		}
 	}
 
