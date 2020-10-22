@@ -159,6 +159,14 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 	return NULL;
 }
 
+static int
+get_boolean_val(char *val)
+{
+    return (strcasecmp(val, "true") == 0 ||
+	strcasecmp(val, "on") == 0 ||
+	strcasecmp(val, "yes") == 0 ||
+	strcmp(val, "1") == 0);
+}
 
 static const struct got_error *
 gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
@@ -220,11 +228,7 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 		remotes[i].mirror_references = 0;
 		mirror = got_gitconfig_get_str(gitconfig, node->field,
 		    "mirror");
-		if (mirror != NULL &&
-		    (strcasecmp(mirror, "true") == 0 ||
-		    strcasecmp(mirror, "on") == 0 ||
-		    strcasecmp(mirror, "yes") == 0 ||
-		    strcmp(mirror, "1") == 0))
+		if (mirror != NULL && get_boolean_val(mirror))
 			remotes[i].mirror_references = 1;
 
 		i++;
@@ -252,6 +256,48 @@ gitconfig_owner_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 		return send_gitconfig_str(ibuf, value);
 	value = got_gitconfig_get_str(gitconfig, "gitweb", "owner");
 	return send_gitconfig_str(ibuf, value);
+}
+
+static const struct got_error *
+gitconfig_extensions_request(struct imsgbuf *ibuf,
+    struct got_gitconfig *gitconfig)
+{
+	const struct got_error *err = NULL;
+	struct got_gitconfig_list *tags;
+	struct got_gitconfig_list_node *node;
+	int nextensions = 0;
+	char *val;
+
+	if (gitconfig == NULL)
+		return got_error(GOT_ERR_PRIVSEP_MSG);
+
+	tags = got_gitconfig_get_tag_list(gitconfig, "extensions");
+	if (tags == NULL)
+		return send_gitconfig_int(ibuf, 0);
+
+	TAILQ_FOREACH(node, &tags->fields, link) {
+		val = got_gitconfig_get_str(gitconfig, "extensions",
+		    node->field);
+		if (get_boolean_val(val))
+			nextensions++;
+	}
+
+	err = send_gitconfig_int(ibuf, nextensions);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(node, &tags->fields, link) {
+		val = got_gitconfig_get_str(gitconfig, "extensions",
+		    node->field);
+		if (get_boolean_val(val)) {
+			err = send_gitconfig_str(ibuf, node->field);
+			if (err)
+				goto done;
+		}
+	}
+done:
+	got_gitconfig_free_list(tags);
+	return err;
 }
 
 int
@@ -320,6 +366,9 @@ main(int argc, char *argv[])
 		case GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST:
 			err = gitconfig_num_request(&ibuf, gitconfig, "core",
 			    "repositoryformatversion", 0);
+			break;
+		case GOT_IMSG_GITCONFIG_REPOSITORY_EXTENSIONS_REQUEST:
+			err = gitconfig_extensions_request(&ibuf, gitconfig);
 			break;
 		case GOT_IMSG_GITCONFIG_AUTHOR_NAME_REQUEST:
 			err = gitconfig_str_request(&ibuf, gitconfig, "user",

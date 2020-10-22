@@ -144,6 +144,7 @@
 #define GOT_ERR_PARSE_CONFIG	127
 #define GOT_ERR_NO_CONFIG_FILE	128
 #define GOT_ERR_BAD_SYMLINK	129
+#define GOT_ERR_GIT_REPO_EXT	130
 
 static const struct got_error {
 	int code;
@@ -295,6 +296,7 @@ static const struct got_error {
 	{ GOT_ERR_NO_CONFIG_FILE, "configuration file doesn't exit" },
 	{ GOT_ERR_BAD_SYMLINK, "symbolic link points outside of paths under "
 	    "version control" },
+	{ GOT_ERR_GIT_REPO_EXT, "unsupported repository format extension" },
 };
 
 /*

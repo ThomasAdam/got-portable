@@ -377,7 +377,7 @@ static const struct got_error *
 parse_gitconfig_file(int *gitconfig_repository_format_version,
     char **gitconfig_author_name, char **gitconfig_author_email,
     struct got_remote_repo **remotes, int *nremotes,
-    char **gitconfig_owner,
+    char **gitconfig_owner, char ***extensions, int *nextensions,
     const char *gitconfig_path)
 {
 	const struct got_error *err = NULL, *child_err = NULL;
@@ -387,6 +387,10 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 	struct imsgbuf *ibuf;
 
 	*gitconfig_repository_format_version = 0;
+	if (extensions)
+		*extensions = NULL;
+	if (nextensions)
+		*nextensions = 0;
 	*gitconfig_author_name = NULL;
 	*gitconfig_author_email = NULL;
 	if (remotes)
@@ -444,6 +448,32 @@ parse_gitconfig_file(int *gitconfig_repository_format_version,
 	    gitconfig_repository_format_version, ibuf);
 	if (err)
 		goto done;
+
+	if (extensions && nextensions) {
+		err = got_privsep_send_gitconfig_repository_extensions_req(
+		    ibuf);
+		if (err)
+			goto done;
+		err = got_privsep_recv_gitconfig_int(nextensions, ibuf);
+		if (err)
+			goto done;
+		if (*nextensions > 0) {
+			int i;
+			*extensions = calloc(*nextensions, sizeof(char *));
+			if (*extensions == NULL) {
+				err = got_error_from_errno("calloc");
+				goto done;
+			}
+			for (i = 0; i < *nextensions; i++) {
+				char *ext;
+				err = got_privsep_recv_gitconfig_str(&ext,
+				    ibuf);
+				if (err)
+					goto done;
+				(*extensions)[i] = ext;
+			}
+		}
+	}
 
 	err = got_privsep_send_gitconfig_author_name_req(ibuf);
 	if (err)
@@ -509,7 +539,7 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 		err = parse_gitconfig_file(&dummy_repo_version,
 		    &repo->global_gitconfig_author_name,
 		    &repo->global_gitconfig_author_email,
-		    NULL, NULL, NULL, global_gitconfig_path);
+		    NULL, NULL, NULL, NULL, NULL, global_gitconfig_path);
 		if (err)
 			return err;
 	}
@@ -522,7 +552,8 @@ read_gitconfig(struct got_repository *repo, const char *global_gitconfig_path)
 	err = parse_gitconfig_file(&repo->gitconfig_repository_format_version,
 	    &repo->gitconfig_author_name, &repo->gitconfig_author_email,
 	    &repo->gitconfig_remotes, &repo->ngitconfig_remotes,
-	    &repo->gitconfig_owner, repo_gitconfig_path);
+	    &repo->gitconfig_owner, &repo->extensions, &repo->nextensions,
+	    repo_gitconfig_path);
 	if (err)
 		goto done;
 done:
@@ -544,6 +575,13 @@ read_gotconfig(struct got_repository *repo)
 	free(gotconfig_path);
 	return err;
 }
+
+/* Supported repository format extensions. */
+static const char *repo_extensions[] = {
+	"noop",			/* Got supports repository format version 1. */
+	"preciousObjects",	/* Got has no garbage collection yet. */
+	"worktreeConfig",	/* Got does not care about Git work trees. */
+};
 
 const struct got_error *
 got_repo_open(struct got_repository **repop, const char *path,
@@ -626,6 +664,20 @@ got_repo_open(struct got_repository **repop, const char *path,
 		goto done;
 	if (repo->gitconfig_repository_format_version != 0)
 		err = got_error_path(path, GOT_ERR_GIT_REPO_FORMAT);
+	for (i = 0; i < repo->nextensions; i++) {
+		char *ext = repo->extensions[i];
+		int j, supported = 0;
+		for (j = 0; j < nitems(repo_extensions); j++) {
+			if (strcmp(ext, repo_extensions[j]) == 0) {
+				supported = 1;
+				break;
+			}
+		}
+		if (!supported) {
+			err = got_error_path(ext, GOT_ERR_GIT_REPO_EXT);
+			goto done;
+		}
+	}
 done:
 	if (err)
 		got_repo_close(repo);
@@ -684,6 +736,9 @@ got_repo_close(struct got_repository *repo)
 	for (i = 0; i < repo->ngitconfig_remotes; i++)
 		got_repo_free_remote_repo_data(&repo->gitconfig_remotes[i]);
 	free(repo->gitconfig_remotes);
+	for (i = 0; i < repo->nextensions; i++)
+		free(repo->extensions[i]);
+	free(repo->extensions);
 	free(repo);
 
 	return err;

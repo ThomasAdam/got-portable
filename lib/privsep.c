@@ -1672,6 +1672,19 @@ got_privsep_send_gitconfig_repository_format_version_req(struct imsgbuf *ibuf)
 }
 
 const struct got_error *
+got_privsep_send_gitconfig_repository_extensions_req(struct imsgbuf *ibuf)
+{
+	if (imsg_compose(ibuf,
+	    GOT_IMSG_GITCONFIG_REPOSITORY_EXTENSIONS_REQUEST, 0, 0, -1,
+	    NULL, 0) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "GITCONFIG_REPOSITORY_EXTENSIONS_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+
+const struct got_error *
 got_privsep_send_gitconfig_author_name_req(struct imsgbuf *ibuf)
 {
 	if (imsg_compose(ibuf,

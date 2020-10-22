@@ -756,6 +756,34 @@ test_checkout_symlink_relative_wtpath() {
 	test_done "$testroot" "$ret"
 }
 
+test_checkout_repo_with_unknown_extension() {
+	local testroot=`test_init checkout_repo_with_unknown_extension`
+
+	(cd $testroot/repo &&
+	    git config --add extensions.badExtension true)
+	(cd $testroot/repo &&
+	    git config --add extensions.otherBadExtension 0)
+
+	echo "got: badExtension: unsupported repository format extension" \
+		> $testroot/stderr.expected
+	got checkout $testroot/repo $testroot/wt \
+		> $testroot/stdout 2> $testroot/stderr
+
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got checkout command succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
@@ -768,3 +796,4 @@ run_test test_checkout_read_only
 run_test test_checkout_into_nonempty_dir
 run_test test_checkout_symlink
 run_test test_checkout_symlink_relative_wtpath
+run_test test_checkout_repo_with_unknown_extension

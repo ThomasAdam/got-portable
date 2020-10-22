@@ -141,6 +141,7 @@ enum got_imsg_type {
 	/* Messages related to gitconfig files. */
 	GOT_IMSG_GITCONFIG_PARSE_REQUEST,
 	GOT_IMSG_GITCONFIG_REPOSITORY_FORMAT_VERSION_REQUEST,
+	GOT_IMSG_GITCONFIG_REPOSITORY_EXTENSIONS_REQUEST,
 	GOT_IMSG_GITCONFIG_AUTHOR_NAME_REQUEST,
 	GOT_IMSG_GITCONFIG_AUTHOR_EMAIL_REQUEST,
 	GOT_IMSG_GITCONFIG_REMOTES_REQUEST,
@@ -460,6 +461,8 @@ const struct got_error *got_privsep_send_gitconfig_parse_req(struct imsgbuf *,
     int);
 const struct got_error *
     got_privsep_send_gitconfig_repository_format_version_req(struct imsgbuf *);
+const struct got_error *got_privsep_send_gitconfig_repository_extensions_req(
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_author_name_req(
     struct imsgbuf *);
 const struct got_error *got_privsep_send_gitconfig_author_email_req(

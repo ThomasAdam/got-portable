@@ -64,6 +64,8 @@ struct got_repository {
 	int ngitconfig_remotes;
 	struct got_remote_repo *gitconfig_remotes;
 	char *gitconfig_owner;
+	char **extensions;
+	int nextensions;
 
 	/* Settings read from got.conf. */
 	struct got_gotconfig *gotconfig;
