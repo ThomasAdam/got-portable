@@ -3297,10 +3297,12 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 		err = got_object_id_str(&id_str2, obj_id2);
 		if (err)
 			goto done;
-		obj_id1 = got_object_commit_get_tree_id(pcommit);
-		err = got_object_id_str(&id_str1, obj_id1);
-		if (err)
-			goto done;
+		if (pcommit) {
+			obj_id1 = got_object_commit_get_tree_id(pcommit);
+			err = got_object_id_str(&id_str1, obj_id1);
+			if (err)
+				goto done;
+		}
 		printf("diff %s %s\n", id_str1 ? id_str1 : "/dev/null", id_str2);
 		err = diff_trees(obj_id1, obj_id2, "", diff_context, 0, repo);
 	}
