@@ -800,6 +800,15 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	free(tmpidxpath);
 	tmpidxpath = NULL;
 
+	if (chmod(packpath, GOT_DEFAULT_FILE_MODE) != 0) {
+		err = got_error_from_errno2("chmod", packpath);
+		goto done;
+	}
+	if (chmod(idxpath, GOT_DEFAULT_FILE_MODE) != 0) {
+		err = got_error_from_errno2("chmod", idxpath);
+		goto done;
+	}
+
 done:
 	if (tmppackpath && unlink(tmppackpath) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", tmppackpath);
