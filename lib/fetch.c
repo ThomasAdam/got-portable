@@ -498,6 +498,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		free(path);
 		if (err)
 			goto done;
+		if (fchmod(packfd, GOT_DEFAULT_FILE_MODE) != 0) {
+			err = got_error_from_errno2("fchmod", tmppackpath);
+			goto done;
+		}
 	}
 	if (list_refs_only) {
 		idxfd = got_opentempfd();
@@ -515,6 +519,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		free(path);
 		if (err)
 			goto done;
+		if (fchmod(idxfd, GOT_DEFAULT_FILE_MODE) != 0) {
+			err = got_error_from_errno2("fchmod", tmpidxpath);
+			goto done;
+		}
 	}
 	nidxfd = dup(idxfd);
 	if (nidxfd == -1) {
@@ -799,15 +807,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	}
 	free(tmpidxpath);
 	tmpidxpath = NULL;
-
-	if (chmod(packpath, GOT_DEFAULT_FILE_MODE) != 0) {
-		err = got_error_from_errno2("chmod", packpath);
-		goto done;
-	}
-	if (chmod(idxpath, GOT_DEFAULT_FILE_MODE) != 0) {
-		err = got_error_from_errno2("chmod", idxpath);
-		goto done;
-	}
 
 done:
 	if (tmppackpath && unlink(tmppackpath) == -1 && err == NULL)
