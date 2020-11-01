@@ -968,6 +968,11 @@ install_symlink_conflict(const char *deriv_target,
 	if (err)
 		goto done;
 
+	if (fchmod(fileno(f), GOT_DEFAULT_FILE_MODE) == -1) {
+		err = got_error_from_errno2("fchmod", path);
+		goto done;
+	}
+
 	if (fprintf(f, "%s %s\n%s\n%s%s%s%s%s\n%s\n%s\n",
 	    GOT_DIFF_CONFLICT_MARKER_BEGIN, label_deriv,
 	    deriv_target ? deriv_target : "(symlink was deleted)",
@@ -987,10 +992,6 @@ install_symlink_conflict(const char *deriv_target,
 	}
 	if (rename(path, ondisk_path) == -1) {
 		err = got_error_from_errno3("rename", path, ondisk_path);
-		goto done;
-	}
-	if (chmod(ondisk_path, GOT_DEFAULT_FILE_MODE) == -1) {
-		err = got_error_from_errno2("chmod", ondisk_path);
 		goto done;
 	}
 done:
@@ -1511,6 +1512,12 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			return got_error_from_errno2("open", ondisk_path);
 	}
 
+	if (fchmod(fd, get_ondisk_perms(te_mode & S_IXUSR, st_mode)) == -1) {
+		err = got_error_from_errno2("fchmod",
+		    update ? tmppath : ondisk_path);
+		goto done;
+	}
+
 	if (progress_cb) {
 		if (restoring_missing_file)
 			err = (*progress_cb)(progress_arg, GOT_STATUS_MISSING,
@@ -1557,12 +1564,6 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 			unlink(tmppath);
 			goto done;
 		}
-	}
-
-	if (chmod(ondisk_path,
-	    get_ondisk_perms(te_mode & S_IXUSR, st_mode)) == -1) {
-		err = got_error_from_errno2("chmod", ondisk_path);
-		goto done;
 	}
 
 done:
@@ -4332,8 +4333,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 			goto done;
 
 		if (!S_ISLNK(sb2.st_mode)) {
-			if (chmod(*path_outfile, sb2.st_mode) == -1) {
-				err = got_error_from_errno2("chmod", path2);
+			if (fchmod(fileno(outfile), sb2.st_mode) == -1) {
+				err = got_error_from_errno2("fchmod", path2);
 				goto done;
 			}
 		}

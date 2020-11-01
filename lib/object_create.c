@@ -78,6 +78,11 @@ create_object_file(struct got_object_id *id, FILE *content,
 			goto done;
 	}
 
+	if (fchmod(fileno(tmpfile), GOT_DEFAULT_FILE_MODE) != 0) {
+		err = got_error_from_errno2("fchmod", tmppath);
+		goto done;
+	}
+
 	err = got_deflate_to_file(&tmplen, content, tmpfile);
 	if (err)
 		goto done;
@@ -92,11 +97,6 @@ create_object_file(struct got_object_id *id, FILE *content,
 	}
 	free(tmppath);
 	tmppath = NULL;
-
-	if (chmod(objpath, GOT_DEFAULT_FILE_MODE) != 0) {
-		err = got_error_from_errno2("chmod", objpath);
-		goto done;
-	}
 done:
 	free(objpath);
 	if (tmppath) {

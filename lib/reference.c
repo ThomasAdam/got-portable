@@ -1140,17 +1140,17 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	}
 
+	if (fchmod(fileno(f), sb.st_mode) != 0) {
+		err = got_error_from_errno2("fchmod", tmppath);
+		goto done;
+	}
+
 	if (rename(tmppath, path) != 0) {
 		err = got_error_from_errno3("rename", tmppath, path);
 		goto done;
 	}
 	free(tmppath);
 	tmppath = NULL;
-
-	if (chmod(path, sb.st_mode) != 0) {
-		err = got_error_from_errno2("chmod", path);
-		goto done;
-	}
 done:
 	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
@@ -1276,23 +1276,22 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			goto done;
 		}
 
-		if (stat(packed_refs_path, &sb) != 0) {
+		if (fstat(fileno(f), &sb) != 0) {
 			if (errno != ENOENT) {
-				err = got_error_from_errno2("stat",
+				err = got_error_from_errno2("fstat",
 				    packed_refs_path);
 				goto done;
 			}
 			sb.st_mode = GOT_DEFAULT_FILE_MODE;
 		}
 
-		if (rename(tmppath, packed_refs_path) != 0) {
-			err = got_error_from_errno3("rename", tmppath,
-			    packed_refs_path);
+		if (fchmod(fileno(tmpf), sb.st_mode) != 0) {
+			err = got_error_from_errno2("fchmod", tmppath);
 			goto done;
 		}
 
-		if (chmod(packed_refs_path, sb.st_mode) != 0) {
-			err = got_error_from_errno2("chmod",
+		if (rename(tmppath, packed_refs_path) != 0) {
+			err = got_error_from_errno3("rename", tmppath,
 			    packed_refs_path);
 			goto done;
 		}
