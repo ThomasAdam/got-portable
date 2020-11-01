@@ -471,7 +471,7 @@ test_log_end_at_commit() {
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
-	echo "got: nonexistent: bad object id string" \
+	echo "got: reference nonexistent not found" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"

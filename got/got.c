@@ -3676,54 +3676,6 @@ get_default_log_limit(void)
 }
 
 static const struct got_error *
-resolve_commit_arg(struct got_object_id **id, const char *commit_arg,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_reference *ref;
-
-	*id = NULL;
-
-	err = got_ref_open(&ref, repo, commit_arg, 0);
-	if (err == NULL) {
-		int obj_type;
-		err = got_ref_resolve(id, repo, ref);
-		got_ref_close(ref);
-		if (err)
-			return err;
-		err = got_object_get_type(&obj_type, repo, *id);
-		if (err)
-			return err;
-		if (obj_type == GOT_OBJ_TYPE_TAG) {
-			struct got_tag_object *tag;
-			err = got_object_open_as_tag(&tag, repo, *id);
-			if (err)
-				return err;
-			if (got_object_tag_get_object_type(tag) !=
-			    GOT_OBJ_TYPE_COMMIT) {
-				got_object_tag_close(tag);
-				return got_error(GOT_ERR_OBJ_TYPE);
-			}
-			free(*id);
-			*id = got_object_id_dup(
-			    got_object_tag_get_object_id(tag));
-			if (*id == NULL)
-				err = got_error_from_errno(
-				    "got_object_id_dup");
-			got_object_tag_close(tag);
-			if (err)
-				return err;
-		} else if (obj_type != GOT_OBJ_TYPE_COMMIT)
-			return got_error(GOT_ERR_OBJ_TYPE);
-	} else {
-		err = got_repo_match_object_id_prefix(id, commit_arg,
-		    GOT_OBJ_TYPE_COMMIT, repo);
-	}
-
-	return err;
-}
-
-static const struct got_error *
 cmd_log(int argc, char *argv[])
 {
 	const struct got_error *error;
@@ -3870,12 +3822,14 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		got_object_commit_close(commit);
 	} else {
-		error = resolve_commit_arg(&start_id, start_commit, repo);
+		error = got_repo_match_object_id(&start_id, NULL,
+		    start_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error != NULL)
 			goto done;
 	}
 	if (end_commit != NULL) {
-		error = resolve_commit_arg(&end_id, end_commit, repo);
+		error = got_repo_match_object_id(&end_id, NULL,
+		    end_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
 		if (error != NULL)
 			goto done;
 	}
