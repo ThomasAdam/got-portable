@@ -4503,24 +4503,26 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
-	if (error)
-		goto done;
-
 	if (worktree) {
 		const char *prefix = got_worktree_get_path_prefix(worktree);
-		char *p, *worktree_subdir = cwd +
-		    strlen(got_worktree_get_root_path(worktree));
-		if (asprintf(&p, "%s%s%s%s%s",
-		    prefix, (strcmp(prefix, "/") != 0) ? "/" : "",
-		    worktree_subdir, worktree_subdir[0] ? "/" : "",
-		    path) == -1) {
+		char *p;
+
+		error = got_worktree_resolve_path(&p, worktree, path);
+		if (error)
+			goto done;
+		if (asprintf(&in_repo_path, "%s%s%s", prefix,
+		    (p[0] != '\0' && !got_path_is_root_dir(prefix)) ? "/" : "",
+		    p) == -1) {
 			error = got_error_from_errno("asprintf");
+			free(p);
 			goto done;
 		}
-		error = got_repo_map_path(&in_repo_path, repo, p, 0);
 		free(p);
+		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 	} else {
+		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+		if (error)
+			goto done;
 		error = got_repo_map_path(&in_repo_path, repo, path, 1);
 	}
 	if (error)

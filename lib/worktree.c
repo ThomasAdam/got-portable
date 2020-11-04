@@ -3625,6 +3625,8 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 	char *resolved = NULL, *cwd = NULL, *path = NULL;
 	size_t len;
 	struct stat sb;
+	char *abspath = NULL;
+	char canonpath[PATH_MAX];
 
 	*wt_path = NULL;
 
@@ -3645,8 +3647,6 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 		 * But we can make the path absolute, assuming it is relative
 		 * to the current working directory, and then canonicalize it.
 		 */
-		char *abspath = NULL;
-		char canonpath[PATH_MAX];
 		if (!got_path_is_absolute(arg)) {
 			if (asprintf(&abspath, "%s/%s", cwd, arg) == -1) {
 				err = got_error_from_errno("asprintf");
@@ -3670,8 +3670,17 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 				err = got_error_from_errno2("realpath", arg);
 				goto done;
 			}
-			if (asprintf(&resolved, "%s/%s", cwd, arg) == -1) {
+			if (asprintf(&abspath, "%s/%s", cwd, arg) == -1) {
 				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			err = got_canonpath(abspath, canonpath,
+			    sizeof(canonpath));
+			if (err)
+				goto done;
+			resolved = strdup(canonpath);
+			if (resolved == NULL) {
+				err = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
@@ -3703,6 +3712,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 		len--;
 	}
 done:
+	free(abspath);
 	free(resolved);
 	free(cwd);
 	if (err == NULL)
