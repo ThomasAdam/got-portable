@@ -3639,6 +3639,7 @@ got_worktree_resolve_path(char **wt_path, struct got_worktree *worktree,
 			err = got_error_from_errno2("lstat", arg);
 			goto done;
 		}
+		sb.st_mode = 0;
 	}
 	if (S_ISLNK(sb.st_mode)) {
 		/*
