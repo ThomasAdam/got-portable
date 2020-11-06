@@ -385,8 +385,45 @@ test_integrate_backwards_in_time() {
 	test_done "$testroot" "$ret"
 }
 
+test_integrate_obstructed_symlink() {
+	local testroot=`test_init update_replace_symlink`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && ln -s alpha alpha.link)
+	(cd $testroot/wt && got add alpha alpha.link >/dev/null)
+	(cd $testroot/wt && got commit -m "add regular file and symlink" \
+		>/dev/null)
+
+	(cd $testroot/wt && got br replace_symlink >/dev/null)
+	(cd $testroot/wt && rm alpha.link >/dev/null)
+	(cd $testroot/wt && cp alpha alpha.link)
+	(cd $testroot/wt && got stage alpha.link >/dev/null)
+	(cd $testroot/wt && got commit -m "replace symlink" >/dev/null)
+
+	(cd $testroot/wt && got up -b master >/dev/null)
+	(cd $testroot/wt && got integrate replace_symlink \
+		2> $testroot/stderr)
+
+	echo "got: $testroot/wt/alpha.link: file is obstructed" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_integrate_basic
 run_test test_integrate_requires_rebase_first
 run_test test_integrate_path_prefix
 run_test test_integrate_backwards_in_time
+run_test test_integrate_obstructed_symlink
