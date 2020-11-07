@@ -4830,28 +4830,32 @@ cmd_tree(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path(repo), 1, NULL);
-	if (error)
-		goto done;
+	if (worktree) {
+		const char *prefix = got_worktree_get_path_prefix(worktree);
+		char *p;
 
-	if (path == NULL) {
-		if (worktree) {
-			char *p, *worktree_subdir = cwd +
-			    strlen(got_worktree_get_root_path(worktree));
-			if (asprintf(&p, "%s/%s",
-			    got_worktree_get_path_prefix(worktree),
-			    worktree_subdir) == -1) {
-				error = got_error_from_errno("asprintf");
-				goto done;
-			}
-			error = got_repo_map_path(&in_repo_path, repo, p, 0);
+		if (path == NULL)
+			path = "";
+		error = got_worktree_resolve_path(&p, worktree, path);
+		if (error)
+			goto done;
+		if (asprintf(&in_repo_path, "%s%s%s", prefix,
+		    (p[0] != '\0' && !got_path_is_root_dir(prefix)) ?  "/" : "",
+		    p) == -1) {
+			error = got_error_from_errno("asprintf");
 			free(p);
-			if (error)
-				goto done;
-		} else
+			goto done;
+		}
+		free(p);
+		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+		if (error)
+			goto done;
+	} else {
+		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
+		if (error)
+			goto done;
+		if (path == NULL)
 			path = "/";
-	}
-	if (in_repo_path == NULL) {
 		error = got_repo_map_path(&in_repo_path, repo, path, 1);
 		if (error != NULL)
 			goto done;
