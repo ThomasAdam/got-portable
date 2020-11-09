@@ -4679,7 +4679,6 @@ main(int argc, char *argv[])
 	struct gw_trans *gw_trans;
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
-	int gw_malloc = 1;
 	enum kcgi_err kerr = KCGI_OK;
 
 	if ((gw_trans = malloc(sizeof(struct gw_trans))) == NULL)
@@ -4732,33 +4731,30 @@ main(int argc, char *argv[])
 	else
 		error = gw_display_index(gw_trans);
 done:
-	if (gw_malloc) {
-		free(gw_trans->gw_conf->got_repos_path);
-		free(gw_trans->gw_conf->got_www_path);
-		free(gw_trans->gw_conf->got_site_name);
-		free(gw_trans->gw_conf->got_site_owner);
-		free(gw_trans->gw_conf->got_site_link);
-		free(gw_trans->gw_conf->got_logo);
-		free(gw_trans->gw_conf->got_logo_url);
-		free(gw_trans->gw_conf);
-		free(gw_trans->commit_id);
-		free(gw_trans->next_id);
-		free(gw_trans->next_prev_id);
-		free(gw_trans->prev_id);
-		free(gw_trans->prev_prev_id);
-		free(gw_trans->repo_path);
-		if (gw_trans->repo)
-			got_repo_close(gw_trans->repo);
+	free(gw_trans->gw_conf->got_repos_path);
+	free(gw_trans->gw_conf->got_www_path);
+	free(gw_trans->gw_conf->got_site_name);
+	free(gw_trans->gw_conf->got_site_owner);
+	free(gw_trans->gw_conf->got_site_link);
+	free(gw_trans->gw_conf->got_logo);
+	free(gw_trans->gw_conf->got_logo_url);
+	free(gw_trans->gw_conf);
+	free(gw_trans->commit_id);
+	free(gw_trans->next_id);
+	free(gw_trans->next_prev_id);
+	free(gw_trans->prev_id);
+	free(gw_trans->prev_prev_id);
+	free(gw_trans->repo_path);
+	if (gw_trans->repo)
+		got_repo_close(gw_trans->repo);
 
-		TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
-			free(dir->name);
-			free(dir->description);
-			free(dir->age);
-			free(dir->url);
-			free(dir->path);
-			free(dir);
-		}
-
+	TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
+		free(dir->name);
+		free(dir->description);
+		free(dir->age);
+		free(dir->url);
+		free(dir->path);
+		free(dir);
 	}
 
 	khttp_free(gw_trans->gw_req);
