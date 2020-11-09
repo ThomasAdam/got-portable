@@ -88,7 +88,7 @@ typedef struct {
 %token	GOT_WWW_PATH GOT_MAX_REPOS GOT_SITE_NAME GOT_SITE_OWNER GOT_SITE_LINK
 %token	GOT_LOGO GOT_LOGO_URL GOT_SHOW_REPO_OWNER GOT_SHOW_REPO_AGE
 %token	GOT_SHOW_REPO_DESCRIPTION GOT_MAX_REPOS_DISPLAY GOT_REPOS_PATH
-%token	GOT_MAX_COMMITS_DISPLAY ON ERROR GOT_SHOW_SITE_OWNER
+%token	GOT_MAX_COMMITS_DISPLAY ERROR GOT_SHOW_SITE_OWNER
 %token	GOT_SHOW_REPO_CLONEURL
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
@@ -102,6 +102,7 @@ grammar		: /* empty */
 
 boolean		: STRING {
 			if (strcasecmp($1, "true") == 0 ||
+			    strcasecmp($1, "on") == 0 ||
 			    strcasecmp($1, "yes") == 0)
 				$$ = 1;
 			else if (strcasecmp($1, "false") == 0 ||
@@ -115,7 +116,6 @@ boolean		: STRING {
 			}
 			free($1);
 		}
-		| ON { $$ = 1; }
 		;
 main		: GOT_REPOS_PATH STRING {
 			gw_conf->got_repos_path = strdup($2);
