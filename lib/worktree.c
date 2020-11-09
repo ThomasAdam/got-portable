@@ -1561,14 +1561,17 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 		if (rename(tmppath, ondisk_path) != 0) {
 			err = got_error_from_errno3("rename", tmppath,
 			    ondisk_path);
-			unlink(tmppath);
 			goto done;
 		}
+		free(tmppath);
+		tmppath = NULL;
 	}
 
 done:
 	if (fd != -1 && close(fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
+	if (tmppath != NULL && unlink(tmppath) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", tmppath);
 	free(tmppath);
 	return err;
 }
