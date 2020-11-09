@@ -1496,7 +1496,8 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 				    GOT_STATUS_UNVERSIONED, path);
 				goto done;
 			}
-			if (!S_ISREG(st_mode) && !installing_bad_symlink) {
+			if (!(S_ISLNK(st_mode) && S_ISREG(te_mode)) &&
+			    !S_ISREG(st_mode) && !installing_bad_symlink) {
 				/* TODO file is obstructed; do something */
 				err = got_error_path(ondisk_path,
 				    GOT_ERR_FILE_OBSTRUCTED);
@@ -1558,6 +1559,10 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	}
 
 	if (update) {
+		if (S_ISLNK(st_mode) && unlink(ondisk_path) == -1) {
+			err = got_error_from_errno2("unlink", ondisk_path);
+			goto done;
+		}
 		if (rename(tmppath, ondisk_path) != 0) {
 			err = got_error_from_errno3("rename", tmppath,
 			    ondisk_path);

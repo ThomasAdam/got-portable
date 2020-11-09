@@ -385,8 +385,8 @@ test_integrate_backwards_in_time() {
 	test_done "$testroot" "$ret"
 }
 
-test_integrate_obstructed_symlink() {
-	local testroot=`test_init update_replace_symlink`
+test_integrate_replace_symlink_with_file() {
+	local testroot=`test_init integrate_replace_symlink_with_file`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -401,22 +401,90 @@ test_integrate_obstructed_symlink() {
 	(cd $testroot/wt && got commit -m "add regular file and symlink" \
 		>/dev/null)
 
-	(cd $testroot/wt && got br replace_symlink >/dev/null)
+	(cd $testroot/wt && got br replace_symlink_with_file >/dev/null)
 	(cd $testroot/wt && rm alpha.link >/dev/null)
 	(cd $testroot/wt && cp alpha alpha.link)
 	(cd $testroot/wt && got stage alpha.link >/dev/null)
 	(cd $testroot/wt && got commit -m "replace symlink" >/dev/null)
 
 	(cd $testroot/wt && got up -b master >/dev/null)
-	(cd $testroot/wt && got integrate replace_symlink \
-		2> $testroot/stderr)
+	(cd $testroot/wt && got integrate replace_symlink_with_file \
+		> $testroot/stdout)
 
-	echo "got: $testroot/wt/alpha.link: file is obstructed" \
-		> $testroot/stderr.expected
-	cmp -s $testroot/stderr.expected $testroot/stderr
+	echo "U  alpha.link" > $testroot/stdout.expected
+	echo -n "Integrated refs/heads/replace_symlink_with_file " \
+		>> $testroot/stdout.expected
+	echo "into refs/heads/master" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		diff -u $testroot/stderr.expected $testroot/stderr
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -h $testroot/wt/alpha.link ]; then
+		echo "alpha.link is still a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha.link > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_integrate_replace_file_with_symlink() {
+	local testroot=`test_init integrate_replace_file_with_symlink`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got br replace_file_with_symlink >/dev/null)
+	(cd $testroot/wt && rm alpha)
+	(cd $testroot/wt && ln -s beta alpha)
+	(cd $testroot/wt && got commit -m "replace regular file with symlink" \
+		>/dev/null)
+
+	(cd $testroot/wt && got up -b master >/dev/null)
+	(cd $testroot/wt && got integrate replace_file_with_symlink \
+		> $testroot/stdout)
+
+	echo "U  alpha" > $testroot/stdout.expected
+	echo -n "Integrated refs/heads/replace_file_with_symlink " \
+		>> $testroot/stdout.expected
+	echo "into refs/heads/master" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/alpha ]; then
+		echo "alpha is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/alpha > $testroot/stdout
+	echo "beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -426,4 +494,5 @@ run_test test_integrate_basic
 run_test test_integrate_requires_rebase_first
 run_test test_integrate_path_prefix
 run_test test_integrate_backwards_in_time
-run_test test_integrate_obstructed_symlink
+run_test test_integrate_replace_symlink_with_file
+run_test test_integrate_replace_file_with_symlink
