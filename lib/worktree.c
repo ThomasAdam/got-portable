@@ -5287,6 +5287,7 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 			    ct->staged_status == GOT_STATUS_MODIFY) {
 				got_fileindex_entry_stage_set(ie,
 				    GOT_FILEIDX_STAGE_NONE);
+				got_fileindex_entry_staged_filetype_set(ie, 0);
 				err = got_fileindex_entry_update(ie,
 				    ct->ondisk_path, ct->staged_blob_id->sha1,
 				    new_base_commit_id->sha1,
@@ -7602,8 +7603,10 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 	if (new_staged_blob_id) {
 		memcpy(ie->staged_blob_sha1, new_staged_blob_id->sha1,
 		    SHA1_DIGEST_LENGTH);
-	} else
+	} else {
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
+		got_fileindex_entry_staged_filetype_set(ie, 0);
+	}
 done:
 	free(new_staged_blob_id);
 	if (path_unstaged_content &&
@@ -7724,9 +7727,11 @@ unstage_path(void *arg, unsigned char status,
 			err = got_error_path(relpath, GOT_ERR_BAD_FILETYPE);
 			break;
 		}
-		if (err == NULL)
+		if (err == NULL) {
 			got_fileindex_entry_stage_set(ie,
 			    GOT_FILEIDX_STAGE_NONE);
+			got_fileindex_entry_staged_filetype_set(ie, 0);
+		}
 		break;
 	case GOT_STATUS_DELETE:
 		if (a->patch_cb) {
@@ -7743,6 +7748,7 @@ unstage_path(void *arg, unsigned char status,
 			}
 		}
 		got_fileindex_entry_stage_set(ie, GOT_FILEIDX_STAGE_NONE);
+		got_fileindex_entry_staged_filetype_set(ie, 0);
 		err = get_file_status(&status, &sb, ie, ondisk_path,
 		    dirfd, de_name, a->repo);
 		if (err)
