@@ -1,3 +1,15 @@
+* got 0.44; 2020-11-20
+- detect unknown repository format extensions such as Git's sha256 extension
+- prevent a NULL dereference if 'got log -p' runs against a root commit
+- fix permissions mode bits for fetched pack files; patch by Alisdair MacLeod
+- use fchmod(2) instead of chmod(2) (semarie, naddy)
+- initialize sb.st_mode after stat(2) failure in got_worktree_resolve_path()
+- clear staged file type in file index entries whenever staged status is cleared
+- unlink temporary files in error cases of install_blob()
+- fix replacing a file with a symlink during merges; problem found by jrick
+- fix parsing of 'ON' keyword in gotweb parse.yl patch by Martin Vahlensieck
+- remove unused variable in gotweb.c; patch by Martin Vahlensieck
+
 * got 0.43; 2020-10-21
 - do not treat the -h and -V flags as errors (naddy)
 - allow regress test data to be stored in locations other than /tmp
