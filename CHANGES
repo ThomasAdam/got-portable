@@ -7,7 +7,7 @@
 - clear staged file type in file index entries whenever staged status is cleared
 - unlink temporary files in error cases of install_blob()
 - fix replacing a file with a symlink during merges; problem found by jrick
-- fix parsing of 'ON' keyword in gotweb parse.yl patch by Martin Vahlensieck
+- fix parsing of 'ON' keyword in gotweb parse.y; patch by Martin Vahlensieck
 - remove unused variable in gotweb.c; patch by Martin Vahlensieck
 
 * got 0.43; 2020-10-21
