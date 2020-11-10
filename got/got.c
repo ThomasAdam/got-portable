@@ -3141,8 +3141,8 @@ diff_blobs(struct got_object_id *blob_id1, struct got_object_id *blob_id2,
 
 	while (path[0] == '/')
 		path++;
-	err = got_diff_blob(blob1, blob2, path, path, diff_context,
-	    ignore_whitespace, stdout);
+	err = got_diff_blob(NULL, NULL, blob1, blob2, path, path,
+	    diff_context, ignore_whitespace, stdout);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -3172,6 +3172,8 @@ diff_trees(struct got_object_id *tree_id1, struct got_object_id *tree_id2,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.outfile = stdout;
+	arg.line_offsets = NULL;
+	arg.nlines = 0;
 	while (path[0] == '/')
 		path++;
 	err = got_diff_tree(tree1, tree2, path, path, repo,
@@ -4000,9 +4002,9 @@ print_diff(void *arg, unsigned char status, unsigned char staged_status,
 		default:
 			return got_error(GOT_ERR_FILE_STATUS);
 		}
-		return got_diff_objects_as_blobs(blob_id, staged_blob_id,
-		    label1, label2, a->diff_context, a->ignore_whitespace,
-		    a->repo, stdout);
+		return got_diff_objects_as_blobs(NULL, NULL, blob_id,
+		    staged_blob_id, label1, label2, a->diff_context,
+		    a->ignore_whitespace, a->repo, stdout);
 	}
 
 	if (staged_status == GOT_STATUS_ADD ||
@@ -4264,17 +4266,18 @@ cmd_diff(int argc, char *argv[])
 
 	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(id1, id2, NULL, NULL,
-		    diff_context, ignore_whitespace, repo, stdout);
+		error = got_diff_objects_as_blobs(NULL, NULL, id1, id2,
+		    NULL, NULL, diff_context, ignore_whitespace, repo,
+		    stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(id1, id2, "", "",
-		    diff_context, ignore_whitespace, repo, stdout);
+		error = got_diff_objects_as_trees(NULL, NULL, id1, id2,
+		    "", "", diff_context, ignore_whitespace, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", label1, label2);
-		error = got_diff_objects_as_commits(id1, id2, diff_context,
-		    ignore_whitespace, repo, stdout);
+		error = got_diff_objects_as_commits(NULL, NULL, id1, id2,
+		    diff_context, ignore_whitespace, repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);

@@ -202,9 +202,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	const struct got_error *err = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
 	char *outpath = NULL;
-	struct got_diff_state ds;
-	struct got_diff_args args;
-	int res;
+	struct got_diffreg_result *diffreg_result = NULL;
 
 	*d = NULL;
 
@@ -224,25 +222,13 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	if (err)
 		goto done;
 
-	memset(&ds, 0, sizeof(ds));
-	/* XXX should stat buffers be passed in args instead of ds? */
-	if (stat(path1, &ds.stb1) == -1) {
-		err = got_error_from_errno2("stat", path1);
+	err = got_diffreg(&diffreg_result, f1, f2,
+	    GOT_DIFF_ALGORITHM_PATIENCE, 0);
+	if (err)
 		goto done;
-	}
-	if (stat(path2, &ds.stb2) == -1) {
-		err = got_error_from_errno2("stat", path2);
-		goto done;
-	}
 
-	memset(&args, 0, sizeof(args));
-	args.diff_format = D_NORMAL;
-	args.label[0] = "";
-	args.label[1] = "";
-	args.diff_context = 0;
-
-	err = got_diffreg(&res, f1, f2, D_FORCEASCII, &args, &ds,
-	    outfile, NULL);
+	err = got_diffreg_output(NULL, NULL, diffreg_result, f1, f2, "", "",
+	    GOT_DIFF_OUTPUT_EDSCRIPT, 0, outfile);
 	if (err)
 		goto done;
 

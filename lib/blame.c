@@ -15,10 +15,12 @@
  */
 
 #include <sys/queue.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 
 #include <sha1.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -38,6 +40,10 @@
 #include "got_lib_object.h"
 #include "got_lib_diff.h"
 
+#ifndef MAX
+#define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
+#endif
+
 struct got_blame_line {
 	int annotated;
 	struct got_object_id id;
@@ -45,6 +51,10 @@ struct got_blame_line {
 
 struct got_blame {
 	FILE *f;
+	char *map;
+	struct diff_data left_data;
+	struct diff_data right_data;
+	const struct diff_config *cfg;
 	size_t filesize;
 	int nlines;
 	int nannotated;
@@ -77,22 +87,33 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 }
 
 static const struct got_error *
-blame_changes(struct got_blame *blame, struct got_diff_changes *changes,
+blame_changes(struct got_blame *blame, struct diff_result *diff_result,
     struct got_object_id *commit_id,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
 	const struct got_error *err = NULL;
-	struct got_diff_change *change;
+	int i;
 
-	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
-		int c = change->cv.c;
-		int d = change->cv.d;
-		int new_lineno = (c < d ? c : d);
-		int new_length = (c < d ? d - c + 1 : (c == d ? 1 : 0));
+	for (i = 0; i < diff_result->chunks.len; i++) {
+		struct diff_chunk *c = diff_chunk_get(diff_result, i);
+		unsigned int right_start, right_count;
+		int lineno, len;
 		int ln;
 
-		for (ln = new_lineno; ln < new_lineno + new_length; ln++) {
+		if (diff_chunk_get_left_count(c) != 0)
+			continue;
+
+		len = diff_chunk_get_right_count(c);
+		if (len == 0)
+			continue;
+
+		right_start = diff_chunk_get_right_start(c, diff_result, 0);
+		right_count = diff_chunk_get_right_count(c);
+
+		lineno = right_start + 1;
+		len = right_count;
+		for (ln = lineno; ln < lineno + len; ln++) {
 			err = annotate_line(blame, ln, commit_id, cb, arg);
 			if (err)
 				return err;
@@ -115,7 +136,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
 	struct got_object_id *obj_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_blob_object *blob = NULL;
-	struct got_diff_changes *changes = NULL;
+	struct got_diffreg_result *diffreg_result = NULL;
 
 	err = got_object_open_as_commit(&commit, repo, parent_id);
 	if (err)
@@ -146,17 +167,25 @@ blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
 		goto done;
 	}
 
-	err = got_diff_blob_file_lines_changed(&changes, blob, blame->f,
-	    blame->filesize);
+	diff_data_free(&blame->left_data);
+	memset(&blame->left_data, 0, sizeof(blame->left_data));
+	err = got_diff_blob_prepared_file(&diffreg_result, &blame->left_data,
+	    blob, &blame->right_data, blame->f, blame->map, blame->filesize,
+	    blame->cfg, 0);
 	if (err)
 		goto done;
 
-	if (changes) {
-		err = blame_changes(blame, changes, id, cb, arg);
-		got_diff_free_changes(changes);
+	if (diffreg_result->result->chunks.len > 0) {
+		err = blame_changes(blame, diffreg_result->result, id, cb, arg);
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
+	if (diffreg_result) {
+		const struct got_error *free_err;
+		free_err = got_diffreg_result_free_left(diffreg_result);
+		if (free_err && err == NULL)
+			err = free_err;
+	}
 	if (commit)
 		got_object_commit_close(commit);
 	free(obj_id);
@@ -172,7 +201,11 @@ blame_close(struct got_blame *blame)
 {
 	const struct got_error *err = NULL;
 
-	if (blame->f && fclose(blame->f) != 0)
+	diff_data_free(&blame->left_data);
+	diff_data_free(&blame->right_data);
+	if (blame->map && munmap(blame->map, blame->filesize) == -1)
+		err = got_error_from_errno("munmap");
+	if (blame->f && fclose(blame->f) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(blame->lines);
 	free(blame);
@@ -191,7 +224,8 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
 	struct got_object_id *id = NULL, *pid = NULL;
-	int lineno;
+	int lineno, created;
+	size_t size;
 	struct got_commit_graph *graph = NULL;
 
 	*blamep = NULL;
@@ -225,6 +259,12 @@ blame_open(struct got_blame **blamep, const char *path,
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
 	    &blame->line_offsets, blame->f, blob);
 	if (err || blame->nlines == 0)
+		goto done;
+
+	blame->cfg = got_diff_get_config(GOT_DIFF_ALGORITHM_PATIENCE),
+	err = got_diff_prepare_file(&blame->f, &blame->map, &created, &size,
+	    &blame->right_data, blame->cfg, 0);
+	if (err)
 		goto done;
 
 	/* Don't include \n at EOF in the blame line count. */

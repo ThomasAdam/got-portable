@@ -4136,47 +4136,62 @@ copy_remaining_content(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
 }
 
 static const struct got_error *
-apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
-    int nchanges, struct got_diff_state *ds, struct got_diff_args *args,
-    int diff_flags, const char *relpath, FILE *f1, FILE *f2, int *line_cur1,
-    int *line_cur2, FILE *outfile, FILE *rejectfile,
+apply_or_reject_change(int *choice, int *nchunks_used,
+    struct diff_result *diff_result, int n,
+    const char *relpath, FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
+    FILE *outfile, FILE *rejectfile, int changeno, int nchanges,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
 	const struct got_error *err = NULL;
-	int start_old = change->cv.a;
-	int end_old = change->cv.b;
-	int start_new = change->cv.c;
-	int end_new = change->cv.d;
-	long pos1, pos2;
+	struct diff_chunk_context cc = {}; 
+	int start_old, end_old, start_new, end_new;
 	FILE *hunkfile;
+	struct diff_output_unidiff_state *diff_state;
+	struct diff_input_info diff_info;
+	int rc;
 
 	*choice = GOT_PATCH_CHOICE_NONE;
 
+	/* Get changed line numbers without context lines for copy_change(). */
+	diff_chunk_context_load_change(&cc, NULL, diff_result, n, 0);
+	start_old = cc.left.start;
+	end_old = cc.left.end;
+	start_new = cc.right.start;
+	end_new = cc.right.end;
+
+	/* Get the same change with context lines for display. */
+	memset(&cc, 0, sizeof(cc));
+	diff_chunk_context_load_change(&cc, nchunks_used, diff_result, n, 3);
+
+	memset(&diff_info, 0, sizeof(diff_info));
+	diff_info.left_path = relpath;
+	diff_info.right_path = relpath;
+
+	diff_state = diff_output_unidiff_state_alloc();
+	if (diff_state == NULL)
+		return got_error_set_errno(ENOMEM,
+		    "diff_output_unidiff_state_alloc");
+
 	hunkfile = got_opentemp();
-	if (hunkfile == NULL)
-		return got_error_from_errno("got_opentemp");
-
-	pos1 = ftell(f1);
-	pos2 = ftell(f2);
-
-	/* XXX TODO needs error checking */
-	got_diff_dump_change(hunkfile, change, ds, args, f1, f2, diff_flags);
-
-	if (fseek(f1, pos1, SEEK_SET) == -1) {
-		err = got_ferror(f1, GOT_ERR_IO);
+	if (hunkfile == NULL) {
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-	if (fseek(f2, pos2, SEEK_SET) == -1) {
-		err = got_ferror(f1, GOT_ERR_IO);
+
+	rc = diff_output_unidiff_chunk(NULL, hunkfile, diff_state, &diff_info,
+	    diff_result, &cc);
+	if (rc != DIFF_RC_OK) {
+		err = got_error_set_errno(rc, "diff_output_unidiff_chunk");
 		goto done;
 	}
+
 	if (fseek(hunkfile, 0L, SEEK_SET) == -1) {
 		err = got_ferror(hunkfile, GOT_ERR_IO);
 		goto done;
 	}
 
 	err = (*patch_cb)(choice, patch_arg, GOT_STATUS_MODIFY, relpath,
-	    hunkfile, n, nchanges);
+	    hunkfile, changeno, nchanges);
 	if (err)
 		goto done;
 
@@ -4196,6 +4211,7 @@ apply_or_reject_change(int *choice, struct got_diff_change *change, int n,
 		break;
 	}
 done:
+	diff_output_unidiff_state_free(diff_state);
 	if (hunkfile && fclose(hunkfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
@@ -4218,20 +4234,17 @@ create_patched_content(char **path_outfile, int reverse_patch,
     const char *relpath, struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
-	const struct got_error *err;
+	const struct got_error *err, *free_err;
 	struct got_blob_object *blob = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
 	int fd2 = -1;
 	char link_target[PATH_MAX];
 	ssize_t link_len = 0;
 	char *path1 = NULL, *id_str = NULL;
-	struct stat sb1, sb2;
-	struct got_diff_changes *changes = NULL;
-	struct got_diff_state *ds = NULL;
-	struct got_diff_args *args = NULL;
-	struct got_diff_change *change;
-	int diff_flags = 0, line_cur1 = 1, line_cur2 = 1, have_content = 0;
-	int n = 0;
+	struct stat sb2;
+	struct got_diffreg_result *diffreg_result = NULL;
+	int line_cur1 = 1, line_cur2 = 1, have_content = 0;
+	int i = 0, n = 0, nchunks_used = 0, nchanges = 0;
 
 	*path_outfile = NULL;
 
@@ -4311,13 +4324,8 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (err)
 		goto done;
 
-	if (stat(path1, &sb1) == -1) {
-		err = got_error_from_errno2("stat", path1);
-		goto done;
-	}
-
-	err = got_diff_files(&changes, &ds, &args, &diff_flags,
-	    f1, sb1.st_size, id_str, f2, sb2.st_size, path2, 3, NULL);
+	err = got_diff_files(&diffreg_result, f1, id_str, f2, path2, 3, 0,
+	    NULL);
 	if (err)
 		goto done;
 
@@ -4329,14 +4337,22 @@ create_patched_content(char **path_outfile, int reverse_patch,
 		return got_ferror(f1, GOT_ERR_IO);
 	if (fseek(f2, 0L, SEEK_SET) == -1)
 		return got_ferror(f2, GOT_ERR_IO);
-	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
+
+	/* Count the number of actual changes in the diff result. */
+	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
+		struct diff_chunk_context cc = {}; 
+		diff_chunk_context_load_change(&cc, &nchunks_used,
+		    diffreg_result->result, n, 0);
+		nchanges++;
+	}
+	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
 		int choice;
-		err = apply_or_reject_change(&choice, change, ++n,
-		    changes->nchanges, ds, args, diff_flags, relpath,
-		    f1, f2, &line_cur1, &line_cur2,
+		err = apply_or_reject_change(&choice, &nchunks_used,
+		    diffreg_result->result, n, relpath, f1, f2,
+		    &line_cur1, &line_cur2,
 		    reverse_patch ? NULL : outfile,
 		    reverse_patch ? outfile : NULL,
-		    patch_cb, patch_arg);
+		    ++i, nchanges, patch_cb, patch_arg);
 		if (err)
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
@@ -4362,6 +4378,9 @@ done:
 	free(id_str);
 	if (blob)
 		got_object_blob_close(blob);
+	free_err = got_diffreg_result_free(diffreg_result);
+	if (err == NULL)
+		err = free_err;
 	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path1);
 	if (f2 && fclose(f2) == EOF && err == NULL)
@@ -4378,13 +4397,6 @@ done:
 		free(*path_outfile);
 		*path_outfile = NULL;
 	}
-	free(args);
-	if (ds) {
-		got_diff_state_free(ds);
-		free(ds);
-	}
-	if (changes)
-		got_diff_free_changes(changes);
 	free(path1);
 	return err;
 }
@@ -7399,17 +7411,13 @@ create_unstaged_content(char **path_unstaged_content,
     struct got_repository *repo,
     got_worktree_patch_cb patch_cb, void *patch_arg)
 {
-	const struct got_error *err;
+	const struct got_error *err, *free_err;
 	struct got_blob_object *blob = NULL, *staged_blob = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL, *rejectfile = NULL;
 	char *path1 = NULL, *path2 = NULL, *label1 = NULL;
-	struct stat sb1, sb2;
-	struct got_diff_changes *changes = NULL;
-	struct got_diff_state *ds = NULL;
-	struct got_diff_args *args = NULL;
-	struct got_diff_change *change;
-	int diff_flags = 0, line_cur1 = 1, line_cur2 = 1, n = 0;
-	int have_content = 0, have_rejected_content = 0;
+	struct got_diffreg_result *diffreg_result = NULL;
+	int line_cur1 = 1, line_cur2 = 1, n = 0, nchunks_used = 0;
+	int have_content = 0, have_rejected_content = 0, i = 0, nchanges = 0;
 
 	*path_unstaged_content = NULL;
 	*path_new_staged_content = NULL;
@@ -7441,18 +7449,8 @@ create_unstaged_content(char **path_unstaged_content,
 	if (err)
 		goto done;
 
-	if (stat(path1, &sb1) == -1) {
-		err = got_error_from_errno2("stat", path1);
-		goto done;
-	}
-
-	if (stat(path2, &sb2) == -1) {
-		err = got_error_from_errno2("stat", path2);
-		goto done;
-	}
-
-	err = got_diff_files(&changes, &ds, &args, &diff_flags,
-	    f1, sb1.st_size, label1, f2, sb2.st_size, path2, 3, NULL);
+	err = got_diff_files(&diffreg_result, f1, label1, f2,
+	    path2, 3, 0, NULL);
 	if (err)
 		goto done;
 
@@ -7473,12 +7471,19 @@ create_unstaged_content(char **path_unstaged_content,
 		err = got_ferror(f2, GOT_ERR_IO);
 		goto done;
 	}
-	SIMPLEQ_FOREACH(change, &changes->entries, entry) {
+	/* Count the number of actual changes in the diff result. */
+	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
+		struct diff_chunk_context cc = {}; 
+		diff_chunk_context_load_change(&cc, &nchunks_used,
+		    diffreg_result->result, n, 0);
+		nchanges++;
+	}
+	for (n = 0; n < diffreg_result->result->chunks.len; n += nchunks_used) {
 		int choice;
-		err = apply_or_reject_change(&choice, change, ++n,
-		    changes->nchanges, ds, args, diff_flags, relpath,
-		    f1, f2, &line_cur1, &line_cur2,
-		    outfile, rejectfile, patch_cb, patch_arg);
+		err = apply_or_reject_change(&choice, &nchunks_used,
+		    diffreg_result->result, n, relpath, f1, f2,
+		    &line_cur1, &line_cur2,
+		    outfile, rejectfile, ++i, nchanges, patch_cb, patch_arg);
 		if (err)
 			goto done;
 		if (choice == GOT_PATCH_CHOICE_YES)
@@ -7497,6 +7502,9 @@ done:
 		got_object_blob_close(blob);
 	if (staged_blob)
 		got_object_blob_close(staged_blob);
+	free_err = got_diffreg_result_free(diffreg_result);
+	if (free_err && err == NULL)
+		err = free_err;
 	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path1);
 	if (f2 && fclose(f2) == EOF && err == NULL)
@@ -7525,13 +7533,6 @@ done:
 		free(*path_new_staged_content);
 		*path_new_staged_content = NULL;
 	}
-	free(args);
-	if (ds) {
-		got_diff_state_free(ds);
-		free(ds);
-	}
-	if (changes)
-		got_diff_free_changes(changes);
 	free(path1);
 	free(path2);
 	return err;

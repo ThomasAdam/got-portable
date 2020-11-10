@@ -21,9 +21,12 @@
  * If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in the diff must be specified as well.
  * Whitespace differences may optionally be ignored.
+ * If not NULL, the two initial output arguments will be populated with an
+ * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_blob(struct got_blob_object *,
-    struct got_blob_object *, const char *, const char *, int, int, FILE *);
+const struct got_error *got_diff_blob(off_t **, size_t *,
+    struct got_blob_object *, struct got_blob_object *,
+    const char *, const char *, int, int, FILE *);
 
 /*
  * Compute the differences between a blob and a file and write unified diff
@@ -61,6 +64,21 @@ struct got_diff_blob_output_unidiff_arg {
 	FILE *outfile;		/* Unidiff text will be written here. */
 	int diff_context;	/* Sets the number of context lines. */
 	int ignore_whitespace;	/* Ignore whitespace differences. */
+
+	/*
+	 * The number of lines contained in produced unidiff text output,
+	 * and an array of byte offsets to each line. May be initialized to
+	 * zero and NULL to ignore line offsets. If not NULL, then the line
+	 * offsets array will be populated. Optionally, the array can be
+	 * pre-populated with line offsets, with nlines > 0 indicating
+	 * the length of the pre-populated array. This is useful if the
+	 * output file already contains some lines of text.
+	 * The array will be grown as needed to accomodate additional line
+	 * offsets, and the last offset found in a pre-populated array will
+	 * be added to all subsequent offsets.
+	 */
+	size_t nlines;
+	off_t *line_offsets;	/* Dispose of with free(3) when done. */
 };
 const struct got_error *got_diff_blob_output_unidiff(void *,
     struct got_blob_object *, struct got_blob_object *,
@@ -105,9 +123,12 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  * the diff output. If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in the diff must be specified as well.
  * Write unified diff text to the provided output FILE.
+ * If not NULL, the two initial output arguments will be populated with an
+ * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_blobs(struct got_object_id *,
-    struct got_object_id *, const char *, const char *, int, int,
+const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
+    struct got_object_id *, struct got_object_id *,
+    const char *, const char *, int, int,
     struct got_repository *, FILE *);
 
 /*
@@ -116,17 +137,22 @@ const struct got_error *got_diff_objects_as_blobs(struct got_object_id *,
  * the trees. If a label is NULL, use the blob's SHA1 checksum instead.
  * The number of context lines to show in diffs must be specified.
  * Write unified diff text to the provided output FILE.
+ * If not NULL, the two initial output arguments will be populated with an
+ * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_trees(struct got_object_id *,
-    struct got_object_id *, char *, char *, int, int,
-    struct got_repository *, FILE *);
+const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
+    struct got_object_id *, struct got_object_id *, char *, char *,
+    int, int, struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
  * The number of context lines to show in diffs must be specified.
  * Write unified diff text to the provided output FILE.
+ * If not NULL, the two initial output arguments will be populated with an
+ * array of line offsets for, and the number of lines in, the unidiff text.
  */
-const struct got_error *got_diff_objects_as_commits(struct got_object_id *,
-    struct got_object_id *, int, int, struct got_repository *, FILE *);
+const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
+    struct got_object_id *, struct got_object_id *, int, int,
+    struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

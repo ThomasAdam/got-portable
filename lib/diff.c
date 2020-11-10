@@ -17,6 +17,7 @@
 #include <sys/queue.h>
 #include <sys/stat.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,27 +40,47 @@
 #include "got_lib_object.h"
 
 static const struct got_error *
-diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
-    const char *label1, const char *label2, mode_t mode1, mode_t mode2,
-    int diff_context, int ignore_whitespace, FILE *outfile,
-    struct got_diff_changes *changes)
+add_line_offset(off_t **line_offsets, size_t *nlines, off_t off)
 {
-	struct got_diff_state ds;
-	struct got_diff_args args;
-	const struct got_error *err = NULL;
+	off_t *p;
+
+	p = reallocarray(*line_offsets, *nlines + 1, sizeof(off_t));
+	if (p == NULL)
+		return got_error_from_errno("reallocarray");
+	*line_offsets = p;
+	(*line_offsets)[*nlines] = off;
+	(*nlines)++;
+	return NULL;
+}
+
+static const struct got_error *
+diff_blobs(off_t **line_offsets, size_t *nlines,
+    struct got_diffreg_result **resultp, struct got_blob_object *blob1,
+    struct got_blob_object *blob2,
+    const char *label1, const char *label2, mode_t mode1, mode_t mode2,
+    int diff_context, int ignore_whitespace, FILE *outfile)
+{
+	const struct got_error *err = NULL, *free_err;
 	FILE *f1 = NULL, *f2 = NULL;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	char *idstr1 = NULL, *idstr2 = NULL;
 	size_t size1, size2;
-	int res, flags = 0;
+	struct got_diffreg_result *result;
+	off_t outoff = 0;
+	int n;
+
+	if (line_offsets && *line_offsets && *nlines > 0)
+		outoff = (*line_offsets)[*nlines - 1];
+
+	if (resultp)
+		*resultp = NULL;
 
 	if (blob1) {
 		f1 = got_opentemp();
 		if (f1 == NULL)
 			return got_error_from_errno("got_opentemp");
-	} else
-		flags |= D_EMPTY1;
+	}
 
 	if (blob2) {
 		f2 = got_opentemp();
@@ -68,8 +89,7 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 			fclose(f1);
 			return err;
 		}
-	} else
-		flags |= D_EMPTY2;
+	}
 
 	size1 = 0;
 	if (blob1) {
@@ -90,27 +110,6 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 			goto done;
 	} else
 		idstr2 = "/dev/null";
-
-	memset(&ds, 0, sizeof(ds));
-	/* XXX should stat buffers be passed in args instead of ds? */
-	ds.stb1.st_mode = S_IFREG;
-	if (blob1)
-		ds.stb1.st_size = size1;
-	ds.stb1.st_mtime = 0; /* XXX */
-
-	ds.stb2.st_mode = S_IFREG;
-	if (blob2)
-		ds.stb2.st_size = size2;
-	ds.stb2.st_mtime = 0; /* XXX */
-
-	memset(&args, 0, sizeof(args));
-	args.diff_format = D_UNIFIED;
-	args.label[0] = label1 ? label1 : idstr1;
-	args.label[1] = label2 ? label2 : idstr2;
-	args.diff_context = diff_context;
-	flags |= D_PROTOTYPE;
-	if (ignore_whitespace)
-		flags |= D_IGNOREBLANKS;
 
 	if (outfile) {
 		char *modestr1 = NULL, *modestr2 = NULL;
@@ -137,15 +136,52 @@ diff_blobs(struct got_blob_object *blob1, struct got_blob_object *blob2,
 				goto done;
 			}
 		}
-		fprintf(outfile, "blob - %s%s\n", idstr1,
+		n = fprintf(outfile, "blob - %s%s\n", idstr1,
 		    modestr1 ? modestr1 : "");
-		fprintf(outfile, "blob + %s%s\n", idstr2,
+		if (n < 0)
+			goto done;
+		outoff += n;
+		if (line_offsets) {
+			err = add_line_offset(line_offsets, nlines, outoff);
+			if (err)
+				goto done;
+		}
+
+		n = fprintf(outfile, "blob + %s%s\n", idstr2,
 		    modestr2 ? modestr2 : "");
+		if (n < 0)
+			goto done;
+		outoff += n;
+		if (line_offsets) {
+			err = add_line_offset(line_offsets, nlines, outoff);
+			if (err)
+				goto done;
+		}
+
 		free(modestr1);
 		free(modestr2);
 	}
-	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile, changes);
-	got_diff_state_free(&ds);
+	err = got_diffreg(&result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE,
+	    ignore_whitespace);
+	if (err)
+		goto done;
+
+	if (outfile) {
+		err = got_diffreg_output(line_offsets, nlines, result, f1, f2,
+		    label1 ? label1 : idstr1,
+		    label2 ? label2 : idstr2,
+		    GOT_DIFF_OUTPUT_UNIDIFF, diff_context, outfile);
+		if (err)
+			goto done;
+	}
+
+	if (resultp && err == NULL)
+		*resultp = result;
+	else {
+		free_err = got_diffreg_result_free(result);
+		if (free_err && err == NULL)
+			err = free_err;
+	}
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -162,45 +198,35 @@ got_diff_blob_output_unidiff(void *arg, struct got_blob_object *blob1,
 {
 	struct got_diff_blob_output_unidiff_arg *a = arg;
 
-	return diff_blobs(blob1, blob2, label1, label2, mode1, mode2,
-	    a->diff_context, a->ignore_whitespace, a->outfile, NULL);
+	return diff_blobs(&a->line_offsets, &a->nlines, NULL,
+	    blob1, blob2, label1, label2, mode1, mode2, a->diff_context,
+	    a->ignore_whitespace, a->outfile);
 }
 
 const struct got_error *
-got_diff_blob(struct got_blob_object *blob1, struct got_blob_object *blob2,
+got_diff_blob(off_t **line_offsets, size_t *nlines,
+    struct got_blob_object *blob1, struct got_blob_object *blob2,
     const char *label1, const char *label2, int diff_context,
     int ignore_whitespace, FILE *outfile)
 {
-	return diff_blobs(blob1, blob2, label1, label2, 0, 0, diff_context,
-	    ignore_whitespace, outfile, NULL);
+	return diff_blobs(line_offsets, nlines, NULL, blob1, blob2,
+	    label1, label2, 0, 0, diff_context, ignore_whitespace, outfile);
 }
 
 static const struct got_error *
-alloc_changes(struct got_diff_changes **changes)
-{
-	*changes = calloc(1, sizeof(**changes));
-	if (*changes == NULL)
-		return got_error_from_errno("calloc");
-	SIMPLEQ_INIT(&(*changes)->entries);
-	return NULL;
-}
-
-static const struct got_error *
-diff_blob_file(struct got_diff_changes **changes,
+diff_blob_file(struct got_diffreg_result **resultp,
     struct got_blob_object *blob1, const char *label1, FILE *f2, size_t size2,
     const char *label2, int diff_context, int ignore_whitespace, FILE *outfile)
 {
-	struct got_diff_state ds;
-	struct got_diff_args args;
-	const struct got_error *err = NULL;
+	const struct got_error *err = NULL, *free_err;
 	FILE *f1 = NULL;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char *idstr1 = NULL;
 	size_t size1;
-	int res, flags = 0;
+	struct got_diffreg_result *result = NULL;
 
-	if (changes)
-		*changes = NULL;
+	if (resultp)
+		*resultp = NULL;
 
 	size1 = 0;
 	if (blob1) {
@@ -213,46 +239,35 @@ diff_blob_file(struct got_diff_changes **changes,
 		if (err)
 			goto done;
 	} else {
-		flags |= D_EMPTY1;
 		idstr1 = "/dev/null";
 	}
-
-	if (f2 == NULL)
-		flags |= D_EMPTY2;
-
-	memset(&ds, 0, sizeof(ds));
-	/* XXX should stat buffers be passed in args instead of ds? */
-	ds.stb1.st_mode = S_IFREG;
-	if (blob1)
-		ds.stb1.st_size = size1;
-	ds.stb1.st_mtime = 0; /* XXX */
-
-	ds.stb2.st_mode = S_IFREG;
-	ds.stb2.st_size = size2;
-	ds.stb2.st_mtime = 0; /* XXX */
-
-	memset(&args, 0, sizeof(args));
-	args.diff_format = D_UNIFIED;
-	args.label[0] = label2;
-	args.label[1] = label2;
-	args.diff_context = diff_context;
-	flags |= D_PROTOTYPE;
-	if (ignore_whitespace)
-		flags |= D_IGNOREBLANKS;
 
 	if (outfile) {
 		fprintf(outfile, "blob - %s\n", label1 ? label1 : idstr1);
 		fprintf(outfile, "file + %s\n",
 		    f2 == NULL ? "/dev/null" : label2);
 	}
-	if (changes) {
-		err = alloc_changes(changes);
+
+	err = got_diffreg(&result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE, 
+	    ignore_whitespace);
+	if (err)
+		goto done;
+
+	if (outfile) {
+		err = got_diffreg_output(NULL, NULL, result, f1, f2,
+		    label2, label2, GOT_DIFF_OUTPUT_UNIDIFF, diff_context,
+		    outfile);
 		if (err)
-			return err;
+			goto done;
 	}
-	err = got_diffreg(&res, f1, f2, flags, &args, &ds, outfile,
-	    changes ? *changes : NULL);
-	got_diff_state_free(&ds);
+
+	if (resultp && err == NULL)
+		*resultp = result;
+	else if (result) {
+		free_err = got_diffreg_result_free(result);
+		if (free_err && err == NULL)
+			err = free_err;
+	}
 done:
 	if (f1 && fclose(f1) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -269,41 +284,57 @@ got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
 }
 
 const struct got_error *
-got_diff_blob_file_lines_changed(struct got_diff_changes **changes,
-    struct got_blob_object *blob1, FILE *f2, size_t size2)
+got_diff_blob_prepared_file(struct got_diffreg_result **resultp,
+    struct diff_data *data1, struct got_blob_object *blob1,
+    struct diff_data *data2, FILE *f2, char *p2, size_t size2,
+    const struct diff_config *cfg, int ignore_whitespace)
 {
-	return diff_blob_file(changes, blob1, NULL, f2, size2, NULL,
-	    0, 0, NULL);
-}
+	const struct got_error *err = NULL, *free_err;
+	FILE *f1 = NULL;
+	char hex1[SHA1_DIGEST_STRING_LENGTH];
+	char *idstr1 = NULL, *p1 = NULL;
+	size_t size1, size;
+	struct got_diffreg_result *result = NULL;
+	int f1_created = 0;
 
-const struct got_error *
-got_diff_blob_lines_changed(struct got_diff_changes **changes,
-    struct got_blob_object *blob1, struct got_blob_object *blob2)
-{
-	const struct got_error *err = NULL;
+	*resultp = NULL;
 
-	err = alloc_changes(changes);
+	size1 = 0;
+	if (blob1) {
+		f1 = got_opentemp();
+		if (f1 == NULL)
+			return got_error_from_errno("got_opentemp");
+		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
+		err = got_object_blob_dump_to_file(&size1, NULL, NULL, f1,
+		    blob1);
+		if (err)
+			goto done;
+	} else {
+		idstr1 = "/dev/null";
+	}
+
+	err = got_diff_prepare_file(&f1, &p1, &f1_created, &size,
+	    data1, cfg, ignore_whitespace);
 	if (err)
-		return err;
+		goto done;
 
-	err = diff_blobs(blob1, blob2, NULL, NULL, 0, 0, 3, 0, NULL, *changes);
+	err = got_diffreg_prepared_files(&result, cfg, data1, f1,
+	    p1, size1, data2, f2, p2, size2);
+	if (err)
+		goto done;
+
+	*resultp = result;
+done:
 	if (err) {
-		got_diff_free_changes(*changes);
-		*changes = NULL;
+		if (result)
+			free_err = got_diffreg_result_free_left(result);
+		else
+			free_err = got_diffreg_close(f1, p1, size1, NULL,
+			    NULL, 0);
+		if (free_err && err == NULL)
+			err = free_err;
 	}
 	return err;
-}
-
-void
-got_diff_free_changes(struct got_diff_changes *changes)
-{
-	struct got_diff_change *change;
-	while (!SIMPLEQ_EMPTY(&changes->entries)) {
-		change = SIMPLEQ_FIRST(&changes->entries);
-		SIMPLEQ_REMOVE_HEAD(&changes->entries, entry);
-		free(change);
-	}
-	free(changes);
 }
 
 static const struct got_error *
@@ -741,7 +772,8 @@ got_diff_tree(struct got_tree_object *tree1, struct got_tree_object *tree2,
 }
 
 const struct got_error *
-got_diff_objects_as_blobs(struct got_object_id *id1, struct got_object_id *id2,
+got_diff_objects_as_blobs(off_t **line_offsets, size_t *nlines,
+    struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2, int diff_context,
     int ignore_whitespace, struct got_repository *repo, FILE *outfile)
 {
@@ -761,8 +793,8 @@ got_diff_objects_as_blobs(struct got_object_id *id1, struct got_object_id *id2,
 		if (err)
 			goto done;
 	}
-	err = got_diff_blob(blob1, blob2, label1, label2, diff_context,
-	    ignore_whitespace, outfile);
+	err = got_diff_blob(line_offsets, nlines, blob1, blob2,
+	    label1, label2, diff_context, ignore_whitespace, outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -772,13 +804,15 @@ done:
 }
 
 const struct got_error *
-got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
+got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
+    struct got_object_id *id1, struct got_object_id *id2,
     char *label1, char *label2, int diff_context, int ignore_whitespace,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_diff_blob_output_unidiff_arg arg;
+	int want_lineoffsets = (line_offsets != NULL && *line_offsets != NULL);
 
 	if (id1 == NULL && id2 == NULL)
 		return got_error(GOT_ERR_NO_OBJ);
@@ -796,8 +830,20 @@ got_diff_objects_as_trees(struct got_object_id *id1, struct got_object_id *id2,
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.outfile = outfile;
+	if (want_lineoffsets) {
+		arg.line_offsets = *line_offsets;
+		arg.nlines = *nlines;
+	} else {
+		arg.line_offsets = NULL;
+		arg.nlines = 0;
+	}
 	err = got_diff_tree(tree1, tree2, label1, label2, repo,
 	    got_diff_blob_output_unidiff, &arg, 1);
+
+	if (want_lineoffsets) {
+		*line_offsets = arg.line_offsets; /* was likely re-allocated */
+		*nlines = arg.nlines;
+	}
 done:
 	if (tree1)
 		got_object_tree_close(tree1);
@@ -807,8 +853,9 @@ done:
 }
 
 const struct got_error *
-got_diff_objects_as_commits(struct got_object_id *id1,
-    struct got_object_id *id2, int diff_context, int ignore_whitespace,
+got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
+    struct got_object_id *id1, struct got_object_id *id2,
+    int diff_context, int ignore_whitespace,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
@@ -827,7 +874,7 @@ got_diff_objects_as_commits(struct got_object_id *id1,
 	if (err)
 		goto done;
 
-	err = got_diff_objects_as_trees(
+	err = got_diff_objects_as_trees(line_offsets, nlines,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
 	    got_object_commit_get_tree_id(commit2), "", "", diff_context,
 	    ignore_whitespace, repo, outfile);
@@ -840,50 +887,15 @@ done:
 }
 
 const struct got_error *
-got_diff_files(struct got_diff_changes **changes,
-    struct got_diff_state **ds,
-    struct got_diff_args **args,
-    int *flags,
-    FILE *f1, size_t size1, const char *label1,
-    FILE *f2, size_t size2, const char *label2,
-    int diff_context, FILE *outfile)
+got_diff_files(struct got_diffreg_result **resultp,
+    FILE *f1, const char *label1, FILE *f2, const char *label2,
+    int diff_context, int ignore_whitespace, FILE *outfile)
 {
 	const struct got_error *err = NULL;
-	int res;
+	struct got_diffreg_result *diffreg_result = NULL;
 
-	*flags = 0;
-	*ds = calloc(1, sizeof(**ds));
-	if (*ds == NULL)
-		return got_error_from_errno("calloc");
-	*args = calloc(1, sizeof(**args));
-	if (*args == NULL) {
-		err = got_error_from_errno("calloc");
-		goto done;
-	}
-
-	if (changes)
-		*changes = NULL;
-
-	if (f1 == NULL)
-		*flags |= D_EMPTY1;
-
-	if (f2 == NULL)
-		*flags |= D_EMPTY2;
-
-	/* XXX should stat buffers be passed in args instead of ds? */
-	(*ds)->stb1.st_mode = S_IFREG;
-	(*ds)->stb1.st_size = size1;
-	(*ds)->stb1.st_mtime = 0; /* XXX */
-
-	(*ds)->stb2.st_mode = S_IFREG;
-	(*ds)->stb2.st_size = size2;
-	(*ds)->stb2.st_mtime = 0; /* XXX */
-
-	(*args)->diff_format = D_UNIFIED;
-	(*args)->label[0] = label1;
-	(*args)->label[1] = label2;
-	(*args)->diff_context = diff_context;
-	*flags |= D_PROTOTYPE;
+	if (resultp)
+		*resultp = NULL;
 
 	if (outfile) {
 		fprintf(outfile, "file - %s\n",
@@ -891,29 +903,29 @@ got_diff_files(struct got_diff_changes **changes,
 		fprintf(outfile, "file + %s\n",
 		    f2 == NULL ? "/dev/null" : label2);
 	}
-	if (changes) {
-		err = alloc_changes(changes);
+
+	err = got_diffreg(&diffreg_result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE,
+	    ignore_whitespace);
+	if (err)
+		goto done;
+
+	if (outfile) {
+		err = got_diffreg_output(NULL, NULL, diffreg_result,
+		    f1, f2, label1, label2, GOT_DIFF_OUTPUT_UNIDIFF,
+		    diff_context, outfile);
 		if (err)
 			goto done;
 	}
-	err = got_diffreg(&res, f1, f2, *flags, *args, *ds, outfile,
-	    changes ? *changes : NULL);
+
 done:
-	if (err) {
-		if (*ds) {
-			got_diff_state_free(*ds);
-			free(*ds);
-			*ds = NULL;
-		}
-		if (*args) {
-			free(*args);
-			*args = NULL;
-		}
-		if (changes) {
-			if (*changes)
-				got_diff_free_changes(*changes);
-			*changes = NULL;
-		}
+	if (resultp && err == NULL)
+		*resultp = diffreg_result;
+	else if (diffreg_result) {
+		const struct got_error *free_err;
+		free_err = got_diffreg_result_free(diffreg_result);
+		if (free_err && err == NULL)
+			err = free_err;
 	}
+
 	return err;
 }

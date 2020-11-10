@@ -252,11 +252,10 @@ struct tog_diff_view_state {
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct tog_colors colors;
-	int nlines;
+	size_t nlines;
 	off_t *line_offsets;
 	int matched_line;
 	int selected_line;
-	size_t filesize;
 
 	/* passed from log view; may be NULL */
 	struct tog_view *log_view;
@@ -2796,19 +2795,23 @@ match_color(struct tog_colors *colors, const char *line)
 }
 
 static const struct got_error *
-draw_file(struct tog_view *view, FILE *f, int *first_displayed_line, int nlines,
-    int selected_line, int max_lines, int *last_displayed_line, int *eof,
-    char *header, struct tog_colors *colors)
+draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
+    off_t *line_offsets, int selected_line, int max_lines,
+    int *last_displayed_line, int *eof, char *header, struct tog_colors *colors)
 {
 	const struct got_error *err;
-	int lineno = 0, nprinted = 0;
+	int nprinted = 0;
 	char *line;
 	struct tog_color *tc;
 	size_t len;
 	wchar_t *wline;
 	int width;
+	off_t line_offset;
 
-	rewind(f);
+	line_offset = line_offsets[first_displayed_line - 1];
+	if (fseeko(f, line_offset, SEEK_SET) == -1)
+		return got_error_from_errno("fseek");
+
 	werase(view->window);
 
 	if (header) {
@@ -2831,17 +2834,12 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line, int nlines,
 	}
 
 	*eof = 0;
-	while (nprinted < max_lines) {
+	while (max_lines > 0 && nprinted < max_lines) {
 		line = parse_next_line(f, &len);
 		if (line == NULL) {
 			*eof = 1;
 			break;
 		}
-		if (++lineno < *first_displayed_line) {
-			free(line);
-			continue;
-		}
-
 		err = format_line(&wline, &width, line, view->ncols, 0);
 		if (err) {
 			free(line);
@@ -2858,13 +2856,15 @@ draw_file(struct tog_view *view, FILE *f, int *first_displayed_line, int nlines,
 			    COLOR_PAIR(tc->colorpair), NULL);
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
-		if (++nprinted == 1)
-			*first_displayed_line = lineno;
+		nprinted++;
 		free(line);
 		free(wline);
 		wline = NULL;
 	}
-	*last_displayed_line = lineno;
+	if (nprinted >= 1)
+		*last_displayed_line = first_displayed_line + (nprinted - 1);
+	else
+		*last_displayed_line = first_displayed_line;
 
 	view_vborder(view);
 
@@ -2949,18 +2949,35 @@ done:
 }
 
 static const struct got_error *
-write_commit_info(struct got_object_id *commit_id,
-    struct got_reflist_head *refs, struct got_repository *repo, FILE *outfile)
+add_line_offset(off_t **line_offsets, size_t *nlines, off_t off)
+{
+	off_t *p;
+
+	p = reallocarray(*line_offsets, *nlines + 1, sizeof(off_t));
+	if (p == NULL)
+		return got_error_from_errno("reallocarray");
+	*line_offsets = p;
+	(*line_offsets)[*nlines] = off;
+	(*nlines)++;
+	return NULL;
+}
+
+static const struct got_error *
+write_commit_info(off_t **line_offsets, size_t *nlines,
+    struct got_object_id *commit_id, struct got_reflist_head *refs,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	char datebuf[26], *datestr;
 	struct got_commit_object *commit;
-	char *id_str = NULL, *logmsg = NULL;
+	char *id_str = NULL, *logmsg = NULL, *s = NULL, *line;
 	time_t committer_time;
 	const char *author, *committer;
 	char *refs_str = NULL;
 	struct got_pathlist_head changed_paths;
 	struct got_pathlist_entry *pe;
+	off_t outoff = 0;
+	int n;
 
 	TAILQ_INIT(&changed_paths);
 
@@ -2980,152 +2997,107 @@ write_commit_info(struct got_object_id *commit_id,
 		goto done;
 	}
 
-	if (fprintf(outfile, "commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
-	    refs_str ? refs_str : "", refs_str ? ")" : "") < 0) {
+	err = add_line_offset(line_offsets, nlines, 0);
+	if (err)
+		goto done;
+
+	n = fprintf(outfile, "commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
+	    refs_str ? refs_str : "", refs_str ? ")" : "");
+	if (n < 0) {
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}
-	if (fprintf(outfile, "from: %s\n",
-	    got_object_commit_get_author(commit)) < 0) {
+	outoff += n;
+	err = add_line_offset(line_offsets, nlines, outoff);
+	if (err)
+		goto done;
+
+	n = fprintf(outfile, "from: %s\n",
+	    got_object_commit_get_author(commit));
+	if (n < 0) {
 		err = got_error_from_errno("fprintf");
 		goto done;
 	}
+	outoff += n;
+	err = add_line_offset(line_offsets, nlines, outoff);
+	if (err)
+		goto done;
+
 	committer_time = got_object_commit_get_committer_time(commit);
 	datestr = get_datestr(&committer_time, datebuf);
-	if (datestr && fprintf(outfile, "date: %s UTC\n", datestr) < 0) {
-		err = got_error_from_errno("fprintf");
-		goto done;
+	if (datestr) {
+		n = fprintf(outfile, "date: %s UTC\n", datestr);
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		outoff += n;
+		err = add_line_offset(line_offsets, nlines, outoff);
+		if (err)
+			goto done;
 	}
 	author = got_object_commit_get_author(commit);
 	committer = got_object_commit_get_committer(commit);
-	if (strcmp(author, committer) != 0 &&
-	    fprintf(outfile, "via: %s\n", committer) < 0) {
-		err = got_error_from_errno("fprintf");
-		goto done;
+	if (strcmp(author, committer) != 0) {
+		n = fprintf(outfile, "via: %s\n", committer);
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		outoff += n;
+		err = add_line_offset(line_offsets, nlines, outoff);
+		if (err)
+			goto done;
 	}
 	err = got_object_commit_get_logmsg(&logmsg, commit);
 	if (err)
 		goto done;
-	if (fprintf(outfile, "%s\n", logmsg) < 0) {
-		err = got_error_from_errno("fprintf");
-		goto done;
+	s = logmsg;
+	while ((line = strsep(&s, "\n")) != NULL) {
+		n = fprintf(outfile, "%s\n", line);
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		outoff += n;
+		err = add_line_offset(line_offsets, nlines, outoff);
+		if (err)
+			goto done;
 	}
+
 	err = get_changed_paths(&changed_paths, commit, repo);
 	if (err)
 		goto done;
 	TAILQ_FOREACH(pe, &changed_paths, entry) {
 		struct got_diff_changed_path *cp = pe->data;
-		fprintf(outfile, "%c  %s\n", cp->status, pe->path);
+		n = fprintf(outfile, "%c  %s\n", cp->status, pe->path);
+		if (n < 0) {
+			err = got_error_from_errno("fprintf");
+			goto done;
+		}
+		outoff += n;
+		err = add_line_offset(line_offsets, nlines, outoff);
+		if (err)
+			goto done;
 		free((char *)pe->path);
 		free(pe->data);
 	}
+
 	fputc('\n', outfile);
+	outoff++;
+	err = add_line_offset(line_offsets, nlines, outoff);
 done:
 	got_pathlist_free(&changed_paths);
 	free(id_str);
 	free(logmsg);
 	free(refs_str);
 	got_object_commit_close(commit);
-	return err;
-}
-
-const struct got_error *
-get_filestream_info(size_t *filesize, int *nlines, off_t **line_offsets,
-    FILE *infile)
-{
-	const struct got_error *err = NULL;
-	size_t len, remain;
-	char buf[32768];
-	int i;
-	size_t nalloc = 0;
-	off_t off = 0;
-
-	*line_offsets = NULL;
-	*filesize = 0;
-	*nlines = 0;
-
-	if (fseek(infile, 0, SEEK_END) == -1)
-		return got_error_from_errno("fseek");
-	len = ftell(infile) + 1;
-	if (ferror(infile))
-		return got_error_from_errno("ftell");
-	if (fseek(infile, 0, SEEK_SET) == -1)
-		return got_error_from_errno("fseek");
-
-	if (len == 0)
-		return NULL;
-
-	remain = len;
-	while (remain > 0) {
-		size_t r, n = MIN(remain, sizeof(buf));
-		r = fread(buf, 1, n, infile);
-		if (r == 0) {
-			if (ferror(infile)) {
-				err = got_error_from_errno("fread");
-				goto done;
-			}
-			break;
-		}
-		i = 0;
-		remain -= r;
-
-		if (*line_offsets == NULL) {
-			/* Have some data but perhaps no '\n'. */
-			*nlines = 1;
-			nalloc = len / 40; /* 40-char average line length */
-			*line_offsets = calloc(nalloc, sizeof(**line_offsets));
-			if (*line_offsets == NULL) {
-				err = got_error_from_errno("calloc");
-				goto done;
-			}
-				/* Skip forward over end of first line. */
-			while (i < len) {
-				if (buf[i] == '\n')
-					break;
-				i++;
-			}
-		}
-
-		/* Scan '\n' offsets in remaining chunk of data. */
-		while (i < r) {
-			if (buf[i] != '\n') {
-				i++;
-				continue;
-			}
-			(*nlines)++;
-			if (nalloc < *nlines) {
-				size_t nallocnew = *nlines + (remain / 40);
-				off_t *o = recallocarray(*line_offsets,
-				    nalloc, nallocnew, sizeof(**line_offsets));
-				if (o == NULL) {
-					err = got_error_from_errno(
-					    "recallocarray");
-					goto done;
-				}
-				*line_offsets = o;
-				nalloc = nallocnew;
-			}
-			off = i + 1;
-			(*line_offsets)[*nlines - 1] = off;
-			i++;
-		}
-	}
-
-	if (fflush(infile) != 0) {
-		err = got_error_from_errno("fflush");
-		goto done;
-	}
-	rewind(infile);
-
-	*filesize = len;
-done:
 	if (err) {
 		free(*line_offsets);
 		*line_offsets = NULL;
-		*filesize = 0;
 		*nlines = 0;
 	}
-	return NULL;
+	return err;
 }
 
 static const struct got_error *
@@ -3134,6 +3106,12 @@ create_diff(struct tog_diff_view_state *s)
 	const struct got_error *err = NULL;
 	FILE *f = NULL;
 	int obj_type;
+
+	free(s->line_offsets);
+	s->line_offsets = malloc(sizeof(off_t));
+	if (s->line_offsets == NULL)
+		return got_error_from_errno("malloc");
+	s->nlines = 0;
 
 	f = got_opentemp();
 	if (f == NULL) {
@@ -3155,12 +3133,13 @@ create_diff(struct tog_diff_view_state *s)
 
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_BLOB:
-		err = got_diff_objects_as_blobs(s->id1, s->id2, NULL, NULL,
-		    s->diff_context, 0, s->repo, s->f);
+		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
+		    s->id1, s->id2, NULL, NULL, s->diff_context, 0,
+		    s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		err = got_diff_objects_as_trees(s->id1, s->id2, "", "",
-		    s->diff_context, 0, s->repo, s->f);
+		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
+		    s->id1, s->id2, "", "", s->diff_context, 0, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -3172,15 +3151,17 @@ create_diff(struct tog_diff_view_state *s)
 			goto done;
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
-			err = write_commit_info(s->id2, s->refs, s->repo, s->f);
+			err = write_commit_info(&s->line_offsets, &s->nlines,
+			    s->id2, s->refs, s->repo, s->f);
 			if (err)
 				goto done;
 		} else {
 			parent_ids = got_object_commit_get_parent_ids(commit2);
 			SIMPLEQ_FOREACH(pid, parent_ids, entry) {
 				if (got_object_id_cmp(s->id1, pid->id) == 0) {
-					err = write_commit_info(s->id2, s->refs,
-					    s->repo, s->f);
+					err = write_commit_info(
+					    &s->line_offsets, &s->nlines,
+					    s->id2, s->refs, s->repo, s->f);
 					if (err)
 						goto done;
 					break;
@@ -3189,8 +3170,8 @@ create_diff(struct tog_diff_view_state *s)
 		}
 		got_object_commit_close(commit2);
 
-		err = got_diff_objects_as_commits(s->id1, s->id2,
-		    s->diff_context, 0, s->repo, s->f);
+		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
+		    s->id1, s->id2, s->diff_context, 0, s->repo, s->f);
 		break;
 	}
 	default:
@@ -3199,8 +3180,6 @@ create_diff(struct tog_diff_view_state *s)
 	}
 	if (err)
 		goto done;
-	err = get_filestream_info(&s->filesize, &s->nlines, &s->line_offsets,
-	    s->f);
 done:
 	if (s->f && fflush(s->f) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
@@ -3394,6 +3373,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		show_log_view(log_view); /* draw vborder */
 	diff_view_indicate_progress(view);
 
+	s->line_offsets = NULL;
+	s->nlines = 0;
 	err = create_diff(s);
 	if (err) {
 		free(s->id1);
@@ -3426,6 +3407,8 @@ close_diff_view(struct tog_view *view)
 		err = got_error_from_errno("fclose");
 	free_colors(&s->colors);
 	free(s->line_offsets);
+	s->line_offsets = NULL;
+	s->nlines = 0;
 	return err;
 }
 
@@ -3455,9 +3438,9 @@ show_diff_view(struct tog_view *view)
 	free(id_str1);
 	free(id_str2);
 
-	return draw_file(view, s->f, &s->first_displayed_line, s->nlines,
-	    s->selected_line, view->nlines, &s->last_displayed_line, &s->eof,
-	    header, &s->colors);
+	return draw_file(view, s->f, s->first_displayed_line, s->nlines,
+	    s->line_offsets, s->selected_line, view->nlines,
+	    &s->last_displayed_line, &s->eof, header, &s->colors);
 }
 
 static const struct got_error *
