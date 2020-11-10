@@ -1,4 +1,4 @@
-* got 0.44; 2020-11-20
+* got 0.44; 2020-11-10
 - detect unknown repository format extensions such as Git's sha256 extension
 - prevent a NULL dereference if 'got log -p' runs against a root commit
 - fix permissions mode bits for fetched pack files; patch by Alisdair MacLeod
