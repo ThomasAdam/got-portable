@@ -2823,6 +2823,8 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 		if (view_needs_focus_indication(view))
 			wstandout(view->window);
 		waddwstr(view->window, wline);
+		free(wline);
+		wline = NULL;
 		if (view_needs_focus_indication(view))
 			wstandend(view->window);
 		if (width <= view->ncols - 1)
@@ -2881,6 +2883,8 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 
 		wstandout(view->window);
 		waddwstr(view->window, wline);
+		free(wline);
+		wline = NULL;
 		wstandend(view->window);
 	}
 
