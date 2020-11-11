@@ -2815,10 +2815,14 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 	werase(view->window);
 
 	if (header) {
-		err = format_line(&wline, &width, header, view->ncols, 0);
-		if (err) {
+		if (asprintf(&line, "[%d/%d] %s",
+		    first_displayed_line - 1 + selected_line, nlines,
+		    header) == -1)
+			return got_error_from_errno("asprintf");
+		err = format_line(&wline, &width, line, view->ncols, 0);
+		free(line);
+		if (err)
 			return err;
-		}
 
 		if (view_needs_focus_indication(view))
 			wstandout(view->window);
