@@ -441,6 +441,7 @@ struct tog_view {
 #define TOG_SEARCH_NO_MORE	2
 #define TOG_SEARCH_HAVE_NONE	3
 	regex_t regex;
+	regmatch_t regmatch;
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
@@ -727,8 +728,7 @@ view_search_start(struct tog_view *view)
 		view->searching = 0;
 	}
 
-	if (regcomp(&view->regex, pattern,
-	    REG_EXTENDED | REG_NOSUB | REG_NEWLINE) == 0) {
+	if (regcomp(&view->regex, pattern, REG_EXTENDED | REG_NEWLINE) == 0) {
 		err = view->search_start(view);
 		if (err) {
 			regfree(&view->regex);
@@ -2774,11 +2774,10 @@ parse_next_line(FILE *f, size_t *len)
 }
 
 static int
-match_line(const char *line, regex_t *regex)
+match_line(const char *line, regex_t *regex, size_t nmatch,
+    regmatch_t *regmatch)
 {
-	regmatch_t regmatch;
-
-	return regexec(regex, line, 1, &regmatch, 0) == 0;
+	return regexec(regex, line, nmatch, regmatch, 0) == 0;
 }
 
 struct tog_color *
@@ -2787,8 +2786,69 @@ match_color(struct tog_colors *colors, const char *line)
 	struct tog_color *tc = NULL;
 
 	SIMPLEQ_FOREACH(tc, colors, entry) {
-		if (match_line(line, &tc->regex))
+		if (match_line(line, &tc->regex, 0, NULL))
 			return tc;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
+    WINDOW *window, regmatch_t *regmatch)
+{
+	const struct got_error *err = NULL;
+	wchar_t *wline;
+	int width;
+	char *s;
+
+	*wtotal = 0;
+
+	s = strndup(line, regmatch->rm_so);
+	if (s == NULL)
+		return got_error_from_errno("strndup");
+
+	err = format_line(&wline, &width, s, wlimit, col_tab_align);
+	if (err) {
+		free(s);
+		return err;
+	}
+	waddwstr(window, wline);
+	free(wline);
+	free(s);
+	wlimit -= width;
+	*wtotal += width;
+
+	if (wlimit > 0) {
+		s = strndup(line + regmatch->rm_so,
+		    regmatch->rm_eo - regmatch->rm_so);
+		if (s == NULL) {
+			err = got_error_from_errno("strndup");
+			free(s);
+			return err;
+		}
+		err = format_line(&wline, &width, s, wlimit, col_tab_align);
+		if (err) {
+			free(s);
+			return err;
+		}
+		wattr_on(window, A_STANDOUT, NULL);
+		waddwstr(window, wline);
+		wattr_off(window, A_STANDOUT, NULL);
+		free(wline);
+		free(s);
+		wlimit -= width;
+		*wtotal += width;
+	}
+
+	if (wlimit > 0 && strlen(line) > regmatch->rm_eo) {
+		err = format_line(&wline, &width,
+		     line + regmatch->rm_eo, wlimit, col_tab_align);
+		if (err)
+			return err;
+		waddwstr(window, wline);
+		free(wline);
+		*wtotal += width;
 	}
 
 	return NULL;
@@ -2797,7 +2857,8 @@ match_color(struct tog_colors *colors, const char *line)
 static const struct got_error *
 draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
     off_t *line_offsets, int selected_line, int max_lines,
-    int *last_displayed_line, int *eof, char *header, struct tog_colors *colors)
+    int *last_displayed_line, int *eof, char *header,
+    struct tog_colors *colors, int matched_line, regmatch_t *regmatch)
 {
 	const struct got_error *err;
 	int nprinted = 0;
@@ -2846,17 +2907,29 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 			*eof = 1;
 			break;
 		}
-		err = format_line(&wline, &width, line, view->ncols, 0);
-		if (err) {
-			free(line);
-			return err;
-		}
 
 		tc = match_color(colors, line);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		waddwstr(view->window, wline);
+		if (first_displayed_line + nprinted == matched_line &&
+		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
+			err = add_matched_line(&width, line, view->ncols, 0,
+			    view->window, regmatch);
+			if (err) {
+				free(line);
+				return err;
+			}
+		} else {
+			err = format_line(&wline, &width, line, view->ncols, 0);
+			if (err) {
+				free(line);
+				return err;
+			}
+			waddwstr(view->window, wline);
+			free(wline);
+			wline = NULL;
+		}
 		if (tc)
 			wattr_off(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -2864,8 +2937,6 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 			waddch(view->window, '\n');
 		nprinted++;
 		free(line);
-		free(wline);
-		wline = NULL;
 	}
 	if (nprinted >= 1)
 		*last_displayed_line = first_displayed_line + (nprinted - 1);
@@ -3259,7 +3330,8 @@ search_next_diff_view(struct tog_view *view)
 		}
 		free(line);
 		line = parse_next_line(s->f, &len);
-		if (line && match_line(line, &view->regex)) {
+		if (line &&
+		    match_line(line, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			free(line);
@@ -3448,7 +3520,8 @@ show_diff_view(struct tog_view *view)
 
 	return draw_file(view, s->f, s->first_displayed_line, s->nlines,
 	    s->line_offsets, s->selected_line, view->nlines,
-	    &s->last_displayed_line, &s->eof, header, &s->colors);
+	    &s->last_displayed_line, &s->eof, header, &s->colors,
+	    s->matched_line, &view->regmatch);
 }
 
 static const struct got_error *
@@ -3730,7 +3803,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
     const char *path, struct tog_blame_line *lines, int nlines,
     int blame_complete, int selected_line, int *first_displayed_line,
     int *last_displayed_line, int *eof, int max_lines,
-    struct tog_colors *colors)
+    struct tog_colors *colors, int matched_line, regmatch_t *regmatch)
 {
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
@@ -3808,21 +3881,6 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 			continue;
 		}
 
-		if (view->ncols <= 9) {
-			width = 9;
-			wline = wcsdup(L"");
-			if (wline == NULL)
-				err = got_error_from_errno("wcsdup");
-		} else {
-			err = format_line(&wline, &width, line,
-			    view->ncols - 9, 9);
-			width += 9;
-		}
-		if (err) {
-			free(line);
-			return err;
-		}
-
 		if (view->focussed && nprinted == selected_line - 1)
 			wstandout(view->window);
 
@@ -3838,7 +3896,6 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 				err = got_object_id_str(&id_str, blame_line->id);
 				if (err) {
 					free(line);
-					free(wline);
 					return err;
 				}
 				tc = get_color(colors, TOG_COLOR_COMMIT);
@@ -3864,14 +3921,37 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 			wstandend(view->window);
 		waddstr(view->window, " ");
 
-		waddwstr(view->window, wline);
+		if (view->ncols <= 9) {
+			width = 9;
+			wline = wcsdup(L"");
+			if (wline == NULL) {
+				err = got_error_from_errno("wcsdup");
+				free(line);
+				return err;
+			}
+		} else if (*first_displayed_line + nprinted == matched_line &&
+		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
+			err = add_matched_line(&width, line, view->ncols - 9, 9,
+			    view->window, regmatch);
+			if (err) {
+				free(line);
+				return err;
+			}
+			width += 9;
+		} else {
+			err = format_line(&wline, &width, line,
+			    view->ncols - 9, 9);
+			waddwstr(view->window, wline);
+			free(wline);
+			wline = NULL;
+			width += 9;
+		}
+
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			*first_displayed_line = lineno;
 		free(line);
-		free(wline);
-		wline = NULL;
 	}
 	*last_displayed_line = lineno;
 
@@ -4245,7 +4325,8 @@ search_next_blame_view(struct tog_view *view)
 		}
 		free(line);
 		line = parse_next_line(s->blame.f, &len);
-		if (line && match_line(line, &view->regex)) {
+		if (line &&
+		    match_line(line, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
 			free(line);
@@ -4288,7 +4369,8 @@ show_blame_view(struct tog_view *view)
 	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
 	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
 	    s->selected_line, &s->first_displayed_line,
-	    &s->last_displayed_line, &s->eof, view->nlines, &s->colors);
+	    &s->last_displayed_line, &s->eof, view->nlines, &s->colors,
+	    s->matched_line, &view->regmatch);
 
 	view_vborder(view);
 	return err;
