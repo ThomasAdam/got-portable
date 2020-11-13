@@ -2032,10 +2032,6 @@ stop_log_thread(struct tog_log_view_state *s)
 		s->thread = NULL;
 	}
 
-	errcode = pthread_cond_destroy(&s->thread_args.need_commits);
-	if (errcode && err == NULL)
-		err = got_error_set_errno(errcode, "pthread_cond_destroy");
-
 	if (s->thread_args.repo) {
 		got_repo_close(s->thread_args.repo);
 		s->thread_args.repo = NULL;
@@ -2054,8 +2050,18 @@ close_log_view(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
+	int errcode;
 
 	err = stop_log_thread(s);
+
+	errcode = pthread_cond_destroy(&s->thread_args.need_commits);
+	if (errcode && err == NULL)
+		err = got_error_set_errno(errcode, "pthread_cond_destroy");
+
+	errcode = pthread_cond_destroy(&s->thread_args.commit_loaded);
+	if (errcode && err == NULL)
+		err = got_error_set_errno(errcode, "pthread_cond_destroy");
+
 	free_commits(&s->commits);
 	free(s->in_repo_path);
 	s->in_repo_path = NULL;
