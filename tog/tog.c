@@ -2601,21 +2601,18 @@ get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
 
 	if (worktree) {
 		const char *prefix = got_worktree_get_path_prefix(worktree);
-		char *wt_path, *p;
+		char *p;
 
-		err = got_worktree_resolve_path(&wt_path, worktree, argv[0]);
+		err = got_worktree_resolve_path(&p, worktree, argv[0]);
 		if (err)
 			return err;
-
-		if (asprintf(&p, "%s%s%s", prefix,
-		    (strcmp(prefix, "/") != 0) ? "/" : "", wt_path) == -1) {
+		if (asprintf(in_repo_path, "%s%s%s", prefix,
+		    (p[0] != '\0' && !got_path_is_root_dir(prefix)) ? "/" : "",
+		    p) == -1) {
 			err = got_error_from_errno("asprintf");
-			free(wt_path);
-			return err;
+			*in_repo_path = NULL;
 		}
-		err = got_repo_map_path(in_repo_path, repo, p, 0);
 		free(p);
-		free(wt_path);
 	} else
 		err = got_repo_map_path(in_repo_path, repo, argv[0], 1);
 
