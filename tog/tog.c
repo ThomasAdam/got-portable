@@ -2614,7 +2614,7 @@ get_in_repo_path_from_argv0(char **in_repo_path, int argc, char *argv[],
 		}
 		free(p);
 	} else
-		err = got_repo_map_path(in_repo_path, repo, argv[0], 1);
+		err = got_repo_map_path(in_repo_path, repo, argv[0]);
 
 	return err;
 }

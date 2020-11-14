@@ -3853,7 +3853,7 @@ cmd_log(int argc, char *argv[])
 		}
 	} else
 		error = got_repo_map_path(&in_repo_path, repo,
-		    path ? path : "", 1);
+		    path ? path : "");
 	if (error != NULL)
 		goto done;
 	if (in_repo_path) {
@@ -4526,7 +4526,7 @@ cmd_blame(int argc, char *argv[])
 		error = apply_unveil(got_repo_get_path(repo), 1, NULL);
 		if (error)
 			goto done;
-		error = got_repo_map_path(&in_repo_path, repo, path, 1);
+		error = got_repo_map_path(&in_repo_path, repo, path);
 	}
 	if (error)
 		goto done;
@@ -4859,7 +4859,7 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 		if (path == NULL)
 			path = "/";
-		error = got_repo_map_path(&in_repo_path, repo, path, 1);
+		error = got_repo_map_path(&in_repo_path, repo, path);
 		if (error != NULL)
 			goto done;
 	}

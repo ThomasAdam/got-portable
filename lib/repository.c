@@ -762,7 +762,7 @@ got_repo_free_remote_repo_data(struct got_remote_repo *repo)
 
 const struct got_error *
 got_repo_map_path(char **in_repo_path, struct got_repository *repo,
-    const char *input_path, int check_disk)
+    const char *input_path)
 {
 	const struct got_error *err = NULL;
 	const char *repo_abspath = NULL;
@@ -782,7 +782,7 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 
 	repo_abspath = got_repo_get_path(repo);
 
-	if (!check_disk || canonpath[0] == '\0') {
+	if (canonpath[0] == '\0') {
 		path = strdup(canonpath);
 		if (path == NULL) {
 			err = got_error_from_errno("strdup");

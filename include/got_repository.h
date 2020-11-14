@@ -105,7 +105,7 @@ int got_repo_is_bare(struct got_repository *);
 
 /* Attempt to map an arbitrary path to a path within the repository. */
 const struct got_error *got_repo_map_path(char **, struct got_repository *,
-    const char *, int);
+    const char *);
 
 /* Create a new repository in an empty directory at a specified path. */
 const struct got_error *got_repo_init(const char *);
