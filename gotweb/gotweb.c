@@ -3730,7 +3730,7 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	}
 
 	error = got_repo_map_path(&in_repo_path, gw_trans->repo,
-	    gw_trans->repo_path, 1);
+	    gw_trans->repo_path);
 	if (error)
 		goto done;
 
@@ -3970,7 +3970,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path, 1);
+	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path);
 	if (error)
 		goto done;
 
@@ -4076,7 +4076,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		goto done;
 	}
 
-	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path, 1);
+	error = got_repo_map_path(&in_repo_path, gw_trans->repo, path);
 	if (error)
 		goto done;
 
@@ -4169,7 +4169,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 		}
 	} else {
 		error = got_repo_map_path(&in_repo_path, gw_trans->repo,
-		    gw_trans->repo_path, 1);
+		    gw_trans->repo_path);
 		if (error)
 			goto done;
 		free(path);
