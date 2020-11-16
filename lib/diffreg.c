@@ -382,9 +382,3 @@ got_diffreg_result_free_right(struct got_diffreg_result *diffreg_result)
 	return got_diffreg_close(NULL, NULL, 0, diffreg_result->f2,
 	    diffreg_result->map2, diffreg_result->size2);
 }
-
-void
-got_diff_dump_change(FILE *outfile, struct diff_chunk *change,
-    FILE *f1, FILE *f2)
-{
-}

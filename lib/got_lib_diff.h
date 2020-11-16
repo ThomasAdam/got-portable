@@ -73,5 +73,3 @@ const struct got_error *got_merge_diff3(int *, int, const char *, const char *,
 
 const struct got_error *got_diff_files(struct got_diffreg_result **, FILE *,
     const char *, FILE *, const char *, int, int, FILE *);
-
-void got_diff_dump_change(FILE *, struct diff_chunk *, FILE *, FILE *);
