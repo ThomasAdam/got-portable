@@ -1,14 +1,17 @@
 lib:
-- improve performance of usr.bin/diff and port these changes back to got
-  (e.g. diffing between versions of sys/dev/pci/pcidevs is too slow)
+- create pack file deltas
+
+libexec:
+- add http(s) transport with libtls in got-fetch-pack or a new helper
+- implement got-send-pack in order to push objects to servers
 
 tog:
 - implement horizonal scrolling in all views
 - implement horizonal split view mode
-- implement search feature for diff view
-- highlight matched parts of commits in tog log search, and then allow regular
-  input to continue (such that the cursor can be moved) while tog is searching
 - implement 'limit' for 'tog log' (like search but display matched commits only)
 - allow moving to prev/next blamed line in diff view if opened from blame view,
   similar to how the diff view can switch commits if opened from log view
 - tog should have a command to list and log/browse references
+
+gotweb:
+- tracey has a gotwebd thingy in progress somewhere
