@@ -283,66 +283,6 @@ got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
 	    diff_context, ignore_whitespace, outfile);
 }
 
-const struct got_error *
-got_diff_blob_prepared_file(struct got_diffreg_result **resultp,
-    struct diff_data *data1, struct got_blob_object *blob1,
-    struct diff_data *data2, FILE *f2, char *p2, size_t size2,
-    const struct diff_config *cfg, int ignore_whitespace)
-{
-	const struct got_error *err = NULL, *free_err;
-	FILE *f1 = NULL;
-	char hex1[SHA1_DIGEST_STRING_LENGTH];
-	char *idstr1 = NULL, *p1 = NULL;
-	size_t size1, size;
-	struct got_diffreg_result *result = NULL;
-	int f1_created = 0;
-
-	*resultp = NULL;
-
-	size1 = 0;
-	if (blob1) {
-		f1 = got_opentemp();
-		if (f1 == NULL)
-			return got_error_from_errno("got_opentemp");
-		idstr1 = got_object_blob_id_str(blob1, hex1, sizeof(hex1));
-		err = got_object_blob_dump_to_file(&size1, NULL, NULL, f1,
-		    blob1);
-		if (err)
-			goto done;
-	} else {
-		idstr1 = "/dev/null";
-		f1_created = 1;
-		f1 = got_opentemp();
-		if (f1 == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-	}
-
-	err = got_diff_prepare_file(f1, &p1, &size, data1, cfg,
-	    ignore_whitespace);
-	if (err)
-		goto done;
-
-	err = got_diffreg_prepared_files(&result, cfg, data1, f1,
-	    p1, size1, data2, f2, p2, size2);
-	if (err)
-		goto done;
-
-	*resultp = result;
-done:
-	if (err) {
-		if (result)
-			free_err = got_diffreg_result_free_left(result);
-		else
-			free_err = got_diffreg_close(f1, p1, size1, NULL,
-			    NULL, 0);
-		if (free_err && err == NULL)
-			err = free_err;
-	}
-	return err;
-}
-
 static const struct got_error *
 diff_added_blob(struct got_object_id *id, const char *label, mode_t mode,
     struct got_repository *repo, got_diff_blob_cb cb, void *cb_arg)

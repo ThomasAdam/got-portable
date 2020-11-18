@@ -51,10 +51,6 @@ const struct got_error *got_diff_prepare_file(FILE *, char **, size_t *,
 const struct got_error *got_diffreg_prepared_files(struct got_diffreg_result **,
     const struct diff_config *, struct diff_data *, FILE *, char *, size_t,
     struct diff_data *, FILE *, char *, size_t);
-const struct got_error *got_diff_blob_prepared_file(
-    struct got_diffreg_result **, struct diff_data *, struct got_blob_object *,
-    struct diff_data *, FILE *, char *, size_t, const struct diff_config *,
-    int);
 const struct got_error *got_diffreg(struct got_diffreg_result **, FILE *, FILE *,
     enum got_diff_algorithm, int);
 const struct got_error *got_diffreg_output(off_t **, size_t *,
