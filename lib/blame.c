@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2019, 2020 Stefan Sperling <stsp@openbsd.org>
+ * Copyright (c) 2020 Neels Hofmeyr <neels@hofmeyr.de>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,9 +52,7 @@ struct got_blame_line {
 
 struct got_blame {
 	FILE *f;
-	char *map;
-	struct diff_data left_data;
-	struct diff_data right_data;
+	off_t size;
 	const struct diff_config *cfg;
 	size_t filesize;
 	int nlines;
@@ -61,6 +60,15 @@ struct got_blame {
 	struct got_blame_line *lines; /* one per line */
 	off_t *line_offsets;		/* one per line */
 	int ncommits;
+
+	/*
+	 * Map line numbers of an older version of the file to valid line
+	 * numbers in blame->f. This map is updated with each commit we
+	 * traverse throughout the file's history.
+	 * Lines mapped to -1 do not correspond to any line in blame->f.
+	 */
+	int *linemap2;
+	int nlines2;
 };
 
 static const struct got_error *
@@ -71,10 +79,10 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	const struct got_error *err = NULL;
 	struct got_blame_line *line;
 
-	if (lineno < 1 || lineno > blame->nlines)
+	if (lineno < 0 || lineno >= blame->nlines)
 		return NULL;
 
-	line = &blame->lines[lineno - 1];
+	line = &blame->lines[lineno];
 	if (line->annotated)
 		return NULL;
 
@@ -82,38 +90,54 @@ annotate_line(struct got_blame *blame, int lineno, struct got_object_id *id,
 	line->annotated = 1;
 	blame->nannotated++;
 	if (cb)
-		err = cb(arg, blame->nlines, lineno, id);
+		err = cb(arg, blame->nlines, lineno + 1, id);
 	return err;
 }
 
 static const struct got_error *
-blame_changes(struct got_blame *blame, struct diff_result *diff_result,
-    struct got_object_id *commit_id,
+blame_changes(struct got_blame *blame, int *linemap1,
+    struct diff_result *diff_result, struct got_object_id *commit_id,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
 	const struct got_error *err = NULL;
 	int i;
+	int idx1 = 0, idx2 = 0;
 
-	for (i = 0; i < diff_result->chunks.len; i++) {
+	for (i = 0; i < diff_result->chunks.len &&
+	    blame->nannotated < blame->nlines; i++) {
 		struct diff_chunk *c = diff_chunk_get(diff_result, i);
+		unsigned int left_start, left_count;
 		unsigned int right_start, right_count;
-		int lineno, len;
-		int ln;
+		int j;
 
-		if (diff_chunk_get_left_count(c) != 0)
-			continue;
-
-		len = diff_chunk_get_right_count(c);
-		if (len == 0)
-			continue;
-
+		/*
+		 * We do not need to worry about idx1/idx2 growing out
+		 * of bounds because the diff implementation ensures
+		 * that chunk ranges never exceed the number of lines
+		 * in the left/right input files.
+		 */
+		left_start = diff_chunk_get_left_start(c, diff_result, 0);
+		left_count = diff_chunk_get_left_count(c);
 		right_start = diff_chunk_get_right_start(c, diff_result, 0);
 		right_count = diff_chunk_get_right_count(c);
 
-		lineno = right_start + 1;
-		len = right_count;
-		for (ln = lineno; ln < lineno + len; ln++) {
+		if (left_count == right_count) {
+			for (j = 0; j < left_count; j++) {
+				linemap1[idx1++] = blame->linemap2[idx2++];
+			}
+			continue;
+		}
+
+		if (right_count == 0) {
+			for (j = 0; j < left_count; j++) {
+				linemap1[idx1++] = -1;
+			}
+			continue;
+		}
+
+		for (j = 0; j < right_count; j++) {
+			int ln = blame->linemap2[idx2++];
 			err = annotate_line(blame, ln, commit_id, cb, arg);
 			if (err)
 				return err;
@@ -126,73 +150,117 @@ blame_changes(struct got_blame *blame, struct diff_result *diff_result,
 }
 
 static const struct got_error *
-blame_commit(struct got_blame *blame, struct got_object_id *parent_id,
-    struct got_object_id *id, const char *path, struct got_repository *repo,
+blame_commit(struct got_blame *blame, struct got_object_id *id,
+    const char *path, struct got_repository *repo,
     const struct got_error *(*cb)(void *, int, int, struct got_object_id *),
     void *arg)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj = NULL;
-	struct got_object_id *obj_id = NULL;
 	struct got_commit_object *commit = NULL;
-	struct got_blob_object *blob = NULL;
+	struct got_object_qid *pid = NULL;
+	struct got_object_id *blob_id = NULL, *pblob_id = NULL;
+	struct got_blob_object *blob = NULL, *pblob = NULL;
 	struct got_diffreg_result *diffreg_result = NULL;
+	FILE *f1 = NULL, *f2 = NULL;
+	size_t size1, size2;
+	int nlines1, nlines2;
+	int *linemap1 = NULL;
 
-	err = got_object_open_as_commit(&commit, repo, parent_id);
+	err = got_object_open_as_commit(&commit, repo, id);
 	if (err)
 		return err;
 
-	err = got_object_id_by_path(&obj_id, repo, parent_id, path);
+	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	if (pid == NULL) {
+		got_object_commit_close(commit);
+		return NULL;
+	}
+
+	err = got_object_id_by_path(&blob_id, repo, id, path);
 	if (err) {
 		if (err->code == GOT_ERR_NO_TREE_ENTRY)
 			err = NULL;
 		goto done;
 	}
 
-	err = got_object_open(&obj, repo, obj_id);
+	err = got_object_open_as_blob(&blob, repo, blob_id, 8192);
 	if (err)
 		goto done;
 
-	if (obj->type != GOT_OBJ_TYPE_BLOB) {
-		err = got_error_path(path, GOT_ERR_OBJ_TYPE);
+	f2 = got_opentemp();
+	if (f2 == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+	err = got_object_blob_dump_to_file(&size2, &nlines2, NULL,
+	    f2, blob);
+	if (err)
+		goto done;
+
+	err = got_object_id_by_path(&pblob_id, repo, pid->id, path);
+	if (err) {
+		if (err->code == GOT_ERR_NO_TREE_ENTRY)
+			err = NULL;
 		goto done;
 	}
 
-	err = got_object_blob_open(&blob, repo, obj, 8192);
+	err = got_object_open_as_blob(&pblob, repo, pblob_id, 8192);
 	if (err)
 		goto done;
 
-	if (fseek(blame->f, 0L, SEEK_SET) == -1) {
-		err = got_ferror(blame->f, GOT_ERR_IO);
+	f1 = got_opentemp();
+	if (f1 == NULL) {
+		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-
-	diff_data_free(&blame->left_data);
-	memset(&blame->left_data, 0, sizeof(blame->left_data));
-	err = got_diff_blob_prepared_file(&diffreg_result, &blame->left_data,
-	    blob, &blame->right_data, blame->f, blame->map, blame->filesize,
-	    blame->cfg, 0);
+	err = got_object_blob_dump_to_file(&size1, &nlines1, NULL, f1, pblob);
 	if (err)
 		goto done;
 
+	err = got_diff_files(&diffreg_result, f1, "", f2, "",
+	    0, 0, NULL);
+	if (err)
+		goto done;
 	if (diffreg_result->result->chunks.len > 0) {
-		err = blame_changes(blame, diffreg_result->result, id, cb, arg);
+		if (nlines1 > 0) {
+			linemap1 = calloc(nlines1, sizeof(*linemap1));
+			if (linemap1 == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+		}
+		err = blame_changes(blame, linemap1,
+		    diffreg_result->result, id, cb, arg);
+		if (err) {
+			free(linemap1);
+			goto done;
+		}
+		if (linemap1) {
+			free(blame->linemap2);
+			blame->linemap2 = linemap1;
+			blame->nlines2 = nlines1;
+		}
 	} else if (cb)
 		err = cb(arg, blame->nlines, -1, id);
 done:
 	if (diffreg_result) {
 		const struct got_error *free_err;
-		free_err = got_diffreg_result_free_left(diffreg_result);
+		free_err = got_diffreg_result_free(diffreg_result);
 		if (free_err && err == NULL)
 			err = free_err;
 	}
 	if (commit)
 		got_object_commit_close(commit);
-	free(obj_id);
-	if (obj)
-		got_object_close(obj);
+	free(blob_id);
+	free(pblob_id);
 	if (blob)
 		got_object_blob_close(blob);
+	if (pblob)
+		got_object_blob_close(pblob);
+	if (f1 && fclose(f1) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f2 && fclose(f2) != 0 && err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
 
@@ -201,13 +269,10 @@ blame_close(struct got_blame *blame)
 {
 	const struct got_error *err = NULL;
 
-	diff_data_free(&blame->left_data);
-	diff_data_free(&blame->right_data);
-	if (blame->map && munmap(blame->map, blame->filesize) == -1)
-		err = got_error_from_errno("munmap");
 	if (blame->f && fclose(blame->f) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(blame->lines);
+	free(blame->linemap2);
 	free(blame);
 	return err;
 }
@@ -223,16 +288,15 @@ blame_open(struct got_blame **blamep, const char *path,
 	struct got_object_id *obj_id = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_blame *blame = NULL;
-	struct got_object_id *id = NULL, *pid = NULL;
-	int lineno, created;
-	size_t size;
+	struct got_object_id *id = NULL;
+	int lineno;
 	struct got_commit_graph *graph = NULL;
 
 	*blamep = NULL;
 
 	err = got_object_id_by_path(&obj_id, repo, start_commit_id, path);
 	if (err)
-		return err;
+		goto done;
 
 	err = got_object_open(&obj, repo, obj_id);
 	if (err)
@@ -248,8 +312,10 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 
 	blame = calloc(1, sizeof(*blame));
-	if (blame == NULL)
-		return got_error_from_errno("calloc");
+	if (blame == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
 
 	blame->f = got_opentemp();
 	if (blame->f == NULL) {
@@ -261,11 +327,7 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err || blame->nlines == 0)
 		goto done;
 
-	blame->cfg = got_diff_get_config(GOT_DIFF_ALGORITHM_PATIENCE),
-	err = got_diff_prepare_file(&blame->f, &blame->map, &created, &size,
-	    &blame->right_data, blame->cfg, 0);
-	if (err)
-		goto done;
+	blame->cfg = got_diff_get_config(GOT_DIFF_ALGORITHM_PATIENCE);
 
 	/* Don't include \n at EOF in the blame line count. */
 	if (blame->line_offsets[blame->nlines - 1] == blame->filesize)
@@ -277,38 +339,50 @@ blame_open(struct got_blame **blamep, const char *path,
 		goto done;
 	}
 
+	blame->nlines2 = blame->nlines;
+	blame->linemap2 = calloc(blame->nlines2, sizeof(*blame->linemap2));
+	if (blame->linemap2 == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+	for (lineno = 0; lineno < blame->nlines2; lineno++)
+		blame->linemap2[lineno] = lineno;
+
 	err = got_commit_graph_open(&graph, path, 1);
 	if (err)
-		return err;
+		goto done;
+
 	err = got_commit_graph_iter_start(graph, start_commit_id, repo,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;
-	id = start_commit_id;
 	for (;;) {
-		err = got_commit_graph_iter_next(&pid, graph, repo,
+		struct got_object_id *next_id;
+		err = got_commit_graph_iter_next(&next_id, graph, repo,
 		    cancel_cb, cancel_arg);
 		if (err) {
-			if (err->code == GOT_ERR_ITER_COMPLETED)
+			if (err->code == GOT_ERR_ITER_COMPLETED) {
 				err = NULL;
-			break;
+				break;
+			}
+			goto done;
 		}
-		if (pid) {
-			err = blame_commit(blame, pid, id, path, repo, cb, arg);
+		if (next_id) {
+			id = next_id;
+			err = blame_commit(blame, id, path, repo, cb, arg);
 			if (err) {
 				if (err->code == GOT_ERR_ITER_COMPLETED)
 					err = NULL;
-				break;
+				goto done;
 			}
 			if (blame->nannotated == blame->nlines)
 				break;
 		}
-		id = pid;
 	}
 
 	if (id && blame->nannotated < blame->nlines) {
 		/* Annotate remaining non-annotated lines with last commit. */
-		for (lineno = 1; lineno <= blame->nlines; lineno++) {
+		for (lineno = 0; lineno < blame->nlines; lineno++) {
 			err = annotate_line(blame, lineno, id, cb, arg);
 			if (err)
 				goto done;
