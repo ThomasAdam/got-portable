@@ -1300,8 +1300,8 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 			break;
 		buf = got_object_blob_get_read_buf(blob);
 		i = hdrlen;
-		if (line_offsets && nlines) {
-			if (*line_offsets == NULL) {
+		if (nlines) {
+			if (line_offsets && *line_offsets == NULL) {
 				/* Have some data but perhaps no '\n'. */
 				noffsets = 1;
 				*nlines = 1;
@@ -1323,7 +1323,7 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 					continue;
 				}
 				(*nlines)++;
-				if (noffsets < *nlines) {
+				if (line_offsets && noffsets < *nlines) {
 					off_t *o = recallocarray(*line_offsets,
 					    noffsets, *nlines,
 					    sizeof(**line_offsets));
@@ -1336,8 +1336,10 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 					*line_offsets = o;
 					noffsets = *nlines;
 				}
-				off = total_len + i - hdrlen + 1;
-				(*line_offsets)[*nlines - 1] = off;
+				if (line_offsets) {
+					off = total_len + i - hdrlen + 1;
+					(*line_offsets)[*nlines - 1] = off;
+				}
 				i++;
 			}
 		}
