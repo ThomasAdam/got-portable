@@ -25,7 +25,72 @@ struct diff_range {
 #define DIFF_RC_OK			0
 /* Any positive return values are errno values from sys/errno.h */
 
-struct diff_atom;
+struct diff_atom {
+	struct diff_data *root; /* back pointer to root diff data */
+
+	off_t pos;		/* if not memory-mapped */
+	const uint8_t *at;	/* if memory-mapped */
+	off_t len;
+
+	/* This hash is just a very cheap speed up for finding *mismatching*
+	 * atoms. When hashes match, we still need to compare entire atoms to
+	 * find out whether they are indeed identical or not.
+	 * Calculated over all atom bytes with diff_atom_hash_update(). */
+	unsigned int hash;
+};
+
+/* Mix another atom_byte into the provided hash value and return the result.
+ * The hash value passed in for the first byte of the atom must be zero. */
+unsigned int
+diff_atom_hash_update(unsigned int hash, unsigned char atom_byte);
+
+/* Compare two atoms for equality. Return 0 on success, or errno on failure.
+ * Set cmp to -1, 0, or 1, just like strcmp(). */
+int
+diff_atom_cmp(int *cmp,
+	      const struct diff_atom *left,
+	      const struct diff_atom *right);
+
+
+/* The atom's index in the entire file. For atoms divided by lines of text, this
+ * yields the line number (starting with 0). Also works for diff_data that
+ * reference only a subsection of a file, always reflecting the global position
+ * in the file (and not the relative position within the subsection). */
+#define diff_atom_root_idx(DIFF_DATA, ATOM) \
+	((ATOM) && ((ATOM) >= (DIFF_DATA)->root->atoms.head) \
+	 ? (unsigned int)((ATOM) - ((DIFF_DATA)->root->atoms.head)) \
+	 : (DIFF_DATA)->root->atoms.len)
+
+/* The atom's index within DIFF_DATA. For atoms divided by lines of text, this
+ * yields the line number (starting with 0). */
+#define diff_atom_idx(DIFF_DATA, ATOM) \
+	((ATOM) && ((ATOM) >= (DIFF_DATA)->atoms.head) \
+	 ? (unsigned int)((ATOM) - ((DIFF_DATA)->atoms.head)) \
+	 : (DIFF_DATA)->atoms.len)
+
+#define foreach_diff_atom(ATOM, FIRST_ATOM, COUNT) \
+	for ((ATOM) = (FIRST_ATOM); \
+	     (ATOM) \
+	     && ((ATOM) >= (FIRST_ATOM)) \
+	     && ((ATOM) - (FIRST_ATOM) < (COUNT)); \
+	     (ATOM)++)
+
+#define diff_data_foreach_atom(ATOM, DIFF_DATA) \
+	foreach_diff_atom(ATOM, (DIFF_DATA)->atoms.head, (DIFF_DATA)->atoms.len)
+
+#define diff_data_foreach_atom_from(FROM, ATOM, DIFF_DATA) \
+	for ((ATOM) = (FROM); \
+	     (ATOM) \
+	     && ((ATOM) >= (DIFF_DATA)->atoms.head) \
+	     && ((ATOM) - (DIFF_DATA)->atoms.head < (DIFF_DATA)->atoms.len); \
+	     (ATOM)++)
+
+#define diff_data_foreach_atom_backwards_from(FROM, ATOM, DIFF_DATA) \
+	for ((ATOM) = (FROM); \
+	     (ATOM) \
+	     && ((ATOM) >= (DIFF_DATA)->atoms.head) \
+	     && ((ATOM) - (DIFF_DATA)->atoms.head >= 0); \
+	     (ATOM)--)
 
 /* For each file, there is a "root" struct diff_data referencing the entire
  * file, which the atoms are parsed from. In recursion of diff algorithm, there

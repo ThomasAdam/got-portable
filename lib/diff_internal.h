@@ -56,71 +56,11 @@ diff_range_len(const struct diff_range *r)
 #define DIFF_RC_OK			0
 /* Any positive return values are errno values from sys/errno.h */
 
-struct diff_data;
-
-struct diff_atom {
-	struct diff_data *root; /* back pointer to root diff data */
-
-	off_t pos;		/* if not memory-mapped */
-	const uint8_t *at;	/* if memory-mapped */
-	off_t len;
-
-	/* This hash is just a very cheap speed up for finding *mismatching*
-	 * atoms. When hashes match, we still need to compare entire atoms to
-	 * find out whether they are indeed identical or not. */
-	unsigned int hash;
-};
-
-int
-diff_atom_cmp(int *cmp,
-	      const struct diff_atom *left,
-	      const struct diff_atom *right);
-
 /* Indicate whether two given diff atoms match. */
 int
 diff_atom_same(bool *same,
 	       const struct diff_atom *left,
 	       const struct diff_atom *right);
-
-/* The atom's index in the entire file. For atoms divided by lines of text, this
- * yields the line number (starting with 0). Also works for diff_data that
- * reference only a subsection of a file, always reflecting the global position
- * in the file (and not the relative position within the subsection). */
-#define diff_atom_root_idx(DIFF_DATA, ATOM) \
-	((ATOM) && ((ATOM) >= (DIFF_DATA)->root->atoms.head) \
-	 ? (unsigned int)((ATOM) - ((DIFF_DATA)->root->atoms.head)) \
-	 : (DIFF_DATA)->root->atoms.len)
-
-/* The atom's index within DIFF_DATA. For atoms divided by lines of text, this
- * yields the line number (starting with 0). */
-#define diff_atom_idx(DIFF_DATA, ATOM) \
-	((ATOM) && ((ATOM) >= (DIFF_DATA)->atoms.head) \
-	 ? (unsigned int)((ATOM) - ((DIFF_DATA)->atoms.head)) \
-	 : (DIFF_DATA)->atoms.len)
-
-#define foreach_diff_atom(ATOM, FIRST_ATOM, COUNT) \
-	for ((ATOM) = (FIRST_ATOM); \
-	     (ATOM) \
-	     && ((ATOM) >= (FIRST_ATOM)) \
-	     && ((ATOM) - (FIRST_ATOM) < (COUNT)); \
-	     (ATOM)++)
-
-#define diff_data_foreach_atom(ATOM, DIFF_DATA) \
-	foreach_diff_atom(ATOM, (DIFF_DATA)->atoms.head, (DIFF_DATA)->atoms.len)
-
-#define diff_data_foreach_atom_from(FROM, ATOM, DIFF_DATA) \
-	for ((ATOM) = (FROM); \
-	     (ATOM) \
-	     && ((ATOM) >= (DIFF_DATA)->atoms.head) \
-	     && ((ATOM) - (DIFF_DATA)->atoms.head < (DIFF_DATA)->atoms.len); \
-	     (ATOM)++)
-
-#define diff_data_foreach_atom_backwards_from(FROM, ATOM, DIFF_DATA) \
-	for ((ATOM) = (FROM); \
-	     (ATOM) \
-	     && ((ATOM) >= (DIFF_DATA)->atoms.head) \
-	     && ((ATOM) - (DIFF_DATA)->atoms.head >= 0); \
-	     (ATOM)--)
 
 /* A diff chunk represents a set of atoms on the left and/or a set of atoms on
  * the right.

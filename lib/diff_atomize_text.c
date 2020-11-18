@@ -29,6 +29,12 @@
 #include "diff_internal.h"
 #include "diff_debug.h"
 
+unsigned int
+diff_atom_hash_update(unsigned int hash, unsigned char atom_byte)
+{
+	return hash * 23 + atom_byte;
+}
+
 static int
 diff_data_atomize_text_lines_fd(struct diff_data *d)
 {
@@ -63,7 +69,8 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 				if (buf[i] != '\r' && buf[i] != '\n') {
 					if (!ignore_whitespace
 					    || !isspace(buf[i]))
-						hash = hash * 23 + buf[i];
+						hash = diff_atom_hash_update(
+						    hash, buf[i]);
 					line_end++;
 				} else
 					eol = buf[i];
