@@ -157,47 +157,6 @@ done:
 }
 
 const struct got_error *
-got_diffreg_prepared_files(struct got_diffreg_result **diffreg_result,
-    const struct diff_config *cfg,
-    struct diff_data *left, FILE *f1, char *p1, size_t size1,
-    struct diff_data *right, FILE *f2, char *p2, size_t size2)
-{
-	const struct got_error *err = NULL;
-	struct diff_result *diff_result;
-
-	*diffreg_result = calloc(1, sizeof(**diffreg_result));
-	if (*diffreg_result == NULL)
-		return got_error_from_errno("calloc");
-	
-	diff_result = diff_main(cfg, left, right);
-	if (diff_result == NULL) {
-		err = got_error_set_errno(ENOMEM, "malloc");
-		goto done;
-	}
-	if (diff_result->rc != DIFF_RC_OK) {
-		err = got_error_set_errno(diff_result->rc, "diff");
-		goto done;
-	}
-
-	(*diffreg_result)->result = diff_result;
-	(*diffreg_result)->f1 = f1;
-	(*diffreg_result)->map1 = p1;
-	(*diffreg_result)->size1 = size1;
-	(*diffreg_result)->f2 = f2;
-	(*diffreg_result)->map2 = p2;
-	(*diffreg_result)->size2 = size2;
-done:
-	if (err) {
-		if (diffreg_result) {
-			free(*diffreg_result);
-			*diffreg_result = NULL;
-		}
-	}
-	
-	return err;
-}
-
-const struct got_error *
 got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
     enum got_diff_algorithm algorithm, int ignore_whitespace)
 {
