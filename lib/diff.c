@@ -311,10 +311,16 @@ got_diff_blob_prepared_file(struct got_diffreg_result **resultp,
 			goto done;
 	} else {
 		idstr1 = "/dev/null";
+		f1_created = 1;
+		f1 = got_opentemp();
+		if (f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
 	}
 
-	err = got_diff_prepare_file(&f1, &p1, &f1_created, &size,
-	    data1, cfg, ignore_whitespace);
+	err = got_diff_prepare_file(f1, &p1, &size, data1, cfg,
+	    ignore_whitespace);
 	if (err)
 		goto done;
 

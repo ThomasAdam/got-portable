@@ -46,8 +46,8 @@ struct got_diffreg_result {
 #define GOT_DIFF_CONFLICT_MARKER_END	">>>>>>>"
 
 const struct diff_config *got_diff_get_config(enum got_diff_algorithm);
-const struct got_error *got_diff_prepare_file(FILE **, char **, int *,
-    size_t *, struct diff_data *, const struct diff_config *, int); 
+const struct got_error *got_diff_prepare_file(FILE *, char **, size_t *,
+    struct diff_data *, const struct diff_config *, int); 
 const struct got_error *got_diffreg_prepared_files(struct got_diffreg_result **,
     const struct diff_config *, struct diff_data *, FILE *, char *, size_t,
     struct diff_data *, FILE *, char *, size_t);

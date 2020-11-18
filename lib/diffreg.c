@@ -118,7 +118,7 @@ got_diff_get_config(enum got_diff_algorithm algorithm)
 }
 
 const struct got_error *
-got_diff_prepare_file(FILE **f, char **p, int *f_created, size_t *size,
+got_diff_prepare_file(FILE *f, char **p, size_t *size,
     struct diff_data *diff_data, const struct diff_config *cfg,
     int ignore_whitespace)
 {
@@ -132,28 +132,18 @@ got_diff_prepare_file(FILE **f, char **p, int *f_created, size_t *size,
 	if (ignore_whitespace)
 		diff_flags |= DIFF_FLAG_IGNORE_WHITESPACE;
 
-	if (f && *f) {
-		if (fstat(fileno(*f), &st) == -1) {
-			err = got_error_from_errno("fstat");
-			goto done;
-		}
-	#ifndef GOT_DIFF_NO_MMAP
-		*p = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE,
-		    fileno(*f), 0);
-		if (*p == MAP_FAILED)
-	#endif
-			*p = NULL; /* fall back on file I/O */
-	} else {
-		*f_created = 1;
-		st.st_size = 0;
-		*f = got_opentemp();
-		if (*f == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
+	if (fstat(fileno(f), &st) == -1) {
+		err = got_error_from_errno("fstat");
+		goto done;
 	}
+#ifndef GOT_DIFF_NO_MMAP
+	*p = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE,
+	    fileno(f), 0);
+	if (*p == MAP_FAILED)
+#endif
+		*p = NULL; /* fall back on file I/O */
 
-	rc = diff_atomize_file(diff_data, cfg, *f, *p, st.st_size, diff_flags);
+	rc = diff_atomize_file(diff_data, cfg, f, *p, st.st_size, diff_flags);
 	if (rc) {
 		err = got_error_set_errno(rc, "diff_atomize_file");
 		goto done;
@@ -232,20 +222,37 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 		left = &d_left;
 		right = &d_right;
 	}
-	
+
 	cfg = got_diff_get_config(algorithm);
 	if (cfg == NULL) {
 		err = got_error(GOT_ERR_NOT_IMPL);
 		goto done;
 	}
 
-	err = got_diff_prepare_file(&f1, &p1, &f1_created, &size1,
-	    left, cfg, ignore_whitespace);
+	if (f1 == NULL) {
+		f1_created = 1;
+		f1 = got_opentemp();
+		if (f1 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+	}
+	if (f2 == NULL) {
+		f2_created = 1;
+		f2 = got_opentemp();
+		if (f2 == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
+	}
+
+	err = got_diff_prepare_file(f1, &p1, &size1, left, cfg,
+	    ignore_whitespace);
 	if (err)
 		goto done;
 
-	err = got_diff_prepare_file(&f2, &p2, &f2_created, &size2,
-	    right, cfg, ignore_whitespace);
+	err = got_diff_prepare_file(f2, &p2, &size2, right, cfg,
+	    ignore_whitespace);
 	if (err)
 		goto done;
 
