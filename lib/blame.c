@@ -53,7 +53,7 @@ struct got_blame_line {
 struct got_blame {
 	FILE *f;
 	off_t size;
-	const struct diff_config *cfg;
+	struct diff_config *cfg;
 	size_t filesize;
 	int nlines;
 	int nannotated;
@@ -273,6 +273,7 @@ blame_close(struct got_blame *blame)
 		err = got_error_from_errno("fclose");
 	free(blame->lines);
 	free(blame->linemap2);
+	free(blame->cfg);
 	free(blame);
 	return err;
 }
@@ -327,7 +328,10 @@ blame_open(struct got_blame **blamep, const char *path,
 	if (err || blame->nlines == 0)
 		goto done;
 
-	blame->cfg = got_diff_get_config(GOT_DIFF_ALGORITHM_PATIENCE);
+	err = got_diff_get_config(&blame->cfg, GOT_DIFF_ALGORITHM_PATIENCE,
+	    NULL, NULL);
+	if (err)
+		goto done;
 
 	/* Don't include \n at EOF in the blame line count. */
 	if (blame->line_offsets[blame->nlines - 1] == blame->filesize)

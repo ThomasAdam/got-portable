@@ -105,16 +105,35 @@ got_diffreg_close(FILE *f1, char *p1, size_t size1,
 	return err;
 }
 
-const struct diff_config *
-got_diff_get_config(enum got_diff_algorithm algorithm)
+const struct got_error *
+got_diff_get_config(struct diff_config **cfg,
+    enum got_diff_algorithm algorithm,
+    diff_atomize_func_t atomize_func, void *atomize_func_data)
 {
+	*cfg = calloc(1, sizeof(**cfg));
+	if (*cfg == NULL)
+		return got_error_from_errno("calloc");
+
 	switch (algorithm) {
 	case GOT_DIFF_ALGORITHM_PATIENCE:
-		return &diff_config_patience;
+		(*cfg)->algo = &patience;
+		break;
 	case GOT_DIFF_ALGORITHM_MYERS:
-		return &diff_config_myers_then_myers_divide;
+		(*cfg)->algo = &myers_then_myers_divide;
+		break;
+	default:
+		return got_error_msg(GOT_ERR_NOT_IMPL, "bad diff algorithm");
 	}
-	return NULL; /* should not happen */
+
+	if (atomize_func) {
+		(*cfg)->atomize_func = atomize_func;
+		(*cfg)->atomize_func_data = atomize_func_data;
+	} else
+		(*cfg)->atomize_func = diff_atomize_text_by_line;
+
+	(*cfg)->max_recursion_depth = 0; /* use default recursion depth */
+
+	return NULL;
 }
 
 const struct got_error *
@@ -161,7 +180,7 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
     enum got_diff_algorithm algorithm, int ignore_whitespace)
 {
 	const struct got_error *err = NULL;
-	const struct diff_config *cfg;
+	struct diff_config *cfg = NULL;
 	char *p1 = NULL, *p2 = NULL;
 	int f1_created = 0, f2_created = 0;
 	size_t size1, size2;
@@ -182,11 +201,9 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 		right = &d_right;
 	}
 
-	cfg = got_diff_get_config(algorithm);
-	if (cfg == NULL) {
-		err = got_error(GOT_ERR_NOT_IMPL);
+	err = got_diff_get_config(&cfg, algorithm, NULL, NULL);
+	if (err)
 		goto done;
-	}
 
 	if (f1 == NULL) {
 		f1_created = 1;
@@ -237,6 +254,7 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 		(*diffreg_result)->size2 = size2;
 	}
 done:
+	free(cfg);
 	if (diffreg_result == NULL) {
 		diff_data_free(left);
 		diff_data_free(right);
