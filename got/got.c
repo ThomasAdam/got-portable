@@ -4438,7 +4438,7 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	struct blame_cb_args bca;
 	int ch, obj_type, i;
-	size_t filesize;
+	off_t filesize;
 
 	memset(&bca, 0, sizeof(bca));
 

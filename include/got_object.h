@@ -277,7 +277,7 @@ void got_object_blob_rewind(struct got_blob_object *);
  * file in the int argument, and line offsets in the off_t argument
  * (NULL can be passed for any output argument).
  */
-const struct got_error *got_object_blob_dump_to_file(size_t *, int *,
+const struct got_error *got_object_blob_dump_to_file(off_t *, int *,
     off_t **, FILE *, struct got_blob_object *);
 
 /*

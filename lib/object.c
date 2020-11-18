@@ -1274,7 +1274,7 @@ got_object_blob_read_block(size_t *outlenp, struct got_blob_object *blob)
 }
 
 const struct got_error *
-got_object_blob_dump_to_file(size_t *filesize, int *nlines,
+got_object_blob_dump_to_file(off_t *filesize, int *nlines,
     off_t **line_offsets, FILE *outfile, struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;

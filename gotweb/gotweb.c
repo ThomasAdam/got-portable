@@ -3960,7 +3960,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 	char *path = NULL, *in_repo_path = NULL;
 	struct gw_blame_cb_args bca;
 	int i, obj_type;
-	size_t filesize;
+	off_t filesize;
 
 	if (asprintf(&path, "%s%s%s",
 	    gw_trans->repo_folder ? gw_trans->repo_folder : "",

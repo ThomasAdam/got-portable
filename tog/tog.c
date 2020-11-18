@@ -333,7 +333,7 @@ struct tog_blame_thread_args {
 
 struct tog_blame {
 	FILE *f;
-	size_t filesize;
+	off_t filesize;
 	struct tog_blame_line *lines;
 	int nlines;
 	off_t *line_offsets;

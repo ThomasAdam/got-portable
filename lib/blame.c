@@ -54,7 +54,7 @@ struct got_blame {
 	FILE *f;
 	off_t size;
 	struct diff_config *cfg;
-	size_t filesize;
+	off_t filesize;
 	int nlines;
 	int nannotated;
 	struct got_blame_line *lines; /* one per line */
@@ -162,7 +162,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	struct got_blob_object *blob = NULL, *pblob = NULL;
 	struct got_diffreg_result *diffreg_result = NULL;
 	FILE *f1 = NULL, *f2 = NULL;
-	size_t size1, size2;
+	off_t size1, size2;
 	int nlines1, nlines2;
 	int *linemap1 = NULL;
 

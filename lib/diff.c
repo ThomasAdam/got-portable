@@ -65,7 +65,7 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char hex2[SHA1_DIGEST_STRING_LENGTH];
 	char *idstr1 = NULL, *idstr2 = NULL;
-	size_t size1, size2;
+	off_t size1, size2;
 	struct got_diffreg_result *result;
 	off_t outoff = 0;
 	int n;
@@ -222,7 +222,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 	FILE *f1 = NULL;
 	char hex1[SHA1_DIGEST_STRING_LENGTH];
 	char *idstr1 = NULL;
-	size_t size1;
+	off_t size1;
 	struct got_diffreg_result *result = NULL;
 
 	if (resultp)
