@@ -1281,7 +1281,8 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 	size_t n, len, hdrlen;
 	const uint8_t *buf;
 	int i;
-	size_t noffsets = 0;
+	const int alloc_chunksz = 512;
+	size_t nalloc = 0;
 	off_t off = 0, total_len = 0;
 
 	if (line_offsets)
@@ -1303,9 +1304,10 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 		if (nlines) {
 			if (line_offsets && *line_offsets == NULL) {
 				/* Have some data but perhaps no '\n'. */
-				noffsets = 1;
 				*nlines = 1;
-				*line_offsets = calloc(1, sizeof(**line_offsets));
+				nalloc = alloc_chunksz;
+				*line_offsets = calloc(nalloc,
+				    sizeof(**line_offsets));
 				if (*line_offsets == NULL)
 					return got_error_from_errno("calloc");
 
@@ -1323,10 +1325,10 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 					continue;
 				}
 				(*nlines)++;
-				if (line_offsets && noffsets < *nlines) {
+				if (line_offsets && nalloc < *nlines) {
+					size_t n = *nlines + alloc_chunksz;
 					off_t *o = recallocarray(*line_offsets,
-					    noffsets, *nlines,
-					    sizeof(**line_offsets));
+					    nalloc, n, sizeof(**line_offsets));
 					if (o == NULL) {
 						free(*line_offsets);
 						*line_offsets = NULL;
@@ -1334,7 +1336,7 @@ got_object_blob_dump_to_file(size_t *filesize, int *nlines,
 						    "recallocarray");
 					}
 					*line_offsets = o;
-					noffsets = *nlines;
+					nalloc = n;
 				}
 				if (line_offsets) {
 					off = total_len + i - hdrlen + 1;
