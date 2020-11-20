@@ -583,6 +583,65 @@ test_diff_symlinks_in_repo() {
 	test_done "$testroot" "$ret"
 }
 
+test_diff_binary_files() {
+	local testroot=`test_init diff_binary_files`
+	local head_rev=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf '\377\377\0\0\377\377\0\0' > $testroot/wt/foo
+	(cd $testroot/wt && got add foo >/dev/null)
+
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + foo' >> $testroot/stdout.expected
+	echo '--- foo' >> $testroot/stdout.expected
+	echo '+++ foo' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	printf '+\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
+	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -a -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -m 'add binary file' > /dev/null)
+	local head_rev=`git_show_head $testroot/repo`
+
+	printf '\377\200\0\0\377\200\0\0' > $testroot/wt/foo
+
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'foo$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + foo' >> $testroot/stdout.expected
+	echo '--- foo' >> $testroot/stdout.expected
+	echo '+++ foo' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	printf '-\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
+	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+	printf '+\377\200\0\0\377\200\0\0\n' >> $testroot/stdout.expected
+	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -a -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -592,3 +651,4 @@ run_test test_diff_ignore_whitespace
 run_test test_diff_submodule_of_same_repo
 run_test test_diff_symlinks_in_work_tree
 run_test test_diff_symlinks_in_repo
+run_test test_diff_binary_files
