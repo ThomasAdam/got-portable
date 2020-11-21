@@ -18,6 +18,11 @@
 struct diff_input_info {
 	const char *left_path;
 	const char *right_path;
+
+	/* Set by caller of diff_output_* functions. */
+	int flags;
+#define DIFF_INPUT_LEFT_NONEXISTENT	0x00000001
+#define DIFF_INPUT_RIGHT_NONEXISTENT	0x00000002
 };
 
 struct diff_output_info {
@@ -89,3 +94,6 @@ int diff_output_chunk_right_version(struct diff_output_info **output_info,
 				const struct diff_input_info *info,
 				const struct diff_result *result,
 				const struct diff_chunk_context *cc);
+
+const char *diff_output_get_label_left(const struct diff_input_info *info);
+const char *diff_output_get_label_right(const struct diff_input_info *info);

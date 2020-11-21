@@ -235,7 +235,8 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 	}
 
 	if (print_header && !(state->header_printed)) {
-		rc = fprintf(dest, "--- %s\n", info->left_path ? : "a");
+		rc = fprintf(dest, "--- %s\n",
+		    diff_output_get_label_left(info));
 		if (rc < 0)
 			return errno;
 		if (outinfo) {
@@ -246,7 +247,8 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 			*offp = outoff;
 
 		}
-		rc = fprintf(dest, "+++ %s\n", info->right_path ? : "b");
+		rc = fprintf(dest, "+++ %s\n",
+		    diff_output_get_label_right(info));
 		if (rc < 0)
 			return errno;
 		if (outinfo) {
@@ -442,8 +444,8 @@ diff_output_unidiff(struct diff_output_info **output_info,
 				continue;
 
 			fprintf(dest, "Binary files %s and %s differ\n",
-			    info->left_path ? : "a",
-			    info->right_path ? : "b");
+			    diff_output_get_label_left(info),
+			    diff_output_get_label_right(info));
 			break;
 		}
 

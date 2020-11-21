@@ -139,8 +139,8 @@ diff_output_edscript(struct diff_output_info **output_info,
 				continue;
 
 			fprintf(dest, "Binary files %s and %s differ\n",
-			    info->left_path ? : "a",
-			    info->right_path ? : "b");
+			    diff_output_get_label_left(info),
+			    diff_output_get_label_right(info));
 			break;
 		}
 

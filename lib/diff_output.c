@@ -326,3 +326,21 @@ diff_output_info_free(struct diff_output_info *output_info)
 	ARRAYLIST_FREE(output_info->line_offsets);
 	free(output_info);
 }
+
+const char *
+diff_output_get_label_left(const struct diff_input_info *info)
+{
+	if (info->flags & DIFF_INPUT_LEFT_NONEXISTENT)
+		return "/dev/null";
+
+	return info->left_path ? : "a";
+}
+
+const char *
+diff_output_get_label_right(const struct diff_input_info *info)
+{
+	if (info->flags & DIFF_INPUT_RIGHT_NONEXISTENT)
+		return "/dev/null";
+
+	return info->right_path ? : "b";
+}
