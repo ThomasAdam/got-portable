@@ -227,7 +227,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	if (err)
 		goto done;
 
-	err = got_diffreg_output(NULL, NULL, diffreg_result, f1, f2, "", "",
+	err = got_diffreg_output(NULL, NULL, diffreg_result, 1, 1, "", "",
 	    GOT_DIFF_OUTPUT_EDSCRIPT, 0, outfile);
 	if (err)
 		goto done;

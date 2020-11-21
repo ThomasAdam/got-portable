@@ -278,16 +278,22 @@ done:
 
 const struct got_error *
 got_diffreg_output(off_t **line_offsets, size_t *nlines,
-    struct got_diffreg_result *diff_result, FILE *f1, FILE *f2,
+    struct got_diffreg_result *diff_result, int f1_exists, int f2_exists,
     const char *path1, const char *path2,
     enum got_diff_output_format output_format, int context_lines, FILE *outfile)
 {
 	struct diff_input_info info = {
 		.left_path = path1,
 		.right_path = path2,
+		.flags = 0,
 	};
 	int rc;
 	struct diff_output_info *output_info;
+
+	if (!f1_exists)
+		info.flags |= DIFF_INPUT_LEFT_NONEXISTENT;
+	if (!f2_exists)
+		info.flags |= DIFF_INPUT_RIGHT_NONEXISTENT;
 
 	switch (output_format) {
 	case GOT_DIFF_OUTPUT_UNIDIFF:

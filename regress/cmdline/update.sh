@@ -1016,7 +1016,7 @@ test_update_conflict_wt_rm_vs_repo_edit() {
 		>> $testroot/stdout.expected
 	echo 'file + /dev/null' >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
-	echo '+++ beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-modified beta' >> $testroot/stdout.expected
 

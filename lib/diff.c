@@ -166,7 +166,8 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 		goto done;
 
 	if (outfile) {
-		err = got_diffreg_output(line_offsets, nlines, result, f1, f2,
+		err = got_diffreg_output(line_offsets, nlines, result,
+		    blob1 != NULL, blob2 != NULL,
 		    label1 ? label1 : idstr1,
 		    label2 ? label2 : idstr2,
 		    GOT_DIFF_OUTPUT_UNIDIFF, diff_context, outfile);
@@ -255,9 +256,11 @@ diff_blob_file(struct got_diffreg_result **resultp,
 		goto done;
 
 	if (outfile) {
-		err = got_diffreg_output(NULL, NULL, result, f1, f2,
-		    label2, label2, GOT_DIFF_OUTPUT_UNIDIFF, diff_context,
-		    outfile);
+		err = got_diffreg_output(NULL, NULL, result,
+		    blob1 != NULL, f2 != NULL,
+		    label2, /* show local file's path, not a blob ID */
+		    label2, GOT_DIFF_OUTPUT_UNIDIFF,
+		    diff_context, outfile);
 		if (err)
 			goto done;
 	}
@@ -862,8 +865,8 @@ got_diff_files(struct got_diffreg_result **resultp,
 
 	if (outfile) {
 		err = got_diffreg_output(NULL, NULL, diffreg_result,
-		    f1, f2, label1, label2, GOT_DIFF_OUTPUT_UNIDIFF,
-		    diff_context, outfile);
+		    f1 != NULL, f2 != NULL, label1, label2,
+		    GOT_DIFF_OUTPUT_UNIDIFF, diff_context, outfile);
 		if (err)
 			goto done;
 	}

@@ -47,12 +47,12 @@ test_diff_basic() {
 		>> $testroot/stdout.expected
 	echo 'file + /dev/null' >> $testroot/stdout.expected
 	echo '--- beta' >> $testroot/stdout.expected
-	echo '+++ beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-beta' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + new' >> $testroot/stdout.expected
-	echo '--- new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ new' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+new file' >> $testroot/stdout.expected
@@ -446,13 +446,13 @@ test_diff_symlinks_in_work_tree() {
 		cut -d' ' -f 1 >> $testroot/stdout.expected
 	echo 'file + /dev/null' >> $testroot/stdout.expected
 	echo '--- nonexistent.link' >> $testroot/stdout.expected
-	echo '+++ nonexistent.link' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
 	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
 	echo '-nonexistent' >> $testroot/stdout.expected
 	echo '\ No newline at end of file' >> $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + zeta.link' >> $testroot/stdout.expected
-	echo '--- zeta.link' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ zeta.link' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+epsilon/zeta' >> $testroot/stdout.expected
@@ -600,7 +600,8 @@ test_diff_binary_files() {
 	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
-	echo "Binary files foo and foo differ" >> $testroot/stdout.expected
+	echo "Binary files /dev/null and foo differ" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -614,7 +615,7 @@ test_diff_binary_files() {
 	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
-	echo '--- foo' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	printf '+\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected

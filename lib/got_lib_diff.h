@@ -52,7 +52,7 @@ const struct got_error *got_diff_prepare_file(FILE *, char **, size_t *,
 const struct got_error *got_diffreg(struct got_diffreg_result **, FILE *,
     FILE *, enum got_diff_algorithm, int, int);
 const struct got_error *got_diffreg_output(off_t **, size_t *,
-    struct got_diffreg_result *, FILE *, FILE *, const char *, const char *,
+    struct got_diffreg_result *, int, int, const char *, const char *,
     enum got_diff_output_format, int, FILE *);
 const struct got_error *got_diffreg_result_free(struct got_diffreg_result *);
 const struct got_error *got_diffreg_result_free_left(

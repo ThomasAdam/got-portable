@@ -721,7 +721,7 @@ test_unstage_patch_added() {
 	echo "diff $commit_id $testroot/wt" > $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + epsilon/new' >> $testroot/stdout.expected
-	echo "--- epsilon/new" >> $testroot/stdout.expected
+	echo "--- /dev/null" >> $testroot/stdout.expected
 	echo "+++ epsilon/new" >> $testroot/stdout.expected
 	echo "@@ -0,0 +1 @@" >> $testroot/stdout.expected
 	echo "+new" >> $testroot/stdout.expected
@@ -791,7 +791,7 @@ test_unstage_patch_removed() {
 		>> $testroot/stdout.expected
 	echo 'file + /dev/null' >> $testroot/stdout.expected
 	echo "--- beta" >> $testroot/stdout.expected
-	echo "+++ beta" >> $testroot/stdout.expected
+	echo "+++ /dev/null" >> $testroot/stdout.expected
 	echo "@@ -1 +0,0 @@" >> $testroot/stdout.expected
 	echo "-beta" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
