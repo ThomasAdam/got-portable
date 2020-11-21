@@ -85,7 +85,8 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 		f2 = got_opentemp();
 		if (f2 == NULL) {
 			err = got_error_from_errno("got_opentemp");
-			fclose(f1);
+			if (f1)
+				fclose(f1);
 			return err;
 		}
 	}
