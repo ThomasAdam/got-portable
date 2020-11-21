@@ -3613,6 +3613,11 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->diff_context--;
 			diff_view_indicate_progress(view);
 			err = create_diff(s);
+			if (s->first_displayed_line + view->nlines - 1 >
+			    s->nlines) {
+				s->first_displayed_line = 1;
+				s->last_displayed_line = view->nlines;
+			}
 		}
 		break;
 	case ']':
