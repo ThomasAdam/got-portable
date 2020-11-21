@@ -105,6 +105,7 @@ struct diff_data {
 	const uint8_t *data;	/* if memory-mapped */
 	off_t len;
 
+	int atomizer_flags;
 	ARRAYLIST(struct diff_atom) atoms;
 	struct diff_data *root;
 	struct diff_data *current;
@@ -115,8 +116,13 @@ struct diff_data {
 	int err;
 };
 
+/* Flags set by file atomizer. */
+#define DIFF_ATOMIZER_FOUND_BINARY_DATA	0x00000001
+
+/* Flags set by caller of diff_main(). */
 #define DIFF_FLAG_IGNORE_WHITESPACE	0x00000001
 #define DIFF_FLAG_SHOW_PROTOTYPES	0x00000002
+#define DIFF_FLAG_FORCE_TEXT_DATA	0x00000004
 
 void diff_data_free(struct diff_data *diff_data);
 
@@ -143,7 +149,7 @@ struct diff_state;
  *
  * func_data: context pointer (free to be used by implementation).
  * d: struct diff_data with d->data and d->len already set up, and
- * d->atoms to be created.
+ * d->atoms to be created and d->atomizer_flags to be set up.
  */
 typedef int (*diff_atomize_func_t)(void *func_data, struct diff_data *d);
 

@@ -412,9 +412,13 @@ diff_output_unidiff(struct diff_output_info **output_info,
 	struct diff_output_unidiff_state *state;
 	struct diff_chunk_context cc = {};
 	struct diff_output_info *outinfo = NULL;
+	int atomizer_flags = (result->left->atomizer_flags|
+	    result->right->atomizer_flags);
 	int flags = (result->left->root->diff_flags |
 	    result->right->root->diff_flags);
 	bool show_function_prototypes = (flags & DIFF_FLAG_SHOW_PROTOTYPES);
+	bool force_text = (flags & DIFF_FLAG_FORCE_TEXT_DATA);
+	bool have_binary = (atomizer_flags & DIFF_ATOMIZER_FOUND_BINARY_DATA);
 	int i;
 
 	if (!result)
@@ -427,6 +431,23 @@ diff_output_unidiff(struct diff_output_info **output_info,
 		if (*output_info == NULL)
 			return ENOMEM;
 		outinfo = *output_info;
+	}
+
+	if (have_binary && !force_text) {
+		for (i = 0; i < result->chunks.len; i++) {
+			struct diff_chunk *c = &result->chunks.head[i];
+			enum diff_chunk_type t = diff_chunk_type(c);
+
+			if (t != CHUNK_MINUS && t != CHUNK_PLUS)
+				continue;
+
+			fprintf(dest, "Binary files %s and %s differ\n",
+			    info->left_path ? : "a",
+			    info->right_path ? : "b");
+			break;
+		}
+
+		return DIFF_RC_OK;
 	}
 
 	state = diff_output_unidiff_state_alloc();

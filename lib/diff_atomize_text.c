@@ -43,6 +43,7 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 	unsigned int array_size_estimate = d->len / 50;
 	unsigned int pow2 = 1;
 	bool ignore_whitespace = (d->diff_flags & DIFF_FLAG_IGNORE_WHITESPACE);
+	bool embedded_nul = false;
 
 	while (array_size_estimate >>= 1)
 		pow2++;
@@ -71,6 +72,8 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 					    || !isspace(buf[i]))
 						hash = diff_atom_hash_update(
 						    hash, buf[i]);
+					if (buf[i] == '\0')
+						embedded_nul = true;
 					line_end++;
 				} else
 					eol = buf[i];
@@ -112,6 +115,10 @@ diff_data_atomize_text_lines_fd(struct diff_data *d)
 			return errno;
 	}
 
+	/* File are considered binary if they contain embedded '\0' bytes. */
+	if (embedded_nul)
+		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
+
 	return DIFF_RC_OK;
 }
 
@@ -121,7 +128,7 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 	const uint8_t *pos = d->data;
 	const uint8_t *end = pos + d->len;
 	bool ignore_whitespace = (d->diff_flags & DIFF_FLAG_IGNORE_WHITESPACE);
-
+	bool embedded_nul = false;
 	unsigned int array_size_estimate = d->len / 50;
 	unsigned int pow2 = 1;
 	while (array_size_estimate >>= 1)
@@ -137,6 +144,8 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 			if (!ignore_whitespace
 			    || !isspace(*line_end))
 				hash = hash * 23 + *line_end;
+			if (*line_end == '\0')
+				embedded_nul = true;
 			line_end++;
 		}
 
@@ -166,6 +175,10 @@ diff_data_atomize_text_lines_mmap(struct diff_data *d)
 		/* Starting point for next line: */
 		pos = line_end;
 	}
+
+	/* File are considered binary if they contain embedded '\0' bytes. */
+	if (embedded_nul)
+		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
 
 	return DIFF_RC_OK;
 }
