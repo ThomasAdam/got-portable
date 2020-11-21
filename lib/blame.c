@@ -173,7 +173,7 @@ blame_prepare_file(FILE *f, unsigned char **p, off_t *size,
     const struct diff_config *cfg, struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
-	int rc;
+	int diff_flags = 0, rc;
 
 	err = got_object_blob_dump_to_file(size, nlines, line_offsets,
 	    f, blob);
@@ -186,7 +186,10 @@ blame_prepare_file(FILE *f, unsigned char **p, off_t *size,
 #endif
 		*p = NULL; /* fall back on file I/O */
 
-	rc = diff_atomize_file(diff_data, cfg, f, *p, *size, 0);
+	/* Allow blaming lines in binary files even though it's useless. */
+	diff_flags |= DIFF_FLAG_FORCE_TEXT_DATA;
+
+	rc = diff_atomize_file(diff_data, cfg, f, *p, *size, diff_flags);
 	if (rc)
 		return got_error_set_errno(rc, "diff_atomize_file");
 
@@ -309,6 +312,7 @@ atomize_file(struct diff_data *d, FILE *f, off_t filesize, int nlines,
     off_t *line_offsets)
 {
 	int i, rc = DIFF_RC_OK;
+	int embedded_nul = 0;
 
 	ARRAYLIST_INIT(d->atoms, nlines);
 
@@ -344,6 +348,10 @@ atomize_file(struct diff_data *d, FILE *f, off_t filesize, int nlines,
 			}
 
 			hash = diff_atom_hash_update(hash, (unsigned char)c);
+
+			if (c == '\0')
+				embedded_nul = 1;
+
 		}
 		*atom = (struct diff_atom){
 			.root = d,
@@ -353,6 +361,10 @@ atomize_file(struct diff_data *d, FILE *f, off_t filesize, int nlines,
 			.hash = hash,
 		};
 	}
+
+	/* File are considered binary if they contain embedded '\0' bytes. */
+	if (embedded_nul)
+		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
 done:
 	if (rc)
 		ARRAYLIST_FREE(d->atoms);
@@ -365,6 +377,7 @@ atomize_file_mmap(struct diff_data *d, unsigned char *p,
     off_t filesize, int nlines, off_t *line_offsets)
 {
 	int i, rc = DIFF_RC_OK;
+	int embedded_nul = 0;
 
 	ARRAYLIST_INIT(d->atoms, nlines);
 
@@ -388,6 +401,9 @@ atomize_file_mmap(struct diff_data *d, unsigned char *p,
 		for (j = 0; j < len; j++)
 			hash = diff_atom_hash_update(hash, p[pos + j]);
 
+		if (!embedded_nul && memchr(&p[pos], '\0', len) != NULL)
+			embedded_nul = 1;
+
 		*atom = (struct diff_atom){
 			.root = d,
 			.pos = pos,
@@ -396,6 +412,10 @@ atomize_file_mmap(struct diff_data *d, unsigned char *p,
 			.hash = hash,
 		};
 	}
+
+	/* File are considered binary if they contain embedded '\0' bytes. */
+	if (embedded_nul)
+		d->atomizer_flags |= DIFF_ATOMIZER_FOUND_BINARY_DATA;
 
 	if (rc)
 		ARRAYLIST_FREE(d->atoms);
