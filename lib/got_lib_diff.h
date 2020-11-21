@@ -48,9 +48,9 @@ struct got_diffreg_result {
 const struct got_error *got_diff_get_config(struct diff_config **,
     enum got_diff_algorithm, diff_atomize_func_t, void *);
 const struct got_error *got_diff_prepare_file(FILE *, char **, size_t *,
-    struct diff_data *, const struct diff_config *, int); 
-const struct got_error *got_diffreg(struct got_diffreg_result **, FILE *, FILE *,
-    enum got_diff_algorithm, int);
+    struct diff_data *, const struct diff_config *, int, int); 
+const struct got_error *got_diffreg(struct got_diffreg_result **, FILE *,
+    FILE *, enum got_diff_algorithm, int, int);
 const struct got_error *got_diffreg_output(off_t **, size_t *,
     struct got_diffreg_result *, FILE *, FILE *, const char *, const char *,
     enum got_diff_output_format, int, FILE *);
@@ -66,4 +66,4 @@ const struct got_error *got_merge_diff3(int *, int, const char *, const char *,
     const char *, const char *, const char *, const char *);
 
 const struct got_error *got_diff_files(struct got_diffreg_result **, FILE *,
-    const char *, FILE *, const char *, int, int, FILE *);
+    const char *, FILE *, const char *, int, int, int, FILE *);

@@ -249,6 +249,7 @@ struct tog_diff_view_state {
 	int last_displayed_line;
 	int eof;
 	int diff_context;
+	int force_text_diff;
 	struct got_repository *repo;
 	struct got_reflist_head *refs;
 	struct tog_colors colors;
@@ -445,7 +446,7 @@ struct tog_view {
 };
 
 static const struct got_error *open_diff_view(struct tog_view *,
-    struct got_object_id *, struct got_object_id *, struct tog_view *,
+    struct got_object_id *, struct got_object_id *, int, struct tog_view *,
     struct got_reflist_head *, struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
@@ -1768,7 +1769,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 
 	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
-	    commit_id, log_view, refs, repo);
+	    commit_id, 0, log_view, refs, repo);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
@@ -2757,8 +2758,8 @@ __dead static void
 usage_diff(void)
 {
 	endwin();
-	fprintf(stderr, "usage: %s diff [-r repository-path] object1 object2\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s diff [-a] [-r repository-path] "
+	    "object1 object2\n", getprogname());
 	exit(1);
 }
 
@@ -3217,11 +3218,12 @@ create_diff(struct tog_diff_view_state *s)
 	case GOT_OBJ_TYPE_BLOB:
 		err = got_diff_objects_as_blobs(&s->line_offsets, &s->nlines,
 		    s->id1, s->id2, NULL, NULL, s->diff_context, 0,
-		    s->repo, s->f);
+		    s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, "", "", s->diff_context, 0, s->repo, s->f);
+		    s->id1, s->id2, "", "", s->diff_context, 0,
+		    s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
 		const struct got_object_id_queue *parent_ids;
@@ -3253,7 +3255,8 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, s->diff_context, 0, s->repo, s->f);
+		    s->id1, s->id2, s->diff_context, 0, s->force_text_diff,
+		    s->repo, s->f);
 		break;
 	}
 	default:
@@ -3357,7 +3360,7 @@ search_next_diff_view(struct tog_view *view)
 
 static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
-    struct got_object_id *id2, struct tog_view *log_view,
+    struct got_object_id *id2, int force_text_diff, struct tog_view *log_view,
     struct got_reflist_head *refs, struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -3400,6 +3403,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
 	s->diff_context = 3;
+	s->force_text_diff = force_text_diff;
 	s->log_view = log_view;
 	s->repo = repo;
 	s->refs = refs;
@@ -3563,6 +3567,14 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 	int i;
 
 	switch (ch) {
+	case 'a':
+		s->force_text_diff = !s->force_text_diff;
+		wclear(view->window);
+		s->first_displayed_line = 1;
+		s->last_displayed_line = view->nlines;
+		diff_view_indicate_progress(view);
+		err = create_diff(s);
+		break;
 	case 'k':
 	case KEY_UP:
 		if (s->first_displayed_line > 1)
@@ -3687,7 +3699,7 @@ cmd_diff(int argc, char *argv[])
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *repo_path = NULL, *cwd = NULL;
 	char *id_str1 = NULL, *id_str2 = NULL;
-	int ch;
+	int ch, force_text_diff = 0;
 	struct tog_view *view;
 
 	SIMPLEQ_INIT(&refs);
@@ -3698,8 +3710,11 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "r:")) != -1) {
+	while ((ch = getopt(argc, argv, "ar:")) != -1) {
 		switch (ch) {
+		case 'a':
+			force_text_diff = 1;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
@@ -3772,7 +3787,8 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_diff_view(view, id1, id2, NULL, &refs, repo);
+	error = open_diff_view(view, id1, id2, force_text_diff, NULL, &refs,
+	    repo);
 	if (error)
 		goto done;
 	error = view_loop(view);
@@ -4533,7 +4549,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		}
 		err = open_diff_view(diff_view, pid ? pid->id : NULL,
-		    id, NULL, s->refs, s->repo);
+		    id, 0, NULL, s->refs, s->repo);
 		got_object_commit_close(commit);
 		if (err) {
 			view_close(diff_view);

@@ -139,7 +139,7 @@ got_diff_get_config(struct diff_config **cfg,
 const struct got_error *
 got_diff_prepare_file(FILE *f, char **p, size_t *size,
     struct diff_data *diff_data, const struct diff_config *cfg,
-    int ignore_whitespace)
+    int ignore_whitespace, int force_text_diff)
 {
 	const struct got_error *err = NULL;
 	struct stat st;
@@ -150,6 +150,8 @@ got_diff_prepare_file(FILE *f, char **p, size_t *size,
 	diff_flags |= DIFF_FLAG_SHOW_PROTOTYPES;
 	if (ignore_whitespace)
 		diff_flags |= DIFF_FLAG_IGNORE_WHITESPACE;
+	if (force_text_diff)
+		diff_flags |= DIFF_FLAG_FORCE_TEXT_DATA;
 
 	if (fstat(fileno(f), &st) == -1) {
 		err = got_error_from_errno("fstat");
@@ -177,7 +179,8 @@ done:
 
 const struct got_error *
 got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
-    enum got_diff_algorithm algorithm, int ignore_whitespace)
+    enum got_diff_algorithm algorithm, int ignore_whitespace,
+    int force_text_diff)
 {
 	const struct got_error *err = NULL;
 	struct diff_config *cfg = NULL;
@@ -223,12 +226,12 @@ got_diffreg(struct got_diffreg_result **diffreg_result, FILE *f1, FILE *f2,
 	}
 
 	err = got_diff_prepare_file(f1, &p1, &size1, left, cfg,
-	    ignore_whitespace);
+	    ignore_whitespace, force_text_diff);
 	if (err)
 		goto done;
 
 	err = got_diff_prepare_file(f2, &p2, &size2, right, cfg,
-	    ignore_whitespace);
+	    ignore_whitespace, force_text_diff);
 	if (err)
 		goto done;
 

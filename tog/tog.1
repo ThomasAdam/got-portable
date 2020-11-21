@@ -175,7 +175,7 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm diff Oo Fl r Ar repository-path Oc Ar object1 object2
+.It Cm diff Oo Fl a Oc Oo Fl r Ar repository-path Oc Ar object1 object2
 Display the differences between two objects in the repository.
 Each
 .Ar object
@@ -188,6 +188,9 @@ The key bindings for
 .Cm tog diff
 are as follows:
 .Bl -tag -width Ds
+.It Cm a
+Toggle treatment of file contents as ASCII text even if binary data was
+detected.
 .It Cm Down-arrow, j
 Scroll down.
 .It Cm Up-arrow, k
@@ -220,6 +223,8 @@ The options for
 .Cm tog diff
 are as follows:
 .Bl -tag -width Ds
+.It Fl a
+Treat file contents as ASCII text even if binary data is detected.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current

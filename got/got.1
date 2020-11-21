@@ -785,7 +785,7 @@ This option has no effect if the specified
 .Ar commit
 is never traversed.
 .El
-.It Cm diff Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path
+.It Cm diff Oo Fl a Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path
 When invoked within a work tree with less than two arguments, display
 local changes in the work tree.
 If a
@@ -803,6 +803,8 @@ The options for
 .Cm got diff
 are as follows:
 .Bl -tag -width Ds
+.It Fl a
+Treat file contents as ASCII text even if binary data is detected.
 .It Fl C Ar number
 Set the number of context lines shown in the diff.
 By default, 3 lines of context are shown.

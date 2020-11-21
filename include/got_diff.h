@@ -26,7 +26,7 @@
  */
 const struct got_error *got_diff_blob(off_t **, size_t *,
     struct got_blob_object *, struct got_blob_object *,
-    const char *, const char *, int, int, FILE *);
+    const char *, const char *, int, int, int, FILE *);
 
 /*
  * Compute the differences between a blob and a file and write unified diff
@@ -37,7 +37,7 @@ const struct got_error *got_diff_blob(off_t **, size_t *,
  * Whitespace differences may optionally be ignored.
  */
 const struct got_error *got_diff_blob_file(struct got_blob_object *,
-    const char *, FILE *, size_t, const char *, int, int, FILE *);
+    const char *, FILE *, size_t, const char *, int, int, int, FILE *);
 
 /*
  * A callback function invoked to handle the differences between two blobs
@@ -64,6 +64,7 @@ struct got_diff_blob_output_unidiff_arg {
 	FILE *outfile;		/* Unidiff text will be written here. */
 	int diff_context;	/* Sets the number of context lines. */
 	int ignore_whitespace;	/* Ignore whitespace differences. */
+	int force_text_diff;	/* Assume text even if binary data detected. */
 
 	/*
 	 * The number of lines contained in produced unidiff text output,
@@ -128,7 +129,7 @@ const struct got_error *got_diff_tree_collect_changed_paths(void *,
  */
 const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
     struct got_object_id *, struct got_object_id *,
-    const char *, const char *, int, int,
+    const char *, const char *, int, int, int,
     struct got_repository *, FILE *);
 
 /*
@@ -142,7 +143,7 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  */
 const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
     struct got_object_id *, struct got_object_id *, char *, char *,
-    int, int, struct got_repository *, FILE *);
+    int, int, int, struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
@@ -152,7 +153,7 @@ const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
-    struct got_object_id *, struct got_object_id *, int, int,
+    struct got_object_id *, struct got_object_id *, int, int, int,
     struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

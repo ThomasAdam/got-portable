@@ -600,13 +600,27 @@ test_diff_binary_files() {
 	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + foo' >> $testroot/stdout.expected
+	echo "Binary files foo and foo differ" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -a -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + foo' >> $testroot/stdout.expected
 	echo '--- foo' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	printf '+\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
 	echo '\\ No newline at end of file' >> $testroot/stdout.expected
 
-	(cd $testroot/wt && got diff > $testroot/stdout)
+	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -633,7 +647,7 @@ test_diff_binary_files() {
 	printf '+\377\200\0\0\377\200\0\0\n' >> $testroot/stdout.expected
 	echo '\\ No newline at end of file' >> $testroot/stdout.expected
 
-	(cd $testroot/wt && got diff > $testroot/stdout)
+	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

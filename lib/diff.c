@@ -57,7 +57,7 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
     struct got_diffreg_result **resultp, struct got_blob_object *blob1,
     struct got_blob_object *blob2,
     const char *label1, const char *label2, mode_t mode1, mode_t mode2,
-    int diff_context, int ignore_whitespace, FILE *outfile)
+    int diff_context, int ignore_whitespace, int force_text_diff, FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
 	FILE *f1 = NULL, *f2 = NULL;
@@ -161,7 +161,7 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 		free(modestr2);
 	}
 	err = got_diffreg(&result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE,
-	    ignore_whitespace);
+	    ignore_whitespace, force_text_diff);
 	if (err)
 		goto done;
 
@@ -199,23 +199,25 @@ got_diff_blob_output_unidiff(void *arg, struct got_blob_object *blob1,
 
 	return diff_blobs(&a->line_offsets, &a->nlines, NULL,
 	    blob1, blob2, label1, label2, mode1, mode2, a->diff_context,
-	    a->ignore_whitespace, a->outfile);
+	    a->ignore_whitespace, a->force_text_diff, a->outfile);
 }
 
 const struct got_error *
 got_diff_blob(off_t **line_offsets, size_t *nlines,
     struct got_blob_object *blob1, struct got_blob_object *blob2,
     const char *label1, const char *label2, int diff_context,
-    int ignore_whitespace, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, FILE *outfile)
 {
 	return diff_blobs(line_offsets, nlines, NULL, blob1, blob2,
-	    label1, label2, 0, 0, diff_context, ignore_whitespace, outfile);
+	    label1, label2, 0, 0, diff_context, ignore_whitespace,
+	    force_text_diff, outfile);
 }
 
 static const struct got_error *
 diff_blob_file(struct got_diffreg_result **resultp,
     struct got_blob_object *blob1, const char *label1, FILE *f2, size_t size2,
-    const char *label2, int diff_context, int ignore_whitespace, FILE *outfile)
+    const char *label2, int diff_context, int ignore_whitespace,
+    int force_text_diff, FILE *outfile)
 {
 	const struct got_error *err = NULL, *free_err;
 	FILE *f1 = NULL;
@@ -248,7 +250,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 	}
 
 	err = got_diffreg(&result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE, 
-	    ignore_whitespace);
+	    ignore_whitespace, force_text_diff);
 	if (err)
 		goto done;
 
@@ -276,10 +278,10 @@ done:
 const struct got_error *
 got_diff_blob_file(struct got_blob_object *blob1, const char *label1,
     FILE *f2, size_t size2, const char *label2, int diff_context,
-    int ignore_whitespace, FILE *outfile)
+    int ignore_whitespace, int force_text_diff, FILE *outfile)
 {
 	return diff_blob_file(NULL, blob1, label1, f2, size2, label2,
-	    diff_context, ignore_whitespace, outfile);
+	    diff_context, ignore_whitespace, force_text_diff, outfile);
 }
 
 static const struct got_error *
@@ -720,7 +722,8 @@ const struct got_error *
 got_diff_objects_as_blobs(off_t **line_offsets, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     const char *label1, const char *label2, int diff_context,
-    int ignore_whitespace, struct got_repository *repo, FILE *outfile)
+    int ignore_whitespace, int force_text_diff,
+    struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
@@ -739,7 +742,8 @@ got_diff_objects_as_blobs(off_t **line_offsets, size_t *nlines,
 			goto done;
 	}
 	err = got_diff_blob(line_offsets, nlines, blob1, blob2,
-	    label1, label2, diff_context, ignore_whitespace, outfile);
+	    label1, label2, diff_context, ignore_whitespace, force_text_diff,
+	    outfile);
 done:
 	if (blob1)
 		got_object_blob_close(blob1);
@@ -752,7 +756,7 @@ const struct got_error *
 got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
     char *label1, char *label2, int diff_context, int ignore_whitespace,
-    struct got_repository *repo, FILE *outfile)
+    int force_text_diff, struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
@@ -774,6 +778,7 @@ got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
 	}
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
+	arg.force_text_diff = force_text_diff;
 	arg.outfile = outfile;
 	if (want_lineoffsets) {
 		arg.line_offsets = *line_offsets;
@@ -800,7 +805,7 @@ done:
 const struct got_error *
 got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
-    int diff_context, int ignore_whitespace,
+    int diff_context, int ignore_whitespace, int force_text_diff,
     struct got_repository *repo, FILE *outfile)
 {
 	const struct got_error *err;
@@ -822,7 +827,7 @@ got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
 	err = got_diff_objects_as_trees(line_offsets, nlines,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
 	    got_object_commit_get_tree_id(commit2), "", "", diff_context,
-	    ignore_whitespace, repo, outfile);
+	    ignore_whitespace, force_text_diff, repo, outfile);
 done:
 	if (commit1)
 		got_object_commit_close(commit1);
@@ -834,7 +839,8 @@ done:
 const struct got_error *
 got_diff_files(struct got_diffreg_result **resultp,
     FILE *f1, const char *label1, FILE *f2, const char *label2,
-    int diff_context, int ignore_whitespace, FILE *outfile)
+    int diff_context, int ignore_whitespace, int force_text_diff,
+    FILE *outfile)
 {
 	const struct got_error *err = NULL;
 	struct got_diffreg_result *diffreg_result = NULL;
@@ -850,7 +856,7 @@ got_diff_files(struct got_diffreg_result **resultp,
 	}
 
 	err = got_diffreg(&diffreg_result, f1, f2, GOT_DIFF_ALGORITHM_PATIENCE,
-	    ignore_whitespace);
+	    ignore_whitespace, force_text_diff);
 	if (err)
 		goto done;
 
