@@ -71,6 +71,11 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 
 	if (line_offsets && *line_offsets && *nlines > 0)
 		outoff = (*line_offsets)[*nlines - 1];
+	else if (line_offsets) {
+		err = add_line_offset(line_offsets, nlines, 0);
+		if (err)
+			goto done;
+	}
 
 	if (resultp)
 		*resultp = NULL;
