@@ -783,6 +783,8 @@ shift_sqrt(int val)
         return i;
 }
 
+#define DIFF_EFFORT_MIN 1024
+
 /* Myers "Divide et Impera": tracing forwards from the start and backwards from
  * the end to find a midpoint that divides the problem into smaller chunks.
  * Requires only linear amounts of memory. */
@@ -822,6 +824,9 @@ diff_algo_myers_divide(const struct diff_algo_config *algo_config,
 	int *kd_forward = kd_buf;
 	int *kd_backward = kd_buf + kd_len;
 	int max_effort = shift_sqrt(max/2);
+
+	if (max_effort < DIFF_EFFORT_MIN)
+		max_effort = DIFF_EFFORT_MIN;
 
 	/* The 'k' axis in Myers spans positive and negative indexes, so point
 	 * the kd to the middle.

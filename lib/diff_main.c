@@ -602,7 +602,7 @@ diff_main(const struct diff_config *config, struct diff_data *left,
 
 	struct diff_state state = {
 		.result = result,
-		.recursion_depth_left = config->max_recursion_depth ? : 32,
+		.recursion_depth_left = config->max_recursion_depth ? : UINT_MAX,
 		.kd_buf = NULL,
 		.kd_buf_size = 0,
 	};

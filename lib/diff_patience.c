@@ -349,104 +349,6 @@ free_and_exit:
 }
 #endif /* UNIQUE_STRATEGY != 0 */
 
-static int
-diff_atoms_swallow_identical_neighbors(struct diff_data *left,
-				       struct diff_data *right,
-				       unsigned int *unique_in_both_count)
-{
-	debug("trivially combine identical lines"
-	      " around unique_in_both lines\n");
-
-	unsigned int l_idx;
-	unsigned int next_l_idx;
-	/* Only checking against identical-line overlaps on the left; overlaps
-	 * on the right are tolerated and ironed out later. See also the other
-	 * place marked with (1). */
-	unsigned int l_min = 0;
-	for (l_idx = 0; l_idx < left->atoms.len; l_idx = next_l_idx) {
-		next_l_idx = l_idx + 1;
-		struct diff_atom *l = &left->atoms.head[l_idx];
-		struct diff_atom *r;
-
-		if (!PATIENCE(l).unique_in_both)
-			continue;
-
-		debug("check identical lines around\n");
-		debug(" L "); debug_dump_atom(left, right, l);
-
-		unsigned int r_idx = diff_atom_idx(right, PATIENCE(l).pos_in_other);
-		r = &right->atoms.head[r_idx];
-		debug(" R "); debug_dump_atom(right, left, r);
-
-		struct diff_range identical_l;
-		struct diff_range identical_r;
-
-		/* Swallow upwards.
-		 * Each common-unique line swallows identical lines upwards and
-		 * downwards.
-		 * Will never hit another identical common-unique line above on
-		 * the left, because those would already have swallowed this
-		 * common-unique line in a previous iteration.
-		 */
-		for (identical_l.start = l_idx, identical_r.start = r_idx;
-		     identical_l.start > (l_min+1) && identical_r.start > 0;
-		     identical_l.start--, identical_r.start--) {
-			bool same;
-			int rc = diff_atom_same(&same,
-				&left->atoms.head[identical_l.start - 1],
-				&right->atoms.head[identical_r.start - 1]);
-			if (rc)
-				return rc;
-			if (!same)
-				break;
-		}
-
-		/* Swallow downwards. Join any common-unique lines in a block of
-		 * matching L/R lines with this one. */
-		for (identical_l.end = l_idx + 1, identical_r.end = r_idx + 1;
-		     identical_l.end < left->atoms.len
-			 && identical_r.end < right->atoms.len;
-		     identical_l.end++, identical_r.end++,
-		     next_l_idx++) {
-			struct diff_atom *l_end;
-			struct diff_atom *r_end;
-			bool same;
-			int rc = diff_atom_same(&same,
-					&left->atoms.head[identical_l.end],
-					&right->atoms.head[identical_r.end]);
-			if (rc)
-				return rc;
-			if (!same)
-				break;
-			l_end = &left->atoms.head[identical_l.end];
-			r_end = &right->atoms.head[identical_r.end];
-			if (!PATIENCE(l_end).unique_in_both)
-				continue;
-			/* A unique_in_both atom is joined with a preceding
-			 * unique_in_both atom, remove the joined atom from
-			 * listing of unique_in_both atoms */
-			PATIENCE(l_end).unique_in_both = false;
-			PATIENCE(r_end).unique_in_both = false;
-			(*unique_in_both_count)--;
-		}
-
-		PATIENCE(l).identical_lines = identical_l;
-		PATIENCE(r).identical_lines = identical_r;
-
-		l_min = identical_l.end;
-
-		if (!diff_range_empty(&PATIENCE(l).identical_lines)) {
-			debug("common-unique line at l=%u r=%u swallowed"
-			      " identical lines l=%u-%u r=%u-%u\n",
-			      l_idx, r_idx,
-			      identical_l.start, identical_l.end,
-			      identical_r.start, identical_r.end);
-		}
-		debug("next_l_idx = %u\n", next_l_idx);
-	}
-	return 0;
-}
-
 /* binary search to find the stack to put this atom "card" on. */
 static int
 find_target_stack(struct diff_atom *atom,
@@ -513,13 +415,6 @@ diff_algo_patience(const struct diff_algo_config *algo_config,
 		rc = DIFF_RC_USE_DIFF_ALGO_FALLBACK;
 		goto free_and_exit;
 	}
-
-	rc = diff_atoms_swallow_identical_neighbors(left, right,
-						    &unique_in_both_count);
-	if (rc)
-		goto free_and_exit;
-	debug("After swallowing identical neighbors: unique_in_both = %u\n",
-	      unique_in_both_count);
 
 	rc = ENOMEM;
 
@@ -652,7 +547,6 @@ diff_algo_patience(const struct diff_algo_config *algo_config,
 		 * [left_idx..identical_lines.end[. */
 		unsigned int left_idx;
 		unsigned int right_idx;
-		int already_done_count = 0;
 
 		debug("iteration %u of %u  left_pos %u  right_pos %u\n",
 		      i, lcs_count, left_pos, right_pos);
@@ -662,11 +556,8 @@ diff_algo_patience(const struct diff_algo_config *algo_config,
 			atom_r = PATIENCE(atom).pos_in_other;
 			debug("lcs[%u] = left[%u] = right[%u]\n", i,
 			      diff_atom_idx(left, atom), diff_atom_idx(right, atom_r));
-			left_idx = PATIENCE(atom).identical_lines.start;
-			right_idx = PATIENCE(atom_r).identical_lines.start;
-			debug(" identical lines l %u-%u  r %u-%u\n",
-			      PATIENCE(atom).identical_lines.start, PATIENCE(atom).identical_lines.end,
-			      PATIENCE(atom_r).identical_lines.start, PATIENCE(atom_r).identical_lines.end);
+			left_idx = diff_atom_idx(left, atom);
+			right_idx = diff_atom_idx(right, atom_r);
 		} else {
 			/* There are no more identical lines until the end of
 			 * left and right. */
@@ -674,21 +565,6 @@ diff_algo_patience(const struct diff_algo_config *algo_config,
 			atom_r = NULL;
 			left_idx = left->atoms.len;
 			right_idx = right->atoms.len;
-		}
-
-		if (right_idx < right_pos) {
-			/* This may happen if common-unique lines were in a
-			 * different order on the right, and then ended up
-			 * consuming the same identical atoms around a pair of
-			 * common-unique atoms more than once.
-			 * See also marker the other place marked with (1). */
-			already_done_count = right_pos - right_idx;
-			left_idx += already_done_count;
-			right_idx += already_done_count;
-			/* Paranoia: make sure we're skipping just an
-			 * additionally joined identical line around it, and not
-			 * the common-unique line itself. */
-			assert(left_idx <= diff_atom_idx(left, atom));
 		}
 
 		/* 'atom' (if not NULL) now marks an atom that matches on both
@@ -744,27 +620,14 @@ diff_algo_patience(const struct diff_algo_config *algo_config,
 		 * lines. */
 		if (atom) {
 			void *ok;
-			unsigned int left_start = PATIENCE(atom).identical_lines.start;
-			unsigned int left_len = diff_range_len(&PATIENCE(atom).identical_lines);
-			unsigned int right_start = PATIENCE(atom_r).identical_lines.start;
-			unsigned int right_len = diff_range_len(&PATIENCE(atom_r).identical_lines);
-
-			left_start += already_done_count;
-			left_len -= already_done_count;
-			right_start += already_done_count;
-			right_len -= already_done_count;
-
 			ok = diff_state_add_chunk(state, true,
-				left->atoms.head + left_start, left_len,
-				right->atoms.head + right_start, right_len);
+						  atom, 1,
+						  PATIENCE(atom).pos_in_other, 1);
 			if (!ok)
 				goto free_and_exit;
-			left_pos = PATIENCE(atom).identical_lines.end;
-			right_pos = PATIENCE(atom_r).identical_lines.end;
-		} else {
-			left_pos = left_idx + 1;
-			right_pos = right_idx + 1;
 		}
+		left_pos = left_idx + 1;
+		right_pos = right_idx + 1;
 		debug("end of iteration %u  left_pos %u  left_idx %u"
 		      "  right_pos %u  right_idx %u\n",
 		      i, left_pos, left_idx, right_pos, right_idx);
