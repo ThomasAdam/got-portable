@@ -485,10 +485,6 @@ close_file2_and_reuse_file1(struct got_blame *blame)
 	blame->nlines2 = blame->nlines1;
 	blame->nlines1 = 0;
 
-	free(blame->line_offsets2);
-	blame->line_offsets2 = blame->line_offsets1;
-	blame->line_offsets2 = NULL;
-
 	diff_data_free(blame->data2); /* does not free pointer itself */
 	memset(blame->data2, 0, sizeof(*blame->data2));
 	d = blame->data2;
