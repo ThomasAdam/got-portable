@@ -253,7 +253,7 @@ struct tog_diff_view_state {
 	int ignore_whitespace;
 	int force_text_diff;
 	struct got_repository *repo;
-	struct got_reflist_head *refs;
+	struct got_reflist_head refs;
 	struct tog_colors colors;
 	size_t nlines;
 	off_t *line_offsets;
@@ -294,7 +294,7 @@ struct tog_log_view_state {
 	const char *head_ref_name;
 	int log_branches;
 	struct got_repository *repo;
-	struct got_reflist_head *refs;
+	struct got_reflist_head refs;
 	struct got_object_id *start_id;
 	sig_atomic_t quit;
 	pthread_t thread;
@@ -357,7 +357,6 @@ struct tog_blame_view_state {
 	struct got_object_qid *blamed_commit;
 	char *path;
 	struct got_repository *repo;
-	struct got_reflist_head *refs;
 	struct got_object_id *commit_id;
 	struct tog_blame blame;
 	int matched_line;
@@ -385,7 +384,6 @@ struct tog_tree_view_state {
 	struct tog_parent_trees parents;
 	struct got_object_id *commit_id;
 	struct got_repository *repo;
-	struct got_reflist_head *refs;
 	struct got_tree_entry *matched_entry;
 	struct tog_colors colors;
 };
@@ -450,7 +448,7 @@ struct tog_view {
 static const struct got_error *open_diff_view(struct tog_view *,
     struct got_object_id *, struct got_object_id *,
     const char *, const char *, int, int, int, struct tog_view *,
-    struct got_reflist_head *, struct got_repository *);
+    struct got_repository *);
 static const struct got_error *show_diff_view(struct tog_view *);
 static const struct got_error *input_diff_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -459,8 +457,8 @@ static const struct got_error *search_start_diff_view(struct tog_view *);
 static const struct got_error *search_next_diff_view(struct tog_view *);
 
 static const struct got_error *open_log_view(struct tog_view *,
-    struct got_object_id *, struct got_reflist_head *,
-    struct got_repository *, const char *, const char *, int);
+    struct got_object_id *, struct got_repository *,
+    const char *, const char *, int);
 static const struct got_error * show_log_view(struct tog_view *);
 static const struct got_error *input_log_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -469,7 +467,7 @@ static const struct got_error *search_start_log_view(struct tog_view *);
 static const struct got_error *search_next_log_view(struct tog_view *);
 
 static const struct got_error *open_blame_view(struct tog_view *, char *,
-    struct got_object_id *, struct got_reflist_head *, struct got_repository *);
+    struct got_object_id *, struct got_repository *);
 static const struct got_error *show_blame_view(struct tog_view *);
 static const struct got_error *input_blame_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -478,8 +476,7 @@ static const struct got_error *search_start_blame_view(struct tog_view *);
 static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
-    struct got_tree_object *, struct got_object_id *, struct got_reflist_head *,
-    struct got_repository *);
+    struct got_tree_object *, struct got_object_id *, struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view **, struct tog_view **, struct tog_view *, int);
@@ -1759,8 +1756,7 @@ scroll_down(struct tog_view *log_view,
 static const struct got_error *
 open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
     struct got_commit_object *commit, struct got_object_id *commit_id,
-    struct tog_view *log_view, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct tog_view *log_view, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_object_qid *parent_id;
@@ -1772,7 +1768,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 
 	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
 	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
-	    commit_id, NULL, NULL, 3, 0, 0, log_view, refs, repo);
+	    commit_id, NULL, NULL, 3, 0, 0, log_view, repo);
 	if (err == NULL)
 		*new_view = diff_view;
 	return err;
@@ -1887,7 +1883,7 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 static const struct got_error *
 browse_commit_tree(struct tog_view **new_view, int begin_x,
     struct commit_queue_entry *entry, const char *path,
-    struct got_reflist_head *refs, struct got_repository *repo)
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
@@ -1903,7 +1899,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	if (tree_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = open_tree_view(tree_view, tree, entry->id, refs, repo);
+	err = open_tree_view(tree_view, tree, entry->id, repo);
 	if (err) {
 		got_object_tree_close(tree);
 		return err;
@@ -2071,6 +2067,7 @@ close_log_view(struct tog_view *view)
 	s->in_repo_path = NULL;
 	free(s->start_id);
 	s->start_id = NULL;
+	got_ref_list_free(&s->refs);
 	return err;
 }
 
@@ -2194,15 +2191,16 @@ search_next_log_view(struct tog_view *view)
 
 static const struct got_error *
 open_log_view(struct tog_view *view, struct got_object_id *start_id,
-    struct got_reflist_head *refs, struct got_repository *repo,
-    const char *head_ref_name, const char *in_repo_path,
-    int log_branches)
+    struct got_repository *repo, const char *head_ref_name,
+    const char *in_repo_path, int log_branches)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 	struct got_repository *thread_repo = NULL;
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
+
+	SIMPLEQ_INIT(&s->refs);
 
 	if (in_repo_path != s->in_repo_path) {
 		free(s->in_repo_path);
@@ -2215,7 +2213,10 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	TAILQ_INIT(&s->commits.head);
 	s->commits.ncommits = 0;
 
-	s->refs = refs;
+	err = got_ref_list(&s->refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+
 	s->repo = repo;
 	s->head_ref_name = head_ref_name;
 	s->start_id = got_object_id_dup(start_id);
@@ -2307,7 +2308,7 @@ show_log_view(struct tog_view *view)
 
 	return draw_commits(view, &s->last_displayed_entry,
 	    &s->selected_entry, s->first_displayed_entry,
-	    &s->commits, s->selected, view->nlines, s->refs,
+	    &s->commits, s->selected, view->nlines, &s->refs,
 	    s->in_repo_path, s->thread_args.commits_needed, &s->colors);
 }
 
@@ -2407,7 +2408,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			begin_x = view_split_begin_x(view->begin_x);
 		err = open_diff_view_for_commit(&diff_view, begin_x,
 		    s->selected_entry->commit, s->selected_entry->id,
-		    view, s->refs, s->repo);
+		    view, s->repo);
 		if (err)
 			break;
 		if (view_is_parent_view(view)) {
@@ -2430,7 +2431,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
 		err = browse_commit_tree(&tree_view, begin_x,
-		    s->selected_entry, s->in_repo_path, s->refs, s->repo);
+		    s->selected_entry, s->in_repo_path, s->repo);
 		if (err)
 			break;
 		if (view_is_parent_view(view)) {
@@ -2465,9 +2466,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			free(parent_path);
 			return got_error_from_errno("view_open");
 		}
-		err = open_log_view(lv, s->start_id, s->refs,
-		    s->repo, s->head_ref_name, parent_path,
-		    s->log_branches);
+		err = open_log_view(lv, s->start_id, s->repo, s->head_ref_name,
+		    parent_path, s->log_branches);
 		free(parent_path);
 		if (err)
 			return err;;
@@ -2499,16 +2499,8 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			view_close(lv);
 			return got_error_from_errno("strdup");
 		}
-		got_ref_list_free(s->refs);
-		err = got_ref_list(s->refs, s->repo, NULL,
-		    got_ref_cmp_by_name, NULL);
-		if (err) {
-			free(start_id);
-			view_close(lv);
-			return err;
-		}
-		err = open_log_view(lv, start_id, s->refs, s->repo,
-		    s->head_ref_name, in_repo_path, s->log_branches);
+		err = open_log_view(lv, start_id, s->repo, s->head_ref_name,
+		    in_repo_path, s->log_branches);
 		if (err) {
 			free(start_id);
 			view_close(lv);
@@ -2526,7 +2518,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
 		if (lv == NULL)
 			return got_error_from_errno("view_open");
-		err = open_log_view(lv, s->start_id, s->refs, s->repo,
+		err = open_log_view(lv, s->start_id, s->repo,
 		    s->head_ref_name, s->in_repo_path, s->log_branches);
 		if (err) {
 			view_close(lv);
@@ -2629,14 +2621,11 @@ cmd_log(int argc, char *argv[])
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_reflist_head refs;
 	struct got_object_id *start_id = NULL;
 	char *in_repo_path = NULL, *repo_path = NULL, *cwd = NULL;
 	char *start_commit = NULL, *head_ref_name = NULL;
 	int ch, log_branches = 0;
 	struct tog_view *view;
-
-	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
@@ -2716,10 +2705,6 @@ cmd_log(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
 	view = view_open(0, 0, 0, 0, TOG_VIEW_LOG);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
@@ -2733,7 +2718,7 @@ cmd_log(int argc, char *argv[])
 			goto done;
 		}
 	}
-	error = open_log_view(view, start_id, &refs, repo, head_ref_name,
+	error = open_log_view(view, start_id, repo, head_ref_name,
 	    in_repo_path, log_branches);
 	if (error)
 		goto done;
@@ -2753,7 +2738,6 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
-	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -3239,7 +3223,7 @@ create_diff(struct tog_diff_view_state *s)
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
 			err = write_commit_info(&s->line_offsets, &s->nlines,
-			    s->id2, s->refs, s->repo, s->f);
+			    s->id2, &s->refs, s->repo, s->f);
 			if (err)
 				goto done;
 		} else {
@@ -3248,7 +3232,7 @@ create_diff(struct tog_diff_view_state *s)
 				if (got_object_id_cmp(s->id1, pid->id) == 0) {
 					err = write_commit_info(
 					    &s->line_offsets, &s->nlines,
-					    s->id2, s->refs, s->repo, s->f);
+					    s->id2, &s->refs, s->repo, s->f);
 					if (err)
 						goto done;
 					break;
@@ -3365,11 +3349,12 @@ static const struct got_error *
 open_diff_view(struct tog_view *view, struct got_object_id *id1,
     struct got_object_id *id2, const char *label1, const char *label2,
     int diff_context, int ignore_whitespace, int force_text_diff,
-    struct tog_view *log_view, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct tog_view *log_view, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
+
+	SIMPLEQ_INIT(&s->refs);
 
 	if (id1 != NULL && id2 != NULL) {
 	    int type1, type2;
@@ -3387,7 +3372,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->last_displayed_line = view->nlines;
 	s->selected_line = 1;
 	s->repo = repo;
-	s->refs = refs;
 	s->id1 = id1;
 	s->id2 = id2;
 	s->label1 = label1;
@@ -3414,7 +3398,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->force_text_diff = force_text_diff;
 	s->log_view = log_view;
 	s->repo = repo;
-	s->refs = refs;
 
 	SIMPLEQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
@@ -3464,6 +3447,16 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 	}
 
+	err = got_ref_list(&s->refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err) {
+		free(s->id1);
+		s->id1 = NULL;
+		free(s->id2);
+		s->id2 = NULL;
+		free_colors(&s->colors);
+		return err;
+	}
+
 	if (log_view && view_is_splitscreen(view))
 		show_log_view(log_view); /* draw vborder */
 	diff_view_indicate_progress(view);
@@ -3476,6 +3469,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		s->id1 = NULL;
 		free(s->id2);
 		s->id2 = NULL;
+		free_colors(&s->colors);
+		got_ref_list_free(&s->refs);
 		return err;
 	}
 
@@ -3504,6 +3499,7 @@ close_diff_view(struct tog_view *view)
 	free(s->line_offsets);
 	s->line_offsets = NULL;
 	s->nlines = 0;
+	got_ref_list_free(&s->refs);
 	return err;
 }
 
@@ -3716,7 +3712,6 @@ cmd_diff(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_reflist_head refs;
 	struct got_object_id *id1 = NULL, *id2 = NULL;
 	char *repo_path = NULL, *cwd = NULL;
 	char *id_str1 = NULL, *id_str2 = NULL;
@@ -3725,8 +3720,6 @@ cmd_diff(int argc, char *argv[])
 	int ch, force_text_diff = 0;
 	const char *errstr;
 	struct tog_view *view;
-
-	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
@@ -3811,17 +3804,13 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
 	view = view_open(0, 0, 0, 0, TOG_VIEW_DIFF);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
 	error = open_diff_view(view, id1, id2, label1, label2, diff_context,
-	    ignore_whitespace, force_text_diff, NULL, &refs, repo);
+	    ignore_whitespace, force_text_diff, NULL,  repo);
 	if (error)
 		goto done;
 	error = view_loop(view);
@@ -3834,7 +3823,6 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
-	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -4252,8 +4240,7 @@ done:
 
 static const struct got_error *
 open_blame_view(struct tog_view *view, char *path,
-    struct got_object_id *commit_id, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct tog_blame_view_state *s = &view->state.blame;
@@ -4276,7 +4263,6 @@ open_blame_view(struct tog_view *view, char *path,
 	s->selected_line = 1;
 	s->blame_complete = 0;
 	s->repo = repo;
-	s->refs = refs;
 	s->commit_id = commit_id;
 	memset(&s->blame, 0, sizeof(s->blame));
 
@@ -4584,7 +4570,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		}
 		err = open_diff_view(diff_view, pid ? pid->id : NULL,
-		    id, NULL, NULL, 3, 0, 0, NULL, s->refs, s->repo);
+		    id, NULL, NULL, 3, 0, 0, NULL, s->repo);
 		got_object_commit_close(commit);
 		if (err) {
 			view_close(diff_view);
@@ -4647,7 +4633,6 @@ cmd_blame(int argc, char *argv[])
 {
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
-	struct got_reflist_head refs;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *link_target = NULL;
@@ -4655,8 +4640,6 @@ cmd_blame(int argc, char *argv[])
 	char *commit_id_str = NULL;
 	int ch;
 	struct tog_view *view;
-
-	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
@@ -4737,10 +4720,6 @@ cmd_blame(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
 	view = view_open(0, 0, 0, 0, TOG_VIEW_BLAME);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
@@ -4753,7 +4732,7 @@ cmd_blame(int argc, char *argv[])
 		goto done;
 
 	error = open_blame_view(view, link_target ? link_target : in_repo_path,
-	    commit_id, &refs, repo);
+	    commit_id, repo);
 	if (error)
 		goto done;
 	if (worktree) {
@@ -4772,7 +4751,6 @@ done:
 		got_worktree_close(worktree);
 	if (repo)
 		got_repo_close(repo);
-	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -5035,8 +5013,7 @@ done:
 static const struct got_error *
 blame_tree_entry(struct tog_view **new_view, int begin_x,
     struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *path;
@@ -5054,7 +5031,7 @@ blame_tree_entry(struct tog_view **new_view, int begin_x,
 		goto done;
 	}
 
-	err = open_blame_view(blame_view, path, commit_id, refs, repo);
+	err = open_blame_view(blame_view, path, commit_id, repo);
 	if (err) {
 		if (err->code == GOT_ERR_CANCELLED)
 			err = NULL;
@@ -5069,8 +5046,7 @@ done:
 static const struct got_error *
 log_tree_entry(struct tog_view **new_view, int begin_x,
     struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	struct tog_view *log_view;
 	const struct got_error *err = NULL;
@@ -5086,7 +5062,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, refs, repo, NULL, path, 0);
+	err = open_log_view(log_view, commit_id, repo, NULL, path, 0);
 	if (err)
 		view_close(log_view);
 	else
@@ -5097,8 +5073,7 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 
 static const struct got_error *
 open_tree_view(struct tog_view *view, struct got_tree_object *root,
-    struct got_object_id *commit_id, struct got_reflist_head *refs,
-    struct got_repository *repo)
+    struct got_object_id *commit_id, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *commit_id_str = NULL;
@@ -5123,7 +5098,6 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
-	s->refs = refs;
 	s->repo = repo;
 
 	SIMPLEQ_INIT(&s->colors);
@@ -5198,7 +5172,6 @@ close_tree_view(struct tog_view *view)
 	if (s->tree != s->root)
 		got_object_tree_close(s->tree);
 	got_object_tree_close(s->root);
-
 	return NULL;
 }
 
@@ -5324,9 +5297,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
-		err = log_tree_entry(&log_view, begin_x,
-		    s->selected_entry, &s->parents,
-		    s->commit_id, s->refs, s->repo);
+		err = log_tree_entry(&log_view, begin_x, s->selected_entry,
+		    &s->parents, s->commit_id, s->repo);
 		if (view_is_parent_view(view)) {
 			err = view_close_child(view);
 			if (err)
@@ -5437,7 +5409,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 
 			err = blame_tree_entry(&blame_view, begin_x,
 			    s->selected_entry, &s->parents,
-			    s->commit_id, s->refs, s->repo);
+			    s->commit_id, s->repo);
 			if (err)
 				break;
 			if (view_is_parent_view(view)) {
@@ -5481,7 +5453,6 @@ cmd_tree(int argc, char *argv[])
 	const struct got_error *error;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	struct got_reflist_head refs;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
 	char *commit_id_arg = NULL;
@@ -5489,8 +5460,6 @@ cmd_tree(int argc, char *argv[])
 	struct got_tree_object *tree = NULL;
 	int ch;
 	struct tog_view *view;
-
-	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
@@ -5571,16 +5540,12 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
-
 	view = view_open(0, 0, 0, 0, TOG_VIEW_TREE);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_tree_view(view, tree, commit_id, &refs, repo);
+	error = open_tree_view(view, tree, commit_id, repo);
 	if (error)
 		goto done;
 	if (!got_path_is_root_dir(in_repo_path)) {
@@ -5606,7 +5571,6 @@ done:
 		got_object_tree_close(tree);
 	if (repo)
 		got_repo_close(repo);
-	got_ref_list_free(&refs);
 	return error;
 }
 
