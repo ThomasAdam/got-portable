@@ -5757,17 +5757,15 @@ close_ref_view(struct tog_view *view)
 }
 
 static const struct got_error *
-log_ref_entry(struct tog_view **new_view, int begin_x,
+resolve_reflist_entry(struct got_object_id **commit_id,
     struct tog_reflist_entry *re, struct got_repository *repo)
 {
-	struct tog_view *log_view;
 	const struct got_error *err = NULL;
-	struct got_object_id *obj_id = NULL;
-	struct got_object_id *commit_id = NULL;
+	struct got_object_id *obj_id;
 	struct got_tag_object *tag = NULL;
 	int obj_type;
 
-	*new_view = NULL;
+	*commit_id = NULL;
 
 	err = got_ref_resolve(&obj_id, repo, re->ref);
 	if (err)
@@ -5779,20 +5777,59 @@ log_ref_entry(struct tog_view **new_view, int begin_x,
 
 	switch (obj_type) {
 	case GOT_OBJ_TYPE_COMMIT:
-		commit_id = obj_id;
+		*commit_id = obj_id;
 		break;
 	case GOT_OBJ_TYPE_TAG:
 		err = got_object_open_as_tag(&tag, repo, obj_id);
 		if (err)
 			goto done;
-		commit_id = got_object_tag_get_object_id(tag);
-		err = got_object_get_type(&obj_type, repo, commit_id);
-		if (err || obj_type != GOT_OBJ_TYPE_COMMIT)
+		free(obj_id);
+		err = got_object_get_type(&obj_type, repo,
+		    got_object_tag_get_object_id(tag));
+		if (err)
 			goto done;
+		if (obj_type != GOT_OBJ_TYPE_COMMIT) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+		*commit_id = got_object_id_dup(
+		    got_object_tag_get_object_id(tag));
+		if (*commit_id == NULL) {
+			err = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
 		break;
 	default:
-		free(obj_id);
-		return NULL;
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		break;
+	}
+
+done:
+	if (tag)
+		got_object_tag_close(tag);
+	if (err) {
+		free(*commit_id);
+		*commit_id = NULL;
+	}
+	return err;
+}
+
+static const struct got_error *
+log_ref_entry(struct tog_view **new_view, int begin_x,
+    struct tog_reflist_entry *re, struct got_repository *repo)
+{
+	struct tog_view *log_view;
+	const struct got_error *err = NULL;
+	struct got_object_id *commit_id = NULL;
+
+	*new_view = NULL;
+
+	err = resolve_reflist_entry(&commit_id, re, repo);
+	if (err) {
+		if (err->code != GOT_ERR_OBJ_TYPE)
+			return err;
+		else
+			return NULL;
 	}
 
 	log_view = view_open(0, 0, 0, begin_x, TOG_VIEW_LOG);
@@ -5807,9 +5844,7 @@ done:
 		view_close(log_view);
 	else
 		*new_view = log_view;
-	if (tag)
-		got_object_tag_close(tag);
-	free(obj_id);
+	free(commit_id);
 	return err;
 }
 
@@ -6057,12 +6092,59 @@ show_ref_view(struct tog_view *view)
 }
 
 static const struct got_error *
+browse_ref_tree(struct tog_view **new_view, int begin_x,
+    struct tog_reflist_entry *re, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *commit_id = NULL, *tree_id = NULL;
+	struct got_tree_object *tree = NULL;
+	struct tog_view *tree_view;
+
+	*new_view = NULL;
+
+	err = resolve_reflist_entry(&commit_id, re, repo);
+	if (err) {
+		if (err->code != GOT_ERR_OBJ_TYPE)
+			return err;
+		else
+			return NULL;
+	}
+
+	err = got_object_id_by_path(&tree_id, repo, commit_id, "/");
+	if (err)
+		goto done;
+
+	err = got_object_open_as_tree(&tree, repo, tree_id);
+	if (err)
+		goto done;
+
+	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
+	if (tree_view == NULL) {
+		err = got_error_from_errno("view_open");
+		goto done;
+	}
+
+	err = open_tree_view(tree_view, tree, commit_id, repo);
+	if (err)
+		goto done;
+
+	*new_view = tree_view;
+done:
+	free(commit_id);
+	free(tree_id);
+	if (err) {
+		if (tree)
+			got_object_tree_close(tree);
+	}
+	return err;
+}
+static const struct got_error *
 input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
     struct tog_view **focus_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_ref_view_state *s = &view->state.ref;
-	struct tog_view *log_view;
+	struct tog_view *log_view, *tree_view;
 	int begin_x = 0, nscrolled;
 
 	switch (ch) {
@@ -6090,6 +6172,29 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 			view->child_focussed = 1;
 		} else
 			*new_view = log_view;
+		break;
+	case 't':
+		if (!s->selected_entry)
+			break;
+		if (view_is_parent_view(view))
+			begin_x = view_split_begin_x(view->begin_x);
+		err = browse_ref_tree(&tree_view, begin_x, s->selected_entry,
+		    s->repo);
+		if (err || tree_view == NULL)
+			break;
+		if (view_is_parent_view(view)) {
+			err = view_close_child(view);
+			if (err)
+				return err;
+			err = view_set_child(view, tree_view);
+			if (err) {
+				view_close(tree_view);
+				break;
+			}
+			*focus_view = tree_view;
+			view->child_focussed = 1;
+		} else
+			*new_view = tree_view;
 		break;
 	case 'k':
 	case KEY_UP:
