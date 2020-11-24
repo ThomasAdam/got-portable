@@ -2340,6 +2340,7 @@ done:
 static const struct got_error *
 show_log_view(struct tog_view *view)
 {
+	const struct got_error *err;
 	struct tog_log_view_state *s = &view->state.log;
 
 	if (s->thread == NULL) {
@@ -2347,6 +2348,15 @@ show_log_view(struct tog_view *view)
 		    &s->thread_args);
 		if (errcode)
 			return got_error_set_errno(errcode, "pthread_create");
+		if (s->thread_args.commits_needed > 0) {
+			err = trigger_log_thread(view, 1,
+			    &s->thread_args.commits_needed,
+			    &s->thread_args.log_complete,
+			    &s->thread_args.need_commits,
+			    &s->thread_args.commit_loaded);
+			if (err)
+				return err;
+		}
 	}
 
 	return draw_commits(view, &s->last_displayed_entry,
