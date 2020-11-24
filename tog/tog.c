@@ -5549,7 +5549,7 @@ cmd_tree(int argc, char *argv[])
 				    optarg);
 			break;
 		default:
-			usage_tree();
+			usage_ref();
 			/* NOTREACHED */
 		}
 	}
@@ -5558,7 +5558,7 @@ cmd_tree(int argc, char *argv[])
 	argv += optind;
 
 	if (argc > 1)
-		usage_tree();
+		usage_ref();
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
