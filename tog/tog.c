@@ -81,24 +81,28 @@ __dead static void	usage_log(void);
 __dead static void	usage_diff(void);
 __dead static void	usage_blame(void);
 __dead static void	usage_tree(void);
+__dead static void	usage_ref(void);
 
 static const struct got_error*	cmd_log(int, char *[]);
 static const struct got_error*	cmd_diff(int, char *[]);
 static const struct got_error*	cmd_blame(int, char *[]);
 static const struct got_error*	cmd_tree(int, char *[]);
+static const struct got_error*	cmd_ref(int, char *[]);
 
 static struct tog_cmd tog_commands[] = {
 	{ "log",	cmd_log,	usage_log },
 	{ "diff",	cmd_diff,	usage_diff },
 	{ "blame",	cmd_blame,	usage_blame },
 	{ "tree",	cmd_tree,	usage_tree },
+	{ "ref",	cmd_ref,	usage_ref },
 };
 
 enum tog_view_type {
 	TOG_VIEW_DIFF,
 	TOG_VIEW_LOG,
 	TOG_VIEW_BLAME,
-	TOG_VIEW_TREE
+	TOG_VIEW_TREE,
+	TOG_VIEW_REF,
 };
 
 #define TOG_EOF_STRING	"(END)"
@@ -206,6 +210,12 @@ default_color_value(const char *envvar)
 	if (strcmp(envvar, "TOG_COLOR_AUTHOR") == 0)
 		return COLOR_CYAN;
 	if (strcmp(envvar, "TOG_COLOR_DATE") == 0)
+		return COLOR_YELLOW;
+	if (strcmp(envvar, "TOG_COLOR_REFS_HEADS") == 0)
+		return COLOR_GREEN;
+	if (strcmp(envvar, "TOG_COLOR_REFS_TAGS") == 0)
+		return COLOR_MAGENTA;
+	if (strcmp(envvar, "TOG_COLOR_REFS_REMOTES") == 0)
 		return COLOR_YELLOW;
 
 	return -1;
@@ -315,6 +325,9 @@ struct tog_log_view_state {
 #define TOG_COLOR_COMMIT		9
 #define TOG_COLOR_AUTHOR		10
 #define TOG_COLOR_DATE		11
+#define TOG_COLOR_REFS_HEADS		12
+#define TOG_COLOR_REFS_TAGS		13
+#define TOG_COLOR_REFS_REMOTES		14
 
 struct tog_blame_cb_args {
 	struct tog_blame_line *lines; /* one per line */
@@ -388,6 +401,26 @@ struct tog_tree_view_state {
 	struct tog_colors colors;
 };
 
+struct tog_reflist_entry {
+	TAILQ_ENTRY(tog_reflist_entry) entry;
+	struct got_reference *ref;
+	int idx;
+};
+
+TAILQ_HEAD(tog_reflist_head, tog_reflist_entry);
+
+struct tog_ref_view_state {
+	struct got_reflist_head simplerefs; /* SIMPLEQ */
+	struct tog_reflist_head refs;	/* TAILQ */
+	struct tog_reflist_entry *first_displayed_entry;
+	struct tog_reflist_entry *last_displayed_entry;
+	struct tog_reflist_entry *selected_entry;
+	int nrefs, ndisplayed, selected, show_ids;
+	struct got_repository *repo;
+	struct tog_reflist_entry *matched_entry;
+	struct tog_colors colors;
+};
+
 /*
  * We implement two types of views: parent views and child views.
  *
@@ -425,6 +458,7 @@ struct tog_view {
 		struct tog_log_view_state log;
 		struct tog_blame_view_state blame;
 		struct tog_tree_view_state tree;
+		struct tog_ref_view_state ref;
 	} state;
 
 	const struct got_error *(*show)(struct tog_view *);
@@ -483,6 +517,15 @@ static const struct got_error *input_tree_view(struct tog_view **,
 static const struct got_error *close_tree_view(struct tog_view *);
 static const struct got_error *search_start_tree_view(struct tog_view *);
 static const struct got_error *search_next_tree_view(struct tog_view *);
+
+static const struct got_error *open_ref_view(struct tog_view *,
+    struct got_repository *);
+static const struct got_error *show_ref_view(struct tog_view *);
+static const struct got_error *input_ref_view(struct tog_view **,
+    struct tog_view **, struct tog_view **, struct tog_view *, int);
+static const struct got_error *close_ref_view(struct tog_view *);
+static const struct got_error *search_start_ref_view(struct tog_view *);
+static const struct got_error *search_next_ref_view(struct tog_view *);
 
 static volatile sig_atomic_t tog_sigwinch_received;
 static volatile sig_atomic_t tog_sigpipe_received;
@@ -2320,6 +2363,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 	struct tog_log_view_state *s = &view->state.log;
 	char *parent_path, *in_repo_path = NULL;
 	struct tog_view *diff_view = NULL, *tree_view = NULL, *lv = NULL;
+	struct tog_view *ref_view = NULL;
 	int begin_x = 0;
 	struct got_object_id *start_id;
 
@@ -2526,6 +2570,32 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		}
 		*dead_view = view;
 		*new_view = lv;
+		break;
+	case 'r':
+		if (view_is_parent_view(view))
+			begin_x = view_split_begin_x(view->begin_x);
+		ref_view = view_open(view->nlines, view->ncols,
+		    view->begin_y, begin_x, TOG_VIEW_REF);
+		if (ref_view == NULL)
+			return got_error_from_errno("view_open");
+		err = open_ref_view(ref_view, s->repo);
+		if (err) {
+			view_close(ref_view);
+			return err;
+		}
+		if (view_is_parent_view(view)) {
+			err = view_close_child(view);
+			if (err)
+				return err;
+			err = view_set_child(view, ref_view);
+			if (err) {
+				view_close(ref_view);
+				break;
+			}
+			*focus_view = ref_view;
+			view->child_focussed = 1;
+		} else
+			*new_view = ref_view;
 		break;
 	default:
 		break;
@@ -5569,6 +5639,607 @@ done:
 		got_object_commit_close(commit);
 	if (tree)
 		got_object_tree_close(tree);
+	if (repo)
+		got_repo_close(repo);
+	return error;
+}
+
+static const struct got_error *
+ref_view_load_refs(struct tog_ref_view_state *s)
+{
+	const struct got_error *err;
+	struct got_reflist_entry *sre;
+	struct tog_reflist_entry *re;
+
+	err = got_ref_list(&s->simplerefs, s->repo, NULL,
+	    got_ref_cmp_by_name, NULL);
+	if (err)
+		return err;
+
+	s->nrefs = 0;
+	SIMPLEQ_FOREACH(sre, &s->simplerefs, entry) {
+		if (strncmp(got_ref_get_name(sre->ref), "refs/got/", 9) == 0)
+			continue;
+
+		re = malloc(sizeof(*re));
+		if (re == NULL)
+			return got_error_from_errno("malloc");
+
+		re->ref = sre->ref;
+		re->idx = s->nrefs++;
+		TAILQ_INSERT_TAIL(&s->refs, re, entry);
+	}
+
+	return NULL;
+}
+
+void
+ref_view_free_refs(struct tog_ref_view_state *s)
+{
+	struct tog_reflist_entry *re;
+
+	while (!TAILQ_EMPTY(&s->refs)) {
+		re = TAILQ_FIRST(&s->refs);
+		TAILQ_REMOVE(&s->refs, re, entry);
+		free(re);
+	}
+	got_ref_list_free(&s->simplerefs);
+}
+
+static const struct got_error *
+open_ref_view(struct tog_view *view, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct tog_ref_view_state *s = &view->state.ref;
+
+	s->first_displayed_entry = 0;
+	s->selected_entry = 0;
+	s->repo = repo;
+
+	SIMPLEQ_INIT(&s->simplerefs);
+	TAILQ_INIT(&s->refs);
+	SIMPLEQ_INIT(&s->colors);
+
+	err = ref_view_load_refs(s);
+	if (err)
+		return err;
+
+	if (has_colors() && getenv("TOG_COLORS") != NULL) {
+		err = add_color(&s->colors, "^refs/heads/",
+		    TOG_COLOR_REFS_HEADS,
+		    get_color_value("TOG_COLOR_REFS_HEADS"));
+		if (err)
+			goto done;
+
+		err = add_color(&s->colors, "^refs/tags/",
+		    TOG_COLOR_REFS_TAGS,
+		    get_color_value("TOG_COLOR_REFS_TAGS"));
+		if (err)
+			goto done;
+
+		err = add_color(&s->colors, "^refs/remotes/",
+		    TOG_COLOR_REFS_REMOTES,
+		    get_color_value("TOG_COLOR_REFS_REMOTES"));
+		if (err)
+			goto done;
+	}
+
+	view->show = show_ref_view;
+	view->input = input_ref_view;
+	view->close = close_ref_view;
+	view->search_start = search_start_ref_view;
+	view->search_next = search_next_ref_view;
+done:
+	if (err)
+		free_colors(&s->colors);
+	return err;
+}
+
+static const struct got_error *
+close_ref_view(struct tog_view *view)
+{
+	struct tog_ref_view_state *s = &view->state.ref;
+
+	ref_view_free_refs(s);
+	free_colors(&s->colors);
+
+	return NULL;
+}
+
+static const struct got_error *
+log_ref_entry(struct tog_view **new_view, int begin_x,
+    struct tog_reflist_entry *re, struct got_repository *repo)
+{
+	struct tog_view *log_view;
+	const struct got_error *err = NULL;
+	struct got_object_id *obj_id = NULL;
+	struct got_object_id *commit_id = NULL;
+	struct got_tag_object *tag = NULL;
+	int obj_type;
+
+	*new_view = NULL;
+
+	err = got_ref_resolve(&obj_id, repo, re->ref);
+	if (err)
+		return err;
+
+	err = got_object_get_type(&obj_type, repo, obj_id);
+	if (err)
+		goto done;
+
+	switch (obj_type) {
+	case GOT_OBJ_TYPE_COMMIT:
+		commit_id = obj_id;
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		err = got_object_open_as_tag(&tag, repo, obj_id);
+		if (err)
+			goto done;
+		commit_id = got_object_tag_get_object_id(tag);
+		err = got_object_get_type(&obj_type, repo, commit_id);
+		if (err || obj_type != GOT_OBJ_TYPE_COMMIT)
+			goto done;
+		break;
+	default:
+		free(obj_id);
+		return NULL;
+	}
+
+	log_view = view_open(0, 0, 0, begin_x, TOG_VIEW_LOG);
+	if (log_view == NULL) {
+		err = got_error_from_errno("view_open");
+		goto done;
+	}
+
+	err = open_log_view(log_view, commit_id, repo, NULL, "", 0);
+done:
+	if (err)
+		view_close(log_view);
+	else
+		*new_view = log_view;
+	if (tag)
+		got_object_tag_close(tag);
+	free(obj_id);
+	return err;
+}
+
+static void
+ref_scroll_up(struct tog_view *view,
+    struct tog_reflist_entry **first_displayed_entry, int maxscroll,
+    struct tog_reflist_head *refs)
+{
+	int i;
+
+	if (*first_displayed_entry == TAILQ_FIRST(refs))
+		return;
+
+	i = 0;
+	while (*first_displayed_entry && i < maxscroll) {
+		*first_displayed_entry = TAILQ_PREV(*first_displayed_entry,
+		    tog_reflist_head, entry);
+		i++;
+	}
+}
+
+static int
+ref_scroll_down(struct tog_reflist_entry **first_displayed_entry, int maxscroll,
+	struct tog_reflist_entry *last_displayed_entry,
+	struct tog_reflist_head *refs)
+{
+	struct tog_reflist_entry *next, *last;
+	int n = 0;
+
+	if (*first_displayed_entry)
+		next = TAILQ_NEXT(*first_displayed_entry, entry);
+	else
+		next = TAILQ_FIRST(refs);
+
+	last = last_displayed_entry;
+	while (next && last && n++ < maxscroll) {
+		last = TAILQ_NEXT(last, entry);
+		if (last) {
+			*first_displayed_entry = next;
+			next = TAILQ_NEXT(next, entry);
+		}
+	}
+	return n;
+}
+
+static const struct got_error *
+search_start_ref_view(struct tog_view *view)
+{
+	struct tog_ref_view_state *s = &view->state.ref;
+
+	s->matched_entry = NULL;
+	return NULL;
+}
+
+static int
+match_reflist_entry(struct tog_reflist_entry *re, regex_t *regex)
+{
+	regmatch_t regmatch;
+
+	return regexec(regex, got_ref_get_name(re->ref), 1, &regmatch,
+	    0) == 0;
+}
+
+static const struct got_error *
+search_next_ref_view(struct tog_view *view)
+{
+	struct tog_ref_view_state *s = &view->state.ref;
+	struct tog_reflist_entry *re = NULL;
+
+	if (!view->searching) {
+		view->search_next_done = TOG_SEARCH_HAVE_MORE;
+		return NULL;
+	}
+
+	if (s->matched_entry) {
+		if (view->searching == TOG_SEARCH_FORWARD) {
+			if (s->selected_entry)
+				re = TAILQ_NEXT(s->selected_entry, entry);
+			else
+				re = TAILQ_PREV(s->selected_entry,
+				    tog_reflist_head, entry);
+		} else {
+			if (s->selected_entry == NULL)
+				re = TAILQ_LAST(&s->refs, tog_reflist_head);
+			else
+				re = TAILQ_PREV(s->selected_entry,
+				    tog_reflist_head, entry);
+		}
+	} else {
+		if (view->searching == TOG_SEARCH_FORWARD)
+			re = TAILQ_FIRST(&s->refs);
+		else
+			re = TAILQ_LAST(&s->refs, tog_reflist_head);
+	}
+
+	while (1) {
+		if (re == NULL) {
+			if (s->matched_entry == NULL) {
+				view->search_next_done = TOG_SEARCH_HAVE_MORE;
+				return NULL;
+			}
+			if (view->searching == TOG_SEARCH_FORWARD)
+				re = TAILQ_FIRST(&s->refs);
+			else
+				re = TAILQ_LAST(&s->refs, tog_reflist_head);
+		}
+
+		if (match_reflist_entry(re, &view->regex)) {
+			view->search_next_done = TOG_SEARCH_HAVE_MORE;
+			s->matched_entry = re;
+			break;
+		}
+
+		if (view->searching == TOG_SEARCH_FORWARD)
+			re = TAILQ_NEXT(re, entry);
+		else
+			re = TAILQ_PREV(re, tog_reflist_head, entry);
+	}
+
+	if (s->matched_entry) {
+		s->first_displayed_entry = s->matched_entry;
+		s->selected = 0;
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
+show_ref_view(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_ref_view_state *s = &view->state.ref;
+	struct tog_reflist_entry *re;
+	char *line = NULL;
+	wchar_t *wline;
+	struct tog_color *tc;
+	int width, n;
+	int limit = view->nlines;
+
+	werase(view->window);
+
+	s->ndisplayed = 0;
+
+	if (limit == 0)
+		return NULL;
+
+	if (s->first_displayed_entry)
+		re = s->first_displayed_entry;
+	else
+		re = TAILQ_FIRST(&s->refs);
+
+	if (asprintf(&line, "references [%d/%d]", re->idx + s->selected + 1,
+	    s->nrefs) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = format_line(&wline, &width, line, view->ncols, 0);
+	if (err) {
+		free(line);
+		return err;
+	}
+	if (view_needs_focus_indication(view))
+		wstandout(view->window);
+	waddwstr(view->window, wline);
+	if (view_needs_focus_indication(view))
+		wstandend(view->window);
+	free(wline);
+	wline = NULL;
+	free(line);
+	line = NULL;
+	if (width < view->ncols - 1)
+		waddch(view->window, '\n');
+	if (--limit <= 0)
+		return NULL;
+
+	n = 0;
+	while (re && limit > 0) {
+		char *line = NULL;
+
+		if (got_ref_is_symbolic(re->ref)) {
+			if (asprintf(&line, "%s -> %s",
+			    got_ref_get_name(re->ref),
+			    got_ref_get_symref_target(re->ref)) == -1)
+				return got_error_from_errno("asprintf");
+		} else if (s->show_ids) {
+			struct got_object_id *id;
+			char *id_str;
+			err = got_ref_resolve(&id, s->repo, re->ref);
+			if (err)
+				return err;
+			err = got_object_id_str(&id_str, id);
+			if (err) {
+				free(id);
+				return err;
+			}
+			if (asprintf(&line, "%s: %s",
+			    got_ref_get_name(re->ref), id_str) == -1) {
+				err = got_error_from_errno("asprintf");
+				free(id);
+				free(id_str);
+				return err;
+			}
+			free(id);
+			free(id_str);
+		} else {
+			line = strdup(got_ref_get_name(re->ref));
+			if (line == NULL)
+				return got_error_from_errno("strdup");
+		}
+
+		err = format_line(&wline, &width, line, view->ncols, 0);
+		if (err) {
+			free(line);
+			return err;
+		}
+		if (n == s->selected) {
+			if (view->focussed)
+				wstandout(view->window);
+			s->selected_entry = re;
+		}
+		tc = match_color(&s->colors, got_ref_get_name(re->ref));
+		if (tc)
+			wattr_on(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
+		waddwstr(view->window, wline);
+		if (tc)
+			wattr_off(view->window,
+			    COLOR_PAIR(tc->colorpair), NULL);
+		if (width < view->ncols - 1)
+			waddch(view->window, '\n');
+		if (n == s->selected && view->focussed)
+			wstandend(view->window);
+		free(line);
+		free(wline);
+		wline = NULL;
+		n++;
+		s->ndisplayed++;
+		s->last_displayed_entry = re;
+
+		limit--;
+		re = TAILQ_NEXT(re, entry);
+	}
+
+	view_vborder(view);
+	return err;
+}
+
+static const struct got_error *
+input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
+    struct tog_view **focus_view, struct tog_view *view, int ch)
+{
+	const struct got_error *err = NULL;
+	struct tog_ref_view_state *s = &view->state.ref;
+	struct tog_view *log_view;
+	int begin_x = 0, nscrolled;
+
+	switch (ch) {
+	case 'i':
+		s->show_ids = !s->show_ids;
+		break;
+	case KEY_ENTER:
+	case '\r':
+		if (!s->selected_entry)
+			break;
+		if (view_is_parent_view(view))
+			begin_x = view_split_begin_x(view->begin_x);
+		err = log_ref_entry(&log_view, begin_x, s->selected_entry,
+		    s->repo);
+		if (view_is_parent_view(view)) {
+			err = view_close_child(view);
+			if (err)
+				return err;
+			err = view_set_child(view, log_view);
+			if (err) {
+				view_close(log_view);
+				break;
+			}
+			*focus_view = log_view;
+			view->child_focussed = 1;
+		} else
+			*new_view = log_view;
+		break;
+	case 'k':
+	case KEY_UP:
+		if (s->selected > 0) {
+			s->selected--;
+			if (s->selected == 0)
+				break;
+		}
+		if (s->selected > 0)
+			break;
+		ref_scroll_up(view, &s->first_displayed_entry, 1, &s->refs);
+		break;
+	case KEY_PPAGE:
+	case CTRL('b'):
+		ref_scroll_up(view, &s->first_displayed_entry,
+		    MAX(0, view->nlines - 4 - s->selected), &s->refs);
+		s->selected = 0;
+		break;
+	case 'j':
+	case KEY_DOWN:
+		if (s->selected < s->ndisplayed - 1) {
+			s->selected++;
+			break;
+		}
+		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL)
+			/* can't scroll any further */
+			break;
+		ref_scroll_down(&s->first_displayed_entry, 1,
+		    s->last_displayed_entry, &s->refs);
+		break;
+	case KEY_NPAGE:
+	case CTRL('f'):
+		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL) {
+			/* can't scroll any further; move cursor down */
+			if (s->selected < s->ndisplayed - 1)
+				s->selected = s->ndisplayed - 1;
+			break;
+		}
+		nscrolled = ref_scroll_down(&s->first_displayed_entry,
+		    view->nlines, s->last_displayed_entry, &s->refs);
+		if (nscrolled < view->nlines) {
+			int ndisplayed = 0;
+			struct tog_reflist_entry *re;
+			re = s->first_displayed_entry;
+			do {
+				ndisplayed++;
+				re = TAILQ_NEXT(re, entry);
+			} while (re);
+			s->selected = ndisplayed - 1;
+		}
+		break;
+	case CTRL('l'):
+		ref_view_free_refs(s);
+		err = ref_view_load_refs(s);
+		break;
+	case KEY_RESIZE:
+		if (s->selected > view->nlines)
+			s->selected = s->ndisplayed - 1;
+		break;
+	default:
+		break;
+	}
+
+	return err;
+}
+
+__dead static void
+usage_ref(void)
+{
+	endwin();
+	fprintf(stderr, "usage: %s ref [-r repository-path]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_ref(int argc, char *argv[])
+{
+	const struct got_error *error;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	int ch;
+	struct tog_view *view;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	while ((ch = getopt(argc, argv, "r:")) != -1) {
+		switch (ch) {
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			break;
+		default:
+			usage_tree();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc > 1)
+		usage_tree();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL)
+		return got_error_from_errno("getcwd");
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error && error->code != GOT_ERR_NOT_WORKTREE)
+		goto done;
+
+	if (repo_path == NULL) {
+		if (worktree)
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+		else
+			repo_path = strdup(cwd);
+	}
+	if (repo_path == NULL) {
+		error = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	error = got_repo_open(&repo, repo_path, NULL);
+	if (error != NULL)
+		goto done;
+
+	init_curses();
+
+	error = apply_unveil(got_repo_get_path(repo), NULL);
+	if (error)
+		goto done;
+
+	view = view_open(0, 0, 0, 0, TOG_VIEW_REF);
+	if (view == NULL) {
+		error = got_error_from_errno("view_open");
+		goto done;
+	}
+
+	error = open_ref_view(view, repo);
+	if (error)
+		goto done;
+
+	if (worktree) {
+		/* Release work tree lock. */
+		got_worktree_close(worktree);
+		worktree = NULL;
+	}
+	error = view_loop(view);
+done:
+	free(repo_path);
+	free(cwd);
 	if (repo)
 		got_repo_close(repo);
 	return error;
