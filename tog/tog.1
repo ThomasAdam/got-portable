@@ -50,6 +50,8 @@ Displays changes made in a particular commit.
 Displays the line-by-line history of a file.
 .It Tree view
 Displays the tree corresponding to a particular commit.
+.It Ref view
+Displays references in the repository.
 .El
 .Pp
 .Nm
@@ -144,6 +146,13 @@ Reload the log view and toggle display of merged commits.
 The
 .Fl b
 option determines whether merged commits are displayed initially.
+.It Cm r
+Open a
+.Cm ref
+view listing all references in the repository.
+This can then be used to open a new
+.Cm log
+view for arbitrary branches and tags.
 .El
 .Pp
 The options for
@@ -373,6 +382,56 @@ If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
 .El
+.It Cm ref Oo Fl r Ar repository-path Oc
+Display references in the repository.
+.Pp
+The key bindings for
+.Cm tog ref
+are as follows:
+.Bl -tag -width Ds
+.It Cm Down-arrow, j
+Move the selection cursor down.
+.It Cm Up-arrow, k
+Move the selection cursor up.
+.It Cm Page-down, Ctrl+f
+Move the selection cursor down one page.
+.It Cm Page-up, Ctrl+b
+Move the selection cursor up one page.
+.It Cm Enter
+Open a log view which begins traversing history at the commit resolved via the
+currently selected reference.
+.It Cm i
+Show object IDs for all non-symbolic references displayed in the
+.Cm ref
+view.
+.It Cm /
+Prompt for a search pattern and start searching for matching references.
+The search pattern is an extended regular expression which is matched
+against absolute reference names.
+Regular expression syntax is documented in
+.Xr re_format 7 .
+.It Cm n
+Find the next reference which matches the current search pattern.
+.It Cm N
+Find the previous reference which matches the current search pattern.
+.It Cm Ctrl+l
+Reload the list of references displayed by the
+.Cm ref
+view.
+.El
+.Pp
+The options for
+.Cm tog ref
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+If this directory is a
+.Xr got 1
+work tree, use the repository path associated with this work tree.
+.El
 .El
 .Sh ENVIRONMENT
 .Bl -tag -width TOG_COLORS
@@ -444,6 +503,27 @@ If not set, the default value
 is used.
 .It Ev TOG_COLOR_DATE
 The color used to mark up date information.
+If not set, the default value
+.Dq yellow
+is used.
+.It Ev TOG_COLOR_REFS_HEADS
+The color used to mark up references in the
+.Dq refs/heads/
+namespace.
+If not set, the default value
+.Dq green
+is used.
+.It Ev TOG_COLOR_REFS_TAGS
+The color used to mark up references in the
+.Dq refs/tags/
+namespace.
+If not set, the default value
+.Dq magenta
+is used.
+.It Ev TOG_COLOR_REFS_REMOTES
+The color used to mark up references in the
+.Dq refs/remotes/
+namespace.
 If not set, the default value
 .Dq yellow
 is used.
