@@ -177,12 +177,11 @@ work tree, use the repository path associated with this work tree.
 .El
 .It Cm diff Oo Fl a Oc Oo Fl r Ar repository-path Oc Ar object1 object2
 Display the differences between two objects in the repository.
-Each
-.Ar object
-argument is an object ID SHA1 hash.
+Treat each of the two arguments as a reference, a tag name, or an object
+ID SHA1 hash, and display differences between the corresponding objects.
+Both objects must be of the same type (blobs, trees, or commits).
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
-Both objects must be of the same type (blobs, trees, or commits).
 .Pp
 The key bindings for
 .Cm tog diff
@@ -217,6 +216,8 @@ Regular expression syntax is documented in
 Find the next line which matches the current search pattern.
 .It Cm N
 Find the previous line which matches the current search pattern.
+.It Cm w
+Toggle display of whitespace-only changes.
 .El
 .Pp
 The options for
@@ -225,6 +226,9 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Treat file contents as ASCII text even if binary data is detected.
+.It Fl C Ar number
+Set the number of context lines shown in the diff.
+By default, 3 lines of context are shown.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
@@ -232,6 +236,8 @@ working directory.
 If this directory is a
 .Xr got 1
 work tree, use the repository path associated with this work tree.
+.It Fl w
+Ignore whitespace-only changes.
 .El
 .It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
 Display line-by-line history of a file at the specified path.
