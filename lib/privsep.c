@@ -2265,7 +2265,7 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_FETCH_PACK,
 	    GOT_PATH_PROG_INDEX_PACK,
 	};
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(helpers); i++) {
 		if (unveil(helpers[i], "x") == 0)

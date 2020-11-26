@@ -40,7 +40,7 @@
 const struct got_error *
 got_error(int code)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code)
@@ -54,7 +54,7 @@ const struct got_error *
 got_error_msg(int code, const char *msg)
 {
 	static struct got_error err;
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code) {
@@ -178,7 +178,7 @@ got_error_path(const char *path, int code)
 {
 	static struct got_error err;
 	static char msg[PATH_MAX + 128];
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code) {

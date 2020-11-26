@@ -167,7 +167,7 @@ got_object_parse_header(struct got_object **obj, char *buf, size_t len)
 	};
 	int type = 0;
 	size_t size = 0, hdrlen = 0;
-	int i;
+	size_t i;
 
 	*obj = NULL;
 

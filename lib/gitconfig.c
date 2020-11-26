@@ -309,7 +309,7 @@ conf_parse(struct got_gitconfig *conf, int trans, char *buf, size_t sz)
 const struct got_error *
 got_gitconfig_open(struct got_gitconfig **conf, int fd)
 {
-	unsigned int i;
+	size_t i;
 
 	*conf = calloc(1, sizeof(**conf));
 	if (*conf == NULL)
@@ -325,7 +325,7 @@ static void
 conf_clear(struct got_gitconfig *conf)
 {
 	struct got_gitconfig_binding *cb;
-	int i;
+	size_t i;
 
 	if (conf->addr) {
 		for (i = 0; i < nitems(conf->bindings); i++)
@@ -502,7 +502,7 @@ got_gitconfig_get_section_list(struct got_gitconfig_list **sections,
 	struct got_gitconfig_list *list = NULL;
 	struct got_gitconfig_list_node *node = 0;
 	struct got_gitconfig_binding *cb;
-	int i;
+	size_t i;
 
 	*sections = NULL;
 

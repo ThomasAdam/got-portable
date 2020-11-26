@@ -264,9 +264,8 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	char *dp13, *dp23, *path1, *path2, *path3;
 	BUF *b1, *b2, *b3, *d1, *d2, *diffb;
 	u_char *data, *patch;
-	size_t dlen, plen;
+	size_t dlen, plen, i;
 	struct diff3_state *d3s;
-	int i;
 
 	*overlapcnt = 0;
 

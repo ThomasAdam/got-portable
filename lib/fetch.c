@@ -359,9 +359,10 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
     int fetchfd, struct got_repository *repo,
     got_fetch_progress_cb progress_cb, void *progress_arg)
 {
+	size_t i;
 	int imsg_fetchfds[2], imsg_idxfds[2];
 	int packfd = -1, npackfd = -1, idxfd = -1, nidxfd = -1, nfetchfd = -1;
-	int tmpfds[3], i;
+	int tmpfds[3];
 	int fetchstatus, idxstatus, done = 0;
 	const struct got_error *err;
 	struct imsgbuf fetchibuf, idxibuf;

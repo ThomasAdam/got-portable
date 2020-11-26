@@ -264,7 +264,7 @@ is_valid_ref_name(const char *name)
 	const char *forbidden_seq[] = { "//", "..", "@{" };
 	const char *lfs = GOT_LOCKFILE_SUFFIX;
 	const size_t lfs_len = sizeof(GOT_LOCKFILE_SUFFIX) - 1;
-	int i;
+	size_t i;
 
 	if (name[0] == '@' && name[1] == '\0')
 		return 0;
@@ -439,7 +439,8 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 	const char *subdirs[] = {
 	    GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
 	};
-	int i, well_known = is_well_known_ref(refname);
+	size_t i;
+	int well_known = is_well_known_ref(refname);
 	struct got_lockfile *lf = NULL;
 
 	*ref = NULL;
