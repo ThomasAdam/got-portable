@@ -1875,17 +1875,10 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 			break;
 		}
 		free(te_name);
-		s->selected_entry = te;
-		s->selected = got_tree_entry_get_index(te);
-		if (s->tree != s->root)
-			s->selected++; /* skip '..' */
+		s->first_displayed_entry = s->selected_entry = te;
 
-		if (!S_ISDIR(got_tree_entry_get_mode(s->selected_entry))) {
-			/* Jump to this file's entry. */
-			s->first_displayed_entry = s->selected_entry;
-			s->selected = 0;
-			break;
-		}
+		if (!S_ISDIR(got_tree_entry_get_mode(s->selected_entry)))
+			break; /* jump to this file's entry */
 
 		slash = strchr(p, '/');
 		if (slash)
