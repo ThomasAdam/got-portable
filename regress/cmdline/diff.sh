@@ -619,7 +619,7 @@ test_diff_binary_files() {
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	printf '+\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
-	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+	printf '\\ No newline at end of file\n' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -643,10 +643,10 @@ test_diff_binary_files() {
 	echo '--- foo' >> $testroot/stdout.expected
 	echo '+++ foo' >> $testroot/stdout.expected
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
-	printf '-\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
-	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+	printf -- '-\377\377\0\0\377\377\0\0\n' >> $testroot/stdout.expected
+	printf '\\ No newline at end of file\n' >> $testroot/stdout.expected
 	printf '+\377\200\0\0\377\200\0\0\n' >> $testroot/stdout.expected
-	echo '\\ No newline at end of file' >> $testroot/stdout.expected
+	printf '\\ No newline at end of file\n' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff -a > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
