@@ -471,7 +471,7 @@ close_file2_and_reuse_file1(struct got_blame *blame)
 		if (munmap(blame->map2, blame->size2) == -1)
 			return got_error_from_errno("munmap");
 		blame->map2 = blame->map1;
-		blame->map2 = NULL;
+		blame->map1 = NULL;
 
 	}
 	blame->size2 = blame->size1;
