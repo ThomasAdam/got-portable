@@ -5358,7 +5358,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 {
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
-	struct tog_view *log_view;
+	struct tog_view *log_view, *ref_view;
 	int begin_x = 0, nscrolled;
 
 	switch (ch) {
@@ -5385,6 +5385,32 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			view->child_focussed = 1;
 		} else
 			*new_view = log_view;
+		break;
+	case 'r':
+		if (view_is_parent_view(view))
+			begin_x = view_split_begin_x(view->begin_x);
+		ref_view = view_open(view->nlines, view->ncols,
+		    view->begin_y, begin_x, TOG_VIEW_REF);
+		if (ref_view == NULL)
+			return got_error_from_errno("view_open");
+		err = open_ref_view(ref_view, s->repo);
+		if (err) {
+			view_close(ref_view);
+			return err;
+		}
+		if (view_is_parent_view(view)) {
+			err = view_close_child(view);
+			if (err)
+				return err;
+			err = view_set_child(view, ref_view);
+			if (err) {
+				view_close(ref_view);
+				break;
+			}
+			*focus_view = ref_view;
+			view->child_focussed = 1;
+		} else
+			*new_view = ref_view;
 		break;
 	case 'k':
 	case KEY_UP:
