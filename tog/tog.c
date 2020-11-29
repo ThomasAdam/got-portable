@@ -4991,29 +4991,24 @@ tree_scroll_up(struct tog_view *view,
     struct got_tree_object *tree, int isroot)
 {
 	struct got_tree_entry *te;
-	int i;
+	int i = 0;
 
 	if (*first_displayed_entry == NULL)
 		return;
 
-	te = got_object_tree_get_entry(tree, 0);
-	if (*first_displayed_entry == te) {
-		if (!isroot)
-			*first_displayed_entry = NULL;
-		return;
+	te = got_tree_entry_get_prev(tree, *first_displayed_entry);
+	while (i++ < maxscroll) {
+		if (te == NULL) {
+			if (!isroot)
+				*first_displayed_entry = NULL;
+			break;
+		}
+		*first_displayed_entry = te;
+		te = got_tree_entry_get_prev(tree, te);
 	}
-
-	i = 0;
-	while (*first_displayed_entry && i < maxscroll) {
-		*first_displayed_entry = got_tree_entry_get_prev(tree,
-		    *first_displayed_entry);
-		i++;
-	}
-	if (!isroot && te == got_object_tree_get_first_entry(tree) && i < maxscroll)
-		*first_displayed_entry = NULL;
 }
 
-static int
+static void
 tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 	struct got_tree_entry *last_displayed_entry,
 	struct got_tree_object *tree)
@@ -5034,7 +5029,6 @@ tree_scroll_down(struct got_tree_entry **first_displayed_entry, int maxscroll,
 			next = got_tree_entry_get_next(tree, next);
 		}
 	}
-	return n;
 }
 
 static const struct got_error *
@@ -5359,7 +5353,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct tog_view *log_view, *ref_view;
-	int begin_x = 0, nscrolled;
+	int begin_x = 0;
 
 	switch (ch) {
 	case 'i':
@@ -5416,23 +5410,23 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case KEY_UP:
 		if (s->selected > 0) {
 			s->selected--;
-			if (s->selected == 0)
-				break;
-		}
-		if (s->selected > 0)
 			break;
+		}
 		tree_scroll_up(view, &s->first_displayed_entry, 1,
 		    s->tree, s->tree == s->root);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+		if (s->tree == s->root) {
+			if (got_object_tree_get_first_entry(s->tree) ==
+			    s->first_displayed_entry)
+				s->selected = 0;
+		} else {
+			if (s->first_displayed_entry == NULL)
+				s->selected = 0;
+		}
 		tree_scroll_up(view, &s->first_displayed_entry,
-		    MAX(0, view->nlines - 4 - s->selected), s->tree,
-		    s->tree == s->root);
-		s->selected = 0;
-		if (got_object_tree_get_first_entry(s->tree) ==
-		    s->first_displayed_entry && s->tree != s->root)
-			s->first_displayed_entry = NULL;
+		    MAX(0, view->nlines - 3), s->tree, s->tree == s->root);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -5456,18 +5450,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected = s->ndisplayed - 1;
 			break;
 		}
-		nscrolled = tree_scroll_down(&s->first_displayed_entry,
-		    view->nlines, s->last_displayed_entry, s->tree);
-		if (nscrolled < view->nlines) {
-			int ndisplayed = 0;
-			struct got_tree_entry *te;
-			te = s->first_displayed_entry;
-			do {
-				ndisplayed++;
-				te = got_tree_entry_get_next(s->tree, te);
-			} while (te);
-			s->selected = ndisplayed - 1;
-		}
+		tree_scroll_down(&s->first_displayed_entry, view->nlines - 3,
+		    s->last_displayed_entry, s->tree);
 		break;
 	case KEY_ENTER:
 	case '\r':
