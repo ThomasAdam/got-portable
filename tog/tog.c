@@ -5705,7 +5705,6 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 	const struct got_error *err = NULL;
 	struct tog_ref_view_state *s = &view->state.ref;
 
-	s->first_displayed_entry = 0;
 	s->selected_entry = 0;
 	s->repo = repo;
 
@@ -5716,6 +5715,8 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 	err = ref_view_load_refs(s);
 	if (err)
 		return err;
+
+	s->first_displayed_entry = TAILQ_FIRST(&s->refs);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "^refs/heads/",
@@ -5856,20 +5857,22 @@ ref_scroll_up(struct tog_view *view,
     struct tog_reflist_entry **first_displayed_entry, int maxscroll,
     struct tog_reflist_head *refs)
 {
-	int i;
+	struct tog_reflist_entry *re;
+	int i = 0;
 
 	if (*first_displayed_entry == TAILQ_FIRST(refs))
 		return;
 
-	i = 0;
-	while (*first_displayed_entry && i < maxscroll) {
-		*first_displayed_entry = TAILQ_PREV(*first_displayed_entry,
-		    tog_reflist_head, entry);
-		i++;
+	re = TAILQ_PREV(*first_displayed_entry, tog_reflist_head, entry);
+	while (i++ < maxscroll) {
+		if (re == NULL)
+			break;
+		*first_displayed_entry = re;
+		re = TAILQ_PREV(re, tog_reflist_head, entry);
 	}
 }
 
-static int
+static void
 ref_scroll_down(struct tog_reflist_entry **first_displayed_entry, int maxscroll,
 	struct tog_reflist_entry *last_displayed_entry,
 	struct tog_reflist_head *refs)
@@ -5890,7 +5893,6 @@ ref_scroll_down(struct tog_reflist_entry **first_displayed_entry, int maxscroll,
 			next = TAILQ_NEXT(next, entry);
 		}
 	}
-	return n;
 }
 
 static const struct got_error *
@@ -5994,10 +5996,7 @@ show_ref_view(struct tog_view *view)
 	if (limit == 0)
 		return NULL;
 
-	if (s->first_displayed_entry)
-		re = s->first_displayed_entry;
-	else
-		re = TAILQ_FIRST(&s->refs);
+	re = s->first_displayed_entry;
 
 	if (asprintf(&line, "references [%d/%d]", re->idx + s->selected + 1,
 	    s->nrefs) == -1)
@@ -6148,7 +6147,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 	const struct got_error *err = NULL;
 	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_view *log_view, *tree_view;
-	int begin_x = 0, nscrolled;
+	int begin_x = 0;
 
 	switch (ch) {
 	case 'i':
@@ -6203,18 +6202,16 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 	case KEY_UP:
 		if (s->selected > 0) {
 			s->selected--;
-			if (s->selected == 0)
-				break;
-		}
-		if (s->selected > 0)
 			break;
+		}
 		ref_scroll_up(view, &s->first_displayed_entry, 1, &s->refs);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
+		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
+			s->selected = 0;
 		ref_scroll_up(view, &s->first_displayed_entry,
-		    MAX(0, view->nlines - 4 - s->selected), &s->refs);
-		s->selected = 0;
+		    MAX(0, view->nlines - 1), &s->refs);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -6236,18 +6233,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected = s->ndisplayed - 1;
 			break;
 		}
-		nscrolled = ref_scroll_down(&s->first_displayed_entry,
-		    view->nlines, s->last_displayed_entry, &s->refs);
-		if (nscrolled < view->nlines) {
-			int ndisplayed = 0;
-			struct tog_reflist_entry *re;
-			re = s->first_displayed_entry;
-			do {
-				ndisplayed++;
-				re = TAILQ_NEXT(re, entry);
-			} while (re);
-			s->selected = ndisplayed - 1;
-		}
+		ref_scroll_down(&s->first_displayed_entry,
+		    view->nlines - 1, s->last_displayed_entry, &s->refs);
 		break;
 	case CTRL('l'):
 		ref_view_free_refs(s);
