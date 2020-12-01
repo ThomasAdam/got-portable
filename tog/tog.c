@@ -4204,22 +4204,22 @@ cancel_blame_view(void *arg)
 }
 
 static const struct got_error *
-run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
-    int *first_displayed_line, int *last_displayed_line, int *selected_line,
-    int *done, int *eof, const char *path, struct got_object_id *commit_id,
-    struct got_repository *repo)
+run_blame(struct tog_view *view)
 {
+	struct tog_blame_view_state *s = &view->state.blame;
+	struct tog_blame *blame = &s->blame;
 	const struct got_error *err = NULL;
 	struct got_blob_object *blob = NULL;
 	struct got_repository *thread_repo = NULL;
 	struct got_object_id *obj_id = NULL;
 	int obj_type;
 
-	err = got_object_id_by_path(&obj_id, repo, commit_id, path);
+	err = got_object_id_by_path(&obj_id, s->repo, s->blamed_commit->id,
+	    s->path);
 	if (err)
 		return err;
 
-	err = got_object_get_type(&obj_type, repo, obj_id);
+	err = got_object_get_type(&obj_type, s->repo, obj_id);
 	if (err)
 		goto done;
 
@@ -4228,7 +4228,7 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		goto done;
 	}
 
-	err = got_object_open_as_blob(&blob, repo, obj_id, 8192);
+	err = got_object_open_as_blob(&blob, s->repo, obj_id, 8192);
 	if (err)
 		goto done;
 	blame->f = got_opentemp();
@@ -4251,27 +4251,27 @@ run_blame(struct tog_blame *blame, struct tog_view *view, int *blame_complete,
 		goto done;
 	}
 
-	err = got_repo_open(&thread_repo, got_repo_get_path(repo), NULL);
+	err = got_repo_open(&thread_repo, got_repo_get_path(s->repo), NULL);
 	if (err)
 		goto done;
 
 	blame->cb_args.view = view;
 	blame->cb_args.lines = blame->lines;
 	blame->cb_args.nlines = blame->nlines;
-	blame->cb_args.commit_id = got_object_id_dup(commit_id);
+	blame->cb_args.commit_id = got_object_id_dup(s->blamed_commit->id);
 	if (blame->cb_args.commit_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
-	blame->cb_args.quit = done;
+	blame->cb_args.quit = &s->done;
 
-	blame->thread_args.path = path;
+	blame->thread_args.path = s->path;
 	blame->thread_args.repo = thread_repo;
 	blame->thread_args.cb_args = &blame->cb_args;
-	blame->thread_args.complete = blame_complete;
+	blame->thread_args.complete = &s->blame_complete;
 	blame->thread_args.cancel_cb = cancel_blame_view;
-	blame->thread_args.cancel_arg = done;
-	*blame_complete = 0;
+	blame->thread_args.cancel_arg = &s->done;
+	s->blame_complete = 0;
 
 done:
 	if (blob)
@@ -4324,10 +4324,7 @@ open_blame_view(struct tog_view *view, char *path,
 	view->search_start = search_start_blame_view;
 	view->search_next = search_next_blame_view;
 
-	return run_blame(&s->blame, view, &s->blame_complete,
-	    &s->first_displayed_line, &s->last_displayed_line,
-	    &s->selected_line, &s->done, &s->eof, s->path,
-	    s->blamed_commit->id, s->repo);
+	return run_blame(view);
 }
 
 static const struct got_error *
@@ -4561,10 +4558,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			break;
 		SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
 		    s->blamed_commit, entry);
-		err = run_blame(&s->blame, view, &s->blame_complete,
-		    &s->first_displayed_line, &s->last_displayed_line,
-		    &s->selected_line, &s->done, &s->eof,
-		    s->path, s->blamed_commit->id, s->repo);
+		err = run_blame(view);
 		if (err)
 			break;
 		break;
@@ -4583,10 +4577,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 		got_object_qid_free(s->blamed_commit);
 		s->blamed_commit =
 		    SIMPLEQ_FIRST(&s->blamed_commits);
-		err = run_blame(&s->blame, view, &s->blame_complete,
-		    &s->first_displayed_line, &s->last_displayed_line,
-		    &s->selected_line, &s->done, &s->eof, s->path,
-		    s->blamed_commit->id, s->repo);
+		err = run_blame(view);
 		if (err)
 			break;
 		break;
