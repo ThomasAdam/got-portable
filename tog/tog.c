@@ -3877,12 +3877,11 @@ struct tog_blame_line {
 };
 
 static const struct got_error *
-draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
-    const char *path, struct tog_blame_line *lines, int nlines,
-    int blame_complete, int selected_line, int *first_displayed_line,
-    int *last_displayed_line, int *eof, int max_lines,
-    struct tog_colors *colors, int matched_line, regmatch_t *regmatch)
+draw_blame(struct tog_view *view)
 {
+	struct tog_blame_view_state *s = &view->state.blame;
+	struct tog_blame *blame = &s->blame;
+	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
 	char *line;
@@ -3894,11 +3893,11 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	char *id_str;
 	struct tog_color *tc;
 
-	err = got_object_id_str(&id_str, id);
+	err = got_object_id_str(&id_str, s->blamed_commit->id);
 	if (err)
 		return err;
 
-	rewind(f);
+	rewind(blame->f);
 	werase(view->window);
 
 	if (asprintf(&line, "commit %s", id_str) == -1) {
@@ -3914,7 +3913,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		return err;
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
-	tc = get_color(colors, TOG_COLOR_COMMIT);
+	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
@@ -3930,8 +3929,8 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		waddch(view->window, '\n');
 
 	if (asprintf(&line, "[%d/%d] %s%s",
-	    *first_displayed_line - 1 + selected_line, nlines,
-	    blame_complete ? "" : "annotating... ", path) == -1) {
+	    s->first_displayed_line - 1 + s->selected_line, blame->nlines,
+	    s->blame_complete ? "" : "annotating... ", s->path) == -1) {
 		free(id_str);
 		return got_error_from_errno("asprintf");
 	}
@@ -3947,27 +3946,27 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 	if (width < view->ncols - 1)
 		waddch(view->window, '\n');
 
-	*eof = 0;
-	while (nprinted < max_lines - 2) {
-		line = parse_next_line(f, &len);
+	s->eof = 0;
+	while (nprinted < view->nlines - 2) {
+		line = parse_next_line(blame->f, &len);
 		if (line == NULL) {
-			*eof = 1;
+			s->eof = 1;
 			break;
 		}
-		if (++lineno < *first_displayed_line) {
+		if (++lineno < s->first_displayed_line) {
 			free(line);
 			continue;
 		}
 
-		if (view->focussed && nprinted == selected_line - 1)
+		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandout(view->window);
 
-		if (nlines > 0) {
-			blame_line = &lines[lineno - 1];
+		if (blame->nlines > 0) {
+			blame_line = &blame->lines[lineno - 1];
 			if (blame_line->annotated && prev_id &&
 			    got_object_id_cmp(prev_id, blame_line->id) == 0 &&
 			    !(view->focussed &&
-			    nprinted == selected_line - 1)) {
+			    nprinted == s->selected_line - 1)) {
 				waddstr(view->window, "        ");
 			} else if (blame_line->annotated) {
 				char *id_str;
@@ -3976,7 +3975,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 					free(line);
 					return err;
 				}
-				tc = get_color(colors, TOG_COLOR_COMMIT);
+				tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 				if (tc)
 					wattr_on(view->window,
 					    COLOR_PAIR(tc->colorpair), NULL);
@@ -3995,7 +3994,7 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 			prev_id = NULL;
 		}
 
-		if (view->focussed && nprinted == selected_line - 1)
+		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandend(view->window);
 		waddstr(view->window, " ");
 
@@ -4007,7 +4006,8 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 				free(line);
 				return err;
 			}
-		} else if (*first_displayed_line + nprinted == matched_line &&
+		} else if (s->first_displayed_line + nprinted ==
+		    s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
 			err = add_matched_line(&width, line, view->ncols - 9, 9,
 			    view->window, regmatch);
@@ -4028,10 +4028,10 @@ draw_blame(struct tog_view *view, struct got_object_id *id, FILE *f,
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
-			*first_displayed_line = lineno;
+			s->first_displayed_line = lineno;
 		free(line);
 	}
-	*last_displayed_line = lineno;
+	s->last_displayed_line = lineno;
 
 	view_vborder(view);
 
@@ -4439,11 +4439,7 @@ show_blame_view(struct tog_view *view)
 	if (s->blame_complete)
 		halfdelay(10); /* disable fast refresh */
 
-	err = draw_blame(view, s->blamed_commit->id, s->blame.f,
-	    s->path, s->blame.lines, s->blame.nlines, s->blame_complete,
-	    s->selected_line, &s->first_displayed_line,
-	    &s->last_displayed_line, &s->eof, view->nlines, &s->colors,
-	    s->matched_line, &view->regmatch);
+	err = draw_blame(view);
 
 	view_vborder(view);
 	return err;
