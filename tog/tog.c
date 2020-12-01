@@ -4778,33 +4778,29 @@ done:
 }
 
 static const struct got_error *
-draw_tree_entries(struct tog_view *view,
-    struct got_tree_entry **first_displayed_entry,
-    struct got_tree_entry **last_displayed_entry,
-    struct got_tree_entry **selected_entry, int *ndisplayed,
-    const char *label, int show_ids, const char *parent_path,
-    struct got_tree_object *tree, int selected, int limit,
-    int isroot, struct tog_colors *colors, struct got_repository *repo)
+draw_tree_entries(struct tog_view *view, const char *parent_path)
 {
+	struct tog_tree_view_state *s = &view->state.tree;
 	const struct got_error *err = NULL;
 	struct got_tree_entry *te;
 	wchar_t *wline;
 	struct tog_color *tc;
 	int width, n, i, nentries;
+	int limit = view->nlines;
 
-	*ndisplayed = 0;
+	s->ndisplayed = 0;
 
 	werase(view->window);
 
 	if (limit == 0)
 		return NULL;
 
-	err = format_line(&wline, &width, label, view->ncols, 0);
+	err = format_line(&wline, &width, s->tree_label, view->ncols, 0);
 	if (err)
 		return err;
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
-	tc = get_color(colors, TOG_COLOR_COMMIT);
+	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
@@ -4834,35 +4830,35 @@ draw_tree_entries(struct tog_view *view,
 	if (--limit <= 0)
 		return NULL;
 
-	if (*first_displayed_entry == NULL) {
-		te = got_object_tree_get_first_entry(tree);
-		if (selected == 0) {
+	if (s->first_displayed_entry == NULL) {
+		te = got_object_tree_get_first_entry(s->tree);
+		if (s->selected == 0) {
 			if (view->focussed)
 				wstandout(view->window);
-			*selected_entry = NULL;
+			s->selected_entry = NULL;
 		}
 		waddstr(view->window, "  ..\n");	/* parent directory */
-		if (selected == 0 && view->focussed)
+		if (s->selected == 0 && view->focussed)
 			wstandend(view->window);
-		(*ndisplayed)++;
+		s->ndisplayed++;
 		if (--limit <= 0)
 			return NULL;
 		n = 1;
 	} else {
 		n = 0;
-		te = *first_displayed_entry;
+		te = s->first_displayed_entry;
 	}
 
-	nentries = got_object_tree_get_nentries(tree);
+	nentries = got_object_tree_get_nentries(s->tree);
 	for (i = got_tree_entry_get_index(te); i < nentries; i++) {
 		char *line = NULL, *id_str = NULL, *link_target = NULL;
 		const char *modestr = "";
 		mode_t mode;
 
-		te = got_object_tree_get_entry(tree, i);
+		te = got_object_tree_get_entry(s->tree, i);
 		mode = got_tree_entry_get_mode(te);
 
-		if (show_ids) {
+		if (s->show_ids) {
 			err = got_object_id_str(&id_str,
 			    got_tree_entry_get_id(te));
 			if (err)
@@ -4875,7 +4871,7 @@ draw_tree_entries(struct tog_view *view,
 			int i;
 
 			err = got_tree_entry_get_symlink_target(&link_target,
-			    te, repo);
+			    te, s->repo);
 			if (err) {
 				free(id_str);
 				return err;
@@ -4905,12 +4901,12 @@ draw_tree_entries(struct tog_view *view,
 			free(line);
 			break;
 		}
-		if (n == selected) {
+		if (n == s->selected) {
 			if (view->focussed)
 				wstandout(view->window);
-			*selected_entry = te;
+			s->selected_entry = te;
 		}
-		tc = match_color(colors, line);
+		tc = match_color(&s->colors, line);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -4920,14 +4916,14 @@ draw_tree_entries(struct tog_view *view,
 			    COLOR_PAIR(tc->colorpair), NULL);
 		if (width < view->ncols - 1)
 			waddch(view->window, '\n');
-		if (n == selected && view->focussed)
+		if (n == s->selected && view->focussed)
 			wstandend(view->window);
 		free(line);
 		free(wline);
 		wline = NULL;
 		n++;
-		(*ndisplayed)++;
-		*last_displayed_entry = te;
+		s->ndisplayed++;
+		s->last_displayed_entry = te;
 		if (--limit <= 0)
 			break;
 	}
@@ -5285,11 +5281,7 @@ show_tree_view(struct tog_view *view)
 	if (err)
 		return err;
 
-	err = draw_tree_entries(view, &s->first_displayed_entry,
-	    &s->last_displayed_entry, &s->selected_entry,
-	    &s->ndisplayed, s->tree_label, s->show_ids, parent_path,
-	    s->tree, s->selected, view->nlines, s->tree == s->root,
-	    &s->colors, s->repo);
+	err = draw_tree_entries(view, parent_path);
 	free(parent_path);
 
 	view_vborder(view);
