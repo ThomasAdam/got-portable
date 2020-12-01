@@ -2887,11 +2887,10 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 }
 
 static const struct got_error *
-draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
-    off_t *line_offsets, int selected_line, int max_lines,
-    int *last_displayed_line, int *eof, const char *header,
-    struct tog_colors *colors, int matched_line, regmatch_t *regmatch)
+draw_file(struct tog_view *view, const char *header)
 {
+	struct tog_diff_view_state *s = &view->state.diff;
+	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
 	int nprinted = 0;
 	char *line;
@@ -2899,17 +2898,19 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 	size_t len;
 	wchar_t *wline;
 	int width;
+	int max_lines = view->nlines;
+	int nlines = s->nlines;
 	off_t line_offset;
 
-	line_offset = line_offsets[first_displayed_line - 1];
-	if (fseeko(f, line_offset, SEEK_SET) == -1)
+	line_offset = s->line_offsets[s->first_displayed_line - 1];
+	if (fseeko(s->f, line_offset, SEEK_SET) == -1)
 		return got_error_from_errno("fseek");
 
 	werase(view->window);
 
 	if (header) {
 		if (asprintf(&line, "[%d/%d] %s",
-		    first_displayed_line - 1 + selected_line, nlines,
+		    s->first_displayed_line - 1 + s->selected_line, nlines,
 		    header) == -1)
 			return got_error_from_errno("asprintf");
 		err = format_line(&wline, &width, line, view->ncols, 0);
@@ -2932,19 +2933,19 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 		max_lines--;
 	}
 
-	*eof = 0;
+	s->eof = 0;
 	while (max_lines > 0 && nprinted < max_lines) {
-		line = parse_next_line(f, &len);
+		line = parse_next_line(s->f, &len);
 		if (line == NULL) {
-			*eof = 1;
+			s->eof = 1;
 			break;
 		}
 
-		tc = match_color(colors, line);
+		tc = match_color(&s->colors, line);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
-		if (first_displayed_line + nprinted == matched_line &&
+		if (s->first_displayed_line + nprinted == s->matched_line &&
 		    regmatch->rm_so >= 0 && regmatch->rm_so < regmatch->rm_eo) {
 			err = add_matched_line(&width, line, view->ncols, 0,
 			    view->window, regmatch);
@@ -2971,13 +2972,14 @@ draw_file(struct tog_view *view, FILE *f, int first_displayed_line, int nlines,
 		free(line);
 	}
 	if (nprinted >= 1)
-		*last_displayed_line = first_displayed_line + (nprinted - 1);
+		s->last_displayed_line = s->first_displayed_line +
+		    (nprinted - 1);
 	else
-		*last_displayed_line = first_displayed_line;
+		s->last_displayed_line = s->first_displayed_line;
 
 	view_vborder(view);
 
-	if (*eof) {
+	if (s->eof) {
 		while (nprinted < view->nlines) {
 			waddch(view->window, '\n');
 			nprinted++;
@@ -3574,10 +3576,7 @@ show_diff_view(struct tog_view *view)
 	free(id_str1);
 	free(id_str2);
 
-	return draw_file(view, s->f, s->first_displayed_line, s->nlines,
-	    s->line_offsets, s->selected_line, view->nlines,
-	    &s->last_displayed_line, &s->eof, header, &s->colors,
-	    s->matched_line, &view->regmatch);
+	return draw_file(view, header);
 }
 
 static const struct got_error *
