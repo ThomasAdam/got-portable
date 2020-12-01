@@ -1687,42 +1687,40 @@ done:
 }
 
 static void
-scroll_up(struct tog_view *view,
-    struct commit_queue_entry **first_displayed_entry, int maxscroll,
-    struct commit_queue *commits)
+log_scroll_up(struct tog_view *view, int maxscroll)
 {
+	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
 	int nscrolled = 0;
 
-	entry = TAILQ_FIRST(&commits->head);
-	if (*first_displayed_entry == entry)
+	entry = TAILQ_FIRST(&s->commits.head);
+	if (s->first_displayed_entry == entry)
 		return;
 
-	entry = *first_displayed_entry;
+	entry = s->first_displayed_entry;
 	while (entry && nscrolled < maxscroll) {
 		entry = TAILQ_PREV(entry, commit_queue_head, entry);
 		if (entry) {
-			*first_displayed_entry = entry;
+			s->first_displayed_entry = entry;
 			nscrolled++;
 		}
 	}
 }
 
 static const struct got_error *
-trigger_log_thread(struct tog_view *log_view, int wait,
-    int *commits_needed, int *log_complete,
-    pthread_cond_t *need_commits, pthread_cond_t *commit_loaded)
+trigger_log_thread(struct tog_view *view, int wait)
 {
+	struct tog_log_thread_args *ta = &view->state.log.thread_args;
 	int errcode;
 
 	halfdelay(1); /* fast refresh while loading commits */
 
-	while (*commits_needed > 0) {
-		if (*log_complete)
+	while (ta->commits_needed > 0) {
+		if (ta->log_complete)
 			break;
 
 		/* Wake the log thread. */
-		errcode = pthread_cond_signal(need_commits);
+		errcode = pthread_cond_signal(&ta->need_commits);
 		if (errcode)
 			return got_error_set_errno(errcode,
 			    "pthread_cond_signal");
@@ -1735,18 +1733,18 @@ trigger_log_thread(struct tog_view *log_view, int wait,
 			break;
 
 		/* Display progress update in log view. */
-		show_log_view(log_view);
+		show_log_view(view);
 		update_panels();
 		doupdate();
 
 		/* Wait right here while next commit is being loaded. */
-		errcode = pthread_cond_wait(commit_loaded, &tog_mutex);
+		errcode = pthread_cond_wait(&ta->commit_loaded, &tog_mutex);
 		if (errcode)
 			return got_error_set_errno(errcode,
 			    "pthread_cond_wait");
 
 		/* Display progress update in log view. */
-		show_log_view(log_view);
+		show_log_view(view);
 		update_panels();
 		doupdate();
 	}
@@ -1755,42 +1753,39 @@ trigger_log_thread(struct tog_view *log_view, int wait,
 }
 
 static const struct got_error *
-scroll_down(struct tog_view *log_view,
-    struct commit_queue_entry **first_displayed_entry, int maxscroll,
-    struct commit_queue_entry **last_displayed_entry,
-    struct commit_queue *commits, int *log_complete, int *commits_needed,
-    pthread_cond_t *need_commits, pthread_cond_t *commit_loaded)
+log_scroll_down(struct tog_view *view, int maxscroll)
 {
+	struct tog_log_view_state *s = &view->state.log;
 	const struct got_error *err = NULL;
 	struct commit_queue_entry *pentry;
 	int nscrolled = 0, ncommits_needed;
 
-	if (*last_displayed_entry == NULL)
+	if (s->last_displayed_entry == NULL)
 		return NULL;
 
-	ncommits_needed = (*last_displayed_entry)->idx + 1 + maxscroll;
-	if (commits->ncommits < ncommits_needed && !*log_complete) {
+	ncommits_needed = (s->last_displayed_entry)->idx + 1 + maxscroll;
+	if (s->commits.ncommits < ncommits_needed &&
+	    !s->thread_args.log_complete) {
 		/*
 		 * Ask the log thread for required amount of commits.
 		 */
-		(*commits_needed) += maxscroll;
-		err = trigger_log_thread(log_view, 1, commits_needed,
-		    log_complete, need_commits, commit_loaded);
+		s->thread_args.commits_needed += maxscroll;
+		err = trigger_log_thread(view, 1);
 		if (err)
 			return err;
 	}
 
 	do {
-		pentry = TAILQ_NEXT(*last_displayed_entry, entry);
+		pentry = TAILQ_NEXT(s->last_displayed_entry, entry);
 		if (pentry == NULL)
 			break;
 
-		*last_displayed_entry = pentry;
+		s->last_displayed_entry = pentry;
 
-		pentry = TAILQ_NEXT(*first_displayed_entry, entry);
+		pentry = TAILQ_NEXT(s->first_displayed_entry, entry);
 		if (pentry == NULL)
 			break;
-		*first_displayed_entry = pentry;
+		s->first_displayed_entry = pentry;
 	} while (++nscrolled < maxscroll);
 
 	return err;
@@ -2180,11 +2175,7 @@ search_next_log_view(struct tog_view *view)
 			 * will resume at s->search_entry once we come back.
 			 */
 			s->thread_args.commits_needed++;
-			return trigger_log_thread(view, 0,
-			    &s->thread_args.commits_needed,
-			    &s->thread_args.log_complete,
-			    &s->thread_args.need_commits,
-			    &s->thread_args.commit_loaded);
+			return trigger_log_thread(view, 0);
 		}
 
 		err = match_commit(&have_match, entry->id, entry->commit,
@@ -2342,11 +2333,7 @@ show_log_view(struct tog_view *view)
 		if (errcode)
 			return got_error_set_errno(errcode, "pthread_create");
 		if (s->thread_args.commits_needed > 0) {
-			err = trigger_log_thread(view, 1,
-			    &s->thread_args.commits_needed,
-			    &s->thread_args.log_complete,
-			    &s->thread_args.need_commits,
-			    &s->thread_args.commit_loaded);
+			err = trigger_log_thread(view, 1);
 			if (err)
 				return err;
 		}
@@ -2383,8 +2370,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (s->selected > 0)
 			s->selected--;
 		else
-			scroll_up(view, &s->first_displayed_entry, 1,
-			    &s->commits);
+			log_scroll_up(view, 1);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
@@ -2395,8 +2381,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected = 0;
 			break;
 		}
-		scroll_up(view, &s->first_displayed_entry,
-		    view->nlines - 1, &s->commits);
+		log_scroll_up(view, view->nlines - 1);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -2409,12 +2394,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected++;
 			break;
 		}
-		err = scroll_down(view, &s->first_displayed_entry, 1,
-		    &s->last_displayed_entry, &s->commits,
-		    &s->thread_args.log_complete,
-		    &s->thread_args.commits_needed,
-		    &s->thread_args.need_commits,
-		    &s->thread_args.commit_loaded);
+		err = log_scroll_down(view, 1);
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'): {
@@ -2422,12 +2402,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		first = s->first_displayed_entry;
 		if (first == NULL)
 			break;
-		err = scroll_down(view, &s->first_displayed_entry,
-		    view->nlines - 1, &s->last_displayed_entry,
-		    &s->commits, &s->thread_args.log_complete,
-		    &s->thread_args.commits_needed,
-		    &s->thread_args.need_commits,
-		    &s->thread_args.commit_loaded);
+		err = log_scroll_down(view, view->nlines - 1);
 		if (err)
 			break;
 		if (first == s->first_displayed_entry &&
@@ -3745,11 +3720,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view **dead_view,
 
 		if (TAILQ_NEXT(ls->selected_entry, entry) == NULL) {
 			ls->thread_args.commits_needed++;
-			err = trigger_log_thread(s->log_view, 1,
-			    &ls->thread_args.commits_needed,
-			    &ls->thread_args.log_complete,
-			    &ls->thread_args.need_commits,
-			    &ls->thread_args.commit_loaded);
+			err = trigger_log_thread(s->log_view, 1);
 			if (err)
 				break;
 		}
