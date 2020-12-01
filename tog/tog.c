@@ -1831,8 +1831,7 @@ tree_view_visit_subtree(struct got_tree_object *subtree,
 
 static const struct got_error *
 tree_view_walk_path(struct tog_tree_view_state *s,
-    struct got_object_id *commit_id,
-    const char *path, struct got_repository *repo)
+    struct got_object_id *commit_id, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree = NULL;
@@ -1881,12 +1880,12 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 			break;
 		}
 
-		err = got_object_id_by_path(&tree_id, repo, commit_id,
+		err = got_object_id_by_path(&tree_id, s->repo, commit_id,
 		    subpath);
 		if (err)
 			break;
 
-		err = got_object_open_as_tree(&tree, repo, tree_id);
+		err = got_object_open_as_tree(&tree, s->repo, tree_id);
 		free(tree_id);
 		if (err)
 			break;
@@ -1938,7 +1937,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	if (got_path_is_root_dir(path))
 		return NULL;
 
-	return tree_view_walk_path(s, entry->id, path, repo);
+	return tree_view_walk_path(s, entry->id, path);
 }
 
 static const struct got_error *
@@ -5571,7 +5570,7 @@ cmd_tree(int argc, char *argv[])
 		goto done;
 	if (!got_path_is_root_dir(in_repo_path)) {
 		error = tree_view_walk_path(&view->state.tree, commit_id,
-		    in_repo_path, repo);
+		    in_repo_path);
 		if (error)
 			goto done;
 	}
