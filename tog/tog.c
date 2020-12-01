@@ -1277,10 +1277,10 @@ format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
 
 static const struct got_error *
 draw_commit(struct tog_view *view, struct got_commit_object *commit,
-    struct got_object_id *id, struct got_reflist_head *refs,
-    const size_t date_display_cols, int author_display_cols,
-    struct tog_colors *colors)
+    struct got_object_id *id, const size_t date_display_cols,
+    int author_display_cols)
 {
+	struct tog_log_view_state *s = &view->state.log;
 	const struct got_error *err = NULL;
 	char datebuf[12]; /* YYYY-MM-DD + SPACE + NUL */
 	char *logmsg0 = NULL, *logmsg = NULL;
@@ -1305,7 +1305,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		limit = MIN(sizeof(datebuf) - 1, avail);
 	else
 		limit = MIN(date_display_cols, sizeof(datebuf) - 1);
-	tc = get_color(colors, TOG_COLOR_DATE);
+	tc = get_color(&s->colors, TOG_COLOR_DATE);
 	if (tc)
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
@@ -1322,7 +1322,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 		err = got_object_id_str(&id_str, id);
 		if (err)
 			goto done;
-		tc = get_color(colors, TOG_COLOR_COMMIT);
+		tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 		if (tc)
 			wattr_on(view->window,
 			    COLOR_PAIR(tc->colorpair), NULL);
@@ -1344,7 +1344,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	err = format_author(&wauthor, &author_width, author, avail - col, col);
 	if (err)
 		goto done;
-	tc = get_color(colors, TOG_COLOR_AUTHOR);
+	tc = get_color(&s->colors, TOG_COLOR_AUTHOR);
 	if (tc)
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
@@ -1521,15 +1521,12 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 }
 
 static const struct got_error *
-draw_commits(struct tog_view *view, struct commit_queue_entry **last,
-    struct commit_queue_entry **selected, struct commit_queue_entry *first,
-    struct commit_queue *commits, int selected_idx, int limit,
-    struct got_reflist_head *refs, const char *path, int commits_needed,
-    struct tog_colors *colors)
+draw_commits(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
+	const int limit = view->nlines;
 	int width;
 	int ncommits, author_cols = 4;
 	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
@@ -1538,35 +1535,34 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 	struct tog_color *tc;
 	static const size_t date_display_cols = 12;
 
-	entry = first;
+	entry = s->first_displayed_entry;
 	ncommits = 0;
 	while (entry) {
-		if (ncommits == selected_idx) {
-			*selected = entry;
+		if (ncommits == s->selected) {
+			s->selected_entry = entry;
 			break;
 		}
 		entry = TAILQ_NEXT(entry, entry);
 		ncommits++;
 	}
 
-	if (*selected && !(view->searching && view->search_next_done == 0)) {
-		err = got_object_id_str(&id_str, (*selected)->id);
+	if (s->selected_entry &&
+	    !(view->searching && view->search_next_done == 0)) {
+		err = got_object_id_str(&id_str, s->selected_entry->id);
 		if (err)
 			return err;
-		if (refs) {
-			err = build_refs_str(&refs_str, refs, (*selected)->id,
-			    s->repo);
-			if (err)
-				goto done;
-		}
+		err = build_refs_str(&refs_str, &s->refs,
+		    s->selected_entry->id, s->repo);
+		if (err)
+			goto done;
 	}
 
-	if (commits_needed == 0)
+	if (s->thread_args.commits_needed == 0)
 		halfdelay(10); /* disable fast refresh */
 
-	if (commits_needed > 0) {
+	if (s->thread_args.commits_needed > 0) {
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
-		    entry ? entry->idx + 1 : 0, commits->ncommits,
+		    entry ? entry->idx + 1 : 0, s->commits.ncommits,
 		    (view->searching && !view->search_next_done) ?
 		    "searching..." : "loading...") == -1) {
 			err = got_error_from_errno("asprintf");
@@ -1585,7 +1581,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		}
 
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
-		    entry ? entry->idx + 1 : 0, commits->ncommits,
+		    entry ? entry->idx + 1 : 0, s->commits.ncommits,
 		    search_str ? search_str :
 		    (refs_str ? refs_str : "")) == -1) {
 			err = got_error_from_errno("asprintf");
@@ -1593,10 +1589,10 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		}
 	}
 
-	if (path && strcmp(path, "/") != 0) {
+	if (s->in_repo_path && strcmp(s->in_repo_path, "/") != 0) {
 		if (asprintf(&header, "commit %s %s%s",
 		    id_str ? id_str : "........................................",
-		    path, ncommits_str) == -1) {
+		    s->in_repo_path, ncommits_str) == -1) {
 			err = got_error_from_errno("asprintf");
 			header = NULL;
 			goto done;
@@ -1616,7 +1612,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 
 	if (view_needs_focus_indication(view))
 		wstandout(view->window);
-	tc = get_color(colors, TOG_COLOR_COMMIT);
+	tc = get_color(&s->colors, TOG_COLOR_COMMIT);
 	if (tc)
 		wattr_on(view->window,
 		    COLOR_PAIR(tc->colorpair), NULL);
@@ -1635,7 +1631,7 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		goto done;
 
 	/* Grow author column size if necessary. */
-	entry = first;
+	entry = s->first_displayed_entry;
 	ncommits = 0;
 	while (entry) {
 		char *author;
@@ -1658,22 +1654,22 @@ draw_commits(struct tog_view *view, struct commit_queue_entry **last,
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
-	entry = first;
-	*last = first;
+	entry = s->first_displayed_entry;
+	s->last_displayed_entry = s->first_displayed_entry;
 	ncommits = 0;
 	while (entry) {
 		if (ncommits >= limit - 1)
 			break;
-		if (ncommits == selected_idx)
+		if (ncommits == s->selected)
 			wstandout(view->window);
-		err = draw_commit(view, entry->commit, entry->id, refs,
-		    date_display_cols, author_cols, colors);
-		if (ncommits == selected_idx)
+		err = draw_commit(view, entry->commit, entry->id,
+		    date_display_cols, author_cols);
+		if (ncommits == s->selected)
 			wstandend(view->window);
 		if (err)
 			goto done;
 		ncommits++;
-		*last = entry;
+		s->last_displayed_entry = entry;
 		entry = TAILQ_NEXT(entry, entry);
 	}
 
@@ -2339,10 +2335,7 @@ show_log_view(struct tog_view *view)
 		}
 	}
 
-	return draw_commits(view, &s->last_displayed_entry,
-	    &s->selected_entry, s->first_displayed_entry,
-	    &s->commits, s->selected, view->nlines, &s->refs,
-	    s->in_repo_path, s->thread_args.commits_needed, &s->colors);
+	return draw_commits(view);
 }
 
 static const struct got_error *
