@@ -1809,8 +1809,8 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 }
 
 static const struct got_error *
-tree_view_visit_subtree(struct got_tree_object *subtree,
-    struct tog_tree_view_state *s)
+tree_view_visit_subtree(struct tog_tree_view_state *s,
+    struct got_tree_object *subtree)
 {
 	struct tog_parent_tree *parent;
 
@@ -1890,7 +1890,7 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 		if (err)
 			break;
 
-		err = tree_view_visit_subtree(tree, s);
+		err = tree_view_visit_subtree(s, tree);
 		if (err) {
 			got_object_tree_close(tree);
 			break;
@@ -5416,7 +5416,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			    got_tree_entry_get_id(s->selected_entry));
 			if (err)
 				break;
-			err = tree_view_visit_subtree(subtree, s);
+			err = tree_view_visit_subtree(s, subtree);
 			if (err) {
 				got_object_tree_close(subtree);
 				break;
