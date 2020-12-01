@@ -1683,9 +1683,8 @@ done:
 }
 
 static void
-log_scroll_up(struct tog_view *view, int maxscroll)
+log_scroll_up(struct tog_log_view_state *s, int maxscroll)
 {
-	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
 	int nscrolled = 0;
 
@@ -2362,7 +2361,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (s->selected > 0)
 			s->selected--;
 		else
-			log_scroll_up(view, 1);
+			log_scroll_up(s, 1);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
@@ -2373,7 +2372,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected = 0;
 			break;
 		}
-		log_scroll_up(view, view->nlines - 1);
+		log_scroll_up(s, view->nlines - 1);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -4931,9 +4930,8 @@ draw_tree_entries(struct tog_view *view, const char *parent_path)
 }
 
 static void
-tree_scroll_up(struct tog_view *view, int maxscroll)
+tree_scroll_up(struct tog_tree_view_state *s, int maxscroll)
 {
-	struct tog_tree_view_state *s = &view->state.tree;
 	struct got_tree_entry *te;
 	int isroot = s->tree == s->root;
 	int i = 0;
@@ -4954,9 +4952,8 @@ tree_scroll_up(struct tog_view *view, int maxscroll)
 }
 
 static void
-tree_scroll_down(struct tog_view *view, int maxscroll)
+tree_scroll_down(struct tog_tree_view_state *s, int maxscroll)
 {
-	struct tog_tree_view_state *s = &view->state.tree;
 	struct got_tree_entry *next, *last;
 	int n = 0;
 
@@ -5353,7 +5350,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected--;
 			break;
 		}
-		tree_scroll_up(view, 1);
+		tree_scroll_up(s, 1);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
@@ -5365,7 +5362,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			if (s->first_displayed_entry == NULL)
 				s->selected = 0;
 		}
-		tree_scroll_up(view, MAX(0, view->nlines - 3));
+		tree_scroll_up(s, MAX(0, view->nlines - 3));
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -5377,7 +5374,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 		    == NULL)
 			/* can't scroll any further */
 			break;
-		tree_scroll_down(view, 1);
+		tree_scroll_down(s, 1);
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'):
@@ -5388,7 +5385,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected = s->ndisplayed - 1;
 			break;
 		}
-		tree_scroll_down(view, view->nlines - 3);
+		tree_scroll_down(s, view->nlines - 3);
 		break;
 	case KEY_ENTER:
 	case '\r':
@@ -5790,9 +5787,8 @@ done:
 }
 
 static void
-ref_scroll_up(struct tog_view *view, int maxscroll)
+ref_scroll_up(struct tog_ref_view_state *s, int maxscroll)
 {
-	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_reflist_entry *re;
 	int i = 0;
 
@@ -5809,9 +5805,8 @@ ref_scroll_up(struct tog_view *view, int maxscroll)
 }
 
 static void
-ref_scroll_down(struct tog_view *view, int maxscroll)
+ref_scroll_down(struct tog_ref_view_state *s, int maxscroll)
 {
-	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_reflist_entry *next, *last;
 	int n = 0;
 
@@ -6139,13 +6134,13 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected--;
 			break;
 		}
-		ref_scroll_up(view, 1);
+		ref_scroll_up(s, 1);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
 		if (s->first_displayed_entry == TAILQ_FIRST(&s->refs))
 			s->selected = 0;
-		ref_scroll_up(view, MAX(0, view->nlines - 1));
+		ref_scroll_up(s, MAX(0, view->nlines - 1));
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -6156,7 +6151,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 		if (TAILQ_NEXT(s->last_displayed_entry, entry) == NULL)
 			/* can't scroll any further */
 			break;
-		ref_scroll_down(view, 1);
+		ref_scroll_down(s, 1);
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'):
@@ -6166,7 +6161,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 				s->selected = s->ndisplayed - 1;
 			break;
 		}
-		ref_scroll_down(view, view->nlines - 1);
+		ref_scroll_down(s, view->nlines - 1);
 		break;
 	case CTRL('l'):
 		ref_view_free_refs(s);
