@@ -2411,6 +2411,12 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			s->selected = view->nlines - 2;
 		if (s->selected > s->commits.ncommits - 1)
 			s->selected = s->commits.ncommits - 1;
+		if (s->commits.ncommits < view->nlines - 1 &&
+		    !s->thread_args.log_complete) {
+			s->thread_args.commits_needed += (view->nlines - 1) -
+			    s->commits.ncommits;
+			err = trigger_log_thread(view, 1);
+		}
 		break;
 	case KEY_ENTER:
 	case ' ':
