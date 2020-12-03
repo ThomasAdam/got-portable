@@ -449,7 +449,6 @@ struct tog_view {
 	int focussed;
 	struct tog_view *parent;
 	struct tog_view *child;
-	int child_focussed;
 
 	/* type-specific state */
 	enum tog_view_type type;
@@ -849,10 +848,8 @@ view_input(struct tog_view **new, struct tog_view **dead,
 	case '\t':
 		if (view->child) {
 			*focus = view->child;
-			view->child_focussed = 1;
 		} else if (view->parent) {
 			*focus = view->parent;
-			view->parent->child_focussed = 0;
 		}
 		break;
 	case 'q':
@@ -868,7 +865,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 				break;
 			if (view_is_splitscreen(view->child)) {
 				*focus = view->child;
-				view->child_focussed = 1;
 				err = view_fullscreen(view->child);
 			} else
 				err = view_splitscreen(view->child);
@@ -879,7 +875,6 @@ view_input(struct tog_view **new, struct tog_view **dead,
 		} else {
 			if (view_is_splitscreen(view)) {
 				*focus = view;
-				view->parent->child_focussed = 1;
 				err = view_fullscreen(view);
 			} else {
 				err = view_splitscreen(view);
@@ -938,7 +933,7 @@ int
 view_needs_focus_indication(struct tog_view *view)
 {
 	if (view_is_parent_view(view)) {
-		if (view->child == NULL || view->child_focussed)
+		if (view->child == NULL || view->child->focussed)
 			return 0;
 		if (!view_is_splitscreen(view->child))
 			return 0;
@@ -1009,7 +1004,8 @@ view_loop(struct tog_view *view)
 				else
 					view = NULL;
 				if (view) {
-					if (view->child && view->child_focussed)
+					if (view->child &&
+					    view->child->focussed)
 						focus_view = view->child;
 					else
 						focus_view = view;
@@ -2440,7 +2436,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = diff_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = diff_view;
 		break;
@@ -2463,7 +2458,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = tree_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = tree_view;
 		break;
@@ -2568,7 +2562,6 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = ref_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = ref_view;
 		break;
@@ -4613,7 +4606,6 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = diff_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = diff_view;
 		if (err)
@@ -5320,7 +5312,6 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = log_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = log_view;
 		break;
@@ -5346,7 +5337,6 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = ref_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = ref_view;
 		break;
@@ -5445,7 +5435,6 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 					break;
 				}
 				*focus_view = blame_view;
-				view->child_focussed = 1;
 			} else
 				*new_view = blame_view;
 		}
@@ -6107,7 +6096,6 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = log_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = log_view;
 		break;
@@ -6130,7 +6118,6 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 				break;
 			}
 			*focus_view = tree_view;
-			view->child_focussed = 1;
 		} else
 			*new_view = tree_view;
 		break;
