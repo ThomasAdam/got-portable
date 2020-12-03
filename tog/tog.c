@@ -713,14 +713,11 @@ view_close_child(struct tog_view *view)
 	return err;
 }
 
-static const struct got_error *
+static void
 view_set_child(struct tog_view *view, struct tog_view *child)
 {
-	const struct got_error *err = NULL;
-
 	view->child = child;
 	child->parent = view;
-	return err;
 }
 
 static int
@@ -2430,11 +2427,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, diff_view);
-			if (err) {
-				view_close(diff_view);
-				break;
-			}
+			view_set_child(view, diff_view);
 			*focus_view = diff_view;
 		} else
 			*new_view = diff_view;
@@ -2452,11 +2445,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, tree_view);
-			if (err) {
-				view_close(tree_view);
-				break;
-			}
+			view_set_child(view, tree_view);
 			*focus_view = tree_view;
 		} else
 			*new_view = tree_view;
@@ -2556,11 +2545,7 @@ input_log_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, ref_view);
-			if (err) {
-				view_close(ref_view);
-				break;
-			}
+			view_set_child(view, ref_view);
 			*focus_view = ref_view;
 		} else
 			*new_view = ref_view;
@@ -4600,11 +4585,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				break;
-			err = view_set_child(view, diff_view);
-			if (err) {
-				view_close(diff_view);
-				break;
-			}
+			view_set_child(view, diff_view);
 			*focus_view = diff_view;
 		} else
 			*new_view = diff_view;
@@ -5306,11 +5287,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, log_view);
-			if (err) {
-				view_close(log_view);
-				break;
-			}
+			view_set_child(view, log_view);
 			*focus_view = log_view;
 		} else
 			*new_view = log_view;
@@ -5331,11 +5308,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, ref_view);
-			if (err) {
-				view_close(ref_view);
-				break;
-			}
+			view_set_child(view, ref_view);
 			*focus_view = ref_view;
 		} else
 			*new_view = ref_view;
@@ -5429,11 +5402,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view **dead_view,
 				err = view_close_child(view);
 				if (err)
 					return err;
-				err = view_set_child(view, blame_view);
-				if (err) {
-					view_close(blame_view);
-					break;
-				}
+				view_set_child(view, blame_view);
 				*focus_view = blame_view;
 			} else
 				*new_view = blame_view;
@@ -6090,11 +6059,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, log_view);
-			if (err) {
-				view_close(log_view);
-				break;
-			}
+			view_set_child(view, log_view);
 			*focus_view = log_view;
 		} else
 			*new_view = log_view;
@@ -6112,11 +6077,7 @@ input_ref_view(struct tog_view **new_view, struct tog_view **dead_view,
 			err = view_close_child(view);
 			if (err)
 				return err;
-			err = view_set_child(view, tree_view);
-			if (err) {
-				view_close(tree_view);
-				break;
-			}
+			view_set_child(view, tree_view);
 			*focus_view = tree_view;
 		} else
 			*new_view = tree_view;
