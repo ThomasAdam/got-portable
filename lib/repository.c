@@ -589,17 +589,10 @@ got_repo_open(struct got_repository **repop, const char *path,
 {
 	struct got_repository *repo = NULL;
 	const struct got_error *err = NULL;
-	char *abspath, *repo_path = NULL;
+	char *repo_path = NULL;
 	size_t i;
 
 	*repop = NULL;
-
-	if (got_path_is_absolute(path))
-		abspath = strdup(path);
-	else
-		abspath = got_path_get_absolute(path);
-	if (abspath == NULL)
-		return got_error_path(path, GOT_ERR_BAD_PATH);
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
@@ -630,9 +623,9 @@ got_repo_open(struct got_repository **repop, const char *path,
 	if (err)
 		goto done;
 
-	repo_path = realpath(abspath, NULL);
+	repo_path = realpath(path, NULL);
 	if (repo_path == NULL) {
-		err = got_error_from_errno2("realpath", abspath);
+		err = got_error_from_errno2("realpath", path);
 		goto done;
 	}
 
@@ -683,7 +676,6 @@ done:
 		got_repo_close(repo);
 	else
 		*repop = repo;
-	free(abspath);
 	free(repo_path);
 	return err;
 }
