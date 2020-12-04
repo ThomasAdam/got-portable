@@ -27,12 +27,6 @@ struct dirent;
 int got_path_is_absolute(const char *);
 
 /*
- * Return an absolute version of a relative path.
- * The result is allocated with malloc(3).
- */
-char *got_path_get_absolute(const char *);
-
-/*
  * Canonicalize absolute paths by removing redundant path separators
  * and resolving references to parent directories ("/../").
  * Relative paths are copied from input to buf as-is.

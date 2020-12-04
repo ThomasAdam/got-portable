@@ -43,21 +43,6 @@ got_path_is_absolute(const char *path)
 	return path[0] == '/';
 }
 
-char *
-got_path_get_absolute(const char *relpath) 
-{
-	char cwd[PATH_MAX];
-	char *abspath;
-
-	if (getcwd(cwd, sizeof(cwd)) == NULL)
-		return NULL;
-
-	if (asprintf(&abspath, "%s/%s/", cwd, relpath) == -1)
-		return NULL;
-
-	return abspath;
-}
-
 /* based on canonpath() from kern_pledge.c */
 const struct got_error *
 got_canonpath(const char *input, char *buf, size_t bufsize)
