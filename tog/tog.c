@@ -2645,12 +2645,6 @@ cmd_log(int argc, char *argv[])
 	int ch, log_branches = 0;
 	struct tog_view *view;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
-
 	while ((ch = getopt(argc, argv, "bc:r:")) != -1) {
 		switch (ch) {
 		case 'b':
@@ -3732,11 +3726,6 @@ cmd_diff(int argc, char *argv[])
 	const char *errstr;
 	struct tog_view *view;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
 	while ((ch = getopt(argc, argv, "aC:r:w")) != -1) {
 		switch (ch) {
 		case 'a':
@@ -4634,12 +4623,6 @@ cmd_blame(int argc, char *argv[])
 	int ch;
 	struct tog_view *view;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
-
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -5435,12 +5418,6 @@ cmd_tree(int argc, char *argv[])
 	int ch;
 	struct tog_view *view;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
-
 	while ((ch = getopt(argc, argv, "c:r:")) != -1) {
 		switch (ch) {
 		case 'c':
@@ -6144,12 +6121,6 @@ cmd_ref(int argc, char *argv[])
 	int ch;
 	struct tog_view *view;
 
-#ifndef PROFILE
-	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
-	    NULL) == -1)
-		err(1, "pledge");
-#endif
-
 	while ((ch = getopt(argc, argv, "r:")) != -1) {
 		switch (ch) {
 		case 'r':
@@ -6406,6 +6377,12 @@ main(int argc, char *argv[])
 		got_version_print_str();
 		return 0;
 	}
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc tty exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
 
 	if (argc == 0) {
 		if (hflag)
