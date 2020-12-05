@@ -1520,23 +1520,13 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 	return err;
 }
 
-static const struct got_error *
-draw_commits(struct tog_view *view)
+static void
+select_commit(struct tog_log_view_state *s)
 {
-	const struct got_error *err = NULL;
-	struct tog_log_view_state *s = &view->state.log;
 	struct commit_queue_entry *entry;
-	const int limit = view->nlines;
-	int width;
-	int ncommits, author_cols = 4;
-	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
-	char *refs_str = NULL;
-	wchar_t *wline;
-	struct tog_color *tc;
-	static const size_t date_display_cols = 12;
+	int ncommits = 0;
 
 	entry = s->first_displayed_entry;
-	ncommits = 0;
 	while (entry) {
 		if (ncommits == s->selected) {
 			s->selected_entry = entry;
@@ -1545,6 +1535,22 @@ draw_commits(struct tog_view *view)
 		entry = TAILQ_NEXT(entry, entry);
 		ncommits++;
 	}
+}
+
+static const struct got_error *
+draw_commits(struct tog_view *view)
+{
+	const struct got_error *err = NULL;
+	struct tog_log_view_state *s = &view->state.log;
+	struct commit_queue_entry *entry = s->selected_entry;
+	const int limit = view->nlines;
+	int width;
+	int ncommits, author_cols = 4;
+	char *id_str = NULL, *header = NULL, *ncommits_str = NULL;
+	char *refs_str = NULL;
+	wchar_t *wline;
+	struct tog_color *tc;
+	static const size_t date_display_cols = 12;
 
 	if (s->selected_entry &&
 	    !(view->searching && view->search_next_done == 0)) {
@@ -2361,17 +2367,17 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected--;
 		else
 			log_scroll_up(s, 1);
+		select_commit(s);
 		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
 		if (s->first_displayed_entry == NULL)
 			break;
-		if (TAILQ_FIRST(&s->commits.head) ==
-		    s->first_displayed_entry) {
+		if (TAILQ_FIRST(&s->commits.head) == s->first_displayed_entry)
 			s->selected = 0;
-			break;
-		}
-		log_scroll_up(s, view->nlines - 1);
+		else
+			log_scroll_up(s, view->nlines - 1);
+		select_commit(s);
 		break;
 	case 'j':
 	case KEY_DOWN:
@@ -2380,11 +2386,14 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->first_displayed_entry == NULL)
 			break;
 		if (s->selected < MIN(view->nlines - 2,
-		    s->commits.ncommits - 1)) {
+		    s->commits.ncommits - 1))
 			s->selected++;
-			break;
+		else {
+			err = log_scroll_down(view, 1);
+			if (err)
+				break;
 		}
-		err = log_scroll_down(view, 1);
+		select_commit(s);
 		break;
 	case KEY_NPAGE:
 	case CTRL('f'): {
@@ -2402,7 +2411,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected = MIN(view->nlines - 2,
 			    s->commits.ncommits - 1);
 		}
-		err = NULL;
+		select_commit(s);
 		break;
 	}
 	case KEY_RESIZE:
@@ -2410,6 +2419,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			s->selected = view->nlines - 2;
 		if (s->selected > s->commits.ncommits - 1)
 			s->selected = s->commits.ncommits - 1;
+		select_commit(s);
 		if (s->commits.ncommits < view->nlines - 1 &&
 		    !s->thread_args.log_complete) {
 			s->thread_args.commits_needed += (view->nlines - 1) -
@@ -3598,7 +3608,6 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	const struct got_error *err = NULL;
 	struct tog_diff_view_state *s = &view->state.diff;
 	struct tog_log_view_state *ls;
-	struct commit_queue_entry *entry;
 	int i;
 
 	switch (ch) {
@@ -3671,16 +3680,12 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->log_view == NULL)
 			break;
 		ls = &s->log_view->state.log;
-		entry = TAILQ_PREV(ls->selected_entry,
-		    commit_queue_head, entry);
-		if (entry == NULL)
-			break;
 
 		err = input_log_view(NULL, s->log_view, KEY_UP);
 		if (err)
 			break;
 
-		err = set_selected_commit(s, entry);
+		err = set_selected_commit(s, ls->selected_entry);
 		if (err)
 			break;
 
@@ -3696,21 +3701,11 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		ls = &s->log_view->state.log;
 
-		if (TAILQ_NEXT(ls->selected_entry, entry) == NULL) {
-			ls->thread_args.commits_needed++;
-			err = trigger_log_thread(s->log_view, 1);
-			if (err)
-				break;
-		}
 		err = input_log_view(NULL, s->log_view, KEY_DOWN);
 		if (err)
 			break;
 
-		entry = TAILQ_NEXT(ls->selected_entry, entry);
-		if (entry == NULL)
-			break;
-
-		err = set_selected_commit(s, entry);
+		err = set_selected_commit(s, ls->selected_entry);
 		if (err)
 			break;
 
