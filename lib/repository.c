@@ -1502,6 +1502,7 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 	struct got_object_id *tag_id;
+	int name_is_absolute = (strncmp(name, "refs/", 5) == 0);
 
 	SIMPLEQ_INIT(&refs);
 	*tag = NULL;
@@ -1515,7 +1516,8 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 		refname = got_ref_get_name(re->ref);
 		if (got_ref_is_symbolic(re->ref))
 			continue;
-		refname += strlen("refs/tags/");
+		if (!name_is_absolute)
+			refname += strlen("refs/tags/");
 		if (strcmp(refname, name) != 0)
 			continue;
 		err = got_ref_resolve(&tag_id, repo, re->ref);
