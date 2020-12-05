@@ -3607,6 +3607,7 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	const struct got_error *err = NULL;
 	struct tog_diff_view_state *s = &view->state.diff;
 	struct tog_log_view_state *ls;
+	struct commit_queue_entry *old_selected_entry;
 	int i;
 
 	switch (ch) {
@@ -3679,9 +3680,13 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->log_view == NULL)
 			break;
 		ls = &s->log_view->state.log;
+		old_selected_entry = ls->selected_entry;
 
 		err = input_log_view(NULL, s->log_view, KEY_UP);
 		if (err)
+			break;
+
+		if (old_selected_entry == ls->selected_entry)
 			break;
 
 		err = set_selected_commit(s, ls->selected_entry);
@@ -3699,9 +3704,13 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (s->log_view == NULL)
 			break;
 		ls = &s->log_view->state.log;
+		old_selected_entry = ls->selected_entry;
 
 		err = input_log_view(NULL, s->log_view, KEY_DOWN);
 		if (err)
+			break;
+
+		if (old_selected_entry == ls->selected_entry)
 			break;
 
 		err = set_selected_commit(s, ls->selected_entry);
