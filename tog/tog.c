@@ -959,7 +959,7 @@ view_loop(struct tog_view *view)
 {
 	const struct got_error *err = NULL;
 	struct tog_view_list_head views;
-	struct tog_view *new_view, *main_view;
+	struct tog_view *new_view;
 	int fast_refresh = 10;
 	int done = 0, errcode;
 
@@ -970,7 +970,6 @@ view_loop(struct tog_view *view)
 	TAILQ_INIT(&views);
 	TAILQ_INSERT_HEAD(&views, view, entry);
 
-	main_view = view;
 	view->focussed = 1;
 	err = view->show(view);
 	if (err)
@@ -1001,7 +1000,7 @@ view_loop(struct tog_view *view)
 				TAILQ_REMOVE(&views, view, entry);
 
 			err = view_close(view);
-			if (err || (view == main_view && new_view == NULL))
+			if (err)
 				goto done;
 
 			view = NULL;
