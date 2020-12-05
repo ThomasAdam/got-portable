@@ -2667,7 +2667,9 @@ cmd_log(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	struct got_object_id *start_id = NULL;
 	char *in_repo_path = NULL, *repo_path = NULL, *cwd = NULL;
-	char *start_commit = NULL, *head_ref_name = NULL;
+	char *start_commit = NULL, *label = NULL;
+	struct got_reference *ref = NULL;
+	const char *head_ref_name = NULL;
 	int ch, log_branches = 0;
 	struct tog_view *view;
 
@@ -2733,28 +2735,29 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (start_commit == NULL)
-		error = got_repo_match_object_id(&start_id, NULL, worktree ?
-		    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
-		    GOT_OBJ_TYPE_COMMIT, 1, repo);
-	else
-		error = got_repo_match_object_id(&start_id, NULL, start_commit,
-		    GOT_OBJ_TYPE_COMMIT, 1, repo);
-	if (error != NULL)
-		goto done;
+	if (start_commit == NULL) {
+		error = got_repo_match_object_id(&start_id, &label,
+		    worktree ? got_worktree_get_head_ref_name(worktree) :
+		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		if (error)
+			goto done;
+		head_ref_name = label;
+	} else {
+		error = got_ref_open(&ref, repo, start_commit, 0);
+		if (error == NULL)
+			head_ref_name = got_ref_get_name(ref);
+		else if (error->code != GOT_ERR_NOT_REF)
+			goto done;
+		error = got_repo_match_object_id(&start_id, NULL,
+		    start_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		if (error)
+			goto done;
+	}
 
 	view = view_open(0, 0, 0, 0, TOG_VIEW_LOG);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
 		goto done;
-	}
-	if (worktree) {
-		head_ref_name = strdup(
-		    got_worktree_get_head_ref_name(worktree));
-		if (head_ref_name == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
 	}
 	error = open_log_view(view, start_id, repo, head_ref_name,
 	    in_repo_path, log_branches);
@@ -2771,7 +2774,9 @@ done:
 	free(repo_path);
 	free(cwd);
 	free(start_id);
-	free(head_ref_name);
+	free(label);
+	if (ref)
+		got_ref_close(ref);
 	if (repo)
 		got_repo_close(repo);
 	if (worktree)
