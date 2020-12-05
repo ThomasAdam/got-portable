@@ -5732,7 +5732,8 @@ log_ref_entry(struct tog_view **new_view, int begin_x,
 		goto done;
 	}
 
-	err = open_log_view(log_view, commit_id, repo, NULL, "", 0);
+	err = open_log_view(log_view, commit_id, repo,
+	    got_ref_get_name(re->ref), "", 0);
 done:
 	if (err)
 		view_close(log_view);
