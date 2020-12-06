@@ -6131,8 +6131,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = ref_view_load_refs(s);
 		break;
 	case KEY_RESIZE:
-		if (s->selected > view->nlines)
-			s->selected = s->ndisplayed - 1;
+		if (view->nlines >= 2 && s->selected >= view->nlines - 1)
+			s->selected = view->nlines - 2;
 		break;
 	default:
 		break;
