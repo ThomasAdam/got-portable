@@ -847,6 +847,15 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 			err = v->input(new, v, KEY_RESIZE);
 			if (err)
 				return err;
+			if (v->child) {
+				err = view_resize(v->child);
+				if (err)
+					return err;
+				err = v->child->input(new, v->child,
+				    KEY_RESIZE);
+				if (err)
+					return err;
+			}
 		}
 	}
 
