@@ -5567,6 +5567,8 @@ done:
 	free(cwd);
 	free(commit_id);
 	free(label);
+	if (ref)
+		got_ref_close(ref);
 	if (commit)
 		got_object_commit_close(commit);
 	if (tree)
