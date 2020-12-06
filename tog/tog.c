@@ -2026,6 +2026,8 @@ log_thread(void *arg)
 				if (errcode)
 					err = got_error_set_errno(errcode,
 					    "pthread_cond_wait");
+				if (*a->quit)
+					done = 1;
 			}
 		}
 
@@ -2348,11 +2350,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 {
 	const struct got_error *err = NULL;
 	struct tog_log_view_state *s = &view->state.log;
-	char *parent_path, *in_repo_path = NULL;
-	struct tog_view *diff_view = NULL, *tree_view = NULL, *lv = NULL;
+	struct tog_view *diff_view = NULL, *tree_view = NULL;
 	struct tog_view *ref_view = NULL;
 	int begin_x = 0;
-	struct got_object_id *start_id;
 
 	switch (ch) {
 	case 'q':
@@ -2473,83 +2473,55 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			*new_view = tree_view;
 		break;
 	case KEY_BACKSPACE:
-		if (got_path_cmp(s->in_repo_path, "/",
-		    strlen(s->in_repo_path), 1) == 0)
-			break;
-		err = got_path_dirname(&parent_path, s->in_repo_path);
-		if (err)
-			return err;
-		err = stop_log_thread(s);
-		if (err) {
-			free(parent_path);
-			return err;
-		}
-		lv = view_open(view->nlines, view->ncols,
-		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
-		if (lv == NULL) {
-			free(parent_path);
-			return got_error_from_errno("view_open");
-		}
-		err = open_log_view(lv, s->start_id, s->repo, s->head_ref_name,
-		    parent_path, s->log_branches);
-		free(parent_path);
-		if (err)
-			return err;;
-		view->focussed = 0;
-		lv->focussed = 1;
-		if (view_is_parent_view(view))
-			*new_view = lv;
-		else
-			view_set_child(view->parent, lv);
-		break;
 	case CTRL('l'):
-		err = stop_log_thread(s);
-		if (err)
-			return err;
-		lv = view_open(view->nlines, view->ncols,
-		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
-		if (lv == NULL)
-			return got_error_from_errno("view_open");
-		err = got_repo_match_object_id(&start_id, NULL,
-		    s->head_ref_name ? s->head_ref_name : GOT_REF_HEAD,
-		    GOT_OBJ_TYPE_COMMIT, 1, s->repo);
-		if (err) {
-			view_close(lv);
-			return err;
-		}
-		in_repo_path = strdup(s->in_repo_path);
-		if (in_repo_path == NULL) {
-			free(start_id);
-			view_close(lv);
-			return got_error_from_errno("strdup");
-		}
-		err = open_log_view(lv, start_id, s->repo, s->head_ref_name,
-		    in_repo_path, s->log_branches);
-		if (err) {
-			free(start_id);
-			view_close(lv);
-			return err;;
-		}
-		view->dying = 1;
-		*new_view = lv;
-		break;
 	case 'B':
-		s->log_branches = !s->log_branches;
+		if (ch == KEY_BACKSPACE &&
+		    got_path_is_root_dir(s->in_repo_path))
+			break;
 		err = stop_log_thread(s);
 		if (err)
 			return err;
-		lv = view_open(view->nlines, view->ncols,
-		    view->begin_y, view->begin_x, TOG_VIEW_LOG);
-		if (lv == NULL)
-			return got_error_from_errno("view_open");
-		err = open_log_view(lv, s->start_id, s->repo,
-		    s->head_ref_name, s->in_repo_path, s->log_branches);
-		if (err) {
-			view_close(lv);
-			return err;;
-		}
-		view->dying = 1;
-		*new_view = lv;
+		if (ch == KEY_BACKSPACE) {
+			char *parent_path;
+			err = got_path_dirname(&parent_path, s->in_repo_path);
+			if (err)
+				return err;
+			free(s->in_repo_path);
+			s->in_repo_path = parent_path;
+			s->thread_args.in_repo_path = s->in_repo_path;
+		} else if (ch == CTRL('l')) {
+			struct got_object_id *start_id;
+			err = got_repo_match_object_id(&start_id, NULL,
+			    s->head_ref_name ? s->head_ref_name : GOT_REF_HEAD,
+			    GOT_OBJ_TYPE_COMMIT, 1, s->repo);
+			if (err)
+				return err;
+			free(s->start_id);
+			s->start_id = start_id;
+			s->thread_args.start_id = s->start_id;
+		} else /* 'B' */
+			s->log_branches = !s->log_branches;
+
+		err = got_repo_open(&s->thread_args.repo,
+		    got_repo_get_path(s->repo), NULL);
+		if (err)
+			return err;
+		err = got_commit_graph_open(&s->thread_args.graph,
+		    s->in_repo_path, !s->log_branches);
+		if (err)
+			return err;
+		err = got_commit_graph_iter_start(s->thread_args.graph,
+		    s->start_id, s->repo, NULL, NULL);
+		if (err)
+			return err;
+		free_commits(&s->commits);
+		s->first_displayed_entry = NULL;
+		s->last_displayed_entry = NULL;
+		s->selected_entry = NULL;
+		s->selected = 0;
+		s->thread_args.log_complete = 0;
+		s->quit = 0;
+		s->thread_args.commits_needed = view->nlines;
 		break;
 	case 'r':
 		if (view_is_parent_view(view))
