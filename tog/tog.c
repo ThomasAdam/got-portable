@@ -396,6 +396,7 @@ struct tog_tree_view_state {
 	int ndisplayed, selected, show_ids;
 	struct tog_parent_trees parents;
 	struct got_object_id *commit_id;
+	const char *head_ref_name;
 	struct got_repository *repo;
 	struct got_tree_entry *matched_entry;
 	struct tog_colors colors;
@@ -521,7 +522,8 @@ static const struct got_error *search_start_blame_view(struct tog_view *);
 static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
-    struct got_tree_object *, struct got_object_id *, struct got_repository *);
+    struct got_tree_object *, struct got_object_id *, const char *,
+    struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view *, int);
@@ -1913,7 +1915,7 @@ tree_view_walk_path(struct tog_tree_view_state *s,
 static const struct got_error *
 browse_commit_tree(struct tog_view **new_view, int begin_x,
     struct commit_queue_entry *entry, const char *path,
-    struct got_repository *repo)
+    const char *head_ref_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_tree_object *tree;
@@ -1929,7 +1931,7 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
 	if (tree_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = open_tree_view(tree_view, tree, entry->id, repo);
+	err = open_tree_view(tree_view, tree, entry->id, head_ref_name, repo);
 	if (err) {
 		got_object_tree_close(tree);
 		return err;
@@ -2455,7 +2457,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
 		err = browse_commit_tree(&tree_view, begin_x,
-		    s->selected_entry, s->in_repo_path, s->repo);
+		    s->selected_entry, s->in_repo_path, s->head_ref_name,
+		    s->repo);
 		if (err)
 			break;
 		view->focussed = 0;
@@ -5033,9 +5036,8 @@ done:
 }
 
 static const struct got_error *
-log_tree_entry(struct tog_view **new_view, int begin_x,
-    struct got_tree_entry *te, struct tog_parent_trees *parents,
-    struct got_object_id *commit_id, struct got_repository *repo)
+log_selected_tree_entry(struct tog_view **new_view, int begin_x,
+    struct tog_tree_view_state *s)
 {
 	struct tog_view *log_view;
 	const struct got_error *err = NULL;
@@ -5047,11 +5049,12 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 	if (log_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = tree_entry_path(&path, parents, te);
+	err = tree_entry_path(&path, &s->parents, s->selected_entry);
 	if (err)
 		return err;
 
-	err = open_log_view(log_view, commit_id, repo, NULL, path, 0);
+	err = open_log_view(log_view, s->commit_id, s->repo, s->head_ref_name,
+	    path, 0);
 	if (err)
 		view_close(log_view);
 	else
@@ -5062,7 +5065,8 @@ log_tree_entry(struct tog_view **new_view, int begin_x,
 
 static const struct got_error *
 open_tree_view(struct tog_view *view, struct got_tree_object *root,
-    struct got_object_id *commit_id, struct got_repository *repo)
+    struct got_object_id *commit_id, const char *head_ref_name,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *commit_id_str = NULL;
@@ -5087,6 +5091,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
+	s->head_ref_name = head_ref_name;
 	s->repo = repo;
 
 	SIMPLEQ_INIT(&s->colors);
@@ -5281,8 +5286,7 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		if (view_is_parent_view(view))
 			begin_x = view_split_begin_x(view->begin_x);
-		err = log_tree_entry(&log_view, begin_x, s->selected_entry,
-		    &s->parents, s->commit_id, s->repo);
+		err = log_selected_tree_entry(&log_view, begin_x, s);
 		view->focussed = 0;
 		log_view->focussed = 1;
 		if (view_is_parent_view(view)) {
@@ -5442,9 +5446,12 @@ cmd_tree(int argc, char *argv[])
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	struct got_object_id *commit_id = NULL;
-	char *commit_id_arg = NULL;
+	const char *commit_id_arg = NULL;
+	char *label = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_tree_object *tree = NULL;
+	struct got_reference *ref = NULL;
+	const char *head_ref_name = NULL;
 	int ch;
 	struct tog_view *view;
 
@@ -5506,11 +5513,24 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_repo_match_object_id(&commit_id, NULL,
-	    commit_id_arg ? commit_id_arg : GOT_REF_HEAD,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
-	if (error)
-		goto done;
+	if (commit_id_arg == NULL) {
+		error = got_repo_match_object_id(&commit_id, &label,
+		    worktree ? got_worktree_get_head_ref_name(worktree) :
+		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		if (error)
+			goto done;
+		head_ref_name = label;
+	} else {
+		error = got_ref_open(&ref, repo, commit_id_arg, 0);
+		if (error == NULL)
+			head_ref_name = got_ref_get_name(ref);
+		else if (error->code != GOT_ERR_NOT_REF)
+			goto done;
+		error = got_repo_match_object_id(&commit_id, NULL,
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		if (error)
+			goto done;
+	}
 
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
@@ -5526,7 +5546,7 @@ cmd_tree(int argc, char *argv[])
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_tree_view(view, tree, commit_id, repo);
+	error = open_tree_view(view, tree, commit_id, head_ref_name, repo);
 	if (error)
 		goto done;
 	if (!got_path_is_root_dir(in_repo_path)) {
@@ -5546,6 +5566,7 @@ done:
 	free(repo_path);
 	free(cwd);
 	free(commit_id);
+	free(label);
 	if (commit)
 		got_object_commit_close(commit);
 	if (tree)
@@ -6021,7 +6042,8 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 		goto done;
 	}
 
-	err = open_tree_view(tree_view, tree, commit_id, repo);
+	err = open_tree_view(tree_view, tree, commit_id,
+	    got_ref_get_name(re->ref), repo);
 	if (err)
 		goto done;
 
