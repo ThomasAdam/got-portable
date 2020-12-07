@@ -301,7 +301,7 @@ struct tog_log_view_state {
 	struct commit_queue_entry *selected_entry;
 	int selected;
 	char *in_repo_path;
-	const char *head_ref_name;
+	char *head_ref_name;
 	int log_branches;
 	struct got_repository *repo;
 	struct got_reflist_head refs;
@@ -396,7 +396,7 @@ struct tog_tree_view_state {
 	int ndisplayed, selected, show_ids;
 	struct tog_parent_trees parents;
 	struct got_object_id *commit_id;
-	const char *head_ref_name;
+	char *head_ref_name;
 	struct got_repository *repo;
 	struct got_tree_entry *matched_entry;
 	struct tog_colors colors;
@@ -2105,6 +2105,8 @@ close_log_view(struct tog_view *view)
 	s->in_repo_path = NULL;
 	free(s->start_id);
 	s->start_id = NULL;
+	free(s->head_ref_name);
+	s->head_ref_name = NULL;
 	got_ref_list_free(&s->refs);
 	return err;
 }
@@ -2252,7 +2254,13 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 		goto done;
 
 	s->repo = repo;
-	s->head_ref_name = head_ref_name;
+	if (head_ref_name) {
+		s->head_ref_name = strdup(head_ref_name);
+		if (s->head_ref_name == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
 	s->start_id = got_object_id_dup(start_id);
 	if (s->start_id == NULL) {
 		err = got_error_from_errno("got_object_id_dup");
@@ -5072,7 +5080,13 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 		err = got_error_from_errno("got_object_id_dup");
 		goto done;
 	}
-	s->head_ref_name = head_ref_name;
+	if (head_ref_name) {
+		s->head_ref_name = strdup(head_ref_name);
+		if (s->head_ref_name == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+	}
 	s->repo = repo;
 
 	SIMPLEQ_INIT(&s->colors);
@@ -5137,6 +5151,8 @@ close_tree_view(struct tog_view *view)
 	s->tree_label = NULL;
 	free(s->commit_id);
 	s->commit_id = NULL;
+	free(s->head_ref_name);
+	s->head_ref_name = NULL;
 	while (!TAILQ_EMPTY(&s->parents)) {
 		struct tog_parent_tree *parent;
 		parent = TAILQ_FIRST(&s->parents);
