@@ -140,9 +140,13 @@ Searching continues until either a match is found or the
 .Cm Backspace
 key is pressed.
 .It Cm Ctrl+l
-Reload the log view with new commits found in the repository.
+Reload the
+.Cm log
+view with new commits found in the repository.
 .It Cm B
-Reload the log view and toggle display of merged commits.
+Reload the
+.Cm log
+view and toggle display of merged commits.
 The
 .Fl b
 option determines whether merged commits are displayed initially.
@@ -212,10 +216,17 @@ Reduce the amount of diff context lines.
 .It Cm \&]
 Increase the amount of diff context lines.
 .It Cm <, Comma
-If the diff view was opened via the log view, move to the previous (younger)
-commit.
+If the
+.Cm diff
+view was opened via the
+.Cm log
+view, move to the previous (younger) commit.
 .It Cm >, Full stop
-If the diff view was opened via the log view, move to the next (older) commit.
+If the
+.Cm diff
+view was opened via the
+.Cm log
+view, move to the next (older) commit.
 .It Cm /
 Prompt for a search pattern and start searching for matching lines.
 The search pattern is an extended regular expression.
@@ -405,7 +416,9 @@ Move the selection cursor down one page.
 .It Cm Page-up, Ctrl+b
 Move the selection cursor up one page.
 .It Cm Enter
-Open a log view which begins traversing history at the commit resolved via the
+Open a
+.Cm log
+view which begins traversing history at the commit resolved via the
 currently selected reference.
 .It Cm t
 Open a
