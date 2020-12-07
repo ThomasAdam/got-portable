@@ -2510,6 +2510,11 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    got_repo_get_path(s->repo), NULL);
 		if (err)
 			return err;
+		got_ref_list_free(&s->refs);
+		err = got_ref_list(&s->refs, s->repo, NULL,
+		    got_ref_cmp_by_name, NULL);
+		if (err)
+			return err;
 		err = got_commit_graph_open(&s->thread_args.graph,
 		    s->in_repo_path, !s->log_branches);
 		if (err)
