@@ -5400,8 +5400,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		break;
 	case KEY_RESIZE:
-		if (s->selected > view->nlines)
-			s->selected = s->ndisplayed - 1;
+		if (view->nlines >= 4 && s->selected >= view->nlines - 3)
+			s->selected = view->nlines - 4;
 		break;
 	default:
 		break;
