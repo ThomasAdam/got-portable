@@ -324,7 +324,7 @@ struct tog_log_view_state {
 #define TOG_COLOR_TREE_EXECUTABLE	8
 #define TOG_COLOR_COMMIT		9
 #define TOG_COLOR_AUTHOR		10
-#define TOG_COLOR_DATE		11
+#define TOG_COLOR_DATE			11
 #define TOG_COLOR_REFS_HEADS		12
 #define TOG_COLOR_REFS_TAGS		13
 #define TOG_COLOR_REFS_REMOTES		14
@@ -1771,7 +1771,7 @@ log_scroll_down(struct tog_view *view, int maxscroll)
 	if (s->last_displayed_entry == NULL)
 		return NULL;
 
-	ncommits_needed = (s->last_displayed_entry)->idx + 1 + maxscroll;
+	ncommits_needed = s->last_displayed_entry->idx + 1 + maxscroll;
 	if (s->commits.ncommits < ncommits_needed &&
 	    !s->thread_args.log_complete) {
 		/*
@@ -2861,7 +2861,7 @@ add_matched_line(int *wtotal, const char *line, int wlimit, int col_tab_align,
 
 	if (wlimit > 0 && strlen(line) > regmatch->rm_eo) {
 		err = format_line(&wline, &width,
-		     line + regmatch->rm_eo, wlimit, col_tab_align);
+		    line + regmatch->rm_eo, wlimit, col_tab_align);
 		if (err)
 			return err;
 		waddwstr(window, wline);
