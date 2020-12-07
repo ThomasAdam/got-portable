@@ -1466,30 +1466,27 @@ done:
 }
 
 static const struct got_error *
-queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
-    int minqueue, struct got_repository *repo, const char *path,
-    int *searching, int *search_next_done, regex_t *regex)
+queue_commits(struct tog_log_thread_args *a)
 {
 	const struct got_error *err = NULL;
-	int nqueued = 0;
 
 	/*
 	 * We keep all commits open throughout the lifetime of the log
 	 * view in order to avoid having to re-fetch commits from disk
 	 * while updating the display.
 	 */
-	while (nqueued < minqueue ||
-	    (*searching == TOG_SEARCH_FORWARD && !*search_next_done)) {
+	do {
 		struct got_object_id *id;
 		struct got_commit_object *commit;
 		struct commit_queue_entry *entry;
 		int errcode;
 
-		err = got_commit_graph_iter_next(&id, graph, repo, NULL, NULL);
+		err = got_commit_graph_iter_next(&id, a->graph, a->repo,
+		    NULL, NULL);
 		if (err || id == NULL)
 			break;
 
-		err = got_object_open_as_commit(&commit, repo, id);
+		err = got_object_open_as_commit(&commit, a->repo, id);
 		if (err)
 			break;
 		entry = alloc_commit_queue_entry(commit, id);
@@ -1505,18 +1502,18 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			break;
 		}
 
-		entry->idx = commits->ncommits;
-		TAILQ_INSERT_TAIL(&commits->head, entry, entry);
-		nqueued++;
-		commits->ncommits++;
+		entry->idx = a->commits->ncommits;
+		TAILQ_INSERT_TAIL(&a->commits->head, entry, entry);
+		a->commits->ncommits++;
 
-		if (*searching == TOG_SEARCH_FORWARD && !*search_next_done) {
+		if (*a->searching == TOG_SEARCH_FORWARD &&
+		    !*a->search_next_done) {
 			int have_match;
-			err = match_commit(&have_match, id, commit, regex);
+			err = match_commit(&have_match, id, commit, a->regex);
 			if (err)
 				break;
 			if (have_match)
-				*search_next_done = TOG_SEARCH_HAVE_MORE;
+				*a->search_next_done = TOG_SEARCH_HAVE_MORE;
 		}
 
 		errcode = pthread_mutex_unlock(&tog_mutex);
@@ -1525,7 +1522,7 @@ queue_commits(struct got_commit_graph *graph, struct commit_queue *commits,
 			    "pthread_mutex_unlock");
 		if (err)
 			break;
-	}
+	} while (*a->searching == TOG_SEARCH_FORWARD && !*a->search_next_done);
 
 	return err;
 }
@@ -1994,9 +1991,7 @@ log_thread(void *arg)
 		return (void *)err;
 
 	while (!done && !err && !tog_sigpipe_received) {
-		err = queue_commits(a->graph, a->commits, 1, a->repo,
-		    a->in_repo_path, a->searching, a->search_next_done,
-		    a->regex);
+		err = queue_commits(a);
 		if (err) {
 			if (err->code != GOT_ERR_ITER_COMPLETED)
 				return (void *)err;
