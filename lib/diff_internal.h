@@ -173,7 +173,9 @@ int diff_output_lines(struct diff_output_info *output_info, FILE *dest,
 int diff_output_trailing_newline_msg(struct diff_output_info *outinfo,
 				     FILE *dest,
 				     const struct diff_chunk *c);
-int diff_output_match_function_prototype(char **prototype,
+#define DIFF_FUNCTION_CONTEXT_SIZE	55
+int diff_output_match_function_prototype(char *prototype, size_t prototype_size,
+					 int *last_prototype_idx,
 					 const struct diff_result *result,
 					 const struct diff_chunk_context *cc);
 

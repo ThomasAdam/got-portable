@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #include <arraylist.h>
@@ -189,6 +190,8 @@ diff_chunk_context_load_change(struct diff_chunk_context *cc,
 
 struct diff_output_unidiff_state {
 	bool header_printed;
+	char prototype[DIFF_FUNCTION_CONTEXT_SIZE];
+	int last_prototype_idx;
 };
 
 struct diff_output_unidiff_state *
@@ -206,6 +209,8 @@ void
 diff_output_unidiff_state_reset(struct diff_output_unidiff_state *state)
 {
 	state->header_printed = false;
+	memset(state->prototype, 0, sizeof(state->prototype));
+	state->last_prototype_idx = 0;
 }
 
 void
@@ -224,7 +229,6 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 {
 	int rc, left_start, left_len, right_start, right_len;
 	off_t outoff = 0, *offp;
-	char *prototype = NULL;
 
 	if (diff_range_empty(&cc->left) && diff_range_empty(&cc->right))
 		return DIFF_RC_OK;
@@ -279,7 +283,8 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 		right_start = cc->right.start + 1;
 
 	if (show_function_prototypes) {
-		rc = diff_output_match_function_prototype(&prototype,
+		rc = diff_output_match_function_prototype(state->prototype,
+		    sizeof(state->prototype), &state->last_prototype_idx,
 		    result, cc);
 		if (rc)
 			return rc;
@@ -288,25 +293,24 @@ output_unidiff_chunk(struct diff_output_info *outinfo, FILE *dest,
 	if (left_len == 1 && right_len == 1) {
 		rc = fprintf(dest, "@@ -%d +%d @@%s%s\n",
 			left_start, right_start,
-			prototype ? " " : "",
-			prototype ? : "");
+			state->prototype[0] ? " " : "",
+			state->prototype[0] ? state->prototype : "");
 	} else if (left_len == 1 && right_len != 1) {
 		rc = fprintf(dest, "@@ -%d +%d,%d @@%s%s\n",
 			left_start, right_start, right_len,
-			prototype ? " " : "",
-			prototype ? : "");
+			state->prototype[0] ? " " : "",
+			state->prototype[0] ? state->prototype : "");
 	} else if (left_len != 1 && right_len == 1) {
 		rc = fprintf(dest, "@@ -%d,%d +%d @@%s%s\n",
 			left_start, left_len, right_start,
-			prototype ? " " : "",
-			prototype ? : "");
+			state->prototype[0] ? " " : "",
+			state->prototype[0] ? state->prototype : "");
 	} else {
 		rc = fprintf(dest, "@@ -%d,%d +%d,%d @@%s%s\n",
 			left_start, left_len, right_start, right_len,
-			prototype ? " " : "",
-			prototype ? : "");
+			state->prototype[0] ? " " : "",
+			state->prototype[0] ? state->prototype : "");
 	}
-	free(prototype);
 	if (rc < 0)
 		return errno;
 	if (outinfo) {

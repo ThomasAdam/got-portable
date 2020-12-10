@@ -236,68 +236,67 @@ diff_output_trailing_newline_msg(struct diff_output_info *outinfo, FILE *dest,
 }
 
 static bool
-is_function_prototype(const char *buf)
+is_function_prototype(unsigned char ch)
 {
-	return isalpha(buf[0]) || buf[0] == '_' || buf[0] == '$';
+	return (isalpha(ch) || ch == '_' || ch == '$');
 }
 
-#define FUNCTION_CONTEXT_SIZE	55
 #define begins_with(s, pre) (strncmp(s, pre, sizeof(pre)-1) == 0)
 
 int
-diff_output_match_function_prototype(char **prototype,
-    const struct diff_result *result,
+diff_output_match_function_prototype(char *prototype, size_t prototype_size,
+    int *last_prototype_idx, const struct diff_result *result,
     const struct diff_chunk_context *cc)
 {
 	struct diff_atom *start_atom, *atom;
 	const struct diff_data *data;
-	unsigned char buf[FUNCTION_CONTEXT_SIZE];
+	unsigned char buf[DIFF_FUNCTION_CONTEXT_SIZE];
 	char *state = NULL;
-	int rc, i;
-
-	*prototype = NULL;
+	int rc, i, ch;
 
 	if (result->left->atoms.len > 0 && cc->left.start > 0) {
 		data = result->left;
 		start_atom = &data->atoms.head[cc->left.start - 1];
-	} else if (result->right->atoms.len > 0 && cc->right.start > 0) {
-		data = result->right;
-		start_atom = &data->atoms.head[cc->right.start - 1];
 	} else
 		return DIFF_RC_OK;
 
 	diff_data_foreach_atom_backwards_from(start_atom, atom, data) {
-		for (i = 0; i < atom->len && i < sizeof(buf) - 1; i++) {
-			unsigned int ch;
+		int atom_idx = diff_atom_root_idx(data, atom);
+		if (atom_idx < *last_prototype_idx)
+			break;
+		rc = get_atom_byte(&ch, atom, 0);
+		if (rc)
+			return rc;
+		buf[0] = (unsigned char)ch;
+		if (!is_function_prototype(buf[0]))
+			continue;
+		for (i = 1; i < atom->len && i < sizeof(buf) - 1; i++) {
 			rc = get_atom_byte(&ch, atom, i);
 			if (rc)
 				return rc;
 			if (ch == '\n')
 				break;
-			buf[i] = ch;
+			buf[i] = (unsigned char)ch;
 		}
 		buf[i] = '\0';
-		if (is_function_prototype(buf)) {
-			if (begins_with(buf, "private:")) {
-				if (!state)
-					state = " (private)";
-			} else if (begins_with(buf, "protected:")) {
-				if (!state)
-					state = " (protected)";
-			} else if (begins_with(buf, "public:")) {
-				if (!state)
-					state = " (public)";
-			} else {
-				if (state)  /* don't care about truncation */
-					strlcat(buf, state, sizeof(buf));
-				*prototype = strdup(buf);
-				if (*prototype == NULL)
-					return ENOMEM;
-				return DIFF_RC_OK;
-			}
+		if (begins_with(buf, "private:")) {
+			if (!state)
+				state = " (private)";
+		} else if (begins_with(buf, "protected:")) {
+			if (!state)
+				state = " (protected)";
+		} else if (begins_with(buf, "public:")) {
+			if (!state)
+				state = " (public)";
+		} else {
+			if (state)  /* don't care about truncation */
+				strlcat(buf, state, sizeof(buf));
+			strlcpy(prototype, buf, prototype_size);
+			break;
 		}
 	}
 
+	*last_prototype_idx = diff_atom_root_idx(data, start_atom);
 	return DIFF_RC_OK;
 }
 
