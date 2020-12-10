@@ -936,7 +936,7 @@ void
 view_vborder(struct tog_view *view)
 {
 	PANEL *panel;
-	struct tog_view *view_above;
+	const struct tog_view *view_above;
 
 	if (view->parent)
 		return view_vborder(view->parent);
