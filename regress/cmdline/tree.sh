@@ -123,7 +123,13 @@ test_tree_submodule_of_same_repo() {
 		test_done "$testroot" "1"
 		return 1
 	fi
-	echo "got-read-tree: bad object data" > $testroot/stderr.expected
+	if [ -n "$GOT_TEST_PACK" ]; then
+		echo "got-read-pack: bad object data" \
+			> $testroot/stderr.expected
+	else
+		echo "got-read-tree: bad object data" \
+			> $testroot/stderr.expected
+	fi
 	echo "got: bad object data" >> $testroot/stderr.expected
 
 	cmp -s $testroot/stderr.expected $testroot/stderr
