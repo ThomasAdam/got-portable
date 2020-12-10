@@ -33,7 +33,6 @@
 #include <string.h>
 #include <err.h>
 #include <unistd.h>
-#include <util.h>
 #include <limits.h>
 #include <wchar.h>
 #include <time.h>
@@ -2794,20 +2793,6 @@ usage_diff(void)
 	exit(1);
 }
 
-static char *
-parse_next_line(FILE *f, size_t *len)
-{
-	char *line;
-	size_t linelen;
-	size_t lineno;
-	const char delim[3] = { '\0', '\0', '\0'};
-
-	line = fparseln(f, &linelen, &lineno, delim, 0);
-	if (len)
-		*len = linelen;
-	return line;
-}
-
 static int
 match_line(const char *line, regex_t *regex, size_t nmatch,
     regmatch_t *regmatch)
@@ -2897,8 +2882,9 @@ draw_file(struct tog_view *view, const char *header)
 	const struct got_error *err;
 	int nprinted = 0;
 	char *line;
+	size_t linesize = 0;
+	ssize_t linelen;
 	struct tog_color *tc;
-	size_t len;
 	wchar_t *wline;
 	int width;
 	int max_lines = view->nlines;
@@ -2937,11 +2923,16 @@ draw_file(struct tog_view *view, const char *header)
 	}
 
 	s->eof = 0;
+	line = NULL;
 	while (max_lines > 0 && nprinted < max_lines) {
-		line = parse_next_line(s->f, &len);
-		if (line == NULL) {
-			s->eof = 1;
-			break;
+		linelen = getline(&line, &linesize, s->f);
+		if (linelen == -1) {
+			if (feof(s->f)) {
+				s->eof = 1;
+				break;
+			}
+			free(line);
+			return got_ferror(s->f, GOT_ERR_IO);
 		}
 
 		tc = match_color(&s->colors, line);
@@ -2972,8 +2963,8 @@ draw_file(struct tog_view *view, const char *header)
 		if (width <= view->ncols - 1)
 			waddch(view->window, '\n');
 		nprinted++;
-		free(line);
 	}
+	free(line);
 	if (nprinted >= 1)
 		s->last_displayed_line = s->first_displayed_line +
 		    (nprinted - 1);
@@ -3326,6 +3317,9 @@ search_next_diff_view(struct tog_view *view)
 {
 	struct tog_diff_view_state *s = &view->state.diff;
 	int lineno;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 
 	if (!view->searching) {
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
@@ -3345,14 +3339,11 @@ search_next_diff_view(struct tog_view *view)
 	}
 
 	while (1) {
-		char *line = NULL;
 		off_t offset;
-		size_t len;
 
 		if (lineno <= 0 || lineno > s->nlines) {
 			if (s->matched_line == 0) {
 				view->search_next_done = TOG_SEARCH_HAVE_MORE;
-				free(line);
 				break;
 			}
 
@@ -3367,21 +3358,19 @@ search_next_diff_view(struct tog_view *view)
 			free(line);
 			return got_error_from_errno("fseeko");
 		}
-		free(line);
-		line = parse_next_line(s->f, &len);
-		if (line &&
+		linelen = getline(&line, &linesize, s->f);
+		if (linelen != -1 &&
 		    match_line(line, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
-			free(line);
 			break;
 		}
-		free(line);
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
+	free(line);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
@@ -3614,6 +3603,9 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_diff_view_state *s = &view->state.diff;
 	struct tog_log_view_state *ls;
 	struct commit_queue_entry *old_selected_entry;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 	int i;
 
 	switch (ch) {
@@ -3655,12 +3647,17 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			break;
 		i = 0;
 		while (!s->eof && i++ < view->nlines - 1) {
-			char *line;
-			line = parse_next_line(s->f, NULL);
+			linelen = getline(&line, &linesize, s->f);
 			s->first_displayed_line++;
-			if (line == NULL)
+			if (linelen == -1) {
+				if (feof(s->f)) {
+					s->eof = 1;
+				} else
+					err = got_ferror(s->f, GOT_ERR_IO);
 				break;
+			}
 		}
+		free(line);
 		break;
 	case '[':
 		if (s->diff_context > 0) {
@@ -3873,8 +3870,9 @@ draw_blame(struct tog_view *view)
 	regmatch_t *regmatch = &view->regmatch;
 	const struct got_error *err;
 	int lineno = 0, nprinted = 0;
-	char *line;
-	size_t len;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 	wchar_t *wline;
 	int width;
 	struct tog_blame_line *blame_line;
@@ -3937,15 +3935,17 @@ draw_blame(struct tog_view *view)
 
 	s->eof = 0;
 	while (nprinted < view->nlines - 2) {
-		line = parse_next_line(blame->f, &len);
-		if (line == NULL) {
-			s->eof = 1;
-			break;
-		}
-		if (++lineno < s->first_displayed_line) {
+		linelen = getline(&line, &linesize, blame->f);
+		if (linelen == -1) {
+			if (feof(blame->f)) {
+				s->eof = 1;
+				break;
+			}
 			free(line);
-			continue;
+			return got_ferror(blame->f, GOT_ERR_IO);
 		}
+		if (++lineno < s->first_displayed_line)
+			continue;
 
 		if (view->focussed && nprinted == s->selected_line - 1)
 			wstandout(view->window);
@@ -4018,8 +4018,8 @@ draw_blame(struct tog_view *view)
 			waddch(view->window, '\n');
 		if (++nprinted == 1)
 			s->first_displayed_line = lineno;
-		free(line);
 	}
+	free(line);
 	s->last_displayed_line = lineno;
 
 	view_vborder(view);
@@ -4344,6 +4344,9 @@ search_next_blame_view(struct tog_view *view)
 {
 	struct tog_blame_view_state *s = &view->state.blame;
 	int lineno;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 
 	if (!view->searching) {
 		view->search_next_done = TOG_SEARCH_HAVE_MORE;
@@ -4363,14 +4366,11 @@ search_next_blame_view(struct tog_view *view)
 	}
 
 	while (1) {
-		char *line = NULL;
 		off_t offset;
-		size_t len;
 
 		if (lineno <= 0 || lineno > s->blame.nlines) {
 			if (s->matched_line == 0) {
 				view->search_next_done = TOG_SEARCH_HAVE_MORE;
-				free(line);
 				break;
 			}
 
@@ -4385,21 +4385,19 @@ search_next_blame_view(struct tog_view *view)
 			free(line);
 			return got_error_from_errno("fseeko");
 		}
-		free(line);
-		line = parse_next_line(s->blame.f, &len);
-		if (line &&
+		linelen = getline(&line, &linesize, s->blame.f);
+		if (linelen != -1 &&
 		    match_line(line, &view->regex, 1, &view->regmatch)) {
 			view->search_next_done = TOG_SEARCH_HAVE_MORE;
 			s->matched_line = lineno;
-			free(line);
 			break;
 		}
-		free(line);
 		if (view->searching == TOG_SEARCH_FORWARD)
 			lineno++;
 		else
 			lineno--;
 	}
+	free(line);
 
 	if (s->matched_line) {
 		s->first_displayed_line = s->matched_line;
