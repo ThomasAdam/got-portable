@@ -1164,6 +1164,15 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
 	if (err)
 		return err;
 
+	if (wlen > 0 && wline[wlen - 1] == L'\n') {
+		wline[wlen - 1] = L'\0';
+		wlen--;
+	}
+	if (wlen > 0 && wline[wlen - 1] == L'\r') {
+		wline[wlen - 1] = L'\0';
+		wlen--;
+	}
+
 	i = 0;
 	while (i < wlen) {
 		int width = wcwidth(wline[i]);
