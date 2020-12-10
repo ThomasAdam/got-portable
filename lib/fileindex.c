@@ -86,15 +86,15 @@ got_fileindex_perms_to_st(struct got_fileindex_entry *ie)
 
 const struct got_error *
 got_fileindex_entry_update(struct got_fileindex_entry *ie,
-    const char *ondisk_path, uint8_t *blob_sha1, uint8_t *commit_sha1,
-    int update_timestamps)
+    int wt_fd, const char *ondisk_path, uint8_t *blob_sha1,
+    uint8_t *commit_sha1, int update_timestamps)
 {
 	struct stat sb;
 
-	if (lstat(ondisk_path, &sb) != 0) {
+	if (fstatat(wt_fd, ondisk_path, &sb, AT_SYMLINK_NOFOLLOW) != 0) {
 		if (!((ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) &&
 		    errno == ENOENT))
-			return got_error_from_errno2("lstat", ondisk_path);
+			return got_error_from_errno2("fstatat", ondisk_path);
 		sb.st_mode = GOT_DEFAULT_FILE_MODE;
 	} else {
 		if (sb.st_mode & S_IFDIR)

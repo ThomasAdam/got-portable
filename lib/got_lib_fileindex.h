@@ -108,7 +108,7 @@ uint16_t got_fileindex_perms_from_st(struct stat *);
 mode_t got_fileindex_perms_to_st(struct got_fileindex_entry *);
 
 const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
-    const char *, uint8_t *, uint8_t *, int);
+    int, const char *, uint8_t *, uint8_t *, int);
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);

@@ -429,6 +429,12 @@ open_worktree(struct got_worktree **worktree, const char *path)
 
 	err = got_gotconfig_read(&(*worktree)->gotconfig,
 	    (*worktree)->gotconfig_path);
+
+	(*worktree)->root_fd = open((*worktree)->root_path, O_DIRECTORY);
+	if ((*worktree)->root_fd == -1) {
+		err = got_error_from_errno2("open", (*worktree)->root_path);
+		goto done;
+	}
 done:
 	if (repo)
 		got_repo_close(repo);
@@ -505,6 +511,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->gotconfig_path);
 	got_gotconfig_free(worktree->gotconfig);
 	free(worktree);
+	close(worktree->root_fd);
 	return err;
 }
 
@@ -1177,7 +1184,7 @@ done:
 static const struct got_error *
 create_fileindex_entry(struct got_fileindex_entry **new_iep,
     struct got_fileindex *fileindex, struct got_object_id *base_commit_id,
-    const char *ondisk_path, const char *path, struct got_object_id *blob_id)
+    int wt_fd, const char *path, struct got_object_id *blob_id)
 {
 	const struct got_error *err = NULL;
 	struct got_fileindex_entry *new_ie;
@@ -1188,7 +1195,7 @@ create_fileindex_entry(struct got_fileindex_entry **new_iep,
 	if (err)
 		return err;
 
-	err = got_fileindex_entry_update(new_ie, ondisk_path,
+	err = got_fileindex_entry_update(new_ie, wt_fd, path,
 	    blob_id->sha1, base_commit_id->sha1, 1);
 	if (err)
 		goto done;
@@ -1863,11 +1870,11 @@ done:
  * we had to run a full content comparison to find out.
  */
 static const struct got_error *
-sync_timestamps(char *ondisk_path, unsigned char status,
+sync_timestamps(int wt_fd, const char *path, unsigned char status,
     struct got_fileindex_entry *ie, struct stat *sb)
 {
 	if (status == GOT_STATUS_NO_CHANGE && stat_info_differs(ie, sb))
-		return got_fileindex_entry_update(ie, ondisk_path,
+		return got_fileindex_entry_update(ie, wt_fd, path,
 		    ie->blob_sha1, ie->commit_sha1, 1);
 
 	return NULL;
@@ -1920,7 +1927,8 @@ update_blob(struct got_worktree *worktree,
 		if (got_fileindex_entry_has_commit(ie) &&
 		    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
-			err = sync_timestamps(ondisk_path, status, ie, &sb);
+			err = sync_timestamps(worktree->root_fd,
+			    path, status, ie, &sb);
 			if (err)
 				goto done;
 			err = (*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
@@ -1930,7 +1938,8 @@ update_blob(struct got_worktree *worktree,
 		if (got_fileindex_entry_has_blob(ie) &&
 		    memcmp(ie->blob_sha1, te->id.sha1,
 		    SHA1_DIGEST_LENGTH) == 0) {
-			err = sync_timestamps(ondisk_path, status, ie, &sb);
+			err = sync_timestamps(worktree->root_fd,
+			    path, status, ie, &sb);
 			goto done;
 		}
 	}
@@ -1989,17 +1998,17 @@ update_blob(struct got_worktree *worktree,
 		 * Otherwise, a future status walk would treat them as
 		 * unmodified files again.
 		 */
-		err = got_fileindex_entry_update(ie, ondisk_path,
+		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
 		    blob->id.sha1, worktree->base_commit_id->sha1,
 		    update_timestamps);
 	} else if (status == GOT_STATUS_MODE_CHANGE) {
-		err = got_fileindex_entry_update(ie, ondisk_path,
+		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
 		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
 	} else if (status == GOT_STATUS_DELETE) {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_MERGE, path);
 		if (err)
 			goto done;
-		err = got_fileindex_entry_update(ie, ondisk_path,
+		err = got_fileindex_entry_update(ie, worktree->root_fd, path,
 		    blob->id.sha1, worktree->base_commit_id->sha1, 0);
 		if (err)
 			goto done;
@@ -2022,11 +2031,12 @@ update_blob(struct got_worktree *worktree,
 			goto done;
 
 		if (ie) {
-			err = got_fileindex_entry_update(ie, ondisk_path,
-			    blob->id.sha1, worktree->base_commit_id->sha1, 1);
+			err = got_fileindex_entry_update(ie,
+			    worktree->root_fd, path, blob->id.sha1,
+			    worktree->base_commit_id->sha1, 1);
 		} else {
 			err = create_fileindex_entry(&ie, fileindex,
-			    worktree->base_commit_id, ondisk_path, path,
+			    worktree->base_commit_id, worktree->root_fd, path,
 			    &blob->id);
 		}
 		if (err)
@@ -2126,8 +2136,8 @@ delete_blob(struct got_worktree *worktree, struct got_fileindex *fileindex,
 		 * Preserve the working file and change the deleted blob's
 		 * entry into a schedule-add entry.
 		 */
-		err = got_fileindex_entry_update(ie, ondisk_path, NULL, NULL,
-		    0);
+		err = got_fileindex_entry_update(ie, worktree->root_fd,
+		    ie->path, NULL, NULL, 0);
 	} else {
 		err = (*progress_cb)(progress_arg, GOT_STATUS_DELETE, ie->path);
 		if (err)
@@ -2935,7 +2945,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				goto done;
 			if (status == GOT_STATUS_DELETE) {
 				err = got_fileindex_entry_update(ie,
-				    ondisk_path, blob2->id.sha1,
+				    a->worktree->root_fd, path2, blob2->id.sha1,
 				    a->worktree->base_commit_id->sha1, 0);
 				if (err)
 					goto done;
@@ -2957,8 +2967,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			err = got_fileindex_entry_alloc(&ie, path2);
 			if (err)
 				goto done;
-			err = got_fileindex_entry_update(ie, ondisk_path,
-			    NULL, NULL, 1);
+			err = got_fileindex_entry_update(ie,
+			    a->worktree->root_fd, path2, NULL, NULL, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
 				goto done;
@@ -3777,7 +3787,8 @@ schedule_addition(void *arg, unsigned char status, unsigned char staged_status,
 	err = got_fileindex_entry_alloc(&ie, relpath);
 	if (err)
 		goto done;
-	err = got_fileindex_entry_update(ie, ondisk_path, NULL, NULL, 1);
+	err = got_fileindex_entry_update(ie, a->worktree->root_fd,
+	    relpath, NULL, NULL, 1);
 	if (err) {
 		got_fileindex_entry_free(ie);
 		goto done;
@@ -4584,7 +4595,8 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			if (status == GOT_STATUS_DELETE ||
 			    status == GOT_STATUS_MODE_CHANGE) {
 				err = got_fileindex_entry_update(ie,
-				    ondisk_path, blob->id.sha1,
+				    a->worktree->root_fd, relpath,
+				    blob->id.sha1,
 				    a->worktree->base_commit_id->sha1, 1);
 				if (err)
 					goto done;
@@ -5287,18 +5299,26 @@ done:
 }
 
 static const struct got_error *
-update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
-    struct got_object_id *new_base_commit_id, struct got_fileindex *fileindex,
-    int have_staged_files)
+update_fileindex_after_commit(struct got_worktree *worktree,
+    struct got_pathlist_head *commitable_paths,
+    struct got_object_id *new_base_commit_id,
+    struct got_fileindex *fileindex, int have_staged_files)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
+	char *relpath = NULL;
 
 	TAILQ_FOREACH(pe, commitable_paths, entry) {
 		struct got_fileindex_entry *ie;
 		struct got_commitable *ct = pe->data;
 
 		ie = got_fileindex_entry_get(fileindex, pe->path, pe->path_len);
+
+		err = got_path_skip_common_ancestor(&relpath,
+		    worktree->root_path, ct->ondisk_path);
+		if (err)
+			goto done;
+
 		if (ie) {
 			if (ct->status == GOT_STATUS_DELETE ||
 			    ct->staged_status == GOT_STATUS_DELETE) {
@@ -5308,32 +5328,40 @@ update_fileindex_after_commit(struct got_pathlist_head *commitable_paths,
 				got_fileindex_entry_stage_set(ie,
 				    GOT_FILEIDX_STAGE_NONE);
 				got_fileindex_entry_staged_filetype_set(ie, 0);
+
 				err = got_fileindex_entry_update(ie,
-				    ct->ondisk_path, ct->staged_blob_id->sha1,
+				    worktree->root_fd, relpath,
+				    ct->staged_blob_id->sha1,
 				    new_base_commit_id->sha1,
 				    !have_staged_files);
 			} else
 				err = got_fileindex_entry_update(ie,
-				    ct->ondisk_path, ct->blob_id->sha1,
+				    worktree->root_fd, relpath,
+				    ct->blob_id->sha1,
 				    new_base_commit_id->sha1,
 				    !have_staged_files);
 		} else {
 			err = got_fileindex_entry_alloc(&ie, pe->path);
 			if (err)
-				break;
-			err = got_fileindex_entry_update(ie, ct->ondisk_path,
-			    ct->blob_id->sha1, new_base_commit_id->sha1, 1);
+				goto done;
+			err = got_fileindex_entry_update(ie,
+			    worktree->root_fd, relpath, ct->blob_id->sha1,
+			    new_base_commit_id->sha1, 1);
 			if (err) {
 				got_fileindex_entry_free(ie);
-				break;
+				goto done;
 			}
 			err = got_fileindex_entry_add(fileindex, ie);
 			if (err) {
 				got_fileindex_entry_free(ie);
-				break;
+				goto done;
 			}
 		}
+		free(relpath);
+		relpath = NULL;
 	}
+done:
+	free(relpath);
 	return err;
 }
 
@@ -5664,8 +5692,8 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
-	    fileindex, have_staged_files);
+	err = update_fileindex_after_commit(worktree, &commitable_paths,
+	    *new_commit_id, fileindex, have_staged_files);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
@@ -6250,8 +6278,8 @@ rebase_commit(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 
-	err = update_fileindex_after_commit(&commitable_paths, *new_commit_id,
-	    fileindex, 0);
+	err = update_fileindex_after_commit(worktree, &commitable_paths,
+	    *new_commit_id, fileindex, 0);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
 		err = sync_err;
