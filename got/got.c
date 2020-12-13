@@ -8024,7 +8024,10 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_MSG_EMPTY)
 			goto done;
-		err = got_object_commit_get_logmsg(&hle->logmsg, commit);
+		err = NULL;
+		hle->logmsg = strdup(new_msg);
+		if (hle->logmsg == NULL)
+			err = got_error_from_errno("strdup");
 	}
 done:
 	if (logmsg_path && unlink(logmsg_path) != 0 && err == NULL)
