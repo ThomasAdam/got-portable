@@ -8643,6 +8643,8 @@ cmd_histedit(int argc, char *argv[])
 		option_conflict('c', 'f');
 	if (fold_only && edit_logmsg_only)
 		option_conflict('f', 'm');
+	if (edit_script_path && fold_only)
+		option_conflict('F', 'f');
 	if (argc != 0)
 		usage_histedit();
 
