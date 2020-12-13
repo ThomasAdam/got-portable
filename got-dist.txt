@@ -87,6 +87,7 @@
 /include/got_version.h
 /include/got_worktree.h
 /lib
+/lib/arraylist.h
 /lib/blame.c
 /lib/buf.c
 /lib/buf.h
@@ -96,6 +97,18 @@
 /lib/delta_cache.c
 /lib/diff.c
 /lib/diff3.c
+/lib/diff_atomize_text.c
+/lib/diff_debug.h
+/lib/diff_internal.h
+/lib/diff_main.c
+/lib/diff_main.h
+/lib/diff_myers.c
+/lib/diff_output.c
+/lib/diff_output.h
+/lib/diff_output_edscript.c
+/lib/diff_output_plain.c
+/lib/diff_output_unidiff.c
+/lib/diff_patience.c
 /lib/diffreg.c
 /lib/error.c
 /lib/fetch.c
