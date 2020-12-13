@@ -4254,6 +4254,12 @@ run_blame(struct tog_view *view)
 	blame->thread_args.cancel_arg = &s->done;
 	s->blame_complete = 0;
 
+	if (s->first_displayed_line + view->nlines - 1 > blame->nlines) {
+		s->first_displayed_line = 1;
+		s->last_displayed_line = view->nlines;
+		s->selected_line = 1;
+	}
+
 done:
 	if (blob)
 		got_object_blob_close(blob);
