@@ -183,6 +183,12 @@ list_commands(FILE *fp)
 	fputc('\n', fp);
 }
 
+__dead static void
+option_conflict(char a, char b)
+{
+	errx(1, "-%c and -%c options are mutually exclusive", a, b);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1389,18 +1395,18 @@ cmd_clone(int argc, char *argv[])
 	argv += optind;
 
 	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
-		errx(1, "-a and -b options are mutually exclusive");
+		option_conflict('a', 'b');
 	if (list_refs_only) {
 		if (!TAILQ_EMPTY(&wanted_branches))
-			errx(1, "-l and -b options are mutually exclusive");
+			option_conflict('l', 'b');
 		if (fetch_all_branches)
-			errx(1, "-l and -a options are mutually exclusive");
+			option_conflict('l', 'a');
 		if (mirror_references)
-			errx(1, "-l and -m options are mutually exclusive");
+			option_conflict('l', 'm');
 		if (verbosity == -1)
-			errx(1, "-l and -q options are mutually exclusive");
+			option_conflict('l', 'q');
 		if (!TAILQ_EMPTY(&wanted_refs))
-			errx(1, "-l and -R options are mutually exclusive");
+			option_conflict('l', 'R');
 	}
 
 	uri = argv[0];
@@ -2062,16 +2068,16 @@ cmd_fetch(int argc, char *argv[])
 	argv += optind;
 
 	if (fetch_all_branches && !TAILQ_EMPTY(&wanted_branches))
-		errx(1, "-a and -b options are mutually exclusive");
+		option_conflict('a', 'b');
 	if (list_refs_only) {
 		if (!TAILQ_EMPTY(&wanted_branches))
-			errx(1, "-l and -b options are mutually exclusive");
+			option_conflict('l', 'b');
 		if (fetch_all_branches)
-			errx(1, "-l and -a options are mutually exclusive");
+			option_conflict('l', 'a');
 		if (delete_refs)
-			errx(1, "-l and -d options are mutually exclusive");
+			option_conflict('l', 'd');
 		if (verbosity == -1)
-			errx(1, "-l and -q options are mutually exclusive");
+			option_conflict('l', 'q');
 	}
 
 	if (argc == 0)
@@ -5195,17 +5201,17 @@ cmd_ref(int argc, char *argv[])
 	}
 
 	if (obj_arg && do_list)
-		errx(1, "-c and -l options are mutually exclusive");
+		option_conflict('c', 'l');
 	if (obj_arg && do_delete)
-		errx(1, "-c and -d options are mutually exclusive");
+		option_conflict('c', 'd');
 	if (obj_arg && symref_target)
-		errx(1, "-c and -s options are mutually exclusive");
+		option_conflict('c', 's');
 	if (symref_target && do_delete)
-		errx(1, "-s and -d options are mutually exclusive");
+		option_conflict('s', 'd');
 	if (symref_target && do_list)
-		errx(1, "-s and -l options are mutually exclusive");
+		option_conflict('s', 'l');
 	if (do_delete && do_list)
-		errx(1, "-d and -l options are mutually exclusive");
+		option_conflict('d', 'l');
 
 	argc -= optind;
 	argv += optind;
@@ -5531,7 +5537,7 @@ cmd_branch(int argc, char *argv[])
 	}
 
 	if (do_list && delref)
-		errx(1, "-l and -d options are mutually exclusive");
+		option_conflict('l', 'd');
 
 	argc -= optind;
 	argv += optind;
@@ -6067,7 +6073,7 @@ cmd_tag(int argc, char *argv[])
 			errx(1,
 			    "-c option can only be used when creating a tag");
 		if (tagmsg)
-			errx(1, "-l and -m options are mutually exclusive");
+			option_conflict('l', 'm');
 		if (argc > 0)
 			usage_tag();
 	} else if (argc != 1)
@@ -8624,19 +8630,19 @@ cmd_histedit(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 	if (abort_edit && continue_edit)
-		errx(1, "histedit's -a and -c options are mutually exclusive");
+		option_conflict('a', 'c');
 	if (edit_script_path && edit_logmsg_only)
-		errx(1, "histedit's -F and -m options are mutually exclusive");
+		option_conflict('F', 'm');
 	if (abort_edit && edit_logmsg_only)
-		errx(1, "histedit's -a and -m options are mutually exclusive");
+		option_conflict('a', 'm');
 	if (continue_edit && edit_logmsg_only)
-		errx(1, "histedit's -c and -m options are mutually exclusive");
+		option_conflict('c', 'm');
 	if (abort_edit && fold_only)
-		errx(1, "histedit's -a and -f options are mutually exclusive");
+		option_conflict('a', 'f');
 	if (continue_edit && fold_only)
-		errx(1, "histedit's -c and -f options are mutually exclusive");
+		option_conflict('c', 'f');
 	if (fold_only && edit_logmsg_only)
-		errx(1, "histedit's -f and -m options are mutually exclusive");
+		option_conflict('f', 'm');
 	if (argc != 0)
 		usage_histedit();
 
