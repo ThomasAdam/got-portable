@@ -1,3 +1,39 @@
+* got 0.45; 2020-12-13
+- new diff implementation from git.gameoftrees.org/diff.git (with neels)
+- use Patience diff algorithm with fallback to Myers diff
+- new blame algorithm which compares commit N-1 to N (with neels)
+- handle binary files in got/tog diff commands; add -a options to force text
+- consistently label removed files as "/dev/null" in diff headers
+- prevent potential fclose(NULL) in error path of diff_blobs()
+- use size_t for loop indices to avoid signedness warnings (by emaste@freebsd)
+- in tests, replace echo with printf and stop option processing via "--" (naddy)
+- fix test failure of test_tree_submodule_of_same_repo for packed repos (yzhong)
+- add fd to got_worktree, modify got_fileindex_entry_update to use fds (yzhong)
+- add histedit -f flag for folding shortcut (jrick)
+- prevent log message loss of folded commits during histedit
+- tog: plug two memory leaks in draw_file()
+- tog: show current/total line numbers in diff view header
+- tog: highlight matched search terms in diff and blame views
+- tog: call pthread_cond_destroy(cond) just once when closing log view (naddy)
+- tog: reset diff view's scroll position if diff context shrinks too much
+- tog: make tog diff accept reference and tag arguments; add -w and -C options
+- tog: new 'tog ref' subcommand which displays references in the repository
+- tog: fix entry selection when moving to the parent in tree view (naddy)
+- tog: fix page-down/page-up scrolling in the tree view (with naddy)
+- tog: trim redundant parameters from many functions, and tidy up code (naddy)
+- tog: log view now requests more commits when the window expands (naddy)
+- tog: call pledge(2) directly in main() instead of per-command
+- tog: fix bug on FreeBSD where pressing 'q' in a child view caused tog to exit
+- tog: fix move to next/prev commit in diff view if log is not displayed (naddy)
+- tog: make ^L in the log view stick to branches/tags selected via -c option
+- tog: make tree view keep track of branches/tags specified via -c
+- tog: fix crashes when the log view reloads displayed data
+- tog: resize events go to child views as well as parent views (found by naddy)
+- tog: move the tree view's selection cursor up if terminal shrinks too much
+- tog: fix display of lines that end in "\r\n" (problem found by jrick)
+- tog: accommodate newer ncurses where panel_userptr() returns const (naddy)
+- tog: use getline(3) instead of fparseln(3) for better portability
+
 * got 0.44; 2020-11-10
 - detect unknown repository format extensions such as Git's sha256 extension
 - prevent a NULL dereference if 'got log -p' runs against a root commit
