@@ -1555,6 +1555,124 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_fold_only_empty_logmsg() {
+	local testroot=`test_init histedit_fold_only_empty_logmsg`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	echo "modified delta on master" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on master"
+	local old_commit3=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 'd' "\$1"
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" got histedit -f > $testroot/stdout)
+
+	local new_commit1=`git_show_head $testroot/repo`
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local very_short_old_commit1=`trim_obj_id 29 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+	local short_old_commit3=`trim_obj_id 28 $old_commit3`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
+	echo "$short_old_commit1 ->  fold commit: committing changes" \
+		>> $testroot/stdout.expected
+	echo "G  epsilon/zeta" >> $testroot/stdout.expected
+	echo -n "$short_old_commit2 ->  " >> $testroot/stdout.expected
+	echo "fold commit: committing to zeta on master" \
+		>> $testroot/stdout.expected
+	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo -n "$short_old_commit3 -> $short_new_commit1: " \
+		>> $testroot/stdout.expected
+	echo "# log message of folded commit $very_short_old_commit1" \
+		>> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha on master" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/beta ]; then
+		echo "removed file beta still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "new file on master" > $testroot/content.expected
+	cat $testroot/wt/epsilon/new > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit1 (master)" > $testroot/stdout.expected
+	echo "commit $orig_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -1572,3 +1690,4 @@ run_test test_histedit_split_commit
 run_test test_histedit_duplicate_commit_in_script
 run_test test_histedit_fold_add_delete
 run_test test_histedit_fold_only
+run_test test_histedit_fold_only_empty_logmsg
