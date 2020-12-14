@@ -1190,10 +1190,13 @@ format_line(wchar_t **wlinep, int *widthp, const char *line, int wlimit,
 			if (wline[i] == L'\t') {
 				width = TABSIZE -
 				    ((cols + col_tab_align) % TABSIZE);
-				if (cols + width > wlimit)
-					break;
-				cols += width;
+			} else {
+				width = 1;
+				wline[i] = L'.';
 			}
+			if (cols + width > wlimit)
+				break;
+			cols += width;
 			i++;
 		} else {
 			err = got_error_from_errno("wcwidth");
