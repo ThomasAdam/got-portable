@@ -212,3 +212,29 @@ got_error_path(const char *path, int code)
 
 	abort();
 }
+
+const struct got_error *
+got_error_fmt(int code, const char *fmt, ...)
+{
+	static struct got_error err;
+	static char msg[PATH_MAX * 4 + 128];
+	char buf[PATH_MAX * 4];
+	va_list ap;
+	size_t i;
+
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+
+	for (i = 0; i < nitems(got_errors); i++) {
+		if (code == got_errors[i].code) {
+			err.code = code;
+			snprintf(msg, sizeof(msg), "%s: %s", buf,
+			    got_errors[i].msg);
+			err.msg = msg;
+			return &err;
+		}
+	}
+
+	abort();
+}

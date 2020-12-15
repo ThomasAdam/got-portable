@@ -380,3 +380,10 @@ const struct got_error *got_error_uuid(uint32_t, const char *);
 
 /* Return an error with a path prefixed to the error message. */
 const struct got_error *got_error_path(const char *, int);
+
+/*
+ * Return an error with an error message prefix built by vsnprintf(3)
+ * from the provided format string and the variable-length list of
+ * additional arguments.
+*/
+const struct got_error *got_error_fmt(int, const char *, ...);
