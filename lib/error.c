@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -104,6 +105,25 @@ got_error_from_errno3(const char *prefix, const char *prefix2,
 
 	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s: %s", prefix, prefix2,
 	    prefix3, strerror(errno));
+
+	err.code = GOT_ERR_ERRNO;
+	err.msg = err_msg;
+	return &err;
+}
+
+const struct got_error *
+got_error_from_errno_fmt(const char *fmt, ...)
+{
+	static struct got_error err;
+	static char err_msg[PATH_MAX * 4 + 64];
+	char buf[PATH_MAX * 4];
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+
+	snprintf(err_msg, sizeof(err_msg), "%s: %s", buf, strerror(errno));
 
 	err.code = GOT_ERR_ERRNO;
 	err.msg = err_msg;
