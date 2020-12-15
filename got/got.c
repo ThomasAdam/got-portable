@@ -431,7 +431,7 @@ doneediting:
 
 static const struct got_error *
 edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
-    const char *initial_content, size_t initial_content_len)
+    const char *initial_content, size_t initial_content_len, int check_comments)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -526,7 +526,7 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		    "commit message cannot be empty, aborting");
 		goto done;
 	}
-	if (strcmp(*logmsg, initial_content_stripped) == 0)
+	if (check_comments && strcmp(*logmsg, initial_content_stripped) == 0)
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 done:
@@ -567,7 +567,7 @@ collect_import_msg(char **logmsg, char **logmsg_path, const char *editor,
 	}
 
 	err = edit_logmsg(logmsg, editor, *logmsg_path, initial_content,
-	    initial_content_len);
+	    initial_content_len, 1);
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", *logmsg_path);
@@ -5901,7 +5901,7 @@ get_tag_message(char **tagmsg, char **tagmsg_path, const char *commit_id_str,
 	if (err)
 		goto done;
 	err = edit_logmsg(tagmsg, editor, *tagmsg_path, initial_content,
-	    initial_content_len);
+	    initial_content_len, 1);
 done:
 	free(initial_content);
 	free(template);
@@ -6782,7 +6782,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content,
-	    initial_content_len);
+	    initial_content_len, 1);
 done:
 	free(initial_content);
 	free(template);
@@ -8020,7 +8020,7 @@ histedit_edit_logmsg(struct got_histedit_list_entry *hle,
 		goto done;
 
 	err = edit_logmsg(&hle->logmsg, editor, logmsg_path, logmsg,
-	    logmsg_len);
+	    logmsg_len, 0);
 	if (err) {
 		if (err->code != GOT_ERR_COMMIT_MSG_EMPTY)
 			goto done;
