@@ -2437,6 +2437,24 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 }
 
 static const struct got_error *
+bump_base_commit_id_everywhere(struct got_worktree *worktree,
+     struct got_fileindex *fileindex,
+     got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	struct bump_base_commit_id_arg bbc_arg;
+
+	bbc_arg.base_commit_id = worktree->base_commit_id;
+	bbc_arg.entry_name = NULL;
+	bbc_arg.path = "";
+	bbc_arg.path_len = 0;
+	bbc_arg.progress_cb = progress_cb;
+	bbc_arg.progress_arg = progress_arg;
+
+	return got_fileindex_for_each_entry_safe(fileindex,
+	    bump_base_commit_id, &bbc_arg);
+}
+
+static const struct got_error *
 sync_fileindex(struct got_fileindex *fileindex, const char *fileindex_path)
 {
 	const struct got_error *err = NULL;
@@ -6437,8 +6455,9 @@ got_worktree_rebase_complete(struct got_worktree *worktree,
     struct got_reference *tmp_branch, struct got_reference *rebased_branch,
     struct got_repository *repo)
 {
-	const struct got_error *err, *unlockerr;
+	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_object_id *new_head_commit_id = NULL;
+	char *fileindex_path = NULL;
 
 	err = got_ref_resolve(&new_head_commit_id, repo, tmp_branch);
 	if (err)
@@ -6457,9 +6476,19 @@ got_worktree_rebase_complete(struct got_worktree *worktree,
 		goto done;
 
 	err = delete_rebase_refs(worktree, repo);
+	if (err)
+		goto done;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+	err = bump_base_commit_id_everywhere(worktree, fileindex, NULL, NULL);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
-	if (fileindex)
-		got_fileindex_free(fileindex);
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
 	free(new_head_commit_id);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
@@ -6906,9 +6935,10 @@ got_worktree_histedit_complete(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_reference *tmp_branch,
     struct got_reference *edited_branch, struct got_repository *repo)
 {
-	const struct got_error *err, *unlockerr;
+	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_object_id *new_head_commit_id = NULL;
 	struct got_reference *resolved = NULL;
+	char *fileindex_path = NULL;
 
 	err = got_ref_resolve(&new_head_commit_id, repo, tmp_branch);
 	if (err)
@@ -6932,9 +6962,19 @@ got_worktree_histedit_complete(struct got_worktree *worktree,
 		goto done;
 
 	err = delete_histedit_refs(worktree, repo);
+	if (err)
+		goto done;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+	err = bump_base_commit_id_everywhere(worktree, fileindex, NULL, NULL);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
 done:
-	if (fileindex)
-		got_fileindex_free(fileindex);
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
 	free(new_head_commit_id);
 	unlockerr = lock_worktree(worktree, LOCK_SH);
 	if (unlockerr && err == NULL)
