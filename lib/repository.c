@@ -77,6 +77,12 @@ got_repo_get_path_git_dir(struct got_repository *repo)
 	return repo->path_git_dir;
 }
 
+int
+got_repo_get_fd(struct got_repository *repo)
+{
+	return repo->gitdir_fd;
+}
+
 const char *
 got_repo_get_gitconfig_author_name(struct got_repository *repo)
 {
@@ -333,6 +339,8 @@ open_repo(struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
 
+	repo->gitdir_fd = -1;
+
 	/* bare git repository? */
 	repo->path_git_dir = strdup(path);
 	if (repo->path_git_dir == NULL)
@@ -341,6 +349,12 @@ open_repo(struct got_repository *repo, const char *path)
 		repo->path = strdup(repo->path_git_dir);
 		if (repo->path == NULL) {
 			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		repo->gitdir_fd = open(repo->path_git_dir, O_DIRECTORY);
+		if (repo->gitdir_fd == -1) {
+			err = got_error_from_errno2("open",
+			    repo->path_git_dir);
 			goto done;
 		}
 		return NULL;
@@ -359,6 +373,12 @@ open_repo(struct got_repository *repo, const char *path)
 			err = got_error_from_errno("strdup");
 			goto done;
 		}
+		repo->gitdir_fd = open(repo->path_git_dir, O_DIRECTORY);
+		if (repo->gitdir_fd == -1) {
+			err = got_error_from_errno2("open",
+			    repo->path_git_dir);
+			goto done;
+		}
 		return NULL;
 	}
 
@@ -369,6 +389,10 @@ done:
 		repo->path = NULL;
 		free(repo->path_git_dir);
 		repo->path_git_dir = NULL;
+		if (repo->gitdir_fd != -1)
+			close(repo->gitdir_fd);
+		repo->gitdir_fd = -1;
+
 	}
 	return err;
 }
@@ -916,11 +940,11 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
     struct got_repository *repo, struct got_object_id *id)
 {
 	const struct got_error *err;
-	char *path_packdir;
-	DIR *packdir;
+	DIR *packdir = NULL;
 	struct dirent *dent;
 	char *path_packidx;
 	size_t i;
+	int packdir_fd;
 
 	/* Search pack index cache. */
 	for (i = 0; i < nitems(repo->packidx_cache); i++) {
@@ -944,16 +968,21 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	}
 	/* No luck. Search the filesystem. */
 
-	path_packdir = got_repo_get_path_objects_pack(repo);
-	if (path_packdir == NULL)
-		return got_error_from_errno("got_repo_get_path_objects_pack");
-
-	packdir = opendir(path_packdir);
-	if (packdir == NULL) {
+	packdir_fd = openat(got_repo_get_fd(repo),
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	if (packdir_fd == -1) {
 		if (errno == ENOENT)
 			err = got_error_no_obj(id);
 		else
-			err = got_error_from_errno2("opendir", path_packdir);
+			err = got_error_from_errno_fmt("openat: %s/%s",
+			    got_repo_get_path_git_dir(repo),
+			    GOT_OBJECTS_PACK_DIR);
+		goto done;
+	}
+
+	packdir = fdopendir(packdir_fd);
+	if (packdir == NULL) {
+		err = got_error_from_errno("fdopendir");
 		goto done;
 	}
 
@@ -963,7 +992,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
-		if (asprintf(&path_packidx, "%s/%s", path_packdir,
+		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
 		    dent->d_name) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
@@ -983,7 +1012,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			continue; /* already searched */
 		}
 
-		err = got_packidx_open(packidx, path_packidx, 0);
+		err = got_packidx_open(packidx, got_repo_get_fd(repo),
+		    path_packidx, 0);
 		if (err) {
 			free(path_packidx);
 			goto done;
@@ -1003,7 +1033,6 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 	err = got_error_no_obj(id);
 done:
-	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == NULL)
 		err = got_error_from_errno("closedir");
 	return err;
@@ -1032,13 +1061,15 @@ read_packfile_hdr(int fd, struct got_packidx *packidx)
 }
 
 static const struct got_error *
-open_packfile(int *fd, const char *path_packfile, struct got_packidx *packidx)
+open_packfile(int *fd, struct got_repository *repo,
+    const char *relpath, struct got_packidx *packidx)
 {
 	const struct got_error *err = NULL;
 
-	*fd = open(path_packfile, O_RDONLY | O_NOFOLLOW);
+	*fd = openat(got_repo_get_fd(repo), relpath, O_RDONLY | O_NOFOLLOW);
 	if (*fd == -1)
-		return got_error_from_errno2("open", path_packfile);
+		return got_error_from_errno_fmt("openat: %s/%s",
+		    got_repo_get_path_git_dir(repo), relpath);
 
 	if (packidx) {
 		err = read_packfile_hdr(*fd, packidx);
@@ -1088,7 +1119,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 		goto done;
 	}
 
-	err = open_packfile(&pack->fd, path_packfile, packidx);
+	err = open_packfile(&pack->fd, repo, path_packfile, packidx);
 	if (err)
 		goto done;
 
@@ -1200,22 +1231,25 @@ match_packed_object(struct got_object_id **unique_id,
     struct got_repository *repo, const char *id_str_prefix, int obj_type)
 {
 	const struct got_error *err = NULL;
-	char *path_packdir;
-	DIR *packdir;
+	DIR *packdir = NULL;
 	struct dirent *dent;
 	char *path_packidx;
 	struct got_object_id_queue matched_ids;
+	int packdir_fd;
 
 	SIMPLEQ_INIT(&matched_ids);
 
-	path_packdir = got_repo_get_path_objects_pack(repo);
-	if (path_packdir == NULL)
-		return got_error_from_errno("got_repo_get_path_objects_pack");
-
-	packdir = opendir(path_packdir);
-	if (packdir == NULL) {
+	packdir_fd = openat(got_repo_get_fd(repo),
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	if (packdir_fd == -1) {
 		if (errno != ENOENT)
-			err = got_error_from_errno2("opendir", path_packdir);
+			err = got_error_from_errno2("openat", GOT_OBJECTS_PACK_DIR);
+		goto done;
+	}
+
+	packdir = fdopendir(packdir_fd);
+	if (packdir == NULL) {
+		err = got_error_from_errno("fdopendir");
 		goto done;
 	}
 
@@ -1223,17 +1257,17 @@ match_packed_object(struct got_object_id **unique_id,
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
 
-
 		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
-		if (asprintf(&path_packidx, "%s/%s", path_packdir,
+		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
 		    dent->d_name) == -1) {
-			err = got_error_from_errno("asprintf");
+			err = got_error_from_errno("strdup");
 			break;
 		}
 
-		err = got_packidx_open(&packidx, path_packidx, 0);
+		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
+		    path_packidx, 0);
 		free(path_packidx);
 		if (err)
 			break;
@@ -1274,7 +1308,6 @@ match_packed_object(struct got_object_id **unique_id,
 	}
 done:
 	got_object_id_queue_free(&matched_ids);
-	free(path_packdir);
 	if (packdir && closedir(packdir) != 0 && err == NULL)
 		err = got_error_from_errno("closedir");
 	if (err) {

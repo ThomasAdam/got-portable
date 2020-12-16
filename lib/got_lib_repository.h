@@ -34,6 +34,7 @@
 struct got_repository {
 	char *path;
 	char *path_git_dir;
+	int gitdir_fd;
 
 	/* The pack index cache speeds up search for packed objects. */
 	struct got_packidx *packidx_cache[GOT_PACKIDX_CACHE_SIZE];

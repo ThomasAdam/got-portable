@@ -328,7 +328,8 @@ done:
 }
 
 const struct got_error *
-got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
+got_packidx_open(struct got_packidx **packidx,
+    int dir_fd, const char *relpath, int verify)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *p;
@@ -340,15 +341,15 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 	if (p == NULL)
 		return got_error_from_errno("calloc");
 
-	p->fd = open(path, O_RDONLY | O_NOFOLLOW);
+	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW);
 	if (p->fd == -1) {
-		err = got_error_from_errno2("open", path);
+		err = got_error_from_errno2("openat", relpath);
 		free(p);
 		return err;
 	}
 
 	if (fstat(p->fd, &sb) != 0) {
-		err = got_error_from_errno2("fstat", path);
+		err = got_error_from_errno2("fstat", relpath);
 		close(p->fd);
 		free(p);
 		return err;
@@ -361,7 +362,7 @@ got_packidx_open(struct got_packidx **packidx, const char *path, int verify)
 		return err;
 	}
 
-	p->path_packidx = strdup(path);
+	p->path_packidx = strdup(relpath);
 	if (p->path_packidx == NULL) {
 		err = got_error_from_errno("strdup");
 		goto done;
