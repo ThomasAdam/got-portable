@@ -974,7 +974,8 @@ main(int argc, char **argv)
 	const struct got_error *err = NULL, *close_err;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
-	int idxfd = -1, tmpfd = -1, i;
+	size_t i;
+	int idxfd = -1, tmpfd = -1;
 	FILE *tmpfiles[3];
 	struct got_pack pack;
 	uint8_t pack_hash[SHA1_DIGEST_LENGTH];

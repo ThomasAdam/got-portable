@@ -79,7 +79,7 @@ path_cmp(void)
 		{ "/bar.sub.sub2", "/bar", 1 },
 		{ "/bar/sub/sub2", "/bar.c", -1 },
 	};
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(test_data); i++) {
 		const char *path1 = test_data[i].path1;
@@ -139,7 +139,7 @@ path_list(void)
 	const struct got_error *err = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int i;
+	size_t i;
 
 	TAILQ_INIT(&paths);
 	for (i = 0; i < nitems(path_list_input); i++) {
@@ -175,7 +175,7 @@ path_list_reverse_input(void)
 	const struct got_error *err = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int i;
+	size_t i;
 
 	TAILQ_INIT(&paths);
 	for (i = nitems(path_list_input) - 1; i >= 0; i--) {

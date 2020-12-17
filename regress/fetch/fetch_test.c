@@ -127,7 +127,7 @@ fetch_parse_uri(void)
 		    "ssh", "127.0.0.1", NULL, "22/git/myrepo", "myrepo",
 		    GOT_ERR_OK },
 	};
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(test_data); i++) {
 		const char *uri = test_data[i].uri;

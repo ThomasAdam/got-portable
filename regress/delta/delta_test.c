@@ -59,7 +59,7 @@ static int
 delta_apply(void)
 {
 	const struct got_error *err = NULL;
-	int i;
+	size_t i;
 	FILE *result_file;
 
 	result_file = got_opentemp();

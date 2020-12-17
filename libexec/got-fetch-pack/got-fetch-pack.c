@@ -437,7 +437,7 @@ match_capabilities(char **my_capabilities, struct got_pathlist_head *symrefs,
 {
 	const struct got_error *err = NULL;
 	char *capa, *equalsign;
-	int i;
+	size_t i;
 
 	*my_capabilities = NULL;
 	do {
@@ -512,7 +512,7 @@ send_fetch_done(struct imsgbuf *ibuf, uint8_t *pack_sha1)
 static const struct got_error *
 fetch_progress(struct imsgbuf *ibuf, const char *buf, size_t len)
 {
-	int i;
+	size_t i;
 
 	if (len == 0)
 		return NULL;
@@ -540,7 +540,7 @@ static const struct got_error *
 fetch_error(const char *buf, size_t len)
 {
 	static char msg[1024];
-	int i;
+	size_t i;
 
 	for (i = 0; i < len && i < sizeof(msg) - 1; i++) {
 		if (!isprint(buf[i]))
