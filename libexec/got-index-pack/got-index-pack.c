@@ -569,7 +569,7 @@ static void
 update_packidx(struct got_packidx *packidx, int nobj,
     struct got_indexed_object *obj)
 {
-	uint32_t idx;
+	int idx;
 	uint32_t nindexed = be32toh(packidx->hdr.fanout_table[0xff]);
 
 	idx = find_object_idx(packidx, obj->id.sha1);
