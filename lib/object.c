@@ -1771,22 +1771,21 @@ got_object_tree_path_changed(int *changed,
 			goto done;
 		}
 
-		te2 = find_entry_by_name(tree2, seg, seglen);
-		if (te2 == NULL) {
-			*changed = 1;
-			goto done;
-		}
+		if (tree2)
+			te2 = find_entry_by_name(tree2, seg, seglen);
 
-		mode1 = normalize_mode_for_comparison(te1->mode);
-		mode2 = normalize_mode_for_comparison(te2->mode);
-		if (mode1 != mode2) {
-			*changed = 1;
-			goto done;
-		}
+		if (te2) {
+			mode1 = normalize_mode_for_comparison(te1->mode);
+			mode2 = normalize_mode_for_comparison(te2->mode);
+			if (mode1 != mode2) {
+				*changed = 1;
+				goto done;
+			}
 
-		if (got_object_id_cmp(&te1->id, &te2->id) == 0) {
-			*changed = 0;
-			goto done;
+			if (got_object_id_cmp(&te1->id, &te2->id) == 0) {
+				*changed = 0;
+				goto done;
+			}
 		}
 
 		if (*s == '\0') { /* final path element */
@@ -1807,14 +1806,20 @@ got_object_tree_path_changed(int *changed,
 				got_object_tree_close(tree1);
 			tree1 = next_tree1;
 
-			err = got_object_open_as_tree(&next_tree2, repo,
-			    &te2->id);
-			te2 = NULL;
-			if (err)
-				goto done;
-			if (tree2 != tree02)
-				got_object_tree_close(tree2);
-			tree2 = next_tree2;
+			if (te2) {
+				err = got_object_open_as_tree(&next_tree2, repo,
+				    &te2->id);
+				te2 = NULL;
+				if (err)
+					goto done;
+				if (tree2 != tree02)
+					got_object_tree_close(tree2);
+				tree2 = next_tree2;
+			} else if (tree2) {
+				if (tree2 != tree02)
+					got_object_tree_close(tree2);
+				tree2 = NULL;
+			}
 		}
 	}
 done:
