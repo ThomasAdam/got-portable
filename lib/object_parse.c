@@ -925,7 +925,7 @@ got_object_parse_tag(struct got_tag_object **tag, uint8_t *buf, size_t len)
 		}
 		s += slen + 1;
 		remain -= slen + 1;
-		if (remain <= 0) {
+		if (remain < 0) {
 			err = got_error(GOT_ERR_BAD_OBJ_DATA);
 			goto done;
 		}
