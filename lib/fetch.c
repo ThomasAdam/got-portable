@@ -67,6 +67,10 @@
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 #endif
 
+#ifndef ssizeof
+#define ssizeof(_x) ((ssize_t)(sizeof(_x)))
+#endif
+
 #ifndef MIN
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
@@ -129,7 +133,7 @@ dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
 		dup2(pfd[0], 0);
 		dup2(pfd[0], 1);
 		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
-		if (n < 0 || n >= sizeof(cmd))
+		if (n < 0 || n >= ssizeof(cmd))
 			err(1, "snprintf");
 		if (execv(GOT_FETCH_PATH_SSH, argv) == -1)
 			err(1, "execl");
@@ -669,18 +673,18 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		free(*pack_hash);
 		*pack_hash = NULL;
 		goto done;
-	} else if (packfile_size < sizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
+	} else if (packfile_size < ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH) {
 		err = got_error_msg(GOT_ERR_BAD_PACKFILE, "short pack file");
 		goto done;
 	} else {
 		ssize_t n;
 
-		n = read(packfd, &pack_hdr, sizeof(pack_hdr));
+		n = read(packfd, &pack_hdr, ssizeof(pack_hdr));
 		if (n == -1) {
 			err = got_error_from_errno("read");
 			goto done;
 		}
-		if (n != sizeof(pack_hdr)) {
+		if (n != ssizeof(pack_hdr)) {
 			err = got_error(GOT_ERR_IO);
 			goto done;
 		}
@@ -696,11 +700,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		}
 		nobj = be32toh(pack_hdr.nobjects);
 		if (nobj == 0 &&
-		    packfile_size > sizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
+		    packfile_size > ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
 			return got_error_msg(GOT_ERR_BAD_PACKFILE,
 			    "bad pack file with zero objects");
 		if (nobj != 0 &&
-		    packfile_size <= sizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
+		    packfile_size <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
 			return got_error_msg(GOT_ERR_BAD_PACKFILE,
 			    "empty pack file with non-zero object count");
 	}
