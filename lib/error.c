@@ -38,6 +38,18 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+static struct got_custom_error {
+	struct got_error err;
+	char msg[4080];
+} custom_errors[16];
+
+static struct got_custom_error *
+get_custom_err(void)
+{
+	static unsigned int idx;
+	return &custom_errors[(idx++) % nitems(custom_errors)];
+}
+
 const struct got_error *
 got_error(int code)
 {
@@ -54,14 +66,16 @@ got_error(int code)
 const struct got_error *
 got_error_msg(int code, const char *msg)
 {
-	static struct got_error err;
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 	size_t i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code) {
-			err.code = code;
-			err.msg = msg;
-			return &err;
+			err->code = code;
+			strlcpy(cerr->msg, msg, sizeof(cerr->msg));
+			err->msg = cerr->msg;
+			return err;
 		}
 	}
 
@@ -71,51 +85,51 @@ got_error_msg(int code, const char *msg)
 const struct got_error *
 got_error_from_errno(const char *prefix)
 {
-	static struct got_error err;
-	static char err_msg[PATH_MAX + 20];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 
-	snprintf(err_msg, sizeof(err_msg), "%s: %s", prefix,
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", prefix,
 	    strerror(errno));
 
-	err.code = GOT_ERR_ERRNO;
-	err.msg = err_msg;
-	return &err;
+	err->code = GOT_ERR_ERRNO;
+	err->msg = cerr->msg;
+	return err;
 }
 
 const struct got_error *
 got_error_from_errno2(const char *prefix, const char *prefix2)
 {
-	static struct got_error err;
-	static char err_msg[(PATH_MAX * 2) + 20];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 
-	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s", prefix, prefix2,
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s: %s", prefix, prefix2,
 	    strerror(errno));
 
-	err.code = GOT_ERR_ERRNO;
-	err.msg = err_msg;
-	return &err;
+	err->code = GOT_ERR_ERRNO;
+	err->msg = cerr->msg;
+	return err;
 }
 
 const struct got_error *
 got_error_from_errno3(const char *prefix, const char *prefix2,
     const char *prefix3)
 {
-	static struct got_error err;
-	static char err_msg[(PATH_MAX * 3) + 20];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 
-	snprintf(err_msg, sizeof(err_msg), "%s: %s: %s: %s", prefix, prefix2,
-	    prefix3, strerror(errno));
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s: %s: %s", prefix,
+	    prefix2, prefix3, strerror(errno));
 
-	err.code = GOT_ERR_ERRNO;
-	err.msg = err_msg;
-	return &err;
+	err->code = GOT_ERR_ERRNO;
+	err->msg = cerr->msg;
+	return err;
 }
 
 const struct got_error *
 got_error_from_errno_fmt(const char *fmt, ...)
 {
-	static struct got_error err;
-	static char err_msg[PATH_MAX * 4 + 64];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 	char buf[PATH_MAX * 4];
 	va_list ap;
 
@@ -123,11 +137,11 @@ got_error_from_errno_fmt(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	snprintf(err_msg, sizeof(err_msg), "%s: %s", buf, strerror(errno));
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", buf, strerror(errno));
 
-	err.code = GOT_ERR_ERRNO;
-	err.msg = err_msg;
-	return &err;
+	err->code = GOT_ERR_ERRNO;
+	err->msg = cerr->msg;
+	return err;
 }
 
 const struct got_error *
@@ -148,8 +162,7 @@ got_ferror(FILE *f, int code)
 const struct got_error *
 got_error_no_obj(struct got_object_id *id)
 {
-	static char msg[sizeof("object   not found") +
-	    SHA1_DIGEST_STRING_LENGTH];
+	char msg[sizeof("object   not found") + SHA1_DIGEST_STRING_LENGTH];
 	char id_str[SHA1_DIGEST_STRING_LENGTH];
 	int ret;
 
@@ -166,7 +179,7 @@ got_error_no_obj(struct got_object_id *id)
 const struct got_error *
 got_error_not_ref(const char *refname)
 {
-	static char msg[sizeof("reference   not found") + 1004];
+	char msg[sizeof("reference   not found") + 1004];
 	int ret;
 
 	ret = snprintf(msg, sizeof(msg), "reference %s not found", refname);
@@ -196,17 +209,17 @@ got_error_uuid(uint32_t uuid_status, const char *prefix)
 const struct got_error *
 got_error_path(const char *path, int code)
 {
-	static struct got_error err;
-	static char msg[PATH_MAX + 128];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 	size_t i;
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code) {
-			err.code = code;
-			snprintf(msg, sizeof(msg), "%s: %s", path,
+			err->code = code;
+			snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", path,
 			    got_errors[i].msg);
-			err.msg = msg;
-			return &err;
+			err->msg = cerr->msg;
+			return err;
 		}
 	}
 
@@ -216,8 +229,8 @@ got_error_path(const char *path, int code)
 const struct got_error *
 got_error_fmt(int code, const char *fmt, ...)
 {
-	static struct got_error err;
-	static char msg[PATH_MAX * 4 + 128];
+	struct got_custom_error *cerr = get_custom_err();
+	struct got_error *err = &cerr->err;
 	char buf[PATH_MAX * 4];
 	va_list ap;
 	size_t i;
@@ -228,11 +241,11 @@ got_error_fmt(int code, const char *fmt, ...)
 
 	for (i = 0; i < nitems(got_errors); i++) {
 		if (code == got_errors[i].code) {
-			err.code = code;
-			snprintf(msg, sizeof(msg), "%s: %s", buf,
+			err->code = code;
+			snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", buf,
 			    got_errors[i].msg);
-			err.msg = msg;
-			return &err;
+			err->msg = cerr->msg;
+			return err;
 		}
 	}
 
