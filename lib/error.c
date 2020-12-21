@@ -87,9 +87,10 @@ got_error_from_errno(const char *prefix)
 {
 	struct got_custom_error *cerr = get_custom_err();
 	struct got_error *err = &cerr->err;
+	char strerr[128];
 
-	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", prefix,
-	    strerror(errno));
+	strerror_r(errno, strerr, sizeof(strerr));
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", prefix, strerr);
 
 	err->code = GOT_ERR_ERRNO;
 	err->msg = cerr->msg;
@@ -101,9 +102,11 @@ got_error_from_errno2(const char *prefix, const char *prefix2)
 {
 	struct got_custom_error *cerr = get_custom_err();
 	struct got_error *err = &cerr->err;
+	char strerr[128];
 
+	strerror_r(errno, strerr, sizeof(strerr));
 	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s: %s", prefix, prefix2,
-	    strerror(errno));
+	    strerr);
 
 	err->code = GOT_ERR_ERRNO;
 	err->msg = cerr->msg;
@@ -116,9 +119,11 @@ got_error_from_errno3(const char *prefix, const char *prefix2,
 {
 	struct got_custom_error *cerr = get_custom_err();
 	struct got_error *err = &cerr->err;
+	char strerr[128];
 
+	strerror_r(errno, strerr, sizeof(strerr));
 	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s: %s: %s", prefix,
-	    prefix2, prefix3, strerror(errno));
+	    prefix2, prefix3, strerr);
 
 	err->code = GOT_ERR_ERRNO;
 	err->msg = cerr->msg;
@@ -131,13 +136,15 @@ got_error_from_errno_fmt(const char *fmt, ...)
 	struct got_custom_error *cerr = get_custom_err();
 	struct got_error *err = &cerr->err;
 	char buf[PATH_MAX * 4];
+	char strerr[128];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", buf, strerror(errno));
+	strerror_r(errno, strerr, sizeof(strerr));
+	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", buf, strerr);
 
 	err->code = GOT_ERR_ERRNO;
 	err->msg = cerr->msg;
