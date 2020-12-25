@@ -263,6 +263,7 @@ struct tog_diff_view_state {
 	int force_text_diff;
 	struct got_repository *repo;
 	struct got_reflist_head refs;
+	struct got_reflist_object_id_map *idmap;
 	struct tog_colors colors;
 	size_t nlines;
 	off_t *line_offsets;
@@ -304,6 +305,7 @@ struct tog_log_view_state {
 	int log_branches;
 	struct got_repository *repo;
 	struct got_reflist_head refs;
+	struct got_reflist_object_id_map *idmap;
 	struct got_object_id *start_id;
 	sig_atomic_t quit;
 	pthread_t thread;
@@ -1572,13 +1574,18 @@ draw_commits(struct tog_view *view)
 
 	if (s->selected_entry &&
 	    !(view->searching && view->search_next_done == 0)) {
+		struct got_reflist_head *refs;
 		err = got_object_id_str(&id_str, s->selected_entry->id);
 		if (err)
 			return err;
-		err = build_refs_str(&refs_str, &s->refs,
-		    s->selected_entry->id, s->repo);
-		if (err)
-			goto done;
+		refs = got_reflist_object_id_map_lookup(s->idmap,
+		    s->selected_entry->id);
+		if (refs) {
+			err = build_refs_str(&refs_str, refs,
+			    s->selected_entry->id, s->repo);
+			if (err)
+				goto done;
+		}
 	}
 
 	if (s->thread_args.commits_needed == 0)
@@ -2118,6 +2125,10 @@ close_log_view(struct tog_view *view)
 	s->start_id = NULL;
 	free(s->head_ref_name);
 	s->head_ref_name = NULL;
+	if (s->idmap) {
+		got_reflist_object_map_free(s->idmap);
+		s->idmap = NULL;
+	}
 	got_ref_list_free(&s->refs);
 	return err;
 }
@@ -2261,6 +2272,9 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	s->commits.ncommits = 0;
 
 	err = got_ref_list(&s->refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+	err = got_reflist_object_id_map_create(&s->idmap, &s->refs, repo);
 	if (err)
 		goto done;
 
@@ -2529,9 +2543,17 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    got_repo_get_path(s->repo), NULL);
 		if (err)
 			return err;
+		if (s->idmap) {
+			got_reflist_object_map_free(s->idmap);
+			s->idmap = NULL;
+		}
 		got_ref_list_free(&s->refs);
 		err = got_ref_list(&s->refs, s->repo, NULL,
 		    got_ref_cmp_by_name, NULL);
+		if (err)
+			return err;
+		err = got_reflist_object_id_map_create(&s->idmap, &s->refs,
+		    s->repo);
 		if (err)
 			return err;
 		err = got_commit_graph_open(&s->thread_args.graph,
@@ -3254,14 +3276,16 @@ create_diff(struct tog_diff_view_state *s)
 		const struct got_object_id_queue *parent_ids;
 		struct got_object_qid *pid;
 		struct got_commit_object *commit2;
+		struct got_reflist_head *refs;
 
 		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
 		if (err)
 			goto done;
+		refs = got_reflist_object_id_map_lookup(s->idmap, s->id2);
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
 			err = write_commit_info(&s->line_offsets, &s->nlines,
-			    s->id2, &s->refs, s->repo, s->f);
+			    s->id2, refs, s->repo, s->f);
 			if (err)
 				goto done;
 		} else {
@@ -3270,7 +3294,7 @@ create_diff(struct tog_diff_view_state *s)
 				if (got_object_id_cmp(s->id1, pid->id) == 0) {
 					err = write_commit_info(
 					    &s->line_offsets, &s->nlines,
-					    s->id2, &s->refs, s->repo, s->f);
+					    s->id2, refs, s->repo, s->f);
 					if (err)
 						goto done;
 					break;
@@ -3492,6 +3516,16 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		free_colors(&s->colors);
 		return err;
 	}
+	err = got_reflist_object_id_map_create(&s->idmap, &s->refs, repo);
+	if (err) {
+		free(s->id1);
+		s->id1 = NULL;
+		free(s->id2);
+		s->id2 = NULL;
+		free_colors(&s->colors);
+		got_ref_list_free(&s->refs);
+		return err;
+	}
 
 	if (log_view && view_is_splitscreen(view))
 		show_log_view(log_view); /* draw vborder */
@@ -3507,6 +3541,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		s->id2 = NULL;
 		free_colors(&s->colors);
 		got_ref_list_free(&s->refs);
+		got_reflist_object_map_free(s->idmap);
+		s->idmap = NULL;
 		return err;
 	}
 
@@ -3535,6 +3571,10 @@ close_diff_view(struct tog_view *view)
 	free(s->line_offsets);
 	s->line_offsets = NULL;
 	s->nlines = 0;
+	if (s->idmap) {
+		got_reflist_object_map_free(s->idmap);
+		s->idmap = NULL;
+	}
 	got_ref_list_free(&s->refs);
 	return err;
 }
