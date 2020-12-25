@@ -43,6 +43,7 @@
 #include "got_lib_delta.h"
 #include "got_lib_inflate.h"
 #include "got_lib_object.h"
+#include "got_lib_object_idset.h"
 #include "got_lib_lockfile.h"
 
 #ifndef nitems
@@ -1399,4 +1400,98 @@ got_ref_unlock(struct got_reference *ref)
 	err = got_lockfile_unlock(ref->lf);
 	ref->lf = NULL;
 	return err;
+}
+
+struct got_reflist_object_id_map {
+	struct got_object_idset *idset;
+};
+
+struct got_reflist_object_id_map_entry {
+	struct got_reflist_head refs;
+};
+
+const struct got_error *
+got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
+    struct got_reflist_head *refs, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_object_idset *idset;
+	struct got_object_id *id = NULL;
+	struct got_reflist_entry *re;
+
+	idset = got_object_idset_alloc();
+	if (idset == NULL)
+		return got_error_from_errno("got_object_idset_alloc");
+
+	*map = malloc(sizeof(**map));
+	if (*map == NULL) {
+		got_object_idset_free(idset);
+		return got_error_from_errno("malloc");
+	}
+	(*map)->idset = idset;
+
+	SIMPLEQ_FOREACH(re, refs, entry) {
+		struct got_reflist_entry *new;
+		struct got_reflist_object_id_map_entry *ent;
+
+		err = got_ref_resolve(&id, repo, re->ref);
+		if (err)
+			goto done;
+
+		ent = got_object_idset_get(idset, id);
+		if (ent == NULL) {
+			ent = malloc(sizeof(*ent));
+			if (ent == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+			SIMPLEQ_INIT(&ent->refs);
+			err = got_object_idset_add(idset, id, ent);
+			if (err)
+				goto done;
+		}
+
+		err = got_reflist_entry_dup(&new, re);
+		if (err)
+			goto done;
+		SIMPLEQ_INSERT_TAIL(&ent->refs, new, entry);
+		free(id);
+		id = NULL;
+	}
+done:
+	free(id);
+	if (err) {
+		got_reflist_object_map_free(*map);
+		*map = NULL;
+	}
+	return NULL;
+}
+
+struct got_reflist_head *
+got_reflist_object_id_map_lookup(struct got_reflist_object_id_map *map,
+    struct got_object_id *id)
+{
+	struct got_reflist_object_id_map_entry *ent;
+	ent = got_object_idset_get(map->idset, id);
+	if (ent)
+		return &ent->refs;
+	return NULL;
+}
+
+static const struct got_error *
+free_id_map_entry(struct got_object_id *id, void *data, void *arg)
+{
+	struct got_reflist_object_id_map_entry *ent = data;
+
+	got_ref_list_free(&ent->refs);
+	free(ent);
+	return NULL;
+}
+
+void
+got_reflist_object_map_free(struct got_reflist_object_id_map *map)
+{
+	got_object_idset_for_each(map->idset, free_id_map_entry, NULL);
+	got_object_idset_free(map->idset);
+	free(map);
 }

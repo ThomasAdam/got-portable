@@ -139,3 +139,28 @@ const struct got_error *got_ref_delete(struct got_reference *,
 
 /* Unlock a reference which was opened in locked state. */
 const struct got_error *got_ref_unlock(struct got_reference *);
+
+/* Map object IDs to references. */
+struct got_reflist_object_id_map;
+
+/*
+ * Create and populate an object ID map for a given list of references.
+ * Map entries will contain deep-copies of elements of the reflist.
+ * The caller must dispose of the map with got_reflist_object_map_free().
+ */
+const struct got_error *got_reflist_object_id_map_create(
+    struct got_reflist_object_id_map **, struct got_reflist_head *, 
+    struct got_repository *);
+
+/*
+ * Return a list of references which correspond to a given object ID.
+ * The returned list must be considered read-only.
+ * The caller must _not_ call free(3) on the returned pointer!
+ * If no references are associated with the ID, return NULL.
+ */
+struct got_reflist_head *
+got_reflist_object_id_map_lookup(struct got_reflist_object_id_map *,
+    struct got_object_id *);
+
+/* Free the specified object ID map. */
+void got_reflist_object_map_free(struct got_reflist_object_id_map *);
