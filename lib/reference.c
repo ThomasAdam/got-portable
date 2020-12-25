@@ -535,8 +535,8 @@ got_ref_dup(struct got_reference *ref)
 			return NULL;
 		}
 	} else {
-		ref->ref.ref.name = strdup(ref->ref.ref.name);
-		if (ref->ref.ref.name == NULL) {
+		ret->ref.ref.name = strdup(ref->ref.ref.name);
+		if (ret->ref.ref.name == NULL) {
 			free(ret);
 			return NULL;
 		}
