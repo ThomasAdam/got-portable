@@ -3402,23 +3402,18 @@ match_changed_paths(int *have_match, struct got_pathlist_head *changed_paths,
 
 #define GOT_COMMIT_SEP_STR "-----------------------------------------------\n"
 
-static const struct got_error *
-print_commit(struct got_commit_object *commit, struct got_object_id *id,
-    struct got_repository *repo, const char *path,
-    struct got_pathlist_head *changed_paths, int show_patch,
-    int diff_context, struct got_reflist_head *refs)
+static const struct got_error*
+build_refs_str(char **refs_str, struct got_reflist_head *refs,
+    struct got_object_id *id, struct got_repository *repo)
 {
-	const struct got_error *err = NULL;
-	char *id_str, *datestr, *logmsg0, *logmsg, *line;
-	char datebuf[26];
-	time_t committer_time;
-	const char *author, *committer;
-	char *refs_str = NULL;
+	static const struct got_error *err = NULL;
 	struct got_reflist_entry *re;
+	char *s;
+	const char *name;
+
+	*refs_str = NULL;
 
 	TAILQ_FOREACH(re, refs, entry) {
-		char *s;
-		const char *name;
 		struct got_tag_object *tag = NULL;
 		struct got_object_id *ref_id;
 		int cmp;
@@ -3440,13 +3435,13 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		}
 		err = got_ref_resolve(&ref_id, repo, re->ref);
 		if (err)
-			return err;
+			break;
 		if (strncmp(name, "tags/", 5) == 0) {
 			err = got_object_open_as_tag(&tag, repo, ref_id);
 			if (err) {
 				if (err->code != GOT_ERR_OBJ_TYPE) {
 					free(ref_id);
-					return err;
+					break;
 				}
 				/* Ref points at something other than a tag. */
 				err = NULL;
@@ -3460,18 +3455,44 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 			got_object_tag_close(tag);
 		if (cmp != 0)
 			continue;
-		s = refs_str;
-		if (asprintf(&refs_str, "%s%s%s", s ? s : "", s ? ", " : "",
-		    name) == -1) {
+		s = *refs_str;
+		if (asprintf(refs_str, "%s%s%s", s ? s : "",
+		    s ? ", " : "", name) == -1) {
 			err = got_error_from_errno("asprintf");
 			free(s);
-			return err;
+			*refs_str = NULL;
+			break;
 		}
 		free(s);
 	}
+
+	return err;
+}
+
+static const struct got_error *
+print_commit(struct got_commit_object *commit, struct got_object_id *id,
+    struct got_repository *repo, const char *path,
+    struct got_pathlist_head *changed_paths, int show_patch,
+    int diff_context, struct got_reflist_object_id_map *refs_idmap)
+{
+	const struct got_error *err = NULL;
+	char *id_str, *datestr, *logmsg0, *logmsg, *line;
+	char datebuf[26];
+	time_t committer_time;
+	const char *author, *committer;
+	char *refs_str = NULL;
+	struct got_reflist_head *refs;
+
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
+
+	refs = got_reflist_object_id_map_lookup(refs_idmap, id);
+	if (refs) {
+		err = build_refs_str(&refs_str, refs, id, repo);
+		if (err)
+			goto done;
+	}
 
 	printf(GOT_COMMIT_SEP_STR);
 	printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
@@ -3497,15 +3518,16 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		SIMPLEQ_FOREACH(qid, parent_ids, entry) {
 			err = got_object_id_str(&id_str, qid->id);
 			if (err)
-				return err;
+				goto done;
 			printf("parent %d: %s\n", n++, id_str);
 			free(id_str);
+			id_str = NULL;
 		}
 	}
 
 	err = got_object_commit_get_logmsg(&logmsg0, commit);
 	if (err)
-		return err;
+		goto done;
 
 	logmsg = logmsg0;
 	do {
@@ -3531,6 +3553,9 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 
 	if (fflush(stdout) != 0 && err == NULL)
 		err = got_error_from_errno("fflush");
+done:
+	free(id_str);
+	free(refs_str);
 	return err;
 }
 
@@ -3538,7 +3563,8 @@ static const struct got_error *
 print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
     struct got_repository *repo, const char *path, int show_changed_paths,
     int show_patch, const char *search_pattern, int diff_context, int limit,
-    int log_branches, int reverse_display_order, struct got_reflist_head *refs)
+    int log_branches, int reverse_display_order,
+    struct got_reflist_object_id_map *refs_idmap)
 {
 	const struct got_error *err;
 	struct got_commit_graph *graph;
@@ -3619,7 +3645,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		} else {
 			err = print_commit(commit, id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs);
+			    show_patch, diff_context, refs_idmap);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -3647,7 +3673,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			}
 			err = print_commit(commit, qid->id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs);
+			    show_patch, diff_context, refs_idmap);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -3715,6 +3741,7 @@ cmd_log(int argc, char *argv[])
 	int reverse_display_order = 0;
 	const char *errstr;
 	struct got_reflist_head refs;
+	struct got_reflist_object_id_map *refs_idmap = NULL;
 
 	TAILQ_INIT(&refs);
 
@@ -3833,6 +3860,10 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_reflist_object_id_map_create(&refs_idmap, &refs, repo);
+	if (error)
+		goto done;
+
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
 		struct got_commit_object *commit = NULL;
@@ -3890,7 +3921,7 @@ cmd_log(int argc, char *argv[])
 
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_patch, search_pattern, diff_context,
-	    limit, log_branches, reverse_display_order, &refs);
+	    limit, log_branches, reverse_display_order, refs_idmap);
 done:
 	free(path);
 	free(repo_path);
@@ -3903,6 +3934,8 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	if (refs_idmap)
+		got_reflist_object_id_map_free(refs_idmap);
 	got_ref_list_free(&refs);
 	return error;
 }
