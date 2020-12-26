@@ -1408,6 +1408,34 @@ struct got_reflist_object_id_map_entry {
 	struct got_reflist_head refs;
 };
 
+static const struct got_error *
+add_object_id_map_entry(struct got_object_idset *idset,
+    struct got_object_id *id, struct got_reflist_entry *re)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_object_id_map_entry *ent;
+	struct got_reflist_entry *new;
+
+	ent = got_object_idset_get(idset, id);
+	if (ent == NULL) {
+		ent = malloc(sizeof(*ent));
+		if (ent == NULL)
+			return got_error_from_errno("malloc");
+
+		TAILQ_INIT(&ent->refs);
+		err = got_object_idset_add(idset, id, ent);
+		if (err)
+			return err;
+	}
+
+	err = got_reflist_entry_dup(&new, re);
+	if (err)
+		return err;
+
+	TAILQ_INSERT_TAIL(&ent->refs, new, entry);
+	return NULL;
+}
+
 const struct got_error *
 got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
     struct got_reflist_head *refs, struct got_repository *repo)
@@ -1429,30 +1457,39 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 	(*map)->idset = idset;
 
 	TAILQ_FOREACH(re, refs, entry) {
-		struct got_reflist_entry *new;
-		struct got_reflist_object_id_map_entry *ent;
+		struct got_tag_object *tag = NULL;
 
 		err = got_ref_resolve(&id, repo, re->ref);
 		if (err)
 			goto done;
 
-		ent = got_object_idset_get(idset, id);
-		if (ent == NULL) {
-			ent = malloc(sizeof(*ent));
-			if (ent == NULL) {
-				err = got_error_from_errno("malloc");
-				goto done;
-			}
-			TAILQ_INIT(&ent->refs);
-			err = got_object_idset_add(idset, id, ent);
-			if (err)
-				goto done;
-		}
-
-		err = got_reflist_entry_dup(&new, re);
+		err = add_object_id_map_entry(idset, id, re);
 		if (err)
 			goto done;
-		TAILQ_INSERT_TAIL(&ent->refs, new, entry);
+
+		if (strstr(got_ref_get_name(re->ref), "/tags/") == NULL) {
+			free(id);
+			id = NULL;
+			continue;
+		}
+
+		err = got_object_open_as_tag(&tag, repo, id);
+		if (err) {
+			if (err->code != GOT_ERR_OBJ_TYPE)
+				goto done;
+			/* Ref points at something other than a tag. */
+			err = NULL;
+			tag = NULL;
+			free(id);
+			id = NULL;
+			continue;
+		}
+
+		err = add_object_id_map_entry(idset,
+		    got_object_tag_get_object_id(tag), re);
+		if (err)
+			goto done;
+
 		free(id);
 		id = NULL;
 	}
