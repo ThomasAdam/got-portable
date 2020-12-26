@@ -1462,7 +1462,7 @@ done:
 		got_reflist_object_id_map_free(*map);
 		*map = NULL;
 	}
-	return NULL;
+	return err;
 }
 
 struct got_reflist_head *
