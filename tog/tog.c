@@ -125,6 +125,32 @@ struct tog_color {
 };
 SIMPLEQ_HEAD(tog_colors, tog_color);
 
+static struct got_reflist_head tog_refs = SIMPLEQ_HEAD_INITIALIZER(tog_refs);
+static struct got_reflist_object_id_map *tog_refs_idmap;
+
+static const struct got_error *
+tog_load_refs(struct got_repository *repo)
+{
+	const struct got_error *err;
+
+	err = got_ref_list(&tog_refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		return err;
+
+	return got_reflist_object_id_map_create(&tog_refs_idmap, &tog_refs,
+	    repo);
+}
+
+static void
+tog_free_refs(void)
+{
+	if (tog_refs_idmap) {
+		got_reflist_object_map_free(tog_refs_idmap);
+		tog_refs_idmap = NULL;
+	}
+	got_ref_list_free(&tog_refs);
+}
+
 static const struct got_error *
 add_color(struct tog_colors *colors, const char *pattern,
     int idx, short color)
@@ -262,8 +288,6 @@ struct tog_diff_view_state {
 	int ignore_whitespace;
 	int force_text_diff;
 	struct got_repository *repo;
-	struct got_reflist_head refs;
-	struct got_reflist_object_id_map *idmap;
 	struct tog_colors colors;
 	size_t nlines;
 	off_t *line_offsets;
@@ -304,8 +328,6 @@ struct tog_log_view_state {
 	char *head_ref_name;
 	int log_branches;
 	struct got_repository *repo;
-	struct got_reflist_head refs;
-	struct got_reflist_object_id_map *idmap;
 	struct got_object_id *start_id;
 	sig_atomic_t quit;
 	pthread_t thread;
@@ -1578,7 +1600,7 @@ draw_commits(struct tog_view *view)
 		err = got_object_id_str(&id_str, s->selected_entry->id);
 		if (err)
 			return err;
-		refs = got_reflist_object_id_map_lookup(s->idmap,
+		refs = got_reflist_object_id_map_lookup(tog_refs_idmap,
 		    s->selected_entry->id);
 		if (refs) {
 			err = build_refs_str(&refs_str, refs,
@@ -2125,11 +2147,6 @@ close_log_view(struct tog_view *view)
 	s->start_id = NULL;
 	free(s->head_ref_name);
 	s->head_ref_name = NULL;
-	if (s->idmap) {
-		got_reflist_object_map_free(s->idmap);
-		s->idmap = NULL;
-	}
-	got_ref_list_free(&s->refs);
 	return err;
 }
 
@@ -2258,8 +2275,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	struct got_commit_graph *thread_graph = NULL;
 	int errcode;
 
-	SIMPLEQ_INIT(&s->refs);
-
 	if (in_repo_path != s->in_repo_path) {
 		free(s->in_repo_path);
 		s->in_repo_path = strdup(in_repo_path);
@@ -2270,13 +2285,6 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	/* The commit queue only contains commits being displayed. */
 	TAILQ_INIT(&s->commits.head);
 	s->commits.ncommits = 0;
-
-	err = got_ref_list(&s->refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (err)
-		goto done;
-	err = got_reflist_object_id_map_create(&s->idmap, &s->refs, repo);
-	if (err)
-		goto done;
 
 	s->repo = repo;
 	if (head_ref_name) {
@@ -2543,17 +2551,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		    got_repo_get_path(s->repo), NULL);
 		if (err)
 			return err;
-		if (s->idmap) {
-			got_reflist_object_map_free(s->idmap);
-			s->idmap = NULL;
-		}
-		got_ref_list_free(&s->refs);
-		err = got_ref_list(&s->refs, s->repo, NULL,
-		    got_ref_cmp_by_name, NULL);
-		if (err)
-			return err;
-		err = got_reflist_object_id_map_create(&s->idmap, &s->refs,
-		    s->repo);
+		tog_free_refs();
+		err = tog_load_refs(s->repo);
 		if (err)
 			return err;
 		err = got_commit_graph_open(&s->thread_args.graph,
@@ -2758,6 +2757,10 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = tog_load_refs(repo);
+	if (error)
+		goto done;
+
 	if (start_commit == NULL) {
 		error = got_repo_match_object_id(&start_id, &label,
 		    worktree ? got_worktree_get_head_ref_name(worktree) :
@@ -2804,6 +2807,7 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
+	tog_free_refs();
 	return error;
 }
 
@@ -3281,7 +3285,7 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_object_open_as_commit(&commit2, s->repo, s->id2);
 		if (err)
 			goto done;
-		refs = got_reflist_object_id_map_lookup(s->idmap, s->id2);
+		refs = got_reflist_object_id_map_lookup(tog_refs_idmap, s->id2);
 		/* Show commit info if we're diffing to a parent/root commit. */
 		if (s->id1 == NULL) {
 			err = write_commit_info(&s->line_offsets, &s->nlines,
@@ -3414,8 +3418,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	const struct got_error *err;
 	struct tog_diff_view_state *s = &view->state.diff;
 
-	SIMPLEQ_INIT(&s->refs);
-
 	if (id1 != NULL && id2 != NULL) {
 	    int type1, type2;
 	    err = got_object_get_type(&type1, repo, id1);
@@ -3507,26 +3509,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 	}
 
-	err = got_ref_list(&s->refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (err) {
-		free(s->id1);
-		s->id1 = NULL;
-		free(s->id2);
-		s->id2 = NULL;
-		free_colors(&s->colors);
-		return err;
-	}
-	err = got_reflist_object_id_map_create(&s->idmap, &s->refs, repo);
-	if (err) {
-		free(s->id1);
-		s->id1 = NULL;
-		free(s->id2);
-		s->id2 = NULL;
-		free_colors(&s->colors);
-		got_ref_list_free(&s->refs);
-		return err;
-	}
-
 	if (log_view && view_is_splitscreen(view))
 		show_log_view(log_view); /* draw vborder */
 	diff_view_indicate_progress(view);
@@ -3540,9 +3522,6 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		free(s->id2);
 		s->id2 = NULL;
 		free_colors(&s->colors);
-		got_ref_list_free(&s->refs);
-		got_reflist_object_map_free(s->idmap);
-		s->idmap = NULL;
 		return err;
 	}
 
@@ -3571,11 +3550,6 @@ close_diff_view(struct tog_view *view)
 	free(s->line_offsets);
 	s->line_offsets = NULL;
 	s->nlines = 0;
-	if (s->idmap) {
-		got_reflist_object_map_free(s->idmap);
-		s->idmap = NULL;
-	}
-	got_ref_list_free(&s->refs);
 	return err;
 }
 
@@ -3855,6 +3829,10 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = tog_load_refs(repo);
+	if (error)
+		goto done;
+
 	error = got_repo_match_object_id(&id1, &label1, id_str1,
 	    GOT_OBJ_TYPE_ANY, 1, repo);
 	if (error)
@@ -3884,6 +3862,7 @@ done:
 		got_repo_close(repo);
 	if (worktree)
 		got_worktree_close(worktree);
+	tog_free_refs();
 	return error;
 }
 
@@ -4748,6 +4727,10 @@ cmd_blame(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = tog_load_refs(repo);
+	if (error)
+		goto done;
+
 	if (commit_id_str == NULL) {
 		struct got_reference *head_ref;
 		error = got_ref_open(&head_ref, repo, worktree ?
@@ -4794,6 +4777,7 @@ done:
 		got_worktree_close(worktree);
 	if (repo)
 		got_repo_close(repo);
+	tog_free_refs();
 	return error;
 }
 
@@ -5558,6 +5542,10 @@ cmd_tree(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = tog_load_refs(repo);
+	if (error)
+		goto done;
+
 	if (commit_id_arg == NULL) {
 		error = got_repo_match_object_id(&commit_id, &label,
 		    worktree ? got_worktree_get_head_ref_name(worktree) :
@@ -5620,6 +5608,7 @@ done:
 		got_object_tree_close(tree);
 	if (repo)
 		got_repo_close(repo);
+	tog_free_refs();
 	return error;
 }
 
@@ -6272,6 +6261,10 @@ cmd_ref(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = tog_load_refs(repo);
+	if (error)
+		goto done;
+
 	view = view_open(0, 0, 0, 0, TOG_VIEW_REF);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
@@ -6293,6 +6286,7 @@ done:
 	free(cwd);
 	if (repo)
 		got_repo_close(repo);
+	tog_free_refs();
 	return error;
 }
 
