@@ -434,7 +434,6 @@ struct tog_reflist_entry {
 TAILQ_HEAD(tog_reflist_head, tog_reflist_entry);
 
 struct tog_ref_view_state {
-	struct got_reflist_head simplerefs; /* SIMPLEQ */
 	struct tog_reflist_head refs;	/* TAILQ */
 	struct tog_reflist_entry *first_displayed_entry;
 	struct tog_reflist_entry *last_displayed_entry;
@@ -5615,17 +5614,11 @@ done:
 static const struct got_error *
 ref_view_load_refs(struct tog_ref_view_state *s)
 {
-	const struct got_error *err;
 	struct got_reflist_entry *sre;
 	struct tog_reflist_entry *re;
 
-	err = got_ref_list(&s->simplerefs, s->repo, NULL,
-	    got_ref_cmp_by_name, NULL);
-	if (err)
-		return err;
-
 	s->nrefs = 0;
-	SIMPLEQ_FOREACH(sre, &s->simplerefs, entry) {
+	SIMPLEQ_FOREACH(sre, &tog_refs, entry) {
 		if (strncmp(got_ref_get_name(sre->ref), "refs/got/", 9) == 0)
 			continue;
 
@@ -5633,11 +5626,14 @@ ref_view_load_refs(struct tog_ref_view_state *s)
 		if (re == NULL)
 			return got_error_from_errno("malloc");
 
-		re->ref = sre->ref;
+		re->ref = got_ref_dup(sre->ref);
+		if (re->ref == NULL)
+			return got_error_from_errno("got_ref_dup");
 		re->idx = s->nrefs++;
 		TAILQ_INSERT_TAIL(&s->refs, re, entry);
 	}
 
+	s->first_displayed_entry = TAILQ_FIRST(&s->refs);
 	return NULL;
 }
 
@@ -5649,9 +5645,9 @@ ref_view_free_refs(struct tog_ref_view_state *s)
 	while (!TAILQ_EMPTY(&s->refs)) {
 		re = TAILQ_FIRST(&s->refs);
 		TAILQ_REMOVE(&s->refs, re, entry);
+		got_ref_close(re->ref);
 		free(re);
 	}
-	got_ref_list_free(&s->simplerefs);
 }
 
 static const struct got_error *
@@ -5663,15 +5659,12 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 	s->selected_entry = 0;
 	s->repo = repo;
 
-	SIMPLEQ_INIT(&s->simplerefs);
 	TAILQ_INIT(&s->refs);
 	SIMPLEQ_INIT(&s->colors);
 
 	err = ref_view_load_refs(s);
 	if (err)
 		return err;
-
-	s->first_displayed_entry = TAILQ_FIRST(&s->refs);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "^refs/heads/",
@@ -6180,6 +6173,10 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		ref_scroll_down(s, view->nlines - 1);
 		break;
 	case CTRL('l'):
+		tog_free_refs();
+		err = tog_load_refs(s->repo);
+		if (err)
+			break;
 		ref_view_free_refs(s);
 		err = ref_view_load_refs(s);
 		break;
