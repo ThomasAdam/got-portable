@@ -1487,6 +1487,7 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 
 		err = add_object_id_map_entry(idset,
 		    got_object_tag_get_object_id(tag), re);
+		got_object_tag_close(tag);
 		if (err)
 			goto done;
 
