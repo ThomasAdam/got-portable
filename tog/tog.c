@@ -2756,9 +2756,12 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = tog_load_refs(repo);
-	if (error)
-		goto done;
+	/* already loaded by tog_log_with_path()? */
+	if (SIMPLEQ_EMPTY(&tog_refs)) {
+		error = tog_load_refs(repo);
+		if (error)
+			goto done;
+	}
 
 	if (start_commit == NULL) {
 		error = got_repo_match_object_id(&start_id, &label,
@@ -6353,9 +6356,6 @@ tog_log_with_path(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL, *id = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *commit_id_str = NULL, **cmd_argv = NULL;
-	struct got_reflist_head refs;
-
-	SIMPLEQ_INIT(&refs);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
@@ -6383,12 +6383,12 @@ tog_log_with_path(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	error = tog_load_refs(repo);
 	if (error)
 		goto done;
 	error = got_repo_match_object_id(&commit_id, NULL, worktree ?
 	    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
-	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
+	    GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 	if (error)
 		goto done;
 
@@ -6435,7 +6435,7 @@ done:
 			free(cmd_argv[i]);
 		free(cmd_argv);
 	}
-	got_ref_list_free(&refs);
+	tog_free_refs();
 	return error;
 }
 
