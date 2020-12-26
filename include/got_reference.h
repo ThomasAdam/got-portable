@@ -77,10 +77,10 @@ char *got_ref_to_str(struct got_reference *);
 
 /* List of references. */
 struct got_reflist_entry {
-	SIMPLEQ_ENTRY(got_reflist_entry) entry;
+	TAILQ_ENTRY(got_reflist_entry) entry;
 	struct got_reference *ref;
 };
-SIMPLEQ_HEAD(got_reflist_head, got_reflist_entry);
+TAILQ_HEAD(got_reflist_head, got_reflist_entry);
 
 /* Duplicate a reference list entry. Caller must dispose of it with free(3). */
 const struct got_error *got_reflist_entry_dup(struct got_reflist_entry **,

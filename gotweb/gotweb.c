@@ -2780,7 +2780,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	time_t committer_time = 0, cmp_time = 0;
 
 	*repo_age = NULL;
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	if (gw_trans->gw_conf->got_show_repo_age == 0)
 		return NULL;
@@ -2802,7 +2802,7 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	 * Find the youngest branch tip in the repository, or the age of
 	 * the a specific branch tip if a name was provided by the caller.
 	 */
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	TAILQ_FOREACH(re, &refs, entry) {
 		struct got_object_id *id = NULL;
 
 		if (refname && strcmp(got_ref_get_name(re->ref), refname) != 0)
@@ -3015,14 +3015,14 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 	int summary_header_displayed = 0, start_tag = 0, chk_next = 0;
 	int prev_set = 0, tag_count = 0;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	error = got_ref_list(&refs, gw_trans->repo, "refs/tags",
 	    got_ref_cmp_tags, gw_trans->repo);
 	if (error)
 		goto done;
 
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname;
 		const char *tagger;
 		const char *tag_commit;
@@ -3420,7 +3420,7 @@ gw_init_header()
 		return NULL;
 
 	header->path = NULL;
-	SIMPLEQ_INIT(&header->refs);
+	TAILQ_INIT(&header->refs);
 
 	header->refs_str = NULL;
 	header->commit_id = NULL;
@@ -3546,7 +3546,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 	char *commit_msg = NULL, *commit_msg0;
 
 	/*print commit*/
-	SIMPLEQ_FOREACH(re, &header->refs, entry) {
+	TAILQ_FOREACH(re, &header->refs, entry) {
 		char *s;
 		const char *name;
 		struct got_tag_object *tag = NULL;
@@ -4402,7 +4402,7 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 	char *href_commits = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	error = got_ref_list(&refs, gw_trans->repo, "refs/heads",
 	    got_ref_cmp_by_name, NULL);
@@ -4428,7 +4428,7 @@ gw_output_repo_heads(struct gw_trans *gw_trans)
 	if (kerr != KCGI_OK)
 		goto done;
 
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname;
 
 		if (got_ref_is_symbolic(re->ref))

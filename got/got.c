@@ -1881,7 +1881,7 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 	char *remote_namespace = NULL;
 	char *local_refname = NULL;
 
-	SIMPLEQ_INIT(&my_refs);
+	TAILQ_INIT(&my_refs);
 
 	if (asprintf(&remote_namespace, "refs/remotes/%s/", remote->name)
 	    == -1)
@@ -1891,7 +1891,7 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 	if (err)
 		goto done;
 
-	SIMPLEQ_FOREACH(re, &my_refs, entry) {
+	TAILQ_FOREACH(re, &my_refs, entry) {
 		const char *refname = got_ref_get_name(re->ref);
 
 		if (!remote->mirror_references) {
@@ -2744,7 +2744,7 @@ cmd_checkout(int argc, char *argv[])
 	if (commit_id_str) {
 		struct got_object_id *commit_id;
 		struct got_reflist_head refs;
-		SIMPLEQ_INIT(&refs);
+		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
@@ -3058,7 +3058,7 @@ cmd_update(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
-		SIMPLEQ_INIT(&refs);
+		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
@@ -3416,7 +3416,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	char *refs_str = NULL;
 	struct got_reflist_entry *re;
 
-	SIMPLEQ_FOREACH(re, refs, entry) {
+	TAILQ_FOREACH(re, refs, entry) {
 		char *s;
 		const char *name;
 		struct got_tag_object *tag = NULL;
@@ -3716,7 +3716,7 @@ cmd_log(int argc, char *argv[])
 	const char *errstr;
 	struct got_reflist_head refs;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -4130,7 +4130,7 @@ cmd_diff(int argc, char *argv[])
 	char *path = NULL;
 	struct got_reflist_head refs;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -4582,7 +4582,7 @@ cmd_blame(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
-		SIMPLEQ_INIT(&refs);
+		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
@@ -4925,7 +4925,7 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	} else {
 		struct got_reflist_head refs;
-		SIMPLEQ_INIT(&refs);
+		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
@@ -5090,12 +5090,12 @@ list_refs(struct got_repository *repo, const char *refname)
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 	err = got_ref_list(&refs, repo, refname, got_ref_cmp_by_name, NULL);
 	if (err)
 		return err;
 
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	TAILQ_FOREACH(re, &refs, entry) {
 		char *refstr;
 		refstr = got_ref_to_str(re->ref);
 		if (refstr == NULL)
@@ -5421,7 +5421,7 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 	struct got_reference *temp_ref = NULL;
 	int rebase_in_progress, histedit_in_progress;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	if (worktree) {
 		err = got_worktree_rebase_in_progress(&rebase_in_progress,
@@ -5449,7 +5449,7 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 	if (err)
 		return err;
 
-	SIMPLEQ_FOREACH(re, &refs, entry)
+	TAILQ_FOREACH(re, &refs, entry)
 		list_branch(repo, worktree, re->ref);
 
 	got_ref_list_free(&refs);
@@ -5646,7 +5646,7 @@ cmd_branch(int argc, char *argv[])
 		error = delete_branch(repo, worktree, delref);
 	else {
 		struct got_reflist_head refs;
-		SIMPLEQ_INIT(&refs);
+		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
@@ -5793,13 +5793,13 @@ list_tags(struct got_repository *repo, struct got_worktree *worktree)
 	struct got_reflist_head refs;
 	struct got_reflist_entry *re;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	err = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_tags, repo);
 	if (err)
 		return err;
 
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	TAILQ_FOREACH(re, &refs, entry) {
 		const char *refname;
 		char *refstr, *tagmsg0, *tagmsg, *line, *id_str, *datestr;
 		char datebuf[26];
@@ -5976,7 +5976,7 @@ add_tag(struct got_repository *repo, struct got_worktree *worktree,
 	int preserve_tagmsg = 0;
 	struct got_reflist_head refs;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	/*
 	 * Don't let the user create a tag name with a leading '-'.
@@ -9624,7 +9624,7 @@ cmd_cat(int argc, char *argv[])
 	int ch, obj_type, i, force_path = 0;
 	struct got_reflist_head refs;
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",

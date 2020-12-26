@@ -746,7 +746,7 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
     got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
-	struct got_reflist_entry *new, *re, *prev = NULL;
+	struct got_reflist_entry *new, *re;
 	int cmp;
 
 	*newp = NULL;
@@ -762,8 +762,13 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 	 * contain redundant entries. On-disk refs take precedence.
 	 * This code assumes that on-disk revs are read before packed-refs.
 	 * We're iterating the list anyway, so insert elements sorted by name.
+	 *
+	 * Many callers will provide paths in a somewhat sorted order.
+	 * Iterating backwards from the tail of the list should be more
+	 * efficient than traversing through the entire list each time
+	 * an element is inserted.
 	 */
-	re = SIMPLEQ_FIRST(refs);
+	re = TAILQ_LAST(refs, got_reflist_head);
 	while (re) {
 		err = (*cmp_cb)(cmp_arg, &cmp, re->ref, new->ref);
 		if (err)
@@ -773,19 +778,14 @@ insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
 			free(new);
 			*newp = NULL;
 			return NULL;
-		} else if (cmp > 0) {
-			if (prev)
-				SIMPLEQ_INSERT_AFTER(refs, prev, new, entry);
-			else
-				SIMPLEQ_INSERT_HEAD(refs, new, entry);
+		} else if (cmp < 0) {
+			TAILQ_INSERT_AFTER(refs, re, new, entry);
 			return NULL;
-		} else {
-			prev = re;
-			re = SIMPLEQ_NEXT(re, entry);
 		}
+		re = TAILQ_PREV(re, got_reflist_head, entry);
 	}
 
-	SIMPLEQ_INSERT_TAIL(refs, new, entry);
+	TAILQ_INSERT_HEAD(refs, new, entry);
 	return NULL;
 }
 
@@ -1012,10 +1012,8 @@ got_ref_list_free(struct got_reflist_head *refs)
 {
 	struct got_reflist_entry *re;
 
-	while (!SIMPLEQ_EMPTY(refs)) {
-		re = SIMPLEQ_FIRST(refs);
-		SIMPLEQ_REMOVE_HEAD(refs, entry);
-		got_ref_close(re->ref);
+	while ((re = TAILQ_FIRST(refs))) {
+		TAILQ_REMOVE(refs, re, entry);
 		free(re);
 	}
 
@@ -1184,7 +1182,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	if (delref->flags & GOT_REF_IS_SYMBOLIC)
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
-	SIMPLEQ_INIT(&refs);
+	TAILQ_INIT(&refs);
 
 	packed_refs_path = got_repo_get_path_packed_refs(repo);
 	if (packed_refs_path == NULL)
@@ -1253,7 +1251,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			goto done;
 		}
 
-		SIMPLEQ_FOREACH(re, &refs, entry) {
+		TAILQ_FOREACH(re, &refs, entry) {
 			uint8_t hex[SHA1_DIGEST_STRING_LENGTH];
 
 			if (got_sha1_digest_to_str(re->ref->ref.ref.sha1, hex,
@@ -1430,7 +1428,7 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 	}
 	(*map)->idset = idset;
 
-	SIMPLEQ_FOREACH(re, refs, entry) {
+	TAILQ_FOREACH(re, refs, entry) {
 		struct got_reflist_entry *new;
 		struct got_reflist_object_id_map_entry *ent;
 
@@ -1445,7 +1443,7 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 				err = got_error_from_errno("malloc");
 				goto done;
 			}
-			SIMPLEQ_INIT(&ent->refs);
+			TAILQ_INIT(&ent->refs);
 			err = got_object_idset_add(idset, id, ent);
 			if (err)
 				goto done;
@@ -1454,7 +1452,7 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 		err = got_reflist_entry_dup(&new, re);
 		if (err)
 			goto done;
-		SIMPLEQ_INSERT_TAIL(&ent->refs, new, entry);
+		TAILQ_INSERT_TAIL(&ent->refs, new, entry);
 		free(id);
 		id = NULL;
 	}

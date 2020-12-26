@@ -1538,7 +1538,7 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 
 	*tag = NULL;
 
-	SIMPLEQ_FOREACH(re, refs, entry) {
+	TAILQ_FOREACH(re, refs, entry) {
 		const char *refname;
 		refname = got_ref_get_name(re->ref);
 		if (got_ref_is_symbolic(re->ref))

@@ -125,7 +125,7 @@ struct tog_color {
 };
 SIMPLEQ_HEAD(tog_colors, tog_color);
 
-static struct got_reflist_head tog_refs = SIMPLEQ_HEAD_INITIALIZER(tog_refs);
+static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
 
 static const struct got_error *
@@ -1248,7 +1248,7 @@ build_refs_str(char **refs_str, struct got_reflist_head *refs,
 
 	*refs_str = NULL;
 
-	SIMPLEQ_FOREACH(re, refs, entry) {
+	TAILQ_FOREACH(re, refs, entry) {
 		struct got_tag_object *tag = NULL;
 		struct got_object_id *ref_id;
 		int cmp;
@@ -2757,7 +2757,7 @@ cmd_log(int argc, char *argv[])
 		goto done;
 
 	/* already loaded by tog_log_with_path()? */
-	if (SIMPLEQ_EMPTY(&tog_refs)) {
+	if (TAILQ_EMPTY(&tog_refs)) {
 		error = tog_load_refs(repo);
 		if (error)
 			goto done;
@@ -5621,7 +5621,7 @@ ref_view_load_refs(struct tog_ref_view_state *s)
 	struct tog_reflist_entry *re;
 
 	s->nrefs = 0;
-	SIMPLEQ_FOREACH(sre, &tog_refs, entry) {
+	TAILQ_FOREACH(sre, &tog_refs, entry) {
 		if (strncmp(got_ref_get_name(sre->ref), "refs/got/", 9) == 0)
 			continue;
 

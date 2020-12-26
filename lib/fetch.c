@@ -408,7 +408,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		tmpfds[i] = -1;
 
 	TAILQ_INIT(&have_refs);
-	SIMPLEQ_INIT(&my_refs);
+	TAILQ_INIT(&my_refs);
 
 	if (!mirror_references) {
 		if (asprintf(&ref_prefix, "refs/remotes/%s/",
@@ -424,7 +424,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			goto done;
 	}
 
-	SIMPLEQ_FOREACH(re, &my_refs, entry) {
+	TAILQ_FOREACH(re, &my_refs, entry) {
 		struct got_object_id *id;
 		const char *refname;
 
