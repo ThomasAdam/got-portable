@@ -1467,7 +1467,7 @@ done:
 
 const struct got_error *
 got_repo_match_object_id(struct got_object_id **id, char **label,
-    const char *id_str, int obj_type, int resolve_tags,
+    const char *id_str, int obj_type, struct got_reflist_head *refs,
     struct got_repository *repo)
 {
 	const struct got_error *err;
@@ -1478,9 +1478,9 @@ got_repo_match_object_id(struct got_object_id **id, char **label,
 	if (label)
 		*label = NULL;
 
-	if (resolve_tags) {
+	if (refs) {
 		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
-		    repo);
+		    refs, repo);
 		if (err == NULL) {
 			*id = got_object_id_dup(
 			    got_object_tag_get_object_id(tag));
@@ -1529,25 +1529,21 @@ done:
 
 const struct got_error *
 got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
-    int obj_type, struct got_repository *repo)
+    int obj_type, struct got_reflist_head *refs, struct got_repository *repo)
 {
-	const struct got_error *err;
-	struct got_reflist_head refs;
+	const struct got_error *err = NULL;
 	struct got_reflist_entry *re;
 	struct got_object_id *tag_id;
 	int name_is_absolute = (strncmp(name, "refs/", 5) == 0);
 
-	SIMPLEQ_INIT(&refs);
 	*tag = NULL;
 
-	err = got_ref_list(&refs, repo, "refs/tags", got_ref_cmp_by_name, NULL);
-	if (err)
-		return err;
-
-	SIMPLEQ_FOREACH(re, &refs, entry) {
+	SIMPLEQ_FOREACH(re, refs, entry) {
 		const char *refname;
 		refname = got_ref_get_name(re->ref);
 		if (got_ref_is_symbolic(re->ref))
+			continue;
+		if (strncmp(refname, "refs/tags/", 10) != 0)
 			continue;
 		if (!name_is_absolute)
 			refname += strlen("refs/tags/");
@@ -1567,7 +1563,6 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 		*tag = NULL;
 	}
 
-	got_ref_list_free(&refs);
 	if (err == NULL && *tag == NULL)
 		err = got_error_path(name, GOT_ERR_NO_OBJ);
 	return err;

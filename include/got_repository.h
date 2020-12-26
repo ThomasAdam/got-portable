@@ -94,6 +94,7 @@ char *got_repo_get_path_gitconfig(struct got_repository *);
 char *got_repo_get_path_gotconfig(struct got_repository *);
 
 struct got_reference;
+struct got_reflist_head;
 
 /*
  * Obtain a reference, by name, from a repository.
@@ -119,22 +120,25 @@ const struct got_error *got_repo_match_object_id_prefix(struct got_object_id **,
 
 /*
  * Given an object ID string or reference name, attempt to find a corresponding
- * commit object. Tags can optionally be ignored during matching.
+ * commit object.
  * The object type may be restricted to commit, tree, blob, or tag.
+ * Tags will only be matched if a list of references is provided.
  * GOT_OBJ_TYPE_ANY will match any type of object.
  * A human-readable label can optionally be returned, which the caller should
  * dispose of with free(3).
  * Return GOT_ERR_NO_OBJ if no matching commit can be found.
  */
 const struct got_error *got_repo_match_object_id(struct got_object_id **,
-    char **, const char *, int, int, struct got_repository *);
+    char **, const char *, int, struct got_reflist_head *,
+    struct got_repository *);
 
 /*
- * Attempt to find a tag object with a given name and target object type.
+ * Search the provided list of references for a tag with a given name
+ * and target object type.
  * Return GOT_ERR_NO_OBJ if no matching tag can be found.
  */
 const struct got_error *got_repo_object_match_tag(struct got_tag_object **,
-    const char *, int, struct got_repository *);
+    const char *, int, struct got_reflist_head *, struct got_repository *);
 
 /* A callback function which is invoked when a path is imported. */
 typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);

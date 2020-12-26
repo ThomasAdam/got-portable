@@ -175,9 +175,12 @@ static const struct got_error	*gw_get_repo_owner(char **, struct gw_trans *,
 static const struct got_error	*gw_get_time_str(char **, time_t, int);
 static const struct got_error	*gw_get_repo_age(char **, struct gw_trans *,
 				    char *, const char *, int);
-static const struct got_error	*gw_output_file_blame(struct gw_trans *);
-static const struct got_error	*gw_output_blob_buf(struct gw_trans *);
-static const struct got_error	*gw_output_repo_tree(struct gw_trans *);
+static const struct got_error	*gw_output_file_blame(struct gw_trans *,
+				    struct gw_header *);
+static const struct got_error	*gw_output_blob_buf(struct gw_trans *,
+				    struct gw_header *);
+static const struct got_error	*gw_output_repo_tree(struct gw_trans *,
+				    struct gw_header *);
 static const struct got_error	*gw_output_diff(struct gw_trans *,
 				    struct gw_header *);
 static const struct got_error	*gw_output_repo_tags(struct gw_trans *,
@@ -399,7 +402,7 @@ gw_blame(struct gw_trans *gw_trans)
 	    "blame", KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
-	error = gw_output_file_blame(gw_trans);
+	error = gw_output_file_blame(gw_trans, header);
 	if (error)
 		goto done;
 	kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
@@ -443,7 +446,7 @@ gw_blob(struct gw_trans *gw_trans)
 	if (error)
 		goto done;
 
-	error = gw_output_blob_buf(gw_trans);
+	error = gw_output_blob_buf(gw_trans, header);
 done:
 
 	if (error) {
@@ -1653,7 +1656,7 @@ gw_tree(struct gw_trans *gw_trans)
 	    "tree", KATTR__MAX);
 	if (kerr != KCGI_OK)
 		goto done;
-	error = gw_output_repo_tree(gw_trans);
+	error = gw_output_repo_tree(gw_trans, header);
 	if (error)
 		goto done;
 
@@ -2854,13 +2857,15 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (header->parent_id != NULL &&
 	    strncmp(header->parent_id, "/dev/null", 9) != 0) {
 		error = got_repo_match_object_id(&id1, &label1,
-			header->parent_id, GOT_OBJ_TYPE_ANY, 1, gw_trans->repo);
+			header->parent_id, GOT_OBJ_TYPE_ANY,
+			&header->refs, gw_trans->repo);
 		if (error)
 			goto done;
 	}
 
 	error = got_repo_match_object_id(&id2, &label2,
-	    header->commit_id, GOT_OBJ_TYPE_ANY, 1, gw_trans->repo);
+	    header->commit_id, GOT_OBJ_TYPE_ANY, &header->refs,
+	    gw_trans->repo);
 	if (error)
 		goto done;
 
@@ -3951,7 +3956,7 @@ done:
 }
 
 static const struct got_error *
-gw_output_file_blame(struct gw_trans *gw_trans)
+gw_output_file_blame(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *obj_id = NULL;
@@ -3975,7 +3980,7 @@ gw_output_file_blame(struct gw_trans *gw_trans)
 		goto done;
 
 	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit_id,
-	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
+	    GOT_OBJ_TYPE_COMMIT, &header->refs, gw_trans->repo);
 	if (error)
 		goto done;
 
@@ -4056,7 +4061,7 @@ done:
 }
 
 static const struct got_error *
-gw_output_blob_buf(struct gw_trans *gw_trans)
+gw_output_blob_buf(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *obj_id = NULL;
@@ -4081,7 +4086,7 @@ gw_output_blob_buf(struct gw_trans *gw_trans)
 		goto done;
 
 	error = got_repo_match_object_id(&commit_id, NULL, gw_trans->commit_id,
-	    GOT_OBJ_TYPE_COMMIT, 1, gw_trans->repo);
+	    GOT_OBJ_TYPE_COMMIT, &header->refs, gw_trans->repo);
 	if (error)
 		goto done;
 
@@ -4148,7 +4153,7 @@ done:
 }
 
 static const struct got_error *
-gw_output_repo_tree(struct gw_trans *gw_trans)
+gw_output_repo_tree(struct gw_trans *gw_trans, struct gw_header *header)
 {
 	const struct got_error *error = NULL;
 	struct got_object_id *tree_id = NULL, *commit_id = NULL;
@@ -4198,7 +4203,7 @@ gw_output_repo_tree(struct gw_trans *gw_trans)
 
 	} else {
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    gw_trans->commit_id, GOT_OBJ_TYPE_COMMIT, 1,
+		    gw_trans->commit_id, GOT_OBJ_TYPE_COMMIT, &header->refs,
 		    gw_trans->repo);
 		if (error)
 			goto done;

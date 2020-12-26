@@ -2743,8 +2743,15 @@ cmd_checkout(int argc, char *argv[])
 
 	if (commit_id_str) {
 		struct got_object_id *commit_id;
+		struct got_reflist_head refs;
+		SIMPLEQ_INIT(&refs);
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		got_ref_list_free(&refs);
 		if (error)
 			goto done;
 		error = check_linear_ancestry(commit_id,
@@ -3050,8 +3057,15 @@ cmd_update(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
+		struct got_reflist_head refs;
+		SIMPLEQ_INIT(&refs);
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		got_ref_list_free(&refs);
 		free(commit_id_str);
 		commit_id_str = NULL;
 		if (error)
@@ -3815,6 +3829,10 @@ cmd_log(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
 	if (start_commit == NULL) {
 		struct got_reference *head_ref;
 		struct got_commit_object *commit = NULL;
@@ -3834,13 +3852,13 @@ cmd_log(int argc, char *argv[])
 		got_object_commit_close(commit);
 	} else {
 		error = got_repo_match_object_id(&start_id, NULL,
-		    start_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    start_commit, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		if (error != NULL)
 			goto done;
 	}
 	if (end_commit != NULL) {
 		error = got_repo_match_object_id(&end_id, NULL,
-		    end_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    end_commit, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 		if (error != NULL)
 			goto done;
 	}
@@ -3869,10 +3887,6 @@ cmd_log(int argc, char *argv[])
 		free(path);
 		path = in_repo_path;
 	}
-
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		goto done;
 
 	error = print_commits(start_id, end_id, repo, path ? path : "",
 	    show_changed_paths, show_patch, search_pattern, diff_context,
@@ -4114,6 +4128,9 @@ cmd_diff(int argc, char *argv[])
 	int force_text_diff = 0;
 	const char *errstr;
 	char *path = NULL;
+	struct got_reflist_head refs;
+
+	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -4256,13 +4273,17 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		return error;
+
 	error = got_repo_match_object_id(&id1, &label1, id_str1,
-	    GOT_OBJ_TYPE_ANY, 1, repo);
+	    GOT_OBJ_TYPE_ANY, &refs, repo);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&id2, &label2, id_str2,
-	    GOT_OBJ_TYPE_ANY, 1, repo);
+	    GOT_OBJ_TYPE_ANY, &refs, repo);
 	if (error)
 		goto done;
 
@@ -4313,6 +4334,7 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	got_ref_list_free(&refs);
 	return error;
 }
 
@@ -4559,8 +4581,15 @@ cmd_blame(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
+		struct got_reflist_head refs;
+		SIMPLEQ_INIT(&refs);
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		got_ref_list_free(&refs);
 		if (error)
 			goto done;
 	}
@@ -4895,8 +4924,15 @@ cmd_tree(int argc, char *argv[])
 		if (error != NULL)
 			goto done;
 	} else {
+		struct got_reflist_head refs;
+		SIMPLEQ_INIT(&refs);
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		got_ref_list_free(&refs);
 		if (error)
 			goto done;
 	}
@@ -5609,12 +5645,19 @@ cmd_branch(int argc, char *argv[])
 	else if (delref)
 		error = delete_branch(repo, worktree, delref);
 	else {
+		struct got_reflist_head refs;
+		SIMPLEQ_INIT(&refs);
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
 		if (commit_id_arg == NULL)
 			commit_id_arg = worktree ?
 			    got_worktree_get_head_ref_name(worktree) :
 			    GOT_REF_HEAD;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, &refs, repo);
+		got_ref_list_free(&refs);
 		if (error)
 			goto done;
 		error = add_branch(repo, argv[0], commit_id);
@@ -5931,6 +5974,9 @@ add_tag(struct got_repository *repo, struct got_worktree *worktree,
 	char *refname = NULL, *tagmsg = NULL, *tagger = NULL;
 	char *tagmsg_path = NULL, *tag_id_str = NULL;
 	int preserve_tagmsg = 0;
+	struct got_reflist_head refs;
+
+	SIMPLEQ_INIT(&refs);
 
 	/*
 	 * Don't let the user create a tag name with a leading '-'.
@@ -5944,8 +5990,12 @@ add_tag(struct got_repository *repo, struct got_worktree *worktree,
 	if (err)
 		return err;
 
+	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+
 	err = got_repo_match_object_id(&commit_id, &label, commit_arg,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (err)
 		goto done;
 
@@ -6027,6 +6077,7 @@ done:
 	free(tagmsg);
 	free(tagmsg_path);
 	free(tagger);
+	got_ref_list_free(&refs);
 	return err;
 }
 
@@ -9571,6 +9622,9 @@ cmd_cat(int argc, char *argv[])
 	const char *commit_id_str = NULL;
 	struct got_object_id *id = NULL, *commit_id = NULL;
 	int ch, obj_type, i, force_path = 0;
+	struct got_reflist_head refs;
+
+	SIMPLEQ_INIT(&refs);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -9636,10 +9690,14 @@ cmd_cat(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
+
 	if (commit_id_str == NULL)
 		commit_id_str = GOT_REF_HEAD;
 	error = got_repo_match_object_id(&commit_id, NULL,
-	    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+	    commit_id_str, GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (error)
 		goto done;
 
@@ -9651,7 +9709,8 @@ cmd_cat(int argc, char *argv[])
 				break;
 		} else {
 			error = got_repo_match_object_id(&id, &label, argv[i],
-			    GOT_OBJ_TYPE_ANY, 0, repo);
+			    GOT_OBJ_TYPE_ANY, NULL /* do not resolve tags */,
+			    repo);
 			if (error) {
 				if (error->code != GOT_ERR_BAD_OBJ_ID_STR &&
 				    error->code != GOT_ERR_NOT_REF)
@@ -9703,6 +9762,7 @@ done:
 		if (error == NULL)
 			error = repo_error;
 	}
+	got_ref_list_free(&refs);
 	return error;
 }
 

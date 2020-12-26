@@ -2537,7 +2537,7 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			struct got_object_id *start_id;
 			err = got_repo_match_object_id(&start_id, NULL,
 			    s->head_ref_name ? s->head_ref_name : GOT_REF_HEAD,
-			    GOT_OBJ_TYPE_COMMIT, 1, s->repo);
+			    GOT_OBJ_TYPE_COMMIT, &tog_refs, s->repo);
 			if (err)
 				return err;
 			free(s->start_id);
@@ -2763,7 +2763,7 @@ cmd_log(int argc, char *argv[])
 	if (start_commit == NULL) {
 		error = got_repo_match_object_id(&start_id, &label,
 		    worktree ? got_worktree_get_head_ref_name(worktree) :
-		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 		if (error)
 			goto done;
 		head_ref_name = label;
@@ -2774,7 +2774,7 @@ cmd_log(int argc, char *argv[])
 		else if (error->code != GOT_ERR_NOT_REF)
 			goto done;
 		error = got_repo_match_object_id(&start_id, NULL,
-		    start_commit, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    start_commit, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 		if (error)
 			goto done;
 	}
@@ -3833,12 +3833,12 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 
 	error = got_repo_match_object_id(&id1, &label1, id_str1,
-	    GOT_OBJ_TYPE_ANY, 1, repo);
+	    GOT_OBJ_TYPE_ANY, &tog_refs, repo);
 	if (error)
 		goto done;
 
 	error = got_repo_match_object_id(&id2, &label2, id_str2,
-	    GOT_OBJ_TYPE_ANY, 1, repo);
+	    GOT_OBJ_TYPE_ANY, &tog_refs, repo);
 	if (error)
 		goto done;
 
@@ -4740,7 +4740,7 @@ cmd_blame(int argc, char *argv[])
 		got_ref_close(head_ref);
 	} else {
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_str, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_str, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 	}
 	if (error != NULL)
 		goto done;
@@ -5548,7 +5548,7 @@ cmd_tree(int argc, char *argv[])
 	if (commit_id_arg == NULL) {
 		error = got_repo_match_object_id(&commit_id, &label,
 		    worktree ? got_worktree_get_head_ref_name(worktree) :
-		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    GOT_REF_HEAD, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 		if (error)
 			goto done;
 		head_ref_name = label;
@@ -5559,7 +5559,7 @@ cmd_tree(int argc, char *argv[])
 		else if (error->code != GOT_ERR_NOT_REF)
 			goto done;
 		error = got_repo_match_object_id(&commit_id, NULL,
-		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, 1, repo);
+		    commit_id_arg, GOT_OBJ_TYPE_COMMIT, &tog_refs, repo);
 		if (error)
 			goto done;
 	}
@@ -6353,6 +6353,9 @@ tog_log_with_path(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL, *id = NULL;
 	char *cwd = NULL, *repo_path = NULL, *in_repo_path = NULL;
 	char *commit_id_str = NULL, **cmd_argv = NULL;
+	struct got_reflist_head refs;
+
+	SIMPLEQ_INIT(&refs);
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL)
@@ -6380,9 +6383,12 @@ tog_log_with_path(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (error)
+		goto done;
 	error = got_repo_match_object_id(&commit_id, NULL, worktree ?
 	    got_worktree_get_head_ref_name(worktree) : GOT_REF_HEAD,
-	    GOT_OBJ_TYPE_COMMIT, 1, repo);
+	    GOT_OBJ_TYPE_COMMIT, &refs, repo);
 	if (error)
 		goto done;
 
@@ -6429,6 +6435,7 @@ done:
 			free(cmd_argv[i]);
 		free(cmd_argv);
 	}
+	got_ref_list_free(&refs);
 	return error;
 }
 
