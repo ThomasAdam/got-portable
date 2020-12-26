@@ -146,7 +146,7 @@ struct got_reflist_object_id_map;
 /*
  * Create and populate an object ID map for a given list of references.
  * Map entries will contain deep-copies of elements of the reflist.
- * The caller must dispose of the map with got_reflist_object_map_free().
+ * The caller must dispose of the map with got_reflist_object_id_map_free().
  */
 const struct got_error *got_reflist_object_id_map_create(
     struct got_reflist_object_id_map **, struct got_reflist_head *, 
@@ -163,4 +163,4 @@ got_reflist_object_id_map_lookup(struct got_reflist_object_id_map *,
     struct got_object_id *);
 
 /* Free the specified object ID map. */
-void got_reflist_object_map_free(struct got_reflist_object_id_map *);
+void got_reflist_object_id_map_free(struct got_reflist_object_id_map *);

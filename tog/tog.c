@@ -145,7 +145,7 @@ static void
 tog_free_refs(void)
 {
 	if (tog_refs_idmap) {
-		got_reflist_object_map_free(tog_refs_idmap);
+		got_reflist_object_id_map_free(tog_refs_idmap);
 		tog_refs_idmap = NULL;
 	}
 	got_ref_list_free(&tog_refs);

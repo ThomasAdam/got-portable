@@ -1459,7 +1459,7 @@ got_reflist_object_id_map_create(struct got_reflist_object_id_map **map,
 done:
 	free(id);
 	if (err) {
-		got_reflist_object_map_free(*map);
+		got_reflist_object_id_map_free(*map);
 		*map = NULL;
 	}
 	return NULL;
@@ -1487,7 +1487,7 @@ free_id_map_entry(struct got_object_id *id, void *data, void *arg)
 }
 
 void
-got_reflist_object_map_free(struct got_reflist_object_id_map *map)
+got_reflist_object_id_map_free(struct got_reflist_object_id_map *map)
 {
 	got_object_idset_for_each(map->idset, free_id_map_entry, NULL);
 	got_object_idset_free(map->idset);
