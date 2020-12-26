@@ -434,7 +434,7 @@ struct tog_reflist_entry {
 TAILQ_HEAD(tog_reflist_head, tog_reflist_entry);
 
 struct tog_ref_view_state {
-	struct tog_reflist_head refs;	/* TAILQ */
+	struct tog_reflist_head refs;
 	struct tog_reflist_entry *first_displayed_entry;
 	struct tog_reflist_entry *last_displayed_entry;
 	struct tog_reflist_entry *selected_entry;
