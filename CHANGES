@@ -1,3 +1,11 @@
+* got 0.47; 2020-12-27
+- update got.1 CAVEATS section; prompted by feedback from otto@
+- fix assignment to wrong pointer in got_ref_dup()
+- fix performance on repositories with many references (e.g. freebsd src.git):
+  o implement an object ID map for reference lists
+  o use reflist object id maps in got log, tog log, and tog diff (with naddy)
+  o switch reflist to TAILQ; insert elements more efficiently for sorted input
+
 * got 0.46; 2020-12-21
 - reset tog blame view's scroll position if line count shrinks too much (naddy)
 - replace unprintable characters with '.' before passing them to curses (naddy)
