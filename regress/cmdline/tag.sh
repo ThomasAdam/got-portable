@@ -91,7 +91,7 @@ test_tag_create() {
 	(cd $testroot/wt && got tag -m 'test' -c $tree_id foobar \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "git tag command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1

@@ -235,7 +235,7 @@ test_revert_no_arguments() {
 
 	(cd $testroot/wt && got revert > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "revert command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -274,7 +274,7 @@ test_revert_directory() {
 
 	(cd $testroot/wt && got revert . > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got revert command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

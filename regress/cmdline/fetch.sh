@@ -702,7 +702,7 @@ test_fetch_reference() {
 	got fetch -q -r $testroot/repo-clone -R refs/remotes/origin/main \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -983,7 +983,7 @@ EOF
 	(cd $testroot/repo-clone && got fetch nonexistent \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		diff -u $testroot/stderr.expected $testroot/stderr
 		test_done "$testroot" "1"

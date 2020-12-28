@@ -91,7 +91,7 @@ test_ref_create() {
 	(cd $testroot/wt && got ref -s $commit_id refs/heads/symbolicref \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "git ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
@@ -109,7 +109,7 @@ test_ref_create() {
 	# Attempt to create a reference without specifying a name
 	(cd $testroot/wt && got ref -c $commit_id 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "git ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
@@ -128,7 +128,7 @@ test_ref_create() {
 	(cd $testroot/wt && got ref -s refs/heads/symbolicref \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "git ref command succeeded unexpectedly"
 		test_done "$testroot" "1"
 		return 1
@@ -226,7 +226,7 @@ test_ref_delete() {
 	got ref -r $testroot/repo -d refs/heads/bogus_ref_name \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got ref succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1

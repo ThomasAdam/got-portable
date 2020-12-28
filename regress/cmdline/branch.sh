@@ -283,7 +283,7 @@ test_branch_delete() {
 	got branch -d bogus_branch_name -r $testroot/repo \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got update succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -376,7 +376,7 @@ test_branch_delete_packed() {
 	got branch -d bogus_branch_name -r $testroot/repo \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got update succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1

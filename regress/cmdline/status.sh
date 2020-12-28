@@ -655,7 +655,7 @@ test_status_status_code() {
 	(cd $testroot/wt && got status -s xDM \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "status succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

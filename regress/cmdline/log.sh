@@ -340,7 +340,7 @@ test_log_nonexistent_path() {
 	(cd $testroot/repo && got log this/does/not/exist \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -465,7 +465,7 @@ test_log_end_at_commit() {
 	(cd $testroot/wt && got log -x nonexistent \
 		> $testroot/stdout 2> $testroot/stderr) 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -494,7 +494,7 @@ test_log_end_at_commit() {
 	(cd $testroot/wt && got log -x $empty_sha1 \
 		> $testroot/stdout 2> $testroot/stderr) 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -762,7 +762,7 @@ test_log_submodule() {
 	got log -p -r $testroot/repo -l1 repo2 \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "log command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

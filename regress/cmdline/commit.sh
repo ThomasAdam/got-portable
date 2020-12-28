@@ -557,7 +557,7 @@ test_commit_selected_paths() {
 	(cd $testroot/wt && got commit -m 'many paths' nonexistent alpha \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "commit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -607,7 +607,7 @@ test_commit_outside_refs_heads() {
 	(cd $testroot/wt && got commit -m 'change alpha' \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "commit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1122,7 +1122,7 @@ test_commit_symlink() {
 	(cd $testroot/wt && got commit -m 'test commit_symlink' \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -1200,7 +1200,7 @@ test_commit_symlink() {
 	(cd $testroot/wt && got commit -m 'test commit_symlink' \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got commit succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1

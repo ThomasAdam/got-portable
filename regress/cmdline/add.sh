@@ -141,7 +141,7 @@ test_add_deleted() {
 	echo -n > $testroot/stdout.expected
 	(cd $testroot/wt && got add beta > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got add command succeeded unexpectedly" >&2
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
@@ -280,7 +280,7 @@ test_add_clashes_with_submodule() {
 	(cd $testroot/wt && got commit -m 'add file repo2' \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "commit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

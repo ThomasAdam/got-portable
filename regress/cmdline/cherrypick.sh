@@ -198,7 +198,7 @@ test_cherrypick_into_work_tree_with_conflicts() {
 	(cd $testroot/wt && got cherrypick $branch_rev \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "cherrypick succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

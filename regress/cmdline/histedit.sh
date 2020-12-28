@@ -541,7 +541,7 @@ test_histedit_edit() {
 	(cd $testroot/wt && got histedit -c > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -664,7 +664,7 @@ test_histedit_fold_last_commit() {
 		> $testroot/stdout 2> $testroot/stderr)
 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -711,7 +711,7 @@ test_histedit_missing_commit() {
 		> $testroot/stdout 2> $testroot/stderr)
 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -864,7 +864,7 @@ test_histedit_path_prefix_drop() {
 		> $testroot/stdout 2> $testroot/stderr)
 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -968,7 +968,7 @@ test_histedit_path_prefix_edit() {
 		> $testroot/stdout 2> $testroot/stderr)
 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1331,7 +1331,7 @@ test_histedit_duplicate_commit_in_script() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "histedit succeeded unexpectedly:" >&2
 		cat $testroot/stdout >&2
 		test_done "$testroot" "$ret"

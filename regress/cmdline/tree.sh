@@ -91,7 +91,7 @@ test_tree_submodule() {
 	# Currently fails in open(2)
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "tree command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -118,7 +118,7 @@ test_tree_submodule_of_same_repo() {
 	# Currently fails with "bad object data"
 	got tree -r $testroot/repo repo2 > $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "tree command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

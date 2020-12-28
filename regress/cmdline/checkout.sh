@@ -111,7 +111,7 @@ test_checkout_dir_not_empty() {
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "checkout succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -183,7 +183,7 @@ test_checkout_commit_from_wrong_branch() {
 	got checkout -b master -c $head_rev $testroot/repo $testroot/wt \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		test_done "$testroot" "1"
 		return 1
 	fi
@@ -372,7 +372,7 @@ test_checkout_into_nonempty_dir() {
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "checkout succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -770,7 +770,7 @@ test_checkout_repo_with_unknown_extension() {
 		> $testroot/stdout 2> $testroot/stderr
 
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got checkout command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

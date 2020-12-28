@@ -346,7 +346,7 @@ test_diff_submodule_of_same_repo() {
 	got diff -r $testroot/repo $epsilon_id $submodule_id \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "diff command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

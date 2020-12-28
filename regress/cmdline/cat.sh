@@ -213,7 +213,7 @@ test_cat_submodule() {
 	got cat -r $testroot/repo repo2 > $testroot/stdout \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "cat command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

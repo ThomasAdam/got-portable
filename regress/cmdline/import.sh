@@ -145,7 +145,7 @@ test_import_requires_new_branch() {
 	got import -b master -m 'init' -r $testroot/repo $testroot/tree \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "import command should have failed but did not"
 		test_done "$testroot" "1"
 		return 1

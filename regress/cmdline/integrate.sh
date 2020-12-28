@@ -176,7 +176,7 @@ test_integrate_requires_rebase_first() {
 	(cd $testroot/wt && got integrate newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got integrate succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
@@ -360,7 +360,7 @@ test_integrate_backwards_in_time() {
 	(cd $testroot/wt && got integrate master \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got integrate succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1

@@ -270,7 +270,7 @@ test_rebase_continue() {
 	(cd $testroot/wt && got rebase -c > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "rebase succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

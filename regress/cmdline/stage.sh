@@ -57,7 +57,7 @@ test_stage_no_changes() {
 	(cd $testroot/wt && got stage alpha beta > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -128,7 +128,7 @@ test_stage_unversioned() {
 	(cd $testroot/wt && got stage unversioned-file > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeed unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -267,7 +267,7 @@ test_stage_conflict() {
 	(cd $testroot/wt && got stage alpha > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -312,7 +312,7 @@ test_stage_out_of_date() {
 	(cd $testroot/wt && got stage alpha > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -366,7 +366,7 @@ test_double_stage() {
 	(cd $testroot/wt && got stage beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -394,7 +394,7 @@ test_double_stage() {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -624,7 +624,7 @@ test_stage_rm_already_staged_file() {
 		(cd $testroot/wt && got rm $f \
 			> $testroot/stdout 2> $testroot/stderr)
 		ret="$?"
-		if [ "$ret" == "0" ]; then
+		if [ "$ret" = "0" ]; then
 			echo "got rm command succeeded unexpectedly" >&2
 			test_done "$testroot" "1"
 			return 1
@@ -1032,7 +1032,7 @@ test_stage_histedit() {
 	(cd $testroot/wt && got histedit -F $testroot/histedit-script \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got histedit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1091,7 +1091,7 @@ test_stage_rebase() {
 	(cd $testroot/wt && got rebase newbranch \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got rebase command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1134,7 +1134,7 @@ test_stage_update() {
 	(cd $testroot/wt && got update > $testroot/stdout  \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got update command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1178,7 +1178,7 @@ test_stage_commit_non_staged() {
 	(cd $testroot/wt && got commit -m "change delta" gamma/delta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got commit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1224,7 +1224,7 @@ test_stage_commit_out_of_date() {
 	(cd $testroot/wt && got commit -m "try to commit" > $testroot/stdout \
 		2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got commit command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -1453,7 +1453,7 @@ test_stage_patch() {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		numbers > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2002,7 +2002,7 @@ test_stage_patch_added_twice() {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		epsilon/new > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2127,7 +2127,7 @@ test_stage_patch_removed_twice() {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -2284,7 +2284,7 @@ test_stage_patch_incomplete_script() {
 	(cd $testroot/wt && got stage -F $testroot/patchscript -p \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -2385,7 +2385,7 @@ test_stage_symlink() {
 
 	(cd $testroot/wt && got stage > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got stage succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1

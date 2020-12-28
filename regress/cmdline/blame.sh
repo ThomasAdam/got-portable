@@ -29,7 +29,7 @@ blame_cmp() {
 
 	cmp -s $testroot/${file}.blame.git $testroot/${file}.blame.got
 	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" == "" ]; then
+	if [ "$ret" != "0" -a "$xfail" = "" ]; then
 		diff -u $testroot/${file}.blame.git $testroot/${file}.blame.got
 		return 1
 	fi
@@ -745,7 +745,7 @@ test_blame_submodule() {
 	got blame -r $testroot/repo repo2 \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -794,7 +794,7 @@ test_blame_symlink() {
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" == "" ]; then
+	if [ "$ret" != "0" -a "$xfail" = "" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -815,7 +815,7 @@ test_blame_symlink() {
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
-	if [ "$ret" != "0" -a "$xfail" == "" ]; then
+	if [ "$ret" != "0" -a "$xfail" = "" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "1"
 		return 1
@@ -824,7 +824,7 @@ test_blame_symlink() {
 	got blame -r $testroot/repo epsilon.link > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -844,7 +844,7 @@ test_blame_symlink() {
 	got blame -r $testroot/repo passwd.link > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -863,7 +863,7 @@ test_blame_symlink() {
 	got blame -r $testroot/repo nonexistent.link > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "blame command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1

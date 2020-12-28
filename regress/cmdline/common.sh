@@ -228,7 +228,7 @@ test_done()
 {
 	local testroot="$1"
 	local result="$2"
-	if [ "$result" == "0" ]; then
+	if [ "$result" = "0" ]; then
 		test_cleanup "$testroot" || return 1
 		if [ -z "$GOT_TEST_QUIET" ]; then
 			echo "ok"

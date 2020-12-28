@@ -1221,7 +1221,7 @@ test_update_partial_rm() {
 
 	(cd $testroot/wt && got update alpha epsilon/zeta 2> $testroot/stderr)
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "update succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
