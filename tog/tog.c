@@ -1308,14 +1308,12 @@ static const struct got_error *
 format_author(wchar_t **wauthor, int *author_width, char *author, int limit,
     int col_tab_align)
 {
-	char *smallerthan, *at;
+	char *smallerthan;
 
 	smallerthan = strchr(author, '<');
 	if (smallerthan && smallerthan[1] != '\0')
 		author = smallerthan + 1;
-	at = strchr(author, '@');
-	if (at)
-		*at = '\0';
+	author[strcspn(author, "@>")] = '\0';
 	return format_line(wauthor, author_width, author, limit, col_tab_align);
 }
 
