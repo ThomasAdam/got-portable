@@ -1599,13 +1599,13 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 		GOT_DIFF_CONFLICT_MARKER_END
 	};
 	int i = 0;
-	char *line;
-	size_t len;
-	const char delim[3] = {'\0', '\0', '\0'};
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 
 	while (*status == GOT_STATUS_MODIFY) {
-		line = fparseln(f, &len, NULL, delim, 0);
-		if (line == NULL) {
+		linelen = getline(&line, &linesize, f);
+		if (linelen == -1) {
 			if (feof(f))
 				break;
 			err = got_ferror(f, GOT_ERR_IO);
@@ -1620,6 +1620,7 @@ get_modified_file_content_status(unsigned char *status, FILE *f)
 				i++;
 		}
 	}
+	free(line);
 
 	return err;
 }

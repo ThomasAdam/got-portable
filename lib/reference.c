@@ -359,9 +359,9 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 {
 	const struct got_error *err = NULL;
 	char *abs_refname;
-	char *line;
-	size_t len;
-	const char delim[3] = {'\0', '\0', '\0'};
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen;
 	int i, ref_is_absolute = (strncmp(refname, "refs/", 5) == 0);
 
 	*ref = NULL;
@@ -369,13 +369,15 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 	if (ref_is_absolute)
 		abs_refname = (char *)refname;
 	do {
-		line = fparseln(f, &len, NULL, delim, 0);
-		if (line == NULL) {
+		linelen = getline(&line, &linesize, f);
+		if (linelen == -1) {
 			if (feof(f))
 				break;
 			err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
 			break;
 		}
+		if (linelen > 0 && line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
 		for (i = 0; i < nsubdirs; i++) {
 			if (!ref_is_absolute &&
 			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
@@ -387,10 +389,10 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 			if (err || *ref != NULL)
 				break;
 		}
-		free(line);
 		if (err)
 			break;
 	} while (*ref == NULL);
+	free(line);
 
 	return err;
 }
@@ -871,6 +873,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	char *packed_refs_path, *path_refs = NULL;
 	char *abs_namespace = NULL;
 	char *buf = NULL, *ondisk_ref_namespace = NULL;
+	char *line = NULL;
 	FILE *f = NULL;
 	struct got_reference *ref;
 	struct got_reflist_entry *new;
@@ -963,19 +966,19 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	f = fopen(packed_refs_path, "r");
 	free(packed_refs_path);
 	if (f) {
-		char *line;
-		size_t len;
-		const char delim[3] = {'\0', '\0', '\0'};
+		size_t linesize;
+		ssize_t linelen;
 		for (;;) {
-			line = fparseln(f, &len, NULL, delim, 0);
-			if (line == NULL) {
+			linelen = getline(&line, &linesize, f);
+			if (linelen == -1) {
 				if (feof(f))
 					break;
 				err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
 				goto done;
 			}
+			if (linelen > 0 && line[linelen - 1] == '\n')
+				line[linelen - 1] = '\0';
 			err = parse_packed_ref_line(&ref, NULL, line);
-			free(line);
 			if (err)
 				goto done;
 			if (ref) {
@@ -1001,6 +1004,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 done:
 	free(abs_namespace);
 	free(buf);
+	free(line);
 	free(path_refs);
 	if (f && fclose(f) != 0 && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -1174,7 +1178,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	const struct got_error *err = NULL, *unlock_err = NULL;
 	struct got_lockfile *lf = NULL;
 	FILE *f = NULL, *tmpf = NULL;
-	char *packed_refs_path, *tmppath = NULL;
+	char *line = NULL, *packed_refs_path, *tmppath = NULL;
 	struct got_reflist_head refs;
 	int found_delref = 0;
 
@@ -1204,21 +1208,21 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		goto done;
 	}
 	for (;;) {
-		char *line;
-		size_t len;
-		const char delim[3] = {'\0', '\0', '\0'};
+		size_t linesize;
+		ssize_t linelen;
 		struct got_reference *ref;
 		struct got_reflist_entry *new;
 
-		line = fparseln(f, &len, NULL, delim, 0);
-		if (line == NULL) {
+		linelen = getline(&line, &linesize, f);
+		if (linelen == -1) {
 			if (feof(f))
 				break;
 			err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
 			goto done;
 		}
+		if (linelen > 0 && line[linelen - 1] == '\n')
+			line[linelen - 1] = '\0';
 		err = parse_packed_ref_line(&ref, NULL, line);
-		free(line);
 		if (err)
 			goto done;
 		if (ref == NULL)
@@ -1310,6 +1314,7 @@ done:
 	}
 	free(tmppath);
 	free(packed_refs_path);
+	free(line);
 	got_ref_list_free(&refs);
 	return err ? err : unlock_err;
 }
