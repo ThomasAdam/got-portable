@@ -966,7 +966,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	f = fopen(packed_refs_path, "r");
 	free(packed_refs_path);
 	if (f) {
-		size_t linesize;
+		size_t linesize = 0;
 		ssize_t linelen;
 		for (;;) {
 			linelen = getline(&line, &linesize, f);
@@ -1179,6 +1179,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	struct got_lockfile *lf = NULL;
 	FILE *f = NULL, *tmpf = NULL;
 	char *line = NULL, *packed_refs_path, *tmppath = NULL;
+	size_t linesize = 0;
 	struct got_reflist_head refs;
 	int found_delref = 0;
 
@@ -1208,7 +1209,6 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		goto done;
 	}
 	for (;;) {
-		size_t linesize;
 		ssize_t linelen;
 		struct got_reference *ref;
 		struct got_reflist_entry *new;
