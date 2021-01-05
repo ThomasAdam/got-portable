@@ -207,7 +207,12 @@ are as follows:
 .It Fl a
 Fetch all branches from the remote repository's
 .Dq refs/heads/
-reference namespace.
+reference namespace and set
+.Cm fetch-all-branches
+in the cloned repository's
+.Xr got.conf 5
+file for future use by
+.Cm got fetch .
 If this option is not specified, a branch resolved via the remote
 repository's HEAD reference will be fetched.
 Cannot be used together with the
