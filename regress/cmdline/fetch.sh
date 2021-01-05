@@ -560,7 +560,7 @@ test_fetch_update_tag() {
 		return 1
 	fi
 
-	got fetch -q -r $testroot/repo-clone
+	got fetch -a -q -r $testroot/repo-clone
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got fetch command failed unexpectedly" >&2

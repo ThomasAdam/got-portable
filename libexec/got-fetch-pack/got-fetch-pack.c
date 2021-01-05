@@ -991,6 +991,25 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				}
 				err = fetch_error(buf, r);
 				goto done;
+			} else if (buf[0] == 'A') {
+				err = readn(&r, fd, buf, datalen);
+				if (err)
+					goto done;
+				if (r != datalen) {
+					err = got_error_msg(GOT_ERR_BAD_PACKET,
+					    "packet too short");
+					goto done;
+				}
+				/*
+				 * Git server responds with ACK after 'done'
+				 * even though multi_ack is disabled?!?
+				 */
+				buf[r] = '\0';
+				if (strncmp(buf, "CK ", 3) == 0)
+					continue; /* ignore */
+				err = got_error_msg(GOT_ERR_BAD_PACKET,
+				    "unexpected message from server");
+				goto done;
 			} else {
 				err = got_error_msg(GOT_ERR_BAD_PACKET,
 				    "unknown side-band received from server");
