@@ -1164,19 +1164,40 @@ create_wanted_ref(const char *refname, struct got_object_id *id,
 static const struct got_error *
 create_gotconfig(const char *proto, const char *host, const char *port,
     const char *remote_repo_path, const char *default_branch,
-    int fetch_all_branches, int mirror_references, struct got_repository *repo)
+    struct got_pathlist_head *wanted_branches, int mirror_references,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gotconfig_path = NULL;
 	char *gotconfig = NULL;
 	FILE *gotconfig_file = NULL;
 	const char *branchname = NULL;
+	char *branches = NULL;
 	ssize_t n;
 
-	if (default_branch) {
+	if (!TAILQ_EMPTY(wanted_branches)) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, wanted_branches, entry) {
+			char *s;
+			branchname = pe->path;
+			if (strncmp(branchname, "refs/heads/", 11) == 0)
+				branchname += 11;
+			if (asprintf(&s, "%s\"%s\" ",
+			    branches ? branches : "", branchname) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(branches);
+			branches = s;
+		}
+	} else if (default_branch) {
 		branchname = default_branch;
 		if (strncmp(branchname, "refs/heads/", 11) == 0)
 			branchname += 11;
+		if (asprintf(&branches, "\"%s\" ", branchname) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
 	}
 
 	/* Create got.conf(5). */
@@ -1201,10 +1222,8 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    "}\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
-	    remote_repo_path,
-	    branchname ? "\tbranch { \"" : "",
-	    branchname ? branchname : "", 
-	    branchname ? "\" }\n" : "", 
+	    remote_repo_path, branches ? "\tbranch { " : "",
+	    branches ? branches : "", branches ? "}\n" : "", 
 	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -1219,17 +1238,21 @@ done:
 	if (gotconfig_file && fclose(gotconfig_file) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", gotconfig_path);
 	free(gotconfig_path);
+	free(branches);
 	return err;
 }
 
 static const struct got_error *
 create_gitconfig(const char *git_url, const char *default_branch,
-    int fetch_all_branches, int mirror_references, struct got_repository *repo)
+    int fetch_all_branches, struct got_pathlist_head *wanted_branches,
+    int mirror_references, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gitconfig_path = NULL;
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
+	char *branches = NULL;
+	const char *branchname, *mirror = NULL;
 	ssize_t n;
 
 	/* Create a config file Git can understand. */
@@ -1244,28 +1267,38 @@ create_gitconfig(const char *git_url, const char *default_branch,
 		goto done;
 	}
 	if (mirror_references) {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
-		    "\tfetch = +refs/*:refs/*\n"
-		    "\tmirror = true\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url) == -1) {
-			err = got_error_from_errno("asprintf");
+		mirror = "\tmirror = true\n";
+		branches = strdup("\tfetch = +refs/*:refs/*\n");
+		if (branches == NULL) {
+			err = got_error_from_errno("strdup");
 			goto done;
 		}
 	} else if (fetch_all_branches) {
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
+		if (asprintf(&branches,
 		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
 		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
+	} else if (!TAILQ_EMPTY(wanted_branches)) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, wanted_branches, entry) {
+			char *s;
+			branchname = pe->path;
+			if (strncmp(branchname, "refs/heads/", 11) == 0)
+				branchname += 11;
+			if (asprintf(&s,
+			    "%s\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
+			    branches ? branches : "",
+			    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
+			    branchname) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(branches);
+			branches = s;
+		}
 	} else {
-		const char *branchname;
-
 		/*
 		 * If the server specified a default branch, use just that one.
 		 * Otherwise fall back to fetching all branches on next fetch.
@@ -1276,16 +1309,23 @@ create_gitconfig(const char *git_url, const char *default_branch,
 				branchname += 11;
 		} else
 			branchname = "*"; /* fall back to all branches */
-		if (asprintf(&gitconfig,
-		    "[remote \"%s\"]\n"
-		    "\turl = %s\n"
+		if (asprintf(&branches,
 		    "\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
-		    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url,
 		    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
 		    branchname) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
+	}
+	if (asprintf(&gitconfig,
+	    "[remote \"%s\"]\n"
+	    "\turl = %s\n"
+	    "%s"
+	    "%s",
+	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url, branches ? branches : "",
+	    mirror ? mirror : "") == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
 	}
 	n = fwrite(gitconfig, 1, strlen(gitconfig), gitconfig_file);
 	if (n != strlen(gitconfig)) {
@@ -1296,6 +1336,7 @@ done:
 	if (gitconfig_file && fclose(gitconfig_file) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", gitconfig_path);
 	free(gitconfig_path);
+	free(branches);
 	return err;
 }
 
@@ -1332,13 +1373,13 @@ create_config_files(const char *proto, const char *host, const char *port,
 
 	/* Create got.conf(5). */
 	err = create_gotconfig(proto, host, port, remote_repo_path,
-	    default_branch, fetch_all_branches, mirror_references, repo);
+	    default_branch, wanted_branches, mirror_references, repo);
 	if (err)
 		return err;
 
 	/* Create a config file Git can understand. */
 	return create_gitconfig(git_url, default_branch, fetch_all_branches,
-	    mirror_references, repo);
+	    wanted_branches, mirror_references, repo);
 }
 
 static const struct got_error *

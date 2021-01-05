@@ -667,6 +667,77 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_clone_multiple_branches() {
+	local testroot=`test_init clone_multiple_branches`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got branch -r $testroot/repo -c $commit_id foo
+	got branch -r $testroot/repo -c $commit_id bar
+
+	got clone -q -b foo -b bar $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	echo "HEAD: refs/heads/foo" > $testroot/stdout.expected
+	echo "refs/heads/bar: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/bar: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/got.conf.expected <<EOF
+remote "origin" {
+	server 127.0.0.1
+	protocol ssh
+	repository "$testroot/repo"
+	branch { "foo" "bar" }
+}
+EOF
+	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/got.conf.expected \
+			$testroot/repo-clone/got.conf
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/config.expected <<EOF
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+
+[remote "origin"]
+	url = ssh://127.0.0.1$testroot/repo
+	fetch = +refs/heads/foo:refs/remotes/origin/foo
+	fetch = +refs/heads/bar:refs/remotes/origin/bar
+EOF
+	cmp -s $testroot/repo-clone/config $testroot/config.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/config.expected \
+			$testroot/repo-clone/config
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_clone_basic
 run_test test_clone_list
@@ -677,3 +748,4 @@ run_test test_clone_mirror_all
 run_test test_clone_reference
 run_test test_clone_branch_and_reference
 run_test test_clone_reference_mirror
+run_test test_clone_multiple_branches
