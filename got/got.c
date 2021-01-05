@@ -1163,14 +1163,21 @@ create_wanted_ref(const char *refname, struct got_object_id *id,
 
 static const struct got_error *
 create_gotconfig(const char *proto, const char *host, const char *port,
-    const char *remote_repo_path, int fetch_all_branches, int mirror_references,
-    struct got_repository *repo)
+    const char *remote_repo_path, const char *default_branch,
+    int fetch_all_branches, int mirror_references, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gotconfig_path = NULL;
 	char *gotconfig = NULL;
 	FILE *gotconfig_file = NULL;
+	const char *branchname = NULL;
 	ssize_t n;
+
+	if (default_branch) {
+		branchname = default_branch;
+		if (strncmp(branchname, "refs/heads/", 11) == 0)
+			branchname += 11;
+	}
 
 	/* Create got.conf(5). */
 	gotconfig_path = got_repo_get_path_gotconfig(repo);
@@ -1189,11 +1196,15 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    "\tprotocol %s\n"
 	    "%s%s%s"
 	    "\trepository \"%s\"\n"
+	    "%s%s%s"
 	    "%s"
 	    "}\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
 	    remote_repo_path,
+	    branchname ? "\tbranch { \"" : "",
+	    branchname ? branchname : "", 
+	    branchname ? "\" }\n" : "", 
 	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -1321,7 +1332,7 @@ create_config_files(const char *proto, const char *host, const char *port,
 
 	/* Create got.conf(5). */
 	err = create_gotconfig(proto, host, port, remote_repo_path,
-	    fetch_all_branches, mirror_references, repo);
+	    default_branch, fetch_all_branches, mirror_references, repo);
 	if (err)
 		return err;
 

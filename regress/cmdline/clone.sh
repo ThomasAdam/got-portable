@@ -94,6 +94,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -193,6 +194,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "foo" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -268,6 +270,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -338,6 +341,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 	mirror-references yes
 }
 EOF
@@ -410,6 +414,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 	mirror-references yes
 }
 EOF
@@ -486,6 +491,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -558,6 +564,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "foo" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -627,6 +634,7 @@ remote "origin" {
 	server 127.0.0.1
 	protocol ssh
 	repository "$testroot/repo"
+	branch { "master" }
 	mirror-references yes
 }
 EOF
