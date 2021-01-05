@@ -2087,8 +2087,6 @@ cmd_fetch(int argc, char *argv[])
 			option_conflict('l', 'a');
 		if (delete_refs)
 			option_conflict('l', 'd');
-		if (verbosity == -1)
-			option_conflict('l', 'q');
 	}
 
 	if (argc == 0)

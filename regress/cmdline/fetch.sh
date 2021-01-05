@@ -136,7 +136,7 @@ test_fetch_list() {
 		return 1
 	fi
 
-	(cd $testroot/repo-clone && got fetch -l \
+	(cd $testroot/repo-clone && got fetch -q -l \
 		> $testroot/stdout 2>$testroot/stderr)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -145,8 +145,7 @@ test_fetch_list() {
 		return 1
 	fi
 
-	echo "Connecting to \"origin\" 127.0.0.1" > $testroot/stdout.expected
-	got ref -l -r $testroot/repo >> $testroot/stdout.expected
+	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"
@@ -999,7 +998,7 @@ remote "barbaz" {
 EOF
 	echo "got: nonexistent: remote repository not found" \
 		> $testroot/stderr.expected
-	(cd $testroot/repo-clone && got fetch nonexistent \
+	(cd $testroot/repo-clone && got fetch -q nonexistent \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" = "0" ]; then
@@ -1009,7 +1008,7 @@ EOF
 		return 1
 	fi
 
-	(cd $testroot/repo-clone && got fetch -l foobar \
+	(cd $testroot/repo-clone && got fetch -q -l foobar \
 		> $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1018,8 +1017,7 @@ EOF
 		return 1
 	fi
 
-	echo "Connecting to \"foobar\" 127.0.0.1" > $testroot/stdout.expected
-	got ref -l -r $testroot/repo >> $testroot/stdout.expected
+	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"
@@ -1038,7 +1036,7 @@ remote "barbaz" {
 	repository "$testroot/repo"
 }
 EOF
-	(cd $testroot/wt && got fetch -l barbaz > $testroot/stdout)
+	(cd $testroot/wt && got fetch -q -l barbaz > $testroot/stdout)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got fetch command failed unexpectedly" >&2
@@ -1046,8 +1044,7 @@ EOF
 		return 1
 	fi
 
-	echo "Connecting to \"barbaz\" 127.0.0.1" > $testroot/stdout.expected
-	got ref -l -r $testroot/repo >> $testroot/stdout.expected
+	got ref -l -r $testroot/repo > $testroot/stdout.expected
 
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"
