@@ -153,6 +153,7 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 
 		iremote.nbranches = nbranches;
 		iremote.mirror_references = repo->mirror_references;
+		iremote.fetch_all_branches = repo->fetch_all_branches;
 
 		iremote.name_len = strlen(repo->name);
 		len += iremote.name_len;

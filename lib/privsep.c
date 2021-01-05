@@ -1889,6 +1889,7 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
+			remote->fetch_all_branches = iremote.fetch_all_branches;
 			remote->nbranches = 0;
 			remote->branches = NULL;
 			(*nremotes)++;
@@ -2095,6 +2096,7 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
+			remote->fetch_all_branches = iremote.fetch_all_branches;
 			if (iremote.nbranches > 0) {
 				remote->branches = recallocarray(NULL, 0,
 				    iremote.nbranches, sizeof(char *));

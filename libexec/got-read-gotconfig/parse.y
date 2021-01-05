@@ -95,7 +95,7 @@ typedef struct {
 
 %token	ERROR
 %token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES BRANCH
-%token	AUTHOR
+%token	AUTHOR FETCH_ALL_BRANCHES
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean portplain
@@ -197,6 +197,9 @@ remoteopts1	: REPOSITORY STRING {
 		| MIRROR_REFERENCES boolean {
 			remote->mirror_references = $2;
 		}
+		| FETCH_ALL_BRANCHES boolean {
+			remote->fetch_all_branches = $2;
+		}
 		| PORT portplain {
 			remote->port = $2;
 		}
@@ -286,6 +289,7 @@ lookup(char *s)
 	static const struct keywords keywords[] = {
 		{"author",		AUTHOR},
 		{"branch",		BRANCH},
+		{"fetch-all-branches",	FETCH_ALL_BRANCHES},
 		{"mirror-references",	MIRROR_REFERENCES},
 		{"port",		PORT},
 		{"protocol",		PROTOCOL},

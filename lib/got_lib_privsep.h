@@ -378,6 +378,7 @@ struct got_imsg_remote {
 	size_t name_len;
 	size_t url_len;
 	int mirror_references;
+	int fetch_all_branches;
 	int nbranches;
 
 	/* Followed by name_len + url_len data bytes. */

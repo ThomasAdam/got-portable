@@ -1164,8 +1164,8 @@ create_wanted_ref(const char *refname, struct got_object_id *id,
 static const struct got_error *
 create_gotconfig(const char *proto, const char *host, const char *port,
     const char *remote_repo_path, const char *default_branch,
-    struct got_pathlist_head *wanted_branches, int mirror_references,
-    struct got_repository *repo)
+    int fetch_all_branches, struct got_pathlist_head *wanted_branches,
+    int mirror_references, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gotconfig_path = NULL;
@@ -1175,7 +1175,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	char *branches = NULL;
 	ssize_t n;
 
-	if (!TAILQ_EMPTY(wanted_branches)) {
+	if (!fetch_all_branches && !TAILQ_EMPTY(wanted_branches)) {
 		struct got_pathlist_entry *pe;
 		TAILQ_FOREACH(pe, wanted_branches, entry) {
 			char *s;
@@ -1190,7 +1190,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 			free(branches);
 			branches = s;
 		}
-	} else if (default_branch) {
+	} else if (!fetch_all_branches && default_branch) {
 		branchname = default_branch;
 		if (strncmp(branchname, "refs/heads/", 11) == 0)
 			branchname += 11;
@@ -1219,12 +1219,14 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    "\trepository \"%s\"\n"
 	    "%s%s%s"
 	    "%s"
+	    "%s"
 	    "}\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, host, proto,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
 	    remote_repo_path, branches ? "\tbranch { " : "",
 	    branches ? branches : "", branches ? "}\n" : "", 
-	    mirror_references ? "\tmirror-references yes\n" : "") == -1) {
+	    mirror_references ? "\tmirror-references yes\n" : "",
+	    fetch_all_branches ? "\tfetch-all-branches yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -1373,7 +1375,8 @@ create_config_files(const char *proto, const char *host, const char *port,
 
 	/* Create got.conf(5). */
 	err = create_gotconfig(proto, host, port, remote_repo_path,
-	    default_branch, wanted_branches, mirror_references, repo);
+	    default_branch, fetch_all_branches, wanted_branches,
+	    mirror_references, repo);
 	if (err)
 		return err;
 
@@ -2209,12 +2212,13 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 	}
 
-	if (TAILQ_EMPTY(&wanted_branches) && remote->nbranches > 0) {
+	if (TAILQ_EMPTY(&wanted_branches)) {
+		if (!fetch_all_branches)
+			fetch_all_branches = remote->fetch_all_branches;
 		for (i = 0; i < remote->nbranches; i++) {
 			got_pathlist_append(&wanted_branches,
 			    remote->branches[i], NULL);
 		}
-
 	}
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,

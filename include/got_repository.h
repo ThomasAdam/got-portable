@@ -61,6 +61,12 @@ struct got_remote_repo {
 	 */
 	int mirror_references;
 
+	/*
+	 * If set, fetch all branches by default and ignore the list of
+	 * branches below.
+	 */
+	int fetch_all_branches;
+
 	/* Branches to fetch by default. */
 	int nbranches;
 	char **branches;

@@ -114,6 +114,17 @@ The list of branches specified here can be overridden at the
 command line with the
 .Fl b
 option.
+.It Ic fetch-all-branches Ar yes | no
+This option controls whether
+.Cm got fetch
+will fetch all branches from the remote repository by default.
+If enabled, this behaviour can be overridden at the
+.Cm got fetch
+command line with the
+.Fl b
+option, and any
+.Cm branch
+configuration settings for this remote repository will be ignored.
 .It Ic mirror-references Ar yes | no
 This option controls the behaviour of
 .Cm got fetch

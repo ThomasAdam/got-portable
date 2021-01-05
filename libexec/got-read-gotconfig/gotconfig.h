@@ -29,6 +29,7 @@ struct gotconfig_remote_repo {
 	char	*protocol;
 	int	port;
 	int	mirror_references;
+	int	fetch_all_branches;
 	struct	node_branch *branch;
 };
 TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
