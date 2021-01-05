@@ -177,8 +177,9 @@ conf_set_now(struct got_gitconfig *conf, char *section, char *tag,
 		conf_remove_now(conf, section, tag);
 	else if (got_gitconfig_get_str(conf, section, tag)) {
 		if (!is_default)
-			log_print("conf_set_now: duplicate tag [%s]:%s, "
-			    "ignoring...\n", section, tag);
+			LOG_DBG((LOG_MISC,
+			    "conf_set_now: duplicate tag [%s]:%s, "
+			    "ignoring...\n", section, tag));
 		return 1;
 	}
 	node = calloc(1, sizeof *node);
