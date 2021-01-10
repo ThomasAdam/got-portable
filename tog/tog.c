@@ -66,7 +66,9 @@
 #define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
 #endif
 
+#ifndef CTRL
 #define CTRL(x)		((x) & 0x1f)
+#endif
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))

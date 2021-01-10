@@ -313,62 +313,46 @@ AC_LINK_IFELSE([AC_LANG_SOURCE(
 	AC_MSG_RESULT(no)
 )
 
-# Look for ncurses.
 PKG_CHECK_MODULES(
-	LIBTINFO,
-	tinfo,
+	LIBPANELW,
+	panelw,
+	found_panel=yes,
+	AC_MSG_ERROR("*** couldn't find -lpanel from ncurses")
+)
+
+PKG_CHECK_MODULES(
+	LIBNCURSES,
+	ncursesw,
 	found_ncurses=yes,
 	found_ncurses=no
 )
-if test "x$found_ncurses" = xno; then
-	PKG_CHECK_MODULES(
-		LIBNCURSES,
-		ncurses,
-		found_ncurses=yes,
-		found_ncurses=no
-	)
-fi
-if test "x$found_ncurses" = xno; then
-	PKG_CHECK_MODULES(
-		LIBNCURSES,
-		ncursesw,
-		found_ncurses=yes,
-		found_ncurses=no
-	)
-fi
 if test "x$found_ncurses" = xyes; then
-	AM_CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $AM_CFLAGS"
-	CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $CFLAGS"
-	LIBS="$LIBNCURSES_LIBS $LIBTINFO_LIBS $LIBS"
+	AM_CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $LIBPANELW_CFLAGS $AM_CFLAGS"
+	CFLAGS="$LIBNCURSES_CFLAGS $LIBTINFO_CFLAGS $LIBPANELW_CFLAGS $CFLAGS"
+	LIBS="$LIBNCURSES_LIBS $LIBTINFO_LIBS $LIBPANELW_LIBS $LIBS"
 else
-	# pkg-config didn't work, try ncurses.
 	AC_CHECK_LIB(
-		tinfo,
+		ncursesw,
 		setupterm,
 		found_ncurses=yes,
 		found_ncurses=no
 	)
-	if test "x$found_ncurses" = xno; then
-		AC_CHECK_LIB(
-			ncurses,
-			setupterm,
-			found_ncurses=yes,
-			found_ncurses=no
-		)
-	fi
 	if test "x$found_ncurses" = xyes; then
 		AC_CHECK_HEADER(
 			ncurses.h,
-			LIBS="$LIBS -lncurses",
-			found_ncurses=no)
-	fi
+			AM_CFLAGS="$LIBPANELW_CFLAGS $AM_CFLAGS"
+			CFLAGS="$LIBPANEL_CFLAGS $CFLAGS"
+			LIBS="$LIBS -lncursesw $LIBPANELW_LIBS",
+			found_ncurses=no
+		)
+		fi
 fi
 if test "x$found_ncurses" = xyes; then
 	AC_DEFINE(HAVE_NCURSES_H)
 else
 	# No ncurses, try curses.
 	AC_CHECK_LIB(
-		curses,
+		cursesw,
 		setupterm,
 		found_curses=yes,
 		found_curses=no
@@ -378,7 +362,9 @@ else
 		,
 		found_curses=no)
 	if test "x$found_curses" = xyes; then
-		LIBS="$LIBS -lcurses"
+		AM_CFLAGS="$LIBPANELW_CFLAGS $AM_CFLAGS"
+		CFLAGS="$LIBPANEL_CFLAGS $CFLAGS"
+		LIBS="$LIBS -lcursesw $LIBPANELW_LIBS"
 		AC_DEFINE(HAVE_CURSES_H)
 	else
 		AC_MSG_ERROR("curses not found")
