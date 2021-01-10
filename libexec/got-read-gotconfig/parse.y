@@ -87,6 +87,7 @@ typedef struct {
 		long long	 number;
 		char		*string;
 		struct node_branch *branch;
+		struct node_ref *ref;
 	} v;
 	int lineno;
 } YYSTYPE;
@@ -95,12 +96,13 @@ typedef struct {
 
 %token	ERROR
 %token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES BRANCH
-%token	AUTHOR FETCH_ALL_BRANCHES
+%token	AUTHOR FETCH_ALL_BRANCHES REFERENCE
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean portplain
 %type	<v.string>	numberstring
 %type	<v.branch>	branch xbranch branch_list
+%type	<v.ref>		ref xref ref_list
 
 %%
 
@@ -163,7 +165,27 @@ branch_list	: xbranch optnl			{ $$ = $1; }
 			$$ = $1;
 		}
 		;
-
+ref		: /* empty */		{ $$ = NULL; }
+		| xref			{ $$ = $1; }
+		| '{' optnl ref_list '}'	{ $$ = $3; }
+		;
+xref		: STRING {
+			$$ = calloc(1, sizeof(struct node_ref));
+			if ($$ == NULL) {
+				yyerror("calloc");
+				YYERROR;
+			}
+			$$->ref_name = $1;
+			$$->tail = $$;
+		}
+		;
+ref_list	: xref optnl			{ $$ = $1; }
+		| ref_list comma xref optnl {
+			$1->tail->next = $3;
+			$1->tail = $3;
+			$$ = $1;
+		}
+		;
 remoteopts2	: remoteopts2 remoteopts1 nl
 	   	| remoteopts1 optnl
 		;
@@ -205,6 +227,9 @@ remoteopts1	: REPOSITORY STRING {
 		}
 		| BRANCH branch {
 			remote->branch = $2;
+		}
+		| REFERENCE ref {
+			remote->ref = $2;
 		}
 	   	;
 remote		: REMOTE STRING {
@@ -293,6 +318,7 @@ lookup(char *s)
 		{"mirror-references",	MIRROR_REFERENCES},
 		{"port",		PORT},
 		{"protocol",		PROTOCOL},
+		{"reference",		REFERENCE},
 		{"remote",		REMOTE},
 		{"repository",		REPOSITORY},
 		{"server",		SERVER},

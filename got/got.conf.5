@@ -125,6 +125,26 @@ command line with the
 option, and any
 .Cm branch
 configuration settings for this remote repository will be ignored.
+.It Ic reference Brq Ar reference ...
+Specify one or more arbitrary references which
+.Cm got fetch
+should fetch by default, in addition to the branches and tags that will
+be fetched.
+The list of references specified here can be overridden at the
+.Cm got fetch
+command line with the
+.Fl R
+option.
+.Cm got fetch
+will refuse to fetch references from the remote repository's
+.Dq refs/remotes/
+or
+.Dq refs/got/
+namespace.
+In any case, references in the
+.Dq refs/tags/
+namespace will always be fetched and mapped directly to local references
+in the same namespace.
 .It Ic mirror-references Ar yes | no
 This option controls the behaviour of
 .Cm got fetch

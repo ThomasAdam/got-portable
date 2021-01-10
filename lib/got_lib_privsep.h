@@ -380,9 +380,11 @@ struct got_imsg_remote {
 	int mirror_references;
 	int fetch_all_branches;
 	int nbranches;
+	int nrefs;
 
 	/* Followed by name_len + url_len data bytes. */
 	/* Followed by nbranches GOT_IMSG_GITCONFIG_STR_VAL messages. */
+	/* Followed by nrefs GOT_IMSG_GITCONFIG_STR_VAL messages. */
 } __attribute__((__packed__));
 
 /*

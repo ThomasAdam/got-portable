@@ -927,6 +927,7 @@ struct got_fetch_progress_arg {
 	struct {
 		struct got_pathlist_head *symrefs;
 		struct got_pathlist_head *wanted_branches;
+		struct got_pathlist_head *wanted_refs;
 		const char *proto;
 		const char *host;
 		const char *port;
@@ -942,7 +943,8 @@ static const struct got_error *
 create_config_files(const char *proto, const char *host, const char *port,
     const char *remote_repo_path, const char *git_url, int fetch_all_branches,
     int mirror_references, struct got_pathlist_head *symrefs,
-    struct got_pathlist_head *wanted_branches, struct got_repository *repo);
+    struct got_pathlist_head *wanted_branches,
+    struct got_pathlist_head *wanted_refs, struct got_repository *repo);
 
 static const struct got_error *
 fetch_progress(void *arg, const char *message, off_t packfile_size,
@@ -969,7 +971,8 @@ fetch_progress(void *arg, const char *message, off_t packfile_size,
 		    a->config_info.fetch_all_branches,
 		    a->config_info.mirror_references,
 		    a->config_info.symrefs,
-		    a->config_info.wanted_branches, a->repo);
+		    a->config_info.wanted_branches,
+		    a->config_info.wanted_refs, a->repo);
 		if (err)
 			return err;
 		a->configs_created = 1;
@@ -1165,14 +1168,15 @@ static const struct got_error *
 create_gotconfig(const char *proto, const char *host, const char *port,
     const char *remote_repo_path, const char *default_branch,
     int fetch_all_branches, struct got_pathlist_head *wanted_branches,
-    int mirror_references, struct got_repository *repo)
+    struct got_pathlist_head *wanted_refs, int mirror_references,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gotconfig_path = NULL;
 	char *gotconfig = NULL;
 	FILE *gotconfig_file = NULL;
 	const char *branchname = NULL;
-	char *branches = NULL;
+	char *branches = NULL, *refs = NULL;
 	ssize_t n;
 
 	if (!fetch_all_branches && !TAILQ_EMPTY(wanted_branches)) {
@@ -1199,6 +1203,22 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 			goto done;
 		}
 	}
+	if (!TAILQ_EMPTY(wanted_refs)) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, wanted_refs, entry) {
+			char *s;
+			const char *refname = pe->path;
+			if (strncmp(refname, "refs/", 5) == 0)
+				branchname += 5;
+			if (asprintf(&s, "%s\"%s\" ",
+			    refs ? refs : "", refname) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(refs);
+			refs = s;
+		}
+	}
 
 	/* Create got.conf(5). */
 	gotconfig_path = got_repo_get_path_gotconfig(repo);
@@ -1218,6 +1238,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    "%s%s%s"
 	    "\trepository \"%s\"\n"
 	    "%s%s%s"
+	    "%s%s%s"
 	    "%s"
 	    "%s"
 	    "}\n",
@@ -1225,6 +1246,7 @@ create_gotconfig(const char *proto, const char *host, const char *port,
 	    port ? "\tport " : "", port ? port : "", port ? "\n" : "",
 	    remote_repo_path, branches ? "\tbranch { " : "",
 	    branches ? branches : "", branches ? "}\n" : "", 
+	    refs ? "\treference { " : "", refs ? refs : "", refs ? "}\n" : "", 
 	    mirror_references ? "\tmirror-references yes\n" : "",
 	    fetch_all_branches ? "\tfetch-all-branches yes\n" : "") == -1) {
 		err = got_error_from_errno("asprintf");
@@ -1247,13 +1269,14 @@ done:
 static const struct got_error *
 create_gitconfig(const char *git_url, const char *default_branch,
     int fetch_all_branches, struct got_pathlist_head *wanted_branches,
-    int mirror_references, struct got_repository *repo)
+    struct got_pathlist_head *wanted_refs, int mirror_references,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *gitconfig_path = NULL;
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
-	char *branches = NULL;
+	char *branches = NULL, *refs = NULL;
 	const char *branchname, *mirror = NULL;
 	ssize_t n;
 
@@ -1319,13 +1342,34 @@ create_gitconfig(const char *git_url, const char *default_branch,
 			goto done;
 		}
 	}
+	if (!mirror_references && !TAILQ_EMPTY(wanted_refs)) {
+		struct got_pathlist_entry *pe;
+		TAILQ_FOREACH(pe, wanted_refs, entry) {
+			char *s;
+			const char *refname = pe->path;
+			if (strncmp(refname, "refs/", 5) == 0)
+				refname += 5;
+			if (asprintf(&s,
+			    "%s\tfetch = +refs/%s:refs/remotes/%s/%s\n",
+			    refs ? refs : "",
+			    refname, GOT_FETCH_DEFAULT_REMOTE_NAME,
+			    refname) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			free(refs);
+			refs = s;
+		}
+	}
+
 	if (asprintf(&gitconfig,
 	    "[remote \"%s\"]\n"
 	    "\turl = %s\n"
 	    "%s"
+	    "%s"
 	    "%s",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url, branches ? branches : "",
-	    mirror ? mirror : "") == -1) {
+	    refs ? refs : "", mirror ? mirror : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
@@ -1346,7 +1390,8 @@ static const struct got_error *
 create_config_files(const char *proto, const char *host, const char *port,
     const char *remote_repo_path, const char *git_url, int fetch_all_branches,
     int mirror_references, struct got_pathlist_head *symrefs,
-    struct got_pathlist_head *wanted_branches, struct got_repository *repo)
+    struct got_pathlist_head *wanted_branches,
+    struct got_pathlist_head *wanted_refs, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	const char *default_branch = NULL;
@@ -1376,13 +1421,13 @@ create_config_files(const char *proto, const char *host, const char *port,
 	/* Create got.conf(5). */
 	err = create_gotconfig(proto, host, port, remote_repo_path,
 	    default_branch, fetch_all_branches, wanted_branches,
-	    mirror_references, repo);
+	    wanted_refs, mirror_references, repo);
 	if (err)
 		return err;
 
 	/* Create a config file Git can understand. */
 	return create_gitconfig(git_url, default_branch, fetch_all_branches,
-	    wanted_branches, mirror_references, repo);
+	    wanted_branches, wanted_refs, mirror_references, repo);
 }
 
 static const struct got_error *
@@ -1566,6 +1611,7 @@ cmd_clone(int argc, char *argv[])
 	fpa.repo = repo;
 	fpa.config_info.symrefs = &symrefs;
 	fpa.config_info.wanted_branches = &wanted_branches;
+	fpa.config_info.wanted_refs = &wanted_refs;
 	fpa.config_info.proto = proto;
 	fpa.config_info.host = host;
 	fpa.config_info.port = port;
@@ -2218,6 +2264,12 @@ cmd_fetch(int argc, char *argv[])
 		for (i = 0; i < remote->nbranches; i++) {
 			got_pathlist_append(&wanted_branches,
 			    remote->branches[i], NULL);
+		}
+	}
+	if (TAILQ_EMPTY(&wanted_refs)) {
+		for (i = 0; i < remote->nrefs; i++) {
+			got_pathlist_append(&wanted_refs,
+			    remote->refs[i], NULL);
 		}
 	}
 

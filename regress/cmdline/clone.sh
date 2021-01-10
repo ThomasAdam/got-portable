@@ -492,6 +492,7 @@ remote "origin" {
 	protocol ssh
 	repository "$testroot/repo"
 	branch { "master" }
+	reference { "hoo" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -512,6 +513,7 @@ EOF
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
 	fetch = +refs/heads/master:refs/remotes/origin/master
+	fetch = +refs/hoo:refs/remotes/origin/hoo
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -565,6 +567,7 @@ remote "origin" {
 	protocol ssh
 	repository "$testroot/repo"
 	branch { "foo" }
+	reference { "hoo/boo/zoo" }
 }
 EOF
 	cmp -s $testroot/repo-clone/got.conf $testroot/got.conf.expected
@@ -585,6 +588,7 @@ EOF
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
 	fetch = +refs/heads/foo:refs/remotes/origin/foo
+	fetch = +refs/hoo/boo/zoo:refs/remotes/origin/hoo/boo/zoo
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -635,6 +639,7 @@ remote "origin" {
 	protocol ssh
 	repository "$testroot/repo"
 	branch { "master" }
+	reference { "hoo" }
 	mirror-references yes
 }
 EOF

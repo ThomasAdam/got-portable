@@ -143,7 +143,8 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		size_t len = sizeof(iremote);
 		struct ibuf *wbuf;
 		struct node_branch *branch;
-		int nbranches = 0;
+		struct node_ref *ref;
+		int nbranches = 0, nrefs = 0;
 
 		branch = repo->branch;
 		while (branch) {
@@ -151,7 +152,14 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 			nbranches++;
 		}
 
+		ref = repo->ref;
+		while (ref) {
+			ref = ref->next;
+			nrefs++;
+		}
+
 		iremote.nbranches = nbranches;
+		iremote.nrefs = nrefs;
 		iremote.mirror_references = repo->mirror_references;
 		iremote.fetch_all_branches = repo->fetch_all_branches;
 
@@ -206,6 +214,14 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 			if (err)
 				break;
 			branch = branch->next;
+		}
+
+		ref = repo->ref;
+		while (ref) {
+			err = send_gotconfig_str(ibuf, ref->ref_name);
+			if (err)
+				break;
+			ref = ref->next;
 		}
 	}
 

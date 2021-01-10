@@ -70,6 +70,10 @@ struct got_remote_repo {
 	/* Branches to fetch by default. */
 	int nbranches;
 	char **branches;
+
+	/* Other arbitrary references to fetch by default. */
+	int nrefs;
+	char **refs;
 };
 
 /*

@@ -1050,9 +1050,44 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+cat > $testroot/repo-clone/got.conf <<EOF
+remote "origin" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/repo"
+	branch { "foo" }
+	reference { "hoo/boo/zoo" }
+}
+EOF
+	(cd $testroot/repo-clone && got fetch -q > $testroot/stdout)
+
+	local tag_id=`got ref -r $testroot/repo -l \
+		| grep "^refs/tags/1.0" | tr -d ' ' | cut -d: -f2`
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/foo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/hoo/boo/zoo: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
-
 }
 
 test_parseargs "$@"

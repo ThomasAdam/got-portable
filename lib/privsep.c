@@ -1808,6 +1808,9 @@ free_remote_data(struct got_remote_repo *remote)
 	for (i = 0; i < remote->nbranches; i++)
 		free(remote->branches[i]);
 	free(remote->branches);
+	for (i = 0; i < remote->nrefs; i++)
+		free(remote->refs[i]);
+	free(remote->refs);
 }
 
 const struct got_error *
@@ -1892,6 +1895,8 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 			remote->fetch_all_branches = iremote.fetch_all_branches;
 			remote->nbranches = 0;
 			remote->branches = NULL;
+			remote->nrefs = 0;
+			remote->refs = NULL;
 			(*nremotes)++;
 			break;
 		default:
@@ -2117,6 +2122,27 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 				}
 				remote->branches[i] = branch;
 				remote->nbranches++;
+			}
+			if (iremote.nrefs > 0) {
+				remote->refs = recallocarray(NULL, 0,
+				    iremote.nrefs, sizeof(char *));
+				if (remote->refs == NULL) {
+					err = got_error_from_errno("calloc");
+					free_remote_data(remote);
+					break;
+				}
+			}
+			remote->nrefs = 0;
+			for (i = 0; i < iremote.nrefs; i++) {
+				char *ref;
+				err = got_privsep_recv_gotconfig_str(&ref,
+				    ibuf);
+				if (err) {
+					free_remote_data(remote);
+					goto done;
+				}
+				remote->refs[i] = ref;
+				remote->nrefs++;
 			}
 			(*nremotes)++;
 			break;

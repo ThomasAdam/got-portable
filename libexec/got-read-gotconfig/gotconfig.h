@@ -21,6 +21,12 @@ struct node_branch {
 	struct node_branch *tail;
 };
 
+struct node_ref {
+	char *ref_name;
+	struct node_ref *next;
+	struct node_ref *tail;
+};
+
 struct gotconfig_remote_repo {
 	TAILQ_ENTRY(gotconfig_remote_repo) entry;
 	char	*name;
@@ -31,6 +37,7 @@ struct gotconfig_remote_repo {
 	int	mirror_references;
 	int	fetch_all_branches;
 	struct	node_branch *branch;
+	struct	node_ref *ref;
 };
 TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
 
