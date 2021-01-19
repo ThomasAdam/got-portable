@@ -2259,14 +2259,14 @@ test_update_single_file() {
 
 	echo c1 > $testroot/repo/c
 	(cd $testroot/repo && git add .)
-	git_commit $testroot/repo -m "adding executable file"
+	git_commit $testroot/repo -m "adding file c"
 	local commit_id1=`git_show_head $testroot/repo`
 
 	echo a > $testroot/repo/a
 	echo b > $testroot/repo/b
 	echo c2 > $testroot/repo/c
 	(cd $testroot/repo && git add .)
-	git_commit $testroot/repo -m "adding executable file"
+	git_commit $testroot/repo -m "add files a and b, change c"
 	local commit_id2=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > /dev/null
@@ -2277,8 +2277,7 @@ test_update_single_file() {
 	fi
 
 	echo "U  c" > $testroot/stdout.expected
-	echo -n "Updated to commit $commit_id1" >> $testroot/stdout.expected
-	echo >> $testroot/stdout.expected
+	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $commit_id1 c \
 		> $testroot/stdout)
@@ -2303,8 +2302,7 @@ test_update_single_file() {
 	fi
 
 	echo "U  c" > $testroot/stdout.expected
-	echo -n "Updated to commit $commit_id2" >> $testroot/stdout.expected
-	echo >> $testroot/stdout.expected
+	echo "Updated to commit $commit_id2" >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update c > $testroot/stdout)
 
