@@ -2254,6 +2254,80 @@ test_update_symlink_conflicts() {
 
 }
 
+test_update_single_file() {
+	local testroot=`test_init update_single_file 1`
+
+	echo c1 > $testroot/repo/c
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding executable file"
+	local commit_id1=`git_show_head $testroot/repo`
+
+	echo a > $testroot/repo/a
+	echo b > $testroot/repo/b
+	echo c2 > $testroot/repo/c
+	(cd $testroot/repo && git add .)
+	git_commit $testroot/repo -m "adding executable file"
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  c" > $testroot/stdout.expected
+	echo -n "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $commit_id1 c \
+		> $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo c1 > $testroot/content.expected
+	cat $testroot/wt/c > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "U  c" > $testroot/stdout.expected
+	echo -n "Updated to commit $commit_id2" >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update c > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo c2 > $testroot/content.expected
+	cat $testroot/wt/c > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_update_basic
 run_test test_update_adds_file
@@ -2293,3 +2367,4 @@ run_test test_update_conflict_wt_file_vs_repo_submodule
 run_test test_update_adds_symlink
 run_test test_update_deletes_symlink
 run_test test_update_symlink_conflicts
+run_test test_update_single_file
