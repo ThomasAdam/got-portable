@@ -2269,7 +2269,11 @@ test_update_single_file() {
 	git_commit $testroot/repo -m "add files a and b, change c"
 	local commit_id2=`git_show_head $testroot/repo`
 
-	got checkout $testroot/repo $testroot/wt > /dev/null
+	(cd $testroot/repo && git rm -qf c)
+	git_commit $testroot/repo -m "remove file c"
+	local commit_id3=`git_show_head $testroot/repo`
+
+	got checkout -c $commit_id2 $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -2304,7 +2308,7 @@ test_update_single_file() {
 	echo "U  c" > $testroot/stdout.expected
 	echo "Updated to commit $commit_id2" >> $testroot/stdout.expected
 
-	(cd $testroot/wt && got update c > $testroot/stdout)
+	(cd $testroot/wt && got update -c $commit_id2 c > $testroot/stdout)
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -2321,8 +2325,54 @@ test_update_single_file() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
 	fi
-	test_done "$testroot" "$ret"
+
+	echo "D  c" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id3" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $commit_id3 c \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	echo "got: /c: no such entry found in tree" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "D  c" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id3" >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -c $commit_id3 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/c ]; then
+		echo "removed file c still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	test_done "$testroot" "0"
+	return 0
 }
 
 
