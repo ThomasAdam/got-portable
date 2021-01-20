@@ -114,7 +114,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/master:refs/remotes/origin/master
+	fetch = refs/heads/master:refs/remotes/origin/master
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -214,7 +215,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/foo:refs/remotes/origin/foo
+	fetch = refs/heads/foo:refs/remotes/origin/foo
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -290,7 +292,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/*:refs/remotes/origin/*
+	fetch = refs/heads/*:refs/remotes/origin/*
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -362,8 +365,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/*:refs/*
-	mirror = true
+	fetch = refs/heads/master:refs/heads/master
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -435,8 +438,8 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/*:refs/*
-	mirror = true
+	fetch = refs/heads/*:refs/heads/*
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -512,8 +515,9 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/master:refs/remotes/origin/master
-	fetch = +refs/hoo:refs/remotes/origin/hoo
+	fetch = refs/heads/master:refs/remotes/origin/master
+	fetch = refs/hoo:refs/remotes/origin/hoo
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -587,8 +591,9 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/foo:refs/remotes/origin/foo
-	fetch = +refs/hoo/boo/zoo:refs/remotes/origin/hoo/boo/zoo
+	fetch = refs/heads/foo:refs/remotes/origin/foo
+	fetch = refs/hoo/boo/zoo:refs/remotes/origin/hoo/boo/zoo
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -660,8 +665,9 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/*:refs/*
-	mirror = true
+	fetch = refs/heads/master:refs/heads/master
+	fetch = refs/hoo:refs/hoo
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"
@@ -731,8 +737,9 @@ EOF
 
 [remote "origin"]
 	url = ssh://127.0.0.1$testroot/repo
-	fetch = +refs/heads/foo:refs/remotes/origin/foo
-	fetch = +refs/heads/bar:refs/remotes/origin/bar
+	fetch = refs/heads/foo:refs/remotes/origin/foo
+	fetch = refs/heads/bar:refs/remotes/origin/bar
+	fetch = refs/tags/*:refs/tags/*
 EOF
 	cmp -s $testroot/repo-clone/config $testroot/config.expected
 	ret="$?"

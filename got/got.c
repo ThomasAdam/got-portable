@@ -1277,7 +1277,7 @@ create_gitconfig(const char *git_url, const char *default_branch,
 	char *gitconfig = NULL;
 	FILE *gitconfig_file = NULL;
 	char *branches = NULL, *refs = NULL;
-	const char *branchname, *mirror = NULL;
+	const char *branchname;
 	ssize_t n;
 
 	/* Create a config file Git can understand. */
@@ -1291,16 +1291,15 @@ create_gitconfig(const char *git_url, const char *default_branch,
 		err = got_error_from_errno2("fopen", gitconfig_path);
 		goto done;
 	}
-	if (mirror_references) {
-		mirror = "\tmirror = true\n";
-		branches = strdup("\tfetch = +refs/*:refs/*\n");
-		if (branches == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else if (fetch_all_branches) {
-		if (asprintf(&branches,
-		    "\tfetch = +refs/heads/*:refs/remotes/%s/*\n",
+	if (fetch_all_branches) {
+		if (mirror_references) {
+			if (asprintf(&branches,
+			    "\tfetch = refs/heads/*:refs/heads/*\n") == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		} else if (asprintf(&branches,
+		    "\tfetch = refs/heads/*:refs/remotes/%s/*\n",
 		    GOT_FETCH_DEFAULT_REMOTE_NAME) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
@@ -1312,8 +1311,16 @@ create_gitconfig(const char *git_url, const char *default_branch,
 			branchname = pe->path;
 			if (strncmp(branchname, "refs/heads/", 11) == 0)
 				branchname += 11;
-			if (asprintf(&s,
-			    "%s\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
+			if (mirror_references) {
+				if (asprintf(&s,
+				    "%s\tfetch = refs/heads/%s:refs/heads/%s\n",
+				    branches ? branches : "",
+				    branchname, branchname) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
+			} else if (asprintf(&s,
+			    "%s\tfetch = refs/heads/%s:refs/remotes/%s/%s\n",
 			    branches ? branches : "",
 			    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
 			    branchname) == -1) {
@@ -1334,23 +1341,37 @@ create_gitconfig(const char *git_url, const char *default_branch,
 				branchname += 11;
 		} else
 			branchname = "*"; /* fall back to all branches */
-		if (asprintf(&branches,
-		    "\tfetch = +refs/heads/%s:refs/remotes/%s/%s\n",
+		if (mirror_references) {
+			if (asprintf(&branches,
+			    "\tfetch = refs/heads/%s:refs/heads/%s\n",
+			    branchname, branchname) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+		} else if (asprintf(&branches,
+		    "\tfetch = refs/heads/%s:refs/remotes/%s/%s\n",
 		    branchname, GOT_FETCH_DEFAULT_REMOTE_NAME,
 		    branchname) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 	}
-	if (!mirror_references && !TAILQ_EMPTY(wanted_refs)) {
+	if (!TAILQ_EMPTY(wanted_refs)) {
 		struct got_pathlist_entry *pe;
 		TAILQ_FOREACH(pe, wanted_refs, entry) {
 			char *s;
 			const char *refname = pe->path;
 			if (strncmp(refname, "refs/", 5) == 0)
 				refname += 5;
-			if (asprintf(&s,
-			    "%s\tfetch = +refs/%s:refs/remotes/%s/%s\n",
+			if (mirror_references) {
+				if (asprintf(&s,
+				    "%s\tfetch = refs/%s:refs/%s\n",
+				    refs ? refs : "", refname, refname) == -1) {
+					err = got_error_from_errno("asprintf");
+					goto done;
+				}
+			} else if (asprintf(&s,
+			    "%s\tfetch = refs/%s:refs/remotes/%s/%s\n",
 			    refs ? refs : "",
 			    refname, GOT_FETCH_DEFAULT_REMOTE_NAME,
 			    refname) == -1) {
@@ -1367,9 +1388,9 @@ create_gitconfig(const char *git_url, const char *default_branch,
 	    "\turl = %s\n"
 	    "%s"
 	    "%s"
-	    "%s",
+	    "\tfetch = refs/tags/*:refs/tags/*\n",
 	    GOT_FETCH_DEFAULT_REMOTE_NAME, git_url, branches ? branches : "",
-	    refs ? refs : "", mirror ? mirror : "") == -1) {
+	    refs ? refs : "") == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
