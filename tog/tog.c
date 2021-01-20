@@ -4237,8 +4237,12 @@ run_blame(struct tog_view *view)
 	}
 	err = got_object_blob_dump_to_file(&blame->filesize, &blame->nlines,
 	    &blame->line_offsets, blame->f, blob);
-	if (err || blame->nlines == 0)
+	if (err)
 		goto done;
+	if (blame->nlines == 0) {
+		s->blame_complete = 1;
+		goto done;
+	}
 
 	/* Don't include \n at EOF in the blame line count. */
 	if (blame->line_offsets[blame->nlines - 1] == blame->filesize)
@@ -4438,7 +4442,7 @@ show_blame_view(struct tog_view *view)
 	struct tog_blame_view_state *s = &view->state.blame;
 	int errcode;
 
-	if (s->blame.thread == NULL) {
+	if (s->blame.thread == NULL && !s->blame_complete) {
 		errcode = pthread_create(&s->blame.thread, NULL, blame_thread,
 		    &s->blame.thread_args);
 		if (errcode)
