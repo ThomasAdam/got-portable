@@ -510,8 +510,8 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->root_path);
 	free(worktree->gotconfig_path);
 	got_gotconfig_free(worktree->gotconfig);
-	free(worktree);
 	close(worktree->root_fd);
+	free(worktree);
 	return err;
 }
 
