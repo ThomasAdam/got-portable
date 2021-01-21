@@ -503,10 +503,11 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->path_prefix);
 	free(worktree->base_commit_id);
 	free(worktree->head_ref_name);
-	if (worktree->lockfd != -1)
+	if (worktree->lockfd != -1) {
 		if (close(worktree->lockfd) != 0)
 			err = got_error_from_errno2("close",
 			    got_worktree_get_root_path(worktree));
+	}
 	free(worktree->root_path);
 	free(worktree->gotconfig_path);
 	got_gotconfig_free(worktree->gotconfig);
