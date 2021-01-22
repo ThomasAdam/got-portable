@@ -3252,7 +3252,7 @@ create_diff(struct tog_diff_view_state *s)
 		err = got_error_from_errno("got_opentemp");
 		goto done;
 	}
-	if (s->f && fclose(s->f) != 0) {
+	if (s->f && fclose(s->f) == EOF) {
 		err = got_error_from_errno("fclose");
 		goto done;
 	}
@@ -4163,7 +4163,7 @@ stop_blame(struct tog_blame *blame)
 		blame->thread_args.repo = NULL;
 	}
 	if (blame->f) {
-		if (fclose(blame->f) != 0 && err == NULL)
+		if (fclose(blame->f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 		blame->f = NULL;
 	}

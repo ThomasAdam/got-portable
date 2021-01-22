@@ -382,7 +382,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 		err = got_error(GOT_ERR_BAD_DELTA);
 
 	if (memstream != NULL) {
-		if (fclose(memstream) != 0)
+		if (fclose(memstream) == EOF)
 			err = got_error_from_errno("fclose");
 		if (err == NULL) {
 			size_t n;

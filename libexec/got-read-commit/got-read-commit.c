@@ -148,7 +148,7 @@ main(int argc, char *argv[])
 		got_object_commit_close(commit);
 done:
 		if (f) {
-			if (fclose(f) != 0 && err == NULL)
+			if (fclose(f) == EOF && err == NULL)
 				err = got_error_from_errno("fclose");
 		} else if (imsg.fd != -1) {
 			if (close(imsg.fd) != 0 && err == NULL)

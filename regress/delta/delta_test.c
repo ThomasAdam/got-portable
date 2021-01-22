@@ -87,7 +87,7 @@ delta_apply(void)
 
 		err = got_delta_apply(base_file, dt->delta, dt->delta_len,
 		    result_file, &result_len);
-		if (fclose(base_file) != 0 && err == NULL)
+		if (fclose(base_file) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 		if (dt->expected == NULL) {
 			/* Invalid delta, expect an error. */

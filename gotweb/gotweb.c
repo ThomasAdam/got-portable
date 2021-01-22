@@ -2696,7 +2696,7 @@ gw_get_repo_description(char **description, struct gw_trans *gw_trans,
 	if (n == 0 && ferror(f))
 		error = got_ferror(f, GOT_ERR_IO);
 done:
-	if (f != NULL && fclose(f) == -1 && error == NULL)
+	if (f != NULL && fclose(f) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	free(d_file);
 	return error;
@@ -2911,7 +2911,7 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 	if (linelen == -1 && ferror(f))
 		error = got_error_from_errno("getline");
 done:
-	if (f && fclose(f) == -1 && error == NULL)
+	if (f && fclose(f) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	free(line);
 	free(label1);
@@ -2994,7 +2994,7 @@ gw_get_clone_url(char **url, struct gw_trans *gw_trans, char *dir)
 	if (n == 0 && ferror(f))
 		error = got_ferror(f, GOT_ERR_IO);
 done:
-	if (f && fclose(f) == -1 && error == NULL)
+	if (f && fclose(f) == EOF && error == NULL)
 		error = got_error_from_errno("fclose");
 	free(d_file);
 	return NULL;

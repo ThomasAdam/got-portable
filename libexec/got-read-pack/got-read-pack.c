@@ -346,11 +346,11 @@ blob_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 	err = got_privsep_send_blob(ibuf, obj->size, obj->hdrlen, buf);
 done:
 	free(buf);
-	if (outfile && fclose(outfile) != 0 && err == NULL)
+	if (outfile && fclose(outfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (basefile && fclose(basefile) != 0 && err == NULL)
+	if (basefile && fclose(basefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (accumfile && fclose(accumfile) != 0 && err == NULL)
+	if (accumfile && fclose(accumfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	got_object_close(obj);
 	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)

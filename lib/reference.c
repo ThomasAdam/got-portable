@@ -227,7 +227,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	}
 done:
 	free(line);
-	if (fclose(f) != 0 && err == NULL) {
+	if (fclose(f) == EOF && err == NULL) {
 		err = got_error_from_errno("fclose");
 		if (*ref) {
 			if (lock)
@@ -486,7 +486,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
 			    refname);
 			if (!err) {
-				if (fclose(f) != 0) {
+				if (fclose(f) == EOF) {
 					err = got_error_from_errno("fclose");
 					got_ref_close(*ref);
 					*ref = NULL;
@@ -1006,7 +1006,7 @@ done:
 	free(buf);
 	free(line);
 	free(path_refs);
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }
@@ -1159,7 +1159,7 @@ done:
 	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
-		if (fclose(f) != 0 && err == NULL)
+		if (fclose(f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
 	free(path_refs);
@@ -1304,12 +1304,12 @@ done:
 	if (delref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf);
 	if (f) {
-		if (fclose(f) != 0 && err == NULL)
+		if (fclose(f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
 	if (tmpf) {
 		unlink(tmppath);
-		if (fclose(tmpf) != 0 && err == NULL)
+		if (fclose(tmpf) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
 	free(tmppath);

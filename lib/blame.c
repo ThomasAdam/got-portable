@@ -293,9 +293,9 @@ blame_close(struct got_blame *blame)
 		if (munmap(blame->map2, blame->size2) == -1 && err == NULL)
 			err = got_error_from_errno("munmap");
 	}
-	if (blame->f1 && fclose(blame->f1) != 0 && err == NULL)
+	if (blame->f1 && fclose(blame->f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (blame->f2 && fclose(blame->f2) != 0 && err == NULL)
+	if (blame->f2 && fclose(blame->f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(blame->lines);
 	free(blame->line_offsets1);

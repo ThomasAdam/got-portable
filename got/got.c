@@ -8442,7 +8442,7 @@ histedit_run_editor(struct got_histedit_list *histedit_cmds,
 
 	err = histedit_check_script(histedit_cmds, commits, repo);
 done:
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(editor);
 	return err;
@@ -8479,7 +8479,7 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 		rewind(f);
 		err = histedit_parse_list(histedit_cmds, f, repo);
 	} else {
-		if (fclose(f) != 0) {
+		if (fclose(f) == EOF) {
 			err = got_error_from_errno("fclose");
 			goto done;
 		}
@@ -8494,7 +8494,7 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 		}
 	}
 done:
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (path && unlink(path) != 0 && err == NULL)
 		err = got_error_from_errno2("unlink", path);
@@ -8537,7 +8537,7 @@ histedit_save_list(struct got_histedit_list *histedit_cmds,
 		}
 	}
 done:
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(path);
 	if (commit)
@@ -8571,7 +8571,7 @@ histedit_load_list(struct got_histedit_list *histedit_cmds,
 
 	err = histedit_parse_list(histedit_cmds, f, repo);
 done:
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }

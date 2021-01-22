@@ -111,7 +111,7 @@ update_meta_file(const char *path_got, const char *name, const char *content)
 	}
 
 done:
-	if (fclose(tmpfile) != 0 && err == NULL)
+	if (fclose(tmpfile) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", tmppath);
 	free(tmppath);
 	return err;
@@ -763,9 +763,9 @@ check_files_equal(int *same, const char *f1_path, const char *f2_path)
 
 	err = check_file_contents_equal(same, f1, f2);
 done:
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 
 	return err;
@@ -916,7 +916,7 @@ done:
 	free(symlink_path);
 	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
 		err = got_error_from_errno("close");
-	if (f_orig && fclose(f_orig) != 0 && err == NULL)
+	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(merged_path);
 	free(base_path);
@@ -1169,7 +1169,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	    ondisk_path, path, st_mode, blob_deriv_path, label_orig,
 	    label_deriv, repo, progress_cb, progress_arg);
 done:
-	if (f_deriv && fclose(f_deriv) != 0 && err == NULL)
+	if (f_deriv && fclose(f_deriv) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(base_path);
 	if (blob_deriv_path) {
@@ -2389,7 +2389,7 @@ open_fileindex(struct got_fileindex **fileindex, char **fileindex_path,
 			err = got_error_from_errno2("fopen", *fileindex_path);
 	} else {
 		err = got_fileindex_read(*fileindex, index);
-		if (fclose(index) != 0 && err == NULL)
+		if (fclose(index) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
 done:
@@ -7694,7 +7694,7 @@ done:
 	if (path_new_staged_content &&
 	    unlink(path_new_staged_content) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", path_new_staged_content);
-	if (f && fclose(f) != 0 && err == NULL)
+	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path_unstaged_content);
 	free(path_unstaged_content);
 	free(path_new_staged_content);

@@ -1229,7 +1229,7 @@ got_object_blob_close(struct got_blob_object *blob)
 {
 	const struct got_error *err = NULL;
 	free(blob->read_buf);
-	if (blob->f && fclose(blob->f) != 0)
+	if (blob->f && fclose(blob->f) == EOF)
 		err = got_error_from_errno("fclose");
 	free(blob->data);
 	free(blob);

@@ -98,9 +98,9 @@ got_diffreg_close(FILE *f1, char *p1, size_t size1,
 		err = got_error_from_errno("munmap");
 	if (p2 && munmap(p2, size2) == -1 && err == NULL)
 		err = got_error_from_errno("munmap");
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }

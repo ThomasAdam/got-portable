@@ -104,7 +104,7 @@ done:
 			err = got_error_from_errno2("unlink", tmppath);
 		free(tmppath);
 	}
-	if (tmpfile && fclose(tmpfile) != 0 && err == NULL)
+	if (tmpfile && fclose(tmpfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (lf)
 		unlock_err = got_lockfile_unlock(lf);
@@ -394,7 +394,7 @@ got_object_tree_create(struct got_object_id **id,
 done:
 	free(header);
 	free(sorted_entries);
-	if (treefile && fclose(treefile) != 0 && err == NULL)
+	if (treefile && fclose(treefile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);
@@ -573,7 +573,7 @@ done:
 	free(tree_str);
 	free(author_str);
 	free(committer_str);
-	if (commitfile && fclose(commitfile) != 0 && err == NULL)
+	if (commitfile && fclose(commitfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);
@@ -751,7 +751,7 @@ done:
 	free(header);
 	free(obj_str);
 	free(tagger_str);
-	if (tagfile && fclose(tagfile) != 0 && err == NULL)
+	if (tagfile && fclose(tagfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err) {
 		free(*id);

@@ -189,9 +189,9 @@ diff_blobs(off_t **line_offsets, size_t *nlines,
 			err = free_err;
 	}
 done:
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }
@@ -279,7 +279,7 @@ diff_blob_file(struct got_diffreg_result **resultp,
 			err = free_err;
 	}
 done:
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }

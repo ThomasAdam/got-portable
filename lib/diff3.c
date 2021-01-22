@@ -244,11 +244,11 @@ done:
 			err = got_error_from_errno2("unlink", outpath);
 		free(outpath);
 	}
-	if (outfile && fclose(outfile) != 0 && err == NULL)
+	if (outfile && fclose(outfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f1 && fclose(f1) != 0 && err == NULL)
+	if (f1 && fclose(f1) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) != 0 && err == NULL)
+	if (f2 && fclose(f2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	return err;
 }
@@ -394,7 +394,7 @@ out:
 	free(patch);
 
 	for (i = 0; i < nitems(d3s->fp); i++) {
-		if (d3s->fp[i] && fclose(d3s->fp[i]) != 0 && err == NULL)
+		if (d3s->fp[i] && fclose(d3s->fp[i]) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
 	}
 	if (err == NULL && diffb) {
@@ -629,7 +629,7 @@ readin(size_t *n, char *name, struct diff **dd, struct diff3_state *d3s)
 		(*dd)[i].new.from = (*dd)[i - 1].new.to;
 	}
 done:
-	if (fclose(f) != 0 && err == NULL)
+	if (fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (err == NULL)
 		*n = i;
