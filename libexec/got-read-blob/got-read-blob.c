@@ -167,11 +167,11 @@ done:
 			if (fclose(f) == EOF && err == NULL)
 				err = got_error_from_errno("fclose");
 		} else if (imsg.fd != -1) {
-			if (close(imsg.fd) != 0 && err == NULL)
+			if (close(imsg.fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
 		if (imsg_outfd.fd != -1) {
-			if (close(imsg_outfd.fd) != 0 && err == NULL)
+			if (close(imsg_outfd.fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");
 		}
 
@@ -190,7 +190,7 @@ done:
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
-	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
+	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
 }

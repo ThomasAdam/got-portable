@@ -303,7 +303,7 @@ buf_write(BUF *b, const char *path, mode_t mode)
 	if (fchmod(fd, mode) < 0)
 		err = got_error_from_errno2("fchmod", path);
 
-	if (close(fd) != 0 && err == NULL)
+	if (close(fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close", path);
 
 	return err;
@@ -328,7 +328,7 @@ buf_write_stmp(BUF *b, char *template)
 		(void)unlink(template);
 	}
 
-	if (close(fd) != 0 && err == NULL)
+	if (close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 
 	return err;

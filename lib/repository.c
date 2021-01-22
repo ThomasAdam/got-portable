@@ -740,7 +740,7 @@ got_repo_close(struct got_repository *repo)
 		    repo->privsep_children[i].pid);
 		if (child_err && err == NULL)
 			err = child_err;
-		if (close(repo->privsep_children[i].imsg_fd) != 0 &&
+		if (close(repo->privsep_children[i].imsg_fd) == -1 &&
 		    err == NULL)
 			err = got_error_from_errno("close");
 	}

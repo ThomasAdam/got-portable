@@ -82,7 +82,7 @@ got_lockfile_unlock(struct got_lockfile *lf)
 
 	if (lf->path && lf->fd != -1 && unlink(lf->path) != 0)
 		err = got_error_from_errno("unlink");
-	if (lf->fd != -1 && close(lf->fd) != 0 && err == NULL)
+	if (lf->fd != -1 && close(lf->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(lf->path);
 	free(lf->locked_path);

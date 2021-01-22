@@ -2307,7 +2307,7 @@ got_privsep_unveil_exec_helpers(void)
 void
 got_privsep_exec_child(int imsg_fds[2], const char *path, const char *repo_path)
 {
-	if (close(imsg_fds[0]) != 0) {
+	if (close(imsg_fds[0]) == -1) {
 		fprintf(stderr, "%s: %s\n", getprogname(), strerror(errno));
 		_exit(1);
 	}

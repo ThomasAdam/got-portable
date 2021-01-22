@@ -557,7 +557,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		    GOT_PATH_PROG_FETCH_PACK, tmppackpath);
 	}
 
-	if (close(imsg_fetchfds[1]) != 0) {
+	if (close(imsg_fetchfds[1]) == -1) {
 		err = got_error_from_errno("close");
 		goto done;
 	}
@@ -732,7 +732,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	} else if (idxpid == 0)
 		got_privsep_exec_child(imsg_idxfds,
 		    GOT_PATH_PROG_INDEX_PACK, tmppackpath);
-	if (close(imsg_idxfds[1]) != 0) {
+	if (close(imsg_idxfds[1]) == -1) {
 		err = got_error_from_errno("close");
 		goto done;
 	}

@@ -111,7 +111,7 @@ main(int argc, char *argv[])
 
 		err = got_privsep_send_obj(&ibuf, obj);
 done:
-		if (close(imsg.fd) != 0 && err == NULL)
+		if (close(imsg.fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (obj)
@@ -127,7 +127,7 @@ done:
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
-	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
+	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
 }

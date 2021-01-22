@@ -203,7 +203,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 	rewind(*blobfile);
 done:
 	free(header);
-	if (fd != -1 && close(fd) != 0 && err == NULL)
+	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (err) {
 		free(*id);

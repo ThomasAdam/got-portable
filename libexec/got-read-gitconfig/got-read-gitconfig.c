@@ -406,7 +406,7 @@ main(int argc, char *argv[])
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
-	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
+	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
 }

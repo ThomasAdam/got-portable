@@ -237,7 +237,7 @@ start_pack_privsep_child(struct got_pack *pack, struct got_packidx *packidx)
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0)
+	if (close(imsg_fds[1]) == -1)
 		return got_error_from_errno("close");
 	pack->privsep_child->imsg_fd = imsg_fds[0];
 	pack->privsep_child->pid = pid;
@@ -362,7 +362,7 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0) {
+	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
 		free(ibuf);
 		return err;
@@ -542,7 +542,7 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0) {
+	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
 		free(ibuf);
 		return err;
@@ -731,7 +731,7 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0) {
+	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
 		free(ibuf);
 		return err;
@@ -1087,7 +1087,7 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0) {
+	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
 		free(ibuf);
 		return err;
@@ -1163,7 +1163,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	}
 
 	if (outbuf) {
-		if (close(outfd) != 0 && err == NULL)
+		if (close(outfd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		outfd = -1;
 		(*blob)->f = fmemopen(outbuf, size, "rb");
@@ -1444,7 +1444,7 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 		/* not reached */
 	}
 
-	if (close(imsg_fds[1]) != 0) {
+	if (close(imsg_fds[1]) == -1) {
 		err = got_error_from_errno("close");
 		free(ibuf);
 		return err;

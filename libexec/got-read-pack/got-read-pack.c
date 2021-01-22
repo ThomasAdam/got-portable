@@ -1009,7 +1009,7 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (imsg.fd != -1 && close(imsg.fd) != 0 && err == NULL)
+		if (imsg.fd != -1 && close(imsg.fd) == -1 && err == NULL)
 			err = got_error_from_errno("close");
 		imsg_free(&imsg);
 		if (err)
@@ -1028,7 +1028,7 @@ main(int argc, char *argv[])
 			got_privsep_send_error(&ibuf, err);
 		}
 	}
-	if (close(GOT_IMSG_FD_CHILD) != 0 && err == NULL)
+	if (close(GOT_IMSG_FD_CHILD) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	return err ? 1 : 0;
 }

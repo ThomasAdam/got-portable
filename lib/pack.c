@@ -408,7 +408,7 @@ got_packidx_close(struct got_packidx *packidx)
 		free(packidx->hdr.large_offsets);
 		free(packidx->hdr.trailer);
 	}
-	if (close(packidx->fd) != 0 && err == NULL)
+	if (close(packidx->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(packidx);
 
@@ -525,7 +525,7 @@ got_pack_stop_privsep_child(struct got_pack *pack)
 	if (err)
 		return err;
 	err = got_privsep_wait_for_child(pack->privsep_child->pid);
-	if (close(pack->privsep_child->imsg_fd) != 0 && err == NULL)
+	if (close(pack->privsep_child->imsg_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(pack->privsep_child);
 	pack->privsep_child = NULL;
@@ -540,7 +540,7 @@ got_pack_close(struct got_pack *pack)
 	err = got_pack_stop_privsep_child(pack);
 	if (pack->map && munmap(pack->map, pack->filesize) == -1 && !err)
 		err = got_error_from_errno("munmap");
-	if (pack->fd != -1 && close(pack->fd) != 0 && err == NULL)
+	if (pack->fd != -1 && close(pack->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	pack->fd = -1;
 	free(pack->path_packfile);

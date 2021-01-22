@@ -504,7 +504,7 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->base_commit_id);
 	free(worktree->head_ref_name);
 	if (worktree->lockfd != -1) {
-		if (close(worktree->lockfd) != 0)
+		if (close(worktree->lockfd) == -1)
 			err = got_error_from_errno2("close",
 			    got_worktree_get_root_path(worktree));
 	}
@@ -914,7 +914,7 @@ done:
 	if (symlinkf && fclose(symlinkf) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", symlink_path);
 	free(symlink_path);
-	if (merged_fd != -1 && close(merged_fd) != 0 && err == NULL)
+	if (merged_fd != -1 && close(merged_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -1581,7 +1581,7 @@ install_blob(struct got_worktree *worktree, const char *ondisk_path,
 	}
 
 done:
-	if (fd != -1 && close(fd) != 0 && err == NULL)
+	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (tmppath != NULL && unlink(tmppath) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", tmppath);
@@ -3623,7 +3623,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	}
 done:
 	free_ignores(&arg.ignores);
-	if (fd != -1 && close(fd) != 0 && err == NULL)
+	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(ondisk_path);
 	return err;
