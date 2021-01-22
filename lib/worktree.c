@@ -7108,6 +7108,10 @@ got_worktree_integrate_continue(struct got_worktree *worktree,
 		goto sync;
 
 	err = got_ref_write(base_branch_ref, repo);
+	if (err)
+		goto sync;
+
+	err = bump_base_commit_id_everywhere(worktree, fileindex, NULL, NULL);
 sync:
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
