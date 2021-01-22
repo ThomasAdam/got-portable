@@ -511,7 +511,9 @@ got_worktree_close(struct got_worktree *worktree)
 	free(worktree->root_path);
 	free(worktree->gotconfig_path);
 	got_gotconfig_free(worktree->gotconfig);
-	close(worktree->root_fd);
+	if (close(worktree->root_fd) == -1 && err == NULL)
+		err = got_error_from_errno2("close",
+		    got_worktree_get_root_path(worktree));
 	free(worktree);
 	return err;
 }
