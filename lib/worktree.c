@@ -499,21 +499,22 @@ const struct got_error *
 got_worktree_close(struct got_worktree *worktree)
 {
 	const struct got_error *err = NULL;
-	free(worktree->repo_path);
-	free(worktree->path_prefix);
-	free(worktree->base_commit_id);
-	free(worktree->head_ref_name);
+
 	if (worktree->lockfd != -1) {
 		if (close(worktree->lockfd) == -1)
 			err = got_error_from_errno2("close",
 			    got_worktree_get_root_path(worktree));
 	}
-	free(worktree->root_path);
-	free(worktree->gotconfig_path);
-	got_gotconfig_free(worktree->gotconfig);
 	if (close(worktree->root_fd) == -1 && err == NULL)
 		err = got_error_from_errno2("close",
 		    got_worktree_get_root_path(worktree));
+	free(worktree->repo_path);
+	free(worktree->path_prefix);
+	free(worktree->base_commit_id);
+	free(worktree->head_ref_name);
+	free(worktree->root_path);
+	free(worktree->gotconfig_path);
+	got_gotconfig_free(worktree->gotconfig);
 	free(worktree);
 	return err;
 }
