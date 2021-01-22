@@ -1,3 +1,21 @@
+* got 0.48; 2021-01-22
+- use POSIX [s1 = s2] syntax instead of [s1 == s2] (patch by Ryo ONODERA)
+- tog log: terminate author field at '>' in case there is no '@' (naddy)
+- replace fparseln(3) with getline(3), for better portability (naddy)
+- make 'got clone' pin the fetched branch in got.conf(5)
+- allow the 'got fetch' -l option together with the -q option
+- store branches passed via 'got clone -b' in got.conf(5) and git-config(1)
+- work around spurious ACK responses from git servers in got-fetch-pack
+- add a 'fetch-all-branches' configuration setting to got.conf(5)
+- add a 'reference' directive to remote repositories in got.conf(5)
+- fix 'got up -c commit path' deleting unrelated files (found by Timo Myyrä)
+- fix 'tog blame' segfault upon empty input file (found by naddy)
+- let 'got clone' write gitconfig directives that match the generated got.conf
+- fix a use after free in got_worktree_close() (naddy)
+- make fclose(3) failure checks consistent; check 'fclose() == EOF' everywhere
+- make close(2) failure checks consistent; check 'close() == -1' everywhere
+- fix missing close(2) error check in got_worktree_close()
+
 * got 0.47; 2020-12-27
 - update got.1 CAVEATS section; prompted by feedback from otto@
 - fix assignment to wrong pointer in got_ref_dup()
