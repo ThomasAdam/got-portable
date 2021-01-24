@@ -502,6 +502,7 @@ struct tog_view {
 
 	const struct got_error *(*search_start)(struct tog_view *);
 	const struct got_error *(*search_next)(struct tog_view *);
+	int search_started;
 	int searching;
 #define TOG_SEARCH_FORWARD	1
 #define TOG_SEARCH_BACKWARD	2
@@ -785,6 +786,13 @@ view_search_start(struct tog_view *view)
 	char pattern[1024];
 	int ret;
 
+	if (view->search_started) {
+		regfree(&view->regex);
+		view->searching = 0;
+		memset(&view->regmatch, 0, sizeof(view->regmatch));
+	}
+	view->search_started = 0;
+
 	if (view->nlines < 1)
 		return NULL;
 
@@ -799,17 +807,13 @@ view_search_start(struct tog_view *view)
 	if (ret == ERR)
 		return NULL;
 
-	if (view->searching) {
-		regfree(&view->regex);
-		view->searching = 0;
-	}
-
 	if (regcomp(&view->regex, pattern, REG_EXTENDED | REG_NEWLINE) == 0) {
 		err = view->search_start(view);
 		if (err) {
 			regfree(&view->regex);
 			return err;
 		}
+		view->search_started = 1;
 		view->searching = TOG_SEARCH_FORWARD;
 		view->search_next_done = 0;
 		view->search_next(view);
@@ -939,7 +943,7 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 		break;
 	case 'N':
 	case 'n':
-		if (view->search_next) {
+		if (view->search_started && view->search_next) {
 			view->searching = (ch == 'n' ?
 			    TOG_SEARCH_FORWARD : TOG_SEARCH_BACKWARD);
 			view->search_next_done = 0;
