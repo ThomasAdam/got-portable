@@ -1524,8 +1524,6 @@ cmd_clone(int argc, char *argv[])
 			option_conflict('l', 'a');
 		if (mirror_references)
 			option_conflict('l', 'm');
-		if (verbosity == -1)
-			option_conflict('l', 'q');
 		if (!TAILQ_EMPTY(&wanted_refs))
 			option_conflict('l', 'R');
 	}
