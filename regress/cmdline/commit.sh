@@ -1357,6 +1357,106 @@ test_commit_fix_bad_symlink() {
 	test_done "$testroot" "0"
 }
 
+test_commit_prepared_logmsg() {
+	local testroot=`test_init commit_prepared_logmsg`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+
+	echo 'test commit_prepared_logmsg' > $testroot/logmsg
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 's/foo/bar/' "\$1"
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		got commit -F "$testroot/logmsg" > $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "A  new" > $testroot/stdout.expected
+	echo "M  alpha" >> $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local author_time=`git_show_author_time $testroot/repo`
+	d=`env TZ=UTC date -r $author_time +"%a %b %e %X %Y UTC"`
+	echo "-----------------------------------------------" > $testroot/stdout.expected
+	echo "commit $head_rev (master)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " test commit_prepared_logmsg" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -l 1 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha again" > $testroot/wt/alpha
+
+	echo 'test commit_prepared_logmsg non-interactive' \
+		> $testroot/logmsg
+
+	(cd $testroot/wt && got commit -N -F "$testroot/logmsg" \
+		> $testroot/stdout)
+
+	local head_rev=`git_show_head $testroot/repo`
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "Created commit $head_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local author_time=`git_show_author_time $testroot/repo`
+	d=`env TZ=UTC date -r $author_time +"%a %b %e %X %Y UTC"`
+	echo "-----------------------------------------------" \
+		> $testroot/stdout.expected
+	echo "commit $head_rev (master)" >> $testroot/stdout.expected
+	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
+	echo "date: $d" >> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+	echo " test commit_prepared_logmsg non-interactive" \
+		>> $testroot/stdout.expected
+	echo " " >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got log -l 1 > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_commit_basic
 run_test test_commit_new_subdir
@@ -1382,3 +1482,4 @@ run_test test_commit_normalizes_filemodes
 run_test test_commit_with_unrelated_submodule
 run_test test_commit_symlink
 run_test test_commit_fix_bad_symlink
+run_test test_commit_prepared_logmsg

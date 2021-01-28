@@ -1216,7 +1216,7 @@ is a directory.
 .It Cm rv
 Short alias for
 .Cm revert .
-.It Cm commit Oo Fl m Ar message Oc Oo Fl S Oc Op Ar path ...
+.It Cm commit Oo Fl F Ar path Oc Oo Fl m Ar message Oc Oo Fl N Oc Oo Fl S Oc Op Ar path ...
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
 If no
@@ -1228,6 +1228,17 @@ If changes have been explicitly staged for commit with
 .Cm got stage ,
 only commit staged changes and reject any specified paths which
 have not been staged.
+.Pp
+.Cm got commit
+opens a temporary file in an editor where a log message can be written
+unless the
+.Fl m
+option is used
+or the
+.Fl F
+and
+.Fl N
+options are used together.
 .Pp
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -1269,13 +1280,28 @@ The options for
 .Cm got commit
 are as follows:
 .Bl -tag -width Ds
+.It Fl F Ar path
+Use the prepared log message stored in the file found at
+.Ar path
+when creating the new commit.
+.Cm got commit
+opens a temporary file in an editor where the prepared log message can be
+reviewed and edited further if needed.
+Cannot be used together with the
+.Fl m
+option.
 .It Fl m Ar message
 Use the specified log message when creating the new commit.
-Without the
-.Fl m
-option,
+Cannot be used together with the
+.Fl F
+option.
+.It Fl N
+This option prevents
 .Cm got commit
-opens a temporary file in an editor where a log message can be written.
+from opening the commit message in an editor.
+It has no effect unless it is used together with the
+.Fl F
+option and is intended for non-interactive use such as scripting.
 .It Fl S
 Allow the addition of symbolic links which point outside of the path space
 that is under version control.
@@ -2126,16 +2152,9 @@ with a pre-defined log message.
 .Pp
 Alternatively, create a new commit from local changes in a work tree
 directory with a log message that has been prepared in the file
-.Pa /tmp/msg .
-If
-.Xr vi 1
-is set as the
-.Ev EDITOR ,
-.Pa /tmp/msg
-can be read into the buffer for review:
+.Pa /tmp/msg:
 .Pp
-.Dl $ got commit
-.Dl :r /tmp/msg
+.Dl $ got commit -F /tmp/msg
 .Pp
 Update any work tree checked out from the
 .Dq unified-buffer-cache

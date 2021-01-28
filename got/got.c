@@ -431,7 +431,8 @@ doneediting:
 
 static const struct got_error *
 edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
-    const char *initial_content, size_t initial_content_len, int check_comments)
+    const char *initial_content, size_t initial_content_len,
+    int require_modification)
 {
 	const struct got_error *err = NULL;
 	char *line = NULL;
@@ -453,7 +454,8 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 	if (stat(logmsg_path, &st2) == -1)
 		return got_error_from_errno("stat");
 
-	if (st.st_mtime == st2.st_mtime && st.st_size == st2.st_size)
+	if (require_modification &&
+	    st.st_mtime == st2.st_mtime && st.st_size == st2.st_size)
 		return got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 
@@ -526,7 +528,8 @@ edit_logmsg(char **logmsg, const char *editor, const char *logmsg_path,
 		    "commit message cannot be empty, aborting");
 		goto done;
 	}
-	if (check_comments && strcmp(*logmsg, initial_content_stripped) == 0)
+	if (require_modification &&
+	    strcmp(*logmsg, initial_content_stripped) == 0)
 		err = got_error_msg(GOT_ERR_COMMIT_MSG_EMPTY,
 		    "no changes made to commit message, aborting");
 done:
@@ -6927,13 +6930,15 @@ done:
 __dead static void
 usage_commit(void)
 {
-	fprintf(stderr, "usage: %s commit [-m msg] [-S] [path ...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s commit [-F path] [-m msg] [-N] [-S] "
+	    "[path ...]\n", getprogname());
 	exit(1);
 }
 
 struct collect_commit_logmsg_arg {
 	const char *cmdline_log;
+	const char *prepared_log;
+	int non_interactive;
 	const char *editor;
 	const char *worktree_path;
 	const char *branch_name;
@@ -6941,6 +6946,56 @@ struct collect_commit_logmsg_arg {
 	char *logmsg_path;
 
 };
+
+static const struct got_error *
+read_prepared_logmsg(char **logmsg, const char *path)
+{
+	const struct got_error *err = NULL;
+	FILE *f = NULL;
+	struct stat sb;
+	size_t r;
+
+	*logmsg = NULL;
+	memset(&sb, 0, sizeof(sb));
+
+	f = fopen(path, "r");
+	if (f == NULL)
+		return got_error_from_errno2("fopen", path);
+
+	if (fstat(fileno(f), &sb) == -1) {
+		err = got_error_from_errno2("fstat", path);
+		goto done;
+	}
+	if (sb.st_size == 0) {
+		err = got_error(GOT_ERR_COMMIT_MSG_EMPTY);
+		goto done;
+	}
+
+	*logmsg = malloc(sb.st_size + 1);
+	if (*logmsg == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+
+	r = fread(*logmsg, 1, sb.st_size, f);
+	if (r != sb.st_size) {
+		if (ferror(f))
+			err = got_error_from_errno2("fread", path);
+		else
+			err = got_error(GOT_ERR_IO);
+		goto done;
+	}
+	(*logmsg)[sb.st_size] = '\0';
+done:
+	if (fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path);
+	if (err) {
+		free(*logmsg);
+		*logmsg = NULL;
+	}
+	return err;
+	
+}
 
 static const struct got_error *
 collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
@@ -6963,20 +7018,36 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 			return got_error_from_errno("malloc");
 		strlcpy(*logmsg, a->cmdline_log, len);
 		return NULL;
-	}
+	} else if (a->prepared_log != NULL && a->non_interactive)
+		return read_prepared_logmsg(logmsg, a->prepared_log);
 
 	if (asprintf(&template, "%s/logmsg", a->worktree_path) == -1)
-		return got_error_from_errno("asprintf");
-
-	initial_content_len = asprintf(&initial_content,
-	    "\n# changes to be committed on branch %s:\n",
-	    a->branch_name);
-	if (initial_content_len == -1)
 		return got_error_from_errno("asprintf");
 
 	err = got_opentemp_named_fd(&a->logmsg_path, &fd, template);
 	if (err)
 		goto done;
+
+	if (a->prepared_log) {
+		char *msg;
+		err = read_prepared_logmsg(&msg, a->prepared_log);
+		if (err)
+			goto done;
+		if (write(fd, msg, strlen(msg)) == -1) {
+			err = got_error_from_errno2("write", a->logmsg_path);
+			free(msg);
+			goto done;
+		}
+		free(msg);
+	}
+
+	initial_content_len = asprintf(&initial_content,
+	    "\n# changes to be committed on branch %s:\n",
+	    a->branch_name);
+	if (initial_content_len == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
 
 	if (write(fd, initial_content, initial_content_len) == -1) {
 		err = got_error_from_errno2("write", a->logmsg_path);
@@ -6991,7 +7062,7 @@ collect_commit_logmsg(struct got_pathlist_head *commitable_paths, char **logmsg,
 	}
 
 	err = edit_logmsg(logmsg, a->editor, a->logmsg_path, initial_content,
-	    initial_content_len, 1);
+	    initial_content_len, a->prepared_log ? 0 : 1);
 done:
 	free(initial_content);
 	free(template);
@@ -7018,19 +7089,33 @@ cmd_commit(int argc, char *argv[])
 	char *cwd = NULL, *id_str = NULL;
 	struct got_object_id *id = NULL;
 	const char *logmsg = NULL;
+	char *prepared_logmsg = NULL;
 	struct collect_commit_logmsg_arg cl_arg;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
-	int allow_bad_symlinks = 0;
+	int allow_bad_symlinks = 0, non_interactive = 0;
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
 	cl_arg.logmsg_path = NULL;
 
-	while ((ch = getopt(argc, argv, "m:S")) != -1) {
+	while ((ch = getopt(argc, argv, "F:m:NS")) != -1) {
 		switch (ch) {
+		case 'F':
+			if (logmsg != NULL)
+				option_conflict('F', 'm');
+			prepared_logmsg = realpath(optarg, NULL);
+			if (prepared_logmsg == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			break;
 		case 'm':
+			if (prepared_logmsg)
+				option_conflict('m', 'F');
 			logmsg = optarg;
+			break;
+		case 'N':
+			non_interactive = 1;
 			break;
 		case 'S':
 			allow_bad_symlinks = 1;
@@ -7104,6 +7189,8 @@ cmd_commit(int argc, char *argv[])
 
 	cl_arg.editor = editor;
 	cl_arg.cmdline_log = logmsg;
+	cl_arg.prepared_log = prepared_logmsg;
+	cl_arg.non_interactive = non_interactive;
 	cl_arg.worktree_path = got_worktree_get_root_path(worktree);
 	cl_arg.branch_name = got_worktree_get_head_ref_name(worktree);
 	if (!histedit_in_progress) {
@@ -7145,6 +7232,7 @@ done:
 	free(gitconfig_path);
 	free(editor);
 	free(author);
+	free(prepared_logmsg);
 	return error;
 }
 
