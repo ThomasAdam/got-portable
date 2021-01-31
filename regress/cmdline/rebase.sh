@@ -173,10 +173,8 @@ test_rebase_ancestry_check() {
 		return 1
 	fi
 
-	echo -n "got: specified branch resolves to a commit " \
+	echo "got: refs/heads/newbranch is already based on refs/heads/master" \
 		> $testroot/stderr.expected
-	echo "which is already contained in work tree's branch" \
-		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

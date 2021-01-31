@@ -7918,9 +7918,12 @@ cmd_rebase(int argc, char *argv[])
 				goto done;
 			error = NULL;
 		} else {
-			error = got_error_msg(GOT_ERR_SAME_BRANCH,
-			    "specified branch resolves to a commit which "
-			    "is already contained in work tree's branch");
+			static char msg[128];
+			snprintf(msg, sizeof(msg),
+			    "%s is already based on %s",
+			    got_ref_get_name(branch),
+			    got_worktree_get_head_ref_name(worktree));
+			error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
 			goto done;
 		}
 		error = got_worktree_rebase_prepare(&new_base_branch,
