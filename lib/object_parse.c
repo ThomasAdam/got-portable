@@ -338,8 +338,14 @@ parse_commit_time(time_t *time, time_t *gmtoff, char *committer)
 		return got_error_from_errno("strdup");
 	err = parse_gmtoff(gmtoff, tzstr);
 	free(tzstr);
-	if (err)
-		return err;
+	if (err) { 
+		if (err->code != GOT_ERR_BAD_OBJ_DATA)
+			return err;
+		/* Old versions of Git omitted the timestamp. */
+		*time = 0;
+		*gmtoff = 0;
+		return NULL;
+	}
 	*space = '\0';
 
 	/* Timestamp is separated from committer name + email by space. */
