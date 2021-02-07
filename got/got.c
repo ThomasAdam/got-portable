@@ -10129,7 +10129,7 @@ cmd_info(int argc, char *argv[])
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
 		if (error->code == GOT_ERR_NOT_WORKTREE)
-			error = wrap_not_worktree_error(error, "status", cwd);
+			error = wrap_not_worktree_error(error, "info", cwd);
 		goto done;
 	}
 
