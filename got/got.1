@@ -978,12 +978,12 @@ Cannot be used together with any other options except
 .It Cm branch Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Oo Fl n Oc Op Ar name
 Create, list, or delete branches.
 .Pp
-Branches are managed via references which live in the
+Local branches are managed via references which live in the
 .Dq refs/heads/
 reference namespace.
 The
 .Cm got branch
-command operates on references in this namespace only.
+command creates or deletes references in this namespace only.
 .Pp
 If invoked in a work tree without any arguments, print the name of the
 work tree's current branch.
@@ -1030,7 +1030,11 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .It Fl l
-List all existing branches in the repository.
+List all existing branches in the repository, including copies of remote
+repositories' branches in the
+.Dq refs/remotes/
+reference namespace.
+.Pp
 If invoked in a work tree, the work tree's current branch is shown
 with one the following annotations:
 .Bl -column YXZ description

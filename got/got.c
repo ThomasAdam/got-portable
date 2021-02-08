@@ -5543,6 +5543,8 @@ list_branch(struct got_repository *repo, struct got_worktree *worktree,
 		refname += 11;
 	if (strncmp(refname, "refs/got/worktree/", 18) == 0)
 		refname += 18;
+	if (strncmp(refname, "refs/remotes/", 13) == 0)
+		refname += 13;
 
 	refstr = got_ref_to_str(ref);
 	if (refstr == NULL)
@@ -5614,6 +5616,17 @@ list_branches(struct got_repository *repo, struct got_worktree *worktree)
 		list_branch(repo, worktree, re->ref);
 
 	got_ref_list_free(&refs);
+
+	err = got_ref_list(&refs, repo, "refs/remotes",
+	    got_ref_cmp_by_name, NULL);
+	if (err)
+		return err;
+
+	TAILQ_FOREACH(re, &refs, entry)
+		list_branch(repo, worktree, re->ref);
+
+	got_ref_list_free(&refs);
+
 	return NULL;
 }
 
