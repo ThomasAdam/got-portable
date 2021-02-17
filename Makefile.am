@@ -10,7 +10,7 @@ EXTRA_DIST = compat/*.[ch] \
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION'" \
 	-DGOT_VERSION_NUMBER='"@VERSION"' \
-	-DGOT_LIBEXEC_DIR="${bindir}" \
+	-DGOT_LIBEXECDIR="${bindir}" \
 	-I$(top_srcdir)/lib \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/include

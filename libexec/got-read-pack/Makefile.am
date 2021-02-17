@@ -17,7 +17,7 @@ got_read_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXEC_DIR="${bindir}" \
+	-DGOT_LIBEXECDIR="${bindir}" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/lib \
