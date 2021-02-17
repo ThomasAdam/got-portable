@@ -1,4 +1,5 @@
 libexec_PROGRAMS = got-index-pack
+bin_PROGRAMS = got-index-pack
 got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/inflate.c \
