@@ -15,7 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -38,8 +37,9 @@
 #include <errno.h>
 #include <libgen.h>
 #include <stdint.h>
-#include <imsg.h>
 #include <uuid.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_reference.h"
@@ -1015,7 +1015,8 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	while ((dent = readdir(packdir)) != NULL) {
 		int is_cached = 0;
 
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name)))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
@@ -1283,7 +1284,8 @@ match_packed_object(struct got_object_id **unique_id,
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
 
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name)))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
@@ -1959,7 +1961,8 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name,
+		    strlen(dent->d_name)))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,

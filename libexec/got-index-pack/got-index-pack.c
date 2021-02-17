@@ -15,7 +15,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/queue.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -24,7 +23,6 @@
 
 #include <stdint.h>
 #include <errno.h>
-#include <imsg.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
@@ -42,6 +40,8 @@
 
 #include "got_error.h"
 #include "got_object.h"
+
+#include "got_compat.h"
 
 #include "got_lib_sha1.h"
 #include "got_lib_delta.h"

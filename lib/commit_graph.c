@@ -16,8 +16,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/queue.h>
-#include <sys/stdint.h>
 
 #include <limits.h>
 #include <stdio.h>
@@ -26,6 +24,8 @@
 #include <sha1.h>
 #include <zlib.h>
 #include <ctype.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"

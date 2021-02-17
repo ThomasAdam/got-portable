@@ -27,7 +27,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/stat.h>
 
 #include <ctype.h>
@@ -38,6 +37,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 

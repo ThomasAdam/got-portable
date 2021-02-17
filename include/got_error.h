@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "got_compat.h"
+
 /* Error codes */
 #define GOT_ERR_OK		0
 #define GOT_ERR_ERRNO		1

@@ -23,6 +23,8 @@
 #include <wchar.h>
 #include <langinfo.h>
 
+#include "got_compat.h"
+
 #include "got_error.h"
 #include "got_utf8.h"
 

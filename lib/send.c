@@ -17,7 +17,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -37,7 +36,6 @@
 #include <zlib.h>
 #include <ctype.h>
 #include <limits.h>
-#include <imsg.h>
 #include <time.h>
 #include <uuid.h>
 

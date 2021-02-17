@@ -32,7 +32,7 @@
 #define GOT_IMSG_FD_CHILD (STDERR_FILENO + 1)
 
 #ifndef GOT_LIBEXECDIR
-#define GOT_LIBEXECDIR /usr/libexec
+#define GOT_LIBEXECDIR /usr/local/bin
 #endif
 
 /* Names of helper programs in libexec directory */

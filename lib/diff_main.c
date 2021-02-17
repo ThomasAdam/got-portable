@@ -16,7 +16,6 @@
  */
 
 
-#include <sys/queue.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>
@@ -31,6 +30,8 @@
 
 #include <arraylist.h>
 #include <diff_main.h>
+
+#include "got_compat.h"
 
 #include "diff_internal.h"
 #include "diff_debug.h"

@@ -15,7 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 
@@ -25,9 +24,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <imsg.h>
 #include <sha1.h>
 #include <limits.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"

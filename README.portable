@@ -1,0 +1,48 @@
+README.portable
+===============
+
+This is the portable version of got[1] (Game of Trees), using autotools to
+provide the library checks required for Got's dependencies.
+
+Currently this has only been tested on Linux, although in theory this should
+still work on *BSD although the BSDs are already packaging Got via ports so
+this isn't a core focus of this portable repository, but patches to improve
+portability across systems are welcomed.
+
+DEPENDENCIES
+============
+
+Got requires the following libraries:
+
+* libncurses (for tog(1))
+* libmd (BSD's digest routines)
+* libcrypto (often via 'libssl-dev' for SHA1 routines)
+* libuuid (for UUID generation)
+* libz (for Z compression)
+
+Currently, these dependencies are searched for via pkg-config(1) which must
+also be installed.
+
+INSTALLATION
+============
+
+ $ autoreconf -i
+ $ ./configure && make
+ $ sudo make install
+
+TODO
+====
+
+This port is incomplete in that only got(1) and tog(1) have been ported.
+gotweb and the test suite (regress) have yet to be ported.
+
+configure.ac should start defining AC_ENABLE arguments to allow for
+finer-grained control of where to search for includes/libraries, etc.
+
+CONTACT
+=======
+
+Thomas Adam <thomas@xteddy.org>
+thomas_adam (#gameoftrees on irc.freenode.net)
+
+[1]  https://gameoftrees.org

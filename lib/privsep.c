@@ -16,7 +16,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 
@@ -29,11 +28,12 @@
 #include <errno.h>
 #include <stdint.h>
 #include <poll.h>
-#include <imsg.h>
 #include <sha1.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <time.h>
+
+#include "got_compat.h"
 
 #include "got_object.h"
 #include "got_error.h"

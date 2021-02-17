@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/queue.h>
 
 #include <errno.h>
 #include <limits.h>
@@ -25,6 +24,8 @@
 #include <sha1.h>
 #include <zlib.h>
 #include <uuid.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"

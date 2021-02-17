@@ -14,8 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/queue.h>
-#include <sys/tree.h>
 #include <sys/stat.h>
 
 #include <errno.h>
@@ -29,6 +27,8 @@
 #include <limits.h>
 #include <unistd.h>
 #include <uuid.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"
@@ -1099,7 +1099,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			}
 			cmp = got_path_cmp((*ie)->path, de_path,
 			    got_fileindex_entry_path_len(*ie),
-			    strlen(path) + 1 + de->d_namlen);
+			    strlen(path) + 1 + strlen(de->d_name));
 			free(de_path);
 			if (cmp == 0) {
 				err = cb->diff_old_new(cb_arg, *ie, de, path,

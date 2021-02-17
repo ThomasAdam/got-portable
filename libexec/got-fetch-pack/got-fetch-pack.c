@@ -15,14 +15,12 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 
 #include <stdint.h>
 #include <errno.h>
-#include <imsg.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
@@ -34,6 +32,8 @@
 #include <unistd.h>
 #include <zlib.h>
 #include <err.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"

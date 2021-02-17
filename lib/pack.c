@@ -16,7 +16,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/mman.h>
 
@@ -31,7 +30,6 @@
 #include <endian.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <imsg.h>
 
 #include "got_error.h"
 #include "got_object.h"

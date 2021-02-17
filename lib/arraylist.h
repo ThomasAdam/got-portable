@@ -37,6 +37,9 @@
  *         printf("%s", foo_to_str(list.head[i]));
  * ARRAYLIST_FREE(list);
  */
+
+#include "got_compat.h"
+
 #define ARRAYLIST(MEMBER_TYPE) \
 	struct { \
 		MEMBER_TYPE *head; \

@@ -23,7 +23,6 @@
 
 %{
 #include <sys/types.h>
-#include <sys/queue.h>
 
 #include <netdb.h>
 
@@ -35,6 +34,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "gotconfig.h"

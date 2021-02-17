@@ -16,7 +16,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -37,7 +36,8 @@
 #include <paths.h>
 #include <regex.h>
 #include <getopt.h>
-#include <util.h>
+
+#include "got_compat.h"
 
 #include "got_version.h"
 #include "got_error.h"

@@ -15,7 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/time.h>
 #include <sys/mman.h>
@@ -23,13 +22,14 @@
 #include <limits.h>
 #include <signal.h>
 #include <stdint.h>
-#include <imsg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sha1.h>
 #include <unistd.h>
 #include <zlib.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_object.h"

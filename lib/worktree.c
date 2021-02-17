@@ -15,8 +15,6 @@
  */
 
 #include <sys/stat.h>
-#include <sys/queue.h>
-#include <sys/tree.h>
 
 #include <dirent.h>
 #include <limits.h>
@@ -32,8 +30,8 @@
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>
-#include <uuid.h>
-#include <util.h>
+
+#include "got_compat.h"
 
 #include "got_error.h"
 #include "got_repository.h"
