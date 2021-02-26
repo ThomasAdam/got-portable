@@ -223,7 +223,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		goto done;
 
 	err = got_diffreg(&diffreg_result, f1, f2,
-	    GOT_DIFF_ALGORITHM_PATIENCE, 0, 1);
+	    GOT_DIFF_ALGORITHM_MYERS, 0, 1);
 	if (err)
 		goto done;
 
