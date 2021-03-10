@@ -14,19 +14,52 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <u.h>
-#include <libc.h>
+#include <sys/types.h>
+#include <sys/queue.h>
 
-#include "git.h"
+#include <assert.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sha1.h>
+
+#include "got_error.h"
+#include "got_object.h"
+
+#include "got_lib_delta.h"
+#include "got_lib_object.h"
+
+struct Dblock {
+	unsigned char	*buf;
+	int		len;
+	int		off;
+	uint64_t	hash;
+};
+
+struct Dtab {
+	unsigned char		*base;
+	int			nbase;
+	struct Dblock		*b;
+	int			nb;
+	int			sz;
+};
+
+struct Delta {
+	int	cpy;
+	int	off;
+	int	len;
+};
 
 enum {
 	Minchunk	= 128,
 	Maxchunk	= 8192,
-	Splitmask	= (1<<8)-1,
+	Splitmask	= (1 << 8) - 1,
 	
 };
 
-static u32int geartab[] = {
+static uint32_t geartab[] = {
     0x67ed26b7, 0x32da500c, 0x53d0fee0, 0xce387dc7, 0xcd406d90, 0x2e83a4d4, 0x9fc9a38d, 0xb67259dc,
     0xca6b1722, 0x6d2ea08c, 0x235cea2e, 0x3149bb5f, 0x1beda787, 0x2a6b77d5, 0x2f22d9ac, 0x91fc0544,
     0xe413acfa, 0x5a30ff7a, 0xad6fdde0, 0x444fd0f5, 0x7ad87864, 0x58c5ff05, 0x8d2ec336, 0x2371f853,
@@ -61,144 +94,164 @@ static u32int geartab[] = {
     0x9984a4f4, 0xd5de43cc, 0xd294daed, 0xbecba2d2, 0xf1f6e72c, 0x5551128a, 0x83af87e2, 0x6f0342ba,
 };
 
-static u64int
-hash(void *p, int n)
+static uint64_t
+hash(unsigned char *p, int n)
 {
-	uchar buf[SHA1dlen];
-	sha1((uchar*)p, n, buf, nil);
-	return GETBE64(buf);
+	unsigned char buf[SHA1_DIGEST_LENGTH];
+	uint64_t h;
+	SHA1Data(p, n, buf);
+	memcpy(&h, buf, sizeof(h));
+	return be64toh(h);
 }
 
-static void
-addblk(Dtab *dt, void *buf, int len, int off, u64int h)
+static const struct got_error *
+addblk(struct Dtab *dt, void *buf, int len, int off, uint64_t h)
 {
 	int i, sz, probe;
-	Dblock *db;
+	struct Dblock *db;
 
 	probe = h % dt->sz;
-	while(dt->b[probe].buf != nil){
-		if(len == dt->b[probe].len && memcmp(buf, dt->b[probe].buf, len) == 0)
-			return;
+	while (dt->b[probe].buf != NULL) {
+		if (len == dt->b[probe].len &&
+		    memcmp(buf, dt->b[probe].buf, len) == 0)
+			return NULL;
 		probe = (probe + 1) % dt->sz;
 	}
-	assert(dt->b[probe].buf == nil);
+	assert(dt->b[probe].buf == NULL);
 	dt->b[probe].buf = buf;
 	dt->b[probe].len = len;
 	dt->b[probe].off = off;
 	dt->b[probe].hash = h;
 	dt->nb++;
-	if(dt->sz < 2*dt->nb){
+	if (dt->sz < 2 * dt->nb) {
 		sz = dt->sz;
 		db = dt->b;
 		dt->sz *= 2;
 		dt->nb = 0;
-		dt->b = eamalloc(dt->sz, sizeof(Dblock));
-		for(i = 0; i < sz; i++)
-			if(db[i].buf != nil)
-				addblk(dt, db[i].buf, db[i].len, db[i].off, db[i].hash);
+		dt->b = calloc(dt->sz, sizeof(struct Dblock));
+		if (dt->b == NULL)
+			return got_error_from_errno("calloc");
+		for (i = 0; i < sz; i++) {
+			if (db[i].buf != NULL)
+				return addblk(dt, db[i].buf, db[i].len,
+				    db[i].off, db[i].hash);
+		}
 		free(db);
-	}		
+	}
+
+	return NULL;
 }
 
-static Dblock*
-lookup(Dtab *dt, uchar *p, int n)
+static struct Dblock *
+lookup(struct Dtab *dt, unsigned char *p, int n)
 {
 	int probe;
-	u64int h;
+	uint64_t h;
 
 	h = hash(p, n);
-	for(probe = h % dt->sz; dt->b[probe].buf != nil; probe = (probe + 1) % dt->sz){
-		if(dt->b[probe].hash != h)
+	for (probe = h % dt->sz; dt->b[probe].buf != NULL;
+	     probe = (probe + 1) % dt->sz) {
+		if (dt->b[probe].hash != h)
 			continue;
-		if(n != dt->b[probe].len)
+		if (n != dt->b[probe].len)
 			continue;
-		if(memcmp(p, dt->b[probe].buf, n) != 0)
+		if (memcmp(p, dt->b[probe].buf, n) != 0)
 			continue;
 		return &dt->b[probe];
 	}
-	return nil;
+	return NULL;
 }
 
 static int
-nextblk(uchar *s, uchar *e)
+nextblk(unsigned char *s, unsigned char *e)
 {
-	u32int gh;
-	uchar *p;
+	uint32_t gh;
+	unsigned char *p;
 
-	if((e - s) < Minchunk)
+	if ((e - s) < Minchunk)
 		return e - s;
 	p = s + Minchunk;
-	if((e - s) > Maxchunk)
+	if ((e - s) > Maxchunk)
 		e = s + Maxchunk;
 	gh = 0;
-	while(p != e){
-		gh = (gh<<1) + geartab[*p++];
-		if((gh & Splitmask) == 0)
+	while (p != e) {
+		gh = (gh << 1) + geartab[*p++];
+		if ((gh & Splitmask) == 0)
 			break;
 	}
 	return p - s;
 }
 
-void
-dtinit(Dtab *dt, Object *obj)
+const struct got_error *
+dtinit(struct Dtab *dt, struct got_object *obj)
 {
-	uchar *s, *e;
-	u64int h;
-	vlong n, o;
+	unsigned char *s = NULL, *e;
+	uint64_t h;
+	long n, o;
 	
 	o = 0;
-	s = (uchar*)obj->data;
+#ifdef notyet
+	s = (unsigned char *)obj->data;
+#endif
 	e = s + obj->size;
-	dt->o = ref(obj);
 	dt->nb = 0;
 	dt->sz = 128;
-	dt->b = eamalloc(dt->sz, sizeof(Dblock));
-	dt->base = (uchar*)obj->data;
+	dt->b = calloc(dt->sz, sizeof(struct Dblock));
+	if (dt->b == NULL)
+		return got_error_from_errno("calloc");
+#ifdef notyet
+	dt->base = (unsigned char *)obj->data;
+#endif
 	dt->nbase = obj->size;
-	while(s != e){
+	while (s != e) {
 		n = nextblk(s, e);
 		h = hash(s, n);
 		addblk(dt, s, n, o, h);
 		s += n;
 		o += n;
 	}
+
+	return NULL;
 }
 
 void
-dtclear(Dtab *dt)
+dtclear(struct Dtab *dt)
 {
-	unref(dt->o);
 	free(dt->b);
 }
 
-static int
-emitdelta(Delta **pd, int *nd, int cpy, int off, int len)
+static const struct got_error *
+emitdelta(struct Delta **pd, int *nd, int cpy, int off, int len)
 {
-	Delta *d;
+	struct Delta *d, *p;
 
 	*nd += 1;
-	*pd = earealloc(*pd, *nd, sizeof(Delta));
+	p = reallocarray(*pd, *nd, sizeof(struct Delta));
+	if (p == NULL)
+		return got_error_from_errno("realloc");
+	*pd = p;
 	d = &(*pd)[*nd - 1];
 	d->cpy = cpy;
 	d->off = off;
 	d->len = len;
-	return len;
+	return NULL;
 }
 
 static int
-stretch(Dtab *dt, Dblock *b, uchar *s, uchar *e, int n)
+stretch(struct Dtab *dt, struct Dblock *b, unsigned char *s,
+    unsigned char *e, int n)
 {
-	uchar *p, *q, *eb;
+	unsigned char *p, *q, *eb;
 
-	if(b == nil)
+	if (b == NULL)
 		return n;
 	p = s + n;
 	q = dt->base + b->off + n;
 	eb = dt->base + dt->nbase;
-	while(n < (1<<24)){
-		if(p == e || q == eb)
+	while (n < (1 << 24)) {
+		if (p == e || q == eb)
 			break;
-		if(*p != *q)
+		if (*p != *q)
 			break;
 		p++;
 		q++;
@@ -207,24 +260,26 @@ stretch(Dtab *dt, Dblock *b, uchar *s, uchar *e, int n)
 	return n;
 }
 
-Delta*
-deltify(Object *obj, Dtab *dt, int *pnd)
+struct Delta *
+deltify(struct got_object *obj, struct Dtab *dt, int *pnd)
 {
-	Delta *d;
-	Dblock *b;
-	uchar *s, *e;
-	vlong n, o;
+	struct Delta *d;
+	struct Dblock *b;
+	unsigned char *s = NULL, *e;
+	long n, o;
 	
 	o = 0;
-	d = nil;
-	s = (uchar*)obj->data;
+	d = NULL;
+#ifdef notyet
+	s = (unsigned char *)obj->data;
+#endif
 	e = s + obj->size;
 	*pnd = 0;
-	while(s != e){
+	while (s != e) {
 		n = nextblk(s, e);
 		b = lookup(dt, s, n);
 		n = stretch(dt, b, s, e, n);
-		if(b != nil)
+		if (b != NULL)
 			emitdelta(&d, pnd, 1, b->off, n);
 		else
 			emitdelta(&d, pnd, 0, o, n);
