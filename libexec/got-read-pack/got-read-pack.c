@@ -773,6 +773,79 @@ done:
 }
 
 static const struct got_error *
+raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
+    struct got_packidx *packidx, struct got_object_cache *objcache)
+{
+	const struct got_error *err = NULL;
+	uint8_t *buf = NULL;
+	uint64_t size = 0;
+	FILE *outfile = NULL, *basefile = NULL, *accumfile = NULL;
+	struct got_imsg_packed_object iobj;
+	struct got_object *obj;
+	struct got_object_id id;
+	size_t datalen;
+
+	datalen = imsg->hdr.len - IMSG_HEADER_SIZE;
+	if (datalen != sizeof(iobj))
+		return got_error(GOT_ERR_PRIVSEP_LEN);
+	memcpy(&iobj, imsg->data, sizeof(iobj));
+	memcpy(id.sha1, iobj.id, SHA1_DIGEST_LENGTH);
+
+	obj = got_object_cache_get(objcache, &id);
+	if (obj) {
+		obj->refcnt++;
+	} else {
+		err = open_object(&obj, pack, packidx, iobj.idx, &id,
+		    objcache);
+		if (err)
+			return err;
+	}
+
+	err = receive_file(&outfile, ibuf, GOT_IMSG_RAW_OBJECT_OUTFD);
+	if (err)
+		return err;
+	err = receive_file(&basefile, ibuf, GOT_IMSG_TMPFD);
+	if (err)
+		goto done;
+	err = receive_file(&accumfile, ibuf, GOT_IMSG_TMPFD);
+	if (err)
+		goto done;
+
+	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
+		err = got_pack_get_max_delta_object_size(&size, obj, pack);
+		if (err)
+			goto done;
+	} else
+		size = obj->size;
+
+	if (size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
+		err = got_packfile_extract_object_to_mem(&buf, &obj->size,
+		    obj, pack);
+	else
+		err = got_packfile_extract_object(pack, obj, outfile, basefile,
+		    accumfile);
+	if (err)
+		goto done;
+
+	err = got_privsep_send_raw_obj(ibuf, size, obj->hdrlen, buf);
+done:
+	free(buf);
+	if (outfile && fclose(outfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (basefile && fclose(basefile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (accumfile && fclose(accumfile) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	got_object_close(obj);
+	if (err && err->code != GOT_ERR_PRIVSEP_PIPE)
+		got_privsep_send_error(ibuf, err);
+
+	return err;
+}
+
+
+
+static const struct got_error *
 receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
@@ -982,6 +1055,10 @@ main(int argc, char *argv[])
 		switch (imsg.hdr.type) {
 		case GOT_IMSG_PACKED_OBJECT_REQUEST:
 			err = object_request(&imsg, &ibuf, pack, packidx,
+			    &objcache);
+			break;
+		case GOT_IMSG_PACKED_RAW_OBJECT_REQUEST:
+			err = raw_object_request(&imsg, &ibuf, pack, packidx,
 			    &objcache);
 			break;
 		case GOT_IMSG_COMMIT_REQUEST:

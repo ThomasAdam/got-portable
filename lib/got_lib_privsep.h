@@ -160,6 +160,12 @@ enum got_imsg_type {
 	GOT_IMSG_GOTCONFIG_STR_VAL,
 	GOT_IMSG_GOTCONFIG_REMOTES,
 	GOT_IMSG_GOTCONFIG_REMOTE,
+
+	/* Raw object access. Uncompress object data but do not parse it. */
+	GOT_IMSG_RAW_OBJECT_REQUEST,
+	GOT_IMSG_RAW_OBJECT_OUTFD,
+	GOT_IMSG_PACKED_RAW_OBJECT_REQUEST,
+	GOT_IMSG_RAW_OBJECT,
 };
 
 /* Structure for GOT_IMSG_ERROR. */
@@ -234,6 +240,19 @@ struct got_imsg_blob {
 	(MAX_IMSGSIZE - IMSG_HEADER_SIZE - sizeof(struct got_imsg_blob))
 };
 
+/* Structure for GOT_IMSG_RAW_OBJECT. */
+struct got_imsg_raw_obj {
+	off_t size;
+	size_t hdrlen;
+
+	/*
+	 * If size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX, object data follows
+	 * in the imsg buffer. Otherwise, object data has been written to a
+	 * file descriptor passed via the GOT_IMSG_RAW_OBJECT_OUTFD imsg.
+	 */
+#define GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX \
+	(MAX_IMSGSIZE - IMSG_HEADER_SIZE - sizeof(struct got_imsg_raw_obj))
+};
 
 /* Structure for GOT_IMSG_TAG data. */
 struct got_imsg_tag_object {
@@ -350,7 +369,8 @@ struct got_imsg_pack {
 } __attribute__((__packed__));
 
 /*
- * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST data.
+ * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST and
+ * GOT_IMSG_PACKED_RAW_OBJECT_REQUEST data.
  */
 struct got_imsg_packed_object {
 	uint8_t id[SHA1_DIGEST_LENGTH];
@@ -409,6 +429,8 @@ void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_ack(struct imsgbuf *);
 const struct got_error *got_privsep_wait_ack(struct imsgbuf *);
 const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_raw_obj_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_raw_obj_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
     struct got_object_id *, int);
 const struct got_error *got_privsep_send_tree_req(struct imsgbuf *, int,
@@ -438,6 +460,10 @@ const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
     struct imsgbuf *);
+const struct got_error *got_privsep_send_raw_obj(struct imsgbuf *, off_t,
+    size_t, uint8_t *);
+const struct got_error *got_privsep_recv_raw_obj(uint8_t **, off_t *, size_t *,
+    struct imsgbuf *);
 const struct got_error *got_privsep_send_commit(struct imsgbuf *,
     struct got_commit_object *);
 const struct got_error *got_privsep_recv_commit(struct got_commit_object **,
@@ -458,6 +484,8 @@ const struct got_error *got_privsep_init_pack_child(struct imsgbuf *,
     struct got_pack *, struct got_packidx *);
 const struct got_error *got_privsep_send_packed_obj_req(struct imsgbuf *, int,
     struct got_object_id *);
+const struct got_error *got_privsep_send_packed_raw_obj_req(struct imsgbuf *,
+    int, struct got_object_id *);
 const struct got_error *got_privsep_send_pack_child_ready(struct imsgbuf *);
 
 const struct got_error *got_privsep_send_gitconfig_parse_req(struct imsgbuf *,

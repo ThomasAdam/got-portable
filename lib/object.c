@@ -190,6 +190,68 @@ request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
 	return NULL;
 }
 
+static const struct got_error *
+request_packed_object_raw(uint8_t **outbuf, off_t *size, size_t *hdrlen,
+    int outfd, struct got_pack *pack, int idx, struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf = pack->privsep_child->ibuf;
+	int outfd_child;
+	int basefd, accumfd; /* temporary files for delta application */
+
+	basefd = got_opentempfd();
+	if (basefd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	accumfd = got_opentempfd();
+	if (accumfd == -1) {
+		close(basefd);
+		return got_error_from_errno("got_opentempfd");
+	}
+
+	outfd_child = dup(outfd);
+	if (outfd_child == -1) {
+		err = got_error_from_errno("dup");
+		close(basefd);
+		close(accumfd);
+		return err;
+	}
+
+	err = got_privsep_send_packed_raw_obj_req(ibuf, idx, id);
+	if (err) {
+		close(basefd);
+		close(accumfd);
+		close(outfd_child);
+		return err;
+	}
+
+	err = got_privsep_send_raw_obj_outfd(ibuf, outfd_child);
+	if (err) {
+		close(basefd);
+		close(accumfd);
+		return err;
+	}
+
+
+	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
+	    basefd);
+	if (err) {
+		close(accumfd);
+		return err;
+	}
+
+	err = got_privsep_send_tmpfd(pack->privsep_child->ibuf,
+	    accumfd);
+	if (err)
+		return err;
+
+	err = got_privsep_recv_raw_obj(outbuf, size, hdrlen, ibuf);
+	if (err)
+		return err;
+
+	return NULL;
+}
+
 static void
 set_max_datasize(void)
 {
@@ -269,16 +331,31 @@ read_packed_object_privsep(struct got_object **obj,
 {
 	const struct got_error *err = NULL;
 
-	if (pack->privsep_child)
-		return request_packed_object(obj, pack, idx, id);
-
-	err = start_pack_privsep_child(pack, packidx);
-	if (err)
-		return err;
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			return err;
+	}
 
 	return request_packed_object(obj, pack, idx, id);
 }
 
+static const struct got_error *
+read_packed_object_raw_privsep(uint8_t **outbuf, off_t *size, size_t *hdrlen,
+    int outfd, struct got_pack *pack, struct got_packidx *packidx, int idx,
+    struct got_object_id *id)
+{
+	const struct got_error *err = NULL;
+
+	if (pack->privsep_child == NULL) {
+		err = start_pack_privsep_child(pack, packidx);
+		if (err)
+			return err;
+	}
+
+	return request_packed_object_raw(outbuf, size, hdrlen, outfd, pack,
+	    idx, id);
+}
 
 static const struct got_error *
 open_packed_object(struct got_object **obj, struct got_object_id *id,
@@ -329,16 +406,37 @@ request_object(struct got_object **obj, struct got_repository *repo, int fd)
 }
 
 static const struct got_error *
-read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
-    int obj_fd)
+request_raw_object(uint8_t **outbuf, off_t *size, size_t *hdrlen, int outfd,
+    struct got_repository *repo, int infd)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
+	struct imsgbuf *ibuf;
+	int outfd_child;
+
+	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
+
+	outfd_child = dup(outfd);
+	if (outfd_child == -1)
+		return got_error_from_errno("dup");
+
+	err = got_privsep_send_raw_obj_req(ibuf, infd);
+	if (err)
+		return err;
+
+	err = got_privsep_send_raw_obj_outfd(ibuf, outfd_child);
+	if (err)
+		return err;
+
+	return got_privsep_recv_raw_obj(outbuf, size, hdrlen, ibuf);
+}
+
+static const struct got_error *
+start_read_object_child(struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
 	int imsg_fds[2];
 	pid_t pid;
 	struct imsgbuf *ibuf;
-
-	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
-		return request_object(obj, repo, obj_fd);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -367,15 +465,48 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 		free(ibuf);
 		return err;
 	}
+
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd =
 	    imsg_fds[0];
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].pid = pid;
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf = ibuf;
 
+	return NULL;
+}
+
+static const struct got_error *
+read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
+    int obj_fd)
+{
+	const struct got_error *err;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
+		return request_object(obj, repo, obj_fd);
+
+	err = start_read_object_child(repo);
+	if (err)
+		return err;
+
 	return request_object(obj, repo, obj_fd);
 }
 
+static const struct got_error *
+read_object_raw_privsep(uint8_t **outbuf, off_t *size, size_t *hdrlen,
+    int outfd, struct got_repository *repo, int obj_fd)
+{
+	const struct got_error *err;
+
+	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
+		return request_raw_object(outbuf, size, hdrlen, outfd, repo,
+		    obj_fd);
+
+	err = start_read_object_child(repo);
+	if (err)
+		return err;
+
+	return request_raw_object(outbuf, size, hdrlen, outfd, repo, obj_fd);
+}
 
 const struct got_error *
 got_object_open(struct got_object **obj, struct got_repository *repo,
@@ -422,7 +553,162 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 done:
 	free(path);
 	return err;
+}
 
+const struct got_error *
+got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
+    struct got_object_id *id, size_t blocksize)
+{
+	const struct got_error *err = NULL;
+	struct got_packidx *packidx = NULL;
+	int idx;
+	uint8_t *outbuf = NULL;
+	int outfd = -1;
+	off_t size = 0;
+	size_t hdrlen = 0;
+	char *path_packfile = NULL;
+
+	*obj = NULL;
+
+	outfd = got_opentempfd();
+	if (outfd == -1)
+		return got_error_from_errno("got_opentempfd");
+
+	err = got_repo_search_packidx(&packidx, &idx, repo, id);
+	if (err == NULL) {
+		struct got_pack *pack = NULL;
+
+		err = get_packfile_path(&path_packfile, packidx);
+		if (err)
+			goto done;
+
+		pack = got_repo_get_cached_pack(repo, path_packfile);
+		if (pack == NULL) {
+			err = got_repo_cache_pack(&pack, repo, path_packfile,
+			    packidx);
+			if (err)
+				goto done;
+		}
+		err = read_packed_object_raw_privsep(&outbuf, &size, &hdrlen,
+		    outfd, pack, packidx, idx, id);
+	} else if (err->code == GOT_ERR_NO_OBJ) {
+		int fd;
+
+		err = open_loose_object(&fd, id, repo);
+		if (err)
+			goto done;
+		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, outfd,
+		    repo, fd);
+	}
+
+	if (hdrlen > size) {
+		err = got_error(GOT_ERR_BAD_OBJ_HDR);
+		goto done;
+	}
+
+	*obj = calloc(1, sizeof(**obj));
+	if (*obj == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
+
+	(*obj)->read_buf = malloc(blocksize);
+	if ((*obj)->read_buf == NULL) {
+		err = got_error_from_errno("malloc");
+		goto done;
+	}
+
+	if (outbuf) {
+		if (close(outfd) == -1) {
+			err = got_error_from_errno("close");
+			goto done;
+		}
+		outfd = -1;
+		(*obj)->f = fmemopen(outbuf, hdrlen + size, "r");
+		if ((*obj)->f == NULL) {
+			err = got_error_from_errno("fdopen");
+			goto done;
+		}
+		(*obj)->data = outbuf;
+	} else {
+		struct stat sb;
+		if (fstat(outfd, &sb) == -1) {
+			err = got_error_from_errno("fstat");
+			goto done;
+		}
+
+		if (sb.st_size != size) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+
+		(*obj)->f = fdopen(outfd, "r");
+		if ((*obj)->f == NULL) {
+			err = got_error_from_errno("fdopen");
+			goto done;
+		}
+		outfd = -1;
+		(*obj)->data = NULL;
+	}
+	(*obj)->hdrlen = hdrlen;
+	(*obj)->size = size;
+	(*obj)->blocksize = blocksize;
+done:
+	free(path_packfile);
+	if (err) {
+		if (*obj) {
+			got_object_raw_close(*obj);
+			*obj = NULL;
+		}
+		if (outfd != -1)
+			close(outfd);
+		free(outbuf);
+	}
+	return err;
+}
+
+void
+got_object_raw_rewind(struct got_raw_object *obj)
+{
+	if (obj->f)
+		rewind(obj->f);
+}
+
+size_t
+got_object_raw_get_hdrlen(struct got_raw_object *obj)
+{
+	return obj->hdrlen;
+}
+
+const uint8_t *
+got_object_raw_get_read_buf(struct got_raw_object *obj)
+{
+	return obj->read_buf;
+}
+
+const struct got_error *
+got_object_raw_read_block(size_t *outlenp, struct got_raw_object *obj)
+{
+	size_t n;
+
+	n = fread(obj->read_buf, 1, obj->blocksize, obj->f);
+	if (n == 0 && ferror(obj->f))
+		return got_ferror(obj->f, GOT_ERR_IO);
+	*outlenp = n;
+	return NULL;
+}
+
+const struct got_error *
+got_object_raw_close(struct got_raw_object *obj)
+{
+	const struct got_error *err = NULL;
+
+	free(obj->read_buf);
+	if (obj->f != NULL && fclose(obj->f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(obj->data);
+	free(obj);
+	return err;
 }
 
 const struct got_error *

@@ -249,6 +249,126 @@ got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
 }
 
 const struct got_error *
+got_privsep_send_raw_obj_req(struct imsgbuf *ibuf, int fd)
+{
+	if (imsg_compose(ibuf, GOT_IMSG_RAW_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
+	    == -1)
+		return got_error_from_errno("imsg_compose RAW_OBJECT_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_raw_obj_outfd(struct imsgbuf *ibuf, int outfd)
+{
+	const struct got_error *err = NULL;
+
+	if (imsg_compose(ibuf, GOT_IMSG_RAW_OBJECT_OUTFD, 0, 0, outfd, NULL, 0)
+	    == -1) {
+		err = got_error_from_errno("imsg_compose RAW_OBJECT_OUTFD");
+		close(outfd);
+		return err;
+	}
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
+    uint8_t *data)
+{
+	const struct got_error *err = NULL;
+	struct got_imsg_raw_obj iobj;
+	size_t len = sizeof(iobj);
+	struct ibuf *wbuf;
+
+	iobj.hdrlen = hdrlen;
+	iobj.size = size;
+
+	if (data && size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
+		len += (size_t)size;
+
+	wbuf = imsg_create(ibuf, GOT_IMSG_RAW_OBJECT, 0, 0, len);
+	if (wbuf == NULL) {
+		err = got_error_from_errno("imsg_create RAW_OBJECT");
+		return err;
+	}
+
+	if (imsg_add(wbuf, &iobj, sizeof(iobj)) == -1) {
+		err = got_error_from_errno("imsg_add RAW_OBJECT");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	if (data && size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
+		if (imsg_add(wbuf, data, size) == -1) {
+			err = got_error_from_errno("imsg_add RAW_OBJECT");
+			ibuf_free(wbuf);
+			return err;
+		}
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_recv_raw_obj(uint8_t **outbuf, off_t *size, size_t *hdrlen,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	struct got_imsg_raw_obj *iobj;
+	size_t datalen;
+
+	*outbuf = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_RAW_OBJECT:
+		if (datalen < sizeof(*iobj)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		iobj = imsg.data;
+		*size = iobj->size;
+		*hdrlen = iobj->hdrlen;
+
+		if (datalen == sizeof(*iobj)) {
+			/* Data has been written to file descriptor. */
+			break;
+		}
+
+		if (*size > GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+
+		*outbuf = malloc(*size);
+		if (*outbuf == NULL) {
+			err = got_error_from_errno("malloc");
+			break;
+		}
+		memcpy(*outbuf, imsg.data + sizeof(*iobj), *size);
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+
+	return err;
+}
+
+const struct got_error *
 got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
@@ -1636,6 +1756,23 @@ got_privsep_send_packed_obj_req(struct imsgbuf *ibuf, int idx,
 	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
 
 	if (imsg_compose(ibuf, GOT_IMSG_PACKED_OBJECT_REQUEST, 0, 0, -1,
+	    &iobj, sizeof(iobj)) == -1)
+		return got_error_from_errno("imsg_compose "
+		    "PACKED_OBJECT_REQUEST");
+
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_packed_raw_obj_req(struct imsgbuf *ibuf, int idx,
+    struct got_object_id *id)
+{
+	struct got_imsg_packed_object iobj;
+
+	iobj.idx = idx;
+	memcpy(iobj.id, id->sha1, sizeof(iobj.id));
+
+	if (imsg_compose(ibuf, GOT_IMSG_PACKED_RAW_OBJECT_REQUEST, 0, 0, -1,
 	    &iobj, sizeof(iobj)) == -1)
 		return got_error_from_errno("imsg_compose "
 		    "PACKED_OBJECT_REQUEST");

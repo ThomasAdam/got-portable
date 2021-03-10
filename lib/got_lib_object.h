@@ -35,6 +35,15 @@ struct got_object {
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
+struct got_raw_object {
+	FILE *f;
+	uint8_t *data;
+	off_t size;
+	size_t hdrlen;
+	size_t blocksize;
+	uint8_t *read_buf;
+};
+
 struct got_commit_object {
 	struct got_object_id *tree_id;
 	unsigned int nparents;
@@ -91,6 +100,14 @@ const struct got_error *got_object_get_path(char **, struct got_object_id *,
     struct got_repository *);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
+const struct got_error *got_object_raw_open(struct got_raw_object **,
+    struct got_repository *, struct got_object_id *, size_t);
+void got_object_raw_rewind(struct got_raw_object *);
+size_t got_object_raw_get_hdrlen(struct got_raw_object *);
+const uint8_t *got_object_raw_get_read_buf(struct got_raw_object *);
+const struct got_error * got_object_raw_read_block(size_t *,
+    struct got_raw_object *);
+const struct got_error *got_object_raw_close(struct got_raw_object *);
 const struct got_error *got_object_open_by_id_str(struct got_object **,
     struct got_repository *, const char *);
 void got_object_close(struct got_object *);
