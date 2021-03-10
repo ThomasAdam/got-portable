@@ -1,0 +1,14 @@
+.PATH:${.CURDIR}/../../lib
+
+PROG = deltify_test
+SRCS = deltify.c error.c opentemp.c sha1.c deltify_test.c
+
+CPPFLAGS = -I${.CURDIR}/../../include -I${.CURDIR}/../../lib
+LDADD = -lz
+
+NOMAN = yes
+
+run-regress-deltify_test:
+	${.OBJDIR}/deltify_test -q
+
+.include <bsd.regress.mk>
