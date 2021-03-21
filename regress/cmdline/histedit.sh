@@ -20,6 +20,7 @@ test_histedit_no_op() {
 	local testroot=`test_init histedit_no_op`
 
 	local orig_commit=`git_show_head $testroot/repo`
+	local orig_author_time=`git_show_author_time $testroot/repo`
 
 	echo "modified alpha on master" > $testroot/repo/alpha
 	(cd $testroot/repo && git rm -q beta)
@@ -31,6 +32,7 @@ test_histedit_no_op() {
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
 	local old_commit2=`git_show_head $testroot/repo`
+	local old_author_time2=`git_show_author_time $testroot/repo`
 
 	got diff -r $testroot/repo $orig_commit $old_commit2 \
 		> $testroot/diff.expected
@@ -50,6 +52,7 @@ test_histedit_no_op() {
 
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
+	local new_author_time2=`git_show_author_time $testroot/repo`
 
 	local short_old_commit1=`trim_obj_id 28 $old_commit1`
 	local short_old_commit2=`trim_obj_id 28 $old_commit2`
@@ -139,6 +142,31 @@ test_histedit_no_op() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	# We should have a backup of old commits
+	(cd $testroot/repo && got histedit -l > $testroot/stdout)
+	d_orig2=`env TZ=UTC date -r $old_author_time2 +"%a %b %e %X %Y UTC"`
+	d_new2=`env TZ=UTC date -r $new_author_time2 +"%G-%m-%d"`
+	d_orig=`env TZ=UTC date -r $orig_author_time +"%G-%m-%d"`
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+commit $old_commit2 (formerly master)
+from: $GOT_AUTHOR
+date: $d_orig2
+ 
+ committing to zeta on master
+ 
+has become commit $new_commit2 (master)
+ $d_new2 $GOT_AUTHOR_11  committing to zeta on master
+history forked at $orig_commit
+ $d_orig $GOT_AUTHOR_11  adding the test tree
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

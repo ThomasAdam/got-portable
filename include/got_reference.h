@@ -99,6 +99,13 @@ const struct got_error *got_ref_cmp_tags(void *, int *,
     struct got_reference *, struct got_reference *);
 
 /*
+ * An implementation of got_ref_cmp_cb which compares commit timestamps.
+ * Requires a struct got_repository * as the void * argument.
+ */
+const struct got_error *got_ref_cmp_by_commit_timestamp_descending(void *,
+    int *, struct got_reference *, struct got_reference *);
+
+/*
  * Append all known references to a caller-provided ref list head.
  * Optionally limit references returned to those within a given
  * reference namespace. Sort the list with the provided reference comparison

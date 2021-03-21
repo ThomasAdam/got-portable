@@ -742,6 +742,48 @@ done:
 	return err;
 }
 
+const struct got_error *
+got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
+    struct got_reference *ref1, struct got_reference *ref2)
+{
+	const struct got_error *err;
+	struct got_repository *repo = arg;
+	struct got_object_id *id1, *id2 = NULL;
+	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
+	time_t time1, time2;
+
+	*cmp = 0;
+
+	err = got_ref_resolve(&id1, repo, ref1);
+	if (err)
+		return err;
+	err = got_ref_resolve(&id2, repo, ref2);
+	if (err)
+		goto done;
+
+	err = got_object_open_as_commit(&commit1, repo, id1);
+	if (err)
+		goto done;
+	err = got_object_open_as_commit(&commit2, repo, id2);
+	if (err)
+		goto done;
+	
+	time1 = got_object_commit_get_committer_time(commit1);
+	time2 = got_object_commit_get_committer_time(commit2);
+	if (time1 < time2)
+		*cmp = 1;
+	else if (time2 < time1)
+		*cmp = -1;
+done:
+	free(id1);
+	free(id2);
+	if (commit1)
+		got_object_commit_close(commit1);
+	if (commit2)
+		got_object_commit_close(commit2);
+	return err;
+}
+
 static const struct got_error *
 insert_ref(struct got_reflist_entry **newp, struct got_reflist_head *refs,
     struct got_reference *ref, struct got_repository *repo,

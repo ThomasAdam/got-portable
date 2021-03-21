@@ -314,10 +314,12 @@ const struct got_error *got_worktree_rebase_postpone(struct got_worktree *,
 /*
  * Complete the current rebase operation. This should be called once all
  * commits have been rebased successfully.
+ * The create_backup parameter controls whether the rebased branch will
+ * be backed up via a reference in refs/got/backup/rebase/.
  */
 const struct got_error *got_worktree_rebase_complete(struct got_worktree *,
     struct got_fileindex *, struct got_reference *, struct got_reference *,
-    struct got_reference *, struct got_repository *);
+    struct got_reference *, struct got_repository *, int create_backup);
 
 /*
  * Abort the current rebase operation.
@@ -469,3 +471,9 @@ typedef const struct got_error *(*got_worktree_path_info_cb)(void *,
 const struct got_error *
 got_worktree_path_info(struct got_worktree *, struct got_pathlist_head *,
     got_worktree_path_info_cb, void *, got_cancel_cb , void *);
+
+/* References pointing at pre-rebase commit backups. */
+#define GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX "refs/got/backup/rebase"
+
+/* References pointing at pre-histedit commit backups. */
+#define GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX "refs/got/backup/histedit"

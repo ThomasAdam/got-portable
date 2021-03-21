@@ -6455,10 +6455,54 @@ done:
 }
 
 const struct got_error *
+create_backup_ref(const char *backup_ref_prefix, struct got_reference *branch,
+    struct got_object_id *new_commit_id, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *ref = NULL;
+	struct got_object_id *old_commit_id = NULL;
+	const char *branch_name = NULL;
+	char *new_id_str = NULL;
+	char *refname = NULL;
+
+	branch_name = got_ref_get_name(branch);
+	if (strncmp(branch_name, "refs/heads/", 11) != 0)
+		return got_error(GOT_ERR_BAD_REF_NAME); /* should not happen */
+	branch_name += 11;
+
+	err = got_object_id_str(&new_id_str, new_commit_id);
+	if (err)
+		return err;
+
+	if (asprintf(&refname, "%s/%s/%s", backup_ref_prefix, branch_name,
+	    new_id_str) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+
+	err = got_ref_resolve(&old_commit_id, repo, branch);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc(&ref, refname, old_commit_id);
+	if (err)
+		goto done;
+
+	err = got_ref_write(ref, repo);
+done:
+	free(new_id_str);
+	free(refname);
+	free(old_commit_id);
+	if (ref)
+		got_ref_close(ref);
+	return err;
+}
+
+const struct got_error *
 got_worktree_rebase_complete(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_reference *new_base_branch,
     struct got_reference *tmp_branch, struct got_reference *rebased_branch,
-    struct got_repository *repo)
+    struct got_repository *repo, int create_backup)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_object_id *new_head_commit_id = NULL;
@@ -6467,6 +6511,13 @@ got_worktree_rebase_complete(struct got_worktree *worktree,
 	err = got_ref_resolve(&new_head_commit_id, repo, tmp_branch);
 	if (err)
 		return err;
+
+	if (create_backup) {
+		err = create_backup_ref(GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX,
+		    rebased_branch, new_head_commit_id, repo);
+		if (err)
+			goto done;
+	}
 
 	err = got_ref_change_ref(rebased_branch, new_head_commit_id);
 	if (err)
@@ -6951,6 +7002,11 @@ got_worktree_histedit_complete(struct got_worktree *worktree,
 
 	err = got_ref_open(&resolved, repo,
 	    got_ref_get_symref_target(edited_branch), 0);
+	if (err)
+		goto done;
+
+	err = create_backup_ref(GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX,
+	    resolved, new_head_commit_id, repo);
 	if (err)
 		goto done;
 

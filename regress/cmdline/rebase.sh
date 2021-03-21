@@ -18,6 +18,8 @@
 
 test_rebase_basic() {
 	local testroot=`test_init rebase_basic`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
 	echo "modified delta on branch" > $testroot/repo/gamma/delta
@@ -31,6 +33,7 @@ test_rebase_basic() {
 
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
+	local orig_author_time2=`git_show_author_time $testroot/repo`
 
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
@@ -49,6 +52,7 @@ test_rebase_basic() {
 	(cd $testroot/repo && git checkout -q newbranch)
 	local new_commit1=`git_show_parent_commit $testroot/repo`
 	local new_commit2=`git_show_head $testroot/repo`
+	local new_author_time2=`git_show_author_time $testroot/repo`
 
 	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
@@ -139,6 +143,31 @@ test_rebase_basic() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo 'Already up-to-date' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	# We should have a backup of old commits
+	(cd $testroot/repo && got rebase -l > $testroot/stdout)
+	d_orig2=`env TZ=UTC date -r $orig_author_time2 +"%a %b %e %X %Y UTC"`
+	d_new2=`env TZ=UTC date -r $new_author_time2 +"%G-%m-%d"`
+	d_0=`env TZ=UTC date -r $commit0_author_time +"%G-%m-%d"`
+	cat > $testroot/stdout.expected <<EOF
+-----------------------------------------------
+commit $orig_commit2 (formerly newbranch)
+from: $GOT_AUTHOR
+date: $d_orig2
+ 
+ committing more changes on newbranch
+ 
+has become commit $new_commit2 (newbranch)
+ $d_new2 $GOT_AUTHOR_11  committing more changes on newbranch
+history forked at $commit0
+ $d_0 $GOT_AUTHOR_11  adding the test tree
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -886,6 +915,16 @@ test_rebase_forward() {
 	echo "commit $commit2 (master, origin/master)" > $testroot/stdout.expected
 	echo "commit $commit1" >> $testroot/stdout.expected
 	echo "commit $commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	# Forward-only rebase operations should not be backed up
+	(cd $testroot/repo && got rebase -l > $testroot/stdout)
+	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

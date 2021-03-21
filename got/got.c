@@ -3601,7 +3601,8 @@ static const struct got_error *
 print_commit(struct got_commit_object *commit, struct got_object_id *id,
     struct got_repository *repo, const char *path,
     struct got_pathlist_head *changed_paths, int show_patch,
-    int diff_context, struct got_reflist_object_id_map *refs_idmap)
+    int diff_context, struct got_reflist_object_id_map *refs_idmap,
+    const char *custom_refs_str)
 {
 	const struct got_error *err = NULL;
 	char *id_str, *datestr, *logmsg0, *logmsg, *line;
@@ -3609,22 +3610,27 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 	time_t committer_time;
 	const char *author, *committer;
 	char *refs_str = NULL;
-	struct got_reflist_head *refs;
 
 	err = got_object_id_str(&id_str, id);
 	if (err)
 		return err;
 
-	refs = got_reflist_object_id_map_lookup(refs_idmap, id);
-	if (refs) {
-		err = build_refs_str(&refs_str, refs, id, repo);
-		if (err)
-			goto done;
+	if (custom_refs_str == NULL) {
+		struct got_reflist_head *refs;
+		refs = got_reflist_object_id_map_lookup(refs_idmap, id);
+		if (refs) {
+			err = build_refs_str(&refs_str, refs, id, repo);
+			if (err)
+				goto done;
+		}
 	}
 
 	printf(GOT_COMMIT_SEP_STR);
-	printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
-	    refs_str ? refs_str : "", refs_str ? ")" : "");
+	if (custom_refs_str)
+		printf("commit %s (%s)\n", id_str, custom_refs_str); 
+	else
+		printf("commit %s%s%s%s\n", id_str, refs_str ? " (" : "",
+		    refs_str ? refs_str : "", refs_str ? ")" : "");
 	free(id_str);
 	id_str = NULL;
 	free(refs_str);
@@ -3773,7 +3779,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		} else {
 			err = print_commit(commit, id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs_idmap);
+			    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -3801,7 +3807,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			}
 			err = print_commit(commit, qid->id, repo, path,
 			    show_changed_paths ? &changed_paths : NULL,
-			    show_patch, diff_context, refs_idmap);
+			    show_patch, diff_context, refs_idmap, NULL);
 			got_object_commit_close(commit);
 			if (err)
 				break;
@@ -7495,7 +7501,7 @@ done:
 __dead static void
 usage_rebase(void)
 {
-	fprintf(stderr, "usage: %s rebase [-a] | [-c] | branch\n",
+	fprintf(stderr, "usage: %s rebase [-a] [-c] [-l] [branch]\n",
 	    getprogname());
 	exit(1);
 }
@@ -7608,11 +7614,12 @@ done:
 static const struct got_error *
 rebase_complete(struct got_worktree *worktree, struct got_fileindex *fileindex,
     struct got_reference *branch, struct got_reference *new_base_branch,
-    struct got_reference *tmp_branch, struct got_repository *repo)
+    struct got_reference *tmp_branch, struct got_repository *repo,
+    int create_backup)
 {
 	printf("Switching work tree to %s\n", got_ref_get_name(branch));
 	return got_worktree_rebase_complete(worktree, fileindex,
-	    new_base_branch, tmp_branch, branch, repo);
+	    new_base_branch, tmp_branch, branch, repo, create_backup);
 }
 
 static const struct got_error *
@@ -7766,6 +7773,238 @@ done:
 }
 
 static const struct got_error *
+get_commit_brief_str(char **brief_str, struct got_commit_object *commit)
+{
+	const struct got_error *err = NULL;
+	time_t committer_time;
+	struct tm tm;
+	char datebuf[11]; /* YYYY-MM-DD + NUL */
+	char *author0 = NULL, *author, *smallerthan;
+	char *logmsg0 = NULL, *logmsg, *newline;
+
+	committer_time = got_object_commit_get_committer_time(commit);
+	if (localtime_r(&committer_time, &tm) == NULL)
+		return got_error_from_errno("localtime_r");
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d", &tm)
+	    >= sizeof(datebuf))
+		return got_error(GOT_ERR_NO_SPACE);
+
+	author0 = strdup(got_object_commit_get_author(commit));
+	if (author0 == NULL)
+		return got_error_from_errno("strdup");
+	author = author0;
+	smallerthan = strchr(author, '<');
+	if (smallerthan && smallerthan[1] != '\0')
+		author = smallerthan + 1;
+	author[strcspn(author, "@>")] = '\0';
+
+	err = got_object_commit_get_logmsg(&logmsg0, commit);
+	if (err)
+		goto done;
+	logmsg = logmsg0;
+	while (*logmsg == '\n')
+		logmsg++;
+	newline = strchr(logmsg, '\n');
+	if (newline)
+		*newline = '\0';
+
+	if (asprintf(brief_str, "%s %s  %s",
+	    datebuf, author, logmsg) == -1)
+		err = got_error_from_errno("asprintf");
+done:
+	free(author0);
+	free(logmsg0);
+	return err;
+}
+
+static const struct got_error *
+print_backup_ref(const char *branch_name, const char *new_id_str,
+    struct got_object_id *old_commit_id, struct got_commit_object *old_commit,
+    struct got_reflist_object_id_map *refs_idmap,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_head *refs;
+	char *refs_str = NULL;
+	struct got_object_id *new_commit_id = NULL;
+	struct got_commit_object *new_commit = NULL;
+	char *new_commit_brief_str = NULL;
+	struct got_object_id *yca_id = NULL;
+	struct got_commit_object *yca_commit = NULL;
+	char *yca_id_str = NULL, *yca_brief_str = NULL;
+	char *custom_refs_str;
+
+	if (asprintf(&custom_refs_str, "formerly %s", branch_name) == -1)
+		return got_error_from_errno("asprintf");
+
+	err = print_commit(old_commit, old_commit_id, repo, NULL, NULL,
+	    0, 0, refs_idmap, custom_refs_str);
+	if (err)
+		goto done;
+
+	err = got_object_resolve_id_str(&new_commit_id, repo, new_id_str);
+	if (err)
+		goto done;
+
+	refs = got_reflist_object_id_map_lookup(refs_idmap, new_commit_id);
+	if (refs) {
+		err = build_refs_str(&refs_str, refs, new_commit_id, repo);
+		if (err)
+			goto done;
+	}
+
+	err = got_object_open_as_commit(&new_commit, repo, new_commit_id);
+	if (err)
+		goto done;
+
+	err = get_commit_brief_str(&new_commit_brief_str, new_commit);
+	if (err)
+		goto done;
+
+	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
+	    old_commit_id, new_commit_id, repo, check_cancelled, NULL);
+	if (err)
+		goto done;
+
+	printf("has become commit %s%s%s%s\n %s\n", new_id_str,
+	    refs_str ? " (" : "", refs_str ? refs_str : "",
+	    refs_str ? ")" : "", new_commit_brief_str);
+	if (yca_id && got_object_id_cmp(yca_id, new_commit_id) != 0 &&
+	    got_object_id_cmp(yca_id, old_commit_id) != 0) {
+		free(refs_str);
+		refs_str = NULL;
+
+		err = got_object_open_as_commit(&yca_commit, repo, yca_id);
+		if (err)
+			goto done;
+
+		err = get_commit_brief_str(&yca_brief_str, yca_commit);
+		if (err)
+			goto done;
+
+		err = got_object_id_str(&yca_id_str, yca_id);
+		if (err)
+			goto done;
+
+		refs = got_reflist_object_id_map_lookup(refs_idmap, yca_id);
+		if (refs) {
+			err = build_refs_str(&refs_str, refs, yca_id, repo);
+			if (err)
+				goto done;
+		}
+		printf("history forked at %s%s%s%s\n %s\n",
+		    yca_id_str,
+		    refs_str ? " (" : "", refs_str ? refs_str : "",
+		    refs_str ? ")" : "", yca_brief_str);
+	}
+done:
+	free(custom_refs_str);
+	free(new_commit_id);
+	free(refs_str);
+	free(yca_id);
+	free(yca_id_str);
+	free(yca_brief_str);
+	if (new_commit)
+		got_object_commit_close(new_commit);
+	if (yca_commit)
+		got_object_commit_close(yca_commit);
+
+	return NULL;
+}
+
+static const struct got_error *
+list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reflist_head refs, backup_refs;
+	struct got_reflist_entry *re;
+	const size_t backup_ref_prefix_len = strlen(backup_ref_prefix);
+	struct got_object_id *old_commit_id = NULL;
+	char *branch_name = NULL;
+	struct got_commit_object *old_commit = NULL;
+	struct got_reflist_object_id_map *refs_idmap = NULL;
+
+	TAILQ_INIT(&refs);
+	TAILQ_INIT(&backup_refs);
+
+	err = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
+	if (err)
+		return err;
+
+	err = got_reflist_object_id_map_create(&refs_idmap, &refs, repo);
+	if (err)
+		goto done;
+
+	if (wanted_branch_name) {
+		if (strncmp(wanted_branch_name, "refs/heads/", 11) == 0)
+			wanted_branch_name += 11;
+	}
+
+	err = got_ref_list(&backup_refs, repo, backup_ref_prefix,
+	    got_ref_cmp_by_commit_timestamp_descending, repo);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(re, &backup_refs, entry) {
+		const char *refname = got_ref_get_name(re->ref);
+		char *slash;
+
+		err = got_ref_resolve(&old_commit_id, repo, re->ref);
+		if (err)
+			break;
+
+		err = got_object_open_as_commit(&old_commit, repo,
+		    old_commit_id);
+		if (err)
+			break;
+
+		if (strncmp(backup_ref_prefix, refname,
+		    backup_ref_prefix_len) == 0)
+			refname += backup_ref_prefix_len;
+
+		while (refname[0] == '/')
+			refname++;
+
+		branch_name = strdup(refname);
+		if (branch_name == NULL) {
+			err = got_error_from_errno("strdup");
+			break;
+		}
+		slash = strrchr(branch_name, '/');
+		if (slash) {
+			*slash = '\0';
+			refname += strlen(branch_name) + 1;
+		}
+
+		if (wanted_branch_name == NULL ||
+		    strcmp(wanted_branch_name, branch_name) == 0) {
+			err = print_backup_ref(branch_name, refname,
+			   old_commit_id, old_commit, refs_idmap, repo);
+			if (err)
+				break;
+		}
+
+		free(old_commit_id);
+		old_commit_id = NULL;
+		free(branch_name);
+		branch_name = NULL;
+		got_object_commit_close(old_commit);
+		old_commit = NULL;
+	}
+done:
+	if (refs_idmap)
+		got_reflist_object_id_map_free(refs_idmap);
+	got_ref_list_free(&refs);
+	got_ref_list_free(&backup_refs);
+	free(old_commit_id);
+	free(branch_name);
+	if (old_commit)
+		got_object_commit_close(old_commit);
+	return err;
+}
+
+static const struct got_error *
 cmd_rebase(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -7780,7 +8019,7 @@ cmd_rebase(int argc, char *argv[])
 	struct got_object_id *branch_head_commit_id = NULL, *yca_id = NULL;
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
-	int histedit_in_progress = 0;
+	int histedit_in_progress = 0, create_backup = 1, list_backups = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
@@ -7790,13 +8029,16 @@ cmd_rebase(int argc, char *argv[])
 	SIMPLEQ_INIT(&commits);
 	TAILQ_INIT(&merged_paths);
 
-	while ((ch = getopt(argc, argv, "ac")) != -1) {
+	while ((ch = getopt(argc, argv, "acl")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_rebase = 1;
 			break;
 		case 'c':
 			continue_rebase = 1;
+			break;
+		case 'l':
+			list_backups = 1;
 			break;
 		default:
 			usage_rebase();
@@ -7812,13 +8054,22 @@ cmd_rebase(int argc, char *argv[])
 	    "unveil", NULL) == -1)
 		err(1, "pledge");
 #endif
-	if (abort_rebase && continue_rebase)
-		usage_rebase();
-	else if (abort_rebase || continue_rebase) {
-		if (argc != 0)
+	if (list_backups) {
+		if (abort_rebase)
+			option_conflict('l', 'a');
+		if (continue_rebase)
+			option_conflict('l', 'c');
+		if (argc != 0 && argc != 1)
 			usage_rebase();
-	} else if (argc != 1)
-		usage_rebase();
+	} else {
+		if (abort_rebase && continue_rebase)
+			usage_rebase();
+		else if (abort_rebase || continue_rebase) {
+			if (argc != 0)
+				usage_rebase();
+		} else if (argc != 1)
+			usage_rebase();
+	}
 
 	cwd = getcwd(NULL, 0);
 	if (cwd == NULL) {
@@ -7827,20 +8078,32 @@ cmd_rebase(int argc, char *argv[])
 	}
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (error->code == GOT_ERR_NOT_WORKTREE)
-			error = wrap_not_worktree_error(error, "rebase", cwd);
-		goto done;
+		if (list_backups) {
+			if (error->code != GOT_ERR_NOT_WORKTREE)
+				goto done;
+		} else {
+			if (error->code == GOT_ERR_NOT_WORKTREE)
+				error = wrap_not_worktree_error(error,
+				    "rebase", cwd);
+			goto done;
+		}
 	}
 
-	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),
-	    NULL);
+	error = got_repo_open(&repo,
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL);
 	if (error != NULL)
 		goto done;
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
-	    got_worktree_get_root_path(worktree));
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
+
+	if (list_backups) {
+		error = list_backup_refs(GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX,
+		    argc == 1 ? argv[0] : NULL, repo);
+		goto done; /* nothing else to do */
+	}
 
 	error = got_worktree_histedit_in_progress(&histedit_in_progress,
 	    worktree);
@@ -7979,7 +8242,8 @@ cmd_rebase(int argc, char *argv[])
 	if (SIMPLEQ_EMPTY(&commits)) {
 		if (continue_rebase) {
 			error = rebase_complete(worktree, fileindex,
-			    branch, new_base_branch, tmp_branch, repo);
+			    branch, new_base_branch, tmp_branch, repo,
+			    create_backup);
 			goto done;
 		} else {
 			/* Fast-forward the reference of the branch. */
@@ -7997,6 +8261,8 @@ cmd_rebase(int argc, char *argv[])
 			    new_head_commit_id);
 			if (error)
 				goto done;
+			/* No backup needed since objects did not change. */
+			create_backup = 0;
 		}
 	}
 
@@ -8042,7 +8308,7 @@ cmd_rebase(int argc, char *argv[])
 		    "conflicts must be resolved before rebasing can continue");
 	} else
 		error = rebase_complete(worktree, fileindex, branch,
-		    new_base_branch, tmp_branch, repo);
+		    new_base_branch, tmp_branch, repo, create_backup);
 done:
 	got_object_id_queue_free(&commits);
 	free(branch_head_commit_id);
@@ -8066,8 +8332,8 @@ done:
 __dead static void
 usage_histedit(void)
 {
-	fprintf(stderr, "usage: %s histedit [-a] [-c] [-f] [-F histedit-script] [-m]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s histedit [-a] [-c] [-f] "
+	    "[-F histedit-script] [-m] [-l] [branch]\n", getprogname());
 	exit(1);
 }
 
@@ -8901,6 +9167,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	int edit_logmsg_only = 0, fold_only = 0;
+	int list_backups = 0;
 	const char *edit_script_path = NULL;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
@@ -8915,7 +9182,7 @@ cmd_histedit(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
-	while ((ch = getopt(argc, argv, "acfF:m")) != -1) {
+	while ((ch = getopt(argc, argv, "acfF:ml")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_edit = 1;
@@ -8931,6 +9198,9 @@ cmd_histedit(int argc, char *argv[])
 			break;
 		case 'm':
 			edit_logmsg_only = 1;
+			break;
+		case 'l':
+			list_backups = 1;
 			break;
 		default:
 			usage_histedit();
@@ -8962,7 +9232,20 @@ cmd_histedit(int argc, char *argv[])
 		option_conflict('f', 'm');
 	if (edit_script_path && fold_only)
 		option_conflict('F', 'f');
-	if (argc != 0)
+	if (list_backups) {
+		if (abort_edit)
+			option_conflict('l', 'a');
+		if (continue_edit)
+			option_conflict('l', 'c');
+		if (edit_script_path)
+			option_conflict('l', 'F');
+		if (edit_logmsg_only)
+			option_conflict('l', 'm');
+		if (fold_only)
+			option_conflict('l', 'f');
+		if (argc != 0 && argc != 1)
+			usage_histedit();
+	} else if (argc != 0)
 		usage_histedit();
 
 	/*
@@ -8981,9 +9264,31 @@ cmd_histedit(int argc, char *argv[])
 	}
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (error->code == GOT_ERR_NOT_WORKTREE)
-			error = wrap_not_worktree_error(error, "histedit", cwd);
-		goto done;
+		if (list_backups) {
+			if (error->code != GOT_ERR_NOT_WORKTREE)
+				goto done;
+		} else {
+			if (error->code == GOT_ERR_NOT_WORKTREE)
+				error = wrap_not_worktree_error(error,
+				    "histedit", cwd);
+			goto done;
+		}
+	}
+
+	if (list_backups) {
+		error = got_repo_open(&repo,
+		    worktree ? got_worktree_get_repo_path(worktree) : cwd,
+		    NULL);
+		if (error != NULL)
+			goto done;
+		error = apply_unveil(got_repo_get_path(repo), 0,
+		    worktree ? got_worktree_get_root_path(worktree) : NULL);
+		if (error)
+			goto done;
+		error = list_backup_refs(
+		    GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX,
+		    argc == 1 ? argv[0] : NULL, repo);
+		goto done; /* nothing else to do */
 	}
 
 	error = got_repo_open(&repo, got_worktree_get_repo_path(worktree),

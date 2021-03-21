@@ -1428,7 +1428,7 @@ conflicts must be resolved first.
 .It Cm bo
 Short alias for
 .Cm backout .
-.It Cm rebase Oo Fl a Oc Oo Fl c Oc Op Ar branch
+.It Cm rebase Oo Fl a Oc Oo Fl c Oc Oo Fl l Oc Op Ar branch
 Rebase commits on the specified
 .Ar branch
 onto the tip of the current branch of the work tree.
@@ -1469,6 +1469,16 @@ Once rebasing has completed successfully, the temporary branch becomes
 the new version of the specified
 .Ar branch
 and the work tree is automatically switched to it.
+.Pp
+Old commits in their pre-rebase state are automatically backed up in the 
+.Dq refs/got/backup/rebase
+reference namespace.
+As long as these references are not removed older versions of rebased
+commits will remain in the repository and can be viewed with the
+.Cm got rebase -l
+command.
+Removal of these references makes objects which become unreachable via
+any reference subject to removal by Git's garbage collector.
 .Pp
 While rebasing commits, show the status of each affected file,
 using the following status codes:
@@ -1532,11 +1542,44 @@ If this option is used, no other command-line arguments are allowed.
 .It Fl c
 Continue an interrupted rebase operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl l
+Show a list of past rebase operations, represented by references in the
+.Dq refs/got/backup/rebase
+reference namespace.
+.Pp
+Display the author, date, and log message of each backed up commit,
+the object ID of the corresponding post-rebase commit, and
+the object ID of their common ancestor commit.
+Given these object IDs,
+the
+.Cm got log
+command with the
+.Fl c
+and
+.Fl x
+options can be used to examine the history of either version of the branch,
+and the
+.Cm got branch
+command with the
+.Fl c
+option can be used to create a new branch from a pre-rebase state if desired.
+.Pp
+If a
+.Ar branch
+is specified, only show commits which at some point in time represented this
+branch.
+Otherwise, list all backed up commits for any branches.
+.Pp
+If this option is used,
+.Cm got rebase
+does not require a work tree.
+None of the other options can be used together with
+.Fl l .
 .El
 .It Cm rb
 Short alias for
 .Cm rebase .
-.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc
+.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Op Ar branch
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
@@ -1601,6 +1644,16 @@ will remain switched to throughout the entire histedit operation.
 Once history editing has completed successfully, the temporary branch becomes
 the new version of the work tree's branch and the work tree is automatically
 switched to it.
+.Pp
+Old commits in their pre-histedit state are automatically backed up in the 
+.Dq refs/got/backup/histedit
+reference namespace.
+As long as these references are not removed older versions of edited
+commits will remain in the repository and can be viewed with the
+.Cm got histedit -l
+command.
+Removal of these references makes objects which become unreachable via
+any reference subject to removal by Git's garbage collector.
 .Pp
 While merging commits, show the status of each affected file,
 using the following status codes:
@@ -1688,6 +1741,39 @@ The
 .Fl m
 option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl l
+Show a list of past histedit operations, represented by references in the
+.Dq refs/got/backup/histedit
+reference namespace.
+.Pp
+Display the author, date, and log message of each backed up commit,
+the object ID of the corresponding post-histedit commit, and
+the object ID of their common ancestor commit.
+Given these object IDs,
+the
+.Cm got log
+command with the
+.Fl c
+and
+.Fl x
+options can be used to examine the history of either version of the branch,
+and the
+.Cm got branch
+command with the
+.Fl c
+option can be used to create a new branch from a pre-histedit state if desired.
+.Pp
+If a
+.Ar branch
+is specified, only show commits which at some point in time represented this
+branch.
+Otherwise, list all backed up commits for any branches.
+.Pp
+If this option is used,
+.Cm got histedit
+does not require a work tree.
+None of the other options can be used together with
+.Fl l .
 .El
 .It Cm he
 Short alias for
