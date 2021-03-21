@@ -972,6 +972,9 @@ Cannot be used together with any other options except
 Delete the reference with the specified
 .Ar name
 from the repository.
+Any commit, tree, tag, and blob objects belonging to deleted references
+remain in the repository and may be removed separately with
+Git's garbage collector.
 Cannot be used together with any other options except
 .Fl r .
 .El
