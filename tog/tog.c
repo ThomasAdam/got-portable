@@ -1343,8 +1343,7 @@ draw_commit(struct tog_view *view, struct got_commit_object *commit,
 	committer_time = got_object_commit_get_committer_time(commit);
 	if (localtime_r(&committer_time, &tm) == NULL)
 		return got_error_from_errno("localtime_r");
-	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm)
-	    >= sizeof(datebuf))
+	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d ", &tm) == 0)
 		return got_error(GOT_ERR_NO_SPACE);
 
 	if (avail <= date_display_cols)
