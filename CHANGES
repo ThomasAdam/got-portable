@@ -1,3 +1,14 @@
+* got 0.50; 2021-03-22
+- use Myers diff instead of Patience diff when merging files with diff3
+- port file deltification code from git9; a prerequisite for writing pack files
+- implement raw object data access; another prerequisite for writing pack files
+- improve got log -x documentation (jrick)
+- improve got ref -d documentation
+- fix strftime(3) short buffer checks (jrick)
+- ensure that old commits remain referenced after rebase and histedit
+- new got rebase -l option which lists past rebase operations
+- new got histedit -l option which lists past histedit operations
+
 * got 0.49; 2021-02-11
 - implicitly mark all files in work tree as up-to-date after 'got integrate'
 - tog: fix behaviour if 'n' is pressed before search is started (found by naddy)
