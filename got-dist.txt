@@ -95,6 +95,7 @@
 /lib/deflate.c
 /lib/delta.c
 /lib/delta_cache.c
+/lib/deltify.c
 /lib/diff.c
 /lib/diff3.c
 /lib/diff_atomize_text.c
@@ -117,6 +118,7 @@
 /lib/got_lib_deflate.h
 /lib/got_lib_delta.h
 /lib/got_lib_delta_cache.h
+/lib/got_lib_deltify.h
 /lib/got_lib_diff.h
 /lib/got_lib_fileindex.h
 /lib/got_lib_gitconfig.h
@@ -222,6 +224,9 @@
 /regress/delta
 /regress/delta/Makefile
 /regress/delta/delta_test.c
+/regress/deltify
+/regress/deltify/Makefile
+/regress/deltify/deltify_test.c
 /regress/fetch
 /regress/fetch/Makefile
 /regress/fetch/fetch_test.c
