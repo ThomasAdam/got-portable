@@ -19,6 +19,7 @@
 #include <sys/queue.h>
 
 #include <assert.h>
+#include <endian.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
