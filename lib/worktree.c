@@ -1731,6 +1731,7 @@ get_file_status(unsigned char *status, struct stat *sb,
 	unsigned char staged_status = get_staged_status(ie);
 
 	*status = GOT_STATUS_NO_CHANGE;
+	memset(sb, 0, sizeof(*sb));
 
 	/*
 	 * Whenever the caller provides a directory descriptor and a
