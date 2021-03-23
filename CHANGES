@@ -1,3 +1,8 @@
+* got 0.51; 2021-03-23
+- deltify.c: explicitly include <endian.h> for be64toh()
+- rebase/histedit -l: error out if no backups for the requested branch exist
+- fix use of uninitialized stat buffer during status crawl (found by naddy)
+
 * got 0.50; 2021-03-22
 - use Myers diff instead of Patience diff when merging files with diff3
 - port file deltification code from git9; a prerequisite for writing pack files
