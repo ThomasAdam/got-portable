@@ -7923,6 +7923,7 @@ list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
 	char *branch_name = NULL;
 	struct got_commit_object *old_commit = NULL;
 	struct got_reflist_object_id_map *refs_idmap = NULL;
+	int wanted_branch_found = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&backup_refs);
@@ -7978,6 +7979,7 @@ list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
 
 		if (wanted_branch_name == NULL ||
 		    strcmp(wanted_branch_name, branch_name) == 0) {
+			wanted_branch_found = 1;
 			err = print_backup_ref(branch_name, refname,
 			   old_commit_id, old_commit, refs_idmap, repo);
 			if (err)
@@ -7990,6 +7992,11 @@ list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
 		branch_name = NULL;
 		got_object_commit_close(old_commit);
 		old_commit = NULL;
+	}
+
+	if (wanted_branch_name && !wanted_branch_found) {
+		err = got_error_fmt(GOT_ERR_NOT_REF,
+		    "%s/%s/", backup_ref_prefix, wanted_branch_name);
 	}
 done:
 	if (refs_idmap)

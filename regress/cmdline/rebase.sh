@@ -172,6 +172,25 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+
+	# Asking for backups of a branch which has none should yield an error
+	(cd $testroot/repo && got rebase -l master \
+		> $testroot/stdout 2> $testroot/stderr)
+	echo -n > $testroot/stdout.expected
+	echo "got: refs/got/backup/rebase/master/: no such reference found" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+	fi
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
 	fi
 	test_done "$testroot" "$ret"
 }
