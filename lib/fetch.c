@@ -129,17 +129,21 @@ dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
 		return error;
 	} else if (pid == 0) {
 		int n;
-		close(pfd[1]);
-		dup2(pfd[0], 0);
-		dup2(pfd[0], 1);
+		if (close(pfd[1]) == -1)
+			err(1, "close");
+		if (dup2(pfd[0], 0) == -1)
+			err(1, "dup2");
+		if (dup2(pfd[0], 1) == -1)
+			err(1, "dup2");
 		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
 		if (n < 0 || n >= ssizeof(cmd))
 			err(1, "snprintf");
 		if (execv(GOT_FETCH_PATH_SSH, argv) == -1)
-			err(1, "execl");
+			err(1, "execv");
 		abort(); /* not reached */
 	} else {
-		close(pfd[0]);
+		if (close(pfd[0]) == -1)
+			return got_error_from_errno("close");
 		*fetchpid = pid;
 		*fetchfd = pfd[1];
 		return NULL;
