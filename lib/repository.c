@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 
 #include <ctype.h>
 #include <endian.h>
@@ -615,8 +616,12 @@ got_repo_open(struct got_repository **repop, const char *path,
 	const struct got_error *err = NULL;
 	char *repo_path = NULL;
 	size_t i;
+	struct rlimit rl;
 
 	*repop = NULL;
+
+	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+		return got_error_from_errno("getrlimit");
 
 	repo = calloc(1, sizeof(*repo));
 	if (repo == NULL) {
@@ -646,6 +651,10 @@ got_repo_open(struct got_repository **repop, const char *path,
 	    GOT_OBJECT_CACHE_TYPE_TAG);
 	if (err)
 		goto done;
+
+	repo->pack_cache_size = GOT_PACK_CACHE_SIZE;
+	if (repo->pack_cache_size > rl.rlim_cur / 8)
+		repo->pack_cache_size = rl.rlim_cur / 8;
 
 	repo_path = realpath(path, NULL);
 	if (repo_path == NULL) {
@@ -710,13 +719,13 @@ got_repo_close(struct got_repository *repo)
 	const struct got_error *err = NULL, *child_err;
 	size_t i;
 
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
 		got_packidx_close(repo->packidx_cache[i]);
 	}
 
-	for (i = 0; i < nitems(repo->packs); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packs[i].path_packfile == NULL)
 			break;
 		got_pack_close(&repo->packs[i]);
@@ -893,7 +902,7 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 	const struct got_error *err = NULL;
 	size_t i;
 
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
 		if (strcmp(repo->packidx_cache[i]->path_packidx,
@@ -901,7 +910,7 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 			return got_error(GOT_ERR_CACHE_DUP_ENTRY);
 		}
 	}
-	if (i == nitems(repo->packidx_cache)) {
+	if (i == repo->pack_cache_size) {
 		err = got_packidx_close(repo->packidx_cache[i - 1]);
 		if (err)
 			return err;
@@ -947,7 +956,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	int packdir_fd;
 
 	/* Search pack index cache. */
-	for (i = 0; i < nitems(repo->packidx_cache); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
 		*idx = got_packidx_get_object_idx(repo->packidx_cache[i], id);
@@ -998,7 +1007,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 		}
 
-		for (i = 0; i < nitems(repo->packidx_cache); i++) {
+		for (i = 0; i < repo->pack_cache_size; i++) {
 			if (repo->packidx_cache[i] == NULL)
 				break;
 			if (strcmp(repo->packidx_cache[i]->path_packidx,
@@ -1094,7 +1103,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 	if (packp)
 		*packp = NULL;
 
-	for (i = 0; i < nitems(repo->packs); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		pack = &repo->packs[i];
 		if (pack->path_packfile == NULL)
 			break;
@@ -1102,7 +1111,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return got_error(GOT_ERR_CACHE_DUP_ENTRY);
 	}
 
-	if (i == nitems(repo->packs)) {
+	if (i == repo->pack_cache_size) {
 		err = got_pack_close(&repo->packs[i - 1]);
 		if (err)
 			return err;
@@ -1159,7 +1168,7 @@ got_repo_get_cached_pack(struct got_repository *repo, const char *path_packfile)
 	struct got_pack *pack = NULL;
 	size_t i;
 
-	for (i = 0; i < nitems(repo->packs); i++) {
+	for (i = 0; i < repo->pack_cache_size; i++) {
 		pack = &repo->packs[i];
 		if (pack->path_packfile == NULL)
 			break;
