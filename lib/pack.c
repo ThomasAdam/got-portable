@@ -106,7 +106,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 	}
-	if (be32toh(*h->magic) != GOT_PACKIDX_V2_MAGIC) {
+	if (*h->magic != htobe32(GOT_PACKIDX_V2_MAGIC)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
@@ -137,7 +137,7 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 			goto done;
 		}
 	}
-	if (be32toh(*h->version) != GOT_PACKIDX_VERSION) {
+	if (*h->version != htobe32(GOT_PACKIDX_VERSION)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		goto done;
 	}
@@ -259,8 +259,8 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 
 	/* Large file offsets are contained only in files > 2GB. */
 	for (i = 0; i < nobj; i++) {
-		uint32_t o = be32toh(h->offsets[i]);
-		if (o & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX)
+		uint32_t o = h->offsets[i];
+		if (o & htobe32(GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX))
 			p->nlargeobj++;
 	}
 	if (p->nlargeobj == 0)
