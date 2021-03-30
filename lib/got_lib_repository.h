@@ -28,7 +28,7 @@
 #define GOT_OBJECTS_PACK_DIR	"objects/pack"
 #define GOT_PACKED_REFS_FILE	"packed-refs"
 
-#define GOT_PACKIDX_CACHE_SIZE	16
+#define GOT_PACKIDX_CACHE_SIZE	64
 #define GOT_PACK_CACHE_SIZE	GOT_PACKIDX_CACHE_SIZE
 
 struct got_repository {
