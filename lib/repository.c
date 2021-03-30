@@ -1102,7 +1102,7 @@ got_repo_cache_pack(struct got_pack **packp, struct got_repository *repo,
 			return got_error(GOT_ERR_CACHE_DUP_ENTRY);
 	}
 
-	if (i == nitems(repo->packs) - 1) {
+	if (i == nitems(repo->packs)) {
 		err = got_pack_close(&repo->packs[i - 1]);
 		if (err)
 			return err;
