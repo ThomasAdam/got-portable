@@ -4381,19 +4381,11 @@ cmd_diff(int argc, char *argv[])
 			error = got_worktree_open(&worktree, cwd);
 			if (error && error->code != GOT_ERR_NOT_WORKTREE)
 				goto done;
-			if (worktree) {
-				repo_path = strdup(
-				    got_worktree_get_repo_path(worktree));
-				if (repo_path == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-			} else {
-				repo_path = strdup(cwd);
-				if (repo_path == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
+			repo_path = strdup(worktree ?
+			    got_worktree_get_repo_path(worktree) : cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
 			}
 		}
 	} else
