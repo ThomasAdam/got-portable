@@ -54,7 +54,7 @@ Global options must precede the command name, and are as follows:
 .Bl -tag -width tenletters
 .It Fl h
 Display usage information and exit immediately.
-.It Fl V, -version
+.It Fl V , -version
 Display program version and exit immediately.
 .El
 .Pp
@@ -950,7 +950,7 @@ Create a reference or change an existing reference.
 The reference with the specified
 .Ar name
 will point at the specified
-.Ar object.
+.Ar object .
 The expected
 .Ar object
 argument is a ID SHA1 hash or an existing reference or tag name which will
@@ -1470,7 +1470,7 @@ the new version of the specified
 .Ar branch
 and the work tree is automatically switched to it.
 .Pp
-Old commits in their pre-rebase state are automatically backed up in the 
+Old commits in their pre-rebase state are automatically backed up in the
 .Dq refs/got/backup/rebase
 reference namespace.
 As long as these references are not removed older versions of rebased
@@ -1645,7 +1645,7 @@ Once history editing has completed successfully, the temporary branch becomes
 the new version of the work tree's branch and the work tree is automatically
 switched to it.
 .Pp
-Old commits in their pre-histedit state are automatically backed up in the 
+Old commits in their pre-histedit state are automatically backed up in the
 .Dq refs/got/backup/histedit
 reference namespace.
 As long as these references are not removed older versions of edited
@@ -2129,7 +2129,7 @@ file.
 Worktree-specific configuration settings for
 .Nm .
 If present, a
-.Xr got.conf
+.Xr got.conf 5
 configuration file in the
 .Pa .got
 meta-data directory of a work tree supersedes any relevant settings in
@@ -2245,7 +2245,7 @@ with a pre-defined log message.
 .Pp
 Alternatively, create a new commit from local changes in a work tree
 directory with a log message that has been prepared in the file
-.Pa /tmp/msg:
+.Pa /tmp/msg :
 .Pp
 .Dl $ got commit -F /tmp/msg
 .Pp
@@ -2358,7 +2358,7 @@ must be configured to map all references in the remote repository
 into the
 .Dq refs/remotes
 namespace of the local repository.
-This can achieved by setting Git's
+This can be achieved by setting Git's
 .Pa remote.origin.fetch
 configuration variable to the value
 .Dq +refs/heads/*:refs/remotes/origin/*
@@ -2448,7 +2448,7 @@ repository with
 .Sh CAVEATS
 .Nm
 is a work-in-progress and some features remain to be implemented.
-
+.Pp
 At present, the user has to fall back on
 .Xr git 1
 to perform some tasks.

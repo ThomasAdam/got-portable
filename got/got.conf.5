@@ -166,6 +166,7 @@ all branches in the
 namespace will be updated directly to match the corresponding branches in
 the remote repository.
 .El
+.El
 .Sh EXAMPLES
 Configure author information:
 .Bd -literal -offset indent
@@ -182,7 +183,9 @@ remote "origin" {
 }
 .Ed
 .Pp
-Mirror the OpenBSD src repository from Github:
+Mirror the
+.Ox
+src repository from Github:
 .Bd -literal -offset indent
 remote "origin" {
 	repository "openbsd/src"
@@ -233,4 +236,3 @@ Users should set their
 or
 .Ev EDITOR
 environment variables instead.
-
