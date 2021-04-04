@@ -485,8 +485,10 @@ read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
 		return request_object(obj, repo, obj_fd);
 
 	err = start_read_object_child(repo);
-	if (err)
+	if (err) {
+		close(obj_fd);
 		return err;
+	}
 
 	return request_object(obj, repo, obj_fd);
 }
