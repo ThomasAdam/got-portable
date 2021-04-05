@@ -1,3 +1,13 @@
+* got 0.52; 2021-04-05
+- fix error checking in dial_ssh()
+- increase pack index cache size from 16 to 64 to improve performance
+- fix off-by-one in got_repo_cache_pack() causing the wrong pack to be evicted
+- cap pack file cache size at 1/8 of the current open file desciptor limit
+- when reading a pack index byte-swap fields at compile-time where possible
+- diff: reduce duplicate code (kn)
+- fix "mandoc -T lint" WARNINGS and ERRORS, add missing word (kn)
+- fix open file descriptor leak in error path of read_object_header_privsep()
+
 * got 0.51; 2021-03-23
 - deltify.c: explicitly include <endian.h> for be64toh()
 - rebase/histedit -l: error out if no backups for the requested branch exist
