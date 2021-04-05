@@ -1946,6 +1946,10 @@ update_blob(struct got_worktree *worktree,
 		    SHA1_DIGEST_LENGTH) == 0) {
 			err = sync_timestamps(worktree->root_fd,
 			    path, status, ie, &sb);
+			if (err)
+				goto done;
+			err = (*progress_cb)(progress_arg, GOT_STATUS_EXISTS,
+			    path);
 			goto done;
 		}
 	}
