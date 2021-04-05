@@ -1929,6 +1929,17 @@ test_update_adds_symlink() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Updating an up-to-date symlink should be a no-op.
+	echo 'Already up-to-date' > $testroot/stdout.expected
+	(cd $testroot/wt && got update > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
