@@ -125,8 +125,8 @@ done:
 	return err;
 }
 
-static const struct got_error *
-open_loose_object(int *fd, struct got_object_id *id,
+const struct got_error *
+got_object_open_loose_fd(int *fd, struct got_object_id *id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -490,7 +490,6 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
     struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
-	char *path;
 	int fd;
 
 	*obj = got_repo_get_cached_object(repo, id);
@@ -507,29 +506,21 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return got_repo_cache_object(repo, id, *obj);
 	}
 
-	err = got_object_get_path(&path, id, repo);
+	err = got_object_open_loose_fd(&fd, id, repo);
+	if (err) {
+		if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
+			err = got_error_no_obj(id);
+		return err;
+	}
+
+	err = read_object_header_privsep(obj, repo, fd);
 	if (err)
 		return err;
 
-	fd = open(path, O_RDONLY | O_NOFOLLOW);
-	if (fd == -1) {
-		if (errno == ENOENT)
-			err = got_error_no_obj(id);
-		else
-			err = got_error_from_errno2("open", path);
-		goto done;
-	} else {
-		err = read_object_header_privsep(obj, repo, fd);
-		if (err)
-			goto done;
-		memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
-	}
+	memcpy((*obj)->id.sha1, id->sha1, SHA1_DIGEST_LENGTH);
 
 	(*obj)->refcnt++;
-	err = got_repo_cache_object(repo, id, *obj);
-done:
-	free(path);
-	return err;
+	return got_repo_cache_object(repo, id, *obj);
 }
 
 const struct got_error *
@@ -571,7 +562,7 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
 
-		err = open_loose_object(&fd, id, repo);
+		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			goto done;
 		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, outfd,
@@ -858,7 +849,7 @@ open_commit(struct got_commit_object **commit,
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
 
-		err = open_loose_object(&fd, id, repo);
+		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
 		err = read_commit_privsep(commit, fd, repo);
@@ -1047,7 +1038,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
 
-		err = open_loose_object(&fd, id, repo);
+		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
 		err = read_tree_privsep(tree, fd, repo);
@@ -1411,7 +1402,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int infd;
 
-		err = open_loose_object(&infd, id, repo);
+		err = got_object_open_loose_fd(&infd, id, repo);
 		if (err)
 			goto done;
 		err = read_blob_privsep(&outbuf, &size, &hdrlen, outfd, infd,
@@ -1772,7 +1763,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
 
-		err = open_loose_object(&fd, id, repo);
+		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
 		err = read_object_header_privsep(&obj, repo, fd);
@@ -1783,7 +1774,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			return got_error(GOT_ERR_OBJ_TYPE);
 
-		err = open_loose_object(&fd, id, repo);
+		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
 		err = read_tag_privsep(tag, fd, repo);
