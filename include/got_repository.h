@@ -160,3 +160,11 @@ typedef const struct got_error *(*got_repo_import_cb)(void *, const char *);
 const struct got_error *got_repo_import(struct got_object_id **, const char *,
     const char *, const char *, struct got_pathlist_head *,
     struct got_repository *, got_repo_import_cb, void *);
+
+/* Obtain the number and size of loose objects in the repository. */
+const struct got_error *got_repo_get_loose_object_info(int *nobjects,
+    off_t *ondisk_size, struct got_repository *);
+
+/* Obtain the number and size of packed objects in the repository. */
+const struct got_error *got_repo_get_packfile_info(int *npackfiles,
+    int *nobjects, off_t *total_packsize, struct got_repository *);

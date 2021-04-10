@@ -1,0 +1,81 @@
+.\"
+.\" Copyright (c) 2021 Stefan Sperling
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate$
+.Dt GOTADMIN 1
+.Os
+.Sh NAME
+.Nm gotadmin
+.Nd Game of Trees repository administration
+.Sh SYNOPSIS
+.Nm
+.Ar command
+.Op Fl h
+.Op Ar arg ...
+.Sh DESCRIPTION
+.Nm
+is the repository maintenance tool for the
+.Xr got 1
+version control system.
+.Pp
+.Xr got 1
+stores the history of tracked files in a Git repository, as used
+by the Git version control system.
+.Nm
+provides commands for inspecting and manipulating the on-disk state of
+Git repositories.
+The repository format is described in
+.Xr git-repository 5 .
+.Pp
+.Nm
+provides global and command-specific options.
+Global options must precede the command name, and are as follows:
+.Bl -tag -width tenletters
+.It Fl h
+Display usage information and exit immediately.
+.It Fl V , -version
+Display program version and exit immediately.
+.El
+.Pp
+The commands for
+.Nm
+are as follows:
+.Bl -tag -width checkout
+.It Cm info Oo Fl r Ar repository-path Oc
+Display information about a repository.
+This includes some configuration settings from
+.Xr got.conf 5 ,
+and the number of objects stored in the repository, in packed or
+loose form, as well as the current on-disk size of these objects.
+.Pp
+The options for
+.Cm gotadmin info
+are as follows:
+.Bl -tag -width Ds
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std gotadmin
+.Sh SEE ALSO
+.Xr got 1 ,
+.Xr tog 1 ,
+.Xr git-repository 5 ,
+.Xr got.conf 5
+.Sh AUTHORS
+.An Stefan Sperling Aq Mt stsp@openbsd.org

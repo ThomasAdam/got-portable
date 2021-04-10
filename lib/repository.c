@@ -1814,3 +1814,181 @@ got_repo_import(struct got_object_id **new_commit_id, const char *path_dir,
 	free(new_tree_id);
 	return err;
 }
+
+const struct got_error *
+got_repo_get_loose_object_info(int *nobjects, off_t *ondisk_size,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *path_objects = NULL, *path = NULL;
+	DIR *dir = NULL;
+	struct got_object_id id;
+	int i;
+
+	*nobjects = 0;
+	*ondisk_size = 0;
+
+	path_objects = got_repo_get_path_objects(repo);
+	if (path_objects == NULL)
+		return got_error_from_errno("got_repo_get_path_objects");
+
+	for (i = 0; i <= 0xff; i++) {
+		struct dirent *dent;
+
+		if (asprintf(&path, "%s/%.2x", path_objects, i) == -1) {
+			err = got_error_from_errno("asprintf");
+			break;
+		}
+
+		dir = opendir(path);
+		if (dir == NULL) {
+			if (errno == ENOENT) {
+				err = NULL;
+				continue;
+			}
+			err = got_error_from_errno2("opendir", path);
+			break;
+		}
+
+		while ((dent = readdir(dir)) != NULL) {
+			char *id_str;
+			int fd;
+			struct stat sb;
+
+			if (strcmp(dent->d_name, ".") == 0 ||
+			    strcmp(dent->d_name, "..") == 0)
+				continue;
+
+			if (asprintf(&id_str, "%.2x%s", i, dent->d_name) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+
+			if (!got_parse_sha1_digest(id.sha1, id_str)) {
+				free(id_str);
+				continue;
+			}
+			free(id_str);
+
+			err = got_object_open_loose_fd(&fd, &id, repo);
+			if (err)
+				goto done;
+
+			if (fstat(fd, &sb) == -1) {
+				err = got_error_from_errno("fstat");
+				close(fd);
+				goto done;
+			}
+			(*nobjects)++;
+			(*ondisk_size) += sb.st_size;
+
+			if (close(fd) == -1) {
+				err = got_error_from_errno("close");
+				goto done;
+			}
+		}
+
+		if (closedir(dir) != 0) {
+			err = got_error_from_errno("closedir");
+			goto done;
+		}
+		dir = NULL;
+
+		free(path);
+		path = NULL;
+	}
+done:
+	if (dir && closedir(dir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+
+	if (err) {
+		*nobjects = 0;
+		*ondisk_size = 0;
+	}
+	free(path_objects);
+	free(path);
+	return err;
+}
+
+const struct got_error *
+got_repo_get_packfile_info(int *npackfiles, int *nobjects,
+    off_t *total_packsize, struct got_repository *repo)
+{
+	const struct got_error *err;
+	DIR *packdir = NULL;
+	struct dirent *dent;
+	struct got_packidx *packidx = NULL;
+	char *path_packidx;
+	char *path_packfile;
+	int packdir_fd;
+	struct stat sb;
+
+	*npackfiles = 0;
+	*nobjects = 0;
+	*total_packsize = 0;
+
+	packdir_fd = openat(got_repo_get_fd(repo),
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	if (packdir_fd == -1) {
+		return got_error_from_errno_fmt("openat: %s/%s",
+		    got_repo_get_path_git_dir(repo),
+		    GOT_OBJECTS_PACK_DIR);
+	}
+
+	packdir = fdopendir(packdir_fd);
+	if (packdir == NULL) {
+		err = got_error_from_errno("fdopendir");
+		goto done;
+	}
+
+	while ((dent = readdir(packdir)) != NULL) {
+		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+			continue;
+
+		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
+		    dent->d_name) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+
+		err = got_packidx_open(&packidx, got_repo_get_fd(repo),
+		    path_packidx, 0);
+		free(path_packidx);
+		if (err)
+			goto done;
+
+		if (fstat(packidx->fd, &sb) == -1)
+			goto done;
+		*total_packsize += sb.st_size;
+
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		if (err)
+			goto done;
+
+		if (fstatat(got_repo_get_fd(repo), path_packfile, &sb,
+		    0) == -1) {
+			free(path_packfile);
+			goto done;
+		}
+		free(path_packfile);
+		*total_packsize += sb.st_size;
+
+		*nobjects += be32toh(packidx->hdr.fanout_table[0xff]);
+
+		(*npackfiles)++;
+
+		got_packidx_close(packidx);
+		packidx = NULL;
+	}
+done:
+	if (packidx)
+		got_packidx_close(packidx);
+	if (packdir && closedir(packdir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+	if (err) {
+		*npackfiles = 0;
+		*nobjects = 0;
+		*total_packsize = 0;
+	}
+	return err;
+}

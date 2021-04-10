@@ -1,4 +1,4 @@
-SUBDIR = libexec got tog
+SUBDIR = libexec got tog gotadmin
 
 .PHONY: release dist
 
