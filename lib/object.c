@@ -146,31 +146,6 @@ done:
 }
 
 static const struct got_error *
-get_packfile_path(char **path_packfile, struct got_packidx *packidx)
-{
-	size_t size;
-
-	/* Packfile path contains ".pack" instead of ".idx", so add one byte. */
-	size = strlen(packidx->path_packidx) + 2;
-	if (size < GOT_PACKFILE_NAMELEN + 1)
-		return got_error_path(packidx->path_packidx, GOT_ERR_BAD_PATH);
-
-	*path_packfile = malloc(size);
-	if (*path_packfile == NULL)
-		return got_error_from_errno("malloc");
-
-	/* Copy up to and excluding ".idx". */
-	if (strlcpy(*path_packfile, packidx->path_packidx,
-	    size - strlen(GOT_PACKIDX_SUFFIX) - 1) >= size)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	return NULL;
-}
-
-static const struct got_error *
 request_packed_object(struct got_object **obj, struct got_pack *pack, int idx,
     struct got_object_id *id)
 {
@@ -371,7 +346,7 @@ open_packed_object(struct got_object **obj, struct got_object_id *id,
 	if (err)
 		return err;
 
-	err = get_packfile_path(&path_packfile, packidx);
+	err = got_packidx_get_packfile_path(&path_packfile, packidx);
 	if (err)
 		return err;
 
@@ -580,7 +555,7 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
 		if (err)
 			goto done;
 
@@ -867,7 +842,7 @@ open_commit(struct got_commit_object **commit,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
 		if (err)
 			return err;
 
@@ -1056,7 +1031,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
 		if (err)
 			return err;
 
@@ -1420,7 +1395,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
 		if (err)
 			goto done;
 
@@ -1770,7 +1745,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile, packidx);
 		if (err)
 			return err;
 
@@ -2274,7 +2249,7 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 		return NULL;
 	}
 
-	err = get_packfile_path(&path_packfile, packidx);
+	err = got_packidx_get_packfile_path(&path_packfile, packidx);
 	if (err)
 		return err;
 

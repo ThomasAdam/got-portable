@@ -415,6 +415,31 @@ got_packidx_close(struct got_packidx *packidx)
 	return err;
 }
 
+const struct got_error *
+got_packidx_get_packfile_path(char **path_packfile, struct got_packidx *packidx)
+{
+	size_t size;
+
+	/* Packfile path contains ".pack" instead of ".idx", so add one byte. */
+	size = strlen(packidx->path_packidx) + 2;
+	if (size < GOT_PACKFILE_NAMELEN + 1)
+		return got_error_path(packidx->path_packidx, GOT_ERR_BAD_PATH);
+
+	*path_packfile = malloc(size);
+	if (*path_packfile == NULL)
+		return got_error_from_errno("malloc");
+
+	/* Copy up to and excluding ".idx". */
+	if (strlcpy(*path_packfile, packidx->path_packidx,
+	    size - strlen(GOT_PACKIDX_SUFFIX) - 1) >= size)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	if (strlcat(*path_packfile, GOT_PACKFILE_SUFFIX, size) >= size)
+		return got_error(GOT_ERR_NO_SPACE);
+
+	return NULL;
+}
+
 static off_t
 get_object_offset(struct got_packidx *packidx, int idx)
 {
