@@ -885,10 +885,12 @@ duplicate(int *dpl, int j, struct line_range *r1, struct line_range *r2,
 	for (nline = 0; nline < r1->to - r1->from; nline++) {
 		do {
 			c = getc(d3s->fp[0]);
-			if (c == EOF)
-				return got_ferror(d3s->fp[0], GOT_ERR_EOF);
 			d = getc(d3s->fp[1]);
-			if (d == EOF)
+			if (c == EOF && d == EOF)
+				break;
+			else if (c == EOF)
+				return got_ferror(d3s->fp[0], GOT_ERR_EOF);
+			else if (d == EOF)
 				return got_ferror(d3s->fp[1], GOT_ERR_EOF);
 			nchar++;
 			if (c != d) {
