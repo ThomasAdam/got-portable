@@ -779,6 +779,88 @@ test_cherrypick_with_path_prefix_and_empty_tree() {
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_conflict_no_eol() {
+	local testroot=`test_init cherrypick_conflict_no_eol 1`
+	local content_a="aaa\naaa\naaa\naaa\naaa\naaa\n"
+	local content_b="aaa\naaa\nbbb\naaa\naaa\naaa\naaa"
+	local content_c="aaa\naaa\nccc\naaa\naaa\naaa\naaa"
+
+	printf "$content_a" > $testroot/repo/a
+	(cd $testroot/repo && git add a)
+	git_commit $testroot/repo -m "initial commit"
+
+	(cd $testroot/repo && got branch newbranch)
+
+	printf "$content_b" > $testroot/repo/a
+	git_commit $testroot/repo -m "change bbb"
+
+	printf "$content_c" > $testroot/repo/a
+	git_commit $testroot/repo -m "change ccc"
+	local ccc_commit=`git_show_head $testroot/repo`
+
+	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cherrypick $ccc_commit > $testroot/stdout)
+
+	echo "C  a" > $testroot/stdout.expected
+	echo "Merged commit $ccc_commit" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+test_cherrypick_conflict_no_eol2() {
+	local testroot=`test_init cherrypick_conflict_no_eol2 1`
+	local content_a="aaa\naaa\naaa\naaa\naaa\naaa"
+	local content_b="aaa\naaa\nbbb\naaa\naaa\naaa"
+	local content_c="aaa\naaa\nbbb\naaa\naaa\naaa\n"
+
+	printf "$content_a" > $testroot/repo/a
+	(cd $testroot/repo && git add a)
+	git_commit $testroot/repo -m "initial commit"
+
+	(cd $testroot/repo && got branch newbranch)
+
+	printf "$content_b" > $testroot/repo/a
+	git_commit $testroot/repo -m "change bbb"
+
+	printf "$content_c" > $testroot/repo/a
+	git_commit $testroot/repo -m "change ccc"
+	local ccc_commit=`git_show_head $testroot/repo`
+
+	got checkout -b newbranch $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cherrypick $ccc_commit \
+		> $testroot/stdout 2> $testroot/stderr)
+
+	echo "C  a" > $testroot/stdout.expected
+	echo "Merged commit $ccc_commit" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		#diff -u $testroot/stdout.expected $testroot/stdout
+		ret="xfail $(head -n 1 $testroot/stderr)"
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -789,3 +871,5 @@ run_test test_cherrypick_conflict_wt_file_vs_repo_submodule
 run_test test_cherrypick_modified_symlinks
 run_test test_cherrypick_symlink_conflicts
 run_test test_cherrypick_with_path_prefix_and_empty_tree
+run_test test_cherrypick_conflict_no_eol
+run_test test_cherrypick_conflict_no_eol2
