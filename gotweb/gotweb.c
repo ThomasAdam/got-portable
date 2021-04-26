@@ -4680,7 +4680,7 @@ gw_colordiff_line(struct gw_trans *gw_trans, char *buf)
 int
 main(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *error2 = NULL;
 	struct gw_trans *gw_trans;
 	struct gw_dir *dir = NULL, *tdir;
 	const char *page = "index";
@@ -4736,6 +4736,24 @@ main(int argc, char *argv[])
 	else
 		error = gw_display_index(gw_trans);
 done:
+	if (error) {
+		gw_trans->error = error;
+		gw_trans->action = GW_ERR;
+		error2 = gw_display_open(gw_trans, KHTTP_200, gw_trans->mime);
+		if (error2)
+			goto cleanup; /* we can't display an error page */
+		kerr = khtml_open(gw_trans->gw_html_req, gw_trans->gw_req, 0);
+		if (kerr != KCGI_OK)
+			goto cleanup; /* we can't display an error page */
+		kerr = khttp_template(gw_trans->gw_req, gw_trans->gw_tmpl,
+			gw_query_funcs[gw_trans->action].template);
+		if (kerr != KCGI_OK) {
+			khtml_close(gw_trans->gw_html_req);
+			goto cleanup; /* we can't display an error page */
+		}
+	}
+
+cleanup:
 	free(gw_trans->gw_conf->got_repos_path);
 	free(gw_trans->gw_conf->got_www_path);
 	free(gw_trans->gw_conf->got_site_name);
