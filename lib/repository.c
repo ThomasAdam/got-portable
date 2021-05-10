@@ -46,7 +46,6 @@
 #include "got_repository.h"
 #include "got_path.h"
 #include "got_cancel.h"
-#include "got_worktree.h"
 #include "got_object.h"
 
 #include "got_lib_delta.h"
@@ -56,7 +55,6 @@
 #include "got_lib_object_create.h"
 #include "got_lib_pack.h"
 #include "got_lib_privsep.h"
-#include "got_lib_worktree.h"
 #include "got_lib_sha1.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
