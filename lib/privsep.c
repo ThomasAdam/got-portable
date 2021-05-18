@@ -22,6 +22,7 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,12 +60,22 @@ static const struct got_error *
 poll_fd(int fd, int events, int timeout)
 {
 	struct pollfd pfd[1];
+	struct timespec ts;
+	sigset_t sigset;
 	int n;
 
 	pfd[0].fd = fd;
 	pfd[0].events = events;
 
-	n = poll(pfd, 1, timeout);
+	ts.tv_sec = timeout;
+	ts.tv_nsec = 0;
+
+	if (sigemptyset(&sigset) == -1)
+		return got_error_from_errno("sigemptyset");
+	if (sigaddset(&sigset, SIGWINCH) == -1)
+		return got_error_from_errno("sigaddset");
+
+	n = ppoll(pfd, 1, timeout == INFTIM ? NULL : &ts, &sigset);
 	if (n == -1)
 		return got_error_from_errno("poll");
 	if (n == 0)
