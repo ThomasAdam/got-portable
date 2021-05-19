@@ -77,7 +77,7 @@ poll_fd(int fd, int events, int timeout)
 
 	n = ppoll(pfd, 1, timeout == INFTIM ? NULL : &ts, &sigset);
 	if (n == -1)
-		return got_error_from_errno("poll");
+		return got_error_from_errno("ppoll");
 	if (n == 0)
 		return got_error(GOT_ERR_TIMEOUT);
 	if (pfd[0].revents & (POLLERR | POLLNVAL))
