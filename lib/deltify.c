@@ -281,6 +281,8 @@ done:
 void
 got_deltify_free(struct got_delta_table *dt)
 {
+	if (dt == NULL)
+		return;
 	free(dt->blocks);
 	free(dt);
 }
