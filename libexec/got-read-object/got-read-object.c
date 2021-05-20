@@ -191,6 +191,8 @@ main(int argc, char *argv[])
 			}
 			err = send_raw_obj(&ibuf, obj, imsg.fd, imsg_outfd.fd);
 			imsg.fd = -1; /* imsg.fd is owned by send_raw_obj() */
+			if (close(imsg_outfd.fd) == -1 && err == NULL)
+				err = got_error_from_errno("close");
 			imsg_free(&imsg_outfd);
 			if (err)
 				goto done;
