@@ -80,7 +80,8 @@ static const struct got_error *
 next_delta_byte(const uint8_t **p, size_t *remain)
 {
 	if (--(*remain) == 0)
-		return got_error(GOT_ERR_BAD_DELTA);
+		return got_error_msg(GOT_ERR_BAD_DELTA,
+		    "delta data truncated");
 	(*p)++;
 	return NULL;
 }
@@ -206,7 +207,8 @@ copy_from_delta(const uint8_t **p, size_t *remain, size_t len, FILE *outfile)
 	size_t n;
 
 	if (*remain < len)
-		return got_error(GOT_ERR_BAD_DELTA);
+		return got_error_msg(GOT_ERR_BAD_DELTA,
+		    "copy from beyond end of delta data");
 
 	n = fwrite(*p, len, 1, outfile);
 	if (n != 1)
@@ -245,7 +247,7 @@ got_delta_get_sizes(uint64_t *base_size, uint64_t *result_size,
 	const uint8_t *p;
 
 	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
-		return got_error(GOT_ERR_BAD_DELTA);
+		return got_error_msg(GOT_ERR_BAD_DELTA, "delta too small");
 
 	p = delta_buf;
 	remain = delta_len;
@@ -265,7 +267,7 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 	*outsize= 0;
 
 	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
-		return got_error(GOT_ERR_BAD_DELTA);
+		return got_error_msg(GOT_ERR_BAD_DELTA, "delta too small");
 
 	p = delta_buf;
 	remain = delta_len;
@@ -285,7 +287,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 			if (SIZE_MAX - offset < len || offset + len < 0 ||
 			    base_bufsz < offset + len ||
 			    *outsize + len > maxoutsize)
-				return got_error(GOT_ERR_BAD_DELTA);
+				return got_error_msg(GOT_ERR_BAD_DELTA,
+				    "bad delta copy length");
 			memcpy(outbuf + *outsize, base_buf + offset, len);
 			if (err == NULL) {
 				*outsize += len;
@@ -297,7 +300,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 		} else {
 			size_t len = (size_t)*p;
 			if (len == 0) {
-				err = got_error(GOT_ERR_BAD_DELTA);
+				err = got_error_msg(GOT_ERR_BAD_DELTA,
+				    "zero length delta");
 				break;
 			}
 			err = next_delta_byte(&p, &remain);
@@ -305,7 +309,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 				break;
 			if (remain < len || SIZE_MAX - *outsize < len ||
 			    *outsize + len > maxoutsize)
-				return got_error(GOT_ERR_BAD_DELTA);
+				return got_error_msg(GOT_ERR_BAD_DELTA,
+				    "bad delta copy length");
 			memcpy(outbuf + *outsize, p, len);
 			p += len;
 			remain -= len;
@@ -314,7 +319,8 @@ got_delta_apply_in_mem(uint8_t *base_buf, size_t base_bufsz,
 	}
 
 	if (*outsize != result_size)
-		err = got_error(GOT_ERR_BAD_DELTA);
+		err = got_error_msg(GOT_ERR_BAD_DELTA,
+		    "delta application result size mismatch");
 	return err;
 }
 
@@ -333,7 +339,7 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 	*outsize = 0;
 
 	if (delta_len < GOT_DELTA_STREAM_LENGTH_MIN)
-		return got_error(GOT_ERR_BAD_DELTA);
+		return got_error_msg(GOT_ERR_BAD_DELTA, "delta too small");
 
 	p = delta_buf;
 	remain = delta_len;
@@ -365,7 +371,8 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 		} else {
 			size_t len = (size_t)*p;
 			if (len == 0) {
-				err = got_error(GOT_ERR_BAD_DELTA);
+				err = got_error_msg(GOT_ERR_BAD_DELTA,
+				    "zero length delta");
 				break;
 			}
 			err = next_delta_byte(&p, &remain);
@@ -379,7 +386,8 @@ got_delta_apply(FILE *base_file, const uint8_t *delta_buf,
 	}
 
 	if (*outsize != result_size)
-		err = got_error(GOT_ERR_BAD_DELTA);
+		err = got_error_msg(GOT_ERR_BAD_DELTA,
+		    "delta application result size mismatch");
 
 	if (memstream != NULL) {
 		if (fclose(memstream) == EOF)
