@@ -83,7 +83,7 @@ create_object_file(struct got_object_id *id, FILE *content,
 		goto done;
 	}
 
-	err = got_deflate_to_file(&tmplen, content, tmpfile);
+	err = got_deflate_to_file(&tmplen, content, tmpfile, NULL);
 	if (err)
 		goto done;
 

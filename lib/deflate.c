@@ -35,7 +35,8 @@
 #endif
 
 const struct got_error *
-got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
+got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize,
+    struct got_deflate_checksum *csum)
 {
 	const struct got_error *err = NULL;
 	int zerr;
@@ -74,10 +75,21 @@ got_deflate_init(struct got_deflate_buf *zb, uint8_t *outbuf, size_t bufsize)
 	} else
 		zb->outbuf = outbuf;
 
+	zb->csum = csum;
 done:
 	if (err)
 		got_deflate_end(zb);
 	return err;
+}
+
+static void
+csum_output(struct got_deflate_checksum *csum, const char *buf, size_t len)
+{
+	if (csum->output_crc)
+		*csum->output_crc = crc32(*csum->output_crc, buf, len);
+
+	if (csum->output_sha1)
+		SHA1Update(csum->output_sha1, buf, len);
 }
 
 const struct got_error *
@@ -92,6 +104,9 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 
 	*outlenp = 0;
 	do {
+		char *csum_out = NULL;
+		size_t csum_avail = 0;
+
 		if (z->avail_in == 0) {
 			size_t n = fread(zb->inbuf, 1, zb->inlen, f);
 			if (n == 0) {
@@ -104,7 +119,15 @@ got_deflate_read(struct got_deflate_buf *zb, FILE *f, size_t *outlenp)
 			z->next_in = zb->inbuf;
 			z->avail_in = n;
 		}
+		if (zb->csum) {
+			csum_out = z->next_out;
+			csum_avail = z->avail_out;
+		}
 		ret = deflate(z, Z_NO_FLUSH);
+		if (zb->csum) {
+			csum_output(zb->csum, csum_out,
+			   csum_avail - z->avail_out);
+		}
 	} while (ret == Z_OK && z->avail_out > 0);
 
 	if (ret == Z_OK) {
@@ -129,13 +152,14 @@ got_deflate_end(struct got_deflate_buf *zb)
 }
 
 const struct got_error *
-got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
+got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile,
+    struct got_deflate_checksum *csum)
 {
 	const struct got_error *err;
 	size_t avail;
 	struct got_deflate_buf zb;
 
-	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE);
+	err = got_deflate_init(&zb, NULL, GOT_DEFLATE_BUFSIZE, csum);
 	if (err)
 		goto done;
 
@@ -157,8 +181,6 @@ got_deflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
 	} while (zb.flags & GOT_DEFLATE_F_HAVE_MORE);
 
 done:
-	if (err == NULL)
-		rewind(outfile);
 	got_deflate_end(&zb);
 	return err;
 }
