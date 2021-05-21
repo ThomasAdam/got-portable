@@ -1060,6 +1060,7 @@ got_ref_list_free(struct got_reflist_head *refs)
 
 	while ((re = TAILQ_FIRST(refs))) {
 		TAILQ_REMOVE(refs, re, entry);
+		got_ref_close(re->ref);
 		free(re);
 	}
 
