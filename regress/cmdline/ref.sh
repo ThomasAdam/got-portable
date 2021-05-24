@@ -389,10 +389,11 @@ test_ref_list() {
 		fi
 	done
 
-	for r in refs//foo/bar refs//foo//bar refs////////foo//bar; do
-		got ref -r $testroot/repo -l $r > $testroot/stdout
+	for r in /refs/abc refs//foo/bar refs//foo//bar refs////////foo//bar; do
+		got ref -r $testroot/repo -l $r > $testroot/stdout \
+			2> $testroot/stderr
 
-		echo "refs/foo/bar/baz: $commit_id" > $testroot/stdout.expected
+		echo -n > $testroot/stdout.expected
 		cmp -s $testroot/stdout $testroot/stdout.expected
 		ret="$?"
 		if [ "$ret" != "0" ]; then
@@ -400,10 +401,19 @@ test_ref_list() {
 			test_done "$testroot" "$ret"
 			return 1
 		fi
+
+		echo "got: $r: bad reference name" > $testroot/stderr.expected
+		cmp -s $testroot/stderr $testroot/stderr.expected
+		ret="$?"
+		if [ "$ret" != "0" ]; then
+			diff -u $testroot/stderr.expected $testroot/stderr
+			test_done "$testroot" "$ret"
+			return 1
+		fi
 	done
 
 	# attempt to list non-existing references
-	for r in refs/fo bar baz moo riffs /refs/abc refs/foo/bar/baz/moo; do
+	for r in refs/fo bar baz moo riffs refs/abc refs/foo/bar/baz/moo; do
 		got ref -r $testroot/repo -l $r > $testroot/stdout
 
 		echo -n > $testroot/stdout.expected

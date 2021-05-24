@@ -409,6 +409,9 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 
 	*ref = NULL;
 
+	if (!is_valid_ref_name(name))
+		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
+
 	if (ref_is_absolute || ref_is_well_known) {
 		if (asprintf(&path, "%s/%s", path_refs, name) == -1)
 			return got_error_from_errno("asprintf");
