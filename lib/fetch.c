@@ -156,8 +156,8 @@ dial_git(int *fetchfd, const char *host, const char *port, const char *path,
 {
 	const struct got_error *err = NULL;
 	struct addrinfo hints, *servinfo, *p;
-	char *cmd = NULL, *pkt = NULL;
-	int fd = -1, totlen, r, eaicode;
+	char *cmd = NULL;
+	int fd = -1, len, r, eaicode;
 
 	*fetchfd = -1;
 
@@ -193,28 +193,12 @@ dial_git(int *fetchfd, const char *host, const char *port, const char *path,
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
-	totlen = 4 + strlen(cmd) + 1 + strlen("host=") + strlen(host) + 1;
-	if (asprintf(&pkt, "%04x%s", totlen, cmd) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	r = write(fd, pkt, strlen(pkt) + 1);
-	if (r == -1) {
-		err = got_error_from_errno("write");
-		goto done;
-	}
-	if (asprintf(&pkt, "host=%s", host) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	r = write(fd, pkt, strlen(pkt) + 1);
-	if (r == -1) {
-		err = got_error_from_errno("write");
-		goto done;
-	}
+	len = 4 + strlen(cmd) + 1 + strlen("host=") + strlen(host) + 1;
+	r = dprintf(fd, "%04x%s%chost=%s%c", len, cmd, '\0', host, '\0');
+	if (r < 0)
+		err = got_error_from_errno("dprintf");
 done:
 	free(cmd);
-	free(pkt);
 	if (err) {
 		if (fd != -1)
 			close(fd);
