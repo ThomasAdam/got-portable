@@ -861,6 +861,341 @@ test_cherrypick_conflict_no_eol2() {
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_unrelated_changes() {
+	local testroot=`test_init cherrypick_unrelated_changes`
+
+	# Sorry about the large HERE document but I have not found
+	# a smaller reproduction recipe yet...
+	cat > $testroot/repo/reference.c <<EOF
+const struct got_error *
+got_ref_alloc(struct got_reference **ref, const char *name,
+    struct got_object_id *id)
+{
+        if (!is_valid_ref_name(name))
+                return got_error_path(name, GOT_ERR_BAD_REF_NAME);
+
+        return alloc_ref(ref, name, id, 0);
+}
+
+static const struct got_error *
+parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
+    const char *line)
+{
+        struct got_object_id id;
+        const char *name;
+
+        *ref = NULL;
+
+        if (line[0] == '#' || line[0] == '^')
+                return NULL;
+
+        if (!got_parse_sha1_digest(id.sha1, line))
+                return got_error(GOT_ERR_BAD_REF_DATA);
+
+        if (abs_refname) {
+                if (strcmp(line + SHA1_DIGEST_STRING_LENGTH, abs_refname) != 0)
+                        return NULL;
+                name = abs_refname;
+        } else
+                name = line + SHA1_DIGEST_STRING_LENGTH;
+
+        return alloc_ref(ref, name, &id, GOT_REF_IS_PACKED);
+}
+
+static const struct got_error *
+open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
+    int nsubdirs, const char *refname)
+{
+        const struct got_error *err = NULL;
+        char *abs_refname;
+        char *line = NULL;
+        size_t linesize = 0;
+        ssize_t linelen;
+        int i, ref_is_absolute = (strncmp(refname, "refs/", 5) == 0);
+
+        *ref = NULL;
+
+        if (ref_is_absolute)
+                abs_refname = (char *)refname;
+        do {
+                linelen = getline(&line, &linesize, f);
+                if (linelen == -1) {
+                        if (feof(f))
+                                break;
+                        err = got_ferror(f, GOT_ERR_BAD_REF_DATA);
+                        break;
+                }
+                if (linelen > 0 && line[linelen - 1] == '\n')
+                        line[linelen - 1] = '\0';
+                for (i = 0; i < nsubdirs; i++) {
+                        if (!ref_is_absolute &&
+                            asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
+                            refname) == -1)
+                                return got_error_from_errno("asprintf");
+                        err = parse_packed_ref_line(ref, abs_refname, line);
+                        if (!ref_is_absolute)
+                                free(abs_refname);
+                        if (err || *ref != NULL)
+                                break;
+                }
+                if (err)
+                        break;
+        } while (*ref == NULL);
+        free(line);
+
+        return err;
+}
+
+static const struct got_error *
+open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
+    const char *name, int lock)
+{
+        const struct got_error *err = NULL;
+        char *path = NULL;
+        char *absname = NULL;
+        int ref_is_absolute = (strncmp(name, "refs/", 5) == 0);
+        int ref_is_well_known = (subdir[0] == '\0' && is_well_known_ref(name));
+
+        *ref = NULL;
+
+        if (ref_is_absolute || ref_is_well_known) {
+                if (asprintf(&path, "%s/%s", path_refs, name) == -1)
+                        return got_error_from_errno("asprintf");
+                absname = (char *)name;
+        } else {
+                if (asprintf(&path, "%s/%s%s%s", path_refs, subdir,
+                    subdir[0] ? "/" : "", name) == -1)
+                        return got_error_from_errno("asprintf");
+
+                if (asprintf(&absname, "refs/%s%s%s",
+                    subdir, subdir[0] ? "/" : "", name) == -1) {
+                        err = got_error_from_errno("asprintf");
+                        goto done;
+                }
+        }
+
+        err = parse_ref_file(ref, name, absname, path, lock);
+done:
+        if (!ref_is_absolute && !ref_is_well_known)
+                free(absname);
+        free(path);
+        return err;
+}
+
+const struct got_error *
+got_ref_open(struct got_reference **ref, struct got_repository *repo,
+   const char *refname, int lock)
+{
+        const struct got_error *err = NULL;
+        char *path_refs = NULL;
+        const char *subdirs[] = {
+            GOT_REF_HEADS, GOT_REF_TAGS, GOT_REF_REMOTES
+        };
+        size_t i;
+        int well_known = is_well_known_ref(refname);
+        struct got_lockfile *lf = NULL;
+
+        *ref = NULL;
+
+        path_refs = get_refs_dir_path(repo, refname);
+        if (path_refs == NULL) {
+                err = got_error_from_errno2("get_refs_dir_path", refname);
+                goto done;
+        }
+
+        if (well_known) {
+                err = open_ref(ref, path_refs, "", refname, lock);
+        } else {
+                char *packed_refs_path;
+                FILE *f;
+
+                /* Search on-disk refs before packed refs! */
+                for (i = 0; i < nitems(subdirs); i++) {
+                        err = open_ref(ref, path_refs, subdirs[i], refname,
+                            lock);
+                        if ((err && err->code != GOT_ERR_NOT_REF) || *ref)
+                                goto done;
+                }
+
+                packed_refs_path = got_repo_get_path_packed_refs(repo);
+                if (packed_refs_path == NULL) {
+                        err = got_error_from_errno(
+                            "got_repo_get_path_packed_refs");
+                        goto done;
+                }
+
+                if (lock) {
+                        err = got_lockfile_lock(&lf, packed_refs_path);
+                        if (err)
+                                goto done;
+                }
+                f = fopen(packed_refs_path, "rb");
+                free(packed_refs_path);
+                if (f != NULL) {
+                        err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
+                            refname);
+                        if (!err) {
+                                if (fclose(f) == EOF) {
+                                        err = got_error_from_errno("fclose");
+                                        got_ref_close(*ref);
+                                        *ref = NULL;
+                                } else if (*ref)
+                                        (*ref)->lf = lf;
+                        }
+                }
+        }
+done:
+        if (!err && *ref == NULL)
+                err = got_error_not_ref(refname);
+        if (err && lf)
+                got_lockfile_unlock(lf);
+        free(path_refs);
+        return err;
+}
+
+struct got_reference *
+got_ref_dup(struct got_reference *ref)
+{
+        struct got_reference *ret;
+
+        ret = calloc(1, sizeof(*ret));
+        if (ret == NULL)
+                return NULL;
+
+        ret->flags = ref->flags;
+        if (ref->flags & GOT_REF_IS_SYMBOLIC) {
+                ret->ref.symref.name = strdup(ref->ref.symref.name);
+                if (ret->ref.symref.name == NULL) {
+                        free(ret);
+                        return NULL;
+                }
+                ret->ref.symref.ref = strdup(ref->ref.symref.ref);
+                if (ret->ref.symref.ref == NULL) {
+                        free(ret->ref.symref.name);
+                        free(ret);
+                        return NULL;
+                }
+        } else {
+                ret->ref.ref.name = strdup(ref->ref.ref.name);
+                if (ret->ref.ref.name == NULL) {
+                        free(ret);
+                        return NULL;
+                }
+                memcpy(ret->ref.ref.sha1, ref->ref.ref.sha1,
+                    sizeof(ret->ref.ref.sha1));
+        }
+
+        return ret;
+}
+
+const struct got_error *
+got_reflist_entry_dup(struct got_reflist_entry **newp,
+    struct got_reflist_entry *re)
+{
+        const struct got_error *err = NULL;
+        struct got_reflist_entry *new;
+
+        *newp = NULL;
+
+        new = malloc(sizeof(*new));
+        if (new == NULL)
+                return got_error_from_errno("malloc");
+
+        new->ref = got_ref_dup(re->ref);
+        if (new->ref == NULL) {
+                err = got_error_from_errno("got_ref_dup");
+                free(new);
+                return err;
+        }
+
+        *newp = new;
+        return NULL;
+}
+
+void
+got_ref_list_free(struct got_reflist_head *refs)
+{
+        struct got_reflist_entry *re;
+
+        while ((re = TAILQ_FIRST(refs))) {
+                TAILQ_REMOVE(refs, re, entry);
+                free(re);
+        }
+
+}
+EOF
+	(cd $testroot/repo && git add reference.c)
+	git_commit $testroot/repo -m "added reference.c file"
+	local base_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	ed -s $testroot/repo/reference.c <<EOF
+91a
+        if (!is_valid_ref_name(name))
+                return got_error_path(name, GOT_ERR_BAD_REF_NAME);
+
+.
+w
+q
+EOF
+	git_commit $testroot/repo -m "added lines on newbranch"
+	local branch_rev1=`git_show_head $testroot/repo`
+
+	ed -s $testroot/repo/reference.c <<EOF
+255a
+                got_ref_close(re->ref);
+.
+w
+q
+EOF
+	git_commit $testroot/repo -m "more lines on newbranch"
+
+	local branch_rev2=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick $branch_rev2 > $testroot/stdout)
+
+	echo "G  reference.c" > $testroot/stdout.expected
+	echo "Merged commit $branch_rev2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/diff.expected <<EOF
+--- reference.c
++++ reference.c
+@@ -250,6 +250,7 @@ got_ref_list_free(struct got_reflist_head *refs)
+ 
+         while ((re = TAILQ_FIRST(refs))) {
+                 TAILQ_REMOVE(refs, re, entry);
++                got_ref_close(re->ref);
+                 free(re);
+         }
+ 
+EOF
+	(cd $testroot/wt && got diff |
+		egrep -v '^(diff|blob|file)' > $testroot/diff)
+	cmp -s $testroot/diff.expected $testroot/diff
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		#diff -u $testroot/diff.expected $testroot/diff
+		ret="xfail cherrypick results in unexpected diff"
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -873,3 +1208,4 @@ run_test test_cherrypick_symlink_conflicts
 run_test test_cherrypick_with_path_prefix_and_empty_tree
 run_test test_cherrypick_conflict_no_eol
 run_test test_cherrypick_conflict_no_eol2
+run_test test_cherrypick_unrelated_changes
