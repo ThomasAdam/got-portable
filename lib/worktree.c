@@ -775,13 +775,13 @@ done:
 }
 
 /*
- * Perform a 3-way merge where blob_orig acts as the common ancestor,
- * the file at deriv_path acts as the first derived version, and the
- * file on disk acts as the second derived version.
+ * Perform a 3-way merge where the file at orig_path acts as the common
+ * ancestor, the file at deriv_path acts as the first derived version,
+ * and the file at ondisk_path acts as the second derived version.
  */
 static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
-    struct got_blob_object *blob_orig, const char *ondisk_path,
+    const char *orig_path, const char *ondisk_path,
     const char *path, uint16_t st_mode, const char *deriv_path,
     const char *label_orig, const char *label_deriv,
     struct got_repository *repo,
@@ -789,8 +789,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	int merged_fd = -1;
-	FILE *f_orig = NULL;
-	char *blob_orig_path = NULL;
+	FILE *f_empty = NULL;
+	char *f_empty_path = NULL;
 	char *merged_path = NULL, *base_path = NULL;
 	int overlapcnt = 0;
 	char *parent = NULL;
@@ -819,20 +819,15 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_opentemp_named(&blob_orig_path, &f_orig, base_path);
-	if (err)
-		goto done;
-	if (blob_orig) {
-		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_orig,
-		    blob_orig);
-		if (err)
-			goto done;
-	} else {
+	if (orig_path == NULL) {
 		/*
 		 * If the file has no blob, this is an "add vs add" conflict,
 		 * and we simply use an empty ancestor file to make both files
 		 * appear in the merged result in their entirety.
 		 */
+		err = got_opentemp_named(&f_empty_path, &f_empty, base_path);
+		if (err)
+			goto done;
 	}
 
 	/* 
@@ -872,7 +867,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	}
 
 	err = got_merge_diff3(&overlapcnt, merged_fd, deriv_path,
-	    blob_orig_path, symlink_path ? symlink_path : ondisk_path,
+	    orig_path ? orig_path : f_empty_path,
+	    symlink_path ? symlink_path : ondisk_path,
 	    label_deriv, label_orig, NULL);
 	if (err)
 		goto done;
@@ -919,13 +915,14 @@ done:
 	free(symlink_path);
 	if (merged_fd != -1 && close(merged_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (f_orig && fclose(f_orig) == EOF && err == NULL)
+	if (f_empty && fclose(f_empty) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(merged_path);
 	free(base_path);
-	if (blob_orig_path) {
-		unlink(blob_orig_path);
-		free(blob_orig_path);
+	if (f_empty_path) {
+		if (unlink(f_empty_path) == -1 && err == NULL)
+			err = got_error_from_errno2("unlink", f_empty_path);
+		free(f_empty_path);
 	}
 	free(parent);
 	return err;
@@ -1134,7 +1131,8 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
-	FILE *f_deriv = NULL;
+	FILE *f_orig = NULL, *f_deriv = NULL;
+	char *blob_orig_path = NULL;
 	char *blob_deriv_path = NULL, *base_path = NULL, *id_str = NULL;
 	char *label_deriv = NULL, *parent = NULL;
 
@@ -1144,7 +1142,25 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	free(base_path);
+	if (blob_orig) {
+		if (asprintf(&base_path, "%s/got-merge-blob-orig",
+		    parent) == -1) {
+			err = got_error_from_errno("asprintf");
+			base_path = NULL;
+			goto done;
+		}
+
+		err = got_opentemp_named(&blob_orig_path, &f_orig, base_path);
+		if (err)
+			goto done;
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_orig,
+		    blob_orig);
+		if (err)
+			goto done;
+
+		free(base_path);
+	}
+
 	if (asprintf(&base_path, "%s/got-merge-blob-deriv", parent) == -1) {
 		err = got_error_from_errno("asprintf");
 		base_path = NULL;
@@ -1168,13 +1184,19 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = merge_file(local_changes_subsumed, worktree, blob_orig,
+	err = merge_file(local_changes_subsumed, worktree, blob_orig_path,
 	    ondisk_path, path, st_mode, blob_deriv_path, label_orig,
 	    label_deriv, repo, progress_cb, progress_arg);
 done:
+	if (f_orig && fclose(f_orig) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (f_deriv && fclose(f_deriv) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(base_path);
+	if (blob_orig_path) {
+		unlink(blob_orig_path);
+		free(blob_orig_path);
+	}
 	if (blob_deriv_path) {
 		unlink(blob_deriv_path);
 		free(blob_deriv_path);
@@ -7705,8 +7727,10 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 	const struct got_error *err = NULL;
 	char *path_unstaged_content = NULL;
 	char *path_new_staged_content = NULL;
+	char *parent = NULL, *base_path = NULL;
+	char *blob_base_path = NULL;
 	struct got_object_id *new_staged_blob_id = NULL;
-	FILE *f = NULL;
+	FILE *f = NULL, *f_base = NULL;
 	struct stat sb;
 
 	err = create_unstaged_content(&path_unstaged_content,
@@ -7755,8 +7779,28 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		    progress_arg);
 	} else {
 		int local_changes_subsumed;
+
+		err = got_path_dirname(&parent, ondisk_path);
+		if (err)
+			return err;
+
+		if (asprintf(&base_path, "%s/got-unstage-blob-orig",
+		    parent) == -1) {
+			err = got_error_from_errno("asprintf");
+			base_path = NULL;
+			goto done;
+		}
+
+		err = got_opentemp_named(&blob_base_path, &f_base, base_path);
+		if (err)
+			goto done;
+		err = got_object_blob_dump_to_file(NULL, NULL, NULL, f_base,
+		    blob_base);
+		if (err)
+			goto done;
+
 		err = merge_file(&local_changes_subsumed, worktree,
-		    blob_base, ondisk_path, ie->path,
+		    blob_base_path, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
 		    path_unstaged_content, label_orig, "unstaged",
 		    repo, progress_cb, progress_arg);
@@ -7779,10 +7823,17 @@ done:
 	if (path_new_staged_content &&
 	    unlink(path_new_staged_content) == -1 && err == NULL)
 		err = got_error_from_errno2("unlink", path_new_staged_content);
+	if (blob_base_path && unlink(blob_base_path) == -1 && err == NULL)
+		err = got_error_from_errno2("unlink", blob_base_path);
+	if (f_base && fclose(f_base) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", path_unstaged_content);
 	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path_unstaged_content);
 	free(path_unstaged_content);
 	free(path_new_staged_content);
+	free(blob_base_path);
+	free(parent);
+	free(base_path);
 	return err;
 }
 
