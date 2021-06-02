@@ -764,8 +764,8 @@ check_files_equal(int *same, FILE *f1, FILE *f2)
  */
 static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
-    FILE *f_orig, const char *ondisk_path,
-    const char *path, uint16_t st_mode, FILE *f_deriv,
+    FILE *f_orig, FILE *f_deriv, const char *ondisk_path,
+    const char *path, uint16_t st_mode,
     const char *label_orig, const char *label_deriv,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
@@ -1172,8 +1172,8 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = merge_file(local_changes_subsumed, worktree, f_orig,
-	    ondisk_path, path, st_mode, f_deriv, label_orig, label_deriv,
+	err = merge_file(local_changes_subsumed, worktree, f_orig, f_deriv,
+	    ondisk_path, path, st_mode, label_orig, label_deriv,
 	    repo, progress_cb, progress_arg);
 done:
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
@@ -7788,9 +7788,9 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 			goto done;
 
 		err = merge_file(&local_changes_subsumed, worktree,
-		    f_base, ondisk_path, ie->path,
+		    f_base, f, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
-		    f, label_orig, "unstaged",
+		    label_orig, "unstaged",
 		    repo, progress_cb, progress_arg);
 	}
 	if (err)
