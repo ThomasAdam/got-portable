@@ -83,38 +83,34 @@ buf_alloc(BUF **b, size_t len)
  * Sets errno on error.
  */
 const struct got_error *
-buf_load(BUF **buf, const char *path)
+buf_load(BUF **buf, FILE *f)
 {
 	const struct got_error *err = NULL;
-	int fd;
-	ssize_t ret;
+	size_t ret;
 	size_t len;
 	u_char *bp;
 	struct stat st;
 
 	*buf = NULL;
 
-	fd = open(path, O_RDONLY, 0600);
-	if (fd == -1)
-		return got_error_from_errno2("open", path);
-
-	if (fstat(fd, &st) == -1) {
-		err = got_error_from_errno2("fstat", path);
+	if (fstat(fileno(f), &st) == -1) {
+		err = got_error_from_errno("fstat");
 		goto out;
 	}
 
 	if ((uintmax_t)st.st_size > SIZE_MAX) {
-		err = got_error_set_errno(EFBIG, path);
+		err = got_error_set_errno(EFBIG,
+		    "cannot fit file into memory buffer");
 		goto out;
 	}
 	err = buf_alloc(buf, st.st_size);
 	if (err)
 		goto out;
-	for (bp = (*buf)->cb_buf; ; bp += (size_t)ret) {
+	for (bp = (*buf)->cb_buf; ; bp += ret) {
 		len = SIZE_LEFT(*buf);
-		ret = read(fd, bp, len);
-		if (ret == -1) {
-			err = got_error_from_errno2("read", path);
+		ret = fread(bp, 1, len, f);
+		if (ret == 0 && ferror(f)) {
+			err = got_ferror(f, GOT_ERR_IO);
 			goto out;
 		} else if (ret == 0)
 			break;
@@ -123,8 +119,6 @@ buf_load(BUF **buf, const char *path)
 	}
 
 out:
-	if (close(fd) == -1 && err == NULL)
-		err = got_error_from_errno2("close", path);
 	if (err) {
 		buf_free(*buf);
 		*buf = NULL;

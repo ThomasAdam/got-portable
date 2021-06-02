@@ -728,25 +728,19 @@ check_file_contents_equal(int *same, FILE *f1, FILE *f2)
 }
 
 static const struct got_error *
-check_files_equal(int *same, const char *f1_path, const char *f2_path)
+check_files_equal(int *same, FILE *f1, FILE *f2)
 {
-	const struct got_error *err = NULL;
 	struct stat sb;
 	size_t size1, size2;
-	FILE *f1 = NULL, *f2 = NULL;
 
 	*same = 1;
 
-	if (lstat(f1_path, &sb) != 0) {
-		err = got_error_from_errno2("lstat", f1_path);
-		goto done;
-	}
+	if (fstat(fileno(f1), &sb) != 0)
+		return got_error_from_errno("fstat");
 	size1 = sb.st_size;
 
-	if (lstat(f2_path, &sb) != 0) {
-		err = got_error_from_errno2("lstat", f2_path);
-		goto done;
-	}
+	if (fstat(fileno(f2), &sb) != 0)
+		return got_error_from_errno("fstat");
 	size2 = sb.st_size;
 
 	if (size1 != size2) {
@@ -754,48 +748,35 @@ check_files_equal(int *same, const char *f1_path, const char *f2_path)
 		return NULL;
 	}
 
-	f1 = fopen(f1_path, "r");
-	if (f1 == NULL)
-		return got_error_from_errno2("fopen", f1_path);
+	if (fseek(f1, 0L, SEEK_SET) == -1)
+		return got_ferror(f1, GOT_ERR_IO);
+	if (fseek(f2, 0L, SEEK_SET) == -1)
+		return got_ferror(f2, GOT_ERR_IO);
 
-	f2 = fopen(f2_path, "r");
-	if (f2 == NULL) {
-		err = got_error_from_errno2("fopen", f2_path);
-		goto done;
-	}
-
-	err = check_file_contents_equal(same, f1, f2);
-done:
-	if (f1 && fclose(f1) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	if (f2 && fclose(f2) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-
-	return err;
+	return check_file_contents_equal(same, f1, f2);
 }
 
 /*
- * Perform a 3-way merge where the file at orig_path acts as the common
- * ancestor, the file at deriv_path acts as the first derived version,
- * and the file at ondisk_path acts as the second derived version.
+ * Perform a 3-way merge where the file f_orig acts as the common
+ * ancestor, the file f_deriv acts as the first derived version,
+ * and the file at ondisk_path acts as both the target and the
+ * second derived version
  */
 static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
-    const char *orig_path, const char *ondisk_path,
-    const char *path, uint16_t st_mode, const char *deriv_path,
+    FILE *f_orig, const char *ondisk_path,
+    const char *path, uint16_t st_mode, FILE *f_deriv,
     const char *label_orig, const char *label_deriv,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
 	int merged_fd = -1;
-	FILE *f_empty = NULL;
-	char *f_empty_path = NULL;
+	FILE *f_merged = NULL;
 	char *merged_path = NULL, *base_path = NULL;
 	int overlapcnt = 0;
 	char *parent = NULL;
-	char *symlink_path = NULL;
-	FILE *symlinkf = NULL;
+	FILE *f = NULL;
 
 	*local_changes_subsumed = 0;
 
@@ -812,25 +793,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	free(base_path);
-	if (asprintf(&base_path, "%s/got-merge-blob-orig", parent) == -1) {
-		err = got_error_from_errno("asprintf");
-		base_path = NULL;
-		goto done;
-	}
-
-	if (orig_path == NULL) {
-		/*
-		 * If the file has no blob, this is an "add vs add" conflict,
-		 * and we simply use an empty ancestor file to make both files
-		 * appear in the merged result in their entirety.
-		 */
-		err = got_opentemp_named(&f_empty_path, &f_empty, base_path);
-		if (err)
-			goto done;
-	}
-
 	/* 
+	 * Open the merge target file.
 	 * In order the run a 3-way merge with a symlink we copy the symlink's
 	 * target path into a temporary file and use that file with diff3.
 	 */
@@ -846,29 +810,46 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 			base_path = NULL;
 			goto done;
 		}
-		err = got_opentemp_named(&symlink_path, &symlinkf, base_path);
-		if (err)
+		f = got_opentemp();
+		if (f == NULL) {
+			err = got_error_from_errno("got_opentemp");
 			goto done;
+		}
 		target_len = readlink(ondisk_path, target_path,
 		    sizeof(target_path));
 		if (target_len == -1) {
 			err = got_error_from_errno2("readlink", ondisk_path);
 			goto done;
 		}
-		n = fwrite(target_path, 1, target_len, symlinkf);
+		n = fwrite(target_path, 1, target_len, f);
 		if (n != target_len) {
-			err = got_ferror(symlinkf, GOT_ERR_IO);
+			err = got_ferror(f, GOT_ERR_IO);
 			goto done;
 		}
-		if (fflush(symlinkf) == EOF) {
-			err = got_error_from_errno2("fflush", symlink_path);
+		if (fflush(f) == EOF) {
+			err = got_error_from_errno("fflush");
+			goto done;
+		}
+		if (fseek(f, 0L, SEEK_SET) == -1) {
+			err = got_ferror(f, GOT_ERR_IO);
+			goto done;
+		}
+	} else {
+		int fd;
+		fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1) {
+			err = got_error_from_errno2("open", ondisk_path);
+			goto done;
+		}
+		f = fdopen(fd, "r");
+		if (f == NULL) {
+			err = got_error_from_errno2("fdopen", ondisk_path);
+			close(fd);
 			goto done;
 		}
 	}
 
-	err = got_merge_diff3(&overlapcnt, merged_fd, deriv_path,
-	    orig_path ? orig_path : f_empty_path,
-	    symlink_path ? symlink_path : ondisk_path,
+	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig, f,
 	    label_deriv, label_orig, NULL);
 	if (err)
 		goto done;
@@ -883,15 +864,22 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
+	f_merged = fdopen(merged_fd, "r");
+	if (f_merged == NULL) {
+		err = got_error_from_errno("fdopen");
+		goto done;
+	}
+	merged_fd = -1;
+
 	/* Check if a clean merge has subsumed all local changes. */
 	if (overlapcnt == 0) {
-		err = check_files_equal(local_changes_subsumed, deriv_path,
-		    merged_path);
+		err = check_files_equal(local_changes_subsumed, f_deriv,
+		    f_merged);
 		if (err)
 			goto done;
 	}
 
-	if (fchmod(merged_fd, st_mode) != 0) {
+	if (fchmod(fileno(f_merged), st_mode) != 0) {
 		err = got_error_from_errno2("fchmod", merged_path);
 		goto done;
 	}
@@ -906,24 +894,14 @@ done:
 		if (merged_path)
 			unlink(merged_path);
 	}
-	if (symlink_path) {
-		if (unlink(symlink_path) == -1 && err == NULL)
-			err = got_error_from_errno2("unlink", symlink_path);
-	}
-	if (symlinkf && fclose(symlinkf) == EOF && err == NULL)
-		err = got_error_from_errno2("fclose", symlink_path);
-	free(symlink_path);
+	if (f && fclose(f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	if (merged_fd != -1 && close(merged_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
-	if (f_empty && fclose(f_empty) == EOF && err == NULL)
+	if (f_merged && fclose(f_merged) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(merged_path);
 	free(base_path);
-	if (f_empty_path) {
-		if (unlink(f_empty_path) == -1 && err == NULL)
-			err = got_error_from_errno2("unlink", f_empty_path);
-		free(f_empty_path);
-	}
 	free(parent);
 	return err;
 }
@@ -1157,8 +1135,18 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		    blob_orig);
 		if (err)
 			goto done;
-
 		free(base_path);
+	} else {
+		/*
+		 * No common ancestor exists. This is an "add vs add" conflict
+		 * and we simply use an empty ancestor file to make both files
+		 * appear in the merged result in their entirety.
+		 */
+		f_orig = got_opentemp();
+		if (f_orig == NULL) {
+			err = got_error_from_errno("got_opentemp");
+			goto done;
+		}
 	}
 
 	if (asprintf(&base_path, "%s/got-merge-blob-deriv", parent) == -1) {
@@ -1184,9 +1172,9 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = merge_file(local_changes_subsumed, worktree, blob_orig_path,
-	    ondisk_path, path, st_mode, blob_deriv_path, label_orig,
-	    label_deriv, repo, progress_cb, progress_arg);
+	err = merge_file(local_changes_subsumed, worktree, f_orig,
+	    ondisk_path, path, st_mode, f_deriv, label_orig, label_deriv,
+	    repo, progress_cb, progress_arg);
 done:
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -7800,9 +7788,9 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 			goto done;
 
 		err = merge_file(&local_changes_subsumed, worktree,
-		    blob_base_path, ondisk_path, ie->path,
+		    f_base, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
-		    path_unstaged_content, label_orig, "unstaged",
+		    f, label_orig, "unstaged",
 		    repo, progress_cb, progress_arg);
 	}
 	if (err)

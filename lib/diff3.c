@@ -236,8 +236,12 @@ diffreg(BUF **d, const char *path1, const char *path2)
 		err = got_error_from_errno2("fflush", outpath);
 		goto done;
 	}
+	if (fseek(outfile, 0L, SEEK_SET) == -1) {
+		err = got_ferror(outfile, GOT_ERR_IO);
+		goto done;
+	}
 
-	err = buf_load(d, outpath);
+	err = buf_load(d, outfile);
 done:
 	if (outpath) {
 		if (unlink(outpath) == -1 && err == NULL)
@@ -257,8 +261,8 @@ done:
  * For merge(1).
  */
 const struct got_error *
-got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
-    const char *p3, const char *label1, const char *label2, const char *label3)
+got_merge_diff3(int *overlapcnt, int outfd, FILE *f1, FILE *f2,
+    FILE *f3, const char *label1, const char *label2, const char *label3)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -277,13 +281,13 @@ got_merge_diff3(int *overlapcnt, int outfd, const char *p1, const char *p2,
 	dp13 = dp23 = path1 = path2 = path3 = NULL;
 	data = patch = NULL;
 
-	err = buf_load(&b1, p1);
+	err = buf_load(&b1, f1);
 	if (err)
 		goto out;
-	err = buf_load(&b2, p2);
+	err = buf_load(&b2, f2);
 	if (err)
 		goto out;
-	err = buf_load(&b3, p3);
+	err = buf_load(&b3, f3);
 	if (err)
 		goto out;
 

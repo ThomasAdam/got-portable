@@ -62,8 +62,8 @@ const struct got_error *got_diffreg_result_free_right(
 const struct got_error *got_diffreg_close(FILE *, char *, size_t,
     FILE *, char *, size_t);
 
-const struct got_error *got_merge_diff3(int *, int, const char *, const char *,
-    const char *, const char *, const char *, const char *);
+const struct got_error *got_merge_diff3(int *, int, FILE *, FILE *, FILE *,
+    const char *, const char *, const char *);
 
 const struct got_error *got_diff_files(struct got_diffreg_result **, FILE *,
     const char *, FILE *, const char *, int, int, int, FILE *);
