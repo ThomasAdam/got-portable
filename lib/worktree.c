@@ -2833,6 +2833,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 	struct stat sb;
 	unsigned char status;
 	int local_changes_subsumed;
+	FILE *f_orig = NULL, *f_deriv = NULL, *f_deriv2 = NULL;
+	char *id_str = NULL, *label_deriv = NULL;
 
 	if (blob1 && blob2) {
 		ie = got_fileindex_entry_get(a->fileindex, path2,
@@ -2873,9 +2875,50 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			    repo, a->progress_cb, a->progress_arg);
 			free(link_target2);
 		} else {
-			err = merge_blob(&local_changes_subsumed, a->worktree,
-			    blob1, ondisk_path, path2, sb.st_mode,
-			    a->label_orig, blob2, a->commit_id2, repo,
+			int fd;
+
+			f_orig = got_opentemp();
+			if (f_orig == NULL) {
+				err = got_error_from_errno("got_opentemp");
+				goto done;
+			}
+			err = got_object_blob_dump_to_file(NULL, NULL, NULL,
+			    f_orig, blob1);
+			if (err)
+				goto done;
+
+			f_deriv = got_opentemp();
+			if (f_deriv == NULL)
+				goto done;
+			err = got_object_blob_dump_to_file(NULL, NULL, NULL,
+			    f_deriv, blob2);
+			if (err)
+				goto done;
+
+			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+			if (fd == -1) {
+				err = got_error_from_errno2("open",
+				    ondisk_path);
+				goto done;
+			}
+			f_deriv2 = fdopen(fd, "r");
+			if (f_deriv2 == NULL) {
+				err = got_error_from_errno2("fdopen",
+				    ondisk_path);
+				close(fd);
+				goto done;
+			}
+			err = got_object_id_str(&id_str, a->commit_id2);
+			if (err)
+				goto done;
+			if (asprintf(&label_deriv, "%s: commit %s",
+			    GOT_MERGE_LABEL_MERGED, id_str) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			err = merge_file(&local_changes_subsumed, a->worktree,
+			    f_orig, f_deriv, f_deriv2, ondisk_path, path2,
+			    sb.st_mode, a->label_orig, label_deriv, repo,
 			    a->progress_cb, a->progress_arg);
 		}
 	} else if (blob1) {
@@ -3047,6 +3090,14 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 		}
 	}
 done:
+	if (f_orig && fclose(f_orig) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f_deriv && fclose(f_deriv) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f_deriv2 && fclose(f_deriv2) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(id_str);
+	free(label_deriv);
 	free(ondisk_path);
 	return err;
 }
