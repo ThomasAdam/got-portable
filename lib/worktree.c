@@ -803,13 +803,6 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		ssize_t target_len;
 		size_t n;
 
-		free(base_path);
-		if (asprintf(&base_path, "%s/got-symlink-merge",
-		    parent) == -1) {
-			err = got_error_from_errno("asprintf");
-			base_path = NULL;
-			goto done;
-		}
 		f = got_opentemp();
 		if (f == NULL) {
 			err = got_error_from_errno("got_opentemp");
