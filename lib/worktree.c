@@ -767,7 +767,7 @@ static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
     FILE *f_orig, FILE *f_deriv, FILE *f_deriv2, const char *ondisk_path,
     const char *path, uint16_t st_mode,
-    const char *label_orig, const char *label_deriv,
+    const char *label_orig, const char *label_deriv, const char *label_deriv2,
     struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
@@ -794,7 +794,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 
 	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig,
-	    f_deriv2, label_deriv, label_orig, NULL);
+	    f_deriv2, label_deriv, label_orig, label_deriv2);
 	if (err)
 		goto done;
 
@@ -1179,7 +1179,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 
 	err = merge_file(local_changes_subsumed, worktree, f_orig, f_deriv,
 	    f_deriv2, ondisk_path, path, st_mode, label_orig, label_deriv,
-	    repo, progress_cb, progress_arg);
+	    NULL, repo, progress_cb, progress_arg);
 done:
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -2834,7 +2834,7 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 	unsigned char status;
 	int local_changes_subsumed;
 	FILE *f_orig = NULL, *f_deriv = NULL, *f_deriv2 = NULL;
-	char *id_str = NULL, *label_deriv = NULL;
+	char *id_str = NULL, *label_deriv2 = NULL;
 
 	if (blob1 && blob2) {
 		ie = got_fileindex_entry_get(a->fileindex, path2,
@@ -2887,11 +2887,11 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (err)
 				goto done;
 
-			f_deriv = got_opentemp();
-			if (f_deriv == NULL)
+			f_deriv2 = got_opentemp();
+			if (f_deriv2 == NULL)
 				goto done;
 			err = got_object_blob_dump_to_file(NULL, NULL, NULL,
-			    f_deriv, blob2);
+			    f_deriv2, blob2);
 			if (err)
 				goto done;
 
@@ -2901,8 +2901,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 				    ondisk_path);
 				goto done;
 			}
-			f_deriv2 = fdopen(fd, "r");
-			if (f_deriv2 == NULL) {
+			f_deriv = fdopen(fd, "r");
+			if (f_deriv == NULL) {
 				err = got_error_from_errno2("fdopen",
 				    ondisk_path);
 				close(fd);
@@ -2911,15 +2911,15 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			err = got_object_id_str(&id_str, a->commit_id2);
 			if (err)
 				goto done;
-			if (asprintf(&label_deriv, "%s: commit %s",
+			if (asprintf(&label_deriv2, "%s: commit %s",
 			    GOT_MERGE_LABEL_MERGED, id_str) == -1) {
 				err = got_error_from_errno("asprintf");
 				goto done;
 			}
 			err = merge_file(&local_changes_subsumed, a->worktree,
 			    f_orig, f_deriv, f_deriv2, ondisk_path, path2,
-			    sb.st_mode, a->label_orig, label_deriv, repo,
-			    a->progress_cb, a->progress_arg);
+			    sb.st_mode, a->label_orig, NULL, label_deriv2,
+			    repo, a->progress_cb, a->progress_arg);
 		}
 	} else if (blob1) {
 		ie = got_fileindex_entry_get(a->fileindex, path1,
@@ -3097,7 +3097,7 @@ done:
 	if (f_deriv2 && fclose(f_deriv2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(id_str);
-	free(label_deriv);
+	free(label_deriv2);
 	free(ondisk_path);
 	return err;
 }
@@ -7872,7 +7872,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		err = merge_file(&local_changes_subsumed, worktree,
 		    f_base, f, f_deriv2, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
-		    label_orig, "unstaged",
+		    label_orig, "unstaged", NULL,
 		    repo, progress_cb, progress_arg);
 	}
 	if (err)

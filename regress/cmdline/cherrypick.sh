@@ -855,8 +855,7 @@ test_cherrypick_conflict_no_eol2() {
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		#diff -u $testroot/stdout.expected $testroot/stdout
-		ret="xfail $(head -n 1 $testroot/stderr)"
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -1189,8 +1188,7 @@ EOF
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		#diff -u $testroot/diff.expected $testroot/diff
-		ret="xfail cherrypick results in unexpected diff"
+		diff -u $testroot/diff.expected $testroot/diff
 	fi
 
 	test_done "$testroot" "$ret"
