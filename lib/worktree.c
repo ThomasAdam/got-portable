@@ -759,12 +759,13 @@ check_files_equal(int *same, FILE *f1, FILE *f2)
 /*
  * Perform a 3-way merge where the file f_orig acts as the common
  * ancestor, the file f_deriv acts as the first derived version,
- * and the file at ondisk_path acts as both the target and the
- * second derived version
+ * and the file f_deriv2 acts as the second derived version.
+ * The merge result will be written to a new file at ondisk_path; any
+ * existing file at this path will be replaced.
  */
 static const struct got_error *
 merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
-    FILE *f_orig, FILE *f_deriv, const char *ondisk_path,
+    FILE *f_orig, FILE *f_deriv, FILE *f_deriv2, const char *ondisk_path,
     const char *path, uint16_t st_mode,
     const char *label_orig, const char *label_deriv,
     struct got_repository *repo,
@@ -776,7 +777,6 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	char *merged_path = NULL, *base_path = NULL;
 	int overlapcnt = 0;
 	char *parent = NULL;
-	FILE *f = NULL;
 
 	*local_changes_subsumed = 0;
 
@@ -793,57 +793,8 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	/* 
-	 * Open the merge target file.
-	 * In order the run a 3-way merge with a symlink we copy the symlink's
-	 * target path into a temporary file and use that file with diff3.
-	 */
-	if (S_ISLNK(st_mode)) {
-		char target_path[PATH_MAX];
-		ssize_t target_len;
-		size_t n;
-
-		f = got_opentemp();
-		if (f == NULL) {
-			err = got_error_from_errno("got_opentemp");
-			goto done;
-		}
-		target_len = readlink(ondisk_path, target_path,
-		    sizeof(target_path));
-		if (target_len == -1) {
-			err = got_error_from_errno2("readlink", ondisk_path);
-			goto done;
-		}
-		n = fwrite(target_path, 1, target_len, f);
-		if (n != target_len) {
-			err = got_ferror(f, GOT_ERR_IO);
-			goto done;
-		}
-		if (fflush(f) == EOF) {
-			err = got_error_from_errno("fflush");
-			goto done;
-		}
-		if (fseek(f, 0L, SEEK_SET) == -1) {
-			err = got_ferror(f, GOT_ERR_IO);
-			goto done;
-		}
-	} else {
-		int fd;
-		fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1) {
-			err = got_error_from_errno2("open", ondisk_path);
-			goto done;
-		}
-		f = fdopen(fd, "r");
-		if (f == NULL) {
-			err = got_error_from_errno2("fdopen", ondisk_path);
-			close(fd);
-			goto done;
-		}
-	}
-
-	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig, f,
-	    label_deriv, label_orig, NULL);
+	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig,
+	    f_deriv2, label_deriv, label_orig, NULL);
 	if (err)
 		goto done;
 
@@ -887,8 +838,6 @@ done:
 		if (merged_path)
 			unlink(merged_path);
 	}
-	if (f && fclose(f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
 	if (merged_fd != -1 && close(merged_fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	if (f_merged && fclose(f_merged) == EOF && err == NULL)
@@ -1088,6 +1037,46 @@ done:
 	return err;
 }
 
+static const struct got_error *
+dump_symlink_target_path_to_file(FILE **outfile, const char *ondisk_path)
+{
+	const struct got_error *err = NULL;
+	char target_path[PATH_MAX];
+	ssize_t target_len;
+	size_t n;
+	FILE *f;
+
+	*outfile = NULL;
+
+	f = got_opentemp();
+	if (f == NULL)
+		return got_error_from_errno("got_opentemp");
+	target_len = readlink(ondisk_path, target_path, sizeof(target_path));
+	if (target_len == -1) {
+		err = got_error_from_errno2("readlink", ondisk_path);
+		goto done;
+	}
+	n = fwrite(target_path, 1, target_len, f);
+	if (n != target_len) {
+		err = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+	if (fflush(f) == EOF) {
+		err = got_error_from_errno("fflush");
+		goto done;
+	}
+	if (fseek(f, 0L, SEEK_SET) == -1) {
+		err = got_ferror(f, GOT_ERR_IO);
+		goto done;
+	}
+done:
+	if (err)
+		fclose(f);
+	else
+		*outfile = f;
+	return err;
+}
+
 /*
  * Perform a 3-way merge where blob_orig acts as the common ancestor,
  * blob_deriv acts as the first derived version, and the file on disk
@@ -1102,7 +1091,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
-	FILE *f_orig = NULL, *f_deriv = NULL;
+	FILE *f_orig = NULL, *f_deriv = NULL, *f_deriv2 = NULL;
 	char *blob_orig_path = NULL;
 	char *blob_deriv_path = NULL, *base_path = NULL, *id_str = NULL;
 	char *label_deriv = NULL, *parent = NULL;
@@ -1165,13 +1154,38 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 	}
 
+	/* 
+	 * In order the run a 3-way merge with a symlink we copy the symlink's
+	 * target path into a temporary file and use that file with diff3.
+	 */
+	if (S_ISLNK(st_mode)) {
+		err = dump_symlink_target_path_to_file(&f_deriv2, ondisk_path);
+		if (err)
+			goto done;
+	} else {
+		int fd;
+		fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+		if (fd == -1) {
+			err = got_error_from_errno2("open", ondisk_path);
+			goto done;
+		}
+		f_deriv2 = fdopen(fd, "r");
+		if (f_deriv2 == NULL) {
+			err = got_error_from_errno2("fdopen", ondisk_path);
+			close(fd);
+			goto done;
+		}
+	}
+
 	err = merge_file(local_changes_subsumed, worktree, f_orig, f_deriv,
-	    ondisk_path, path, st_mode, label_orig, label_deriv,
+	    f_deriv2, ondisk_path, path, st_mode, label_orig, label_deriv,
 	    repo, progress_cb, progress_arg);
 done:
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (f_deriv && fclose(f_deriv) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (f_deriv2 && fclose(f_deriv2) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(base_path);
 	if (blob_orig_path) {
@@ -7711,7 +7725,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 	char *parent = NULL, *base_path = NULL;
 	char *blob_base_path = NULL;
 	struct got_object_id *new_staged_blob_id = NULL;
-	FILE *f = NULL, *f_base = NULL;
+	FILE *f = NULL, *f_base = NULL, *f_deriv2 = NULL;
 	struct stat sb;
 
 	err = create_unstaged_content(&path_unstaged_content,
@@ -7780,8 +7794,32 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		if (err)
 			goto done;
 
+		/* 
+		 * In order the run a 3-way merge with a symlink we copy the symlink's
+		 * target path into a temporary file and use that file with diff3.
+		 */
+		if (S_ISLNK(got_fileindex_perms_to_st(ie))) {
+			err = dump_symlink_target_path_to_file(&f_deriv2,
+			    ondisk_path);
+			if (err)
+				goto done;
+		} else {
+			int fd;
+			fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
+			if (fd == -1) {
+				err = got_error_from_errno2("open", ondisk_path);
+				goto done;
+			}
+			f_deriv2 = fdopen(fd, "r");
+			if (f_deriv2 == NULL) {
+				err = got_error_from_errno2("fdopen", ondisk_path);
+				close(fd);
+				goto done;
+			}
+		}
+
 		err = merge_file(&local_changes_subsumed, worktree,
-		    f_base, f, ondisk_path, ie->path,
+		    f_base, f, f_deriv2, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
 		    label_orig, "unstaged",
 		    repo, progress_cb, progress_arg);
@@ -7810,6 +7848,8 @@ done:
 		err = got_error_from_errno2("fclose", path_unstaged_content);
 	if (f && fclose(f) == EOF && err == NULL)
 		err = got_error_from_errno2("fclose", path_unstaged_content);
+	if (f_deriv2 && fclose(f_deriv2) == EOF && err == NULL)
+		err = got_error_from_errno2("fclose", ondisk_path);
 	free(path_unstaged_content);
 	free(path_new_staged_content);
 	free(blob_base_path);
