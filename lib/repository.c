@@ -1912,7 +1912,7 @@ const struct got_error *
 got_repo_get_packfile_info(int *npackfiles, int *nobjects,
     off_t *total_packsize, struct got_repository *repo)
 {
-	const struct got_error *err;
+	const struct got_error *err = NULL;
 	DIR *packdir = NULL;
 	struct dirent *dent;
 	struct got_packidx *packidx = NULL;
