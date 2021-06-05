@@ -85,7 +85,6 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 		goto done;
 
 	if (len < obj->hdrlen || len != obj->hdrlen + obj->size) {
-		fprintf(stderr, "len=%zd obj->hdrlen=%zd obj->size=%zd\n", len, obj->hdrlen, obj->size);
 		err = got_error(GOT_ERR_BAD_OBJ_HDR);
 		goto done;
 	}
