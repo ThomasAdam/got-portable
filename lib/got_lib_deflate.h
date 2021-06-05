@@ -31,13 +31,12 @@ struct got_deflate_buf {
 	int flags;
 #define GOT_DEFLATE_F_HAVE_MORE		0x01
 #define GOT_DEFLATE_F_OWN_OUTBUF	0x02
-	struct got_deflate_checksum *csum;
 };
 
 #define GOT_DEFLATE_BUFSIZE		8192
 
 const struct got_error *got_deflate_init(struct got_deflate_buf *, uint8_t *,
-    size_t, struct got_deflate_checksum *);
+    size_t);
 const struct got_error *got_deflate_read(struct got_deflate_buf *, FILE *,
     size_t *);
 void got_deflate_end(struct got_deflate_buf *);
