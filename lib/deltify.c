@@ -121,9 +121,9 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 		/*
 		 * Avoid adding duplicate blocks.
 		 * NB: A matching hash is insufficient for detecting equality.
-		 * The hash can only detect inequality, so only check 'len'.
+		 * The hash can only detect inequality.
 		 */
-		if (len == dt->blocks[i].len) {
+		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
 			uint8_t buf2[GOT_DELTIFY_MAXCHUNK];
 			if (fseeko(f, dt->blocks[i].offset, SEEK_SET) == -1)
 				return got_error_from_errno("fseeko");
