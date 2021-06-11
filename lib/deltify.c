@@ -268,6 +268,8 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 		if (err)
 			goto done;
 		fileoffset += blocklen;
+		if (fseeko(f, fileoffset, SEEK_SET) == -1)
+			return got_error_from_errno("fseeko");
 	}
 done:
 	if (err) {
