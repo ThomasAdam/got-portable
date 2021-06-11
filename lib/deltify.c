@@ -157,7 +157,7 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 		 * in the array depend on the allocated length of the array.
 		 */
 		dt->nblocks = 0;
-		for (i = 0; i < nalloc; i++) {
+		for (i = 0; i < old_size; i++) {
 			if (db[i].len == 0)
 				continue;
 			err = addblk(dt, f, db[i].len, db[i].offset,
