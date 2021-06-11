@@ -99,7 +99,7 @@ static const struct got_error *
 addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 {
 	const struct got_error *err = NULL;
-	int i, nalloc;
+	int i;
 	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
 	size_t r = 0;
 
@@ -140,17 +140,18 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 	dt->blocks[i].offset = offset;
 	dt->blocks[i].hash = h;
 	dt->nblocks++;
-	if (dt->nalloc < 2 * dt->nblocks) {
+	if (dt->nalloc < dt->nblocks + 64) {
 		struct got_delta_block *db;
-		nalloc = dt->nalloc * 2;
+		size_t old_size = dt->nalloc;
 		db = dt->blocks;
-		dt->blocks = calloc(nalloc, sizeof(struct got_delta_block));
+		dt->blocks = calloc(dt->nalloc + 64,
+		    sizeof(struct got_delta_block));
 		if (dt->blocks == NULL) {
 			err = got_error_from_errno("calloc");
 			dt->blocks = db;
 			return err;
 		}
-		dt->nalloc = nalloc;
+		dt->nalloc += 64;
 		/*
 		 * Recompute all block positions. Hash-based indices of blocks
 		 * in the array depend on the allocated length of the array.
