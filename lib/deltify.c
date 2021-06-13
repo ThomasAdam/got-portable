@@ -101,6 +101,7 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 	const struct got_error *err = NULL;
 	int i;
 	uint8_t buf[GOT_DELTIFY_MAXCHUNK];
+	uint8_t buf2[GOT_DELTIFY_MAXCHUNK];
 	size_t r = 0;
 
 	if (len == 0)
@@ -108,23 +109,22 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 
 	i = h % dt->nalloc;
 	while (dt->blocks[i].len != 0) {
-		if (r == 0) {
-			if (fseeko(f, offset, SEEK_SET) == -1)
-				return got_error_from_errno("fseeko");
-			r = fread(buf, 1, len, f);
-			if (r != len) {
-				if (ferror(f))
-					return got_ferror(f, GOT_ERR_IO);
-				return NULL;
-			}
-		}
 		/*
 		 * Avoid adding duplicate blocks.
 		 * NB: A matching hash is insufficient for detecting equality.
 		 * The hash can only detect inequality.
 		 */
 		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
-			uint8_t buf2[GOT_DELTIFY_MAXCHUNK];
+			if (r == 0) {
+				if (fseeko(f, offset, SEEK_SET) == -1)
+					return got_error_from_errno("fseeko");
+				r = fread(buf, 1, len, f);
+				if (r != len) {
+					if (!ferror(f))
+						return NULL;
+					return got_ferror(f, GOT_ERR_IO);
+				}
+			}
 			if (fseeko(f, dt->blocks[i].offset, SEEK_SET) == -1)
 				return got_error_from_errno("fseeko");
 			if (fread(buf2, 1, len, f) != len)
