@@ -333,7 +333,7 @@ got_repo_get_cached_tag(struct got_repository *repo, struct got_object_id *id)
 	    &repo->tagcache, id);
 }
 
-const struct got_error *
+static const struct got_error *
 open_repo(struct got_repository *repo, const char *path)
 {
 	const struct got_error *err = NULL;
@@ -751,6 +751,9 @@ got_repo_close(struct got_repository *repo)
 		    err == NULL)
 			err = got_error_from_errno("close");
 	}
+
+	if (repo->gitdir_fd != -1)
+		close(repo->gitdir_fd);
 
 	if (repo->gotconfig)
 		got_gotconfig_free(repo->gotconfig);
