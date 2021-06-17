@@ -118,8 +118,8 @@ dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
 	argv[i++] = (char *)path;
 	argv[i++] = NULL;
 
-	if (pipe(pfd) == -1)
-		return got_error_from_errno("pipe");
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pfd) == -1)
+		return got_error_from_errno("socketpair");
 
 	pid = fork();
 	if (pid == -1) {
