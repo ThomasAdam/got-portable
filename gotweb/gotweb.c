@@ -308,6 +308,10 @@ gw_apply_unveil(const char *repo_path)
 {
 	const struct got_error *err;
 
+#ifdef PROFILE
+	if (unveil("gmon.out", "rwc") != 0)
+		return got_error_from_errno2("unveil", "gmon.out");
+#endif
 	if (repo_path && unveil(repo_path, "r") != 0)
 		return got_error_from_errno2("unveil", repo_path);
 
