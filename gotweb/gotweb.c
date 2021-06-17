@@ -2833,8 +2833,11 @@ gw_get_repo_age(char **repo_age, struct gw_trans *gw_trans, char *dir,
 	}
 done:
 	got_ref_list_free(&refs);
-	if (gw_trans->repo == NULL)
-		got_repo_close(repo);
+	if (gw_trans->repo == NULL) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -2927,7 +2930,7 @@ done:
 static const struct got_error *
 gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *close_err;
 	struct got_repository *repo;
 	const char *gitconfig_owner;
 
@@ -2945,7 +2948,9 @@ gw_get_repo_owner(char **owner, struct gw_trans *gw_trans, char *dir)
 		if (*owner == NULL)
 			error = got_error_from_errno("strdup");
 	}
-	got_repo_close(repo);
+	close_err = got_repo_close(repo);
+	if (error == NULL)
+		error = close_err;
 	return error;
 }
 
@@ -4736,6 +4741,12 @@ main(int argc, char *argv[])
 	else
 		error = gw_display_index(gw_trans);
 done:
+	if (gw_trans->repo) {
+		const struct got_error *close_err;
+		close_err = got_repo_close(gw_trans->repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (error) {
 		gw_trans->error = error;
 		gw_trans->action = GW_ERR;
@@ -4768,9 +4779,6 @@ cleanup:
 	free(gw_trans->prev_id);
 	free(gw_trans->prev_prev_id);
 	free(gw_trans->repo_path);
-	if (gw_trans->repo)
-		got_repo_close(gw_trans->repo);
-
 	TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
 		free(dir->name);
 		free(dir->description);

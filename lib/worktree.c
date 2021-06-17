@@ -436,8 +436,11 @@ open_worktree(struct got_worktree **worktree, const char *path)
 		goto done;
 	}
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (err == NULL)
+			err = close_err;
+	}
 	free(path_got);
 	free(path_lock);
 	free(base_commit_id_str);

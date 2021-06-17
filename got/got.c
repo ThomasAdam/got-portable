@@ -1800,8 +1800,11 @@ done:
 	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	TAILQ_FOREACH(pe, &refs, entry) {
 		free((void *)pe->path);
 		free(pe->data);
@@ -2515,8 +2518,11 @@ done:
 	}
 	if (fetchfd != -1 && close(fetchfd) == -1 && error == NULL)
 		error = got_error_from_errno("close");
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &refs, entry) {
@@ -4063,10 +4069,9 @@ done:
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *repo_error;
-		repo_error = got_repo_close(repo);
+		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
-			error = repo_error;
+			error = close_err;
 	}
 	if (refs_idmap)
 		got_reflist_object_id_map_free(refs_idmap);
@@ -4488,10 +4493,9 @@ done:
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *repo_error;
-		repo_error = got_repo_close(repo);
+		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
-			error = repo_error;
+			error = close_err;
 	}
 	got_ref_list_free(&refs);
 	return error;
@@ -4818,10 +4822,9 @@ done:
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *repo_error;
-		repo_error = got_repo_close(repo);
+		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
-			error = repo_error;
+			error = close_err;
 	}
 	if (bca.lines) {
 		for (i = 0; i < bca.nlines; i++) {
@@ -5106,10 +5109,9 @@ done:
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *repo_error;
-		repo_error = got_repo_close(repo);
+		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
-			error = repo_error;
+			error = close_err;
 	}
 	return error;
 }
@@ -5495,8 +5497,11 @@ cmd_ref(int argc, char *argv[])
 	}
 done:
 	free(refname);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
@@ -5877,8 +5882,11 @@ cmd_branch(int argc, char *argv[])
 done:
 	if (ref)
 		got_ref_close(ref);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
@@ -6387,8 +6395,11 @@ cmd_tag(int argc, char *argv[])
 		    commit_id_str ? commit_id_str : commit_id_arg, tagmsg);
 	}
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
@@ -6519,8 +6530,11 @@ cmd_add(int argc, char *argv[])
 	error = got_worktree_schedule_add(worktree, &paths, add_progress,
 	    NULL, repo, no_ignores);
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -6668,8 +6682,11 @@ cmd_remove(int argc, char *argv[])
 	    delete_local_mods, status_codes, print_remove_status, NULL,
 	    repo, keep_on_disk);
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -6929,8 +6946,11 @@ done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
 		error = got_error_from_errno2("fclose", patch_script_path);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(path);
@@ -7234,8 +7254,11 @@ done:
 	    error == NULL)
 		error = got_error_from_errno2("unlink", cl_arg.logmsg_path);
 	free(cl_arg.logmsg_path);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
@@ -7365,8 +7388,11 @@ done:
 		got_ref_close(head_ref);
 	if (worktree)
 		got_worktree_close(worktree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -7485,8 +7511,11 @@ done:
 		got_ref_close(head_ref);
 	if (worktree)
 		got_worktree_close(worktree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -8322,8 +8351,11 @@ done:
 		got_ref_close(tmp_branch);
 	if (worktree)
 		got_worktree_close(worktree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -9620,8 +9652,11 @@ done:
 		got_ref_close(tmp_branch);
 	if (worktree)
 		got_worktree_close(worktree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -9753,8 +9788,11 @@ cmd_integrate(int argc, char *argv[])
 	printf("Integrated %s into %s\n", refname, base_refname);
 	print_update_progress_stats(&upa);
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(cwd);
@@ -9900,8 +9938,11 @@ done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
 		error = got_error_from_errno2("fclose", patch_script_path);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -10010,8 +10051,11 @@ done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
 		error = got_error_from_errno2("fclose", patch_script_path);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	TAILQ_FOREACH(pe, &paths, entry)
@@ -10322,10 +10366,9 @@ done:
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
-		const struct got_error *repo_error;
-		repo_error = got_repo_close(repo);
+		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
-			error = repo_error;
+			error = close_err;
 	}
 	got_ref_list_free(&refs);
 	return error;

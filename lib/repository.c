@@ -752,8 +752,9 @@ got_repo_close(struct got_repository *repo)
 			err = got_error_from_errno("close");
 	}
 
-	if (repo->gitdir_fd != -1)
-		close(repo->gitdir_fd);
+	if (repo->gitdir_fd != -1 && close(repo->gitdir_fd) == -1 &&
+	    err == NULL)
+		err = got_error_from_errno("close");
 
 	if (repo->gotconfig)
 		got_gotconfig_free(repo->gotconfig);

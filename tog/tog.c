@@ -2111,7 +2111,7 @@ stop_log_thread(struct tog_log_view_state *s)
 	}
 
 	if (s->thread_args.repo) {
-		got_repo_close(s->thread_args.repo);
+		err = got_repo_close(s->thread_args.repo);
 		s->thread_args.repo = NULL;
 	}
 
@@ -2806,8 +2806,11 @@ done:
 	free(label);
 	if (ref)
 		got_ref_close(ref);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	tog_free_refs();
@@ -3861,8 +3864,11 @@ done:
 	free(label2);
 	free(repo_path);
 	free(cwd);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	tog_free_refs();
@@ -4092,7 +4098,7 @@ done:
 static void *
 blame_thread(void *arg)
 {
-	const struct got_error *err;
+	const struct got_error *err, *close_err;
 	struct tog_blame_thread_args *ta = arg;
 	struct tog_blame_cb_args *a = ta->cb_args;
 	int errcode;
@@ -4111,7 +4117,9 @@ blame_thread(void *arg)
 		return (void *)got_error_set_errno(errcode,
 		    "pthread_mutex_lock");
 
-	got_repo_close(ta->repo);
+	close_err = got_repo_close(ta->repo);
+	if (err == NULL)
+		err = close_err;
 	ta->repo = NULL;
 	*ta->complete = 1;
 
@@ -4162,7 +4170,10 @@ stop_blame(struct tog_blame *blame)
 		blame->thread = NULL;
 	}
 	if (blame->thread_args.repo) {
-		got_repo_close(blame->thread_args.repo);
+		const struct got_error *close_err;
+		close_err = got_repo_close(blame->thread_args.repo);
+		if (err == NULL)
+			err = close_err;
 		blame->thread_args.repo = NULL;
 	}
 	if (blame->f) {
@@ -4782,8 +4793,11 @@ done:
 	free(commit_id);
 	if (worktree)
 		got_worktree_close(worktree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	tog_free_refs();
 	return error;
 }
@@ -5613,8 +5627,11 @@ done:
 		got_object_commit_close(commit);
 	if (tree)
 		got_object_tree_close(tree);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	tog_free_refs();
 	return error;
 }
@@ -6289,8 +6306,11 @@ cmd_ref(int argc, char *argv[])
 done:
 	free(repo_path);
 	free(cwd);
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (close_err)
+			error = close_err;
+	}
 	tog_free_refs();
 	return error;
 }
@@ -6354,7 +6374,7 @@ make_argv(int argc, ...)
 static const struct got_error *
 tog_log_with_path(int argc, char *argv[])
 {
-	const struct got_error *error = NULL;
+	const struct got_error *error = NULL, *close_err;
 	struct tog_cmd *cmd = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
@@ -6412,7 +6432,9 @@ tog_log_with_path(int argc, char *argv[])
 		/* not reached */
 	}
 
-	got_repo_close(repo);
+	close_err = got_repo_close(repo);
+	if (error == NULL)
+		error = close_err;
 	repo = NULL;
 
 	error = got_object_id_str(&commit_id_str, commit_id);
@@ -6424,8 +6446,11 @@ tog_log_with_path(int argc, char *argv[])
 	cmd_argv = make_argv(argc, cmd->name, "-c", commit_id_str, argv[0]);
 	error = cmd->cmd_main(argc, cmd_argv);
 done:
-	if (repo)
-		got_repo_close(repo);
+	if (repo) {
+		close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	if (worktree)
 		got_worktree_close(worktree);
 	free(id);
