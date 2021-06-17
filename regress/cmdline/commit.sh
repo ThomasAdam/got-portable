@@ -1380,7 +1380,7 @@ sed -i 's/foo/bar/' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 
-	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+	(cd $testroot/wt && env VISUAL="$testroot/editor.sh" \
 		got commit -F "$testroot/logmsg" > $testroot/stdout)
 
 	local head_rev=`git_show_head $testroot/repo`
