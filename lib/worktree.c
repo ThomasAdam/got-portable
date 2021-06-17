@@ -771,7 +771,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
     FILE *f_orig, FILE *f_deriv, FILE *f_deriv2, const char *ondisk_path,
     const char *path, uint16_t st_mode,
     const char *label_orig, const char *label_deriv, const char *label_deriv2,
-    struct got_repository *repo,
+    enum got_diff_algorithm diff_algo, struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -797,7 +797,7 @@ merge_file(int *local_changes_subsumed, struct got_worktree *worktree,
 		goto done;
 
 	err = got_merge_diff3(&overlapcnt, merged_fd, f_deriv, f_orig,
-	    f_deriv2, label_deriv, label_orig, label_deriv2);
+	    f_deriv2, label_deriv, label_orig, label_deriv2, diff_algo);
 	if (err)
 		goto done;
 
@@ -1182,7 +1182,7 @@ merge_blob(int *local_changes_subsumed, struct got_worktree *worktree,
 
 	err = merge_file(local_changes_subsumed, worktree, f_orig, f_deriv,
 	    f_deriv2, ondisk_path, path, st_mode, label_orig, label_deriv,
-	    NULL, repo, progress_cb, progress_arg);
+	    NULL, GOT_DIFF_ALGORITHM_MYERS, repo, progress_cb, progress_arg);
 done:
 	if (f_orig && fclose(f_orig) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
@@ -2922,7 +2922,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			err = merge_file(&local_changes_subsumed, a->worktree,
 			    f_orig, f_deriv, f_deriv2, ondisk_path, path2,
 			    sb.st_mode, a->label_orig, NULL, label_deriv2,
-			    repo, a->progress_cb, a->progress_arg);
+			    GOT_DIFF_ALGORITHM_PATIENCE, repo,
+			    a->progress_cb, a->progress_arg);
 		}
 	} else if (blob1) {
 		ie = got_fileindex_entry_get(a->fileindex, path1,
@@ -7875,7 +7876,7 @@ unstage_hunks(struct got_object_id *staged_blob_id,
 		err = merge_file(&local_changes_subsumed, worktree,
 		    f_base, f, f_deriv2, ondisk_path, ie->path,
 		    got_fileindex_perms_to_st(ie),
-		    label_orig, "unstaged", NULL,
+		    label_orig, "unstaged", NULL, GOT_DIFF_ALGORITHM_MYERS,
 		    repo, progress_cb, progress_arg);
 	}
 	if (err)

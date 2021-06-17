@@ -197,7 +197,8 @@ diff_output(BUF *diffbuf, const char *fmt, ...)
 }
 
 static const struct got_error*
-diffreg(BUF **d, const char *path1, const char *path2)
+diffreg(BUF **d, const char *path1, const char *path2,
+    enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err = NULL;
 	FILE *f1 = NULL, *f2 = NULL, *outfile = NULL;
@@ -222,8 +223,7 @@ diffreg(BUF **d, const char *path1, const char *path2)
 	if (err)
 		goto done;
 
-	err = got_diffreg(&diffreg_result, f1, f2,
-	    GOT_DIFF_ALGORITHM_MYERS, 0, 1);
+	err = got_diffreg(&diffreg_result, f1, f2, diff_algo, 0, 1);
 	if (err)
 		goto done;
 
@@ -262,7 +262,8 @@ done:
  */
 const struct got_error *
 got_merge_diff3(int *overlapcnt, int outfd, FILE *f1, FILE *f2,
-    FILE *f3, const char *label1, const char *label2, const char *label3)
+    FILE *f3, const char *label1, const char *label2, const char *label3,
+    enum got_diff_algorithm diff_algo)
 {
 	const struct got_error *err = NULL;
 	char *dp13, *dp23, *path1, *path2, *path3;
@@ -321,14 +322,14 @@ got_merge_diff3(int *overlapcnt, int outfd, FILE *f1, FILE *f2,
 	buf_free(b2);
 	b2 = NULL;
 
-	err = diffreg(&d1, path1, path3);
+	err = diffreg(&d1, path1, path3, diff_algo);
 	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
 		goto out;
 
 	}
-	err = diffreg(&d2, path2, path3);
+	err = diffreg(&d2, path2, path3, diff_algo);
 	if (err) {
 		buf_free(diffb);
 		diffb = NULL;
