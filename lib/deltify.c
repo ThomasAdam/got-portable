@@ -315,8 +315,6 @@ stretchblk(FILE *basefile, struct got_delta_block *block, FILE *f,
 {
 	uint8_t basebuf[GOT_DELTIFY_MAXCHUNK], buf[GOT_DELTIFY_MAXCHUNK];
 	size_t base_r, r, i;
-	off_t orig_blocklen = *blocklen;
-	off_t pos = ftello(f);
 	int buf_equal = 1;
 
 	if (fseeko(basefile, block->offset, SEEK_SET) == -1)
@@ -343,9 +341,6 @@ stretchblk(FILE *basefile, struct got_delta_block *block, FILE *f,
 			(*blocklen)++;
 		}
 	}
-
-	if (fseeko(f, pos + *blocklen - orig_blocklen, SEEK_SET) == -1)
-		return got_error_from_errno("fseeko");
 
 	return NULL;
 }
@@ -403,6 +398,9 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			    blocklen);
 		}
 		fileoffset += blocklen;
+		if (fseeko(f, fileoffset, SEEK_SET) == -1)
+			return got_error_from_errno("fseeko");
+
 	}
 
 	if (err) {
