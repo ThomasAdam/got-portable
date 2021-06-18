@@ -569,11 +569,6 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 		    repo, fd);
 	}
 
-	if (hdrlen > size) {
-		err = got_error(GOT_ERR_BAD_OBJ_HDR);
-		goto done;
-	}
-
 	*obj = calloc(1, sizeof(**obj));
 	if (*obj == NULL) {
 		err = got_error_from_errno("calloc");
@@ -605,7 +600,7 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 			goto done;
 		}
 
-		if (sb.st_size != size) {
+		if (sb.st_size != hdrlen + size) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}

@@ -77,7 +77,7 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 		return err;
 	}
 
-	if (obj->size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
+	if (obj->size + obj->hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
 		err = got_inflate_to_mem(&data, &len, &consumed, f);
 	else
 		err = got_inflate_to_fd(&len, f, outfd);
@@ -89,7 +89,8 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 		goto done;
 	}
 
-	err = got_privsep_send_raw_obj(ibuf, len, obj->hdrlen, data);
+	err = got_privsep_send_raw_obj(ibuf, obj->size, obj->hdrlen, data);
+
 done:
 	free(data);
 	if (fclose(f) == EOF && err == NULL)

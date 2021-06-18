@@ -296,8 +296,8 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 	iobj.hdrlen = hdrlen;
 	iobj.size = size;
 
-	if (data && size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
-		len += (size_t)size;
+	if (data && size + hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
+		len += (size_t)size + hdrlen;
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_RAW_OBJECT, 0, 0, len);
 	if (wbuf == NULL) {
@@ -311,8 +311,8 @@ got_privsep_send_raw_obj(struct imsgbuf *ibuf, off_t size, size_t hdrlen,
 		return err;
 	}
 
-	if (data && size <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
-		if (imsg_add(wbuf, data, size) == -1) {
+	if (data && size + hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
+		if (imsg_add(wbuf, data, size + hdrlen) == -1) {
 			err = got_error_from_errno("imsg_add RAW_OBJECT");
 			ibuf_free(wbuf);
 			return err;
@@ -357,17 +357,17 @@ got_privsep_recv_raw_obj(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 			break;
 		}
 
-		if (*size > GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
+		if (*size + *hdrlen > GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			break;
 		}
 
-		*outbuf = malloc(*size);
+		*outbuf = malloc(*size + *hdrlen);
 		if (*outbuf == NULL) {
 			err = got_error_from_errno("malloc");
 			break;
 		}
-		memcpy(*outbuf, imsg.data + sizeof(*iobj), *size);
+		memcpy(*outbuf, imsg.data + sizeof(*iobj), *size + *hdrlen);
 		break;
 	default:
 		err = got_error(GOT_ERR_PRIVSEP_MSG);
