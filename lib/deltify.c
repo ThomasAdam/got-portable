@@ -387,15 +387,18 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			    &blocklen);
 			if (err)
 				break;
-			emitdelta(deltas, ndeltas, 1,
-			    block->offset - basefile_offset0, blocklen);
+			err = emitdelta(deltas, ndeltas, 1, block->offset, blocklen);
+			if (err)
+				break;
 		} else {
 			/*
 			 * No match.
 			 * This block needs to be sourced from the file itself.
 			 */
-			emitdelta(deltas, ndeltas, 0, fileoffset - offset0,
+			err = emitdelta(deltas, ndeltas, 0, fileoffset - offset0,
 			    blocklen);
+			if (err)
+				break;
 		}
 		fileoffset += blocklen;
 		if (fseeko(f, fileoffset, SEEK_SET) == -1)
