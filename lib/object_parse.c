@@ -89,6 +89,7 @@ got_object_qid_alloc_partial(struct got_object_qid **qid)
 		*qid = NULL;
 		return err;
 	}
+	(*qid)->data = NULL;
 
 	return NULL;
 }
