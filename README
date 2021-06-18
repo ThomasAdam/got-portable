@@ -110,7 +110,7 @@ As another example, to compile gotweb with profiling enabled:
   $ doas make install
   $ doas chown www /var/www/cgi-bin/gotweb/
 
-After loading a gotweb page in the browsers, there should now
+After loading a gotweb page in the browser, there should now
 be a gmon.out file next to the gotweb binary:
 
 $ ls -l /var/www/cgi-bin/gotweb/
