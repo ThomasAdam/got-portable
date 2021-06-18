@@ -96,7 +96,8 @@ hashblk(const unsigned char *p, off_t n)
 }
 
 static const struct got_error *
-addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
+addblk(struct got_delta_table *dt, FILE *f, off_t file_offset0, off_t len,
+    off_t offset, uint64_t h)
 {
 	const struct got_error *err = NULL;
 	int i;
@@ -116,7 +117,7 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 		 */
 		if (len == dt->blocks[i].len && h == dt->blocks[i].hash) {
 			if (r == 0) {
-				if (fseeko(f, offset, SEEK_SET) == -1)
+				if (fseeko(f, file_offset0 + offset, SEEK_SET) == -1)
 					return got_error_from_errno("fseeko");
 				r = fread(buf, 1, len, f);
 				if (r != len) {
@@ -125,7 +126,8 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 					return got_ferror(f, GOT_ERR_IO);
 				}
 			}
-			if (fseeko(f, dt->blocks[i].offset, SEEK_SET) == -1)
+			if (fseeko(f, file_offset0 + dt->blocks[i].offset,
+			    SEEK_SET) == -1)
 				return got_error_from_errno("fseeko");
 			if (fread(buf2, 1, len, f) != len)
 				return got_ferror(f, GOT_ERR_IO);
@@ -160,8 +162,8 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 		for (i = 0; i < old_size; i++) {
 			if (db[i].len == 0)
 				continue;
-			err = addblk(dt, f, db[i].len, db[i].offset,
-			    db[i].hash);
+			err = addblk(dt, f, file_offset0, db[i].len,
+			    db[i].offset, db[i].hash);
 			if (err)
 				break;
 		}
@@ -173,7 +175,7 @@ addblk(struct got_delta_table *dt, FILE *f, off_t len, off_t offset, uint64_t h)
 
 static const struct got_error *
 lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
-    unsigned char *p, off_t len, FILE *basefile)
+    unsigned char *p, off_t len, FILE *basefile, off_t basefile_offset0)
 {
 	int i;
 	uint64_t h;
@@ -188,7 +190,8 @@ lookupblk(struct got_delta_block **block, struct got_delta_table *dt,
 		if (dt->blocks[i].hash != h ||
 		    dt->blocks[i].len != len)
 			continue;
-		if (fseeko(basefile, dt->blocks[i].offset, SEEK_SET) == -1)
+		if (fseeko(basefile, basefile_offset0 + dt->blocks[i].offset,
+		    SEEK_SET) == -1)
 			return got_error_from_errno("fseeko");
 		r = fread(buf, 1, len, basefile);
 		if (r != len)
@@ -239,6 +242,7 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 {
 	const struct got_error *err = NULL;
 	uint64_t h;
+	const off_t offset0 = fileoffset;
 
 	*dt = calloc(1, sizeof(**dt));
 	if (*dt == NULL)
@@ -264,7 +268,8 @@ got_deltify_init(struct got_delta_table **dt, FILE *f, off_t fileoffset,
 		if (blocklen == 0)
 			break;
 		h = hashblk(buf, blocklen);
-		err = addblk(*dt, f, blocklen, fileoffset, h);
+		err = addblk(*dt, f, offset0, blocklen,
+		    fileoffset - offset0, h);
 		if (err)
 			goto done;
 		fileoffset += blocklen;
@@ -310,14 +315,14 @@ emitdelta(struct got_delta_instruction **deltas, int *ndeltas, int copy,
 }
 
 static const struct got_error *
-stretchblk(FILE *basefile, struct got_delta_block *block, FILE *f,
-    off_t filesize, off_t *blocklen)
+stretchblk(FILE *basefile, off_t base_offset0, struct got_delta_block *block,
+    FILE *f, off_t filesize, off_t *blocklen)
 {
 	uint8_t basebuf[GOT_DELTIFY_MAXCHUNK], buf[GOT_DELTIFY_MAXCHUNK];
 	size_t base_r, r, i;
 	int buf_equal = 1;
 
-	if (fseeko(basefile, block->offset, SEEK_SET) == -1)
+	if (fseeko(basefile, base_offset0 + block->offset, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
 	while (buf_equal && *blocklen < (1 << 24) - 1) {
@@ -374,7 +379,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			break;
 		if (blocklen == 0)
 			break;
-		err = lookupblk(&block, dt, buf, blocklen, basefile);
+		err = lookupblk(&block, dt, buf, blocklen, basefile,
+		    basefile_offset0);
 		if (err)
 			break;
 		if (block != NULL) {
@@ -383,8 +389,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			 * Attempt to stretch the block as far as possible and
 			 * generate a copy instruction.
 			 */
-			err = stretchblk(basefile, block, f, filesize,
-			    &blocklen);
+			err = stretchblk(basefile, basefile_offset0, block,
+			    f, filesize, &blocklen);
 			if (err)
 				break;
 			err = emitdelta(deltas, ndeltas, 1, block->offset, blocklen);
