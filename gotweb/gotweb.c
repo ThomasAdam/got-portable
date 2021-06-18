@@ -347,10 +347,11 @@ gw_blame(struct gw_trans *gw_trans)
 	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
@@ -424,10 +425,11 @@ gw_blob(struct gw_trans *gw_trans)
 	struct gw_header *header = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
@@ -477,10 +479,11 @@ gw_diff(struct gw_trans *gw_trans)
 	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath proc exec sendfd unveil",
 	    NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
@@ -566,12 +569,13 @@ gw_index(struct gw_trans *gw_trans)
 	unsigned int prev_disp = 0, next_disp = 1, dir_c = 0;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		return error;
 	}
-
+#endif
 	error = gw_apply_unveil(gw_trans->gw_conf->got_repos_path);
 	if (error)
 		return error;
@@ -968,12 +972,13 @@ gw_commits(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		goto done;
 	}
-
+#endif
 	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
@@ -1191,12 +1196,13 @@ gw_briefs(struct gw_trans *gw_trans)
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil",
 	    NULL) == -1) {
 		error = got_error_from_errno("pledge");
 		goto done;
 	}
-
+#endif
 	if (gw_trans->action != GW_SUMMARY) {
 		error = gw_apply_unveil(gw_trans->gw_dir->path);
 		if (error)
@@ -1448,9 +1454,10 @@ gw_summary(struct gw_trans *gw_trans)
 	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	error = gw_apply_unveil(gw_trans->gw_dir->path);
 	if (error)
 		goto done;
@@ -1610,9 +1617,10 @@ gw_tree(struct gw_trans *gw_trans)
 	char *age = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
@@ -1684,9 +1692,10 @@ gw_tags(struct gw_trans *gw_trans)
 	char *href_next = NULL, *href_prev = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 
@@ -1804,9 +1813,10 @@ gw_tag(struct gw_trans *gw_trans)
 	struct gw_header *header = NULL;
 	enum kcgi_err kerr = KCGI_OK;
 
+#ifndef PROFILE
 	if (pledge("stdio rpath proc exec sendfd unveil", NULL) == -1)
 		return got_error_from_errno("pledge");
-
+#endif
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
 

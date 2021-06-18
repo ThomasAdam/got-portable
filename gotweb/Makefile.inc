@@ -17,3 +17,10 @@ WWWUSR ?=	www
 WWWGRP ?=	www
 
 CPPFLAGS +=	-DGOT_TMPDIR=${GOTWEB_TMP_DIR}
+
+.if defined(PROFILE)
+CPPFLAGS += -DPROFILE
+DEBUG = -O0 -pg -g -static
+.else
+DEBUG = -O0 -g
+.endif
