@@ -117,6 +117,20 @@ const struct got_error *got_ref_list(struct got_reflist_head *,
 /* Free all references on a ref list. */
 void got_ref_list_free(struct got_reflist_head *);
 
+/*
+ * Insert a reference into a reference list.
+ * Return a pointer to the newly allocated list entry in *newp.
+ * If *newp is NULL and no error occured then the specified reference was
+ * already an element of the list. If *newp is not NULL then the reference
+ * was shallow-copied onto the list and should no longer be closed with
+ * got_ref_close(). Instead it will be closed along with other list
+ * elements by got_ref_list_free().
+ */
+const struct got_error *
+got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
+    struct got_reference *ref, struct got_repository *repo,
+    got_ref_cmp_cb cmp_cb, void *cmp_arg);
+
 /* Indicate whether the provided reference is symbolic (points at another
  * refernce) or not (points at an object ID). */
 int got_ref_is_symbolic(struct got_reference *);
