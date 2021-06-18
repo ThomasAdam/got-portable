@@ -904,6 +904,30 @@ got_object_qid_alloc(struct got_object_qid **qid, struct got_object_id *id)
 	return NULL;
 }
 
+const struct got_error *
+got_object_id_queue_copy(const struct got_object_id_queue *src,
+    struct got_object_id_queue *dest)
+{
+	const struct got_error *err;
+	struct got_object_qid *qid;
+
+	SIMPLEQ_FOREACH(qid, src, entry) {
+		struct got_object_qid *new;
+		/*
+		 * Deep-copy the object ID only. Let the caller deal
+		 * with setting up the new->data pointer if needed.
+		 */
+		err = got_object_qid_alloc(&new, qid->id); 
+		if (err) {
+			got_object_id_queue_free(dest);
+			return err;
+		}
+		SIMPLEQ_INSERT_TAIL(dest, new, entry);
+	}
+
+	return NULL;
+}
+
 static const struct got_error *
 request_packed_tree(struct got_tree_object **tree, struct got_pack *pack,
     int pack_idx, struct got_object_id *id)

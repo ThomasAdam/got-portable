@@ -35,6 +35,13 @@ const struct got_error *got_object_qid_alloc(struct got_object_qid **,
 void got_object_qid_free(struct got_object_qid *);
 void got_object_id_queue_free(struct got_object_id_queue *);
 
+/*
+ * Deep-copy elements from ID queue src to ID queue dest. Do not copy any
+ * qid->data pointers! This is the caller's responsibility if needed.
+ */
+const struct got_error *got_object_id_queue_copy(
+    const struct got_object_id_queue *src, struct got_object_id_queue *dest);
+
 /* Object types. */
 #define GOT_OBJ_TYPE_ANY		0 /* wildcard value at run-time */
 #define GOT_OBJ_TYPE_COMMIT		1
