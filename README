@@ -81,6 +81,46 @@ Documentation is available in manual pages:
  $ man -l gotweb/gotweb.conf.5
 
 
+Got can be built with profiling enabled to debug performance issues.
+Note that profiled builds cannot make use of pledge(2).
+Profiling should only be enabled for one program at a time. Otherwise,
+multiple programs will attempt to write to the 'gmon.out' file in the
+current working directory.
+
+For example, to compile got-read-pack with profiling enabled:
+
+  $ cd libexec/got-read-pack
+  $ make clean
+  $ make PROFILE=1
+  $ make install
+
+Running any Got command which ends up using got-read-pack should now
+produce the file 'gmon.out' in the current working directory.
+The gprof2dot program can be used to generate a profile graph:
+
+  $ doas pkg_add gprof2dot graphviz
+  $ gprof ~/bin/got-read-pack gmon.out | gprof2dot | dot -T png > profile.png
+
+As another example, to compile gotweb with profiling enabled:
+
+  $ cd gotweb
+  $ make clean
+  $ make PROFILE=1 gotweb
+  $ make # compile remaining gotweb binaries as usual
+  $ doas make install
+  $ doas chown www /var/www/cgi-bin/gotweb/
+
+After loading a gotweb page in the browsers, there should now
+be a gmon.out file next to the gotweb binary:
+
+$ ls -l /var/www/cgi-bin/gotweb/
+total 6088
+-rw-r--r--  1 www   daemon   427642 Jun 17 22:04 gmon.out
+-rwxr-xr-x  1 www   www     2630488 Jun 17 22:03 gotweb
+drwxr-xr-x  2 root  daemon      512 Jun 17 22:03 gw_tmpl
+drwxr-xr-x  2 root  daemon      512 Jun 17 22:03 libexec
+
+
 Guidelines for reporting problems:
 
 All problem/bug reports should include a reproduction recipe in form of a
