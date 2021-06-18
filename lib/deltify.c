@@ -354,7 +354,7 @@ const struct got_error *
 got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
     FILE *f, off_t fileoffset, off_t filesize,
     struct got_delta_table *dt, FILE *basefile,
-    off_t basefile_size)
+    off_t basefile_offset0, off_t basefile_size)
 {
 	const struct got_error *err = NULL;
 	const off_t offset0 = fileoffset;
@@ -392,7 +392,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			    &blocklen);
 			if (err)
 				break;
-			emitdelta(deltas, ndeltas, 1, block->offset, blocklen);
+			emitdelta(deltas, ndeltas, 1,
+			    block->offset - basefile_offset0, blocklen);
 		} else {
 			/*
 			 * No match.

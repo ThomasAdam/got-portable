@@ -44,5 +44,6 @@ const struct got_error *got_deltify_init(struct got_delta_table **dt, FILE *f,
     off_t fileoffset, off_t filesize);
 const struct got_error *got_deltify(struct got_delta_instruction **deltas,
     int *ndeltas, FILE *f, off_t fileoffset, off_t filesize,
-    struct got_delta_table *dt, FILE *basefile, off_t basefile_size);
+    struct got_delta_table *dt, FILE *basefile, off_t basefile_offset0,
+    off_t basefile_size);
 void got_deltify_free(struct got_delta_table *dt);

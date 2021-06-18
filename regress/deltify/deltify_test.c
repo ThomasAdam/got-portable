@@ -85,7 +85,8 @@ deltify_abc_axc(void)
 	}
 
 	err = got_deltify(&deltas, &ndeltas, derived_file, 0,
-	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_file, 3 * GOT_DELTIFY_MAXCHUNK);
+	    3 * GOT_DELTIFY_MAXCHUNK, dt, base_file, 0,
+	    3 * GOT_DELTIFY_MAXCHUNK);
 	if (err)
 		goto done;
 
