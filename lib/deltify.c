@@ -377,8 +377,15 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 		err = nextblk(buf, &blocklen, f);
 		if (err)
 			break;
-		if (blocklen == 0)
+		if (blocklen == 0) {
+			/* Source remainder from the file itself. */
+			if (fileoffset < filesize) {
+				err = emitdelta(deltas, ndeltas, 0,
+				    fileoffset - offset0,
+				    filesize - fileoffset);
+			}
 			break;
+		}
 		err = lookupblk(&block, dt, buf, blocklen, basefile,
 		    basefile_offset0);
 		if (err)
