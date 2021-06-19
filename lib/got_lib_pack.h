@@ -24,7 +24,6 @@ struct got_pack {
 	struct got_delta_cache *delta_cache;
 };
 
-const struct got_error *got_pack_stop_privsep_child(struct got_pack *);
 const struct got_error *got_pack_close(struct got_pack *);
 
 const struct got_error *got_pack_parse_offset_delta(off_t *, size_t *,

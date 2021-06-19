@@ -538,8 +538,8 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	return err;
 }
 
-const struct got_error *
-got_pack_stop_privsep_child(struct got_pack *pack)
+static const struct got_error *
+pack_stop_privsep_child(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 
@@ -564,7 +564,7 @@ got_pack_close(struct got_pack *pack)
 {
 	const struct got_error *err = NULL;
 
-	err = got_pack_stop_privsep_child(pack);
+	err = pack_stop_privsep_child(pack);
 	if (pack->map && munmap(pack->map, pack->filesize) == -1 && !err)
 		err = got_error_from_errno("munmap");
 	if (pack->fd != -1 && close(pack->fd) == -1 && err == NULL)
