@@ -2104,7 +2104,7 @@ static const struct got_error *
 remove_ondisk_file(const char *root_path, const char *path)
 {
 	const struct got_error *err = NULL;
-	char *ondisk_path = NULL;
+	char *ondisk_path = NULL, *parent = NULL;
 
 	if (asprintf(&ondisk_path, "%s/%s", root_path, path) == -1)
 		return got_error_from_errno("asprintf");
@@ -2114,23 +2114,28 @@ remove_ondisk_file(const char *root_path, const char *path)
 			err = got_error_from_errno2("unlink", ondisk_path);
 	} else {
 		size_t root_len = strlen(root_path);
-		do {
-			char *parent;
-			err = got_path_dirname(&parent, ondisk_path);
-			if (err)
-				break;
+		err = got_path_dirname(&parent, ondisk_path);
+		if (err)
+			goto done;
+		while (got_path_cmp(parent, root_path,
+		    strlen(parent), root_len) != 0) {
 			free(ondisk_path);
 			ondisk_path = parent;
+			parent = NULL;
 			if (rmdir(ondisk_path) == -1) {
 				if (errno != ENOTEMPTY)
 					err = got_error_from_errno2("rmdir",
 					    ondisk_path);
 				break;
 			}
-		} while (got_path_cmp(ondisk_path, root_path,
-		    strlen(ondisk_path), root_len) != 0);
+			err = got_path_dirname(&parent, ondisk_path);
+			if (err)
+				break;
+		}
 	}
+done:
 	free(ondisk_path);
+	free(parent);
 	return err;
 }
 

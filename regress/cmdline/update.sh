@@ -98,7 +98,8 @@ test_update_adds_file() {
 test_update_deletes_file() {
 	local testroot=`test_init update_deletes_file`
 
-	got checkout $testroot/repo $testroot/wt > /dev/null
+	mkdir $testroot/wtparent
+	got checkout $testroot/repo $testroot/wtparent/wt > /dev/null
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -113,7 +114,11 @@ test_update_deletes_file() {
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
-	(cd $testroot/wt && got update > $testroot/stdout)
+	# verify that no error occurs if the work tree's parent
+	# directory is not writable
+	chmod u-w $testroot/wtparent
+	(cd $testroot/wtparent/wt && got update > $testroot/stdout)
+	chmod u+w $testroot/wtparent
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -123,7 +128,7 @@ test_update_deletes_file() {
 		return 1
 	fi
 
-	if [ -e $testroot/wt/beta ]; then
+	if [ -e $testroot/wtparent/wt/beta ]; then
 		echo "removed file beta still exists on disk" >&2
 		test_done "$testroot" "1"
 		return 1
