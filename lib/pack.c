@@ -440,8 +440,8 @@ got_packidx_get_packfile_path(char **path_packfile, struct got_packidx *packidx)
 	return NULL;
 }
 
-static off_t
-get_object_offset(struct got_packidx *packidx, int idx)
+off_t
+got_packidx_get_object_offset(struct got_packidx *packidx, int idx)
 {
 	uint32_t offset = be32toh(packidx->hdr.offsets[idx]);
 	if (offset & GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX) {
@@ -853,7 +853,7 @@ resolve_ref_delta(struct got_delta_chain *deltas, struct got_packidx *packidx,
 	if (idx == -1)
 		return got_error(GOT_ERR_NO_OBJ);
 
-	base_offset = get_object_offset(packidx, idx);
+	base_offset = got_packidx_get_object_offset(packidx, idx);
 	if (base_offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
@@ -956,7 +956,7 @@ got_packfile_open_object(struct got_object **obj, struct got_pack *pack,
 
 	*obj = NULL;
 
-	offset = get_object_offset(packidx, idx);
+	offset = got_packidx_get_object_offset(packidx, idx);
 	if (offset == (uint64_t)-1)
 		return got_error(GOT_ERR_BAD_PACKIDX);
 
