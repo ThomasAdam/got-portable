@@ -3734,7 +3734,7 @@ done:
 const struct got_error *
 got_worktree_status(struct got_worktree *worktree,
     struct got_pathlist_head *paths, struct got_repository *repo,
-    got_worktree_status_cb status_cb, void *status_arg,
+    int no_ignores, got_worktree_status_cb status_cb, void *status_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
@@ -3748,7 +3748,8 @@ got_worktree_status(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			status_cb, status_arg, cancel_cb, cancel_arg, 0, 0);
+			status_cb, status_arg, cancel_cb, cancel_arg,
+			no_ignores, 0);
 		if (err)
 			break;
 	}

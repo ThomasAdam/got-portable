@@ -4430,8 +4430,8 @@ cmd_diff(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		error = got_worktree_status(worktree, &paths, repo, print_diff,
-		    &arg, check_cancelled, NULL);
+		error = got_worktree_status(worktree, &paths, repo, 0,
+		    print_diff, &arg, check_cancelled, NULL);
 		free(id_str);
 		got_pathlist_free(&paths);
 		goto done;
@@ -5119,7 +5119,7 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [-s status-codes ] [path ...]\n",
+	fprintf(stderr, "usage: %s status [-I] [-s status-codes ] [path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -5157,12 +5157,15 @@ cmd_status(int argc, char *argv[])
 	char *cwd = NULL, *status_codes = NULL;;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch, i;
+	int ch, i, no_ignores = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "s:")) != -1) {
+	while ((ch = getopt(argc, argv, "Is:")) != -1) {
 		switch (ch) {
+		case 'I':
+			no_ignores = 1;
+			break;
 		case 's':
 			for (i = 0; i < strlen(optarg); i++) {
 				switch (optarg[i]) {
@@ -5224,8 +5227,8 @@ cmd_status(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_worktree_status(worktree, &paths, repo, print_status,
-	    status_codes, check_cancelled, NULL);
+	error = got_worktree_status(worktree, &paths, repo, no_ignores,
+	    print_status, status_codes, check_cancelled, NULL);
 done:
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
@@ -9536,7 +9539,7 @@ cmd_histedit(int argc, char *argv[])
 				if (error)
 					goto done;
 				error = got_worktree_status(worktree, &paths,
-				    repo, check_local_changes, &have_changes,
+				    repo, 0, check_local_changes, &have_changes,
 				    check_cancelled, NULL);
 				got_pathlist_free(&paths);
 				if (error) {
@@ -9924,7 +9927,7 @@ cmd_stage(int argc, char *argv[])
 		goto done;
 
 	if (list_stage)
-		error = got_worktree_status(worktree, &paths, repo,
+		error = got_worktree_status(worktree, &paths, repo, 0,
 		    print_stage, NULL, check_cancelled, NULL);
 	else {
 		cpa.patch_script_file = patch_script_file;

@@ -581,6 +581,33 @@ test_status_cvsignore() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+?  .cvsignore
+?  epsilon/.cvsignore
+?  epsilon/bar
+?  epsilon/boo
+?  epsilon/foo
+?  epsilon/moo
+?  epsilon/new/foo
+?  foo
+?  foop
+EOF
+	(cd $testroot/wt && got status -I > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got status failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -625,6 +652,33 @@ test_status_gitignore() {
 	echo '?  .gitignore' > $testroot/stdout.expected
 	echo '?  foop' >> $testroot/stdout.expected
 	(cd $testroot/wt/gamma && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/stdout.expected <<EOF
+?  .gitignore
+?  a/b/c/foo
+?  a/b/c/zoo
+?  barp
+?  epsilon/bar
+?  epsilon/boo
+?  epsilon/moo
+?  foo
+?  foop
+EOF
+	(cd $testroot/wt && got status -I > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got status failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
