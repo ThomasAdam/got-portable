@@ -827,7 +827,7 @@ raw_object_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pac
 	if (err)
 		goto done;
 
-	err = got_privsep_send_raw_obj(ibuf, size, obj->hdrlen, buf);
+	err = got_privsep_send_raw_obj(ibuf, obj->size, obj->hdrlen, buf);
 done:
 	free(buf);
 	if (outfile && fclose(outfile) == EOF && err == NULL)
