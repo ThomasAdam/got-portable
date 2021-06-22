@@ -69,6 +69,118 @@ Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
 working directory.
 .El
+.It Cm pack Oo Fl a Oc Oo Fl r Ar repository-path Oc Oo Fl x Ar reference Oc Op Ar reference ...
+Generate a new pack file and a corresponding pack file index.
+By default, add any loose objects which are reachable via any references
+to the generated pack file.
+.Pp
+If one or more
+.Ar reference
+arguments is specified, only add objects which are reachable via the specified
+references.
+Each
+.Ar reference
+argument may either specify a specific reference or a reference namespace,
+in which case all references within this namespace will be used.
+.Pp
+.Cm gotadmin pack
+always ignores references in the
+.Pa refs/got/
+namespace, effectively treating such references as if they did not refer
+to any objects.
+.Pp
+The options for
+.Cm gotadmin pack
+are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Add objects to the generated pack file even if they are already packed
+in a different pack file.
+Unless this option is specified, only loose objects will be added.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+.It Fl x Ar reference
+Exclude objects reachable via the specified
+.Ar reference
+from the pack file.
+The
+.Ar reference
+argument may either specify a specific reference or a reference namespace,
+in which case all references within this namespace will be excluded.
+The
+.Fl x
+option may be specified multiple times to build a list of references to exclude.
+.Pp
+Exclusion takes precedence over inclusion.
+If a reference appears in both the included and excluded lists, it will
+be excluded.
+.El
+.It Cm indexpack Ar packfile-path
+Create a pack index for the pack file at
+.Ar packfile-path .
+.Pp
+A pack index is required for using the corresponding pack file with
+.Xr got 1 .
+Usually, a pack index will be created by commands such as
+.Cm gotadmin pack
+or
+.Cm got fetch
+as part of regular operation.
+The
+.Cm gotadmin indexpack
+command may be used to recover from a corrupt or missing index.
+A given pack file will always yield the same bit-identical index.
+.Pp
+The provided
+.Ar packfile-path
+must be located within the
+.Pa objects/pack/
+directory of the repository and should end in
+.Pa .pack .
+The filename of the corresponding pack index is equivalent, except
+that it ends in
+.Pa .idx .
+.Pp
+.It Cm ix
+Short alias for
+.Cm indexpack .
+.It Cm listpack Oo Fl h Oc Oo Fl s Oc Ar packfile-path
+List the contents of the pack file at
+.Ar packfile-path .
+.Pp
+Each object contained in the pack file will be displayed on a single line.
+The information shown includes the object ID, object type, object offset,
+and object size.
+.Pp
+If a packed object is deltified against another object the delta base
+will be shown as well.
+For offset deltas, the delta base is identified via an offset into the
+pack file.
+For reference deltas, the delta base is identified via an object ID.
+.Pp
+The provided
+.Ar packfile-path
+must be located within the
+.Pa objects/pack/
+directory of the repository and should end in
+.Pa .pack .
+.Pp
+The options for
+.Cm gotadmin listpack
+are as follows:
+.Bl -tag -width Ds
+.It Fl h
+Show object sizes in human-readable form.
+.It Fl s
+Display statistics about the pack file after listing objects. 
+This includes the total number of objects stored in the pack file
+and a break-down of the number of objects per object type.
+.El
+.It Cm ls
+Short alias for
+.Cm listpack .
 .El
 .Sh EXIT STATUS
 .Ex -std gotadmin
@@ -79,3 +191,4 @@ working directory.
 .Xr got.conf 5
 .Sh AUTHORS
 .An Stefan Sperling Aq Mt stsp@openbsd.org
+.An Ori Bernstein Aq Mt ori@openbsd.org

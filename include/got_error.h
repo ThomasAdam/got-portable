@@ -145,6 +145,7 @@
 #define GOT_ERR_NO_CONFIG_FILE	128
 #define GOT_ERR_BAD_SYMLINK	129
 #define GOT_ERR_GIT_REPO_EXT	130
+#define GOT_ERR_CANNOT_PACK	131
 
 static const struct got_error {
 	int code;
@@ -297,6 +298,7 @@ static const struct got_error {
 	{ GOT_ERR_BAD_SYMLINK, "symbolic link points outside of paths under "
 	    "version control" },
 	{ GOT_ERR_GIT_REPO_EXT, "unsupported repository format extension" },
+	{ GOT_ERR_CANNOT_PACK, "not enough objects to pack" },
 };
 
 /*

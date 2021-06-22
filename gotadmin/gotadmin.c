@@ -15,11 +15,15 @@
  */
 
 #include <sys/queue.h>
+#include <sys/types.h>
 
+#include <ctype.h>
 #include <getopt.h>
 #include <err.h>
 #include <errno.h>
 #include <locale.h>
+#include <inttypes.h>
+#include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -31,10 +35,11 @@
 #include "got_error.h"
 #include "got_object.h"
 #include "got_reference.h"
+#include "got_cancel.h"
 #include "got_repository.h"
+#include "got_repository_admin.h"
 #include "got_gotconfig.h"
 #include "got_path.h"
-#include "got_cancel.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
 
@@ -57,6 +62,13 @@ catch_sigpipe(int signo)
 	sigpipe_received = 1;
 }
 
+static const struct got_error *
+check_cancelled(void *arg)
+{
+	if (sigint_received || sigpipe_received)
+		return got_error(GOT_ERR_CANCELLED);
+	return NULL;
+}
 
 struct gotadmin_cmd {
 	const char	*cmd_name;
@@ -67,11 +79,20 @@ struct gotadmin_cmd {
 
 __dead static void	usage(int, int);
 __dead static void	usage_info(void);
+__dead static void	usage_pack(void);
+__dead static void	usage_indexpack(void);
+__dead static void	usage_listpack(void);
 
 static const struct got_error*		cmd_info(int, char *[]);
+static const struct got_error*		cmd_pack(int, char *[]);
+static const struct got_error*		cmd_indexpack(int, char *[]);
+static const struct got_error*		cmd_listpack(int, char *[]);
 
 static struct gotadmin_cmd gotadmin_commands[] = {
 	{ "info",	cmd_info,	usage_info,	"" },
+	{ "pack",	cmd_pack,	usage_pack,	"" },
+	{ "indexpack",	cmd_indexpack,	usage_indexpack,"ix" },
+	{ "listpack",	cmd_listpack,	usage_listpack,	"ls" },
 };
 
 static void
@@ -301,5 +322,571 @@ done:
 	if (repo)
 		got_repo_close(repo);
 	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_pack(void)
+{
+	fprintf(stderr, "usage: %s pack [-a] [-r repository-path] "
+	    "[-x reference] [reference ...]\n",
+	    getprogname());
+	exit(1);
+}
+
+struct got_pack_progress_arg {
+	char last_scaled_size[FMT_SCALED_STRSIZE];
+	int last_ncommits;
+	int last_nobj_total;
+	int last_p_deltify;
+	int last_p_written;
+	int last_p_indexed;
+	int last_p_resolved;
+	int verbosity;
+	int printed_something;
+};
+
+static const struct got_error *
+pack_progress(void *arg, off_t packfile_size, int ncommits,
+    int nobj_total, int nobj_deltify, int nobj_written)
+{
+	struct got_pack_progress_arg *a = arg;
+	char scaled_size[FMT_SCALED_STRSIZE];
+	int p_deltify, p_written;
+	int print_searching = 0, print_total = 0;
+	int print_deltify = 0, print_written = 0;
+
+	if (a->verbosity < 0)
+		return NULL;
+
+	if (fmt_scaled(packfile_size, scaled_size) == -1)
+		return got_error_from_errno("fmt_scaled");
+
+	if (a->last_ncommits != ncommits) {
+		print_searching = 1;
+		a->last_ncommits = ncommits;
+	}
+
+	if (a->last_nobj_total != nobj_total) {
+		print_searching = 1;
+		print_total = 1;
+		a->last_nobj_total = nobj_total;
+	}
+
+	if (packfile_size > 0 && (a->last_scaled_size[0] == '\0' ||
+	    strcmp(scaled_size, a->last_scaled_size)) != 0) {
+		if (strlcpy(a->last_scaled_size, scaled_size,
+		    FMT_SCALED_STRSIZE) >= FMT_SCALED_STRSIZE)
+			return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	if (nobj_deltify > 0 || nobj_written > 0) {
+		if (nobj_deltify > 0) {
+			p_deltify = (nobj_deltify * 100) / nobj_total;
+			if (p_deltify != a->last_p_deltify) {
+				a->last_p_deltify = p_deltify;
+				print_searching = 1;
+				print_total = 1;
+				print_deltify = 1;
+			}
+		}
+		if (nobj_written > 0) {
+			p_written = (nobj_written * 100) / nobj_total;
+			if (p_written != a->last_p_written) {
+				a->last_p_written = p_written;
+				print_searching = 1;
+				print_total = 1;
+				print_deltify = 1;
+				print_written = 1;
+			}
+		}
+	}
+
+	if (print_searching || print_total || print_deltify || print_written)
+		printf("\r");
+	if (print_searching)
+		printf("packing %d reference%s", ncommits,
+		    ncommits == 1 ? "" : "s");
+	if (print_total)
+		printf("; %d object%s", nobj_total,
+		    nobj_total == 1 ? "" : "s");
+	if (print_deltify)
+		printf("; deltify: %d%%", p_deltify);
+	if (print_written)
+		printf("; writing pack: %*s %d%%", FMT_SCALED_STRSIZE,
+		    scaled_size, p_written);
+	if (print_searching || print_total || print_deltify ||
+	    print_written) {
+		a->printed_something = 1;
+		fflush(stdout);
+	}
+	return NULL;
+}
+
+static const struct got_error *
+pack_index_progress(void *arg, off_t packfile_size, int nobj_total,
+    int nobj_indexed, int nobj_loose, int nobj_resolved)
+{
+	struct got_pack_progress_arg *a = arg;
+	char scaled_size[FMT_SCALED_STRSIZE];
+	int p_indexed, p_resolved;
+	int print_size = 0, print_indexed = 0, print_resolved = 0;
+
+	if (a->verbosity < 0)
+		return NULL;
+
+	if (packfile_size > 0 || nobj_indexed > 0) {
+		if (fmt_scaled(packfile_size, scaled_size) == 0 &&
+		    (a->last_scaled_size[0] == '\0' ||
+		    strcmp(scaled_size, a->last_scaled_size)) != 0) {
+			print_size = 1;
+			if (strlcpy(a->last_scaled_size, scaled_size,
+			    FMT_SCALED_STRSIZE) >= FMT_SCALED_STRSIZE)
+				return got_error(GOT_ERR_NO_SPACE);
+		}
+		if (nobj_indexed > 0) {
+			p_indexed = (nobj_indexed * 100) / nobj_total;
+			if (p_indexed != a->last_p_indexed) {
+				a->last_p_indexed = p_indexed;
+				print_indexed = 1;
+				print_size = 1;
+			}
+		}
+		if (nobj_resolved > 0) {
+			p_resolved = (nobj_resolved * 100) /
+			    (nobj_total - nobj_loose);
+			if (p_resolved != a->last_p_resolved) {
+				a->last_p_resolved = p_resolved;
+				print_resolved = 1;
+				print_indexed = 1;
+				print_size = 1;
+			}
+		}
+
+	}
+	if (print_size || print_indexed || print_resolved)
+		printf("\r");
+	if (print_size)
+		printf("%*s packed", FMT_SCALED_STRSIZE, scaled_size);
+	if (print_indexed)
+		printf("; indexing %d%%", p_indexed);
+	if (print_resolved)
+		printf("; resolving deltas %d%%", p_resolved);
+	if (print_size || print_indexed || print_resolved)
+		fflush(stdout);
+
+	return NULL;
+}
+
+static const struct got_error *
+add_ref(struct got_reflist_entry **new, struct got_reflist_head *refs,
+    const char *refname, struct got_repository *repo)
+{
+	const struct got_error *err;
+	struct got_reference *ref;
+
+	*new = NULL;
+
+	err = got_ref_open(&ref, repo, refname, 0);
+	if (err) {
+		if (err->code != GOT_ERR_NOT_REF)
+			return err;
+
+		/* Treat argument as a reference prefix. */
+		err = got_ref_list(refs, repo, refname,
+		    got_ref_cmp_by_name, NULL);
+	} else {
+		err = got_reflist_insert(new, refs, ref, repo,
+		    got_ref_cmp_by_name, NULL);
+		if (err || *new == NULL /* duplicate */)
+			got_ref_close(ref);
+	}
+
+	return err;
+}
+
+static const struct got_error *
+cmd_pack(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	struct got_repository *repo = NULL;
+	int ch, i, loose_obj_only = 1;
+	struct got_object_id *pack_hash = NULL;
+	char *id_str = NULL;
+	struct got_pack_progress_arg ppa;
+	FILE *packfile = NULL;
+	struct got_pathlist_head exclude_args;
+	struct got_pathlist_entry *pe;
+	struct got_reflist_head exclude_refs;
+	struct got_reflist_head include_refs;
+	struct got_reflist_entry *re, *new;
+
+	TAILQ_INIT(&exclude_args);
+	TAILQ_INIT(&exclude_refs);
+	TAILQ_INIT(&include_refs);
+
+	while ((ch = getopt(argc, argv, "ar:x:")) != -1) {
+		switch (ch) {
+		case 'a':
+			loose_obj_only = 0;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'x':
+			got_path_strip_trailing_slashes(optarg);
+			error = got_pathlist_append(&exclude_args,
+			    optarg, NULL);
+			if (error)
+				return error;
+			break;
+		default:
+			usage_pack();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_repo_open(&repo, repo_path ? repo_path : cwd, NULL);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
+	if (error)
+		goto done;
+
+	TAILQ_FOREACH(pe, &exclude_args, entry) {
+		const char *refname = pe->path;
+		error = add_ref(&new, &exclude_refs, refname, repo);
+		if (error)
+			goto done;
+
+	}
+
+	if (argc == 0) {
+		error = got_ref_list(&include_refs, repo, "",
+		    got_ref_cmp_by_name, NULL);
+		if (error)
+			goto done;
+	} else {
+		for (i = 0; i < argc; i++) {
+			const char *refname;
+			got_path_strip_trailing_slashes(argv[i]);
+			refname = argv[i];
+			error = add_ref(&new, &include_refs, refname, repo);
+			if (error)
+				goto done;
+		}
+	}
+
+	/* Ignore references in the refs/got/ namespace. */
+	TAILQ_FOREACH_SAFE(re, &include_refs, entry, new) {
+		const char *refname = got_ref_get_name(re->ref);
+		if (strncmp("refs/got/", refname, 9) != 0)
+			continue;
+		TAILQ_REMOVE(&include_refs, re, entry);
+		got_ref_close(re->ref);
+		free(re);
+	}
+
+	memset(&ppa, 0, sizeof(ppa));
+	ppa.last_scaled_size[0] = '\0';
+	ppa.last_p_indexed = -1;
+	ppa.last_p_resolved = -1;
+
+	error = got_repo_pack_objects(&packfile, &pack_hash,
+	    &include_refs, &exclude_refs, repo, loose_obj_only,
+	    pack_progress, &ppa, check_cancelled, NULL);
+	if (error) {
+		if (ppa.printed_something)
+			printf("\n");
+		goto done;
+	}
+
+	error = got_object_id_str(&id_str, pack_hash);
+	if (error)
+		goto done;
+	printf("\nWrote %s.pack\n", id_str);
+
+	error = got_repo_index_pack(packfile, pack_hash, repo,
+	    pack_index_progress, &ppa, check_cancelled, NULL);
+	if (error)
+		goto done;
+	printf("\nIndexed %s.pack\n", id_str);
+done:
+	got_pathlist_free(&exclude_args);
+	got_ref_list_free(&exclude_refs);
+	got_ref_list_free(&include_refs);
+	free(id_str);
+	free(pack_hash);
+	free(cwd);
+	return error;
+}
+
+__dead static void
+usage_indexpack(void)
+{
+	fprintf(stderr, "usage: %s indexpack packfile-path\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_indexpack(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	int ch;
+	struct got_object_id *pack_hash = NULL;
+	char *packfile_path = NULL;
+	char *id_str = NULL;
+	struct got_pack_progress_arg ppa;
+	FILE *packfile = NULL;
+
+	while ((ch = getopt(argc, argv, "")) != -1) {
+		switch (ch) {
+		default:
+			usage_indexpack();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_indexpack();
+
+	packfile_path = realpath(argv[0], NULL);
+	if (packfile_path == NULL)
+		return got_error_from_errno2("realpath", argv[0]);
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	error = got_repo_open(&repo, packfile_path, NULL);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
+	if (error)
+		goto done;
+
+	memset(&ppa, 0, sizeof(ppa));
+	ppa.last_scaled_size[0] = '\0';
+	ppa.last_p_indexed = -1;
+	ppa.last_p_resolved = -1;
+
+	error = got_repo_find_pack(&packfile, &pack_hash, repo,
+	    packfile_path);
+	if (error)
+		goto done;
+
+	error = got_object_id_str(&id_str, pack_hash);
+	if (error)
+		goto done;
+
+	error = got_repo_index_pack(packfile, pack_hash, repo,
+	    pack_index_progress, &ppa, check_cancelled, NULL);
+	if (error)
+		goto done;
+	printf("\nIndexed %s.pack\n", id_str);
+done:
+	free(id_str);
+	free(pack_hash);
+	return error;
+}
+
+__dead static void
+usage_listpack(void)
+{
+	fprintf(stderr, "usage: %s listpack [-h] [-s] packfile-path\n",
+	    getprogname());
+	exit(1);
+}
+
+struct gotadmin_list_pack_cb_args {
+	int nblobs;
+	int ntrees;
+	int ncommits;
+	int ntags;
+	int noffdeltas;
+	int nrefdeltas;
+	int human_readable;
+};
+
+static const struct got_error *
+list_pack_cb(void *arg, struct got_object_id *id, int type, off_t offset,
+    off_t size, off_t base_offset, struct got_object_id *base_id)
+{
+	const struct got_error *err;
+	struct gotadmin_list_pack_cb_args *a = arg;
+	char *id_str, *delta_str = NULL, *base_id_str = NULL;
+	const char *type_str;
+
+	err = got_object_id_str(&id_str, id);	
+	if (err)
+		return err;
+
+	switch (type) {
+	case GOT_OBJ_TYPE_BLOB:
+		type_str = GOT_OBJ_LABEL_BLOB;
+		a->nblobs++;
+		break;
+	case GOT_OBJ_TYPE_TREE:
+		type_str = GOT_OBJ_LABEL_TREE;
+		a->ntrees++;
+		break;
+	case GOT_OBJ_TYPE_COMMIT:
+		type_str = GOT_OBJ_LABEL_COMMIT;
+		a->ncommits++;
+		break;
+	case GOT_OBJ_TYPE_TAG:
+		type_str = GOT_OBJ_LABEL_TAG;
+		a->ntags++;
+		break;
+	case GOT_OBJ_TYPE_OFFSET_DELTA:
+		type_str = "offset-delta";
+		if (asprintf(&delta_str, " base-offset %llu",
+		    base_offset) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		a->noffdeltas++;
+		break;
+	case GOT_OBJ_TYPE_REF_DELTA:
+		type_str = "ref-delta";
+		err = got_object_id_str(&base_id_str, base_id);	
+		if (err)
+			goto done;
+		if (asprintf(&delta_str, " base-id %s", base_id_str) == -1) {
+			err = got_error_from_errno("asprintf");
+			goto done;
+		}
+		a->nrefdeltas++;
+		break;
+	default:
+		err = got_error(GOT_ERR_OBJ_TYPE);
+		goto done;
+	}
+	if (a->human_readable) {
+		char scaled[FMT_SCALED_STRSIZE];
+		char *s;;
+		if (fmt_scaled(size, scaled) == -1) {
+			err = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		s = scaled;
+		while (isspace((unsigned char)*s))
+			s++;
+		printf("%s %s at %llu size %s%s\n", id_str, type_str, offset,
+		    s, delta_str ? delta_str : "");
+	} else {
+		printf("%s %s at %llu size %llu%s\n", id_str, type_str, offset,
+		    size, delta_str ? delta_str : "");
+	}
+done:
+	free(id_str);
+	free(base_id_str);
+	free(delta_str);
+	return err;
+}
+
+static const struct got_error *
+cmd_listpack(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_repository *repo = NULL;
+	int ch;
+	struct got_object_id *pack_hash = NULL;
+	char *packfile_path = NULL;
+	char *id_str = NULL;
+	struct gotadmin_list_pack_cb_args lpa;
+	FILE *packfile = NULL;
+	int show_stats = 0, human_readable = 0;
+
+	while ((ch = getopt(argc, argv, "hs")) != -1) {
+		switch (ch) {
+		case 'h':
+			human_readable = 1;
+			break;
+		case 's':
+			show_stats = 1;
+			break;
+		default:
+			usage_listpack();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1)
+		usage_listpack();
+	packfile_path = realpath(argv[0], NULL);
+	if (packfile_path == NULL)
+		return got_error_from_errno2("realpath", argv[0]);
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+	error = got_repo_open(&repo, packfile_path, NULL);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
+	if (error)
+		goto done;
+
+	error = got_repo_find_pack(&packfile, &pack_hash, repo,
+	    packfile_path);
+	if (error)
+		goto done;
+	error = got_object_id_str(&id_str, pack_hash);
+	if (error)
+		goto done;
+
+	memset(&lpa, 0, sizeof(lpa));
+	lpa.human_readable = human_readable;
+	error = got_repo_list_pack(packfile, pack_hash, repo,
+	    list_pack_cb, &lpa, check_cancelled, NULL);
+	if (error)
+		goto done;
+	if (show_stats) {
+		printf("objects: %d\n  blobs: %d\n  trees: %d\n  commits: %d\n"
+		    "  tags: %d\n  offset-deltas: %d\n  ref-deltas: %d\n",
+		    lpa.nblobs + lpa.ntrees + lpa.ncommits + lpa.ntags +
+		    lpa.noffdeltas + lpa.nrefdeltas,
+		    lpa.nblobs, lpa.ntrees, lpa.ncommits, lpa.ntags,
+		    lpa.noffdeltas, lpa.nrefdeltas);
+	}
+done:
+	free(id_str);
+	free(pack_hash);
+	free(packfile_path);
 	return error;
 }

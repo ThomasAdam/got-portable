@@ -6,8 +6,9 @@ PROG=		gotadmin
 SRCS=		gotadmin.c \
 		deflate.c delta.c delta_cache.c deltify.c error.c gotconfig.c \
 		inflate.c lockfile.c object.c object_cache.c object_create.c \
-		object_idset.c object_parse.c opentemp.c pack.c \
-		path.c privsep.c reference.c repository.c sha1.c
+		object_idset.c object_parse.c opentemp.c pack.c pack_create.c \
+		path.c privsep.c reference.c repository.c repository_admin.c \
+		sha1.c
 MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
