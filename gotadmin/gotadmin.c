@@ -569,7 +569,7 @@ cmd_pack(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = apply_unveil(got_repo_get_path_git_dir(repo), 1);
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 0);
 	if (error)
 		goto done;
 
