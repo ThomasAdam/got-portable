@@ -1,3 +1,24 @@
+* got 0.53; 2021-06-22
+- do not update symlinks which are already up-to-date
+- add a gotadmin utility with info, pack, indexpack, and listpack commands
+- fix 3-way merge of files which lack a final \n
+- make double-quotes appear in rendered got.1 man page as intended (Nam Nguyen)
+- gotweb: render error page instead of returning error 500 (tracey)
+- avoid an error in tog(1) while the terminal window is being resized
+- plug a memory leak in got_ref_list_free()
+- catch invalid reference names passed to 'got ref -l'
+- fix a memory leak in dial_git() (naddy)
+- fix unrelated changes being merged by got cherrypick/backout/rebase/histedit
+- go back to Patience diff for merging during cherrypick/backout/histedit/rebase
+- fix file descriptor leak in got_repo_close() (tracey)
+- fix hang in commit regress test if $VISUAL is set in the environment (tracey)
+- use socketpair(2) instead of pipe(2) for better portability to Linux
+- make it possible to profile gotweb and document how profiling works
+- fix memory and fd leaks in got_pack_stop_privsep_child() (tracey)
+- fix bogus 'permission denied' error when a file at work tree root is removed
+- port packfile creation code over from git9
+- new -I option for 'got status' to show files which match an ignore pattern
+
 * got 0.52; 2021-04-05
 - fix error checking in dial_ssh()
 - increase pack index cache size from 16 to 64 to improve performance
