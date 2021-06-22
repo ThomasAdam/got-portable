@@ -13,6 +13,10 @@
 /got/got.1
 /got/got.c
 /got/got.conf.5
+/gotadmin
+/gotadmin/Makefile
+/gotadmin/gotadmin.1
+/gotadmin/gotadmin.c
 /gotweb
 /gotweb/Makefile
 /gotweb/Makefile.inc
@@ -83,6 +87,7 @@
 /include/got_privsep.h
 /include/got_reference.h
 /include/got_repository.h
+/include/got_repository_admin.h
 /include/got_utf8.h
 /include/got_version.h
 /include/got_worktree.h
@@ -132,6 +137,7 @@
 /lib/got_lib_object_idset.h
 /lib/got_lib_object_parse.h
 /lib/got_lib_pack.h
+/lib/got_lib_pack_create.h
 /lib/got_lib_privsep.h
 /lib/got_lib_repository.h
 /lib/got_lib_sha1.h
@@ -146,12 +152,14 @@
 /lib/object_parse.c
 /lib/opentemp.c
 /lib/pack.c
+/lib/pack_create.c
 /lib/path.c
 /lib/privsep.c
 /lib/rcsutil.c
 /lib/rcsutil.h
 /lib/reference.c
 /lib/repository.c
+/lib/repository_admin.c
 /lib/sha1.c
 /lib/utf8.c
 /lib/worktree.c
@@ -211,6 +219,7 @@
 /regress/cmdline/import.sh
 /regress/cmdline/integrate.sh
 /regress/cmdline/log.sh
+/regress/cmdline/pack.sh
 /regress/cmdline/rebase.sh
 /regress/cmdline/ref.sh
 /regress/cmdline/revert.sh
