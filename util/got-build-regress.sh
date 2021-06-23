@@ -16,7 +16,7 @@
 
 prog=`basename $0`
 usage="$prog [-b branch] [-f] [-w worktree ] [ -r from-address ] email-address [email-address ...]"
-branch=master
+branch=main
 worktree=$HOME/got
 fromaddr_arg=
 force=0
