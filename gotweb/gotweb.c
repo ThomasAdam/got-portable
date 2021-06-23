@@ -3635,7 +3635,7 @@ gw_get_commit(struct gw_trans *gw_trans, struct gw_header *header,
 		return error;
 
 	if (gw_trans->action == GW_DIFF) {
-		parent_id = SIMPLEQ_FIRST(
+		parent_id = STAILQ_FIRST(
 		    got_object_commit_get_parent_ids(commit));
 		if (parent_id != NULL) {
 			id2 = got_object_id_dup(parent_id->id);

@@ -490,7 +490,7 @@ got_object_commit_create(struct got_object_id **id,
 	}
 
 	if (parent_ids) {
-		SIMPLEQ_FOREACH(qid, parent_ids, entry) {
+		STAILQ_FOREACH(qid, parent_ids, entry) {
 			char *parent_str = NULL;
 
 			free(id_str);

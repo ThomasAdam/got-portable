@@ -119,11 +119,11 @@ struct commit_queue {
 };
 
 struct tog_color {
-	SIMPLEQ_ENTRY(tog_color) entry;
+	STAILQ_ENTRY(tog_color) entry;
 	regex_t regex;
 	short colorpair;
 };
-SIMPLEQ_HEAD(tog_colors, tog_color);
+STAILQ_HEAD(tog_colors, tog_color);
 
 static struct got_reflist_head tog_refs = TAILQ_HEAD_INITIALIZER(tog_refs);
 static struct got_reflist_object_id_map *tog_refs_idmap;
@@ -181,7 +181,7 @@ add_color(struct tog_colors *colors, const char *pattern,
 		return err;
 	}
 	tc->colorpair = idx;
-	SIMPLEQ_INSERT_HEAD(colors, tc, entry);
+	STAILQ_INSERT_HEAD(colors, tc, entry);
 	return NULL;
 }
 
@@ -190,9 +190,9 @@ free_colors(struct tog_colors *colors)
 {
 	struct tog_color *tc;
 
-	while (!SIMPLEQ_EMPTY(colors)) {
-		tc = SIMPLEQ_FIRST(colors);
-		SIMPLEQ_REMOVE_HEAD(colors, entry);
+	while (!STAILQ_EMPTY(colors)) {
+		tc = STAILQ_FIRST(colors);
+		STAILQ_REMOVE_HEAD(colors, entry);
 		regfree(&tc->regex);
 		free(tc);
 	}
@@ -203,7 +203,7 @@ get_color(struct tog_colors *colors, int colorpair)
 {
 	struct tog_color *tc = NULL;
 
-	SIMPLEQ_FOREACH(tc, colors, entry) {
+	STAILQ_FOREACH(tc, colors, entry) {
 		if (tc->colorpair == colorpair)
 			return tc;
 	}
@@ -1852,7 +1852,7 @@ open_diff_view_for_commit(struct tog_view **new_view, int begin_x,
 	if (diff_view == NULL)
 		return got_error_from_errno("view_open");
 
-	parent_id = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	parent_id = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	err = open_diff_view(diff_view, parent_id ? parent_id->id : NULL,
 	    commit_id, NULL, NULL, 3, 0, 0, log_view, repo);
 	if (err == NULL)
@@ -2301,7 +2301,7 @@ open_log_view(struct tog_view *view, struct got_object_id *start_id,
 	}
 	s->log_branches = log_branches;
 
-	SIMPLEQ_INIT(&s->colors);
+	STAILQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "^$", TOG_COLOR_COMMIT,
 		    get_color_value("TOG_COLOR_COMMIT"));
@@ -2838,7 +2838,7 @@ match_color(struct tog_colors *colors, const char *line)
 {
 	struct tog_color *tc = NULL;
 
-	SIMPLEQ_FOREACH(tc, colors, entry) {
+	STAILQ_FOREACH(tc, colors, entry) {
 		if (match_line(line, &tc->regex, 0, NULL))
 			return tc;
 	}
@@ -3054,7 +3054,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_object_qid *qid;
 
-	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 		err = got_object_open_as_commit(&pcommit, repo,
@@ -3300,7 +3300,7 @@ create_diff(struct tog_diff_view_state *s)
 				goto done;
 		} else {
 			parent_ids = got_object_commit_get_parent_ids(commit2);
-			SIMPLEQ_FOREACH(pid, parent_ids, entry) {
+			STAILQ_FOREACH(pid, parent_ids, entry) {
 				if (got_object_id_cmp(s->id1, pid->id) == 0) {
 					err = write_commit_info(
 					    &s->line_offsets, &s->nlines,
@@ -3467,7 +3467,7 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 	s->log_view = log_view;
 	s->repo = repo;
 
-	SIMPLEQ_INIT(&s->colors);
+	STAILQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors,
 		    "^-", TOG_COLOR_DIFF_MINUS,
@@ -3611,7 +3611,7 @@ set_selected_commit(struct tog_diff_view_state *s,
 		return err;
 	parent_ids = got_object_commit_get_parent_ids(selected_commit);
 	free(s->id1);
-	pid = SIMPLEQ_FIRST(parent_ids);
+	pid = STAILQ_FIRST(parent_ids);
 	s->id1 = pid ? got_object_id_dup(pid->id) : NULL;
 	got_object_commit_close(selected_commit);
 	return NULL;
@@ -4312,7 +4312,7 @@ open_blame_view(struct tog_view *view, char *path,
 	const struct got_error *err = NULL;
 	struct tog_blame_view_state *s = &view->state.blame;
 
-	SIMPLEQ_INIT(&s->blamed_commits);
+	STAILQ_INIT(&s->blamed_commits);
 
 	s->path = strdup(path);
 	if (s->path == NULL)
@@ -4324,7 +4324,7 @@ open_blame_view(struct tog_view *view, char *path,
 		return err;
 	}
 
-	SIMPLEQ_INSERT_HEAD(&s->blamed_commits, s->blamed_commit, entry);
+	STAILQ_INSERT_HEAD(&s->blamed_commits, s->blamed_commit, entry);
 	s->first_displayed_line = 1;
 	s->last_displayed_line = view->nlines;
 	s->selected_line = 1;
@@ -4333,7 +4333,7 @@ open_blame_view(struct tog_view *view, char *path,
 	s->commit_id = commit_id;
 	memset(&s->blame, 0, sizeof(s->blame));
 
-	SIMPLEQ_INIT(&s->colors);
+	STAILQ_INIT(&s->colors);
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "^", TOG_COLOR_COMMIT,
 		    get_color_value("TOG_COLOR_COMMIT"));
@@ -4359,10 +4359,10 @@ close_blame_view(struct tog_view *view)
 	if (s->blame.thread)
 		err = stop_blame(&s->blame);
 
-	while (!SIMPLEQ_EMPTY(&s->blamed_commits)) {
+	while (!STAILQ_EMPTY(&s->blamed_commits)) {
 		struct got_object_qid *blamed_commit;
-		blamed_commit = SIMPLEQ_FIRST(&s->blamed_commits);
-		SIMPLEQ_REMOVE_HEAD(&s->blamed_commits, entry);
+		blamed_commit = STAILQ_FIRST(&s->blamed_commits);
+		STAILQ_REMOVE_HEAD(&s->blamed_commits, entry);
 		got_object_qid_free(blamed_commit);
 	}
 
@@ -4532,7 +4532,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			    s->repo, id);
 			if (err)
 				break;
-			pid = SIMPLEQ_FIRST(
+			pid = STAILQ_FIRST(
 			    got_object_commit_get_parent_ids(commit));
 			if (pid == NULL) {
 				got_object_commit_close(commit);
@@ -4572,7 +4572,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->done = 0;
 		if (thread_err)
 			break;
-		SIMPLEQ_INSERT_HEAD(&s->blamed_commits,
+		STAILQ_INSERT_HEAD(&s->blamed_commits,
 		    s->blamed_commit, entry);
 		err = run_blame(view);
 		if (err)
@@ -4581,7 +4581,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	}
 	case 'B': {
 		struct got_object_qid *first;
-		first = SIMPLEQ_FIRST(&s->blamed_commits);
+		first = STAILQ_FIRST(&s->blamed_commits);
 		if (!got_object_id_cmp(first->id, s->commit_id))
 			break;
 		s->done = 1;
@@ -4589,10 +4589,10 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->done = 0;
 		if (thread_err)
 			break;
-		SIMPLEQ_REMOVE_HEAD(&s->blamed_commits, entry);
+		STAILQ_REMOVE_HEAD(&s->blamed_commits, entry);
 		got_object_qid_free(s->blamed_commit);
 		s->blamed_commit =
-		    SIMPLEQ_FIRST(&s->blamed_commits);
+		    STAILQ_FIRST(&s->blamed_commits);
 		err = run_blame(view);
 		if (err)
 			break;
@@ -4610,7 +4610,7 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = got_object_open_as_commit(&commit, s->repo, id);
 		if (err)
 			break;
-		pid = SIMPLEQ_FIRST(
+		pid = STAILQ_FIRST(
 		    got_object_commit_get_parent_ids(commit));
 		if (view_is_parent_view(view))
 		    begin_x = view_split_begin_x(view->begin_x);
@@ -5144,7 +5144,7 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	}
 	s->repo = repo;
 
-	SIMPLEQ_INIT(&s->colors);
+	STAILQ_INIT(&s->colors);
 
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "\\$$",
@@ -5685,7 +5685,7 @@ open_ref_view(struct tog_view *view, struct got_repository *repo)
 	s->repo = repo;
 
 	TAILQ_INIT(&s->refs);
-	SIMPLEQ_INIT(&s->colors);
+	STAILQ_INIT(&s->colors);
 
 	err = ref_view_load_refs(s);
 	if (err)

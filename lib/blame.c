@@ -213,7 +213,7 @@ blame_commit(struct got_blame *blame, struct got_object_id *id,
 	if (err)
 		return err;
 
-	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (pid == NULL) {
 		got_object_commit_close(commit);
 		return NULL;

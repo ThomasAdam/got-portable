@@ -63,7 +63,7 @@ got_delta_chain_get_base_type(int *type, struct got_delta_chain *deltas)
 	struct got_delta *delta;
 
 	/* The first delta in the chain should represent the base object. */
-	delta = SIMPLEQ_FIRST(&deltas->entries);
+	delta = STAILQ_FIRST(&deltas->entries);
 	if (delta->type == GOT_OBJ_TYPE_COMMIT ||
 	    delta->type == GOT_OBJ_TYPE_TREE ||
 	    delta->type == GOT_OBJ_TYPE_BLOB ||

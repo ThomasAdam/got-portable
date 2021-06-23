@@ -378,7 +378,7 @@ load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
 			err = got_object_qid_alloc(&qid, id);
 			if (err)
 				break;
-			SIMPLEQ_INSERT_TAIL(ids, qid, entry);
+			STAILQ_INSERT_TAIL(ids, qid, entry);
 		} else if (S_ISREG(mode)) {
 			err = add_meta(v, idset, id, p, GOT_OBJ_TYPE_BLOB,
 			    mtime, loose_obj_only, repo);
@@ -411,18 +411,18 @@ load_tree(struct got_pack_metavec *v, struct got_object_idset *idset,
 	if (err)
 		return err;
 
-	SIMPLEQ_INIT(&tree_ids);
-	SIMPLEQ_INSERT_TAIL(&tree_ids, qid, entry);
+	STAILQ_INIT(&tree_ids);
+	STAILQ_INSERT_TAIL(&tree_ids, qid, entry);
 
-	while (!SIMPLEQ_EMPTY(&tree_ids)) {
+	while (!STAILQ_EMPTY(&tree_ids)) {
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
 				break;
 		}
 
-		qid = SIMPLEQ_FIRST(&tree_ids);
-		SIMPLEQ_REMOVE_HEAD(&tree_ids, entry);
+		qid = STAILQ_FIRST(&tree_ids);
+		STAILQ_REMOVE_HEAD(&tree_ids, entry);
 
 		if (got_object_idset_contains(idset, qid->id)) {
 			got_object_qid_free(qid);
@@ -557,7 +557,7 @@ queue_commit_id(struct got_object_id_queue *ids, struct got_object_id *id,
 	if (err)
 		return err;
 
-	SIMPLEQ_INSERT_TAIL(ids, qid, entry);
+	STAILQ_INSERT_TAIL(ids, qid, entry);
 	qid->data = (void *)&findtwixt_colors[color];
 	return NULL;
 }
@@ -573,22 +573,22 @@ drop_commit(struct got_object_idset *keep, struct got_object_idset *drop,
 	struct got_object_id_queue ids;
 	struct got_object_qid *qid;
 
-	SIMPLEQ_INIT(&ids);
+	STAILQ_INIT(&ids);
 
 	err = got_object_qid_alloc(&qid, id);
 	if (err)
 		return err;
-	SIMPLEQ_INSERT_HEAD(&ids, qid, entry);
+	STAILQ_INSERT_HEAD(&ids, qid, entry);
 
-	while (!SIMPLEQ_EMPTY(&ids)) {
+	while (!STAILQ_EMPTY(&ids)) {
 		if (cancel_cb) {
 			err = (*cancel_cb)(cancel_arg);
 			if (err)
 				break;
 		}
 
-		qid = SIMPLEQ_FIRST(&ids);
-		SIMPLEQ_REMOVE_HEAD(&ids, entry);
+		qid = STAILQ_FIRST(&ids);
+		STAILQ_REMOVE_HEAD(&ids, entry);
 
 		if (got_object_idset_contains(drop, qid->id)) {
 			got_object_qid_free(qid);
@@ -657,7 +657,7 @@ findtwixt(struct got_object_id ***res, int *nres,
 	struct got_object_qid *qid;
 	int i, ncolor, nkeep, obj_type;
 
-	SIMPLEQ_INIT(&ids);
+	STAILQ_INIT(&ids);
 	*res = NULL;
 	*nres = 0;
 
@@ -698,9 +698,9 @@ findtwixt(struct got_object_id ***res, int *nres,
 			goto done;
 	}
 
-	while (!SIMPLEQ_EMPTY(&ids)) {
+	while (!STAILQ_EMPTY(&ids)) {
 		int qcolor;
-		qid = SIMPLEQ_FIRST(&ids);
+		qid = STAILQ_FIRST(&ids);
 		qcolor = *((int *)qid->data);
 
 		if (got_object_idset_contains(drop, qid->id))
@@ -712,7 +712,7 @@ findtwixt(struct got_object_id ***res, int *nres,
 
 		if (ncolor == COLOR_DROP || (ncolor == COLOR_KEEP &&
 		    qcolor == COLOR_KEEP)) {
-			SIMPLEQ_REMOVE_HEAD(&ids, entry);
+			STAILQ_REMOVE_HEAD(&ids, entry);
 			got_object_qid_free(qid);
 			continue;
 		}
@@ -749,7 +749,7 @@ findtwixt(struct got_object_id ***res, int *nres,
 			}
 			parents = got_object_commit_get_parent_ids(commit);
 			if (parents) {
-				SIMPLEQ_FOREACH(pid, parents, entry) {
+				STAILQ_FOREACH(pid, parents, entry) {
 					err = queue_commit_id(&ids, pid->id,
 					    qcolor, repo);
 					if (err) {
@@ -767,7 +767,7 @@ findtwixt(struct got_object_id ***res, int *nres,
 			goto done;
 		}
 
-		SIMPLEQ_REMOVE_HEAD(&ids, entry);
+		STAILQ_REMOVE_HEAD(&ids, entry);
 		got_object_qid_free(qid);
 	}
 

@@ -23,12 +23,12 @@ struct got_tag_object;
 struct got_commit_object;
 
 struct got_object_qid {
-	SIMPLEQ_ENTRY(got_object_qid) entry;
+	STAILQ_ENTRY(got_object_qid) entry;
 	struct got_object_id *id;
 	void *data; /* managed by API user */
 };
 
-SIMPLEQ_HEAD(got_object_id_queue, got_object_qid);
+STAILQ_HEAD(got_object_id_queue, got_object_qid);
 
 const struct got_error *got_object_qid_alloc(struct got_object_qid **,
     struct got_object_id *);

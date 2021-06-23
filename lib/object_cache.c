@@ -81,7 +81,7 @@ get_size_obj(struct got_object *obj)
 	if ((obj->flags & GOT_OBJ_FLAG_DELTIFIED) == 0)
 		return size;
 
-	SIMPLEQ_FOREACH(delta, &obj->deltas.entries, entry) {
+	STAILQ_FOREACH(delta, &obj->deltas.entries, entry) {
 		if (SIZE_MAX - sizeof(*delta) < size)
 			return SIZE_MAX;
 		size += sizeof(*delta);
@@ -110,7 +110,7 @@ get_size_commit(struct got_commit_object *commit)
 	size += strlen(commit->committer);
 	size += strlen(commit->logmsg);
 
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry)
+	STAILQ_FOREACH(qid, &commit->parent_ids, entry)
 		size += sizeof(*qid) + sizeof(*qid->id);
 
 	return size;

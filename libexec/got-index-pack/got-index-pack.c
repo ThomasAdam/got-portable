@@ -386,7 +386,7 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 	const char *obj_label;
 
 	deltas.nentries = 0;
-	SIMPLEQ_INIT(&deltas.entries);
+	STAILQ_INIT(&deltas.entries);
 
 	err = got_pack_resolve_delta_chain(&deltas, packidx, pack,
 	    obj->off, obj->tslen, obj->type, obj->size,
@@ -435,9 +435,9 @@ resolve_deltified_object(struct got_pack *pack, struct got_packidx *packidx,
 done:
 	free(buf);
 	free(header);
-	while (!SIMPLEQ_EMPTY(&deltas.entries)) {
-		delta = SIMPLEQ_FIRST(&deltas.entries);
-		SIMPLEQ_REMOVE_HEAD(&deltas.entries, entry);
+	while (!STAILQ_EMPTY(&deltas.entries)) {
+		delta = STAILQ_FIRST(&deltas.entries);
+		STAILQ_REMOVE_HEAD(&deltas.entries, entry);
 		free(delta);
 	}
 	return err;

@@ -109,7 +109,7 @@ detect_changed_path(int *changed, struct got_commit_object *commit,
 
 	*changed = 0;
 
-	pid = SIMPLEQ_FIRST(&commit->parent_ids);
+	pid = STAILQ_FIRST(&commit->parent_ids);
 	if (pid == NULL) {
 		struct got_object_id *obj_id;
 		err = got_object_id_by_path(&obj_id, repo, commit_id, path);
@@ -203,7 +203,7 @@ packed_first_parent_traversal(int *ncommits_traversed,
 	struct got_object_id_queue traversed_commits;
 	struct got_object_qid *qid;
 
-	SIMPLEQ_INIT(&traversed_commits);
+	STAILQ_INIT(&traversed_commits);
 	*ncommits_traversed = 0;
 
 	err = got_traverse_packed_commits(&traversed_commits,
@@ -212,7 +212,7 @@ packed_first_parent_traversal(int *ncommits_traversed,
 		return err;
 
 	/* Add all traversed commits to the graph... */
-	SIMPLEQ_FOREACH(qid, &traversed_commits, entry) {
+	STAILQ_FOREACH(qid, &traversed_commits, entry) {
 		struct got_commit_graph_node *node;
 
 		if (got_object_idset_contains(graph->open_branches, qid->id))
@@ -223,7 +223,7 @@ packed_first_parent_traversal(int *ncommits_traversed,
 		(*ncommits_traversed)++;
 
 		/* ... except the last commit is the new branch tip. */
-		if (SIMPLEQ_NEXT(qid, entry) == NULL) {
+		if (STAILQ_NEXT(qid, entry) == NULL) {
 			err = got_object_idset_add(graph->open_branches,
 			    qid->id, NULL);
 			break;
@@ -261,7 +261,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		return err;
 
 	if (graph->flags & GOT_COMMIT_GRAPH_FIRST_PARENT_TRAVERSAL) {
-		qid = SIMPLEQ_FIRST(&commit->parent_ids);
+		qid = STAILQ_FIRST(&commit->parent_ids);
 		if (qid == NULL ||
 		    got_object_idset_contains(graph->open_branches, qid->id))
 			return NULL;
@@ -298,7 +298,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		if (err)
 			return err;
 
-		SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+		STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
 			struct got_object_id *id;
 
 			if (got_object_idset_contains(graph->open_branches,
@@ -348,7 +348,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		 * follow the first parent only.
 		 */
 		if (!branches_differ) {
-			qid = SIMPLEQ_FIRST(&commit->parent_ids);
+			qid = STAILQ_FIRST(&commit->parent_ids);
 			if (qid == NULL)
 				return NULL;
 			if (got_object_idset_contains(graph->open_branches,
@@ -362,7 +362,7 @@ advance_branch(struct got_commit_graph *graph, struct got_object_id *commit_id,
 		}
 	}
 
-	SIMPLEQ_FOREACH(qid, &commit->parent_ids, entry) {
+	STAILQ_FOREACH(qid, &commit->parent_ids, entry) {
 		if (got_object_idset_contains(graph->open_branches, qid->id))
 			continue;
 		if (got_object_idset_contains(graph->node_ids, qid->id))

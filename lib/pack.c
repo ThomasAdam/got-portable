@@ -496,7 +496,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 	struct got_packidx_object_id *oid;
 	uint32_t i;
 
-	SIMPLEQ_INIT(matched_ids);
+	STAILQ_INIT(matched_ids);
 
 	if (prefix_len < 2)
 		return got_error_path(id_str_prefix, GOT_ERR_BAD_OBJ_ID_STR);
@@ -528,7 +528,7 @@ got_packidx_match_id_str_prefix(struct got_object_id_queue *matched_ids,
 		if (err)
 			break;
 		memcpy(qid->id->sha1, oid->sha1, SHA1_DIGEST_LENGTH);
-		SIMPLEQ_INSERT_TAIL(matched_ids, qid, entry);
+		STAILQ_INSERT_TAIL(matched_ids, qid, entry);
 
 		oid = &packidx->hdr.sorted_ids[++i];
 	}
@@ -758,7 +758,7 @@ add_delta(struct got_delta_chain *deltas, off_t delta_offset, size_t tslen,
 		return got_error_from_errno("got_delta_open");
 	/* delta is freed in got_object_close() */
 	deltas->nentries++;
-	SIMPLEQ_INSERT_HEAD(&deltas->entries, delta, entry);
+	STAILQ_INSERT_HEAD(&deltas->entries, delta, entry);
 	return NULL;
 }
 
@@ -934,7 +934,7 @@ open_delta_object(struct got_object **obj, struct got_packidx *packidx,
 	memcpy(&(*obj)->id, id, sizeof((*obj)->id));
 	(*obj)->pack_offset = offset + tslen;
 
-	SIMPLEQ_INIT(&(*obj)->deltas.entries);
+	STAILQ_INIT(&(*obj)->deltas.entries);
 	(*obj)->flags |= GOT_OBJ_FLAG_DELTIFIED;
 	(*obj)->flags |= GOT_OBJ_FLAG_PACKED;
 	(*obj)->pack_idx = idx;
@@ -1007,7 +1007,7 @@ got_pack_get_delta_chain_max_size(uint64_t *max_size, struct got_delta_chain *de
 	uint64_t base_size = 0, result_size = 0;
 
 	*max_size = 0;
-	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+	STAILQ_FOREACH(delta, &deltas->entries, entry) {
 		/* Plain object types are the delta base. */
 		if (delta->type != GOT_OBJ_TYPE_COMMIT &&
 		    delta->type != GOT_OBJ_TYPE_TREE &&
@@ -1076,7 +1076,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 
 	*result_size = 0;
 
-	if (SIMPLEQ_EMPTY(&deltas->entries))
+	if (STAILQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
 	/* We process small enough files entirely in memory for speed. */
@@ -1092,7 +1092,7 @@ got_pack_dump_delta_chain_to_file(size_t *result_size,
 	}
 
 	/* Deltas are ordered in ascending order. */
-	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+	STAILQ_FOREACH(delta, &deltas->entries, entry) {
 		int cached = 1;
 		if (n == 0) {
 			size_t mapoff;
@@ -1245,7 +1245,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 	*outbuf = NULL;
 	*outlen = 0;
 
-	if (SIMPLEQ_EMPTY(&deltas->entries))
+	if (STAILQ_EMPTY(&deltas->entries))
 		return got_error(GOT_ERR_BAD_DELTA_CHAIN);
 
 	err = got_pack_get_delta_chain_max_size(&max_size, deltas, pack);
@@ -1256,7 +1256,7 @@ got_pack_dump_delta_chain_to_mem(uint8_t **outbuf, size_t *outlen,
 		return got_error_from_errno("malloc");
 
 	/* Deltas are ordered in ascending order. */
-	SIMPLEQ_FOREACH(delta, &deltas->entries, entry) {
+	STAILQ_FOREACH(delta, &deltas->entries, entry) {
 		int cached = 1;
 		if (n == 0) {
 			size_t delta_data_offset;

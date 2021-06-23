@@ -15,7 +15,7 @@
  */
 
 struct got_delta {
-	SIMPLEQ_ENTRY(got_delta) entry;
+	STAILQ_ENTRY(got_delta) entry;
 	off_t offset;
 	size_t tslen;
 	int type;
@@ -25,7 +25,7 @@ struct got_delta {
 
 struct got_delta_chain {
 	int nentries;
-	SIMPLEQ_HEAD(, got_delta) entries;
+	STAILQ_HEAD(, got_delta) entries;
 };
 
 #define GOT_DELTA_CHAIN_RECURSION_MAX	500

@@ -2718,15 +2718,15 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	char *fileindex_path = NULL;
 	struct got_pathlist_entry *pe;
 	struct tree_path_data {
-		SIMPLEQ_ENTRY(tree_path_data) entry;
+		STAILQ_ENTRY(tree_path_data) entry;
 		struct got_object_id *tree_id;
 		int entry_type;
 		char *relpath;
 		char *entry_name;
 	} *tpd = NULL;
-	SIMPLEQ_HEAD(tree_paths, tree_path_data) tree_paths;
+	STAILQ_HEAD(tree_paths, tree_path_data) tree_paths;
 
-	SIMPLEQ_INIT(&tree_paths);
+	STAILQ_INIT(&tree_paths);
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -2758,7 +2758,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		} else
 			tpd->entry_name = NULL;
 
-		SIMPLEQ_INSERT_TAIL(&tree_paths, tpd, entry);
+		STAILQ_INSERT_TAIL(&tree_paths, tpd, entry);
 	}
 
 	/*
@@ -2770,7 +2770,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	tpd = SIMPLEQ_FIRST(&tree_paths);
+	tpd = STAILQ_FIRST(&tree_paths);
 	TAILQ_FOREACH(pe, paths, entry) {
 		struct bump_base_commit_id_arg bbc_arg;
 
@@ -2791,7 +2791,7 @@ got_worktree_checkout_files(struct got_worktree *worktree,
 		if (err)
 			break;
 
-		tpd = SIMPLEQ_NEXT(tpd, entry);
+		tpd = STAILQ_NEXT(tpd, entry);
 	}
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
@@ -2804,9 +2804,9 @@ done:
 		got_object_commit_close(commit);
 	if (fileindex)
 		got_fileindex_free(fileindex);
-	while (!SIMPLEQ_EMPTY(&tree_paths)) {
-		tpd = SIMPLEQ_FIRST(&tree_paths);
-		SIMPLEQ_REMOVE_HEAD(&tree_paths, entry);
+	while (!STAILQ_EMPTY(&tree_paths)) {
+		tpd = STAILQ_FIRST(&tree_paths);
+		STAILQ_REMOVE_HEAD(&tree_paths, entry);
 		free(tpd->relpath);
 		free(tpd->tree_id);
 		free(tpd);
@@ -5552,7 +5552,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 
 	*new_commit_id = NULL;
 
-	SIMPLEQ_INIT(&parent_ids);
+	STAILQ_INIT(&parent_ids);
 
 	err = got_object_open_as_commit(&head_commit, repo, head_commit_id);
 	if (err)
@@ -5608,7 +5608,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	err = got_object_qid_alloc(&pid, worktree->base_commit_id);
 	if (err)
 		goto done;
-	SIMPLEQ_INSERT_TAIL(&parent_ids, pid, entry);
+	STAILQ_INSERT_TAIL(&parent_ids, pid, entry);
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
 	    1, author, time(NULL), committer, time(NULL), logmsg, repo);
 	got_object_qid_free(pid);

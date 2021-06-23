@@ -906,7 +906,7 @@ got_object_id_queue_copy(const struct got_object_id_queue *src,
 	const struct got_error *err;
 	struct got_object_qid *qid;
 
-	SIMPLEQ_FOREACH(qid, src, entry) {
+	STAILQ_FOREACH(qid, src, entry) {
 		struct got_object_qid *new;
 		/*
 		 * Deep-copy the object ID only. Let the caller deal
@@ -917,7 +917,7 @@ got_object_id_queue_copy(const struct got_object_id_queue *src,
 			got_object_id_queue_free(dest);
 			return err;
 		}
-		SIMPLEQ_INSERT_TAIL(dest, new, entry);
+		STAILQ_INSERT_TAIL(dest, new, entry);
 	}
 
 	return NULL;

@@ -3350,7 +3350,7 @@ get_changed_paths(struct got_pathlist_head *paths,
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
 	struct got_object_qid *qid;
 
-	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
 		struct got_commit_object *pcommit;
 		err = got_object_open_as_commit(&pcommit, repo,
@@ -3394,7 +3394,7 @@ print_patch(struct got_commit_object *commit, struct got_object_id *id,
 	struct got_object_id *obj_id1 = NULL, *obj_id2 = NULL;
 	struct got_object_qid *qid;
 
-	qid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	qid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (qid != NULL) {
 		err = got_object_open_as_commit(&pcommit, repo,
 		    qid->id);
@@ -3655,7 +3655,7 @@ print_commit(struct got_commit_object *commit, struct got_object_id *id,
 		struct got_object_qid *qid;
 		int n = 1;
 		parent_ids = got_object_commit_get_parent_ids(commit);
-		SIMPLEQ_FOREACH(qid, parent_ids, entry) {
+		STAILQ_FOREACH(qid, parent_ids, entry) {
 			err = got_object_id_str(&id_str, qid->id);
 			if (err)
 				goto done;
@@ -3716,7 +3716,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 	struct got_pathlist_head changed_paths;
 	struct got_pathlist_entry *pe;
 
-	SIMPLEQ_INIT(&reversed_commits);
+	STAILQ_INIT(&reversed_commits);
 	TAILQ_INIT(&changed_paths);
 
 	if (search_pattern && regcomp(&regex, search_pattern,
@@ -3780,7 +3780,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 			err = got_object_qid_alloc(&qid, id);
 			if (err)
 				break;
-			SIMPLEQ_INSERT_HEAD(&reversed_commits, qid, entry);
+			STAILQ_INSERT_HEAD(&reversed_commits, qid, entry);
 			got_object_commit_close(commit);
 		} else {
 			err = print_commit(commit, id, repo, path,
@@ -3801,7 +3801,7 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		got_pathlist_free(&changed_paths);
 	}
 	if (reverse_display_order) {
-		SIMPLEQ_FOREACH(qid, &reversed_commits, entry) {
+		STAILQ_FOREACH(qid, &reversed_commits, entry) {
 			err = got_object_open_as_commit(&commit, repo, qid->id);
 			if (err)
 				break;
@@ -3825,9 +3825,9 @@ print_commits(struct got_object_id *root_id, struct got_object_id *end_id,
 		}
 	}
 done:
-	while (!SIMPLEQ_EMPTY(&reversed_commits)) {
-		qid = SIMPLEQ_FIRST(&reversed_commits);
-		SIMPLEQ_REMOVE_HEAD(&reversed_commits, entry);
+	while (!STAILQ_EMPTY(&reversed_commits)) {
+		qid = STAILQ_FIRST(&reversed_commits);
+		STAILQ_REMOVE_HEAD(&reversed_commits, entry);
 		got_object_qid_free(qid);
 	}
 	TAILQ_FOREACH(pe, &changed_paths, entry) {
@@ -5922,13 +5922,13 @@ sort_tags(struct got_reflist_head *sorted, struct got_reflist_head *tags)
 	struct got_tag_object *re_tag, *se_tag;
 	time_t re_time, se_time;
 
-	SIMPLEQ_FOREACH(re, tags, entry) {
-		se = SIMPLEQ_FIRST(sorted);
+	STAILQ_FOREACH(re, tags, entry) {
+		se = STAILQ_FIRST(sorted);
 		if (se == NULL) {
 			err = got_reflist_entry_dup(&new, re);
 			if (err)
 				return err;
-			SIMPLEQ_INSERT_HEAD(sorted, new, entry);
+			STAILQ_INSERT_HEAD(sorted, new, entry);
 			continue;
 		} else {
 			err = got_ref_resolve(&re_id, repo, re->ref);
@@ -5957,10 +5957,10 @@ sort_tags(struct got_reflist_head *sorted, struct got_reflist_head *tags)
 				err = got_reflist_entry_dup(&new, re);
 				if (err)
 					return err;
-				SIMPLEQ_INSERT_AFTER(sorted, se, new, entry);
+				STAILQ_INSERT_AFTER(sorted, se, new, entry);
 				break;
 			}
-			se = SIMPLEQ_NEXT(se, entry);
+			se = STAILQ_NEXT(se, entry);
 			continue;
 		}
 	}
@@ -7372,7 +7372,7 @@ cmd_cherrypick(int argc, char *argv[])
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
-	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	memset(&upa, 0, sizeof(upa));
 	error = got_worktree_merge_files(worktree, pid ? pid->id : NULL,
 	    commit_id, repo, update_progress, &upa, check_cancelled,
@@ -7491,7 +7491,7 @@ cmd_backout(int argc, char *argv[])
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
-	pid = SIMPLEQ_FIRST(got_object_commit_get_parent_ids(commit));
+	pid = STAILQ_FIRST(got_object_commit_get_parent_ids(commit));
 	if (pid == NULL) {
 		error = got_error(GOT_ERR_ROOT_COMMIT);
 		goto done;
@@ -7787,7 +7787,7 @@ collect_commits(struct got_object_id_queue *commits,
 			err = got_object_qid_alloc(&qid, commit_id);
 			if (err)
 				goto done;
-			SIMPLEQ_INSERT_HEAD(commits, qid, entry);
+			STAILQ_INSERT_HEAD(commits, qid, entry);
 			commit_id = parent_id;
 		}
 	}
@@ -8056,7 +8056,7 @@ cmd_rebase(int argc, char *argv[])
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid, *pid;
 
-	SIMPLEQ_INIT(&commits);
+	STAILQ_INIT(&commits);
 	TAILQ_INIT(&merged_paths);
 
 	while ((ch = getopt(argc, argv, "acl")) != -1) {
@@ -8244,7 +8244,7 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 
 	parent_ids = got_object_commit_get_parent_ids(commit);
-	pid = SIMPLEQ_FIRST(parent_ids);
+	pid = STAILQ_FIRST(parent_ids);
 	if (pid == NULL) {
 		if (!continue_rebase) {
 			struct got_update_progress_arg upa;
@@ -8269,7 +8269,7 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (SIMPLEQ_EMPTY(&commits)) {
+	if (STAILQ_EMPTY(&commits)) {
 		if (continue_rebase) {
 			error = rebase_complete(worktree, fileindex,
 			    branch, new_base_branch, tmp_branch, repo,
@@ -8297,7 +8297,7 @@ cmd_rebase(int argc, char *argv[])
 	}
 
 	pid = NULL;
-	SIMPLEQ_FOREACH(qid, &commits, entry) {
+	STAILQ_FOREACH(qid, &commits, entry) {
 		struct got_update_progress_arg upa;
 
 		commit_id = qid->id;
@@ -8438,12 +8438,12 @@ histedit_write_commit_list(struct got_object_id_queue *commits,
 	struct got_object_qid *qid;
 	const char *histedit_cmd = NULL;
 
-	if (SIMPLEQ_EMPTY(commits))
+	if (STAILQ_EMPTY(commits))
 		return got_error(GOT_ERR_EMPTY_HISTEDIT);
 
-	SIMPLEQ_FOREACH(qid, commits, entry) {
+	STAILQ_FOREACH(qid, commits, entry) {
 		histedit_cmd = got_histedit_cmds[0].name;
-		if (fold_only && SIMPLEQ_NEXT(qid, entry) != NULL)
+		if (fold_only && STAILQ_NEXT(qid, entry) != NULL)
 			histedit_cmd = "fold";
 		err = histedit_write_commit(qid->id, histedit_cmd, f, repo);
 		if (err)
@@ -8470,7 +8470,7 @@ write_cmd_list(FILE *f, const char *branch_name,
 	char *id_str;
 	struct got_object_qid *qid;
 
-	qid = SIMPLEQ_FIRST(commits);
+	qid = STAILQ_FIRST(commits);
 	err = got_object_id_str(&id_str, qid->id);
 	if (err)
 		return err;
@@ -8769,7 +8769,7 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 	if (TAILQ_EMPTY(histedit_cmds))
 		return got_error_msg(GOT_ERR_EMPTY_HISTEDIT,
 		    "histedit script contains no commands");
-	if (SIMPLEQ_EMPTY(commits))
+	if (STAILQ_EMPTY(commits))
 		return got_error(GOT_ERR_EMPTY_HISTEDIT);
 
 	TAILQ_FOREACH(hle, histedit_cmds, entry) {
@@ -8790,7 +8790,7 @@ histedit_check_script(struct got_histedit_list *histedit_cmds,
 		}
 	}
 
-	SIMPLEQ_FOREACH(qid, commits, entry) {
+	STAILQ_FOREACH(qid, commits, entry) {
 		TAILQ_FOREACH(hle, histedit_cmds, entry) {
 			if (got_object_id_cmp(qid->id, hle->commit_id) == 0)
 				break;
@@ -9210,7 +9210,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_histedit_list histedit_cmds;
 	struct got_histedit_list_entry *hle;
 
-	SIMPLEQ_INIT(&commits);
+	STAILQ_INIT(&commits);
 	TAILQ_INIT(&histedit_cmds);
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
@@ -9409,7 +9409,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 		parent_ids = got_object_commit_get_parent_ids(commit);
-		pid = SIMPLEQ_FIRST(parent_ids);
+		pid = STAILQ_FIRST(parent_ids);
 		if (pid == NULL) {
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
@@ -9450,7 +9450,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 		parent_ids = got_object_commit_get_parent_ids(commit);
-		pid = SIMPLEQ_FIRST(parent_ids);
+		pid = STAILQ_FIRST(parent_ids);
 		if (pid == NULL) {
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
@@ -9464,7 +9464,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		if (SIMPLEQ_EMPTY(&commits)) {
+		if (STAILQ_EMPTY(&commits)) {
 			error = got_error(GOT_ERR_EMPTY_HISTEDIT);
 			goto done;
 		}
@@ -9581,7 +9581,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error)
 			goto done;
 		parent_ids = got_object_commit_get_parent_ids(commit);
-		pid = SIMPLEQ_FIRST(parent_ids);
+		pid = STAILQ_FIRST(parent_ids);
 
 		error = got_worktree_histedit_merge_files(&merged_paths,
 		    worktree, fileindex, pid->id, hle->commit_id, repo,
@@ -10144,7 +10144,7 @@ cat_commit(struct got_object_id *id, struct got_repository *repo, FILE *outfile)
 	parent_ids = got_object_commit_get_parent_ids(commit);
 	fprintf(outfile, "numparents %d\n",
 	    got_object_commit_get_nparents(commit));
-	SIMPLEQ_FOREACH(pid, parent_ids, entry) {
+	STAILQ_FOREACH(pid, parent_ids, entry) {
 		char *pid_str;
 		err = got_object_id_str(&pid_str, pid->id);
 		if (err)

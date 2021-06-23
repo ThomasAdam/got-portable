@@ -1248,7 +1248,7 @@ match_packed_object(struct got_object_id **unique_id,
 	struct got_object_id_queue matched_ids;
 	int packdir_fd;
 
-	SIMPLEQ_INIT(&matched_ids);
+	STAILQ_INIT(&matched_ids);
 
 	packdir_fd = openat(got_repo_get_fd(repo),
 	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
@@ -1293,7 +1293,7 @@ match_packed_object(struct got_object_id **unique_id,
 		if (err)
 			break;
 
-		SIMPLEQ_FOREACH(qid, &matched_ids, entry) {
+		STAILQ_FOREACH(qid, &matched_ids, entry) {
 			if (obj_type != GOT_OBJ_TYPE_ANY) {
 				int matched_type;
 				err = got_object_get_type(&matched_type, repo,

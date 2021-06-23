@@ -667,7 +667,7 @@ commit_traversal_request(struct imsg *imsg, struct imsgbuf *ibuf,
 		memcpy(commit_ids[ncommits - 1].sha1, id.sha1,
 		    SHA1_DIGEST_LENGTH);
 
-		pid = SIMPLEQ_FIRST(&commit->parent_ids);
+		pid = STAILQ_FIRST(&commit->parent_ids);
 		if (pid == NULL)
 			break;
 

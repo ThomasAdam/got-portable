@@ -123,9 +123,9 @@ got_object_close(struct got_object *obj)
 
 	if (obj->flags & GOT_OBJ_FLAG_DELTIFIED) {
 		struct got_delta *delta;
-		while (!SIMPLEQ_EMPTY(&obj->deltas.entries)) {
-			delta = SIMPLEQ_FIRST(&obj->deltas.entries);
-			SIMPLEQ_REMOVE_HEAD(&obj->deltas.entries, entry);
+		while (!STAILQ_EMPTY(&obj->deltas.entries)) {
+			delta = STAILQ_FIRST(&obj->deltas.entries);
+			STAILQ_REMOVE_HEAD(&obj->deltas.entries, entry);
 			free(delta);
 		}
 	}
@@ -144,9 +144,9 @@ got_object_id_queue_free(struct got_object_id_queue *ids)
 {
 	struct got_object_qid *qid;
 
-	while (!SIMPLEQ_EMPTY(ids)) {
-		qid = SIMPLEQ_FIRST(ids);
-		SIMPLEQ_REMOVE_HEAD(ids, entry);
+	while (!STAILQ_EMPTY(ids)) {
+		qid = STAILQ_FIRST(ids);
+		STAILQ_REMOVE_HEAD(ids, entry);
 		got_object_qid_free(qid);
 	}
 }
@@ -268,7 +268,7 @@ got_object_commit_alloc_partial(void)
 		return NULL;
 	}
 
-	SIMPLEQ_INIT(&commit->parent_ids);
+	STAILQ_INIT(&commit->parent_ids);
 
 	return commit;
 }
@@ -290,7 +290,7 @@ got_object_commit_add_parent(struct got_commit_object *commit,
 		return err;
 	}
 
-	SIMPLEQ_INSERT_TAIL(&commit->parent_ids, qid, entry);
+	STAILQ_INSERT_TAIL(&commit->parent_ids, qid, entry);
 	commit->nparents++;
 
 	return NULL;
