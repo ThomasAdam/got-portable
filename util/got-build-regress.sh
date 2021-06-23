@@ -20,8 +20,9 @@ branch=main
 worktree=$HOME/got
 fromaddr_arg=
 force=0
+testroot="/tmp"
 
-args=`getopt b:fw:r: $*`
+args=`getopt b:fw:r:R: $*`
 if [ $? -ne 0 ]
 then
 	echo "usage: $usage" >&2
@@ -39,6 +40,8 @@ while [ $# -ne 0 ]; do
 			worktree="$2"; shift; shift;;
 		-r)	
 			fromaddr_arg="-r $2"; shift; shift;;
+		-R)
+			testroot="$2"; shift; shift;;
 		--)
 			shift; break;;
 	esac
@@ -115,7 +118,7 @@ if [ "$build_status" != "0" ]; then
 fi
 
 printf "\n\n\tRunning tests\n\n" >> build.log
-log_cmd regress.log env PATH=$HOME/bin:$PATH make regress
+log_cmd regress.log env PATH=$HOME/bin:$PATH make regress GOT_TEST_ROOT="$testroot"
 regress_status="$?"
 cat regress.log >> build.log
 egrep "test.*failed" regress.log > failures.log
