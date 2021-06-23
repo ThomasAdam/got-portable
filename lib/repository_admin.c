@@ -22,6 +22,7 @@
 #include <sys/wait.h>
 
 #include <dirent.h>
+#include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
