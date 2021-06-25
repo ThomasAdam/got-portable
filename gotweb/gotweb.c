@@ -3521,7 +3521,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	error = got_commit_graph_iter_start(graph, id, gw_trans->repo, NULL,
 	    NULL);
 	if (error)
-		goto done;
+		goto err;
 
 	for (;;) {
 		error = got_commit_graph_iter_next(&id, graph, gw_trans->repo,
@@ -3529,14 +3529,14 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED)
 				error = NULL;
-			goto err;
+			goto done;
 		}
 		if (id == NULL)
 			goto err;
 
 		error = got_object_open_as_commit(&commit, gw_trans->repo, id);
-			if (error)
-				goto err;
+		if (error)
+			goto err;
 		if (limit == 1 && chk_multi == 0 &&
 		    gw_trans->gw_conf->got_max_commits_display != 1) {
 			error = gw_get_commit(gw_trans, header, commit, id);
@@ -3618,7 +3618,6 @@ done:
 			c_cnt++;
 		}
 	}
-
 err:
 	if (commit != NULL)
 		got_object_commit_close(commit);
