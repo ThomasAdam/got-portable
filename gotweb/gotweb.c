@@ -3596,12 +3596,15 @@ done:
 	if (gw_trans->prev_id == NULL && gw_trans->commit_id != NULL &&
 	    (gw_trans->action == GW_BRIEFS || gw_trans->action == GW_COMMITS ||
 	    gw_trans->action == GW_SUMMARY)) {
+		commit_found = 0;
 		TAILQ_FOREACH_REVERSE(t_header, &gw_trans->gw_headers,
 		    headers, entry) {
 			if (commit_found == 0 &&
 			    strcmp(gw_trans->commit_id,
 			    t_header->commit_id) != 0)
 				continue;
+			else
+				commit_found = 1;
 			if (gw_trans->commit_id != NULL &&
 			    strcmp(gw_trans->commit_id,
 			    t_header->commit_id) != 0 &&
