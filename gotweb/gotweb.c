@@ -3594,8 +3594,7 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	}
 done:
 	if (gw_trans->prev_id == NULL && gw_trans->commit_id != NULL &&
-	    (gw_trans->action == GW_BRIEFS || gw_trans->action == GW_COMMITS ||
-	    gw_trans->action == GW_SUMMARY)) {
+	    (gw_trans->action == GW_BRIEFS || gw_trans->action == GW_COMMITS)) {
 		commit_found = 0;
 		TAILQ_FOREACH_REVERSE(t_header, &gw_trans->gw_headers,
 		    headers, entry) {
