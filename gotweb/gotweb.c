@@ -67,9 +67,7 @@ struct gw_trans {
 	char			*repo_path;
 	char			*commit_id;
 	char			*next_id;
-	char			*next_prev_id;
 	char			*prev_id;
-	char			*prev_prev_id;
 	const char		*repo_file;
 	char			*repo_folder;
 	const char		*headref;
@@ -113,7 +111,6 @@ enum gw_key {
 	KEY_PAGE,
 	KEY_PATH,
 	KEY_PREV_ID,
-	KEY_PREV_PREV_ID,
 	KEY__ZMAX
 };
 
@@ -157,7 +154,6 @@ static const struct kvalid gw_keys[KEY__ZMAX] = {
 	{ kvalid_int,		"page" },
 	{ kvalid_stringne,	"path" },
 	{ kvalid_stringne,	"prev" },
-	{ kvalid_stringne,	"prev_prev" },
 };
 
 static struct gw_header		*gw_init_header(void);
@@ -968,6 +964,7 @@ gw_commits(struct gw_trans *gw_trans)
 	char *age = NULL, *href_diff = NULL, *href_tree = NULL;
 	char *href_prev = NULL, *href_next = NULL;
 	enum kcgi_err kerr = KCGI_OK;
+	int commit_found = 0;
 
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
@@ -989,6 +986,13 @@ gw_commits(struct gw_trans *gw_trans)
 		goto done;
 
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
+		if (commit_found == 0 && gw_trans->commit_id != NULL) {
+			if (strcmp(gw_trans->commit_id,
+			    n_header->commit_id) != 0)
+				continue;
+			else
+				commit_found = 1;
+		}
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV, KATTR_ID,
 		    "commits_line_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1094,7 +1098,7 @@ gw_commits(struct gw_trans *gw_trans)
 		age = NULL;
 	}
 
-	if (gw_trans->next_id || gw_trans->page > 0) {
+	if (gw_trans->next_id || gw_trans->prev_id) {
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "np_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1105,14 +1109,12 @@ gw_commits(struct gw_trans *gw_trans)
 			goto done;
 	}
 
-	if (gw_trans->page > 0 && gw_trans->prev_id) {
+	if (gw_trans->prev_id) {
 		href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "path",
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page - 1), "action",
 		    KATTRX_STRING, "commits", "commit", KATTRX_STRING,
-		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
-		    KATTRX_STRING, gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "", NULL);
+		    gw_trans->prev_id ? gw_trans->prev_id : "", NULL);
 		if (href_prev == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -1144,10 +1146,7 @@ gw_commits(struct gw_trans *gw_trans)
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page + 1), "action",
 		    KATTRX_STRING, "commits", "commit", KATTRX_STRING,
-		    gw_trans->next_id, "prev", KATTRX_STRING,
-		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
-		    "prev_prev", KATTRX_STRING, gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "", NULL);
+		    gw_trans->next_id, NULL);
 		if (href_next == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -1192,6 +1191,7 @@ gw_briefs(struct gw_trans *gw_trans)
 	char *href_prev = NULL, *href_next = NULL;
 	char *newline, *smallerthan;
 	enum kcgi_err kerr = KCGI_OK;
+	int commit_found = 0;
 
 	if ((header = gw_init_header()) == NULL)
 		return got_error_from_errno("malloc");
@@ -1218,6 +1218,13 @@ gw_briefs(struct gw_trans *gw_trans)
 		goto done;
 
 	TAILQ_FOREACH(n_header, &gw_trans->gw_headers, entry) {
+		if (commit_found == 0 && gw_trans->commit_id != NULL) {
+			if (strcmp(gw_trans->commit_id,
+			    n_header->commit_id) != 0)
+				continue;
+			else
+				commit_found = 1;
+		}
 		error = gw_get_time_str(&age, n_header->committer_time,
 		    TM_DIFF);
 		if (error)
@@ -1357,7 +1364,7 @@ gw_briefs(struct gw_trans *gw_trans)
 		href_tree = NULL;
 	}
 
-	if (gw_trans->next_id || gw_trans->page > 0) {
+	if (gw_trans->next_id || gw_trans->prev_id) {
 		kerr = khtml_attr(gw_trans->gw_html_req, KELEM_DIV,
 		    KATTR_ID, "np_wrapper", KATTR__MAX);
 		if (kerr != KCGI_OK)
@@ -1368,14 +1375,12 @@ gw_briefs(struct gw_trans *gw_trans)
 			goto done;
 	}
 
-	if (gw_trans->page > 0 && gw_trans->prev_id) {
+	if (gw_trans->prev_id) {
 		href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "path",
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page - 1), "action",
 		    KATTRX_STRING, "briefs", "commit", KATTRX_STRING,
-		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
-		    KATTRX_STRING, gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "", NULL);
+		    gw_trans->prev_id ? gw_trans->prev_id : "", NULL);
 		if (href_prev == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -1408,10 +1413,7 @@ gw_briefs(struct gw_trans *gw_trans)
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page + 1), "action",
 		    KATTRX_STRING, "briefs", "commit", KATTRX_STRING,
-		    gw_trans->next_id, "prev", KATTRX_STRING,
-		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
-		    "prev_prev", KATTRX_STRING, gw_trans->prev_id ?
-		    gw_trans->prev_id : "", NULL);
+		    gw_trans->next_id, NULL);
 		if (href_next == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -1733,14 +1735,12 @@ gw_tags(struct gw_trans *gw_trans)
 			goto done;
 	}
 
-	if (gw_trans->page > 0 && gw_trans->prev_id) {
+	if (gw_trans->prev_id) {
 		href_prev = khttp_urlpartx(NULL, NULL, "gotweb", "path",
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page - 1), "action",
 		    KATTRX_STRING, "tags", "commit", KATTRX_STRING,
-		    gw_trans->prev_id ? gw_trans->prev_id : "", "prev",
-		    KATTRX_STRING, gw_trans->prev_prev_id ?
-		    gw_trans->prev_prev_id : "", NULL);
+		    gw_trans->prev_id ? gw_trans->prev_id : "", NULL);
 		if (href_prev == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -1772,10 +1772,7 @@ gw_tags(struct gw_trans *gw_trans)
 		    KATTRX_STRING, gw_trans->repo_name, "page",
 		    KATTRX_INT, (int64_t) (gw_trans->page + 1), "action",
 		    KATTRX_STRING, "tags", "commit", KATTRX_STRING,
-		    gw_trans->next_id, "prev", KATTRX_STRING,
-		    gw_trans->next_prev_id ? gw_trans->next_prev_id : "",
-		    "prev_prev", KATTRX_STRING, gw_trans->prev_id ?
-		    gw_trans->prev_id : "", NULL);
+		    gw_trans->next_id, NULL);
 		if (href_next == NULL) {
 			error = got_error_from_errno("khttp_urlpartx");
 			goto done;
@@ -2077,12 +2074,6 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 
 		if ((p = gw_trans->gw_req->fieldmap[KEY_PREV_ID])) {
 			if (asprintf(&gw_trans->prev_id, "%s",
-			    p->parsed.s) == -1)
-				return got_error_from_errno("asprintf");
-		}
-
-		if ((p = gw_trans->gw_req->fieldmap[KEY_PREV_PREV_ID])) {
-			if (asprintf(&gw_trans->prev_prev_id, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
 		}
@@ -3031,8 +3022,8 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 	char *tag_commit0 = NULL, *href_tag = NULL, *href_briefs = NULL;
 	struct got_tag_object *tag = NULL;
 	enum kcgi_err kerr = KCGI_OK;
-	int summary_header_displayed = 0, start_tag = 0, chk_next = 0;
-	int prev_set = 0, tag_count = 0;
+	int summary_header_displayed = 0, chk_next = 0;
+	int tag_count = 0, commit_found = 0, c_cnt = 0;
 
 	TAILQ_INIT(&refs);
 
@@ -3091,29 +3082,19 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 			continue;
 
 		if (tag_type == TAGBRIEF && gw_trans->commit_id &&
-		    start_tag == 0 && strncmp(id_str, header->commit_id,
-		    strlen(id_str)) != 0) {
+		    commit_found == 0 && strncmp(id_str, gw_trans->commit_id,
+		    strlen(id_str)) != 0)
 			continue;
-		} else {
-			start_tag = 1;
-		}
+		else
+			commit_found = 1;
 
 		tag_count++;
-
-		if (prev_set == 0 && start_tag == 1) {
-			gw_trans->next_prev_id = strdup(id_str);
-			if (gw_trans->next_prev_id == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-			prev_set = 1;
-		}
 
 		if (chk_next) {
 			gw_trans->next_id = strdup(id_str);
 			if (gw_trans->next_id == NULL)
 				error = got_error_from_errno("strdup");
-			goto done;
+			goto prev;
 		}
 
 		if (commit) {
@@ -3400,6 +3381,77 @@ gw_output_repo_tags(struct gw_trans *gw_trans, struct gw_header *header,
 		if (kerr != KCGI_OK)
 			goto done;
 		kerr = khtml_closeelem(gw_trans->gw_html_req, 2);
+		goto done;
+	}
+prev:
+	commit_found = 0;
+	TAILQ_FOREACH_REVERSE(re, &refs, got_reflist_head, entry) {
+		const char *refname;
+		const char *tagger;
+		time_t tagger_time;
+		struct got_object_id *id;
+		struct got_commit_object *commit = NULL;
+
+		refname = got_ref_get_name(re->ref);
+		if (strncmp(refname, "refs/tags/", 10) != 0)
+			continue;
+		refname += 10;
+
+		error = got_ref_resolve(&id, gw_trans->repo, re->ref);
+		if (error)
+			goto done;
+
+		error = got_object_open_as_tag(&tag, gw_trans->repo, id);
+		if (error) {
+			if (error->code != GOT_ERR_OBJ_TYPE) {
+				free(id);
+				goto done;
+			}
+			/* "lightweight" tag */
+			error = got_object_open_as_commit(&commit,
+			    gw_trans->repo, id);
+			if (error) {
+				free(id);
+				goto done;
+			}
+			tagger = got_object_commit_get_committer(commit);
+			tagger_time =
+			    got_object_commit_get_committer_time(commit);
+			error = got_object_id_str(&id_str, id);
+			free(id);
+		} else {
+			free(id);
+			tagger = got_object_tag_get_tagger(tag);
+			tagger_time = got_object_tag_get_tagger_time(tag);
+			error = got_object_id_str(&id_str,
+			    got_object_tag_get_object_id(tag));
+		}
+		if (error)
+			goto done;
+
+		if (tag_type == TAGFULL && strncmp(id_str, header->commit_id,
+		    strlen(id_str)) != 0)
+			continue;
+
+		if (commit_found == 0 && tag_type == TAGBRIEF &&
+		    gw_trans->commit_id  != NULL &&
+		    strncmp(id_str, gw_trans->commit_id, strlen(id_str)) != 0)
+			continue;
+		else
+			commit_found = 1;
+
+		if (gw_trans->commit_id != NULL &&
+		    strcmp(id_str, gw_trans->commit_id) != 0 &&
+		    (re == TAILQ_FIRST(&refs) ||
+		    c_cnt == gw_trans->gw_conf->got_max_commits_display)) {
+			gw_trans->prev_id = strdup(id_str);
+			if (gw_trans->prev_id == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+			break;
+		}
+		c_cnt++;
 	}
 done:
 	if (tag)
@@ -3459,7 +3511,8 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 	const struct got_error *error = NULL;
 	struct got_commit_graph *graph = NULL;
 	struct got_commit_object *commit = NULL;
-	int chk_next = 0, chk_multi = 0, prev_set = 0;
+	int chk_next = 0, chk_multi = 0, c_cnt = 0, commit_found = 0;
+	struct gw_header *t_header = NULL;
 
 	error = got_commit_graph_open(&graph, header->path, 0);
 	if (error)
@@ -3476,77 +3529,95 @@ gw_get_commits(struct gw_trans * gw_trans, struct gw_header *header,
 		if (error) {
 			if (error->code == GOT_ERR_ITER_COMPLETED)
 				error = NULL;
-			goto done;
+			goto err;
 		}
 		if (id == NULL)
-			goto done;
+			goto err;
 
 		error = got_object_open_as_commit(&commit, gw_trans->repo, id);
 			if (error)
-				goto done;
+				goto err;
 		if (limit == 1 && chk_multi == 0 &&
 		    gw_trans->gw_conf->got_max_commits_display != 1) {
 			error = gw_get_commit(gw_trans, header, commit, id);
 			if (error)
-				goto done;
+				goto err;
+			commit_found = 1;
 		} else {
 			chk_multi = 1;
 			struct gw_header *n_header = NULL;
 			if ((n_header = gw_init_header()) == NULL) {
 				error = got_error_from_errno("malloc");
-				goto done;
+				goto err;
 			}
+			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
+			    entry);
 			error = got_ref_list(&n_header->refs, gw_trans->repo,
 			    NULL, got_ref_cmp_by_name, NULL);
 			if (error)
-				goto done;
+				goto err;
 
 			error = gw_get_commit(gw_trans, n_header, commit, id);
 			if (error)
-				goto done;
+				goto err;
 			got_ref_list_free(&n_header->refs);
 
-			/*
-			 * we have a commit_id now, so copy it to next_prev_id
-			 * for navigation through gw_briefs and gw_commits
-			 */
-			if (gw_trans->next_prev_id == NULL && prev_set == 0 &&
-			    (gw_trans->action == GW_BRIEFS ||
-			     gw_trans->action == GW_COMMITS ||
-			     gw_trans->action == GW_SUMMARY)) {
-				prev_set = 1;
-				gw_trans->next_prev_id =
-				    strdup(n_header->commit_id);
-				if (gw_trans->next_prev_id == NULL) {
-					error = got_error_from_errno("strdup");
-					goto done;
-				}
-			}
+			if (gw_trans->commit_id != NULL) {
+				if (strcmp(gw_trans->commit_id,
+				    n_header->commit_id) == 0)
+					commit_found = 1;
+			} else
+				commit_found = 1;
 
 			/*
 			 * check for one more commit before breaking,
 			 * so we know whether to navicate through gw_briefs
 			 * gw_commits and gw_summary
 			 */
-			if (chk_next && (gw_trans->action == GW_BRIEFS||
+			if (chk_next && (gw_trans->action == GW_BRIEFS ||
 			    gw_trans->action == GW_COMMITS ||
 			    gw_trans->action == GW_SUMMARY)) {
 				gw_trans->next_id = strdup(n_header->commit_id);
 				if (gw_trans->next_id == NULL)
 					error = got_error_from_errno("strdup");
+				TAILQ_REMOVE(&gw_trans->gw_headers, n_header,
+				    entry);
 				goto done;
 			}
 
-			TAILQ_INSERT_TAIL(&gw_trans->gw_headers, n_header,
-			    entry);
 		}
-		if (error || (limit && --limit == 0)) {
+		if (commit_found == 1 && (error || (limit && --limit == 0))) {
 			if (chk_multi == 0)
 				break;
 			chk_next = 1;
 		}
 	}
 done:
+	if (gw_trans->prev_id == NULL && gw_trans->commit_id != NULL &&
+	    (gw_trans->action == GW_BRIEFS || gw_trans->action == GW_COMMITS ||
+	    gw_trans->action == GW_SUMMARY)) {
+		TAILQ_FOREACH_REVERSE(t_header, &gw_trans->gw_headers,
+		    headers, entry) {
+			if (commit_found == 0 &&
+			    strcmp(gw_trans->commit_id,
+			    t_header->commit_id) != 0)
+				continue;
+			if (gw_trans->commit_id != NULL &&
+			    strcmp(gw_trans->commit_id,
+			    t_header->commit_id) != 0 &&
+			    (c_cnt == gw_trans->gw_conf->got_max_commits_display
+			    || t_header ==
+			    TAILQ_FIRST(&gw_trans->gw_headers))) {
+				gw_trans->prev_id = strdup(t_header->commit_id);
+				if (gw_trans->prev_id == NULL)
+					error = got_error_from_errno("strdup");
+				break;
+			}
+			c_cnt++;
+		}
+	}
+
+err:
 	if (commit != NULL)
 		got_object_commit_close(commit);
 	if (graph)
@@ -3689,25 +3760,25 @@ gw_get_header(struct gw_trans *gw_trans, struct gw_header *header, int limit)
 	const struct got_error *error = NULL;
 	char *in_repo_path = NULL;
 	struct got_object_id *id = NULL;
+	struct got_reference *ref;
 
 	error = got_repo_open(&gw_trans->repo, gw_trans->repo_path, NULL);
 	if (error)
 		return error;
 
-	if (gw_trans->commit_id == NULL) {
-		struct got_reference *head_ref;
-		error = got_ref_open(&head_ref, gw_trans->repo,
+	if (gw_trans->commit_id == NULL || gw_trans->action == GW_COMMITS ||
+	    gw_trans->action == GW_BRIEFS || gw_trans->action == GW_SUMMARY ||
+	    gw_trans->action == GW_TAGS) {
+		error = got_ref_open(&ref, gw_trans->repo,
 		    gw_trans->headref, 0);
 		if (error)
 			return error;
 
-		error = got_ref_resolve(&id, gw_trans->repo, head_ref);
-		got_ref_close(head_ref);
+		error = got_ref_resolve(&id, gw_trans->repo, ref);
+		got_ref_close(ref);
 		if (error)
 			return error;
 	} else {
-		struct got_reference *ref;
-
 		error = got_ref_open(&ref, gw_trans->repo,
 		    gw_trans->commit_id, 0);
 		if (error == NULL) {
@@ -4732,9 +4803,7 @@ main(int argc, char *argv[])
 	gw_trans->repo_path = NULL;
 	gw_trans->commit_id = NULL;
 	gw_trans->next_id = NULL;
-	gw_trans->next_prev_id = NULL;
 	gw_trans->prev_id = NULL;
-	gw_trans->prev_prev_id = NULL;
 	gw_trans->headref = GOT_REF_HEAD;
 	gw_trans->mime = KMIME_TEXT_HTML;
 	gw_trans->gw_tmpl->key = gw_templs;
@@ -4789,9 +4858,7 @@ cleanup:
 	free(gw_trans->gw_conf);
 	free(gw_trans->commit_id);
 	free(gw_trans->next_id);
-	free(gw_trans->next_prev_id);
 	free(gw_trans->prev_id);
-	free(gw_trans->prev_prev_id);
 	free(gw_trans->repo_path);
 	TAILQ_FOREACH_SAFE(dir, &gw_trans->gw_dirs, entry, tdir) {
 		free(dir->name);
