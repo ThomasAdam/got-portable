@@ -2572,6 +2572,113 @@ test_update_file_skipped_due_to_conflict() {
 	test_done "$testroot" "$ret"
 }
 
+test_update_file_skipped_due_to_obstruction() {
+	local testroot=`test_init update_file_skipped_due_to_obstruction`
+	local commit_id0=`git_show_head $testroot/repo`
+	blob_id0=`get_blob_id $testroot/repo "" beta`
+
+	echo "changed beta" > $testroot/repo/beta
+	git_commit $testroot/repo -m "changed beta"
+	local commit_id1=`git_show_head $testroot/repo`
+	blob_id1=`get_blob_id $testroot/repo "" beta`
+
+	got checkout -c $commit_id0 $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blob_id=`(cd $testroot/wt && got info beta | grep 'blob:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$blob_id" != "$blob_id0" ]; then
+		echo "file beta has the wrong base blob ID" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	commit_id=`(cd $testroot/wt && got info beta | \
+		grep 'based on commit:' | cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$commit_id" != "$commit_id0" ]; then
+		echo "file beta has the wrong base commit ID" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	rm $testroot/wt/beta
+	mkdir -p $testroot/wt/beta/psi
+
+	# update to the latest commit; this skips beta
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo "~  beta" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "File paths obstructed by a non-regular file: 1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blob_id=`(cd $testroot/wt && got info beta | grep 'blob:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$blob_id" != "$blob_id0" ]; then
+		echo "file beta has the wrong base blob ID" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	commit_id=`(cd $testroot/wt && got info beta | \
+		grep 'based on commit:' | cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$commit_id" != "$commit_id0" ]; then
+		echo "file beta has the wrong base commit ID" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	# remove the directory which obstructs file beta
+	rm -r $testroot/wt/beta
+
+	# updating to the latest commit should now update beta
+	(cd $testroot/wt && got update > $testroot/stdout)
+	echo "!  beta" > $testroot/stdout.expected
+	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	blob_id=`(cd $testroot/wt && got info beta | grep 'blob:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$blob_id" != "$blob_id1" ]; then
+		echo "file beta has the wrong base blob ID" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	commit_id=`(cd $testroot/wt && got info beta | \
+		grep 'based on commit:' | cut -d ':' -f 2 | tr -d ' ')`
+	if [ "$commit_id" != "$commit_id1" ]; then
+		echo "file beta has the wrong base commit ID: $commit_id" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "changed beta" > $testroot/content.expected
+	cat $testroot/wt/beta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 
 test_parseargs "$@"
 run_test test_update_basic
@@ -2614,3 +2721,4 @@ run_test test_update_deletes_symlink
 run_test test_update_symlink_conflicts
 run_test test_update_single_file
 run_test test_update_file_skipped_due_to_conflict
+run_test test_update_file_skipped_due_to_obstruction

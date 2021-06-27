@@ -1947,6 +1947,8 @@ update_blob(struct got_worktree *worktree,
 	}
 
 	if (status == GOT_STATUS_OBSTRUCTED) {
+		if (ie)
+			got_fileindex_entry_mark_skipped(ie);
 		err = (*progress_cb)(progress_arg, status, path);
 		goto done;
 	}
