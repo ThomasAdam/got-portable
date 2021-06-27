@@ -1951,6 +1951,8 @@ update_blob(struct got_worktree *worktree,
 		goto done;
 	}
 	if (status == GOT_STATUS_CONFLICT) {
+		if (ie)
+			got_fileindex_entry_mark_skipped(ie);
 		err = (*progress_cb)(progress_arg, GOT_STATUS_CANNOT_UPDATE,
 		    path);
 		goto done;
@@ -2472,6 +2474,9 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 		if (strcmp(ie->path, a->path) != 0)
 			return NULL;
 	} else if (!got_path_is_child(ie->path, a->path, a->path_len))
+		return NULL;
+
+	if (got_fileindex_entry_was_skipped(ie))
 		return NULL;
 
 	if (memcmp(ie->commit_sha1, a->base_commit_id->sha1,

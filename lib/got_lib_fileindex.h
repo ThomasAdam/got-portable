@@ -109,6 +109,7 @@ mode_t got_fileindex_perms_to_st(struct got_fileindex_entry *);
 
 const struct got_error *got_fileindex_entry_update(struct got_fileindex_entry *,
     int, const char *, uint8_t *, uint8_t *, int);
+void got_fileindex_entry_mark_skipped(struct got_fileindex_entry *);
 const struct got_error *got_fileindex_entry_alloc(struct got_fileindex_entry **,
     const char *);
 void got_fileindex_entry_free(struct got_fileindex_entry *);
@@ -164,6 +165,7 @@ const struct got_error *got_fileindex_diff_dir(struct got_fileindex *, int,
 int got_fileindex_entry_has_blob(struct got_fileindex_entry *);
 int got_fileindex_entry_has_commit(struct got_fileindex_entry *);
 int got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *);
+int got_fileindex_entry_was_skipped(struct got_fileindex_entry *);
 uint32_t got_fileindex_entry_stage_get(const struct got_fileindex_entry *);
 void got_fileindex_entry_stage_set(struct got_fileindex_entry *ie, uint32_t);
 int got_fileindex_entry_filetype_get(struct got_fileindex_entry *);

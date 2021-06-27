@@ -46,6 +46,7 @@
 #define GOT_FILEIDX_F_NO_COMMIT		0x00040000
 #define GOT_FILEIDX_F_NO_FILE_ON_DISK	0x00080000
 #define GOT_FILEIDX_F_REMOVE_ON_FLUSH	0x00100000
+#define GOT_FILEIDX_F_SKIPPED		0x00200000
 
 struct got_fileindex {
 	struct got_fileindex_tree entries;
@@ -146,6 +147,12 @@ got_fileindex_entry_mark_deleted_from_disk(struct got_fileindex_entry *ie)
 	ie->flags |= GOT_FILEIDX_F_NO_FILE_ON_DISK;
 }
 
+void
+got_fileindex_entry_mark_skipped(struct got_fileindex_entry *ie)
+{
+	ie->flags |= GOT_FILEIDX_F_SKIPPED;
+}
+
 const struct got_error *
 got_fileindex_entry_alloc(struct got_fileindex_entry **ie,
     const char *relpath)
@@ -243,6 +250,12 @@ int
 got_fileindex_entry_has_file_on_disk(struct got_fileindex_entry *ie)
 {
 	return (ie->flags & GOT_FILEIDX_F_NO_FILE_ON_DISK) == 0;
+}
+
+int
+got_fileindex_entry_was_skipped(struct got_fileindex_entry *ie)
+{
+	return (ie->flags & GOT_FILEIDX_F_SKIPPED) != 0;
 }
 
 static const struct got_error *
@@ -497,6 +510,7 @@ got_fileindex_write(struct got_fileindex *fileindex, FILE *outfile)
 
 	RB_FOREACH_SAFE(ie, got_fileindex_tree, &fileindex->entries, tmp) {
 		ie->flags &= ~GOT_FILEIDX_F_NOT_FLUSHED;
+		ie->flags &= ~GOT_FILEIDX_F_SKIPPED;
 		if (ie->flags & GOT_FILEIDX_F_REMOVE_ON_FLUSH) {
 			RB_REMOVE(got_fileindex_tree, &fileindex->entries, ie);
 			got_fileindex_entry_free(ie);
