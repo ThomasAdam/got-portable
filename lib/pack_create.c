@@ -287,6 +287,16 @@ search_packidx(int *found, struct got_object_id *id,
 	return err;
 }
 
+static const int obj_types[] = {
+	GOT_OBJ_TYPE_ANY,
+	GOT_OBJ_TYPE_COMMIT,
+	GOT_OBJ_TYPE_TREE,
+	GOT_OBJ_TYPE_BLOB,
+	GOT_OBJ_TYPE_TAG,
+	GOT_OBJ_TYPE_OFFSET_DELTA,
+	GOT_OBJ_TYPE_REF_DELTA
+};
+
 static const struct got_error *
 add_meta(struct got_pack_metavec *v, struct got_object_idset *idset,
     struct got_object_id *id, const char *path, int obj_type,
@@ -304,7 +314,7 @@ add_meta(struct got_pack_metavec *v, struct got_object_idset *idset,
 			return NULL;
 	}
 
-	err = got_object_idset_add(idset, id, NULL);
+	err = got_object_idset_add(idset, id, (void *)&obj_types[obj_type]);
 	if (err)
 		return err;
 
@@ -595,7 +605,8 @@ drop_commit(struct got_object_idset *keep, struct got_object_idset *drop,
 			continue;
 		}
 
-		err = got_object_idset_add(drop, qid->id, NULL);
+		err = got_object_idset_add(drop, qid->id,
+		    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
 		if (err) {
 			got_object_qid_free(qid);
 			break;
@@ -734,9 +745,11 @@ findtwixt(struct got_object_id ***res, int *nres,
 				goto done;
 			}
 			if (qcolor == COLOR_KEEP)
-				err = got_object_idset_add(keep, id, NULL);
+				err = got_object_idset_add(keep, id,
+				    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
 			else
-				err = got_object_idset_add(drop, id, NULL);
+				err = got_object_idset_add(drop, id,
+				    (void *)&obj_types[GOT_OBJ_TYPE_COMMIT]);
 			if (err) {
 				free(id);
 				goto done;
@@ -864,11 +877,16 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 
 	for (i = 0; i < ntheirs; i++) {
 		struct got_object_id *id = theirs[i];
+		int *cached_type;
 		if (id == NULL)
 			continue;
-		err = got_object_get_type(&obj_type, repo, id);
-		if (err)
-			return err;
+		cached_type = got_object_idset_get(idset, id);
+		if (cached_type == NULL) {
+			err = got_object_get_type(&obj_type, repo, id);
+			if (err)
+				goto done;
+		} else
+			obj_type = *cached_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
 		err = load_tag(NULL, idset, id, repo,
@@ -885,11 +903,16 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 
 	for (i = 0; i < nours; i++) {
 		struct got_object_id *id = ours[i];
+		int *cached_type;
 		if (id == NULL)
 			continue;
-		err = got_object_get_type(&obj_type, repo, id);
-		if (err)
-			return err;
+		cached_type = got_object_idset_get(idset, id);
+		if (cached_type == NULL) {
+			err = got_object_get_type(&obj_type, repo, id);
+			if (err)
+				goto done;
+		} else
+			obj_type = *cached_type;
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
 		err = load_tag(&v, idset, id, repo,
