@@ -101,7 +101,7 @@ get_reflist_object_ids(struct got_object_id ***ids, int *nobjects,
 			}
 		}
 
-		if (nalloc >= *nobjects) {
+		if (nalloc <= *nobjects) {
 			struct got_object_id **new;
 			new = recallocarray(*ids, nalloc,
 			    nalloc + alloc_chunksz,
