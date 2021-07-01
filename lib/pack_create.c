@@ -863,7 +863,7 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 	}
 
 	for (i = 0; i < ntheirs; i++) {
-		struct got_object_id *id = ours[i];
+		struct got_object_id *id = theirs[i];
 		if (id == NULL)
 			continue;
 		err = got_object_get_type(&obj_type, repo, id);
