@@ -27,8 +27,6 @@ const struct got_error *got_object_idset_remove(void **,
     struct got_object_idset *, struct got_object_id *);
 int got_object_idset_contains(struct got_object_idset *,
     struct got_object_id *);
-void *got_object_idset_lookup_data(struct got_object_idset *,
-    struct got_object_id *);
 const struct got_error *got_object_idset_for_each(struct got_object_idset *,
     const struct got_error *(*cb)(struct got_object_id *, void *, void *),
     void *);
