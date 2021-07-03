@@ -355,7 +355,8 @@ namespace will be updated directly to match the corresponding branches in
 the remote repository.
 If those branches contained local commits, these commits will no longer be
 reachable via a reference and will therefore be at risk of being discarded
-by Git's garbage collector.
+by Git's garbage collector or
+.Cm gotadmin cleanup .
 Maintaining custom changes in a mirror repository is therefore discouraged.
 .Pp
 In any case, references in the
@@ -397,7 +398,8 @@ present in the remote repository.
 Only references are deleted.
 Any commit, tree, tag, and blob objects belonging to deleted branches or
 tags remain in the repository and may be removed separately with
-Git's garbage collector.
+Git's garbage collector or
+.Cm gotadmin cleanup .
 .It Fl l
 List branches and tags available for fetching from the remote repository
 and exit immediately.
@@ -976,7 +978,8 @@ Delete the reference with the specified
 from the repository.
 Any commit, tree, tag, and blob objects belonging to deleted references
 remain in the repository and may be removed separately with
-Git's garbage collector.
+Git's garbage collector or
+.Cm gotadmin cleanup .
 Cannot be used together with any other options except
 .Fl r .
 .El
@@ -1051,7 +1054,8 @@ Delete the branch with the specified name from the repository.
 Only the branch reference is deleted.
 Any commit, tree, and blob objects belonging to the branch
 remain in the repository and may be removed separately with
-Git's garbage collector.
+Git's garbage collector or
+.Cm gotadmin cleanup .
 .It Fl n
 Do not switch and update the work tree after creating a new branch.
 .El
@@ -1480,7 +1484,8 @@ commits will remain in the repository and can be viewed with the
 .Cm got rebase -l
 command.
 Removal of these references makes objects which become unreachable via
-any reference subject to removal by Git's garbage collector.
+any reference subject to removal by Git's garbage collector or
+.Cm gotadmin cleanup .
 .Pp
 While rebasing commits, show the status of each affected file,
 using the following status codes:
@@ -1655,7 +1660,8 @@ commits will remain in the repository and can be viewed with the
 .Cm got histedit -l
 command.
 Removal of these references makes objects which become unreachable via
-any reference subject to removal by Git's garbage collector.
+any reference subject to removal by Git's garbage collector or
+.Cm gotadmin cleanup .
 .Pp
 While merging commits, show the status of each affected file,
 using the following status codes:

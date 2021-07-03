@@ -143,7 +143,8 @@ directory, or in the
 file which contains one reference definition per line.
 .Pp
 Any object which is not directly or indirectly reachable via a reference
-is subject to deletion by Git's garbage collector.
+is subject to deletion by Git's garbage collector or
+.Cm gotadmin cleanup .
 .Sh FILES
 .Bl -tag -width packed-refs -compact
 .It Pa HEAD

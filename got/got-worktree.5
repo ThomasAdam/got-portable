@@ -146,8 +146,9 @@ file has been exclusively locked with
 Each work tree has a universal unique identifier.
 When a work tree is checked out or updated, this identifier is used to
 create a reference to the current base commit in the Git repository.
-The presence of this reference prevents Git garbage collectors from
-discarding the base commit and any objects it refers to.
+The presence of this reference prevents the Git garbage collector and
+.Cm gotadmin cleanup
+from discarding the base commit and any objects it refers to.
 When a work tree is no longer needed its reference can be deleted from
 the Git repository with
 .Cm got ref -d .

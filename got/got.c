@@ -2563,8 +2563,8 @@ show_worktree_base_ref_warning(void)
 {
 	fprintf(stderr, "%s: warning: could not create a reference "
 	    "to the work tree's base commit; the commit could be "
-	    "garbage-collected by Git; making the repository "
-	    "writable and running 'got update' will prevent this\n",
+	    "garbage-collected by Git or 'gotadmin cleanup'; making the "
+	    "repository writable and running 'got update' will prevent this\n",
 	    getprogname());
 }
 

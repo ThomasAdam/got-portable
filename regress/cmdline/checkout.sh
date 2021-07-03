@@ -335,8 +335,9 @@ test_checkout_read_only() {
 		> $testroot/stderr.expected
 	echo -n "to the work tree's base commit; the commit could " \
 		>> $testroot/stderr.expected
-	echo -n "be garbage-collected by Git; making the repository " \
+	echo -n "be garbage-collected by Git or 'gotadmin cleanup'; " \
 		>> $testroot/stderr.expected
+	echo -n "making the repository " >> $testroot/stderr.expected
 	echo "writable and running 'got update' will prevent this" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
