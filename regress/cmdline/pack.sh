@@ -64,7 +64,7 @@ test_pack_all_loose_objects() {
 			ret=1
 			break
 		done
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
@@ -131,11 +131,11 @@ test_pack_exclude() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
-	if [ "$ret" == "1" ]; then
+	if [ "$ret" = "1" ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -147,12 +147,12 @@ test_pack_exclude() {
 			obj_id=${id0}${e}
 			excluded=0
 			for id in $excluded_ids; do
-				if [ "$obj_id" == "$id" ]; then
+				if [ "$obj_id" = "$id" ]; then
 					excluded=1
 					break
 				fi
 			done
-			if [ "$excluded" == "1" ]; then
+			if [ "$excluded" = "1" ]; then
 				continue
 			fi
 			if grep -q ^$obj_id $testroot/stdout; then
@@ -162,7 +162,7 @@ test_pack_exclude() {
 			ret=1
 			break
 		done
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
@@ -230,11 +230,11 @@ test_pack_include() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
-	if [ "$ret" == "1" ]; then
+	if [ "$ret" = "1" ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -246,12 +246,12 @@ test_pack_include() {
 	included_ids="$included_ids $commit0 $tree0"
 	for obj_id in $included_ids; do
 		for id in $excluded_ids; do
-			if [ "$obj_id" == "$id" ]; then
+			if [ "$obj_id" = "$id" ]; then
 				excluded=1
 				break
 			fi
 		done
-		if [ "$excluded" == "1" ]; then
+		if [ "$excluded" = "1" ]; then
 			continue
 		fi
 		if grep -q ^$obj_id $testroot/stdout; then
@@ -306,7 +306,7 @@ test_pack_ambiguous_arg() {
 	gotadmin pack -r $testroot/repo -x master master \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -400,11 +400,11 @@ test_pack_loose_only() {
 			echo "found excluded object $id in pack file" >&2
 			ret=1
 		fi
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
-	if [ "$ret" == "1" ]; then
+	if [ "$ret" = "1" ]; then
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -416,12 +416,12 @@ test_pack_loose_only() {
 			obj_id=${id0}${e}
 			excluded=0
 			for id in $excluded_ids; do
-				if [ "$obj_id" == "$id" ]; then
+				if [ "$obj_id" = "$id" ]; then
 					excluded=1
 					break
 				fi
 			done
-			if [ "$excluded" == "1" ]; then
+			if [ "$excluded" = "1" ]; then
 				continue
 			fi
 			if grep -q ^$obj_id $testroot/stdout; then
@@ -431,7 +431,7 @@ test_pack_loose_only() {
 			ret=1
 			break
 		done
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
@@ -510,7 +510,7 @@ test_pack_all_objects() {
 			ret=1
 			break
 		done
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
@@ -555,7 +555,7 @@ test_pack_bad_ref() {
 	gotadmin pack -r $testroot/repo refs/got/worktree/ \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "gotadmin pack succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
