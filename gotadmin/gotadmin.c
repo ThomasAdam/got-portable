@@ -82,17 +82,20 @@ __dead static void	usage_info(void);
 __dead static void	usage_pack(void);
 __dead static void	usage_indexpack(void);
 __dead static void	usage_listpack(void);
+__dead static void	usage_cleanup(void);
 
 static const struct got_error*		cmd_info(int, char *[]);
 static const struct got_error*		cmd_pack(int, char *[]);
 static const struct got_error*		cmd_indexpack(int, char *[]);
 static const struct got_error*		cmd_listpack(int, char *[]);
+static const struct got_error*		cmd_cleanup(int, char *[]);
 
 static struct gotadmin_cmd gotadmin_commands[] = {
 	{ "info",	cmd_info,	usage_info,	"" },
 	{ "pack",	cmd_pack,	usage_pack,	"" },
 	{ "indexpack",	cmd_indexpack,	usage_indexpack,"ix" },
 	{ "listpack",	cmd_listpack,	usage_listpack,	"ls" },
+	{ "cleanup",	cmd_cleanup,	usage_cleanup,	"cl" },
 };
 
 static void
@@ -888,5 +891,167 @@ done:
 	free(id_str);
 	free(pack_hash);
 	free(packfile_path);
+	return error;
+}
+
+__dead static void
+usage_cleanup(void)
+{
+	fprintf(stderr, "usage: %s cleanup [-n] [-r repository-path] [-q]\n",
+	    getprogname());
+	exit(1);
+}
+
+struct got_cleanup_progress_arg {
+	int last_nloose;
+	int last_ncommits;
+	int last_npurged;
+	int verbosity;
+	int printed_something;
+	int dry_run;
+};
+
+static const struct got_error *
+cleanup_progress(void *arg, int nloose, int ncommits, int npurged)
+{
+	struct got_cleanup_progress_arg *a = arg;
+	int print_loose = 0, print_commits = 0, print_purged = 0;
+
+	if (a->last_nloose != nloose) {
+		print_loose = 1;
+		a->last_nloose = nloose;
+	}
+	if (a->last_ncommits != ncommits) {
+		print_loose = 1;
+		print_commits = 1;
+		a->last_ncommits = ncommits;
+	}
+	if (a->last_npurged != npurged) {
+		print_loose = 1;
+		print_commits = 1;
+		print_purged = 1;
+		a->last_npurged = npurged;
+	}
+
+	if (a->verbosity < 0)
+		return NULL;
+
+	if (print_loose || print_commits || print_purged)
+		printf("\r");
+	if (print_loose)
+		printf("%d loose object%s", nloose, nloose == 1 ? "" : "s");
+	if (print_commits)
+		printf("; %d commit%s scanned", ncommits,
+		    ncommits == 1 ? "" : "s");
+	if (print_purged) {
+		if (a->dry_run) {
+			printf("; %d object%s could be purged", npurged,
+			    npurged == 1 ? "" : "s");
+		} else {
+			printf("; %d object%s purged", npurged,
+			    npurged == 1 ? "" : "s");
+		}
+	}
+	if (print_loose || print_commits || print_purged) {
+		a->printed_something = 1;
+		fflush(stdout);
+	}
+	return NULL;
+}
+
+static const struct got_error *
+cmd_cleanup(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	struct got_repository *repo = NULL;
+	int ch, dry_run = 0, npacked = 0, verbosity = 0;
+	struct got_cleanup_progress_arg cpa;
+	off_t size_before, size_after;
+	char scaled_before[FMT_SCALED_STRSIZE];
+	char scaled_after[FMT_SCALED_STRSIZE];
+	char scaled_diff[FMT_SCALED_STRSIZE];
+
+	while ((ch = getopt(argc, argv, "r:nq")) != -1) {
+		switch (ch) {
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 'n':
+			dry_run = 1;
+			break;
+		case 'q':
+			verbosity = -1;
+			break;
+		default:
+			usage_cleanup();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
+	    NULL) == -1)
+		err(1, "pledge");
+#endif
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_repo_open(&repo, repo_path ? repo_path : cwd, NULL);
+	if (error)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path_git_dir(repo), 0);
+	if (error)
+		goto done;
+
+	memset(&cpa, 0, sizeof(cpa));
+	cpa.last_ncommits = -1;
+	cpa.last_npurged = -1;
+	cpa.dry_run = dry_run;
+	cpa.verbosity = verbosity;
+	error = got_repo_purge_unreferenced_loose_objects(repo,
+	   &size_before, &size_after, &npacked, dry_run,
+	   cleanup_progress, &cpa, check_cancelled, NULL);
+	if (cpa.printed_something)
+		printf("\n");
+	if (error)
+		goto done;
+	if (cpa.printed_something) {
+		if (fmt_scaled(size_before, scaled_before) == -1) {
+			error = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		if (fmt_scaled(size_after, scaled_after) == -1) {
+			error = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		if (fmt_scaled(size_before - size_after, scaled_diff) == -1) {
+			error = got_error_from_errno("fmt_scaled");
+			goto done;
+		}
+		printf("loose total size before: %s\n", scaled_before);
+		printf("loose total size after: %s\n", scaled_after);
+		if (dry_run) {
+			printf("disk space which would be freed: %s\n",
+			    scaled_diff);
+		} else
+			printf("disk space freed: %s\n", scaled_diff);
+		printf("loose objects also found in pack files: %d\n", npacked);
+	}
+done:
+	if (repo)
+		got_repo_close(repo);
+	free(cwd);
 	return error;
 }

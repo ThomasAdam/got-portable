@@ -332,8 +332,8 @@ read_packed_object_raw_privsep(uint8_t **outbuf, off_t *size, size_t *hdrlen,
 	    idx, id);
 }
 
-static const struct got_error *
-open_packed_object(struct got_object **obj, struct got_object_id *id,
+const struct got_error *
+got_object_open_packed(struct got_object **obj, struct got_object_id *id,
     struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
@@ -450,9 +450,9 @@ start_read_object_child(struct got_repository *repo)
 	return NULL;
 }
 
-static const struct got_error *
-read_object_header_privsep(struct got_object **obj, struct got_repository *repo,
-    int obj_fd)
+const struct got_error *
+got_object_read_header_privsep(struct got_object **obj,
+    struct got_repository *repo, int obj_fd)
 {
 	const struct got_error *err;
 
@@ -498,7 +498,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return NULL;
 	}
 
-	err = open_packed_object(obj, id, repo);
+	err = got_object_open_packed(obj, id, repo);
 	if (err && err->code != GOT_ERR_NO_OBJ)
 		return err;
 	if (*obj) {
@@ -513,7 +513,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return err;
 	}
 
-	err = read_object_header_privsep(obj, repo, fd);
+	err = got_object_read_header_privsep(obj, repo, fd);
 	if (err)
 		return err;
 
@@ -1785,7 +1785,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
-		err = read_object_header_privsep(&obj, repo, fd);
+		err = got_object_read_header_privsep(&obj, repo, fd);
 		if (err)
 			return err;
 		obj_type = obj->type;

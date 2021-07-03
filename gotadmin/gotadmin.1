@@ -181,6 +181,80 @@ and a break-down of the number of objects per object type.
 .It Cm ls
 Short alias for
 .Cm listpack .
+.It Cm cleanup Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
+Purge unreferenced loose objects from the repository and display
+the amount of disk space which has been freed as a result.
+.Pp
+Unreferenced objects are present in the repository but cannot be
+reached via any reference in the entire
+.Pa refs/
+namespace.
+.Pp
+Loose objects are stored as individual files beneath the repository's
+.Pa objects/
+directory,
+spread across 256 sub-directories named after the 256 possible
+hexadecimal values of the first byte of an object identifier.
+.Pp
+Packed objects stored in pack files under
+.Pa objects/pack/ 
+will not be purged.
+However, if redundant copies of packed objects exist in loose form,
+such redundant copies will be purged.
+.Pp
+Objects will usually become unreferenced as a result of deleting
+branches or tags with
+.Cm got branch -d
+or
+.Cm got tag -d .
+Deleting arbitrary references with
+.Cm got ref -d 
+may also leave unreferenced objects behind.
+.Pp
+In order to determine the set of objects which are referenced, search
+all references for commit objects and tag objects, and traverse the
+corresponding tree object hierarchies.
+Any loose object IDs not encountered during this search are unreferenced
+and thus subject to removal.
+Display the number of commits which have been searched to indicate progress.
+.Pp
+References in the
+.Pa refs/got
+namespace may prevent objects from being purged.
+This includes references in the
+.Pa refs/got/worktree
+namespace created by
+.Cm got checkout
+and
+.Cm got update ,
+as well as references in the
+.Pa refs/got/backup
+namespace created by
+.Cm got rebase
+and
+.Cm got histedit .
+.Cm gotadmin cleanup
+will only purge corresponding objects once such references have been
+deleted with
+.Cm got ref -d .
+.Pp
+The options for
+.Cm gotadmin listpack
+are as follows:
+.Bl -tag -width Ds
+.It Fl n
+Display the usual progress output and summary information but do not actually
+purge any objects.
+.It Fl r Ar repository-path
+Use the repository at the specified path.
+If not specified, assume the repository is located at or above the current
+working directory.
+.It Fl q
+Suppress progress reporting and disk space summary output.
+.El
+.It Cm cl
+Short alias for
+.Cm cleanup .
 .El
 .Sh EXIT STATUS
 .Ex -std gotadmin
@@ -202,9 +276,10 @@ to perform some tasks.
 In particular:
 .Bl -bullet
 .It
-Reducing the size of repositories by removing redundant or unreferenced
-data requires
-.Xr git-gc 1 .
+Removing redundant or unreferenced packed objects requires
+.Xr git-gc 1
+and perhaps
+.Xr git-repack 1 .
 .It
 Exporting data from repositories requires
 .Xr git-fast-export 1 .
