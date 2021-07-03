@@ -233,6 +233,35 @@ test_cleanup_redundant_loose_objects() {
 	test_done "$testroot" "$ret"
 }
 
+test_cleanup_precious_objects() {
+	local testroot=`test_init cleanup_precious_objects`
+
+	# enable Git's preciousObjects extension
+	(cd $testroot/repo && git config extensions.preciousObjects true)
+
+	# cleanup should now refuse to purge objects
+	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "gotadmin cleanup succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "gotadmin: the preciousObjects Git extension is enabled; " \
+		> $testroot/stderr.expected
+	echo "this implies that objects must not be deleted" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cleanup_unreferenced_loose_objects
 run_test test_cleanup_redundant_loose_objects
+run_test test_cleanup_precious_objects

@@ -238,6 +238,12 @@ will only purge corresponding objects once such references have been
 deleted with
 .Cm got ref -d .
 .Pp
+The
+.Dq preciousObjects
+Git extension is intended to prevent the removal of objects from a repository.
+.Cm gotadmin cleanup 
+will refuse to operate on repositories where this extension is active.
+.Pp
 The options for
 .Cm gotadmin cleanup
 are as follows:

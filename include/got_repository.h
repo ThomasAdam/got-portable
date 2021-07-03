@@ -50,6 +50,10 @@ const char *got_repo_get_global_gitconfig_author_email(struct got_repository *);
 /* Obtain repository owner name if parsed from gitconfig, else NULL. */
 const char *got_repo_get_gitconfig_owner(struct got_repository *);
 
+/* Obtain the list of enabled Git extensions parsed from gitconfig. */
+void got_repo_get_gitconfig_extensions(char ***, int *,
+    struct got_repository *);
+
 /* Information about one remote repository. */
 struct got_remote_repo {
 	char *name;

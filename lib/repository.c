@@ -112,6 +112,14 @@ got_repo_get_gitconfig_owner(struct got_repository *repo)
 	return repo->gitconfig_owner;
 }
 
+void
+got_repo_get_gitconfig_extensions(char ***extensions, int *nextensions,
+    struct got_repository *repo)
+{
+	*extensions = repo->extensions;
+	*nextensions = repo->nextensions;
+}
+
 int
 got_repo_is_bare(struct got_repository *repo)
 {
