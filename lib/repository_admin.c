@@ -1038,6 +1038,7 @@ done:
 		got_object_commit_close(commit);
 	if (tag)
 		got_object_tag_close(tag);
+	got_object_id_queue_free(&ids);
 	return err;
 }
 
