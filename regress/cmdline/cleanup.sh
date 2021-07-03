@@ -67,7 +67,7 @@ test_cleanup_unreferenced_loose_objects() {
 	got ref -r $testroot/repo -d "refs/got/worktree/base-$wt_uuid"
 
 	# cleanup -n should not remove any objects
-	ls -1 -R $testroot/repo/.git/objects > $testroot/objects-before
+	ls -R $testroot/repo/.git/objects > $testroot/objects-before
 	gotadmin cleanup -n -q -r $testroot/repo > $testroot/stdout
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -77,7 +77,7 @@ test_cleanup_unreferenced_loose_objects() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	ls -1 -R $testroot/repo/.git/objects > $testroot/objects-after
+	ls -R $testroot/repo/.git/objects > $testroot/objects-after
 	cmp -s $testroot/objects-before $testroot/objects-after
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -164,7 +164,7 @@ test_cleanup_redundant_loose_objects() {
 	fi
 
 	# cleanup -n should not remove any objects
-	ls -1 -R $testroot/repo/.git/objects > $testroot/objects-before
+	ls -R $testroot/repo/.git/objects > $testroot/objects-before
 	gotadmin cleanup -n -q -r $testroot/repo > $testroot/stdout
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -174,7 +174,7 @@ test_cleanup_redundant_loose_objects() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
-	ls -1 -R $testroot/repo/.git/objects > $testroot/objects-after
+	ls -R $testroot/repo/.git/objects > $testroot/objects-after
 	cmp -s $testroot/objects-before $testroot/objects-after
 	ret="$?"
 	if [ "$ret" != "0" ]; then
