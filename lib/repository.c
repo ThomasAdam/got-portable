@@ -610,7 +610,7 @@ read_gotconfig(struct got_repository *repo)
 /* Supported repository format extensions. */
 static const char *repo_extensions[] = {
 	"noop",			/* Got supports repository format version 1. */
-	"preciousObjects",	/* Got has no garbage collection yet. */
+	"preciousObjects",	/* Supported by gotadmin cleanup. */
 	"worktreeConfig",	/* Got does not care about Git work trees. */
 };
 
