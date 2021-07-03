@@ -287,3 +287,14 @@ Exporting data from repositories requires
 Importing data into repositories requires
 .Xr git-fast-import 1 .
 .El
+.Sh BUGS
+Disk space savings reported by
+.Cm gotadmin cleanup
+will be misleading if the repository contains object files that were
+hard-linked from another repository.
+Such hard-links will be created by certain
+.Xr git 1
+commands.
+By itself,
+.Xr got 1
+will never create hard-linked object files.
