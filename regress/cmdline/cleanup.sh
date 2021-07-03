@@ -225,7 +225,7 @@ test_cleanup_redundant_loose_objects() {
 			ret=1
 			break
 		done
-		if [ "$ret" == "1" ]; then
+		if [ "$ret" = "1" ]; then
 			break
 		fi
 	done
