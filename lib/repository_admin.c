@@ -721,55 +721,31 @@ done:
 }
 
 static const struct got_error *
-search_packidx(int *found, struct got_object_id *id,
-    struct got_repository *repo)
-{
-	const struct got_error *err = NULL;
-	struct got_packidx *packidx = NULL;
-	int idx;
-
-	*found = 0;
-
-	err = got_repo_search_packidx(&packidx, &idx, repo, id);
-	if (err == NULL)
-		*found = 1; /* object is already packed */
-	else if (err->code == GOT_ERR_NO_OBJ)
-		err = NULL;
-	return err;
-}
-
-static const struct got_error *
 preserve_loose_object(struct got_object_idset *loose_ids,
     struct got_object_id *id, struct got_repository *repo, int *npacked)
 {
 	const struct got_error *err = NULL;
-	int is_packed;
+	struct got_object *obj;
 
 	if (!got_object_idset_contains(loose_ids, id))
 		return NULL;
 
-	err = search_packidx(&is_packed, id, repo);
-	if (err)
-		return err;
-	if (is_packed) {
-		struct got_object *obj;
-
+	/*
+	 * Try to open this object from a pack file. This ensures that
+	 * we do in fact have a valid packed copy of the object. Otherwise
+	 * we should not delete the loose representation of this object.
+	 */
+	 err = got_object_open_packed(&obj, id, repo);
+	 if (err == NULL) {
+		got_object_close(obj);
 		/*
-		 * Sanity check: Open the packed object to prevent a
-		 * corrupt pack index from misleading us.
+		 * The object is referenced and packed.
+		 * We can purge the redundantly stored loose object.
 		 */
-		 err = got_object_open_packed(&obj, id, repo);
-		 if (err == NULL) {
-			got_object_close(obj);
-			/*
-			 * The object is referenced and packed.
-			 * We can purge the redundantly stored loose object.
-			 */
-			(*npacked)++;
-			return NULL;
-		} else if (err->code != GOT_ERR_NO_OBJ)
-			return err;
-	}
+		(*npacked)++;
+		return NULL;
+	} else if (err->code != GOT_ERR_NO_OBJ)
+		return err;
 
 	/*
 	 * This object is referenced and not packed.
