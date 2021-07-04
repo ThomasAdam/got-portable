@@ -46,14 +46,16 @@ const struct got_error *got_inflate_read_mmap(struct got_inflate_buf *,
     uint8_t *, size_t, size_t, size_t *, size_t *);
 void got_inflate_end(struct got_inflate_buf *);
 const struct got_error *got_inflate_to_mem(uint8_t **, size_t *, size_t *,
-    FILE *);
+    struct got_inflate_checksum *, FILE *);
 const struct got_error *got_inflate_to_mem_fd(uint8_t **, size_t *, size_t *,
     struct got_inflate_checksum *, size_t, int);
 const struct got_error *got_inflate_to_mem_mmap(uint8_t **, size_t *, size_t *,
     struct got_inflate_checksum *, uint8_t *, size_t, size_t);
-const struct got_error *got_inflate_to_file(size_t *, FILE *, FILE *);
+const struct got_error *got_inflate_to_file(size_t *, FILE *,
+    struct got_inflate_checksum *, FILE *);
 const struct got_error *got_inflate_to_file_fd(size_t *, size_t *,
     struct got_inflate_checksum *, int, FILE *);
-const struct got_error *got_inflate_to_fd(size_t *, FILE *, int);
+const struct got_error *got_inflate_to_fd(size_t *, FILE *,
+    struct got_inflate_checksum *, int);
 const struct got_error *got_inflate_to_file_mmap(size_t *, size_t *,
     struct got_inflate_checksum *, uint8_t *, size_t, size_t, FILE *);

@@ -55,7 +55,7 @@ read_commit_object(struct got_commit_object **commit, FILE *f)
 	size_t len;
 	uint8_t *p;
 
-	err = got_inflate_to_mem(&p, &len, NULL, f);
+	err = got_inflate_to_mem(&p, &len, NULL, NULL, f);
 	if (err)
 		return err;
 

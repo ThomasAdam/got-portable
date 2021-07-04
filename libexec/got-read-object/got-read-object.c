@@ -78,9 +78,9 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 	}
 
 	if (obj->size + obj->hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
-		err = got_inflate_to_mem(&data, &len, &consumed, f);
+		err = got_inflate_to_mem(&data, &len, &consumed, NULL, f);
 	else
-		err = got_inflate_to_fd(&len, f, outfd);
+		err = got_inflate_to_fd(&len, f, NULL, outfd);
 	if (err)
 		goto done;
 

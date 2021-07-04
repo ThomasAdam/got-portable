@@ -146,11 +146,11 @@ main(int argc, char *argv[])
 
 		if (obj->size + obj->hdrlen <=
 		    GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
-			err = got_inflate_to_mem(&buf, &size, NULL, f);
+			err = got_inflate_to_mem(&buf, &size, NULL, NULL, f);
 			if (err)
 				goto done;
 		} else {
-			err = got_inflate_to_fd(&size, f, imsg_outfd.fd);
+			err = got_inflate_to_fd(&size, f, NULL, imsg_outfd.fd);
 			if (err)
 				goto done;
 		}

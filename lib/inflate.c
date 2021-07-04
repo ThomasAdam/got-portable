@@ -262,7 +262,7 @@ got_inflate_end(struct got_inflate_buf *zb)
 
 const struct got_error *
 got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
-    size_t *consumed_total, FILE *f)
+    size_t *consumed_total, struct got_inflate_checksum *csum, FILE *f)
 {
 	const struct got_error *err;
 	size_t avail, consumed;
@@ -274,9 +274,9 @@ got_inflate_to_mem(uint8_t **outbuf, size_t *outlen,
 		*outbuf = malloc(GOT_INFLATE_BUFSIZE);
 		if (*outbuf == NULL)
 			return got_error_from_errno("malloc");
-		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE, NULL);
+		err = got_inflate_init(&zb, *outbuf, GOT_INFLATE_BUFSIZE, csum);
 	} else
-		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
+		err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, csum);
 	if (err)
 		return err;
 
@@ -437,13 +437,14 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_fd(size_t *outlen, FILE *infile, int outfd)
+got_inflate_to_fd(size_t *outlen, FILE *infile,
+    struct got_inflate_checksum *csum, int outfd)
 {
 	const struct got_error *err = NULL;
 	size_t avail;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, csum);
 	if (err)
 		goto done;
 
@@ -474,13 +475,14 @@ done:
 }
 
 const struct got_error *
-got_inflate_to_file(size_t *outlen, FILE *infile, FILE *outfile)
+got_inflate_to_file(size_t *outlen, FILE *infile,
+    struct got_inflate_checksum *csum, FILE *outfile)
 {
 	const struct got_error *err;
 	size_t avail;
 	struct got_inflate_buf zb;
 
-	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, NULL);
+	err = got_inflate_init(&zb, NULL, GOT_INFLATE_BUFSIZE, csum);
 	if (err)
 		goto done;
 
