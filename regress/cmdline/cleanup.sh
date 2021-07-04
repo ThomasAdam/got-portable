@@ -16,6 +16,9 @@
 
 . ./common.sh
 
+# disable automatic packing for these tests
+export GOT_TEST_PACK=""
+
 test_cleanup_unreferenced_loose_objects() {
 	local testroot=`test_init cleanup_unreferenced_loose_objects`
 
