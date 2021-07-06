@@ -346,7 +346,8 @@ got_object_open_packed(struct got_object **obj, struct got_object_id *id,
 	if (err)
 		return err;
 
-	err = got_packidx_get_packfile_path(&path_packfile, packidx);
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
 	if (err)
 		return err;
 
@@ -546,7 +547,8 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			goto done;
 
@@ -828,7 +830,8 @@ open_commit(struct got_commit_object **commit,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			return err;
 
@@ -1041,7 +1044,8 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			return err;
 
@@ -1405,7 +1409,8 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			goto done;
 
@@ -1755,7 +1760,8 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 	if (err == NULL) {
 		struct got_pack *pack = NULL;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			return err;
 
@@ -2259,7 +2265,8 @@ got_traverse_packed_commits(struct got_object_id_queue *traversed_commits,
 		return NULL;
 	}
 
-	err = got_packidx_get_packfile_path(&path_packfile, packidx);
+	err = got_packidx_get_packfile_path(&path_packfile,
+	    packidx->path_packidx);
 	if (err)
 		return err;
 

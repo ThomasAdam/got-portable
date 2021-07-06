@@ -173,7 +173,7 @@ const struct got_error *got_packidx_init_hdr(struct got_packidx *, int);
 const struct got_error *got_packidx_open(struct got_packidx **,
     int, const char *, int);
 const struct got_error *got_packidx_close(struct got_packidx *);
-const struct got_error *got_packidx_get_packfile_path(char **, struct got_packidx *);
+const struct got_error *got_packidx_get_packfile_path(char **, const char *);
 off_t got_packidx_get_object_offset(struct got_packidx *, int idx);
 int got_packidx_get_object_idx(struct got_packidx *, struct got_object_id *);
 const struct got_error *got_packidx_match_id_str_prefix(

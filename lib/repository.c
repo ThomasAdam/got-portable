@@ -1971,7 +1971,8 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 			goto done;
 		*total_packsize += sb.st_size;
 
-		err = got_packidx_get_packfile_path(&path_packfile, packidx);
+		err = got_packidx_get_packfile_path(&path_packfile,
+		    packidx->path_packidx);
 		if (err)
 			goto done;
 
