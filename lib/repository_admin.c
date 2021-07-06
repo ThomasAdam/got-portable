@@ -1053,7 +1053,7 @@ purge_loose_object(struct got_object_id *id, void *data, void *arg)
 	}
 
 	if (!a->dry_run) {
-		err = got_lockfile_lock(&lf, path);
+		err = got_lockfile_lock(&lf, path, -1);
 		if (err)
 			goto done;
 		if (unlink(path) == -1) {
@@ -1073,7 +1073,7 @@ done:
 		err = got_error_from_errno("close");
 	free(path);
 	if (lf)
-		unlock_err = got_lockfile_unlock(lf);
+		unlock_err = got_lockfile_unlock(lf, -1);
 	return err ? err : unlock_err;
 }
 

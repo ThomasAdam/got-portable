@@ -31,7 +31,7 @@
 #include "got_lib_lockfile.h"
 
 const struct got_error *
-got_lockfile_lock(struct got_lockfile **lf, const char *path)
+got_lockfile_lock(struct got_lockfile **lf, const char *path, int dir_fd)
 {
 	const struct got_error *err = NULL;
 	int attempts = 5;
@@ -53,9 +53,15 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 	}
 
 	do {
-		(*lf)->fd = open((*lf)->path,
-		    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK,
-		    GOT_DEFAULT_FILE_MODE);
+		if (dir_fd != -1) {
+			(*lf)->fd = openat(dir_fd, (*lf)->path,
+			    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK,
+			    GOT_DEFAULT_FILE_MODE);
+		} else {
+			(*lf)->fd = open((*lf)->path,
+			    O_RDONLY | O_CREAT | O_EXCL | O_EXLOCK,
+			    GOT_DEFAULT_FILE_MODE);
+		}
 		if ((*lf)->fd != -1)
 			break;
 		if (errno != EEXIST) {
@@ -69,18 +75,22 @@ got_lockfile_lock(struct got_lockfile **lf, const char *path)
 		err = got_error(GOT_ERR_LOCKFILE_TIMEOUT);
 done:
 	if (err) {
-		got_lockfile_unlock(*lf);
+		got_lockfile_unlock(*lf, dir_fd);
 		*lf = NULL;
 	}
 	return err;
 }
 
 const struct got_error *
-got_lockfile_unlock(struct got_lockfile *lf)
+got_lockfile_unlock(struct got_lockfile *lf, int dir_fd)
 {
 	const struct got_error *err = NULL;
 
-	if (lf->path && lf->fd != -1 && unlink(lf->path) != 0)
+	if (dir_fd != -1) {
+		if (lf->path && lf->fd != -1 &&
+		    unlinkat(dir_fd, lf->path, 0) != 0)
+			err = got_error_from_errno("unlinkat");
+	} else if (lf->path && lf->fd != -1 && unlink(lf->path) != 0)
 		err = got_error_from_errno("unlink");
 	if (lf->fd != -1 && close(lf->fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");

@@ -27,5 +27,6 @@ struct got_lockfile {
 	int fd;
 };
 
-const struct got_error *got_lockfile_lock(struct got_lockfile **, const char *);
-const struct got_error *got_lockfile_unlock(struct got_lockfile *);
+const struct got_error *got_lockfile_lock(struct got_lockfile **,
+    const char *, int);
+const struct got_error *got_lockfile_unlock(struct got_lockfile *, int);

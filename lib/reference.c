@@ -174,7 +174,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	struct got_lockfile *lf = NULL;
 
 	if (lock) {
-		err = got_lockfile_lock(&lf, abspath);
+		err = got_lockfile_lock(&lf, abspath, -1);
 		if (err) {
 			if (err->code == GOT_ERR_ERRNO && errno == ENOENT)
 				err = got_error_not_ref(name);
@@ -189,7 +189,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		else
 			err = got_error_not_ref(name);
 		if (lock)
-			got_lockfile_unlock(lf);
+			got_lockfile_unlock(lf, -1);
 		return err;
 	}
 
@@ -206,7 +206,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 				err = got_error_from_errno2("getline", abspath);
 		}
 		if (lock)
-			got_lockfile_unlock(lf);
+			got_lockfile_unlock(lf, -1);
 		goto done;
 	}
 	while (linelen > 0 && line[linelen - 1] == '\n') {
@@ -217,12 +217,12 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	err = parse_ref_line(ref, absname, line);
 	if (lock) {
 		if (err)
-			got_lockfile_unlock(lf);
+			got_lockfile_unlock(lf, -1);
 		else {
 			if (*ref)
 				(*ref)->lf = lf;
 			else
-				got_lockfile_unlock(lf);
+				got_lockfile_unlock(lf, -1);
 		}
 	}
 done:
@@ -479,7 +479,7 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		}
 
 		if (lock) {
-			err = got_lockfile_lock(&lf, packed_refs_path);
+			err = got_lockfile_lock(&lf, packed_refs_path, -1);
 			if (err)
 				goto done;
 		}
@@ -502,7 +502,7 @@ done:
 	if (!err && *ref == NULL)
 		err = got_error_not_ref(refname);
 	if (err && lf)
-		got_lockfile_unlock(lf);
+		got_lockfile_unlock(lf, -1);
 	free(path_refs);
 	return err;
 }
@@ -1175,7 +1175,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 	}
 
 	if (ref->lf == NULL) {
-		err = got_lockfile_lock(&lf, path);
+		err = got_lockfile_lock(&lf, path, -1);
 		if (err)
 			goto done;
 	}
@@ -1203,7 +1203,7 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 	tmppath = NULL;
 done:
 	if (ref->lf == NULL && lf)
-		unlock_err = got_lockfile_unlock(lf);
+		unlock_err = got_lockfile_unlock(lf, -1);
 	if (f) {
 		if (fclose(f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
@@ -1244,7 +1244,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		goto done;
 
 	if (delref->lf == NULL) {
-		err = got_lockfile_lock(&lf, packed_refs_path);
+		err = got_lockfile_lock(&lf, packed_refs_path, -1);
 		if (err)
 			goto done;
 	}
@@ -1348,7 +1348,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 	}
 done:
 	if (delref->lf == NULL && lf)
-		unlock_err = got_lockfile_unlock(lf);
+		unlock_err = got_lockfile_unlock(lf, -1);
 	if (f) {
 		if (fclose(f) == EOF && err == NULL)
 			err = got_error_from_errno("fclose");
@@ -1385,7 +1385,7 @@ delete_loose_ref(struct got_reference *ref, struct got_repository *repo)
 	}
 
 	if (ref->lf == NULL) {
-		err = got_lockfile_lock(&lf, path);
+		err = got_lockfile_lock(&lf, path, -1);
 		if (err)
 			goto done;
 	}
@@ -1396,7 +1396,7 @@ delete_loose_ref(struct got_reference *ref, struct got_repository *repo)
 		err = got_error_from_errno2("unlink", path);
 done:
 	if (ref->lf == NULL && lf)
-		unlock_err = got_lockfile_unlock(lf);
+		unlock_err = got_lockfile_unlock(lf, -1);
 
 	free(path_refs);
 	free(path);
@@ -1446,7 +1446,7 @@ const struct got_error *
 got_ref_unlock(struct got_reference *ref)
 {
 	const struct got_error *err;
-	err = got_lockfile_unlock(ref->lf);
+	err = got_lockfile_unlock(ref->lf, -1);
 	ref->lf = NULL;
 	return err;
 }

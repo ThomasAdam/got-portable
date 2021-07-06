@@ -87,7 +87,7 @@ create_object_file(struct got_object_id *id, FILE *content,
 	if (err)
 		goto done;
 
-	err = got_lockfile_lock(&lf, objpath);
+	err = got_lockfile_lock(&lf, objpath, -1);
 	if (err)
 		goto done;
 
@@ -107,7 +107,7 @@ done:
 	if (tmpfile && fclose(tmpfile) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	if (lf)
-		unlock_err = got_lockfile_unlock(lf);
+		unlock_err = got_lockfile_unlock(lf, -1);
 	return err ? err : unlock_err;
 }
 
