@@ -332,34 +332,55 @@ got_packidx_open(struct got_packidx **packidx,
     int dir_fd, const char *relpath, int verify)
 {
 	const struct got_error *err = NULL;
-	struct got_packidx *p;
+	struct got_packidx *p = NULL;
+	char *pack_relpath;
 	struct stat sb;
 
 	*packidx = NULL;
 
+	err = got_packidx_get_packfile_path(&pack_relpath, relpath);
+	if (err)
+		return err;
+
+	/*
+	 * Ensure that a corresponding pack file exists.
+	 * Some Git repositories have this problem. Git seems to ignore
+	 * the existence of lonely pack index files but we do not.
+	 */
+	if (fstatat(dir_fd, pack_relpath, &sb, 0) == -1) {
+		if (errno == ENOENT) {
+			err = got_error_fmt(GOT_ERR_LONELY_PACKIDX,
+			    "%s", relpath);
+		} else
+			err = got_error_from_errno2("fstatat", pack_relpath);
+		goto done;
+	}
+
 	p = calloc(1, sizeof(*p));
-	if (p == NULL)
-		return got_error_from_errno("calloc");
+	if (p == NULL) {
+		err = got_error_from_errno("calloc");
+		goto done;
+	}
 
 	p->fd = openat(dir_fd, relpath, O_RDONLY | O_NOFOLLOW);
 	if (p->fd == -1) {
 		err = got_error_from_errno2("openat", relpath);
 		free(p);
-		return err;
+		goto done;
 	}
 
 	if (fstat(p->fd, &sb) != 0) {
 		err = got_error_from_errno2("fstat", relpath);
 		close(p->fd);
 		free(p);
-		return err;
+		goto done;
 	}
 	p->len = sb.st_size;
 	if (p->len < sizeof(p->hdr)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		close(p->fd);
 		free(p);
-		return err;
+		goto done;
 	}
 
 	p->path_packidx = strdup(relpath);
@@ -381,11 +402,12 @@ got_packidx_open(struct got_packidx **packidx,
 
 	err = got_packidx_init_hdr(p, verify);
 done:
-	if (err)
-		got_packidx_close(p);
-	else
+	if (err) {
+		if (p)
+			got_packidx_close(p);
+	} else
 		*packidx = p;
-
+	free(pack_relpath);
 	return err;
 }
 

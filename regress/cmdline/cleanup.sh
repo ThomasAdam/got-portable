@@ -264,7 +264,103 @@ test_cleanup_precious_objects() {
 	test_done "$testroot" "$ret"
 }
 
+test_cleanup_missing_pack_file() {
+	local testroot=`test_init cleanup_missing_pack_file`
+
+	# no pack files should exist yet
+	ls $testroot/repo/.git/objects/pack/ > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	gotadmin pack -r $testroot/repo > $testroot/stdout
+	packname=`grep ^Wrote $testroot/stdout | cut -d ' ' -f2`
+	packhash=`echo $packname | sed -e 's:^objects/pack/pack-::' \
+		-e 's/.pack$//'`
+
+	# Some freshly cloned Git repositories suffer from lonely pack index
+	# files. Remove the pack file we just wrote to simulate this issue.
+	rm $testroot/repo/.git/objects/pack/pack-$packname
+
+	# cleanup should now refuse to purge objects
+	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "gotadmin cleanup succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n "gotadmin: objects/pack/pack-${packhash}.idx: " \
+		> $testroot/stderr.expected
+	echo "pack index has no corresponding pack file" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	gotadmin cleanup -r $testroot/repo -p -n > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "gotadmin cleanup failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	packidx_path=$testroot/repo/.git/objects/pack/pack-${packhash}.idx
+	echo "$packidx_path could be removed" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	gotadmin cleanup -r $testroot/repo -p > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "gotadmin cleanup failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "$packidx_path removed" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# cleanup should now attempt to purge objects
+	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "gotadmin cleanup failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_cleanup_unreferenced_loose_objects
 run_test test_cleanup_redundant_loose_objects
 run_test test_cleanup_precious_objects
+run_test test_cleanup_missing_pack_file

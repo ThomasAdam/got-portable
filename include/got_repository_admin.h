@@ -85,3 +85,13 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
     off_t *size_before, off_t *size_after, int *npacked, int dry_run,
     got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
+
+/* A callback function which gets invoked with cleanup information to print. */
+typedef const struct got_error *(*got_lonely_packidx_progress_cb)(void *arg,
+    const char *path);
+
+/* Remove pack index files which do not have a corresponding pack file. */
+const struct got_error *
+got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
+    got_lonely_packidx_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg);

@@ -897,8 +897,8 @@ done:
 __dead static void
 usage_cleanup(void)
 {
-	fprintf(stderr, "usage: %s cleanup [-n] [-r repository-path] [-q]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s cleanup [-p] [-n] [-r repository-path] "
+	    "[-q]\n", getprogname());
 	exit(1);
 }
 
@@ -959,6 +959,29 @@ cleanup_progress(void *arg, int nloose, int ncommits, int npurged)
 	return NULL;
 }
 
+struct got_lonely_packidx_progress_arg {
+	int verbosity;
+	int printed_something;
+	int dry_run;
+};
+
+static const struct got_error *
+lonely_packidx_progress(void *arg, const char *path)
+{
+	struct got_lonely_packidx_progress_arg *a = arg;
+
+	if (a->verbosity < 0)
+		return NULL;
+
+	if (a->dry_run)
+		printf("%s could be removed\n", path);
+	else
+		printf("%s removed\n", path);
+
+	a->printed_something = 1;
+	return NULL;
+}
+
 static const struct got_error *
 cmd_cleanup(int argc, char *argv[])
 {
@@ -966,7 +989,9 @@ cmd_cleanup(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	struct got_repository *repo = NULL;
 	int ch, dry_run = 0, npacked = 0, verbosity = 0;
+	int remove_lonely_packidx = 0;
 	struct got_cleanup_progress_arg cpa;
+	struct got_lonely_packidx_progress_arg lpa;
 	off_t size_before, size_after;
 	char scaled_before[FMT_SCALED_STRSIZE];
 	char scaled_after[FMT_SCALED_STRSIZE];
@@ -974,8 +999,11 @@ cmd_cleanup(int argc, char *argv[])
 	char **extensions;
 	int nextensions, i;
 
-	while ((ch = getopt(argc, argv, "r:nq")) != -1) {
+	while ((ch = getopt(argc, argv, "pr:nq")) != -1) {
 		switch (ch) {
+		case 'p':
+			remove_lonely_packidx = 1;
+			break;
 		case 'r':
 			repo_path = realpath(optarg, NULL);
 			if (repo_path == NULL)
@@ -1026,6 +1054,15 @@ cmd_cleanup(int argc, char *argv[])
 			    "this implies that objects must not be deleted");
 			goto done;
 		}
+	}
+
+	if (remove_lonely_packidx) {
+		memset(&lpa, 0, sizeof(lpa));
+		lpa.dry_run = dry_run;
+		lpa.verbosity = verbosity;
+		error = got_repo_remove_lonely_packidx(repo, dry_run,
+		    lonely_packidx_progress, &lpa, check_cancelled, NULL);
+		goto done;
 	}
 
 	memset(&cpa, 0, sizeof(cpa));

@@ -1157,3 +1157,103 @@ done:
 	got_object_idset_free(traversed_ids);
 	return err;
 }
+
+static const struct got_error *
+remove_packidx(int dir_fd, const char *relpath)
+{
+	const struct got_error *err, *unlock_err;
+	struct got_lockfile *lf;
+
+	err = got_lockfile_lock(&lf, relpath, dir_fd);
+	if (err)
+		return err;
+	if (unlinkat(dir_fd, relpath, 0) == -1)
+		err = got_error_from_errno("unlinkat");
+	unlock_err = got_lockfile_unlock(lf, dir_fd);
+	return err ? err : unlock_err;
+}
+
+const struct got_error *
+got_repo_remove_lonely_packidx(struct got_repository *repo, int dry_run,
+    got_lonely_packidx_progress_cb progress_cb, void *progress_arg,
+    got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	DIR *packdir = NULL;
+	struct dirent *dent;
+	char *pack_relpath = NULL;
+	int packdir_fd;
+	struct stat sb;
+
+	packdir_fd = openat(got_repo_get_fd(repo),
+	    GOT_OBJECTS_PACK_DIR, O_DIRECTORY);
+	if (packdir_fd == -1) {
+		if (errno == ENOENT)
+			return NULL;
+		return got_error_from_errno_fmt("openat: %s/%s",
+		    got_repo_get_path_git_dir(repo),
+		    GOT_OBJECTS_PACK_DIR);
+	}
+
+	packdir = fdopendir(packdir_fd);
+	if (packdir == NULL) {
+		err = got_error_from_errno("fdopendir");
+		goto done;
+	}
+
+	while ((dent = readdir(packdir)) != NULL) {
+		if (cancel_cb) {
+			err = cancel_cb(cancel_arg);
+			if (err)
+				goto done;
+		}
+
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
+			continue;
+
+		err = got_packidx_get_packfile_path(&pack_relpath,
+		    dent->d_name);
+		if (err)
+			goto done;
+
+		if (fstatat(packdir_fd, pack_relpath, &sb, 0) != -1) {
+			free(pack_relpath);
+			pack_relpath = NULL;
+			continue;
+		}
+		if (errno != ENOENT) {
+			err = got_error_from_errno_fmt("fstatat: %s/%s/%s",
+			    got_repo_get_path_git_dir(repo),
+			    GOT_OBJECTS_PACK_DIR,
+			    pack_relpath);
+			goto done;
+		}
+
+		if (!dry_run) {
+			err = remove_packidx(packdir_fd, dent->d_name);
+			if (err)
+				goto done;
+		}
+		if (progress_cb) {
+			char *path;
+			if (asprintf(&path, "%s/%s/%s",
+			    got_repo_get_path_git_dir(repo),
+			    GOT_OBJECTS_PACK_DIR,
+			    dent->d_name) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			err = progress_cb(progress_arg, path);
+			free(path);
+			if (err)
+				goto done;
+		}
+		free(pack_relpath);
+		pack_relpath = NULL;
+	}
+done:
+	if (packdir && closedir(packdir) != 0 && err == NULL)
+		err = got_error_from_errno("closedir");
+	free(pack_relpath);
+	return err;
+}

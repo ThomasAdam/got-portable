@@ -146,6 +146,7 @@
 #define GOT_ERR_BAD_SYMLINK	129
 #define GOT_ERR_GIT_REPO_EXT	130
 #define GOT_ERR_CANNOT_PACK	131
+#define GOT_ERR_LONELY_PACKIDX	132
 
 static const struct got_error {
 	int code;
@@ -299,6 +300,7 @@ static const struct got_error {
 	    "version control" },
 	{ GOT_ERR_GIT_REPO_EXT, "unsupported repository format extension" },
 	{ GOT_ERR_CANNOT_PACK, "not enough objects to pack" },
+	{ GOT_ERR_LONELY_PACKIDX, "pack index has no corresponding pack file" },
 };
 
 /*

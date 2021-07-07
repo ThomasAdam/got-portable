@@ -938,8 +938,8 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 	return NULL;
 }
 
-static int
-is_packidx_filename(const char *name, size_t len)
+int
+got_repo_is_packidx_filename(const char *name, size_t len)
 {
 	if (len != GOT_PACKIDX_NAMELEN)
 		return 0;
@@ -1008,7 +1008,7 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	while ((dent = readdir(packdir)) != NULL) {
 		int is_cached = 0;
 
-		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
@@ -1276,7 +1276,7 @@ match_packed_object(struct got_object_id **unique_id,
 		struct got_packidx *packidx;
 		struct got_object_qid *qid;
 
-		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,
@@ -1952,7 +1952,7 @@ got_repo_get_packfile_info(int *npackfiles, int *nobjects,
 	}
 
 	while ((dent = readdir(packdir)) != NULL) {
-		if (!is_packidx_filename(dent->d_name, dent->d_namlen))
+		if (!got_repo_is_packidx_filename(dent->d_name, dent->d_namlen))
 			continue;
 
 		if (asprintf(&path_packidx, "%s/%s", GOT_OBJECTS_PACK_DIR,

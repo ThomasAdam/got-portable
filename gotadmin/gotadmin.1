@@ -181,7 +181,7 @@ and a break-down of the number of objects per object type.
 .It Cm ls
 Short alias for
 .Cm listpack .
-.It Cm cleanup Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
+.It Cm cleanup Oo Fl p Oc Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
 Purge unreferenced loose objects from the repository and display
 the amount of disk space which has been freed as a result.
 .Pp
@@ -238,6 +238,16 @@ will only purge corresponding objects once such references have been
 deleted with
 .Cm got ref -d .
 .Pp
+Some Git repositories contain pack index files which lack a corresponding
+pack file, which is an inconsistent repository state.
+In such cases,
+.Cm gotadmin cleanup -p -n
+will display a list of affected pack index files.
+Whenever possible the missing pack files should be restored.
+If restoring missing pack files is not possible then affected pack index
+files can be removed with
+.Cm gotadmin cleanup -p .
+.Pp
 The
 .Dq preciousObjects
 Git extension is intended to prevent the removal of objects from a repository.
@@ -248,9 +258,12 @@ The options for
 .Cm gotadmin cleanup
 are as follows:
 .Bl -tag -width Ds
+.It Fl p
+Instead of purging unreferenced loose objects, remove any pack index files
+which do not have a corresponding pack file.
 .It Fl n
 Display the usual progress output and summary information but do not actually
-purge any objects.
+remove any files from disk.
 .It Fl r Ar repository-path
 Use the repository at the specified path.
 If not specified, assume the repository is located at or above the current
