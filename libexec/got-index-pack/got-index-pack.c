@@ -186,6 +186,7 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 	size_t mapoff = obj->off;
 	struct got_inflate_checksum csum;
 
+	memset(&csum, 0, sizeof(csum));
 	csum.input_sha1 = pack_sha1_ctx;
 	csum.input_crc = &obj->crc;
 

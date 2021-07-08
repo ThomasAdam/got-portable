@@ -103,7 +103,7 @@ const struct got_error *got_object_open_loose_fd(int *, struct got_object_id *,
 const struct got_error *got_object_open_packed(struct got_object **,
     struct got_object_id *, struct got_repository *);
 const struct got_error *got_object_read_header_privsep(struct got_object **,
-    struct got_repository *, int);
+    struct got_object_id *, struct got_repository *, int);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
 const struct got_error *got_object_raw_open(struct got_raw_object **,

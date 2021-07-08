@@ -38,6 +38,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_sha1.h"
 
 static volatile sig_atomic_t sigint_received;
 
@@ -48,20 +49,38 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
-read_tag_object(struct got_tag_object **tag, FILE *f)
+read_tag_object(struct got_tag_object **tag, FILE *f,
+    struct got_object_id *expected_id)
 {
 	const struct got_error *err = NULL;
-	struct got_object *obj;
+	struct got_object *obj = NULL;
 	size_t len;
 	uint8_t *p;
+	struct got_inflate_checksum csum;
+	SHA1_CTX sha1_ctx;
+	struct got_object_id id;
 
-	err = got_inflate_to_mem(&p, &len, NULL, NULL, f);
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
+
+	err = got_inflate_to_mem(&p, &len, NULL, &csum, f);
 	if (err)
 		return err;
+
+	SHA1Final(id.sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
 
 	err = got_object_parse_header(&obj, p, len);
 	if (err)
-		return err;
+		goto done;
 
 	if (len < obj->hdrlen + obj->size) {
 		err = got_error(GOT_ERR_BAD_OBJ_DATA);
@@ -73,7 +92,8 @@ read_tag_object(struct got_tag_object **tag, FILE *f)
 	err = got_object_parse_tag(tag, p + obj->hdrlen, len);
 done:
 	free(p);
-	got_object_close(obj);
+	if (obj)
+		got_object_close(obj);
 	return err;
 }
 
@@ -82,6 +102,7 @@ main(int argc, char *argv[])
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf ibuf;
+	size_t datalen;
 
 	signal(SIGINT, catch_sigint);
 
@@ -100,6 +121,7 @@ main(int argc, char *argv[])
 		struct imsg imsg;
 		FILE *f = NULL;
 		struct got_tag_object *tag = NULL;
+		struct got_object_id expected_id;
 
 		if (sigint_received) {
 			err = got_error(GOT_ERR_CANCELLED);
@@ -121,6 +143,13 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (datalen != sizeof(expected_id)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		memcpy(&expected_id, imsg.data, sizeof(expected_id));
+
 		if (imsg.fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
 			goto done;
@@ -133,7 +162,7 @@ main(int argc, char *argv[])
 			goto done;
 		}
 
-		err = read_tag_object(&tag, f);
+		err = read_tag_object(&tag, f, &expected_id);
 		if (err)
 			goto done;
 

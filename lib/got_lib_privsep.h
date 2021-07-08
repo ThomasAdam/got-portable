@@ -369,6 +369,13 @@ struct got_imsg_pack {
 } __attribute__((__packed__));
 
 /*
+ * Structure for GOT_IMSG_OBJECT_REQUEST, GOT_IMSG_BLOB_REQUEST,
+ * GOT_IMSG_TREE_REQUEST, GOT_IMSG_COMMIT_REQUEST, and
+ * GOT_IMSG_TAG_REQUEST data.
+ */
+struct got_object_id;
+
+/*
  * Structure for GOT_IMSG_PACKED_OBJECT_REQUEST and
  * GOT_IMSG_PACKED_RAW_OBJECT_REQUEST data.
  */
@@ -428,8 +435,10 @@ const struct got_error *got_privsep_recv_imsg(struct imsg *, struct imsgbuf *,
 void got_privsep_send_error(struct imsgbuf *, const struct got_error *);
 const struct got_error *got_privsep_send_ack(struct imsgbuf *);
 const struct got_error *got_privsep_wait_ack(struct imsgbuf *);
-const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int);
-const struct got_error *got_privsep_send_raw_obj_req(struct imsgbuf *, int);
+const struct got_error *got_privsep_send_obj_req(struct imsgbuf *, int,
+    struct got_object_id *);
+const struct got_error *got_privsep_send_raw_obj_req(struct imsgbuf *, int,
+    struct got_object_id *);
 const struct got_error *got_privsep_send_raw_obj_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_send_commit_req(struct imsgbuf *, int,
     struct got_object_id *, int);

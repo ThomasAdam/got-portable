@@ -250,20 +250,22 @@ got_privsep_send_stop(int fd)
 }
 
 const struct got_error *
-got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd)
+got_privsep_send_obj_req(struct imsgbuf *ibuf, int fd,
+    struct got_object_id *id)
 {
-	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
-	    == -1)
+	if (imsg_compose(ibuf, GOT_IMSG_OBJECT_REQUEST, 0, 0, fd,
+	    id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_compose OBJECT_REQUEST");
 
 	return flush_imsg(ibuf);
 }
 
 const struct got_error *
-got_privsep_send_raw_obj_req(struct imsgbuf *ibuf, int fd)
+got_privsep_send_raw_obj_req(struct imsgbuf *ibuf, int fd,
+    struct got_object_id *id)
 {
-	if (imsg_compose(ibuf, GOT_IMSG_RAW_OBJECT_REQUEST, 0, 0, fd, NULL, 0)
-	    == -1)
+	if (imsg_compose(ibuf, GOT_IMSG_RAW_OBJECT_REQUEST, 0, 0, fd,
+	    id, sizeof(*id)) == -1)
 		return got_error_from_errno("imsg_compose RAW_OBJECT_REQUEST");
 
 	return flush_imsg(ibuf);
@@ -384,20 +386,21 @@ got_privsep_send_commit_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_packed_object iobj, *iobjp;
+	struct got_imsg_packed_object iobj;
+	void *data;
 	size_t len;
 
-	if (id) { /* commit is packed */
+	if (pack_idx != -1) { /* commit is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
-		iobjp = &iobj;
+		data = &iobj;
 		len = sizeof(iobj);
 	} else {
-		iobjp = NULL;
-		len = 0;
+		data = id;
+		len = sizeof(*id);
 	}
 
-	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_REQUEST, 0, 0, fd, iobjp, len)
+	if (imsg_compose(ibuf, GOT_IMSG_COMMIT_REQUEST, 0, 0, fd, data, len)
 	    == -1) {
 		err = got_error_from_errno("imsg_compose COMMIT_REQUEST");
 		close(fd);
@@ -413,19 +416,24 @@ got_privsep_send_tree_req(struct imsgbuf *ibuf, int fd,
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
-	size_t len = id ? sizeof(struct got_imsg_packed_object) : 0;
+	size_t len;
+
+	if (pack_idx != -1)
+		len = sizeof(struct got_imsg_packed_object);
+	else
+		len = sizeof(*id);
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_TREE_REQUEST, 0, 0, len);
 	if (wbuf == NULL)
 		return got_error_from_errno("imsg_create TREE_REQUEST");
 
-	if (id) { /* tree is packed */
-		if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
-			err = got_error_from_errno("imsg_add TREE_ENTRY");
-			ibuf_free(wbuf);
-			return err;
-		}
+	if (imsg_add(wbuf, id->sha1, SHA1_DIGEST_LENGTH) == -1) {
+		err = got_error_from_errno("imsg_add TREE_ENTRY");
+		ibuf_free(wbuf);
+		return err;
+	}
 
+	if (pack_idx != -1) { /* tree is packed */
 		if (imsg_add(wbuf, &pack_idx, sizeof(pack_idx)) == -1) {
 			err = got_error_from_errno("imsg_add TREE_ENTRY");
 			ibuf_free(wbuf);
@@ -443,20 +451,21 @@ const struct got_error *
 got_privsep_send_tag_req(struct imsgbuf *ibuf, int fd,
     struct got_object_id *id, int pack_idx)
 {
-	struct got_imsg_packed_object iobj, *iobjp;
+	struct got_imsg_packed_object iobj;
+	void *data;
 	size_t len;
 
-	if (id) { /* tag is packed */
+	if (pack_idx != -1) { /* tag is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
-		iobjp = &iobj;
+		data = &iobj;
 		len = sizeof(iobj);
 	} else {
-		iobjp = NULL;
-		len = 0;
+		data = id;
+		len = sizeof(*id);
 	}
 
-	if (imsg_compose(ibuf, GOT_IMSG_TAG_REQUEST, 0, 0, fd, iobjp, len)
+	if (imsg_compose(ibuf, GOT_IMSG_TAG_REQUEST, 0, 0, fd, data, len)
 	    == -1)
 		return got_error_from_errno("imsg_compose TAG_REQUEST");
 
@@ -468,20 +477,21 @@ got_privsep_send_blob_req(struct imsgbuf *ibuf, int infd,
     struct got_object_id *id, int pack_idx)
 {
 	const struct got_error *err = NULL;
-	struct got_imsg_packed_object iobj, *iobjp;
+	struct got_imsg_packed_object iobj;
+	void *data;
 	size_t len;
 
-	if (id) { /* blob is packed */
+	if (pack_idx != -1) { /* blob is packed */
 		iobj.idx = pack_idx;
 		memcpy(iobj.id, id->sha1, sizeof(iobj.id));
-		iobjp = &iobj;
+		data = &iobj;
 		len = sizeof(iobj);
 	} else {
-		iobjp = NULL;
-		len = 0;
+		data = id;
+		len = sizeof(*id);
 	}
 
-	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, iobjp, len)
+	if (imsg_compose(ibuf, GOT_IMSG_BLOB_REQUEST, 0, 0, infd, data, len)
 	    == -1) {
 		err = got_error_from_errno("imsg_compose BLOB_REQUEST");
 		close(infd);

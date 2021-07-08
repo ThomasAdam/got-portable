@@ -38,6 +38,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_sha1.h"
 
 static volatile sig_atomic_t sigint_received;
 
@@ -73,6 +74,14 @@ main(int argc, char *argv[])
 		size_t size;
 		struct got_object *obj = NULL;
 		uint8_t *buf = NULL;
+		struct got_object_id id;
+		struct got_object_id expected_id;
+		struct got_inflate_checksum csum;
+		SHA1_CTX sha1_ctx;
+
+		SHA1Init(&sha1_ctx);
+		memset(&csum, 0, sizeof(csum));
+		csum.output_sha1 = &sha1_ctx;
 
 		memset(&imsg, 0, sizeof(imsg));
 		imsg.fd = -1;
@@ -98,6 +107,13 @@ main(int argc, char *argv[])
 			err = got_error(GOT_ERR_PRIVSEP_MSG);
 			goto done;
 		}
+
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		if (datalen != sizeof(expected_id)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			goto done;
+		}
+		memcpy(&expected_id, imsg.data, sizeof(expected_id));
 
 		if (imsg.fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
@@ -146,13 +162,22 @@ main(int argc, char *argv[])
 
 		if (obj->size + obj->hdrlen <=
 		    GOT_PRIVSEP_INLINE_BLOB_DATA_MAX) {
-			err = got_inflate_to_mem(&buf, &size, NULL, NULL, f);
+			err = got_inflate_to_mem(&buf, &size, NULL, &csum, f);
 			if (err)
 				goto done;
 		} else {
-			err = got_inflate_to_fd(&size, f, NULL, imsg_outfd.fd);
+			err = got_inflate_to_fd(&size, f, &csum, imsg_outfd.fd);
 			if (err)
 				goto done;
+		}
+		SHA1Final(id.sha1, &sha1_ctx);
+		if (memcmp(expected_id.sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+			char buf[SHA1_DIGEST_STRING_LENGTH];
+			err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+			    "checksum failure for object %s",
+			    got_sha1_digest_to_str(expected_id.sha1, buf,
+			    sizeof(buf)));
+			goto done;
 		}
 
 		if (size < obj->hdrlen) {

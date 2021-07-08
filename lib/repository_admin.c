@@ -664,7 +664,8 @@ get_loose_object_ids(struct got_object_idset **loose_ids, off_t *ondisk_size,
 				err = got_error_from_errno("fstat");
 				goto done;
 			}
-			err = got_object_read_header_privsep(&obj, repo, fd);
+			err = got_object_read_header_privsep(&obj, &id, repo,
+			    fd);
 			if (err)
 				goto done;
 			fd = -1; /* already closed */

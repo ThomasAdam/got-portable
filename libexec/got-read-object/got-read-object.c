@@ -38,6 +38,7 @@
 #include "got_lib_object.h"
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
+#include "got_lib_sha1.h"
 
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
@@ -57,12 +58,21 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
-send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
+send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj,
+    struct got_object_id *expected_id,
+    int fd, int outfd)
 {
 	const struct got_error *err = NULL;
 	uint8_t *data = NULL;
 	size_t len = 0, consumed;
 	FILE *f;
+	struct got_object_id id;
+	struct got_inflate_checksum csum;
+	SHA1_CTX sha1_ctx;
+
+	SHA1Init(&sha1_ctx);
+	memset(&csum, 0, sizeof(csum));
+	csum.output_sha1 = &sha1_ctx;
 
 	if (lseek(fd, SEEK_SET, 0) == -1) {
 		err = got_error_from_errno("lseek");
@@ -78,9 +88,9 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 	}
 
 	if (obj->size + obj->hdrlen <= GOT_PRIVSEP_INLINE_OBJECT_DATA_MAX)
-		err = got_inflate_to_mem(&data, &len, &consumed, NULL, f);
+		err = got_inflate_to_mem(&data, &len, &consumed, &csum, f);
 	else
-		err = got_inflate_to_fd(&len, f, NULL, outfd);
+		err = got_inflate_to_fd(&len, f, &csum, outfd);
 	if (err)
 		goto done;
 
@@ -88,6 +98,17 @@ send_raw_obj(struct imsgbuf *ibuf, struct got_object *obj, int fd, int outfd)
 		err = got_error(GOT_ERR_BAD_OBJ_HDR);
 		goto done;
 	}
+
+	SHA1Final(id.sha1, &sha1_ctx);
+	if (memcmp(expected_id->sha1, id.sha1, SHA1_DIGEST_LENGTH) != 0) {
+		char buf[SHA1_DIGEST_STRING_LENGTH];
+		err = got_error_fmt(GOT_ERR_OBJ_CSUM,
+		    "checksum failure for object %s",
+		    got_sha1_digest_to_str(expected_id->sha1, buf,
+		    sizeof(buf)));
+		goto done;
+	}
+
 
 	err = got_privsep_send_raw_obj(ibuf, obj->size, obj->hdrlen, data);
 
@@ -107,6 +128,7 @@ main(int argc, char *argv[])
 	struct imsg imsg;
 	struct imsgbuf ibuf;
 	size_t datalen;
+	struct got_object_id expected_id;
 
 	signal(SIGINT, catch_sigint);
 
@@ -144,10 +166,11 @@ main(int argc, char *argv[])
 		}
 
 		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
-		if (datalen != 0) {
+		if (datalen != sizeof(expected_id)) {
 			err = got_error(GOT_ERR_PRIVSEP_LEN);
 			goto done;
 		}
+		memcpy(&expected_id, imsg.data, sizeof(expected_id));
 
 		if (imsg.fd == -1) {
 			err = got_error(GOT_ERR_PRIVSEP_NO_FD);
@@ -160,6 +183,7 @@ main(int argc, char *argv[])
 
 		if (imsg.hdr.type == GOT_IMSG_RAW_OBJECT_REQUEST) {
 			struct imsg imsg_outfd;
+
 			err = got_privsep_recv_imsg(&imsg_outfd, &ibuf, 0);
 			if (err) {
 				if (imsg_outfd.hdr.len == 0)
@@ -189,7 +213,8 @@ main(int argc, char *argv[])
 				imsg_free(&imsg_outfd);
 				goto done;
 			}
-			err = send_raw_obj(&ibuf, obj, imsg.fd, imsg_outfd.fd);
+			err = send_raw_obj(&ibuf, obj, &expected_id,
+			    imsg.fd, imsg_outfd.fd);
 			imsg.fd = -1; /* imsg.fd is owned by send_raw_obj() */
 			if (close(imsg_outfd.fd) == -1 && err == NULL)
 				err = got_error_from_errno("close");

@@ -367,14 +367,15 @@ done:
 }
 
 static const struct got_error *
-request_object(struct got_object **obj, struct got_repository *repo, int fd)
+request_object(struct got_object **obj, struct got_object_id *id,
+    struct got_repository *repo, int fd)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].ibuf;
 
-	err = got_privsep_send_obj_req(ibuf, fd);
+	err = got_privsep_send_obj_req(ibuf, fd, id);
 	if (err)
 		return err;
 
@@ -383,7 +384,7 @@ request_object(struct got_object **obj, struct got_repository *repo, int fd)
 
 static const struct got_error *
 request_raw_object(uint8_t **outbuf, off_t *size, size_t *hdrlen, int outfd,
-    struct got_repository *repo, int infd)
+    struct got_object_id *id, struct got_repository *repo, int infd)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
@@ -395,7 +396,7 @@ request_raw_object(uint8_t **outbuf, off_t *size, size_t *hdrlen, int outfd,
 	if (outfd_child == -1)
 		return got_error_from_errno("dup");
 
-	err = got_privsep_send_raw_obj_req(ibuf, infd);
+	err = got_privsep_send_raw_obj_req(ibuf, infd, id);
 	if (err)
 		return err;
 
@@ -453,12 +454,12 @@ start_read_object_child(struct got_repository *repo)
 
 const struct got_error *
 got_object_read_header_privsep(struct got_object **obj,
-    struct got_repository *repo, int obj_fd)
+    struct got_object_id *id, struct got_repository *repo, int obj_fd)
 {
 	const struct got_error *err;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
-		return request_object(obj, repo, obj_fd);
+		return request_object(obj, id, repo, obj_fd);
 
 	err = start_read_object_child(repo);
 	if (err) {
@@ -466,24 +467,26 @@ got_object_read_header_privsep(struct got_object **obj,
 		return err;
 	}
 
-	return request_object(obj, repo, obj_fd);
+	return request_object(obj, id, repo, obj_fd);
 }
 
 static const struct got_error *
 read_object_raw_privsep(uint8_t **outbuf, off_t *size, size_t *hdrlen,
-    int outfd, struct got_repository *repo, int obj_fd)
+    int outfd, struct got_object_id *id, struct got_repository *repo,
+    int obj_fd)
 {
 	const struct got_error *err;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_OBJECT].imsg_fd != -1)
-		return request_raw_object(outbuf, size, hdrlen, outfd, repo,
-		    obj_fd);
+		return request_raw_object(outbuf, size, hdrlen, outfd, id,
+		    repo, obj_fd);
 
 	err = start_read_object_child(repo);
 	if (err)
 		return err;
 
-	return request_raw_object(outbuf, size, hdrlen, outfd, repo, obj_fd);
+	return request_raw_object(outbuf, size, hdrlen, outfd, id, repo,
+	    obj_fd);
 }
 
 const struct got_error *
@@ -514,7 +517,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 		return err;
 	}
 
-	err = got_object_read_header_privsep(obj, repo, fd);
+	err = got_object_read_header_privsep(obj, id, repo, fd);
 	if (err)
 		return err;
 
@@ -568,7 +571,7 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 		if (err)
 			goto done;
 		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, outfd,
-		    repo, fd);
+		    id, repo, fd);
 	}
 
 	*obj = calloc(1, sizeof(**obj));
@@ -745,14 +748,14 @@ read_packed_commit_privsep(struct got_commit_object **commit,
 
 static const struct got_error *
 request_commit(struct got_commit_object **commit, struct got_repository *repo,
-    int fd)
+    int fd, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf;
 
-	err = got_privsep_send_commit_req(ibuf, fd, NULL, -1);
+	err = got_privsep_send_commit_req(ibuf, fd, id, -1);
 	if (err)
 		return err;
 
@@ -761,7 +764,7 @@ request_commit(struct got_commit_object **commit, struct got_repository *repo,
 
 static const struct got_error *
 read_commit_privsep(struct got_commit_object **commit, int obj_fd,
-    struct got_repository *repo)
+    struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err;
 	int imsg_fds[2];
@@ -769,7 +772,7 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].imsg_fd != -1)
-		return request_commit(commit, repo, obj_fd);
+		return request_commit(commit, repo, obj_fd, id);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -804,7 +807,7 @@ read_commit_privsep(struct got_commit_object **commit, int obj_fd,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_COMMIT].ibuf = ibuf;
 
-	return request_commit(commit, repo, obj_fd);
+	return request_commit(commit, repo, obj_fd, id);
 }
 
 
@@ -850,7 +853,7 @@ open_commit(struct got_commit_object **commit,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
-		err = read_commit_privsep(commit, fd, repo);
+		err = read_commit_privsep(commit, fd, id, repo);
 	}
 
 	if (err == NULL) {
@@ -959,14 +962,14 @@ read_packed_tree_privsep(struct got_tree_object **tree,
 
 static const struct got_error *
 request_tree(struct got_tree_object **tree, struct got_repository *repo,
-    int fd)
+    int fd, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf;
 
-	err = got_privsep_send_tree_req(ibuf, fd, NULL, -1);
+	err = got_privsep_send_tree_req(ibuf, fd, id, -1);
 	if (err)
 		return err;
 
@@ -975,7 +978,7 @@ request_tree(struct got_tree_object **tree, struct got_repository *repo,
 
 const struct got_error *
 read_tree_privsep(struct got_tree_object **tree, int obj_fd,
-    struct got_repository *repo)
+    struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err;
 	int imsg_fds[2];
@@ -983,7 +986,7 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].imsg_fd != -1)
-		return request_tree(tree, repo, obj_fd);
+		return request_tree(tree, repo, obj_fd, id);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -1019,7 +1022,7 @@ read_tree_privsep(struct got_tree_object **tree, int obj_fd,
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TREE].ibuf = ibuf;
 
 
-	return request_tree(tree, repo, obj_fd);
+	return request_tree(tree, repo, obj_fd, id);
 }
 
 static const struct got_error *
@@ -1064,7 +1067,7 @@ open_tree(struct got_tree_object **tree, struct got_repository *repo,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
-		err = read_tree_privsep(tree, fd, repo);
+		err = read_tree_privsep(tree, fd, id, repo);
 	}
 
 	if (err == NULL) {
@@ -1301,7 +1304,7 @@ read_packed_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 static const struct got_error *
 request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
-    int infd, struct imsgbuf *ibuf)
+    int infd, struct got_object_id *id, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
 	int outfd_child;
@@ -1310,7 +1313,7 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 	if (outfd_child == -1)
 		return got_error_from_errno("dup");
 
-	err = got_privsep_send_blob_req(ibuf, infd, NULL, -1);
+	err = got_privsep_send_blob_req(ibuf, infd, id, -1);
 	if (err)
 		return err;
 
@@ -1330,7 +1333,7 @@ request_blob(uint8_t **outbuf, size_t *size, size_t *hdrlen, int outfd,
 
 static const struct got_error *
 read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
-    int outfd, int infd, struct got_repository *repo)
+    int outfd, int infd, struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err;
 	int imsg_fds[2];
@@ -1339,7 +1342,8 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].imsg_fd != -1) {
 		ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf;
-		return request_blob(outbuf, size, hdrlen, outfd, infd, ibuf);
+		return request_blob(outbuf, size, hdrlen, outfd, infd, id,
+		    ibuf);
 	}
 
 	ibuf = calloc(1, sizeof(*ibuf));
@@ -1375,7 +1379,7 @@ read_blob_privsep(uint8_t **outbuf, size_t *size, size_t *hdrlen,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_BLOB].ibuf = ibuf;
 
-	return request_blob(outbuf, size, hdrlen, outfd, infd, ibuf);
+	return request_blob(outbuf, size, hdrlen, outfd, infd, id, ibuf);
 }
 
 static const struct got_error *
@@ -1430,7 +1434,7 @@ open_blob(struct got_blob_object **blob, struct got_repository *repo,
 		if (err)
 			goto done;
 		err = read_blob_privsep(&outbuf, &size, &hdrlen, outfd, infd,
-		    repo);
+		    id, repo);
 	}
 	if (err)
 		goto done;
@@ -1674,14 +1678,14 @@ read_packed_tag_privsep(struct got_tag_object **tag,
 
 static const struct got_error *
 request_tag(struct got_tag_object **tag, struct got_repository *repo,
-    int fd)
+    int fd, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct imsgbuf *ibuf;
 
 	ibuf = repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf;
 
-	err = got_privsep_send_tag_req(ibuf, fd, NULL, -1);
+	err = got_privsep_send_tag_req(ibuf, fd, id, -1);
 	if (err)
 		return err;
 
@@ -1690,7 +1694,7 @@ request_tag(struct got_tag_object **tag, struct got_repository *repo,
 
 static const struct got_error *
 read_tag_privsep(struct got_tag_object **tag, int obj_fd,
-    struct got_repository *repo)
+    struct got_object_id *id, struct got_repository *repo)
 {
 	const struct got_error *err;
 	int imsg_fds[2];
@@ -1698,7 +1702,7 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 	struct imsgbuf *ibuf;
 
 	if (repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].imsg_fd != -1)
-		return request_tag(tag, repo, obj_fd);
+		return request_tag(tag, repo, obj_fd, id);
 
 	ibuf = calloc(1, sizeof(*ibuf));
 	if (ibuf == NULL)
@@ -1733,7 +1737,7 @@ read_tag_privsep(struct got_tag_object **tag, int obj_fd,
 	imsg_init(ibuf, imsg_fds[0]);
 	repo->privsep_children[GOT_REPO_PRIVSEP_CHILD_TAG].ibuf = ibuf;
 
-	return request_tag(tag, repo, obj_fd);
+	return request_tag(tag, repo, obj_fd, id);
 }
 
 static const struct got_error *
@@ -1791,7 +1795,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
-		err = got_object_read_header_privsep(&obj, repo, fd);
+		err = got_object_read_header_privsep(&obj, id, repo, fd);
 		if (err)
 			return err;
 		obj_type = obj->type;
@@ -1802,7 +1806,7 @@ open_tag(struct got_tag_object **tag, struct got_repository *repo,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			return err;
-		err = read_tag_privsep(tag, fd, repo);
+		err = read_tag_privsep(tag, fd, id, repo);
 	}
 
 	if (err == NULL) {
