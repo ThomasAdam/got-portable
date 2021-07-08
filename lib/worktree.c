@@ -3269,7 +3269,7 @@ struct diff_dir_cb_arg {
     got_cancel_cb cancel_cb;
     void *cancel_arg;
     /* A pathlist containing per-directory pathlists of ignore patterns. */
-    struct got_pathlist_head ignores;
+    struct got_pathlist_head *ignores;
     int report_unchanged;
     int no_ignores;
 };
@@ -3573,7 +3573,7 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 
 	if (de->d_type != DT_DIR &&
 	    got_path_is_child(path, a->status_path, a->status_path_len)
-	    && !match_ignores(&a->ignores, path))
+	    && !match_ignores(a->ignores, path))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 	if (parent_path[0])
@@ -3590,12 +3590,12 @@ status_traverse(void *arg, const char *path, int dirfd)
 	if (a->no_ignores)
 		return NULL;
 
-	err = add_ignores(&a->ignores, a->worktree->root_path,
+	err = add_ignores(a->ignores, a->worktree->root_path,
 	    path, dirfd, ".cvsignore");
 	if (err)
 		return err;
 
-	err = add_ignores(&a->ignores, a->worktree->root_path, path,
+	err = add_ignores(a->ignores, a->worktree->root_path, path,
 	    dirfd, ".gitignore");
 
 	return err;
@@ -3603,11 +3603,15 @@ status_traverse(void *arg, const char *path, int dirfd)
 
 static const struct got_error *
 report_single_file_status(const char *path, const char *ondisk_path,
-struct got_fileindex *fileindex, got_worktree_status_cb status_cb,
-void *status_arg, struct got_repository *repo, int report_unchanged)
+    struct got_fileindex *fileindex, got_worktree_status_cb status_cb,
+    void *status_arg, struct got_repository *repo, int report_unchanged,
+    struct got_pathlist_head *ignores)
 {
 	struct got_fileindex_entry *ie;
 	struct stat sb;
+
+	if (match_ignores(ignores, path))
+		return NULL;
 
 	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 	if (ie)
@@ -3667,6 +3671,8 @@ add_ignores_from_parent_paths(struct got_pathlist_head *ignores,
 				err = NULL; /* traversed everything */
 			break;
 		}
+		if (got_path_is_root_dir(parent_path))
+			break;
 		free(parent_path);
 		parent_path = next_parent_path;
 		next_parent_path = NULL;
@@ -3689,8 +3695,9 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	struct got_fileindex_diff_dir_cb fdiff_cb;
 	struct diff_dir_cb_arg arg;
 	char *ondisk_path = NULL;
+	struct got_pathlist_head ignores;
 
-	TAILQ_INIT(&arg.ignores);
+	TAILQ_INIT(&ignores);
 
 	if (asprintf(&ondisk_path, "%s%s%s",
 	    worktree->root_path, path[0] ? "/" : "", path) == -1)
@@ -3701,10 +3708,17 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES &&
 		    errno != ELOOP)
 			err = got_error_from_errno2("open", ondisk_path);
-		else
+		else {
+			if (!no_ignores) {
+				err = add_ignores_from_parent_paths(&ignores,
+				    worktree->root_path, ondisk_path);
+				if (err)
+					goto done;
+			}
 			err = report_single_file_status(path, ondisk_path,
 			    fileindex, status_cb, status_arg, repo,
-			    report_unchanged);
+			    report_unchanged, &ignores);
+		}
 	} else {
 		fdiff_cb.diff_old_new = status_old_new;
 		fdiff_cb.diff_old = status_old;
@@ -3722,16 +3736,17 @@ worktree_status(struct got_worktree *worktree, const char *path,
 		arg.report_unchanged = report_unchanged;
 		arg.no_ignores = no_ignores;
 		if (!no_ignores) {
-			err = add_ignores_from_parent_paths(&arg.ignores,
+			err = add_ignores_from_parent_paths(&ignores,
 			    worktree->root_path, path);
 			if (err)
 				goto done;
 		}
+		arg.ignores = &ignores;
 		err = got_fileindex_diff_dir(fileindex, fd,
 		    worktree->root_path, path, repo, &fdiff_cb, &arg);
 	}
 done:
-	free_ignores(&arg.ignores);
+	free_ignores(&ignores);
 	if (fd != -1 && close(fd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
 	free(ondisk_path);

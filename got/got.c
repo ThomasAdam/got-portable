@@ -6494,13 +6494,6 @@ cmd_add(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (!can_recurse && no_ignores) {
-		error = got_error_msg(GOT_ERR_BAD_PATH,
-		    "disregarding ignores requires -R option");
-		goto done;
-
-	}
-
 	if (!can_recurse) {
 		char *ondisk_path;
 		struct stat sb;

@@ -181,7 +181,7 @@ test_add_directory() {
 
 	(cd $testroot/wt && got add -I . > $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
-	echo "got: disregarding ignores requires -R option" \
+	echo "got: adding directories requires -R option" \
 		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
@@ -236,6 +236,18 @@ test_add_directory() {
 	fi
 
 	(cd $testroot/wt && got add tree2/foo > $testroot/stdout)
+
+	echo -n '' > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got add -I tree2/foo > $testroot/stdout)
 
 	echo 'A  tree2/foo' > $testroot/stdout.expected
 
