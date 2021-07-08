@@ -55,6 +55,8 @@ get_atom_byte(int *ch, struct diff_atom *atom, off_t off)
 	return 0;
 }
 
+#define DIFF_OUTPUT_BUF_SIZE	512
+
 int
 diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 		  const char *prefix, struct diff_atom *start_atom,
@@ -71,12 +73,16 @@ diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 
 	foreach_diff_atom(atom, start_atom, count) {
 		off_t outlen = 0;
-		int i, ch;
+		int i, ch, nbuf = 0;
 		unsigned int len = atom->len;
-		rc = fprintf(dest, "%s", prefix);
-		if (rc < 0)
-			return errno;
-		outlen += rc;
+		unsigned char buf[DIFF_OUTPUT_BUF_SIZE + 1 /* '\n' */];
+		size_t n;
+
+		n = strlcpy(buf, prefix, sizeof(buf));
+		if (n >= DIFF_OUTPUT_BUF_SIZE) /* leave room for '\n' */
+			return ENOBUFS;
+		nbuf += n;
+
 		if (len) {
 			rc = get_atom_byte(&ch, atom, len - 1);
 			if (rc)
@@ -96,13 +102,18 @@ diff_output_lines(struct diff_output_info *outinfo, FILE *dest,
 			rc = get_atom_byte(&ch, atom, i);
 			if (rc)
 				return rc;
-			rc = fprintf(dest, "%c", (unsigned char)ch);
-			if (rc < 0)
-				return errno;
-			outlen += rc;
+			if (nbuf >= DIFF_OUTPUT_BUF_SIZE) {
+				rc = fwrite(buf, 1, nbuf, dest);
+				if (rc != nbuf)
+					return errno;
+				outlen += rc;
+				nbuf = 0;
+			}
+			buf[nbuf++] = ch;
 		}
-		rc = fprintf(dest, "\n");
-		if (rc < 0)
+		buf[nbuf++] = '\n';
+		rc = fwrite(buf, 1, nbuf, dest);
+		if (rc != nbuf)
 			return errno;
 		outlen += rc;
 		if (outinfo) {
