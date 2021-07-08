@@ -1,3 +1,19 @@
+* got 0.54; 2021-07-08
+- fix imsg header includes in pack_create.c
+- explicitly include endian.h for be32toh() in repository_admin.c (naddy)
+- switch from SIMPLEQ to equivalent STAILQ macros (naddy)
+- fix logic error in gotweb navigation for commits, briefs, and tags (tracey)
+- fix bugs where files skipped by 'got update' could not be updated again
+- fix out-of-bounds access in 'gotadmin pack'
+- fix unintended redundant recallocarray() calls done by 'gotadmin pack'
+- cache object type in memory to speed up packing of objects referenced by tags
+- fix, again, use of POSIX [ s1 = s2 ] syntax instead of [ s1 == s2 ] (naddy)
+- new 'gotadmin cleanup' command for removing unreferenced loose objects
+- handle pack index files which lack a corresponding pack file
+- make 'got add' always require the -I option in order to add ignored files
+- write lines instead of just one character at a time in diff_output_lines()
+- verify object ID checksums while loose objects are being accessed
+
 * got 0.53; 2021-06-22
 - do not update symlinks which are already up-to-date
 - add a gotadmin utility with info, pack, indexpack, and listpack commands
