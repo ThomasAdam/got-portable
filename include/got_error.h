@@ -301,7 +301,8 @@ static const struct got_error {
 	    "version control" },
 	{ GOT_ERR_GIT_REPO_EXT, "unsupported repository format extension" },
 	{ GOT_ERR_CANNOT_PACK, "not enough objects to pack" },
-	{ GOT_ERR_LONELY_PACKIDX, "pack index has no corresponding pack file" },
+	{ GOT_ERR_LONELY_PACKIDX, "pack index has no corresponding pack file; "
+	    "pack file must be restored or 'gotadmin cleanup -p' must be run" },
 	{ GOT_ERR_OBJ_CSUM, "bad object checksum" },
 };
 

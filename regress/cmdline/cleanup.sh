@@ -304,7 +304,9 @@ test_cleanup_missing_pack_file() {
 
 	echo -n "gotadmin: objects/pack/pack-${packhash}.idx: " \
 		> $testroot/stderr.expected
-	echo "pack index has no corresponding pack file" \
+	echo -n "pack index has no corresponding pack file; pack file must " \
+		>> $testroot/stderr.expected
+	echo "be restored or 'gotadmin cleanup -p' must be run" \
 		>> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
