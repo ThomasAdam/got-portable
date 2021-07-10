@@ -411,14 +411,14 @@ TAILQ_HEAD(tog_parent_trees, tog_parent_tree);
 
 struct tog_tree_view_state {
 	char *tree_label;
-	struct got_tree_object *root;
-	struct got_tree_object *tree;
+	struct got_object_id *commit_id;/* commit which this tree belongs to */
+	struct got_tree_object *root;	/* the commit's root tree entry */
+	struct got_tree_object *tree;	/* currently displayed (sub-)tree */
 	struct got_tree_entry *first_displayed_entry;
 	struct got_tree_entry *last_displayed_entry;
 	struct got_tree_entry *selected_entry;
 	int ndisplayed, selected, show_ids;
-	struct tog_parent_trees parents;
-	struct got_object_id *commit_id;
+	struct tog_parent_trees parents; /* parent trees of current sub-tree */
 	char *head_ref_name;
 	struct got_repository *repo;
 	struct got_tree_entry *matched_entry;
@@ -545,8 +545,7 @@ static const struct got_error *search_start_blame_view(struct tog_view *);
 static const struct got_error *search_next_blame_view(struct tog_view *);
 
 static const struct got_error *open_tree_view(struct tog_view *,
-    struct got_tree_object *, struct got_object_id *, const char *,
-    struct got_repository *);
+    struct got_object_id *, const char *, struct got_repository *);
 static const struct got_error *show_tree_view(struct tog_view *);
 static const struct got_error *input_tree_view(struct tog_view **,
     struct tog_view *, int);
@@ -1964,24 +1963,16 @@ browse_commit_tree(struct tog_view **new_view, int begin_x,
     const char *head_ref_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_tree_object *tree;
 	struct tog_tree_view_state *s;
 	struct tog_view *tree_view;
-
-	err = got_object_open_as_tree(&tree, repo,
-	    got_object_commit_get_tree_id(entry->commit));
-	if (err)
-		return err;
 
 	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL)
 		return got_error_from_errno("view_open");
 
-	err = open_tree_view(tree_view, tree, entry->id, head_ref_name, repo);
-	if (err) {
-		got_object_tree_close(tree);
+	err = open_tree_view(tree_view, entry->id, head_ref_name, repo);
+	if (err)
 		return err;
-	}
 	s = &tree_view->state.tree;
 
 	*new_view = tree_view;
@@ -5108,15 +5099,35 @@ log_selected_tree_entry(struct tog_view **new_view, int begin_x,
 }
 
 static const struct got_error *
-open_tree_view(struct tog_view *view, struct got_tree_object *root,
-    struct got_object_id *commit_id, const char *head_ref_name,
-    struct got_repository *repo)
+open_tree_view(struct tog_view *view, struct got_object_id *commit_id,
+    const char *head_ref_name, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	char *commit_id_str = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
+	struct got_commit_object *commit = NULL;
 
 	TAILQ_INIT(&s->parents);
+	STAILQ_INIT(&s->colors);
+
+	s->commit_id = got_object_id_dup(commit_id);
+	if (s->commit_id == NULL)
+		return got_error_from_errno("got_object_id_dup");
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	/*
+	 * The root is opened here and will be closed when the view is closed.
+	 * Any visited subtrees and their path-wise parents are opened and
+	 * closed on demand.
+	 */
+	err = got_object_open_as_tree(&s->root, repo,
+	    got_object_commit_get_tree_id(commit));
+	if (err)
+		goto done;
+	s->tree = s->root;
 
 	err = got_object_id_str(&commit_id_str, commit_id);
 	if (err != NULL)
@@ -5127,14 +5138,8 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 		goto done;
 	}
 
-	s->root = s->tree = root;
 	s->first_displayed_entry = got_object_tree_get_entry(s->tree, 0);
 	s->selected_entry = got_object_tree_get_entry(s->tree, 0);
-	s->commit_id = got_object_id_dup(commit_id);
-	if (s->commit_id == NULL) {
-		err = got_error_from_errno("got_object_id_dup");
-		goto done;
-	}
 	if (head_ref_name) {
 		s->head_ref_name = strdup(head_ref_name);
 		if (s->head_ref_name == NULL) {
@@ -5144,8 +5149,6 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	}
 	s->repo = repo;
 
-	STAILQ_INIT(&s->colors);
-
 	if (has_colors() && getenv("TOG_COLORS") != NULL) {
 		err = add_color(&s->colors, "\\$$",
 		    TOG_COLOR_TREE_SUBMODULE,
@@ -5154,32 +5157,24 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 			goto done;
 		err = add_color(&s->colors, "@$", TOG_COLOR_TREE_SYMLINK,
 		    get_color_value("TOG_COLOR_TREE_SYMLINK"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 		err = add_color(&s->colors, "/$",
 		    TOG_COLOR_TREE_DIRECTORY,
 		    get_color_value("TOG_COLOR_TREE_DIRECTORY"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 
 		err = add_color(&s->colors, "\\*$",
 		    TOG_COLOR_TREE_EXECUTABLE,
 		    get_color_value("TOG_COLOR_TREE_EXECUTABLE"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 
 		err = add_color(&s->colors, "^$", TOG_COLOR_COMMIT,
 		    get_color_value("TOG_COLOR_COMMIT"));
-		if (err) {
-			free_colors(&s->colors);
+		if (err)
 			goto done;
-		}
 	}
 
 	view->show = show_tree_view;
@@ -5189,10 +5184,10 @@ open_tree_view(struct tog_view *view, struct got_tree_object *root,
 	view->search_next = search_next_tree_view;
 done:
 	free(commit_id_str);
-	if (err) {
-		free(s->tree_label);
-		s->tree_label = NULL;
-	}
+	if (commit)
+		got_object_commit_close(commit);
+	if (err)
+		close_tree_view(view);
 	return err;
 }
 
@@ -5212,12 +5207,15 @@ close_tree_view(struct tog_view *view)
 		struct tog_parent_tree *parent;
 		parent = TAILQ_FIRST(&s->parents);
 		TAILQ_REMOVE(&s->parents, parent, entry);
+		if (parent->tree != s->root)
+			got_object_tree_close(parent->tree);
 		free(parent);
 
 	}
-	if (s->tree != s->root)
+	if (s->tree != NULL && s->tree != s->root)
 		got_object_tree_close(s->tree);
-	got_object_tree_close(s->root);
+	if (s->root)
+		got_object_tree_close(s->root);
 	return NULL;
 }
 
@@ -5500,8 +5498,6 @@ cmd_tree(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	const char *commit_id_arg = NULL;
 	char *label = NULL;
-	struct got_commit_object *commit = NULL;
-	struct got_tree_object *tree = NULL;
 	struct got_reference *ref = NULL;
 	const char *head_ref_name = NULL;
 	int ch;
@@ -5586,21 +5582,12 @@ cmd_tree(int argc, char *argv[])
 			goto done;
 	}
 
-	error = got_object_open_as_commit(&commit, repo, commit_id);
-	if (error)
-		goto done;
-
-	error = got_object_open_as_tree(&tree, repo,
-	    got_object_commit_get_tree_id(commit));
-	if (error)
-		goto done;
-
 	view = view_open(0, 0, 0, 0, TOG_VIEW_TREE);
 	if (view == NULL) {
 		error = got_error_from_errno("view_open");
 		goto done;
 	}
-	error = open_tree_view(view, tree, commit_id, head_ref_name, repo);
+	error = open_tree_view(view, commit_id, head_ref_name, repo);
 	if (error)
 		goto done;
 	if (!got_path_is_root_dir(in_repo_path)) {
@@ -5623,10 +5610,6 @@ done:
 	free(label);
 	if (ref)
 		got_ref_close(ref);
-	if (commit)
-		got_object_commit_close(commit);
-	if (tree)
-		got_object_tree_close(tree);
 	if (repo) {
 		const struct got_error *close_err = got_repo_close(repo);
 		if (error == NULL)
@@ -6068,7 +6051,7 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
     struct tog_reflist_entry *re, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct got_object_id *commit_id = NULL, *tree_id = NULL;
+	struct got_object_id *commit_id = NULL;
 	struct got_tree_object *tree = NULL;
 	struct tog_view *tree_view;
 
@@ -6082,13 +6065,6 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 			return NULL;
 	}
 
-	err = got_object_id_by_path(&tree_id, repo, commit_id, "/");
-	if (err)
-		goto done;
-
-	err = got_object_open_as_tree(&tree, repo, tree_id);
-	if (err)
-		goto done;
 
 	tree_view = view_open(0, 0, 0, begin_x, TOG_VIEW_TREE);
 	if (tree_view == NULL) {
@@ -6096,7 +6072,7 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 		goto done;
 	}
 
-	err = open_tree_view(tree_view, tree, commit_id,
+	err = open_tree_view(tree_view, commit_id,
 	    got_ref_get_name(re->ref), repo);
 	if (err)
 		goto done;
@@ -6104,7 +6080,6 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 	*new_view = tree_view;
 done:
 	free(commit_id);
-	free(tree_id);
 	if (err) {
 		if (tree)
 			got_object_tree_close(tree);
