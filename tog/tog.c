@@ -6052,7 +6052,6 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 {
 	const struct got_error *err = NULL;
 	struct got_object_id *commit_id = NULL;
-	struct got_tree_object *tree = NULL;
 	struct tog_view *tree_view;
 
 	*new_view = NULL;
@@ -6080,10 +6079,6 @@ browse_ref_tree(struct tog_view **new_view, int begin_x,
 	*new_view = tree_view;
 done:
 	free(commit_id);
-	if (err) {
-		if (tree)
-			got_object_tree_close(tree);
-	}
 	return err;
 }
 static const struct got_error *
