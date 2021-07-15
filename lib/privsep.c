@@ -1737,6 +1737,7 @@ got_privsep_init_pack_child(struct imsgbuf *ibuf, struct got_pack *pack,
 	int fd;
 
 	ipackidx.len = packidx->len;
+	ipackidx.packfile_size = pack->filesize;
 	fd = dup(packidx->fd);
 	if (fd == -1)
 		return got_error_from_errno("dup");

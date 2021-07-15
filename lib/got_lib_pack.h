@@ -169,7 +169,7 @@ struct got_packfile_obj_data {
 	} __attribute__((__packed__));
 } __attribute__((__packed__));
 
-const struct got_error *got_packidx_init_hdr(struct got_packidx *, int);
+const struct got_error *got_packidx_init_hdr(struct got_packidx *, int, off_t);
 const struct got_error *got_packidx_open(struct got_packidx **,
     int, const char *, int);
 const struct got_error *got_packidx_close(struct got_packidx *);

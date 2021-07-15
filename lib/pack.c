@@ -69,7 +69,7 @@ verify_fanout_table(uint32_t *fanout_table)
 }
 
 const struct got_error *
-got_packidx_init_hdr(struct got_packidx *p, int verify)
+got_packidx_init_hdr(struct got_packidx *p, int verify, off_t packfile_size)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx_v2_hdr *h;
@@ -258,13 +258,19 @@ got_packidx_init_hdr(struct got_packidx *p, int verify)
 	offset += nobj * sizeof(*h->offsets);
 
 	/* Large file offsets are contained only in files > 2GB. */
-	for (i = 0; i < nobj; i++) {
-		uint32_t o = h->offsets[i];
-		if (o & htobe32(GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX))
-			p->nlargeobj++;
+	if (verify || packfile_size > 0x7fffffff) {
+		for (i = 0; i < nobj; i++) {
+			uint32_t o = h->offsets[i];
+			if (o & htobe32(GOT_PACKIDX_OFFSET_VAL_IS_LARGE_IDX))
+				p->nlargeobj++;
+		}
 	}
 	if (p->nlargeobj == 0)
 		goto checksum;
+	else if (packfile_size <= 0x7fffffff) {
+		err = got_error(GOT_ERR_BAD_PACKIDX);
+		goto done;
+	}
 
 	if (remain < p->nlargeobj * sizeof(*h->large_offsets)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
@@ -334,7 +340,7 @@ got_packidx_open(struct got_packidx **packidx,
 	const struct got_error *err = NULL;
 	struct got_packidx *p = NULL;
 	char *pack_relpath;
-	struct stat sb;
+	struct stat idx_sb, pack_sb;
 
 	*packidx = NULL;
 
@@ -347,7 +353,7 @@ got_packidx_open(struct got_packidx **packidx,
 	 * Some Git repositories have this problem. Git seems to ignore
 	 * the existence of lonely pack index files but we do not.
 	 */
-	if (fstatat(dir_fd, pack_relpath, &sb, 0) == -1) {
+	if (fstatat(dir_fd, pack_relpath, &pack_sb, 0) == -1) {
 		if (errno == ENOENT) {
 			err = got_error_fmt(GOT_ERR_LONELY_PACKIDX,
 			    "%s", relpath);
@@ -369,13 +375,13 @@ got_packidx_open(struct got_packidx **packidx,
 		goto done;
 	}
 
-	if (fstat(p->fd, &sb) != 0) {
+	if (fstat(p->fd, &idx_sb) != 0) {
 		err = got_error_from_errno2("fstat", relpath);
 		close(p->fd);
 		free(p);
 		goto done;
 	}
-	p->len = sb.st_size;
+	p->len = idx_sb.st_size;
 	if (p->len < sizeof(p->hdr)) {
 		err = got_error(GOT_ERR_BAD_PACKIDX);
 		close(p->fd);
@@ -400,7 +406,7 @@ got_packidx_open(struct got_packidx **packidx,
 	}
 #endif
 
-	err = got_packidx_init_hdr(p, verify);
+	err = got_packidx_init_hdr(p, verify, pack_sb.st_size);
 done:
 	if (err) {
 		if (p)

@@ -358,6 +358,7 @@ struct got_imsg_index_pack_progress {
 /* Structure for GOT_IMSG_PACKIDX. */
 struct got_imsg_packidx {
 	size_t len;
+	off_t packfile_size;
 	/* Additionally, a file desciptor is passed via imsg. */
 };
 

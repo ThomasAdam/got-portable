@@ -899,7 +899,7 @@ receive_packidx(struct got_packidx **packidx, struct imsgbuf *ibuf)
 	if (p->map == MAP_FAILED)
 		p->map = NULL; /* fall back to read(2) */
 #endif
-	err = got_packidx_init_hdr(p, 1);
+	err = got_packidx_init_hdr(p, 1, ipackidx.packfile_size);
 done:
 	if (err) {
 		if (imsg.fd != -1)
