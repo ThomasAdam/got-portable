@@ -1968,7 +1968,7 @@ delete_missing_ref(struct got_reference *ref,
 		if (err)
 			return err;
 		if (verbosity >= 0) {
-			printf("Deleted reference %s: %s\n",
+			printf("Deleted %s: %s\n",
 			    got_ref_get_name(ref),
 			    got_ref_get_symref_target(ref));
 		}
@@ -1984,7 +1984,7 @@ delete_missing_ref(struct got_reference *ref,
 		if (err)
 			goto done;
 		if (verbosity >= 0) {
-			printf("Deleted reference %s: %s\n",
+			printf("Deleted %s: %s\n",
 			    got_ref_get_name(ref), id_str);
 		}
 	}
