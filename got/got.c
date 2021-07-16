@@ -5291,9 +5291,11 @@ delete_ref(struct got_repository *repo, const char *refname)
 	if (err)
 		goto done;
 
-	printf("Deleted %s: %s\n", got_ref_get_name(ref), id_str);
-
 	err = got_ref_delete(ref, repo);
+	if (err)
+		goto done;
+
+	printf("Deleted %s: %s\n", got_ref_get_name(ref), id_str);
 done:
 	got_ref_close(ref);
 	free(id);
