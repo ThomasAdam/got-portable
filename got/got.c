@@ -5279,23 +5279,29 @@ delete_ref(struct got_repository *repo, const char *refname)
 	struct got_reference *ref;
 	struct got_object_id *id = NULL;
 	char *id_str = NULL;
+	const char *target;
 
 	err = got_ref_open(&ref, repo, refname, 0);
 	if (err)
 		return err;
 
-	err = got_ref_resolve(&id, repo, ref);
-	if (err)
-		goto done;
-	err = got_object_id_str(&id_str, id);
-	if (err)
-		goto done;
+	if (got_ref_is_symbolic(ref)) {
+		target = got_ref_get_symref_target(ref);
+	} else {
+		err = got_ref_resolve(&id, repo, ref);
+		if (err)
+			goto done;
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			goto done;
+		target = id_str;
+	}
 
 	err = got_ref_delete(ref, repo);
 	if (err)
 		goto done;
 
-	printf("Deleted %s: %s\n", got_ref_get_name(ref), id_str);
+	printf("Deleted %s: %s\n", got_ref_get_name(ref), target);
 done:
 	got_ref_close(ref);
 	free(id);
