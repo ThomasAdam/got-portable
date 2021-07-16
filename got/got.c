@@ -7518,7 +7518,7 @@ done:
 __dead static void
 usage_rebase(void)
 {
-	fprintf(stderr, "usage: %s rebase [-a] [-c] [-l] [branch]\n",
+	fprintf(stderr, "usage: %s rebase [-a] [-c] [-l] [-X] [branch]\n",
 	    getprogname());
 	exit(1);
 }
@@ -7834,6 +7834,27 @@ done:
 }
 
 static const struct got_error *
+delete_backup_ref(struct got_reference *ref, struct got_object_id *id,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *id_str;
+
+	err = got_object_id_str(&id_str, id);
+	if (err)
+		return err;
+
+	err = got_ref_delete(ref, repo);
+	if (err)
+		goto done;
+
+	printf("Deleted %s: %s\n", got_ref_get_name(ref), id_str);
+done:
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
 print_backup_ref(const char *branch_name, const char *new_id_str,
     struct got_object_id *old_commit_id, struct got_commit_object *old_commit,
     struct got_reflist_object_id_map *refs_idmap,
@@ -7929,8 +7950,8 @@ done:
 }
 
 static const struct got_error *
-list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
-    struct got_repository *repo)
+process_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
+    int delete, struct got_repository *repo)
 {
 	const struct got_error *err;
 	struct got_reflist_head refs, backup_refs;
@@ -7967,6 +7988,10 @@ list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
 		const char *refname = got_ref_get_name(re->ref);
 		char *slash;
 
+		err = check_cancelled(NULL);
+		if (err)
+			break;
+
 		err = got_ref_resolve(&old_commit_id, repo, re->ref);
 		if (err)
 			break;
@@ -7997,8 +8022,14 @@ list_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_name,
 		if (wanted_branch_name == NULL ||
 		    strcmp(wanted_branch_name, branch_name) == 0) {
 			wanted_branch_found = 1;
-			err = print_backup_ref(branch_name, refname,
-			   old_commit_id, old_commit, refs_idmap, repo);
+			if (delete) {
+				err = delete_backup_ref(re->ref,
+				    old_commit_id, repo);
+			} else {
+				err = print_backup_ref(branch_name, refname,
+				   old_commit_id, old_commit, refs_idmap,
+				   repo);
+			}
 			if (err)
 				break;
 		}
@@ -8043,6 +8074,7 @@ cmd_rebase(int argc, char *argv[])
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	int histedit_in_progress = 0, create_backup = 1, list_backups = 0;
+	int delete_backups = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
@@ -8052,7 +8084,7 @@ cmd_rebase(int argc, char *argv[])
 	STAILQ_INIT(&commits);
 	TAILQ_INIT(&merged_paths);
 
-	while ((ch = getopt(argc, argv, "acl")) != -1) {
+	while ((ch = getopt(argc, argv, "aclX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_rebase = 1;
@@ -8062,6 +8094,9 @@ cmd_rebase(int argc, char *argv[])
 			break;
 		case 'l':
 			list_backups = 1;
+			break;
+		case 'X':
+			delete_backups = 1;
 			break;
 		default:
 			usage_rebase();
@@ -8082,6 +8117,17 @@ cmd_rebase(int argc, char *argv[])
 			option_conflict('l', 'a');
 		if (continue_rebase)
 			option_conflict('l', 'c');
+		if (delete_backups)
+			option_conflict('l', 'X');
+		if (argc != 0 && argc != 1)
+			usage_rebase();
+	} else if (delete_backups) {
+		if (abort_rebase)
+			option_conflict('X', 'a');
+		if (continue_rebase)
+			option_conflict('X', 'c');
+		if (list_backups)
+			option_conflict('l', 'X');
 		if (argc != 0 && argc != 1)
 			usage_rebase();
 	} else {
@@ -8101,7 +8147,7 @@ cmd_rebase(int argc, char *argv[])
 	}
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (list_backups) {
+		if (list_backups || delete_backups) {
 			if (error->code != GOT_ERR_NOT_WORKTREE)
 				goto done;
 		} else {
@@ -8122,9 +8168,10 @@ cmd_rebase(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (list_backups) {
-		error = list_backup_refs(GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX,
-		    argc == 1 ? argv[0] : NULL, repo);
+	if (list_backups || delete_backups) {
+		error = process_backup_refs(
+		    GOT_WORKTREE_REBASE_BACKUP_REF_PREFIX,
+		    argc == 1 ? argv[0] : NULL, delete_backups, repo);
 		goto done; /* nothing else to do */
 	}
 
@@ -8359,7 +8406,8 @@ __dead static void
 usage_histedit(void)
 {
 	fprintf(stderr, "usage: %s histedit [-a] [-c] [-f] "
-	    "[-F histedit-script] [-m] [-l] [branch]\n", getprogname());
+	    "[-F histedit-script] [-m] [-l] [-X] [branch]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -9193,7 +9241,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	int edit_logmsg_only = 0, fold_only = 0;
-	int list_backups = 0;
+	int list_backups = 0, delete_backups = 0;
 	const char *edit_script_path = NULL;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
@@ -9208,7 +9256,7 @@ cmd_histedit(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
-	while ((ch = getopt(argc, argv, "acfF:ml")) != -1) {
+	while ((ch = getopt(argc, argv, "acfF:mlX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_edit = 1;
@@ -9227,6 +9275,9 @@ cmd_histedit(int argc, char *argv[])
 			break;
 		case 'l':
 			list_backups = 1;
+			break;
+		case 'X':
+			delete_backups = 1;
 			break;
 		default:
 			usage_histedit();
@@ -9269,6 +9320,23 @@ cmd_histedit(int argc, char *argv[])
 			option_conflict('l', 'm');
 		if (fold_only)
 			option_conflict('l', 'f');
+		if (delete_backups)
+			option_conflict('l', 'X');
+		if (argc != 0 && argc != 1)
+			usage_histedit();
+	} else if (delete_backups) {
+		if (abort_edit)
+			option_conflict('X', 'a');
+		if (continue_edit)
+			option_conflict('X', 'c');
+		if (edit_script_path)
+			option_conflict('X', 'F');
+		if (edit_logmsg_only)
+			option_conflict('X', 'm');
+		if (fold_only)
+			option_conflict('X', 'f');
+		if (list_backups)
+			option_conflict('X', 'l');
 		if (argc != 0 && argc != 1)
 			usage_histedit();
 	} else if (argc != 0)
@@ -9290,7 +9358,7 @@ cmd_histedit(int argc, char *argv[])
 	}
 	error = got_worktree_open(&worktree, cwd);
 	if (error) {
-		if (list_backups) {
+		if (list_backups || delete_backups) {
 			if (error->code != GOT_ERR_NOT_WORKTREE)
 				goto done;
 		} else {
@@ -9301,7 +9369,7 @@ cmd_histedit(int argc, char *argv[])
 		}
 	}
 
-	if (list_backups) {
+	if (list_backups || delete_backups) {
 		error = got_repo_open(&repo,
 		    worktree ? got_worktree_get_repo_path(worktree) : cwd,
 		    NULL);
@@ -9311,9 +9379,9 @@ cmd_histedit(int argc, char *argv[])
 		    worktree ? got_worktree_get_root_path(worktree) : NULL);
 		if (error)
 			goto done;
-		error = list_backup_refs(
+		error = process_backup_refs(
 		    GOT_WORKTREE_HISTEDIT_BACKUP_REF_PREFIX,
-		    argc == 1 ? argv[0] : NULL, repo);
+		    argc == 1 ? argv[0] : NULL, delete_backups, repo);
 		goto done; /* nothing else to do */
 	}
 

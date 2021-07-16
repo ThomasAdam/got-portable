@@ -1437,7 +1437,7 @@ conflicts must be resolved first.
 .It Cm bo
 Short alias for
 .Cm backout .
-.It Cm rebase Oo Fl a Oc Oo Fl c Oc Oo Fl l Oc Op Ar branch
+.It Cm rebase Oo Fl a Oc Oo Fl c Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
 Rebase commits on the specified
 .Ar branch
 onto the tip of the current branch of the work tree.
@@ -1585,11 +1585,34 @@ If this option is used,
 does not require a work tree.
 None of the other options can be used together with
 .Fl l .
+.It Fl X
+Delete backups created by past rebase operations, represented by references
+in the
+.Dq refs/got/backup/rebase
+reference namespace.
+.Pp
+If a
+.Ar branch
+is specified, only delete backups which at some point in time represented
+this branch.
+Otherwise, delete all references found within
+.Dq refs/got/backup/rebase .
+.Pp
+Any commit, tree, tag, and blob objects belonging to deleted backups
+remain in the repository and may be removed separately with
+Git's garbage collector or
+.Cm gotadmin cleanup .
+.Pp
+If this option is used,
+.Cm got rebase
+does not require a work tree.
+None of the other options can be used together with
+.Fl X .
 .El
 .It Cm rb
 Short alias for
 .Cm rebase .
-.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Op Ar branch
+.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
@@ -1785,6 +1808,29 @@ If this option is used,
 does not require a work tree.
 None of the other options can be used together with
 .Fl l .
+.It Fl X
+Delete backups created by past histedit operations, represented by references
+in the
+.Dq refs/got/backup/histedit
+reference namespace.
+.Pp
+If a
+.Ar branch
+is specified, only delete backups which at some point in time represented
+this branch.
+Otherwise, delete all references found within
+.Dq refs/got/backup/histedit .
+.Pp
+Any commit, tree, tag, and blob objects belonging to deleted backups
+remain in the repository and may be removed separately with
+Git's garbage collector or
+.Cm gotadmin cleanup .
+.Pp
+If this option is used,
+.Cm got histedit
+does not require a work tree.
+None of the other options can be used together with
+.Fl X .
 .El
 .It Cm he
 Short alias for
