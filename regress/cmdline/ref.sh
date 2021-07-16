@@ -209,6 +209,14 @@ test_ref_delete() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+	echo "Deleted refs/heads/ref2: $commit_id" > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
 
 	got ref -l -r $testroot/repo > $testroot/stdout
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
@@ -263,7 +271,7 @@ test_ref_delete() {
 		return 1
 	fi
 
-	got ref -r $testroot/repo -d master
+	got ref -r $testroot/repo -d master >/dev/null
 
 	got ref -l -r $testroot/repo > $testroot/stdout
 	echo "HEAD: refs/heads/master" > $testroot/stdout.expected

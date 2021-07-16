@@ -67,7 +67,8 @@ test_cleanup_unreferenced_loose_objects() {
 	# remove worktree's base commit reference, which points at the branch
 	wt_uuid=`(cd $testroot/wt && got info | grep 'UUID:' | \
 		cut -d ':' -f 2 | tr -d ' ')`
-	got ref -r $testroot/repo -d "refs/got/worktree/base-$wt_uuid"
+	got ref -r $testroot/repo -d "refs/got/worktree/base-$wt_uuid" \
+		> /dev/null
 
 	# cleanup -n should not remove any objects
 	ls -R $testroot/repo/.git/objects > $testroot/objects-before

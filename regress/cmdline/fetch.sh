@@ -939,7 +939,7 @@ test_fetch_headref_deleted_locally() {
 		return 1
 	fi
 
-	got ref -r $testroot/repo-clone -d refs/remotes/origin/HEAD
+	got ref -r $testroot/repo-clone -d refs/remotes/origin/HEAD > /dev/null
 
 	got fetch -q -r $testroot/repo-clone
 	ret="$?"

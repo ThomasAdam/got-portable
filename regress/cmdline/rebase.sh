@@ -912,7 +912,7 @@ test_rebase_forward() {
 	# commit 3907e11dceaae2ca7f8db79c2af31794673945ad (origin/master)
 	# commit ffcffcd102cf1af6572fbdbb4cf07a0f1fd2d840 (master)
 	# commit 87a6a8a2263a15b61c016ff1720b24741d455eb5
-	(cd $testroot/repo && got ref -d master)
+	(cd $testroot/repo && got ref -d master >/dev/null)
 	(cd $testroot/repo && got ref -c $commit1 refs/heads/master)
 	(cd $testroot/repo && got ref -c $commit2 refs/remotes/origin/master)
 
