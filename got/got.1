@@ -319,7 +319,7 @@ namespace.
 .It Cm cl
 Short alias for
 .Cm clone .
-.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl t Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Op Ar remote-repository
+.It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl t Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Oo Fl X Oc Op Ar remote-repository
 Fetch new changes from a remote repository.
 If no
 .Ar remote-repository
@@ -466,6 +466,29 @@ will refuse to fetch references from the remote repository's
 or
 .Dq refs/got/
 namespace.
+.It Fl X
+Delete all references which correspond to a particular
+.Ar remote-repository
+instead of fetching new changes.
+This can be useful when a remote repository is being removed from
+.Xr got.conf 5 .
+.Pp
+With
+.Fl X ,
+the
+.Ar remote-repository
+argument is mandatory and no other options except
+.Fl r ,
+.Fl v ,
+and
+.Fl q
+are allowed.
+.Pp
+Only references are deleted.
+Any commit, tree, tag, and blob objects fetched from a remote repository
+will generally be stored in pack files and may be removed separately with
+.Xr git-repack 1
+and Git's garbage collector.
 .El
 .It Cm fe
 Short alias for

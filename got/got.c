@@ -1949,7 +1949,7 @@ __dead static void
 usage_fetch(void)
 {
 	fprintf(stderr, "usage: %s fetch [-a] [-b branch] [-d] [-l] "
-	    "[-r repository-path] [-t] [-q] [-v] [-R reference] "
+	    "[-r repository-path] [-t] [-q] [-v] [-R reference] [-X] "
 	    "[remote-repository-name]\n",
 	    getprogname());
 	exit(1);
@@ -2116,6 +2116,62 @@ done:
 }
 
 static const struct got_error *
+delete_ref(struct got_repository *repo, struct got_reference *ref)
+{
+	const struct got_error *err = NULL;
+	struct got_object_id *id = NULL;
+	char *id_str = NULL;
+	const char *target;
+
+	if (got_ref_is_symbolic(ref)) {
+		target = got_ref_get_symref_target(ref);
+	} else {
+		err = got_ref_resolve(&id, repo, ref);
+		if (err)
+			goto done;
+		err = got_object_id_str(&id_str, id);
+		if (err)
+			goto done;
+		target = id_str;
+	}
+
+	err = got_ref_delete(ref, repo);
+	if (err)
+		goto done;
+
+	printf("Deleted %s: %s\n", got_ref_get_name(ref), target);
+done:
+	free(id);
+	free(id_str);
+	return err;
+}
+
+static const struct got_error *
+delete_refs_for_remote(struct got_repository *repo, const char *remote_name)
+{
+	const struct got_error *err = NULL;
+	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
+	char *prefix;
+
+	TAILQ_INIT(&refs);
+
+	if (asprintf(&prefix, "refs/remotes/%s", remote_name) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	err = got_ref_list(&refs, repo, prefix, got_ref_cmp_by_name, NULL);
+	if (err)
+		goto done;
+
+	TAILQ_FOREACH(re, &refs, entry)
+		delete_ref(repo, re->ref);
+done:
+	got_ref_list_free(&refs);
+	return err;
+}
+
+static const struct got_error *
 cmd_fetch(int argc, char *argv[])
 {
 	const struct got_error *error = NULL, *unlock_err;
@@ -2136,14 +2192,14 @@ cmd_fetch(int argc, char *argv[])
 	pid_t fetchpid = -1;
 	struct got_fetch_progress_arg fpa;
 	int verbosity = 0, fetch_all_branches = 0, list_refs_only = 0;
-	int delete_refs = 0, replace_tags = 0;
+	int delete_refs = 0, replace_tags = 0, delete_remote = 0;
 
 	TAILQ_INIT(&refs);
 	TAILQ_INIT(&symrefs);
 	TAILQ_INIT(&wanted_branches);
 	TAILQ_INIT(&wanted_refs);
 
-	while ((ch = getopt(argc, argv, "ab:dlr:tvqR:")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:dlr:tvqR:X")) != -1) {
 		switch (ch) {
 		case 'a':
 			fetch_all_branches = 1;
@@ -2185,6 +2241,9 @@ cmd_fetch(int argc, char *argv[])
 			if (error)
 				return error;
 			break;
+		case 'X':
+			delete_remote = 1;
+			break;
 		default:
 			usage_fetch();
 			break;
@@ -2202,11 +2261,27 @@ cmd_fetch(int argc, char *argv[])
 			option_conflict('l', 'a');
 		if (delete_refs)
 			option_conflict('l', 'd');
+		if (delete_remote)
+			option_conflict('l', 'X');
+	}
+	if (delete_remote) {
+		if (fetch_all_branches)
+			option_conflict('X', 'a');
+		if (!TAILQ_EMPTY(&wanted_branches))
+			option_conflict('X', 'b');
+		if (delete_refs)
+			option_conflict('X', 'd');
+		if (replace_tags)
+			option_conflict('X', 't');
+		if (!TAILQ_EMPTY(&wanted_refs))
+			option_conflict('X', 'R');
 	}
 
-	if (argc == 0)
+	if (argc == 0) {
+		if (delete_remote)
+			errx(1, "-X option requires a remote name");
 		remote_name = GOT_FETCH_DEFAULT_REMOTE_NAME;
-	else if (argc == 1)
+	} else if (argc == 1)
 		remote_name = argv[0];
 	else
 		usage_fetch();
@@ -2242,6 +2317,11 @@ cmd_fetch(int argc, char *argv[])
 	error = got_repo_open(&repo, repo_path, NULL);
 	if (error)
 		goto done;
+
+	if (delete_remote) {
+		error = delete_refs_for_remote(repo, remote_name);
+		goto done; /* nothing else to do */
+	}
 
 	if (worktree) {
 		worktree_conf = got_worktree_get_gotconfig(worktree);
@@ -5273,39 +5353,17 @@ list_refs(struct got_repository *repo, const char *refname)
 }
 
 static const struct got_error *
-delete_ref(struct got_repository *repo, const char *refname)
+delete_ref_by_name(struct got_repository *repo, const char *refname)
 {
-	const struct got_error *err = NULL;
+	const struct got_error *err;
 	struct got_reference *ref;
-	struct got_object_id *id = NULL;
-	char *id_str = NULL;
-	const char *target;
 
 	err = got_ref_open(&ref, repo, refname, 0);
 	if (err)
 		return err;
 
-	if (got_ref_is_symbolic(ref)) {
-		target = got_ref_get_symref_target(ref);
-	} else {
-		err = got_ref_resolve(&id, repo, ref);
-		if (err)
-			goto done;
-		err = got_object_id_str(&id_str, id);
-		if (err)
-			goto done;
-		target = id_str;
-	}
-
-	err = got_ref_delete(ref, repo);
-	if (err)
-		goto done;
-
-	printf("Deleted %s: %s\n", got_ref_get_name(ref), target);
-done:
+	err = delete_ref(repo, ref);
 	got_ref_close(ref);
-	free(id);
-	free(id_str);
 	return err;
 }
 
@@ -5512,7 +5570,7 @@ cmd_ref(int argc, char *argv[])
 	if (do_list)
 		error = list_refs(repo, refname);
 	else if (do_delete)
-		error = delete_ref(repo, refname);
+		error = delete_ref_by_name(repo, refname);
 	else if (symref_target)
 		error = add_symref(repo, refname, symref_target);
 	else {

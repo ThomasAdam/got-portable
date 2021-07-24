@@ -1090,6 +1090,100 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_fetch_delete_remote_refs() {
+	local testroot=`test_init fetch_basic`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -X > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got fetch command succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: -X option requires a remote name" > $testroot/stderr.expected
+	cmp -s $testroot/stderr $testroot/stderr.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got fetch -q -r $testroot/repo-clone -X origin > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "Deleted refs/remotes/origin/HEAD: " > $testroot/stdout.expected
+	echo "refs/remotes/origin/master" >> $testroot/stdout.expected
+	echo "Deleted refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_fetch_basic
 run_test test_fetch_list
@@ -1103,3 +1197,4 @@ run_test test_fetch_replace_symref
 run_test test_fetch_update_headref
 run_test test_fetch_headref_deleted_locally
 run_test test_fetch_gotconfig_remote_repo
+run_test test_fetch_delete_remote_refs
