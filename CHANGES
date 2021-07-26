@@ -1,3 +1,11 @@
+* got 0.55; 2021-07-26
+- display recovery steps in the lonely pack index error message
+- fix double-free that ocurred upon exit from 'tog tree'; found by naddy
+- don't scan pack index offsets for large values if pack file is < 2GB
+- new -X option for removing backups created by got rebase and got histedit
+- add 'got fetch -X' option for deleting references created by 'got fetch'
+- make 'got ref -d' print reference name and value like the new -X options do
+
 * got 0.54; 2021-07-08
 - fix imsg header includes in pack_create.c
 - explicitly include endian.h for be32toh() in repository_admin.c (naddy)
