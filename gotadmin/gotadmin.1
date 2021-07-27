@@ -181,7 +181,7 @@ and a break-down of the number of objects per object type.
 .It Cm ls
 Short alias for
 .Cm listpack .
-.It Cm cleanup Oo Fl p Oc Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
+.It Cm cleanup Oo Fl a Oc Oo Fl p Oc Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
 Purge unreferenced loose objects from the repository and display
 the amount of disk space which has been freed as a result.
 .Pp
@@ -258,6 +258,13 @@ The options for
 .Cm gotadmin cleanup
 are as follows:
 .Bl -tag -width Ds
+.It Fl a
+Delete all loose objects.
+By default, objects which are newer than an implementation-defined
+modification timestamp are kept on disk to prevent race conditions
+with other commands that add new objects to the repository while
+.Cm gotadmin cleanup
+is running.
 .It Fl p
 Instead of purging unreferenced loose objects, remove any pack index files
 which do not have a corresponding pack file.

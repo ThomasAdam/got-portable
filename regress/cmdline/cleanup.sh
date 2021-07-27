@@ -72,7 +72,7 @@ test_cleanup_unreferenced_loose_objects() {
 
 	# cleanup -n should not remove any objects
 	ls -R $testroot/repo/.git/objects > $testroot/objects-before
-	gotadmin cleanup -n -q -r $testroot/repo > $testroot/stdout
+	gotadmin cleanup -a -n -q -r $testroot/repo > $testroot/stdout
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -91,7 +91,7 @@ test_cleanup_unreferenced_loose_objects() {
 	fi
 
 	# cleanup should remove loose objects that belonged to the branch
-	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "gotadmin cleanup failed unexpectedly" >&2
@@ -169,7 +169,7 @@ test_cleanup_redundant_loose_objects() {
 
 	# cleanup -n should not remove any objects
 	ls -R $testroot/repo/.git/objects > $testroot/objects-before
-	gotadmin cleanup -n -q -r $testroot/repo > $testroot/stdout
+	gotadmin cleanup -a -n -q -r $testroot/repo > $testroot/stdout
 	echo -n > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -196,7 +196,7 @@ test_cleanup_redundant_loose_objects() {
 	fi
 
 	# cleanup should remove all loose objects
-	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "gotadmin cleanup failed unexpectedly" >&2
@@ -244,7 +244,7 @@ test_cleanup_precious_objects() {
 	(cd $testroot/repo && git config extensions.preciousObjects true)
 
 	# cleanup should now refuse to purge objects
-	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" == "0" ]; then
@@ -294,7 +294,7 @@ test_cleanup_missing_pack_file() {
 	rm $testroot/repo/.git/objects/pack/pack-$packname
 
 	# cleanup should now refuse to purge objects
-	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" == "0" ]; then
@@ -317,7 +317,7 @@ test_cleanup_missing_pack_file() {
 		return 1
 	fi
 
-	gotadmin cleanup -r $testroot/repo -p -n > $testroot/stdout
+	gotadmin cleanup -a -r $testroot/repo -p -n > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "gotadmin cleanup failed unexpectedly" >&2
@@ -334,7 +334,7 @@ test_cleanup_missing_pack_file() {
 		return 1
 	fi
 
-	gotadmin cleanup -r $testroot/repo -p > $testroot/stdout
+	gotadmin cleanup -a -r $testroot/repo -p > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "gotadmin cleanup failed unexpectedly" >&2
@@ -351,7 +351,7 @@ test_cleanup_missing_pack_file() {
 	fi
 
 	# cleanup should now attempt to purge objects
-	gotadmin cleanup -q -r $testroot/repo > $testroot/stdout \
+	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then

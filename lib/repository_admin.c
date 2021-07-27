@@ -1028,6 +1028,8 @@ struct purge_loose_object_arg {
 	int npurged;
 	off_t size_purged;
 	int dry_run;
+	time_t max_mtime;
+	int ignore_mtime;
 };
 
 static const struct got_error *
@@ -1053,21 +1055,29 @@ purge_loose_object(struct got_object_id *id, void *data, void *arg)
 		goto done;
 	}
 
-	if (!a->dry_run) {
-		err = got_lockfile_lock(&lf, path, -1);
-		if (err)
-			goto done;
-		if (unlink(path) == -1) {
-			err = got_error_from_errno2("unlink", path);
-			goto done;
+	/*
+	 * Do not delete objects which are younger than our maximum
+	 * modification time threshold. This prevents a race where
+	 * new objects which are being added to the repository
+	 * concurrently would be deleted.
+	 */
+	if (a->ignore_mtime || sb.st_mtime <= a->max_mtime) {
+		if (!a->dry_run) {
+			err = got_lockfile_lock(&lf, path, -1);
+			if (err)
+				goto done;
+			if (unlink(path) == -1) {
+				err = got_error_from_errno2("unlink", path);
+				goto done;
+			}
 		}
-	}
 
-	a->npurged++;
-	a->size_purged += sb.st_size;
-	if (a->progress_cb) {
-		err = a->progress_cb(a->progress_arg, a->nloose,
-		    a->ncommits, a->npurged);
+		a->npurged++;
+		a->size_purged += sb.st_size;
+		if (a->progress_cb) {
+			err = a->progress_cb(a->progress_arg, a->nloose,
+			    a->ncommits, a->npurged);
+		}
 	}
 done:
 	if (fd != -1 && close(fd) == -1 && err == NULL)
@@ -1081,7 +1091,7 @@ done:
 const struct got_error *
 got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
     off_t *size_before, off_t *size_after, int *npacked, int dry_run,
-    got_cleanup_progress_cb progress_cb, void *progress_arg,
+    int ignore_mtime, got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err;
@@ -1090,7 +1100,9 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	struct got_object_id **referenced_ids;
 	int i, nreferenced, nloose, ncommits = 0;
 	struct got_reflist_head refs;
+	struct got_reflist_entry *re;
 	struct purge_loose_object_arg arg;
+	time_t max_mtime = 0;
 
 	TAILQ_INIT(&refs);
 
@@ -1117,6 +1129,19 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	err = got_ref_list(&refs, repo, "", got_ref_cmp_by_name, NULL);
 	if (err)
 		goto done;
+	if (!ignore_mtime) {
+		TAILQ_FOREACH(re, &refs, entry) {
+			time_t mtime = got_ref_get_mtime(re->ref);
+			if (mtime > max_mtime)
+				max_mtime = mtime;
+		}
+		/*
+		 * For safety, keep objects created within 10 minutes
+		 * before the youngest reference was created.
+		 */
+		if (max_mtime >= 600)
+			max_mtime -= 600;
+	}
 
 	err = get_reflist_object_ids(&referenced_ids, &nreferenced,
 	    (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
@@ -1149,6 +1174,8 @@ got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
 	arg.size_purged = 0;
 	arg.ncommits = ncommits;
 	arg.dry_run = dry_run;
+	arg.max_mtime = max_mtime;
+	arg.ignore_mtime = ignore_mtime;
 	err = got_object_idset_for_each(loose_ids, purge_loose_object, &arg);
 	if (err)
 		goto done;

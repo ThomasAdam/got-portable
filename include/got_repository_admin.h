@@ -76,6 +76,8 @@ typedef const struct got_error *(*got_cleanup_progress_cb)(void *arg,
  * Walk objects reachable via references to determine whether any loose
  * objects can be removed from disk. Do remove such objects from disk
  * unless the dry_run parameter is set.
+ * Do not remove objects with a modification timestamp above an
+ * implementation-defined timestamp threshold, unless ignore_mtime is set.
  * Return the disk space size occupied by loose objects before and after
  * the operation.
  * Return the number of loose objects which are also stored in a pack file.
@@ -83,7 +85,7 @@ typedef const struct got_error *(*got_cleanup_progress_cb)(void *arg,
 const struct got_error *
 got_repo_purge_unreferenced_loose_objects(struct got_repository *repo,
     off_t *size_before, off_t *size_after, int *npacked, int dry_run,
-    got_cleanup_progress_cb progress_cb, void *progress_arg,
+    int ignore_mtime, got_cleanup_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);
 
 /* A callback function which gets invoked with cleanup information to print. */

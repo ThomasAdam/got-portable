@@ -897,7 +897,7 @@ done:
 __dead static void
 usage_cleanup(void)
 {
-	fprintf(stderr, "usage: %s cleanup [-p] [-n] [-r repository-path] "
+	fprintf(stderr, "usage: %s cleanup [-a] [-p] [-n] [-r repository-path] "
 	    "[-q]\n", getprogname());
 	exit(1);
 }
@@ -989,7 +989,7 @@ cmd_cleanup(int argc, char *argv[])
 	char *cwd = NULL, *repo_path = NULL;
 	struct got_repository *repo = NULL;
 	int ch, dry_run = 0, npacked = 0, verbosity = 0;
-	int remove_lonely_packidx = 0;
+	int remove_lonely_packidx = 0, ignore_mtime = 0;
 	struct got_cleanup_progress_arg cpa;
 	struct got_lonely_packidx_progress_arg lpa;
 	off_t size_before, size_after;
@@ -999,8 +999,11 @@ cmd_cleanup(int argc, char *argv[])
 	char **extensions;
 	int nextensions, i;
 
-	while ((ch = getopt(argc, argv, "pr:nq")) != -1) {
+	while ((ch = getopt(argc, argv, "apr:nq")) != -1) {
 		switch (ch) {
+		case 'a':
+			ignore_mtime = 1;
+			break;
 		case 'p':
 			remove_lonely_packidx = 1;
 			break;
@@ -1071,7 +1074,7 @@ cmd_cleanup(int argc, char *argv[])
 	cpa.dry_run = dry_run;
 	cpa.verbosity = verbosity;
 	error = got_repo_purge_unreferenced_loose_objects(repo,
-	   &size_before, &size_after, &npacked, dry_run,
+	   &size_before, &size_after, &npacked, dry_run, ignore_mtime,
 	   cleanup_progress, &cpa, check_cancelled, NULL);
 	if (cpa.printed_something)
 		printf("\n");
