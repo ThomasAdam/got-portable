@@ -87,11 +87,12 @@ struct got_reference {
 	} ref;
 
 	struct got_lockfile *lf;
+	time_t mtime;
 };
 
 static const struct got_error *
 alloc_ref(struct got_reference **ref, const char *name,
-    struct got_object_id *id, int flags)
+    struct got_object_id *id, int flags, time_t mtime)
 {
 	const struct got_error *err = NULL;
 
@@ -102,6 +103,7 @@ alloc_ref(struct got_reference **ref, const char *name,
 	memcpy((*ref)->ref.ref.sha1, id->sha1, sizeof((*ref)->ref.ref.sha1));
 	(*ref)->flags = flags;
 	(*ref)->ref.ref.name = strdup(name);
+	(*ref)->mtime = mtime;
 	if ((*ref)->ref.ref.name == NULL) {
 		err = got_error_from_errno("strdup");
 		got_ref_close(*ref);
@@ -147,7 +149,8 @@ parse_symref(struct got_reference **ref, const char *name, const char *line)
 }
 
 static const struct got_error *
-parse_ref_line(struct got_reference **ref, const char *name, const char *line)
+parse_ref_line(struct got_reference **ref, const char *name, const char *line,
+    time_t mtime)
 {
 	struct got_object_id id;
 
@@ -159,7 +162,7 @@ parse_ref_line(struct got_reference **ref, const char *name, const char *line)
 	if (!got_parse_sha1_digest(id.sha1, line))
 		return got_error(GOT_ERR_BAD_REF_DATA);
 
-	return alloc_ref(ref, name, &id, 0);
+	return alloc_ref(ref, name, &id, 0, mtime);
 }
 
 static const struct got_error *
@@ -172,6 +175,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 	size_t linesize = 0;
 	ssize_t linelen;
 	struct got_lockfile *lf = NULL;
+	struct stat sb;
 
 	if (lock) {
 		err = got_lockfile_lock(&lf, abspath, -1);
@@ -191,6 +195,10 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		if (lock)
 			got_lockfile_unlock(lf, -1);
 		return err;
+	}
+	if (fstat(fileno(f), &sb) == -1) {
+		err = got_error_from_errno2("fstat", abspath);
+		goto done;
 	}
 
 	linelen = getline(&line, &linesize, f);
@@ -214,7 +222,7 @@ parse_ref_file(struct got_reference **ref, const char *name,
 		linelen--;
 	}
 
-	err = parse_ref_line(ref, absname, line);
+	err = parse_ref_line(ref, absname, line, sb.st_mtime);
 	if (lock) {
 		if (err)
 			got_lockfile_unlock(lf, -1);
@@ -315,7 +323,7 @@ got_ref_alloc(struct got_reference **ref, const char *name,
 	if (!is_valid_ref_name(name))
 		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
-	return alloc_ref(ref, name, id, 0);
+	return alloc_ref(ref, name, id, 0, 0);
 }
 
 const struct got_error *
@@ -330,7 +338,7 @@ got_ref_alloc_symref(struct got_reference **ref, const char *name,
 
 static const struct got_error *
 parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
-    const char *line)
+    const char *line, time_t mtime)
 {
 	struct got_object_id id;
 	const char *name;
@@ -350,12 +358,12 @@ parse_packed_ref_line(struct got_reference **ref, const char *abs_refname,
 	} else
 		name = line + SHA1_DIGEST_STRING_LENGTH;
 
-	return alloc_ref(ref, name, &id, GOT_REF_IS_PACKED);
+	return alloc_ref(ref, name, &id, GOT_REF_IS_PACKED, mtime);
 }
 
 static const struct got_error *
 open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
-    int nsubdirs, const char *refname)
+    int nsubdirs, const char *refname, time_t mtime)
 {
 	const struct got_error *err = NULL;
 	char *abs_refname;
@@ -383,7 +391,8 @@ open_packed_ref(struct got_reference **ref, FILE *f, const char **subdirs,
 			    asprintf(&abs_refname, "refs/%s/%s", subdirs[i],
 			    refname) == -1)
 				return got_error_from_errno("asprintf");
-			err = parse_packed_ref_line(ref, abs_refname, line);
+			err = parse_packed_ref_line(ref, abs_refname, line,
+			    mtime);
 			if (!ref_is_absolute)
 				free(abs_refname);
 			if (err || *ref != NULL)
@@ -486,8 +495,14 @@ got_ref_open(struct got_reference **ref, struct got_repository *repo,
 		f = fopen(packed_refs_path, "rb");
 		free(packed_refs_path);
 		if (f != NULL) {
+			struct stat sb;
+			if (fstat(fileno(f), &sb) == -1) {
+				err = got_error_from_errno2("fstat",
+				    packed_refs_path);
+				goto done;
+			}
 			err = open_packed_ref(ref, f, subdirs, nitems(subdirs),
-			    refname);
+			    refname, sb.st_mtime);
 			if (!err) {
 				if (fclose(f) == EOF) {
 					err = got_error_from_errno("fclose");
@@ -668,6 +683,12 @@ got_ref_get_symref_target(struct got_reference *ref)
 		return ref->ref.symref.ref;
 
 	return NULL;
+}
+
+time_t
+got_ref_get_mtime(struct got_reference *ref)
+{
+	return ref->mtime;
 }
 
 const struct got_error *
@@ -1013,6 +1034,12 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 	if (f) {
 		size_t linesize = 0;
 		ssize_t linelen;
+		struct stat sb;
+
+		if (fstat(fileno(f), &sb) == -1) {
+			err = got_error_from_errno2("fstat", packed_refs_path);
+			goto done;
+		}
 		for (;;) {
 			linelen = getline(&line, &linesize, f);
 			if (linelen == -1) {
@@ -1023,7 +1050,8 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 			}
 			if (linelen > 0 && line[linelen - 1] == '\n')
 				line[linelen - 1] = '\0';
-			err = parse_packed_ref_line(&ref, NULL, line);
+			err = parse_packed_ref_line(&ref, NULL, line,
+			    sb.st_mtime);
 			if (err)
 				goto done;
 			if (ref) {
@@ -1201,6 +1229,12 @@ got_ref_write(struct got_reference *ref, struct got_repository *repo)
 	}
 	free(tmppath);
 	tmppath = NULL;
+
+	if (stat(path, &sb) == -1) {
+		err = got_error_from_errno2("stat", path);
+		goto done;
+	}
+	ref->mtime = sb.st_mtime;
 done:
 	if (ref->lf == NULL && lf)
 		unlock_err = got_lockfile_unlock(lf, -1);
@@ -1268,7 +1302,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 		if (linelen > 0 && line[linelen - 1] == '\n')
 			line[linelen - 1] = '\0';
-		err = parse_packed_ref_line(&ref, NULL, line);
+		err = parse_packed_ref_line(&ref, NULL, line, 0);
 		if (err)
 			goto done;
 		if (ref == NULL)

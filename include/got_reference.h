@@ -59,6 +59,9 @@ const char *got_ref_get_name(struct got_reference *);
 /* Get the name of the reference which a symoblic reference points at. */
 const char *got_ref_get_symref_target(struct got_reference *);
 
+/* Get the last modification timestamp of the reference. */
+time_t got_ref_get_mtime(struct got_reference *);
+
 /*
  * Create a duplicate copy of a reference.
  * The caller must dispose of this copy with got_ref_close().
