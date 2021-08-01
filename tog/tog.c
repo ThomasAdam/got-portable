@@ -3580,7 +3580,9 @@ show_diff_view(struct tog_view *view)
 	free(id_str1);
 	free(id_str2);
 
-	return draw_file(view, header);
+	err = draw_file(view, header);
+	free(header);
+	return err;
 }
 
 static const struct got_error *
