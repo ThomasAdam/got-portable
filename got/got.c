@@ -3438,7 +3438,12 @@ get_changed_paths(struct got_pathlist_head *paths,
 		if (err)
 			return err;
 
-		tree_id1 = got_object_commit_get_tree_id(pcommit);
+		tree_id1 = got_object_id_dup(
+		    got_object_commit_get_tree_id(pcommit));
+		if (tree_id1 == NULL) {
+			got_object_commit_close(pcommit);
+			return got_error_from_errno("got_object_id_dup");
+		}
 		got_object_commit_close(pcommit);
 
 	}
@@ -3461,6 +3466,7 @@ done:
 		got_object_tree_close(tree1);
 	if (tree2)
 		got_object_tree_close(tree2);
+	free(tree_id1);
 	return err;
 }
 
