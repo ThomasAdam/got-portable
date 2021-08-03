@@ -439,55 +439,48 @@ const struct got_error *
 got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 {
 	const struct got_error *err = NULL;
-	char *msg0, *msg, *line, *s;
+	const char *src;
+	char *dst;
 	size_t len;
-	int headers = 1;
 
-	*logmsg = NULL;
+	len = strlen(commit->logmsg);
+	*logmsg = malloc(len + 2); /* leave room for a trailing \n and \0 */
+	if (*logmsg == NULL)
+		return got_error_from_errno("malloc");
 
-	msg0 = strdup(commit->logmsg);
-	if (msg0 == NULL)
-		return got_error_from_errno("strdup");
+	/*
+	 * Strip out unusual headers. Headers are separated from the commit
+	 * message body by a single empty line.
+	 */
+	src = commit->logmsg;
+	dst = *logmsg;
+	while (*src != '\0' && *src != '\n') {
+		int copy_header = 1, eol = 0;
+		if (strncmp(src, GOT_COMMIT_LABEL_TREE,
+		    strlen(GOT_COMMIT_LABEL_TREE)) != 0 &&
+		    strncmp(src, GOT_COMMIT_LABEL_AUTHOR,
+		    strlen(GOT_COMMIT_LABEL_AUTHOR)) != 0 &&
+		    strncmp(src, GOT_COMMIT_LABEL_PARENT,
+		    strlen(GOT_COMMIT_LABEL_PARENT)) != 0 &&
+		    strncmp(src, GOT_COMMIT_LABEL_COMMITTER,
+		    strlen(GOT_COMMIT_LABEL_COMMITTER)) != 0)
+			copy_header = 0;
 
-	/* Copy log message line by line to strip out unusual headers... */
-	msg = msg0;
-	do {
-		if ((line = strsep(&msg, "\n")) == NULL)
-			break;
-
-		if (headers == 1) {
-			if (line[0] != '\0' &&
-			    strncmp(line, GOT_COMMIT_LABEL_TREE,
-			        strlen(GOT_COMMIT_LABEL_TREE)) != 0 &&
-			    strncmp(line, GOT_COMMIT_LABEL_AUTHOR,
-			        strlen(GOT_COMMIT_LABEL_AUTHOR)) != 0 &&
-			    strncmp(line, GOT_COMMIT_LABEL_PARENT,
-			        strlen(GOT_COMMIT_LABEL_PARENT)) != 0 &&
-			    strncmp(line, GOT_COMMIT_LABEL_COMMITTER,
-			        strlen(GOT_COMMIT_LABEL_COMMITTER)) != 0)
-				continue;
-
-			if (line[0] == '\0')
-				headers = 0;
+		while (*src != '\0' && !eol) {
+			if (copy_header) {
+				*dst = *src;
+				dst++;
+			}
+			if (*src == '\n')
+				eol = 1;
+			src++;
 		}
+	}
+	*dst = '\0';
 
-		if (asprintf(&s, "%s%s\n",
-		    *logmsg ? *logmsg : "", line) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		free(*logmsg);
-		*logmsg = s;
-
-	} while (line);
-
-	if (*logmsg == NULL) {
-		/* log message does not contain \n */
-		*logmsg = strdup(commit->logmsg);
-		if (*logmsg == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
+	if (strlcat(*logmsg, src, len + 1) >= len + 1) {
+		err = got_error(GOT_ERR_NO_SPACE);
+		goto done;
 	}
 
 	/* Trim redundant trailing whitespace. */
@@ -497,8 +490,13 @@ got_object_commit_get_logmsg(char **logmsg, struct got_commit_object *commit)
 		(*logmsg)[len - 1] = '\0';
 		len--;
 	}
+
+	/* Append a trailing newline if missing. */
+	if (len > 0 && (*logmsg)[len - 1] != '\n') {
+		(*logmsg)[len] = '\n';
+		(*logmsg)[len + 1] = '\0';
+	}
 done:
-	free(msg0);
 	if (err) {
 		free(*logmsg);
 		*logmsg = NULL;
