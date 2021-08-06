@@ -499,7 +499,7 @@ add_ref(struct got_reflist_entry **new, struct got_reflist_head *refs,
 		err = got_ref_list(refs, repo, refname,
 		    got_ref_cmp_by_name, NULL);
 	} else {
-		err = got_reflist_insert(new, refs, ref, repo,
+		err = got_reflist_insert(new, refs, ref,
 		    got_ref_cmp_by_name, NULL);
 		if (err || *new == NULL /* duplicate */)
 			got_ref_close(ref);

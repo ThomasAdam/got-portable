@@ -810,8 +810,7 @@ done:
 
 const struct got_error *
 got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
-    struct got_reference *ref, struct got_repository *repo,
-    got_ref_cmp_cb cmp_cb, void *cmp_arg)
+    struct got_reference *ref, got_ref_cmp_cb cmp_cb, void *cmp_arg)
 {
 	const struct got_error *err;
 	struct got_reflist_entry *new, *re;
@@ -902,7 +901,7 @@ gather_on_disk_refs(struct got_reflist_head *refs, const char *path_refs,
 				goto done;
 			if (ref) {
 				struct got_reflist_entry *new;
-				err = got_reflist_insert(&new, refs, ref, repo,
+				err = got_reflist_insert(&new, refs, ref,
 				    cmp_cb, cmp_arg);
 				if (err || new == NULL /* duplicate */)
 					got_ref_close(ref);
@@ -953,8 +952,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 		err = open_ref(&ref, path_refs, "", GOT_REF_HEAD, 0);
 		if (err)
 			goto done;
-		err = got_reflist_insert(&new, refs, ref, repo,
-		    cmp_cb, cmp_arg);
+		err = got_reflist_insert(&new, refs, ref, cmp_cb, cmp_arg);
 		if (err || new == NULL /* duplicate */)
 			got_ref_close(ref);
 		if (err && err->code != GOT_ERR_NOT_REF)
@@ -973,7 +971,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 				goto done;
 			/* Try to look up references in a given namespace. */
 		} else {
-			err = got_reflist_insert(&new, refs, ref, repo,
+			err = got_reflist_insert(&new, refs, ref,
 			    cmp_cb, cmp_arg);
 			if (err || new == NULL /* duplicate */)
 				got_ref_close(ref);
@@ -1065,7 +1063,7 @@ got_ref_list(struct got_reflist_head *refs, struct got_repository *repo,
 						continue;
 					}
 				}
-				err = got_reflist_insert(&new, refs, ref, repo,
+				err = got_reflist_insert(&new, refs, ref,
 				    cmp_cb, cmp_arg);
 				if (err || new == NULL /* duplicate */)
 					got_ref_close(ref);
@@ -1316,7 +1314,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 			continue;
 		}
 
-		err = got_reflist_insert(&new, &refs, ref, repo,
+		err = got_reflist_insert(&new, &refs, ref,
 		    got_ref_cmp_by_name, NULL);
 		if (err || new == NULL /* duplicate */)
 			got_ref_close(ref);

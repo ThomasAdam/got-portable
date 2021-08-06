@@ -131,8 +131,7 @@ void got_ref_list_free(struct got_reflist_head *);
  */
 const struct got_error *
 got_reflist_insert(struct got_reflist_entry **newp, struct got_reflist_head *refs,
-    struct got_reference *ref, struct got_repository *repo,
-    got_ref_cmp_cb cmp_cb, void *cmp_arg);
+    struct got_reference *ref, got_ref_cmp_cb cmp_cb, void *cmp_arg);
 
 /* Indicate whether the provided reference is symbolic (points at another
  * refernce) or not (points at an object ID). */
