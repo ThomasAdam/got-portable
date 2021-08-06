@@ -1157,7 +1157,8 @@ main(int argc, char **argv)
 		return 1;
 	}
 #endif
-	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
 		goto done;
@@ -1184,7 +1185,8 @@ main(int argc, char **argv)
 		struct got_object_id *id;
 		char *refname;
 
-		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+		if (err) {
 			if (err->code == GOT_ERR_PRIVSEP_PIPE)
 				err = NULL;
 			goto done;
@@ -1233,7 +1235,8 @@ main(int argc, char **argv)
 	for (i = 0; i < fetch_req.n_wanted_branches; i++) {
 		char *refname;
 
-		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+		if (err) {
 			if (err->code == GOT_ERR_PRIVSEP_PIPE)
 				err = NULL;
 			goto done;
@@ -1274,7 +1277,8 @@ main(int argc, char **argv)
 	for (i = 0; i < fetch_req.n_wanted_refs; i++) {
 		char *refname;
 
-		if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+		err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+		if (err) {
 			if (err->code == GOT_ERR_PRIVSEP_PIPE)
 				err = NULL;
 			goto done;
@@ -1312,7 +1316,8 @@ main(int argc, char **argv)
 		imsg_free(&imsg);
 	}
 
-	if ((err = got_privsep_recv_imsg(&imsg, &ibuf, 0)) != 0) {
+	err = got_privsep_recv_imsg(&imsg, &ibuf, 0);
+	if (err) {
 		if (err->code == GOT_ERR_PRIVSEP_PIPE)
 			err = NULL;
 		goto done;
