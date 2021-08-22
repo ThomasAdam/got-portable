@@ -1257,7 +1257,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 	if (n != SHA1_DIGEST_LENGTH)
 		err = got_ferror(packfile, GOT_ERR_IO);
 	packfile_size += SHA1_DIGEST_LENGTH;
-	packfile_size += 16; /* pack file header */
+	packfile_size += sizeof(struct got_packfile_hdr);
 	err = progress_cb(progress_arg, packfile_size, nours,
 	    nmeta, nmeta, nmeta);
 	if (err)
