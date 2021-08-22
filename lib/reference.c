@@ -592,8 +592,8 @@ got_reflist_entry_dup(struct got_reflist_entry **newp,
 	return NULL;
 }
 
-static const struct got_error *
-resolve_symbolic_ref(struct got_reference **resolved,
+const struct got_error *
+got_ref_resolve_symbolic(struct got_reference **resolved,
     struct got_repository *repo, struct got_reference *ref)
 {
 	struct got_reference *nextref;
@@ -604,7 +604,7 @@ resolve_symbolic_ref(struct got_reference **resolved,
 		return err;
 
 	if (nextref->flags & GOT_REF_IS_SYMBOLIC)
-		err = resolve_symbolic_ref(resolved, repo, nextref);
+		err = got_ref_resolve_symbolic(resolved, repo, nextref);
 	else
 		*resolved = got_ref_dup(nextref);
 
@@ -624,7 +624,7 @@ ref_resolve(struct got_object_id **id, struct got_repository *repo,
 
 	if (ref->flags & GOT_REF_IS_SYMBOLIC) {
 		struct got_reference *resolved = NULL;
-		err = resolve_symbolic_ref(&resolved, repo, ref);
+		err = got_ref_resolve_symbolic(&resolved, repo, ref);
 		if (err == NULL)
 			err = ref_resolve(id, repo, resolved, --recursion);
 		if (resolved)

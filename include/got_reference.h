@@ -68,7 +68,11 @@ time_t got_ref_get_mtime(struct got_reference *);
  */
 struct got_reference *got_ref_dup(struct got_reference *);
 
-/* Attempt to resolve a reference to an object ID. */
+/* Attempt to resolve a symbolic reference to a non-symbolic one. */
+const struct got_error *got_ref_resolve_symbolic(struct got_reference **,
+    struct got_repository *, struct got_reference *);
+
+/* Attempt to resolve a reference (symbolic or not) to an object ID. */
 const struct got_error *got_ref_resolve(struct got_object_id **,
     struct got_repository *, struct got_reference *);
 
