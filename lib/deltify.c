@@ -296,17 +296,20 @@ got_deltify_free(struct got_delta_table *dt)
 }
 
 static const struct got_error *
-emitdelta(struct got_delta_instruction **deltas, int *ndeltas, int copy,
-    off_t offset, off_t len)
+emitdelta(struct got_delta_instruction **deltas, size_t *nalloc, int *ndeltas,
+    const size_t alloc_chunk_size, int copy, off_t offset, off_t len)
 {
 	struct got_delta_instruction *d, *p;
 
+	if (*nalloc < *ndeltas + alloc_chunk_size) {
+		p = reallocarray(*deltas, *nalloc + alloc_chunk_size,
+		    sizeof(struct got_delta_instruction));
+		if (p == NULL)
+			return got_error_from_errno("realloc");
+		*deltas = p;
+		*nalloc += alloc_chunk_size;
+	}
 	*ndeltas += 1;
-	p = reallocarray(*deltas, *ndeltas,
-	    sizeof(struct got_delta_instruction));
-	if (p == NULL)
-		return got_error_from_errno("realloc");
-	*deltas = p;
 	d = &(*deltas)[*ndeltas - 1];
 	d->copy = copy;
 	d->offset = offset;
@@ -358,6 +361,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 {
 	const struct got_error *err = NULL;
 	const off_t offset0 = fileoffset;
+	size_t nalloc = 0;
+	const size_t alloc_chunk_size = 64;
 
 	*deltas = NULL;
 	*ndeltas = 0;
@@ -370,6 +375,12 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 	if (fseeko(f, offset0, SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
+	*deltas = reallocarray(NULL, alloc_chunk_size,
+	    sizeof(struct got_delta_instruction));
+	if (*deltas == NULL)
+		return got_error_from_errno("reallocarray");
+	nalloc = alloc_chunk_size;
+
 	while (fileoffset < filesize) {
 		uint8_t buf[GOT_DELTIFY_MAXCHUNK];
 		off_t blocklen;
@@ -380,8 +391,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 		if (blocklen == 0) {
 			/* Source remainder from the file itself. */
 			if (fileoffset < filesize) {
-				err = emitdelta(deltas, ndeltas, 0,
-				    fileoffset - offset0,
+				err = emitdelta(deltas, &nalloc, ndeltas,
+				    alloc_chunk_size, 0, fileoffset - offset0,
 				    filesize - fileoffset);
 			}
 			break;
@@ -400,7 +411,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			    f, filesize, &blocklen);
 			if (err)
 				break;
-			err = emitdelta(deltas, ndeltas, 1, block->offset, blocklen);
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 1, block->offset, blocklen);
 			if (err)
 				break;
 		} else {
@@ -408,8 +420,8 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 			 * No match.
 			 * This block needs to be sourced from the file itself.
 			 */
-			err = emitdelta(deltas, ndeltas, 0, fileoffset - offset0,
-			    blocklen);
+			err = emitdelta(deltas, &nalloc, ndeltas,
+			    alloc_chunk_size, 0, fileoffset - offset0, blocklen);
 			if (err)
 				break;
 		}
