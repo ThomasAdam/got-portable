@@ -426,9 +426,10 @@ got_deltify(struct got_delta_instruction **deltas, int *ndeltas,
 				break;
 		}
 		fileoffset += blocklen;
-		if (fseeko(f, fileoffset, SEEK_SET) == -1)
-			return got_error_from_errno("fseeko");
-
+		if (fseeko(f, fileoffset, SEEK_SET) == -1) {
+			err = got_error_from_errno("fseeko");
+			break;
+		}
 	}
 
 	if (err) {
