@@ -265,8 +265,8 @@ get_refs_dir_path(struct got_repository *repo, const char *refname)
 	return got_repo_get_path_refs(repo);
 }
 
-static int
-is_valid_ref_name(const char *name)
+int
+got_ref_name_is_valid(const char *name)
 {
 	const char *s, *seg;
 	const char forbidden[] = { ' ', '~', '^', ':', '?', '*', '[' , '\\' };
@@ -320,7 +320,7 @@ const struct got_error *
 got_ref_alloc(struct got_reference **ref, const char *name,
     struct got_object_id *id)
 {
-	if (!is_valid_ref_name(name))
+	if (!got_ref_name_is_valid(name))
 		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
 	return alloc_ref(ref, name, id, 0, 0);
@@ -330,7 +330,7 @@ const struct got_error *
 got_ref_alloc_symref(struct got_reference **ref, const char *name,
 	struct got_reference *target_ref)
 {
-	if (!is_valid_ref_name(name))
+	if (!got_ref_name_is_valid(name))
 		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
 	return alloc_symref(ref, name, got_ref_get_name(target_ref), 0);
@@ -418,7 +418,7 @@ open_ref(struct got_reference **ref, const char *path_refs, const char *subdir,
 
 	*ref = NULL;
 
-	if (!is_valid_ref_name(name))
+	if (!got_ref_name_is_valid(name))
 		return got_error_path(name, GOT_ERR_BAD_REF_NAME);
 
 	if (ref_is_absolute || ref_is_well_known) {

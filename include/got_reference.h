@@ -26,6 +26,9 @@ struct got_reference;
 struct got_repository;
 struct got_object_id;
 
+/* Determine whether a given reference name is valid. */
+int got_ref_name_is_valid(const char *);
+
 /*
  * Attempt to open the reference with the provided name in a repository.
  * The caller must dispose of the reference with got_ref_close().
