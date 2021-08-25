@@ -311,7 +311,7 @@ tokenize_refline(char **tokens, char *line, int len, int maxtokens)
 		}
 	}
 	if (i <= 2)
-		err = got_error(GOT_ERR_NOT_REF);
+		err = got_error(GOT_ERR_BAD_PACKET);
 done:
 	if (err) {
 		int j;
