@@ -294,7 +294,7 @@ tokenize_refline(char **tokens, char *line, int len, int maxtokens)
 			n++;
 		}
 		p = line;
-		while (*line != '\0' &&
+		while (*line != '\0' && n < len &&
 		    (!isspace(*line) || i == maxtokens - 1)) {
 			line++;
 			n++;
