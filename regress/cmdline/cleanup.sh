@@ -247,7 +247,7 @@ test_cleanup_precious_objects() {
 	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "gotadmin cleanup succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1
@@ -297,7 +297,7 @@ test_cleanup_missing_pack_file() {
 	gotadmin cleanup -a -q -r $testroot/repo > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "gotadmin cleanup succeeded unexpectedly" >&2
 		test_done "$testroot" "1"
 		return 1

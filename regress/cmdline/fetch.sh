@@ -1128,7 +1128,7 @@ test_fetch_delete_remote_refs() {
 	got fetch -q -r $testroot/repo-clone -X > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got fetch command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
