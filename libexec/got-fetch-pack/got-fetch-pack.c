@@ -710,7 +710,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				goto done;
 			if (chattygot)
 				fprintf(stderr, "%s: my capabilities:%s\n",
-				    getprogname(), my_capabilities);
+				    getprogname(), my_capabilities != NULL ?
+				    my_capabilities : "");
 			err = send_fetch_symrefs(ibuf, &symrefs);
 			if (err)
 				goto done;
@@ -844,7 +845,8 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			continue;
 		got_sha1_digest_to_str(want[i].sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "want %s%s\n", hashstr,
-		    sent_my_capabilites ? "" : my_capabilities);
+		    sent_my_capabilites || my_capabilities == NULL ?
+		    "" : my_capabilities);
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
