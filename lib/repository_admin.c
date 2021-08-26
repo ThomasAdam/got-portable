@@ -198,7 +198,7 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	}
 
 	err = got_pack_create((*pack_hash)->sha1, *packfile, theirs, ntheirs,
-	    ours, nours, repo, loose_obj_only, progress_cb, progress_arg,
+	    ours, nours, repo, loose_obj_only, 0, progress_cb, progress_arg,
 	    cancel_cb, cancel_arg);
 	if (err)
 		goto done;

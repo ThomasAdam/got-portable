@@ -148,6 +148,13 @@
 #define GOT_ERR_CANNOT_PACK	131
 #define GOT_ERR_LONELY_PACKIDX	132
 #define GOT_ERR_OBJ_CSUM	133
+#define GOT_ERR_SEND_BAD_REF	134
+#define GOT_ERR_SEND_FAILED	135
+#define GOT_ERR_SEND_EMPTY	136
+#define GOT_ERR_SEND_ANCESTRY	137
+#define GOT_ERR_CAPA_DELETE_REFS 138
+#define GOT_ERR_SEND_DELETE_REF	139
+#define GOT_ERR_SEND_TAG_EXISTS	140
 
 static const struct got_error {
 	int code;
@@ -304,6 +311,13 @@ static const struct got_error {
 	{ GOT_ERR_LONELY_PACKIDX, "pack index has no corresponding pack file; "
 	    "pack file must be restored or 'gotadmin cleanup -p' must be run" },
 	{ GOT_ERR_OBJ_CSUM, "bad object checksum" },
+	{ GOT_ERR_SEND_BAD_REF, "reference cannot be sent" },
+	{ GOT_ERR_SEND_FAILED, "could not send pack file" },
+	{ GOT_ERR_SEND_EMPTY, "no references to send" },
+	{ GOT_ERR_SEND_ANCESTRY, "fetch and rebase required" },
+	{ GOT_ERR_CAPA_DELETE_REFS, "server cannot delete references" },
+	{ GOT_ERR_SEND_DELETE_REF, "reference cannot be deleted" },
+	{ GOT_ERR_SEND_TAG_EXISTS, "tag already exists on server" },
 };
 
 /*

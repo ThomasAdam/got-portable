@@ -24,6 +24,6 @@
 const struct got_error *got_pack_create(uint8_t *pack_sha1, FILE *packfile,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
-    struct got_repository *repo, int loose_obj_only,
+    struct got_repository *repo, int loose_obj_only, int allow_empty,
     got_pack_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg);

@@ -862,6 +862,249 @@ done:
 	return err;
 }
 
+static const struct got_error *
+send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
+    int delete, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	size_t len;
+	struct ibuf *wbuf;
+
+	len = sizeof(struct got_imsg_send_ref) + name_len;
+	wbuf = imsg_create(ibuf, GOT_IMSG_SEND_REF, 0, 0, len);
+	if (wbuf == NULL)
+		return got_error_from_errno("imsg_create SEND_REF");
+
+	/* Keep in sync with struct got_imsg_send_ref! */
+	if (imsg_add(wbuf, id->sha1, sizeof(id->sha1)) == -1) {
+		err = got_error_from_errno("imsg_add SEND_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, &delete, sizeof(delete)) == -1) {
+		err = got_error_from_errno("imsg_add SEND_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, &name_len, sizeof(name_len)) == -1) {
+		err = got_error_from_errno("imsg_add SEND_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+	if (imsg_add(wbuf, name, name_len) == -1) {
+		err = got_error_from_errno("imsg_add SEND_REF");
+		ibuf_free(wbuf);
+		return err;
+	}
+
+	wbuf->fd = -1;
+	imsg_close(ibuf, wbuf);
+	return flush_imsg(ibuf);
+}
+
+const struct got_error *
+got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
+   struct got_pathlist_head *have_refs,
+   struct got_pathlist_head *delete_refs,
+   int verbosity)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct got_imsg_send_request sendreq;
+	struct got_object_id zero_id;
+
+	memset(&zero_id, 0, sizeof(zero_id));
+	memset(&sendreq, 0, sizeof(sendreq));
+	sendreq.verbosity = verbosity;
+	TAILQ_FOREACH(pe, have_refs, entry)
+		sendreq.nrefs++;
+	TAILQ_FOREACH(pe, delete_refs, entry)
+		sendreq.nrefs++;
+	if (imsg_compose(ibuf, GOT_IMSG_SEND_REQUEST, 0, 0, fd,
+	    &sendreq, sizeof(sendreq)) == -1) {
+		err = got_error_from_errno(
+		    "imsg_compose FETCH_SERVER_PROGRESS");
+		goto done;
+	}
+
+	err = flush_imsg(ibuf);
+	if (err)
+		goto done;
+	fd = -1;
+
+	TAILQ_FOREACH(pe, have_refs, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+		struct got_object_id *id = pe->data;
+		err = send_send_ref(name, name_len, id, 0, ibuf);
+		if (err)
+			goto done;
+	}
+
+	TAILQ_FOREACH(pe, delete_refs, entry) {
+		const char *name = pe->path;
+		size_t name_len = pe->path_len;
+		err = send_send_ref(name, name_len, &zero_id, 1, ibuf);
+		if (err)
+			goto done;
+	}
+done:
+	if (fd != -1 && close(fd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
+	return err;
+
+}
+
+const struct got_error *
+got_privsep_recv_send_remote_refs(struct got_pathlist_head *remote_refs,
+    struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	int done = 0;
+	struct got_imsg_send_remote_ref iremote_ref;
+	struct got_object_id *id = NULL;
+	char *refname = NULL;
+	struct got_pathlist_entry *new;
+
+	while (!done) {
+		err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+		if (err)
+			return err;
+		datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+		switch (imsg.hdr.type) {
+		case GOT_IMSG_ERROR:
+			if (datalen < sizeof(struct got_imsg_error)) {
+				err = got_error(GOT_ERR_PRIVSEP_LEN);
+				goto done;
+			}
+			err = recv_imsg_error(&imsg, datalen);
+			goto done;
+		case GOT_IMSG_SEND_REMOTE_REF:
+			if (datalen < sizeof(iremote_ref)) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				goto done;
+			}
+			memcpy(&iremote_ref, imsg.data, sizeof(iremote_ref));
+			if (datalen != sizeof(iremote_ref) +
+			    iremote_ref.name_len) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				goto done;
+			}
+			id = malloc(sizeof(*id));
+			if (id == NULL) {
+				err = got_error_from_errno("malloc");
+				goto done;
+			}
+			memcpy(id->sha1, iremote_ref.id, SHA1_DIGEST_LENGTH);
+			refname = strndup(imsg.data + sizeof(iremote_ref),
+			    datalen - sizeof(iremote_ref));
+			if (refname == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+			err = got_pathlist_insert(&new, remote_refs,
+			    refname, id);
+			if (err)
+				goto done;
+			if (new == NULL) { /* duplicate which wasn't inserted */
+				free(id);
+				free(refname);
+			}
+			id = NULL;
+			refname = NULL;
+			break;
+		case GOT_IMSG_SEND_PACK_REQUEST:
+			if (datalen != 0) {
+				err = got_error(GOT_ERR_PRIVSEP_MSG);
+				goto done;
+			}
+			/* got-send-pack is now waiting for a pack file. */
+			done = 1;
+			break;
+		default:
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+	}
+done:
+	free(id);
+	free(refname);
+	imsg_free(&imsg);
+	return err;
+}
+
+const struct got_error *
+got_privsep_send_packfd(struct imsgbuf *ibuf, int fd)
+{
+	return send_fd(ibuf, GOT_IMSG_SEND_PACKFD, fd);
+}
+
+const struct got_error *
+got_privsep_recv_send_progress(int *done, off_t *bytes_sent,
+    int *success, char **refname, struct imsgbuf *ibuf)
+{
+	const struct got_error *err = NULL;
+	struct imsg imsg;
+	size_t datalen;
+	struct got_imsg_send_ref_status iref_status;
+
+	/* Do not reset the current value of 'bytes_sent', it accumulates. */
+	*done = 0;
+	*success = 0;
+	*refname = NULL;
+
+	err = got_privsep_recv_imsg(&imsg, ibuf, 0);
+	if (err)
+		return err;
+
+	datalen = imsg.hdr.len - IMSG_HEADER_SIZE;
+	switch (imsg.hdr.type) {
+	case GOT_IMSG_ERROR:
+		if (datalen < sizeof(struct got_imsg_error)) {
+			err = got_error(GOT_ERR_PRIVSEP_LEN);
+			break;
+		}
+		err = recv_imsg_error(&imsg, datalen);
+		break;
+	case GOT_IMSG_SEND_UPLOAD_PROGRESS:
+		if (datalen < sizeof(*bytes_sent)) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		memcpy(bytes_sent, imsg.data, sizeof(*bytes_sent));
+		break;
+	case GOT_IMSG_SEND_REF_STATUS:
+		if (datalen < sizeof(iref_status)) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		memcpy(&iref_status, imsg.data, sizeof(iref_status));
+		if (datalen != sizeof(iref_status) + iref_status.name_len) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		*success = iref_status.success;
+		*refname = strndup(imsg.data + sizeof(iref_status),
+		    iref_status.name_len);
+		break;
+	case GOT_IMSG_SEND_DONE:
+		if (datalen != 0) {
+			err = got_error(GOT_ERR_PRIVSEP_MSG);
+			break;
+		}
+		*done = 1;
+		break;
+	default:
+		err = got_error(GOT_ERR_PRIVSEP_MSG);
+		break;
+	}
+
+	imsg_free(&imsg);
+	return err;
+}
+
 const struct got_error *
 got_privsep_send_index_pack_req(struct imsgbuf *ibuf, uint8_t *pack_sha1,
     int fd)
@@ -2451,6 +2694,7 @@ got_privsep_unveil_exec_helpers(void)
 	    GOT_PATH_PROG_READ_GOTCONFIG,
 	    GOT_PATH_PROG_FETCH_PACK,
 	    GOT_PATH_PROG_INDEX_PACK,
+	    GOT_PATH_PROG_SEND_PACK,
 	};
 	size_t i;
 

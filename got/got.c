@@ -51,6 +51,7 @@
 #include "got_diff.h"
 #include "got_commit_graph.h"
 #include "got_fetch.h"
+#include "got_send.h"
 #include "got_blame.h"
 #include "got_privsep.h"
 #include "got_opentemp.h"
@@ -102,6 +103,7 @@ __dead static void	usage_add(void);
 __dead static void	usage_remove(void);
 __dead static void	usage_revert(void);
 __dead static void	usage_commit(void);
+__dead static void	usage_send(void);
 __dead static void	usage_cherrypick(void);
 __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
@@ -130,6 +132,7 @@ static const struct got_error*		cmd_add(int, char *[]);
 static const struct got_error*		cmd_remove(int, char *[]);
 static const struct got_error*		cmd_revert(int, char *[]);
 static const struct got_error*		cmd_commit(int, char *[]);
+static const struct got_error*		cmd_send(int, char *[]);
 static const struct got_error*		cmd_cherrypick(int, char *[]);
 static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
@@ -159,6 +162,7 @@ static struct got_cmd got_commands[] = {
 	{ "remove",	cmd_remove,	usage_remove,	"rm" },
 	{ "revert",	cmd_revert,	usage_revert,	"rv" },
 	{ "commit",	cmd_commit,	usage_commit,	"ci" },
+	{ "send",	cmd_send,	usage_send,	"se" },
 	{ "cherrypick",	cmd_cherrypick,	usage_cherrypick, "cy" },
 	{ "backout",	cmd_backout,	usage_backout,	"bo" },
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
@@ -7349,6 +7353,498 @@ done:
 	free(editor);
 	free(author);
 	free(prepared_logmsg);
+	return error;
+}
+
+__dead static void
+usage_send(void)
+{
+	fprintf(stderr, "usage: %s send [-a] [-b branch] [-d branch] [-f] "
+	    "[-r repository-path] [-t tag] [-T] [-q] [-v] "
+	    "[remote-repository]\n", getprogname());
+	exit(1);
+}
+
+struct got_send_progress_arg {
+	char last_scaled_packsize[FMT_SCALED_STRSIZE];
+	int verbosity;
+	int last_ncommits;
+	int last_nobj_total;
+	int last_p_deltify;
+	int last_p_written;
+	int last_p_sent;
+	int printed_something;
+	int sent_something;
+	struct got_pathlist_head *delete_branches;
+};
+
+static const struct got_error *
+send_progress(void *arg, off_t packfile_size, int ncommits, int nobj_total,
+    int nobj_deltify, int nobj_written, off_t bytes_sent, const char *refname,
+    int success)
+{
+	struct got_send_progress_arg *a = arg;
+	char scaled_packsize[FMT_SCALED_STRSIZE];
+	char scaled_sent[FMT_SCALED_STRSIZE];
+	int p_deltify = 0, p_written = 0, p_sent = 0;
+	int print_searching = 0, print_total = 0;
+	int print_deltify = 0, print_written = 0, print_sent = 0;
+
+	if (a->verbosity < 0)
+		return NULL;
+
+	if (refname) {
+		const char *status = success ? "accepted" : "rejected";
+
+		if (success) {
+			struct got_pathlist_entry *pe;
+			TAILQ_FOREACH(pe, a->delete_branches, entry) {
+				const char *branchname = pe->path;
+				if (got_path_cmp(branchname, refname,
+				    strlen(branchname), strlen(refname)) == 0) {
+					status = "deleted";
+					break;
+				}
+			}
+		}
+
+		printf("\nServer has %s %s", status, refname);
+		a->printed_something = 1;
+		return NULL;
+	}
+
+	if (fmt_scaled(packfile_size, scaled_packsize) == -1)
+		return got_error_from_errno("fmt_scaled");
+	if (fmt_scaled(bytes_sent, scaled_sent) == -1)
+		return got_error_from_errno("fmt_scaled");
+
+	if (a->last_ncommits != ncommits) {
+		print_searching = 1;
+		a->last_ncommits = ncommits;
+	}
+
+	if (a->last_nobj_total != nobj_total) {
+		print_searching = 1;
+		print_total = 1;
+		a->last_nobj_total = nobj_total;
+	}
+
+	if (packfile_size > 0 && (a->last_scaled_packsize[0] == '\0' ||
+	    strcmp(scaled_packsize, a->last_scaled_packsize)) != 0) {
+		if (strlcpy(a->last_scaled_packsize, scaled_packsize,
+		    FMT_SCALED_STRSIZE) >= FMT_SCALED_STRSIZE)
+			return got_error(GOT_ERR_NO_SPACE);
+	}
+
+	if (nobj_deltify > 0 || nobj_written > 0) {
+		if (nobj_deltify > 0) {
+			p_deltify = (nobj_deltify * 100) / nobj_total;
+			if (p_deltify != a->last_p_deltify) {
+				a->last_p_deltify = p_deltify;
+				print_searching = 1;
+				print_total = 1;
+				print_deltify = 1;
+			}
+		}
+		if (nobj_written > 0) {
+			p_written = (nobj_written * 100) / nobj_total;
+			if (p_written != a->last_p_written) {
+				a->last_p_written = p_written;
+				print_searching = 1;
+				print_total = 1;
+				print_deltify = 1;
+				print_written = 1;
+			}
+		}
+	}
+
+	if (bytes_sent > 0) {
+		p_sent = (bytes_sent * 100) / packfile_size;
+		if (p_sent != a->last_p_sent) {
+			a->last_p_sent = p_sent;
+			print_searching = 1;
+			print_total = 1;
+			print_deltify = 1;
+			print_written = 1;
+			print_sent = 1;
+		}
+		a->sent_something = 1;
+	}
+
+	if (print_searching || print_total || print_deltify || print_written ||
+	    print_sent)
+		printf("\r");
+	if (print_searching)
+		printf("packing %d reference%s", ncommits,
+		    ncommits == 1 ? "" : "s");
+	if (print_total)
+		printf("; %d object%s", nobj_total,
+		    nobj_total == 1 ? "" : "s");
+	if (print_deltify)
+		printf("; deltify: %d%%", p_deltify);
+	if (print_sent)
+		printf("; uploading pack: %*s %d%%", FMT_SCALED_STRSIZE,
+		    scaled_packsize, p_sent);
+	else if (print_written)
+		printf("; writing pack: %*s %d%%", FMT_SCALED_STRSIZE,
+		    scaled_packsize, p_written);
+	if (print_searching || print_total || print_deltify ||
+	    print_written || print_sent) {
+		a->printed_something = 1;
+		fflush(stdout);
+	}
+	return NULL;
+}
+
+static const struct got_error *
+cmd_send(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	char *cwd = NULL, *repo_path = NULL;
+	const char *remote_name;
+	char *proto = NULL, *host = NULL, *port = NULL;
+	char *repo_name = NULL, *server_path = NULL;
+	const struct got_remote_repo *remotes, *remote = NULL;
+	int nremotes, nbranches = 0, ntags = 0, ndelete_branches = 0;
+	struct got_repository *repo = NULL;
+	struct got_worktree *worktree = NULL;
+	const struct got_gotconfig *repo_conf = NULL, *worktree_conf = NULL;
+	struct got_pathlist_head branches;
+	struct got_pathlist_head tags;
+	struct got_reflist_head all_branches;
+	struct got_reflist_head all_tags;
+	struct got_pathlist_head delete_args;
+	struct got_pathlist_head delete_branches;
+	struct got_reflist_entry *re;
+	struct got_pathlist_entry *pe;
+	int i, ch, sendfd = -1, sendstatus;
+	pid_t sendpid = -1;
+	struct got_send_progress_arg spa;
+	int verbosity = 0, overwrite_refs = 0;
+	int send_all_branches = 0, send_all_tags = 0;
+	struct got_reference *ref = NULL;
+
+	TAILQ_INIT(&branches);
+	TAILQ_INIT(&tags);
+	TAILQ_INIT(&all_branches);
+	TAILQ_INIT(&all_tags);
+	TAILQ_INIT(&delete_args);
+	TAILQ_INIT(&delete_branches);
+
+	while ((ch = getopt(argc, argv, "ab:d:fr:t:Tvq")) != -1) {
+		switch (ch) {
+		case 'a':
+			send_all_branches = 1;
+			break;
+		case 'b':
+			error = got_pathlist_append(&branches, optarg, NULL);
+			if (error)
+				return error;
+			nbranches++;
+			break;
+		case 'd':
+			error = got_pathlist_append(&delete_args, optarg, NULL);
+			if (error)
+				return error;
+			break;
+		case 'f':
+			overwrite_refs = 1;
+			break;
+		case 'r':
+			repo_path = realpath(optarg, NULL);
+			if (repo_path == NULL)
+				return got_error_from_errno2("realpath",
+				    optarg);
+			got_path_strip_trailing_slashes(repo_path);
+			break;
+		case 't':
+			error = got_pathlist_append(&tags, optarg, NULL);
+			if (error)
+				return error;
+			ntags++;
+			break;
+		case 'T':
+			send_all_tags = 1;
+			break;
+		case 'v':
+			if (verbosity < 0)
+				verbosity = 0;
+			else if (verbosity < 3)
+				verbosity++;
+			break;
+		case 'q':
+			verbosity = -1;
+			break;
+		default:
+			usage_send();
+			/* NOTREACHED */
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (send_all_branches && !TAILQ_EMPTY(&branches))
+		option_conflict('a', 'b');
+	if (send_all_tags && !TAILQ_EMPTY(&tags))
+		option_conflict('T', 't');
+
+
+	if (argc == 0)
+		remote_name = GOT_SEND_DEFAULT_REMOTE_NAME;
+	else if (argc == 1)
+		remote_name = argv[0];
+	else
+		usage_send();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	if (repo_path == NULL) {
+		error = got_worktree_open(&worktree, cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
+			goto done;
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL)
+				error = got_error_from_errno("strdup");
+			if (error)
+				goto done;
+		} else {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	error = got_repo_open(&repo, repo_path, NULL);
+	if (error)
+		goto done;
+
+	if (worktree) {
+		worktree_conf = got_worktree_get_gotconfig(worktree);
+		if (worktree_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    worktree_conf);
+			for (i = 0; i < nremotes; i++) {
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
+					break;
+				}
+			}
+		}
+	}
+	if (remote == NULL) {
+		repo_conf = got_repo_get_gotconfig(repo);
+		if (repo_conf) {
+			got_gotconfig_get_remotes(&nremotes, &remotes,
+			    repo_conf);
+			for (i = 0; i < nremotes; i++) {
+				if (strcmp(remotes[i].name, remote_name) == 0) {
+					remote = &remotes[i];
+					break;
+				}
+			}
+		}
+	}
+	if (remote == NULL) {
+		got_repo_get_gitconfig_remotes(&nremotes, &remotes, repo);
+		for (i = 0; i < nremotes; i++) {
+			if (strcmp(remotes[i].name, remote_name) == 0) {
+				remote = &remotes[i];
+				break;
+			}
+		}
+	}
+	if (remote == NULL) {
+		error = got_error_path(remote_name, GOT_ERR_NO_REMOTE);
+		goto done;
+	}
+
+	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	    &repo_name, remote->url);
+	if (error)
+		goto done;
+
+	if (strcmp(proto, "git") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd dns inet unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "git+ssh") == 0 ||
+	    strcmp(proto, "ssh") == 0) {
+#ifndef PROFILE
+		if (pledge("stdio rpath wpath cpath fattr flock proc exec "
+		    "sendfd unveil", NULL) == -1)
+			err(1, "pledge");
+#endif
+	} else if (strcmp(proto, "http") == 0 ||
+	    strcmp(proto, "git+http") == 0) {
+		error = got_error_path(proto, GOT_ERR_NOT_IMPL);
+		goto done;
+	} else {
+		error = got_error_path(proto, GOT_ERR_BAD_PROTO);
+		goto done;
+	}
+
+	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
+		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
+			error = got_error_from_errno2("unveil",
+			    GOT_FETCH_PATH_SSH);
+			goto done;
+		}
+	}
+	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
+	if (error)
+		goto done;
+
+	if (send_all_branches) {
+		error = got_ref_list(&all_branches, repo, "refs/heads",
+		    got_ref_cmp_by_name, NULL);
+		if (error)
+			goto done;
+		TAILQ_FOREACH(re, &all_branches, entry) {
+			const char *branchname = got_ref_get_name(re->ref);
+			error = got_pathlist_append(&branches,
+			    branchname, NULL);
+			if (error)
+				goto done;
+			nbranches++;
+		}
+	}
+
+	if (send_all_tags) {
+		error = got_ref_list(&all_tags, repo, "refs/tags",
+		    got_ref_cmp_by_name, NULL);
+		if (error)
+			goto done;
+		TAILQ_FOREACH(re, &all_tags, entry) {
+			const char *tagname = got_ref_get_name(re->ref);
+			error = got_pathlist_append(&tags,
+			    tagname, NULL);
+			if (error)
+				goto done;
+			ntags++;
+		}
+	}
+
+	/*
+	 * To prevent accidents only branches in refs/heads/ can be deleted
+	 * with 'got send -d'.
+	 * Deleting anything else requires local repository access or Git.
+	 */
+	TAILQ_FOREACH(pe, &delete_args, entry) {
+		const char *branchname = pe->path;
+		char *s;
+		struct got_pathlist_entry *new;
+		if (strncmp(branchname, "refs/heads/", 11) == 0) {
+			s = strdup(branchname);
+			if (s == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		} else {
+			if (asprintf(&s, "refs/heads/%s", branchname) == -1) {
+				error = got_error_from_errno("asprintf");
+				goto done;
+			}
+		}
+		error = got_pathlist_insert(&new, &delete_branches, s, NULL);
+		if (error || new == NULL /* duplicate */)
+			free(s);
+		if (error)
+			goto done;
+		ndelete_branches++;
+	}
+
+	if (nbranches == 0 && ndelete_branches == 0) {
+		struct got_reference *head_ref;
+		if (worktree)
+			error = got_ref_open(&head_ref, repo,
+			    got_worktree_get_head_ref_name(worktree), 0);
+		else
+			error = got_ref_open(&head_ref, repo, GOT_REF_HEAD, 0);
+		if (error)
+			goto done;
+		if (got_ref_is_symbolic(head_ref)) {
+			error = got_ref_resolve_symbolic(&ref, repo, head_ref);
+			got_ref_close(head_ref);
+			if (error)
+				goto done;
+		} else
+			ref = head_ref;
+		error = got_pathlist_append(&branches, got_ref_get_name(ref),
+		   NULL);
+		if (error)
+			goto done;
+		nbranches++;
+	}
+
+	if (verbosity >= 0)
+		printf("Connecting to \"%s\" %s%s%s\n", remote->name, host,
+		    port ? ":" : "", port ? port : "");
+
+	error = got_send_connect(&sendpid, &sendfd, proto, host, port,
+	    server_path, verbosity);
+	if (error)
+		goto done;
+
+	memset(&spa, 0, sizeof(spa));
+	spa.last_scaled_packsize[0] = '\0';
+	spa.last_p_deltify = -1;
+	spa.last_p_written = -1;
+	spa.verbosity = verbosity;
+	spa.delete_branches = &delete_branches;
+	error = got_send_pack(remote_name, &branches, &tags, &delete_branches,
+	    verbosity, overwrite_refs, sendfd, repo, send_progress, &spa,
+	    check_cancelled, NULL);
+	if (spa.printed_something)
+		putchar('\n');
+	if (error)
+		goto done;
+	if (!spa.sent_something && verbosity >= 0)
+		printf("Already up-to-date\n");
+done:
+	if (sendpid > 0) {
+		if (kill(sendpid, SIGTERM) == -1)
+			error = got_error_from_errno("kill");
+		if (waitpid(sendpid, &sendstatus, 0) == -1 && error == NULL)
+			error = got_error_from_errno("waitpid");
+	}
+	if (sendfd != -1 && close(sendfd) == -1 && error == NULL)
+		error = got_error_from_errno("close");
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
+	if (worktree)
+		got_worktree_close(worktree);
+	if (ref)
+		got_ref_close(ref);
+	got_pathlist_free(&branches);
+	got_pathlist_free(&tags);
+	got_ref_list_free(&all_branches);
+	got_ref_list_free(&all_tags);
+	got_pathlist_free(&delete_args);
+	TAILQ_FOREACH(pe, &delete_branches, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&delete_branches);
+	free(cwd);
+	free(repo_path);
+	free(proto);
+	free(host);
+	free(port);
+	free(server_path);
+	free(repo_name);
 	return error;
 }
 

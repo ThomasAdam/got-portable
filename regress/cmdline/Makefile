@@ -77,6 +77,9 @@ clone:
 fetch:
 	./fetch.sh -q -r "$(GOT_TEST_ROOT)"
 
+send:
+	./send.sh -q -r "$(GOT_TEST_ROOT)"
+
 tree:
 	./tree.sh -q -r "$(GOT_TEST_ROOT)"
 

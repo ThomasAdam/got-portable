@@ -1271,7 +1271,7 @@ const struct got_error *
 got_pack_create(uint8_t *packsha1, FILE *packfile,
     struct got_object_id **theirs, int ntheirs,
     struct got_object_id **ours, int nours,
-    struct got_repository *repo, int loose_obj_only,
+    struct got_repository *repo, int loose_obj_only, int allow_empty,
     got_pack_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
@@ -1284,15 +1284,16 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	if (err)
 		return err;
 
-	if (nmeta == 0) {
+	if (nmeta == 0 && !allow_empty) {
 		err = got_error(GOT_ERR_CANNOT_PACK);
 		goto done;
 	}
-
-	err = pick_deltas(meta, nmeta, nours, repo,
-	    progress_cb, progress_arg, cancel_cb, cancel_arg);
-	if (err)
-		goto done;
+	if (nmeta > 0) {
+		err = pick_deltas(meta, nmeta, nours, repo,
+		    progress_cb, progress_arg, cancel_cb, cancel_arg);
+		if (err)
+			goto done;
+	}
 
 	err = genpack(packsha1, packfile, meta, nmeta, nours, 1, repo,
 	    progress_cb, progress_arg, cancel_cb, cancel_arg);

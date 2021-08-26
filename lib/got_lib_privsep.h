@@ -126,6 +126,14 @@ enum got_imsg_type {
 	GOT_IMSG_IDXPACK_OUTFD,
 	GOT_IMSG_IDXPACK_PROGRESS,
 	GOT_IMSG_IDXPACK_DONE,
+	GOT_IMSG_SEND_REQUEST,
+	GOT_IMSG_SEND_REF,
+	GOT_IMSG_SEND_REMOTE_REF,
+	GOT_IMSG_SEND_REF_STATUS,
+	GOT_IMSG_SEND_PACK_REQUEST,
+	GOT_IMSG_SEND_PACKFD,
+	GOT_IMSG_SEND_UPLOAD_PROGRESS,
+	GOT_IMSG_SEND_DONE,
 
 	/* Messages related to pack files. */
 	GOT_IMSG_PACKIDX,
@@ -335,6 +343,41 @@ struct got_imsg_fetch_download_progress {
 	off_t packfile_bytes;
 };
 
+/* Structure for GOT_IMSG_SEND_REQUEST data. */
+struct got_imsg_send_request {
+	int verbosity;
+	size_t nrefs;
+	/* Followed by nrefs GOT_IMSG_SEND_REF messages. */
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_SEND_UPLOAD_PROGRESS data. */
+struct got_imsg_send_upload_progress {
+	/* Number of packfile data bytes uploaded so far. */
+	off_t packfile_bytes;
+};
+
+/* Structure for GOT_IMSG_SEND_REF data. */
+struct got_imsg_send_ref {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	int delete;
+	size_t name_len;
+	/* Followed by name_len data bytes. */
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_SEND_REMOTE_REF data. */
+struct got_imsg_send_remote_ref {
+	uint8_t id[SHA1_DIGEST_LENGTH];
+	size_t name_len;
+	/* Followed by name_len data bytes. */
+} __attribute__((__packed__));
+
+/* Structure for GOT_IMSG_SEND_REF_STATUS data. */
+struct got_imsg_send_ref_status {
+	int success;
+	size_t name_len;
+	/* Followed by name_len data bytes. */
+} __attribute__((__packed__));
+
 /* Structure for GOT_IMSG_IDXPACK_REQUEST data. */
 struct got_imsg_index_pack_request {
 	uint8_t pack_hash[SHA1_DIGEST_LENGTH];
@@ -466,6 +509,13 @@ const struct got_error *got_privsep_send_fetch_outfd(struct imsgbuf *, int);
 const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *, char **,
     off_t *, uint8_t *, struct imsgbuf *);
+const struct got_error *got_privsep_send_send_req(struct imsgbuf *, int,
+   struct got_pathlist_head *, struct got_pathlist_head *, int);
+const struct got_error *got_privsep_recv_send_remote_refs(
+    struct got_pathlist_head *, struct imsgbuf *);
+const struct got_error *got_privsep_send_packfd(struct imsgbuf *, int);
+const struct got_error *got_privsep_recv_send_progress(int *, off_t *,
+    int *, char **, struct imsgbuf *);
 const struct got_error *got_privsep_get_imsg_obj(struct got_object **,
     struct imsg *, struct imsgbuf *);
 const struct got_error *got_privsep_recv_obj(struct got_object **,
