@@ -1395,14 +1395,18 @@ the commits which have been sent.
 .Pp
 By default, changes will only be sent if they are based on up-to-date
 copies of relevant branches in the remote repository.
-If any changes to be sent are based on out-of-date copies, new changes
-must be fetched from the server with
+If any changes to be sent are based on out-of-date copies or would
+otherwise break linear history of existing branches, new changes must
+be fetched from the server with
 .Cm got fetch
 and local branches must be rebased with
 .Cm got rebase
 before
 .Cm got send
 can succeed.
+The
+.Fl f
+option can be used to make exceptions to these requirements.
 .Pp
 The options for
 .Cm got send
@@ -1448,10 +1452,15 @@ may become subject to deletion by Git's garbage collector running on
 the server.
 .Pp
 Requesting deletion of branches results in an error if the server
-does not support this feature.
+does not support this feature or disallows the deletion of branches
+based on its configuration.
 .It Fl f
-Attempt to force the server to accept uploaded branches or tags in
-spite of failing client-side sanity checks.
+Attempt to force the server to overwrite existing branches or tags
+in the remote repository, even when
+.Cm got fetch
+and
+.Cm got rebase
+would usually be required before changes can be sent.
 The server may reject forced requests regardless, depending on its
 configuration.
 .Pp
