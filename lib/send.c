@@ -742,6 +742,13 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			refs_to_send++;
 	}
 
+	/* Account for any existing references we are going to delete. */
+	TAILQ_FOREACH(pe, delete_branches, entry) {
+		const char *branchname = pe->path;
+		if (find_their_ref(&their_refs, branchname))
+			refs_to_send++;
+	}
+
 	if (refs_to_send == 0) {
 		got_privsep_send_stop(imsg_sendfds[0]);
 		goto done;

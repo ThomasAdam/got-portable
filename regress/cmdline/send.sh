@@ -353,11 +353,27 @@ EOF
 		return 1
 	fi
 
-	got send -q -r $testroot/repo -d refs/heads/branch2 origin \
-		> $testroot/stdout 2> $testroot/stderr
+	got send -r $testroot/repo -d refs/heads/branch2 origin \
+		> $testroot/stdout.raw 2>$testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	tr -d '\r' < $testroot/stdout.raw > $testroot/stdout
+
+	echo 'Connecting to "origin" 127.0.0.1' > $testroot/stdout.expected
+	echo -n "packing 0 references; 0 objects; deltify: 0%; " \
+		>> $testroot/stdout.expected
+	echo "uploading pack:     32B 100%" >> $testroot/stdout.expected
+	echo "Server has deleted refs/heads/branch2" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi
