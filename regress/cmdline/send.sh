@@ -150,7 +150,7 @@ EOF
 
 	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -207,7 +207,7 @@ EOF
 	got send -q -r $testroot/repo -f > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -328,7 +328,7 @@ EOF
 	got send -q -r $testroot/repo -d branch1 -b branch1 \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -366,7 +366,7 @@ EOF
 	got send -q -r $testroot/repo -d refs/heads/branchX origin \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -387,7 +387,7 @@ EOF
 	got send -q -r $testroot/repo -d refs/tags/1.0 origin \
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -643,7 +643,7 @@ EOF
 	got send -q -r $testroot/repo -t 1.0 > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -663,7 +663,7 @@ EOF
 	got send -q -r $testroot/repo -T > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
@@ -844,7 +844,7 @@ test_send_all_branches() {
 	got send -a -q -r $testroot/repo-clone -b master > $testroot/stdout \
 		2> $testroot/stderr
 	ret="$?"
-	if [ "$ret" == "0" ]; then
+	if [ "$ret" = "0" ]; then
 		echo "got send command succeeded unexpectedly" >&2
 		test_done "$testroot" "$ret"
 		return 1
