@@ -233,8 +233,32 @@ remoteopts1	: REPOSITORY STRING {
 		| REFERENCE ref {
 			remote->ref = $2;
 		}
-		| FETCH fetch
-		| SEND send
+		| FETCH {
+			static const struct got_error* error;
+
+			if (remote->fetch_repo != NULL) {
+				yyerror("fetch block already exists");
+				YYERROR;
+			}
+			error = new_fetch(&remote->fetch_repo);
+			if (error) {
+				yyerror("%s", error->msg);
+				YYERROR;
+			}
+		} '{' optnl fetchopts2 '}'
+		| SEND {
+			static const struct got_error* error;
+
+			if (remote->send_repo != NULL) {
+				yyerror("send block already exists");
+				YYERROR;
+			}
+			error = new_send(&remote->send_repo);
+			if (error) {
+				yyerror("%s", error->msg);
+				YYERROR;
+			}
+		} '{' optnl sendopts2 '}'
 	   	;
 fetchopts2	: fetchopts2 fetchopts1 nl
 	   	| fetchopts1 optnl
@@ -274,20 +298,6 @@ fetchopts1	: /* empty */
 			remote->fetch_repo->fetch_branch = $2;
 		}
 	   	;
-fetch		: {
-			static const struct got_error* error;
-
-			if (remote->fetch_repo != NULL) {
-				yyerror("fetch block already exists");
-				YYERROR;
-			}
-			error = new_fetch(&remote->fetch_repo);
-			if (error) {
-				yyerror("%s", error->msg);
-				YYERROR;
-			}
-		} '{' optnl fetchopts2 '}'
-       		;
 sendopts2	: sendopts2 sendopts1 nl
 	   	| sendopts1 optnl
 		;
@@ -326,20 +336,6 @@ sendopts1	: /* empty */
 			remote->send_repo->send_branch = $2;
 		}
 	   	;
-send		: {
-			static const struct got_error* error;
-
-			if (remote->send_repo != NULL) {
-				yyerror("send block already exists");
-				YYERROR;
-			}
-			error = new_send(&remote->send_repo);
-			if (error) {
-				yyerror("%s", error->msg);
-				YYERROR;
-			}
-		} '{' optnl sendopts2 '}'
-       		;
 remote		: REMOTE STRING {
 			static const struct got_error* error;
 
