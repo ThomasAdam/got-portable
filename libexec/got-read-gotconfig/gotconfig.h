@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Tracey Emery <tracey@openbsd.org>
+ * Copyright (c) 2020, 2021 Tracey Emery <tracey@openbsd.org>
  * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -14,6 +14,24 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+struct fetch_repo {
+	char	*fetch_name;
+	char	*fetch_repository;
+	char	*fetch_server;
+	char	*fetch_protocol;
+	int	fetch_port;
+	struct	node_branch *fetch_branch;
+};
+
+struct send_repo {
+	char	*send_name;
+	char	*send_repository;
+	char	*send_server;
+	char	*send_protocol;
+	int	send_port;
+	struct	node_branch *send_branch;
+};
 
 struct node_branch {
 	char *branch_name;
@@ -38,6 +56,8 @@ struct gotconfig_remote_repo {
 	int	fetch_all_branches;
 	struct	node_branch *branch;
 	struct	node_ref *ref;
+	struct	fetch_repo *fetch_repo;
+	struct	send_repo *send_repo;
 };
 TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
 

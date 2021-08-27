@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Tracey Emery <tracey@openbsd.org>
+ * Copyright (c) 2020, 2021 Tracey Emery <tracey@openbsd.org>
  * Copyright (c) 2020 Stefan Sperling <stsp@openbsd.org>
  * Copyright (c) 2004, 2005 Esben Norby <norby@openbsd.org>
  * Copyright (c) 2004 Ryan McBride <mcbride@openbsd.org>
@@ -81,6 +81,8 @@ static const struct got_error* gerror;
 static struct gotconfig_remote_repo *remote;
 static struct gotconfig gotconfig;
 static const struct got_error* new_remote(struct gotconfig_remote_repo **);
+static const struct got_error* new_fetch(struct fetch_repo **);
+static const struct got_error* new_send(struct send_repo **);
 
 typedef struct {
 	union {
@@ -96,7 +98,7 @@ typedef struct {
 
 %token	ERROR
 %token	REMOTE REPOSITORY SERVER PORT PROTOCOL MIRROR_REFERENCES BRANCH
-%token	AUTHOR FETCH_ALL_BRANCHES REFERENCE
+%token	AUTHOR FETCH_ALL_BRANCHES REFERENCE FETCH SEND
 %token	<v.string>	STRING
 %token	<v.number>	NUMBER
 %type	<v.number>	boolean portplain
@@ -231,7 +233,111 @@ remoteopts1	: REPOSITORY STRING {
 		| REFERENCE ref {
 			remote->ref = $2;
 		}
+		| FETCH fetch
+		| SEND send
 	   	;
+fetchopts2	: fetchopts2 fetchopts1 nl
+	   	| fetchopts1 optnl
+		;
+fetchopts1	: REPOSITORY STRING {
+	   		remote->fetch_repo->fetch_repository = strdup($2);
+			if (remote->fetch_repo->fetch_repository == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+	   	}
+	   	| SERVER STRING {
+	   		remote->fetch_repo->fetch_server = strdup($2);
+			if (remote->fetch_repo->fetch_server == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		}
+		| PROTOCOL STRING {
+	   		remote->fetch_repo->fetch_protocol = strdup($2);
+			if (remote->fetch_repo->fetch_protocol == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		}
+		| PORT portplain {
+			remote->fetch_repo->fetch_port = $2;
+		}
+		| BRANCH branch {
+			remote->fetch_repo->fetch_branch = $2;
+		}
+	   	;
+fetch		: {
+			static const struct got_error* error;
+
+			if (remote->fetch_repo != NULL) {
+				yyerror("fetch block already exists");
+				YYERROR;
+			}
+			error = new_fetch(&remote->fetch_repo);
+			if (error) {
+				yyerror("%s", error->msg);
+				YYERROR;
+			}
+		} '{' optnl fetchopts2 '}'
+       		;
+sendopts2	: sendopts2 sendopts1 nl
+	   	| sendopts1 optnl
+		;
+sendopts1	: REPOSITORY STRING {
+	   		remote->send_repo->send_repository = strdup($2);
+			if (remote->send_repo->send_repository == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+	   	}
+	   	| SERVER STRING {
+	   		remote->send_repo->send_server = strdup($2);
+			if (remote->send_repo->send_server == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		}
+		| PROTOCOL STRING {
+	   		remote->send_repo->send_protocol = strdup($2);
+			if (remote->send_repo->send_protocol == NULL) {
+				free($2);
+				yyerror("strdup");
+				YYERROR;
+			}
+			free($2);
+		}
+		| PORT portplain {
+			remote->send_repo->send_port = $2;
+		}
+		| BRANCH branch {
+			remote->send_repo->send_branch = $2;
+		}
+	   	;
+send		: {
+			static const struct got_error* error;
+
+			if (remote->send_repo != NULL) {
+				yyerror("send block already exists");
+				YYERROR;
+			}
+			error = new_send(&remote->send_repo);
+			if (error) {
+				yyerror("%s", error->msg);
+				YYERROR;
+			}
+		} '{' optnl sendopts2 '}'
+       		;
 remote		: REMOTE STRING {
 			static const struct got_error* error;
 
@@ -314,6 +420,7 @@ lookup(char *s)
 	static const struct keywords keywords[] = {
 		{"author",		AUTHOR},
 		{"branch",		BRANCH},
+		{"fetch",		FETCH},
 		{"fetch-all-branches",	FETCH_ALL_BRANCHES},
 		{"mirror-references",	MIRROR_REFERENCES},
 		{"port",		PORT},
@@ -321,6 +428,7 @@ lookup(char *s)
 		{"reference",		REFERENCE},
 		{"remote",		REMOTE},
 		{"repository",		REPOSITORY},
+		{"send",		SEND},
 		{"server",		SERVER},
 	};
 	const struct keywords	*p;
@@ -661,6 +769,28 @@ new_remote(struct gotconfig_remote_repo **remote)
 	return error;
 }
 
+static const struct got_error*
+new_fetch(struct fetch_repo **fetch_repo)
+{
+	const struct got_error *error = NULL;
+
+	*fetch_repo = calloc(1, sizeof(**fetch_repo));
+	if (*fetch_repo == NULL)
+		error = got_error_from_errno("calloc");
+	return error;
+}
+
+static const struct got_error*
+new_send(struct send_repo **send_repo)
+{
+	const struct got_error *error = NULL;
+
+	*send_repo = calloc(1, sizeof(**send_repo));
+	if (*send_repo == NULL)
+		error = got_error_from_errno("calloc");
+	return error;
+}
+
 static void
 closefile(struct file *file)
 {
@@ -710,6 +840,18 @@ gotconfig_free(struct gotconfig *conf)
 	while (!TAILQ_EMPTY(&conf->remotes)) {
 		remote = TAILQ_FIRST(&conf->remotes);
 		TAILQ_REMOVE(&conf->remotes, remote, entry);
+		if (remote->fetch_repo != NULL) {
+			free(remote->fetch_repo->fetch_name);
+			free(remote->fetch_repo->fetch_repository);
+			free(remote->fetch_repo->fetch_server);
+			free(remote->fetch_repo->fetch_protocol);
+		}
+		if (remote->send_repo != NULL) {
+			free(remote->send_repo->send_name);
+			free(remote->send_repo->send_repository);
+			free(remote->send_repo->send_server);
+			free(remote->send_repo->send_protocol);
+		}
 		free(remote->name);
 		free(remote->repository);
 		free(remote->server);
