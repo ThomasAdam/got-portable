@@ -1014,7 +1014,16 @@ Local branches are managed via references which live in the
 reference namespace.
 The
 .Cm got branch
-command creates or deletes references in this namespace only.
+command creates references in this namespace only.
+.Pp
+When deleting branches the specified
+.Ar name
+is searched in the
+.Dq refs/heads
+reference namespace first.
+If no corresponding branch is found the
+.Dq refs/remotes
+namespace will be searched next.
 .Pp
 If invoked in a work tree without any arguments, print the name of the
 work tree's current branch.
@@ -1073,7 +1082,14 @@ with one the following annotations:
 .It \(a~ Ta work tree's base commit is out-of-date
 .El
 .It Fl d Ar name
-Delete the branch with the specified name from the repository.
+Delete the branch with the specified
+.Ar name
+from the
+.Dq refs/heads
+or
+.Dq refs/remotes
+reference namespace.
+.Pp
 Only the branch reference is deleted.
 Any commit, tree, and blob objects belonging to the branch
 remain in the repository and may be removed separately with

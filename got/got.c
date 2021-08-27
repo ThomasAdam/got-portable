@@ -5732,14 +5732,39 @@ delete_branch(struct got_repository *repo, struct got_worktree *worktree,
 {
 	const struct got_error *err = NULL;
 	struct got_reference *ref = NULL;
-	char *refname;
+	char *refname, *remote_refname = NULL;
+
+	if (strncmp(branch_name, "refs/", 5) == 0)
+		branch_name += 5;
+	if (strncmp(branch_name, "heads/", 6) == 0)
+		branch_name += 6;
+	else if (strncmp(branch_name, "remotes/", 8) == 0)
+		branch_name += 8;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1)
 		return got_error_from_errno("asprintf");
 
-	err = got_ref_open(&ref, repo, refname, 0);
-	if (err)
+	if (asprintf(&remote_refname, "refs/remotes/%s",
+	    branch_name) == -1) {
+		err = got_error_from_errno("asprintf");
 		goto done;
+	}
+
+	err = got_ref_open(&ref, repo, refname, 0);
+	if (err) {
+		const struct got_error *err2;
+		if (err->code != GOT_ERR_NOT_REF)
+			goto done;
+		/*
+		 * Keep 'err' intact such that if neither branch exists
+		 * we report "refs/heads" rather than "refs/remotes" in
+		 * our error message.
+		 */
+		err2 = got_ref_open(&ref, repo, remote_refname, 0);
+		if (err2)
+			goto done;
+		err = NULL;
+	}
 
 	if (worktree &&
 	    strcmp(got_worktree_get_head_ref_name(worktree),
@@ -5754,6 +5779,7 @@ done:
 	if (ref)
 		got_ref_close(ref);
 	free(refname);
+	free(remote_refname);
 	return err;
 }
 
@@ -5772,6 +5798,9 @@ add_branch(struct got_repository *repo, const char *branch_name,
 	 */
 	if (branch_name[0] == '-')
 		return got_error_path(branch_name, GOT_ERR_REF_NAME_MINUS);
+
+	if (strncmp(branch_name, "refs/heads/", 11) == 0)
+		branch_name += 11;
 
 	if (asprintf(&refname, "refs/heads/%s", branch_name) == -1) {
 		err = got_error_from_errno("asprintf");

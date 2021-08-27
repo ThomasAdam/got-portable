@@ -59,7 +59,7 @@ test_branch_create() {
 	fi
 
 	# Create a branch based on the work tree's branch
-	(cd $testroot/wt && got branch -n anotherbranch)
+	(cd $testroot/wt && got branch -n refs/heads/anotherbranch)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		test_done "$testroot" "$ret"
@@ -250,7 +250,7 @@ test_branch_delete() {
 	got branch -d branch2 -r $testroot/repo > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo "got update command failed unexpectedly"
+		echo "got branch command failed unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -284,7 +284,7 @@ test_branch_delete() {
 		> $testroot/stdout 2> $testroot/stderr
 	ret="$?"
 	if [ "$ret" = "0" ]; then
-		echo "got update succeeded unexpectedly"
+		echo "got branch succeeded unexpectedly"
 		test_done "$testroot" "$ret"
 		return 1
 	fi
@@ -295,6 +295,61 @@ test_branch_delete() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -r $testroot/repo -c master refs/remotes/origin/master
+	got ref -r $testroot/repo -c branch1 refs/remotes/origin/branch1
+	got ref -r $testroot/repo -c branch3 refs/remotes/origin/branch3
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/branch1: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/branch1: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/branch3: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got branch -d origin/branch1 -r $testroot/repo > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got branch command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got branch -d refs/remotes/origin/branch3 -r $testroot/repo \
+		> $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got branch command failed unexpectedly"
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/branch1: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/branch3: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 	fi
 	test_done "$testroot" "$ret"
 }
@@ -340,7 +395,7 @@ test_branch_delete_packed() {
 
 	(cd $testroot/repo && git pack-refs --all)
 
-	got branch -d branch2 -r $testroot/repo > $testroot/stdout
+	got branch -d refs/heads/branch2 -r $testroot/repo > $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		echo "got update command failed unexpectedly"
