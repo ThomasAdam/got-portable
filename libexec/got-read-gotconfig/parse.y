@@ -839,13 +839,11 @@ gotconfig_free(struct gotconfig *conf)
 		remote = TAILQ_FIRST(&conf->remotes);
 		TAILQ_REMOVE(&conf->remotes, remote, entry);
 		if (remote->fetch_repo != NULL) {
-			free(remote->fetch_repo->fetch_name);
 			free(remote->fetch_repo->fetch_repository);
 			free(remote->fetch_repo->fetch_server);
 			free(remote->fetch_repo->fetch_protocol);
 		}
 		if (remote->send_repo != NULL) {
-			free(remote->send_repo->send_name);
 			free(remote->send_repo->send_repository);
 			free(remote->send_repo->send_server);
 			free(remote->send_repo->send_protocol);

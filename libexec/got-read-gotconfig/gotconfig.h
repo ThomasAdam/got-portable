@@ -16,7 +16,6 @@
  */
 
 struct fetch_repo {
-	char	*fetch_name;
 	char	*fetch_repository;
 	char	*fetch_server;
 	char	*fetch_protocol;
@@ -25,7 +24,6 @@ struct fetch_repo {
 };
 
 struct send_repo {
-	char	*send_name;
 	char	*send_repository;
 	char	*send_server;
 	char	*send_protocol;
