@@ -2532,7 +2532,9 @@ to be amended and perhaps committed again:
 .Dl $ # now back out the previous backout :-)
 .Dl $ got backout unified-buffer-cache
 .Pp
-Fetch new upstream commits into the local repository's
+Fetch new changes on the remote repository's
+.Dq master
+branch, making them visible on the local repository's
 .Dq origin/master
 branch:
 .Pp
@@ -2582,40 +2584,6 @@ branch:
 .Dl $ got update -c master
 .Dl $ got histedit
 .Pp
-In order to merge changes committed to the
-.Dq unified-buffer-cache
-branch back into the
-.Dq master
-branch, the
-.Dq unified-buffer-cache
-branch must first be rebased onto the
-.Dq master
-branch:
-.Pp
-.Dl $ got update -b master
-.Dl $ got rebase unified-buffer-cache
-.Pp
-Changes on the
-.Dq unified-buffer-cache
-branch can now be made visible on the
-.Dq master
-branch with
-.Cm got integrate .
-Because the rebase operation switched the work tree to the
-.Dq unified-buffer-cache
-branch, the work tree must be switched back to the
-.Dq master
-branch before the
-.Dq unified-buffer-cache
-branch can be integrated into
-.Dq master :
-.Pp
-.Dl $ got update -b master
-.Dl $ got integrate unified-buffer-cache
-.Pp
-Additional steps may be necessary if local changes need to be pushed back
-to the remote repository, which currently requires
-.Cm git push .
 Before working against existing branches in a repository cloned with
 .Cm git clone --bare
 instead of
@@ -2661,30 +2629,69 @@ namespace free for use by local branches checked out with
 .Cm got checkout
 and, if needed, created with
 .Cm got branch .
-.Pp
 Branches in the
-.Dq remotes/origin
+.Dq refs/remotes/origin
 namespace can now be updated with incoming changes from the remote
 repository with
 .Cm got fetch
 or
 .Xr git-fetch 1
-without extra command line arguments:
+without extra command line arguments.
+Newly fetched changes can be examined with
+.Cm got log .
 .Pp
-.Dl $ cd /var/git/repo
-.Dl $ git fetch
+Display changes on the remote repository's version of the
+.Dq master
+branch, as of the last time
+.Cm got fetch
+was run:
 .Pp
-To make changes fetched from the remote repository appear on the
-.Dq master
-branch, the
-.Dq master
-branch must be rebased onto the
+.Dl $ got log -c origin/master | less
+.Pp
+As shown here, most commands accept abbreviated reference names such as
 .Dq origin/master
+instead of
+.Dq refs/remotes/origin/master .
+The latter is only needed in case of ambiguity.
+.Pp
+.Cm got rebase
+must be used to merge changes which are visible on the
+.Dq origin/master
+branch into the
+.Dq master
 branch.
 This will also merge local changes, if any, with the incoming changes:
 .Pp
 .Dl $ got update -b origin/master
 .Dl $ got rebase master
+.Pp
+In order to make changes committed to the
+.Dq unified-buffer-cache
+visible on the
+.Dq master
+branch, the
+.Dq unified-buffer-cache
+branch must first be rebased onto the
+.Dq master
+branch:
+.Pp
+.Dl $ got update -b master
+.Dl $ got rebase unified-buffer-cache
+.Pp
+Changes on the
+.Dq unified-buffer-cache
+branch can now be made visible on the
+.Dq master
+branch with
+.Cm got integrate .
+Because the rebase operation switched the work tree to the
+.Dq unified-buffer-cache
+branch the work tree must be switched back to the
+.Dq master
+branch first:
+.Pp
+.Dl $ got update -b master
+.Dl $ got integrate unified-buffer-cache
 .Pp
 On the
 .Dq master
@@ -2695,13 +2702,25 @@ by other developers and any other important new information:
 .Dl $ got update -c origin/master
 .Dl $ got histedit -m
 .Pp
-Local changes on the
+If the remote repository offers write access local changes on the
 .Dq master
-branch can then be pushed to the remote
-repository with
-.Cm git push :
+branch can be sent to the remote repository with
+.Cm got send.
+Usually, 
+.Cm got send
+can be run without further arguments.
+The arguments shown here match defaults, provided the work tree's
+current branch is the
+.Dq master
+branch:
 .Pp
-.Dl $ cd /var/git/repo
+.Dl $ got send -b master origin
+.Pp
+If the remote repository requires the HTTPS protocol the
+.Xr git-push 1
+command must be used instead:
+.Pp
+.Dl $ cd /var/git/src.git
 .Dl $ git push origin master
 .Sh SEE ALSO
 .Xr gotadmin 1 ,
@@ -2729,7 +2748,7 @@ Reading from remote repositories over HTTP or HTTPS protocols requires
 and
 .Xr git-fetch 1 .
 .It
-Writing to remote repositories, over any protocol, requires
+Writing to remote repositories over HTTP or HTTPS protocols requires
 .Xr git-push 1 .
 .It
 The creation of merge commits, i.e. commits with two or more parent commits,
