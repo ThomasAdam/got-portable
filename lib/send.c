@@ -453,7 +453,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	struct got_object_id *my_id = NULL;
 	int i, nours = 0, ntheirs = 0;
 	size_t nalloc_ours = 0, nalloc_theirs = 0;
-	int refs_to_send = 0;
+	int refs_to_send = 0, refs_to_delete = 0;
 	off_t bytes_sent = 0;
 	struct pack_progress_arg ppa;
 	uint8_t packsha1[SHA1_DIGEST_LENGTH];
@@ -746,37 +746,43 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	TAILQ_FOREACH(pe, delete_branches, entry) {
 		const char *branchname = pe->path;
 		if (find_their_ref(&their_refs, branchname))
-			refs_to_send++;
+			refs_to_delete++;
 	}
 
-	if (refs_to_send == 0) {
+	if (refs_to_send == 0 && refs_to_delete == 0) {
 		got_privsep_send_stop(imsg_sendfds[0]);
 		goto done;
 	}
 
-	memset(&ppa, 0, sizeof(ppa));
-	ppa.progress_cb = progress_cb;
-	ppa.progress_arg = progress_arg;
-	err = got_pack_create(packsha1, packfile, their_ids, ntheirs,
-	    our_ids, nours, repo, 0, 1, pack_progress, &ppa,
-	    cancel_cb, cancel_arg);
-	if (err)
-		goto done;
+	if (refs_to_send > 0) {
+		memset(&ppa, 0, sizeof(ppa));
+		ppa.progress_cb = progress_cb;
+		ppa.progress_arg = progress_arg;
+		err = got_pack_create(packsha1, packfile, their_ids, ntheirs,
+		    our_ids, nours, repo, 0, 1, pack_progress, &ppa,
+		    cancel_cb, cancel_arg);
+		if (err)
+			goto done;
 
-	if (fflush(packfile) == -1) {
-		err = got_error_from_errno("fflush");
-		goto done;
-	}
+		if (fflush(packfile) == -1) {
+			err = got_error_from_errno("fflush");
+			goto done;
+		}
 
-	npackfd = dup(fileno(packfile));
-	if (npackfd == -1) {
-		err = got_error_from_errno("dup");
-		goto done;
+		npackfd = dup(fileno(packfile));
+		if (npackfd == -1) {
+			err = got_error_from_errno("dup");
+			goto done;
+		}
+		err = got_privsep_send_packfd(&sendibuf, npackfd);
+		if (err != NULL)
+			goto done;
+		npackfd = -1;
+	} else {
+		err = got_privsep_send_packfd(&sendibuf, -1);
+		if (err != NULL)
+			goto done;
 	}
-	err = got_privsep_send_packfd(&sendibuf, npackfd);
-	if (err != NULL)
-		goto done;
-	npackfd = -1;
 
 	while (!done) {
 		int success = 0;

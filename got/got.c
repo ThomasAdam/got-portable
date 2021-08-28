@@ -7432,12 +7432,15 @@ send_progress(void *arg, off_t packfile_size, int ncommits, int nobj_total,
 				if (got_path_cmp(branchname, refname,
 				    strlen(branchname), strlen(refname)) == 0) {
 					status = "deleted";
+					a->sent_something = 1;
 					break;
 				}
 			}
 		}
 
-		printf("\nServer has %s %s", status, refname);
+		if (a->printed_something)
+			putchar('\n');
+		printf("Server has %s %s", status, refname);
 		a->printed_something = 1;
 		return NULL;
 	}

@@ -820,9 +820,11 @@ send_pack(int fd, struct got_pathlist_head *refs,
 	if (err)
 		goto done;
 
-	err = send_pack_file(fd, packfd, ibuf);
-	if (err)
-		goto done;
+	if (packfd != -1) {
+		err = send_pack_file(fd, packfd, ibuf);
+		if (err)
+			goto done;
+	}
 
 	err = readpkt(&n, fd, buf, sizeof(buf));
 	if (err)
