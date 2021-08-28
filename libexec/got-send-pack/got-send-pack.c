@@ -369,27 +369,6 @@ match_capabilities(char **my_capabilities, char *server_capabilities)
 			goto done;
 		}
 	}
-
-	/*
-	 * Workaround for github.
-	 *
-	 * Github will accept the pack but fail to update the references
-	 * if we don't have capabilities advertised. Report-status seems
-	 * harmless to add, so we add it.
-	 *
-	 * Github doesn't advertise any capabilities, so we can't check
-	 * for compatibility. We just need to add it blindly.
-	 */
-	if (strstr(*my_capabilities, GOT_CAPA_REPORT_STATUS) == NULL) {
-		char *s;
-		if (asprintf(&s, "%s %s", *my_capabilities,
-		    GOT_CAPA_REPORT_STATUS) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		free(*my_capabilities);
-		*my_capabilities = s;
-	}
 done:
 	if (err) {
 		free(*my_capabilities);
