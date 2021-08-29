@@ -230,8 +230,25 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 }
 
 static const struct got_error *
+validate_protocol(const char *protocol, const char *repo_name)
+{
+	static char msg[512];
+
+	if (strcmp(protocol, "ssh") != 0 &&
+	    strcmp(protocol, "git+ssh") != 0 &&
+	    strcmp(protocol, "git") != 0) {
+		snprintf(msg, sizeof(msg),"unknown protocol \"%s\" "
+		    "for remote repository \"%s\"", protocol, repo_name);
+		return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);
+	}
+
+	return NULL;
+}
+
+static const struct got_error *
 validate_config(struct gotconfig *gotconfig)
 {
+	const struct got_error *err;
 	struct gotconfig_remote_repo *repo, *repo2;
 	static char msg[512];
 
@@ -251,29 +268,51 @@ validate_config(struct gotconfig *gotconfig)
 			return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);
 		}
 
-		if (repo->server == NULL) {
+		if (repo->server == NULL &&
+		    (repo->fetch_config == NULL ||
+		    repo->fetch_config->server == NULL) &&
+		    (repo->send_config == NULL ||
+		    repo->send_config->server == NULL)) {
 			snprintf(msg, sizeof(msg),
 			    "server required for remote repository \"%s\"",
 			    repo->name);
 			return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);
 		}
 
-		if (repo->protocol == NULL) {
+		if (repo->protocol == NULL &&
+		    (repo->fetch_config == NULL ||
+		    repo->fetch_config->protocol == NULL) &&
+		    (repo->send_config == NULL ||
+		    repo->send_config->protocol == NULL)) {
 			snprintf(msg, sizeof(msg),
 			    "protocol required for remote repository \"%s\"",
 			    repo->name);
 			return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);
 		}
-		if (strcmp(repo->protocol, "ssh") != 0 &&
-		    strcmp(repo->protocol, "git+ssh") != 0 &&
-		    strcmp(repo->protocol, "git") != 0) {
-			snprintf(msg, sizeof(msg),"unknown protocol \"%s\" "
-			    "for remote repository \"%s\"", repo->protocol,
+
+		if (repo->protocol) {
+			err = validate_protocol(repo->protocol, repo->name);
+			if (err)
+				return err;
+		}
+		if (repo->fetch_config && repo->fetch_config->protocol) {
+			err = validate_protocol(repo->fetch_config->protocol,
 			    repo->name);
-			return got_error_msg(GOT_ERR_PARSE_CONFIG, msg);
+			if (err)
+				return err;
+		}
+		if (repo->send_config && repo->send_config->protocol) {
+			err = validate_protocol(repo->send_config->protocol,
+			    repo->name);
+			if (err)
+				return err;
 		}
 
-		if (repo->repository == NULL) {
+		if (repo->repository == NULL &&
+		    (repo->fetch_config == NULL ||
+		    repo->fetch_config->repository == NULL) &&
+		    (repo->send_config == NULL ||
+		    repo->send_config->repository == NULL)) {
 			snprintf(msg, sizeof(msg),
 			    "repository path required for remote "
 			    "repository \"%s\"", repo->name);
