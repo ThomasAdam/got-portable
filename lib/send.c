@@ -554,13 +554,6 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		goto done;
 	}
 
-	err = realloc_ids(&our_ids, &nalloc_ours, 0);
-	if (err)
-		goto done;
-	err = realloc_ids(&their_ids, &nalloc_ours, 0);
-	if (err)
-		goto done;
-
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, imsg_sendfds) == -1) {
 		err = got_error_from_errno("socketpair");
 		goto done;
