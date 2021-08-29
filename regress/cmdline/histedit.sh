@@ -147,6 +147,7 @@ test_histedit_no_op() {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	# We should have a backup of old commits

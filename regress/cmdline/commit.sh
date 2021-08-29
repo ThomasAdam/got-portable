@@ -936,6 +936,7 @@ commit_check_mode() {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	local tree_id=$(got cat -r $testroot/repo $commit_id | \

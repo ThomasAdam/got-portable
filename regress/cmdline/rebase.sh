@@ -148,6 +148,7 @@ test_rebase_basic() {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	# We should have a backup of old commits
@@ -173,6 +174,7 @@ EOF
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	# Asking for backups of a branch which has none should yield an error
@@ -972,6 +974,7 @@ test_rebase_forward() {
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	# Forward-only rebase operations should not be backed up

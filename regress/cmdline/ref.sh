@@ -69,6 +69,7 @@ test_ref_create() {
 	if [ "$ret" != "0" ]; then
 		echo "git checkout command failed unexpectedly"
 		test_done "$testroot" "$ret"
+		return 1
 	fi
 
 	# Create a symbolic ref
