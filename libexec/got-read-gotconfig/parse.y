@@ -535,7 +535,7 @@ getservice(char *n)
 	u_long		 ulval;
 
 	if (atoul(n, &ulval) == 0) {
-		if (ulval > 65535) {
+		if (ulval == 0 || ulval > 65535) {
 			yyerror("illegal port value %lu", ulval);
 			return (-1);
 		}
