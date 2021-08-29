@@ -325,7 +325,8 @@ stretchblk(FILE *basefile, off_t base_offset0, struct got_delta_block *block,
 	size_t base_r, r, i;
 	int buf_equal = 1;
 
-	if (fseeko(basefile, base_offset0 + block->offset, SEEK_SET) == -1)
+	if (fseeko(basefile, base_offset0 + block->offset + *blocklen,
+	    SEEK_SET) == -1)
 		return got_error_from_errno("fseeko");
 
 	while (buf_equal && *blocklen < (1 << 24) - 1) {
