@@ -81,8 +81,8 @@ static const struct got_error* gerror;
 static struct gotconfig_remote_repo *remote;
 static struct gotconfig gotconfig;
 static const struct got_error* new_remote(struct gotconfig_remote_repo **);
-static const struct got_error* new_fetch(struct fetch_repo **);
-static const struct got_error* new_send(struct send_repo **);
+static const struct got_error* new_fetch_config(struct fetch_config **);
+static const struct got_error* new_send_config(struct send_config **);
 
 typedef struct {
 	union {
@@ -236,11 +236,11 @@ remoteopts1	: REPOSITORY STRING {
 		| FETCH {
 			static const struct got_error* error;
 
-			if (remote->fetch_repo != NULL) {
+			if (remote->fetch_config != NULL) {
 				yyerror("fetch block already exists");
 				YYERROR;
 			}
-			error = new_fetch(&remote->fetch_repo);
+			error = new_fetch_config(&remote->fetch_config);
 			if (error) {
 				yyerror("%s", error->msg);
 				YYERROR;
@@ -249,11 +249,11 @@ remoteopts1	: REPOSITORY STRING {
 		| SEND {
 			static const struct got_error* error;
 
-			if (remote->send_repo != NULL) {
+			if (remote->send_config != NULL) {
 				yyerror("send block already exists");
 				YYERROR;
 			}
-			error = new_send(&remote->send_repo);
+			error = new_send_config(&remote->send_config);
 			if (error) {
 				yyerror("%s", error->msg);
 				YYERROR;
@@ -265,8 +265,8 @@ fetchopts2	: fetchopts2 fetchopts1 nl
 		;
 fetchopts1	: /* empty */
 		| REPOSITORY STRING {
-	   		remote->fetch_repo->fetch_repository = strdup($2);
-			if (remote->fetch_repo->fetch_repository == NULL) {
+	   		remote->fetch_config->repository = strdup($2);
+			if (remote->fetch_config->repository == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -274,8 +274,8 @@ fetchopts1	: /* empty */
 			free($2);
 	   	}
 	   	| SERVER STRING {
-	   		remote->fetch_repo->fetch_server = strdup($2);
-			if (remote->fetch_repo->fetch_server == NULL) {
+	   		remote->fetch_config->server = strdup($2);
+			if (remote->fetch_config->server == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -283,8 +283,8 @@ fetchopts1	: /* empty */
 			free($2);
 		}
 		| PROTOCOL STRING {
-	   		remote->fetch_repo->fetch_protocol = strdup($2);
-			if (remote->fetch_repo->fetch_protocol == NULL) {
+	   		remote->fetch_config->protocol = strdup($2);
+			if (remote->fetch_config->protocol == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -292,10 +292,10 @@ fetchopts1	: /* empty */
 			free($2);
 		}
 		| PORT portplain {
-			remote->fetch_repo->fetch_port = $2;
+			remote->fetch_config->port = $2;
 		}
 		| BRANCH branch {
-			remote->fetch_repo->fetch_branch = $2;
+			remote->fetch_config->branch = $2;
 		}
 	   	;
 sendopts2	: sendopts2 sendopts1 nl
@@ -303,8 +303,8 @@ sendopts2	: sendopts2 sendopts1 nl
 		;
 sendopts1	: /* empty */
 		| REPOSITORY STRING {
-	   		remote->send_repo->send_repository = strdup($2);
-			if (remote->send_repo->send_repository == NULL) {
+	   		remote->send_config->repository = strdup($2);
+			if (remote->send_config->repository == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -312,8 +312,8 @@ sendopts1	: /* empty */
 			free($2);
 	   	}
 	   	| SERVER STRING {
-	   		remote->send_repo->send_server = strdup($2);
-			if (remote->send_repo->send_server == NULL) {
+	   		remote->send_config->server = strdup($2);
+			if (remote->send_config->server == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -321,8 +321,8 @@ sendopts1	: /* empty */
 			free($2);
 		}
 		| PROTOCOL STRING {
-	   		remote->send_repo->send_protocol = strdup($2);
-			if (remote->send_repo->send_protocol == NULL) {
+	   		remote->send_config->protocol = strdup($2);
+			if (remote->send_config->protocol == NULL) {
 				free($2);
 				yyerror("strdup");
 				YYERROR;
@@ -330,10 +330,10 @@ sendopts1	: /* empty */
 			free($2);
 		}
 		| PORT portplain {
-			remote->send_repo->send_port = $2;
+			remote->send_config->port = $2;
 		}
 		| BRANCH branch {
-			remote->send_repo->send_branch = $2;
+			remote->send_config->branch = $2;
 		}
 	   	;
 remote		: REMOTE STRING {
@@ -768,23 +768,23 @@ new_remote(struct gotconfig_remote_repo **remote)
 }
 
 static const struct got_error*
-new_fetch(struct fetch_repo **fetch_repo)
+new_fetch_config(struct fetch_config **fetch_config)
 {
 	const struct got_error *error = NULL;
 
-	*fetch_repo = calloc(1, sizeof(**fetch_repo));
-	if (*fetch_repo == NULL)
+	*fetch_config = calloc(1, sizeof(**fetch_config));
+	if (*fetch_config == NULL)
 		error = got_error_from_errno("calloc");
 	return error;
 }
 
 static const struct got_error*
-new_send(struct send_repo **send_repo)
+new_send_config(struct send_config **send_config)
 {
 	const struct got_error *error = NULL;
 
-	*send_repo = calloc(1, sizeof(**send_repo));
-	if (*send_repo == NULL)
+	*send_config = calloc(1, sizeof(**send_config));
+	if (*send_config == NULL)
 		error = got_error_from_errno("calloc");
 	return error;
 }
@@ -829,6 +829,24 @@ gotconfig_parse(struct gotconfig **conf, const char *filename, int *fd)
 	return gerror;
 }
 
+static void
+free_fetch_config(struct fetch_config *fetch_config)
+{
+	free(remote->fetch_config->repository);
+	free(remote->fetch_config->server);
+	free(remote->fetch_config->protocol);
+	free(remote->fetch_config);
+}
+
+static void
+free_send_config(struct send_config *send_config)
+{
+	free(remote->send_config->repository);
+	free(remote->send_config->server);
+	free(remote->send_config->protocol);
+	free(remote->send_config);
+}
+
 void
 gotconfig_free(struct gotconfig *conf)
 {
@@ -838,16 +856,10 @@ gotconfig_free(struct gotconfig *conf)
 	while (!TAILQ_EMPTY(&conf->remotes)) {
 		remote = TAILQ_FIRST(&conf->remotes);
 		TAILQ_REMOVE(&conf->remotes, remote, entry);
-		if (remote->fetch_repo != NULL) {
-			free(remote->fetch_repo->fetch_repository);
-			free(remote->fetch_repo->fetch_server);
-			free(remote->fetch_repo->fetch_protocol);
-		}
-		if (remote->send_repo != NULL) {
-			free(remote->send_repo->send_repository);
-			free(remote->send_repo->send_server);
-			free(remote->send_repo->send_protocol);
-		}
+		if (remote->fetch_config != NULL)
+			free_fetch_config(remote->fetch_config);
+		if (remote->send_config != NULL)
+			free_send_config(remote->send_config);
 		free(remote->name);
 		free(remote->repository);
 		free(remote->server);

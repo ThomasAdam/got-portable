@@ -15,20 +15,23 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-struct fetch_repo {
-	char	*fetch_repository;
-	char	*fetch_server;
-	char	*fetch_protocol;
-	int	fetch_port;
-	struct	node_branch *fetch_branch;
+/*
+ * We maintain two different structures for fetch and send configuration
+ * settings in case they diverge in the future.
+ */
+struct fetch_config {
+	char	*repository;
+	char	*server;
+	char	*protocol;
+	int	port;
+	struct	node_branch *branch;
 };
-
-struct send_repo {
-	char	*send_repository;
-	char	*send_server;
-	char	*send_protocol;
-	int	send_port;
-	struct	node_branch *send_branch;
+struct send_config {
+	char	*repository;
+	char	*server;
+	char	*protocol;
+	int	port;
+	struct	node_branch *branch;
 };
 
 struct node_branch {
@@ -54,8 +57,8 @@ struct gotconfig_remote_repo {
 	int	fetch_all_branches;
 	struct	node_branch *branch;
 	struct	node_ref *ref;
-	struct	fetch_repo *fetch_repo;
-	struct	send_repo *send_repo;
+	struct	fetch_config *fetch_config;
+	struct	send_config *send_config;
 };
 TAILQ_HEAD(gotconfig_remote_repo_list, gotconfig_remote_repo);
 
