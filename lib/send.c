@@ -320,7 +320,7 @@ realloc_ids(struct got_object_id ***ids, size_t *nalloc, size_t n)
 	struct got_object_id **new;
 	const size_t alloc_chunksz = 256;
 
-	if (*nalloc >= n + alloc_chunksz)
+	if (*nalloc >= n)
 		return NULL;
 
 	new = recallocarray(*ids, *nalloc, *nalloc + alloc_chunksz,
@@ -596,7 +596,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		 * Also prepare the array of our object IDs which
 		 * will be needed for generating a pack file.
 		 */
-		err = realloc_ids(&our_ids, &nalloc_ours, nours);
+		err = realloc_ids(&our_ids, &nalloc_ours, nours + 1);
 		if (err)
 			goto done;
 		our_ids[nours] = id;
@@ -676,7 +676,7 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 			have_their_id = 1;
 		}
 
-		err = realloc_ids(&their_ids, &nalloc_theirs, ntheirs);
+		err = realloc_ids(&their_ids, &nalloc_theirs, ntheirs + 1);
 		if (err)
 			goto done;
 
