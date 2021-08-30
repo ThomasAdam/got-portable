@@ -2389,16 +2389,20 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_view *ref_view = NULL;
 	int begin_x = 0;
 
-	switch (ch) {
-	case ERR: /* no user input from wgetch() */
-		if (s->thread_args.load_all && s->thread_args.log_complete) {
+	if (s->thread_args.load_all) {
+		if (ch == KEY_BACKSPACE)
+			s->thread_args.load_all = 0;
+		else if (s->thread_args.log_complete) {
 			s->thread_args.load_all = 0;
 			log_scroll_down(view, s->commits.ncommits);
 			s->selected = MIN(view->nlines - 2,
 			    s->commits.ncommits - 1);
 			select_commit(s);
 		}
-		break;
+		return NULL;
+	}
+
+	switch (ch) {
 	case 'q':
 		s->quit = 1;
 		break;
@@ -2542,11 +2546,6 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_BACKSPACE:
 	case CTRL('l'):
 	case 'B':
-		if (s->thread_args.load_all) {
-			if (ch == KEY_BACKSPACE)
-				s->thread_args.load_all = 0;
-			break;
-		}
 		if (ch == KEY_BACKSPACE &&
 		    got_path_is_root_dir(s->in_repo_path))
 			break;
