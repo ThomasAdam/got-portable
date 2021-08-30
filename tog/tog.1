@@ -112,8 +112,8 @@ Move the selection cursor up one page.
 Move the cursor to the newest commit.
 .It Cm End, G
 Move the cursor to the oldest commit.
-This will iterate over all commit objects in the repository and may take
-a long time depending on the size of the repository.
+This will traverse all commits on the current branch which may take
+a long time depending on the number of commits in branch history.
 If needed this operation can be cancelled with
 .Cm Backspace .
 .It Cm Enter, Space
