@@ -3678,7 +3678,6 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		err = create_diff(s);
 		break;
 	case 'g':
-	case CTRL('u'):
 	case KEY_HOME:
 		s->first_displayed_line = 1;
 		break;
