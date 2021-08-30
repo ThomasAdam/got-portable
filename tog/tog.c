@@ -2542,8 +2542,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_BACKSPACE:
 	case CTRL('l'):
 	case 'B':
-		if (ch == KEY_BACKSPACE && s->thread_args.load_all) {
-			s->thread_args.load_all = 0;
+		if (s->thread_args.load_all) {
+			if (ch == KEY_BACKSPACE)
+				s->thread_args.load_all = 0;
 			break;
 		}
 		if (ch == KEY_BACKSPACE &&
