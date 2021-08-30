@@ -263,8 +263,7 @@ remoteopts1	: REPOSITORY STRING {
 fetchopts2	: fetchopts2 fetchopts1 nl
 	   	| fetchopts1 optnl
 		;
-fetchopts1	: /* empty */
-		| REPOSITORY STRING {
+fetchopts1	: REPOSITORY STRING {
 	   		remote->fetch_config->repository = strdup($2);
 			if (remote->fetch_config->repository == NULL) {
 				free($2);
@@ -301,8 +300,7 @@ fetchopts1	: /* empty */
 sendopts2	: sendopts2 sendopts1 nl
 	   	| sendopts1 optnl
 		;
-sendopts1	: /* empty */
-		| REPOSITORY STRING {
+sendopts1	: REPOSITORY STRING {
 	   		remote->send_config->repository = strdup($2);
 			if (remote->send_config->repository == NULL) {
 				free($2);
