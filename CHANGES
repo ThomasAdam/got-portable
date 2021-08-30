@@ -1,3 +1,23 @@
+* got 0.56; 2021-08-30
+- prevent a race where 'gotadmin cleanup' deletes concurrently created objects
+- plug a small memory leak in tog's show_diff_view() function
+- fix a use-after-free in get_changed_paths() in got and tog
+- use less memory allocations when formatting log messages
+- make got_deltify() rellocate the deltas array less often
+- plug a memory leak in an error path of got_deltify()
+- fix miscalculation of the final pack file size reported by got_pack_create()
+- fix the error message shown when the server sends a bad ref line
+- prevent NULL deref in got-fetch-pack if server does not announce capabilities
+- add a missing bounds-check in got-fetch-pack when parsing server response
+- fix, again, use of POSIX [ s1 = s2 ] syntax instead of [ s1 == s2 ] (naddy)
+- add 'got send' for sending changes to remote repositories (with naddy, tracey)
+- allow deletion of refs/remotes/ branches with got branch -d
+- add missing "return 1" to failure handling in the regress scripts (naddy)
+- make realloc_ids() malloc-like and do not overallocate (naddy)
+- fix seek to incorrect offset in the delta base when creating deltas
+- use gmtime_r(3) to display timestamps in UTC as intended (found by naddy)
+- add keys for navigating to first/last item of tog log and diff views (jasper)
+
 * got 0.55; 2021-07-26
 - display recovery steps in the lonely pack index error message
 - fix double-free that ocurred upon exit from 'tog tree'; found by naddy
