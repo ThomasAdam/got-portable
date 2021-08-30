@@ -123,10 +123,11 @@ Open a
 .Cm tree
 view showing the tree for the currently selected commit.
 .It Cm Backspace
-Show log entries for the parent directory of the currently selected path,
-unless an active search is in progress in which case
+Show log entries for the parent directory of the currently selected path.
+However when an active search is in progress or when additional commits
+are loaded,
 .Cm Backspace
-aborts the search.
+aborts the running operation.
 .It Cm /
 Prompt for a search pattern and start searching for matching commits.
 The search pattern is an extended regular expression which is matched
