@@ -108,6 +108,12 @@ Move the selection cursor up.
 Move the selection cursor down one page.
 .It Cm Page-up, Ctrl+b
 Move the selection cursor up one page.
+.It Cm Home, g, Ctrl-u
+Move the cursor to the newest commit.
+.It Cm End, G
+Move the cursor to the oldest commit.
+This will iterate over all commit objects in the repository and may take
+a long time depending on the size of the repository.
 .It Cm Enter, Space
 Open a
 .Cm diff
@@ -210,6 +216,10 @@ Scroll up.
 Scroll down one page.
 .It Cm Page-up, Ctrl+b
 Scroll up one page.
+.It Cm Home, g, Ctrl-u
+Scroll to the top of the view.
+.It Cm End, G
+Scroll to the bottom of the view.
 .It Cm \&[
 Reduce the amount of diff context lines.
 .It Cm \&]

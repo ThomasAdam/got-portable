@@ -2406,6 +2406,16 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			log_scroll_up(s, 1);
 		select_commit(s);
 		break;
+	case 'g':
+	case CTRL('u'):
+	case KEY_HOME:
+		if (s->first_displayed_entry == NULL)
+			break;
+
+		s->selected = 0;
+		log_scroll_up(s, s->commits.ncommits);
+		select_commit(s);
+		break;
 	case KEY_PPAGE:
 	case CTRL('b'):
 		if (s->first_displayed_entry == NULL)
@@ -2432,6 +2442,25 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		}
 		select_commit(s);
 		break;
+	case 'G':
+	case KEY_END: {
+		/* We don't know yet how many commits, so we're forced to
+		 * traverse them all. */
+		while (1) {
+			if (s->thread_args.log_complete)
+				break;
+
+			s->thread_args.commits_needed++;
+			err = trigger_log_thread(view, 1);
+			if (err)
+				return err;
+		}
+
+		log_scroll_down(view, s->commits.ncommits);
+		s->selected = MIN(view->nlines - 2, s->commits.ncommits - 1);
+		select_commit(s);
+		break;
+	}
 	case KEY_NPAGE:
 	case CTRL('f'): {
 		struct commit_queue_entry *first;
@@ -3640,6 +3669,19 @@ input_diff_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		s->last_displayed_line = view->nlines;
 		diff_view_indicate_progress(view);
 		err = create_diff(s);
+		break;
+	case 'g':
+	case CTRL('u'):
+	case KEY_HOME:
+		s->first_displayed_line = 1;
+		break;
+	case 'G':
+	case KEY_END:
+		if (s->eof)
+			break;
+
+		s->first_displayed_line = (s->nlines - view->nlines) + 2;
+		s->eof = 1;
 		break;
 	case 'k':
 	case KEY_UP:
