@@ -2415,7 +2415,6 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		select_commit(s);
 		break;
 	case 'g':
-	case CTRL('u'):
 	case KEY_HOME:
 		if (s->first_displayed_entry == NULL)
 			break;
