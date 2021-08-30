@@ -304,6 +304,7 @@ struct tog_log_thread_args {
 	pthread_cond_t need_commits;
 	pthread_cond_t commit_loaded;
 	int commits_needed;
+	int load_all;
 	struct got_commit_graph *graph;
 	struct commit_queue *commits;
 	const char *in_repo_path;
@@ -885,8 +886,6 @@ view_input(struct tog_view **new, int *done, struct tog_view *view,
 	}
 
 	switch (ch) {
-	case ERR:
-		break;
 	case '\t':
 		if (view->child) {
 			view->focussed = 0;
@@ -1612,7 +1611,7 @@ draw_commits(struct tog_view *view)
 	if (s->thread_args.commits_needed == 0)
 		halfdelay(10); /* disable fast refresh */
 
-	if (s->thread_args.commits_needed > 0) {
+	if (s->thread_args.commits_needed > 0 || s->thread_args.load_all) {
 		if (asprintf(&ncommits_str, " [%d/%d] %s",
 		    entry ? entry->idx + 1 : 0, s->commits.ncommits,
 		    (view->searching && !view->search_next_done) ?
@@ -1762,7 +1761,7 @@ trigger_log_thread(struct tog_view *view, int wait)
 
 	halfdelay(1); /* fast refresh while loading commits */
 
-	while (ta->commits_needed > 0) {
+	while (ta->commits_needed > 0 || ta->load_all) {
 		if (ta->log_complete)
 			break;
 
@@ -2028,7 +2027,7 @@ log_thread(void *arg)
 				return (void *)err;
 			err = NULL;
 			done = 1;
-		} else if (a->commits_needed > 0)
+		} else if (a->commits_needed > 0 && !a->load_all)
 			a->commits_needed--;
 
 		errcode = pthread_mutex_lock(&tog_mutex);
@@ -2055,7 +2054,7 @@ log_thread(void *arg)
 		if (done)
 			a->commits_needed = 0;
 		else {
-			if (a->commits_needed == 0) {
+			if (a->commits_needed == 0 && !a->load_all) {
 				errcode = pthread_cond_wait(&a->need_commits,
 				    &tog_mutex);
 				if (errcode)
@@ -2391,6 +2390,15 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	int begin_x = 0;
 
 	switch (ch) {
+	case ERR: /* no user input from wgetch() */
+		if (s->thread_args.load_all && s->thread_args.log_complete) {
+			s->thread_args.load_all = 0;
+			log_scroll_down(view, s->commits.ncommits);
+			s->selected = MIN(view->nlines - 2,
+			    s->commits.ncommits - 1);
+			select_commit(s);
+		}
+		break;
 	case 'q':
 		s->quit = 1;
 		break;
@@ -2446,14 +2454,9 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_END: {
 		/* We don't know yet how many commits, so we're forced to
 		 * traverse them all. */
-		while (1) {
-			if (s->thread_args.log_complete)
-				break;
-
-			s->thread_args.commits_needed++;
-			err = trigger_log_thread(view, 1);
-			if (err)
-				return err;
+		if (!s->thread_args.log_complete) {
+			s->thread_args.load_all = 1;
+			return trigger_log_thread(view, 0);
 		}
 
 		log_scroll_down(view, s->commits.ncommits);
@@ -2540,6 +2543,10 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case KEY_BACKSPACE:
 	case CTRL('l'):
 	case 'B':
+		if (ch == KEY_BACKSPACE && s->thread_args.load_all) {
+			s->thread_args.load_all = 0;
+			break;
+		}
 		if (ch == KEY_BACKSPACE &&
 		    got_path_is_root_dir(s->in_repo_path))
 			break;
