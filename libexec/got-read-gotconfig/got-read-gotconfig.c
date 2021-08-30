@@ -51,28 +51,48 @@ catch_sigint(int signo)
 }
 
 static const struct got_error *
-make_repo_url(char **url, struct gotconfig_remote_repo *repo)
+make_fetch_url(char **url, struct gotconfig_remote_repo *repo)
 {
 	const struct got_error *err = NULL;
 	char *s = NULL, *p = NULL;
+	const char *protocol, *server, *repo_path;
+	int port;
 
 	*url = NULL;
 
-	if (asprintf(&s, "%s://", repo->protocol) == -1)
+	if (repo->fetch_config && repo->fetch_config->protocol)
+		protocol = repo->fetch_config->protocol;
+	else
+		protocol = repo->protocol;
+	if (protocol == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "fetch protocol required for remote repository \"%s\"",
+		    repo->name);
+	if (asprintf(&s, "%s://", protocol) == -1)
 		return got_error_from_errno("asprintf");
 
-	if (repo->server) {
-		p = s;
-		s = NULL;
-		if (asprintf(&s, "%s%s", p, repo->server) == -1) {
-			err = got_error_from_errno("asprintf");
-			goto done;
-		}
-		free(p);
-		p = NULL;
+	if (repo->fetch_config && repo->fetch_config->server)
+		server = repo->fetch_config->server;
+	else
+		server = repo->server;
+	if (server == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "fetch server required for remote repository \"%s\"",
+		    repo->name);
+	p = s;
+	s = NULL;
+	if (asprintf(&s, "%s%s", p, server) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
 	}
+	free(p);
+	p = NULL;
 
-	if (repo->port) {
+	if (repo->fetch_config && repo->fetch_config->server)
+		port = repo->fetch_config->port;
+	else
+		port = repo->port;
+	if (port) {
 		p = s;
 		s = NULL;
 		if (asprintf(&s, "%s:%d", p, repo->port) == -1) {
@@ -83,19 +103,108 @@ make_repo_url(char **url, struct gotconfig_remote_repo *repo)
 		p = NULL;
 	}
 
-	if (repo->repository) {
-		char *repo_path = repo->repository;
-		while (repo_path[0] == '/')
-			repo_path++;
+	if (repo->fetch_config && repo->fetch_config->repository)
+		repo_path = repo->fetch_config->repository;
+	else
+		repo_path = repo->repository;
+	if (repo_path == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "fetch repository path required for remote "
+		    "repository \"%s\"", repo->name);
+
+	while (repo_path[0] == '/')
+		repo_path++;
+	p = s;
+	s = NULL;
+	if (asprintf(&s, "%s/%s", p, repo_path) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	free(p);
+	p = NULL;
+
+	got_path_strip_trailing_slashes(s);
+done:
+	if (err) {
+		free(s);
+		free(p);
+	} else
+		*url = s;
+	return err;
+}
+
+static const struct got_error *
+make_send_url(char **url, struct gotconfig_remote_repo *repo)
+{
+	const struct got_error *err = NULL;
+	char *s = NULL, *p = NULL;
+	const char *protocol, *server, *repo_path;
+	int port;
+
+	*url = NULL;
+
+	if (repo->send_config && repo->send_config->protocol)
+		protocol = repo->send_config->protocol;
+	else
+		protocol = repo->protocol;
+	if (protocol == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "send protocol required for remote repository \"%s\"",
+		    repo->name);
+	if (asprintf(&s, "%s://", protocol) == -1)
+		return got_error_from_errno("asprintf");
+
+	if (repo->send_config && repo->send_config->server)
+		server = repo->send_config->server;
+	else
+		server = repo->server;
+	if (server == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "send server required for remote repository \"%s\"",
+		    repo->name);
+	p = s;
+	s = NULL;
+	if (asprintf(&s, "%s%s", p, server) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	free(p);
+	p = NULL;
+
+	if (repo->send_config && repo->send_config->server)
+		port = repo->send_config->port;
+	else
+		port = repo->port;
+	if (port) {
 		p = s;
 		s = NULL;
-		if (asprintf(&s, "%s/%s", p, repo_path) == -1) {
+		if (asprintf(&s, "%s:%d", p, repo->port) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
 		free(p);
 		p = NULL;
 	}
+
+	if (repo->send_config && repo->send_config->repository)
+		repo_path = repo->send_config->repository;
+	else
+		repo_path = repo->repository;
+	if (repo_path == NULL)
+		return got_error_fmt(GOT_ERR_PARSE_CONFIG,
+		    "send repository path required for remote "
+		    "repository \"%s\"", repo->name);
+
+	while (repo_path[0] == '/')
+		repo_path++;
+	p = s;
+	s = NULL;
+	if (asprintf(&s, "%s/%s", p, repo_path) == -1) {
+		err = got_error_from_errno("asprintf");
+		goto done;
+	}
+	free(p);
+	p = NULL;
 
 	got_path_strip_trailing_slashes(s);
 done:
@@ -126,7 +235,7 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 	const struct got_error *err = NULL;
 	struct got_imsg_remotes iremotes;
 	struct gotconfig_remote_repo *repo;
-	char *url = NULL;
+	char *fetch_url = NULL, *send_url = NULL;
 
 	iremotes.nremotes = nremotes;
 	if (imsg_compose(ibuf, GOT_IMSG_GOTCONFIG_REMOTES, 0, 0, -1,
@@ -144,33 +253,62 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		struct ibuf *wbuf;
 		struct node_branch *branch;
 		struct node_ref *ref;
-		int nbranches = 0, nrefs = 0;
+		int nfetch_branches = 0, nsend_branches = 0, nfetch_refs = 0;
 
-		branch = repo->branch;
-		while (branch) {
-			branch = branch->next;
-			nbranches++;
+		if (repo->fetch_config && repo->fetch_config->branch) {
+			branch = repo->fetch_config->branch;
+			while (branch) {
+				branch = branch->next;
+				nfetch_branches++;
+			}
+		} else {
+			branch = repo->branch;
+			while (branch) {
+				branch = branch->next;
+				nfetch_branches++;
+			}
 		}
 
-		ref = repo->ref;
+		if (repo->send_config && repo->send_config->branch) {
+			branch = repo->send_config->branch;
+			while (branch) {
+				branch = branch->next;
+				nsend_branches++;
+			}
+		} else {
+			branch = repo->branch;
+			while (branch) {
+				branch = branch->next;
+				nsend_branches++;
+			}
+		}
+
+		ref = repo->fetch_ref;
 		while (ref) {
 			ref = ref->next;
-			nrefs++;
+			nfetch_refs++;
 		}
 
-		iremote.nbranches = nbranches;
-		iremote.nrefs = nrefs;
+		iremote.nfetch_branches = nfetch_branches;
+		iremote.nsend_branches = nsend_branches;
+		iremote.nfetch_refs = nfetch_refs;
 		iremote.mirror_references = repo->mirror_references;
 		iremote.fetch_all_branches = repo->fetch_all_branches;
 
 		iremote.name_len = strlen(repo->name);
 		len += iremote.name_len;
 
-		err = make_repo_url(&url, repo);
+		err = make_fetch_url(&fetch_url, repo);
 		if (err)
 			break;
-		iremote.url_len = strlen(url);
-		len += iremote.url_len;
+		iremote.fetch_url_len = strlen(fetch_url);
+		len += iremote.fetch_url_len;
+
+		err = make_send_url(&send_url, repo);
+		if (err)
+			break;
+		iremote.send_url_len = strlen(send_url);
+		len += iremote.send_url_len;
 
 		wbuf = imsg_create(ibuf, GOT_IMSG_GOTCONFIG_REMOTE, 0, 0, len);
 		if (wbuf == NULL) {
@@ -192,7 +330,13 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 			ibuf_free(wbuf);
 			break;
 		}
-		if (imsg_add(wbuf, url, iremote.url_len) == -1) {
+		if (imsg_add(wbuf, fetch_url, iremote.fetch_url_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GOTCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			break;
+		}
+		if (imsg_add(wbuf, send_url, iremote.send_url_len) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GOTCONFIG_REMOTE");
 			ibuf_free(wbuf);
@@ -205,18 +349,52 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		if (err)
 			break;
 
-		free(url);
-		url = NULL;
+		free(fetch_url);
+		fetch_url = NULL;
+		free(send_url);
+		send_url = NULL;
 
-		branch = repo->branch;
-		while (branch) {
-			err = send_gotconfig_str(ibuf, branch->branch_name);
-			if (err)
-				break;
-			branch = branch->next;
+		if (repo->fetch_config && repo->fetch_config->branch) {
+			branch = repo->fetch_config->branch;
+			while (branch) {
+				err = send_gotconfig_str(ibuf,
+				    branch->branch_name);
+				if (err)
+					break;
+				branch = branch->next;
+			}
+		} else {
+			branch = repo->branch;
+			while (branch) {
+				err = send_gotconfig_str(ibuf,
+				    branch->branch_name);
+				if (err)
+					break;
+				branch = branch->next;
+			}
 		}
 
-		ref = repo->ref;
+		if (repo->send_config && repo->send_config->branch) {
+			branch = repo->send_config->branch;
+			while (branch) {
+				err = send_gotconfig_str(ibuf,
+				    branch->branch_name);
+				if (err)
+					break;
+				branch = branch->next;
+			}
+		} else {
+			branch = repo->branch;
+			while (branch) {
+				err = send_gotconfig_str(ibuf,
+				    branch->branch_name);
+				if (err)
+					break;
+				branch = branch->next;
+			}
+		}
+
+		ref = repo->fetch_ref;
 		while (ref) {
 			err = send_gotconfig_str(ibuf, ref->ref_name);
 			if (err)
@@ -225,7 +403,8 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		}
 	}
 
-	free(url);
+	free(fetch_url);
+	free(send_url);
 	return err;
 }
 

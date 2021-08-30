@@ -292,7 +292,7 @@ cmd_info(int argc, char *argv[])
 		got_gotconfig_get_remotes(&nremotes, &remotes, gotconfig);
 		for (i = 0; i < nremotes; i++) {
 			printf("remote \"%s\": %s\n", remotes[i].name,
-			    remotes[i].url);
+			    remotes[i].fetch_url);
 		}
 	}
 

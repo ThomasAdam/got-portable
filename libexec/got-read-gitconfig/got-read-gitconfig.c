@@ -121,8 +121,10 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 		iremote.mirror_references = remotes[i].mirror_references;
 		iremote.name_len = strlen(remotes[i].name);
 		len += iremote.name_len;
-		iremote.url_len = strlen(remotes[i].url);
-		len += iremote.url_len;
+		iremote.fetch_url_len = strlen(remotes[i].fetch_url);
+		len += iremote.fetch_url_len;
+		iremote.send_url_len = strlen(remotes[i].send_url);
+		len += iremote.send_url_len;
 
 		wbuf = imsg_create(ibuf, GOT_IMSG_GITCONFIG_REMOTE, 0, 0, len);
 		if (wbuf == NULL)
@@ -142,7 +144,13 @@ send_gitconfig_remotes(struct imsgbuf *ibuf, struct got_remote_repo *remotes,
 			ibuf_free(wbuf);
 			return err;
 		}
-		if (imsg_add(wbuf, remotes[i].url, iremote.url_len) == -1) {
+		if (imsg_add(wbuf, remotes[i].fetch_url, iremote.fetch_url_len) == -1) {
+			err = got_error_from_errno(
+			    "imsg_add GITCONFIG_REMOTE");
+			ibuf_free(wbuf);
+			return err;
+		}
+		if (imsg_add(wbuf, remotes[i].send_url, iremote.send_url_len) == -1) {
 			err = got_error_from_errno(
 			    "imsg_add GITCONFIG_REMOTE");
 			ibuf_free(wbuf);
@@ -218,9 +226,19 @@ gitconfig_remotes_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig)
 			*end = '\0';
 		remotes[i].name = name;
 
-		remotes[i].url = got_gitconfig_get_str(gitconfig,
+		remotes[i].fetch_url = got_gitconfig_get_str(gitconfig,
 		    node->field, "url");
-		if (remotes[i].url == NULL) {
+		if (remotes[i].fetch_url == NULL) {
+			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
+			goto done;
+		}
+
+		remotes[i].send_url = got_gitconfig_get_str(gitconfig,
+		    node->field, "pushurl");
+		if (remotes[i].send_url == NULL)
+			remotes[i].send_url = got_gitconfig_get_str(gitconfig,
+			    node->field, "url");
+		if (remotes[i].send_url == NULL) {
 			err = got_error(GOT_ERR_GITCONFIG_SYNTAX);
 			goto done;
 		}

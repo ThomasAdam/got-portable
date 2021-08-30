@@ -786,13 +786,20 @@ got_repo_free_remote_repo_data(struct got_remote_repo *repo)
 
 	free(repo->name);
 	repo->name = NULL;
-	free(repo->url);
-	repo->url = NULL;
-	for (i = 0; i < repo->nbranches; i++)
-		free(repo->branches[i]);
-	free(repo->branches);
-	repo->branches = NULL;
-	repo->nbranches = 0;
+	free(repo->fetch_url);
+	repo->fetch_url = NULL;
+	free(repo->send_url);
+	repo->send_url = NULL;
+	for (i = 0; i < repo->nfetch_branches; i++)
+		free(repo->fetch_branches[i]);
+	free(repo->fetch_branches);
+	repo->fetch_branches = NULL;
+	repo->nfetch_branches = 0;
+	for (i = 0; i < repo->nsend_branches; i++)
+		free(repo->send_branches[i]);
+	free(repo->send_branches);
+	repo->send_branches = NULL;
+	repo->nsend_branches = 0;
 }
 
 const struct got_error *

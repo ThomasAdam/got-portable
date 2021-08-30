@@ -1041,6 +1041,122 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_and_fetch_config() {
+	local testroot=`test_init send_fetch_conf`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -r $testroot/repo -m '1.0' 1.0 >/dev/null
+	tag_id=`got ref -r $testroot/repo -l | grep "^refs/tags/1.0" \
+		| tr -d ' ' | cut -d: -f2`
+
+	cp -R $testroot/repo-clone $testroot/repo-clone2
+	got tag -r $testroot/repo-clone2 -m '2.0' 2.0 >/dev/null
+	tag_id2=`got ref -r $testroot/repo-clone2 -l | grep "^refs/tags/2.0" \
+		| tr -d ' ' | cut -d: -f2`
+
+	cat > $testroot/repo/.git/got.conf <<EOF
+remote "origin" {
+	protocol ssh
+	server 127.0.0.1
+	send {
+		repository "$testroot/repo-clone"
+	}
+	fetch {
+		repository "$testroot/repo-clone2"
+	}
+}
+EOF
+	got ref -l -r $testroot/repo > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# fetch tag 2.0 from repo-clone2
+	got fetch -q -r $testroot/repo > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got fetch command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+	echo "refs/tags/2.0: $tag_id2" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# send tag 1.0 to repo-clone
+	got send -q -r $testroot/repo -t 1.0 > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+
+	test_done "$testroot" "$ret"
+}
 
 test_parseargs "$@"
 run_test test_send_basic
@@ -1052,3 +1168,4 @@ run_test test_send_tags
 run_test test_send_new_branch
 run_test test_send_all_branches
 run_test test_send_to_empty_repo
+run_test test_send_and_fetch_config

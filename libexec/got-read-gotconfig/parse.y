@@ -231,7 +231,7 @@ remoteopts1	: REPOSITORY STRING {
 			remote->branch = $2;
 		}
 		| REFERENCE ref {
-			remote->ref = $2;
+			remote->fetch_ref = $2;
 		}
 		| FETCH {
 			static const struct got_error* error;

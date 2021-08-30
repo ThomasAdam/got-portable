@@ -56,7 +56,7 @@ struct gotconfig_remote_repo {
 	int	mirror_references;
 	int	fetch_all_branches;
 	struct	node_branch *branch;
-	struct	node_ref *ref;
+	struct	node_ref *fetch_ref;
 	struct	fetch_config *fetch_config;
 	struct	send_config *send_config;
 };

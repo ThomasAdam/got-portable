@@ -2370,20 +2370,20 @@ cmd_fetch(int argc, char *argv[])
 	if (TAILQ_EMPTY(&wanted_branches)) {
 		if (!fetch_all_branches)
 			fetch_all_branches = remote->fetch_all_branches;
-		for (i = 0; i < remote->nbranches; i++) {
+		for (i = 0; i < remote->nfetch_branches; i++) {
 			got_pathlist_append(&wanted_branches,
-			    remote->branches[i], NULL);
+			    remote->fetch_branches[i], NULL);
 		}
 	}
 	if (TAILQ_EMPTY(&wanted_refs)) {
-		for (i = 0; i < remote->nrefs; i++) {
+		for (i = 0; i < remote->nfetch_refs; i++) {
 			got_pathlist_append(&wanted_refs,
-			    remote->refs[i], NULL);
+			    remote->fetch_refs[i], NULL);
 		}
 	}
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
-	    &repo_name, remote->url);
+	    &repo_name, remote->fetch_url);
 	if (error)
 		goto done;
 
@@ -7701,7 +7701,7 @@ cmd_send(int argc, char *argv[])
 	}
 
 	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
-	    &repo_name, remote->url);
+	    &repo_name, remote->send_url);
 	if (error)
 		goto done;
 

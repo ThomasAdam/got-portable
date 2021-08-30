@@ -443,19 +443,24 @@ struct got_imsg_traversed_commits {
 } __attribute__((__packed__));
 
 /*
- * Structure for GOT_IMSG_GITCONFIG_REMOTE data.
+ * Structure for GOT_IMSG_GOTCONFIG_REMOTE and
+ * GOT_IMSG_GOTCONFIG_REMOTE data.
  */
 struct got_imsg_remote {
 	size_t name_len;
-	size_t url_len;
+	size_t fetch_url_len;
+	size_t send_url_len;
 	int mirror_references;
 	int fetch_all_branches;
-	int nbranches;
-	int nrefs;
+	int nfetch_branches;
+	int nsend_branches;
+	int nfetch_refs;
 
-	/* Followed by name_len + url_len data bytes. */
-	/* Followed by nbranches GOT_IMSG_GITCONFIG_STR_VAL messages. */
-	/* Followed by nrefs GOT_IMSG_GITCONFIG_STR_VAL messages. */
+	/* Followed by name_len data bytes. */
+	/* Followed by fetch_url_len + send_url_len data bytes. */
+	/* Followed by nfetch_branches GOT_IMSG_GITCONFIG_STR_VAL messages. */
+	/* Followed by nsend_branches GOT_IMSG_GITCONFIG_STR_VAL messages. */
+	/* Followed by nfetch_refs GOT_IMSG_GITCONFIG_STR_VAL messages. */
 } __attribute__((__packed__));
 
 /*

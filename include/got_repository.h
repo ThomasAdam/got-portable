@@ -57,10 +57,11 @@ void got_repo_get_gitconfig_extensions(char ***, int *,
 /* Information about one remote repository. */
 struct got_remote_repo {
 	char *name;
-	char *url;
+	char *fetch_url;
+	char *send_url;
 
 	/*
-	 * If set, references are mirrored 1:1 into the local repository.
+	 * If set, fetched references are mirrored 1:1 into our repository.
 	 * If not set, references are mapped into "refs/remotes/$name/".
 	 */
 	int mirror_references;
@@ -72,12 +73,16 @@ struct got_remote_repo {
 	int fetch_all_branches;
 
 	/* Branches to fetch by default. */
-	int nbranches;
-	char **branches;
+	int nfetch_branches;
+	char **fetch_branches;
+
+	/* Branches to send by default. */
+	int nsend_branches;
+	char **send_branches;
 
 	/* Other arbitrary references to fetch by default. */
-	int nrefs;
-	char **refs;
+	int nfetch_refs;
+	char **fetch_refs;
 };
 
 /*

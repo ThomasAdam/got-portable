@@ -2206,13 +2206,17 @@ free_remote_data(struct got_remote_repo *remote)
 	int i;
 
 	free(remote->name);
-	free(remote->url);
-	for (i = 0; i < remote->nbranches; i++)
-		free(remote->branches[i]);
-	free(remote->branches);
-	for (i = 0; i < remote->nrefs; i++)
-		free(remote->refs[i]);
-	free(remote->refs);
+	free(remote->fetch_url);
+	free(remote->send_url);
+	for (i = 0; i < remote->nfetch_branches; i++)
+		free(remote->fetch_branches[i]);
+	free(remote->fetch_branches);
+	for (i = 0; i < remote->nsend_branches; i++)
+		free(remote->send_branches[i]);
+	free(remote->send_branches);
+	for (i = 0; i < remote->nfetch_refs; i++)
+		free(remote->fetch_refs[i]);
+	free(remote->fetch_refs);
 }
 
 const struct got_error *
@@ -2274,9 +2278,11 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 				break;
 			}
 			memcpy(&iremote, imsg.data, sizeof(iremote));
-			if (iremote.name_len == 0 || iremote.url_len == 0 ||
+			if (iremote.name_len == 0 ||
+			    iremote.fetch_url_len == 0 ||
+			    iremote.send_url_len == 0 ||
 			    (sizeof(iremote) + iremote.name_len +
-			    iremote.url_len) > datalen) {
+			    iremote.fetch_url_len + iremote.send_url_len) > datalen) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
@@ -2286,19 +2292,29 @@ got_privsep_recv_gitconfig_remotes(struct got_remote_repo **remotes,
 				err = got_error_from_errno("strndup");
 				break;
 			}
-			remote->url = strndup(imsg.data + sizeof(iremote) +
-			    iremote.name_len, iremote.url_len);
-			if (remote->url == NULL) {
+			remote->fetch_url = strndup(imsg.data + sizeof(iremote) +
+			    iremote.name_len, iremote.fetch_url_len);
+			if (remote->fetch_url == NULL) {
+				err = got_error_from_errno("strndup");
+				free_remote_data(remote);
+				break;
+			}
+			remote->send_url = strndup(imsg.data + sizeof(iremote) +
+			    iremote.name_len + iremote.fetch_url_len,
+			    iremote.send_url_len);
+			if (remote->send_url == NULL) {
 				err = got_error_from_errno("strndup");
 				free_remote_data(remote);
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
 			remote->fetch_all_branches = iremote.fetch_all_branches;
-			remote->nbranches = 0;
-			remote->branches = NULL;
-			remote->nrefs = 0;
-			remote->refs = NULL;
+			remote->nfetch_branches = 0;
+			remote->fetch_branches = NULL;
+			remote->nsend_branches = 0;
+			remote->send_branches = NULL;
+			remote->nfetch_refs = 0;
+			remote->fetch_refs = NULL;
 			(*nremotes)++;
 			break;
 		default:
@@ -2404,7 +2420,6 @@ got_privsep_recv_gotconfig_str(char **str, struct imsgbuf *ibuf)
 	return err;
 }
 
-
 const struct got_error *
 got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
     int *nremotes, struct imsgbuf *ibuf)
@@ -2483,9 +2498,12 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 				break;
 			}
 			memcpy(&iremote, imsg.data, sizeof(iremote));
-			if (iremote.name_len == 0 || iremote.url_len == 0 ||
+			if (iremote.name_len == 0 ||
+			    (iremote.fetch_url_len == 0 &&
+			    iremote.send_url_len == 0) ||
 			    (sizeof(iremote) + iremote.name_len +
-			    iremote.url_len) > datalen) {
+			    iremote.fetch_url_len + iremote.send_url_len) >
+			    datalen) {
 				err = got_error(GOT_ERR_PRIVSEP_LEN);
 				break;
 			}
@@ -2495,26 +2513,35 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 				err = got_error_from_errno("strndup");
 				break;
 			}
-			remote->url = strndup(imsg.data + sizeof(iremote) +
-			    iremote.name_len, iremote.url_len);
-			if (remote->url == NULL) {
+			remote->fetch_url = strndup(imsg.data +
+			    sizeof(iremote) + iremote.name_len,
+			    iremote.fetch_url_len);
+			if (remote->fetch_url == NULL) {
+				err = got_error_from_errno("strndup");
+				free_remote_data(remote);
+				break;
+			}
+			remote->send_url = strndup(imsg.data +
+			    sizeof(iremote) + iremote.name_len +
+			    iremote.fetch_url_len, iremote.send_url_len);
+			if (remote->send_url == NULL) {
 				err = got_error_from_errno("strndup");
 				free_remote_data(remote);
 				break;
 			}
 			remote->mirror_references = iremote.mirror_references;
 			remote->fetch_all_branches = iremote.fetch_all_branches;
-			if (iremote.nbranches > 0) {
-				remote->branches = recallocarray(NULL, 0,
-				    iremote.nbranches, sizeof(char *));
-				if (remote->branches == NULL) {
+			if (iremote.nfetch_branches > 0) {
+				remote->fetch_branches = recallocarray(NULL, 0,
+				    iremote.nfetch_branches, sizeof(char *));
+				if (remote->fetch_branches == NULL) {
 					err = got_error_from_errno("calloc");
 					free_remote_data(remote);
 					break;
 				}
 			}
-			remote->nbranches = 0;
-			for (i = 0; i < iremote.nbranches; i++) {
+			remote->nfetch_branches = 0;
+			for (i = 0; i < iremote.nfetch_branches; i++) {
 				char *branch;
 				err = got_privsep_recv_gotconfig_str(&branch,
 				    ibuf);
@@ -2522,20 +2549,41 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 					free_remote_data(remote);
 					goto done;
 				}
-				remote->branches[i] = branch;
-				remote->nbranches++;
+				remote->fetch_branches[i] = branch;
+				remote->nfetch_branches++;
 			}
-			if (iremote.nrefs > 0) {
-				remote->refs = recallocarray(NULL, 0,
-				    iremote.nrefs, sizeof(char *));
-				if (remote->refs == NULL) {
+			if (iremote.nsend_branches > 0) {
+				remote->send_branches = recallocarray(NULL, 0,
+				    iremote.nsend_branches, sizeof(char *));
+				if (remote->send_branches == NULL) {
 					err = got_error_from_errno("calloc");
 					free_remote_data(remote);
 					break;
 				}
 			}
-			remote->nrefs = 0;
-			for (i = 0; i < iremote.nrefs; i++) {
+			remote->nsend_branches = 0;
+			for (i = 0; i < iremote.nsend_branches; i++) {
+				char *branch;
+				err = got_privsep_recv_gotconfig_str(&branch,
+				    ibuf);
+				if (err) {
+					free_remote_data(remote);
+					goto done;
+				}
+				remote->send_branches[i] = branch;
+				remote->nsend_branches++;
+			}
+			if (iremote.nfetch_refs > 0) {
+				remote->fetch_refs = recallocarray(NULL, 0,
+				    iremote.nfetch_refs, sizeof(char *));
+				if (remote->fetch_refs == NULL) {
+					err = got_error_from_errno("calloc");
+					free_remote_data(remote);
+					break;
+				}
+			}
+			remote->nfetch_refs = 0;
+			for (i = 0; i < iremote.nfetch_refs; i++) {
 				char *ref;
 				err = got_privsep_recv_gotconfig_str(&ref,
 				    ibuf);
@@ -2543,8 +2591,8 @@ got_privsep_recv_gotconfig_remotes(struct got_remote_repo **remotes,
 					free_remote_data(remote);
 					goto done;
 				}
-				remote->refs[i] = ref;
-				remote->nrefs++;
+				remote->fetch_refs[i] = ref;
+				remote->nfetch_refs++;
 			}
 			(*nremotes)++;
 			break;
