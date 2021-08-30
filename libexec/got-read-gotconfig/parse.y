@@ -245,7 +245,7 @@ remoteopts1	: REPOSITORY STRING {
 				yyerror("%s", error->msg);
 				YYERROR;
 			}
-		} '{' optnl fetchopts2 '}'
+		} '{' optnl fetchempty '}'
 		| SEND {
 			static const struct got_error* error;
 
@@ -258,8 +258,11 @@ remoteopts1	: REPOSITORY STRING {
 				yyerror("%s", error->msg);
 				YYERROR;
 			}
-		} '{' optnl sendopts2 '}'
+		} '{' optnl sendempty '}'
 	   	;
+fetchempty	: /* empty */
+		| fetchopts2
+		;
 fetchopts2	: fetchopts2 fetchopts1 nl
 	   	| fetchopts1 optnl
 		;
@@ -297,6 +300,9 @@ fetchopts1	: REPOSITORY STRING {
 			remote->fetch_config->branch = $2;
 		}
 	   	;
+sendempty	: /* empty */
+		| sendopts2
+		;
 sendopts2	: sendopts2 sendopts1 nl
 	   	| sendopts1 optnl
 		;
