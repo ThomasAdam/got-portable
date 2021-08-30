@@ -88,6 +88,7 @@
 /include/got_reference.h
 /include/got_repository.h
 /include/got_repository_admin.h
+/include/got_send.h
 /include/got_utf8.h
 /include/got_version.h
 /include/got_worktree.h
@@ -160,6 +161,7 @@
 /lib/reference.c
 /lib/repository.c
 /lib/repository_admin.c
+/lib/send.c
 /lib/sha1.c
 /lib/utf8.c
 /lib/worktree.c
@@ -198,6 +200,9 @@
 /libexec/got-read-tree
 /libexec/got-read-tree/Makefile
 /libexec/got-read-tree/got-read-tree.c
+/libexec/got-send-pack
+/libexec/got-send-pack/Makefile
+/libexec/got-send-pack/got-send-pack.c
 /regress
 /regress/Makefile
 /regress/Makefile.inc
@@ -225,6 +230,7 @@
 /regress/cmdline/ref.sh
 /regress/cmdline/revert.sh
 /regress/cmdline/rm.sh
+/regress/cmdline/send.sh
 /regress/cmdline/stage.sh
 /regress/cmdline/status.sh
 /regress/cmdline/tag.sh
