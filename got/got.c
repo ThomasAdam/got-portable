@@ -4659,8 +4659,8 @@ blame_cb(void *arg, int nlines, int lineno, struct got_object_id *id)
 	}
 
 	committer_time = got_object_commit_get_committer_time(commit);
-	if (localtime_r(&committer_time, &tm) == NULL)
-		return got_error_from_errno("localtime_r");
+	if (gmtime_r(&committer_time, &tm) == NULL)
+		return got_error_from_errno("gmtime_r");
 	if (strftime(bline->datebuf, sizeof(bline->datebuf), "%G-%m-%d",
 	    &tm) == 0) {
 		err = got_error(GOT_ERR_NO_SPACE);
@@ -8414,8 +8414,8 @@ get_commit_brief_str(char **brief_str, struct got_commit_object *commit)
 	char *logmsg0 = NULL, *logmsg, *newline;
 
 	committer_time = got_object_commit_get_committer_time(commit);
-	if (localtime_r(&committer_time, &tm) == NULL)
-		return got_error_from_errno("localtime_r");
+	if (gmtime_r(&committer_time, &tm) == NULL)
+		return got_error_from_errno("gmtime_r");
 	if (strftime(datebuf, sizeof(datebuf), "%G-%m-%d", &tm) == 0)
 		return got_error(GOT_ERR_NO_SPACE);
 
