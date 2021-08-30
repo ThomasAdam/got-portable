@@ -255,32 +255,22 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		struct node_ref *ref;
 		int nfetch_branches = 0, nsend_branches = 0, nfetch_refs = 0;
 
-		if (repo->fetch_config && repo->fetch_config->branch) {
+		if (repo->fetch_config && repo->fetch_config->branch)
 			branch = repo->fetch_config->branch;
-			while (branch) {
-				branch = branch->next;
-				nfetch_branches++;
-			}
-		} else {
+		else
 			branch = repo->branch;
-			while (branch) {
-				branch = branch->next;
-				nfetch_branches++;
-			}
+		while (branch) {
+			branch = branch->next;
+			nfetch_branches++;
 		}
 
-		if (repo->send_config && repo->send_config->branch) {
+		if (repo->send_config && repo->send_config->branch)
 			branch = repo->send_config->branch;
-			while (branch) {
-				branch = branch->next;
-				nsend_branches++;
-			}
-		} else {
+		else
 			branch = repo->branch;
-			while (branch) {
-				branch = branch->next;
-				nsend_branches++;
-			}
+		while (branch) {
+			branch = branch->next;
+			nsend_branches++;
 		}
 
 		ref = repo->fetch_ref;
@@ -354,44 +344,26 @@ send_gotconfig_remotes(struct imsgbuf *ibuf,
 		free(send_url);
 		send_url = NULL;
 
-		if (repo->fetch_config && repo->fetch_config->branch) {
+		if (repo->fetch_config && repo->fetch_config->branch)
 			branch = repo->fetch_config->branch;
-			while (branch) {
-				err = send_gotconfig_str(ibuf,
-				    branch->branch_name);
-				if (err)
-					break;
-				branch = branch->next;
-			}
-		} else {
+		else
 			branch = repo->branch;
-			while (branch) {
-				err = send_gotconfig_str(ibuf,
-				    branch->branch_name);
-				if (err)
-					break;
-				branch = branch->next;
-			}
+		while (branch) {
+			err = send_gotconfig_str(ibuf, branch->branch_name);
+			if (err)
+				break;
+			branch = branch->next;
 		}
 
-		if (repo->send_config && repo->send_config->branch) {
+		if (repo->send_config && repo->send_config->branch)
 			branch = repo->send_config->branch;
-			while (branch) {
-				err = send_gotconfig_str(ibuf,
-				    branch->branch_name);
-				if (err)
-					break;
-				branch = branch->next;
-			}
-		} else {
+		else
 			branch = repo->branch;
-			while (branch) {
-				err = send_gotconfig_str(ibuf,
-				    branch->branch_name);
-				if (err)
-					break;
-				branch = branch->next;
-			}
+		while (branch) {
+			err = send_gotconfig_str(ibuf, branch->branch_name);
+			if (err)
+				break;
+			branch = branch->next;
 		}
 
 		ref = repo->fetch_ref;
