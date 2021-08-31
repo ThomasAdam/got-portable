@@ -152,9 +152,9 @@ test_histedit_no_op() {
 
 	# We should have a backup of old commits
 	(cd $testroot/repo && got histedit -l > $testroot/stdout)
-	d_orig2=`env TZ=UTC date -r $old_author_time2 +"%a %b %e %X %Y UTC"`
-	d_new2=`env TZ=UTC date -r $new_author_time2 +"%G-%m-%d"`
-	d_orig=`env TZ=UTC date -r $orig_author_time +"%G-%m-%d"`
+	d_orig2=`date -u -r $old_author_time2 +"%a %b %e %X %Y UTC"`
+	d_new2=`date -u -r $new_author_time2 +"%G-%m-%d"`
+	d_orig=`date -u -r $orig_author_time +"%G-%m-%d"`
 	cat > $testroot/stdout.expected <<EOF
 -----------------------------------------------
 commit $old_commit2 (formerly master)

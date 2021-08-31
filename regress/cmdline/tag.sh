@@ -137,11 +137,11 @@ test_tag_list() {
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 	local tagger_time=`git_show_tagger_time $testroot/repo $tag`
-	d1=`env TZ=UTC date -r $tagger_time +"%a %b %e %X %Y UTC"`
+	d1=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
 	tag_id2=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
 	local tagger_time2=`git_show_tagger_time $testroot/repo $tag2`
-	d2=`env TZ=UTC date -r $tagger_time2 +"%a %b %e %X %Y UTC"`
+	d2=`date -u -r $tagger_time2 +"%a %b %e %X %Y UTC"`
 
 	got tag -r $testroot/repo -l > $testroot/stdout
 
@@ -184,11 +184,11 @@ test_tag_list_lightweight() {
 	tag_id=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag" | tr -d ' ' | cut -d: -f2`
 	local tagger_time=`git_show_author_time $testroot/repo $tag`
-	d1=`env TZ=UTC date -r $tagger_time +"%a %b %e %X %Y UTC"`
+	d1=`date -u -r $tagger_time +"%a %b %e %X %Y UTC"`
 	tag_id2=`got ref -r $testroot/repo -l \
 		| grep "^refs/tags/$tag2" | tr -d ' ' | cut -d: -f2`
 	local tagger_time2=`git_show_author_time $testroot/repo $tag2`
-	d2=`env TZ=UTC date -r $tagger_time2 +"%a %b %e %X %Y UTC"`
+	d2=`date -u -r $tagger_time2 +"%a %b %e %X %Y UTC"`
 
 	got tag -r $testroot/repo -l > $testroot/stdout
 
