@@ -118,71 +118,29 @@ boolean		: STRING {
 		}
 		;
 main		: GOT_REPOS_PATH STRING {
-			gw_conf->got_repos_path = strdup($2);
-			if (gw_conf->got_repos_path == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_repos_path = $2;
 		}
 		| GOT_WWW_PATH STRING {
-			gw_conf->got_www_path = strdup($2);
-			if (gw_conf->got_www_path == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_www_path = $2;
 		}
 		| GOT_MAX_REPOS NUMBER {
 			if ($2 > 0)
 				gw_conf->got_max_repos = $2;
 		}
 		| GOT_SITE_NAME STRING {
-			gw_conf->got_site_name = strdup($2);
-			if (gw_conf->got_site_name == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_site_name = $2;
 		}
 		| GOT_SITE_OWNER STRING {
-			gw_conf->got_site_owner = strdup($2);
-			if (gw_conf->got_site_owner == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_site_owner = $2;
 		}
 		| GOT_SITE_LINK STRING {
-			gw_conf->got_site_link = strdup($2);
-			if (gw_conf->got_site_link == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_site_link = $2;
 		}
 		| GOT_LOGO STRING {
-			gw_conf->got_logo = strdup($2);
-			if (gw_conf->got_logo== NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_logo = $2;
 		}
 		| GOT_LOGO_URL STRING {
-			gw_conf->got_logo_url = strdup($2);
-			if (gw_conf->got_logo_url== NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			gw_conf->got_logo_url = $2;
 		}
 		| GOT_SHOW_SITE_OWNER boolean {
 			gw_conf->got_show_site_owner = $2;
@@ -232,9 +190,8 @@ yyerror(const char *fmt, ...)
 		gerror = got_error_from_errno("asprintf");
 		return(0);
 	}
-	gerror = got_error_msg(GOT_ERR_PARSE_CONFIG, strdup(err));
+	gerror = got_error_msg(GOT_ERR_PARSE_CONFIG, err);
 	free(msg);
-	free(err);
 	return(0);
 }
 

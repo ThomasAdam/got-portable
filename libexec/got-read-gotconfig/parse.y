@@ -192,31 +192,13 @@ remoteopts2	: remoteopts2 remoteopts1 nl
 	   	| remoteopts1 optnl
 		;
 remoteopts1	: REPOSITORY STRING {
-	   		remote->repository = strdup($2);
-			if (remote->repository == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->repository = $2;
 	   	}
 	   	| SERVER STRING {
-	   		remote->server = strdup($2);
-			if (remote->server == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->protocol = strdup($2);
-			if (remote->protocol == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->protocol = $2;
 		}
 		| MIRROR_REFERENCES boolean {
 			remote->mirror_references = $2;
@@ -267,31 +249,13 @@ fetchopts2	: fetchopts2 fetchopts1 nl
 	   	| fetchopts1 optnl
 		;
 fetchopts1	: REPOSITORY STRING {
-	   		remote->fetch_config->repository = strdup($2);
-			if (remote->fetch_config->repository == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->fetch_config->repository = $2;
 	   	}
 	   	| SERVER STRING {
-	   		remote->fetch_config->server = strdup($2);
-			if (remote->fetch_config->server == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->fetch_config->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->fetch_config->protocol = strdup($2);
-			if (remote->fetch_config->protocol == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->fetch_config->protocol = $2;
 		}
 		| PORT portplain {
 			remote->fetch_config->port = $2;
@@ -307,31 +271,13 @@ sendopts2	: sendopts2 sendopts1 nl
 	   	| sendopts1 optnl
 		;
 sendopts1	: REPOSITORY STRING {
-	   		remote->send_config->repository = strdup($2);
-			if (remote->send_config->repository == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->send_config->repository = $2;
 	   	}
 	   	| SERVER STRING {
-	   		remote->send_config->server = strdup($2);
-			if (remote->send_config->server == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->send_config->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->send_config->protocol = strdup($2);
-			if (remote->send_config->protocol == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		remote->send_config->protocol = $2;
 		}
 		| PORT portplain {
 			remote->send_config->port = $2;
@@ -349,26 +295,14 @@ remote		: REMOTE STRING {
 				yyerror("%s", error->msg);
 				YYERROR;
 			}
-			remote->name = strdup($2);
-			if (remote->name == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+			remote->name = $2;
 		} '{' optnl remoteopts2 '}' {
 			TAILQ_INSERT_TAIL(&gotconfig.remotes, remote, entry);
 			gotconfig.nremotes++;
 		}
 		;
 author		: AUTHOR STRING {
-	   		gotconfig.author = strdup($2);
-			if (gotconfig.author == NULL) {
-				free($2);
-				yyerror("strdup");
-				YYERROR;
-			}
-			free($2);
+	   		gotconfig.author = $2;
 		}
 		;
 optnl		: '\n' optnl
@@ -404,9 +338,8 @@ yyerror(const char *fmt, ...)
 		gerror = got_error_from_errno("asprintf");
 		return(0);
 	}
-	gerror = got_error_msg(GOT_ERR_PARSE_CONFIG, strdup(err));
+	gerror = got_error_msg(GOT_ERR_PARSE_CONFIG, err);
 	free(msg);
-	free(err);
 	return(0);
 }
 int
