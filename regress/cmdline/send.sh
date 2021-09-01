@@ -1158,6 +1158,82 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_config() {
+	local testroot=`test_init send_fetch_conf`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cat > $testroot/repo/.git/got.conf <<EOF
+remote "origin" {
+	protocol ssh
+	server 127.0.0.1
+	branch foo
+	repository "$testroot/repo-clone"
+}
+EOF
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	got branch -r $testroot/repo foo
+
+	got send -q -r $testroot/repo > $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/foo: $commit_id" >> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_send_basic
 run_test test_send_rebase_required
@@ -1169,3 +1245,4 @@ run_test test_send_new_branch
 run_test test_send_all_branches
 run_test test_send_to_empty_repo
 run_test test_send_and_fetch_config
+run_test test_send_config

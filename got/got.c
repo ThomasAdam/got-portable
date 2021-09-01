@@ -7751,6 +7751,11 @@ cmd_send(int argc, char *argv[])
 				goto done;
 			nbranches++;
 		}
+	} else if (nbranches == 0) {
+		for (i = 0; i < remote->nsend_branches; i++) {
+			got_pathlist_append(&branches,
+			    remote->send_branches[i], NULL);
+		}
 	}
 
 	if (send_all_tags) {
