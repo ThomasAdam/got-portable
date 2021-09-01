@@ -4840,19 +4840,20 @@ struct collect_commitables_arg {
 };
 
 static const struct got_error *
-collect_commitables(void *arg, unsigned char status,
-    unsigned char staged_status, const char *relpath,
+collect_commitable(struct got_pathlist_head *commitable_paths,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    unsigned char status, unsigned char staged_status,
+    int have_staged_files, int allow_bad_symlinks, const char *relpath,
     struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
     struct got_object_id *commit_id, int dirfd, const char *de_name)
 {
-	struct collect_commitables_arg *a = arg;
 	const struct got_error *err = NULL;
 	struct got_commitable *ct = NULL;
 	struct got_pathlist_entry *new = NULL;
 	char *parent_path = NULL, *path = NULL;
 	struct stat sb;
 
-	if (a->have_staged_files) {
+	if (have_staged_files) {
 		if (staged_status != GOT_STATUS_MODIFY &&
 		    staged_status != GOT_STATUS_ADD &&
 		    staged_status != GOT_STATUS_DELETE)
@@ -4888,7 +4889,7 @@ collect_commitables(void *arg, unsigned char status,
 		goto done;
 	}
 
-	if (asprintf(&ct->ondisk_path, "%s/%s", a->worktree->root_path,
+	if (asprintf(&ct->ondisk_path, "%s/%s", worktree->root_path,
 	    relpath) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
@@ -4897,7 +4898,7 @@ collect_commitables(void *arg, unsigned char status,
 	if (staged_status == GOT_STATUS_ADD ||
 	    staged_status == GOT_STATUS_MODIFY) {
 		struct got_fileindex_entry *ie;
-		ie = got_fileindex_entry_get(a->fileindex, path, strlen(path));
+		ie = got_fileindex_entry_get(fileindex, path, strlen(path));
 		switch (got_fileindex_entry_staged_filetype_get(ie)) {
 		case GOT_FILEIDX_MODE_REGULAR_FILE:
 		case GOT_FILEIDX_MODE_BAD_SYMLINK:
@@ -4927,15 +4928,15 @@ collect_commitables(void *arg, unsigned char status,
 		ct->mode = sb.st_mode;
 	}
 
-	if (asprintf(&ct->in_repo_path, "%s%s%s", a->worktree->path_prefix,
-	    got_path_is_root_dir(a->worktree->path_prefix) ? "" : "/",
+	if (asprintf(&ct->in_repo_path, "%s%s%s", worktree->path_prefix,
+	    got_path_is_root_dir(worktree->path_prefix) ? "" : "/",
 	    relpath) == -1) {
 		err = got_error_from_errno("asprintf");
 		goto done;
 	}
 
 	if (S_ISLNK(ct->mode) && staged_status == GOT_STATUS_NO_CHANGE &&
-	    status == GOT_STATUS_ADD && !a->allow_bad_symlinks) {
+	    status == GOT_STATUS_ADD && !allow_bad_symlinks) {
 		int is_bad_symlink;
 		char target_path[PATH_MAX];
 		ssize_t target_len;
@@ -4947,7 +4948,7 @@ collect_commitables(void *arg, unsigned char status,
 			goto done;
 		}
 		err = is_bad_symlink_target(&is_bad_symlink, target_path,
-		    target_len, ct->ondisk_path, a->worktree->root_path);
+		    target_len, ct->ondisk_path, worktree->root_path);
 		if (err)
 			goto done;
 		if (is_bad_symlink) {
@@ -4987,13 +4988,26 @@ collect_commitables(void *arg, unsigned char status,
 		err = got_error_from_errno("strdup");
 		goto done;
 	}
-	err = got_pathlist_insert(&new, a->commitable_paths, ct->path, ct);
+	err = got_pathlist_insert(&new, commitable_paths, ct->path, ct);
 done:
 	if (ct && (err || new == NULL))
 		free_commitable(ct);
 	free(parent_path);
 	free(path);
 	return err;
+}
+
+static const struct got_error *
+collect_commitables(void *arg, unsigned char status,
+    unsigned char staged_status, const char *relpath,
+    struct got_object_id *blob_id, struct got_object_id *staged_blob_id,
+    struct got_object_id *commit_id, int dirfd, const char *de_name)
+{
+	struct collect_commitables_arg *a = arg;
+	return collect_commitable(a->commitable_paths, a->worktree,
+	    a->fileindex, status, staged_status, a->have_staged_files,
+	    a->allow_bad_symlinks, relpath, blob_id, staged_blob_id,
+	    commit_id, dirfd, de_name);
 }
 
 static const struct got_error *write_tree(struct got_object_id **, int *,
