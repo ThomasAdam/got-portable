@@ -2431,7 +2431,7 @@ Enable tab-completion of
 command names in
 .Xr ksh 1 :
 .Pp
-.Dl $ set -A complete_got -- $(got -h 2>&1 | sed -n s/commands://p)
+.Dl $ set -A complete_got_1 -- $(got -h 2>&1 | sed -n s/commands://p)
 .Pp
 Clone an existing Git repository for use with
 .Nm .
