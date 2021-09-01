@@ -1414,7 +1414,7 @@ test_histedit_duplicate_commit_in_script() {
 # if a previous commit introduces a new file, and it is folded into a commit
 # that deletes the same file, the file still exists after the histedit
 test_histedit_fold_add_delete() {
-	local testroot=`test_init histedit_fold`
+	local testroot=`test_init histedit_fold_add_delete`
 
 	local orig_commit=`git_show_head $testroot/repo`
 
