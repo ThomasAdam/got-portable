@@ -3605,12 +3605,12 @@ static const struct got_error *
 report_single_file_status(const char *path, const char *ondisk_path,
     struct got_fileindex *fileindex, got_worktree_status_cb status_cb,
     void *status_arg, struct got_repository *repo, int report_unchanged,
-    struct got_pathlist_head *ignores)
+    struct got_pathlist_head *ignores, int no_ignores)
 {
 	struct got_fileindex_entry *ie;
 	struct stat sb;
 
-	if (match_ignores(ignores, path))
+	if (!no_ignores && match_ignores(ignores, path))
 		return NULL;
 
 	ie = got_fileindex_entry_get(fileindex, path, strlen(path));
@@ -3717,7 +3717,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 			}
 			err = report_single_file_status(path, ondisk_path,
 			    fileindex, status_cb, status_arg, repo,
-			    report_unchanged, &ignores);
+			    report_unchanged, &ignores, no_ignores);
 		}
 	} else {
 		fdiff_cb.diff_old_new = status_old_new;
@@ -6380,14 +6380,14 @@ rebase_commit(struct got_object_id **new_commit_id,
 		struct got_pathlist_entry *pe;
 		TAILQ_FOREACH(pe, merged_paths, entry) {
 			err = worktree_status(worktree, pe->path, fileindex,
-			    repo, collect_commitables, &cc_arg, NULL, NULL, 0,
+			    repo, collect_commitables, &cc_arg, NULL, NULL, 1,
 			    0);
 			if (err)
 				goto done;
 		}
 	} else {
 		err = worktree_status(worktree, "", fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
+		    collect_commitables, &cc_arg, NULL, NULL, 1, 0);
 		if (err)
 			goto done;
 	}
