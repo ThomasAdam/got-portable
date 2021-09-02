@@ -7902,7 +7902,6 @@ cmd_cherrypick(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
-	struct got_reference *head_ref = NULL;
 	int ch;
 	struct got_update_progress_arg upa;
 
@@ -7966,21 +7965,6 @@ cmd_cherrypick(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_open(&head_ref, repo,
-	    got_worktree_get_head_ref_name(worktree), 0);
-	if (error != NULL)
-		goto done;
-
-	error = check_same_branch(commit_id, head_ref, NULL, repo);
-	if (error) {
-		if (error->code != GOT_ERR_ANCESTRY)
-			goto done;
-		error = NULL;
-	} else {
-		error = got_error(GOT_ERR_SAME_BRANCH);
-		goto done;
-	}
-
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
@@ -7999,8 +7983,6 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);
-	if (head_ref)
-		got_ref_close(head_ref);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -8028,7 +8010,6 @@ cmd_backout(int argc, char *argv[])
 	struct got_object_id *commit_id = NULL;
 	struct got_commit_object *commit = NULL;
 	struct got_object_qid *pid;
-	struct got_reference *head_ref = NULL;
 	int ch;
 	struct got_update_progress_arg upa;
 
@@ -8091,15 +8072,6 @@ cmd_backout(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	error = got_ref_open(&head_ref, repo,
-	    got_worktree_get_head_ref_name(worktree), 0);
-	if (error != NULL)
-		goto done;
-
-	error = check_same_branch(commit_id, head_ref, NULL, repo);
-	if (error)
-		goto done;
-
 	error = got_object_open_as_commit(&commit, repo, commit_id);
 	if (error)
 		goto done;
@@ -8122,8 +8094,6 @@ done:
 	if (commit)
 		got_object_commit_close(commit);
 	free(commit_id_str);
-	if (head_ref)
-		got_ref_close(head_ref);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
