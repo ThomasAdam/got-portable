@@ -3144,6 +3144,7 @@ check_merge_ok(void *arg, struct got_fileindex_entry *ie)
 
 	/* Reject merges into a work tree with conflicted files. */
 	err = get_file_status(&status, &sb, ie, ondisk_path, -1, NULL, a->repo);
+	free(ondisk_path);
 	if (err)
 		return err;
 	if (status == GOT_STATUS_CONFLICT)
