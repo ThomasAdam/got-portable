@@ -4532,6 +4532,22 @@ input_blame_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	case 'q':
 		s->done = 1;
 		break;
+	case 'g':
+	case KEY_HOME:
+		s->selected_line = 1;
+		s->first_displayed_line = 1;
+		break;
+	case 'G':
+	case KEY_END:
+		if (s->blame.nlines < view->nlines - 2) {
+			s->selected_line = s->blame.nlines;
+			s->first_displayed_line = 1;
+		} else {
+			s->selected_line = view->nlines - 2;
+			s->first_displayed_line = s->blame.nlines -
+			    (view->nlines - 3);
+		}
+		break;
 	case 'k':
 	case KEY_UP:
 		if (s->selected_line > 1)
