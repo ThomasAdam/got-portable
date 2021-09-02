@@ -38,6 +38,10 @@ test_cherrypick_basic() {
 
 	local branch_rev=`git_show_head $testroot/repo`
 
+	echo "modified new file on branch" > $testroot/repo/epsilon/new
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+	local branch_rev2=`git_show_head $testroot/repo`
+
 	(cd $testroot/wt && got cherrypick $branch_rev > $testroot/stdout)
 
 	echo "G  alpha" > $testroot/stdout.expected
@@ -75,6 +79,33 @@ test_cherrypick_basic() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'D  beta' >> $testroot/stdout.expected
+	echo 'A  epsilon/new' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got cherrypick $branch_rev2 > $testroot/stdout)
+
+	echo "G  epsilon/new" > $testroot/stdout.expected
+	echo "Merged commit $branch_rev2" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
 		test_done "$testroot" "$ret"
 		return 1
 	fi

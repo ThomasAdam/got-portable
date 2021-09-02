@@ -3133,7 +3133,8 @@ check_merge_ok(void *arg, struct got_fileindex_entry *ie)
 	char *ondisk_path;
 
 	/* Reject merges into a work tree with mixed base commits. */
-	if (memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
+	if (got_fileindex_entry_has_commit(ie) &&
+	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
 	    SHA1_DIGEST_LENGTH))
 		return got_error(GOT_ERR_MIXED_COMMITS);
 
