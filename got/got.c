@@ -19,7 +19,6 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/param.h>
 #include <sys/wait.h>
 
 #include <err.h>
