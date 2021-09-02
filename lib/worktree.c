@@ -6359,8 +6359,13 @@ rebase_commit(struct got_object_id **new_commit_id,
 	/*
 	 * If possible get the status of individual files directly to
 	 * avoid crawling the entire work tree once per rebased commit.
-	 * TODO: Ideally, merged_paths would contain a list of commitables
+	 *
+	 * Ideally, merged_paths would contain a list of commitables
 	 * we could use so we could skip worktree_status() entirely.
+	 * However, we would then need carefully keep track of cumulative
+	 * effects of operations such as file additions and deletions
+	 * in 'got histedit -f' (folding multiple commits into one),
+	 * and this extra complexity is not really worth it.
 	 */
 	if (merged_paths) {
 		struct got_pathlist_entry *pe;
