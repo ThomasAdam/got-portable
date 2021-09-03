@@ -1,3 +1,14 @@
+* got 0.57; 2021-09-03
+- remove superfluous strdup(3) from parse.y files (Martin Vahlensieck)
+- adapt regress tests which handle UTC dates (naddy)
+- make 'got send' actually heed branch {} options in got.conf(5) as intended
+- disable ignore lists during status walks used by rebase and histedit
+- tog: add support for navigating to first/last line of blame view (naddy)
+- fix bogus error when 'got cherrypick' merged changes into locally added file
+- remove ancestry checks to make 'got cherrypick' and 'got backout' run faster
+- limit checks for merge conflicts to files affected by the merge to be faster
+- fix 'got send' adding too many objects to the pack file in some cases
+
 * got 0.56; 2021-08-30
 - prevent a race where 'gotadmin cleanup' deletes concurrently created objects
 - plug a small memory leak in tog's show_diff_view() function
