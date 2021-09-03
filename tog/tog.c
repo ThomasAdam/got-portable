@@ -2420,11 +2420,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 		break;
 	case 'g':
 	case KEY_HOME:
-		if (s->first_displayed_entry == NULL)
-			break;
-
 		s->selected = 0;
-		log_scroll_up(s, s->commits.ncommits);
+		s->first_displayed_entry = TAILQ_FIRST(&s->commits.head);
 		select_commit(s);
 		break;
 	case KEY_PPAGE:
