@@ -265,6 +265,66 @@ test_cherrypick_into_work_tree_with_conflicts() {
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_into_work_tree_with_mixed_commits() {
+	local testroot=`test_init cherrypick_into_work_tree_with_mixed_commits`
+	local first_rev=`git_show_head $testroot/repo`
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha" 
+	local second_rev=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local branch_rev=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got update -c $first_rev alpha >/dev/null)
+
+	(cd $testroot/wt && got cherrypick $branch_rev \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "cherrypick succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo -n > $testroot/stdout.expected
+	echo -n "got: work tree contains files from multiple base commits; " \
+		> $testroot/stderr.expected
+	echo "the entire work tree must be updated first" \
+		>> $testroot/stderr.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+
+}
+
 test_cherrypick_modified_submodule() {
 	local testroot=`test_init cherrypick_modified_submodules`
 
@@ -1229,6 +1289,7 @@ test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
 run_test test_cherrypick_into_work_tree_with_conflicts
+run_test test_cherrypick_into_work_tree_with_mixed_commits
 run_test test_cherrypick_modified_submodule
 run_test test_cherrypick_added_submodule
 run_test test_cherrypick_conflict_wt_file_vs_repo_submodule
