@@ -5396,7 +5396,8 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	const struct got_error *err = NULL;
 	struct tog_tree_view_state *s = &view->state.tree;
 	struct tog_view *log_view, *ref_view;
-	int begin_x = 0;
+	struct got_tree_entry *te;
+	int begin_x = 0, n;
 
 	switch (ch) {
 	case 'i':
@@ -5441,6 +5442,33 @@ input_tree_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			view->focus_child = 1;
 		} else
 			*new_view = ref_view;
+		break;
+	case 'g':
+	case KEY_HOME:
+		s->selected = 0;
+		if (s->tree == s->root)
+			s->first_displayed_entry =
+			    got_object_tree_get_first_entry(s->tree);
+		else
+			s->first_displayed_entry = NULL;
+		break;
+	case 'G':
+	case KEY_END:
+		s->selected = 0;
+		te = got_object_tree_get_last_entry(s->tree);
+		for (n = 0; n < view->nlines - 3; n++) {
+			if (te == NULL) {
+				if(s->tree != s->root) {
+					s->first_displayed_entry = NULL;
+					n++;
+				}
+				break;
+			}
+			s->first_displayed_entry = te;
+			te = got_tree_entry_get_prev(s->tree, te);
+		}
+		if (n > 0)
+			s->selected = n - 1;
 		break;
 	case 'k':
 	case KEY_UP:
@@ -6158,7 +6186,8 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	const struct got_error *err = NULL;
 	struct tog_ref_view_state *s = &view->state.ref;
 	struct tog_view *log_view, *tree_view;
-	int begin_x = 0;
+	struct tog_reflist_entry *re;
+	int begin_x = 0, n;
 
 	switch (ch) {
 	case 'i':
@@ -6202,6 +6231,24 @@ input_ref_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			view->focus_child = 1;
 		} else
 			*new_view = tree_view;
+		break;
+	case 'g':
+	case KEY_HOME:
+		s->selected = 0;
+		s->first_displayed_entry = TAILQ_FIRST(&s->refs);
+		break;
+	case 'G':
+	case KEY_END:
+		s->selected = 0;
+		re = TAILQ_LAST(&s->refs, tog_reflist_head);
+		for (n = 0; n < view->nlines - 1; n++) {
+			if (re == NULL)
+				break;
+			s->first_displayed_entry = re;
+			re = TAILQ_PREV(re, tog_reflist_head, entry);
+		}
+		if (n > 0)
+			s->selected = n - 1;
 		break;
 	case 'k':
 	case KEY_UP:
