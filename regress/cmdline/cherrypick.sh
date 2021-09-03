@@ -1285,6 +1285,47 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_same_branch() {
+	local testroot=`test_init cherrypick_same_branch`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified delta on branch" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on branch" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing more changes on newbranch"
+
+	local branch_rev=`git_show_head $testroot/repo`
+
+	# picking a commit from the branch's own history does not make
+	# sense but we should have test coverage for this case regardless
+	(cd $testroot/wt && got up -b newbranch > /dev/null)
+	(cd $testroot/wt && got cherrypick $branch_rev > $testroot/stdout)
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "!  beta" >> $testroot/stdout.expected
+	echo "G  epsilon/new" >> $testroot/stdout.expected
+	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
+
 test_parseargs "$@"
 run_test test_cherrypick_basic
 run_test test_cherrypick_root_commit
@@ -1299,3 +1340,4 @@ run_test test_cherrypick_with_path_prefix_and_empty_tree
 run_test test_cherrypick_conflict_no_eol
 run_test test_cherrypick_conflict_no_eol2
 run_test test_cherrypick_unrelated_changes
+run_test test_cherrypick_same_branch
