@@ -3118,25 +3118,47 @@ done:
 	return err;
 }
 
-struct check_merge_ok_arg {
+static const struct got_error *
+check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
+{
+	struct got_worktree *worktree = arg;
+
+ 	/* Reject merges into a work tree with mixed base commits. */
+ 	if (got_fileindex_entry_has_commit(ie) &&
+	    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
+	    SHA1_DIGEST_LENGTH) != 0)
+ 		return got_error(GOT_ERR_MIXED_COMMITS);
+
+	return NULL;
+}
+
+struct check_merge_conflicts_arg {
 	struct got_worktree *worktree;
+	struct got_fileindex *fileindex;
 	struct got_repository *repo;
 };
 
 static const struct got_error *
-check_merge_ok(void *arg, struct got_fileindex_entry *ie)
+check_merge_conflicts(void *arg, struct got_blob_object *blob1,
+    struct got_blob_object *blob2, struct got_object_id *id1,
+    struct got_object_id *id2, const char *path1, const char *path2,
+    mode_t mode1, mode_t mode2, struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
-	struct check_merge_ok_arg *a = arg;
+	struct check_merge_conflicts_arg *a = arg;
 	unsigned char status;
 	struct stat sb;
+	struct got_fileindex_entry *ie;
+	const char *path = path2 ? path2 : path1;
+	struct got_object_id *id = id2 ? id2 : id1;
 	char *ondisk_path;
 
-	/* Reject merges into a work tree with mixed base commits. */
-	if (got_fileindex_entry_has_commit(ie) &&
-	    memcmp(ie->commit_sha1, a->worktree->base_commit_id->sha1,
-	    SHA1_DIGEST_LENGTH))
-		return got_error(GOT_ERR_MIXED_COMMITS);
+	if (id == NULL)
+		return NULL;
+
+	ie = got_fileindex_entry_get(a->fileindex, path, strlen(path));
+	if (ie == NULL)
+		return NULL;
 
 	if (asprintf(&ondisk_path, "%s/%s", a->worktree->root_path, ie->path)
 	    == -1)
@@ -3163,6 +3185,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	const struct got_error *err = NULL, *sync_err;
 	struct got_object_id *tree_id1 = NULL, *tree_id2 = NULL;
 	struct got_tree_object *tree1 = NULL, *tree2 = NULL;
+	struct check_merge_conflicts_arg cmc_arg;
 	struct merge_file_cb_arg arg;
 	char *label_orig = NULL;
 
@@ -3201,6 +3224,14 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	if (err)
 		goto done;
 
+	cmc_arg.worktree = worktree;
+	cmc_arg.fileindex = fileindex;
+	cmc_arg.repo = repo;
+	err = got_diff_tree(tree1, tree2, "", "", repo,
+	    check_merge_conflicts, &cmc_arg, 0);
+	if (err)
+		goto done;
+
 	arg.worktree = worktree;
 	arg.fileindex = fileindex;
 	arg.progress_cb = progress_cb;
@@ -3231,7 +3262,6 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	const struct got_error *err, *unlockerr;
 	char *fileindex_path = NULL;
 	struct got_fileindex *fileindex = NULL;
-	struct check_merge_ok_arg mok_arg;
 
 	err = lock_worktree(worktree, LOCK_EX);
 	if (err)
@@ -3241,10 +3271,8 @@ got_worktree_merge_files(struct got_worktree *worktree,
 	if (err)
 		goto done;
 
-	mok_arg.worktree = worktree;
-	mok_arg.repo = repo;
-	err = got_fileindex_for_each_entry_safe(fileindex, check_merge_ok,
-	    &mok_arg);
+	err = got_fileindex_for_each_entry_safe(fileindex, check_mixed_commits,
+	    worktree);
 	if (err)
 		goto done;
 
