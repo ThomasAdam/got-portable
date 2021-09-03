@@ -862,19 +862,6 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		}
 	}
 
-	for (i = 0; i < nobj; i++) {
-		err = load_commit(&v, idset, ids[i], repo,
-		    loose_obj_only, cancel_cb, cancel_arg);
-		if (err)
-			goto done;
-		if (progress_cb) {
-			err = progress_cb(progress_arg, 0L, nours,
-			    v.nmeta, 0, 0);
-			if (err)
-				goto done;
-		}
-	}
-
 	for (i = 0; i < ntheirs; i++) {
 		struct got_object_id *id = theirs[i];
 		int *cached_type;
@@ -890,6 +877,19 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 		if (obj_type != GOT_OBJ_TYPE_TAG)
 			continue;
 		err = load_tag(NULL, idset, id, repo,
+		    loose_obj_only, cancel_cb, cancel_arg);
+		if (err)
+			goto done;
+		if (progress_cb) {
+			err = progress_cb(progress_arg, 0L, nours,
+			    v.nmeta, 0, 0);
+			if (err)
+				goto done;
+		}
+	}
+
+	for (i = 0; i < nobj; i++) {
+		err = load_commit(&v, idset, ids[i], repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
