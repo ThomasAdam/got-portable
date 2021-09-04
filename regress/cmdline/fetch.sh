@@ -438,7 +438,7 @@ test_fetch_delete_branch() {
 		return 1
 	fi
 
-	got branch -r $testroot/repo -d foo
+	got branch -r $testroot/repo -d foo >/dev/null
 
 	got fetch -q -r $testroot/repo-clone
 	ret="$?"

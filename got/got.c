@@ -5773,7 +5773,7 @@ delete_branch(struct got_repository *repo, struct got_worktree *worktree,
 		goto done;
 	}
 
-	err = got_ref_delete(ref, repo);
+	err = delete_ref(repo, ref);
 done:
 	if (ref)
 		got_ref_close(ref);
