@@ -48,6 +48,7 @@
 #include "got_lib_object_parse.h"
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
+#include "got_lib_pkt.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -56,169 +57,6 @@
 struct got_object *indexed;
 static int chattygot;
 static struct got_object_id zhash = {.sha1={0}};
-
-static const struct got_error *
-readn(ssize_t *off, int fd, void *buf, size_t n)
-{
-	ssize_t r;
-
-	*off = 0;
-	while (*off != n) {
-		r = read(fd, buf + *off, n - *off);
-		if (r == -1)
-			return got_error_from_errno("read");
-		if (r == 0)
-			return NULL;
-		*off += r;
-	}
-	return NULL;
-}
-
-static const struct got_error *
-flushpkt(int fd)
-{
-	ssize_t w;
-
-	if (chattygot > 1)
-		fprintf(stderr, "%s: writepkt: 0000\n", getprogname());
-
-	w = write(fd, "0000", 4);
-	if (w == -1)
-		return got_error_from_errno("write");
-	if (w != 4)
-		return got_error(GOT_ERR_IO);
-	return NULL;
-}
-
-/*
- * Packet header contains a 4-byte hexstring which specifies the length
- * of data which follows.
- */
-static const struct got_error *
-read_pkthdr(int *datalen, int fd)
-{
-	static const struct got_error *err = NULL;
-	char lenstr[5];
-	long len;
-	char *e;
-	int n, i;
-	ssize_t r;
-
-	*datalen = 0;
-
-	err = readn(&r, fd, lenstr, 4);
-	if (err)
-		return err;
-	if (r == 0) {
-		/* implicit "0000" */
-		if (chattygot > 1)
-			fprintf(stderr, "%s: readpkt: 0000\n", getprogname());
-		return NULL;
-	}
-	if (r != 4)
-		return got_error_msg(GOT_ERR_BAD_PACKET,
-		    "wrong packet header length");
-
-	lenstr[4] = '\0';
-	for (i = 0; i < 4; i++) {
-		if (!isprint((unsigned char)lenstr[i]))
-			return got_error_msg(GOT_ERR_BAD_PACKET,
-			    "unprintable character in packet length field");
-	}
-	for (i = 0; i < 4; i++) {
-		if (!isxdigit((unsigned char)lenstr[i])) {
-			if (chattygot)
-				fprintf(stderr, "%s: bad length: '%s'\n",
-				    getprogname(), lenstr);
-			return got_error_msg(GOT_ERR_BAD_PACKET,
-			    "packet length not specified in hex");
-		}
-	}
-	errno = 0;
-	len = strtol(lenstr, &e, 16);
-	if (lenstr[0] == '\0' || *e != '\0')
-		return got_error(GOT_ERR_BAD_PACKET);
-	if (errno == ERANGE && (len == LONG_MAX || len == LONG_MIN))
-		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
-	if (len > INT_MAX || len < INT_MIN)
-		return got_error_msg(GOT_ERR_BAD_PACKET, "bad packet length");
-	n = len;
-	if (n == 0)
-		return NULL;
-	if (n <= 4)
-		return got_error_msg(GOT_ERR_BAD_PACKET, "packet too short");
-	n  -= 4;
-
-	*datalen = n;
-	return NULL;
-}
-
-static const struct got_error *
-readpkt(int *outlen, int fd, char *buf, int buflen)
-{
-	const struct got_error *err = NULL;
-	int datalen, i;
-	ssize_t n;
-
-	err = read_pkthdr(&datalen, fd);
-	if (err)
-		return err;
-
-	if (datalen > buflen)
-		return got_error(GOT_ERR_NO_SPACE);
-
-	err = readn(&n, fd, buf, datalen);
-	if (err)
-		return err;
-	if (n != datalen)
-		return got_error_msg(GOT_ERR_BAD_PACKET, "short packet");
-
-	if (chattygot > 1) {
-		fprintf(stderr, "%s: readpkt: %zd:\t", getprogname(), n);
-		for (i = 0; i < n; i++) {
-			if (isprint(buf[i]))
-				fputc(buf[i], stderr);
-			else
-				fprintf(stderr, "[0x%.2x]", buf[i]);
-		}
-		fputc('\n', stderr);
-	}
-
-	*outlen = n;
-	return NULL;
-}
-
-static const struct got_error *
-writepkt(int fd, char *buf, int nbuf)
-{
-	char len[5];
-	int i;
-	ssize_t w;
-
-	if (snprintf(len, sizeof(len), "%04x", nbuf + 4) >= sizeof(len))
-		return got_error(GOT_ERR_NO_SPACE);
-	w = write(fd, len, 4);
-	if (w == -1)
-		return got_error_from_errno("write");
-	if (w != 4)
-		return got_error(GOT_ERR_IO);
-	w = write(fd, buf, nbuf);
-	if (w == -1)
-		return got_error_from_errno("write");
-	if (w != nbuf)
-		return got_error(GOT_ERR_IO);
-	if (chattygot > 1) {
-		fprintf(stderr, "%s: writepkt: %s:\t", getprogname(), len);
-		for (i = 0; i < nbuf; i++) {
-			if (isprint(buf[i]))
-				fputc(buf[i], stderr);
-			else
-				fprintf(stderr, "[0x%.2x]", buf[i]);
-		}
-		fputc('\n', stderr);
-	}
-	return NULL;
-}
 
 static void
 match_remote_ref(struct got_pathlist_head *have_refs,
@@ -687,7 +525,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		goto done;
 	}
 	while (1) {
-		err = readpkt(&n, fd, buf, sizeof(buf));
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
 		if (err)
 			goto done;
 		if (n == 0)
@@ -851,13 +689,13 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		err = writepkt(fd, buf, n);
+		err = got_pkt_writepkt(fd, buf, n, chattygot);
 		if (err)
 			goto done;
 		sent_my_capabilites = 1;
 		nwant++;
 	}
-	err = flushpkt(fd);
+	err = got_pkt_flushpkt(fd, chattygot);
 	if (err)
 		goto done;
 
@@ -873,7 +711,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			err = got_error(GOT_ERR_NO_SPACE);
 			goto done;
 		}
-		err = writepkt(fd, buf, n);
+		err = got_pkt_writepkt(fd, buf, n, chattygot);
 		if (err)
 			goto done;
 		nhave++;
@@ -883,7 +721,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		struct got_object_id common_id;
 
 		/* The server should ACK the object IDs we need. */
-		err = readpkt(&n, fd, buf, sizeof(buf));
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
 		if (err)
 			goto done;
 		if (n >= 4 && strncmp(buf, "ERR ", 4) == 0) {
@@ -909,12 +747,12 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	}
 
 	n = snprintf(buf, sizeof(buf), "done\n");
-	err = writepkt(fd, buf, n);
+	err = got_pkt_writepkt(fd, buf, n, chattygot);
 	if (err)
 		goto done;
 
 	if (nhave == 0) {
-		err = readpkt(&n, fd, buf, sizeof(buf));
+		err = got_pkt_readpkt(&n, fd, buf, sizeof(buf), chattygot);
 		if (err)
 			goto done;
 		if (n != 4 || strncmp(buf, "NAK\n", n) != 0) {
@@ -936,7 +774,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 		int datalen = -1;
 
 		if (have_sidebands) {
-			err = read_pkthdr(&datalen, fd);
+			err = got_pkt_readhdr(&datalen, fd, chattygot);
 			if (err)
 				goto done;
 			if (datalen <= 0)
@@ -961,7 +799,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			datalen--; /* sideband ID has been read */
 			if (buf[0] == GOT_SIDEBAND_PACKFILE_DATA) {
 				/* Read packfile data. */
-				err = readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -970,7 +808,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					goto done;
 				}
 			} else if (buf[0] == GOT_SIDEBAND_PROGRESS_INFO) {
-				err = readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -983,7 +821,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 					goto done;
 				continue;
 			} else if (buf[0] == GOT_SIDEBAND_ERROR_INFO) {
-				err = readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -994,7 +832,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 				err = fetch_error(buf, r);
 				goto done;
 			} else if (buf[0] == 'A') {
-				err = readn(&r, fd, buf, datalen);
+				err = got_pkt_readn(&r, fd, buf, datalen);
 				if (err)
 					goto done;
 				if (r != datalen) {
@@ -1019,7 +857,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 			}
 		} else {
 			/* No sideband channel. Every byte is packfile data. */
-			err = readn(&r, fd, buf, sizeof buf);
+			err = got_pkt_readn(&r, fd, buf, sizeof buf);
 			if (err)
 				goto done;
 			if (r <= 0)
