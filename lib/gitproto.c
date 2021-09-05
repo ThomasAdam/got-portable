@@ -122,7 +122,7 @@ match_capability(char **my_capabilities, const char *capa,
 	    *my_capabilities != NULL ? *my_capabilities : "",
 	    mycapa->key,
 	    mycapa->value != NULL ? "=" : "",
-	    mycapa->value != NULL? mycapa->value : "") == -1)
+	    mycapa->value != NULL ? mycapa->value : "") == -1)
 		return got_error_from_errno("asprintf");
 
 	free(*my_capabilities);
