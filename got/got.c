@@ -1544,7 +1544,7 @@ cmd_clone(int argc, char *argv[])
 	else
 		usage_clone();
 
-	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
 	    &repo_name, uri);
 	if (error)
 		goto done;
@@ -2379,7 +2379,7 @@ cmd_fetch(int argc, char *argv[])
 		}
 	}
 
-	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
 	    &repo_name, remote->fetch_url);
 	if (error)
 		goto done;
@@ -7694,7 +7694,7 @@ cmd_send(int argc, char *argv[])
 		goto done;
 	}
 
-	error = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+	error = got_dial_parse_uri(&proto, &host, &port, &server_path,
 	    &repo_name, remote->send_url);
 	if (error)
 		goto done;

@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/queue.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -26,6 +27,7 @@
 #include <unistd.h>
 
 #include "got_error.h"
+#include "got_path.h"
 
 #include "got_lib_dial.h"
 
@@ -56,6 +58,132 @@ got_dial_apply_unveil(const char *proto)
 	}
 
 	return NULL;
+}
+
+static int
+hassuffix(char *base, char *suf)
+{
+	int nb, ns;
+
+	nb = strlen(base);
+	ns = strlen(suf);
+	if (ns <= nb && strcmp(base + (nb - ns), suf) == 0)
+		return 1;
+	return 0;
+}
+
+const struct got_error *
+got_dial_parse_uri(char **proto, char **host, char **port,
+    char **server_path, char **repo_name, const char *uri)
+{
+	const struct got_error *err = NULL;
+	char *s, *p, *q;
+	int n;
+
+	*proto = *host = *port = *server_path = *repo_name = NULL;
+
+	p = strstr(uri, "://");
+	if (!p) {
+		/* Try parsing Git's "scp" style URL syntax. */
+		*proto = strdup("ssh");
+		if (proto == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
+		}
+		s = (char *)uri;
+		q = strchr(s, ':');
+		if (q == NULL) {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+		/* No slashes allowed before first colon. */
+		p = strchr(s, '/');
+		if (p && q > p) {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+		*host = strndup(s, q - s);
+		if (*host == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		p = q + 1;
+	} else {
+		*proto = strndup(uri, p - uri);
+		if (proto == NULL) {
+			err = got_error_from_errno("strndup");
+			goto done;
+		}
+		s = p + 3;
+
+		p = strstr(s, "/");
+		if (p == NULL || strlen(p) == 1) {
+			err = got_error(GOT_ERR_PARSE_URI);
+			goto done;
+		}
+
+		q = memchr(s, ':', p - s);
+		if (q) {
+			*host = strndup(s, q - s);
+			if (*host == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+			*port = strndup(q + 1, p - (q + 1));
+			if (*port == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+		} else {
+			*host = strndup(s, p - s);
+			if (*host == NULL) {
+				err = got_error_from_errno("strndup");
+				goto done;
+			}
+		}
+	}
+
+	while (p[0] == '/' && p[1] == '/')
+		p++;
+	*server_path = strdup(p);
+	if (*server_path == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+	got_path_strip_trailing_slashes(*server_path);
+
+	p = strrchr(p, '/');
+	if (!p || strlen(p) <= 1) {
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
+	}
+	p++;
+	n = strlen(p);
+	if (n == 0) {
+		err = got_error(GOT_ERR_PARSE_URI);
+		goto done;
+	}
+	if (hassuffix(p, ".git"))
+		n -= 4;
+	*repo_name = strndup(p, (p + n) - p);
+	if (*repo_name == NULL) {
+		err = got_error_from_errno("strndup");
+		goto done;
+	}
+done:
+	if (err) {
+		free(*proto);
+		*proto = NULL;
+		free(*host);
+		*host = NULL;
+		free(*port);
+		*port = NULL;
+		free(*server_path);
+		*server_path = NULL;
+		free(*repo_name);
+		*repo_name = NULL;
+	}
+	return err;
 }
 
 const struct got_error *

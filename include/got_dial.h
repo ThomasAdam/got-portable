@@ -15,3 +15,5 @@
  */
 
 const struct got_error *got_dial_apply_unveil(const char *proto);
+const struct got_error *got_dial_parse_uri(char **proto, char **host,
+    char **port, char **server_path, char **repo_name, const char *uri);
