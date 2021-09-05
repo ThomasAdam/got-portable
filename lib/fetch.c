@@ -39,8 +39,6 @@
 #include <imsg.h>
 #include <time.h>
 #include <uuid.h>
-#include <netdb.h>
-#include <netinet/in.h>
 
 #include "got_error.h"
 #include "got_reference.h"
@@ -62,6 +60,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
+#include "got_lib_dial.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -87,126 +86,6 @@ hassuffix(char *base, char *suf)
 	return 0;
 }
 
-static const struct got_error *
-dial_ssh(pid_t *fetchpid, int *fetchfd, const char *host, const char *port,
-    const char *path, const char *direction, int verbosity)
-{
-	const struct got_error *error = NULL;
-	int pid, pfd[2];
-	char cmd[64];
-	char *argv[11];
-	int i = 0, j;
-
-	*fetchpid = -1;
-	*fetchfd = -1;
-
-	argv[i++] = GOT_FETCH_PATH_SSH;
-	if (port != NULL) {
-		argv[i++] = "-p";
-		argv[i++] = (char *)port;
-	}
-	if (verbosity == -1) {
-		argv[i++] = "-q";
-	} else {
-		/* ssh(1) allows up to 3 "-v" options. */
-		for (j = 0; j < MIN(3, verbosity); j++)
-			argv[i++] = "-v";
-	}
-	argv[i++] = "--";
-	argv[i++] = (char *)host;
-	argv[i++] = (char *)cmd;
-	argv[i++] = (char *)path;
-	argv[i++] = NULL;
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pfd) == -1)
-		return got_error_from_errno("socketpair");
-
-	pid = fork();
-	if (pid == -1) {
-		error = got_error_from_errno("fork");
-		close(pfd[0]);
-		close(pfd[1]);
-		return error;
-	} else if (pid == 0) {
-		int n;
-		if (close(pfd[1]) == -1)
-			err(1, "close");
-		if (dup2(pfd[0], 0) == -1)
-			err(1, "dup2");
-		if (dup2(pfd[0], 1) == -1)
-			err(1, "dup2");
-		n = snprintf(cmd, sizeof(cmd), "git-%s-pack", direction);
-		if (n < 0 || n >= ssizeof(cmd))
-			err(1, "snprintf");
-		if (execv(GOT_FETCH_PATH_SSH, argv) == -1)
-			err(1, "execv");
-		abort(); /* not reached */
-	} else {
-		if (close(pfd[0]) == -1)
-			return got_error_from_errno("close");
-		*fetchpid = pid;
-		*fetchfd = pfd[1];
-		return NULL;
-	}
-}
-
-static const struct got_error *
-dial_git(int *fetchfd, const char *host, const char *port, const char *path,
-    const char *direction)
-{
-	const struct got_error *err = NULL;
-	struct addrinfo hints, *servinfo, *p;
-	char *cmd = NULL;
-	int fd = -1, len, r, eaicode;
-
-	*fetchfd = -1;
-
-	if (port == NULL)
-		port = GOT_DEFAULT_GIT_PORT_STR;
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	eaicode = getaddrinfo(host, port, &hints, &servinfo);
-	if (eaicode) {
-		char msg[512];
-		snprintf(msg, sizeof(msg), "%s: %s", host,
-		    gai_strerror(eaicode));
-		return got_error_msg(GOT_ERR_ADDRINFO, msg);
-	}
-
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-		if ((fd = socket(p->ai_family, p->ai_socktype,
-		    p->ai_protocol)) == -1)
-			continue;
-		if (connect(fd, p->ai_addr, p->ai_addrlen) == 0) {
-			err = NULL;
-			break;
-		}
-		err = got_error_from_errno("connect");
-		close(fd);
-	}
-	if (p == NULL)
-		goto done;
-
-	if (asprintf(&cmd, "git-%s-pack %s", direction, path) == -1) {
-		err = got_error_from_errno("asprintf");
-		goto done;
-	}
-	len = 4 + strlen(cmd) + 1 + strlen("host=") + strlen(host) + 1;
-	r = dprintf(fd, "%04x%s%chost=%s%c", len, cmd, '\0', host, '\0');
-	if (r < 0)
-		err = got_error_from_errno("dprintf");
-done:
-	free(cmd);
-	if (err) {
-		if (fd != -1)
-			close(fd);
-	} else
-		*fetchfd = fd;
-	return err;
-}
-
 const struct got_error *
 got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
     const char *host, const char *port, const char *server_path, int verbosity)
@@ -217,10 +96,11 @@ got_fetch_connect(pid_t *fetchpid, int *fetchfd, const char *proto,
 	*fetchfd = -1;
 
 	if (strcmp(proto, "ssh") == 0 || strcmp(proto, "git+ssh") == 0)
-		err = dial_ssh(fetchpid, fetchfd, host, port, server_path,
-		    "upload", verbosity);
+		err = got_dial_ssh(fetchpid, fetchfd, host, port,
+		    server_path, GOT_DIAL_DIRECTION_FETCH, verbosity);
 	else if (strcmp(proto, "git") == 0)
-		err = dial_git(fetchfd, host, port, server_path, "upload");
+		err = got_dial_git(fetchfd, host, port, server_path,
+		    GOT_DIAL_DIRECTION_FETCH);
 	else if (strcmp(proto, "http") == 0 || strcmp(proto, "git+http") == 0)
 		err = got_error_path(proto, GOT_ERR_NOT_IMPL);
 	else

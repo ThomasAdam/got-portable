@@ -55,6 +55,7 @@
 #include "got_privsep.h"
 #include "got_opentemp.h"
 #include "got_gotconfig.h"
+#include "got_dial.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -1598,13 +1599,10 @@ cmd_clone(int argc, char *argv[])
 		}
 	}
 
-	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
-		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
-			error = got_error_from_errno2("unveil",
-			    GOT_FETCH_PATH_SSH);
-			goto done;
-		}
-	}
+	error = got_dial_apply_unveil(proto);
+	if (error)
+		goto done;
+
 	error = apply_unveil(repo_path, 0, NULL);
 	if (error)
 		goto done;
@@ -2408,13 +2406,10 @@ cmd_fetch(int argc, char *argv[])
 		goto done;
 	}
 
-	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
-		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
-			error = got_error_from_errno2("unveil",
-			    GOT_FETCH_PATH_SSH);
-			goto done;
-		}
-	}
+	error = got_dial_apply_unveil(proto);
+	if (error)
+		goto done;
+
 	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 	if (error)
 		goto done;
@@ -7726,13 +7721,10 @@ cmd_send(int argc, char *argv[])
 		goto done;
 	}
 
-	if (strcmp(proto, "git+ssh") == 0 || strcmp(proto, "ssh") == 0) {
-		if (unveil(GOT_FETCH_PATH_SSH, "x") != 0) {
-			error = got_error_from_errno2("unveil",
-			    GOT_FETCH_PATH_SSH);
-			goto done;
-		}
-	}
+	error = got_dial_apply_unveil(proto);
+	if (error)
+		goto done;
+
 	error = apply_unveil(got_repo_get_path(repo), 0, NULL);
 	if (error)
 		goto done;
