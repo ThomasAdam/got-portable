@@ -50,6 +50,7 @@
 #include "got_lib_privsep.h"
 #include "got_lib_pack.h"
 #include "got_lib_pkt.h"
+#include "got_lib_gitproto.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -58,92 +59,6 @@
 struct got_object *indexed;
 static int chattygot;
 
-static const struct got_error *
-tokenize_refline(char **tokens, char *line, int len, int maxtokens)
-{
-	const struct got_error *err = NULL;
-	char *p;
-	size_t i, n = 0;
-
-	for (i = 0; i < maxtokens; i++)
-		tokens[i] = NULL;
-
-	for (i = 0; n < len && i < maxtokens; i++) {
-		while (isspace(*line)) {
-			line++;
-			n++;
-		}
-		p = line;
-		while (*line != '\0' && n < len &&
-		    (!isspace(*line) || i == maxtokens - 1)) {
-			line++;
-			n++;
-		}
-		tokens[i] = strndup(p, line - p);
-		if (tokens[i] == NULL) {
-			err = got_error_from_errno("strndup");
-			goto done;
-		}
-		/* Skip \0 field-delimiter at end of token. */
-		while (line[0] == '\0' && n < len) {
-			line++;
-			n++;
-		}
-	}
-	if (i <= 2)
-		err = got_error(GOT_ERR_NOT_REF);
-done:
-	if (err) {
-		int j;
-		for (j = 0; j < i; j++) {
-			free(tokens[j]);
-			tokens[j] = NULL;
-		}
-	}
-	return err;
-}
-
-static const struct got_error *
-parse_refline(char **id_str, char **refname, char **server_capabilities,
-    char *line, int len)
-{
-	const struct got_error *err = NULL;
-	char *tokens[3];
-
-	err = tokenize_refline(tokens, line, len, nitems(tokens));
-	if (err)
-		return err;
-
-	if (tokens[0])
-		*id_str = tokens[0];
-	if (tokens[1])
-		*refname = tokens[1];
-	if (tokens[2]) {
-		char *p;
-		*server_capabilities = tokens[2];
-		p = strrchr(*server_capabilities, '\n');
-		if (p)
-			*p = '\0';
-	}
-
-	return NULL;
-}
-
-#define GOT_CAPA_AGENT			"agent"
-#define GOT_CAPA_OFS_DELTA		"ofs-delta"
-#define GOT_CAPA_SIDE_BAND_64K		"side-band-64k"
-#define GOT_CAPA_REPORT_STATUS		"report-status"
-#define GOT_CAPA_DELETE_REFS		"delete-refs"
-
-#define GOT_SIDEBAND_PACKFILE_DATA	1
-#define GOT_SIDEBAND_PROGRESS_INFO	2
-#define GOT_SIDEBAND_ERROR_INFO		3
-
-
-struct got_capability {
-	const char *key;
-	const char *value;
-};
 static const struct got_capability got_capabilities[] = {
 	{ GOT_CAPA_AGENT, "got/" GOT_VERSION_STR },
 	{ GOT_CAPA_OFS_DELTA, NULL },
@@ -153,67 +68,6 @@ static const struct got_capability got_capabilities[] = {
 	{ GOT_CAPA_REPORT_STATUS, NULL },
 	{ GOT_CAPA_DELETE_REFS, NULL },
 };
-
-static const struct got_error *
-match_capability(char **my_capabilities, const char *capa,
-    const struct got_capability *mycapa)
-{
-	char *equalsign;
-	char *s;
-
-	equalsign = strchr(capa, '=');
-	if (equalsign) {
-		if (strncmp(capa, mycapa->key, equalsign - capa) != 0)
-			return NULL;
-	} else {
-		if (strcmp(capa, mycapa->key) != 0)
-			return NULL;
-	}
-
-	if (asprintf(&s, "%s %s%s%s",
-	    *my_capabilities != NULL ? *my_capabilities : "",
-	    mycapa->key,
-	    mycapa->value != NULL ? "=" : "",
-	    mycapa->value != NULL? mycapa->value : "") == -1)
-		return got_error_from_errno("asprintf");
-
-	free(*my_capabilities);
-	*my_capabilities = s;
-	return NULL;
-}
-
-static const struct got_error *
-match_capabilities(char **my_capabilities, char *server_capabilities)
-{
-	const struct got_error *err = NULL;
-	char *capa;
-	size_t i;
-
-	*my_capabilities = NULL;
-	do {
-		capa = strsep(&server_capabilities, " ");
-		for (i = 0; capa != NULL && i < nitems(got_capabilities); i++) {
-			err = match_capability(my_capabilities,
-			    capa, &got_capabilities[i]);
-			if (err)
-				goto done;
-		}
-	} while (capa);
-
-	if (*my_capabilities == NULL) {
-		*my_capabilities = strdup("");
-		if (*my_capabilities == NULL) {
-			err = got_error_from_errno("strdup");
-			goto done;
-		}
-	}
-done:
-	if (err) {
-		free(*my_capabilities);
-		*my_capabilities = NULL;
-	}
-	return err;
-}
 
 static const struct got_error *
 send_upload_progress(struct imsgbuf *ibuf, off_t bytes)
@@ -500,16 +354,17 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			err = send_error(&buf[4], n - 4);
 			goto done;
 		}
-		err = parse_refline(&id_str, &refname, &server_capabilities,
-		    buf, n);
+		err = got_gitproto_parse_refline(&id_str, &refname,
+		    &server_capabilities, buf, n);
 		if (err)
 			goto done;
 		if (is_firstpkt) {
 			if (chattygot && server_capabilities[0] != '\0')
 				fprintf(stderr, "%s: server capabilities: %s\n",
 				    getprogname(), server_capabilities);
-			err = match_capabilities(&my_capabilities,
-			    server_capabilities);
+			err = got_gitproto_match_capabilities(&my_capabilities,
+			    NULL, server_capabilities, got_capabilities,
+			    nitems(got_capabilities));
 			if (err)
 				goto done;
 			if (chattygot)
