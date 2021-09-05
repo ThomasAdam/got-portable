@@ -868,9 +868,9 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 				 * Matched an on-disk path inside repository
 				 * database. Treat input as repository-relative.
 				 */
-				 free(path);
-				 path = canonpath;
-				 canonpath = NULL;
+				free(path);
+				path = canonpath;
+				canonpath = NULL;
 			} else {
 				char *child;
 				/* Strip common prefix with repository path. */
@@ -886,9 +886,9 @@ got_repo_map_path(char **in_repo_path, struct got_repository *repo,
 			 * Matched unrelated on-disk path.
 			 * Treat input as repository-relative.
 			 */
-			 free(path);
-			 path = canonpath;
-			 canonpath = NULL;
+			free(path);
+			path = canonpath;
+			canonpath = NULL;
 		}
 	}
 

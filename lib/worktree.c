@@ -2497,8 +2497,8 @@ bump_base_commit_id(void *arg, struct got_fileindex_entry *ie)
 
 static const struct got_error *
 bump_base_commit_id_everywhere(struct got_worktree *worktree,
-     struct got_fileindex *fileindex,
-     got_worktree_checkout_cb progress_cb, void *progress_arg)
+    struct got_fileindex *fileindex,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	struct bump_base_commit_id_arg bbc_arg;
 
@@ -3123,11 +3123,11 @@ check_mixed_commits(void *arg, struct got_fileindex_entry *ie)
 {
 	struct got_worktree *worktree = arg;
 
- 	/* Reject merges into a work tree with mixed base commits. */
- 	if (got_fileindex_entry_has_commit(ie) &&
+	/* Reject merges into a work tree with mixed base commits. */
+	if (got_fileindex_entry_has_commit(ie) &&
 	    memcmp(ie->commit_sha1, worktree->base_commit_id->sha1,
 	    SHA1_DIGEST_LENGTH) != 0)
- 		return got_error(GOT_ERR_MIXED_COMMITS);
+		return got_error(GOT_ERR_MIXED_COMMITS);
 
 	return NULL;
 }
@@ -4252,7 +4252,7 @@ static const struct got_error *
 copy_change(FILE *f1, FILE *f2, int *line_cur1, int *line_cur2,
     int start_old, int end_old, int start_new, int end_new,
     FILE *outfile, FILE *rejectfile)
- {
+{
 	const struct got_error *err;
 
 	/* Copy old file's lines leading up to patch. */
@@ -6713,7 +6713,7 @@ const struct got_error *
 got_worktree_rebase_abort(struct got_worktree *worktree,
     struct got_fileindex *fileindex, struct got_repository *repo,
     struct got_reference *new_base_branch,
-     got_worktree_checkout_cb progress_cb, void *progress_arg)
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err, *unlockerr, *sync_err;
 	struct got_reference *resolved = NULL;

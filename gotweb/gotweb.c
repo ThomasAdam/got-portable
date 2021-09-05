@@ -2057,7 +2057,7 @@ gw_parse_querystring(struct gw_trans *gw_trans)
 			return error;
 		}
 
- 		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
+		if ((p = gw_trans->gw_req->fieldmap[KEY_COMMIT_ID])) {
 			if (asprintf(&gw_trans->commit_id, "%s",
 			    p->parsed.s) == -1)
 				return got_error_from_errno("asprintf");
@@ -2887,7 +2887,7 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, id1, id2,
-		   "", "", 3, 0, 0, gw_trans->repo, f);
+		    "", "", 3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, id1, id2,

@@ -189,16 +189,16 @@ ref_list	: xref optnl			{ $$ = $1; }
 		}
 		;
 remoteopts2	: remoteopts2 remoteopts1 nl
-	   	| remoteopts1 optnl
+		| remoteopts1 optnl
 		;
 remoteopts1	: REPOSITORY STRING {
-	   		remote->repository = $2;
-	   	}
-	   	| SERVER STRING {
-	   		remote->server = $2;
+			remote->repository = $2;
+		}
+		| SERVER STRING {
+			remote->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->protocol = $2;
+			remote->protocol = $2;
 		}
 		| MIRROR_REFERENCES boolean {
 			remote->mirror_references = $2;
@@ -241,21 +241,21 @@ remoteopts1	: REPOSITORY STRING {
 				YYERROR;
 			}
 		} '{' optnl sendempty '}'
-	   	;
+		;
 fetchempty	: /* empty */
 		| fetchopts2
 		;
 fetchopts2	: fetchopts2 fetchopts1 nl
-	   	| fetchopts1 optnl
+		| fetchopts1 optnl
 		;
 fetchopts1	: REPOSITORY STRING {
-	   		remote->fetch_config->repository = $2;
-	   	}
-	   	| SERVER STRING {
-	   		remote->fetch_config->server = $2;
+			remote->fetch_config->repository = $2;
+		}
+		| SERVER STRING {
+			remote->fetch_config->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->fetch_config->protocol = $2;
+			remote->fetch_config->protocol = $2;
 		}
 		| PORT portplain {
 			remote->fetch_config->port = $2;
@@ -263,21 +263,21 @@ fetchopts1	: REPOSITORY STRING {
 		| BRANCH branch {
 			remote->fetch_config->branch = $2;
 		}
-	   	;
+		;
 sendempty	: /* empty */
 		| sendopts2
 		;
 sendopts2	: sendopts2 sendopts1 nl
-	   	| sendopts1 optnl
+		| sendopts1 optnl
 		;
 sendopts1	: REPOSITORY STRING {
-	   		remote->send_config->repository = $2;
-	   	}
-	   	| SERVER STRING {
-	   		remote->send_config->server = $2;
+			remote->send_config->repository = $2;
+		}
+		| SERVER STRING {
+			remote->send_config->server = $2;
 		}
 		| PROTOCOL STRING {
-	   		remote->send_config->protocol = $2;
+			remote->send_config->protocol = $2;
 		}
 		| PORT portplain {
 			remote->send_config->port = $2;
@@ -285,7 +285,7 @@ sendopts1	: REPOSITORY STRING {
 		| BRANCH branch {
 			remote->send_config->branch = $2;
 		}
-	   	;
+		;
 remote		: REMOTE STRING {
 			static const struct got_error* error;
 
@@ -302,7 +302,7 @@ remote		: REMOTE STRING {
 		}
 		;
 author		: AUTHOR STRING {
-	   		gotconfig.author = $2;
+			gotconfig.author = $2;
 		}
 		;
 optnl		: '\n' optnl

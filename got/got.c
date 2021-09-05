@@ -7818,7 +7818,7 @@ cmd_send(int argc, char *argv[])
 		} else
 			ref = head_ref;
 		error = got_pathlist_append(&branches, got_ref_get_name(ref),
-		   NULL);
+		    NULL);
 		if (error)
 			goto done;
 		nbranches++;
@@ -8615,8 +8615,8 @@ process_backup_refs(const char *backup_ref_prefix, const char *wanted_branch_nam
 				    old_commit_id, repo);
 			} else {
 				err = print_backup_ref(branch_name, refname,
-				   old_commit_id, old_commit, refs_idmap,
-				   repo);
+				    old_commit_id, old_commit, refs_idmap,
+				    repo);
 			}
 			if (err)
 				break;

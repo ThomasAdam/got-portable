@@ -1074,8 +1074,8 @@ cmd_cleanup(int argc, char *argv[])
 	cpa.dry_run = dry_run;
 	cpa.verbosity = verbosity;
 	error = got_repo_purge_unreferenced_loose_objects(repo,
-	   &size_before, &size_after, &npacked, dry_run, ignore_mtime,
-	   cleanup_progress, &cpa, check_cancelled, NULL);
+	    &size_before, &size_after, &npacked, dry_run, ignore_mtime,
+	    cleanup_progress, &cpa, check_cancelled, NULL);
 	if (cpa.printed_something)
 		printf("\n");
 	if (error)

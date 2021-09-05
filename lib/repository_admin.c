@@ -172,8 +172,8 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 	packfd = -1;
 
 	err = get_reflist_object_ids(&ours, &nours,
-	   (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
-	   include_refs, repo, cancel_cb, cancel_arg);
+	    (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
+	    include_refs, repo, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 
@@ -184,9 +184,9 @@ got_repo_pack_objects(FILE **packfile, struct got_object_id **pack_hash,
 
 	if (!TAILQ_EMPTY(exclude_refs)) {
 		err = get_reflist_object_ids(&theirs, &ntheirs,
-		   (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
-		   exclude_refs, repo,
-		   cancel_cb, cancel_arg);
+		    (1 << GOT_OBJ_TYPE_COMMIT) | (1 << GOT_OBJ_TYPE_TAG),
+		    exclude_refs, repo,
+		    cancel_cb, cancel_arg);
 		if (err)
 			goto done;
 	}
@@ -450,29 +450,29 @@ got_repo_find_pack(FILE **packfile, struct got_object_id **pack_hash,
 
 	if (strncmp(p, "pack-", 5) != 0) {
 		err = got_error_fmt(GOT_ERR_BAD_PATH,
-		   "'%s' is not a valid pack file name",
-		   packfile_name);
+		    "'%s' is not a valid pack file name",
+		    packfile_name);
 		goto done;
 	}
 	p += 5;
 	dot = strchr(p, '.');
 	if (dot == NULL) {
 		err = got_error_fmt(GOT_ERR_BAD_PATH,
-		   "'%s' is not a valid pack file name",
-		   packfile_name);
+		    "'%s' is not a valid pack file name",
+		    packfile_name);
 		goto done;
 	}
 	if (strcmp(dot + 1, "pack") != 0) {
 		err = got_error_fmt(GOT_ERR_BAD_PATH,
-		   "'%s' is not a valid pack file name",
-		   packfile_name);
+		    "'%s' is not a valid pack file name",
+		    packfile_name);
 		goto done;
 	}
 	*dot = '\0';
 	if (!got_parse_sha1_digest(id.sha1, p)) {
 		err = got_error_fmt(GOT_ERR_BAD_PATH,
-		   "'%s' is not a valid pack file name",
-		   packfile_name);
+		    "'%s' is not a valid pack file name",
+		    packfile_name);
 		goto done;
 	}
 
@@ -736,8 +736,8 @@ preserve_loose_object(struct got_object_idset *loose_ids,
 	 * we do in fact have a valid packed copy of the object. Otherwise
 	 * we should not delete the loose representation of this object.
 	 */
-	 err = got_object_open_packed(&obj, id, repo);
-	 if (err == NULL) {
+	err = got_object_open_packed(&obj, id, repo);
+	if (err == NULL) {
 		got_object_close(obj);
 		/*
 		 * The object is referenced and packed.

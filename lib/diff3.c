@@ -911,7 +911,7 @@ duplicate(int *dpl, int j, struct line_range *r1, struct line_range *r2,
 				    SEEK_CUR) == -1)
 					return got_ferror(d3s->fp[1],
 						GOT_ERR_IO);
- 				/* original lines end here */
+				/* original lines end here */
 				d3s->de[j + 1].oldo.to = off + orig_line_len;
 				err = repos(nchar, d3s);
 				if (err)
@@ -1014,8 +1014,8 @@ edscript(int n, struct diff3_state *d3s)
 			    GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
 				return err;
- 		} else {
- 			err = diff_output(d3s->diffbuf, "%da\n%s\n",
+		} else {
+			err = diff_output(d3s->diffbuf, "%da\n%s\n",
 			    d3s->de[n].old.to -1, GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
 				return err;

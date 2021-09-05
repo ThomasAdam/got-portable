@@ -105,7 +105,7 @@ csum_output(struct got_inflate_checksum *csum, const char *buf, size_t len)
 
 const struct got_error *
 got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
-   size_t *consumed)
+    size_t *consumed)
 {
 	size_t last_total_out = zb->z.total_out;
 	size_t last_total_in = zb->z.total_in;

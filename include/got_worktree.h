@@ -420,7 +420,7 @@ const struct got_error *got_worktree_get_histedit_script_path(char **,
  */
 const struct got_error *
 got_worktree_integrate_prepare(struct got_fileindex **,
-   struct got_reference **, struct got_reference **,
+    struct got_reference **, struct got_reference **,
     struct got_worktree *, const char *, struct got_repository *);
 
 /*

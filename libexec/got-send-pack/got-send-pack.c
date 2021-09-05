@@ -541,7 +541,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			goto done;
 		} else if (strncmp(buf, "ok ", 3) == 0) {
 			err = send_ref_status(ibuf, buf + 3, 1,
-			   refs, delete_refs);
+			    refs, delete_refs);
 			if (err)
 				goto done;
 		} else if (strncmp(buf, "ng ", 3) == 0) {

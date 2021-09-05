@@ -48,7 +48,7 @@ struct got_repository {
 	int pack_cache_size;
 
 	/* Handles to child processes for reading loose objects. */
-	 struct got_privsep_child privsep_children[5];
+	struct got_privsep_child privsep_children[5];
 #define GOT_REPO_PRIVSEP_CHILD_OBJECT	0
 #define GOT_REPO_PRIVSEP_CHILD_COMMIT	1
 #define GOT_REPO_PRIVSEP_CHILD_TREE	2

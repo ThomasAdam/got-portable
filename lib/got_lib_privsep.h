@@ -515,7 +515,7 @@ const struct got_error *got_privsep_recv_fetch_progress(int *,
     struct got_object_id **, char **, struct got_pathlist_head *, char **,
     off_t *, uint8_t *, struct imsgbuf *);
 const struct got_error *got_privsep_send_send_req(struct imsgbuf *, int,
-   struct got_pathlist_head *, struct got_pathlist_head *, int);
+    struct got_pathlist_head *, struct got_pathlist_head *, int);
 const struct got_error *got_privsep_recv_send_remote_refs(
     struct got_pathlist_head *, struct imsgbuf *);
 const struct got_error *got_privsep_send_packfd(struct imsgbuf *, int);

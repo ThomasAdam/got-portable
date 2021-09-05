@@ -560,9 +560,9 @@ got_privsep_send_obj(struct imsgbuf *ibuf, struct got_object *obj)
 
 const struct got_error *
 got_privsep_send_fetch_req(struct imsgbuf *ibuf, int fd,
-   struct got_pathlist_head *have_refs, int fetch_all_branches,
-   struct got_pathlist_head *wanted_branches,
-   struct got_pathlist_head *wanted_refs, int list_refs_only, int verbosity)
+    struct got_pathlist_head *have_refs, int fetch_all_branches,
+    struct got_pathlist_head *wanted_branches,
+    struct got_pathlist_head *wanted_refs, int list_refs_only, int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
@@ -904,9 +904,9 @@ send_send_ref(const char *name, size_t name_len, struct got_object_id *id,
 
 const struct got_error *
 got_privsep_send_send_req(struct imsgbuf *ibuf, int fd,
-   struct got_pathlist_head *have_refs,
-   struct got_pathlist_head *delete_refs,
-   int verbosity)
+    struct got_pathlist_head *have_refs,
+    struct got_pathlist_head *delete_refs,
+    int verbosity)
 {
 	const struct got_error *err = NULL;
 	struct got_pathlist_entry *pe;
@@ -2619,7 +2619,7 @@ done:
 
 const struct got_error *
 got_privsep_send_commit_traversal_request(struct imsgbuf *ibuf,
-     struct got_object_id *id, int idx, const char *path)
+    struct got_object_id *id, int idx, const char *path)
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;

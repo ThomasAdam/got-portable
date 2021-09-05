@@ -447,7 +447,7 @@ done:
 
 const struct got_error *
 got_ref_open(struct got_reference **ref, struct got_repository *repo,
-   const char *refname, int lock)
+    const char *refname, int lock)
 {
 	const struct got_error *err = NULL;
 	char *path_refs = NULL;
