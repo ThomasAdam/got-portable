@@ -17,8 +17,6 @@
 
 #define GOT_SEND_DEFAULT_REMOTE_NAME	"origin"
 
-#define GOT_SEND_PKTMAX	65536
-
 /*
  * Attempt to open a connection to a server using the provided protocol
  * scheme, hostname port number (as a string) and server-side path.

@@ -325,7 +325,7 @@ send_pack(int fd, struct got_pathlist_head *refs,
     struct got_pathlist_head *delete_refs, struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	char buf[GOT_FETCH_PKTMAX];
+	char buf[GOT_PKT_MAX];
 	unsigned char zero_id[SHA1_DIGEST_LENGTH] = { 0 };
 	char old_hashstr[SHA1_DIGEST_STRING_LENGTH];
 	char new_hashstr[SHA1_DIGEST_STRING_LENGTH];

@@ -61,6 +61,7 @@
 #include "got_lib_object_cache.h"
 #include "got_lib_repository.h"
 #include "got_lib_dial.h"
+#include "got_lib_pkt.h"
 
 #ifndef nitems
 #define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -452,7 +453,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	npackfd = -1;
 
 	packfile_size = 0;
-	progress = calloc(GOT_FETCH_PKTMAX, 1);
+	progress = calloc(GOT_PKT_MAX, 1);
 	if (progress == NULL) {
 		err = got_error_from_errno("calloc");
 		goto done;
@@ -488,7 +489,7 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 			 * partial lines of progress output to the callback.
 			 */
 			if (strlcat(progress, server_progress,
-			    GOT_FETCH_PKTMAX) >= GOT_FETCH_PKTMAX) {
+			    GOT_PKT_MAX) >= GOT_PKT_MAX) {
 				progress[0] = '\0'; /* discard */
 				continue;
 			}
@@ -509,9 +510,9 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 				if (err)
 					break;
 				n = strlen(progress);
-				if (n < GOT_FETCH_PKTMAX - 1) {
+				if (n < GOT_PKT_MAX - 1) {
 					memmove(progress, &progress[n + 1],
-					    GOT_FETCH_PKTMAX - n - 1);
+					    GOT_PKT_MAX - n - 1);
 				} else
 					progress[0] = '\0';
 			}

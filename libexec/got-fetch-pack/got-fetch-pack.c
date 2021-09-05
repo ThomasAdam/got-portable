@@ -308,7 +308,7 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
     struct imsgbuf *ibuf)
 {
 	const struct got_error *err = NULL;
-	char buf[GOT_FETCH_PKTMAX];
+	char buf[GOT_PKT_MAX];
 	char hashstr[SHA1_DIGEST_STRING_LENGTH];
 	struct got_object_id *have, *want;
 	int is_firstpkt = 1, nref = 0, refsz = 16;

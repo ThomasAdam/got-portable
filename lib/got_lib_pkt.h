@@ -15,6 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define GOT_PKT_MAX	65536
+
 const struct got_error *got_pkt_readn(ssize_t *off, int fd, void *buf,
     size_t n);
 const struct got_error *got_pkt_flushpkt(int fd, int chattygot);

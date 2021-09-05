@@ -16,8 +16,6 @@
 
 #define GOT_FETCH_DEFAULT_REMOTE_NAME	"origin"
 
-#define GOT_FETCH_PKTMAX	65536
-
 /*
  * Attempt to parse a URI into the following parts:
  * A protocol scheme, hostname, port number (as a string), path on server,
