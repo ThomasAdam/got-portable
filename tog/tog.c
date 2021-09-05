@@ -2387,7 +2387,8 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 	struct tog_log_view_state *s = &view->state.log;
 	struct tog_view *diff_view = NULL, *tree_view = NULL;
 	struct tog_view *ref_view = NULL;
-	int begin_x = 0;
+	struct commit_queue_entry *entry;
+	int begin_x = 0, n;
 
 	if (s->thread_args.load_all) {
 		if (ch == KEY_BACKSPACE)
@@ -2459,8 +2460,16 @@ input_log_view(struct tog_view **new_view, struct tog_view *view, int ch)
 			return trigger_log_thread(view, 0);
 		}
 
-		log_scroll_down(view, s->commits.ncommits);
-		s->selected = MIN(view->nlines - 2, s->commits.ncommits - 1);
+		s->selected = 0;
+		entry = TAILQ_LAST(&s->commits.head, commit_queue_head);
+		for (n = 0; n < view->nlines - 1; n++) {
+			if (entry == NULL)
+				break;
+			s->first_displayed_entry = entry;
+			entry = TAILQ_PREV(entry, commit_queue_head, entry);
+		}
+		if (n > 0)
+			s->selected = n - 1;
 		select_commit(s);
 		break;
 	}
