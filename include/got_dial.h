@@ -14,6 +14,20 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * Apply any unveil(2) operations required to support the given protocol.
+ * This function must be called during initialization of the main program
+ * if any got_dial funcionality will be used.
+ */
 const struct got_error *got_dial_apply_unveil(const char *proto);
+
+/*
+ * Attempt to parse a URI into the following parts:
+ * A protocol scheme, hostname, port number (as a string), path on server,
+ * and a repository name. If the URI lacks some of this information return
+ * default values where applicable.
+ * The results of this function must be passed to other functions below.
+ * The caller should dispose of the returned values with free(3).
+ */
 const struct got_error *got_dial_parse_uri(char **proto, char **host,
     char **port, char **server_path, char **repo_name, const char *uri);
