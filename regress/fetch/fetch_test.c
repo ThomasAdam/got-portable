@@ -31,6 +31,7 @@
 #include "got_object.h"
 #include "got_path.h"
 #include "got_fetch.h"
+#include "got_dial.h"
 
 #include "got_lib_object_idset.h"
 #include "got_lib_sha1.h"
@@ -138,7 +139,7 @@ fetch_parse_uri(void)
 		const char *expected_repo_name = test_data[i].repo_name;
 		char *proto, *host, *port, *server_path, *repo_name;
 
-		err = got_fetch_parse_uri(&proto, &host, &port, &server_path,
+		err = got_dial_parse_uri(&proto, &host, &port, &server_path,
 		    &repo_name, uri);
 		if (err && err->code != test_data[i].errcode) {
 			test_printf("%d: error code %d; expected %d\n",
