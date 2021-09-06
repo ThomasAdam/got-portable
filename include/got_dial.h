@@ -15,7 +15,8 @@
  */
 
 /*
- * Apply any unveil(2) operations required to support the given protocol.
+ * Apply any unveil(2) operations required to support the given protocol,
+ * as obtained from the 'proto' output parameter of got_dial_parse_uri().
  * This function must be called during initialization of the main program
  * if got_fetch.h or got_send.h funcionality will be used.
  */
