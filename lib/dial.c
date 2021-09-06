@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include <assert.h>
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,10 @@
 #include "got_path.h"
 
 #include "got_lib_dial.h"
+
+#ifndef nitems
+#define nitems(_a) (sizeof((_a)) / sizeof((_a)[0]))
+#endif
 
 #ifndef ssizeof
 #define ssizeof(_x) ((ssize_t)(sizeof(_x)))
@@ -216,6 +221,7 @@ got_dial_ssh(pid_t *newpid, int *newfd, const char *host,
 	argv[i++] = (char *)cmd;
 	argv[i++] = (char *)path;
 	argv[i++] = NULL;
+	assert(i <= nitems(argv));
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pfd) == -1)
 		return got_error_from_errno("socketpair");
