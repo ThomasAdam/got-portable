@@ -291,8 +291,17 @@ cmd_info(int argc, char *argv[])
 		}
 		got_gotconfig_get_remotes(&nremotes, &remotes, gotconfig);
 		for (i = 0; i < nremotes; i++) {
-			printf("remote \"%s\": %s\n", remotes[i].name,
-			    remotes[i].fetch_url);
+			const char *fetch_url = remotes[i].fetch_url;
+			const char *send_url = remotes[i].send_url;
+			if (strcmp(fetch_url, send_url) == 0) {
+				printf("remote \"%s\": %s\n", remotes[i].name,
+				    remotes[i].fetch_url);
+			} else {
+				printf("remote \"%s\" (fetch): %s\n",
+				    remotes[i].name, remotes[i].fetch_url);
+				printf("remote \"%s\" (send): %s\n",
+				    remotes[i].name, remotes[i].send_url);
+			}
 		}
 	}
 
