@@ -27,7 +27,6 @@ const struct got_error *got_dial_apply_unveil(const char *proto);
  * A protocol scheme, hostname, port number (as a string), path on server,
  * and a repository name. If the URI lacks some of this information return
  * default values where applicable.
- * The results of this function must be passed to other functions below.
  * The caller should dispose of the returned values with free(3).
  */
 const struct got_error *got_dial_parse_uri(char **proto, char **host,
