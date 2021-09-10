@@ -1091,7 +1091,7 @@ EOF
 }
 
 test_fetch_delete_remote_refs() {
-	local testroot=`test_init fetch_basic`
+	local testroot=`test_init fetch_delete_remote_refs`
 	local testurl=ssh://127.0.0.1/$testroot
 	local commit_id=`git_show_head $testroot/repo`
 
