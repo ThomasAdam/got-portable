@@ -2020,8 +2020,11 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 
 	TAILQ_FOREACH(re, &my_refs, entry) {
 		const char *refname = got_ref_get_name(re->ref);
+		const char *their_refname;
 
-		if (!remote->mirror_references) {
+		if (remote->mirror_references) {
+			their_refname = refname;
+		} else {
 			if (strncmp(refname, remote_namespace,
 			    strlen(remote_namespace)) == 0) {
 				if (strcmp(refname + strlen(remote_namespace),
@@ -2034,17 +2037,19 @@ delete_missing_refs(struct got_pathlist_head *their_refs,
 				}
 			} else if (strncmp(refname, "refs/tags/", 10) != 0)
 				continue;
-		}
 
+			their_refname = local_refname;
+		}
+	
 		TAILQ_FOREACH(pe, their_refs, entry) {
-			if (strcmp(local_refname, pe->path) == 0)
+			if (strcmp(their_refname, pe->path) == 0)
 				break;
 		}
 		if (pe != NULL)
 			continue;
 
 		TAILQ_FOREACH(pe, their_symrefs, entry) {
-			if (strcmp(local_refname, pe->path) == 0)
+			if (strcmp(their_refname, pe->path) == 0)
 				break;
 		}
 		if (pe != NULL)
