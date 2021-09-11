@@ -77,6 +77,7 @@
 /include/got_blame.h
 /include/got_cancel.h
 /include/got_commit_graph.h
+/include/got_dial.h
 /include/got_diff.h
 /include/got_error.h
 /include/got_fetch.h
@@ -102,6 +103,7 @@
 /lib/delta.c
 /lib/delta_cache.c
 /lib/deltify.c
+/lib/dial.c
 /lib/diff.c
 /lib/diff3.c
 /lib/diff_atomize_text.c
@@ -121,13 +123,16 @@
 /lib/fetch.c
 /lib/fileindex.c
 /lib/gitconfig.c
+/lib/gitproto.c
 /lib/got_lib_deflate.h
 /lib/got_lib_delta.h
 /lib/got_lib_delta_cache.h
 /lib/got_lib_deltify.h
+/lib/got_lib_dial.h
 /lib/got_lib_diff.h
 /lib/got_lib_fileindex.h
 /lib/got_lib_gitconfig.h
+/lib/got_lib_gitproto.h
 /lib/got_lib_gotconfig.h
 /lib/got_lib_inflate.h
 /lib/got_lib_lockfile.h
@@ -139,6 +144,7 @@
 /lib/got_lib_object_parse.h
 /lib/got_lib_pack.h
 /lib/got_lib_pack_create.h
+/lib/got_lib_pkt.h
 /lib/got_lib_privsep.h
 /lib/got_lib_repository.h
 /lib/got_lib_sha1.h
@@ -155,6 +161,7 @@
 /lib/pack.c
 /lib/pack_create.c
 /lib/path.c
+/lib/pkt.c
 /lib/privsep.c
 /lib/rcsutil.c
 /lib/rcsutil.h
