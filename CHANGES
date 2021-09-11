@@ -1,3 +1,13 @@
+* got 0.58; 2021-09-11
+- tog: support navigating to first/last line of tree and ref views (naddy)
+- tog: jump directly to first log item instead of traversing the list (naddy)
+- tog: when jumping to bottom of the log view, go from tail backwards (naddy)
+- make "got branch -d" print reference name and value (naddy)
+- move code duplicated by got-send-pack and got-fetch-pack to common files
+- assert against accidentally overflowing argv[] in got_dial_ssh() (naddy)
+- make 'gotadmin info' display separate send/fetch URLs if they differ
+- fix a null-pointer deref in 'got fetch -d' (reported by Omar Polo)
+
 * got 0.57; 2021-09-03
 - remove superfluous strdup(3) from parse.y files (Martin Vahlensieck)
 - adapt regress tests which handle UTC dates (naddy)
