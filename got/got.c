@@ -2637,7 +2637,8 @@ __dead static void
 usage_checkout(void)
 {
 	fprintf(stderr, "usage: %s checkout [-E] [-b branch] [-c commit] "
-	    "[-p prefix] repository-path [worktree-path]\n", getprogname());
+	    "[-p prefix] [-q] repository-path [worktree-path]\n",
+	    getprogname());
 	exit(1);
 }
 
@@ -2654,6 +2655,7 @@ show_worktree_base_ref_warning(void)
 struct got_checkout_progress_arg {
 	const char *worktree_path;
 	int had_base_commit_ref_error;
+	int verbosity;
 };
 
 static const struct got_error *
@@ -2673,7 +2675,9 @@ checkout_progress(void *arg, unsigned char status, const char *path)
 	while (path[0] == '/')
 		path++;
 
-	printf("%c  %s/%s\n", status, a->worktree_path, path);
+	if (a->verbosity >= 0)
+		printf("%c  %s/%s\n", status, a->worktree_path, path);
+
 	return NULL;
 }
 
@@ -2827,13 +2831,13 @@ cmd_checkout(int argc, char *argv[])
 	const char *branch_name = GOT_REF_HEAD;
 	char *commit_id_str = NULL;
 	char *cwd = NULL;
-	int ch, same_path_prefix, allow_nonempty = 0;
+	int ch, same_path_prefix, allow_nonempty = 0, verbosity = 0;
 	struct got_pathlist_head paths;
 	struct got_checkout_progress_arg cpa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "b:c:Ep:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:c:Ep:q")) != -1) {
 		switch (ch) {
 		case 'b':
 			branch_name = optarg;
@@ -2848,6 +2852,9 @@ cmd_checkout(int argc, char *argv[])
 			break;
 		case 'p':
 			path_prefix = optarg;
+			break;
+		case 'q':
+			verbosity = -1;
 			break;
 		default:
 			usage_checkout();
@@ -3001,6 +3008,7 @@ cmd_checkout(int argc, char *argv[])
 		goto done;
 	cpa.worktree_path = worktree_path;
 	cpa.had_base_commit_ref_error = 0;
+	cpa.verbosity = verbosity;
 	error = got_worktree_checkout_files(worktree, &paths, repo,
 	    checkout_progress, &cpa, check_cancelled, NULL);
 	if (error != NULL)
@@ -3023,6 +3031,7 @@ struct got_update_progress_arg {
 	int conflicts;
 	int obstructed;
 	int not_updated;
+	int verbosity;
 };
 
 void
@@ -3044,7 +3053,8 @@ print_update_progress_stats(struct got_update_progress_arg *upa)
 __dead static void
 usage_update(void)
 {
-	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [path ...]\n",
+	fprintf(stderr, "usage: %s update [-b branch] [-c commit] [-q] "
+	    "[path ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -3073,7 +3083,9 @@ update_progress(void *arg, unsigned char status, const char *path)
 
 	while (path[0] == '/')
 		path++;
-	printf("%c  %s\n", status, path);
+	if (upa->verbosity >= 0)
+		printf("%c  %s\n", status, path);
+
 	return NULL;
 }
 
@@ -3202,12 +3214,12 @@ cmd_update(int argc, char *argv[])
 	struct got_reference *head_ref = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
-	int ch;
+	int ch, verbosity = 0;
 	struct got_update_progress_arg upa;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "b:c:")) != -1) {
+	while ((ch = getopt(argc, argv, "b:c:q")) != -1) {
 		switch (ch) {
 		case 'b':
 			branch_name = optarg;
@@ -3216,6 +3228,9 @@ cmd_update(int argc, char *argv[])
 			commit_id_str = strdup(optarg);
 			if (commit_id_str == NULL)
 				return got_error_from_errno("strdup");
+			break;
+		case 'q':
+			verbosity = -1;
 			break;
 		default:
 			usage_update();
@@ -3338,6 +3353,7 @@ cmd_update(int argc, char *argv[])
 	}
 
 	memset(&upa, 0, sizeof(upa));
+	upa.verbosity = verbosity;
 	error = got_worktree_checkout_files(worktree, &paths, repo,
 	    update_progress, &upa, check_cancelled, NULL);
 	if (error != NULL)
