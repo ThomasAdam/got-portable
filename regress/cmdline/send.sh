@@ -723,6 +723,124 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_send_tag_of_deleted_branch() {
+	local testroot=`test_init send_tag_of_deleted_branch`
+	local testurl=ssh://127.0.0.1/$testroot
+	local commit_id=`git_show_head $testroot/repo`
+
+	got clone -q $testurl/repo $testroot/repo-clone
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got clone command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	cat > $testroot/repo/.git/got.conf <<EOF
+remote "origin" {
+	protocol ssh
+	server 127.0.0.1
+	repository "$testroot/repo-clone"
+}
+EOF
+	got branch -r $testroot/repo foo
+
+	# modify alpha on branch foo
+	got checkout -b foo $testroot/repo $testroot/wt > /dev/null
+	echo boo >> $testroot/wt/beta
+	(cd $testroot/wt && got commit -m 'changed beta on branch foo' \
+		> /dev/null)
+	local commit_id2=`git_show_branch_head $testroot/repo foo`
+
+	# tag HEAD commit of branch foo
+	got tag -r $testroot/repo -c foo -m '1.0' 1.0 > /dev/null
+	tag_id=`got ref -r $testroot/repo -l | grep "^refs/tags/1.0" \
+		| tr -d ' ' | cut -d: -f2`
+
+	# delete the branch; commit is now only reachable via tags/1.0
+	got branch -r $testroot/repo -d foo > /dev/null
+
+	# unrelated change on master branch, then try sending this branch
+	# and the tag
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+	local commit_id3=`git_show_head $testroot/repo`
+
+	got send -q -r $testroot/repo -T > $testroot/stdout 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	wt_uuid=`(cd $testroot/wt && got info | grep 'UUID:' | \
+		cut -d ':' -f 2 | tr -d ' ')`
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/got/worktree/base-$wt_uuid: $commit_id2" \
+		>> $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id3" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got ref -l -r $testroot/repo-clone > $testroot/stdout
+	if [ "$ret" != "0" ]; then
+		echo "got ref command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "HEAD: refs/heads/master" > $testroot/stdout.expected
+	echo "refs/heads/master: $commit_id3" >> $testroot/stdout.expected
+	echo "refs/remotes/origin/HEAD: refs/remotes/origin/master" \
+		>> $testroot/stdout.expected
+	echo "refs/remotes/origin/master: $commit_id" \
+		>> $testroot/stdout.expected
+	echo "refs/tags/1.0: $tag_id" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tag -l -r $testroot/repo-clone | grep ^tag | sort > $testroot/stdout
+	echo "tag 1.0 $tag_id" > $testroot/stdout.expected
+
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_send_new_branch() {
 	local testroot=`test_init send_new_branch`
 	local testurl=ssh://127.0.0.1/$testroot
@@ -1241,6 +1359,7 @@ run_test test_send_rebase_required_overwrite
 run_test test_send_delete
 run_test test_send_clone_and_send
 run_test test_send_tags
+run_test test_send_tag_of_deleted_branch
 run_test test_send_new_branch
 run_test test_send_all_branches
 run_test test_send_to_empty_repo

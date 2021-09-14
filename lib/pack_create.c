@@ -527,7 +527,7 @@ load_tag(struct got_pack_metavec *v, struct got_object_idset *idset,
 
 	switch (got_object_tag_get_object_type(tag)) {
 	case GOT_OBJ_TYPE_COMMIT:
-		err = load_commit(NULL, idset,
+		err = load_commit(v, idset,
 		    got_object_tag_get_object_id(tag), repo,
 		    loose_obj_only, cancel_cb, cancel_arg);
 		break;
