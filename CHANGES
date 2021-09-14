@@ -1,3 +1,11 @@
+* got 0.59; 2021-09-14
+- fix copy-pasto in got.conf man page
+- add -q quiet mode to checkout and update (tracey)
+- make 'got send' send commits which are referenced only by tags (found by Omar)
+- add -S option to 'got status' for suppressing certain status codes (tracey)
+- make 'got checkout' display the checked out reference and commit ID
+- make 'got update' display the worktree's branch name upon success
+
 * got 0.58; 2021-09-11
 - tog: support navigating to first/last line of tree and ref views (naddy)
 - tog: jump directly to first log item instead of traversing the list (naddy)
