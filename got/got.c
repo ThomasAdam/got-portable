@@ -5323,6 +5323,11 @@ cmd_status(int argc, char *argv[])
 		case 'I':
 			no_ignores = 1;
 			break;
+		case 'S':
+			if (st.status_codes != NULL && st.suppress == 0)
+				option_conflict('S', 's');
+			st.suppress = 1;
+			/* fallthrough */
 		case 's':
 			for (i = 0; i < strlen(optarg); i++) {
 				switch (optarg[i]) {
@@ -5341,15 +5346,9 @@ cmd_status(int argc, char *argv[])
 					    optarg[i]);
 				}
 			}
-			if (st.suppress)
+			if (ch == 's' && st.suppress)
 				option_conflict('s', 'S');
 			st.status_codes = optarg;
-			break;
-		case 'S':
-			if (st.status_codes != NULL && st.suppress == 0)
-				option_conflict('S', 's');
-			st.status_codes = optarg;
-			st.suppress = 1;
 			break;
 		default:
 			usage_status();
