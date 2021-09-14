@@ -5341,9 +5341,13 @@ cmd_status(int argc, char *argv[])
 					    optarg[i]);
 				}
 			}
+			if (st.suppress)
+				option_conflict('s', 'S');
 			st.status_codes = optarg;
 			break;
 		case 'S':
+			if (st.status_codes != NULL && st.suppress == 0)
+				option_conflict('S', 's');
 			st.status_codes = optarg;
 			st.suppress = 1;
 			break;
