@@ -119,6 +119,24 @@ git_commit_tree()
 	maybe_pack_repo $repo
 }
 
+git_fsck()
+{
+	local testroot="$1"
+	local repo="$2"
+
+	(cd $repo && git fsck --strict \
+		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo -n "git fsck: "
+		cat $testroot/fsck.stderr
+		echo "git fsck failed; leaving test data in $testroot"
+		return 1
+	fi
+
+	return 0
+}
+
 make_test_tree()
 {
 	repo="$1"
@@ -186,14 +204,10 @@ test_cleanup()
 {
 	local testroot="$1"
 
-	(cd $testroot/repo && git fsck --strict \
-		> $testroot/fsck.stdout 2> $testroot/fsck.stderr)
+	git_fsck $testroot $testroot/repo
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		echo -n "git fsck: "
-		cat $testroot/fsck.stderr
-		echo "git fsck failed; leaving test data in $testroot"
-		return 1
+		return $ret
 	fi
 
 	rm -rf "$testroot"

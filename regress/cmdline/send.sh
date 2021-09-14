@@ -117,7 +117,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -171,7 +176,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -282,7 +292,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -456,7 +471,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -537,7 +557,12 @@ test_send_clone_and_send() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -759,7 +784,10 @@ EOF
 		test_done "$testroot" "1"
 		return 1
 	fi
-	test_done "$testroot" "0"
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
+	test_done "$testroot" "$ret"
 }
 
 test_send_tag_of_deleted_branch() {
@@ -876,7 +904,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -962,7 +995,12 @@ test_send_new_branch() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -1094,7 +1132,12 @@ test_send_all_branches() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -1194,7 +1237,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo2"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -1310,8 +1358,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
 
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
@@ -1387,7 +1439,12 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
+
+	git_fsck "$testroot" "$testroot/repo-clone"
+	ret="$?"
 	test_done "$testroot" "$ret"
 }
 
