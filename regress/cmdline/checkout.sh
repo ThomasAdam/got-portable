@@ -816,6 +816,43 @@ test_checkout_repo_with_unknown_extension() {
 	test_done "$testroot" "$ret"
 }
 
+test_checkout_quiet() {
+	local testroot=`test_init checkout_quiet`
+
+	echo -n "Checked out refs/heads/master: " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo "\nNow shut up and hack" >> $testroot/stdout.expected
+
+	got checkout -q $testroot/repo $testroot/wt > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "alpha" > $testroot/content.expected
+	echo "beta" >> $testroot/content.expected
+	echo "zeta" >> $testroot/content.expected
+	echo "delta" >> $testroot/content.expected
+	cat $testroot/wt/alpha $testroot/wt/beta $testroot/wt/epsilon/zeta \
+	    $testroot/wt/gamma/delta > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_checkout_basic
 run_test test_checkout_dir_exists
@@ -829,3 +866,4 @@ run_test test_checkout_into_nonempty_dir
 run_test test_checkout_symlink
 run_test test_checkout_symlink_relative_wtpath
 run_test test_checkout_repo_with_unknown_extension
+run_test test_checkout_quiet

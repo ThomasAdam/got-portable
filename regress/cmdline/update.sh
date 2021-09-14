@@ -2679,6 +2679,43 @@ test_update_file_skipped_due_to_obstruction() {
 	test_done "$testroot" "$ret"
 }
 
+test_update_quiet() {
+	local testroot=`test_init update_quiet`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "modified alpha"
+
+	echo -n "Updated to commit " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got update -q > $testroot/stdout)
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+	fi
+	test_done "$testroot" "$ret"
+}
 
 test_parseargs "$@"
 run_test test_update_basic
@@ -2722,3 +2759,4 @@ run_test test_update_symlink_conflicts
 run_test test_update_single_file
 run_test test_update_file_skipped_due_to_conflict
 run_test test_update_file_skipped_due_to_obstruction
+run_test test_update_quiet

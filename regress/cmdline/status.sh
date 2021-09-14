@@ -803,6 +803,133 @@ test_status_status_code() {
 	test_done "$testroot" "$ret"
 }
 
+test_status_suppress() {
+	local testroot=`test_init status_suppress`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "unversioned file" > $testroot/wt/foo
+	rm $testroot/wt/epsilon/zeta
+	touch $testroot/wt/beta
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+
+	(cd $testroot/wt && got status -S xDM \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "status succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: invalid status code 'x'" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status -S D?A\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'D  beta' > $testroot/stdout.expected
+	(cd $testroot/wt && got status -S M?A\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo '!  epsilon/zeta' > $testroot/stdout.expected
+	echo '?  foo' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status -S MDA > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'A  new' > $testroot/stdout.expected
+	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got stage new > $testroot/stdout)
+
+	echo ' A new' > $testroot/stdout.expected
+	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'changed file new' > $testroot/wt/new
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	echo 'MA new' >> $testroot/stdout.expected
+	(cd $testroot/wt && got status -S D?\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo 'M  alpha' > $testroot/stdout.expected
+	(cd $testroot/wt && got status -S AD?\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	rm $testroot/stdout.expected
+	touch $testroot/stdout.expected
+
+	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" "$ret"
+}
+
 test_status_empty_file() {
 	local testroot=`test_init status_empty_file`
 
@@ -873,4 +1000,5 @@ run_test test_status_many_paths
 run_test test_status_cvsignore
 run_test test_status_gitignore
 run_test test_status_status_code
+run_test test_status_suppress
 run_test test_status_empty_file
