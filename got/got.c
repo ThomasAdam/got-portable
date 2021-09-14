@@ -2823,13 +2823,14 @@ cmd_checkout(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
-	struct got_reference *head_ref = NULL;
+	struct got_reference *head_ref = NULL, *ref = NULL;
 	struct got_worktree *worktree = NULL;
 	char *repo_path = NULL;
 	char *worktree_path = NULL;
 	const char *path_prefix = "";
-	const char *branch_name = GOT_REF_HEAD;
+	const char *branch_name = GOT_REF_HEAD, *refname = NULL;
 	char *commit_id_str = NULL;
+	struct got_object_id *commit_id = NULL;
 	char *cwd = NULL;
 	int ch, same_path_prefix, allow_nonempty = 0, verbosity = 0;
 	struct got_pathlist_head paths;
@@ -2966,7 +2967,6 @@ cmd_checkout(int argc, char *argv[])
 	}
 
 	if (commit_id_str) {
-		struct got_object_id *commit_id;
 		struct got_reflist_head refs;
 		TAILQ_INIT(&refs);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
@@ -2998,7 +2998,21 @@ cmd_checkout(int argc, char *argv[])
 		}
 		error = got_worktree_set_base_commit_id(worktree, repo,
 		    commit_id);
-		free(commit_id);
+		if (error)
+			goto done;
+		/* Expand potentially abbreviated commit ID string. */
+		free(commit_id_str);
+		error = got_object_id_str(&commit_id_str, commit_id);
+		if (error)
+			goto done;
+	} else {
+		commit_id = got_object_id_dup(
+		    got_worktree_get_base_commit_id(worktree));
+		if (commit_id == NULL) {
+			error = got_error_from_errno("got_object_id_dup");
+			goto done;
+		}
+		error = got_object_id_str(&commit_id_str, commit_id);
 		if (error)
 			goto done;
 	}
@@ -3014,12 +3028,25 @@ cmd_checkout(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
+	if (got_ref_is_symbolic(head_ref)) {
+		error = got_ref_resolve_symbolic(&ref, repo, head_ref);
+		if (error)
+			goto done;
+		refname = got_ref_get_name(ref);
+	} else
+		refname = got_ref_get_name(head_ref);
+	printf("Checked out %s: %s\n", refname, commit_id_str);
 	printf("Now shut up and hack\n");
 	if (cpa.had_base_commit_ref_error)
 		show_worktree_base_ref_warning();
 done:
+	if (head_ref)
+		got_ref_close(head_ref);
+	if (ref)
+		got_ref_close(ref);
 	got_pathlist_free(&paths);
 	free(commit_id_str);
+	free(commit_id);
 	free(repo_path);
 	free(worktree_path);
 	free(cwd);

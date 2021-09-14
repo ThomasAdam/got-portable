@@ -104,6 +104,8 @@ test_import_basic() {
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/main: $head_commit" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout

@@ -18,11 +18,14 @@
 
 test_checkout_basic() {
 	local testroot=`test_init checkout_basic`
+	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
@@ -57,11 +60,14 @@ test_checkout_basic() {
 
 test_checkout_dir_exists() {
 	local testroot=`test_init checkout_dir_exists`
+	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	mkdir $testroot/wt
@@ -98,11 +104,14 @@ test_checkout_dir_exists() {
 
 test_checkout_dir_not_empty() {
 	local testroot=`test_init checkout_dir_not_empty`
+	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/alpha" > $testroot/stdout.expected
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	mkdir $testroot/wt
@@ -144,8 +153,11 @@ test_checkout_sets_xbit() {
 	chmod +x $testroot/repo/xfile
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "adding executable file"
+	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/xfile" > $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
@@ -218,6 +230,7 @@ test_checkout_commit_from_wrong_branch() {
 
 test_checkout_tag() {
 	local testroot=`test_init checkout_tag`
+	local commit_id=`git_show_head $testroot/repo`
 	local tag="1.0.0"
 
 	(cd $testroot/repo && git tag -a -m "test" $tag)
@@ -226,6 +239,8 @@ test_checkout_tag() {
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -c $tag $testroot/repo $testroot/wt > $testroot/stdout
@@ -265,12 +280,15 @@ test_checkout_ignores_submodules() {
 
 	(cd $testroot/repo && git submodule -q add ../repo2)
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
+	local commit_id=`git_show_head $testroot/repo`
 
 	echo "A  $testroot/wt/.gitmodules" > $testroot/stdout.expected
 	echo "A  $testroot/wt/alpha" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
@@ -305,6 +323,7 @@ test_checkout_ignores_submodules() {
 
 test_checkout_read_only() {
 	local testroot=`test_init checkout_read_only`
+	local commit_id=`git_show_head $testroot/repo`
 
 	# Make the repostiory read-only
 	chmod -R a-w $testroot/repo
@@ -313,6 +332,8 @@ test_checkout_read_only() {
 	echo "A  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout $testroot/repo $testroot/wt \
@@ -366,6 +387,7 @@ test_checkout_read_only() {
 
 test_checkout_into_nonempty_dir() {
 	local testroot=`test_init checkout_into_nonempty_dir`
+	local commit_id=`git_show_head $testroot/repo`
 
 	mkdir -p $testroot/wt
 	make_test_tree $testroot/wt
@@ -402,6 +424,8 @@ test_checkout_into_nonempty_dir() {
 	echo "?  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "?  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "?  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
@@ -423,6 +447,8 @@ test_checkout_into_nonempty_dir() {
 	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "E  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "E  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
@@ -461,6 +487,8 @@ test_checkout_into_nonempty_dir() {
 	echo "E  $testroot/wt/beta" >> $testroot/stdout.expected
 	echo "E  $testroot/wt/epsilon/zeta" >> $testroot/stdout.expected
 	echo "E  $testroot/wt/gamma/delta" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	got checkout -E $testroot/repo $testroot/wt > $testroot/stdout
@@ -516,6 +544,7 @@ test_checkout_symlink() {
 	(cd $testroot/repo && ln -s .got/foo dotgotfoo.link)
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "add symlinks"
+	local commit_id=`git_show_head $testroot/repo`
 
 	got checkout $testroot/repo $testroot/wt > $testroot/stdout
 	ret="$?"
@@ -536,6 +565,8 @@ test_checkout_symlink() {
 	echo "A  $testroot/wt/nonexistent.link" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/passwd.link" >> $testroot/stdout.expected
 	echo "A  $testroot/wt/passwd2.link" >> $testroot/stdout.expected
+	echo "Checked out refs/heads/master: $commit_id" \
+		>> $testroot/stdout.expected
 	echo "Now shut up and hack" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
