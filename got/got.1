@@ -658,7 +658,7 @@ Silence progress output.
 .It Cm up
 Short alias for
 .Cm update .
-.It Cm status Oo Fl I Oc Oo Fl s Ar status-codes Oc Op Ar path ...
+.It Cm status Oo Fl I Oc Oo Fl s Ar status-codes Oc Oo Fl q Oc Op Ar path ...
 Show the current modification status of files in a work tree,
 using the following status codes:
 .Bl -column YXZ description
@@ -705,6 +705,14 @@ are as follows:
 Show unversioned files even if they match an ignore pattern.
 .It Fl s Ar status-codes
 Only show files with a modification status matching any of the
+single-character status codes contained in the
+.Ar status-codes
+argument.
+Any combination of codes from the above list of possible status codes
+may be specified.
+For staged files, status codes displayed in either column will be matched.
+.It Fl S Ar status-codes
+Suppress the output of files with a modification status matching any of the
 single-character status codes contained in the
 .Ar status-codes
 argument.

@@ -5224,10 +5224,15 @@ done:
 __dead static void
 usage_status(void)
 {
-	fprintf(stderr, "usage: %s status [-I] [-s status-codes ] [path ...]\n",
-	    getprogname());
+	fprintf(stderr, "usage: %s status [-I] [-s status-codes ] "
+	    "[-S status-codes] [path ...]\n", getprogname());
 	exit(1);
 }
+
+struct got_status_arg {
+	char *status_codes;
+	int suppress;
+};
 
 static const struct got_error *
 print_status(void *arg, unsigned char status, unsigned char staged_status,
@@ -5235,20 +5240,35 @@ print_status(void *arg, unsigned char status, unsigned char staged_status,
     struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
     int dirfd, const char *de_name)
 {
+	struct got_status_arg *st = arg;
+
 	if (status == staged_status && (status == GOT_STATUS_DELETE))
 		status = GOT_STATUS_NO_CHANGE;
-	if (arg) {
-		char *status_codes = arg;
-		size_t ncodes = strlen(status_codes);
-		int i;
+	if (st != NULL && st->status_codes) {
+		size_t ncodes = strlen(st->status_codes);
+		int i, j = 0;
+
 		for (i = 0; i < ncodes ; i++) {
-			if (status == status_codes[i] ||
-			    staged_status == status_codes[i])
-				break;
+			if (st->suppress) {
+				if (status == st->status_codes[i] ||
+				    staged_status == st->status_codes[i]) {
+					j++;
+					continue;
+				}
+			} else {
+				if (status == st->status_codes[i] ||
+				    staged_status == st->status_codes[i])
+					break;
+			}
 		}
+
+		if (st->suppress && j == 0)
+			goto print;
+
 		if (i == ncodes)
 			return NULL;
 	}
+print:
 	printf("%c%c %s\n", status, staged_status, path);
 	return NULL;
 }
@@ -5259,14 +5279,19 @@ cmd_status(int argc, char *argv[])
 	const struct got_error *error = NULL;
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
-	char *cwd = NULL, *status_codes = NULL;;
+	struct got_status_arg st;
+	char *cwd = NULL;
 	struct got_pathlist_head paths;
 	struct got_pathlist_entry *pe;
 	int ch, i, no_ignores = 0;
 
 	TAILQ_INIT(&paths);
 
-	while ((ch = getopt(argc, argv, "Is:")) != -1) {
+	memset(&st, 0, sizeof(st));
+	st.status_codes = NULL;
+	st.suppress = 0;
+
+	while ((ch = getopt(argc, argv, "Is:S:")) != -1) {
 		switch (ch) {
 		case 'I':
 			no_ignores = 1;
@@ -5289,7 +5314,11 @@ cmd_status(int argc, char *argv[])
 					    optarg[i]);
 				}
 			}
-			status_codes = optarg;
+			st.status_codes = optarg;
+			break;
+		case 'S':
+			st.status_codes = optarg;
+			st.suppress = 1;
 			break;
 		default:
 			usage_status();
@@ -5333,7 +5362,7 @@ cmd_status(int argc, char *argv[])
 		goto done;
 
 	error = got_worktree_status(worktree, &paths, repo, no_ignores,
-	    print_status, status_codes, check_cancelled, NULL);
+	    print_status, &st, check_cancelled, NULL);
 done:
 	TAILQ_FOREACH(pe, &paths, entry)
 		free((char *)pe->path);
