@@ -821,6 +821,44 @@ test_status_suppress() {
 	echo "new file" > $testroot/wt/new
 	(cd $testroot/wt && got add new >/dev/null)
 
+	(cd $testroot/wt && got status -S A -s M \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "status succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: -s and -S options are mutually exclusive" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status -s A -S M \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "status succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "got: -S and -s options are mutually exclusive" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	(cd $testroot/wt && got status -S xDM \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
