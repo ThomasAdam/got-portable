@@ -249,7 +249,7 @@ test_stage_conflict() {
 	echo "modified alpha, too" > $testroot/wt/alpha
 
 	echo "C  alpha" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected

@@ -3386,9 +3386,10 @@ cmd_update(int argc, char *argv[])
 	if (error != NULL)
 		goto done;
 
-	if (upa.did_something)
-		printf("Updated to commit %s\n", commit_id_str);
-	else
+	if (upa.did_something) {
+		printf("Updated to %s: %s\n",
+		    got_worktree_get_head_ref_name(worktree), commit_id_str);
+	} else
 		printf("Already up-to-date\n");
 	print_update_progress_stats(&upa);
 done:
@@ -6070,8 +6071,11 @@ cmd_branch(int argc, char *argv[])
 			    NULL);
 			if (error)
 				goto done;
-			if (upa.did_something)
-				printf("Updated to commit %s\n", commit_id_str);
+			if (upa.did_something) {
+				printf("Updated to %s: %s\n",
+				    got_worktree_get_head_ref_name(worktree),
+				    commit_id_str);
+			}
 			print_update_progress_stats(&upa);
 		}
 	}

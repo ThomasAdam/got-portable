@@ -30,7 +30,7 @@ test_update_basic() {
 	git_commit $testroot/repo -m "modified alpha"
 
 	echo "U  alpha" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -70,7 +70,7 @@ test_update_adds_file() {
 	git_commit $testroot/repo -m "adding a new file"
 
 	echo "A  gamma/new" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -110,7 +110,7 @@ test_update_deletes_file() {
 	git_commit $testroot/repo -m "deleting a file"
 
 	echo "D  beta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -151,7 +151,7 @@ test_update_deletes_dir() {
 	git_commit $testroot/repo -m "deleting a directory"
 
 	echo "D  epsilon/zeta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -193,7 +193,8 @@ test_update_deletes_dir_with_path_prefix() {
 
 	# update back to first commit and expect psi/mu to be deleted
 	echo "D  psi/mu" > $testroot/stdout.expected
-	echo "Updated to commit $first_rev" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $first_rev" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
@@ -236,7 +237,8 @@ test_update_deletes_dir_recursively() {
 	# update back to first commit and expect psi/mu to be deleted
 	echo "D  psi/chi/tau" > $testroot/stdout.expected
 	echo "D  psi/mu" >> $testroot/stdout.expected
-	echo "Updated to commit $first_rev" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $first_rev" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $first_rev > $testroot/stdout)
 
@@ -276,7 +278,7 @@ test_update_sibling_dirs_with_common_prefix() {
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
 	echo "A  epsilon2/mu" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -294,7 +296,7 @@ test_update_sibling_dirs_with_common_prefix() {
 	git_commit $testroot/repo -m "changing epsilon/zeta again"
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -338,7 +340,7 @@ test_update_dir_with_dot_sibling() {
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
 	echo "A  epsilon.txt" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -356,7 +358,7 @@ test_update_dir_with_dot_sibling() {
 	git_commit $testroot/repo -m "changing epsilon/zeta again"
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -403,7 +405,7 @@ test_update_moves_files_upwards() {
 	echo "D  epsilon/psi/chi/tau" >> $testroot/stdout.expected
 	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
 	echo "A  epsilon/psi/tau" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -458,7 +460,7 @@ test_update_moves_files_to_new_dir() {
 	echo "D  epsilon/psi/mu" >> $testroot/stdout.expected
 	echo "A  epsilon-new/mu" >> $testroot/stdout.expected
 	echo "A  epsilon-new/psi/tau" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -525,7 +527,7 @@ test_update_creates_missing_parent() {
 	echo "D  snake.c" >> $testroot/stdout.expected
 	echo "A  snscore/Makefile" >> $testroot/stdout.expected
 	echo "A  snscore/snscore.c" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -577,7 +579,7 @@ test_update_creates_missing_parent_with_subdir() {
 	echo "A  sss/snake/snake.6" >> $testroot/stdout.expected
 	echo "A  sss/snake/snake.c" >> $testroot/stdout.expected
 	echo "A  sss/snake/snake.h" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -617,7 +619,7 @@ test_update_file_in_subsubdir() {
 	git_commit $testroot/repo -m "changed a file"
 
 	echo "U  arch/alpha/Makefile" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -668,7 +670,7 @@ test_update_merges_file_edits() {
 	echo "C  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
 	echo "G  numbers" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
@@ -734,7 +736,7 @@ test_update_keeps_xbit() {
 	git_commit $testroot/repo -m "changed executable file"
 
 	echo "U  xfile" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -792,7 +794,7 @@ test_update_clears_xbit() {
 	git_commit $testroot/repo -m "not an executable file anymore"
 
 	echo "U  xfile" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -833,7 +835,7 @@ test_update_restores_missing_file() {
 	rm $testroot/wt/alpha
 
 	echo "!  alpha" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	(cd $testroot/wt && got update > $testroot/stdout)
@@ -878,7 +880,7 @@ test_update_conflict_wt_add_vs_repo_add() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "C  gamma/new" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
@@ -939,7 +941,7 @@ test_update_conflict_wt_edit_vs_repo_rm() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "G  beta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -991,7 +993,7 @@ test_update_conflict_wt_rm_vs_repo_edit() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "G  beta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1052,7 +1054,7 @@ test_update_conflict_wt_rm_vs_repo_rm() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "D  beta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1109,7 +1111,7 @@ test_update_partial() {
 
 	echo "U  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1136,7 +1138,7 @@ test_update_partial() {
 	fi
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1181,7 +1183,7 @@ test_update_partial_add() {
 
 	echo "A  new" > $testroot/stdout.expected
 	echo "A  epsilon/new2" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1258,7 +1260,7 @@ test_update_partial_dir() {
 	git_commit $testroot/repo -m "modified two files"
 
 	echo "U  epsilon/zeta" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1359,7 +1361,7 @@ test_update_to_another_branch() {
 
 	echo "Switching work tree from refs/heads/master to refs/heads/newbranch" > $testroot/stdout.expected
 	echo "C  alpha" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/newbranch: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
@@ -1498,7 +1500,7 @@ test_update_bumps_base_commit_id() {
 
 	echo "U  epsilon/psi" > $testroot/stdout.expected
 	echo "C  epsilon/zeta" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
@@ -1546,7 +1548,7 @@ test_update_tag() {
 	(cd $testroot/repo && git tag -m "test" -a $tag)
 
 	echo "U  alpha" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1601,7 +1603,7 @@ test_update_toggles_xbit() {
 	local commit_id2=`git_show_head $testroot/repo`
 
 	echo "U  xfile" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1613,7 +1615,7 @@ test_update_toggles_xbit() {
 	fi
 
 	echo "U  xfile" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1640,7 +1642,8 @@ test_update_toggles_xbit() {
 	fi
 
 	echo "U  xfile" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id2" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id2" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1692,7 +1695,7 @@ test_update_preserves_conflicted_file() {
 	fi
 
 	echo "#  alpha" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files not updated because of existing merge conflicts: 1" \
@@ -1735,7 +1738,7 @@ test_update_modified_submodules() {
 
 	# This update only records the new base commit. Otherwise it is a
 	# no-op change because Got's file index does not track submodules.
-	echo -n "Updated to commit " > $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " > $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1763,7 +1766,7 @@ test_update_adds_submodule() {
 	(cd $testroot/repo && git commit -q -m 'adding submodule')
 
 	echo "A  .gitmodules" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1805,7 +1808,7 @@ test_update_conflict_wt_file_vs_repo_submodule() {
 	# No conflict occurs because 'got update' ignores the submodule
 	# and leaves the clashing file as it was.
 	echo "A  .gitmodules" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1854,7 +1857,7 @@ test_update_adds_symlink() {
 	echo "A  epsilon.link" >> $testroot/stdout.expected
 	echo "A  nonexistent.link" >> $testroot/stdout.expected
 	echo "A  passwd.link" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -1968,7 +1971,7 @@ test_update_deletes_symlink() {
 	git_commit $testroot/repo -m "delete symlink"
 
 	echo "D  alpha.link" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -2055,7 +2058,7 @@ test_update_symlink_conflicts() {
 	echo "C  new.link" >> $testroot/stdout.expected
 	echo "C  nonexistent.link" >> $testroot/stdout.expected
 	echo "G  zeta.link" >> $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 7" >> $testroot/stdout.expected
@@ -2297,7 +2300,8 @@ test_update_single_file() {
 	fi
 
 	echo "U  c" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $commit_id1 c \
 		> $testroot/stdout)
@@ -2322,7 +2326,8 @@ test_update_single_file() {
 	fi
 
 	echo "U  c" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id2" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id2" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $commit_id2 c > $testroot/stdout)
 
@@ -2346,7 +2351,8 @@ test_update_single_file() {
 	fi
 
 	echo "D  c" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id3" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id3" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $commit_id3 c \
 		> $testroot/stdout 2> $testroot/stderr)
@@ -2370,7 +2376,8 @@ test_update_single_file() {
 	fi
 
 	echo "D  c" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id3" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id3" \
+		>> $testroot/stdout.expected
 
 	(cd $testroot/wt && got update -c $commit_id3 > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -2429,7 +2436,8 @@ test_update_file_skipped_due_to_conflict() {
 	(cd $testroot/wt && got update -c $commit_id0 > $testroot/stdout)
 
 	echo "C  beta" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id0" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id0" \
+		>> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -2478,7 +2486,8 @@ test_update_file_skipped_due_to_conflict() {
 	# update to the latest commit again; this skips beta
 	(cd $testroot/wt && got update > $testroot/stdout)
 	echo "#  beta" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
 	echo "Files not updated because of existing merge conflicts: 1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -2537,7 +2546,8 @@ test_update_file_skipped_due_to_conflict() {
 	# updating to the latest commit should now update beta
 	(cd $testroot/wt && got update > $testroot/stdout)
 	echo "U  beta" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -2612,8 +2622,10 @@ test_update_file_skipped_due_to_obstruction() {
 	(cd $testroot/wt && got update > $testroot/stdout)
 
 	echo "~  beta" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
-	echo "File paths obstructed by a non-regular file: 1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
+	echo "File paths obstructed by a non-regular file: 1" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -2644,7 +2656,8 @@ test_update_file_skipped_due_to_obstruction() {
 	# updating to the latest commit should now update beta
 	(cd $testroot/wt && got update > $testroot/stdout)
 	echo "!  beta" > $testroot/stdout.expected
-	echo "Updated to commit $commit_id1" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -2692,7 +2705,7 @@ test_update_quiet() {
 	echo "modified alpha" > $testroot/repo/alpha
 	git_commit $testroot/repo -m "modified alpha"
 
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 

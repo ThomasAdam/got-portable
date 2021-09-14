@@ -121,7 +121,8 @@ test_diff_shows_conflict() {
 	sed -i 's/8/88/' $testroot/wt/numbers
 
 	echo "C  numbers" > $testroot/stdout.expected
-	echo -n "Updated to commit $head_rev" >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: $head_rev" \
+		>> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
 

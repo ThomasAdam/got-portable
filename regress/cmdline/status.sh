@@ -184,7 +184,7 @@ test_status_shows_local_mods_after_update() {
 	sed -i 's/7/77/' $testroot/wt/numbers
 
 	echo "G  numbers" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -343,7 +343,7 @@ test_status_shows_no_mods_after_complete_merge() {
 	sed -i 's/2/22/' $testroot/wt/numbers
 
 	echo "G  numbers" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 
@@ -397,7 +397,7 @@ test_status_shows_conflict() {
 	sed -i 's/2/77/' $testroot/wt/numbers
 
 	echo "C  numbers" > $testroot/stdout.expected
-	echo -n "Updated to commit " >> $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected

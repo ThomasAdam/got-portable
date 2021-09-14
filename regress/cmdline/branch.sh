@@ -116,7 +116,8 @@ test_branch_create() {
 		> $testroot/stdout.expected
 	echo "refs/heads/updatebranch" >> $testroot/stdout.expected
 	echo "U  gamma/delta" >> $testroot/stdout.expected
-	echo "Updated to commit $commit_id0" >> $testroot/stdout.expected
+	echo "Updated to refs/heads/updatebranch: $commit_id0" \
+		>> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
