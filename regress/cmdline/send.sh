@@ -719,8 +719,47 @@ EOF
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
 	fi
-	test_done "$testroot" "$ret"
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	echo 'new line in file alpha' >> $testroot/wt/alpha
+	(cd $testroot/wt && got commit -m 'changing file alpha' > /dev/null)
+
+	# Send the new commit in isolation.
+	got send -q -r $testroot/repo > $testroot/stdout \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Now tag it and send the tag.
+	# Verify that just the new tag object gets sent.
+	got tag -r $testroot/repo -m '3.0' 3.0 >/dev/null
+	tag_id4=`got ref -r $testroot/repo -l | grep "^refs/tags/1.0" \
+		| tr -d ' ' | cut -d: -f2`
+
+	got send -r $testroot/repo -t 3.0 > $testroot/stdout.raw \
+		2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got send command failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	tr -d '\r' < $testroot/stdout.raw > $testroot/stdout
+	if ! grep -q "packing 2 references; 1 object; deltify: 100%" \
+		$testroot/stdout; then
+		echo "got send did apparently pack too many objects:" >&2
+		cat $testroot/stdout.raw >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	test_done "$testroot" "0"
 }
 
 test_send_tag_of_deleted_branch() {

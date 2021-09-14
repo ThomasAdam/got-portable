@@ -330,7 +330,6 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 	struct got_reflist_entry *re;
 	struct got_object_id **our_ids = NULL;
 	struct got_object_id **their_ids = NULL;
-	struct got_object_id *my_id = NULL;
 	int i, nours = 0, ntheirs = 0;
 	size_t nalloc_ours = 0, nalloc_theirs = 0;
 	int refs_to_send = 0, refs_to_delete = 0;
@@ -518,15 +517,13 @@ got_send_pack(const char *remote_name, struct got_pathlist_head *branch_names,
 		 */
 		my_ref = find_ref(&refs, refname);
 		if (my_ref) {
+			struct got_object_id *my_id;
 			err = got_ref_resolve(&my_id, repo, my_ref);
 			if (err)
 				goto done;
-			if (got_object_id_cmp(my_id, their_id) == 0) {
-				free(my_id);
-				my_id = NULL;
-				continue;
-			}
-			refs_to_send++;
+			if (got_object_id_cmp(my_id, their_id) != 0)
+				refs_to_send++;
+			free(my_id);
 
 		}
 
@@ -722,6 +719,5 @@ done:
 	for (i = 0; i < ntheirs; i++)
 		free(their_ids[i]);
 	free(their_ids);
-	free(my_id);
 	return err;
 }
