@@ -1,3 +1,8 @@
+* got 0.60; 2021-09-15
+- fix another instance of 'got send' sending branches the server already has
+- make 'got send' regression tests run 'git fsck' on all involved repositories
+- shell code fixes in regress tests for portability (naddy)
+
 * got 0.59; 2021-09-14
 - fix copy-pasto in got.conf man page
 - add -q quiet mode to checkout and update (tracey)
