@@ -746,7 +746,7 @@ test_status_status_code() {
 
 	echo '!  epsilon/zeta' > $testroot/stdout.expected
 	echo '?  foo' >> $testroot/stdout.expected
-	(cd $testroot/wt && got status -s \!? > $testroot/stdout)
+	(cd $testroot/wt && got status -s !\? > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -878,7 +878,7 @@ test_status_suppress() {
 	fi
 
 	echo 'M  alpha' > $testroot/stdout.expected
-	(cd $testroot/wt && got status -S D?A\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S D\?A! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -888,7 +888,7 @@ test_status_suppress() {
 	fi
 
 	echo 'D  beta' > $testroot/stdout.expected
-	(cd $testroot/wt && got status -S M?A\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S M\?A! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -909,7 +909,7 @@ test_status_suppress() {
 	fi
 
 	echo 'A  new' > $testroot/stdout.expected
-	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S MD\?! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -921,7 +921,7 @@ test_status_suppress() {
 	(cd $testroot/wt && got stage new > $testroot/stdout)
 
 	echo ' A new' > $testroot/stdout.expected
-	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S MD\?! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -934,7 +934,7 @@ test_status_suppress() {
 
 	echo 'M  alpha' > $testroot/stdout.expected
 	echo 'MA new' >> $testroot/stdout.expected
-	(cd $testroot/wt && got status -S D?\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S D\?! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -944,7 +944,7 @@ test_status_suppress() {
 	fi
 
 	echo 'M  alpha' > $testroot/stdout.expected
-	(cd $testroot/wt && got status -S AD?\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S AD\?! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -956,7 +956,7 @@ test_status_suppress() {
 	rm $testroot/stdout.expected
 	touch $testroot/stdout.expected
 
-	(cd $testroot/wt && got status -S MD?\! > $testroot/stdout)
+	(cd $testroot/wt && got status -S MD\?! > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
