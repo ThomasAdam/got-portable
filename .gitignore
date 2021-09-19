@@ -16,6 +16,7 @@ configure
 core
 etc/
 got/got
+gotadmin/gotadmin
 lib/.dirstamp
 libexec/got-fetch-pack/got-fetch-pack
 libexec/got-index-pack/got-index-pack

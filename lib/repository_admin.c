@@ -15,7 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/queue.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -32,7 +31,6 @@
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
-#include <imsg.h>
 
 #include "got_error.h"
 #include "got_cancel.h"

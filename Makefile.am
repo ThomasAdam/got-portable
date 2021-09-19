@@ -1,4 +1,4 @@
-SUBDIRS = compat libexec got tog
+SUBDIRS = compat libexec got tog gotadmin
 
 EXTRA_DIST = compat/*.[ch] \
 	     got/*.[15] \

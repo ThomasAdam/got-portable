@@ -395,6 +395,7 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-read-tag/Makefile
 		 libexec/got-send-pack/Makefile
 		 got/Makefile
+		 gotadmin/Makefile
 		 tog/Makefile])
 AC_OUTPUT
 
