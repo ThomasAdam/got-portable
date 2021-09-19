@@ -153,9 +153,9 @@ test_rebase_basic() {
 
 	# We should have a backup of old commits
 	(cd $testroot/repo && got rebase -l > $testroot/stdout)
-	d_orig2=`date -u -r $orig_author_time2 +"%a %b %e %X %Y UTC"`
-	d_new2=`date -u -r $new_author_time2 +"%G-%m-%d"`
-	d_0=`date -u -r $commit0_author_time +"%G-%m-%d"`
+	d_orig2=`env LC_TIME=C date -u -d "@$orig_author_time2" +"%a %b %e %X %Y UTC"`
+	d_new2=`date -u -d "@$new_author_time2" +"%G-%m-%d"`
+	d_0=`date -u -d "@$commit0_author_time" +"%G-%m-%d"`
 	cat > $testroot/stdout.expected <<EOF
 -----------------------------------------------
 commit $orig_commit2 (formerly newbranch)

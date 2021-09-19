@@ -1399,7 +1399,7 @@ EOF
 	fi
 
 	local author_time=`git_show_author_time $testroot/repo`
-	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	d=`env LC_TIME=C date -u -d "@$author_time" +"%a %b %e %X %Y UTC"`
 	echo "-----------------------------------------------" > $testroot/stdout.expected
 	echo "commit $head_rev (master)" >> $testroot/stdout.expected
 	echo "from: $GOT_AUTHOR" >> $testroot/stdout.expected
@@ -1438,7 +1438,7 @@ EOF
 	fi
 
 	local author_time=`git_show_author_time $testroot/repo`
-	d=`date -u -r $author_time +"%a %b %e %X %Y UTC"`
+	d=`env LC_TIME=C date -u -d "@$author_time" +"%a %b %e %X %Y UTC"`
 	echo "-----------------------------------------------" \
 		> $testroot/stdout.expected
 	echo "commit $head_rev (master)" >> $testroot/stdout.expected
