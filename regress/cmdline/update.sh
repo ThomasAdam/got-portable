@@ -2016,7 +2016,7 @@ test_update_symlink_conflicts() {
 	fi
 
 	(cd $testroot/repo && ln -sf beta alpha.link)
-	(cd $testroot/repo && ln -sfh gamma epsilon.link)
+	(cd $testroot/repo && ln -sfT gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
 	echo 'this is regular file foo' > $testroot/repo/dotgotfoo.link
 	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
@@ -2030,9 +2030,9 @@ test_update_symlink_conflicts() {
 	# modified symlink to file A vs modified symlink to file B
 	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
 	# modified symlink to dir A vs modified symlink to file B
-	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	(cd $testroot/wt && ln -sfT beta epsilon.link)
 	# modeified symlink to file A vs modified symlink to dir B
-	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	(cd $testroot/wt && ln -sfT ../gamma epsilon/beta.link)
 	# added regular file A vs added bad symlink to file A
 	(cd $testroot/wt && ln -sf .got/bar dotgotfoo.link)
 	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)

@@ -1071,11 +1071,11 @@ test_revert_symlink() {
 	# symlink to file A now points to file B
 	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
 	# symlink to a directory A now points to file B
-	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	(cd $testroot/wt && ln -sfT beta epsilon.link)
 	# "bad" symlink now contains a different target path
 	echo "foo" > $testroot/wt/passwd.link
 	# relative symlink to directory A now points to relative directory B
-	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	(cd $testroot/wt && ln -sfT ../gamma epsilon/beta.link)
 	# an unversioned symlink
 	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
 	# symlink to file A now points to non-existent file B
@@ -1244,11 +1244,11 @@ test_revert_patch_symlink() {
 	# symlink to file A now points to file B
 	(cd $testroot/wt && ln -sf gamma/delta alpha.link)
 	# symlink to a directory A now points to file B
-	(cd $testroot/wt && ln -sfh beta epsilon.link)
+	(cd $testroot/wt && ln -sfT beta epsilon.link)
 	# "bad" symlink now contains a different target path
 	echo "foo" > $testroot/wt/passwd.link
 	# relative symlink to directory A now points to relative directory B
-	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
+	(cd $testroot/wt && ln -sfT ../gamma epsilon/beta.link)
 	# an unversioned symlink
 	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
 	# symlink to file A now points to non-existent file B
