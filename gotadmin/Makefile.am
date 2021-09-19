@@ -28,18 +28,16 @@ gotadmin_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 man1_MANS = gotadmin.1
 
-EXTRA_DIST = gotadmin.1
-
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
        -DGOT_VERSION_NUMBER='"@VERSION@"' \
-       -DGOT_LIBEXECDIR="$(libexecdir)" \
+       -DGOT_LIBEXECDIR="${bindir}" \
        -I$(top_srcdir) \
        -I$(top_srcdir)/compat \
        -I$(top_srcdir)/lib \
        -I$(top_srcdir)/include \
        -I.
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lmd
+LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 if HOST_FREEBSD
 LDADD += -lmd
 endif
