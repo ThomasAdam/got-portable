@@ -26,7 +26,7 @@ also be installed.
 INSTALLATION
 ============
 
- $ autoreconf -i
+ $ ./autogen.sh
  $ ./configure && make
  $ sudo make install
 
@@ -43,6 +43,6 @@ CONTACT
 =======
 
 Thomas Adam <thomas@xteddy.org>
-thomas_adam (#gameoftrees on irc.freenode.net)
+thomas_adam (#gameoftrees on irc.libera.chat)
 
 [1]  https://gameoftrees.org
