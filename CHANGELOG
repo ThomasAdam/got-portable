@@ -1,0 +1,11 @@
+Got-portable Changelog
+======================
+
+This file details portable-specific changes to make things work on systems
+other than OpenBSD.
+
+All changes are on top of the versioned changes listed in CHANGES.
+
+# got-portable 0.60; (2021-09-21)
+
+* First portable version released for Linux.

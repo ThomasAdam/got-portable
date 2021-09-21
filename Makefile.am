@@ -1,5 +1,7 @@
 SUBDIRS = compat libexec got tog gotadmin
 
+EXTRA_DIST = CHANGES CHANGELOG
+
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION'" \
 	-DGOT_VERSION_NUMBER='"@VERSION"' \
 	-DGOT_LIBEXECDIR="${bindir}" \
