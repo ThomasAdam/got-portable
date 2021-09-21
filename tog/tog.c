@@ -4515,7 +4515,7 @@ show_blame_view(struct tog_view *view)
 	struct tog_blame_view_state *s = &view->state.blame;
 	int errcode;
 
-	if (s->blame.thread != 0 && !s->blame_complete) {
+	if (s->blame.thread == 0 && !s->blame_complete) {
 		errcode = pthread_create(&s->blame.thread, NULL, blame_thread,
 		    &s->blame.thread_args);
 		if (errcode)
