@@ -39,6 +39,14 @@
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
 
+#if defined(__GLIBC__)
+	/*
+	 * The autoconf test for strerror_r is broken in current versions
+	 * of autoconf: https://savannah.gnu.org/support/?110367
+	 */
+#define strerror_r __xpg_strerror_r
+#endif
+
 static struct got_custom_error {
 	struct got_error err;
 	char msg[4080];
@@ -144,7 +152,15 @@ got_error_from_errno_fmt(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
+#ifdef __GLIBC__
+	/*
+	 * The autoconf test for strerror_r is broken in current versions
+	 * of autoconf: https://savannah.gnu.org/support/?110367
+	 */
+	__xpg_strerror_r(errno, strerr, sizeof(strerr));
+#else
 	strerror_r(errno, strerr, sizeof(strerr));
+#endif
 	snprintf(cerr->msg, sizeof(cerr->msg), "%s: %s", buf, strerr);
 
 	err->code = GOT_ERR_ERRNO;
