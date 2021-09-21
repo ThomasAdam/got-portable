@@ -20,9 +20,8 @@
 
 #include <ctype.h>
 #include <errno.h>
-#define _XOPEN_SOURCE_EXTENDED
+#define _XOPEN_SOURCE_EXTENDED /* for ncurses wide-character functions */
 #include <curses.h>
-#undef _XOPEN_SOURCE_EXTENDED
 #include <panel.h>
 #include <locale.h>
 #include <signal.h>
