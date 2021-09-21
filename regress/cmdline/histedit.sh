@@ -28,6 +28,7 @@ test_histedit_no_op() {
 	(cd $testroot/repo && git add epsilon/new)
 	git_commit $testroot/repo -m "committing changes"
 	local old_commit1=`git_show_head $testroot/repo`
+	local old_author_time1=`git_show_author_time $testroot/repo`
 
 	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
 	git_commit $testroot/repo -m "committing to zeta on master"
@@ -152,6 +153,7 @@ test_histedit_no_op() {
 
 	# We should have a backup of old commits
 	(cd $testroot/repo && got histedit -l > $testroot/stdout)
+	d_orig1=`date -u -r $old_author_time1 +"%G-%m-%d"`
 	d_orig2=`date -u -r $old_author_time2 +"%a %b %e %X %Y UTC"`
 	d_new2=`date -u -r $new_author_time2 +"%G-%m-%d"`
 	d_orig=`date -u -r $orig_author_time +"%G-%m-%d"`
@@ -165,9 +167,29 @@ date: $d_orig2
  
 has become commit $new_commit2 (master)
  $d_new2 $GOT_AUTHOR_11  committing to zeta on master
-history forked at $orig_commit
- $d_orig $GOT_AUTHOR_11  adding the test tree
 EOF
+
+	local is_forked=true d_fork fork_commit fork_commit_msg
+
+	if [ "$old_commit1" = "$new_commit1" ]; then
+		if [ "$old_commit2" = "$new_commit2" ]; then
+			is_forked=false
+		else
+			d_fork=$d_orig1
+			fork_commit=$new_commit1
+			fork_commit_msg="committing changes"
+		fi
+	else
+		d_fork=$d_orig
+		fork_commit=$orig_commit
+		fork_commit_msg="adding the test tree"
+	fi
+
+	$is_forked && cat >> $testroot/stdout.expected <<EOF
+history forked at $fork_commit
+ $d_fork $GOT_AUTHOR_11  $fork_commit_msg
+EOF
+
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
