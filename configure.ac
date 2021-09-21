@@ -396,7 +396,8 @@ AC_CONFIG_FILES([Makefile
 		 libexec/got-send-pack/Makefile
 		 got/Makefile
 		 gotadmin/Makefile
-		 tog/Makefile])
+		 tog/Makefile
+		 regress/cmdline/Makefile.linux:regress/cmdline/Makefile.am])
 AC_OUTPUT
 
 #                tog/GNUMakefile])

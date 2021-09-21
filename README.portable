@@ -23,6 +23,19 @@ Got requires the following libraries:
 Currently, these dependencies are searched for via pkg-config(1) which must
 also be installed.
 
+TESTS (REGRESS)
+===============
+
+There are tests under regress/ -- these are designed to work on OpenBSD.  For
+now, the cmdline/ tests have been prioritised.
+
+To run the test suite:
+
+ $ make tests
+
+NOTE:  THIS ONLY WORKS AFTER 'make install' DUE TO HOW PATHS TO LIBEXEC
+       HELPERS ARE HARD-CODED INTO THE BINARIES.
+
 INSTALLATION
 ============
 
@@ -34,7 +47,7 @@ TODO
 ====
 
 This port is incomplete in that only got(1) and tog(1) have been ported.
-gotweb and the test suite (regress) have yet to be ported.
+gotweb has yet to be ported.
 
 configure.ac should start defining AC_ENABLE arguments to allow for
 finer-grained control of where to search for includes/libraries, etc.
