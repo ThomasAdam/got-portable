@@ -27,7 +27,6 @@
 #include <unistd.h>
 
 #include "got_compat.h"
-#include "xmalloc.h"
 
 static int	ibuf_realloc(struct ibuf *, size_t);
 static void	ibuf_enqueue(struct msgbuf *, struct ibuf *);
@@ -78,7 +77,7 @@ ibuf_realloc(struct ibuf *buf, size_t len)
 		return (-1);
 	}
 
-	b = xrecallocarray(buf->buf, buf->size, buf->wpos + len, 1);
+	b = recallocarray(buf->buf, buf->size, buf->wpos + len, 1);
 	if (b == NULL)
 		return (-1);
 	buf->buf = b;
