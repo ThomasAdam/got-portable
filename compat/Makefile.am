@@ -30,6 +30,9 @@ libopenbsd_compat_a_SOURCES =  \
 	strsep.c \
 	strtonum.c \
 	uuid.c
+	imsg.h \
+	queue.h \
+	tree.h
 
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \

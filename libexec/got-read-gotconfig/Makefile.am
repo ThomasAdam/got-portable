@@ -1,5 +1,7 @@
 bin_PROGRAMS = got-read-gotconfig
-got_read_gotconfig_SOURCES = got-read-gotconfig.c \
+got_read_gotconfig_SOURCES = \
+	got-read-gotconfig.c \
+	gotconfig.h \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/inflate.c \
 	$(top_srcdir)/lib/object_parse.c \

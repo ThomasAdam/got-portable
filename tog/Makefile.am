@@ -45,6 +45,8 @@ tog_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 man1_MANS = tog.1
 
+EXTRA_DIST = tog.1
+
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
 	-DGOT_LIBEXECDIR="${bindir}" \

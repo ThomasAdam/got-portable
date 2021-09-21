@@ -43,9 +43,14 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/pack_create.c \
 	$(top_srcdir)/lib/dial.c
 
+EXTRA_DIST = $(top_srcdir)/compat/*.[ch] \
+	     $(top_srcdir)/lib/*.[ch] \
+	     $(top_srcdir)/include/*.[ch] \
+	     got.1 got.conf.5 git-repository.5 got-worktree.5
+
 got_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
-man1_MANS = got.1
+man1_MANS = got.1 got.conf.5 git-repository.5 got-worktree.5
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \

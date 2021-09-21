@@ -1,13 +1,5 @@
 SUBDIRS = compat libexec got tog gotadmin
 
-EXTRA_DIST = compat/*.[ch] \
-	     got/*.[15] \
-	     lib/*.[ch] \
-	     include/*.[ch] \
-	     tog/*.[15] \
-	     gotadmin/*.[15] \
-	     libexec
-
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION'" \
 	-DGOT_VERSION_NUMBER='"@VERSION"' \
 	-DGOT_LIBEXECDIR="${bindir}" \
