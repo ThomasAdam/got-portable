@@ -372,8 +372,7 @@ load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
 				break;
 		}
 
-		if (got_object_tree_entry_is_symlink(e) ||
-		    got_object_tree_entry_is_submodule(e) ||
+		if (got_object_tree_entry_is_submodule(e) ||
 		    got_object_idset_contains(idset, id))
 			continue;
 		
@@ -389,7 +388,7 @@ load_tree_entries(struct got_object_id_queue *ids, struct got_pack_metavec *v,
 			if (err)
 				break;
 			STAILQ_INSERT_TAIL(ids, qid, entry);
-		} else if (S_ISREG(mode)) {
+		} else if (S_ISREG(mode) || S_ISLNK(mode)) {
 			err = add_meta(v, idset, id, p, GOT_OBJ_TYPE_BLOB,
 			    mtime, loose_obj_only, repo);
 			if (err)

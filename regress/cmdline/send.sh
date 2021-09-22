@@ -40,6 +40,10 @@ EOF
 		| tr -d ' ' | cut -d: -f2`
 
 	echo "modified alpha" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	(cd $testroot/repo && ln -s epsilon/zeta symlink && git add symlink)
+	echo "new file alpha" > $testroot/repo/new
+	(cd $testroot/repo && git add new)
 	git_commit $testroot/repo -m "modified alpha"
 	local commit_id2=`git_show_head $testroot/repo`
 
@@ -95,6 +99,18 @@ EOF
 	echo "refs/remotes/origin/master: $commit_id" \
 		>> $testroot/stdout.expected
 
+	cmp -s $testroot/stdout $testroot/stdout.expected
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tree -r $testroot/repo-clone -c $commit_id2 -i -R \
+		> $testroot/stdout
+	got tree -r $testroot/repo -c $commit_id2 -i -R \
+		> $testroot/stdout.expected
 	cmp -s $testroot/stdout $testroot/stdout.expected
 	ret="$?"
 	if [ "$ret" != "0" ]; then
