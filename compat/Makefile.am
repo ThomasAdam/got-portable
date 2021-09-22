@@ -29,7 +29,7 @@ libopenbsd_compat_a_SOURCES =  \
 	strnlen.c \
 	strsep.c \
 	strtonum.c \
-	uuid.c
+	uuid.c \
 	imsg.h \
 	queue.h \
 	tree.h
