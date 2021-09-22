@@ -50,7 +50,8 @@ EXTRA_DIST = $(top_srcdir)/compat/*.[ch] \
 
 got_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
-man1_MANS = got.1 got.conf.5 git-repository.5 got-worktree.5
+man1_MANS = got.1
+man5_MANS = got.conf.5 git-repository.5 got-worktree.5
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
