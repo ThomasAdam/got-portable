@@ -143,6 +143,26 @@ AC_REPLACE_FUNCS([ \
 # implementations.
 AC_LIBOBJ(getopt)
 
+# Check the platform we're compiling on.
+AC_MSG_CHECKING(platform)
+case "$host_os" in
+	*linux*)
+		AC_MSG_RESULT(linux)
+		PLATFORM=linux
+		;;
+	*freebsd*)
+		AC_MSG_RESULT(freebsd)
+		PLATFORM=freebsd
+		;;
+	*)
+		AC_MSG_RESULT(unknown)
+		PLATFORM=unknown
+		;;
+esac
+AC_SUBST(PLATFORM)
+AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
+AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
+
 # Clang sanitizers wrap reallocarray even if it isn't available on the target
 # system. When compiled it always returns NULL and crashes the program. To
 # detect this we need a more complicated test.
@@ -183,9 +203,13 @@ PKG_CHECK_MODULES(
 		found_libcrypto=yes
 	],
 	[
-	 	AC_MSG_ERROR("*** couldn't find libcrypto via pkg-config")
+	 	found_libcrypto=no
 	]
 )
+
+if test "x$found_libcrypto" = "xyes"; then
+	AC_DEFINE(HAVE_LIBCRYPTO)
+fi
 
 AC_SEARCH_LIBS(uuid_create, , AC_DEFINE(HAVE_BSD_UUID))
 AC_SEARCH_LIBS(mergesort, , AC_DEFINE(HAVE_BSD_MERGESORT))
@@ -200,10 +224,20 @@ PKG_CHECK_MODULES(
 		found_libuuid=yes
 	],
 	[
-	 	AC_MSG_ERROR("*** couldn't find libuuid via pkg-config")
+	 	found_libuuid=no
 	]
 )
 
+if test "x$found_libuuid" = "xno"; then
+	AC_CHECK_HEADER(
+		uuid.h,
+		found_libuuid=yes,
+		found_libuuid=no)
+fi
+
+if test "x$found_libuuid" = "xno"; then
+	AC_MSG_ERROR("*** couldn't find uuid ***")
+fi
 
 PKG_CHECK_MODULES(
 	ZLIB,
@@ -215,44 +249,47 @@ PKG_CHECK_MODULES(
 		found_zlib=yes
 	],
 	[
-	 	AC_MSG_ERROR("*** couldn't find zlib via pkg-config")
+	 	found_zlib=no
 	]
 )
 
-PKG_CHECK_MODULES(
-	LIBMD,
-	libmd,
-	[
-	 	AM_CFLAGS="$LIBMD_CFLAGS $AM_CFLAGS"
-		CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-		LIBS="$LIBMD_LIBS $LIBS"
-	],
-	[
-	 	AC_MSG_ERROR("*** couldn't find libmd via pkg-config")
-	]
-)
-# libmd (uuid)
-# imsg
-# libbsd (some portability gloop)
-# lssl
-# lz
-# ldl *
-# rdynamic *
+if test "x$found_zlib" = "xno"; then
+	AC_CHECK_HEADER(
+		zlib.h,
+		,
+		found_zlib=no)
+fi
 
-# Check if libbsd is installed -- if we can use that version of sys/tree.h or
-# our own if not.
-PKG_CHECK_MODULES(
-	LIBBSD,
-	libbsd-overlay,
-	[
-		AM_CFLAGS="$LIBBSD_CFLAGS $AM_CFLAGS"
-		CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-		LIBS="$LIBBSD_LIBS $LIBS"
-		found_libbsd=yes
-		AC_DEFINE(HAVE_LIBBSD)
-	],
-	[]
-)
+if test "x$found_zlib" = "xno"; then
+	AC_MSG_ERROR("*** couldn't find zlib ***")
+fi
+
+if test "$PLATFORM" = "linux"; then
+	PKG_CHECK_MODULES(
+		LIBMD,
+		libmd,
+		[
+			AM_CFLAGS="$LIBMD_CFLAGS $AM_CFLAGS"
+			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
+			LIBS="$LIBMD_LIBS $LIBS"
+		],
+		[
+			AC_MSG_ERROR("*** couldn't find libmd via pkg-config")
+		]
+	)
+	PKG_CHECK_MODULES(
+		LIBBSD,
+		libbsd-overlay,
+		[
+			AM_CFLAGS="$LIBBSD_CFLAGS $AM_CFLAGS"
+			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
+			LIBS="$LIBBSD_LIBS $LIBS"
+			found_libbsd=yes
+			AC_DEFINE(HAVE_LIBBSD)
+		],
+		[]
+	)
+fi
 
 # Look for a suitable queue.h.  We hope libbsd is enough, but that is missing
 # SIMPLEQ.
@@ -313,12 +350,20 @@ AC_LINK_IFELSE([AC_LANG_SOURCE(
 	AC_MSG_RESULT(no)
 )
 
-PKG_CHECK_MODULES(
-	LIBPANELW,
-	panelw,
-	found_panel=yes,
-	AC_MSG_ERROR("*** couldn't find -lpanel from ncurses")
-)
+if test "$PLATFORM" = "linux"; then
+	PKG_CHECK_MODULES(
+		LIBPANELW,
+		panelw,
+		found_panel=yes,
+		AC_MSG_ERROR("*** couldn't find -lpanel from ncurses")
+	)
+else
+	AC_CHECK_LIB(panelw, update_panels,,
+		AC_MSG_ERROR([ "*** panelw not found for ncurses. ***"])
+	)
+
+	LIBPANELW_LIBS="-lpanelw"
+fi
 
 PKG_CHECK_MODULES(
 	LIBNCURSES,
@@ -345,7 +390,7 @@ else
 			LIBS="$LIBS -lncursesw $LIBPANELW_LIBS",
 			found_ncurses=no
 		)
-		fi
+	fi
 fi
 if test "x$found_ncurses" = xyes; then
 	AC_DEFINE(HAVE_NCURSES_H)

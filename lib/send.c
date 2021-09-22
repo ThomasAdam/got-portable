@@ -23,7 +23,6 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 
-#include <endian.h>
 #include <errno.h>
 #include <err.h>
 #include <fcntl.h>
@@ -31,7 +30,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <sha1.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <ctype.h>

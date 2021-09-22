@@ -21,7 +21,6 @@
 #include <string.h>
 #include <limits.h>
 #include <zlib.h>
-#include <sha1.h>
 #include <time.h>
 #include <zlib.h>
 

@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <sha1.h>
 #include <limits.h>
 
 #include "got_compat.h"

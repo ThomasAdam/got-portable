@@ -26,10 +26,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sha1.h>
 #include <zlib.h>
 #include <fnmatch.h>
 #include <libgen.h>
+#include <uuid.h>
 
 #include "got_compat.h"
 

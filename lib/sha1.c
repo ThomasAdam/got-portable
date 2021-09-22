@@ -15,11 +15,12 @@
  */
 
 #include <sys/types.h>
-#include <sha1.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+
+#include "got_compat.h"
 
 #include "got_lib_sha1.h"
 

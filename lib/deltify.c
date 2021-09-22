@@ -18,14 +18,12 @@
 #include <sys/types.h>
 
 #include <assert.h>
-#include <endian.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
 
 #include "got_error.h"
 

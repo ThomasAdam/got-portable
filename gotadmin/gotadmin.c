@@ -22,7 +22,6 @@
 #include <errno.h>
 #include <locale.h>
 #include <inttypes.h>
-#include <sha1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>

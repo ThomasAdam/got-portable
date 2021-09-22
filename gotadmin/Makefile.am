@@ -39,4 +39,7 @@ AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
        -I$(top_srcdir)/include \
        -I.
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat
+LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lmd
+if HOST_FREEBSD
+LDADD += -lmd
+endif

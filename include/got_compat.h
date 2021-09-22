@@ -4,6 +4,11 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
+#if defined(__FreeBSD__)
+#include <sys/endian.h>
+#else
+#include <endian.h>
+#endif
 
 #include <fnmatch.h>
 #include <limits.h>
@@ -100,6 +105,20 @@ void uuid_to_string(uuid_t *, char **, uint32_t *);
 #include "compat/imsg.h"
 #endif
 
+#ifdef HAVE_LIBCRYPTO
+#include <sha1.h>
+#else
+#include <sha.h>
+
+#define SHA1_DIGEST_LENGTH		SHA_DIGEST_LENGTH
+#define SHA1_DIGEST_STRING_LENGTH	(SHA1_DIGEST_LENGTH * 2 + 1)
+
+#define SHA1_CTX	SHA_CTX
+#define SHA1Init	SHA1_Init
+#define SHA1Update	SHA1_Update
+#define SHA1Final	SHA1_Final
+#endif
+
 #ifndef HAVE_ASPRINTF
 /* asprintf.c */
 int		 asprintf(char **, const char *, ...);
@@ -119,6 +138,10 @@ int		 getdtablecount(void);
 #ifndef HAVE_CLOSEFROM
 /* closefrom.c */
 //void		 closefrom(int);
+#define closefrom(fd) (closefrom(fd), 0)
+#endif
+
+#if defined (__FreeBSD__)
 #define closefrom(fd) (closefrom(fd), 0)
 #endif
 

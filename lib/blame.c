@@ -19,7 +19,6 @@
 #include <sys/stat.h>
 
 #include <errno.h>
-#include <sha1.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

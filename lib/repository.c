@@ -22,14 +22,12 @@
 #include <sys/resource.h>
 
 #include <ctype.h>
-#include <endian.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <limits.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sha1.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>

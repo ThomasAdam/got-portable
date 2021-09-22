@@ -29,10 +29,13 @@ libopenbsd_compat_a_SOURCES =  \
 	strnlen.c \
 	strsep.c \
 	strtonum.c \
-	uuid.c \
 	imsg.h \
 	queue.h \
 	tree.h
+if HOST_FREEBSD
+else
+libopenbsd_compat_a_SOURCES += uuid.c
+endif
 
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \

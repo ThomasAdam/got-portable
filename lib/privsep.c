@@ -28,7 +28,6 @@
 #include <errno.h>
 #include <stdint.h>
 #include <poll.h>
-#include <sha1.h>
 #include <unistd.h>
 #include <zlib.h>
 #include <time.h>

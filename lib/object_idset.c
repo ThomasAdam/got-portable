@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <sha1.h>
 #include <stdio.h>
 #include <zlib.h>
 #include <limits.h>

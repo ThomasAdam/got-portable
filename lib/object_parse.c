@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <sha1.h>
 #include <zlib.h>
 #include <ctype.h>
 #include <limits.h>
