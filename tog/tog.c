@@ -3227,6 +3227,29 @@ write_commit_info(off_t **line_offsets, size_t *nlines,
 		if (err)
 			goto done;
 	}
+	if (got_object_commit_get_nparents(commit) > 1) {
+		const struct got_object_id_queue *parent_ids;
+		struct got_object_qid *qid;
+		int pn = 1;
+		parent_ids = got_object_commit_get_parent_ids(commit);
+		STAILQ_FOREACH(qid, parent_ids, entry) {
+			err = got_object_id_str(&id_str, qid->id);
+			if (err)
+				goto done;
+			n = fprintf(outfile, "parent %d: %s\n", pn++, id_str);
+			if (n < 0) {
+				err = got_error_from_errno("fprintf");
+				goto done;
+			}
+			outoff += n;
+			err = add_line_offset(line_offsets, nlines, outoff);
+			if (err)
+				goto done;
+			free(id_str);
+			id_str = NULL;
+		}
+	}
+
 	err = got_object_commit_get_logmsg(&logmsg, commit);
 	if (err)
 		goto done;
@@ -3528,8 +3551,8 @@ open_diff_view(struct tog_view *view, struct got_object_id *id1,
 		}
 
 		err = add_color(&s->colors,
-		    "^(commit [0-9a-f]|(blob|file) [-+] |[MDmA]  [^ ])",
-		    TOG_COLOR_DIFF_META,
+		    "^(commit [0-9a-f]|parent [0-9]|(blob|file) [-+] |"
+		    "[MDmA]  [^ ])", TOG_COLOR_DIFF_META,
 		    get_color_value("TOG_COLOR_DIFF_META"));
 		if (err) {
 			free_colors(&s->colors);
