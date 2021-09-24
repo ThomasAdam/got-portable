@@ -7657,6 +7657,7 @@ got_worktree_merge_in_progress(int *in_progress, struct got_worktree *worktree,
 	if (err)
 		return err;
 	err = got_ref_open(&branch_ref, repo, branch_refname, 0);
+	free(branch_refname);
 	if (err) {
 		if (err->code != GOT_ERR_NOT_REF)
 			return err;
