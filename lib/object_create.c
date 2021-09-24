@@ -491,10 +491,10 @@ got_object_commit_create(struct got_object_id **id,
 	}
 
 	if (parent_ids) {
+		free(id_str);
+		id_str = NULL;
 		STAILQ_FOREACH(qid, parent_ids, entry) {
 			char *parent_str = NULL;
-
-			free(id_str);
 
 			err = got_object_id_str(&id_str, qid->id);
 			if (err)
@@ -513,6 +513,8 @@ got_object_commit_create(struct got_object_id **id,
 				goto done;
 			}
 			free(parent_str);
+			free(id_str);
+			id_str = NULL;
 		}
 	}
 
@@ -569,6 +571,7 @@ got_object_commit_create(struct got_object_id **id,
 
 	err = create_object_file(*id, commitfile, repo);
 done:
+	free(id_str);
 	free(msg0);
 	free(header);
 	free(tree_str);

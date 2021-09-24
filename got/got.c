@@ -109,6 +109,7 @@ __dead static void	usage_backout(void);
 __dead static void	usage_rebase(void);
 __dead static void	usage_histedit(void);
 __dead static void	usage_integrate(void);
+__dead static void	usage_merge(void);
 __dead static void	usage_stage(void);
 __dead static void	usage_unstage(void);
 __dead static void	usage_cat(void);
@@ -138,6 +139,7 @@ static const struct got_error*		cmd_backout(int, char *[]);
 static const struct got_error*		cmd_rebase(int, char *[]);
 static const struct got_error*		cmd_histedit(int, char *[]);
 static const struct got_error*		cmd_integrate(int, char *[]);
+static const struct got_error*		cmd_merge(int, char *[]);
 static const struct got_error*		cmd_stage(int, char *[]);
 static const struct got_error*		cmd_unstage(int, char *[]);
 static const struct got_error*		cmd_cat(int, char *[]);
@@ -168,6 +170,7 @@ static struct got_cmd got_commands[] = {
 	{ "rebase",	cmd_rebase,	usage_rebase,	"rb" },
 	{ "histedit",	cmd_histedit,	usage_histedit,	"he" },
 	{ "integrate",  cmd_integrate,  usage_integrate,"ig" },
+	{ "merge",	cmd_merge,	usage_merge,	"mg" },
 	{ "stage",	cmd_stage,	usage_stage,	"sg" },
 	{ "unstage",	cmd_unstage,	usage_unstage,	"ug" },
 	{ "cat",	cmd_cat,	usage_cat,	"" },
@@ -3058,6 +3061,7 @@ struct got_update_progress_arg {
 	int conflicts;
 	int obstructed;
 	int not_updated;
+	int missing;
 	int verbosity;
 };
 
@@ -3107,6 +3111,8 @@ update_progress(void *arg, unsigned char status, const char *path)
 		upa->obstructed++;
 	if (status == GOT_STATUS_CANNOT_UPDATE)
 		upa->not_updated++;
+	if (status == GOT_STATUS_MISSING)
+		upa->missing++;
 
 	while (path[0] == '/')
 		path++;
@@ -3173,6 +3179,22 @@ check_rebase_or_histedit_in_progress(struct got_worktree *worktree)
 		return err;
 	if (in_progress)
 		return got_error(GOT_ERR_HISTEDIT_BUSY);
+
+	return NULL;
+}
+
+static const struct got_error *
+check_merge_in_progress(struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	int in_progress;
+
+	err = got_worktree_merge_in_progress(&in_progress, worktree, repo);
+	if (err)
+		return err;
+	if (in_progress)
+		return got_error(GOT_ERR_MERGE_BUSY);
 
 	return NULL;
 }
@@ -3297,6 +3319,10 @@ cmd_update(int argc, char *argv[])
 
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = check_merge_in_progress(worktree, repo);
 	if (error)
 		goto done;
 
@@ -7317,7 +7343,7 @@ cmd_commit(int argc, char *argv[])
 	struct collect_commit_logmsg_arg cl_arg;
 	char *gitconfig_path = NULL, *editor = NULL, *author = NULL;
 	int ch, rebase_in_progress, histedit_in_progress, preserve_logmsg = 0;
-	int allow_bad_symlinks = 0, non_interactive = 0;
+	int allow_bad_symlinks = 0, non_interactive = 0, merge_in_progress = 0;
 	struct got_pathlist_head paths;
 
 	TAILQ_INIT(&paths);
@@ -7390,6 +7416,14 @@ cmd_commit(int argc, char *argv[])
 	    gitconfig_path);
 	if (error != NULL)
 		goto done;
+
+	error = got_worktree_merge_in_progress(&merge_in_progress, worktree, repo);
+	if (error)
+		goto done;
+	if (merge_in_progress) {
+		error = got_error(GOT_ERR_MERGE_BUSY);
+		goto done;
+	}
 
 	error = get_author(&author, repo, worktree);
 	if (error)
@@ -8157,8 +8191,8 @@ cmd_backout(int argc, char *argv[])
 	}
 
 	memset(&upa, 0, sizeof(upa));
-	error = got_worktree_merge_files(worktree, commit_id, pid->id, repo,
-	    update_progress, &upa, check_cancelled, NULL);
+	error = got_worktree_merge_files(worktree, commit_id, pid->id,
+	    repo, update_progress, &upa, check_cancelled, NULL);
 	if (error != NULL)
 		goto done;
 
@@ -8737,8 +8771,8 @@ cmd_rebase(int argc, char *argv[])
 	struct got_object_id *branch_head_commit_id = NULL, *yca_id = NULL;
 	struct got_commit_object *commit = NULL;
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
-	int histedit_in_progress = 0, create_backup = 1, list_backups = 0;
-	int delete_backups = 0;
+	int histedit_in_progress = 0, merge_in_progress = 0;
+	int create_backup = 1, list_backups = 0, delete_backups = 0;
 	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
@@ -8845,6 +8879,15 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 	if (histedit_in_progress) {
 		error = got_error(GOT_ERR_HISTEDIT_BUSY);
+		goto done;
+	}
+
+	error = got_worktree_merge_in_progress(&merge_in_progress,
+	    worktree, repo);
+	if (error)
+		goto done;
+	if (merge_in_progress) {
+		error = got_error(GOT_ERR_MERGE_BUSY);
 		goto done;
 	}
 
@@ -9901,7 +9944,7 @@ cmd_histedit(int argc, char *argv[])
 	struct got_object_id *base_commit_id = NULL;
 	struct got_object_id *head_commit_id = NULL;
 	struct got_commit_object *commit = NULL;
-	int ch, rebase_in_progress = 0;
+	int ch, rebase_in_progress = 0, merge_in_progress = 0;
 	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
 	int edit_logmsg_only = 0, fold_only = 0;
@@ -10059,6 +10102,15 @@ cmd_histedit(int argc, char *argv[])
 		goto done;
 	if (rebase_in_progress) {
 		error = got_error(GOT_ERR_REBASING);
+		goto done;
+	}
+
+	error = got_worktree_merge_in_progress(&merge_in_progress, worktree,
+	    repo);
+	if (error)
+		goto done;
+	if (merge_in_progress) {
+		error = got_error(GOT_ERR_MERGE_BUSY);
 		goto done;
 	}
 
@@ -10456,6 +10508,10 @@ cmd_integrate(int argc, char *argv[])
 	if (error)
 		goto done;
 
+	error = check_merge_in_progress(worktree, repo);
+	if (error)
+		goto done;
+
 	if (asprintf(&refname, "refs/heads/%s", branch_arg) == -1) {
 		error = got_error_from_errno("asprintf");
 		goto done;
@@ -10528,6 +10584,256 @@ done:
 	free(commit_id);
 	free(refname);
 	free(base_refname);
+	return error;
+}
+
+__dead static void
+usage_merge(void)
+{
+	fprintf(stderr, "usage: %s merge [-a] [-c] [branch]\n",
+	    getprogname());
+	exit(1);
+}
+
+static const struct got_error *
+cmd_merge(int argc, char *argv[])
+{
+	const struct got_error *error = NULL;
+	struct got_worktree *worktree = NULL;
+	struct got_repository *repo = NULL;
+	struct got_fileindex *fileindex = NULL;
+	char *cwd = NULL, *id_str = NULL, *author = NULL;
+	struct got_reference *branch = NULL, *wt_branch = NULL;
+	struct got_object_id *branch_tip = NULL, *yca_id = NULL;
+	struct got_object_id *wt_branch_tip = NULL;
+	int ch, merge_in_progress = 0, abort_merge = 0, continue_merge = 0;
+	struct got_update_progress_arg upa;
+	struct got_object_id *merge_commit_id = NULL;
+	char *branch_name = NULL;
+
+	memset(&upa, 0, sizeof(upa));
+
+	while ((ch = getopt(argc, argv, "ac")) != -1) {
+		switch (ch) {
+		case 'a':
+			abort_merge = 1;
+			break;
+		case 'c':
+			continue_merge = 1;
+			break;
+		default:
+			usage_rebase();
+			/* NOTREACHED */
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+#ifndef PROFILE
+	if (pledge("stdio rpath wpath cpath fattr flock proc exec sendfd "
+	    "unveil", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	if (abort_merge && continue_merge)
+		option_conflict('a', 'c');
+	if (abort_merge || continue_merge) {
+		if (argc != 0)
+			usage_merge();
+	} else if (argc != 1)
+		usage_merge();
+
+	cwd = getcwd(NULL, 0);
+	if (cwd == NULL) {
+		error = got_error_from_errno("getcwd");
+		goto done;
+	}
+
+	error = got_worktree_open(&worktree, cwd);
+	if (error) {
+		if (error->code == GOT_ERR_NOT_WORKTREE)
+			error = wrap_not_worktree_error(error,
+			    "merge", cwd);
+		goto done;
+	}
+
+	error = got_repo_open(&repo,
+	    worktree ? got_worktree_get_repo_path(worktree) : cwd, NULL);
+	if (error != NULL)
+		goto done;
+
+	error = apply_unveil(got_repo_get_path(repo), 0,
+	    worktree ? got_worktree_get_root_path(worktree) : NULL);
+	if (error)
+		goto done;
+
+	error = check_rebase_or_histedit_in_progress(worktree);
+	if (error)
+		goto done;
+
+	error = got_worktree_merge_in_progress(&merge_in_progress, worktree,
+	    repo);
+	if (error)
+		goto done;
+
+	if (abort_merge) {
+		if (!merge_in_progress) {
+			error = got_error(GOT_ERR_NOT_MERGING);
+			goto done;
+		}
+		error = got_worktree_merge_continue(&branch_name,
+		    &branch_tip, &fileindex, worktree, repo);
+		if (error)
+			goto done;
+		error = got_worktree_merge_abort(worktree, fileindex, repo,
+		    update_progress, &upa);
+		if (error)
+			goto done;
+		printf("Merge of %s aborted\n", branch_name);
+		goto done; /* nothing else to do */
+	}
+
+	error = get_author(&author, repo, worktree);
+	if (error)
+		goto done;
+
+	if (continue_merge) {
+		if (!merge_in_progress) {
+			error = got_error(GOT_ERR_NOT_MERGING);
+			goto done;
+		}
+		error = got_worktree_merge_continue(&branch_name,
+		    &branch_tip, &fileindex, worktree, repo);
+		if (error)
+			goto done;
+	} else {
+		error = got_ref_open(&branch, repo, argv[0], 0);
+		if (error != NULL)
+			goto done;
+		branch_name = strdup(got_ref_get_name(branch));
+		if (branch_name == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+		error = got_ref_resolve(&branch_tip, repo, branch);
+		if (error)
+			goto done;
+	}
+
+	error = got_ref_open(&wt_branch, repo,
+	    got_worktree_get_head_ref_name(worktree), 0);
+	if (error)
+		goto done;
+	error = got_ref_resolve(&wt_branch_tip, repo, wt_branch);
+	if (error)
+		goto done;
+	error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
+	    wt_branch_tip, branch_tip, repo,
+	    check_cancelled, NULL);
+	if (error)
+		goto done;
+	if (yca_id == NULL) {
+		error = got_error_msg(GOT_ERR_ANCESTRY,
+		    "specified branch shares no common ancestry "
+		    "with work tree's branch");
+		goto done;
+	}
+
+	if (!continue_merge) {
+		error = check_path_prefix(wt_branch_tip, branch_tip,
+		    got_worktree_get_path_prefix(worktree),
+		    GOT_ERR_MERGE_PATH, repo);
+		if (error)
+			goto done;
+		error = check_same_branch(wt_branch_tip, branch,
+		    yca_id, repo);
+		if (error) {
+			if (error->code != GOT_ERR_ANCESTRY)
+				goto done;
+			error = NULL;
+		} else {
+			static char msg[512];
+			snprintf(msg, sizeof(msg),
+			    "cannot create a merge commit because "
+			    "%s is based on %s; %s can be integrated "
+			    "with 'got integrate' instead", branch_name,
+			    got_worktree_get_head_ref_name(worktree),
+			    branch_name);
+			error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
+			goto done;
+		}
+		error = got_worktree_merge_prepare(&fileindex, worktree,
+		    branch, repo);
+		if (error)
+			goto done;
+
+		error = got_worktree_merge_branch(worktree, fileindex,
+		    yca_id, branch_tip, repo, update_progress, &upa,
+		    check_cancelled, NULL);
+		if (error)
+			goto done;
+		print_update_progress_stats(&upa);
+	}
+
+	if (upa.conflicts > 0 || upa.obstructed > 0 || upa.missing > 0) {
+		error = got_worktree_merge_postpone(worktree, fileindex);
+		if (error)
+			goto done;
+		if (upa.conflicts > 0 &&
+		    upa.obstructed == 0 && upa.missing == 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before merging "
+			    "can continue");
+		} else if (upa.conflicts > 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before merging "
+			    "can continue; changes destined for missing "
+			    "or obstructed files were not yet merged and "
+			    "should be merged manually if required before the "
+			    "merge operation is continued");
+		} else {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "changes destined for missing or obstructed "
+			    "files were not yet merged and should be "
+			    "merged manually if required before the "
+			    "merge operation is continued");
+		}
+		goto done;
+	} else {
+		error = got_worktree_merge_commit(&merge_commit_id, worktree,
+		    fileindex, author, NULL, 1, branch_tip, branch_name, repo);
+		if (error)
+			goto done;
+		error = got_worktree_merge_complete(worktree, fileindex, repo);
+		if (error)
+			goto done;
+		error = got_object_id_str(&id_str, merge_commit_id);
+		if (error)
+			goto done;
+		printf("Merged %s into %s: %s\n", branch_name,
+		    got_worktree_get_head_ref_name(worktree),
+		    id_str);
+
+	}
+done:
+	free(id_str);
+	free(merge_commit_id);
+	free(author);
+	free(branch_tip);
+	free(branch_name);
+	free(yca_id);
+	if (branch)
+		got_ref_close(branch);
+	if (wt_branch)
+		got_ref_close(wt_branch);
+	if (worktree)
+		got_worktree_close(worktree);
+	if (repo) {
+		const struct got_error *close_err = got_repo_close(repo);
+		if (error == NULL)
+			error = close_err;
+	}
 	return error;
 }
 
@@ -10644,6 +10950,10 @@ cmd_stage(int argc, char *argv[])
 	}
 	error = apply_unveil(got_repo_get_path(repo), 0,
 	    got_worktree_get_root_path(worktree));
+	if (error)
+		goto done;
+
+	error = check_merge_in_progress(worktree, repo);
 	if (error)
 		goto done;
 
