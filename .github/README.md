@@ -1,6 +1,9 @@
 README.portable
 ===============
 
+**NOTE: This repository is read-only and is used only to mirror the
+got-portable repository for CI purposes.**
+
 This is the portable version of got[1] (Game of Trees), using autotools to
 provide the library checks required for Got's dependencies.
 
