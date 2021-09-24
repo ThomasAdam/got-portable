@@ -970,6 +970,119 @@ test_merge_missing_file() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_no_op() {
+	local testroot=`test_init merge_no_op`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local branch_commitk=`git_show_branch_head $testroot/repo newbranch`
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a conflicting commit
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified alpha on master" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	# need an up-to-date work tree for 'got merge' 
+	(cd $testroot/wt && got update > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got merge succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "C  alpha" >> $testroot/stdout.expected
+	echo "Files with new merge conflicts: 1" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: conflicts must be resolved before merging can continue" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "C  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# resolve the conflict by reverting all changes; now it is no-op merge
+	(cd $testroot/wt && got revert alpha > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got revert failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge -c > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got merge succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: merge of refs/heads/newbranch cannot proceed: " \
+		> $testroot/stderr.expected
+	echo "no changes to commit" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n "" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
@@ -977,3 +1090,4 @@ run_test test_merge_abort
 run_test test_merge_in_progress
 run_test test_merge_path_prefix
 run_test test_merge_missing_file
+run_test test_merge_no_op
