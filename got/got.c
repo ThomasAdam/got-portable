@@ -10776,12 +10776,11 @@ cmd_merge(int argc, char *argv[])
 		print_update_progress_stats(&upa);
 	}
 
-	if (upa.conflicts > 0 || upa.obstructed > 0 || upa.missing > 0) {
+	if (upa.conflicts > 0 || upa.missing > 0) {
 		error = got_worktree_merge_postpone(worktree, fileindex);
 		if (error)
 			goto done;
-		if (upa.conflicts > 0 &&
-		    upa.obstructed == 0 && upa.missing == 0) {
+		if (upa.conflicts > 0 && upa.missing == 0) {
 			error = got_error_msg(GOT_ERR_CONFLICTS,
 			    "conflicts must be resolved before merging "
 			    "can continue");
@@ -10789,12 +10788,12 @@ cmd_merge(int argc, char *argv[])
 			error = got_error_msg(GOT_ERR_CONFLICTS,
 			    "conflicts must be resolved before merging "
 			    "can continue; changes destined for missing "
-			    "or obstructed files were not yet merged and "
+			    "files were not yet merged and "
 			    "should be merged manually if required before the "
 			    "merge operation is continued");
 		} else {
 			error = got_error_msg(GOT_ERR_CONFLICTS,
-			    "changes destined for missing or obstructed "
+			    "changes destined for missing "
 			    "files were not yet merged and should be "
 			    "merged manually if required before the "
 			    "merge operation is continued");
