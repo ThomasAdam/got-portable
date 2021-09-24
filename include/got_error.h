@@ -155,6 +155,12 @@
 #define GOT_ERR_CAPA_DELETE_REFS 138
 #define GOT_ERR_SEND_DELETE_REF	139
 #define GOT_ERR_SEND_TAG_EXISTS	140
+#define GOT_ERR_NOT_MERGING	141
+#define GOT_ERR_MERGE_OUT_OF_DATE 142
+#define GOT_ERR_MERGE_STAGED_PATHS 143
+#define GOT_ERR_MERGE_COMMIT_OUT_OF_DATE 143
+#define GOT_ERR_MERGE_BUSY	144
+#define GOT_ERR_MERGE_PATH	145
 
 static const struct got_error {
 	int code;
@@ -318,6 +324,19 @@ static const struct got_error {
 	{ GOT_ERR_CAPA_DELETE_REFS, "server cannot delete references" },
 	{ GOT_ERR_SEND_DELETE_REF, "reference cannot be deleted" },
 	{ GOT_ERR_SEND_TAG_EXISTS, "tag already exists on server" },
+	{ GOT_ERR_NOT_MERGING,	"merge operation not in progress" },
+	{ GOT_ERR_MERGE_OUT_OF_DATE, "work tree must be updated before it "
+	    "can be used to merge a branch" },
+	{ GOT_ERR_MERGE_STAGED_PATHS, "work tree contains files with staged "
+	    "changes; these changes must be unstaged before merging can "
+	    "proceed" },
+	{ GOT_ERR_MERGE_COMMIT_OUT_OF_DATE, "merging cannot proceed because "
+	    "the work tree is no longer up-to-date; merge must be aborted "
+	    "and retried" },
+	{ GOT_ERR_MERGE_BUSY,"a merge operation is in progress in this "
+	    "work tree and must be continued or aborted first" },
+	{ GOT_ERR_MERGE_PATH,	"cannot merge branch which contains "
+	    "changes outside of this work tree's path prefix" },
 };
 
 /*

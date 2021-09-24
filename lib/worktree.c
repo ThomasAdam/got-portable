@@ -2380,6 +2380,20 @@ got_worktree_get_histedit_script_path(char **path,
 	return NULL;
 }
 
+static const struct got_error *
+get_merge_branch_ref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_MERGE_BRANCH_REF_PREFIX);
+}
+
+static const struct got_error *
+get_merge_commit_ref_name(char **refname, struct got_worktree *worktree)
+{
+	return get_ref_name(refname, worktree,
+	    GOT_WORKTREE_MERGE_COMMIT_REF_PREFIX);
+}
+
 /*
  * Prevent Git's garbage collector from deleting our base commit by
  * setting a reference to our base commit's ID.
@@ -3277,7 +3291,8 @@ got_worktree_merge_files(struct got_worktree *worktree,
 		goto done;
 
 	err = merge_files(worktree, fileindex, fileindex_path, commit_id1,
-	    commit_id2, repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
+	    commit_id2, repo, progress_cb, progress_arg,
+	    cancel_cb, cancel_arg);
 done:
 	if (fileindex)
 		got_fileindex_free(fileindex);
@@ -4411,6 +4426,7 @@ struct revert_file_args {
 	got_worktree_patch_cb patch_cb;
 	void *patch_arg;
 	struct got_repository *repo;
+	int unlink_added_files;
 };
 
 static const struct got_error *
@@ -4691,6 +4707,19 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 		if (err)
 			goto done;
 		got_fileindex_entry_remove(a->fileindex, ie);
+		if (a->unlink_added_files) {
+			if (asprintf(&ondisk_path, "%s/%s",
+			    got_worktree_get_root_path(a->worktree),
+			    relpath) == -1) {
+				err = got_error_from_errno("asprintf");
+				goto done;
+			}
+			if (unlink(ondisk_path) == -1) {
+				err = got_error_from_errno2("unlink",
+				    ondisk_path);
+				break;
+			}
+		}
 		break;
 	case GOT_STATUS_DELETE:
 		if (a->patch_cb) {
@@ -4828,6 +4857,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.patch_cb = patch_cb;
 	rfa.patch_arg = patch_arg;
 	rfa.repo = repo;
+	rfa.unlink_added_files = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
 		    revert_file, &rfa, NULL, NULL, 0, 0);
@@ -5583,7 +5613,9 @@ done:
 const struct got_error *
 commit_worktree(struct got_object_id **new_commit_id,
     struct got_pathlist_head *commitable_paths,
-    struct got_object_id *head_commit_id, struct got_worktree *worktree,
+    struct got_object_id *head_commit_id,
+    struct got_object_id *parent_id2,
+    struct got_worktree *worktree,
     const char *author, const char *committer,
     got_worktree_commit_msg_cb commit_msg_cb, void *commit_arg,
     got_worktree_status_cb status_cb, void *status_arg,
@@ -5597,7 +5629,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	struct got_object_id *head_commit_id2 = NULL;
 	struct got_tree_object *head_tree = NULL;
 	struct got_object_id *new_tree_id = NULL;
-	int nentries;
+	int nentries, nparents = 0;
 	struct got_object_id_queue parent_ids;
 	struct got_object_qid *pid = NULL;
 	char *logmsg = NULL;
@@ -5661,9 +5693,16 @@ commit_worktree(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 	STAILQ_INSERT_TAIL(&parent_ids, pid, entry);
+	nparents++;
+	if (parent_id2) {
+		err = got_object_qid_alloc(&pid, parent_id2);
+		if (err)
+			goto done;
+		STAILQ_INSERT_TAIL(&parent_ids, pid, entry);
+		nparents++;
+	}
 	err = got_object_commit_create(new_commit_id, new_tree_id, &parent_ids,
-	    1, author, time(NULL), committer, time(NULL), logmsg, repo);
-	got_object_qid_free(pid);
+	    nparents, author, time(NULL), committer, time(NULL), logmsg, repo);
 	if (logmsg != NULL)
 		free(logmsg);
 	if (err)
@@ -5702,6 +5741,7 @@ commit_worktree(struct got_object_id **new_commit_id,
 	if (err)
 		goto done;
 done:
+	got_object_id_queue_free(&parent_ids);
 	if (head_tree)
 		got_object_tree_close(head_tree);
 	if (head_commit)
@@ -5862,7 +5902,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	}
 
 	err = commit_worktree(new_commit_id, &commitable_paths,
-	    head_commit_id, worktree, author, committer,
+	    head_commit_id, NULL, worktree, author, committer,
 	    commit_msg_cb, commit_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
@@ -6444,7 +6484,7 @@ rebase_commit(struct got_object_id **new_commit_id,
 
 	/* NB: commit_worktree will call free(logmsg) */
 	err = commit_worktree(new_commit_id, &commitable_paths, head_commit_id,
-	    worktree, got_object_commit_get_author(orig_commit),
+	    NULL, worktree, got_object_commit_get_author(orig_commit),
 	    got_object_commit_get_committer(orig_commit),
 	    collect_rebase_commit_msg, logmsg, rebase_status, NULL, repo);
 	if (err)
@@ -6768,6 +6808,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	rfa.patch_cb = NULL;
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
+	rfa.unlink_added_files = 0;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    revert_file, &rfa, NULL, NULL, 0, 0);
 	if (err)
@@ -7121,6 +7162,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	rfa.patch_cb = NULL;
 	rfa.patch_arg = NULL;
 	rfa.repo = repo;
+	rfa.unlink_added_files = 0;
 	err = worktree_status(worktree, "", fileindex, repo,
 	    revert_file, &rfa, NULL, NULL, 0, 0);
 	if (err)
@@ -7372,6 +7414,489 @@ got_worktree_integrate_abort(struct got_worktree *worktree,
 		err = unlockerr;
 	got_ref_close(base_branch_ref);
 
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_postpone(struct got_worktree *worktree,
+    struct got_fileindex *fileindex)
+{
+	const struct got_error *err, *sync_err;
+	char *fileindex_path = NULL;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+
+	err = lock_worktree(worktree, LOCK_SH);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
+	return err;
+}
+
+static const struct got_error *
+delete_merge_refs(struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *branch_refname = NULL, *commit_refname = NULL;
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(branch_refname, repo);
+	if (err)
+		goto done;
+
+	err = get_merge_commit_ref_name(&commit_refname, worktree);
+	if (err)
+		goto done;
+	err = delete_ref(commit_refname, repo);
+	if (err)
+		goto done;
+
+done:
+	free(branch_refname);
+	free(commit_refname);
+	return err;
+}
+
+struct merge_commit_msg_arg {
+	struct got_worktree *worktree;
+	const char *branch_name;
+};
+
+static const struct got_error *
+merge_commit_msg_cb(struct got_pathlist_head *commitable_paths, char **logmsg,
+    void *arg)
+{
+	struct merge_commit_msg_arg *a = arg;
+
+	if (asprintf(logmsg, "merge %s into %s\n", a->branch_name,
+	    got_worktree_get_head_ref_name(a->worktree)) == -1)
+		return got_error_from_errno("asprintf");
+
+	return NULL;
+}
+
+static const struct got_error *
+merge_status_cb(void *arg, unsigned char status, unsigned char staged_status,
+    const char *path, struct got_object_id *blob_id,
+    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
+    int dirfd, const char *de_name)
+{
+	return NULL;
+}
+
+const struct got_error *
+got_worktree_merge_branch(struct got_worktree *worktree,
+    struct got_fileindex *fileindex,
+    struct got_object_id *yca_commit_id,
+    struct got_object_id *branch_tip,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg)
+{
+	const struct got_error *err;
+	char *fileindex_path = NULL;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	err = got_fileindex_for_each_entry_safe(fileindex, check_mixed_commits,
+	    worktree);
+	if (err)
+		goto done;
+
+	err = merge_files(worktree, fileindex, fileindex_path, yca_commit_id,
+	    branch_tip, repo, progress_cb, progress_arg,
+	    cancel_cb, cancel_arg);
+done:
+	free(fileindex_path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_commit(struct got_object_id **new_commit_id,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    const char *author, const char *committer, int allow_bad_symlinks,
+    struct got_object_id *branch_tip, const char *branch_name,
+    struct got_repository *repo)
+{
+	const struct got_error *err = NULL, *sync_err;
+	struct got_pathlist_head commitable_paths;
+	struct collect_commitables_arg cc_arg;
+	struct got_pathlist_entry *pe;
+	struct got_reference *head_ref = NULL;
+	struct got_object_id *head_commit_id = NULL;
+	int have_staged_files = 0;
+	struct merge_commit_msg_arg mcm_arg;
+	char *fileindex_path = NULL;
+
+	*new_commit_id = NULL;
+
+	TAILQ_INIT(&commitable_paths);
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&head_ref, repo, worktree->head_ref_name, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&head_commit_id, repo, head_ref);
+	if (err)
+		goto done;
+
+	err = got_fileindex_for_each_entry_safe(fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+	if (have_staged_files) {
+		err = got_error(GOT_ERR_MERGE_STAGED_PATHS);
+		goto done;
+	}
+
+	cc_arg.commitable_paths = &commitable_paths;
+	cc_arg.worktree = worktree;
+	cc_arg.fileindex = fileindex;
+	cc_arg.repo = repo;
+	cc_arg.have_staged_files = have_staged_files;
+	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
+	err = worktree_status(worktree, "", fileindex, repo,
+	    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
+	if (err)
+		goto done;
+
+	if (TAILQ_EMPTY(&commitable_paths)) {
+		err = got_error_fmt(GOT_ERR_COMMIT_NO_CHANGES,
+		    "merge of %s cannot proceed", branch_name);
+		goto done;
+	}
+
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		const char *ct_path = ct->in_repo_path;
+
+		while (ct_path[0] == '/')
+			ct_path++;
+		err = check_out_of_date(ct_path, ct->status,
+		    ct->staged_status, ct->base_blob_id, ct->base_commit_id,
+		    head_commit_id, repo, GOT_ERR_MERGE_COMMIT_OUT_OF_DATE);
+		if (err)
+			goto done;
+
+	}
+
+	mcm_arg.worktree = worktree;
+	mcm_arg.branch_name = branch_name;
+	err = commit_worktree(new_commit_id, &commitable_paths,
+	    head_commit_id, branch_tip, worktree, author, committer,
+	    merge_commit_msg_cb, &mcm_arg, merge_status_cb, NULL, repo);
+	if (err)
+		goto done;
+
+	err = update_fileindex_after_commit(worktree, &commitable_paths,
+	    *new_commit_id, fileindex, have_staged_files);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	TAILQ_FOREACH(pe, &commitable_paths, entry) {
+		struct got_commitable *ct = pe->data;
+		free_commitable(ct);
+	}
+	got_pathlist_free(&commitable_paths);
+	free(fileindex_path);
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_complete(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo)
+{
+	const struct got_error *err, *unlockerr, *sync_err;
+	char *fileindex_path = NULL;
+
+	err = delete_merge_refs(worktree, repo);
+	if (err)
+		goto done;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+	err = bump_base_commit_id_everywhere(worktree, fileindex, NULL, NULL);
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	got_fileindex_free(fileindex);
+	free(fileindex_path);
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_in_progress(int *in_progress, struct got_worktree *worktree,
+    struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *branch_refname = NULL;
+	struct got_reference *branch_ref = NULL;
+
+	*in_progress = 0;
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		return err;
+	err = got_ref_open(&branch_ref, repo, branch_refname, 0);
+	if (err) {
+		if (err->code != GOT_ERR_NOT_REF)
+			return err;
+	} else
+		*in_progress = 1;
+
+	return NULL;
+}
+
+const struct got_error *got_worktree_merge_prepare(
+    struct got_fileindex **fileindex, struct got_worktree *worktree,
+    struct got_reference *branch, struct got_repository *repo)
+{
+	const struct got_error *err = NULL;
+	char *fileindex_path = NULL;
+	char *branch_refname = NULL, *commit_refname = NULL;
+	struct got_reference *wt_branch = NULL, *branch_ref = NULL;
+	struct got_reference *commit_ref = NULL;
+	struct got_object_id *branch_tip = NULL, *wt_branch_tip = NULL;
+	struct check_rebase_ok_arg ok_arg;
+
+	*fileindex = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	/* Preconditions are the same as for rebase. */
+	ok_arg.worktree = worktree;
+	ok_arg.repo = repo;
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_rebase_ok,
+	    &ok_arg);
+	if (err)
+		goto done;
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		return err;
+
+	err = get_merge_commit_ref_name(&commit_refname, worktree);
+	if (err)
+		return err;
+
+	err = got_ref_open(&wt_branch, repo, worktree->head_ref_name,
+	    0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(&wt_branch_tip, repo, wt_branch);
+	if (err)
+		goto done;
+
+	if (got_object_id_cmp(worktree->base_commit_id, wt_branch_tip) != 0) {
+		err = got_error(GOT_ERR_MERGE_OUT_OF_DATE);
+		goto done;
+	}
+
+	err = got_ref_resolve(&branch_tip, repo, branch);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc_symref(&branch_ref, branch_refname, branch);
+	if (err)
+		goto done;
+	err = got_ref_write(branch_ref, repo);
+	if (err)
+		goto done;
+
+	err = got_ref_alloc(&commit_ref, commit_refname, branch_tip);
+	if (err)
+		goto done;
+	err = got_ref_write(commit_ref, repo);
+	if (err)
+		goto done;
+
+done:
+	free(branch_refname);
+	free(commit_refname);
+	free(fileindex_path);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	if (wt_branch)
+		got_ref_close(wt_branch);
+	free(wt_branch_tip);
+	if (err) {
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_continue(char **branch_name,
+    struct got_object_id **branch_tip, struct got_fileindex **fileindex,
+    struct got_worktree *worktree, struct got_repository *repo)
+{
+	const struct got_error *err;
+	char *commit_refname = NULL, *branch_refname = NULL;
+	struct got_reference *commit_ref = NULL, *branch_ref = NULL;
+	char *fileindex_path = NULL;
+	int have_staged_files = 0;
+
+	*branch_name = NULL;
+	*branch_tip = NULL;
+	*fileindex = NULL;
+
+	err = lock_worktree(worktree, LOCK_EX);
+	if (err)
+		return err;
+
+	err = open_fileindex(fileindex, &fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	err = got_fileindex_for_each_entry_safe(*fileindex, check_staged_file,
+	    &have_staged_files);
+	if (err && err->code != GOT_ERR_CANCELLED)
+		goto done;
+	if (have_staged_files) {
+		err = got_error(GOT_ERR_STAGED_PATHS);
+		goto done;
+	}
+
+	err = get_merge_branch_ref_name(&branch_refname, worktree);
+	if (err)
+		goto done;
+
+	err = get_merge_commit_ref_name(&commit_refname, worktree);
+	if (err)
+		goto done;
+
+	err = got_ref_open(&branch_ref, repo, branch_refname, 0);
+	if (err)
+		goto done;
+
+	if (!got_ref_is_symbolic(branch_ref)) {
+		err = got_error_fmt(GOT_ERR_BAD_REF_TYPE,
+		    "%s is not a symbolic reference",
+		    got_ref_get_name(branch_ref));
+		goto done;
+	}
+	*branch_name = strdup(got_ref_get_symref_target(branch_ref));
+	if (*branch_name == NULL) {
+		err = got_error_from_errno("strdup");
+		goto done;
+	}
+
+	err = got_ref_open(&commit_ref, repo, commit_refname, 0);
+	if (err)
+		goto done;
+
+	err = got_ref_resolve(branch_tip, repo, commit_ref);
+	if (err)
+		goto done;
+done:
+	free(commit_refname);
+	free(branch_refname);
+	free(fileindex_path);
+	if (commit_ref)
+		got_ref_close(commit_ref);
+	if (branch_ref)
+		got_ref_close(branch_ref);
+	if (err) {
+		if (*branch_name) {
+			free(*branch_name);
+			*branch_name = NULL;
+		}
+		free(*branch_tip);
+		*branch_tip = NULL;
+		if (*fileindex) {
+			got_fileindex_free(*fileindex);
+			*fileindex = NULL;
+		}
+		lock_worktree(worktree, LOCK_SH);
+	}
+	return err;
+}
+
+const struct got_error *
+got_worktree_merge_abort(struct got_worktree *worktree,
+    struct got_fileindex *fileindex, struct got_repository *repo,
+    got_worktree_checkout_cb progress_cb, void *progress_arg)
+{
+	const struct got_error *err, *unlockerr, *sync_err;
+	struct got_object_id *commit_id = NULL;
+	char *fileindex_path = NULL;
+	struct revert_file_args rfa;
+	struct got_object_id *tree_id = NULL;
+
+	err = got_object_id_by_path(&tree_id, repo,
+	    worktree->base_commit_id, worktree->path_prefix);
+	if (err)
+		goto done;
+
+	err = delete_merge_refs(worktree, repo);
+	if (err)
+		goto done;
+
+	err = get_fileindex_path(&fileindex_path, worktree);
+	if (err)
+		goto done;
+
+	rfa.worktree = worktree;
+	rfa.fileindex = fileindex;
+	rfa.progress_cb = progress_cb;
+	rfa.progress_arg = progress_arg;
+	rfa.patch_cb = NULL;
+	rfa.patch_arg = NULL;
+	rfa.repo = repo;
+	rfa.unlink_added_files = 1;
+	err = worktree_status(worktree, "", fileindex, repo,
+	    revert_file, &rfa, NULL, NULL, 0, 0);
+	if (err)
+		goto sync;
+
+	err = checkout_files(worktree, fileindex, "", tree_id, NULL,
+	    repo, progress_cb, progress_arg, NULL, NULL);
+sync:
+	sync_err = sync_fileindex(fileindex, fileindex_path);
+	if (sync_err && err == NULL)
+		err = sync_err;
+done:
+	free(tree_id);
+	free(commit_id);
+	if (fileindex)
+		got_fileindex_free(fileindex);
+	free(fileindex_path);
+
+	unlockerr = lock_worktree(worktree, LOCK_SH);
+	if (unlockerr && err == NULL)
+		err = unlockerr;
 	return err;
 }
 

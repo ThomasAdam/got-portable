@@ -1,6 +1,6 @@
 REGRESS_TARGETS=checkout update status log add rm diff blame branch tag \
 	ref commit revert cherrypick backout rebase import histedit \
-	integrate stage unstage cat clone fetch tree pack cleanup
+	integrate merge stage unstage cat clone fetch tree pack cleanup
 NOOBJ=Yes
 
 GOT_TEST_ROOT=/tmp
@@ -61,6 +61,9 @@ histedit:
 
 integrate:
 	./integrate.sh -q -r "$(GOT_TEST_ROOT)"
+
+merge:
+	./merge.sh -q -r "$(GOT_TEST_ROOT)"
 
 stage:
 	./stage.sh -q -r "$(GOT_TEST_ROOT)"

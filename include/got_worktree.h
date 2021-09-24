@@ -437,6 +437,72 @@ const struct got_error *got_worktree_integrate_abort(struct got_worktree *,
     struct got_fileindex *, struct got_repository *,
     struct got_reference *, struct got_reference *);
 
+/* Postpone the merge operation. Should be called after a merge conflict. */
+const struct got_error *got_worktree_merge_postpone(struct got_worktree *,
+    struct got_fileindex *);
+
+/* Merge changes from the merge source branch into the worktree. */
+const struct got_error *
+got_worktree_merge_branch(struct got_worktree *worktree,
+    struct got_fileindex *fileindex,
+    struct got_object_id *yca_commit_id,
+    struct got_object_id *branch_tip,
+    struct got_repository *repo, got_worktree_checkout_cb progress_cb,
+    void *progress_arg, got_cancel_cb cancel_cb, void *cancel_arg);
+
+/* Attempt to commit merged changes. */
+const struct got_error *
+got_worktree_merge_commit(struct got_object_id **new_commit_id,
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    const char *author, const char *committer, int allow_bad_symlinks,
+    struct got_object_id *branch_tip, const char *branch_name,
+    struct got_repository *repo);
+
+/*
+ * Complete the merge operation.
+ * This should be called once changes have been successfully committed.
+ */
+const struct got_error *got_worktree_merge_complete(
+    struct got_worktree *worktree, struct got_fileindex *fileindex,
+    struct got_repository *repo);
+
+/* Check whether a merge operation is in progress. */
+const struct got_error *got_worktree_merge_in_progress(int *,
+    struct got_worktree *, struct got_repository *);
+
+/*
+ * Prepare for merging a branch into the work tree's current branch.
+ * This function creates a reference to the branch being merged, and to
+ * this branch's current tip commit, in the "got/worktree/merge/" namespace.
+ * These references are used to keep track of merge operation state and are
+ * used as input and/or output arguments with other merge-related functions.
+ * The function also returns a pointer to a fileindex which must be
+ * passed back to other merge-related functions.
+ */
+const struct got_error *got_worktree_merge_prepare(struct got_fileindex **,
+    struct got_worktree *, struct got_reference *, struct got_repository *);
+
+/*
+ * Continue an interrupted merge operation.
+ * This function returns name of the branch being merged, and the ID of the
+ * tip commit being merged.
+ * This function should be called before either resuming or aborting a
+ * merge operation.
+ * The function also returns a pointer to a fileindex which must be
+ * passed back to other merge-related functions.
+ */
+const struct got_error *got_worktree_merge_continue(char **,
+    struct got_object_id **, struct got_fileindex **,
+    struct got_worktree *, struct got_repository *);
+
+/*
+ * Abort the current rebase operation.
+ * Report reverted files via the specified progress callback.
+ */
+const struct got_error *got_worktree_merge_abort(struct got_worktree *,
+    struct got_fileindex *, struct got_repository *,
+    got_worktree_checkout_cb, void *);
+
 /*
  * Stage the specified paths for commit.
  * If the patch callback is not NULL, call it to select patch hunks for

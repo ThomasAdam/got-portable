@@ -102,3 +102,9 @@ const struct got_error *got_worktree_get_base_ref_name(char **,
 /* Reference pointing at the ID of the current commit being edited. */
 #define GOT_WORKTREE_HISTEDIT_COMMIT_REF_PREFIX \
 	"refs/got/worktree/histedit/commit"
+
+/* Symbolic reference pointing at the name of the merge source branch. */
+#define GOT_WORKTREE_MERGE_BRANCH_REF_PREFIX "refs/got/worktree/merge/branch"
+
+/* Reference pointing at the ID of the merge source branches's tip commit. */
+#define GOT_WORKTREE_MERGE_COMMIT_REF_PREFIX "refs/got/worktree/merge/commit"

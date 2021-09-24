@@ -2132,6 +2132,123 @@ or reverted with
 .It Cm ig
 Short alias for
 .Cm integrate .
+.It Cm merge Oo Fl a Oc Oo Fl c Oc Op Ar branch
+Create a merge commit based on the current branch of the work tree and
+the specified
+.Ar branch .
+If a linear project history is desired, then use of
+.Cm got rebase
+should be preferred over
+.Cm got merge .
+However, even strictly linear projects may require merge commits in order
+to merge in new versions of code imported from third-party projects on
+vendor branches.
+.Pp
+Merge commits are commits based on multiple parent commits.
+The tip commit of the work tree's current branch, which must be set with
+.Cm got update -b
+before starting the
+.Cm merge
+operation, will be used as the first parent.
+The tip commit of the specified
+.Ar branch
+will be used as the second parent.
+.Pp
+It is not possible to create merge commits with more than two parents.
+If more than one branch needs to be merged, then multiple merge commits
+with two parents each can be created in sequence.
+.Pp
+The
+.Ar branch
+must share common ancestry with the work tree's current branch.
+.Pp
+While merging changes found on the
+.Ar branch
+into the work tree, show the status of each affected file,
+using the following status codes:
+.Bl -column YXZ description
+.It G Ta file was merged
+.It C Ta file was merged and conflicts occurred during merge
+.It ! Ta changes destined for a missing file were not merged
+.It D Ta file was deleted
+.It d Ta file's deletion was obstructed by local modifications
+.It A Ta new file was added
+.It \(a~ Ta changes destined for a non-regular file were not merged
+.It ? Ta changes destined for an unversioned file were not merged
+.El
+.Pp
+If merge conflicts occur, the merge operation is interrupted and conflicts
+must be resolved before the merge operation can continue.
+If any files with destined changes are found to be missing or obstructed,
+the merge operation will be interrupted to prevent potentially incomplete
+changes from being committed to the repository without user intervention.
+The work tree may be modified as desired and the merge can be continued
+once the changes present in the work tree are considered complete.
+Alternatively, the merge operation may be aborted which will leave
+the work tree's current branch unmodified.
+.Pp
+If a merge conflict is resolved in a way which renders all merged
+changes into no-op changes, the merge operation cannot continue
+and must be aborted.
+.Pp
+.Cm got merge
+will refuse to run if certain preconditions are not met.
+If history of the
+.Ar branch
+is based on the work tree's current branch, then no merge commit can
+be created and
+.Cm got integrate
+may be used to integrate the
+.Ar branch
+instead.
+If the work tree is not yet fully updated to the tip commit of its
+branch, then the work tree must first be updated with
+.Cm got update .
+If the work tree contains multiple base commits it must first be updated
+to a single base commit with
+.Cm got update .
+If changes have been staged with
+.Cm got stage ,
+these changes must first be committed with
+.Cm got commit
+or unstaged with
+.Cm got unstage .
+If the work tree contains local changes, these changes must first be
+committed with
+.Cm got commit
+or reverted with
+.Cm got revert .
+If the
+.Ar branch
+contains changes to files outside of the work tree's path prefix,
+the work tree cannot be used to merge this branch.
+.Pp
+The
+.Cm got update ,
+.Cm got commit ,
+.Cm got rebase ,
+.Cm got histedit , 
+.Cm got integrate ,
+and
+.Cm got stage
+commands will refuse to run while a merge operation is in progress.
+Other commands which manipulate the work tree may be used for
+conflict resolution purposes.
+.Pp
+The options for
+.Cm got merge
+are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Abort an interrupted merge operation.
+If this option is used, no other command-line arguments are allowed.
+.It Fl c
+Continue an interrupted merge operation.
+If this option is used, no other command-line arguments are allowed.
+.El
+.It Cm mg
+Short alias for
+.Cm merge .
 .It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl S Oc Op Ar path ...
 Stage local changes for inclusion in the next commit.
 If no
