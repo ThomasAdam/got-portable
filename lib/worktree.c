@@ -1940,8 +1940,20 @@ update_blob(struct got_worktree *worktree,
 		if (status == GOT_STATUS_MISSING || status == GOT_STATUS_DELETE)
 			sb.st_mode = got_fileindex_perms_to_st(ie);
 	} else {
-		sb.st_mode = GOT_DEFAULT_FILE_MODE;
-		status = GOT_STATUS_UNVERSIONED;
+		if (stat(ondisk_path, &sb) == -1) {
+			if (errno != ENOENT) {
+				err = got_error_from_errno2("stat",
+				    ondisk_path);
+				goto done;
+			}
+			sb.st_mode = GOT_DEFAULT_FILE_MODE;
+			status = GOT_STATUS_UNVERSIONED;
+		} else {
+			if (S_ISREG(sb.st_mode) || S_ISLNK(sb.st_mode))
+				status = GOT_STATUS_UNVERSIONED;
+			else
+				status = GOT_STATUS_OBSTRUCTED;
+		}
 	}
 
 	if (status == GOT_STATUS_OBSTRUCTED) {

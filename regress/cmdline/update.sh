@@ -2588,6 +2588,8 @@ test_update_file_skipped_due_to_obstruction() {
 	blob_id0=`get_blob_id $testroot/repo "" beta`
 
 	echo "changed beta" > $testroot/repo/beta
+	echo "new file" > $testroot/repo/new
+	(cd $testroot/repo && git add new)
 	git_commit $testroot/repo -m "changed beta"
 	local commit_id1=`git_show_head $testroot/repo`
 	blob_id1=`get_blob_id $testroot/repo "" beta`
@@ -2617,14 +2619,22 @@ test_update_file_skipped_due_to_obstruction() {
 
 	rm $testroot/wt/beta
 	mkdir -p $testroot/wt/beta/psi
+	mkdir -p $testroot/wt/new
 
-	# update to the latest commit; this skips beta
+	# update to the latest commit; this skips beta and the new file
 	(cd $testroot/wt && got update > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "update failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 
 	echo "~  beta" > $testroot/stdout.expected
+	echo "~  new" >> $testroot/stdout.expected
 	echo "Updated to refs/heads/master: $commit_id1" \
 		>> $testroot/stdout.expected
-	echo "File paths obstructed by a non-regular file: 1" \
+	echo "File paths obstructed by a non-regular file: 2" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
@@ -2656,7 +2666,10 @@ test_update_file_skipped_due_to_obstruction() {
 	# updating to the latest commit should now update beta
 	(cd $testroot/wt && got update > $testroot/stdout)
 	echo "!  beta" > $testroot/stdout.expected
+	echo "~  new" >> $testroot/stdout.expected
 	echo "Updated to refs/heads/master: $commit_id1" \
+		>> $testroot/stdout.expected
+	echo "File paths obstructed by a non-regular file: 1" \
 		>> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
