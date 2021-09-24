@@ -43,6 +43,13 @@
 #define unveil(s, p) (0)
 #endif
 
+#ifdef HAVE_LINUX_LANDLOCK_H
+int	landlock_no_fs(void);
+int	landlock_unveil(const char *, const char *);
+/* #undef unveil */
+/* #define unveil(s, p) landlock_unveil((s), (p)) */
+#endif
+
 #ifndef INFTIM
 #define INFTIM -1
 #endif

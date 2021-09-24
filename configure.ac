@@ -42,6 +42,7 @@ AC_CHECK_HEADERS([ \
 	fcntl.h \
 	langinfo.h \
 	limits.h \
+	linux/landlock.h \
 	locale.h \
 	netdb.h \
 	netinet/in.h \
@@ -162,6 +163,16 @@ esac
 AC_SUBST(PLATFORM)
 AM_CONDITIONAL([HOST_FREEBSD], [test "$PLATFORM" = "freebsd"])
 AM_CONDITIONAL([HOST_LINUX], [test "$PLATFORM" = "linux"])
+
+# Landlock detection.
+AC_MSG_CHECKING([for landlock])
+AM_CONDITIONAL([HAVE_LINUX_LANDLOCK],
+    [test "x$ac_cv_header_linux_landlock_h" = "xyes"])
+if test "x$ac_cv_header_linux_landlock_h" = "xyes"; then
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
 
 # Clang sanitizers wrap reallocarray even if it isn't available on the target
 # system. When compiled it always returns NULL and crashes the program. To

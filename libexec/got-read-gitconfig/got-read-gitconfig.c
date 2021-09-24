@@ -342,6 +342,14 @@ main(int argc, char *argv[])
 		return 1;
 	}
 #endif
+#ifdef HAVE_LINUX_LANDLOCK_H
+	/* revoke fs access */
+	if (landlock_no_fs() == -1) {
+		err = got_error_from_errno("landlock_no_fs");
+		got_privsep_send_error(&ibuf, err);
+		return 1;
+	}
+#endif
 
 	for (;;) {
 		struct imsg imsg;
