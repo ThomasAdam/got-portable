@@ -105,7 +105,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 open_commit(struct got_commit_object **commit, struct got_pack *pack,
     struct got_packidx *packidx, int obj_idx, struct got_object_id *id,
     struct got_object_cache *objcache)
@@ -174,7 +174,7 @@ done:
 	return err;
 }
 
-const struct got_error *
+static const struct got_error *
 open_tree(uint8_t **buf, struct got_pathlist_head *entries, int *nentries,
     struct got_pack *pack, struct got_packidx *packidx, int obj_idx,
     struct got_object_id *id, struct got_object_cache *objcache)
@@ -431,7 +431,7 @@ find_entry_by_name(struct got_pathlist_head *entries, int nentries,
 	return NULL;
 }
 
-const struct got_error *
+static const struct got_error *
 tree_path_changed(int *changed, uint8_t **buf1, uint8_t **buf2,
     struct got_pathlist_head *entries1, int *nentries1,
     struct got_pathlist_head *entries2, int *nentries2,
