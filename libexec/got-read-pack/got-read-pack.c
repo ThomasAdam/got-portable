@@ -251,7 +251,7 @@ tree_request(struct imsg *imsg, struct imsgbuf *ibuf, struct got_pack *pack,
 }
 
 static const struct got_error *
-receive_file(FILE **f, struct imsgbuf *ibuf, int imsg_code)
+receive_file(FILE **f, struct imsgbuf *ibuf, uint32_t imsg_code)
 {
 	const struct got_error *err;
 	struct imsg imsg;
@@ -539,7 +539,7 @@ send_traversed_commits(struct got_object_id *commit_ids, size_t ncommits,
 {
 	const struct got_error *err;
 	struct ibuf *wbuf;
-	int i;
+	size_t i;
 
 	wbuf = imsg_create(ibuf, GOT_IMSG_TRAVERSED_COMMITS, 0, 0,
 	    sizeof(struct got_imsg_traversed_commits) +

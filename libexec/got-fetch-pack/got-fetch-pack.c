@@ -778,7 +778,7 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int fetchfd, packfd = -1, i;
+	int fetchfd, packfd = -1;
 	uint8_t pack_sha1[SHA1_DIGEST_LENGTH];
 	struct imsgbuf ibuf;
 	struct imsg imsg;
@@ -790,7 +790,7 @@ main(int argc, char **argv)
 	struct got_imsg_fetch_have_ref href;
 	struct got_imsg_fetch_wanted_branch wbranch;
 	struct got_imsg_fetch_wanted_ref wref;
-	size_t datalen;
+	size_t datalen, i;
 #if 0
 	static int attached;
 	while (!attached)

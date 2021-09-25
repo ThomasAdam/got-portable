@@ -572,7 +572,7 @@ int
 main(int argc, char **argv)
 {
 	const struct got_error *err = NULL;
-	int sendfd, i;
+	int sendfd;
 	struct imsgbuf ibuf;
 	struct imsg imsg;
 	struct got_pathlist_head refs;
@@ -580,7 +580,7 @@ main(int argc, char **argv)
 	struct got_pathlist_entry *pe;
 	struct got_imsg_send_request send_req;
 	struct got_imsg_send_ref href;
-	size_t datalen;
+	size_t datalen, i;
 #if 0
 	static int attached;
 	while (!attached)
