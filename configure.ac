@@ -212,27 +212,32 @@ if test "x$found_libcrypto" = "xyes"; then
 fi
 
 AC_SEARCH_LIBS(uuid_create, , AC_DEFINE(HAVE_BSD_UUID))
+AC_SEARCH_LIBS(uuid_create, found_uuid=no, found_uuid=yes)
 AC_SEARCH_LIBS(mergesort, , AC_DEFINE(HAVE_BSD_MERGESORT))
 
-PKG_CHECK_MODULES(
-	LIBUUID,
-	uuid,
-	[
-	 	AM_CFLAGS="$LIBUUID_CFLAGS $AM_CFLAGS"
-		CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
-		LIBS="$LIBUUID_LIBS $LIBS"
-		found_libuuid=yes
-	],
-	[
-	 	found_libuuid=no
-	]
-)
+if test "x$found_uuid" = "xyes"; then
+	AC_DEFINE(HAVE_BSD_UUID)
+else
+	PKG_CHECK_MODULES(
+		LIBUUID,
+		uuid,
+		[
+			AM_CFLAGS="$LIBUUID_CFLAGS $AM_CFLAGS"
+			CFLAGS="$AM_CFLAGS $SAVED_CFLAGS"
+			LIBS="$LIBUUID_LIBS $LIBS"
+			found_libuuid=yes
+		],
+		[
+			found_libuuid=no
+		]
+	)
 
-if test "x$found_libuuid" = "xno"; then
-	AC_CHECK_HEADER(
-		uuid.h,
-		found_libuuid=yes,
-		found_libuuid=no)
+	if test "x$found_libuuid" = "xno"; then
+		AC_CHECK_HEADER(
+			uuid.h,
+			found_libuuid=yes,
+			found_libuuid=no)
+	fi
 fi
 
 if test "x$found_libuuid" = "xno"; then
