@@ -779,8 +779,8 @@ list_pack_cb(void *arg, struct got_object_id *id, int type, off_t offset,
 		break;
 	case GOT_OBJ_TYPE_OFFSET_DELTA:
 		type_str = "offset-delta";
-		if (asprintf(&delta_str, " base-offset %llu",
-		    base_offset) == -1) {
+		if (asprintf(&delta_str, " base-offset %lld",
+		    (long long)base_offset) == -1) {
 			err = got_error_from_errno("asprintf");
 			goto done;
 		}
@@ -811,11 +811,12 @@ list_pack_cb(void *arg, struct got_object_id *id, int type, off_t offset,
 		s = scaled;
 		while (isspace((unsigned char)*s))
 			s++;
-		printf("%s %s at %llu size %s%s\n", id_str, type_str, offset,
-		    s, delta_str ? delta_str : "");
+		printf("%s %s at %lld size %s%s\n", id_str, type_str,
+		    (long long)offset, s, delta_str ? delta_str : "");
 	} else {
-		printf("%s %s at %llu size %llu%s\n", id_str, type_str, offset,
-		    size, delta_str ? delta_str : "");
+		printf("%s %s at %lld size %lld%s\n", id_str, type_str,
+		    (long long)offset, (long long)size,
+		    delta_str ? delta_str : "");
 	}
 done:
 	free(id_str);
