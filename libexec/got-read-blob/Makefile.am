@@ -1,4 +1,4 @@
-bin_PROGRAMS = got-read-blob
+libexec_PROGRAMS = got-read-blob
 got_read_blob_SOURCES = got-read-blob.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/inflate.c \
@@ -11,7 +11,7 @@ got_read_blob_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="${bindir}" \
+	-DGOT_LIBEXECDIR="$(libexecdir)" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/lib \

@@ -1,4 +1,4 @@
-bin_PROGRAMS = got-index-pack
+libexec_PROGRAMS = got-index-pack
 got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/inflate.c \
@@ -15,7 +15,7 @@ got_index_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="${bindir}" \
+	-DGOT_LIBEXECDIR="$(libexecdir)" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/lib \

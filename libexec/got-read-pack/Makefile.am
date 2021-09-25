@@ -1,4 +1,4 @@
-bin_PROGRAMS = got-read-pack
+libexec_PROGRAMS = got-read-pack
 got_read_pack_SOURCES = got-read-pack.c \
 	$(top_srcdir)/lib/delta.c \
 	$(top_srcdir)/lib/delta_cache.c \
@@ -17,7 +17,7 @@ got_read_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="${bindir}" \
+	-DGOT_LIBEXECDIR="$(libexecdir)" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/lib \

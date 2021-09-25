@@ -1,4 +1,4 @@
-bin_PROGRAMS = got-read-gotconfig
+libexec_PROGRAMS = got-read-gotconfig
 got_read_gotconfig_SOURCES = \
 	got-read-gotconfig.c \
 	gotconfig.h \
@@ -14,7 +14,7 @@ got_read_gotconfig_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
 	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="${bindir}" \
+	-DGOT_LIBEXECDIR="$(libexecdir)" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/compat \
 	-I$(top_srcdir)/lib \
