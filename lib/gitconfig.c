@@ -103,7 +103,7 @@ struct got_gitconfig {
 };
 
 static __inline__ u_int8_t
-conf_hash(char *s)
+conf_hash(const char *s)
 {
 	u_int8_t hash = 0;
 
@@ -438,8 +438,8 @@ fail:
  * if that tag does not exist.
  */
 int
-got_gitconfig_get_num(struct got_gitconfig *conf, char *section, char *tag,
-    int def)
+got_gitconfig_get_num(struct got_gitconfig *conf, const char *section,
+    const char *tag, int def)
 {
 	char	*value = got_gitconfig_get_str(conf, section, tag);
 
@@ -477,7 +477,8 @@ got_gitconfig_match_num(struct got_gitconfig *conf, char *section, char *tag,
 
 /* Return the string value denoted by TAG in section SECTION.  */
 char *
-got_gitconfig_get_str(struct got_gitconfig *conf, char *section, char *tag)
+got_gitconfig_get_str(struct got_gitconfig *conf, const char *section,
+    const char *tag)
 {
 	struct got_gitconfig_binding *cb;
 
@@ -605,7 +606,7 @@ cleanup:
 }
 
 struct got_gitconfig_list *
-got_gitconfig_get_tag_list(struct got_gitconfig *conf, char *section)
+got_gitconfig_get_tag_list(struct got_gitconfig *conf, const char *section)
 {
 	struct got_gitconfig_list *list = 0;
 	struct got_gitconfig_list_node *node = 0;
