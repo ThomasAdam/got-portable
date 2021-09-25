@@ -215,7 +215,6 @@ send_their_ref(struct imsgbuf *ibuf, struct got_object_id *refid,
 static const struct got_error *
 send_ref_status(struct imsgbuf *ibuf, const char *refname, int success,
     struct got_pathlist_head *refs, struct got_pathlist_head *delete_refs)
-
 {
 	const struct got_error *err = NULL;
 	struct ibuf *wbuf;
