@@ -58,7 +58,7 @@ send_gitconfig_int(struct imsgbuf *ibuf, int value)
 
 static const struct got_error *
 gitconfig_num_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
-    char *section, char *tag, int def)
+    const char *section, const char *tag, int def)
 {
 	int value;
 
@@ -83,7 +83,7 @@ send_gitconfig_str(struct imsgbuf *ibuf, const char *value)
 
 static const struct got_error *
 gitconfig_str_request(struct imsgbuf *ibuf, struct got_gitconfig *gitconfig,
-    char *section, char *tag)
+    const char *section, const char *tag)
 {
 	char *value;
 

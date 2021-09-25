@@ -43,11 +43,12 @@ const struct got_error *got_gitconfig_get_section_list(
     struct got_gitconfig_list **, struct got_gitconfig *);
 struct got_gitconfig_list *got_gitconfig_get_list(struct got_gitconfig *,
     char *, char *);
-struct got_gitconfig_list *got_gitconfig_get_tag_list(struct got_gitconfig *, char *);
-int got_gitconfig_get_num(struct got_gitconfig *, char *, char *,
+struct got_gitconfig_list *got_gitconfig_get_tag_list(struct got_gitconfig *,
+    const char *);
+int got_gitconfig_get_num(struct got_gitconfig *, const char *, const char *,
     int);
-char *got_gitconfig_get_str(struct got_gitconfig *, char *,
-    char *);
+char *got_gitconfig_get_str(struct got_gitconfig *, const char *,
+    const char *);
 const struct got_error *got_gitconfig_open(struct got_gitconfig **, int);
 void got_gitconfig_close(struct got_gitconfig *);
 int      got_gitconfig_match_num(struct got_gitconfig *, char *, char *, int);
