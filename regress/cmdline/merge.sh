@@ -1131,6 +1131,111 @@ test_merge_no_op() {
 	test_done "$testroot" "$ret"
 }
 
+test_merge_imported_branch() {
+	local testroot=`test_init merge_import`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
+
+	# import a new sub-tree to the 'files' branch such that
+	# none of the files added here collide with existing ones
+	mkdir -p $testroot/tree/there
+	mkdir -p $testroot/tree/be/lots
+	mkdir -p $testroot/tree/files
+	echo "there should" > $testroot/tree/there/should
+	echo "be lots of" > $testroot/tree/be/lots/of
+	echo "files here" > $testroot/tree/files/here
+	got import -r $testroot/repo -b files -m 'import files' \
+		$testroot/tree > /dev/null
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge files > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local merge_commit0=`git_show_head $testroot/repo`
+	cat > $testroot/stdout.expected <<EOF
+A  be/lots/of
+A  files/here
+A  there/should
+Merged refs/heads/files into refs/heads/master: $merge_commit0
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# try to merge again while no new changes are available
+	(cd $testroot/wt && got merge files > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo "Already up-to-date" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# update the 'files' branch
+	(cd $testroot/repo && git reset -q --hard master)
+	(cd $testroot/repo && git checkout -q files)
+	echo "indeed" > $testroot/repo/indeed
+	(cd $testroot/repo && git add indeed)
+	git_commit $testroot/repo -m "adding another file indeed"
+	echo "be lots and lots of" > $testroot/repo/be/lots/of
+	git_commit $testroot/repo -m "lots of changes"
+
+	(cd $testroot/wt && got update > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# we should now be able to merge more changes from files branch
+	(cd $testroot/wt && got merge files > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local merge_commit1=`git_show_branch_head $testroot/repo master`
+	cat > $testroot/stdout.expected <<EOF
+G  be/lots/of
+A  indeed
+Merged refs/heads/files into refs/heads/master: $merge_commit1
+EOF
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
@@ -1139,3 +1244,4 @@ run_test test_merge_in_progress
 run_test test_merge_path_prefix
 run_test test_merge_missing_file
 run_test test_merge_no_op
+run_test test_merge_imported_branch

@@ -163,7 +163,7 @@ check_linear_ancestry(const char *refname, struct got_object_id *my_id,
 		    "bad object type on server for %s", refname);
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    my_id, their_id, repo, cancel_cb, cancel_arg);
+	    my_id, their_id, 1, repo, cancel_cb, cancel_arg);
 	if (err)
 		return err;
 	if (yca_id == NULL)
