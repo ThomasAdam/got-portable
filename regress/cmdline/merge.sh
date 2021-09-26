@@ -1236,6 +1236,152 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_merge_interrupt() {
+	local testroot=`test_init merge_interrupt`
+	local commit0=`git_show_head $testroot/repo`
+	local commit0_author_time=`git_show_author_time $testroot/repo`
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	echo "modified alpha on branch" > $testroot/repo/alpha
+	git_commit $testroot/repo -m "committing to alpha on newbranch"
+	local branch_commit0=`git_show_branch_head $testroot/repo newbranch`
+
+	got checkout -b master $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got checkout failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# create a non-conflicting commit
+	(cd $testroot/repo && git checkout -q master)
+	echo "modified beta on master" > $testroot/repo/beta
+	git_commit $testroot/repo -m "committing to beta on master"
+	local master_commit=`git_show_head $testroot/repo`
+
+	# need an up-to-date work tree for 'got merge' 
+	(cd $testroot/wt && got update > /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got merge -n newbranch \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "Merge of refs/heads/newbranch interrupted on request" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo "M  alpha" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha on branch" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# adjust merge result
+	echo "adjusted merge result" > $testroot/wt/alpha
+
+	# continue the merge
+	(cd $testroot/wt && got merge -c > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got merge failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local merge_commit=`git_show_head $testroot/repo`
+
+	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
+		> $testroot/stdout.expected
+	echo $merge_commit >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $merge_commit (master)" > $testroot/stdout.expected
+	echo "commit $master_commit" >> $testroot/stdout.expected
+	echo "commit $commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got update > $testroot/stdout)
+
+	echo 'Already up-to-date' > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# We should have created a merge commit with two parents.
+	(cd $testroot/wt && got log -l1 | grep ^parent > $testroot/stdout)
+	echo "parent 1: $master_commit" > $testroot/stdout.expected
+	echo "parent 2: $branch_commit0" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_merge_basic
 run_test test_merge_continue
@@ -1245,3 +1391,4 @@ run_test test_merge_path_prefix
 run_test test_merge_missing_file
 run_test test_merge_no_op
 run_test test_merge_imported_branch
+run_test test_merge_interrupt

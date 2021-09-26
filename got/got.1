@@ -2132,7 +2132,7 @@ or reverted with
 .It Cm ig
 Short alias for
 .Cm integrate .
-.It Cm merge Oo Fl a Oc Oo Fl c Oc Op Ar branch
+.It Cm merge Oo Fl a Oc Oo Fl c Oc Oo Fl n Oc Op Ar branch
 Create a merge commit based on the current branch of the work tree and
 the specified
 .Ar branch .
@@ -2246,6 +2246,14 @@ If this option is used, no other command-line arguments are allowed.
 .It Fl c
 Continue an interrupted merge operation.
 If this option is used, no other command-line arguments are allowed.
+.It Fl n
+Merge changes into the work tree as usual but do not create a merge
+commit immediately.
+The merge result can be adjusted as desired before a merge commit is
+created with
+.Cm got merge -c .
+Alternatively, the merge may be aborted with
+.Cm got merge -a .
 .El
 .It Cm mg
 Short alias for
