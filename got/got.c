@@ -2701,7 +2701,7 @@ check_linear_ancestry(struct got_object_id *commit_id,
 	struct got_object_id *yca_id;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    commit_id, base_commit_id, repo, check_cancelled, NULL);
+	    commit_id, base_commit_id, 1, repo, check_cancelled, NULL);
 	if (err)
 		return err;
 
@@ -8597,7 +8597,7 @@ print_backup_ref(const char *branch_name, const char *new_id_str,
 		goto done;
 
 	err = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    old_commit_id, new_commit_id, repo, check_cancelled, NULL);
+	    old_commit_id, new_commit_id, 1, repo, check_cancelled, NULL);
 	if (err)
 		goto done;
 
@@ -8954,7 +8954,7 @@ cmd_rebase(int argc, char *argv[])
 
 		base_commit_id = got_worktree_get_base_commit_id(worktree);
 		error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-		    base_commit_id, branch_head_commit_id, repo,
+		    base_commit_id, branch_head_commit_id, 1, repo,
 		    check_cancelled, NULL);
 		if (error)
 			goto done;
@@ -10729,16 +10729,10 @@ cmd_merge(int argc, char *argv[])
 	if (error)
 		goto done;
 	error = got_commit_graph_find_youngest_common_ancestor(&yca_id,
-	    wt_branch_tip, branch_tip, repo,
+	    wt_branch_tip, branch_tip, 0, repo,
 	    check_cancelled, NULL);
-	if (error)
+	if (error && error->code != GOT_ERR_ANCESTRY)
 		goto done;
-	if (yca_id == NULL) {
-		error = got_error_msg(GOT_ERR_ANCESTRY,
-		    "specified branch shares no common ancestry "
-		    "with work tree's branch");
-		goto done;
-	}
 
 	if (!continue_merge) {
 		error = check_path_prefix(wt_branch_tip, branch_tip,
@@ -10746,22 +10740,24 @@ cmd_merge(int argc, char *argv[])
 		    GOT_ERR_MERGE_PATH, repo);
 		if (error)
 			goto done;
-		error = check_same_branch(wt_branch_tip, branch,
-		    yca_id, repo);
-		if (error) {
-			if (error->code != GOT_ERR_ANCESTRY)
+		if (yca_id) {
+			error = check_same_branch(wt_branch_tip, branch,
+			    yca_id, repo);
+			if (error) {
+				if (error->code != GOT_ERR_ANCESTRY)
+					goto done;
+				error = NULL;
+			} else {
+				static char msg[512];
+				snprintf(msg, sizeof(msg),
+				    "cannot create a merge commit because "
+				    "%s is based on %s; %s can be integrated "
+				    "with 'got integrate' instead", branch_name,
+				    got_worktree_get_head_ref_name(worktree),
+				    branch_name);
+				error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
 				goto done;
-			error = NULL;
-		} else {
-			static char msg[512];
-			snprintf(msg, sizeof(msg),
-			    "cannot create a merge commit because "
-			    "%s is based on %s; %s can be integrated "
-			    "with 'got integrate' instead", branch_name,
-			    got_worktree_get_head_ref_name(worktree),
-			    branch_name);
-			error = got_error_msg(GOT_ERR_SAME_BRANCH, msg);
-			goto done;
+			}
 		}
 		error = got_worktree_merge_prepare(&fileindex, worktree,
 		    branch, repo);
@@ -10774,6 +10770,14 @@ cmd_merge(int argc, char *argv[])
 		if (error)
 			goto done;
 		print_update_progress_stats(&upa);
+		if (!upa.did_something) {
+			error = got_worktree_merge_abort(worktree, fileindex,
+			    repo, update_progress, &upa);
+			if (error)
+				goto done;
+			printf("Already up-to-date\n");
+			goto done;
+		}
 	}
 
 	if (upa.conflicts > 0 || upa.missing > 0) {

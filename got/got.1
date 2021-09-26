@@ -2141,8 +2141,9 @@ If a linear project history is desired, then use of
 should be preferred over
 .Cm got merge .
 However, even strictly linear projects may require merge commits in order
-to merge in new versions of code imported from third-party projects on
-vendor branches.
+to merge in new versions of third-party code stored on vendor branches
+created with
+.Cm got import .
 .Pp
 Merge commits are commits based on multiple parent commits.
 The tip commit of the work tree's current branch, which must be set with
@@ -2154,13 +2155,13 @@ The tip commit of the specified
 .Ar branch
 will be used as the second parent.
 .Pp
+No ancestral relationship between the two branches is required.
+If the two branches have already been merged previously, only new changes
+will be merged.
+.Pp
 It is not possible to create merge commits with more than two parents.
 If more than one branch needs to be merged, then multiple merge commits
 with two parents each can be created in sequence.
-.Pp
-The
-.Ar branch
-must share common ancestry with the work tree's current branch.
 .Pp
 While merging changes found on the
 .Ar branch

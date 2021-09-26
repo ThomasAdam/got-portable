@@ -600,6 +600,7 @@ got_commit_graph_iter_next(struct got_object_id **id,
 const struct got_error *
 got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
     struct got_object_id *commit_id, struct got_object_id *commit_id2,
+    int first_parent_traversal,
     struct got_repository *repo, got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
@@ -613,11 +614,11 @@ got_commit_graph_find_youngest_common_ancestor(struct got_object_id **yca_id,
 	if (commit_ids == NULL)
 		return got_error_from_errno("got_object_idset_alloc");
 
-	err = got_commit_graph_open(&graph, "/", 1);
+	err = got_commit_graph_open(&graph, "/", first_parent_traversal);
 	if (err)
 		goto done;
 
-	err = got_commit_graph_open(&graph2, "/", 1);
+	err = got_commit_graph_open(&graph2, "/", first_parent_traversal);
 	if (err)
 		goto done;
 
