@@ -10590,7 +10590,7 @@ done:
 __dead static void
 usage_merge(void)
 {
-	fprintf(stderr, "usage: %s merge [-a] [-c] [branch]\n",
+	fprintf(stderr, "usage: %s merge [-a] [-c] [-n] [branch]\n",
 	    getprogname());
 	exit(1);
 }
@@ -10607,19 +10607,23 @@ cmd_merge(int argc, char *argv[])
 	struct got_object_id *branch_tip = NULL, *yca_id = NULL;
 	struct got_object_id *wt_branch_tip = NULL;
 	int ch, merge_in_progress = 0, abort_merge = 0, continue_merge = 0;
+	int interrupt_merge = 0;
 	struct got_update_progress_arg upa;
 	struct got_object_id *merge_commit_id = NULL;
 	char *branch_name = NULL;
 
 	memset(&upa, 0, sizeof(upa));
 
-	while ((ch = getopt(argc, argv, "ac")) != -1) {
+	while ((ch = getopt(argc, argv, "acn")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_merge = 1;
 			break;
 		case 'c':
 			continue_merge = 1;
+			break;
+		case 'n':
+			interrupt_merge = 1;
 			break;
 		default:
 			usage_rebase();
@@ -10780,7 +10784,12 @@ cmd_merge(int argc, char *argv[])
 		}
 	}
 
-	if (upa.conflicts > 0 || upa.missing > 0) {
+	if (interrupt_merge) {
+		error = got_worktree_merge_postpone(worktree, fileindex);
+		if (error)
+			goto done;
+		printf("Merge of %s interrupted on request\n", branch_name);
+	} else if (upa.conflicts > 0 || upa.missing > 0) {
 		error = got_worktree_merge_postpone(worktree, fileindex);
 		if (error)
 			goto done;
