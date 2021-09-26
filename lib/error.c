@@ -258,3 +258,22 @@ got_error_fmt(int code, const char *fmt, ...)
 
 	abort();
 }
+
+int
+got_err_open_nofollow_on_symlink(void)
+{
+	/*
+	 * Check whether open(2) with O_NOFOLLOW failed on a symlink.
+	 * Posix mandates ELOOP and OpenBSD follows it. Others return
+	 * different error codes. We carry this workaround to help the
+	 * portable version a little.
+	 */
+	return (errno == ELOOP
+#ifdef EMLINK
+	|| errno == EMLINK
+#endif
+#ifdef EFTYPE
+	|| errno == EFTYPE
+#endif
+	);
+}

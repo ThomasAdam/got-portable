@@ -427,3 +427,9 @@ const struct got_error *got_error_path(const char *, int);
  * additional arguments.
 */
 const struct got_error *got_error_fmt(int, const char *, ...);
+
+/*
+ * Check whether open(2) with O_NOFOLLOW failed on a symlink.
+ * This must be called directly after open(2) because it uses errno!
+ */
+int got_err_open_nofollow_on_symlink(void);
