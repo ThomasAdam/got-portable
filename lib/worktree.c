@@ -1282,7 +1282,7 @@ replace_existing_symlink(int *did_something, const char *ondisk_path,
 	 */
 	fd = open(ondisk_path, O_RDWR | O_EXCL | O_NOFOLLOW);
 	if (fd == -1) {
-		if (errno != ELOOP)
+		if (!got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", ondisk_path);
 
 		/* We are updating an existing on-disk symlink. */
@@ -1779,9 +1779,10 @@ get_file_status(unsigned char *status, struct stat *sb,
 		}
 	} else {
 		fd = open(abspath, O_RDONLY | O_NOFOLLOW);
-		if (fd == -1 && errno != ENOENT && errno != ELOOP)
+		if (fd == -1 && errno != ENOENT &&
+		    !got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", abspath);
-		else if (fd == -1 && errno == ELOOP) {
+		else if (fd == -1 && got_err_open_nofollow_on_symlink()) {
 			if (lstat(abspath, sb) == -1)
 				return got_error_from_errno2("lstat", abspath);
 		} else if (fd == -1 || fstat(fd, sb) == -1) {
@@ -3765,7 +3766,7 @@ worktree_status(struct got_worktree *worktree, const char *path,
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY);
 	if (fd == -1) {
 		if (errno != ENOTDIR && errno != ENOENT && errno != EACCES &&
-		    errno != ELOOP)
+		    !got_err_open_nofollow_on_symlink())
 			err = got_error_from_errno2("open", ondisk_path);
 		else {
 			if (!no_ignores) {
@@ -4471,7 +4472,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	if (dirfd2 != -1) {
 		fd2 = openat(dirfd2, de_name2, O_RDONLY | O_NOFOLLOW);
 		if (fd2 == -1) {
-			if (errno != ELOOP) {
+			if (!got_err_open_nofollow_on_symlink()) {
 				err = got_error_from_errno2("openat", path2);
 				goto done;
 			}
@@ -4485,7 +4486,7 @@ create_patched_content(char **path_outfile, int reverse_patch,
 	} else {
 		fd2 = open(path2, O_RDONLY | O_NOFOLLOW);
 		if (fd2 == -1) {
-			if (errno != ELOOP) {
+			if (!got_err_open_nofollow_on_symlink()) {
 				err = got_error_from_errno2("open", path2);
 				goto done;
 			}

@@ -129,7 +129,7 @@ got_object_blob_file_create(struct got_object_id **id, FILE **blobfile,
 
 	fd = open(ondisk_path, O_RDONLY | O_NOFOLLOW);
 	if (fd == -1) {
-		if (errno != ELOOP)
+		if (!got_err_open_nofollow_on_symlink())
 			return got_error_from_errno2("open", ondisk_path);
 
 		if (lstat(ondisk_path, &sb) == -1) {
