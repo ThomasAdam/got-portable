@@ -1372,7 +1372,8 @@ static const struct got_error *
 install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
     const char *ondisk_path, const char *path, struct got_blob_object *blob,
     int restoring_missing_file, int reverting_versioned_file,
-    int path_is_unversioned, struct got_repository *repo,
+    int path_is_unversioned, int allow_bad_symlinks,
+    struct got_repository *repo,
     got_worktree_checkout_cb progress_cb, void *progress_arg)
 {
 	const struct got_error *err = NULL;
@@ -1417,7 +1418,7 @@ install_symlink(int *is_bad_symlink, struct got_worktree *worktree,
 	if (err)
 		return err;
 
-	if (*is_bad_symlink) {
+	if (*is_bad_symlink && !allow_bad_symlinks) {
 		/* install as a regular file */
 		got_object_blob_rewind(blob);
 		err = install_blob(worktree, ondisk_path, path,
@@ -2081,8 +2082,8 @@ update_blob(struct got_worktree *worktree,
 			err = install_symlink(&is_bad_symlink, worktree,
 			    ondisk_path, path, blob,
 			    status == GOT_STATUS_MISSING, 0,
-			    status == GOT_STATUS_UNVERSIONED, repo,
-			    progress_cb, progress_arg);
+			    status == GOT_STATUS_UNVERSIONED, 0,
+			    repo, progress_cb, progress_arg);
 		} else {
 			err = install_blob(worktree, ondisk_path, path,
 			    te->mode, sb.st_mode, blob,
@@ -2859,6 +2860,7 @@ struct merge_file_cb_arg {
     void *cancel_arg;
     const char *label_orig;
     struct got_object_id *commit_id2;
+    int allow_bad_symlinks;
 };
 
 static const struct got_error *
@@ -3103,7 +3105,8 @@ merge_file_cb(void *arg, struct got_blob_object *blob1,
 			if (S_ISLNK(mode2)) {
 				err = install_symlink(&is_bad_symlink,
 				    a->worktree, ondisk_path, path2, blob2, 0,
-				    0, 1, repo, a->progress_cb, a->progress_arg);
+				    0, 1, a->allow_bad_symlinks, repo,
+				    a->progress_cb, a->progress_arg);
 			} else {
 				err = install_blob(a->worktree, ondisk_path, path2,
 				    mode2, sb.st_mode, blob2, 0, 0, 0, 1, repo,
@@ -3266,6 +3269,7 @@ merge_files(struct got_worktree *worktree, struct got_fileindex *fileindex,
 	arg.cancel_arg = cancel_arg;
 	arg.label_orig = label_orig;
 	arg.commit_id2 = commit_id2;
+	arg.allow_bad_symlinks = 1; /* preserve bad symlinks across merges */
 	err = got_diff_tree(tree1, tree2, "", "", repo, merge_file_cb, &arg, 1);
 	sync_err = sync_fileindex(fileindex, fileindex_path);
 	if (sync_err && err == NULL)
@@ -4782,7 +4786,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 				}
 				err = install_symlink(&is_bad_symlink,
 				    a->worktree, ondisk_path, ie->path,
-				    blob, 0, 1, 0, a->repo,
+				    blob, 0, 1, 0, 0, a->repo,
 				    a->progress_cb, a->progress_arg);
 			} else {
 				if (rename(path_content, ondisk_path) == -1) {
@@ -4796,7 +4800,7 @@ revert_file(void *arg, unsigned char status, unsigned char staged_status,
 			if (te && S_ISLNK(te->mode)) {
 				err = install_symlink(&is_bad_symlink,
 				    a->worktree, ondisk_path, ie->path,
-				    blob, 0, 1, 0, a->repo,
+				    blob, 0, 1, 0, 0, a->repo,
 				    a->progress_cb, a->progress_arg);
 			} else {
 				err = install_blob(a->worktree, ondisk_path,

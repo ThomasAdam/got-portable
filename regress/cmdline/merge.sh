@@ -39,6 +39,10 @@ test_merge_basic() {
 	(cd $testroot/repo && ln -s alpha symlink && git add symlink)
 	git_commit $testroot/repo -m "adding symlink on newbranch"
 	local branch_commit4=`git_show_branch_head $testroot/repo newbranch`
+	(cd $testroot/repo && ln -sf .got/bar dotgotbar.link)
+	(cd $testroot/repo && git add dotgotbar.link)
+	git_commit $testroot/repo -m "adding a bad symlink on newbranch"
+	local branch_commit5=`git_show_branch_head $testroot/repo newbranch`
 
 	got checkout -b master $testroot/repo $testroot/wt > /dev/null
 	ret="$?"
@@ -216,6 +220,7 @@ test_merge_basic() {
 
 	echo "G  alpha" >> $testroot/stdout.expected
 	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  dotgotbar.link" >> $testroot/stdout.expected
 	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "G  gamma/delta" >> $testroot/stdout.expected
 	echo "A  symlink" >> $testroot/stdout.expected
@@ -267,6 +272,12 @@ test_merge_basic() {
 		return 1
 	fi
 
+	if [ ! -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	readlink $testroot/wt/symlink > $testroot/stdout
 	echo "alpha" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -302,7 +313,10 @@ test_merge_basic() {
 
 	(cd $testroot/wt && got update > $testroot/stdout)
 
-	echo 'Already up-to-date' > $testroot/stdout.expected
+	echo 'U  dotgotbar.link' > $testroot/stdout.expected
+	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
+	git_show_head $testroot/repo >> $testroot/stdout.expected
+	echo >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -311,10 +325,44 @@ test_merge_basic() {
 		return 1
 	fi
 
+	# update has changed the bad symlink into a regular file
+	if [ -h $testroot/wt/dotgotbar.link ]; then
+		echo "dotgotbar.link is a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
 	# We should have created a merge commit with two parents.
 	(cd $testroot/wt && got log -l1 | grep ^parent > $testroot/stdout)
 	echo "parent 1: $master_commit" > $testroot/stdout.expected
-	echo "parent 2: $branch_commit4" >> $testroot/stdout.expected
+	echo "parent 2: $branch_commit5" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	got tree -r $testroot/repo -c $merge_commit -R > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got tree failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# bad symlink dotgotbar.link appears as a symlink in the merge commit:
+	cat > $testroot/stdout.expected <<EOF
+alpha
+dotgotbar.link@ -> .got/bar
+epsilon/
+epsilon/new
+epsilon/zeta
+gamma/
+gamma/delta
+symlink@ -> alpha
+EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

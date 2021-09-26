@@ -448,6 +448,29 @@ test_cherrypick_modified_symlinks() {
 	git_commit $testroot/repo -m "add symlinks"
 	local commit_id1=`git_show_head $testroot/repo`
 
+	got tree -r $testroot/repo -R -c $commit_id1 \
+		> $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+alpha
+alpha.link@ -> alpha
+beta
+epsilon/
+epsilon/beta.link@ -> ../beta
+epsilon/zeta
+epsilon.link@ -> epsilon
+gamma/
+gamma/delta
+nonexistent.link@ -> nonexistent
+passwd.link@ -> /etc/passwd
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	got branch -r $testroot/repo foo
 
 	got checkout -b foo $testroot/repo $testroot/wt > /dev/null
@@ -455,7 +478,7 @@ test_cherrypick_modified_symlinks() {
 	(cd $testroot/repo && ln -sf beta alpha.link)
 	(cd $testroot/repo && ln -sfh gamma epsilon.link)
 	(cd $testroot/repo && ln -sf ../gamma/delta epsilon/beta.link)
-	(cd $testroot/repo && ln -sf .got/bar $testroot/repo/dotgotfoo.link)
+	(cd $testroot/repo && ln -sf .got/foo $testroot/repo/dotgotfoo.link)
 	(cd $testroot/repo && git rm -q nonexistent.link)
 	(cd $testroot/repo && ln -sf epsilon/zeta zeta.link)
 	(cd $testroot/repo && git add .)
@@ -487,6 +510,22 @@ test_cherrypick_modified_symlinks() {
 
 	readlink $testroot/wt/alpha.link > $testroot/stdout
 	echo "beta" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if ! [ -h $testroot/wt/dotgotfoo.link ]; then
+		echo "dotgotfoo.link is not a symlink"
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	readlink $testroot/wt/dotgotfoo.link > $testroot/stdout
+	echo ".got/foo" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -546,7 +585,58 @@ test_cherrypick_modified_symlinks() {
 		return 1
 	fi
 
-	test_done "$testroot" "0"
+	(cd $testroot/wt && got commit -m 'commit cherrypick result' \
+		> /dev/null 2>$testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "got commit succeeded unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	echo -n "got: $testroot/wt/dotgotfoo.link: symbolic link points " \
+		> $testroot/stderr.expected
+	echo "outside of paths under version control" \
+		>> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got commit -S -m 'commit cherrypick result' \
+		> /dev/null)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	local commit_id2=`git_show_head $testroot/repo`
+
+	got tree -r $testroot/repo -R -c $commit_id2 \
+		> $testroot/stdout
+	cat > $testroot/stdout.expected <<EOF
+alpha
+alpha.link@ -> beta
+beta
+dotgotfoo.link@ -> .got/foo
+epsilon/
+epsilon/beta.link@ -> ../gamma/delta
+epsilon/zeta
+epsilon.link@ -> gamma
+gamma/
+gamma/delta
+passwd.link@ -> /etc/passwd
+zeta.link@ -> epsilon/zeta
+EOF
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
 }
 
 test_cherrypick_symlink_conflicts() {
@@ -585,7 +675,7 @@ test_cherrypick_symlink_conflicts() {
 	# modeified symlink to file A vs modified symlink to dir B
 	(cd $testroot/wt && ln -sfh ../gamma epsilon/beta.link)
 	# added regular file A vs added bad symlink to file A
-	(cd $testroot/wt && ln -sf .got/bar dotgotfoo.link)
+	(cd $testroot/wt && ln -sf .got/foo dotgotfoo.link)
 	(cd $testroot/wt && got add dotgotfoo.link > /dev/null)
 	# added bad symlink to file A vs added regular file A
 	echo 'this is regular file bar' > $testroot/wt/dotgotbar.link
@@ -755,7 +845,7 @@ test_cherrypick_symlink_conflicts() {
 		> $testroot/content.expected
 	echo "this is regular file foo" >> $testroot/content.expected
 	echo "=======" >> $testroot/content.expected
-	echo -n ".got/bar" >> $testroot/content.expected
+	echo -n ".got/foo" >> $testroot/content.expected
 	echo '>>>>>>>' >> $testroot/content.expected
 	cp $testroot/wt/dotgotfoo.link $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
