@@ -51,7 +51,7 @@ BRANCHES + SUBMITTING PATCHES
 `got-portable` has two key branches:
 
 * `main` which tracks got upstream untainted.
-* `linux` which provices the portable version of GoT based from code on `main`
+* `linux` which provides the portable version of GoT based from code on `main`
 
 Patches for portable code fixes should be based from the `linux` branch and
 sent to the mailing list for review [2] or sent to me directly (see CONTACT).
