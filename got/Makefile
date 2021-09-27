@@ -33,8 +33,4 @@ realinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} \
 	-m ${BINMODE} ${PROG} ${BINDIR}/${PROG}
 
-dist:
-	mkdir ../got-${GOT_VERSION}/got
-	cp ${SRCS} ${MAN} ../got-${GOT_VERSION}/got
-
 .include <bsd.prog.mk>
