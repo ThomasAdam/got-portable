@@ -997,7 +997,7 @@ test_merge_missing_file() {
 		return 1
 	fi
 
-	echo -n "got: changes destined for missing files " \
+	echo -n "got: changes destined for some files " \
 		> $testroot/stderr.expected
 	echo -n "were not yet merged and should be merged manually if " \
 		>> $testroot/stderr.expected
