@@ -1188,6 +1188,9 @@ test_rebase_delete_missing_file() {
 	local orig_commit1=`git_show_parent_commit $testroot/repo`
 	local orig_commit2=`git_show_head $testroot/repo`
 
+	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
+	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
+
 	(cd $testroot/wt && got update -b master > /dev/null)
 	(cd $testroot/wt && got rm beta d/f/g/new > /dev/null)
 	(cd $testroot/wt && got commit \
@@ -1197,12 +1200,18 @@ test_rebase_delete_missing_file() {
 	local master_commit=`git_show_head $testroot/repo`
 
 	(cd $testroot/wt && got update -b master > /dev/null)
-	(cd $testroot/wt && got rebase newbranch > $testroot/stdout)
+	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "rebase succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 
-	(cd $testroot/repo && git checkout -q newbranch)
-	local new_commit1=`git_show_head $testroot/repo`
+	local new_commit1=$(cd $testroot/wt && got info | \
+		grep '^work tree base commit: ' | cut -d: -f2 | tr -d ' ')
 
-	local short_orig_commit1=`trim_obj_id 28 $orig_commit1`
 	local short_orig_commit2=`trim_obj_id 28 $orig_commit2`
 	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 
@@ -1215,8 +1224,37 @@ test_rebase_delete_missing_file() {
 	echo -n "Files which had incoming changes but could not be found " \
 		>> $testroot/stdout.expected
 	echo "in the work tree: 2" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo -n "got: changes destined for some files were not yet merged " \
+		> $testroot/stderr.expected
+	echo -n "and should be merged manually if required before the " \
+		>> $testroot/stderr.expected
+	echo "rebase operation is continued" >> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# ignore the missing changes and continue
+	(cd $testroot/wt && got rebase -c > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "rebase failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
 	echo -n "$short_orig_commit2 -> no-op change" \
-		>> $testroot/stdout.expected
+		> $testroot/stdout.expected
 	echo ": removing beta and d/f/g/new on newbranch" \
 		>> $testroot/stdout.expected
 	echo "Switching work tree to refs/heads/newbranch" \
@@ -1256,6 +1294,10 @@ test_rebase_delete_missing_file() {
 		test_done "$testroot" "$ret"
 		return 1
 	fi
+
+	(cd $testroot/repo && git checkout -q newbranch)
+	local new_commit1=`git_show_head $testroot/repo`
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
 
 	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
 	echo "commit $new_commit1 (newbranch)" > $testroot/stdout.expected
