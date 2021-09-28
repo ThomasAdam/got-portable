@@ -8808,14 +8808,15 @@ cmd_rebase(int argc, char *argv[])
 	int ch, rebase_in_progress = 0, abort_rebase = 0, continue_rebase = 0;
 	int histedit_in_progress = 0, merge_in_progress = 0;
 	int create_backup = 1, list_backups = 0, delete_backups = 0;
-	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
 	const struct got_object_id_queue *parent_ids;
 	struct got_object_qid *qid, *pid;
+	struct got_update_progress_arg upa;
 
 	STAILQ_INIT(&commits);
 	TAILQ_INIT(&merged_paths);
+	memset(&upa, 0, sizeof(upa));
 
 	while ((ch = getopt(argc, argv, "aclX")) != -1) {
 		switch (ch) {
@@ -8931,7 +8932,6 @@ cmd_rebase(int argc, char *argv[])
 		goto done;
 
 	if (abort_rebase) {
-		struct got_update_progress_arg upa;
 		if (!rebase_in_progress) {
 			error = got_error(GOT_ERR_NOT_REBASING);
 			goto done;
@@ -8943,7 +8943,6 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(new_base_branch));
-		memset(&upa, 0, sizeof(upa));
 		error = got_worktree_rebase_abort(worktree, fileindex, repo,
 		    new_base_branch, update_progress, &upa);
 		if (error)
@@ -9029,8 +9028,6 @@ cmd_rebase(int argc, char *argv[])
 	pid = STAILQ_FIRST(parent_ids);
 	if (pid == NULL) {
 		if (!continue_rebase) {
-			struct got_update_progress_arg upa;
-			memset(&upa, 0, sizeof(upa));
 			error = got_worktree_rebase_abort(worktree, fileindex,
 			    repo, new_base_branch, update_progress, &upa);
 			if (error)
@@ -9080,7 +9077,6 @@ cmd_rebase(int argc, char *argv[])
 
 	pid = NULL;
 	STAILQ_FOREACH(qid, &commits, entry) {
-		struct got_update_progress_arg upa;
 
 		commit_id = qid->id;
 		parent_id = pid ? pid->id : yca_id;
@@ -9094,13 +9090,14 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 
 		print_merge_progress_stats(&upa);
-		if (upa.conflicts > 0)
-			rebase_status = GOT_STATUS_CONFLICT;
-
-		if (rebase_status == GOT_STATUS_CONFLICT) {
-			error = show_rebase_merge_conflict(qid->id, repo);
-			if (error)
-				goto done;
+		if (upa.conflicts > 0 || upa.missing > 0 ||
+		    upa.not_deleted > 0 || upa.unversioned > 0) {
+			if (upa.conflicts > 0) {
+				error = show_rebase_merge_conflict(qid->id,
+				    repo);
+				if (error)
+					goto done;
+			}
 			got_worktree_rebase_pathlist_free(&merged_paths);
 			break;
 		}
@@ -9112,12 +9109,30 @@ cmd_rebase(int argc, char *argv[])
 			goto done;
 	}
 
-	if (rebase_status == GOT_STATUS_CONFLICT) {
+	if (upa.conflicts > 0 || upa.missing > 0 ||
+	    upa.not_deleted > 0 || upa.unversioned > 0) {
 		error = got_worktree_rebase_postpone(worktree, fileindex);
 		if (error)
 			goto done;
-		error = got_error_msg(GOT_ERR_CONFLICTS,
-		    "conflicts must be resolved before rebasing can continue");
+		if (upa.conflicts > 0 && upa.missing == 0 &&
+		    upa.not_deleted == 0 && upa.unversioned == 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before rebasing "
+			    "can continue");
+		} else if (upa.conflicts > 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before rebasing "
+			    "can continue; changes destined for some "
+			    "files were not yet merged and should be "
+			    "merged manually if required before the "
+			    "rebase operation is continued");
+		} else {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "changes destined for some files were not "
+			    "yet merged and should be merged manually "
+			    "if required before the rebase operation "
+			    "is continued");
+		}
 	} else
 		error = rebase_complete(worktree, fileindex, branch,
 		    new_base_branch, tmp_branch, repo, create_backup);
