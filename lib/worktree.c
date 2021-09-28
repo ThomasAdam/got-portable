@@ -5221,6 +5221,9 @@ report_ct_status(struct got_commitable *ct,
 	const char *ct_path = ct->path;
 	unsigned char status;
 
+	if (status_cb == NULL) /* no commit progress output desired */
+		return NULL;
+
 	while (ct_path[0] == '/')
 		ct_path++;
 
@@ -7500,14 +7503,6 @@ merge_commit_msg_cb(struct got_pathlist_head *commitable_paths, char **logmsg,
 	return NULL;
 }
 
-static const struct got_error *
-merge_status_cb(void *arg, unsigned char status, unsigned char staged_status,
-    const char *path, struct got_object_id *blob_id,
-    struct got_object_id *staged_blob_id, struct got_object_id *commit_id,
-    int dirfd, const char *de_name)
-{
-	return NULL;
-}
 
 const struct got_error *
 got_worktree_merge_branch(struct got_worktree *worktree,
@@ -7542,7 +7537,9 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *author, const char *committer, int allow_bad_symlinks,
     struct got_object_id *branch_tip, const char *branch_name,
-    struct got_repository *repo)
+    struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg)
+
 {
 	const struct got_error *err = NULL, *sync_err;
 	struct got_pathlist_head commitable_paths;
@@ -7614,7 +7611,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	mcm_arg.branch_name = branch_name;
 	err = commit_worktree(new_commit_id, &commitable_paths,
 	    head_commit_id, branch_tip, worktree, author, committer,
-	    merge_commit_msg_cb, &mcm_arg, merge_status_cb, NULL, repo);
+	    merge_commit_msg_cb, &mcm_arg, status_cb, status_arg, repo);
 	if (err)
 		goto done;
 
