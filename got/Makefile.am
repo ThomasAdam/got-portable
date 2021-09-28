@@ -1,5 +1,7 @@
 bin_PROGRAMS = got
 
+include $(top_builddir)/Makefile.common
+
 got_SOURCES = got.c \
 	$(top_srcdir)/lib/blame.c \
 	$(top_srcdir)/lib/commit_graph.c \
@@ -52,15 +54,6 @@ got_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
 man1_MANS = got.1
 man5_MANS = got.conf.5 git-repository.5 got-worktree.5
-
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 if HOST_FREEBSD

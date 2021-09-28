@@ -1,4 +1,7 @@
 libexec_PROGRAMS = got-read-gotconfig
+
+include $(top_builddir)/Makefile.common
+
 got_read_gotconfig_SOURCES = \
 	got-read-gotconfig.c \
 	gotconfig.h \
@@ -11,15 +14,6 @@ got_read_gotconfig_SOURCES = \
 	parse.y
 
 got_read_gotconfig_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 if HOST_FREEBSD

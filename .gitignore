@@ -7,6 +7,7 @@
 *~
 .ccls-cache/
 .deps/
+Makefile.common
 aclocal.m4
 autom4te.cache/
 compat/.dirstamp

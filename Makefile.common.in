@@ -1,0 +1,19 @@
+AM_CFLAGS += \
+	    @AM_CPPFLAGS@ \
+	    -g -Wall -Wno-long-long -W -Wformat=2 -Wmissing-prototypes \
+	    -Wstrict-prototypes -Wmissing-declarations -Wwrite-strings \
+	    -Wshadow -Wpointer-arith -Wsign-compare -Wundef \
+	    -Wbad-function-cast -Winline -Wcast-align \
+	    -Wdeclaration-after-statement -Wno-pointer-sign \
+	    -Wno-attributes -Wno-unused-result
+
+AM_CPPFLAGS += \
+	      @AM_CPPFLAGS@ \
+	      -DGOT_VERSION=@VERSION@ \
+	      -DGOT_VERSION_NUMBER=@VERSION@ \
+	      -DGOT_LIBEXECDIR="$(libexecdir)" \
+	      -I$(top_srcdir) \
+	      -I$(top_srcdir)/compat \
+	      -I$(top_srcdir)/lib \
+	      -I$(top_srcdir)/include \
+	      -I.

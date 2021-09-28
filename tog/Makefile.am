@@ -1,5 +1,7 @@
 bin_PROGRAMS = tog
 
+include $(top_builddir)/Makefile.common
+
 tog_SOURCES = tog.c \
 	$(top_srcdir)/lib/blame.c \
 	$(top_srcdir)/lib/commit_graph.c \
@@ -46,15 +48,6 @@ tog_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 man1_MANS = tog.1
 
 EXTRA_DIST = tog.1
-
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lpthread
 if HOST_FREEBSD
