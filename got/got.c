@@ -10814,7 +10814,8 @@ cmd_merge(int argc, char *argv[])
 		goto done;
 	} else {
 		error = got_worktree_merge_commit(&merge_commit_id, worktree,
-		    fileindex, author, NULL, 1, branch_tip, branch_name, repo);
+		    fileindex, author, NULL, 1, branch_tip, branch_name,
+		    repo, continue_merge ? print_status : NULL, NULL);
 		if (error)
 			goto done;
 		error = got_worktree_merge_complete(worktree, fileindex, repo);

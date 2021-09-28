@@ -456,7 +456,8 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
     struct got_worktree *worktree, struct got_fileindex *fileindex,
     const char *author, const char *committer, int allow_bad_symlinks,
     struct got_object_id *branch_tip, const char *branch_name,
-    struct got_repository *repo);
+    struct got_repository *repo,
+    got_worktree_status_cb status_cb, void *status_arg);
 
 /*
  * Complete the merge operation.

@@ -492,8 +492,12 @@ test_merge_continue() {
 
 	local merge_commit=`git_show_head $testroot/repo`
 
+	echo "M  alpha" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
+	echo "M  gamma/delta" >> $testroot/stdout.expected
 	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
-		> $testroot/stdout.expected
+		>> $testroot/stdout.expected
 	echo $merge_commit >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -1324,8 +1328,9 @@ test_merge_interrupt() {
 
 	local merge_commit=`git_show_head $testroot/repo`
 
+	echo "M  alpha" > $testroot/stdout.expected
 	echo -n "Merged refs/heads/newbranch into refs/heads/master: " \
-		> $testroot/stdout.expected
+		>> $testroot/stdout.expected
 	echo $merge_commit >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
