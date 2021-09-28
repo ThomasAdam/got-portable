@@ -124,8 +124,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	off_t packfile_size = 0;
 	struct got_packfile_hdr pack_hdr;
 	uint32_t nobj = 0;
-	char *ref_prefix = NULL;
-	size_t ref_prefixlen = 0;
 	char *path;
 	char *progress = NULL;
 
@@ -153,13 +151,6 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	TAILQ_INIT(&have_refs);
 	TAILQ_INIT(&my_refs);
 
-	if (!mirror_references) {
-		if (asprintf(&ref_prefix, "refs/remotes/%s/",
-		    remote_name) == -1)
-			return got_error_from_errno("asprintf");
-		ref_prefixlen = strlen(ref_prefix);
-	}
-
 	if (!list_refs_only) {
 		err = got_ref_list(&my_refs, repo, NULL,
 		    got_ref_cmp_by_name, NULL);
@@ -174,60 +165,17 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		if (got_ref_is_symbolic(re->ref))
 			continue;
 
-		refname = got_ref_get_name(re->ref);
-
-		if (mirror_references) {
-			char *name;
-			err = got_ref_resolve(&id, repo, re->ref);
-			if (err)
-				goto done;
-			name = strdup(refname);
-			if (name == NULL) {
-				err = got_error_from_errno("strdup");
-				goto done;
-			}
-			err = got_pathlist_append(&have_refs, name, id);
-			if (err)
-				goto done;
-			continue;
+		err = got_ref_resolve(&id, repo, re->ref);
+		if (err)
+			goto done;
+		refname = strdup(got_ref_get_name(re->ref));
+		if (refname == NULL) {
+			err = got_error_from_errno("strdup");
+			goto done;
 		}
-
-		if (strncmp("refs/tags/", refname, 10) == 0) {
-			char *tagname;
-
-			err = got_ref_resolve(&id, repo, re->ref);
-			if (err)
-				goto done;
-			tagname = strdup(refname);
-			if (tagname == NULL) {
-				err = got_error_from_errno("strdup");
-				goto done;
-			}
-			err = got_pathlist_append(&have_refs, tagname, id);
-			if (err) {
-				free(tagname);
-				goto done;
-			}
-		}
-
-		if (strncmp(ref_prefix, refname, ref_prefixlen) == 0) {
-			char *branchname;
-
-			err = got_ref_resolve(&id, repo, re->ref);
-			if (err)
-				goto done;
-
-			if (asprintf(&branchname, "refs/heads/%s",
-			    refname + ref_prefixlen) == -1) {
-				err = got_error_from_errno("asprintf");
-				goto done;
-			}
-			err = got_pathlist_append(&have_refs, branchname, id);
-			if (err) {
-				free(branchname);
-				goto done;
-			}
-		}
+		err = got_pathlist_append(&have_refs, refname, id);
+		if (err)
+			goto done;
 	}
 
 	if (list_refs_only) {
@@ -577,7 +525,6 @@ done:
 	free(tmpidxpath);
 	free(idxpath);
 	free(packpath);
-	free(ref_prefix);
 	free(progress);
 
 	TAILQ_FOREACH(pe, &have_refs, entry) {
