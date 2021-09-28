@@ -1,13 +1,7 @@
 noinst_LIBRARIES = libopenbsd-compat.a
 
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
+include $(top_builddir)/Makefile.common
+
 
 libopenbsd_compat_a_SOURCES =  \
 	asprintf.c \
