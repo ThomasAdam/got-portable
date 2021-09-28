@@ -1,5 +1,7 @@
 libexec_PROGRAMS = got-index-pack
-bin_PROGRAMS = got-index-pack
+
+include $(top_builddir)/Makefile.common
+
 got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/error.c \
 	$(top_srcdir)/lib/inflate.c \
@@ -13,15 +15,6 @@ got_index_pack_SOURCES = got-index-pack.c \
 	$(top_srcdir)/lib/sha1.c
 
 got_index_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 if HOST_FREEBSD

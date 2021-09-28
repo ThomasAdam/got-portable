@@ -1,4 +1,7 @@
 libexec_PROGRAMS = got-read-pack
+
+include $(top_builddir)/Makefile.common
+
 got_read_pack_SOURCES = got-read-pack.c \
 	$(top_srcdir)/lib/delta.c \
 	$(top_srcdir)/lib/delta_cache.c \
@@ -14,15 +17,6 @@ got_read_pack_SOURCES = got-read-pack.c \
 	$(top_srcdir)/lib/sha1.c
 
 got_read_pack_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
-
-AM_CPPFLAGS += -DGOT_VERSION='"@VERSION@"' \
-	-DGOT_VERSION_NUMBER='"@VERSION@"' \
-	-DGOT_LIBEXECDIR="$(libexecdir)" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/compat \
-	-I$(top_srcdir)/lib \
-	-I$(top_srcdir)/include \
-	-I.
 
 LDADD = -L$(top_builddir)/compat -lopenbsd-compat
 if HOST_FREEBSD
