@@ -19,6 +19,9 @@
 
 #include <ctype.h>
 #include <errno.h>
+#if defined(__FreeBSD__)
+#define _XOPEN_SOURCE_EXTENDED /* for ncurses wide-character functions */
+#endif
 #include <curses.h>
 #include <panel.h>
 #include <locale.h>
