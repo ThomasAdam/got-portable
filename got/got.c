@@ -10000,7 +10000,6 @@ cmd_histedit(int argc, char *argv[])
 	int edit_logmsg_only = 0, fold_only = 0;
 	int list_backups = 0, delete_backups = 0;
 	const char *edit_script_path = NULL;
-	unsigned char rebase_status = GOT_STATUS_NO_CHANGE;
 	struct got_object_id_queue commits;
 	struct got_pathlist_head merged_paths;
 	const struct got_object_id_queue *parent_ids;
@@ -10419,14 +10418,14 @@ cmd_histedit(int argc, char *argv[])
 		commit = NULL;
 
 		print_merge_progress_stats(&upa);
-		if (upa.conflicts > 0)
-			rebase_status = GOT_STATUS_CONFLICT;
-
-		if (rebase_status == GOT_STATUS_CONFLICT) {
-			error = show_rebase_merge_conflict(hle->commit_id,
-			    repo);
-			if (error)
-				goto done;
+		if (upa.conflicts > 0 || upa.missing > 0 ||
+		    upa.not_deleted > 0 || upa.unversioned > 0) {
+			if (upa.conflicts > 0) {
+				error = show_rebase_merge_conflict(
+				    hle->commit_id, repo);
+				if (error)
+					goto done;
+			}
 			got_worktree_rebase_pathlist_free(&merged_paths);
 			break;
 		}
@@ -10459,12 +10458,30 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 	}
 
-	if (rebase_status == GOT_STATUS_CONFLICT) {
+	if (upa.conflicts > 0 || upa.missing > 0 ||
+	    upa.not_deleted > 0 || upa.unversioned > 0) {
 		error = got_worktree_histedit_postpone(worktree, fileindex);
 		if (error)
 			goto done;
-		error = got_error_msg(GOT_ERR_CONFLICTS,
-		    "conflicts must be resolved before histedit can continue");
+		if (upa.conflicts > 0 && upa.missing == 0 &&
+		    upa.not_deleted == 0 && upa.unversioned == 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before histedit "
+			    "can continue");
+		} else if (upa.conflicts > 0) {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "conflicts must be resolved before histedit "
+			    "can continue; changes destined for some "
+			    "files were not yet merged and should be "
+			    "merged manually if required before the "
+			    "histedit operation is continued");
+		} else {
+			error = got_error_msg(GOT_ERR_CONFLICTS,
+			    "changes destined for some files were not "
+			    "yet merged and should be merged manually "
+			    "if required before the histedit operation "
+			    "is continued");
+		}
 	} else
 		error = histedit_complete(worktree, fileindex, tmp_branch,
 		    branch, repo);
