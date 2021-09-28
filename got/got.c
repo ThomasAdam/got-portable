@@ -3062,6 +3062,8 @@ struct got_update_progress_arg {
 	int obstructed;
 	int not_updated;
 	int missing;
+	int not_deleted;
+	int unversioned;
 	int verbosity;
 };
 
@@ -3079,6 +3081,35 @@ print_update_progress_stats(struct got_update_progress_arg *upa)
 	if (upa->not_updated > 0)
 		printf("Files not updated because of existing merge "
 		    "conflicts: %d\n", upa->not_updated);
+}
+
+/*
+ * The meaning of some status codes differs between merge-style operations and
+ * update operations. For example, the ! status code means "file was missing"
+ * if changes were merged into the work tree, and "missing file was restored"
+ * if the work tree was updated. This function should be used by any operation
+ * which merges changes into the work tree without updating the work tree.
+ */
+void
+print_merge_progress_stats(struct got_update_progress_arg *upa)
+{
+	if (!upa->did_something)
+		return;
+
+	if (upa->conflicts > 0)
+		printf("Files with new merge conflicts: %d\n", upa->conflicts);
+	if (upa->obstructed > 0)
+		printf("File paths obstructed by a non-regular file: %d\n",
+		    upa->obstructed);
+	if (upa->missing > 0)
+		printf("Files which had incoming changes but could not be "
+		    "found in the work tree: %d\n", upa->missing);
+	if (upa->not_deleted > 0)
+		printf("Files not deleted due to differences in deleted "
+		    "content: %d\n", upa->not_deleted);
+	if (upa->unversioned > 0)
+		printf("Files not merged because an unversioned file was "
+		    "found in the work tree: %d\n", upa->unversioned);
 }
 
 __dead static void
@@ -3113,6 +3144,10 @@ update_progress(void *arg, unsigned char status, const char *path)
 		upa->not_updated++;
 	if (status == GOT_STATUS_MISSING)
 		upa->missing++;
+	if (status == GOT_STATUS_CANNOT_DELETE)
+		upa->not_deleted++;
+	if (status == GOT_STATUS_UNVERSIONED)
+		upa->unversioned++;
 
 	while (path[0] == '/')
 		path++;
@@ -8087,7 +8122,7 @@ cmd_cherrypick(int argc, char *argv[])
 
 	if (upa.did_something)
 		printf("Merged commit %s\n", commit_id_str);
-	print_update_progress_stats(&upa);
+	print_merge_progress_stats(&upa);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -8198,7 +8233,7 @@ cmd_backout(int argc, char *argv[])
 
 	if (upa.did_something)
 		printf("Backed out commit %s\n", commit_id_str);
-	print_update_progress_stats(&upa);
+	print_merge_progress_stats(&upa);
 done:
 	if (commit)
 		got_object_commit_close(commit);
@@ -8914,7 +8949,7 @@ cmd_rebase(int argc, char *argv[])
 		if (error)
 			goto done;
 		printf("Rebase of %s aborted\n", got_ref_get_name(branch));
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 		goto done; /* nothing else to do */
 	}
 
@@ -9002,7 +9037,7 @@ cmd_rebase(int argc, char *argv[])
 				goto done;
 			printf("Rebase of %s aborted\n",
 			    got_ref_get_name(branch));
-			print_update_progress_stats(&upa);
+			print_merge_progress_stats(&upa);
 
 		}
 		error = got_error(GOT_ERR_EMPTY_REBASE);
@@ -9058,7 +9093,7 @@ cmd_rebase(int argc, char *argv[])
 		if (error)
 			goto done;
 
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 		if (upa.conflicts > 0)
 			rebase_status = GOT_STATUS_CONFLICT;
 
@@ -10147,7 +10182,7 @@ cmd_histedit(int argc, char *argv[])
 			goto done;
 		printf("Histedit of %s aborted\n",
 		    got_ref_get_symref_target(branch));
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 		goto done; /* nothing else to do */
 	} else if (abort_edit) {
 		error = got_error(GOT_ERR_NOT_HISTEDIT);
@@ -10258,7 +10293,7 @@ cmd_histedit(int argc, char *argv[])
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
 				    update_progress, &upa);
-				print_update_progress_stats(&upa);
+				print_merge_progress_stats(&upa);
 				goto done;
 			}
 		} else {
@@ -10272,7 +10307,7 @@ cmd_histedit(int argc, char *argv[])
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
 				    update_progress, &upa);
-				print_update_progress_stats(&upa);
+				print_merge_progress_stats(&upa);
 				goto done;
 			}
 
@@ -10284,7 +10319,7 @@ cmd_histedit(int argc, char *argv[])
 			got_worktree_histedit_abort(worktree, fileindex,
 			    repo, branch, base_commit_id,
 			    update_progress, &upa);
-			print_update_progress_stats(&upa);
+			print_merge_progress_stats(&upa);
 			goto done;
 		}
 
@@ -10368,7 +10403,7 @@ cmd_histedit(int argc, char *argv[])
 		got_object_commit_close(commit);
 		commit = NULL;
 
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 		if (upa.conflicts > 0)
 			rebase_status = GOT_STATUS_CONFLICT;
 
@@ -10773,7 +10808,7 @@ cmd_merge(int argc, char *argv[])
 		    check_cancelled, NULL);
 		if (error)
 			goto done;
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 		if (!upa.did_something) {
 			error = got_worktree_merge_abort(worktree, fileindex,
 			    repo, update_progress, &upa);
@@ -11097,7 +11132,7 @@ cmd_unstage(int argc, char *argv[])
 	error = got_worktree_unstage(worktree, &paths, update_progress,
 	    &upa, pflag ? choose_patch : NULL, &cpa, repo);
 	if (!error)
-		print_update_progress_stats(&upa);
+		print_merge_progress_stats(&upa);
 done:
 	if (patch_script_file && fclose(patch_script_file) == EOF &&
 	    error == NULL)
