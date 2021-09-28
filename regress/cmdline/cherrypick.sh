@@ -708,6 +708,12 @@ test_cherrypick_symlink_conflicts() {
 	echo "C  new.link" >> $testroot/stdout.expected
 	echo "Merged commit $commit_id2" >> $testroot/stdout.expected
 	echo "Files with new merge conflicts: 6" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 1" >> $testroot/stdout.expected
+	echo -n "Files not merged because an unversioned file was found in " \
+		>> $testroot/stdout.expected
+	echo "the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1406,6 +1412,9 @@ test_cherrypick_same_branch() {
 	echo "!  beta" >> $testroot/stdout.expected
 	echo "G  epsilon/new" >> $testroot/stdout.expected
 	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 1" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

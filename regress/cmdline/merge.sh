@@ -986,6 +986,9 @@ test_merge_missing_file() {
 
 	echo "!  alpha" > $testroot/stdout.expected
 	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

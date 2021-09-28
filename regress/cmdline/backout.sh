@@ -117,6 +117,9 @@ test_backout_edits_for_file_since_deleted() {
 
 	echo "!  alpha" > $testroot/stdout.expected
 	echo "Backed out commit $bad_commit" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -168,6 +171,9 @@ test_backout_next_commit() {
 	echo "G  epsilon/zeta" >> $testroot/stdout.expected
 	echo "!  new" >> $testroot/stdout.expected
 	echo "Backed out commit $bad_commit" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 1" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

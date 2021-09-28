@@ -1212,6 +1212,9 @@ test_rebase_delete_missing_file() {
 	echo ": committing to delta on newbranch" >> $testroot/stdout.expected
 	echo "!  beta" >> $testroot/stdout.expected
 	echo "!  d/f/g/new" >> $testroot/stdout.expected
+	echo -n "Files which had incoming changes but could not be found " \
+		>> $testroot/stdout.expected
+	echo "in the work tree: 2" >> $testroot/stdout.expected
 	echo -n "$short_orig_commit2 -> no-op change" \
 		>> $testroot/stdout.expected
 	echo ": removing beta and d/f/g/new on newbranch" \
