@@ -209,7 +209,7 @@ got_object_read_header(struct got_object **obj, int fd)
 {
 	const struct got_error *err;
 	struct got_inflate_buf zb;
-	char *buf;
+	uint8_t *buf;
 	const size_t zbsize = 64;
 	size_t outlen, totlen;
 	int nbuf = 1;
@@ -233,7 +233,7 @@ got_object_read_header(struct got_object **obj, int fd)
 			break;
 		totlen += outlen;
 		if (memchr(zb.outbuf, '\0', outlen) == NULL) {
-			char *newbuf;
+			uint8_t *newbuf;
 			nbuf++;
 			newbuf = recallocarray(buf, nbuf - 1, nbuf, zbsize);
 			if (newbuf == NULL) {

@@ -82,7 +82,7 @@ done:
 }
 
 static void
-csum_input(struct got_inflate_checksum *csum, const char *buf, size_t len)
+csum_input(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 {
 	if (csum->input_crc)
 		*csum->input_crc = crc32(*csum->input_crc, buf, len);
@@ -92,7 +92,7 @@ csum_input(struct got_inflate_checksum *csum, const char *buf, size_t len)
 }
 
 static void
-csum_output(struct got_inflate_checksum *csum, const char *buf, size_t len)
+csum_output(struct got_inflate_checksum *csum, const uint8_t *buf, size_t len)
 {
 	if (csum->output_crc)
 		*csum->output_crc = crc32(*csum->output_crc, buf, len);
@@ -117,7 +117,7 @@ got_inflate_read(struct got_inflate_buf *zb, FILE *f, size_t *outlenp,
 	if (consumed)
 		*consumed = 0;
 	do {
-		char *csum_in = NULL, *csum_out = NULL;
+		uint8_t *csum_in = NULL, *csum_out = NULL;
 		size_t csum_avail_in = 0, csum_avail_out = 0;
 
 		if (z->avail_in == 0) {
@@ -177,7 +177,7 @@ got_inflate_read_fd(struct got_inflate_buf *zb, int fd, size_t *outlenp,
 	if (consumed)
 		*consumed = 0;
 	do {
-		char *csum_in = NULL, *csum_out = NULL;
+		uint8_t *csum_in = NULL, *csum_out = NULL;
 		size_t csum_avail_in = 0, csum_avail_out = 0;
 
 		if (z->avail_in == 0) {
@@ -236,7 +236,7 @@ got_inflate_read_mmap(struct got_inflate_buf *zb, uint8_t *map, size_t offset,
 	*consumed = 0;
 
 	do {
-		char *csum_in = NULL, *csum_out = NULL;
+		uint8_t *csum_in = NULL, *csum_out = NULL;
 		size_t csum_avail_in = 0, csum_avail_out = 0;
 		size_t last_total_in = zb->z.total_in;
 
