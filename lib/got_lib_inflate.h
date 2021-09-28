@@ -30,9 +30,9 @@ struct got_inflate_checksum {
 
 struct got_inflate_buf {
 	z_stream z;
-	char *inbuf;
+	uint8_t *inbuf;
 	size_t inlen;
-	char *outbuf;
+	uint8_t *outbuf;
 	size_t outlen;
 	int flags;
 #define GOT_INFLATE_F_HAVE_MORE		0x01

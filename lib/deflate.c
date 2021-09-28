@@ -80,7 +80,7 @@ done:
 }
 
 static void
-csum_output(struct got_deflate_checksum *csum, const char *buf, size_t len)
+csum_output(struct got_deflate_checksum *csum, const uint8_t *buf, size_t len)
 {
 	if (csum->output_crc)
 		*csum->output_crc = crc32(*csum->output_crc, buf, len);

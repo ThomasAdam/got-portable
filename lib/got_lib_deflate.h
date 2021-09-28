@@ -24,9 +24,9 @@ struct got_deflate_checksum {
 
 struct got_deflate_buf {
 	z_stream z;
-	char *inbuf;
+	uint8_t *inbuf;
 	size_t inlen;
-	char *outbuf;
+	uint8_t *outbuf;
 	size_t outlen;
 	int flags;
 #define GOT_DEFLATE_F_HAVE_MORE		0x01
