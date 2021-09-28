@@ -1333,7 +1333,7 @@ delete_packed_ref(struct got_reference *delref, struct got_repository *repo)
 		}
 
 		TAILQ_FOREACH(re, &refs, entry) {
-			uint8_t hex[SHA1_DIGEST_STRING_LENGTH];
+			char hex[SHA1_DIGEST_STRING_LENGTH];
 
 			if (got_sha1_digest_to_str(re->ref->ref.ref.sha1, hex,
 			    sizeof(hex)) == NULL) {
