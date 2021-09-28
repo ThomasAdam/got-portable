@@ -10824,24 +10824,26 @@ cmd_merge(int argc, char *argv[])
 		if (error)
 			goto done;
 		printf("Merge of %s interrupted on request\n", branch_name);
-	} else if (upa.conflicts > 0 || upa.missing > 0) {
+	} else if (upa.conflicts > 0 || upa.missing > 0 ||
+	    upa.not_deleted > 0 || upa.unversioned > 0) {
 		error = got_worktree_merge_postpone(worktree, fileindex);
 		if (error)
 			goto done;
-		if (upa.conflicts > 0 && upa.missing == 0) {
+		if (upa.conflicts > 0 && upa.missing == 0 &&
+		    upa.not_deleted == 0 && upa.unversioned == 0) {
 			error = got_error_msg(GOT_ERR_CONFLICTS,
 			    "conflicts must be resolved before merging "
 			    "can continue");
 		} else if (upa.conflicts > 0) {
 			error = got_error_msg(GOT_ERR_CONFLICTS,
 			    "conflicts must be resolved before merging "
-			    "can continue; changes destined for missing "
+			    "can continue; changes destined for some "
 			    "files were not yet merged and "
 			    "should be merged manually if required before the "
 			    "merge operation is continued");
 		} else {
 			error = got_error_msg(GOT_ERR_CONFLICTS,
-			    "changes destined for missing "
+			    "changes destined for some "
 			    "files were not yet merged and should be "
 			    "merged manually if required before the "
 			    "merge operation is continued");
