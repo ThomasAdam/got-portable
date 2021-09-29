@@ -36,8 +36,6 @@ if HOST_FREEBSD
 else
 libopenbsd_compat_a_SOURCES += uuid.c
 endif
-	uuid.c \
-	xmalloc.c
 
 EXTRA_DIST = \
 	$(top_srcdir)/include/got_compat.h \
