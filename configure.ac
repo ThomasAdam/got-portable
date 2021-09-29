@@ -447,8 +447,7 @@ AC_CONFIG_FILES([Makefile
 		 got/Makefile
 		 gotadmin/Makefile
 		 tog/Makefile
-		 Makefile.common:Makefile.common.in
-		 regress/cmdline/Makefile.linux:regress/cmdline/Makefile.am])
+		 Makefile.common:Makefile.common.in])
 AC_OUTPUT
 
 #                tog/GNUMakefile])

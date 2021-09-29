@@ -22,7 +22,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <err.h>
-#include <sha1.h>
 #include <zlib.h>
 #include <time.h>
 

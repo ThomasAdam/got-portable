@@ -5,6 +5,119 @@ include $(top_builddir)/Makefile.common
 EXTRA_DIST = CHANGES CHANGELOG
 
 LDADD = $(LIBOBJS)
+if HOST_FREEBSD
+LDADD += -lmd
+LIBS += -lmd
+endif
 
-tests:
-	$(MAKE) -C regress/cmdline -f Makefile.linux
+TEST_TARGETS=regress-delta regress-deltify regress-fetch regress-idset \
+	     regress-path regress-cmdline
+GOT_TEST_ROOT=/tmp
+
+tests: $(TEST_TARGETS)
+
+regress-cmdline:
+	(cd $(top_builddir)/regress/cmdline || exit $$?; 	\
+	./checkout.sh -r "$(GOT_TEST_ROOT)";			\
+	./update.sh -r "$(GOT_TEST_ROOT)";			\
+	./status.sh -r "$(GOT_TEST_ROOT)";			\
+	./log.sh -r "$(GOT_TEST_ROOT)";				\
+	./add.sh -r "$(GOT_TEST_ROOT)";				\
+	./rm.sh -r "$(GOT_TEST_ROOT)";				\
+	./diff.sh -r "$(GOT_TEST_ROOT)";			\
+	./blame.sh -r "$(GOT_TEST_ROOT)";			\
+	./branch.sh -r "$(GOT_TEST_ROOT)";			\
+	./tag.sh -r "$(GOT_TEST_ROOT)";				\
+	./ref.sh -r "$(GOT_TEST_ROOT)";				\
+	./commit.sh -r "$(GOT_TEST_ROOT)";			\
+	./revert.sh -r "$(GOT_TEST_ROOT)";			\
+	./cherrypick.sh -r "$(GOT_TEST_ROOT)";			\
+	./backout.sh -r "$(GOT_TEST_ROOT)";			\
+	./rebase.sh -r "$(GOT_TEST_ROOT)";			\
+	./import.sh -r "$(GOT_TEST_ROOT)";			\
+	./histedit.sh -r "$(GOT_TEST_ROOT)";			\
+	./integrate.sh -r "$(GOT_TEST_ROOT)";			\
+	./stage.sh -r "$(GOT_TEST_ROOT)";			\
+	./unstage.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./cat.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./clone.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./fetch.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./send.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./tree.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./pack.sh -r "$(GOT_TEST_ROOT)"; 			\
+	./cleanup.sh -r "$(GOT_TEST_ROOT)")
+
+regress-delta:
+	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
+		-o $(top_builddir)/regress/delta/delta_test \
+		$(top_srcdir)/lib/delta.c \
+		$(top_srcdir)/lib/error.c \
+		$(top_srcdir)/lib/opentemp.c \
+		$(top_srcdir)/lib/path.c \
+		$(top_srcdir)/lib/inflate.c \
+		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/regress/delta/delta_test.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+			$(top_builddir)/regress/delta/delta_test
+
+regress-deltify:
+	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
+		-o $(top_builddir)/regress/deltify/deltify_test \
+		$(top_srcdir)/regress/deltify/deltify_test.c \
+		$(top_srcdir)/lib/deltify.c \
+		$(top_srcdir)/lib/error.c \
+		$(top_srcdir)/lib/opentemp.c \
+		$(top_srcdir)/lib/sha1.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+			$(top_builddir)/regress/deltify/deltify_test
+
+regress-fetch:
+	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
+		-o $(top_builddir)/regress/fetch/fetch_test \
+		$(top_srcdir)/regress/fetch/fetch_test.c \
+		$(top_srcdir)/lib/error.c \
+		$(top_srcdir)/lib/privsep.c \
+		$(top_srcdir)/lib/reference.c \
+		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/lib/object.c \
+		$(top_srcdir)/lib/object_parse.c \
+		$(top_srcdir)/lib/path.c \
+		$(top_srcdir)/lib/opentemp.c \
+		$(top_srcdir)/lib/repository.c \
+		$(top_srcdir)/lib/lockfile.c \
+		$(top_srcdir)/lib/object_cache.c \
+		$(top_srcdir)/lib/pack.c \
+		$(top_srcdir)/lib/inflate.c \
+		$(top_srcdir)/lib/deflate.c \
+		$(top_srcdir)/lib/delta.c \
+		$(top_srcdir)/lib/delta_cache.c \
+		$(top_srcdir)/lib/object_idset.c \
+		$(top_srcdir)/lib/object_create.c \
+		$(top_srcdir)/lib/fetch.c \
+		$(top_srcdir)/lib/gotconfig.c \
+		$(top_srcdir)/lib/dial.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+			$(top_builddir)/regress/fetch/fetch_test
+
+regress-idset:
+	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
+		-o $(top_builddir)/regress/idset/idset_test \
+		$(top_srcdir)/regress/idset/idset_test.c \
+		$(top_srcdir)/lib/error.c \
+		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/lib/object_idset.c \
+		$(top_srcdir)/lib/inflate.c \
+		$(top_srcdir)/lib/path.c \
+		$(top_srcdir)/lib/object_parse.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+			$(top_builddir)/regress/idset/idset_test
+
+regress-path:
+	$(CC) $(DEFS) $(AM_CFLAGS) $(AM_CPPFLAGS) \
+		-o $(top_builddir)/regress/path/path_test \
+		$(top_srcdir)/regress/path/path_test.c \
+		$(top_srcdir)/lib/error.c \
+		$(top_srcdir)/lib/sha1.c \
+		$(top_srcdir)/lib/path.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+			$(top_builddir)/regress/path/path_test
