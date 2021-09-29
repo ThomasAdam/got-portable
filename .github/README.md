@@ -78,3 +78,4 @@ Thomas Adam <thomas@xteddy.org>
 thomas_adam (#gameoftrees on irc.libera.chat)
 
 [1]  https://gameoftrees.org
+[2]  https://lists.openbsd.org/cgi-bin/mj_wwwusr?user=&passw=&func=lists-long-full&extra=gameoftrees

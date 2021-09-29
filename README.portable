@@ -39,7 +39,6 @@ NOTE:  THIS ONLY WORKS AFTER `make install` DUE TO HOW PATHS TO LIBEXEC
 INSTALLATION
 ============
 
-<<<<<<< HEAD
 ```
  $ ./autogen.sh
  $ ./configure && make
@@ -59,11 +58,6 @@ sent to the mailing list for review [2] or sent to me directly (see CONTACT).
 
 The read-only Github repository also runs CI checks using Cirrus-CI on Linux
 and FreeBSD.
-=======
- $ autoreconf -i
- $ ./configure && make
- $ sudo make install
->>>>>>> 74564ec3 (portable: initial Linux compilation)
 
 TODO
 ====
@@ -81,3 +75,4 @@ Thomas Adam <thomas@xteddy.org>
 thomas_adam (#gameoftrees on irc.libera.chat)
 
 [1]  https://gameoftrees.org
+[2]  https://lists.openbsd.org/cgi-bin/mj_wwwusr?user=&passw=&func=lists-long-full&extra=gameoftrees
