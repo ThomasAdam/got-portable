@@ -36,5 +36,10 @@ libexec/got-read-pack/got-read-pack
 libexec/got-read-tag/got-read-tag
 libexec/got-read-tree/got-read-tree
 libexec/got-send-pack/got-send-pack
+regress/delta/delta_test
+regress/deltify/deltify_test
+regress/fetch/fetch_test
+regress/idset/idset_test
+regress/path/path_test
 tags
 tog/tog
