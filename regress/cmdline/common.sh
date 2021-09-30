@@ -29,6 +29,17 @@ export MALLOC_OPTIONS=S
 git_init()
 {
 	git init -q "$1"
+
+	# Switch the default branch to match our test expectations if needed.
+	# Only need to change HEAD since 'git init' did not create any refs.
+	# Relying on implementation details of 'git init' is no problem for us.
+	# We want to be alerted when Git changes fundamental assumptions such
+	# as what an empty repository looks like and where the default branch
+	# is set. In such cases Got's own tooling might well need to change
+	# its behaviour, too, and our tests should fail.
+	# TODO: Update all tests to assume 'main' instead of 'master' and
+	# switch to main here, to match Got's own default.
+	echo "ref: refs/heads/master" > "$1/.git/HEAD"
 }
 
 maybe_pack_repo()
