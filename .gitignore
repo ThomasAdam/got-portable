@@ -1,3 +1,4 @@
+**/*.orig
 **/Makefile
 **/Makefile.in
 **/Makefile.linux
