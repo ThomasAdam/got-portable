@@ -989,7 +989,7 @@ static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_pathlist_entry *dle, int fd,
     const char *path, const char *rootpath, struct got_repository *repo,
-    struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
+    int ignore, struct got_fileindex_diff_dir_cb *cb, void *cb_arg)
 {
 	const struct got_error *err = NULL;
 	struct dirent *de = dle->data;
@@ -1011,7 +1011,7 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 	} else
 		type = de->d_type;
 
-	if (type == DT_DIR) {
+	if (type == DT_DIR && !ignore) {
 		char *subpath;
 		char *subdirpath;
 		struct got_pathlist_head subdirlist;
@@ -1077,6 +1077,7 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 	struct dirent *de = NULL;
 	size_t path_len = strlen(path);
 	struct got_pathlist_entry *dle;
+	int ignore;
 
 	if (cb->diff_traverse) {
 		err = cb->diff_traverse(cb_arg, path, dirfd);
@@ -1106,18 +1107,19 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
 				err = walk_dir(&dle, fileindex, ie, dle, dirfd,
-				    path, rootpath, repo, cb, cb_arg);
+				    path, rootpath, repo, 0, cb, cb_arg);
 			} else if (cmp < 0 ) {
 				err = cb->diff_old(cb_arg, *ie, path);
 				if (err)
 					break;
 				*ie = walk_fileindex(fileindex, *ie);
 			} else {
-				err = cb->diff_new(cb_arg, de, path, dirfd);
+				err = cb->diff_new(&ignore, cb_arg, de, path,
+				    dirfd);
 				if (err)
 					break;
 				err = walk_dir(&dle, fileindex, ie, dle, dirfd,
-				    path, rootpath, repo, cb, cb_arg);
+				    path, rootpath, repo, ignore, cb, cb_arg);
 			}
 			if (err)
 				break;
@@ -1128,11 +1130,11 @@ diff_fileindex_dir(struct got_fileindex *fileindex,
 			*ie = walk_fileindex(fileindex, *ie);
 		} else if (dle) {
 			de = dle->data;
-			err = cb->diff_new(cb_arg, de, path, dirfd);
+			err = cb->diff_new(&ignore, cb_arg, de, path, dirfd);
 			if (err)
 				break;
 			err = walk_dir(&dle, fileindex, ie, dle, dirfd, path,
-			    rootpath, repo, cb, cb_arg);
+			    rootpath, repo, ignore, cb, cb_arg);
 			if (err)
 				break;
 		}

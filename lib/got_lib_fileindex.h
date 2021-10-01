@@ -148,7 +148,7 @@ typedef const struct got_error *(*got_fileindex_diff_dir_old_new_cb)(void *,
     struct got_fileindex_entry *, struct dirent *, const char *, int);
 typedef const struct got_error *(*got_fileindex_diff_dir_old_cb)(void *,
     struct got_fileindex_entry *, const char *);
-typedef const struct got_error *(*got_fileindex_diff_dir_new_cb)(void *,
+typedef const struct got_error *(*got_fileindex_diff_dir_new_cb)(int *, void *,
     struct dirent *, const char *, int);
 typedef const struct got_error *(*got_fileindex_diff_dir_traverse)(void *,
     const char *, int);
