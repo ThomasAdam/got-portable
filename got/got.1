@@ -1863,7 +1863,7 @@ None of the other options can be used together with
 .It Cm rb
 Short alias for
 .Cm rebase .
-.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
+.It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl e Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
@@ -2010,6 +2010,15 @@ Abort an interrupted histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl c
 Continue an interrupted histedit operation.
+If this option is used, no other command-line arguments are allowed.
+.It Fl e
+Interrupt the histedit operation for editing after merging each commit.
+This option is a quick equivalent to a histedit script which uses the
+.Cm edit
+command for all commits.
+The
+.Fl e
+option can only be used when starting a new histedit operation.
 If this option is used, no other command-line arguments are allowed.
 .It Fl f
 Fold all commits into a single commit.
