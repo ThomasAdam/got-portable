@@ -3617,11 +3617,15 @@ add_ignores(struct got_pathlist_head *ignores, const char *root_path,
 }
 
 static const struct got_error *
-status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
+status_new(int *ignore, void *arg, struct dirent *de, const char *parent_path,
+    int dirfd)
 {
 	const struct got_error *err = NULL;
 	struct diff_dir_cb_arg *a = arg;
 	char *path = NULL;
+
+	if (ignore != NULL)
+		*ignore = 0;
 
 	if (a->cancel_cb && a->cancel_cb(a->cancel_arg))
 		return got_error(GOT_ERR_CANCELLED);
@@ -3633,9 +3637,12 @@ status_new(void *arg, struct dirent *de, const char *parent_path, int dirfd)
 		path = de->d_name;
 	}
 
-	if (de->d_type != DT_DIR &&
-	    got_path_is_child(path, a->status_path, a->status_path_len)
-	    && !match_ignores(a->ignores, path))
+	if (de->d_type == DT_DIR) {
+		if (!a->no_ignores && ignore != NULL &&
+		    match_ignores(a->ignores, path))
+			*ignore = 1;
+	} else if (!match_ignores(a->ignores, path) &&
+	    got_path_is_child(path, a->status_path, a->status_path_len))
 		err = (*a->status_cb)(a->status_arg, GOT_STATUS_UNVERSIONED,
 		    GOT_STATUS_NO_CHANGE, path, NULL, NULL, NULL, -1, NULL);
 	if (parent_path[0])
@@ -4213,7 +4220,7 @@ got_worktree_schedule_delete(struct got_worktree *worktree,
 
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-			schedule_for_deletion, &sda, NULL, NULL, 0, 1);
+			schedule_for_deletion, &sda, NULL, NULL, 1, 1);
 		if (err)
 			break;
 	}
@@ -4877,7 +4884,7 @@ got_worktree_revert(struct got_worktree *worktree,
 	rfa.unlink_added_files = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    revert_file, &rfa, NULL, NULL, 0, 0);
+		    revert_file, &rfa, NULL, NULL, 1, 0);
 		if (err)
 			break;
 	}
@@ -5891,7 +5898,7 @@ got_worktree_commit(struct got_object_id **new_commit_id,
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
+		    collect_commitables, &cc_arg, NULL, NULL, 1, 0);
 		if (err)
 			goto done;
 	}
@@ -6830,7 +6837,7 @@ got_worktree_rebase_abort(struct got_worktree *worktree,
 	rfa.repo = repo;
 	rfa.unlink_added_files = 0;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 0, 0);
+	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
 		goto sync;
 
@@ -7184,7 +7191,7 @@ got_worktree_histedit_abort(struct got_worktree *worktree,
 	rfa.repo = repo;
 	rfa.unlink_added_files = 0;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 0, 0);
+	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
 		goto sync;
 
@@ -7583,7 +7590,7 @@ got_worktree_merge_commit(struct got_object_id **new_commit_id,
 	cc_arg.have_staged_files = have_staged_files;
 	cc_arg.allow_bad_symlinks = allow_bad_symlinks;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    collect_commitables, &cc_arg, NULL, NULL, 0, 0);
+	    collect_commitables, &cc_arg, NULL, NULL, 1, 0);
 	if (err)
 		goto done;
 
@@ -7892,7 +7899,7 @@ got_worktree_merge_abort(struct got_worktree *worktree,
 	rfa.repo = repo;
 	rfa.unlink_added_files = 1;
 	err = worktree_status(worktree, "", fileindex, repo,
-	    revert_file, &rfa, NULL, NULL, 0, 0);
+	    revert_file, &rfa, NULL, NULL, 1, 0);
 	if (err)
 		goto sync;
 
@@ -8179,7 +8186,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	oka.have_changes = 0;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    check_stage_ok, &oka, NULL, NULL, 0, 0);
+		    check_stage_ok, &oka, NULL, NULL, 1, 0);
 		if (err)
 			goto done;
 	}
@@ -8199,7 +8206,7 @@ got_worktree_stage(struct got_worktree *worktree,
 	spa.allow_bad_symlinks = allow_bad_symlinks;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    stage_path, &spa, NULL, NULL, 0, 0);
+		    stage_path, &spa, NULL, NULL, 1, 0);
 		if (err)
 			goto done;
 	}
@@ -8691,7 +8698,7 @@ got_worktree_unstage(struct got_worktree *worktree,
 	upa.patch_arg = patch_arg;
 	TAILQ_FOREACH(pe, paths, entry) {
 		err = worktree_status(worktree, pe->path, fileindex, repo,
-		    unstage_path, &upa, NULL, NULL, 0, 0);
+		    unstage_path, &upa, NULL, NULL, 1, 0);
 		if (err)
 			goto done;
 	}
