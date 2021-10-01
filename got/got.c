@@ -9162,7 +9162,7 @@ done:
 __dead static void
 usage_histedit(void)
 {
-	fprintf(stderr, "usage: %s histedit [-a] [-c] [-f] "
+	fprintf(stderr, "usage: %s histedit [-a] [-c] [-e] [-f] "
 	    "[-F histedit-script] [-m] [-l] [-X] [branch]\n",
 	    getprogname());
 	exit(1);
@@ -9230,7 +9230,8 @@ done:
 
 static const struct got_error *
 histedit_write_commit_list(struct got_object_id_queue *commits,
-    FILE *f, int edit_logmsg_only, int fold_only, struct got_repository *repo)
+    FILE *f, int edit_logmsg_only, int fold_only, int edit_only,
+    struct got_repository *repo)
 {
 	const struct got_error *err = NULL;
 	struct got_object_qid *qid;
@@ -9241,7 +9242,9 @@ histedit_write_commit_list(struct got_object_id_queue *commits,
 
 	STAILQ_FOREACH(qid, commits, entry) {
 		histedit_cmd = got_histedit_cmds[0].name;
-		if (fold_only && STAILQ_NEXT(qid, entry) != NULL)
+		if (edit_only)
+			histedit_cmd = "edit";
+		else if (fold_only && STAILQ_NEXT(qid, entry) != NULL)
 			histedit_cmd = "fold";
 		err = histedit_write_commit(qid->id, histedit_cmd, f, repo);
 		if (err)
@@ -9655,7 +9658,8 @@ histedit_edit_list_retry(struct got_histedit_list *, const struct got_error *,
 static const struct got_error *
 histedit_edit_script(struct got_histedit_list *histedit_cmds,
     struct got_object_id_queue *commits, const char *branch_name,
-    int edit_logmsg_only, int fold_only, struct got_repository *repo)
+    int edit_logmsg_only, int fold_only, int edit_only,
+    struct got_repository *repo)
 {
 	const struct got_error *err;
 	FILE *f = NULL;
@@ -9670,11 +9674,11 @@ histedit_edit_script(struct got_histedit_list *histedit_cmds,
 		goto done;
 
 	err = histedit_write_commit_list(commits, f, edit_logmsg_only,
-	    fold_only, repo);
+	    fold_only, edit_only, repo);
 	if (err)
 		goto done;
 
-	if (edit_logmsg_only || fold_only) {
+	if (edit_logmsg_only || fold_only || edit_only) {
 		rewind(f);
 		err = histedit_parse_list(histedit_cmds, f, repo);
 	} else {
@@ -9805,7 +9809,7 @@ histedit_edit_list_retry(struct got_histedit_list *histedit_cmds,
 		} else if (resp == 'r') {
 			histedit_free_list(histedit_cmds);
 			err = histedit_edit_script(histedit_cmds,
-			    commits, branch_name, 0, 0, repo);
+			    commits, branch_name, 0, 0, 0, repo);
 			if (err) {
 				if (err->code != GOT_ERR_HISTEDIT_SYNTAX &&
 				    err->code != GOT_ERR_HISTEDIT_CMD)
@@ -9997,7 +10001,7 @@ cmd_histedit(int argc, char *argv[])
 	int ch, rebase_in_progress = 0, merge_in_progress = 0;
 	struct got_update_progress_arg upa;
 	int edit_in_progress = 0, abort_edit = 0, continue_edit = 0;
-	int edit_logmsg_only = 0, fold_only = 0;
+	int edit_logmsg_only = 0, fold_only = 0, edit_only = 0;
 	int list_backups = 0, delete_backups = 0;
 	const char *edit_script_path = NULL;
 	struct got_object_id_queue commits;
@@ -10012,13 +10016,16 @@ cmd_histedit(int argc, char *argv[])
 	TAILQ_INIT(&merged_paths);
 	memset(&upa, 0, sizeof(upa));
 
-	while ((ch = getopt(argc, argv, "acfF:mlX")) != -1) {
+	while ((ch = getopt(argc, argv, "acefF:mlX")) != -1) {
 		switch (ch) {
 		case 'a':
 			abort_edit = 1;
 			break;
 		case 'c':
 			continue_edit = 1;
+			break;
+		case 'e':
+			edit_only = 1;
 			break;
 		case 'f':
 			fold_only = 1;
@@ -10065,6 +10072,14 @@ cmd_histedit(int argc, char *argv[])
 		option_conflict('f', 'm');
 	if (edit_script_path && fold_only)
 		option_conflict('F', 'f');
+	if (abort_edit && edit_only)
+		option_conflict('a', 'e');
+	if (continue_edit && edit_only)
+		option_conflict('c', 'e');
+	if (edit_only && edit_logmsg_only)
+		option_conflict('e', 'm');
+	if (edit_script_path && edit_only)
+		option_conflict('F', 'e');
 	if (list_backups) {
 		if (abort_edit)
 			option_conflict('l', 'a');
@@ -10076,6 +10091,8 @@ cmd_histedit(int argc, char *argv[])
 			option_conflict('l', 'm');
 		if (fold_only)
 			option_conflict('l', 'f');
+		if (edit_only)
+			option_conflict('l', 'e');
 		if (delete_backups)
 			option_conflict('l', 'X');
 		if (argc != 0 && argc != 1)
@@ -10091,6 +10108,8 @@ cmd_histedit(int argc, char *argv[])
 			option_conflict('X', 'm');
 		if (fold_only)
 			option_conflict('X', 'f');
+		if (edit_only)
+			option_conflict('X', 'e');
 		if (list_backups)
 			option_conflict('X', 'l');
 		if (argc != 0 && argc != 1)
@@ -10179,6 +10198,13 @@ cmd_histedit(int argc, char *argv[])
 		    "histedit operation is in progress in this "
 		    "work tree and must be continued or aborted "
 		    "before the -f option can be used");
+		goto done;
+	}
+	if (edit_in_progress && edit_only) {
+		error = got_error_msg(GOT_ERR_HISTEDIT_BUSY,
+		    "histedit operation is in progress in this "
+		    "work tree and must be continued or aborted "
+		    "before the -e option can be used");
 		goto done;
 	}
 
@@ -10316,7 +10342,8 @@ cmd_histedit(int argc, char *argv[])
 			if (strncmp(branch_name, "refs/heads/", 11) == 0)
 				branch_name += 11;
 			error = histedit_edit_script(&histedit_cmds, &commits,
-			    branch_name, edit_logmsg_only, fold_only, repo);
+			    branch_name, edit_logmsg_only, fold_only,
+			    edit_only, repo);
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,

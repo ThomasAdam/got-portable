@@ -1766,6 +1766,153 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_edit_only() {
+	local testroot=`test_init histedit_edit_only`
+
+	local orig_commit=`git_show_head $testroot/repo`
+
+	echo "modified alpha on master" > $testroot/repo/alpha
+	(cd $testroot/repo && git rm -q beta)
+	echo "new file on master" > $testroot/repo/epsilon/new
+	(cd $testroot/repo && git add epsilon/new)
+	git_commit $testroot/repo -m "committing changes"
+	local old_commit1=`git_show_head $testroot/repo`
+
+	echo "modified zeta on master" > $testroot/repo/epsilon/zeta
+	git_commit $testroot/repo -m "committing to zeta on master"
+	local old_commit2=`git_show_head $testroot/repo`
+
+	got checkout -c $orig_commit $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -e > $testroot/stdout)
+
+	local short_old_commit1=`trim_obj_id 28 $old_commit1`
+	local short_old_commit2=`trim_obj_id 28 $old_commit2`
+
+	echo "G  alpha" > $testroot/stdout.expected
+	echo "D  beta" >> $testroot/stdout.expected
+	echo "A  epsilon/new" >> $testroot/stdout.expected
+	echo "Stopping histedit for amending commit $old_commit1" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edited modified alpha on master" > $testroot/wt/alpha
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 's/.*/committing edited changes 1/' "\$1"
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" got histedit -c > $testroot/stdout)
+
+	local new_commit1=$(cd $testroot/wt && got info | \
+		grep '^work tree base commit: ' | cut -d: -f2 | tr -d ' ')
+	local short_new_commit1=`trim_obj_id 28 $new_commit1`
+
+	echo -n "$short_old_commit1 -> $short_new_commit1: " \
+		> $testroot/stdout.expected
+	echo "committing edited changes 1" >> $testroot/stdout.expected
+	echo "G  epsilon/zeta" >> $testroot/stdout.expected
+	echo "Stopping histedit for amending commit $old_commit2" \
+		>> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edited zeta on master" > $testroot/wt/epsilon/zeta
+
+	cat > $testroot/editor.sh <<EOF
+#!/bin/sh
+sed -i 's/.*/committing edited changes 2/' "\$1"
+EOF
+	chmod +x $testroot/editor.sh
+
+	(cd $testroot/wt && env EDITOR="$testroot/editor.sh" \
+		VISUAL="$testroot/editor.sh" got histedit -c > $testroot/stdout)
+
+	local new_commit2=`git_show_head $testroot/repo`
+	local short_new_commit2=`trim_obj_id 28 $new_commit2`
+
+	echo -n "$short_old_commit2 -> $short_new_commit2: " \
+		> $testroot/stdout.expected
+	echo "committing edited changes 2" >> $testroot/stdout.expected
+	echo "Switching work tree to refs/heads/master" \
+		>> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "edited modified alpha on master" > $testroot/content.expected
+	cat $testroot/wt/alpha > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	if [ -e $testroot/wt/beta ]; then
+		echo "removed file beta still exists on disk" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "new file on master" > $testroot/content.expected
+	cat $testroot/wt/epsilon/new > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got status > $testroot/stdout)
+
+	echo -n > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got log -l3 | grep ^commit > $testroot/stdout)
+	echo "commit $new_commit2 (master)" > $testroot/stdout.expected
+	echo "commit $new_commit1" >> $testroot/stdout.expected
+	echo "commit $orig_commit" >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -1784,3 +1931,4 @@ run_test test_histedit_duplicate_commit_in_script
 run_test test_histedit_fold_add_delete
 run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
+run_test test_histedit_edit_only
