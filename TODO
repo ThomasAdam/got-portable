@@ -1,10 +1,7 @@
 got:
-- Add support for creating merge commits. This should move the work tree
-  onto a temporary branch like rebase and histedit do, recording commit
-  IDs and such in refs/got/merge/ as needed to keep state.
-  Bonus points for being able to merge an arbitrary tree into an arbitrary
-  subdirectory of the work tree. This would be required for merging vendor
-  branches. Say you have a branch 'llvm-12' which intially contains a 12.0
+- Teach 'got merge' to merge changes into an arbitrary subdirectory
+  of the work tree. This would be nice for merging vendor branches.
+  Say you have a branch 'llvm-12' which intially contains a 12.0
   release tree as published by the LLVM project, added to the repository
   with a command such as 'got import -b llvm-12'. On the main branch we
   would want to merge files from the llvm-12 branch into /usr/src/gnu/llvm
