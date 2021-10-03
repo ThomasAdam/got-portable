@@ -131,7 +131,7 @@ test_histedit_no_op() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit2 \
 		> $testroot/diff
-	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	sed -i '' -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -154,7 +154,11 @@ test_histedit_no_op() {
 	# We should have a backup of old commits
 	(cd $testroot/repo && got histedit -l > $testroot/stdout)
 	d_orig1=`date -u -d "@$old_author_time1" +"%G-%m-%d"`
-	d_orig2=`env LC_TIME=C date -u -d "@$old_author_time2" +"%a %b %e %X %Y UTC"`
+
+	local prev_LC_TIME="$LC_TIME"
+	export LC_TIME=C
+	d_orig2=`date -u -d "@$old_author_time2" +"%a %b %e %X %Y UTC"`
+	export LC_TIME="$prev_LC_TIME"
 	d_new2=`date -u -d "@$new_author_time2" +"%G-%m-%d"`
 	d_orig=`date -u -d "@$orig_author_time" +"%G-%m-%d"`
 	cat > $testroot/stdout.expected <<EOF
@@ -340,7 +344,7 @@ test_histedit_swap() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit1 \
 		> $testroot/diff
-	sed -i -e "s/$old_commit2/$new_commit1/" $testroot/diff.expected
+	sed -i '' -e "s/$old_commit2/$new_commit1/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -445,8 +449,8 @@ test_histedit_drop() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit2 \
 		> $testroot/diff
-	sed -i -e "s/$old_commit1/$orig_commit/" $testroot/diff.expected
-	sed -i -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
+	sed -i '' -e "s/$old_commit1/$orig_commit/" $testroot/diff.expected
+	sed -i '' -e "s/$old_commit2/$new_commit2/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1150,7 +1154,7 @@ test_histedit_path_prefix_edit() {
 
 	got diff -r $testroot/repo $orig_commit $new_commit1 \
 		> $testroot/diff
-	sed -i -e "s/$old_commit1/$new_commit1/" $testroot/diff.expected
+	sed -i '' -e "s/$old_commit1/$new_commit1/" $testroot/diff.expected
 	cmp -s $testroot/diff.expected $testroot/diff
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1565,7 +1569,7 @@ test_histedit_fold_only() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 's/.*/committing folded changes/' "\$1"
+sed -i '' 's/.*/committing folded changes/' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -1681,7 +1685,7 @@ test_histedit_fold_only_empty_logmsg() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i 'd' "\$1"
+sed -i '' 'd' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 
