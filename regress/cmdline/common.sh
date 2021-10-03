@@ -26,6 +26,31 @@ export GOT_TEST_ROOT="/tmp"
 
 export MALLOC_OPTIONS=S
 
+date()
+{
+	DATECMD="date"
+	[ "$OSTYPE" != "linux-gnu" ] && DATECMD="gdate"
+
+	"$DATECMD" "$@"
+}
+
+ln()
+{
+	LNCMD="ln"
+	[ "$OSTYPE" != "linux-gnu" ] && LNCMD="gln"
+
+	"$LNCMD" "$@"
+}
+
+#sed()
+#{
+#	SEDCMD="sed"
+#	[ "$OSTYPE" != "linux-gnu" ] && LNCMD="gsed"
+#
+#	"$SEDCMD" "$@"
+#}
+
+
 git_init()
 {
 	git init -q "$1"

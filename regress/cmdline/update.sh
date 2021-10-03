@@ -660,12 +660,12 @@ test_update_merges_file_edits() {
 
 	echo "modified alpha" > $testroot/repo/alpha
 	echo "modified beta" > $testroot/repo/beta
-	sed -i 's/2/22/' $testroot/repo/numbers
+	sed -i '' 's/2/22/' $testroot/repo/numbers
 	git_commit $testroot/repo -m "modified 3 files"
 
 	echo "modified alpha, too" > $testroot/wt/alpha
 	touch $testroot/wt/beta
-	sed -i 's/7/77/' $testroot/wt/numbers
+	sed -i '' 's/7/77/' $testroot/wt/numbers
 
 	echo "C  alpha" > $testroot/stdout.expected
 	echo "U  beta" >> $testroot/stdout.expected
