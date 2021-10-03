@@ -1,3 +1,28 @@
+* got 0.61; 2021-10-03
+- fix list of 'got status' options in the got.1 man page
+- tog: use sched_yield(2) for better portability (patch by Quentin Rameau)
+- fix histedit_no_op test which was failing randomly (patch by Lucas)
+- fix 'got send' with tree objects which contain symlinks (reported by Omar)
+- tog: show parent commit IDs of merge commits in the diff view
+- add a 'got merge' command for creating merge commits
+- fix 'got update' of an added + obstructed file
+- mark some function parameters 'const', as they should be (patch by Omar Polo)
+- add 'static' qualifier to local functions in got-read-pack (again Omar Polo)
+- fix some integers that had a slightly wrong type (again by Omar Polo)
+- match printf specifiers and (cast) types for portability (naddy)
+- don't change bad symlinks into regular files during merges
+- handle errno variations upon open(2) failure with O_NOFOLLOW for portability
+- garbage-collect unused "dist" target from subdirectory Makefiles (naddy)
+- match the unsigned char type used by the zlib interface (naddy)
+- fix unsigned/signed char mismatch in parse.y (naddy)
+- fix 'got fetch' downloading too many objects in some cases
+- interrupt 'got rebase' upon missing/unversioned/not-deleted files
+- interrupt 'got histedit' upon missing/unversioned/not-deleted files
+- pull in a type fix from the OpenBSD parse.y template (naddy)
+- explicitly set the default branch name after 'git init' in regress tests
+- add histedit -e option which runs the 'edit' script command for every commit
+- skip ignored directories during 'got status' disk crawl
+
 * got 0.60; 2021-09-15
 - fix another instance of 'got send' sending branches the server already has
 - make 'got send' regression tests run 'git fsck' on all involved repositories
