@@ -198,9 +198,9 @@ test_unstage_patch() {
 		return 1
 	fi
 
-	sed -i -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
 
 	(cd $testroot/wt && got stage > /dev/null)
 	ret="$?"
@@ -818,9 +818,9 @@ test_unstage_patch_quit() {
 		return 1
 	fi
 
-	sed -i -e 's/^2$/a/' $testroot/wt/numbers
-	sed -i -e 's/^7$/b/' $testroot/wt/numbers
-	sed -i -e 's/^16$/c/' $testroot/wt/numbers
+	sed -i '' -e 's/^2$/a/' $testroot/wt/numbers
+	sed -i '' -e 's/^7$/b/' $testroot/wt/numbers
+	sed -i '' -e 's/^16$/c/' $testroot/wt/numbers
 	(cd $testroot/wt && got rm zzz > /dev/null)
 	(cd $testroot/wt && got stage > /dev/null)
 

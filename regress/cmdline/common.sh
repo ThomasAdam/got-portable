@@ -31,7 +31,7 @@ date()
 	DATECMD="date"
 	[ "$OSTYPE" != "linux-gnu" ] && DATECMD="gdate"
 
-	"$DATECMD" "$@"
+	command "$DATECMD" "$@"
 }
 
 ln()
@@ -39,16 +39,23 @@ ln()
 	LNCMD="ln"
 	[ "$OSTYPE" != "linux-gnu" ] && LNCMD="gln"
 
-	"$LNCMD" "$@"
+	command "$LNCMD" "$@"
 }
 
-#sed()
-#{
-#	SEDCMD="sed"
-#	[ "$OSTYPE" != "linux-gnu" ] && LNCMD="gsed"
-#
-#	"$SEDCMD" "$@"
-#}
+sed()
+{
+	SEDCMD="sed"
+	[ "$OSTYPE" == "linux-gnu" ] && {
+		set -- "$@"
+		[ $# -ge 4 ] && {
+			shift 2
+			
+			command "$SEDCMD" -i "$@"
+			return
+		}
+	}
+	command "$SEDCMD" "$@"
+}
 
 
 git_init()

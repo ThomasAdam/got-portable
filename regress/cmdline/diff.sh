@@ -427,14 +427,14 @@ test_diff_shows_conflict() {
 		return 1
 	fi
 
-	sed -i '' 's/2/22/' $testroot/repo/numbers
-	sed -i '' 's/8/33/' $testroot/repo/numbers
+	sed -i '' -e 's/2/22/' $testroot/repo/numbers
+	sed -i '' -e 's/8/33/' $testroot/repo/numbers
 	git_commit $testroot/repo -m "modified line 2"
 	local head_rev=`git_show_head $testroot/repo`
 
 	# modify lines 2 and 8 in conflicting ways
-	sed -i '' 's/2/77/' $testroot/wt/numbers
-	sed -i '' 's/8/88/' $testroot/wt/numbers
+	sed -i '' -e 's/2/77/' $testroot/wt/numbers
+	sed -i '' -e 's/8/88/' $testroot/wt/numbers
 
 	echo "C  numbers" > $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: $head_rev" \

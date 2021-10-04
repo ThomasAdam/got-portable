@@ -1569,7 +1569,9 @@ test_histedit_fold_only() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i '' 's/.*/committing folded changes/' "\$1"
+SOPTS='-i ""'
+[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
+sed "\$SOPTS" -e 's/.*/committing folded changes/' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 
@@ -1685,7 +1687,9 @@ test_histedit_fold_only_empty_logmsg() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i '' 'd' "\$1"
+SOPTS='-i ""'
+[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
+sed "\$SOPTS" -e 'd' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 

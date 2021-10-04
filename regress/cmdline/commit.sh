@@ -1377,7 +1377,9 @@ test_commit_prepared_logmsg() {
 
 	cat > $testroot/editor.sh <<EOF
 #!/bin/sh
-sed -i '' 's/foo/bar/' "\$1"
+SOPTS='-i ""'
+[ "\$OSTYPE" = "linux-gnu" ] && SOPTS="-i"
+sed "\$SOPTS" -e 's/foo/bar/' "\$1"
 EOF
 	chmod +x $testroot/editor.sh
 
