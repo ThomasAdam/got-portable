@@ -5,8 +5,7 @@ AM_CFLAGS += \
 	    -Wshadow -Wpointer-arith -Wno-sign-compare -Wundef \
 	    -Wbad-function-cast -Winline -Wcast-align \
 	    -Wdeclaration-after-statement -Wno-pointer-sign \
-	    -Wno-attributes -Wno-unused-result \
-	    -Wno-incompatible-pointer-types-discards-qualifiers
+	    -Wno-attributes -Wno-unused-result
 
 AM_CPPFLAGS += \
 	      @AM_CPPFLAGS@ \
