@@ -73,7 +73,9 @@ the
 command must be used to populate the empty repository before
 .Cm got checkout
 can be used.
+.Tg im
 .It Cm import Oo Fl b Ar branch Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl I Ar pattern Oc Ar directory
+.Dl (alias: Cm im )
 Create an initial commit in a repository from the file hierarchy
 within the specified
 .Ar directory .
@@ -132,10 +134,9 @@ The
 follows the globbing rules documented in
 .Xr glob 7 .
 .El
-.It Cm im
-Short alias for
-.Cm import .
+.Tg cl
 .It Cm clone Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl l Oc Oo Fl m Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Ar repository-URL Op Ar directory
+.Dl (alias: Cm cl )
 Clone a Git repository at the specified
 .Ar repository-URL
 into the specified
@@ -316,10 +317,9 @@ or
 .Dq refs/got/
 namespace.
 .El
-.It Cm cl
-Short alias for
-.Cm clone .
+.Tg fe
 .It Cm fetch Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Oc Oo Fl l Oc Oo Fl r Ar repository-path Oc Oo Fl t Oc Oo Fl q Oc Oo Fl v Oc Oo Fl R Ar reference Oc Oo Fl X Oc Op Ar remote-repository
+.Dl (alias: Cm fe )
 Fetch new changes from a remote repository.
 If no
 .Ar remote-repository
@@ -490,10 +490,9 @@ will generally be stored in pack files and may be removed separately with
 .Xr git-repack 1
 and Git's garbage collector.
 .El
-.It Cm fe
-Short alias for
-.Cm fetch .
+.Tg co
 .It Cm checkout  Oo Fl E Oc Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl p Ar path-prefix Oc Oo Fl q Oc Ar repository-path Op Ar work-tree-path
+.Dl (alias: Cm co )
 Copy files from a repository into a new work tree.
 Show the status of each affected file, using the following status codes:
 .Bl -column YXZ description
@@ -556,10 +555,9 @@ will be checked out.
 .It Fl q
 Silence progress output.
 .El
-.It Cm co
-Short alias for
-.Cm checkout .
+.Tg up
 .It Cm update Oo Fl b Ar branch Oc Oo Fl c Ar commit Oc Oo Fl q Oc Op Ar path ...
+.Dl (alias: Cm up )
 Update an existing work tree to a different
 .Ar commit .
 Change existing files in the work tree as necessary to match file contents
@@ -655,10 +653,9 @@ branch will be used.
 .It Fl q
 Silence progress output.
 .El
-.It Cm up
-Short alias for
-.Cm update .
+.Tg st
 .It Cm status Oo Fl I Oc Oo Fl s Ar status-codes Oc Oo Fl S Ar status-codes Oc Op Ar path ...
+.Dl (alias: Cm st )
 Show the current modification status of files in a work tree,
 using the following status codes:
 .Bl -column YXZ description
@@ -759,9 +756,6 @@ does not support negated ignore patterns prefixed with
 and gives no special significance to the location of path component separators,
 .Dq / ,
 in a pattern.
-.It Cm st
-Short alias for
-.Cm status .
 .It Cm log Oo Fl b Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl l Ar N Oc Oo Fl p Oc Oo Fl P Oc Oo Fl s Ar search-pattern Oc Oo Fl r Ar repository-path Oc Oo Fl R Oc Oo Fl x Ar commit Oc Op Ar path
 Display history of a repository.
 If a
@@ -844,7 +838,9 @@ This option has no effect if the specified
 .Ar commit
 is never traversed.
 .El
+.Tg di
 .It Cm diff Oo Fl a Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path
+.Dl (alias: Cm di )
 When invoked within a work tree with less than two arguments, display
 local changes in the work tree.
 If a
@@ -884,10 +880,9 @@ is invoked in a work tree.
 .It Fl w
 Ignore whitespace-only changes.
 .El
-.It Cm di
-Short alias for
-.Cm diff .
+.Tg bl
 .It Cm blame Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Ar path
+.Dl (alias: Cm bl )
 Display line-by-line history of a file at the specified path.
 .Pp
 The options for
@@ -909,10 +904,9 @@ If this directory is a
 .Nm
 work tree, use the repository path associated with this work tree.
 .El
-.It Cm bl
-Short alias for
-.Cm blame .
+.Tg tr
 .It Cm tree Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl i Oc Oo Fl R Oc Op Ar path
+.Dl (alias: Cm tr )
 Display a listing of files and directories at the specified
 directory path in the repository.
 Entries shown in this listing may carry one of the following trailing
@@ -955,9 +949,6 @@ Show object IDs of files (blob objects) and directories (tree objects).
 .It Fl R
 Recurse into sub-directories in the repository.
 .El
-.It Cm tr
-Short alias for
-.Cm tree .
 .It Cm ref Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl c Ar object Oc Oo Fl s Ar reference Oc Oo Fl d Oc Op Ar name
 Manage references in a repository.
 .Pp
@@ -1024,7 +1015,9 @@ Git's garbage collector or
 Cannot be used together with any other options except
 .Fl r .
 .El
+.Tg br
 .It Cm branch Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Oo Fl d Ar name Oc Oo Fl n Oc Op Ar name
+.Dl (alias: Cm br )
 Create, list, or delete branches.
 .Pp
 Local branches are managed via references which live in the
@@ -1116,9 +1109,6 @@ Git's garbage collector or
 .It Fl n
 Do not switch and update the work tree after creating a new branch.
 .El
-.It Cm br
-Short alias for
-.Cm branch .
 .It Cm tag Oo Fl c Ar commit Oc Oo Fl m Ar message Oc Oo Fl r Ar repository-path Oc Oo Fl l Oc Ar name
 Manage tags in a repository.
 .Pp
@@ -1202,7 +1192,9 @@ Add files even if they match a
 .Cm got status
 ignore pattern.
 .El
+.Tg rm
 .It Cm remove Oo Fl f Oc Oo Fl k Oc Oo Fl R Oc Oo Fl s Ar status-codes Oc Ar path ...
+.Dl (alias: Cm rm )
 Remove versioned files from a work tree and schedule them for deletion
 from the repository in the next commit.
 .Pp
@@ -1234,10 +1226,9 @@ option)
 .It ! Ta versioned file expected on disk but missing
 .El
 .El
-.It Cm rm
-Short alias for
-.Cm remove .
+.Tg rv
 .It Cm revert Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl R Oc Ar path ...
+.Dl (alias: Cm rv )
 Revert any local changes in files at the specified paths in a work tree.
 File contents will be overwritten with those contained in the
 work tree's base commit.
@@ -1286,10 +1277,9 @@ will refuse to run if a specified
 .Ar path
 is a directory.
 .El
-.It Cm rv
-Short alias for
-.Cm revert .
+.Tg ci
 .It Cm commit Oo Fl F Ar path Oc Oo Fl m Ar message Oc Oo Fl N Oc Oo Fl S Oc Op Ar path ...
+.Dl (alias: Cm ci )
 Create a new commit in the repository from changes in a work tree
 and use this commit as the new base commit for the work tree.
 If no
@@ -1403,10 +1393,9 @@ If a path is found to be out of date,
 .Cm got update
 must be used first in order to merge local changes with changes made
 in the repository.
-.It Cm ci
-Short alias for
-.Cm commit .
+.Tg se
 .It Cm send Oo Fl a Oc Oo Fl b Ar branch Oc Oo Fl d Ar branch Oc Oo Fl f Oc Oo Fl r Ar repository-path Oc Oo Fl t Ar tag Oc Oo Fl T Oc Oo Fl q Oc Oo Fl v Oc Op Ar remote-repository
+.Dl (alias: Cm se )
 Send new changes to a remote repository.
 If no
 .Ar remote-repository
@@ -1591,10 +1580,9 @@ if applicable.
 Multiple -v options increase the verbosity.
 The maximum is 3.
 .El
-.It Cm se
-Short alias for
-.Cm send .
+.Tg cy
 .It Cm cherrypick Ar commit
+.Dl (alias: Cm cy )
 Merge changes from a single
 .Ar commit
 into the work tree.
@@ -1635,10 +1623,9 @@ to a single base commit with
 .Cm got update .
 If any relevant files already contain merge conflicts, these
 conflicts must be resolved first.
-.It Cm cy
-Short alias for
-.Cm cherrypick .
+.Tg bo
 .It Cm backout Ar commit
+.Dl (alias: Cm bo )
 Reverse-merge changes from a single
 .Ar commit
 into the work tree.
@@ -1679,10 +1666,9 @@ to a single base commit with
 .Cm got update .
 If any relevant files already contain merge conflicts, these
 conflicts must be resolved first.
-.It Cm bo
-Short alias for
-.Cm backout .
+.Tg rb
 .It Cm rebase Oo Fl a Oc Oo Fl c Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
+.Dl (alias: Cm rb )
 Rebase commits on the specified
 .Ar branch
 onto the tip of the current branch of the work tree.
@@ -1860,10 +1846,9 @@ does not require a work tree.
 None of the other options can be used together with
 .Fl X .
 .El
-.It Cm rb
-Short alias for
-.Cm rebase .
+.Tg he
 .It Cm histedit Oo Fl a Oc Oo Fl c Oc Oo Fl e Oc Oo Fl f Oc Oo Fl F Ar histedit-script Oc Oo Fl m Oc Oo Fl l Oc Oo Fl X Oc Op Ar branch
+.Dl (alias: Cm he )
 Edit commit history between the work tree's current base commit and
 the tip commit of the work tree's current branch.
 .Pp
@@ -2098,10 +2083,9 @@ does not require a work tree.
 None of the other options can be used together with
 .Fl X .
 .El
-.It Cm he
-Short alias for
-.Cm histedit .
+.Tg ig
 .It Cm integrate Ar branch
+.Dl (alias: Cm ig )
 Integrate the specified
 .Ar branch
 into the work tree's current branch.
@@ -2150,9 +2134,6 @@ committed with
 .Cm got commit
 or reverted with
 .Cm got revert .
-.It Cm ig
-Short alias for
-.Cm integrate .
 .It Cm merge Oo Fl a Oc Oo Fl c Oc Oo Fl n Oc Op Ar branch
 Create a merge commit based on the current branch of the work tree and
 the specified
@@ -2277,10 +2258,9 @@ created with
 Alternatively, the merge may be aborted with
 .Cm got merge -a .
 .El
-.It Cm mg
-Short alias for
-.Cm merge .
+.Tg sg
 .It Cm stage Oo Fl l Oc Oo Fl p Oc Oo Fl F Ar response-script Oc Oo Fl S Oc Op Ar path ...
+.Dl (alias: Cm sg )
 Stage local changes for inclusion in the next commit.
 If no
 .Ar path
@@ -2394,10 +2374,9 @@ is out of date, the path must be unstaged with
 before it can be updated with
 .Cm got update ,
 and may then be staged again if necessary.
-.It Cm sg
-Short alias for
-.Cm stage .
+.Tg ug
 .It Cm unstage Oo Fl p Oc Oo Fl F Ar response-script Oc Op Ar path ...
+.Dl (alias: Cm ug )
 Merge staged changes back into the work tree and put affected paths
 back into non-staged status.
 If no
@@ -2443,9 +2422,6 @@ responses line-by-line from the specified
 .Ar response-script
 file instead of prompting interactively.
 .El
-.It Cm ug
-Short alias for
-.Cm unstage .
 .It Cm cat Oo Fl c Ar commit Oc Oo Fl r Ar repository-path Oc Oo Fl P Oc Ar arg ...
 Parse and print contents of objects to standard output in a line-based
 text format.
