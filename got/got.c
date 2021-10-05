@@ -8792,6 +8792,19 @@ done:
 }
 
 static const struct got_error *
+abort_progress(void *arg, unsigned char status, const char *path)
+{
+	/*
+	 * Unversioned files should not clutter progress output when
+	 * an operation is aborted.
+	 */
+	if (status == GOT_STATUS_UNVERSIONED)
+		return NULL;
+
+	return update_progress(arg, status, path);
+}
+
+static const struct got_error *
 cmd_rebase(int argc, char *argv[])
 {
 	const struct got_error *error = NULL;
@@ -8944,7 +8957,7 @@ cmd_rebase(int argc, char *argv[])
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(new_base_branch));
 		error = got_worktree_rebase_abort(worktree, fileindex, repo,
-		    new_base_branch, update_progress, &upa);
+		    new_base_branch, abort_progress, &upa);
 		if (error)
 			goto done;
 		printf("Rebase of %s aborted\n", got_ref_get_name(branch));
@@ -9029,7 +9042,7 @@ cmd_rebase(int argc, char *argv[])
 	if (pid == NULL) {
 		if (!continue_rebase) {
 			error = got_worktree_rebase_abort(worktree, fileindex,
-			    repo, new_base_branch, update_progress, &upa);
+			    repo, new_base_branch, abort_progress, &upa);
 			if (error)
 				goto done;
 			printf("Rebase of %s aborted\n",
@@ -10217,7 +10230,7 @@ cmd_histedit(int argc, char *argv[])
 		printf("Switching work tree to %s\n",
 		    got_ref_get_symref_target(branch));
 		error = got_worktree_histedit_abort(worktree, fileindex, repo,
-		    branch, base_commit_id, update_progress, &upa);
+		    branch, base_commit_id, abort_progress, &upa);
 		if (error)
 			goto done;
 		printf("Histedit of %s aborted\n",
@@ -10332,7 +10345,7 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    update_progress, &upa);
+				    abort_progress, &upa);
 				print_merge_progress_stats(&upa);
 				goto done;
 			}
@@ -10347,7 +10360,7 @@ cmd_histedit(int argc, char *argv[])
 			if (error) {
 				got_worktree_histedit_abort(worktree, fileindex,
 				    repo, branch, base_commit_id,
-				    update_progress, &upa);
+				    abort_progress, &upa);
 				print_merge_progress_stats(&upa);
 				goto done;
 			}
@@ -10359,7 +10372,7 @@ cmd_histedit(int argc, char *argv[])
 		if (error) {
 			got_worktree_histedit_abort(worktree, fileindex,
 			    repo, branch, base_commit_id,
-			    update_progress, &upa);
+			    abort_progress, &upa);
 			print_merge_progress_stats(&upa);
 			goto done;
 		}
@@ -10785,7 +10798,7 @@ cmd_merge(int argc, char *argv[])
 		if (error)
 			goto done;
 		error = got_worktree_merge_abort(worktree, fileindex, repo,
-		    update_progress, &upa);
+		    abort_progress, &upa);
 		if (error)
 			goto done;
 		printf("Merge of %s aborted\n", branch_name);
@@ -10870,7 +10883,7 @@ cmd_merge(int argc, char *argv[])
 		print_merge_progress_stats(&upa);
 		if (!upa.did_something) {
 			error = got_worktree_merge_abort(worktree, fileindex,
-			    repo, update_progress, &upa);
+			    repo, abort_progress, &upa);
 			if (error)
 				goto done;
 			printf("Already up-to-date\n");

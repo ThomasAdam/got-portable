@@ -622,6 +622,9 @@ test_merge_abort() {
 		return 1
 	fi
 
+	# unrelated unversioned file in work tree
+	touch $testroot/wt/unversioned-file
+
 	# create a conflicting commit
 	(cd $testroot/repo && git checkout -q master)
 	echo "modified alpha on master" > $testroot/repo/alpha
@@ -677,6 +680,7 @@ test_merge_abort() {
 	echo "A  epsilon/new" >> $testroot/stdout.expected
 	echo "M  gamma/delta" >> $testroot/stdout.expected
 	echo "A  symlink" >> $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -753,7 +757,7 @@ test_merge_abort() {
 
 	(cd $testroot/wt && got status > $testroot/stdout)
 
-	echo -n "" > $testroot/stdout.expected
+	echo "?  unversioned-file" > $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then

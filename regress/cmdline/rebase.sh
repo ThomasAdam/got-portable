@@ -424,6 +424,9 @@ test_rebase_abort() {
 		return 1
 	fi
 
+	# unrelated unversioned file in work tree
+	touch $testroot/wt/unversioned-file
+
 	(cd $testroot/wt && got rebase newbranch > $testroot/stdout \
 		2> $testroot/stderr)
 
@@ -471,6 +474,7 @@ test_rebase_abort() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	echo "C  alpha" > $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
