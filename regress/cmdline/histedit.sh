@@ -833,6 +833,9 @@ test_histedit_abort() {
 		return 1
 	fi
 
+	# unrelated unversioned file in work tree
+	touch $testroot/wt/unversioned-file
+
 	echo "edit $old_commit1" > $testroot/histedit-script
 	echo "mesg committing changes" >> $testroot/histedit-script
 	echo "pick $old_commit2" >> $testroot/histedit-script
@@ -904,6 +907,7 @@ test_histedit_abort() {
 	(cd $testroot/wt && got status > $testroot/stdout)
 
 	echo "?  epsilon/new" > $testroot/stdout.expected
+	echo "?  unversioned-file" >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
