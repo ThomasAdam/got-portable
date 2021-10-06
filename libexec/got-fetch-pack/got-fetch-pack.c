@@ -57,7 +57,6 @@
 
 struct got_object *indexed;
 static int chattygot;
-static struct got_object_id zhash = {.sha1={0}};
 
 static const struct got_capability got_capabilities[] = {
 	{ GOT_CAPA_AGENT, "got/" GOT_VERSION_STR },
@@ -516,10 +515,9 @@ fetch_pack(int fd, int packfd, uint8_t *pack_sha1,
 	if (nwant == 0)
 		goto done;
 
-	for (i = 0; i < nref; i++) {
-		if (got_object_id_cmp(&have[i], &zhash) == 0)
-			continue;
-		got_sha1_digest_to_str(have[i].sha1, hashstr, sizeof(hashstr));
+	TAILQ_FOREACH(pe, have_refs, entry) {
+		struct got_object_id *id = pe->data;
+		got_sha1_digest_to_str(id->sha1, hashstr, sizeof(hashstr));
 		n = snprintf(buf, sizeof(buf), "have %s\n", hashstr);
 		if (n >= sizeof(buf)) {
 			err = got_error(GOT_ERR_NO_SPACE);
