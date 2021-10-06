@@ -174,7 +174,7 @@ are as follows:
 .It Fl h
 Show object sizes in human-readable form.
 .It Fl s
-Display statistics about the pack file after listing objects. 
+Display statistics about the pack file after listing objects.
 This includes the total number of objects stored in the pack file
 and a break-down of the number of objects per object type.
 .El
@@ -196,7 +196,7 @@ spread across 256 sub-directories named after the 256 possible
 hexadecimal values of the first byte of an object identifier.
 .Pp
 Packed objects stored in pack files under
-.Pa objects/pack/ 
+.Pa objects/pack/
 will not be purged.
 However, if redundant copies of packed objects exist in loose form,
 such redundant copies will be purged.
@@ -207,7 +207,7 @@ branches or tags with
 or
 .Cm got tag -d .
 Deleting arbitrary references with
-.Cm got ref -d 
+.Cm got ref -d
 may also leave unreferenced objects behind.
 .Pp
 In order to determine the set of objects which are referenced, search
@@ -250,7 +250,7 @@ files can be removed with
 The
 .Dq preciousObjects
 Git extension is intended to prevent the removal of objects from a repository.
-.Cm gotadmin cleanup 
+.Cm gotadmin cleanup
 will refuse to operate on repositories where this extension is active.
 .Pp
 The options for
