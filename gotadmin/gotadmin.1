@@ -117,7 +117,9 @@ Exclusion takes precedence over inclusion.
 If a reference appears in both the included and excluded lists, it will
 be excluded.
 .El
+.Tg ix
 .It Cm indexpack Ar packfile-path
+.Dl (alias: Cm ix )
 Create a pack index for the pack file at
 .Ar packfile-path .
 .Pp
@@ -142,11 +144,9 @@ directory of the repository and should end in
 The filename of the corresponding pack index is equivalent, except
 that it ends in
 .Pa .idx .
-.Pp
-.It Cm ix
-Short alias for
-.Cm indexpack .
+.Tg ls
 .It Cm listpack Oo Fl h Oc Oo Fl s Oc Ar packfile-path
+.Dl (alias: Cm ls )
 List the contents of the pack file at
 .Ar packfile-path .
 .Pp
@@ -178,10 +178,9 @@ Display statistics about the pack file after listing objects.
 This includes the total number of objects stored in the pack file
 and a break-down of the number of objects per object type.
 .El
-.It Cm ls
-Short alias for
-.Cm listpack .
+.Tg cl
 .It Cm cleanup Oo Fl a Oc Oo Fl p Oc Oo Fl n Oc Oo Fl r Ar repository-path Oc Oo Fl q Oc
+.Dl (alias: Cm cl )
 Purge unreferenced loose objects from the repository and display
 the amount of disk space which has been freed as a result.
 .Pp
@@ -278,9 +277,6 @@ working directory.
 .It Fl q
 Suppress progress reporting and disk space summary output.
 .El
-.It Cm cl
-Short alias for
-.Cm cleanup .
 .El
 .Sh EXIT STATUS
 .Ex -std gotadmin
