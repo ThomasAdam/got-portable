@@ -294,6 +294,9 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 		    &packfile_size_cur, (*pack_hash)->sha1, &fetchibuf);
 		if (err != NULL)
 			goto done;
+		/* Don't report size progress for an empty pack file. */
+		if (packfile_size_cur <= ssizeof(pack_hdr) + SHA1_DIGEST_LENGTH)
+			packfile_size_cur = 0;
 		if (!done && refname && id) {
 			err = got_pathlist_insert(NULL, refs, refname, id);
 			if (err)
@@ -400,8 +403,11 @@ got_fetch_pack(struct got_object_id **pack_hash, struct got_pathlist_head *refs,
 	 * If the pack file contains no objects, we may only need to update
 	 * references in our repository. The caller will take care of that.
 	 */
-	if (nobj == 0)
+	if (nobj == 0) {
+		free(*pack_hash);
+		*pack_hash = NULL;
 		goto done;
+	}
 
 	if (lseek(packfd, 0, SEEK_SET) == -1) {
 		err = got_error_from_errno("lseek");
