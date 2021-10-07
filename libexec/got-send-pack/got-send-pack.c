@@ -353,6 +353,8 @@ send_pack(int fd, struct got_pathlist_head *refs,
 			err = send_error(&buf[4], n - 4);
 			goto done;
 		}
+		free(id_str);
+		free(refname);
 		err = got_gitproto_parse_refline(&id_str, &refname,
 		    &server_capabilities, buf, n);
 		if (err)
