@@ -10,6 +10,10 @@ SUBDIR += regress
 SUBDIR += gotweb
 .endif
 
+.if make(tags) || make(cleandir)
+SUBDIR += lib
+.endif
+
 .include "got-version.mk"
 
 release: clean
