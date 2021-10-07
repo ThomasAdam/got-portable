@@ -66,6 +66,29 @@ test_diff_basic() {
 		return 1
 	fi
 
+	# 'got diff' in a repository without any arguments is an error
+	(cd $testroot/repo && got diff 2> $testroot/stderr)
+	echo "got: no got work tree found" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# 'got diff' in a repository with two arguments requires that
+	# both named objects exist
+	(cd $testroot/repo && got diff $head_rev foo 2> $testroot/stderr)
+	echo "got: foo: object not found" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
 	# diff non-existent path
 	(cd $testroot/wt && got diff nonexistent > $testroot/stdout \
 		2> $testroot/stderr)
@@ -85,6 +108,299 @@ test_diff_basic() {
 	ret="$?"
 	if [ "$ret" != "0" ]; then
 		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified zeta" > $testroot/wt/epsilon/zeta
+
+	# diff several paths in a work tree
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + epsilon/zeta' >> $testroot/stdout.expected
+	echo '--- epsilon/zeta' >> $testroot/stdout.expected
+	echo '+++ epsilon/zeta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-zeta' >> $testroot/stdout.expected
+	echo '+modified zeta' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff new alpha epsilon beta > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# a branch 'new' should not collide with path 'new' if more
+	# than two arguments are passed
+	got br -r $testroot/repo -c master new > /dev/null
+	(cd $testroot/wt && got diff new alpha epsilon beta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# different order of arguments results in different output order
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + alpha' >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + epsilon/zeta' >> $testroot/stdout.expected
+	echo '--- epsilon/zeta' >> $testroot/stdout.expected
+	echo '+++ epsilon/zeta' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-zeta' >> $testroot/stdout.expected
+	echo '+modified zeta' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff alpha new epsilon beta \
+		> $testroot/stdout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# Two arguments are interpreted as objects if a colliding path exists
+	echo master > $testroot/wt/master
+	(cd $testroot/wt && got add master > /dev/null)
+	(cd $testroot/wt && got diff master new > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	# diff between the branches is empty
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	# same without a work tree
+	(cd $testroot/repo && got diff master new > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	# same with -r argument
+	got diff -r $testroot/repo master new > $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "diff refs/heads/master refs/heads/new" > $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -P can be used to force use of paths
+	(cd $testroot/wt && got diff -P new master > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + master' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ master' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+master' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# -P can only be used in a work tree
+	got diff -r $testroot/repo -P new master 2> $testroot/stderr
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: -P option can only be used when diffing a work tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# a single argument which can be resolved to a path is not ambiguous
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff new > $testroot/stdout)
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		echo "diff failed unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff with just one object ID argument results in
+	# interpretation of argument as a path
+	(cd $testroot/wt && got diff $head_rev 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: $head_rev: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# diff with more than two object arguments results in
+	# interpretation of arguments as paths
+	(cd $testroot/wt && got diff new $head_rev master \
+		> $testroot/stout 2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" = "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+
+	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "got: $head_rev: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		return 1
 	fi
 	test_done "$testroot" "$ret"
 }

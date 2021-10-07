@@ -839,13 +839,13 @@ This option has no effect if the specified
 is never traversed.
 .El
 .Tg di
-.It Cm diff Oo Fl a Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path
+.It Cm diff Oo Fl a Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl P Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path ...
 .Dl (alias: Cm di )
-When invoked within a work tree with less than two arguments, display
+When invoked within a work tree without any arguments, display all
 local changes in the work tree.
-If a
+If one or more
 .Ar path
-is specified, only show changes within this path.
+arguments are specified, only show changes within the specified paths.
 .Pp
 If two arguments are provided, treat each argument as a reference, a tag
 name, or an object ID SHA1 hash, and display differences between the
@@ -853,6 +853,12 @@ corresponding objects.
 Both objects must be of the same type (blobs, trees, or commits).
 An abbreviated hash argument will be expanded to a full SHA1 hash
 automatically, provided the abbreviation is unique.
+If none of these interpretations produce a valid result or if the
+.Fl P
+option is used,
+and if
+.Cm got diff
+is running in a work tree, attempt to interpret the two arguments as paths.
 .Pp
 The options for
 .Cm got diff
@@ -874,6 +880,13 @@ work tree, use the repository path associated with this work tree.
 Show changes staged with
 .Cm got stage
 instead of showing local changes in the work tree.
+This option is only valid when
+.Cm got diff
+is invoked in a work tree.
+.It Fl P
+Interpret all arguments as paths only.
+This option can be used to resolve ambiguity in cases where paths
+look like tag names, reference names, or object IDs.
 This option is only valid when
 .Cm got diff
 is invoked in a work tree.
