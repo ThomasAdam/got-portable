@@ -33,7 +33,7 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
-static uint32_t geartab[] = {
+static uint32_t geartab[256] = {
     0x67ed26b7, 0x32da500c, 0x53d0fee0, 0xce387dc7, 0xcd406d90, 0x2e83a4d4,
     0x9fc9a38d, 0xb67259dc, 0xca6b1722, 0x6d2ea08c, 0x235cea2e, 0x3149bb5f,
     0x1beda787, 0x2a6b77d5, 0x2f22d9ac, 0x91fc0544, 0xe413acfa, 0x5a30ff7a,
