@@ -33,6 +33,11 @@
 #define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
 #endif
 
+/*
+ * The algorihm used here is FastCDC (Fast Content-Defined Chunking)
+ * https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia
+ */
+
 static uint32_t geartab[256] = {
     0x67ed26b7, 0x32da500c, 0x53d0fee0, 0xce387dc7, 0xcd406d90, 0x2e83a4d4,
     0x9fc9a38d, 0xb67259dc, 0xca6b1722, 0x6d2ea08c, 0x235cea2e, 0x3149bb5f,
