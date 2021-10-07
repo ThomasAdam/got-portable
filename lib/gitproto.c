@@ -83,6 +83,10 @@ got_gitproto_parse_refline(char **id_str, char **refname,
 	const struct got_error *err = NULL;
 	char *tokens[3];
 
+	*id_str = NULL;
+	*refname = NULL;
+	/* don't reset *server_capabilities */
+
 	err = tokenize_refline(tokens, line, len, nitems(tokens));
 	if (err)
 		return err;
@@ -92,11 +96,14 @@ got_gitproto_parse_refline(char **id_str, char **refname,
 	if (tokens[1])
 		*refname = tokens[1];
 	if (tokens[2]) {
-		char *p;
-		*server_capabilities = tokens[2];
-		p = strrchr(*server_capabilities, '\n');
-		if (p)
-			*p = '\0';
+		if (*server_capabilities == NULL) {
+			char *p;
+			*server_capabilities = tokens[2];
+			p = strrchr(*server_capabilities, '\n');
+			if (p)
+				*p = '\0';
+		} else
+			free(tokens[2]);
 	}
 
 	return NULL;
