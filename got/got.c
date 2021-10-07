@@ -4277,7 +4277,7 @@ __dead static void
 usage_diff(void)
 {
 	fprintf(stderr, "usage: %s diff [-a] [-C number] [-r repository-path] "
-	    "[-s] [-w] [object1 object2 | path]\n", getprogname());
+	    "[-s] [-w] [-P] [object1 object2 | path ...]\n", getprogname());
 	exit(1);
 }
 
@@ -4486,17 +4486,18 @@ cmd_diff(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
-	struct got_object_id *id1 = NULL, *id2 = NULL;
-	const char *id_str1 = NULL, *id_str2 = NULL;
-	char *label1 = NULL, *label2 = NULL;
+	struct got_object_id *ids[2] = { NULL, NULL };
+	char *labels[2] = { NULL, NULL };
 	int type1, type2;
-	int diff_context = 3, diff_staged = 0, ignore_whitespace = 0, ch;
-	int force_text_diff = 0;
+	int diff_context = 3, diff_staged = 0, ignore_whitespace = 0, ch, i;
+	int force_text_diff = 0, force_path = 0, rflag = 0;
 	const char *errstr;
-	char *path = NULL;
 	struct got_reflist_head refs;
+	struct got_pathlist_head paths;
+	struct got_pathlist_entry *pe;
 
 	TAILQ_INIT(&refs);
+	TAILQ_INIT(&paths);
 
 #ifndef PROFILE
 	if (pledge("stdio rpath wpath cpath flock proc exec sendfd unveil",
@@ -4504,7 +4505,7 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aC:r:sw")) != -1) {
+	while ((ch = getopt(argc, argv, "aC:r:swP")) != -1) {
 		switch (ch) {
 		case 'a':
 			force_text_diff = 1;
@@ -4521,12 +4522,16 @@ cmd_diff(int argc, char *argv[])
 				return got_error_from_errno2("realpath",
 				    optarg);
 			got_path_strip_trailing_slashes(repo_path);
+			rflag = 1;
 			break;
 		case 's':
 			diff_staged = 1;
 			break;
 		case 'w':
 			ignore_whitespace = 1;
+			break;
+		case 'P':
+			force_path = 1;
 			break;
 		default:
 			usage_diff();
@@ -4542,53 +4547,47 @@ cmd_diff(int argc, char *argv[])
 		error = got_error_from_errno("getcwd");
 		goto done;
 	}
-	if (argc <= 1) {
-		if (repo_path)
-			errx(1,
-			    "-r option can't be used when diffing a work tree");
+
+	if (repo_path == NULL) {
 		error = got_worktree_open(&worktree, cwd);
-		if (error) {
-			if (error->code == GOT_ERR_NOT_WORKTREE)
-				error = wrap_not_worktree_error(error, "diff",
-				    cwd);
+		if (error && error->code != GOT_ERR_NOT_WORKTREE)
 			goto done;
-		}
-		repo_path = strdup(got_worktree_get_repo_path(worktree));
-		if (repo_path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-		if (argc == 1) {
-			error = got_worktree_resolve_path(&path, worktree,
-			    argv[0]);
-			if (error)
-				goto done;
-		} else {
-			path = strdup("");
-			if (path == NULL) {
+		else
+			error = NULL;
+		if (worktree) {
+			repo_path =
+			    strdup(got_worktree_get_repo_path(worktree));
+			if (repo_path == NULL) {
 				error = got_error_from_errno("strdup");
 				goto done;
 			}
-		}
-	} else if (argc == 2) {
-		if (diff_staged)
-			errx(1, "-s option can't be used when diffing "
-			    "objects in repository");
-		id_str1 = argv[0];
-		id_str2 = argv[1];
-		if (repo_path == NULL) {
-			error = got_worktree_open(&worktree, cwd);
-			if (error && error->code != GOT_ERR_NOT_WORKTREE)
-				goto done;
-			repo_path = strdup(worktree ?
-			    got_worktree_get_repo_path(worktree) : cwd);
+		} else {
+			repo_path = strdup(cwd);
 			if (repo_path == NULL) {
 				error = got_error_from_errno("strdup");
 				goto done;
 			}
 		}
-	} else
-		usage_diff();
+	}
+
+	if (worktree) {
+		repo_path = strdup(got_worktree_get_repo_path(worktree));
+		if (repo_path == NULL) {
+			error = got_error_from_errno("strdup");
+			goto done;
+		}
+	} else {
+		if (repo_path == NULL) {
+			repo_path = strdup(cwd);
+			if (repo_path == NULL) {
+				error = got_error_from_errno("strdup");
+				goto done;
+			}
+		}
+	}
+
+	if (force_path && (rflag || worktree == NULL))
+		errx(1, "-P option can only be used when diffing a work tree");
 
 	error = got_repo_open(&repo, repo_path, NULL);
 	free(repo_path);
@@ -4600,12 +4599,34 @@ cmd_diff(int argc, char *argv[])
 	if (error)
 		goto done;
 
-	if (argc <= 1) {
-		struct print_diff_arg arg;
-		struct got_pathlist_head paths;
-		char *id_str;
+	if (!force_path && argc == 2) {
+		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
+		    NULL);
+		if (error)
+			goto done;
+		for (i = 0; i < argc; i++) {
+			error = got_repo_match_object_id(&ids[i], &labels[i],
+			    argv[i], GOT_OBJ_TYPE_ANY, &refs, repo);
+			if (error) {
+				if (error->code != GOT_ERR_NOT_REF &&
+				    error->code != GOT_ERR_NO_OBJ)
+					goto done;
+				error = NULL;
+				break;
+			}
+		}
+	}
 
-		TAILQ_INIT(&paths);
+	if (worktree != NULL && (ids[0] == NULL || ids[1] == NULL)) {
+		error = get_worktree_paths_from_argv(&paths,
+		    argc, argv, worktree);
+		if (error)
+			goto done;
+	}
+
+	if (!TAILQ_EMPTY(&paths)) {
+		struct print_diff_arg arg;
+		char *id_str;
 
 		error = got_object_id_str(&id_str,
 		    got_worktree_get_base_commit_id(worktree));
@@ -4620,39 +4641,34 @@ cmd_diff(int argc, char *argv[])
 		arg.ignore_whitespace = ignore_whitespace;
 		arg.force_text_diff = force_text_diff;
 
-		error = got_pathlist_append(&paths, path, NULL);
-		if (error)
-			goto done;
-
 		error = got_worktree_status(worktree, &paths, repo, 0,
 		    print_diff, &arg, check_cancelled, NULL);
 		free(id_str);
-		got_pathlist_free(&paths);
 		goto done;
 	}
 
-	error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name, NULL);
-	if (error)
-		return error;
+	if (ids[0] == NULL || ids[1] == NULL) {
+		if (argc == 2) {
+			error = got_error_fmt(GOT_ERR_NO_OBJ, "%s",
+			    ids[0] ? argv[1] : argv[0]);
+			goto done;
+		} if (worktree == NULL) {
+			error = got_error(GOT_ERR_NOT_WORKTREE);
+			goto done;
+		} else
+			usage_diff();
+	}
+	if (diff_staged)
+		errx(1, "-s option can't be used when diffing "
+		    "objects in repository");
 
-	error = got_repo_match_object_id(&id1, &label1, id_str1,
-	    GOT_OBJ_TYPE_ANY, &refs, repo);
-	if (error)
-		goto done;
-
-	error = got_repo_match_object_id(&id2, &label2, id_str2,
-	    GOT_OBJ_TYPE_ANY, &refs, repo);
-	if (error)
-		goto done;
-
-	error = got_object_get_type(&type1, repo, id1);
-	if (error)
-		goto done;
-
-	error = got_object_get_type(&type2, repo, id2);
+	error = got_object_get_type(&type1, repo, ids[0]);
 	if (error)
 		goto done;
 
+	error = got_object_get_type(&type2, repo, ids[1]);
+	if (error)
+		goto done;
 	if (type1 != type2) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
@@ -4660,18 +4676,18 @@ cmd_diff(int argc, char *argv[])
 
 	switch (type1) {
 	case GOT_OBJ_TYPE_BLOB:
-		error = got_diff_objects_as_blobs(NULL, NULL, id1, id2,
+		error = got_diff_objects_as_blobs(NULL, NULL, ids[0], ids[1],
 		    NULL, NULL, diff_context, ignore_whitespace,
 		    force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_TREE:
-		error = got_diff_objects_as_trees(NULL, NULL, id1, id2,
+		error = got_diff_objects_as_trees(NULL, NULL, ids[0], ids[1],
 		    "", "", diff_context, ignore_whitespace, force_text_diff,
 		    repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
-		printf("diff %s %s\n", label1, label2);
-		error = got_diff_objects_as_commits(NULL, NULL, id1, id2,
+		printf("diff %s %s\n", labels[0], labels[1]);
+		error = got_diff_objects_as_commits(NULL, NULL, ids[0], ids[1],
 		    diff_context, ignore_whitespace, force_text_diff, repo,
 		    stdout);
 		break;
@@ -4679,11 +4695,10 @@ cmd_diff(int argc, char *argv[])
 		error = got_error(GOT_ERR_OBJ_TYPE);
 	}
 done:
-	free(label1);
-	free(label2);
-	free(id1);
-	free(id2);
-	free(path);
+	free(labels[0]);
+	free(labels[1]);
+	free(ids[0]);
+	free(ids[1]);
 	if (worktree)
 		got_worktree_close(worktree);
 	if (repo) {
@@ -4691,6 +4706,9 @@ done:
 		if (error == NULL)
 			error = close_err;
 	}
+	TAILQ_FOREACH(pe, &paths, entry)
+		free((char *)pe->path);
+	got_pathlist_free(&paths);
 	got_ref_list_free(&refs);
 	return error;
 }
