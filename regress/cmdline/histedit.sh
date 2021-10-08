@@ -1917,6 +1917,62 @@ EOF
 	test_done "$testroot" "$ret"
 }
 
+test_histedit_prepend_line() {
+	local testroot=`test_init histedit_prepend_line`
+	local orig_commit=`git_show_head $testroot/repo`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+
+	ed "$testroot/wt/alpha" <<EOF >/dev/null 2>&1
+0i
+first line
+.
+wq
+EOF
+
+	cp $testroot/wt/alpha $testroot/content.expected
+
+	(cd $testroot/wt/ && got commit -m 'modified alpha on master' \
+		alpha > /dev/null)
+	ret="$?"
+	if [ "$?" != 0 ]; then
+		echo "got commit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	local top_commit=`git_show_head $testroot/repo`
+	echo "pick $top_commit" > "$testroot/histedit-script"
+
+	(cd $testroot/wt/ && got update -c $orig_commit > /dev/null)
+	ret="$?"
+	if [ "$?" != 0 ]; then
+		echo "got update failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/wt && got histedit -F "$testroot/histedit-script" \
+		> /dev/null)
+	ret="$?"
+	if [ "$?" != 0 ]; then
+		echo "got histedit failed unexpectedly" >&2
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	cp $testroot/wt/alpha $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/content.expected $testroot/content
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	test_done "$testroot" $ret
+}
+
 test_parseargs "$@"
 run_test test_histedit_no_op
 run_test test_histedit_swap
@@ -1936,3 +1992,4 @@ run_test test_histedit_fold_add_delete
 run_test test_histedit_fold_only
 run_test test_histedit_fold_only_empty_logmsg
 run_test test_histedit_edit_only
+run_test test_histedit_prepend_line
