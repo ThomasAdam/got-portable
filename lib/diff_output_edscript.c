@@ -45,8 +45,10 @@ output_edscript_chunk(struct diff_output_info *outinfo,
 		left_start = 0;
 	else if (left_len == 0 && cc->left.start > 0)
 		left_start = cc->left.start;
-	else
+	else if (cc->left.end > 0)
 		left_start = cc->left.start + 1;
+	else
+		left_start = cc->left.start;
 
 	right_len = cc->right.end - cc->right.start;
 	if (right_len < 0)
@@ -55,8 +57,10 @@ output_edscript_chunk(struct diff_output_info *outinfo,
 		right_start = 0;
 	else if (right_len == 0 && cc->right.start > 0)
 		right_start = cc->right.start;
-	else
+	else if (cc->right.end > 0)
 		right_start = cc->right.start + 1;
+	else
+		right_start = cc->right.start;
 
 	if (left_len == 0) {
 		/* addition */
