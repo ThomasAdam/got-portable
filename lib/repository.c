@@ -1505,7 +1505,7 @@ got_repo_match_object_id(struct got_object_id **id, char **label,
 		*label = NULL;
 
 	if (refs) {
-		err = got_repo_object_match_tag(&tag, id_str, GOT_OBJ_TYPE_ANY,
+		err = got_repo_object_match_tag(&tag, id_str, obj_type,
 		    refs, repo);
 		if (err == NULL) {
 			*id = got_object_id_dup(
