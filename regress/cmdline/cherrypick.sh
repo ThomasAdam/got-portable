@@ -1424,6 +1424,44 @@ test_cherrypick_same_branch() {
 	test_done "$testroot" "$ret"
 }
 
+test_cherrypick_dot_on_a_line_by_itself() {
+	local testroot=`test_init cherrypick_dot_on_a_line_by_itself`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	(cd $testroot/repo && git checkout -q -b newbranch)
+	printf "modified\ndelta\n.\non\nbranch\n" > $testroot/repo/gamma/delta
+	git_commit $testroot/repo -m "committing to delta on newbranch"
+	local branch_rev=`git_show_head $testroot/repo`
+
+	(cd $testroot/wt && got cherrypick newbranch > $testroot/stdout)
+
+	echo "G  gamma/delta" >> $testroot/stdout.expected
+	echo "Merged commit $branch_rev" >> $testroot/stdout.expected
+
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	printf "modified\ndelta\n.\non\nbranch\n" > $testroot/content.expected
+	cat $testroot/wt/gamma/delta > $testroot/content
+	cmp -s $testroot/content.expected $testroot/content
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		#diff -u $testroot/content.expected $testroot/content
+		ret="xfail (badly merged content)"
+	fi
+	test_done "$testroot" "$ret"
+}
 
 test_parseargs "$@"
 run_test test_cherrypick_basic
@@ -1440,3 +1478,4 @@ run_test test_cherrypick_conflict_no_eol
 run_test test_cherrypick_conflict_no_eol2
 run_test test_cherrypick_unrelated_changes
 run_test test_cherrypick_same_branch
+run_test test_cherrypick_dot_on_a_line_by_itself
