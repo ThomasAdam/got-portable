@@ -27,6 +27,7 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/sha1.c
 
 gotadmin_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
+EXTRA_DIST = gotadmin.1
 
 man1_MANS = gotadmin.1
 
