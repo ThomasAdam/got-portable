@@ -1485,8 +1485,29 @@ done:
 	if (err) {
 		free(*id);
 		*id = NULL;
-	} else if (*id == NULL)
-		err = got_error_path(id_str_prefix, GOT_ERR_NO_OBJ);
+	} else if (*id == NULL) {
+		switch (obj_type) {
+		case GOT_OBJ_TYPE_BLOB:
+			err = got_error_fmt(GOT_ERR_NO_OBJ, "%s %s",
+			    GOT_OBJ_LABEL_BLOB, id_str_prefix);
+			break;
+		case GOT_OBJ_TYPE_TREE:
+			err = got_error_fmt(GOT_ERR_NO_OBJ, "%s %s",
+			    GOT_OBJ_LABEL_TREE, id_str_prefix);
+			break;
+		case GOT_OBJ_TYPE_COMMIT:
+			err = got_error_fmt(GOT_ERR_NO_OBJ, "%s %s",
+			    GOT_OBJ_LABEL_COMMIT, id_str_prefix);
+			break;
+		case GOT_OBJ_TYPE_TAG:
+			err = got_error_fmt(GOT_ERR_NO_OBJ, "%s %s",
+			    GOT_OBJ_LABEL_TAG, id_str_prefix);
+			break;
+		default:
+			err = got_error_path(id_str_prefix, GOT_ERR_NO_OBJ);
+			break;
+		}
+	}
 
 	return err;
 }
@@ -1590,7 +1611,8 @@ got_repo_object_match_tag(struct got_tag_object **tag, const char *name,
 	}
 
 	if (err == NULL && *tag == NULL)
-		err = got_error_path(name, GOT_ERR_NO_OBJ);
+		err = got_error_fmt(GOT_ERR_NO_OBJ, "%s %s",
+		    GOT_OBJ_LABEL_TAG, name);
 	return err;
 }
 

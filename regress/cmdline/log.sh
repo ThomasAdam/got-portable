@@ -500,7 +500,8 @@ test_log_end_at_commit() {
 		return 1
 	fi
 	echo -n > $testroot/stdout.expected
-	echo "got: $empty_sha1: object not found" > $testroot/stderr.expected
+	echo "got: commit $empty_sha1: object not found" \
+		> $testroot/stderr.expected
 	cmp -s $testroot/stderr.expected $testroot/stderr
 	ret="$?"
 	if [ "$ret" != "0" ]; then
