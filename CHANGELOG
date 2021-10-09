@@ -6,6 +6,11 @@ other than OpenBSD.
 
 All changes are on top of the versioned changes listed in CHANGES.
 
+# got-portable 0.61; (2021-10-09)
+
+* Port regress tests.
+* Improve FreeBSD compatibility.
+
 # got-portable 0.60; (2021-09-21)
 
 * First portable version released for Linux.
