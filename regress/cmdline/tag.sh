@@ -98,7 +98,8 @@ test_tag_create() {
 		return 1
 	fi
 
-	echo "got: $tree_id: object not found" > $testroot/stderr.expected
+	echo "got: commit $tree_id: object not found" \
+		> $testroot/stderr.expected
 	cmp -s $testroot/stderr $testroot/stderr.expected
 	ret="$?"
 	if [ "$ret" != "0" ]; then
