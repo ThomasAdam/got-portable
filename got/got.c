@@ -4570,22 +4570,6 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	if (worktree) {
-		repo_path = strdup(got_worktree_get_repo_path(worktree));
-		if (repo_path == NULL) {
-			error = got_error_from_errno("strdup");
-			goto done;
-		}
-	} else {
-		if (repo_path == NULL) {
-			repo_path = strdup(cwd);
-			if (repo_path == NULL) {
-				error = got_error_from_errno("strdup");
-				goto done;
-			}
-		}
-	}
-
 	if (force_path && (rflag || worktree == NULL))
 		errx(1, "-P option can only be used when diffing a work tree");
 
