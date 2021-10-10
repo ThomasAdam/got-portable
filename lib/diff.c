@@ -761,9 +761,137 @@ done:
 	return err;
 }
 
+static const struct got_error *
+diff_paths(struct got_tree_object *tree1, struct got_tree_object *tree2,
+    struct got_pathlist_head *paths, struct got_repository *repo,
+    got_diff_blob_cb cb, void *cb_arg)
+{
+	const struct got_error *err = NULL;
+	struct got_pathlist_entry *pe;
+	struct got_object_id *id1 = NULL, *id2 = NULL;
+	struct got_tree_object *subtree1 = NULL, *subtree2 = NULL;
+	struct got_blob_object *blob1 = NULL, *blob2 = NULL;
+
+	TAILQ_FOREACH(pe, paths, entry) {
+		int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
+		mode_t mode1 = 0, mode2 = 0;
+
+		free(id1);
+		id1 = NULL;
+		free(id2);
+		id2 = NULL;
+		if (subtree1) {
+			got_object_tree_close(subtree1);
+			subtree1 = NULL;
+		}
+		if (subtree2) {
+			got_object_tree_close(subtree2);
+			subtree2 = NULL;
+		}
+		if (blob1) {
+			got_object_blob_close(blob1);
+			blob1 = NULL;
+		}
+		if (blob2) {
+			got_object_blob_close(blob2);
+			blob2 = NULL;
+		}
+
+		err = got_object_tree_find_path(&id1, &mode1, repo, tree1,
+		    pe->path);
+		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+			goto done;
+		err = got_object_tree_find_path(&id2, &mode2, repo, tree2,
+		    pe->path);
+		if (err && err->code != GOT_ERR_NO_TREE_ENTRY)
+			goto done;
+		if (id1 == NULL && id2 == NULL) {
+			err = got_error_path(pe->path, GOT_ERR_NO_TREE_ENTRY);
+			goto done;
+		}
+		if (id1) {
+			err = got_object_get_type(&type1, repo, id1);
+			if (err)
+				goto done;
+		}
+		if (id2) {
+			err = got_object_get_type(&type2, repo, id2);
+			if (err)
+				goto done;
+		}
+		if (type1 == GOT_OBJ_TYPE_ANY &&
+		    type2 == GOT_OBJ_TYPE_ANY) {
+			err = got_error_path(pe->path, GOT_ERR_NO_OBJ);
+			goto done;
+		} else if (type1 != GOT_OBJ_TYPE_ANY &&
+		    type2 != GOT_OBJ_TYPE_ANY && type1 != type2) {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+
+		if (type1 == GOT_OBJ_TYPE_BLOB ||
+		    type2 == GOT_OBJ_TYPE_BLOB) {
+			if (id1) {
+				err = got_object_open_as_blob(&blob1, repo,
+				    id1, 8192);
+				if (err)
+					goto done;
+			}
+			if (id2) {
+				err = got_object_open_as_blob(&blob2, repo,
+				    id2, 8192);
+				if (err)
+					goto done;
+			}
+			err = cb(cb_arg, blob1, blob2, id1, id2,
+			    id1 ? pe->path : "/dev/null",
+			    id2 ? pe->path : "/dev/null",
+			    mode1, mode2, repo);
+			if (err)
+				goto done;
+		} else if (type1 == GOT_OBJ_TYPE_TREE ||
+		    type2 == GOT_OBJ_TYPE_TREE) {
+			if (id1) {
+				err = got_object_open_as_tree(&subtree1, repo,
+				    id1);
+				if (err)
+					goto done;
+			}
+			if (id2) {
+				err = got_object_open_as_tree(&subtree2, repo,
+				    id2);
+				if (err)
+					goto done;
+			}
+			err = got_diff_tree(subtree1, subtree2,
+			    id1 ? pe->path : "/dev/null",
+			    id2 ? pe->path : "/dev/null",
+			    repo, cb, cb_arg, 1);
+			if (err)
+				goto done;
+		} else {
+			err = got_error(GOT_ERR_OBJ_TYPE);
+			goto done;
+		}
+	}
+done:
+	free(id1);
+	free(id2);
+	if (subtree1)
+		got_object_tree_close(subtree1);
+	if (subtree2)
+		got_object_tree_close(subtree2);
+	if (blob1)
+		got_object_blob_close(blob1);
+	if (blob2)
+		got_object_blob_close(blob2);
+	return err;
+}
+
 const struct got_error *
 got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
+    struct got_pathlist_head *paths,
     char *label1, char *label2, int diff_context, int ignore_whitespace,
     int force_text_diff, struct got_repository *repo, FILE *outfile)
 {
@@ -785,6 +913,7 @@ got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
 		if (err)
 			goto done;
 	}
+
 	arg.diff_context = diff_context;
 	arg.ignore_whitespace = ignore_whitespace;
 	arg.force_text_diff = force_text_diff;
@@ -796,9 +925,13 @@ got_diff_objects_as_trees(off_t **line_offsets, size_t *nlines,
 		arg.line_offsets = NULL;
 		arg.nlines = 0;
 	}
-	err = got_diff_tree(tree1, tree2, label1, label2, repo,
-	    got_diff_blob_output_unidiff, &arg, 1);
-
+	if (paths == NULL || TAILQ_EMPTY(paths)) {
+		err = got_diff_tree(tree1, tree2, label1, label2, repo,
+		    got_diff_blob_output_unidiff, &arg, 1);
+	} else {
+		err = diff_paths(tree1, tree2, paths, repo,
+		    got_diff_blob_output_unidiff, &arg);
+	}
 	if (want_lineoffsets) {
 		*line_offsets = arg.line_offsets; /* was likely re-allocated */
 		*nlines = arg.nlines;
@@ -814,6 +947,7 @@ done:
 const struct got_error *
 got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
     struct got_object_id *id1, struct got_object_id *id2,
+    struct got_pathlist_head *paths,
     int diff_context, int ignore_whitespace, int force_text_diff,
     struct got_repository *repo, FILE *outfile)
 {
@@ -835,8 +969,8 @@ got_diff_objects_as_commits(off_t **line_offsets, size_t *nlines,
 
 	err = got_diff_objects_as_trees(line_offsets, nlines,
 	    commit1 ? got_object_commit_get_tree_id(commit1) : NULL,
-	    got_object_commit_get_tree_id(commit2), "", "", diff_context,
-	    ignore_whitespace, force_text_diff, repo, outfile);
+	    got_object_commit_get_tree_id(commit2), paths, "", "",
+	    diff_context, ignore_whitespace, force_text_diff, repo, outfile);
 done:
 	if (commit1)
 		got_object_commit_close(commit1);

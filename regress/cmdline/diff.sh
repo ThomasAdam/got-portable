@@ -974,6 +974,247 @@ test_diff_binary_files() {
 	test_done "$testroot" "$ret"
 }
 
+test_diff_commits() {
+	local testroot=`test_init diff_commits`
+	local commit_id0=`git_show_head $testroot/repo`
+	alpha_id0=`get_blob_id $testroot/repo "" alpha`
+	beta_id0=`get_blob_id $testroot/repo "" beta`
+
+	got checkout $testroot/repo $testroot/wt > /dev/null
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "modified alpha" > $testroot/wt/alpha
+	(cd $testroot/wt && got rm beta >/dev/null)
+	echo "new file" > $testroot/wt/new
+	(cd $testroot/wt && got add new >/dev/null)
+	(cd $testroot/wt && got commit -m 'committing changes' >/dev/null)
+	local commit_id1=`git_show_head $testroot/repo`
+
+	alpha_id1=`get_blob_id $testroot/repo "" alpha`
+	new_id1=`get_blob_id $testroot/repo "" new`
+
+	echo "diff $commit_id0 refs/heads/master" > $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+
+	(cd $testroot/wt && got diff -c master > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# same diff with explicit parent commit ID
+	(cd $testroot/wt && got diff -c $commit_id0 -c master \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# same diff with commit object IDs
+	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# same diff, filtered by paths
+	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "blob - $alpha_id0" >> $testroot/stdout.expected
+	echo "blob + $alpha_id1" >> $testroot/stdout.expected
+	echo '--- alpha' >> $testroot/stdout.expected
+	echo '+++ alpha' >> $testroot/stdout.expected
+	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
+	echo '-alpha' >> $testroot/stdout.expected
+	echo '+modified alpha' >> $testroot/stdout.expected
+	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 alpha \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+	# same in a work tree
+	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 alpha \
+		> $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	echo "diff $commit_id0 $commit_id1" > $testroot/stdout.expected
+	echo "blob - $beta_id0 (mode 644)" >> $testroot/stdout.expected
+	echo 'blob + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo "blob + $new_id1 (mode 644)" >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
+	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 \
+		beta new > $testroot/stdout)
+	cmp -s $testroot/stdout.expected $testroot/stdout
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stdout.expected $testroot/stdout
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# more than two -c options are not allowed
+	(cd $testroot/repo && got diff -c $commit_id0 -c $commit_id1 -c foo \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: too many -c options used" > $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# use of -c options implies a repository diff; use with -P is an error
+	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -P foo \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: -P option can only be used when diffing a work tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# use of -c options implies a repository diff; use with -s is an error
+	(cd $testroot/wt && got diff -c $commit_id0 -c $commit_id1 -s foo \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: -s option can only be used when diffing a work tree" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# three arguments imply use of path filtering (repository case)
+	(cd $testroot/repo && got diff $commit_id0 $commit_id1 foo \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: specified paths cannot be resolved: no got work tree found" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+		test_done "$testroot" "$ret"
+		return 1
+	fi
+
+	# three arguments imply use of path filtering (work tree case)
+	(cd $testroot/wt && got diff $commit_id0 $commit_id1 foo \
+		2> $testroot/stderr)
+	ret="$?"
+	if [ "$ret" == "0" ]; then
+		echo "diff succeeded unexpectedly" >&2
+		test_done "$testroot" "1"
+		return 1
+	fi
+	echo "got: $commit_id0: No such file or directory" \
+		> $testroot/stderr.expected
+	cmp -s $testroot/stderr.expected $testroot/stderr
+	ret="$?"
+	if [ "$ret" != "0" ]; then
+		diff -u $testroot/stderr.expected $testroot/stderr
+	fi
+	test_done "$testroot" "$ret"
+}
+
 test_parseargs "$@"
 run_test test_diff_basic
 run_test test_diff_shows_conflict
@@ -984,3 +1225,4 @@ run_test test_diff_submodule_of_same_repo
 run_test test_diff_symlinks_in_work_tree
 run_test test_diff_symlinks_in_repo
 run_test test_diff_binary_files
+run_test test_diff_commits

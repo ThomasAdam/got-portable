@@ -3350,7 +3350,7 @@ create_diff(struct tog_diff_view_state *s)
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		err = got_diff_objects_as_trees(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, "", "", s->diff_context,
+		    s->id1, s->id2, NULL, "", "", s->diff_context,
 		    s->ignore_whitespace, s->force_text_diff, s->repo, s->f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT: {
@@ -3385,7 +3385,7 @@ create_diff(struct tog_diff_view_state *s)
 		got_object_commit_close(commit2);
 
 		err = got_diff_objects_as_commits(&s->line_offsets, &s->nlines,
-		    s->id1, s->id2, s->diff_context, s->ignore_whitespace,
+		    s->id1, s->id2, NULL, s->diff_context, s->ignore_whitespace,
 		    s->force_text_diff, s->repo, s->f);
 		break;
 	}

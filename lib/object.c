@@ -1905,39 +1905,24 @@ got_object_tree_find_entry(struct got_tree_object *tree, const char *name)
 }
 
 const struct got_error *
-got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
-    struct got_object_id *commit_id, const char *path)
+got_object_tree_find_path(struct got_object_id **id, mode_t *mode,
+    struct got_repository *repo, struct got_tree_object *tree,
+    const char *path)
 {
 	const struct got_error *err = NULL;
-	struct got_commit_object *commit = NULL;
-	struct got_tree_object *tree = NULL;
+	struct got_tree_object *subtree = NULL;
 	struct got_tree_entry *te = NULL;
 	const char *seg, *s;
 	size_t seglen;
 
 	*id = NULL;
 
-	err = got_object_open_as_commit(&commit, repo, commit_id);
-	if (err)
-		goto done;
-
-	/* Handle opening of root of commit's tree. */
-	if (got_path_is_root_dir(path)) {
-		*id = got_object_id_dup(commit->tree_id);
-		if (*id == NULL)
-			err = got_error_from_errno("got_object_id_dup");
-		goto done;
-	}
-
-	err = got_object_open_as_tree(&tree, repo, commit->tree_id);
-	if (err)
-		goto done;
-
 	s = path;
 	while (s[0] == '/')
 		s++;
 	seg = s;
 	seglen = 0;
+	subtree = tree;
 	while (*s) {
 		struct got_tree_object *next_tree;
 
@@ -1948,7 +1933,7 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 				continue;
 		}
 
-		te = find_entry_by_name(tree, seg, seglen);
+		te = find_entry_by_name(subtree, seg, seglen);
 		if (te == NULL) {
 			err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
 			goto done;
@@ -1966,8 +1951,9 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 			te = NULL;
 			if (err)
 				goto done;
-			got_object_tree_close(tree);
-			tree = next_tree;
+			if (subtree != tree)
+				got_object_tree_close(subtree);
+			subtree = next_tree;
 		}
 	}
 
@@ -1975,8 +1961,40 @@ got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
 		*id = got_object_id_dup(&te->id);
 		if (*id == NULL)
 			return got_error_from_errno("got_object_id_dup");
+		if (mode)
+			*mode = te->mode;
 	} else
 		err = got_error_path(path, GOT_ERR_NO_TREE_ENTRY);
+done:
+	if (subtree && subtree != tree)
+		got_object_tree_close(subtree);
+	return err;
+}
+const struct got_error *
+got_object_id_by_path(struct got_object_id **id, struct got_repository *repo,
+    struct got_object_id *commit_id, const char *path)
+{
+	const struct got_error *err = NULL;
+	struct got_commit_object *commit = NULL;
+	struct got_tree_object *tree = NULL;
+
+	*id = NULL;
+
+	err = got_object_open_as_commit(&commit, repo, commit_id);
+	if (err)
+		goto done;
+
+	/* Handle opening of root of commit's tree. */
+	if (got_path_is_root_dir(path)) {
+		*id = got_object_id_dup(commit->tree_id);
+		if (*id == NULL)
+			err = got_error_from_errno("got_object_id_dup");
+	} else {
+		err = got_object_open_as_tree(&tree, repo, commit->tree_id);
+		if (err)
+			goto done;
+		err = got_object_tree_find_path(id, NULL, repo, tree, path);
+	}
 done:
 	if (commit)
 		got_object_commit_close(commit);
