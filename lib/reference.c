@@ -87,6 +87,9 @@ struct got_reference {
 
 	struct got_lockfile *lf;
 	time_t mtime;
+
+	/* Cached timestamp for got_ref_cmp_by_commit_timestamp_descending() */
+	time_t committer_time;
 };
 
 static const struct got_error *
@@ -771,31 +774,36 @@ got_ref_cmp_by_commit_timestamp_descending(void *arg, int *cmp,
 {
 	const struct got_error *err;
 	struct got_repository *repo = arg;
-	struct got_object_id *id1, *id2 = NULL;
+	struct got_object_id *id1 = NULL, *id2 = NULL;
 	struct got_commit_object *commit1 = NULL, *commit2 = NULL;
-	time_t time1, time2;
 
 	*cmp = 0;
 
-	err = got_ref_resolve(&id1, repo, ref1);
-	if (err)
-		return err;
-	err = got_ref_resolve(&id2, repo, ref2);
-	if (err)
-		goto done;
+	if (ref1->committer_time == 0) {
+		err = got_ref_resolve(&id1, repo, ref1);
+		if (err)
+			return err;
+		err = got_object_open_as_commit(&commit1, repo, id1);
+		if (err)
+			goto done;
+		ref1->committer_time =
+		    got_object_commit_get_committer_time(commit1);
+	}
 
-	err = got_object_open_as_commit(&commit1, repo, id1);
-	if (err)
-		goto done;
-	err = got_object_open_as_commit(&commit2, repo, id2);
-	if (err)
-		goto done;
-	
-	time1 = got_object_commit_get_committer_time(commit1);
-	time2 = got_object_commit_get_committer_time(commit2);
-	if (time1 < time2)
+	if (ref2->committer_time == 0) {
+		err = got_ref_resolve(&id2, repo, ref2);
+		if (err)
+			return err;
+		err = got_object_open_as_commit(&commit2, repo, id2);
+		if (err)
+			goto done;
+		ref2->committer_time =
+		    got_object_commit_get_committer_time(commit2);
+	}
+
+	if (ref1->committer_time < ref2->committer_time)
 		*cmp = 1;
-	else if (time2 < time1)
+	else if (ref2->committer_time < ref1->committer_time)
 		*cmp = -1;
 done:
 	free(id1);
