@@ -4276,9 +4276,9 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-a] [-c commit1] [-c commit2] "
-	    "[-C number] [-r repository-path] "
-	    "[-s] [-w] [-P] [object1 object2 | path ...]\n", getprogname());
+	fprintf(stderr, "usage: %s diff [-a] [-c commit] [-C number] "
+	    "[-r repository-path] [-s] [-w] [-P] "
+	    "[object1 object2 | path ...]\n", getprogname());
 	exit(1);
 }
 
