@@ -4276,7 +4276,8 @@ done:
 __dead static void
 usage_diff(void)
 {
-	fprintf(stderr, "usage: %s diff [-a] [-C number] [-r repository-path] "
+	fprintf(stderr, "usage: %s diff [-a] [-c commit1] [-c commit2] "
+	    "[-C number] [-r repository-path] "
 	    "[-s] [-w] [-P] [object1 object2 | path ...]\n", getprogname());
 	exit(1);
 }
@@ -4486,9 +4487,11 @@ cmd_diff(int argc, char *argv[])
 	struct got_repository *repo = NULL;
 	struct got_worktree *worktree = NULL;
 	char *cwd = NULL, *repo_path = NULL;
+	const char *commit_args[2] = { NULL, NULL };
+	int ncommit_args = 0;
 	struct got_object_id *ids[2] = { NULL, NULL };
 	char *labels[2] = { NULL, NULL };
-	int type1, type2;
+	int type1 = GOT_OBJ_TYPE_ANY, type2 = GOT_OBJ_TYPE_ANY;
 	int diff_context = 3, diff_staged = 0, ignore_whitespace = 0, ch, i;
 	int force_text_diff = 0, force_path = 0, rflag = 0;
 	const char *errstr;
@@ -4505,10 +4508,15 @@ cmd_diff(int argc, char *argv[])
 		err(1, "pledge");
 #endif
 
-	while ((ch = getopt(argc, argv, "aC:r:swP")) != -1) {
+	while ((ch = getopt(argc, argv, "ac:C:r:swP")) != -1) {
 		switch (ch) {
 		case 'a':
 			force_text_diff = 1;
+			break;
+		case 'c':
+			if (ncommit_args >= 2)
+				errx(1, "too many -c options used");
+			commit_args[ncommit_args++] = optarg;
 			break;
 		case 'C':
 			diff_context = strtonum(optarg, 0, GOT_DIFF_MAX_CONTEXT,
@@ -4570,30 +4578,51 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	if (force_path && (rflag || worktree == NULL))
-		errx(1, "-P option can only be used when diffing a work tree");
-
 	error = got_repo_open(&repo, repo_path, NULL);
 	free(repo_path);
 	if (error != NULL)
 		goto done;
+
+	if (rflag || worktree == NULL || ncommit_args > 0) {
+		if (force_path) {
+			error = got_error_msg(GOT_ERR_NOT_IMPL,
+			    "-P option can only be used when diffing "
+			    "a work tree");
+			goto done;
+		}
+		if (diff_staged) {
+			error = got_error_msg(GOT_ERR_NOT_IMPL,
+			    "-s option can only be used when diffing "
+			    "a work tree");
+			goto done;
+		}
+	}
 
 	error = apply_unveil(got_repo_get_path(repo), 1,
 	    worktree ? got_worktree_get_root_path(worktree) : NULL);
 	if (error)
 		goto done;
 
-	if (!force_path && argc == 2) {
+	if ((!force_path && argc == 2) || ncommit_args > 0) {
+		int obj_type = (ncommit_args > 0 ?
+		    GOT_OBJ_TYPE_COMMIT : GOT_OBJ_TYPE_ANY);
 		error = got_ref_list(&refs, repo, NULL, got_ref_cmp_by_name,
 		    NULL);
 		if (error)
 			goto done;
-		for (i = 0; i < argc; i++) {
+		for (i = 0; i < (ncommit_args > 0 ? ncommit_args : argc); i++) {
+			const char *arg;
+			if (ncommit_args > 0)
+				arg = commit_args[i];
+			else
+				arg = argv[i];
 			error = got_repo_match_object_id(&ids[i], &labels[i],
-			    argv[i], GOT_OBJ_TYPE_ANY, &refs, repo);
+			    arg, obj_type, &refs, repo);
 			if (error) {
 				if (error->code != GOT_ERR_NOT_REF &&
 				    error->code != GOT_ERR_NO_OBJ)
+					goto done;
+				if (ncommit_args > 0)
 					goto done;
 				error = NULL;
 				break;
@@ -4601,16 +4630,31 @@ cmd_diff(int argc, char *argv[])
 		}
 	}
 
-	if (worktree != NULL && (ids[0] == NULL || ids[1] == NULL)) {
-		error = get_worktree_paths_from_argv(&paths,
-		    argc, argv, worktree);
-		if (error)
-			goto done;
-	}
-
-	if (!TAILQ_EMPTY(&paths)) {
+	if (ncommit_args == 0 && (ids[0] == NULL || ids[1] == NULL)) {
 		struct print_diff_arg arg;
 		char *id_str;
+
+		if (worktree == NULL) {
+			if (argc == 2 && ids[0] == NULL) {
+				error = got_error_path(argv[0], GOT_ERR_NO_OBJ);
+				goto done;
+			} else if (argc == 2 && ids[1] == NULL) {
+				error = got_error_path(argv[1], GOT_ERR_NO_OBJ);
+				goto done;
+			} else if (argc > 0) {
+				error = got_error_fmt(GOT_ERR_NOT_WORKTREE,
+				    "%s", "specified paths cannot be resolved");
+				goto done;
+			} else {
+				error = got_error(GOT_ERR_NOT_WORKTREE);
+				goto done;
+			}
+		}
+
+		error = get_worktree_paths_from_argv(&paths, argc, argv,
+		    worktree);
+		if (error)
+			goto done;
 
 		error = got_object_id_str(&id_str,
 		    got_worktree_get_base_commit_id(worktree));
@@ -4631,34 +4675,115 @@ cmd_diff(int argc, char *argv[])
 		goto done;
 	}
 
-	if (ids[0] == NULL || ids[1] == NULL) {
-		if (argc == 2) {
-			error = got_error_fmt(GOT_ERR_NO_OBJ, "%s",
-			    ids[0] ? argv[1] : argv[0]);
+	if (ncommit_args == 1) {
+		struct got_commit_object *commit;
+		error = got_object_open_as_commit(&commit, repo, ids[0]);
+		if (error)
 			goto done;
-		} if (worktree == NULL) {
-			error = got_error(GOT_ERR_NOT_WORKTREE);
-			goto done;
-		} else
-			usage_diff();
-	}
-	if (diff_staged)
-		errx(1, "-s option can't be used when diffing "
-		    "objects in repository");
 
-	error = got_object_get_type(&type1, repo, ids[0]);
-	if (error)
+		labels[1] = labels[0];
+		ids[1] = ids[0];
+		if (got_object_commit_get_nparents(commit) > 0) {
+			const struct got_object_id_queue *pids;
+			struct got_object_qid *pid;
+			pids = got_object_commit_get_parent_ids(commit);
+			pid = STAILQ_FIRST(pids);
+			ids[0] = got_object_id_dup(pid->id);
+			if (ids[0] == NULL) {
+				error = got_error_from_errno(
+				    "got_object_id_dup");
+				got_object_commit_close(commit);
+				goto done;
+			}
+			error = got_object_id_str(&labels[0], ids[0]);
+			if (error) {
+				got_object_commit_close(commit);
+				goto done;
+			}
+		} else {
+			ids[0] = NULL;
+			labels[0] = strdup("/dev/null");
+			if (labels[0] == NULL) {
+				error = got_error_from_errno("strdup");
+				got_object_commit_close(commit);
+				goto done;
+			}
+		}
+
+		got_object_commit_close(commit);
+	}
+
+	if (ncommit_args == 0 && argc > 2) {
+		error = got_error_msg(GOT_ERR_BAD_PATH,
+		    "path arguments cannot be used when diffing two objects");
 		goto done;
+	}
+
+	if (ids[0]) {
+		error = got_object_get_type(&type1, repo, ids[0]);
+		if (error)
+			goto done;
+	}
 
 	error = got_object_get_type(&type2, repo, ids[1]);
 	if (error)
 		goto done;
-	if (type1 != type2) {
+	if (type1 != GOT_OBJ_TYPE_ANY && type1 != type2) {
 		error = got_error(GOT_ERR_OBJ_TYPE);
 		goto done;
 	}
+	if (type1 == GOT_OBJ_TYPE_BLOB && argc > 0) {
+		error = got_error_msg(GOT_ERR_OBJ_TYPE,
+		    "path arguments cannot be used when diffing blobs");
+		goto done;
+	}
 
-	switch (type1) {
+	for (i = 0; ncommit_args > 0 && i < argc; i++) {
+		char *in_repo_path;
+		struct got_pathlist_entry *new;
+		if (worktree) {
+			const char *prefix;
+			char *p;
+			error = got_worktree_resolve_path(&p, worktree,
+			    argv[i]);
+			if (error)
+				goto done;
+			prefix = got_worktree_get_path_prefix(worktree);
+			while (prefix[0] == '/')
+				prefix++;
+			if (asprintf(&in_repo_path, "%s%s%s", prefix,
+			    (p[0] != '\0' && prefix[0] != '\0') ? "/" : "",
+			    p) == -1) {
+				error = got_error_from_errno("asprintf");
+				free(p);
+				goto done;
+			}
+			free(p);
+		} else {
+			char *mapped_path, *s;
+			error = got_repo_map_path(&mapped_path, repo, argv[i]);
+			if (error)
+				goto done;
+			s = mapped_path;
+			while (s[0] == '/')
+				s++;
+			in_repo_path = strdup(s);
+			if (in_repo_path == NULL) {
+				error = got_error_from_errno("asprintf");
+				free(mapped_path);
+				goto done;
+			}
+			free(mapped_path);
+
+		}
+		error = got_pathlist_insert(&new, &paths, in_repo_path, NULL);
+		if (error || new == NULL /* duplicate */)
+			free(in_repo_path);
+		if (error)
+			goto done;
+	}
+
+	switch (type1 == GOT_OBJ_TYPE_ANY ? type2 : type1) {
 	case GOT_OBJ_TYPE_BLOB:
 		error = got_diff_objects_as_blobs(NULL, NULL, ids[0], ids[1],
 		    NULL, NULL, diff_context, ignore_whitespace,
@@ -4666,14 +4791,14 @@ cmd_diff(int argc, char *argv[])
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, ids[0], ids[1],
-		    "", "", diff_context, ignore_whitespace, force_text_diff,
-		    repo, stdout);
+		    &paths, "", "", diff_context, ignore_whitespace,
+		    force_text_diff, repo, stdout);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		printf("diff %s %s\n", labels[0], labels[1]);
 		error = got_diff_objects_as_commits(NULL, NULL, ids[0], ids[1],
-		    diff_context, ignore_whitespace, force_text_diff, repo,
-		    stdout);
+		    &paths, diff_context, ignore_whitespace, force_text_diff,
+		    repo, stdout);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);

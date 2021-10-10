@@ -142,8 +142,8 @@ const struct got_error *got_diff_objects_as_blobs(off_t **, size_t *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
-    struct got_object_id *, struct got_object_id *, char *, char *,
-    int, int, int, struct got_repository *, FILE *);
+    struct got_object_id *, struct got_object_id *, struct got_pathlist_head *,
+    char *, char *, int, int, int, struct got_repository *, FILE *);
 
 /*
  * Diff two objects, assuming both objects are commits.
@@ -153,7 +153,7 @@ const struct got_error *got_diff_objects_as_trees(off_t **, size_t *,
  * array of line offsets for, and the number of lines in, the unidiff text.
  */
 const struct got_error *got_diff_objects_as_commits(off_t **, size_t *,
-    struct got_object_id *, struct got_object_id *, int, int, int,
-    struct got_repository *, FILE *);
+    struct got_object_id *, struct got_object_id *, struct got_pathlist_head *,
+    int, int, int, struct got_repository *, FILE *);
 
 #define GOT_DIFF_MAX_CONTEXT	64

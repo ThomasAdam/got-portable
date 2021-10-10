@@ -2887,11 +2887,11 @@ gw_output_diff(struct gw_trans *gw_trans, struct gw_header *header)
 		break;
 	case GOT_OBJ_TYPE_TREE:
 		error = got_diff_objects_as_trees(NULL, NULL, id1, id2,
-		    "", "", 3, 0, 0, gw_trans->repo, f);
+		    NULL, "", "", 3, 0, 0, gw_trans->repo, f);
 		break;
 	case GOT_OBJ_TYPE_COMMIT:
 		error = got_diff_objects_as_commits(NULL, NULL, id1, id2,
-		    3, 0, 0, gw_trans->repo, f);
+		    NULL, 3, 0, 0, gw_trans->repo, f);
 		break;
 	default:
 		error = got_error(GOT_ERR_OBJ_TYPE);

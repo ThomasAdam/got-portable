@@ -93,6 +93,15 @@ struct got_object_id *got_object_id_dup(struct got_object_id *);
 
 /*
  * Get a newly allocated ID of the object which resides at the specified
+ * path in the specified tree.
+ * The caller should dispose of it with free(3).
+ */
+const struct got_error *got_object_tree_find_path(struct got_object_id **id,
+    mode_t *mode, struct got_repository *repo, struct got_tree_object *tree,
+    const char *path);
+
+/*
+ * Get a newly allocated ID of the object which resides at the specified
  * path in the tree of the specified commit.
  * The caller should dispose of it with free(3).
  */

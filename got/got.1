@@ -839,7 +839,7 @@ This option has no effect if the specified
 is never traversed.
 .El
 .Tg di
-.It Cm diff Oo Fl a Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl P Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path ...
+.It Cm diff Oo Fl a Oc Oo Fl c Ar commit Oc Oo Fl C Ar number Oc Oo Fl r Ar repository-path Oc Oo Fl s Oc Oo Fl P Oc Oo Fl w Oc Op Ar object1 Ar object2 | Ar path ...
 .Dl (alias: Cm di )
 When invoked within a work tree without any arguments, display all
 local changes in the work tree.
@@ -866,6 +866,30 @@ are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Treat file contents as ASCII text even if binary data is detected.
+.It Fl c Ar commit
+Show differences between commits in the repository.
+This options may be used up to two times.
+When used only once, show differences between the specified
+.Ar commit
+and its first parent commit.
+When used twice, show differences between the two specified commits.
+.Pp
+The expected argument is a commit ID SHA1 hash or an existing reference
+or tag name which will be resolved to a commit ID.
+An abbreviated hash argument will be expanded to a full SHA1 hash
+automatically, provided the abbreviation is unique.
+.Pp
+If the
+.Fl c
+option is used, all non-option arguments will be interpreted as paths.
+If one or more such
+.Ar path
+arguments are provided, only show differences for the specified paths.
+.Pp
+Cannot be used together with the
+.Fl P
+option.
+.Pp
 .It Fl C Ar number
 Set the number of context lines shown in the diff.
 By default, 3 lines of context are shown.
