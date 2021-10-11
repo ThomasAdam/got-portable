@@ -550,6 +550,10 @@ ed_patch_lines(struct rcs_lines *dlines, struct rcs_lines *plines)
 				    lp->l_line[1] == '\n')
 					break;
 
+				if (lp->l_line[0] == ':') {
+					lp->l_line++;
+					lp->l_len--;
+				}
 				TAILQ_REMOVE(&(plines->l_lines), lp, l_list);
 				TAILQ_INSERT_AFTER(&(dlines->l_lines), dlp,
 				    lp, l_list);
@@ -975,8 +979,10 @@ static const struct got_error *
 edscript(int n, struct diff3_state *d3s)
 {
 	const struct got_error *err = NULL;
-	size_t k, len;
-	char block[BUFSIZ+1];
+	off_t len;
+	char *line = NULL;
+	size_t linesize = 0;
+	ssize_t linelen, k;
 
 	for (; n > 0; n--) {
 		if (!d3s->overlap[n]) {
@@ -985,79 +991,76 @@ edscript(int n, struct diff3_state *d3s)
 				return err;
 		} else if (d3s->de[n].oldo.from < d3s->de[n].oldo.to) {
 			/* Output a block of 3-way diff base file content. */
-			err = diff_output(d3s->diffbuf, "%da\n%s\n",
+			err = diff_output(d3s->diffbuf, "%da\n:%s\n",
 			    d3s->de[n].old.to - 1, d3s->f2mark);
 			if (err)
 				return err;
 			if (fseeko(d3s->fp[1], d3s->de[n].oldo.from, SEEK_SET)
 			    == -1)
 				return got_error_from_errno("fseeko");
-			k = (size_t)(d3s->de[n].oldo.to - d3s->de[n].oldo.from);
-			for (; k > 0; k -= len) {
-				size_t r;
-				len = k > BUFSIZ ? BUFSIZ : k;
-				r = fread(block, 1, len, d3s->fp[1]);
-				if (r == 0) {
+			len = (d3s->de[n].oldo.to - d3s->de[n].oldo.from);
+			for (k = 0; k < (ssize_t)len; k += linelen) {
+				linelen = getline(&line, &linesize, d3s->fp[1]);
+				if (linelen == -1) {
 					if (feof(d3s->fp[1]))
 						break;
-					return got_ferror(d3s->fp[1],
+					err = got_ferror(d3s->fp[1],
 					    GOT_ERR_IO);
+					goto done;
 				}
-				if (r != len)
-					len = r;
-				block[len] = '\0';
-				err = diff_output(d3s->diffbuf, "%s", block);
+				err = diff_output(d3s->diffbuf, ":%s", line);
 				if (err)
-					return err;
+					goto done;
 			}
-			err = diff_output(d3s->diffbuf, "%s\n",
+			err = diff_output(d3s->diffbuf, "%s%s\n",
+			    line[linelen] == '\n' ? ":" : "",
 			    GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
-				return err;
+				goto done;
 		} else {
-			err = diff_output(d3s->diffbuf, "%da\n%s\n",
+			err = diff_output(d3s->diffbuf, "%da\n:%s\n",
 			    d3s->de[n].old.to -1, GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
-				return err;
+				goto done;
 		}
 		if (fseeko(d3s->fp[2], d3s->de[n].newo.from, SEEK_SET)
-		    == -1)
-			return got_error_from_errno("fseek");
-		k = (size_t)(d3s->de[n].newo.to - d3s->de[n].newo.from);
-		for (; k > 0; k -= len) {
-			size_t r;
-			len = k > BUFSIZ ? BUFSIZ : k;
-			r = fread(block, 1, len, d3s->fp[2]);
-			if (r == 0) {
+		    == -1) {
+			err = got_error_from_errno("fseek");
+			goto done;
+		}
+		len = (d3s->de[n].newo.to - d3s->de[n].newo.from);
+		for (k = 0; k < (ssize_t)len; k += linelen) {
+			linelen = getline(&line, &linesize, d3s->fp[2]);
+			if (linelen == -1) {
 				if (feof(d3s->fp[2]))
 					break;
-				return got_ferror(d3s->fp[2],
-				    GOT_ERR_IO);
+				err = got_ferror(d3s->fp[2], GOT_ERR_IO);
+				goto done;
 			}
-			if (r != len)
-				len = r;
-			block[len] = '\0';
-			err = diff_output(d3s->diffbuf, "%s", block);
+			err = diff_output(d3s->diffbuf, ":%s", line);
 			if (err)
-				return err;
+				goto done;
 		}
 
 		if (!d3s->overlap[n]) {
 			err = diff_output(d3s->diffbuf, ".\n");
 			if (err)
-				return err;
+				goto done;
 		} else {
-			err = diff_output(d3s->diffbuf, "%s\n.\n", d3s->f3mark);
+			err = diff_output(d3s->diffbuf, "%s%s\n.\n",
+			    line[linelen] == '\n' ? ":" : "",
+			    d3s->f3mark);
 			if (err)
-				return err;
-			err = diff_output(d3s->diffbuf, "%da\n%s\n.\n",
+				goto done;
+			err = diff_output(d3s->diffbuf, "%da\n:%s\n.\n",
 			    d3s->de[n].old.from - 1, d3s->f1mark);
 			if (err)
-				return err;
+				goto done;
 		}
 	}
-
-	return NULL;
+done:
+	free(line);
+	return err;
 }
 
 static const struct got_error *
