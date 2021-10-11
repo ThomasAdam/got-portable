@@ -981,7 +981,7 @@ edscript(int n, struct diff3_state *d3s)
 	off_t len;
 	char *line = NULL;
 	size_t linesize = 0;
-	ssize_t linelen, k;
+	ssize_t linelen = 0, k;
 
 	for (; n > 0; n--) {
 		if (!d3s->overlap[n]) {
@@ -1012,7 +1012,7 @@ edscript(int n, struct diff3_state *d3s)
 					goto done;
 			}
 			err = diff_output(d3s->diffbuf, "%s%s\n",
-			    line[linelen] == '\n' ? ":" : "",
+			    linelen > 0 && line[linelen] == '\n' ? ":" : "",
 			    GOT_DIFF_CONFLICT_MARKER_SEP);
 			if (err)
 				goto done;
