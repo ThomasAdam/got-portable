@@ -90,9 +90,9 @@ test_add_multiple() {
 		return 1
 	fi
 
-	echo "A  foo" > $testroot/stdout.expected
-	echo "A  bar" >> $testroot/stdout.expected
+	echo "A  bar" > $testroot/stdout.expected
 	echo "A  baz" >> $testroot/stdout.expected
+	echo "A  foo" >> $testroot/stdout.expected
 
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

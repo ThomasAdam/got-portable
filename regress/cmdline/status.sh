@@ -493,12 +493,12 @@ test_status_many_paths() {
 	mkdir $testroot/wt/newdir
 	(cd $testroot/wt && got add new >/dev/null)
 
-	(cd $testroot/wt && got status newdir > $testroot/stdout.expected)
-	(cd $testroot/wt && got status alpha >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status alpha > $testroot/stdout.expected)
+	(cd $testroot/wt && got status beta >> $testroot/stdout.expected)
 	(cd $testroot/wt && got status epsilon >> $testroot/stdout.expected)
 	(cd $testroot/wt && got status foo >> $testroot/stdout.expected)
 	(cd $testroot/wt && got status new >> $testroot/stdout.expected)
-	(cd $testroot/wt && got status beta >> $testroot/stdout.expected)
+	(cd $testroot/wt && got status newdir >> $testroot/stdout.expected)
 	(cd $testroot/wt && got status . >> $testroot/stdout.expected)
 
 	(cd $testroot/wt && got status newdir alpha epsilon foo new beta . \

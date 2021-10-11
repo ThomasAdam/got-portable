@@ -3240,6 +3240,7 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 {
 	const struct got_error *err = NULL;
 	char *path;
+	struct got_pathlist_entry *new;
 	int i;
 
 	if (argc == 0) {
@@ -3253,10 +3254,11 @@ get_worktree_paths_from_argv(struct got_pathlist_head *paths, int argc,
 		err = got_worktree_resolve_path(&path, worktree, argv[i]);
 		if (err)
 			break;
-		err = got_pathlist_append(paths, path, NULL);
-		if (err) {
+		err = got_pathlist_insert(&new, paths, path, NULL);
+		if (err || new == NULL /* duplicate */) {
 			free(path);
-			break;
+			if (err)
+				break;
 		}
 	}
 

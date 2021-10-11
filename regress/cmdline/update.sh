@@ -1181,8 +1181,8 @@ test_update_partial_add() {
 	(cd $testroot/repo && git add .)
 	git_commit $testroot/repo -m "added two files"
 
-	echo "A  new" > $testroot/stdout.expected
-	echo "A  epsilon/new2" >> $testroot/stdout.expected
+	echo "A  epsilon/new2" > $testroot/stdout.expected
+	echo "A  new" >> $testroot/stdout.expected
 	echo -n "Updated to refs/heads/master: " >> $testroot/stdout.expected
 	git_show_head $testroot/repo >> $testroot/stdout.expected
 	echo >> $testroot/stdout.expected
