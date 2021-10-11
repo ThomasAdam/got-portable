@@ -30,6 +30,15 @@
 
 #define GOT_PACK_CACHE_SIZE	64
 
+struct got_packidx_bloom_filter {
+	char path_packidx[PATH_MAX]; /* on-disk path */
+	size_t path_packidx_len;
+	struct bloom *bloom;
+	STAILQ_ENTRY(got_packidx_bloom_filter) entry;
+};
+
+STAILQ_HEAD(got_packidx_bloom_filter_head, got_packidx_bloom_filter);
+
 struct got_repository {
 	char *path;
 	char *path_git_dir;
@@ -37,6 +46,13 @@ struct got_repository {
 
 	/* The pack index cache speeds up search for packed objects. */
 	struct got_packidx *packidx_cache[GOT_PACK_CACHE_SIZE];
+
+	/*
+	 * List of bloom filters for pack index files.
+	 * Used to avoid opening a pack index in search of an
+	 * object ID which is not contained in this pack index.
+	 */
+	struct got_packidx_bloom_filter_head packidx_bloom_filters;
 
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];

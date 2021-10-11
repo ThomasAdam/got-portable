@@ -14,12 +14,13 @@ SRCS =		gotweb.c parse.y blame.c commit_graph.c delta.c diff.c \
 		deflate.c object_create.c delta_cache.c gotconfig.c \
 		diff_main.c diff_atomize_text.c diff_myers.c diff_output.c \
 		diff_output_plain.c diff_output_unidiff.c \
-		diff_output_edscript.c diff_patience.c
+		diff_output_edscript.c diff_patience.c \
+		bloom.c murmurhash2.c
 MAN =		${PROG}.conf.5 ${PROG}.8
 
 CPPFLAGS +=	-I${.CURDIR}/../include -I${.CURDIR}/../lib -I${.CURDIR} \
 		-I${KCGIBASE}/include
-LDADD +=	-L${KCGIBASE}/lib -lkcgihtml -lkcgi -lz
+LDADD +=	-L${KCGIBASE}/lib -lkcgihtml -lkcgi -lz -lm
 LDSTATIC =	${STATIC}
 
 .if ${GOT_RELEASE} != "Yes"

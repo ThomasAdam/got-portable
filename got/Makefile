@@ -12,16 +12,17 @@ SRCS=		got.c blame.c commit_graph.c delta.c diff.c \
 		gotconfig.c diff_main.c diff_atomize_text.c \
 		diff_myers.c diff_output.c diff_output_plain.c \
 		diff_output_unidiff.c diff_output_edscript.c \
-		diff_patience.c send.c deltify.c pack_create.c dial.c
+		diff_patience.c send.c deltify.c pack_create.c dial.c \
+		bloom.c murmurhash2.c
 
 MAN =		${PROG}.1 got-worktree.5 git-repository.5 got.conf.5
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 
 .if defined(PROFILE)
-LDADD = -lutil_p -lz_p -lc_p
+LDADD = -lutil_p -lz_p -lm_p -lc_p
 .else
-LDADD = -lutil -lz
+LDADD = -lutil -lz -lm
 .endif
 DPADD = ${LIBZ} ${LIBUTIL}
 

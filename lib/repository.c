@@ -41,6 +41,8 @@
 #include <imsg.h>
 #include <uuid.h>
 
+#include "bloom.h"
+
 #include "got_error.h"
 #include "got_reference.h"
 #include "got_repository.h"
@@ -635,6 +637,8 @@ got_repo_open(struct got_repository **repop, const char *path,
 		goto done;
 	}
 
+	STAILQ_INIT(&repo->packidx_bloom_filters);
+
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		memset(&repo->privsep_children[i], 0,
 		    sizeof(repo->privsep_children[0]));
@@ -729,6 +733,14 @@ got_repo_close(struct got_repository *repo)
 		if (repo->packidx_cache[i] == NULL)
 			break;
 		got_packidx_close(repo->packidx_cache[i]);
+	}
+
+	while (!STAILQ_EMPTY(&repo->packidx_bloom_filters)) {
+		struct got_packidx_bloom_filter *bf;
+		bf = STAILQ_FIRST(&repo->packidx_bloom_filters);
+		STAILQ_REMOVE_HEAD(&repo->packidx_bloom_filters, entry);
+		free(bf->bloom);
+		free(bf);
 	}
 
 	for (i = 0; i < repo->pack_cache_size; i++) {
@@ -955,6 +967,80 @@ got_repo_is_packidx_filename(const char *name, size_t len)
 	return 1;
 }
 
+static int
+check_packidx_bloom_filter(struct got_repository *repo,
+    const char *path_packidx, struct got_object_id *id)
+{
+	struct got_packidx_bloom_filter *bf;
+
+	STAILQ_FOREACH(bf, &repo->packidx_bloom_filters, entry) {
+		if (got_path_cmp(bf->path_packidx, path_packidx,
+		    bf->path_packidx_len, strlen(path_packidx)) == 0) {
+			return bloom_check(bf->bloom, id->sha1,
+			    sizeof(id->sha1));
+		}
+	}
+
+	/* No bloom filter means this pack index must be searched. */
+	return 1;
+}
+
+static const struct got_error *
+add_packidx_bloom_filter(struct got_repository *repo,
+    struct got_packidx *packidx, const char *path_packidx)
+{
+	int i, nobjects = be32toh(packidx->hdr.fanout_table[0xff]);
+	struct got_packidx_bloom_filter *bf;
+	size_t len;
+
+	/*
+	 * Don't use bloom filters for very large pack index files.
+	 * Large pack files will contain a relatively large fraction
+	 * of our objects so we will likely need to visit them anyway.
+	 * The more objects a pack file contains the higher the probability
+	 * of a false-positive match from the bloom filter. And reading
+	 * all object IDs from a large pack index file can be expensive.
+	 */
+	if (nobjects > 100000) /* cut-off at about 2MB, at 20 bytes per ID */
+		return NULL;
+
+	/* Do we already have a filter for this pack index? */
+	STAILQ_FOREACH(bf, &repo->packidx_bloom_filters, entry) {
+		if (got_path_cmp(bf->path_packidx, path_packidx,
+		    bf->path_packidx_len, strlen(path_packidx)) == 0)
+			return NULL;
+	}
+
+	bf = calloc(1, sizeof(*bf));
+	if (bf == NULL)
+		return got_error_from_errno("calloc");
+	bf->bloom = calloc(1, sizeof(*bf->bloom));
+	if (bf->bloom == NULL) {
+		free(bf);
+		return got_error_from_errno("calloc");
+	}
+	
+	
+	len = strlcpy(bf->path_packidx, path_packidx, sizeof(bf->path_packidx));
+	if (len >= sizeof(bf->path_packidx)) {
+		free(bf->bloom);
+		free(bf);
+		return got_error(GOT_ERR_NO_SPACE);
+	}
+	bf->path_packidx_len = len;
+
+	/* Minimum size supported by our bloom filter is 1000 entries. */
+	bloom_init(bf->bloom, nobjects < 1000 ? 1000 : nobjects, 0.1);
+	for (i = 0; i < nobjects; i++) {
+		struct got_packidx_object_id *id;
+		id = &packidx->hdr.sorted_ids[i];
+		bloom_add(bf->bloom, id->sha1, sizeof(id->sha1));
+	}
+
+	STAILQ_INSERT_TAIL(&repo->packidx_bloom_filters, bf, entry);
+	return NULL;
+}
+
 const struct got_error *
 got_repo_search_packidx(struct got_packidx **packidx, int *idx,
     struct got_repository *repo, struct got_object_id *id)
@@ -970,6 +1056,9 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 	for (i = 0; i < repo->pack_cache_size; i++) {
 		if (repo->packidx_cache[i] == NULL)
 			break;
+		if (!check_packidx_bloom_filter(repo,
+		    repo->packidx_cache[i]->path_packidx, id))
+			continue; /* object will not be found in this index */
 		*idx = got_packidx_get_object_idx(repo->packidx_cache[i], id);
 		if (*idx != -1) {
 			*packidx = repo->packidx_cache[i];
@@ -1018,6 +1107,11 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			goto done;
 		}
 
+		if (!check_packidx_bloom_filter(repo, path_packidx, id)) {
+			free(path_packidx);
+			continue; /* object will not be found in this index */
+		}
+
 		for (i = 0; i < repo->pack_cache_size; i++) {
 			if (repo->packidx_cache[i] == NULL)
 				break;
@@ -1034,6 +1128,12 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 
 		err = got_packidx_open(packidx, got_repo_get_fd(repo),
 		    path_packidx, 0);
+		if (err) {
+			free(path_packidx);
+			goto done;
+		}
+
+		err = add_packidx_bloom_filter(repo, *packidx, path_packidx);
 		if (err) {
 			free(path_packidx);
 			goto done;

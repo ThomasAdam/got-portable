@@ -12,15 +12,15 @@ SRCS=		tog.c blame.c commit_graph.c delta.c diff.c \
 		gotconfig.c diff_main.c diff_atomize_text.c \
 		diff_myers.c diff_output.c diff_output_plain.c \
 		diff_output_unidiff.c diff_output_edscript.c \
-		diff_patience.c
+		diff_patience.c bloom.c murmurhash2.c
 MAN =		${PROG}.1
 
 CPPFLAGS = -I${.CURDIR}/../include -I${.CURDIR}/../lib
 
 .if defined(PROFILE)
-LDADD = -lpanel_p -lncursesw_p -lutil_p -lz_p -lpthread_p -lc_p
+LDADD = -lpanel_p -lncursesw_p -lutil_p -lz_p -lpthread_p -lm_p -lc_p
 .else
-LDADD = -lpanel -lncursesw -lutil -lz -lpthread
+LDADD = -lpanel -lncursesw -lutil -lz -lpthread -lm
 .endif
 DPADD = ${LIBZ} ${LIBUTIL}
 
