@@ -1092,12 +1092,12 @@ test_revert_symlink() {
 
 	cat > $testroot/stdout.expected <<EOF
 R  alpha.link
-R  epsilon.link
-R  passwd.link
 R  epsilon/beta.link
-R  nonexistent.link
-R  zeta.link
+R  epsilon.link
 R  new.link
+R  nonexistent.link
+R  passwd.link
+R  zeta.link
 EOF
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"

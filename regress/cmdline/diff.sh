@@ -116,12 +116,6 @@ test_diff_basic() {
 
 	# diff several paths in a work tree
 	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
-	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
-	echo '--- /dev/null' >> $testroot/stdout.expected
-	echo '+++ new' >> $testroot/stdout.expected
-	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
-	echo '+new file' >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
@@ -132,6 +126,14 @@ test_diff_basic() {
 	echo '-alpha' >> $testroot/stdout.expected
 	echo '+modified alpha' >> $testroot/stdout.expected
 	echo -n 'blob - ' >> $testroot/stdout.expected
+	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
+		>> $testroot/stdout.expected
+	echo 'file + /dev/null' >> $testroot/stdout.expected
+	echo '--- beta' >> $testroot/stdout.expected
+	echo '+++ /dev/null' >> $testroot/stdout.expected
+	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
+	echo '-beta' >> $testroot/stdout.expected
+	echo -n 'blob - ' >> $testroot/stdout.expected
 	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
 		>> $testroot/stdout.expected
 	echo 'file + epsilon/zeta' >> $testroot/stdout.expected
@@ -140,14 +142,12 @@ test_diff_basic() {
 	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
 	echo '-zeta' >> $testroot/stdout.expected
 	echo '+modified zeta' >> $testroot/stdout.expected
-	echo -n 'blob - ' >> $testroot/stdout.expected
-	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
-	echo 'file + /dev/null' >> $testroot/stdout.expected
-	echo '--- beta' >> $testroot/stdout.expected
-	echo '+++ /dev/null' >> $testroot/stdout.expected
-	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
-	echo '-beta' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
 
 	(cd $testroot/wt && got diff new alpha epsilon beta > $testroot/stdout)
 	cmp -s $testroot/stdout.expected $testroot/stdout
@@ -158,10 +158,8 @@ test_diff_basic() {
 		return 1
 	fi
 
-	# a branch 'new' should not collide with path 'new' if more
-	# than two arguments are passed
-	got br -r $testroot/repo -c master new > /dev/null
-	(cd $testroot/wt && got diff new alpha epsilon beta \
+	# different order of arguments results in same output order
+	(cd $testroot/wt && got diff alpha new epsilon beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -177,41 +175,10 @@ test_diff_basic() {
 		return 1
 	fi
 
-	# different order of arguments results in different output order
-	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
-	echo -n 'blob - ' >> $testroot/stdout.expected
-	got tree -r $testroot/repo -i | grep 'alpha$' | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
-	echo 'file + alpha' >> $testroot/stdout.expected
-	echo '--- alpha' >> $testroot/stdout.expected
-	echo '+++ alpha' >> $testroot/stdout.expected
-	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
-	echo '-alpha' >> $testroot/stdout.expected
-	echo '+modified alpha' >> $testroot/stdout.expected
-	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
-	echo '--- /dev/null' >> $testroot/stdout.expected
-	echo '+++ new' >> $testroot/stdout.expected
-	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
-	echo '+new file' >> $testroot/stdout.expected
-	echo -n 'blob - ' >> $testroot/stdout.expected
-	got tree -r $testroot/repo -i epsilon | grep 'zeta$' | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
-	echo 'file + epsilon/zeta' >> $testroot/stdout.expected
-	echo '--- epsilon/zeta' >> $testroot/stdout.expected
-	echo '+++ epsilon/zeta' >> $testroot/stdout.expected
-	echo '@@ -1 +1 @@' >> $testroot/stdout.expected
-	echo '-zeta' >> $testroot/stdout.expected
-	echo '+modified zeta' >> $testroot/stdout.expected
-	echo -n 'blob - ' >> $testroot/stdout.expected
-	got tree -r $testroot/repo -i | grep 'beta$' | cut -d' ' -f 1 \
-		>> $testroot/stdout.expected
-	echo 'file + /dev/null' >> $testroot/stdout.expected
-	echo '--- beta' >> $testroot/stdout.expected
-	echo '+++ /dev/null' >> $testroot/stdout.expected
-	echo '@@ -1 +0,0 @@' >> $testroot/stdout.expected
-	echo '-beta' >> $testroot/stdout.expected
-	(cd $testroot/wt && got diff alpha new epsilon beta \
+	# a branch 'new' should not collide with path 'new' if more
+	# than two arguments are passed
+	got br -r $testroot/repo -c master new > /dev/null
+	(cd $testroot/wt && got diff new alpha epsilon beta \
 		> $testroot/stdout 2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -289,17 +256,17 @@ test_diff_basic() {
 	fi
 	echo "diff $head_rev $testroot/wt" > $testroot/stdout.expected
 	echo 'blob - /dev/null' >> $testroot/stdout.expected
-	echo 'file + new' >> $testroot/stdout.expected
-	echo '--- /dev/null' >> $testroot/stdout.expected
-	echo '+++ new' >> $testroot/stdout.expected
-	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
-	echo '+new file' >> $testroot/stdout.expected
-	echo 'blob - /dev/null' >> $testroot/stdout.expected
 	echo 'file + master' >> $testroot/stdout.expected
 	echo '--- /dev/null' >> $testroot/stdout.expected
 	echo '+++ master' >> $testroot/stdout.expected
 	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
 	echo '+master' >> $testroot/stdout.expected
+	echo 'blob - /dev/null' >> $testroot/stdout.expected
+	echo 'file + new' >> $testroot/stdout.expected
+	echo '--- /dev/null' >> $testroot/stdout.expected
+	echo '+++ new' >> $testroot/stdout.expected
+	echo '@@ -0,0 +1 @@' >> $testroot/stdout.expected
+	echo '+new file' >> $testroot/stdout.expected
 	cmp -s $testroot/stdout.expected $testroot/stdout
 	ret="$?"
 	if [ "$ret" != "0" ]; then
@@ -1197,7 +1164,7 @@ test_diff_commits() {
 	fi
 
 	# three arguments imply use of path filtering (work tree case)
-	(cd $testroot/wt && got diff $commit_id0 $commit_id1 foo \
+	(cd $testroot/wt && got diff $commit_id0 master foo \
 		2> $testroot/stderr)
 	ret="$?"
 	if [ "$ret" == "0" ]; then

@@ -423,10 +423,10 @@ test_rm_symlink() {
 	fi
 
 	echo 'D  alpha.link' > $testroot/stdout.expected
-	echo 'D  epsilon.link' >> $testroot/stdout.expected
-	echo 'D  passwd.link' >> $testroot/stdout.expected
 	echo 'D  epsilon/beta.link' >> $testroot/stdout.expected
+	echo 'D  epsilon.link' >> $testroot/stdout.expected
 	echo 'D  nonexistent.link' >> $testroot/stdout.expected
+	echo 'D  passwd.link' >> $testroot/stdout.expected
 	(cd $testroot/wt && got rm alpha.link epsilon.link passwd.link \
 		epsilon/beta.link nonexistent.link > $testroot/stdout)
 
