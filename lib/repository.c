@@ -928,19 +928,13 @@ cache_packidx(struct got_repository *repo, struct got_packidx *packidx,
 		}
 	}
 	if (i == repo->pack_cache_size) {
-		err = got_packidx_close(repo->packidx_cache[i - 1]);
+		i = repo->pack_cache_size - 1;
+		err = got_packidx_close(repo->packidx_cache[i]);
 		if (err)
 			return err;
 	}
 
-	/*
-	 * Insert the new pack index at the front so it will
-	 * be searched first in the future.
-	 */
-	memmove(&repo->packidx_cache[1], &repo->packidx_cache[0],
-	    sizeof(repo->packidx_cache) -
-	    sizeof(repo->packidx_cache[0]));
-	repo->packidx_cache[0] = packidx;
+	repo->packidx_cache[i] = packidx;
 
 	return NULL;
 }
@@ -984,10 +978,10 @@ got_repo_search_packidx(struct got_packidx **packidx, int *idx,
 			 * searching a wrong pack index can be expensive.
 			 */
 			if (i > 0) {
-				struct got_packidx *p;
-				p = repo->packidx_cache[0];
+				memmove(&repo->packidx_cache[1],
+				    &repo->packidx_cache[0],
+				    i * sizeof(repo->packidx_cache[0]));
 				repo->packidx_cache[0] = *packidx;
-				repo->packidx_cache[i] = p;
 			}
 			return NULL;
 		}
