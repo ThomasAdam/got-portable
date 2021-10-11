@@ -1435,7 +1435,7 @@ test_cherrypick_dot_on_a_line_by_itself() {
 	fi
 
 	(cd $testroot/repo && git checkout -q -b newbranch)
-	printf "modified\ndelta\n.\non\nbranch\n" > $testroot/repo/gamma/delta
+	printf "modified\n:delta\n.\non\n:branch\n" > $testroot/repo/gamma/delta
 	git_commit $testroot/repo -m "committing to delta on newbranch"
 	local branch_rev=`git_show_head $testroot/repo`
 
@@ -1452,13 +1452,12 @@ test_cherrypick_dot_on_a_line_by_itself() {
 		return 1
 	fi
 
-	printf "modified\ndelta\n.\non\nbranch\n" > $testroot/content.expected
+	printf "modified\n:delta\n.\non\n:branch\n" > $testroot/content.expected
 	cat $testroot/wt/gamma/delta > $testroot/content
 	cmp -s $testroot/content.expected $testroot/content
 	ret="$?"
 	if [ "$ret" != "0" ]; then
-		#diff -u $testroot/content.expected $testroot/content
-		ret="xfail (badly merged content)"
+		diff -u $testroot/content.expected $testroot/content
 	fi
 	test_done "$testroot" "$ret"
 }
