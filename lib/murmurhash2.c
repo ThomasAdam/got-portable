@@ -5,12 +5,11 @@
 /* Obtained from https://github.com/aappleby/smhasher */
 
 #include <stdint.h>
-#include <string.h>
 
 #include "murmurhash2.h"
 
 uint32_t
-murmurhash2(const unsigned char * key, int len, uint32_t seed)
+murmurhash2(const void * key, int len, uint32_t seed)
 {
   // 'm' and 'r' are mixing constants generated offline.
   // They're not really 'magic', they just happen to work well.
@@ -24,13 +23,11 @@ murmurhash2(const unsigned char * key, int len, uint32_t seed)
 
   // Mix 4 bytes at a time into the hash
 
-  const unsigned char *data = key;
+  const unsigned char *data = (const unsigned char *)key;
 
   while(len >= 4)
   {
-    uint32_t k;
-
-    memcpy(&k, data, sizeof(k));
+    uint32_t k = *(uint32_t*)data;
 
     k *= m;
     k ^= k >> r;
@@ -61,4 +58,4 @@ murmurhash2(const unsigned char * key, int len, uint32_t seed)
   h ^= h >> 15;
 
   return h;
-}
+} 
