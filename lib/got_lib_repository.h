@@ -31,13 +31,20 @@
 #define GOT_PACK_CACHE_SIZE	64
 
 struct got_packidx_bloom_filter {
-	char path_packidx[PATH_MAX]; /* on-disk path */
-	size_t path_packidx_len;
+	RB_ENTRY(got_packidx_bloom_filter) entry;
+	char path[PATH_MAX]; /* on-disk path */
+	size_t path_len;
 	struct bloom *bloom;
-	STAILQ_ENTRY(got_packidx_bloom_filter) entry;
 };
 
-STAILQ_HEAD(got_packidx_bloom_filter_head, got_packidx_bloom_filter);
+RB_HEAD(got_packidx_bloom_filter_tree, got_packidx_bloom_filter);
+
+static inline int
+got_packidx_bloom_filter_cmp(const struct got_packidx_bloom_filter *f1,
+    const struct got_packidx_bloom_filter *f2)
+{
+	return got_path_cmp(f1->path, f2->path, f1->path_len, f2->path_len);
+}
 
 struct got_repository {
 	char *path;
@@ -52,7 +59,7 @@ struct got_repository {
 	 * Used to avoid opening a pack index in search of an
 	 * object ID which is not contained in this pack index.
 	 */
-	struct got_packidx_bloom_filter_head packidx_bloom_filters;
+	struct got_packidx_bloom_filter_tree packidx_bloom_filters;
 
 	/* Open file handles for pack files. */
 	struct got_pack packs[GOT_PACK_CACHE_SIZE];
