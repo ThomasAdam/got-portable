@@ -307,7 +307,7 @@ emitdelta(struct got_delta_instruction **deltas, size_t *nalloc, int *ndeltas,
 		p = reallocarray(*deltas, *nalloc + alloc_chunk_size,
 		    sizeof(struct got_delta_instruction));
 		if (p == NULL)
-			return got_error_from_errno("realloc");
+			return got_error_from_errno("reallocarray");
 		*deltas = p;
 		*nalloc += alloc_chunk_size;
 	}
