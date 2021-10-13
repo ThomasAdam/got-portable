@@ -94,8 +94,11 @@
 /include/got_version.h
 /include/got_worktree.h
 /lib
+/lib/Makefile
 /lib/arraylist.h
 /lib/blame.c
+/lib/bloom.c
+/lib/bloom.h
 /lib/buf.c
 /lib/buf.h
 /lib/commit_graph.c
@@ -152,6 +155,8 @@
 /lib/gotconfig.c
 /lib/inflate.c
 /lib/lockfile.c
+/lib/murmurhash2.c
+/lib/murmurhash2.h
 /lib/object.c
 /lib/object_cache.c
 /lib/object_create.c
