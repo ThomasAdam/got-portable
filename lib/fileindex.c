@@ -987,6 +987,30 @@ free_dirlist(struct got_pathlist_head *dirlist)
 	got_pathlist_free(dirlist);
 }
 
+static int
+have_tracked_file_in_dir(struct got_fileindex *fileindex, const char *path)
+{
+	struct got_fileindex_entry *ie;
+	size_t path_len = strlen(path);
+	int cmp;
+
+	ie = RB_ROOT(&fileindex->entries);
+	while (ie) {
+		if (got_path_is_child(ie->path, path, path_len))
+			return 1;
+		cmp = got_path_cmp(path, ie->path, path_len,
+		    got_fileindex_entry_path_len(ie));
+		if (cmp < 0)
+			ie = RB_LEFT(ie, entry);
+		else if (cmp > 0)
+			ie = RB_RIGHT(ie, entry);
+		else
+			break;
+	}
+
+	return 0;
+}
+
 static const struct got_error *
 walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
     struct got_fileindex_entry **ie, struct got_pathlist_entry *dle, int fd,
@@ -1012,6 +1036,11 @@ walk_dir(struct got_pathlist_entry **next, struct got_fileindex *fileindex,
 			return err;
 	} else
 		type = de->d_type;
+
+	/* Must traverse ignored directories if they contain tracked files. */
+	if (type == DT_DIR && ignore &&
+	    have_tracked_file_in_dir(fileindex, path))
+		ignore = 0;
 
 	if (type == DT_DIR && !ignore) {
 		char *subpath;

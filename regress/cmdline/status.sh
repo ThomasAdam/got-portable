@@ -531,6 +531,7 @@ test_status_cvsignore() {
 	mkdir -p $testroot/wt/epsilon/new/
 	echo "unversioned file" > $testroot/wt/epsilon/new/foo
 	echo "**/foo" > $testroot/wt/.cvsignore
+	echo "**/gamma" >> $testroot/wt/.cvsignore
 	echo "bar" > $testroot/wt/epsilon/.cvsignore
 	echo "moo" >> $testroot/wt/epsilon/.cvsignore
 
