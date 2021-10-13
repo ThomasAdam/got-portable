@@ -86,7 +86,7 @@ alloc_meta(struct got_pack_meta **new, struct got_object_id *id,
 
 	m = calloc(1, sizeof(*m));
 	if (m == NULL)
-		return got_error_from_errno("malloc");
+		return got_error_from_errno("calloc");
 
 	memcpy(&m->id, id, sizeof(m->id));
 
@@ -831,7 +831,7 @@ read_meta(struct got_pack_meta ***meta, int *nmeta,
 	v.metasz = 64;
 	v.meta = calloc(v.metasz, sizeof(struct got_pack_meta *));
 	if (v.meta == NULL) {
-		err = got_error_from_errno("reallocarray");
+		err = got_error_from_errno("calloc");
 		goto done;
 	}
 
