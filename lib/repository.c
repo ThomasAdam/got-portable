@@ -15,6 +15,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/queue.h>
+#include <sys/tree.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -61,6 +63,9 @@
 #ifndef nitems
 #define nitems(_a) (sizeof(_a) / sizeof((_a)[0]))
 #endif
+
+RB_PROTOTYPE(got_packidx_bloom_filter_tree, got_packidx_bloom_filter, entry,
+    got_packidx_bloom_filter_cmp);
 
 const char *
 got_repo_get_path(struct got_repository *repo)
@@ -633,7 +638,7 @@ got_repo_open(struct got_repository **repop, const char *path,
 		goto done;
 	}
 
-	STAILQ_INIT(&repo->packidx_bloom_filters);
+	RB_INIT(&repo->packidx_bloom_filters);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		memset(&repo->privsep_children[i], 0,
@@ -723,6 +728,7 @@ const struct got_error *
 got_repo_close(struct got_repository *repo)
 {
 	const struct got_error *err = NULL, *child_err;
+	struct got_packidx_bloom_filter *bf;
 	size_t i;
 
 	for (i = 0; i < repo->pack_cache_size; i++) {
@@ -731,10 +737,10 @@ got_repo_close(struct got_repository *repo)
 		got_packidx_close(repo->packidx_cache[i]);
 	}
 
-	while (!STAILQ_EMPTY(&repo->packidx_bloom_filters)) {
-		struct got_packidx_bloom_filter *bf;
-		bf = STAILQ_FIRST(&repo->packidx_bloom_filters);
-		STAILQ_REMOVE_HEAD(&repo->packidx_bloom_filters, entry);
+	while ((bf = RB_MIN(got_packidx_bloom_filter_tree,
+	    &repo->packidx_bloom_filters))) {
+		RB_REMOVE(got_packidx_bloom_filter_tree,
+		    &repo->packidx_bloom_filters, bf);
 		free(bf->bloom);
 		free(bf);
 	}
@@ -963,19 +969,29 @@ got_repo_is_packidx_filename(const char *name, size_t len)
 	return 1;
 }
 
+static struct got_packidx_bloom_filter *
+get_packidx_bloom_filter(struct got_repository *repo,
+    const char *path, size_t path_len)
+{
+	struct got_packidx_bloom_filter key;
+
+	if (strlcpy(key.path, path, sizeof(key.path)) >= sizeof(key.path))
+		return NULL; /* XXX */
+	key.path_len = path_len;
+
+	return RB_FIND(got_packidx_bloom_filter_tree,
+	    &repo->packidx_bloom_filters, &key);
+}
+
 static int
 check_packidx_bloom_filter(struct got_repository *repo,
     const char *path_packidx, struct got_object_id *id)
 {
 	struct got_packidx_bloom_filter *bf;
 
-	STAILQ_FOREACH(bf, &repo->packidx_bloom_filters, entry) {
-		if (got_path_cmp(bf->path_packidx, path_packidx,
-		    bf->path_packidx_len, strlen(path_packidx)) == 0) {
-			return bloom_check(bf->bloom, id->sha1,
-			    sizeof(id->sha1));
-		}
-	}
+	bf = get_packidx_bloom_filter(repo, path_packidx, strlen(path_packidx));
+	if (bf)
+		return bloom_check(bf->bloom, id->sha1, sizeof(id->sha1));
 
 	/* No bloom filter means this pack index must be searched. */
 	return 1;
@@ -1001,11 +1017,9 @@ add_packidx_bloom_filter(struct got_repository *repo,
 		return NULL;
 
 	/* Do we already have a filter for this pack index? */
-	STAILQ_FOREACH(bf, &repo->packidx_bloom_filters, entry) {
-		if (got_path_cmp(bf->path_packidx, path_packidx,
-		    bf->path_packidx_len, strlen(path_packidx)) == 0)
-			return NULL;
-	}
+	if (get_packidx_bloom_filter(repo, path_packidx,
+	    strlen(path_packidx)) != NULL)
+		return NULL;
 
 	bf = calloc(1, sizeof(*bf));
 	if (bf == NULL)
@@ -1016,14 +1030,13 @@ add_packidx_bloom_filter(struct got_repository *repo,
 		return got_error_from_errno("calloc");
 	}
 	
-	
-	len = strlcpy(bf->path_packidx, path_packidx, sizeof(bf->path_packidx));
-	if (len >= sizeof(bf->path_packidx)) {
+	len = strlcpy(bf->path, path_packidx, sizeof(bf->path));
+	if (len >= sizeof(bf->path)) {
 		free(bf->bloom);
 		free(bf);
 		return got_error(GOT_ERR_NO_SPACE);
 	}
-	bf->path_packidx_len = len;
+	bf->path_len = len;
 
 	/* Minimum size supported by our bloom filter is 1000 entries. */
 	bloom_init(bf->bloom, nobjects < 1000 ? 1000 : nobjects, 0.1);
@@ -1033,7 +1046,8 @@ add_packidx_bloom_filter(struct got_repository *repo,
 		bloom_add(bf->bloom, id->sha1, sizeof(id->sha1));
 	}
 
-	STAILQ_INSERT_TAIL(&repo->packidx_bloom_filters, bf, entry);
+	RB_INSERT(got_packidx_bloom_filter_tree,
+	    &repo->packidx_bloom_filters, bf);
 	return NULL;
 }
 
@@ -2125,3 +2139,6 @@ done:
 	}
 	return err;
 }
+
+RB_GENERATE(got_packidx_bloom_filter_tree, got_packidx_bloom_filter, entry,
+    got_packidx_bloom_filter_cmp);
