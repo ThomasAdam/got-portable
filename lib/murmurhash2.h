@@ -4,4 +4,4 @@
 
 /* Obtained from https://github.com/aappleby/smhasher */
 
-uint32_t murmurhash2(const void *key, int len, uint32_t seed);
+uint32_t murmurhash2(const unsigned char *key, int len, uint32_t seed);
