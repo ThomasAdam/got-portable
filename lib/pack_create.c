@@ -36,6 +36,7 @@
 #include "got_path.h"
 #include "got_reference.h"
 #include "got_repository_admin.h"
+#include "got_opentemp.h"
 
 #include "got_lib_deltify.h"
 #include "got_lib_delta.h"
@@ -1005,43 +1006,14 @@ packhdr(int *hdrlen, char *hdr, size_t bufsize, int obj_type, size_t len)
 }
 
 static const struct got_error *
-append(char **p, int *len, int *sz, void *seg, int nseg)
+encodedelta(struct got_pack_meta *m, struct got_raw_object *o,
+    off_t base_size, FILE *f)
 {
-	char *n;
-
-	if (*len + nseg >= *sz) {
-		while (*len + nseg >= *sz)
-			*sz += *sz / 2;
-		n = realloc(*p, *sz);
-		if (n == NULL)
-			return got_error_from_errno("realloc");
-		*p = n;
-	}
-	memcpy(*p + *len, seg, nseg);
-	*len += nseg;
-	return NULL;
-}
-
-
-static const struct got_error *
-encodedelta(int *nd, struct got_pack_meta *m, struct got_raw_object *o,
-    off_t base_size, char **pp)
-{
-	const struct got_error *err = NULL;
-	char *p;
 	unsigned char buf[16], *bp;
-	int len, sz, i, j;
+	int i, j;
 	off_t n;
+	size_t w;
 	struct got_delta_instruction *d;
-
-	*pp = NULL;
-	*nd = 0;
-
-	sz = 128;
-	len = 0;
-	p = malloc(sz);
-	if (p == NULL)
-		return got_error_from_errno("malloc");
 
 	/* base object size */
 	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
@@ -1051,9 +1023,9 @@ encodedelta(int *nd, struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	err = append(&p, &len, &sz, buf, i);
-	if (err)
-		return err;
+	w = fwrite(buf, 1, i, f);
+	if (w != i)
+		return got_ferror(f, GOT_ERR_IO);
 
 	/* target object size */
 	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
@@ -1063,9 +1035,10 @@ encodedelta(int *nd, struct got_pack_meta *m, struct got_raw_object *o,
 		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
 		n >>= GOT_DELTA_SIZE_SHIFT;
 	}
-	err = append(&p, &len, &sz, buf, i);
-	if (err)
-		return err;
+	w = fwrite(buf, 1, i, f);
+	if (w != i)
+		return got_ferror(f, GOT_ERR_IO);
+
 	for (j = 0; j < m->ndeltas; j++) {
 		d = &m->deltas[j];
 		if (d->copy) {
@@ -1090,9 +1063,9 @@ encodedelta(int *nd, struct got_pack_meta *m, struct got_raw_object *o,
 					n >>= 8;
 				}
 			}
-			err = append(&p, &len, &sz, buf, bp - buf);
-			if (err)
-				return err;
+			w = fwrite(buf, 1, bp - buf, f);
+			if (w != bp - buf)
+				return got_ferror(f, GOT_ERR_IO);
 		} else {
 			char content[128];
 			size_t r;
@@ -1101,21 +1074,20 @@ encodedelta(int *nd, struct got_pack_meta *m, struct got_raw_object *o,
 			n = 0;
 			while (n != d->len) {
 				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				err = append(&p, &len, &sz, buf, 1);
-				if (err)
-					return err;
+				w = fwrite(buf, 1, 1, f);
+				if (w != 1)
+					return got_ferror(f, GOT_ERR_IO);
 				r = fread(content, 1, buf[0], o->f);
 				if (r != buf[0])
 					return got_ferror(o->f, GOT_ERR_IO);
-				err = append(&p, &len, &sz, content, buf[0]);
-				if (err)
-					return err;
+				w = fwrite(content, 1, buf[0], f);
+				if (w != buf[0])
+					return got_ferror(f, GOT_ERR_IO);
 				n += buf[0];
 			}
 		}
 	}
-	*pp = p;
-	*nd = len;
+
 	return NULL;
 }
 
@@ -1145,11 +1117,13 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
-	int i, nh, nd;
+	int i, nh;
+	off_t nd;
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
-	struct got_raw_object *raw;
-	char *p = NULL, buf[32];
+	struct got_raw_object *raw = NULL, *base_raw = NULL;
+	FILE *delta_file = NULL;
+	char buf[32];
 	size_t outlen, n;
 	struct got_deflate_checksum csum;
 	off_t packfile_size = 0;
@@ -1201,16 +1175,36 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				goto done;
 			packfile_size += outlen;
 		} else {
-			FILE *delta_file;
-			struct got_raw_object *base_raw;
+			if (delta_file == NULL) {
+				delta_file = got_opentemp();
+				if (delta_file == NULL) {
+					err = got_error_from_errno(
+					    "got_opentemp");
+					goto done;
+				}
+			}
+			if (ftruncate(fileno(delta_file), 0L) == -1) {
+				err = got_error_from_errno("ftruncate");
+				goto done;
+			}
+			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
+			}
 			err = got_object_raw_open(&base_raw, repo,
 			    &m->prev->id, 8192);
 			if (err)
 				goto done;
-			err = encodedelta(&nd, m, raw, base_raw->size, &p);
+			err = encodedelta(m, raw, base_raw->size, delta_file);
 			if (err)
 				goto done;
+			nd = ftello(delta_file);
+			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
+			}
 			got_object_raw_close(base_raw);
+			base_raw = NULL;
 			if (use_offset_deltas && m->prev->off != 0) {
 				err = packhdr(&nh, buf, sizeof(buf),
 				    GOT_OBJ_TYPE_OFFSET_DELTA, nd);
@@ -1235,20 +1229,11 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				if (err)
 					goto done;
 			}
-			/* XXX need got_deflate_from_mem() */
-			delta_file = fmemopen(p, nd, "r");
-			if (delta_file == NULL) {
-				err = got_error_from_errno("fmemopen");
-				goto done;
-			}
 			err = got_deflate_to_file(&outlen, delta_file,
 			    packfile, &csum);
-			fclose(delta_file);
 			if (err)
 				goto done;
 			packfile_size += outlen;
-			free(p);
-			p = NULL;
 		}
 		got_object_raw_close(raw);
 		raw = NULL;
@@ -1264,7 +1249,12 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 	if (err)
 		goto done;
 done:
-	free(p);
+	if (delta_file && fclose(delta_file) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	if (raw)
+		got_object_raw_close(raw);
+	if (base_raw)
+		got_object_raw_close(base_raw);
 	return err;
 }
 
