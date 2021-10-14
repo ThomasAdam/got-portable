@@ -56,6 +56,7 @@ struct got_pack_meta {
 	struct got_object_id id;
 	char	*path;
 	int	obj_type;
+	off_t	size;
 	time_t	mtime;
 
 	/* The best delta we picked */
@@ -196,6 +197,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		err = got_object_raw_open(&raw, repo, &m->id, 8192);
 		if (err)
 			goto done;
+		m->size = raw->size;
 
 		err = got_deltify_init(&m->dtab, raw->f, raw->hdrlen,
 		    raw->size + raw->hdrlen);
@@ -1121,7 +1123,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 	off_t nd;
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
-	struct got_raw_object *raw = NULL, *base_raw = NULL;
+	struct got_raw_object *raw = NULL;
 	FILE *delta_file = NULL;
 	char buf[32];
 	size_t outlen, n;
@@ -1191,11 +1193,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
-			err = got_object_raw_open(&base_raw, repo,
-			    &m->prev->id, 8192);
-			if (err)
-				goto done;
-			err = encodedelta(m, raw, base_raw->size, delta_file);
+			err = encodedelta(m, raw, m->prev->size, delta_file);
 			if (err)
 				goto done;
 			nd = ftello(delta_file);
@@ -1203,8 +1201,6 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
-			got_object_raw_close(base_raw);
-			base_raw = NULL;
 			if (use_offset_deltas && m->prev->off != 0) {
 				err = packhdr(&nh, buf, sizeof(buf),
 				    GOT_OBJ_TYPE_OFFSET_DELTA, nd);
@@ -1253,8 +1249,6 @@ done:
 		err = got_error_from_errno("fclose");
 	if (raw)
 		got_object_raw_close(raw);
-	if (base_raw)
-		got_object_raw_close(base_raw);
 	return err;
 }
 
