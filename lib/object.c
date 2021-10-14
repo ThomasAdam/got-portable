@@ -565,6 +565,8 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 		}
 		err = read_packed_object_raw_privsep(&outbuf, &size, &hdrlen,
 		    outfd, pack, packidx, idx, id);
+		if (err)
+			goto done;
 	} else if (err->code == GOT_ERR_NO_OBJ) {
 		int fd;
 
@@ -573,6 +575,8 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 			goto done;
 		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, outfd,
 		    id, repo, fd);
+		if (err)
+			goto done;
 	}
 
 	*obj = calloc(1, sizeof(**obj));
