@@ -641,37 +641,6 @@ done:
 	return err;
 }
 
-void
-got_object_raw_rewind(struct got_raw_object *obj)
-{
-	if (obj->f)
-		rewind(obj->f);
-}
-
-size_t
-got_object_raw_get_hdrlen(struct got_raw_object *obj)
-{
-	return obj->hdrlen;
-}
-
-const uint8_t *
-got_object_raw_get_read_buf(struct got_raw_object *obj)
-{
-	return obj->read_buf;
-}
-
-const struct got_error *
-got_object_raw_read_block(size_t *outlenp, struct got_raw_object *obj)
-{
-	size_t n;
-
-	n = fread(obj->read_buf, 1, obj->blocksize, obj->f);
-	if (n == 0 && ferror(obj->f))
-		return got_ferror(obj->f, GOT_ERR_IO);
-	*outlenp = n;
-	return NULL;
-}
-
 const struct got_error *
 got_object_open_by_id_str(struct got_object **obj, struct got_repository *repo,
     const char *id_str)
