@@ -15,6 +15,8 @@
  */
 
 #include <sys/time.h>
+#include <sys/queue.h>
+#include <sys/resource.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,12 +42,15 @@
 #define GOT_OBJECT_CACHE_SIZE_TREE	256
 #define GOT_OBJECT_CACHE_SIZE_COMMIT	64
 #define GOT_OBJECT_CACHE_SIZE_TAG	2048
+#define GOT_OBJECT_CACHE_SIZE_RAW	64
 #define GOT_OBJECT_CACHE_MAX_ELEM_SIZE	1048576	/* 1 MB */
 
 const struct got_error *
 got_object_cache_init(struct got_object_cache *cache,
     enum got_object_cache_type type)
 {
+	struct rlimit rl;
+
 	memset(cache, 0, sizeof(*cache));
 
 	cache->idset = got_object_idset_alloc();
@@ -65,6 +70,13 @@ got_object_cache_init(struct got_object_cache *cache,
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TAG:
 		cache->size = GOT_OBJECT_CACHE_SIZE_TAG;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+			return got_error_from_errno("getrlimit");
+		cache->size = GOT_OBJECT_CACHE_SIZE_RAW;
+		if (cache->size > rl.rlim_cur / 16)
+			cache->size = rl.rlim_cur / 16;
 		break;
 	}
 	return NULL;
@@ -126,6 +138,12 @@ get_size_tag(struct got_tag_object *tag)
 	return size;
 }
 
+size_t
+get_size_raw(struct got_raw_object *raw)
+{
+	return sizeof(*raw);
+}
+
 const struct got_error *
 got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, void *item)
 {
@@ -146,6 +164,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TAG:
 		size = get_size_tag((struct got_tag_object *)item);
+		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		size = get_size_raw((struct got_raw_object *)item);
 		break;
 	default:
 		return got_error(GOT_ERR_OBJ_TYPE);
@@ -169,6 +190,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 			break;
 		case GOT_OBJECT_CACHE_TYPE_TAG:
 			fprintf(stderr, "tag");
+			break;
+		case GOT_OBJECT_CACHE_TYPE_RAW:
+			fprintf(stderr, "raw");
 			break;
 		}
 		fprintf(stderr, " %s (%zd bytes; %zd MB)\n", id_str, size,
@@ -198,6 +222,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		case GOT_OBJECT_CACHE_TYPE_TAG:
 			got_object_tag_close(ce->data.tag);
 			break;
+		case GOT_OBJECT_CACHE_TYPE_RAW:
+			got_object_raw_close(ce->data.raw);
+			break;
 		}
 		free(ce);
 		cache->cache_evict++;
@@ -219,6 +246,9 @@ got_object_cache_add(struct got_object_cache *cache, struct got_object_id *id, v
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TAG:
 		ce->data.tag = (struct got_tag_object *)item;
+		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		ce->data.raw = (struct got_raw_object *)item;
 		break;
 	}
 
@@ -246,6 +276,8 @@ got_object_cache_get(struct got_object_cache *cache, struct got_object_id *id)
 			return ce->data.commit;
 		case GOT_OBJECT_CACHE_TYPE_TAG:
 			return ce->data.tag;
+		case GOT_OBJECT_CACHE_TYPE_RAW:
+			return ce->data.raw;
 		}
 	}
 
@@ -273,6 +305,7 @@ check_refcount(struct got_object_id *id, void *data, void *arg)
 	struct got_tree_object *tree;
 	struct got_commit_object *commit;
 	struct got_tag_object *tag;
+	struct got_raw_object *raw;
 	char *id_str;
 
 	if (got_object_id_str(&id_str, id) != NULL)
@@ -307,6 +340,13 @@ check_refcount(struct got_object_id *id, void *data, void *arg)
 		fprintf(stderr, "tag %s has %d unclaimed references\n",
 		    id_str, tag->refcnt - 1);
 		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		raw = ce->data.raw;
+		if (raw->refcnt == 1)
+			break;
+		fprintf(stderr, "raw %s has %d unclaimed references\n",
+		    id_str, raw->refcnt - 1);
+		break;
 	}
 	free(id_str);
 	return NULL;
@@ -329,6 +369,9 @@ got_object_cache_close(struct got_object_cache *cache)
 		break;
 	case GOT_OBJECT_CACHE_TYPE_TAG:
 		print_cache_stats(cache, "tag");
+		break;
+	case GOT_OBJECT_CACHE_TYPE_RAW:
+		print_cache_stats(cache, "raw");
 		break;
 	}
 
