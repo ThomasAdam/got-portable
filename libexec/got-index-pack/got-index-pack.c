@@ -675,7 +675,7 @@ index_pack(struct got_pack *pack, int idxfd, FILE *tmpfile,
 	memset(&packidx, 0, sizeof(packidx));
 	packidx.hdr.magic = malloc(sizeof(uint32_t));
 	if (packidx.hdr.magic == NULL)
-		return got_error_from_errno("calloc");
+		return got_error_from_errno("malloc");
 	*packidx.hdr.magic = htobe32(GOT_PACKIDX_V2_MAGIC);
 	packidx.hdr.version = malloc(sizeof(uint32_t));
 	if (packidx.hdr.version == NULL) {
@@ -1095,7 +1095,7 @@ done:
 	for (i = 0; i < nitems(tmpfiles); i++) {
 		if (tmpfiles[i] != NULL && fclose(tmpfiles[i]) == EOF &&
 		    err == NULL)
-			err = got_error_from_errno("close");
+			err = got_error_from_errno("fclose");
 	}
 
 	if (err == NULL)
