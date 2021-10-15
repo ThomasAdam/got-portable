@@ -46,6 +46,10 @@
 #include "got_lib_privsep.h"
 #include "got_lib_repository.h"
 
+#ifndef MIN
+#define	MIN(_a,_b) ((_a) < (_b) ? (_a) : (_b))
+#endif
+
 #ifndef MAX
 #define	MAX(_a,_b) ((_a) > (_b) ? (_a) : (_b))
 #endif
@@ -60,8 +64,8 @@ struct got_pack_meta {
 	/* The best delta we picked */
 	struct got_pack_meta *head;
 	struct got_pack_meta *prev;
-	struct got_delta_instruction *deltas;
-	int	ndeltas;
+	off_t	delta_offset;	/* offset in delta cache file */
+	off_t	delta_len;	/* length in delta cache file */
 	int	nchain;
 
 	/* Only used for delta window */
@@ -110,8 +114,6 @@ clear_meta(struct got_pack_meta *meta)
 {
 	if (meta == NULL)
 		return;
-	free(meta->deltas);
-	meta->deltas = NULL;
 	free(meta->path);
 	meta->path = NULL;
 }
@@ -158,18 +160,22 @@ delta_size(struct got_delta_instruction *deltas, int ndeltas)
 	return size;
 }
 
+static const struct got_error *
+encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
+    struct got_delta_instruction *deltas, int ndeltas,
+    off_t base_size, FILE *f);
 
 static const struct got_error *
 pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
-    struct got_repository *repo,
+    FILE *delta_cache, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
     got_cancel_cb cancel_cb, void *cancel_arg)
 {
 	const struct got_error *err = NULL;
 	struct got_pack_meta *m = NULL, *base = NULL;
 	struct got_raw_object *raw = NULL, *base_raw = NULL;
-	struct got_delta_instruction *deltas;
-	int i, j, size, ndeltas, best;
+	struct got_delta_instruction *deltas = NULL, *best_deltas = NULL;
+	int i, j, size, best_size, ndeltas, best_ndeltas;
 	const int max_base_candidates = 10;
 	int outfd = -1;
 
@@ -186,8 +192,6 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				goto done;
 		}
 		m = meta[i];
-		m->deltas = NULL;
-		m->ndeltas = 0;
 
 		if (m->obj_type == GOT_OBJ_TYPE_COMMIT ||
 		    m->obj_type == GOT_OBJ_TYPE_TAG)
@@ -210,7 +214,8 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			n->dtab = NULL;
 		}
 
-		best = raw->size;
+		best_size = raw->size;
+		best_ndeltas = 0;
 		for (j = MAX(0, i - max_base_candidates); j < i; j++) {
 			if (cancel_cb) {
 				err = (*cancel_cb)(cancel_arg);
@@ -237,15 +242,16 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				goto done;
 
 			size = delta_size(deltas, ndeltas);
-			if (size + 32 < best){
+			if (size + 32 < best_size){
 				/*
 				 * if we already picked a best delta,
 				 * replace it.
 				 */
-				free(m->deltas);
-				best = size;
-				m->deltas = deltas;
-				m->ndeltas = ndeltas;
+				best_size = size;
+				free(best_deltas);
+				best_deltas = deltas;
+				best_ndeltas = ndeltas;
+				deltas = NULL;
 				m->nchain = base->nchain + 1;
 				m->prev = base;
 				m->head = base->head;
@@ -256,6 +262,18 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				deltas = NULL;
 				ndeltas = 0;
 			}
+		}
+
+		if (best_ndeltas > 0) {
+			m->delta_offset = ftello(delta_cache);
+			err = encode_delta(m, raw, best_deltas,
+			    best_ndeltas, m->prev->size, delta_cache);
+			free(best_deltas);
+			best_deltas = NULL;
+			best_ndeltas = 0;
+			if (err)
+				goto done;
+			m->delta_len = ftello(delta_cache) - m->delta_offset;
 		}
 
 		got_object_raw_close(raw);
@@ -272,6 +290,8 @@ done:
 		got_object_raw_close(base_raw);
 	if (outfd != -1 && close(outfd) == -1 && err == NULL)
 		err = got_error_from_errno("close");
+	free(deltas);
+	free(best_deltas);
 	return err;
 }
 
@@ -1009,7 +1029,8 @@ packhdr(int *hdrlen, char *hdr, size_t bufsize, int obj_type, size_t len)
 }
 
 static const struct got_error *
-encodedelta(struct got_pack_meta *m, struct got_raw_object *o,
+encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
+    struct got_delta_instruction *deltas, int ndeltas,
     off_t base_size, FILE *f)
 {
 	unsigned char buf[16], *bp;
@@ -1042,8 +1063,8 @@ encodedelta(struct got_pack_meta *m, struct got_raw_object *o,
 	if (w != i)
 		return got_ferror(f, GOT_ERR_IO);
 
-	for (j = 0; j < m->ndeltas; j++) {
-		d = &m->deltas[j];
+	for (j = 0; j < ndeltas; j++) {
+		d = &deltas[j];
 		if (d->copy) {
 			n = d->offset;
 			bp = &buf[1];
@@ -1113,7 +1134,7 @@ packoff(char *hdr, off_t off)
 }
 
 static const struct got_error *
-genpack(uint8_t *pack_sha1, FILE *packfile,
+genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
     struct got_pack_meta **meta, int nmeta, int nours,
     int use_offset_deltas, struct got_repository *repo,
     got_pack_progress_cb progress_cb, void *progress_arg,
@@ -1121,7 +1142,6 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 {
 	const struct got_error *err = NULL;
 	int i, nh;
-	off_t nd;
 	SHA1_CTX ctx;
 	struct got_pack_meta *m;
 	struct got_raw_object *raw = NULL;
@@ -1160,7 +1180,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 		err = got_object_raw_open(&raw, &outfd, repo, &m->id);
 		if (err)
 			goto done;
-		if (m->deltas == NULL) {
+		if (m->delta_len == 0) {
 			err = packhdr(&nh, buf, sizeof(buf),
 			    m->obj_type, raw->size);
 			if (err)
@@ -1179,6 +1199,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				goto done;
 			packfile_size += outlen;
 		} else {
+			off_t remain;
 			if (delta_file == NULL) {
 				delta_file = got_opentemp();
 				if (delta_file == NULL) {
@@ -1195,17 +1216,33 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
-			err = encodedelta(m, raw, m->prev->size, delta_file);
-			if (err)
-				goto done;
-			nd = ftello(delta_file);
-			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
+			if (fseeko(delta_cache, m->delta_offset, SEEK_SET)
+			    == -1) {
 				err = got_error_from_errno("fseeko");
 				goto done;
 			}
+			remain = m->delta_len;
+			while (remain > 0) {
+				char delta_buf[8192];
+				size_t r, w, n;
+				n = MIN(remain, sizeof(delta_buf));
+				r = fread(delta_buf, 1, n, delta_cache);
+				if (r != n) {
+					err = got_ferror(delta_cache,
+					    GOT_ERR_IO);
+					goto done;
+				}
+				w = fwrite(delta_buf, 1, n, delta_file);
+				if (w != n) {
+					err = got_ferror(delta_file,
+					    GOT_ERR_IO);
+					goto done;
+				}
+				remain -= n;
+			}
 			if (use_offset_deltas && m->prev->off != 0) {
 				err = packhdr(&nh, buf, sizeof(buf),
-				    GOT_OBJ_TYPE_OFFSET_DELTA, nd);
+				    GOT_OBJ_TYPE_OFFSET_DELTA, m->delta_len);
 				if (err)
 					goto done;
 				nh += packoff(buf + nh,
@@ -1216,7 +1253,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				packfile_size += nh;
 			} else {
 				err = packhdr(&nh, buf, sizeof(buf),
-				    GOT_OBJ_TYPE_REF_DELTA, nd);
+				    GOT_OBJ_TYPE_REF_DELTA, m->delta_len);
 				err = hwrite(packfile, buf, nh, &ctx);
 				if (err)
 					goto done;
@@ -1226,6 +1263,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 				packfile_size += sizeof(m->prev->id.sha1);
 				if (err)
 					goto done;
+			}
+			if (fseeko(delta_file, 0L, SEEK_SET) == -1) {
+				err = got_error_from_errno("fseeko");
+				goto done;
 			}
 			err = got_deflate_to_file(&outlen, delta_file,
 			    packfile, &csum);
@@ -1267,6 +1308,7 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 	const struct got_error *err;
 	struct got_pack_meta **meta;
 	int nmeta;
+	FILE *delta_cache = NULL;
 
 	err = read_meta(&meta, &nmeta, theirs, ntheirs, ours, nours, repo,
 	    loose_obj_only, progress_cb, progress_arg, cancel_cb, cancel_arg);
@@ -1277,18 +1319,31 @@ got_pack_create(uint8_t *packsha1, FILE *packfile,
 		err = got_error(GOT_ERR_CANNOT_PACK);
 		goto done;
 	}
+
+	delta_cache = got_opentemp();
+	if (delta_cache == NULL) {
+		err = got_error_from_errno("got_opentemp");
+		goto done;
+	}
+
 	if (nmeta > 0) {
-		err = pick_deltas(meta, nmeta, nours, repo,
+		err = pick_deltas(meta, nmeta, nours, delta_cache, repo,
 		    progress_cb, progress_arg, cancel_cb, cancel_arg);
 		if (err)
 			goto done;
+		if (fseeko(delta_cache, 0L, SEEK_SET) == -1) {
+			err = got_error_from_errno("fseeko");
+			goto done;
+		}
 	}
 
-	err = genpack(packsha1, packfile, meta, nmeta, nours, 1, repo,
-	    progress_cb, progress_arg, cancel_cb, cancel_arg);
+	err = genpack(packsha1, packfile, delta_cache, meta, nmeta, nours, 1,
+	    repo, progress_cb, progress_arg, cancel_cb, cancel_arg);
 	if (err)
 		goto done;
 done:
 	free_nmeta(meta, nmeta);
+	if (delta_cache && fclose(delta_cache) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
 	return err;
 }
