@@ -547,7 +547,7 @@ top:
 		p = val + strlen(val) - 1;
 		lungetc(DONE_EXPAND);
 		while (p >= val) {
-			lungetc(*p);
+			lungetc((unsigned char)*p);
 			p--;
 		}
 		lungetc(START_EXPAND);
@@ -625,8 +625,8 @@ top:
 		} else {
 nodigits:
 			while (p > buf + 1)
-				lungetc(*--p);
-			c = *--p;
+				lungetc((unsigned char)*--p);
+			c = (unsigned char)*--p;
 			if (c == '-')
 				return (c);
 		}
