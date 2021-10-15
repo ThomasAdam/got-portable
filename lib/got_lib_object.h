@@ -106,7 +106,7 @@ const struct got_error *got_object_read_header_privsep(struct got_object **,
     struct got_object_id *, struct got_repository *, int);
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
-const struct got_error *got_object_raw_open(struct got_raw_object **,
+const struct got_error *got_object_raw_open(struct got_raw_object **, int,
     struct got_repository *, struct got_object_id *, size_t);
 void got_object_raw_rewind(struct got_raw_object *);
 size_t got_object_raw_get_hdrlen(struct got_raw_object *);

@@ -529,23 +529,18 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 }
 
 const struct got_error *
-got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
-    struct got_object_id *id, size_t blocksize)
+got_object_raw_open(struct got_raw_object **obj, int outfd,
+    struct got_repository *repo, struct got_object_id *id, size_t blocksize)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
 	int idx;
 	uint8_t *outbuf = NULL;
-	int outfd = -1;
 	off_t size = 0;
 	size_t hdrlen = 0;
 	char *path_packfile = NULL;
 
 	*obj = NULL;
-
-	outfd = got_opentempfd();
-	if (outfd == -1)
-		return got_error_from_errno("got_opentempfd");
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {
@@ -592,11 +587,6 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 	}
 
 	if (outbuf) {
-		if (close(outfd) == -1) {
-			err = got_error_from_errno("close");
-			goto done;
-		}
-		outfd = -1;
 		(*obj)->f = fmemopen(outbuf, hdrlen + size, "r");
 		if ((*obj)->f == NULL) {
 			err = got_error_from_errno("fdopen");
@@ -620,7 +610,6 @@ got_object_raw_open(struct got_raw_object **obj, struct got_repository *repo,
 			err = got_error_from_errno("fdopen");
 			goto done;
 		}
-		outfd = -1;
 		(*obj)->data = NULL;
 	}
 	(*obj)->hdrlen = hdrlen;
@@ -633,8 +622,6 @@ done:
 			got_object_raw_close(*obj);
 			*obj = NULL;
 		}
-		if (outfd != -1)
-			close(outfd);
 		free(outbuf);
 	}
 	return err;
