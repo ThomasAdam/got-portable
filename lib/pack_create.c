@@ -163,7 +163,90 @@ delta_size(struct got_delta_instruction *deltas, int ndeltas)
 static const struct got_error *
 encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
     struct got_delta_instruction *deltas, int ndeltas,
-    off_t base_size, FILE *f);
+    off_t base_size, FILE *f)
+{
+	unsigned char buf[16], *bp;
+	int i, j;
+	off_t n;
+	size_t w;
+	struct got_delta_instruction *d;
+
+	/* base object size */
+	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
+	n = base_size >> GOT_DELTA_SIZE_SHIFT;
+	for (i = 1; n > 0; i++) {
+		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
+		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
+		n >>= GOT_DELTA_SIZE_SHIFT;
+	}
+	w = fwrite(buf, 1, i, f);
+	if (w != i)
+		return got_ferror(f, GOT_ERR_IO);
+
+	/* target object size */
+	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
+	n = o->size >> GOT_DELTA_SIZE_SHIFT;
+	for (i = 1; n > 0; i++) {
+		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
+		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
+		n >>= GOT_DELTA_SIZE_SHIFT;
+	}
+	w = fwrite(buf, 1, i, f);
+	if (w != i)
+		return got_ferror(f, GOT_ERR_IO);
+
+	for (j = 0; j < ndeltas; j++) {
+		d = &deltas[j];
+		if (d->copy) {
+			n = d->offset;
+			bp = &buf[1];
+			buf[0] = GOT_DELTA_BASE_COPY;
+			for (i = 0; i < 4; i++) {
+				/* DELTA_COPY_OFF1 ... DELTA_COPY_OFF4 */
+				buf[0] |= 1 << i;
+				*bp++ = n & 0xff;
+				n >>= 8;
+				if (n == 0)
+					break;
+			}
+
+			n = d->len;
+			if (n != GOT_DELTA_COPY_DEFAULT_LEN) {
+				/* DELTA_COPY_LEN1 ... DELTA_COPY_LEN3 */
+				for (i = 0; i < 3 && n > 0; i++) {
+					buf[0] |= 1 << (i + 4);
+					*bp++ = n & 0xff;
+					n >>= 8;
+				}
+			}
+			w = fwrite(buf, 1, bp - buf, f);
+			if (w != bp - buf)
+				return got_ferror(f, GOT_ERR_IO);
+		} else {
+			char content[128];
+			size_t r;
+			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1)
+				return got_error_from_errno("fseeko");
+			n = 0;
+			while (n != d->len) {
+				buf[0] = (d->len - n < 127) ? d->len - n : 127;
+				w = fwrite(buf, 1, 1, f);
+				if (w != 1)
+					return got_ferror(f, GOT_ERR_IO);
+				r = fread(content, 1, buf[0], o->f);
+				if (r != buf[0])
+					return got_ferror(o->f, GOT_ERR_IO);
+				w = fwrite(content, 1, buf[0], f);
+				if (w != buf[0])
+					return got_ferror(f, GOT_ERR_IO);
+				n += buf[0];
+			}
+		}
+	}
+
+	return NULL;
+}
+
 
 static const struct got_error *
 pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
@@ -1025,93 +1108,6 @@ packhdr(int *hdrlen, char *hdr, size_t bufsize, int obj_type, size_t len)
 	}
 
 	*hdrlen = i;
-	return NULL;
-}
-
-static const struct got_error *
-encode_delta(struct got_pack_meta *m, struct got_raw_object *o,
-    struct got_delta_instruction *deltas, int ndeltas,
-    off_t base_size, FILE *f)
-{
-	unsigned char buf[16], *bp;
-	int i, j;
-	off_t n;
-	size_t w;
-	struct got_delta_instruction *d;
-
-	/* base object size */
-	buf[0] = base_size & GOT_DELTA_SIZE_VAL_MASK;
-	n = base_size >> GOT_DELTA_SIZE_SHIFT;
-	for (i = 1; n > 0; i++) {
-		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
-		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
-		n >>= GOT_DELTA_SIZE_SHIFT;
-	}
-	w = fwrite(buf, 1, i, f);
-	if (w != i)
-		return got_ferror(f, GOT_ERR_IO);
-
-	/* target object size */
-	buf[0] = o->size & GOT_DELTA_SIZE_VAL_MASK;
-	n = o->size >> GOT_DELTA_SIZE_SHIFT;
-	for (i = 1; n > 0; i++) {
-		buf[i - 1] |= GOT_DELTA_SIZE_MORE;
-		buf[i] = n & GOT_DELTA_SIZE_VAL_MASK;
-		n >>= GOT_DELTA_SIZE_SHIFT;
-	}
-	w = fwrite(buf, 1, i, f);
-	if (w != i)
-		return got_ferror(f, GOT_ERR_IO);
-
-	for (j = 0; j < ndeltas; j++) {
-		d = &deltas[j];
-		if (d->copy) {
-			n = d->offset;
-			bp = &buf[1];
-			buf[0] = GOT_DELTA_BASE_COPY;
-			for (i = 0; i < 4; i++) {
-				/* DELTA_COPY_OFF1 ... DELTA_COPY_OFF4 */
-				buf[0] |= 1 << i;
-				*bp++ = n & 0xff;
-				n >>= 8;
-				if (n == 0)
-					break;
-			}
-
-			n = d->len;
-			if (n != GOT_DELTA_COPY_DEFAULT_LEN) {
-				/* DELTA_COPY_LEN1 ... DELTA_COPY_LEN3 */
-				for (i = 0; i < 3 && n > 0; i++) {
-					buf[0] |= 1 << (i + 4);
-					*bp++ = n & 0xff;
-					n >>= 8;
-				}
-			}
-			w = fwrite(buf, 1, bp - buf, f);
-			if (w != bp - buf)
-				return got_ferror(f, GOT_ERR_IO);
-		} else {
-			char content[128];
-			size_t r;
-			if (fseeko(o->f, o->hdrlen + d->offset, SEEK_SET) == -1)
-				return got_error_from_errno("fseeko");
-			n = 0;
-			while (n != d->len) {
-				buf[0] = (d->len - n < 127) ? d->len - n : 127;
-				w = fwrite(buf, 1, 1, f);
-				if (w != 1)
-					return got_ferror(f, GOT_ERR_IO);
-				r = fread(content, 1, buf[0], o->f);
-				if (r != buf[0])
-					return got_ferror(o->f, GOT_ERR_IO);
-				w = fwrite(content, 1, buf[0], f);
-				if (w != buf[0])
-					return got_ferror(f, GOT_ERR_IO);
-				n += buf[0];
-			}
-		}
-	}
-
 	return NULL;
 }
 
