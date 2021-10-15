@@ -173,6 +173,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 	struct got_delta_instruction *deltas;
 	int i, j, size, ndeltas, best;
 	const int max_base_candidates = 10;
+	int outfd = -1;
 
 	qsort(meta, nmeta, sizeof(struct got_pack_meta *), delta_order_cmp);
 	for (i = 0; i < nmeta; i++) {
@@ -194,9 +195,18 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		    m->obj_type == GOT_OBJ_TYPE_TAG)
 			continue;
 
-		err = got_object_raw_open(&raw, repo, &m->id, 8192);
+		if (outfd == -1) {
+			outfd = got_opentempfd();
+			if (outfd == -1) {
+				err = got_error_from_errno("got_opentempfd");
+				goto done;
+			}
+		}
+		err = got_object_raw_open(&raw, outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
+		if (raw->data == NULL)
+			outfd = -1; /* outfd is now raw->f */
 		m->size = raw->size;
 
 		err = got_deltify_init(&m->dtab, raw->f, raw->hdrlen,
@@ -224,10 +234,20 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			    base->obj_type != m->obj_type)
 				continue;
 
-			err = got_object_raw_open(&base_raw, repo, &base->id,
-			    8192);
+			if (outfd == -1) {
+				outfd = got_opentempfd();
+				if (outfd == -1) {
+					err = got_error_from_errno(
+					    "got_opentempfd");
+					goto done;
+				}
+			}
+			err = got_object_raw_open(&base_raw, outfd, repo,
+			    &base->id, 8192);
 			if (err)
 				goto done;
+			if (base_raw->data == NULL)
+				outfd = -1; /* outfd is now base_raw->f */
 			err = got_deltify(&deltas, &ndeltas,
 			    raw->f, raw->hdrlen, raw->size + raw->hdrlen,
 			    base->dtab, base_raw->f, base_raw->hdrlen,
@@ -271,6 +291,8 @@ done:
 		got_object_raw_close(raw);
 	if (base_raw)
 		got_object_raw_close(base_raw);
+	if (outfd != -1 && close(outfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	return err;
 }
 
@@ -1129,6 +1151,7 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 	size_t outlen, n;
 	struct got_deflate_checksum csum;
 	off_t packfile_size = 0;
+	int outfd = -1;
 
 	SHA1Init(&ctx);
 	csum.output_sha1 = &ctx;
@@ -1155,9 +1178,18 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 		}
 		m = meta[i];
 		m->off = ftello(packfile);
-		err = got_object_raw_open(&raw, repo, &m->id, 8192);
+		if (outfd == -1) {
+			outfd = got_opentempfd();
+			if (outfd == -1) {
+				err = got_error_from_errno("got_opentempfd");
+				goto done;
+			}
+		}
+		err = got_object_raw_open(&raw, outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
+		if (raw->data == NULL)
+			outfd = -1; /* outfd is now raw->f */
 		if (m->deltas == NULL) {
 			err = packhdr(&nh, buf, sizeof(buf),
 			    m->obj_type, raw->size);
@@ -1249,6 +1281,8 @@ done:
 		err = got_error_from_errno("fclose");
 	if (raw)
 		got_object_raw_close(raw);
+	if (outfd != -1 && close(outfd) == -1 && err == NULL)
+		err = got_error_from_errno("close");
 	return err;
 }
 
