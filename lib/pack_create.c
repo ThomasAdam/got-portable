@@ -284,7 +284,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		    m->obj_type == GOT_OBJ_TYPE_TAG)
 			continue;
 
-		err = got_object_raw_open(&raw, &outfd, repo, &m->id);
+		err = got_object_raw_open(&raw, &outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
 		m->size = raw->size;
@@ -316,7 +316,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 				continue;
 
 			err = got_object_raw_open(&base_raw, &outfd, repo,
-			    &base->id);
+			    &base->id, 8192);
 			if (err)
 				goto done;
 			err = got_deltify(&deltas, &ndeltas,
@@ -1177,10 +1177,10 @@ genpack(uint8_t *pack_sha1, FILE *packfile, FILE *delta_cache,
 		}
 		m = meta[i];
 		m->off = ftello(packfile);
-		err = got_object_raw_open(&raw, &outfd, repo, &m->id);
+		err = got_object_raw_open(&raw, &outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
-		if (m->delta_len == 0) {
+		if (m->deltas == NULL) {
 			err = packhdr(&nh, buf, sizeof(buf),
 			    m->obj_type, raw->size);
 			if (err)

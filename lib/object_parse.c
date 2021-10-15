@@ -144,6 +144,7 @@ got_object_raw_close(struct got_raw_object *obj)
 			return NULL;
 	}
 
+	free(obj->read_buf);
 	if (obj->f != NULL && fclose(obj->f) == EOF && err == NULL)
 		err = got_error_from_errno("fclose");
 	free(obj->data);

@@ -531,7 +531,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 /* *outfd must be initialized to -1 by caller */
 const struct got_error *
 got_object_raw_open(struct got_raw_object **obj, int *outfd,
-    struct got_repository *repo, struct got_object_id *id)
+    struct got_repository *repo, struct got_object_id *id, size_t blocksize)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
@@ -620,6 +620,7 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 	}
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
+	(*obj)->blocksize = blocksize;
 	err = got_repo_cache_raw_object(repo, id, *obj);
 done:
 	free(path_packfile);
@@ -632,6 +633,37 @@ done:
 	} else
 		(*obj)->refcnt++;
 	return err;
+}
+
+void
+got_object_raw_rewind(struct got_raw_object *obj)
+{
+	if (obj->f)
+		rewind(obj->f);
+}
+
+size_t
+got_object_raw_get_hdrlen(struct got_raw_object *obj)
+{
+	return obj->hdrlen;
+}
+
+const uint8_t *
+got_object_raw_get_read_buf(struct got_raw_object *obj)
+{
+	return obj->read_buf;
+}
+
+const struct got_error *
+got_object_raw_read_block(size_t *outlenp, struct got_raw_object *obj)
+{
+	size_t n;
+
+	n = fread(obj->read_buf, 1, obj->blocksize, obj->f);
+	if (n == 0 && ferror(obj->f))
+		return got_ferror(obj->f, GOT_ERR_IO);
+	*outlenp = n;
+	return NULL;
 }
 
 const struct got_error *
