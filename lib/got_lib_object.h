@@ -40,8 +40,6 @@ struct got_raw_object {
 	uint8_t *data;
 	off_t size;
 	size_t hdrlen;
-	size_t blocksize;
-	uint8_t *read_buf;
 	int refcnt;		/* > 0 if open and/or cached */
 };
 
@@ -108,7 +106,7 @@ const struct got_error *got_object_read_header_privsep(struct got_object **,
 const struct got_error *got_object_open(struct got_object **,
     struct got_repository *, struct got_object_id *);
 const struct got_error *got_object_raw_open(struct got_raw_object **, int *,
-    struct got_repository *, struct got_object_id *, size_t);
+    struct got_repository *, struct got_object_id *);
 const struct got_error *got_object_raw_close(struct got_raw_object *);
 const struct got_error *got_object_open_by_id_str(struct got_object **,
     struct got_repository *, const char *);

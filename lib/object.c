@@ -531,7 +531,7 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 /* *outfd must be initialized to -1 by caller */
 const struct got_error *
 got_object_raw_open(struct got_raw_object **obj, int *outfd,
-    struct got_repository *repo, struct got_object_id *id, size_t blocksize)
+    struct got_repository *repo, struct got_object_id *id)
 {
 	const struct got_error *err = NULL;
 	struct got_packidx *packidx = NULL;
@@ -591,12 +591,6 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 		goto done;
 	}
 
-	(*obj)->read_buf = malloc(blocksize);
-	if ((*obj)->read_buf == NULL) {
-		err = got_error_from_errno("malloc");
-		goto done;
-	}
-
 	if (outbuf) {
 		(*obj)->f = fmemopen(outbuf, hdrlen + size, "r");
 		if ((*obj)->f == NULL) {
@@ -626,7 +620,6 @@ got_object_raw_open(struct got_raw_object **obj, int *outfd,
 	}
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
-	(*obj)->blocksize = blocksize;
 	err = got_repo_cache_raw_object(repo, id, *obj);
 done:
 	free(path_packfile);
