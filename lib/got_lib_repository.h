@@ -83,6 +83,7 @@ struct got_repository {
 	struct got_object_cache treecache;
 	struct got_object_cache commitcache;
 	struct got_object_cache tagcache;
+	struct got_object_cache rawcache;
 
 	/* Settings read from Git configuration files. */
 	int gitconfig_repository_format_version;
@@ -115,6 +116,10 @@ struct got_commit_object *got_repo_get_cached_commit(struct got_repository *,
 const struct got_error*got_repo_cache_tag(struct got_repository *,
     struct got_object_id *, struct got_tag_object *);
 struct got_tag_object *got_repo_get_cached_tag(struct got_repository *,
+    struct got_object_id *);
+const struct got_error*got_repo_cache_raw_object(struct got_repository *,
+    struct got_object_id *, struct got_raw_object *);
+struct got_raw_object *got_repo_get_cached_raw_object(struct got_repository *,
     struct got_object_id *);
 int got_repo_is_packidx_filename(const char *, size_t);
 const struct got_error *got_repo_search_packidx(struct got_packidx **, int *,

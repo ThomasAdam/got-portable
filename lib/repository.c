@@ -347,6 +347,33 @@ got_repo_get_cached_tag(struct got_repository *repo, struct got_object_id *id)
 	    &repo->tagcache, id);
 }
 
+const struct got_error *
+got_repo_cache_raw_object(struct got_repository *repo, struct got_object_id *id,
+    struct got_raw_object *raw)
+{
+#ifndef GOT_NO_OBJ_CACHE
+	const struct got_error *err = NULL;
+	err = got_object_cache_add(&repo->rawcache, id, raw);
+	if (err) {
+		if (err->code == GOT_ERR_OBJ_EXISTS ||
+		    err->code == GOT_ERR_OBJ_TOO_LARGE)
+			err = NULL;
+		return err;
+	}
+	raw->refcnt++;
+#endif
+	return NULL;
+}
+
+
+struct got_raw_object *
+got_repo_get_cached_raw_object(struct got_repository *repo,
+    struct got_object_id *id)
+{
+	return (struct got_raw_object *)got_object_cache_get(&repo->rawcache, id);
+}
+
+
 static const struct got_error *
 open_repo(struct got_repository *repo, const char *path)
 {
@@ -665,6 +692,10 @@ got_repo_open(struct got_repository **repop, const char *path,
 	    GOT_OBJECT_CACHE_TYPE_TAG);
 	if (err)
 		goto done;
+	err = got_object_cache_init(&repo->rawcache,
+	    GOT_OBJECT_CACHE_TYPE_RAW);
+	if (err)
+		goto done;
 
 	repo->pack_cache_size = GOT_PACK_CACHE_SIZE;
 	if (repo->pack_cache_size > rl.rlim_cur / 8)
@@ -761,6 +792,7 @@ got_repo_close(struct got_repository *repo)
 	got_object_cache_close(&repo->treecache);
 	got_object_cache_close(&repo->commitcache);
 	got_object_cache_close(&repo->tagcache);
+	got_object_cache_close(&repo->rawcache);
 
 	for (i = 0; i < nitems(repo->privsep_children); i++) {
 		if (repo->privsep_children[i].imsg_fd == -1)

@@ -195,18 +195,9 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 		    m->obj_type == GOT_OBJ_TYPE_TAG)
 			continue;
 
-		if (outfd == -1) {
-			outfd = got_opentempfd();
-			if (outfd == -1) {
-				err = got_error_from_errno("got_opentempfd");
-				goto done;
-			}
-		}
-		err = got_object_raw_open(&raw, outfd, repo, &m->id, 8192);
+		err = got_object_raw_open(&raw, &outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
-		if (raw->data == NULL)
-			outfd = -1; /* outfd is now raw->f */
 		m->size = raw->size;
 
 		err = got_deltify_init(&m->dtab, raw->f, raw->hdrlen,
@@ -234,20 +225,10 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			    base->obj_type != m->obj_type)
 				continue;
 
-			if (outfd == -1) {
-				outfd = got_opentempfd();
-				if (outfd == -1) {
-					err = got_error_from_errno(
-					    "got_opentempfd");
-					goto done;
-				}
-			}
-			err = got_object_raw_open(&base_raw, outfd, repo,
+			err = got_object_raw_open(&base_raw, &outfd, repo,
 			    &base->id, 8192);
 			if (err)
 				goto done;
-			if (base_raw->data == NULL)
-				outfd = -1; /* outfd is now base_raw->f */
 			err = got_deltify(&deltas, &ndeltas,
 			    raw->f, raw->hdrlen, raw->size + raw->hdrlen,
 			    base->dtab, base_raw->f, base_raw->hdrlen,
@@ -1178,18 +1159,9 @@ genpack(uint8_t *pack_sha1, FILE *packfile,
 		}
 		m = meta[i];
 		m->off = ftello(packfile);
-		if (outfd == -1) {
-			outfd = got_opentempfd();
-			if (outfd == -1) {
-				err = got_error_from_errno("got_opentempfd");
-				goto done;
-			}
-		}
-		err = got_object_raw_open(&raw, outfd, repo, &m->id, 8192);
+		err = got_object_raw_open(&raw, &outfd, repo, &m->id, 8192);
 		if (err)
 			goto done;
-		if (raw->data == NULL)
-			outfd = -1; /* outfd is now raw->f */
 		if (m->deltas == NULL) {
 			err = packhdr(&nh, buf, sizeof(buf),
 			    m->obj_type, raw->size);

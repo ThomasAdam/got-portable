@@ -528,8 +528,9 @@ got_object_open(struct got_object **obj, struct got_repository *repo,
 	return got_repo_cache_object(repo, id, *obj);
 }
 
+/* *outfd must be initialized to -1 by caller */
 const struct got_error *
-got_object_raw_open(struct got_raw_object **obj, int outfd,
+got_object_raw_open(struct got_raw_object **obj, int *outfd,
     struct got_repository *repo, struct got_object_id *id, size_t blocksize)
 {
 	const struct got_error *err = NULL;
@@ -540,7 +541,17 @@ got_object_raw_open(struct got_raw_object **obj, int outfd,
 	size_t hdrlen = 0;
 	char *path_packfile = NULL;
 
-	*obj = NULL;
+	*obj = got_repo_get_cached_raw_object(repo, id);
+	if (*obj != NULL) {
+		(*obj)->refcnt++;
+		return NULL;
+	}
+
+	if (*outfd == -1) {
+		*outfd = got_opentempfd();
+		if (*outfd == -1)
+			return got_error_from_errno("got_opentempfd");
+	}
 
 	err = got_repo_search_packidx(&packidx, &idx, repo, id);
 	if (err == NULL) {
@@ -559,7 +570,7 @@ got_object_raw_open(struct got_raw_object **obj, int outfd,
 				goto done;
 		}
 		err = read_packed_object_raw_privsep(&outbuf, &size, &hdrlen,
-		    outfd, pack, packidx, idx, id);
+		    *outfd, pack, packidx, idx, id);
 		if (err)
 			goto done;
 	} else if (err->code == GOT_ERR_NO_OBJ) {
@@ -568,7 +579,7 @@ got_object_raw_open(struct got_raw_object **obj, int outfd,
 		err = got_object_open_loose_fd(&fd, id, repo);
 		if (err)
 			goto done;
-		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, outfd,
+		err = read_object_raw_privsep(&outbuf, &size, &hdrlen, *outfd,
 		    id, repo, fd);
 		if (err)
 			goto done;
@@ -595,7 +606,7 @@ got_object_raw_open(struct got_raw_object **obj, int outfd,
 		(*obj)->data = outbuf;
 	} else {
 		struct stat sb;
-		if (fstat(outfd, &sb) == -1) {
+		if (fstat(*outfd, &sb) == -1) {
 			err = got_error_from_errno("fstat");
 			goto done;
 		}
@@ -605,16 +616,18 @@ got_object_raw_open(struct got_raw_object **obj, int outfd,
 			goto done;
 		}
 
-		(*obj)->f = fdopen(outfd, "r");
+		(*obj)->f = fdopen(*outfd, "r");
 		if ((*obj)->f == NULL) {
 			err = got_error_from_errno("fdopen");
 			goto done;
 		}
 		(*obj)->data = NULL;
+		*outfd = -1;
 	}
 	(*obj)->hdrlen = hdrlen;
 	(*obj)->size = size;
 	(*obj)->blocksize = blocksize;
+	err = got_repo_cache_raw_object(repo, id, *obj);
 done:
 	free(path_packfile);
 	if (err) {
@@ -623,7 +636,8 @@ done:
 			*obj = NULL;
 		}
 		free(outbuf);
-	}
+	} else
+		(*obj)->refcnt++;
 	return err;
 }
 
@@ -656,19 +670,6 @@ got_object_raw_read_block(size_t *outlenp, struct got_raw_object *obj)
 		return got_ferror(obj->f, GOT_ERR_IO);
 	*outlenp = n;
 	return NULL;
-}
-
-const struct got_error *
-got_object_raw_close(struct got_raw_object *obj)
-{
-	const struct got_error *err = NULL;
-
-	free(obj->read_buf);
-	if (obj->f != NULL && fclose(obj->f) == EOF && err == NULL)
-		err = got_error_from_errno("fclose");
-	free(obj->data);
-	free(obj);
-	return err;
 }
 
 const struct got_error *

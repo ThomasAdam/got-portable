@@ -133,6 +133,25 @@ got_object_close(struct got_object *obj)
 	free(obj);
 }
 
+const struct got_error *
+got_object_raw_close(struct got_raw_object *obj)
+{
+	const struct got_error *err = NULL;
+
+	if (obj->refcnt > 0) {
+		obj->refcnt--;
+		if (obj->refcnt > 0)
+			return NULL;
+	}
+
+	free(obj->read_buf);
+	if (obj->f != NULL && fclose(obj->f) == EOF && err == NULL)
+		err = got_error_from_errno("fclose");
+	free(obj->data);
+	free(obj);
+	return err;
+}
+
 void
 got_object_qid_free(struct got_object_qid *qid)
 {
