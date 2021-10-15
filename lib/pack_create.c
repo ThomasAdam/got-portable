@@ -221,7 +221,7 @@ pick_deltas(struct got_pack_meta **meta, int nmeta, int nours,
 			}
 			base = meta[j];
 			/* long chains make unpacking slow, avoid such bases */
-			if (base->nchain >= 128 ||
+			if (base->nchain >= 32 ||
 			    base->obj_type != m->obj_type)
 				continue;
 
