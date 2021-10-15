@@ -253,8 +253,11 @@ read_packed_object(struct got_pack *pack, struct got_indexed_object *obj,
 		SHA1Update(&ctx, header, headerlen);
 		if (obj->size > GOT_DELTA_RESULT_SIZE_CACHED_MAX) {
 			err = read_file_sha1(&ctx, tmpfile, datalen);
-			if (err)
+			if (err) {
+				free(header);
+				free(data);
 				break;
+			}
 		} else
 			SHA1Update(&ctx, data, datalen);
 		SHA1Final(obj->id.sha1, &ctx);
