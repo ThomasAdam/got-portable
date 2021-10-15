@@ -96,7 +96,9 @@ regress-fetch:
 		$(top_srcdir)/lib/fetch.c \
 		$(top_srcdir)/lib/gotconfig.c \
 		$(top_srcdir)/lib/dial.c \
-		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) && \
+		$(top_srcdir)/lib/bloom.c \
+		$(top_srcdir)/lib/murmurhash2.c \
+		-L$(top_builddir)/compat -lopenbsd-compat $(LIBS) -lm && \
 			$(top_builddir)/regress/fetch/fetch_test
 
 regress-idset:
