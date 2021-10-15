@@ -41,7 +41,9 @@ tog_SOURCES = tog.c \
 	$(top_srcdir)/lib/diff_output_edscript.c \
 	$(top_srcdir)/lib/diff_patience.c \
 	$(top_srcdir)/lib/utf8.c \
-	$(top_srcdir)/lib/dial.c
+	$(top_srcdir)/lib/dial.c \
+	$(top_srcdir)/lib/bloom.c \
+	$(top_srcdir)/lib/murmurhash2.c
 
 tog_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 
@@ -49,7 +51,7 @@ man1_MANS = tog.1
 
 EXTRA_DIST = tog.1
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lpthread
+LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lpthread -lm
 if HOST_FREEBSD
 LDADD += -lmd
 endif

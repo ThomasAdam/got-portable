@@ -24,14 +24,16 @@ gotadmin_SOURCES = gotadmin.c \
        $(top_srcdir)/lib/reference.c \
        $(top_srcdir)/lib/repository.c \
        $(top_srcdir)/lib/repository_admin.c \
-       $(top_srcdir)/lib/sha1.c
+       $(top_srcdir)/lib/sha1.c \
+       $(top_srcdir)/lib/bloom.c \
+       $(top_srcdir)/lib/murmurhash2.c
 
 gotadmin_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 EXTRA_DIST = gotadmin.1
 
 man1_MANS = gotadmin.1
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat
+LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
 if HOST_FREEBSD
 LDADD += -lmd
 endif

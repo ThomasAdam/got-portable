@@ -43,7 +43,9 @@ got_SOURCES = got.c \
 	$(top_srcdir)/lib/send.c \
 	$(top_srcdir)/lib/deltify.c \
 	$(top_srcdir)/lib/pack_create.c \
-	$(top_srcdir)/lib/dial.c
+	$(top_srcdir)/lib/dial.c \
+	$(top_srcdir)/lib/bloom.c \
+	$(top_srcdir)/lib/murmurhash2.c
 
 EXTRA_DIST = $(top_srcdir)/compat/*.[ch] \
 	     $(top_srcdir)/lib/*.[ch] \
@@ -55,7 +57,7 @@ got_DEPENDENCIES = $(top_builddir)/compat/libopenbsd-compat.a
 man1_MANS = got.1
 man5_MANS = got.conf.5 git-repository.5 got-worktree.5
 
-LDADD = -L$(top_builddir)/compat -lopenbsd-compat
+LDADD = -L$(top_builddir)/compat -lopenbsd-compat -lm
 if HOST_FREEBSD
 LDADD += -lmd
 endif
